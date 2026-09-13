@@ -6,12 +6,7 @@ This document describes the automated weekly proactive audit pipeline and mutati
 
 ## 1. Setup & Requirements
 
-### Einmaliges Erstellen des Labels `jules-audit`
-Falls das Label `jules-audit` im Repository noch nicht existiert, erstelle es einmalig per `gh`-CLI:
-
-```bash
-gh label create jules-audit --description "Automatisch generierter Jules-Audit-Auftrag" --color FBCA04
-```
+*(Hinweis: Das Label `jules-audit` ist historisch und wird im automatisierten Workflow nicht mehr aktiv verwendet, da Audit-Aufträge nun als Repository-Artefakt via PR übermittelt werden.)*
 
 ---
 
@@ -23,8 +18,10 @@ Er besteht aus zwei unabhängigen Jobs:
 
 ### Job 1: `prepare-audit-context`
 - Sammelt alle Commit-Logs der letzten 7 Tage (`git log --since="7 days ago" --oneline --no-merges`).
-- Erstellt automatisch ein GitHub-Issue mit dem Titel `Proaktiv-Audit YYYY-MM-DD` und den Labels `jules-audit`, `automated`.
-- Der Issue-Text verweist strikt auf `.jules/AUDIT_INTAKE_PROTOCOL.md` und fordert die Prüfung auf:
+- Prüft vor Erstellung, ob bereits eine unbearbeitete `.jules/pending-audit-task.md` existiert (Fehler, falls existiert und nicht mit `STATUS: DONE` markiert).
+- Erstellt/überschreibt die Datei `.jules/pending-audit-task.md` mit dem Header (`STATUS: PENDING`, `CREATED: YYYY-MM-DD`), dem Auftragstext und den Commits der letzten 7 Tage.
+- Öffnet automatisch einen Pull Request gegen `main` auf dem Branch `automated/weekly-audit-task` via `peter-evans/create-pull-request@v7`.
+- Der Auftragstext verweist strikt auf `.jules/AUDIT_INTAKE_PROTOCOL.md` und fordert die Prüfung auf:
   1. Race Conditions / TOCTOU-Fehler
   2. Neue `.unwrap()` / `.expect()` außerhalb der Baseline (`.unwrap-baseline.json`)
   3. Silent-Failure-Pattern (`let _ = ...` bei I/O-Operationen)
@@ -41,26 +38,16 @@ Er besteht aus zwei unabhängigen Jobs:
 
 ---
 
-## 3. Workflow für die Bearbeitung (ChatOps / Escalation)
+## 3. Workflow für die Bearbeitung (Artefakt-Handoff)
 
-Da kein direkter Jules-GitHub-App-Webhook automatisch ohne Zuweisung reagiert:
-1. Mensch/Operator erhält Benachrichtigung über das neue Issue mit Label `jules-audit`.
-2. Zuweisung an Jules via Issue-Kommentar: `@google-jules löse das Problem` (oder Übergabe des Issue-Inhalts in den Jules-Prompt).
+Statt manueller Issue-Zuweisung wird der Audit-Auftrag direkt als Artefakt im Repository verarbeitet:
+1. Der automatische PR mit Branch `automated/weekly-audit-task` wird gemergt.
+2. Eine neue Jules-Session findet beim regulären Bootstrap die Datei `.jules/pending-audit-task.md` vor.
 3. Jules arbeitet den Auftrag gemäß `.jules/AUDIT_INTAKE_PROTOCOL.md` ab.
+4. Nach Abschluss (oder wenn kein Fund verifiziert werden kann) wird der Header der Datei `.jules/pending-audit-task.md` auf `STATUS: DONE` gesetzt.
 
 ---
 
 ## Audit-Workflow v2 (nach Review 2026-09)
 
-1. Automatisches Audit-Issue wird wie bisher erstellt.
-2. Agent führt statische Analyse durch und erstellt Draft-Report.
-3. **NEU: Draft-Report darf NICHT selbst als VERIFIED markiert werden.**
-   Der Status bleibt auf DRAFT, bis Schritt 4 abgeschlossen ist.
-4. **NEU: Stichproben-Pflicht.** Jeder Audit-Zyklus muss mindestens
-   EINEN der folgenden menschlichen Review-Schritte enthalten:
-   a) Manuelle Code-Review des Reports durch einen Menschen, ODER
-   b) Cross-Crate-Invarianten-Test durch einen zweiten Agenten mit
-      separatem System-Prompt (anderer Kontext, kein Zugriff auf
-      den Draft-Report des ersten Agenten), ODER
-   c) Externes Fuzzing-/Property-Test-Ergebnis als Gate.
-5. Status "VERIFIED" darf nur gesetzt werden wenn Schritt 4 belegt ist.
+Siehe `.jules/AUDIT_INTAKE_PROTOCOL.md` Abschnitt "Verdict-Unabhängigkeitspflicht (Audit-Workflow v2)" — dort kanonisch definiert.

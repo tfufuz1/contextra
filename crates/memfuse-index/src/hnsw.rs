@@ -140,7 +140,7 @@ impl HnswConfig {
             ));
         }
         // ANCHOR[ALG-FIX:D2-003] STATUS:DONE (TS:2026-06-01T00:00:00Z) — ef_construction < M Guard fehlt
-        // INVARIANTE: ef_construction >= M (INV-HNSW-1)
+        // INVARIANTE: ef_construction >= M (INV-HNSW-1): Konfigurationsvalidierung erzwingt ef_construction >= m.
         if self.ef_construction < self.m {
             return Err(MemFuseError::invalid_input(format!(
                 "ef_construction ({}) must be >= m ({})",
@@ -508,6 +508,7 @@ impl HnswIndex {
                 nodes: &nodes,
                 mmap: mmap_guard.as_ref(),
                 mmap_node_count,
+                prior_prepared: &[],
             };
 
             let factor = if self.inner.config.quantize { 4 } else { 2 };
@@ -1044,11 +1045,93 @@ impl HnswIndex {
     }
 }
 
-/// Helper for hybrid resolution of nodes (RAM vs Mmap).
+#[cfg(test)]
+pub static FAIL_HNSW_COMPUTE_INSERT_COUNT: AtomicU64 = AtomicU64::new(0);
+#[cfg(test)]
+pub static FAIL_HNSW_COMPUTE_INSERT_TARGET: AtomicU64 = AtomicU64::new(0);
+
+/// Prepared insert operation containing all fallible calculations prior to state mutation.
+#[derive(Debug)]
+pub struct PreparedInsert {
+    pub doc_id: DocId,
+    pub vector_data: VectorData,
+    pub new_layer: usize,
+    pub new_idx: usize,
+    pub final_connections: Vec<Vec<u32>>,
+    pub neighbor_backlinks: Vec<NeighborBacklink>,
+    pub should_update_entry_point: bool,
+    pub should_update_ram_entry_point: bool,
+}
+
+/// Back-link connection update for a neighbor node at a specific layer.
+#[derive(Debug)]
+pub struct NeighborBacklink {
+    pub neighbor_ram_idx: usize,
+    pub layer: usize,
+    pub updated_connections: Vec<u32>,
+}
+
+/// Batch tracking context for running state across multi-operation transaction commits.
+#[derive(Debug)]
+pub struct BatchContext {
+    pub running_max_layer: usize,
+    pub has_entry_point: bool,
+    pub has_ram_entry_point: bool,
+}
+
+impl BatchContext {
+    pub fn new(core: &HnswIndexCore) -> Self {
+        Self {
+            running_max_layer: core.max_layer.load(Ordering::SeqCst) as usize,
+            has_entry_point: core.entry_point.read().is_some(),
+            has_ram_entry_point: core.ram_entry_point.read().is_some(),
+        }
+    }
+}
+
+fn get_neighbor_conns_in_batch(
+    neighbor_idx: usize,
+    layer: usize,
+    base_batch_idx: usize,
+    mmap_node_count: usize,
+    nodes_read: &[HnswNode],
+    prior_prepared: &[PreparedInsert],
+) -> Vec<u32> {
+    if neighbor_idx >= base_batch_idx {
+        let offset = neighbor_idx - base_batch_idx;
+        return prior_prepared
+            .get(offset)
+            .and_then(|p| p.final_connections.get(layer))
+            .cloned()
+            .unwrap_or_default();
+    }
+
+    if neighbor_idx < mmap_node_count {
+        return Vec::new();
+    }
+
+    let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+    for prepared in prior_prepared.iter().rev() {
+        for bl in prepared.neighbor_backlinks.iter().rev() {
+            if bl.neighbor_ram_idx == neighbor_ram_idx && bl.layer == layer {
+                return bl.updated_connections.clone();
+            }
+        }
+    }
+
+    nodes_read
+        .get(neighbor_ram_idx)
+        .and_then(|node| node.connections.get(layer))
+        .map(|v| v.read().clone())
+        .unwrap_or_default()
+}
+
+/// Helper for hybrid resolution of nodes (RAM vs Mmap, plus in-flight batch prepared inserts).
 struct SearchContext<'a> {
     nodes: &'a [HnswNode],
     mmap: Option<&'a crate::persistence::MmapIndex>,
     mmap_node_count: usize,
+    prior_prepared: &'a [PreparedInsert],
 }
 
 /// Liefert den aktuellen Rebuild-Status des Index.
@@ -1189,6 +1272,13 @@ impl HnswIndexCore {
         query_q: Option<&[u8]>,
         ctx: &SearchContext,
     ) -> Result<f32> {
+        let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
+        if idx >= base_batch_idx {
+            let prepared_offset = idx - base_batch_idx;
+            if let Some(prepared) = ctx.prior_prepared.get(prepared_offset) {
+                return self.compute_distance_with_data(query, query_q, &prepared.vector_data);
+            }
+        }
         if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
                 let record = mmap.get_node_record(idx)?;
@@ -1206,30 +1296,65 @@ impl HnswIndexCore {
         layer: usize,
         ctx: &'a SearchContext,
     ) -> Result<Cow<'a, [u32]>> {
+        let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
+        if idx >= base_batch_idx {
+            let prepared_offset = idx - base_batch_idx;
+            if let Some(prepared) = ctx.prior_prepared.get(prepared_offset) {
+                let conns = prepared
+                    .final_connections
+                    .get(layer)
+                    .cloned()
+                    .unwrap_or_default();
+                return Ok(Cow::Owned(conns));
+            }
+        }
+
         if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
                 let record = mmap.get_node_record(idx)?;
                 return Ok(Cow::Owned(mmap.get_connections(&record, layer)?));
             }
             let ram_idx = idx - ctx.mmap_node_count;
-            return Ok(Cow::Owned(
-                ctx.nodes[ram_idx]
-                    .connections
-                    .get(layer)
-                    .map(|v| v.read().clone())
-                    .unwrap_or_default(),
-            ));
-        }
-        Ok(Cow::Owned(
-            ctx.nodes[idx]
+            let conns = ctx.nodes[ram_idx]
                 .connections
                 .get(layer)
                 .map(|v| v.read().clone())
-                .unwrap_or_default(),
-        ))
+                .unwrap_or_default();
+
+            for prepared in ctx.prior_prepared.iter().rev() {
+                for bl in prepared.neighbor_backlinks.iter().rev() {
+                    if bl.neighbor_ram_idx == ram_idx && bl.layer == layer {
+                        return Ok(Cow::Owned(bl.updated_connections.clone()));
+                    }
+                }
+            }
+            return Ok(Cow::Owned(conns));
+        }
+
+        let conns = ctx.nodes[idx]
+            .connections
+            .get(layer)
+            .map(|v| v.read().clone())
+            .unwrap_or_default();
+
+        for prepared in ctx.prior_prepared.iter().rev() {
+            for bl in prepared.neighbor_backlinks.iter().rev() {
+                if bl.neighbor_ram_idx == idx && bl.layer == layer {
+                    return Ok(Cow::Owned(bl.updated_connections.clone()));
+                }
+            }
+        }
+        Ok(Cow::Owned(conns))
     }
 
     fn resolve_doc_id(&self, idx: usize, ctx: &SearchContext) -> Result<DocId> {
+        let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
+        if idx >= base_batch_idx {
+            let prepared_offset = idx - base_batch_idx;
+            if let Some(prepared) = ctx.prior_prepared.get(prepared_offset) {
+                return Ok(prepared.doc_id);
+            }
+        }
         if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
                 let record = mmap.get_node_record(idx)?;
@@ -1249,6 +1374,18 @@ impl HnswIndexCore {
         ef: usize,
         layer: usize,
     ) -> Result<Vec<Candidate>> {
+        self.search_layer_with_context(query, query_quantized, entry_points, ef, layer, &[])
+    }
+
+    fn search_layer_with_context(
+        &self,
+        query: &[f32],
+        query_quantized: Option<&[u8]>,
+        entry_points: &[usize],
+        ef: usize,
+        layer: usize,
+        prior_prepared: &[PreparedInsert],
+    ) -> Result<Vec<Candidate>> {
         let nodes_guard = self.nodes.read();
         let mmap_guard = self.mmap_index.read();
         let mmap_node_count = mmap_guard
@@ -1260,6 +1397,7 @@ impl HnswIndexCore {
             nodes: &nodes_guard,
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
+            prior_prepared,
         };
 
         let mut visited = AHashSet::new();
@@ -1371,45 +1509,111 @@ impl HnswIndexCore {
         Ok(vec)
     }
 
+    fn resolve_vector_data_with_batch(
+        &self,
+        idx: usize,
+        ctx: &SearchContext,
+        pending_idx: usize,
+        pending_vector: &VectorData,
+        prior_prepared: &[PreparedInsert],
+    ) -> Result<VectorData> {
+        if idx == pending_idx {
+            return Ok(pending_vector.clone());
+        }
+
+        let ram_nodes_count = ctx.nodes.len();
+        let base_batch_idx = ctx.mmap_node_count + ram_nodes_count;
+
+        if idx >= base_batch_idx {
+            let prepared_offset = idx - base_batch_idx;
+            if let Some(prepared) = prior_prepared.get(prepared_offset) {
+                return Ok(prepared.vector_data.clone());
+            }
+        }
+
+        if let Some(mmap) = ctx.mmap {
+            if idx < ctx.mmap_node_count {
+                let record = mmap.get_node_record(idx)?;
+                let bytes = mmap.get_vector(&record)?;
+                return if mmap.header.is_quantized() {
+                    Ok(VectorData::U8(bytes.to_vec()))
+                } else {
+                    let mut v = vec![0.0f32; self.config.dimension];
+                    for i in 0..self.config.dimension {
+                        v[i] = f32::from_le_bytes(
+                            bytes[i * 4..(i + 1) * 4]
+                                .try_into()
+                                .map_err(|_| MemFuseError::Index("Corrupt f32 in mmap vector".into()))?,
+                        );
+                    }
+                    Ok(VectorData::F32(v))
+                };
+            }
+            return Ok(ctx.nodes[idx - ctx.mmap_node_count].vector.clone());
+        }
+
+        if idx < ctx.nodes.len() {
+            return Ok(ctx.nodes[idx].vector.clone());
+        }
+
+        Err(MemFuseError::Index(format!(
+            "Invalid node index {} in resolve_vector_data_with_batch",
+            idx
+        )))
+    }
+
+    fn compute_symmetric_distance_hybrid_with_batch(
+        &self,
+        idx_a: usize,
+        idx_b: usize,
+        ctx: &SearchContext,
+        pending_idx: usize,
+        pending_vector: &VectorData,
+        prior_prepared: &[PreparedInsert],
+    ) -> Result<f32> {
+        let data_a = self.resolve_vector_data_with_batch(
+            idx_a,
+            ctx,
+            pending_idx,
+            pending_vector,
+            prior_prepared,
+        )?;
+        let data_b = self.resolve_vector_data_with_batch(
+            idx_b,
+            ctx,
+            pending_idx,
+            pending_vector,
+            prior_prepared,
+        )?;
+        self.compute_symmetric_distance(&data_a, &data_b)
+    }
+
+    #[allow(dead_code)]
     fn compute_symmetric_distance_hybrid(
         &self,
         idx_a: usize,
         idx_b: usize,
         ctx: &SearchContext,
     ) -> Result<f32> {
-        let get_vector_data = |idx: usize| -> Result<VectorData> {
-            if let Some(mmap) = ctx.mmap {
-                if idx < ctx.mmap_node_count {
-                    let record = mmap.get_node_record(idx)?;
-                    let bytes = mmap.get_vector(&record)?;
-                    return if mmap.header.is_quantized() {
-                        Ok(VectorData::U8(bytes.to_vec()))
-                    } else {
-                        let mut v = vec![0.0f32; self.config.dimension];
-                        for i in 0..self.config.dimension {
-                            v[i] =
-                                f32::from_le_bytes(bytes[i * 4..(i + 1) * 4].try_into().map_err(
-                                    |_| MemFuseError::Index("Corrupt f32 in mmap vector".into()),
-                                )?);
-                        }
-                        Ok(VectorData::F32(v))
-                    };
-                }
-                return Ok(ctx.nodes[idx - ctx.mmap_node_count].vector.clone());
-            }
-            Ok(ctx.nodes[idx].vector.clone())
-        };
-
-        let data_a = get_vector_data(idx_a)?;
-        let data_b = get_vector_data(idx_b)?;
-        self.compute_symmetric_distance(&data_a, &data_b)
+        let dummy = VectorData::F32(Vec::new());
+        self.compute_symmetric_distance_hybrid_with_batch(
+            idx_a,
+            idx_b,
+            ctx,
+            usize::MAX,
+            &dummy,
+            &[],
+        )
     }
 
-    fn select_neighbors_heuristic(
+    fn select_neighbors_heuristic_with_batch(
         &self,
         ctx: &SearchContext,
         candidates: &[Candidate],
         m: usize,
+        pending_idx: usize,
+        pending_vector: &VectorData,
+        prior_prepared: &[PreparedInsert],
     ) -> Result<Vec<u32>> {
         if candidates.is_empty() {
             return Ok(Vec::new());
@@ -1445,8 +1649,14 @@ impl HnswIndexCore {
             }
             let mut keep = true;
             for selected in &result {
-                let dist_between =
-                    self.compute_symmetric_distance_hybrid(closest.index, selected.index, ctx)?;
+                let dist_between = self.compute_symmetric_distance_hybrid_with_batch(
+                    closest.index,
+                    selected.index,
+                    ctx,
+                    pending_idx,
+                    pending_vector,
+                    prior_prepared,
+                )?;
 
                 // Hartes Pruning bei Standard-F32, dynamisches Pruning bei SQ8
                 if closest.distance > dist_between * (1.0 + relaxation) {
@@ -1485,7 +1695,50 @@ impl HnswIndexCore {
         Ok(result.iter().map(|c| c.index as u32).collect())
     }
 
-    fn do_insert(&self, id: DocId, vector: &[f32]) -> Result<()> {
+    #[allow(dead_code)]
+    fn select_neighbors_heuristic(
+        &self,
+        ctx: &SearchContext,
+        candidates: &[Candidate],
+        m: usize,
+    ) -> Result<Vec<u32>> {
+        let dummy = VectorData::F32(Vec::new());
+        self.select_neighbors_heuristic_with_batch(
+            ctx,
+            candidates,
+            m,
+            usize::MAX,
+            &dummy,
+            &[],
+        )
+    }
+
+    pub fn compute_insert(&self, id: DocId, vector: &[f32]) -> Result<PreparedInsert> {
+        let mut batch_ctx = BatchContext::new(self);
+        self.compute_insert_with_context(id, vector, 0, &mut [], &mut batch_ctx)
+    }
+
+    pub fn compute_insert_with_context(
+        &self,
+        id: DocId,
+        vector: &[f32],
+        offset: usize,
+        prior_prepared: &mut [PreparedInsert],
+        batch_ctx: &mut BatchContext,
+    ) -> Result<PreparedInsert> {
+        #[cfg(test)]
+        {
+            let target = FAIL_HNSW_COMPUTE_INSERT_TARGET.load(Ordering::SeqCst);
+            if target > 0 {
+                let current = FAIL_HNSW_COMPUTE_INSERT_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+                if current == target {
+                    return Err(MemFuseError::Index(
+                        "Fault injection: compute_insert simulated failure".into(),
+                    ));
+                }
+            }
+        }
+
         if vector.len() != self.config.dimension {
             return Err(MemFuseError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
@@ -1520,7 +1773,6 @@ impl HnswIndexCore {
 
         let new_layer = self.random_layer();
         let entry_point_opt = *self.entry_point.read();
-        let current_max_layer = self.max_layer.load(Ordering::SeqCst) as usize;
 
         let mmap_node_count = self
             .mmap_index
@@ -1529,194 +1781,273 @@ impl HnswIndexCore {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
-        let new_idx = {
-            let mut nodes = self.nodes.write();
-            let idx = nodes.len();
-            let mut conns = Vec::with_capacity(new_layer + 1);
-            for _ in 0..=new_layer {
-                conns.push(RwLock::new(Vec::new()));
-            }
-            nodes.push(HnswNode {
-                doc_id: id,
-                vector: vector_data,
-                connections: conns,
-                max_layer: new_layer,
-                committed_tx: 0,
-            });
-            mmap_node_count + idx
-        };
-
-        self.doc_to_node.write().insert(id.inner(), new_idx);
+        let nodes_read = self.nodes.read();
+        let ram_nodes_count = nodes_read.len();
+        let new_idx = mmap_node_count + ram_nodes_count + offset;
 
         let query_quantized: Option<Vec<u8>> = None;
 
-        let (_ep, final_connections) = {
-            let nodes_read = self.nodes.read();
-            let mmap_guard = self.mmap_index.read();
-            let mmap_node_count = mmap_guard
-                .as_ref()
-                .map(|m| m.header.node_count() as usize)
-                .unwrap_or(0);
-            let ctx = SearchContext {
-                nodes: &nodes_read,
-                mmap: mmap_guard.as_ref(),
-                mmap_node_count,
-            };
+        let mmap_guard = self.mmap_index.read();
 
-            // If no entry point, we already returned after setting it.
-            // But we need to handle the case where it was set but we didn't capture ep_idx.
-            let mut ep = Vec::new();
-            if let Some(global_ep) = entry_point_opt {
-                ep.push(global_ep);
+        let mut ep = Vec::new();
+        let mut batch_global_ep = None;
+        let mut batch_ram_ep = None;
+
+        for prepared in &*prior_prepared {
+            if prepared.should_update_entry_point {
+                batch_global_ep = Some(prepared.new_idx);
             }
-            if let Some(ram_ep) = *self.ram_entry_point.read() {
+            if prepared.should_update_ram_entry_point {
+                batch_ram_ep = Some(prepared.new_idx);
+            }
+        }
+
+        if let Some(b_ep) = batch_global_ep {
+            ep.push(b_ep);
+        } else if let Some(global_ep) = entry_point_opt {
+            ep.push(global_ep);
+        }
+
+        if let Some(b_ram_ep) = batch_ram_ep {
+            if !ep.contains(&b_ram_ep) {
+                ep.push(b_ram_ep);
+            }
+        } else if let Some(ram_ep) = *self.ram_entry_point.read() {
+            if !ep.contains(&ram_ep) {
+                ep.push(ram_ep);
+            }
+        }
+
+        if ep.is_empty() {
+            let should_update_entry_point =
+                !batch_ctx.has_entry_point || new_layer > batch_ctx.running_max_layer;
+            let should_update_ram_entry_point =
+                !batch_ctx.has_ram_entry_point || new_layer > batch_ctx.running_max_layer;
+
+            if should_update_entry_point {
+                batch_ctx.running_max_layer = new_layer;
+                batch_ctx.has_entry_point = true;
+            }
+            if should_update_ram_entry_point {
+                batch_ctx.has_ram_entry_point = true;
+            }
+
+            return Ok(PreparedInsert {
+                doc_id: id,
+                vector_data,
+                new_layer,
+                new_idx,
+                final_connections: vec![vec![]; new_layer + 1],
+                neighbor_backlinks: Vec::new(),
+                should_update_entry_point,
+                should_update_ram_entry_point,
+            });
+        }
+
+        let current_max_layer = batch_ctx.running_max_layer;
+
+        for layer in (new_layer + 1..=current_max_layer).rev() {
+            let best = self.search_layer_with_context(
+                vector,
+                query_quantized.as_deref(),
+                &ep,
+                1,
+                layer,
+                prior_prepared,
+            )?;
+            if let Some(closest) = best.first() {
+                ep = vec![closest.index];
+            }
+        }
+
+        let mut final_connections = vec![vec![]; new_layer + 1];
+
+        for layer in (0..=new_layer.min(current_max_layer)).rev() {
+            let ram_ep_candidate = batch_ram_ep.or_else(|| *self.ram_entry_point.read());
+            if let Some(ram_ep) = ram_ep_candidate {
                 if !ep.contains(&ram_ep) {
                     ep.push(ram_ep);
                 }
             }
-            if ep.is_empty() {
-                ep.push(new_idx);
-            }
 
-            for layer in (new_layer + 1..=current_max_layer).rev() {
-                let best = self.search_layer(vector, query_quantized.as_deref(), &ep, 1, layer)?;
-                if let Some(closest) = best.first() {
-                    ep = vec![closest.index];
+            let neighbors = self.search_layer_with_context(
+                vector,
+                query_quantized.as_deref(),
+                &ep,
+                self.config.ef_construction,
+                layer,
+                prior_prepared,
+            )?;
+            let ctx = SearchContext {
+                nodes: &nodes_read,
+                mmap: mmap_guard.as_ref(),
+                mmap_node_count,
+                prior_prepared,
+            };
+            let selected = self.select_neighbors_heuristic_with_batch(
+                &ctx,
+                &neighbors,
+                self.config.m,
+                new_idx,
+                &vector_data,
+                prior_prepared,
+            )?;
+            final_connections[layer] = selected;
+            ep = neighbors.iter().map(|c| c.index).collect();
+        }
+
+        let base_batch_idx = mmap_node_count + ram_nodes_count;
+        let mut neighbor_backlinks = Vec::new();
+
+        for layer in (0..=new_layer.min(current_max_layer)).rev() {
+            for &ni in &final_connections[layer] {
+                let neighbor_idx = ni as usize;
+
+                if neighbor_idx < mmap_node_count {
+                    continue;
                 }
-            }
 
-            // Before layer 0 (and other layers <= new_layer)
-            // We should ensure ep is fresh and includes ram_ep if we lost it during top-down
-            // But search_layer will continue from whatever ep we have.
-
-            let mut final_connections = vec![vec![]; new_layer + 1];
-
-            for layer in (0..=new_layer.min(current_max_layer)).rev() {
-                // For hybrid recall: re-add ram_ep at each layer if not present?
-                // Actually, let's just make sure we have it at the start of layer-by-layer search.
-                if let Some(ram_ep) = *self.ram_entry_point.read() {
-                    if !ep.contains(&ram_ep) {
-                        ep.push(ram_ep);
-                    }
-                }
-
-                let neighbors = self.search_layer(
-                    vector,
-                    query_quantized.as_deref(),
-                    &ep,
-                    self.config.ef_construction,
+                let existing_conns = get_neighbor_conns_in_batch(
+                    neighbor_idx,
                     layer,
-                )?;
-                let selected = self.select_neighbors_heuristic(&ctx, &neighbors, self.config.m)?;
-                final_connections[layer] = selected;
-                ep = neighbors.iter().map(|c| c.index).collect();
+                    base_batch_idx,
+                    mmap_node_count,
+                    &nodes_read,
+                    prior_prepared,
+                );
+
+                let mut conn_indices = existing_conns;
+                if !conn_indices.contains(&(new_idx as u32)) {
+                    conn_indices.push(new_idx as u32);
+                }
+
+                let selected = if conn_indices.len() > self.config.m * 2 {
+                    let mut conn_cands = Vec::with_capacity(conn_indices.len());
+                    for &idx_u32 in &conn_indices {
+                        let idx = idx_u32 as usize;
+                        let ctx = SearchContext {
+                            nodes: &nodes_read,
+                            mmap: mmap_guard.as_ref(),
+                            mmap_node_count,
+                            prior_prepared,
+                        };
+                        let dist = self.compute_symmetric_distance_hybrid_with_batch(
+                            idx,
+                            neighbor_idx,
+                            &ctx,
+                            new_idx,
+                            &vector_data,
+                            prior_prepared,
+                        )?;
+                        conn_cands.push(Candidate {
+                            index: idx,
+                            distance: dist,
+                        });
+                    }
+
+                    let ctx = SearchContext {
+                        nodes: &nodes_read,
+                        mmap: mmap_guard.as_ref(),
+                        mmap_node_count,
+                        prior_prepared,
+                    };
+                    self.select_neighbors_heuristic_with_batch(
+                        &ctx,
+                        &conn_cands,
+                        self.config.m * 2,
+                        new_idx,
+                        &vector_data,
+                        prior_prepared,
+                    )?
+                } else {
+                    conn_indices
+                };
+
+                if neighbor_idx >= base_batch_idx {
+                    let prepared_offset = neighbor_idx - base_batch_idx;
+                    if let Some(prep) = prior_prepared.get_mut(prepared_offset) {
+                        if prep.final_connections.len() > layer {
+                            prep.final_connections[layer] = selected;
+                        }
+                    }
+                } else {
+                    let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                    neighbor_backlinks.push(NeighborBacklink {
+                        neighbor_ram_idx,
+                        layer,
+                        updated_connections: selected,
+                    });
+                }
             }
-            (ep, final_connections)
+        }
+
+        let should_update_entry_point =
+            !batch_ctx.has_entry_point || new_layer > batch_ctx.running_max_layer;
+        let should_update_ram_entry_point =
+            !batch_ctx.has_ram_entry_point || new_layer > batch_ctx.running_max_layer;
+
+        if should_update_entry_point {
+            batch_ctx.running_max_layer = new_layer;
+            batch_ctx.has_entry_point = true;
+        }
+        if should_update_ram_entry_point {
+            batch_ctx.has_ram_entry_point = true;
+        }
+
+        Ok(PreparedInsert {
+            doc_id: id,
+            vector_data,
+            new_layer,
+            new_idx,
+            final_connections,
+            neighbor_backlinks,
+            should_update_entry_point,
+            should_update_ram_entry_point,
+        })
+    }
+
+    pub fn apply_insert(&self, prepared: PreparedInsert) {
+        let mut conns = Vec::with_capacity(prepared.final_connections.len());
+        for layer_conns in prepared.final_connections {
+            conns.push(RwLock::new(layer_conns));
+        }
+
+        let node = HnswNode {
+            doc_id: prepared.doc_id,
+            vector: prepared.vector_data,
+            connections: conns,
+            max_layer: prepared.new_layer,
+            committed_tx: 0,
         };
 
-        {
-            let mut nodes = self.nodes.write();
-            let mmap_guard = self.mmap_index.read();
-            let mmap_node_count = mmap_guard
-                .as_ref()
-                .map(|m| m.header.node_count() as usize)
-                .unwrap_or(0);
+        self.nodes.write().push(node);
+        self.doc_to_node
+            .write()
+            .insert(prepared.doc_id.inner(), prepared.new_idx);
 
-            if let Some(new_node) = nodes.get_mut(new_idx - mmap_node_count) {
-                let mut conns = Vec::with_capacity(final_connections.len());
-                for layer_conns in final_connections.iter() {
-                    conns.push(RwLock::new(layer_conns.clone()));
-                }
-                new_node.connections = conns;
-            } else {
-                return Err(MemFuseError::Index(format!(
-                    "HNSW new node missing at index {}",
-                    new_idx
-                )));
-            }
-
-            for layer in (0..=new_layer.min(current_max_layer)).rev() {
-                for &ni in &final_connections[layer] {
-                    let neighbor_idx = ni as usize;
-
-                    // SAFETY: Read-only mmap index.
-                    // We can only back-link to nodes that are in RAM.
-                    if neighbor_idx < mmap_node_count {
-                        continue;
-                    }
-
-                    // Scope for neighbor modification to release mutable borrow
-                    let (should_shrink, conn_indices) = {
-                        let neighbor_node = nodes
-                            .get_mut(neighbor_idx - mmap_node_count)
-                            .ok_or_else(|| {
-                                MemFuseError::Index(format!(
-                                    "HNSW neighbor node missing at RAM index {} (global {})",
-                                    neighbor_idx - mmap_node_count,
-                                    neighbor_idx
-                                ))
-                            })?;
-                        if let Some(conn_layer_lock) = neighbor_node.connections.get(layer) {
-                            let mut conn_layer = conn_layer_lock.write();
-                            conn_layer.push(new_idx as u32);
-                            if conn_layer.len() > self.config.m * 2 {
-                                (true, conn_layer.clone())
-                            } else {
-                                (false, vec![])
-                            }
-                        } else {
-                            (false, vec![])
-                        }
-                    };
-
-                    if should_shrink {
-                        let mut conn_cands = Vec::with_capacity(conn_indices.len());
-                        for &idx_u32 in conn_indices.iter() {
-                            let idx = idx_u32 as usize;
-                            let dist = {
-                                let ctx = SearchContext {
-                                    nodes: &nodes,
-                                    mmap: mmap_guard.as_ref(),
-                                    mmap_node_count,
-                                };
-                                self.compute_symmetric_distance_hybrid(idx, neighbor_idx, &ctx)?
-                            };
-                            conn_cands.push(Candidate {
-                                index: idx,
-                                distance: dist,
-                            });
-                        }
-                        let selected = {
-                            let ctx = SearchContext {
-                                nodes: &nodes,
-                                mmap: mmap_guard.as_ref(),
-                                mmap_node_count,
-                            };
-                            self.select_neighbors_heuristic(&ctx, &conn_cands, self.config.m * 2)?
-                        };
-
-                        if let Some(neighbor_node) = nodes.get_mut(neighbor_idx - mmap_node_count) {
-                            if let Some(cl) = neighbor_node.connections.get(layer) {
-                                *cl.write() = selected;
-                            }
-                        }
-                    }
+        let nodes = self.nodes.read();
+        for backlink in prepared.neighbor_backlinks {
+            if let Some(neighbor_node) = nodes.get(backlink.neighbor_ram_idx) {
+                if let Some(conn_layer_lock) = neighbor_node.connections.get(backlink.layer) {
+                    *conn_layer_lock.write() = backlink.updated_connections;
                 }
             }
         }
 
-        {
-            let mut ram_ep = self.ram_entry_point.write();
-            let mut ep_global = self.entry_point.write();
-            if ep_global.is_none() || new_layer > current_max_layer {
-                *ep_global = Some(new_idx);
-                self.max_layer.store(new_layer as u64, Ordering::SeqCst);
-            }
-            // For hybrid recall: track the best RAM node
-            if ram_ep.is_none() || new_layer >= (self.max_layer.load(Ordering::SeqCst) as usize) {
-                *ram_ep = Some(new_idx);
-            }
+        if prepared.should_update_entry_point {
+            *self.entry_point.write() = Some(prepared.new_idx);
+            self.max_layer
+                .store(prepared.new_layer as u64, Ordering::SeqCst);
         }
+
+        if prepared.should_update_ram_entry_point {
+            *self.ram_entry_point.write() = Some(prepared.new_idx);
+        }
+    }
+
+    fn do_insert(&self, id: DocId, vector: &[f32]) -> Result<()> {
+        let prepared = self.compute_insert(id, vector)?;
+        self.apply_insert(prepared);
         Ok(())
     }
 
@@ -1727,8 +2058,8 @@ impl HnswIndexCore {
             self.deleted_count.fetch_add(1, Ordering::SeqCst);
 
             // ANCHOR[ALG-FIX:D2-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Entry-Point-Aktualisierung nach Delete (INV-HNSW-4)
-            // Wenn der gelöschte Knoten der Entry-Point war, muss ein neuer
-            // Entry-Point gefunden werden. Strategie: Nachbar auf höchstem Layer.
+            // INVARIANTE (INV-HNSW-4): Wenn der gelöschte Knoten der aktuelle Entry-Point (oder RAM-Entry-Point) war,
+            // wird unter den verbleibenden nicht-gelöschten Knoten derjenige mit der höchsten Schicht (max_layer) als neuer Entry-Point gewählt.
             let mut ep = self.entry_point.write();
             let mut ram_ep = self.ram_entry_point.write();
 
@@ -2353,6 +2684,7 @@ impl VectorIndex for HnswIndex {
             nodes: &nodes,
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
+            prior_prepared: &[],
         };
 
         for c in candidates.iter() {
@@ -2474,17 +2806,27 @@ impl VectorIndex for HnswIndex {
             }
         }
 
-        let mut inserted_doc_ids = Vec::new();
+        // INVARIANTE: Compute-then-Commit Transaktionsatomarität:
+        // Phase 1: Compute all fallible operations for ALL ops in the transaction.
+        // Purely read-only with respect to self.inner.nodes and self.inner.doc_to_node.
+        let mut prepared_inserts = Vec::new();
+        let mut deletes_to_apply = Vec::new();
+        let mut batch_ctx = BatchContext::new(&self.inner);
 
         for op in &ops {
             match op {
                 IndexOp::Insert { doc_id, data } => {
-                    self.inner.do_insert(*doc_id, data)?;
-                    inserted_doc_ids.push(*doc_id);
+                    let prepared = self.inner.compute_insert_with_context(
+                        *doc_id,
+                        data,
+                        prepared_inserts.len(),
+                        &mut prepared_inserts,
+                        &mut batch_ctx,
+                    )?;
+                    prepared_inserts.push(prepared);
                 }
                 IndexOp::Delete { doc_id, .. } => {
-                    self.inner.do_delete(*doc_id)?;
-                    deleted_any = true;
+                    deletes_to_apply.push(*doc_id);
                 }
                 // AI-TAG[PANIC-SAFETY][CRITICAL] RESOLVED: AGT-INDEX-004 — IndexOp ist #[non_exhaustive]; neue Varianten (TS:2026-08-25T00:00:00Z)
                 // müssen hier explizit behandelt werden, bevor sie in den HNSW-Commit-Pfad gelangen.
@@ -2498,6 +2840,18 @@ impl VectorIndex for HnswIndex {
                     )));
                 }
             }
+        }
+
+        // Phase 2: Once ALL Phase 1 computations succeeded without error, apply infallible mutations.
+        let mut inserted_doc_ids = Vec::with_capacity(prepared_inserts.len());
+        for prepared in prepared_inserts {
+            inserted_doc_ids.push(prepared.doc_id);
+            self.inner.apply_insert(prepared);
+        }
+
+        for doc_id in deletes_to_apply {
+            self.inner.do_delete(doc_id)?;
+            deleted_any = true;
         }
 
         // Record ops into seq_log for search_at snapshot isolation
@@ -2668,6 +3022,7 @@ impl VectorIndex for HnswIndex {
             nodes: &nodes,
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
+            prior_prepared: &[],
         };
 
         let total_nodes = mmap_node_count + nodes.len();
@@ -4117,5 +4472,81 @@ mod tests {
         assert!(!active_docs.contains(&DocId::new(1)));
         assert!(!active_docs.contains(&DocId::new(2)));
         assert!(!active_docs.contains(&DocId::new(99)));
+    }
+
+    #[tokio::test]
+    async fn test_compute_then_commit_fault_injection_atomicity() {
+        let index = HnswIndex::try_new(test_config(4)).unwrap();
+
+        // 1. Insert baseline vectors in Tx 1
+        let tx1 = TxId::new(1);
+        index
+            .insert(tx1, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
+            .await
+            .unwrap();
+        index
+            .insert(tx1, DocId::new(2), &[0.0, 1.0, 0.0, 0.0])
+            .await
+            .unwrap();
+        index.commit(tx1).await.unwrap();
+
+        // Snapshot counts before batch commit
+        let initial_nodes_count = index.inner.nodes.read().len();
+        let initial_doc_map_count = index.inner.doc_to_node.read().len();
+        assert_eq!(initial_nodes_count, 2);
+        assert_eq!(initial_doc_map_count, 2);
+
+        // 2. Stage batch of 5 insert operations in Tx 2
+        let tx2 = TxId::new(2);
+        for i in 100..105u64 {
+            let vec = [i as f32, 0.5, 0.0, 0.0];
+            index.insert(tx2, DocId::new(i), &vec).await.unwrap();
+        }
+
+        // 3. Configure fault injection to fail on the 3rd element during Phase 1 compute
+        FAIL_HNSW_COMPUTE_INSERT_TARGET.store(3, Ordering::SeqCst);
+        FAIL_HNSW_COMPUTE_INSERT_COUNT.store(0, Ordering::SeqCst);
+
+        // 4. Commit must fail due to fault injection in Phase 1
+        let commit_res = index.commit(tx2).await;
+        assert!(
+            commit_res.is_err(),
+            "Commit must fail when fault injection triggers during compute_insert"
+        );
+        let err_msg = commit_res.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Fault injection"),
+            "Error message must contain fault injection notice: {}",
+            err_msg
+        );
+
+        // Reset fault injection static flags
+        FAIL_HNSW_COMPUTE_INSERT_TARGET.store(0, Ordering::SeqCst);
+        FAIL_HNSW_COMPUTE_INSERT_COUNT.store(0, Ordering::SeqCst);
+
+        // 5. Verify snapshot node and doc_to_node counts AFTER failed commit
+        let final_nodes_count = index.inner.nodes.read().len();
+        let final_doc_map_count = index.inner.doc_to_node.read().len();
+
+        assert_eq!(
+            initial_nodes_count, final_nodes_count,
+            "Nodes vector count must remain unchanged after failed commit (before: {}, after: {})",
+            initial_nodes_count, final_nodes_count
+        );
+        assert_eq!(
+            initial_doc_map_count, final_doc_map_count,
+            "doc_to_node map count must remain unchanged after failed commit (before: {}, after: {})",
+            initial_doc_map_count, final_doc_map_count
+        );
+
+        // Verify none of the transaction batch DocIds exist in doc_to_node
+        let doc_map = index.inner.doc_to_node.read();
+        for i in 100..105u64 {
+            assert!(
+                !doc_map.contains_key(&i),
+                "DocId {} from failed transaction must not exist in doc_to_node",
+                i
+            );
+        }
     }
 }

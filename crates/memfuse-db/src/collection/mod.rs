@@ -254,6 +254,8 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) insert_lock: Arc<tokio::sync::Mutex<()>>,
     pub(super) consolidation_guard: Arc<tokio::sync::Mutex<()>>,
     pub(super) kv_locks: Arc<kv_lock::KvKeyLocks>,
+    /// Optionaler tenant-isolierter KV-Cache-Store zur automatischen KV-Cache-Bereinigung bei Rollbacks.
+    pub(super) kv_store: Option<Arc<memfuse_crypto::TenantIsolatedKvStore>>,
     /// Zählt Graph-Mutationen seit letzter Community Detection.
     pub(super) mutations_since_community_detection: Arc<AtomicU64>,
     /// Trigger-Schwelle: bei Überschreitung wird Community Detection geplant (Default: 100, 0 = deaktiviert).
@@ -282,6 +284,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             insert_lock: self.insert_lock.clone(),
             consolidation_guard: self.consolidation_guard.clone(),
             kv_locks: self.kv_locks.clone(),
+            kv_store: self.kv_store.clone(),
             mutations_since_community_detection: self.mutations_since_community_detection.clone(),
             community_detection_trigger_threshold: self
                 .community_detection_trigger_threshold
@@ -359,6 +362,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             insert_lock: Arc::new(tokio::sync::Mutex::new(())),
             consolidation_guard: Arc::new(tokio::sync::Mutex::new(())),
             kv_locks: Arc::new(kv_lock::KvKeyLocks::new()),
+            kv_store: None,
             mutations_since_community_detection: Arc::new(AtomicU64::new(0)),
             community_detection_trigger_threshold: Arc::new(AtomicU64::new(100)),
             consolidation_in_progress: Arc::new(AtomicBool::new(false)),
@@ -408,6 +412,22 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Returns the CSR graph index for this collection.
     pub fn graph_index(&self) -> Arc<CsrGraph> {
         self.graph_index.clone()
+    }
+
+    /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
+    pub fn with_kv_store(mut self, kv_store: Arc<memfuse_crypto::TenantIsolatedKvStore>) -> Self {
+        self.kv_store = Some(kv_store);
+        self
+    }
+
+    /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
+    pub fn set_kv_store(&mut self, kv_store: Arc<memfuse_crypto::TenantIsolatedKvStore>) {
+        self.kv_store = Some(kv_store);
+    }
+
+    /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
+    pub fn kv_store(&self) -> Option<&Arc<memfuse_crypto::TenantIsolatedKvStore>> {
+        self.kv_store.as_ref()
     }
 
     /// Sets the text embedder for this collection (consuming version).

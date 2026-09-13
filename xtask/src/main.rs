@@ -53,6 +53,7 @@ mod bench_gate;
 mod check_adr_deadlines;
 mod check_agents_integrity;
 mod check_audit_duplication;
+mod check_audit_verdict_independence;
 mod check_commit_messages;
 mod check_compile;
 mod check_doc_references;
@@ -2132,6 +2133,11 @@ fn main() {
             let check_only = args.iter().any(|arg| arg == "--check");
             let success = run_sync_docs(check_only);
             if !success {
+                process::exit(1);
+            }
+        }
+        "check-audit-verdict-independence" => {
+            if !check_audit_verdict_independence::run_check_audit_verdict_independence() {
                 process::exit(1);
             }
         }

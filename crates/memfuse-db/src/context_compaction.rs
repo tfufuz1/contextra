@@ -16,7 +16,7 @@ use crate::collection::Collection;
 use crate::ProvenanceRecord;
 use memfuse_core::{
     ContextChunk, ContextSegment, DocId, LlmTextGenerator, MemFuseError, Result, StorageEngine,
-    TokenBudget, TxId, VectorIndex,
+    TenantId, TokenBudget, TxId, VectorIndex,
 };
 
 /// Strategie für Context Compaction.
@@ -148,6 +148,7 @@ impl ContextCompactor {
     /// returned directly to the caller (no silent fallback to `StatusToken`).
     pub async fn consolidate_via_llm(
         &self,
+        tenant: TenantId,
         chunks: &[ContextChunk],
         generator: &(impl LlmTextGenerator + ?Sized),
         _model: &str,
@@ -182,7 +183,7 @@ impl ContextCompactor {
             })
             .collect();
 
-        let summary_text = generator.generate_with_context(&segments).await?;
+        let summary_text = generator.generate_with_context(tenant, &segments).await?;
 
         let estimated_tokens = crate::context::ContextManager::estimate_tokens(&summary_text);
 
@@ -493,8 +494,9 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         // 3. Generate summary via LLM
         let compactor =
             ContextCompactor::new(TokenBudget::new(8192, 0), CompactionStrategy::Summarize);
+        let default_tenant = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
         let compacted = compactor
-            .consolidate_via_llm(&chunks, generator, "default")
+            .consolidate_via_llm(default_tenant, &chunks, generator, "default")
             .await?;
 
         let summary_text = compacted
@@ -790,8 +792,9 @@ mod tests {
             make_chunk(102, "Second chunk content", 0.8, false),
         ];
 
+        let tenant = TenantId::try_new(1).unwrap();
         let res = compactor
-            .consolidate_via_llm(&chunks, &dead_llm, "llama3.2")
+            .consolidate_via_llm(tenant, &chunks, &dead_llm, "llama3.2")
             .await;
         // Must return an Error and NOT fall back silently to StatusToken inside compaction.rs
         assert!(res.is_err());
@@ -804,8 +807,9 @@ mod tests {
         let dead_llm = UnreachableLlmGenerator;
 
         // Empty chunks slice test
+        let tenant = TenantId::try_new(1).unwrap();
         let empty_res = compactor
-            .consolidate_via_llm(&[], &dead_llm, "llama3.2")
+            .consolidate_via_llm(tenant, &[], &dead_llm, "llama3.2")
             .await;
         assert!(empty_res.is_ok());
         let empty_ctx = empty_res.unwrap(); // unwrap allowed (in test)
@@ -832,8 +836,9 @@ mod tests {
             make_chunk(30, "Drittes Quelldokument", 0.7, false),
         ];
 
+        let tenant = TenantId::try_new(1).unwrap();
         let compacted = compactor
-            .consolidate_via_llm(&chunks, &mock_llm, "mock-model")
+            .consolidate_via_llm(tenant, &chunks, &mock_llm, "mock-model")
             .await
             .expect("Consolidation should succeed");
 
