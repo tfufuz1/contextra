@@ -138,7 +138,7 @@ impl Drop for WalQueueGuard {
 }
 
 struct PendingCommitQueue {
-    leader_mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
+    _leader_mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
     requests: Vec<GroupCommitRequest>,
     first_prev_hmac: [u8; 32],
     notify_full: Arc<tokio::sync::Notify>,
@@ -302,6 +302,7 @@ pub struct LsmStorage {
     pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,
     wal_queue_depth: Arc<std::sync::atomic::AtomicUsize>,
     pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
+    intent_locks: std::sync::Mutex<std::collections::HashMap<Vec<u8>, TxId>>,
 }
 
 impl LsmStorage {
@@ -641,6 +642,7 @@ impl LsmStorage {
             pending_commit_queue: tokio::sync::Mutex::new(None),
             wal_queue_depth,
             pressure_rx,
+            intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
         };
 
         // Flush after WAL replay regardless of WAL count — ensures replayed data is persisted to SSTable before any WAL rotation/deletion can occur.
@@ -711,6 +713,20 @@ impl LsmStorage {
         }
 
         Ok(storage)
+    }
+
+    /// Removes all intent lock registrations associated with the specified transaction ID.
+    pub fn clear_intent_locks_for_tx(&self, tx_id: TxId) {
+        if let Ok(mut locks) = self.intent_locks.lock() {
+            locks.retain(|_, locked_tx| *locked_tx != tx_id);
+        }
+    }
+
+    /// Removes all intent lock registrations associated with transactions strictly newer than target_tx.
+    pub fn clear_intent_locks_above_tx(&self, target_tx: TxId) {
+        if let Ok(mut locks) = self.intent_locks.lock() {
+            locks.retain(|_, locked_tx| *locked_tx <= target_tx);
+        }
     }
 
     /// Forces a flush (to be used by PersistentCheckpointStore or tests).
@@ -820,6 +836,8 @@ impl LsmStorage {
     /// holding `commit_mutex` violates lock ordering and leads to state corruption and race conditions.
     // AI-TAG[SMELL][MINOR] RESOLVED(audit-NC-3/C-4): Rollback transaction crash-atomicity via rollback-{txid}.intent file and startup recovery confirmed fully operational in LsmStorage::new() and verified by test_rollback_crash_recovery_startup. (ID: AGT-STORE-27a11909) (TS: 2026-09-11T19:30:00Z) (SESSION: 4a9ccf21)
     async fn rollback_to_tx_locked(&self, target_tx: TxId, _guard: &CommitGuard<'_>) -> Result<()> {
+        self.clear_intent_locks_above_tx(target_tx);
+
         // NC-3-RECOVERY-NOTE: Implement recovery in P1 fix/lsm-startup-recovery
         // NC-3: Write crash-atomic rollback intent file before any mutation.
         // On recovery in new(), this file signals that rollback must be completed.
@@ -1365,63 +1383,48 @@ impl StorageEngine for LsmStorage {
                 return Err(MemFuseError::Storage("Memory budget exceeded (95%)".into()));
             }
 
-            let _commit_lock = self.commit_mutex.lock().await;
-
             // 1. Read-Your-Writes check: Single-shard check for current transaction scope.
             if self.tx_buffer.is_key_staged_for_tx(tx_id, key) {
                 return Ok(false);
             }
 
-            // 2. Global atomic key-shard staging check
-            if self.tx_buffer.is_key_staged_globally(key) {
-                return Ok(false);
-            }
-
-            if let Some(is_insert) = self.tx_buffer.staged_status(key) {
-                if is_insert {
-                    return Ok(false);
-                }
-            }
-
-            let mut pending_found: Option<bool> = None;
+            // 2. Intent-Lock acquisition: Acquire short-lived per-key lock without holding commit_mutex
+            // or reading uncommitted staging data of other transactions.
             {
-                let queue_guard = self.pending_commit_queue.lock().await;
-                if let Some(ref queue) = *queue_guard {
-                    'outer: for req in queue.requests.iter().rev() {
-                        for (k, _v, seq) in req.mem_updates.iter().rev() {
-                            if k.as_slice() == key {
-                                if (seq & TOMBSTONE_BIT) == 0 {
-                                    pending_found = Some(true);
-                                } else {
-                                    pending_found = Some(false);
-                                }
-                                break 'outer;
-                            }
-                        }
+                let mut locks = self
+                    .intent_locks
+                    .lock()
+                    .map_err(|_| MemFuseError::Internal("Intent lock mutex poisoned".into()))?;
+                if let Some(&owner_tx) = locks.get(key) {
+                    if owner_tx != tx_id {
+                        return Ok(false);
                     }
-                    if pending_found.is_none() {
-                        for (k, _v, seq) in queue.leader_mem_updates.iter().rev() {
-                            if k.as_slice() == key {
-                                if (seq & TOMBSTONE_BIT) == 0 {
-                                    pending_found = Some(true);
-                                } else {
-                                    pending_found = Some(false);
-                                }
-                                break;
-                            }
-                        }
-                    }
+                } else {
+                    locks.insert(key.to_vec(), tx_id);
                 }
             }
 
-            if let Some(is_present) = pending_found {
-                if is_present {
+            // 3. Check committed MVCC state as of current_max_seq
+            let current_max_seq = self.next_seq_no.load(Ordering::Acquire);
+            match self.get_at_seq(key, current_max_seq).await {
+                Ok(Some(_)) => {
+                    // Key already exists in committed state; release intent lock and return false
+                    if let Ok(mut locks) = self.intent_locks.lock() {
+                        if locks.get(key) == Some(&tx_id) {
+                            locks.remove(key);
+                        }
+                    }
                     return Ok(false);
                 }
-            } else {
-                let current_max_seq = self.next_seq_no.load(Ordering::Acquire);
-                if self.get_at_seq(key, current_max_seq).await?.is_some() {
-                    return Ok(false);
+                Ok(None) => {}
+                Err(e) => {
+                    // Release intent lock on read error
+                    if let Ok(mut locks) = self.intent_locks.lock() {
+                        if locks.get(key) == Some(&tx_id) {
+                            locks.remove(key);
+                        }
+                    }
+                    return Err(e);
                 }
             }
 
@@ -1432,13 +1435,20 @@ impl StorageEngine for LsmStorage {
                 DocId::new(u64::from_le_bytes(bytes))
             };
 
-            self.tx_buffer.stage_kv(
+            if let Err(e) = self.tx_buffer.stage_kv(
                 tx_id,
                 IndexOp::Insert {
                     doc_id,
                     data: (key.to_vec(), value.to_vec()),
                 },
-            )?;
+            ) {
+                if let Ok(mut locks) = self.intent_locks.lock() {
+                    if locks.get(key) == Some(&tx_id) {
+                        locks.remove(key);
+                    }
+                }
+                return Err(e);
+            }
 
             Ok(true)
         })
@@ -1537,6 +1547,14 @@ impl StorageEngine for LsmStorage {
             if !self.budget.has_memory_capacity() {
                 return Err(MemFuseError::Storage("Memory budget exceeded (95%)".into()));
             }
+
+            struct IntentLockGuard<'a>(&'a LsmStorage, TxId);
+            impl<'a> Drop for IntentLockGuard<'a> {
+                fn drop(&mut self) {
+                    self.0.clear_intent_locks_for_tx(self.1);
+                }
+            }
+            let _intent_guard = IntentLockGuard(self, tx_id);
 
             // ANCHOR[ALG-FIX:D6-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Snapshot-Inversion bei parallel commit (INV-MVCC-1)
             // FIX: Commit-Mutex serialisiert fetch_add + wal.prepare_batch.
@@ -1713,7 +1731,7 @@ impl StorageEngine for LsmStorage {
 
                 let notify_full = Arc::new(tokio::sync::Notify::new());
                 *queue_guard = Some(PendingCommitQueue {
-                    leader_mem_updates: leader_mem_updates.clone(),
+                    _leader_mem_updates: leader_mem_updates.clone(),
                     requests: Vec::new(),
                     first_prev_hmac: prev_hmac_snapshot,
                     notify_full: notify_full.clone(),
@@ -4277,6 +4295,28 @@ mod tests {
         } else {
             assert_eq!(stored_val, b"val2");
         }
+    }
+
+    #[tokio::test]
+    async fn test_put_if_absent_no_deadlock_and_no_commit_mutex_holding() {
+        let (storage, _tmp) = test_storage().await;
+        let storage = Arc::new(storage);
+
+        // Lock commit_mutex to simulate an active long-running commit or operation holding commit_mutex
+        let commit_guard = storage.commit_mutex.lock().await;
+
+        let key = b"no_commit_mutex_block_key";
+        let tx = TxId::new(100);
+
+        // put_if_absent should complete without waiting for commit_mutex!
+        let res = storage.put_if_absent(tx, key, b"val").await;
+        assert!(
+            res.is_ok() && res.unwrap(),
+            "put_if_absent must proceed without being blocked by commit_mutex"
+        );
+
+        drop(commit_guard);
+        storage.commit(tx).await.unwrap();
     }
 
     #[tokio::test]
