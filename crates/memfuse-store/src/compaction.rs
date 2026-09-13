@@ -55,6 +55,12 @@ pub struct CompactionConfig {
     pub yield_threshold: usize,
     /// Maximum memory (in bytes) to use for in-memory buffering during merge.
     pub max_memory_bytes: Option<u64>,
+    /// I/O-Rate-Limit für Compaction-Merge-Writes (Token-Bucket, plattformneutral).
+    /// `None` = unbegrenzt (Standard).
+    /// Bei Aktivierung: Token-Bucket-Delay nach jedem Merge-Block AUSSERHALB
+    /// aller MVCC-Write-Locks. Max. 100 ms Delay pro Iteration.
+    /// Verhindert NVMe-Queue-Depth-Sättigung die P95-Lese-Latenz von hybrid_search() erhöht.
+    pub max_io_bytes_per_second: Option<u64>,
 }
 
 impl Default for CompactionConfig {
@@ -65,6 +71,7 @@ impl Default for CompactionConfig {
             check_interval: Duration::from_secs(30),
             yield_threshold: 1000,
             max_memory_bytes: Some(128 * 1024 * 1024), // 128MB budget by default
+            max_io_bytes_per_second: None,
         }
     }
 }
@@ -422,6 +429,10 @@ impl CompactionEngine {
         let mut last_key: Option<bytes::Bytes> = None;
         let mut processed_count = 0;
 
+        // Token-Bucket-State für I/O-Rate-Limiting (§4.12 C-2)
+        let mut io_token_bytes_written: u64 = 0;
+        let mut io_token_last_reset = std::time::Instant::now();
+
         while let Some(item) = heap.pop() {
             processed_count += 1;
             if processed_count % self.config.yield_threshold == 0 {
@@ -459,9 +470,31 @@ impl CompactionEngine {
                 let should_gc_tombstone =
                     is_tombstone && is_full_compaction && raw_seq < min_snapshot_seq;
                 if !should_gc_tombstone {
+                    let entry_bytes = (item.key.len() + item.value.len() + 16) as u64; // +16 für Overhead
                     builder
                         .add(&item.key, &item.value, item.seq, item.tx)
                         .await?;
+
+                    // Token-Bucket I/O Rate Limiting (plattformneutral, außerhalb aller Write-Locks)
+                    if let Some(max_bps) = self.config.max_io_bytes_per_second {
+                        if max_bps > 0 {
+                            io_token_bytes_written += entry_bytes;
+                            let elapsed = io_token_last_reset.elapsed();
+                            let target = std::time::Duration::from_secs_f64(
+                                io_token_bytes_written as f64 / max_bps as f64,
+                            );
+                            if target > elapsed {
+                                let delay =
+                                    (target - elapsed).min(std::time::Duration::from_millis(100));
+                                // INVARIANTE: Kein MVCC-Write-Lock aktiv an dieser Stelle (merge läuft lock-frei).
+                                // Verifiziert durch Lektüre von merge_sstables() — kein RwLock::write() im Merge-Loop.
+                                tokio::time::sleep(delay).await;
+                                // Nach Sleep: Token-Bucket zurücksetzen
+                                io_token_bytes_written = 0;
+                                io_token_last_reset = std::time::Instant::now();
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1235,6 +1268,7 @@ mod tests {
                 check_interval: Duration::from_millis(100), // Fast check
                 yield_threshold: 100,
                 max_memory_bytes: Some(128 * 1024 * 1024),
+                max_io_bytes_per_second: None,
             },
             encryption_passphrase: None,
             ..Default::default()
@@ -1476,6 +1510,7 @@ mod tests {
             check_interval: std::time::Duration::from_millis(10),
             yield_threshold: 100,
             max_memory_bytes: None,
+            max_io_bytes_per_second: None,
         };
         let engine = Arc::new(CompactionEngine::new(
             config,
@@ -1535,6 +1570,7 @@ mod tests {
                     check_interval: std::time::Duration::from_millis(10),
                     yield_threshold: 100,
                     max_memory_bytes: Some(1024 * 1024),
+                    max_io_bytes_per_second: None,
                 },
                 encryption_passphrase: None,
                 ..Default::default()

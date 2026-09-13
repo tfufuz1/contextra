@@ -2976,6 +2976,7 @@ mod tests {
                 check_interval: Duration::from_secs(30),
                 yield_threshold: 1000,
                 max_memory_bytes: Some(1024 * 1024),
+                ..Default::default()
             },
             encryption_passphrase: None,
             ..Default::default()
@@ -3258,6 +3259,7 @@ mod tests {
                 check_interval: Duration::from_secs(3600),
                 yield_threshold: 100,
                 max_memory_bytes: Some(1024 * 1024),
+                ..Default::default()
             },
             encryption_passphrase: None,
             ..Default::default()
@@ -3326,6 +3328,7 @@ mod tests {
                 check_interval: Duration::from_secs(30),
                 yield_threshold: 1000,
                 max_memory_bytes: Some(1024 * 1024),
+                ..Default::default()
             },
             encryption_passphrase: None,
             ..Default::default()
