@@ -250,6 +250,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_with_context_empty_segments() -> Result<(), Box<dyn std::error::Error>> {
+        let tenant = TenantId::SYSTEM;
         let llm = MockDefaultLlm;
         let res = llm.generate_with_context(tenant, &[]).await?;
         assert_eq!(res, "Generated: ");

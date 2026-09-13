@@ -17,13 +17,11 @@
 
 Stand letzter Prüfung: 2026-09-13
 Befehl: `cargo xtask sync-docs` / `grep -rn "AI-TAG\[SMELL\]\[CRITICAL\]" crates/ --include="*.rs" | grep -v RESOLVED`
-Ergebnis: **4 offene Tags**
+Ergebnis: **2 offene Tags**
 
 | Crate/Datei | Zeile | ID | Kat. | Sev. | Zeitstempel | Beschreibung |
 |---|---|---|---|---|---|---|
 | `crates/memfuse-crypto/src/kv_segment/store.rs` | 451 | `AGT-SECURITY-3edfea62` | `TEST` | `ANALYZED-SAFE` | `2026-09-12T09:35:00Z` | // AI-TAG[TEST][ANALYZED-SAFE] Lock release test timing dependency resolved via Notify handshake (ID: AGT-SECURITY-3edfea62) (TS: 2026-09-12T09:35:00Z) (SESSION: 5f10d4f0) |
-| `crates/memfuse-mcp/src/lib.rs` | 39 | `AGT-MCP-a4c8ea50` | `SMELL` | `MINOR` | `2026-09-13T01:25:57Z` | // AI-TAG[SMELL][MINOR] Missing inactivity timeout on stdio read_line_bounded (ID: AGT-MCP-a4c8ea50) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863) |
-| `crates/memfuse-mcp/src/lib.rs` | 878 | `AGT-MCP-a2705ed3` | `SMELL` | `MINOR` | `2026-09-13T01:25:57Z` | // AI-TAG[SMELL][MINOR] Missing explicit id.len() <= 256 length check in memfuse_get (ID: AGT-MCP-a2705ed3) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863) |
 | `crates/memfuse-store/src/wal.rs` | 1086 | `AGT-STORE-d73203c0` | `SMELL` | `ANALYZED-SAFE` | `2026-09-10T19:14:58Z` | // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: Exklusiver Mutex-Lock self.file.lock() in append_batch serialisiert Header-Check (write_header) und Dateischreibzugriffe vollständig. Die HMAC-Korrektheit wird NICHT durch die self.file-Mutex-Serialisierung, sondern durch den separaten last_hmac-Mutex in prepare_batch garantiert (siehe last_hmac.lock() in prepare_batch). (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8) |
 
 
@@ -41,13 +39,13 @@ Ergebnis: **4 offene Tags**
 | `memfuse-candle` | 3 | 3903 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-index` | 3 | 16386 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-ollama` | 3 | 4248 | 🟢 Clean |  |
-| `memfuse-store` | 3 | 20302 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
+| `memfuse-store` | 3 | 20310 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-embed` | 4 | 2201 | 🧊 Optional |  |
 | `memfuse-db` | 5 | 33928 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 6 | 4641 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-router` | 6 | 5536 | 🟢 Clean |  |
 | `memfuse-agent` | 7 | 6027 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
-| `memfuse-mcp` | 8 | 5138 | 🟢 Clean |  |
+| `memfuse-mcp` | 8 | 5221 | 🟢 Clean |  |
 
 
 ## DAG-Topologie

@@ -448,9 +448,7 @@ impl LsmStorage {
         }
         pending_rollbacks.sort_unstable();
 
-        // Einzige autorisierte Lesestelle für das Manifest in `new()`.
-        // Das geladene HashSet wird verwendet, um verwaiste oder nicht-manifestierte SSTables
-        // beim Verzeichnis-Scan zu erkennen und zu überspringen.
+        // Authoritative manifest load for SSTable verification during data directory scanning in `new()`.
         let manifest_path = config.path.join("MANIFEST");
         let manifest_exists = manifest_path.exists();
         let _valid_manifest_sstables: Option<std::collections::HashSet<std::path::PathBuf>> =
@@ -1184,7 +1182,7 @@ impl StorageEngine for LsmStorage {
                 DocId::new(u64::from_le_bytes(bytes))
             };
 
-            self.tx_buffer.stage(
+            self.tx_buffer.stage_kv(
                 tx_id,
                 IndexOp::Insert {
                     doc_id,
@@ -1211,12 +1209,12 @@ impl StorageEngine for LsmStorage {
 
             let _commit_lock = self.commit_mutex.lock().await;
 
-            // 1. Read-Your-Writes check: Atomic single-shard check for current transaction scope.
+            // 1. Read-Your-Writes check: Single-shard check for current transaction scope.
             if self.tx_buffer.is_key_staged_for_tx(tx_id, key) {
                 return Ok(false);
             }
 
-            // 2. Global heuristic check: Best-effort cross-transaction staging detection across all shards.
+            // 2. Global atomic key-shard staging check
             if self.tx_buffer.is_key_staged_globally(key) {
                 return Ok(false);
             }
@@ -1276,7 +1274,7 @@ impl StorageEngine for LsmStorage {
                 DocId::new(u64::from_le_bytes(bytes))
             };
 
-            self.tx_buffer.stage(
+            self.tx_buffer.stage_kv(
                 tx_id,
                 IndexOp::Insert {
                     doc_id,
@@ -1354,7 +1352,7 @@ impl StorageEngine for LsmStorage {
                 DocId::new(u64::from_le_bytes(bytes))
             };
 
-            self.tx_buffer.stage(
+            self.tx_buffer.stage_kv(
                 tx_id,
                 IndexOp::Delete {
                     doc_id,
@@ -1386,7 +1384,7 @@ impl StorageEngine for LsmStorage {
             // FIX: Commit-Mutex serialisiert fetch_add + wal.prepare_batch.
             let _commit_lock = self.commit_mutex.lock().await;
 
-            let ops = self.tx_buffer.drain(tx_id);
+            let ops = self.tx_buffer.drain_kv(tx_id);
             if ops.is_empty() {
                 return Ok(());
             }
@@ -1739,7 +1737,7 @@ impl StorageEngine for LsmStorage {
     /// Panikt nicht in Produktionscode.
     fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            self.tx_buffer.discard(tx_id);
+            self.tx_buffer.discard_kv(tx_id);
             Ok(())
         })
     }

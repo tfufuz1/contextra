@@ -36,25 +36,31 @@
 
 Jedes Audit-Ergebnis und `VERDICT:`-Tag in Audit-Reports unter `docs/audits/*.md` unterliegt der strikten Zwei-Session-Unabhängigkeitspflicht.
 
-### 1. Status & VERIFIED-BY-SESSION Invariante
-- **DRAFT-Status (`VERIFIED-BY-SESSION: PENDING`)**:
-  Erstellt ein Agent einen Audit-Report oder einen Befund, wird das Feld `VERIFIED-BY-SESSION` zwingend auf `PENDING` gesetzt. Solange `VERIFIED-BY-SESSION: PENDING` steht, gilt der Report als **DRAFT** und darf in keinem PR-Body, keiner Commit-Message und keiner anderen Dokumentation als abgeschlossene Verifikation zitiert werden.
-- **FINAL / VERIFIED-Status (`VERIFIED-BY-SESSION: <hash>`)**:
-  Ein `VERDICT: GO/APPROVED` in einem Audit-Report gilt erst dann als endgültig ("VERIFIED"), wenn das Feld `VERIFIED-BY-SESSION` den 8-stelligen Hex-Hash einer zweiten Session trägt (`VERIFIED-BY-SESSION: <zweitsession-hash>`).
+### 1. Syntax & Folgezeilen-Pflicht
+Jede `VERDICT:`-Zeile (z. B. `**VERDICT: GO / APPROVED**`, `**VERDICT: CONDITIONAL**` oder `**VERDICT: BLOCKED**`) MUSS direkt von einer `VERIFIED-BY-SESSION`-Kommentarzeile gefolgt werden:
+```markdown
+**VERDICT: GO / APPROVED**
+<!-- VERIFIED-BY-SESSION: <8-hex-hash>|PENDING (TS: <ISO-8601-UTC>) -->
+```
 
-### 2. Bedingungen an die verifizierende Zweitsession
-Die zweite Session MUSS zwingend folgende Kriterien erfüllen:
-1. **Sitzungs-Identität**: Die SESSION-ID (`VERIFIED-BY-SESSION: <hash2>`) darf NICHT identisch mit der SESSION-ID des ursprünglichen Audit-Autors (`SESSION: <hash1>`) sein (`hash2 != hash1`).
-2. **Chronologische Reihenfolge**: Die zweite Session muss zeitlich NACH der ersten Session stattfinden.
+### 2. Status & DRAFT-Sperre
+- **DRAFT-Status (`VERIFIED-BY-SESSION: PENDING ...`)**:
+  Erstellt ein Agent einen Audit-Report oder einen Befund, wird das Feld `VERIFIED-BY-SESSION` zwingend auf `PENDING` gesetzt. `PENDING` ist für maximal 72 Stunden ab dem `TS:`-Zeitstempel des umgebenden Abschnitts (nächstgelegene `SESSION:`/`TS:`-Fundstelle oberhalb im selben Dokument) zulässig (Kulanzfrist). Solange `PENDING` steht, gilt der Report als **DRAFT** und darf in keinem PR-Body, keiner Commit-Message und keiner anderen Dokumentation als abgeschlossene Verifikation zitiert werden.
+- **FINAL / VERIFIED-Status (`VERIFIED-BY-SESSION: <8-hex-hash> ...`)**:
+  Ein `VERDICT: GO / APPROVED` gilt erst dann als final bestätigt ("VERIFIED"), wenn die zugehörige `VERIFIED-BY-SESSION`-Zeile den 8-stelligen Hex-Hash einer von der Autor-Session abweichenden, gültigen Prüfsitzung trägt.
+
+### 3. Kriterien für die verifizierende Zweitsession
+1. **Sitzungs-Identität**: Der im `VERIFIED-BY-SESSION`-Feld genannte Hash MUSS von der Session-ID abweichen, die den umgebenden Abschnitt (nächstgelegene `SESSION:`-Fundstelle oberhalb der VERDICT-Zeile im selben Dokument) verfasst hat (`hash2 != hash1`).
+2. **Chronologische Reihenfolge**: Die zweite Session muss zeitlich NACH der Ersteller-Session stattfinden (`TS2 > TS1`).
 3. **Unabhängigkeit**: Die zweite Session muss den Befund unabhängig (ohne Kenntnis des Drafts als Prämisse) am Quellcode nachvollzogen und in ihrem eigenen PR-, Issue- oder Log-Eintrag explizit bestätigt haben.
 
-### 3. Audit-Workflow Schritte (Kanonische Definition)
+### 4. Audit-Workflow Schritte (Kanonische Definition)
 1. Automatisches Audit-Issue wird erstellt oder manueller Audit-Auftrag gestartet.
-2. Agent führt statische/dynamische Analyse durch und erstellt den Draft-Report mit `VERIFIED-BY-SESSION: PENDING`.
+2. Agent führt statische/dynamische Analyse durch und erstellt den Draft-Report mit `<!-- VERIFIED-BY-SESSION: PENDING (TS: <ISO-8601-UTC>) -->`.
 3. **Draft-Sperre**: Der Draft-Report darf vom Ersteller-Agenten NICHT selbst als VERIFIED markiert oder freigegeben werden.
 4. **Stichproben- & Unabhängigkeitspflicht**: Jeder Audit-Zyklus erfordert eine unabhängige Bestätigung durch mindestens einen der folgenden Schritte:
-   a) Unabhängige Review des Reports durch eine zweite Agenten-Session (mit `VERIFIED-BY-SESSION: <hash2>`), ODER
+   a) Unabhängige Review des Reports durch eine zweite Agenten-Session (mit Eintragen der `VERIFIED-BY-SESSION: <hash2>`-Zeile), ODER
    b) Cross-Crate-Invarianten-Test durch einen zweiten Agenten mit separatem System-Prompt (anderer Kontext, kein Zugriff auf den Draft-Report des ersten Agenten), ODER
    c) Manuelle Code-Review und Bestätigung durch einen menschlichen Reviewer, ODER
    d) Nachgewiesenes Fuzzing-/Property-Test-Ergebnis als Gate.
-5. Erst nach erfolgreichem Vollzug von Schritt 4 darf `VERIFIED-BY-SESSION` von `PENDING` auf den Hash der verifizierenden Zweitsession aktualisiert werden.
+5. Erst nach erfolgreichem Vollzug von Schritt 4 darf `VERIFIED-BY-SESSION` von `PENDING` auf den Hash der verifizierenden Zweitsession mit neuem Zeitstempel `TS:` aktualisiert werden.

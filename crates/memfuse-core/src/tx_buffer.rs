@@ -106,6 +106,20 @@ impl<T: Clone> TxShard<T> {
     }
 }
 
+#[derive(Debug)]
+struct KeyShard {
+    // Map: key -> Map<tx_id, is_insert>
+    staged: AHashMap<Vec<u8>, AHashMap<TxId, bool>>,
+}
+
+impl KeyShard {
+    fn new() -> Self {
+        Self {
+            staged: AHashMap::new(),
+        }
+    }
+}
+
 /// Buffers index operations until commit or rollback.
 ///
 /// Sharded into sub-buffers to reduce lock contention.
@@ -120,6 +134,7 @@ impl<T: Clone> TxShard<T> {
 #[derive(Debug)]
 pub struct TxBuffer<T: Clone> {
     shards: Vec<RwLock<TxShard<T>>>,
+    key_shards: Vec<RwLock<KeyShard>>,
     tx_timeout: Duration,
     config: TxBufferConfig,
 }
@@ -150,11 +165,14 @@ impl<T: Clone> TxBuffer<T> {
     ) -> Self {
         let shard_count = if shard_count == 0 { 1 } else { shard_count };
         let mut shards = Vec::with_capacity(shard_count);
+        let mut key_shards = Vec::with_capacity(shard_count);
         for _ in 0..shard_count {
             shards.push(RwLock::new(TxShard::new()));
+            key_shards.push(RwLock::new(KeyShard::new()));
         }
         Self {
             shards,
+            key_shards,
             tx_timeout: config.tx_timeout,
             config,
         }
@@ -164,6 +182,14 @@ impl<T: Clone> TxBuffer<T> {
     fn shard_idx(&self, tx: TxId) -> usize {
         // SAFETY: Modulo-Cast u64→usize (sicher wegen %-Operator)
         (tx.inner() % self.shards.len() as u64) as usize
+    }
+
+    #[inline]
+    fn key_shard_idx(&self, key: &[u8]) -> usize {
+        use std::hash::Hasher;
+        let mut hasher = ahash::AHasher::default();
+        hasher.write(key);
+        (hasher.finish() % self.key_shards.len() as u64) as usize
     }
 
     /// Checks if the given transaction exists in the buffer.
@@ -339,6 +365,78 @@ impl<T: Clone> TxBuffer<T> {
 }
 
 impl TxBuffer<(Vec<u8>, Vec<u8>)> {
+    fn track_key_stage(&self, tx: TxId, key: &[u8], is_insert: bool) {
+        let idx = self.key_shard_idx(key);
+        let mut shard = self.key_shards[idx].write();
+        shard
+            .staged
+            .entry(key.to_vec())
+            .or_default()
+            .insert(tx, is_insert);
+    }
+
+    fn untrack_key_ops_kv(&self, tx: TxId, ops: &[IndexOp<(Vec<u8>, Vec<u8>)>]) {
+        for op in ops {
+            let key = match op {
+                IndexOp::Insert { data, .. } => &data.0,
+                IndexOp::Delete { data: Some(d), .. } => &d.0,
+                IndexOp::Delete { data: None, .. } => continue,
+            };
+            let idx = self.key_shard_idx(key);
+            let mut shard = self.key_shards[idx].write();
+            if let std::collections::hash_map::Entry::Occupied(mut entry) = shard.staged.entry(key.to_vec()) {
+                entry.get_mut().remove(&tx);
+                if entry.get().is_empty() {
+                    entry.remove();
+                }
+            }
+        }
+    }
+
+    /// Stages a key-value operation and updates atomic key staging map.
+    pub fn stage_kv(&self, tx: TxId, op: IndexOp<(Vec<u8>, Vec<u8>)>) -> Result<()> {
+        let (key, is_insert) = match &op {
+            IndexOp::Insert { data, .. } => (data.0.as_slice(), true),
+            IndexOp::Delete { data: Some(d), .. } => (d.0.as_slice(), false),
+            IndexOp::Delete { data: None, .. } => {
+                return self.stage(tx, op);
+            }
+        };
+
+        self.track_key_stage(tx, key, is_insert);
+        let key_vec = key.to_vec();
+        if let Err(e) = self.stage(tx, op) {
+            // Roll back key tracking if staging fails capacity check
+            let idx = self.key_shard_idx(&key_vec);
+            let mut shard = self.key_shards[idx].write();
+            if let std::collections::hash_map::Entry::Occupied(mut entry) = shard.staged.entry(key_vec) {
+                entry.get_mut().remove(&tx);
+                if entry.get().is_empty() {
+                    entry.remove();
+                }
+            }
+            return Err(e);
+        }
+        Ok(())
+    }
+
+    /// Drains and returns all buffered operations for a key-value transaction, cleaning up key staging.
+    pub fn drain_kv(&self, tx: TxId) -> Vec<IndexOp<(Vec<u8>, Vec<u8>)>> {
+        let ops = self.drain(tx);
+        if !ops.is_empty() {
+            self.untrack_key_ops_kv(tx, &ops);
+        }
+        ops
+    }
+
+    /// Discards all buffered operations for a key-value transaction, cleaning up key staging.
+    pub fn discard_kv(&self, tx: TxId) {
+        if let Some(ops) = self.get_ops(tx) {
+            self.untrack_key_ops_kv(tx, &ops);
+        }
+        self.discard(tx);
+    }
+
     /// Checks if `key` is staged for insertion in the specified transaction `tx_id`.
     ///
     /// This method is atomic because all operations for a given `tx_id` land in the same shard
@@ -359,77 +457,43 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         false
     }
 
-    /// Prüft ob `key` in irgendeinem Shard des TxBuffers gespeichert ist.
+    /// Atomisch prüft ob `key` in irgendeiner uncommitted Transaktion als Insert gestaged ist.
     ///
-    /// # TOCTOU-Warnung
-    /// Diese Methode ist KEIN atomarer Snapshot. Zwischen dem Lesen von Shard N und
-    /// Shard N+1 kann ein concurrent Commit den Key aus Shard N entfernt haben.
-    /// Das Ergebnis ist eine "approximately true" Aussage, nicht eine strikt
-    /// serialisierbare Garantie.
-    ///
-    /// # Korrekte Verwendung
-    /// Nur für Optimierungen (Cache-Hints, Fast-Path-Bypass) verwenden, NIEMALS
-    /// für Korrektheitsentscheidungen (z.B. "ist dieser Key committed?").
-    /// Für Read-Your-Writes-Isolation: verwende stattdessen den tx-spezifischen
-    /// `is_key_staged_for_tx(tx_id, key)` auf dem einzelnen Shard.
-    ///
-    /// # Locking Strategy
-    /// Iterates through all shards sequentially, acquiring a read lock (`shard_lock.read()`) on each
-    /// shard individually and dropping it before moving to the next shard. Because only a single shard lock
-    /// is ever held at a time, this method never holds nested shard locks, avoiding lock inversion
-    /// and deadlocks with concurrent single-shard operations like `stage()` or `drain()`.
+    /// Bietet O(1) atomare Einzel-Shard-Abfrage ohne sweep über 64 Shards.
     pub fn is_key_staged_globally(&self, key: &[u8]) -> bool {
-        for shard_lock in &self.shards {
-            let shard = shard_lock.read();
-            for (_tx_id, (ops, _instant)) in &shard.ops {
-                for op in ops {
-                    if let IndexOp::Insert { data, .. } = op {
-                        if data.0 == key {
-                            return true;
-                        }
-                    }
-                }
-            }
+        let idx = self.key_shard_idx(key);
+        let shard = self.key_shards[idx].read();
+        if let Some(map) = shard.staged.get(key) {
+            return map.values().any(|&is_insert| is_insert);
         }
         false
     }
 
-    /// Checks if a key is currently staged in any active transaction in the buffer.
-    /// Returns `Some(true)` if staged for insertion, `Some(false)` if staged for deletion,
-    /// or `None` if not staged in any transaction.
+    /// Atomisch ermittelt den Staging-Status eines Keys über alle uncommitted Transaktionen.
+    ///
+    /// Gibt `Some(true)` für Insert, `Some(false)` für Delete, oder `None` zurück.
     pub fn staged_status(&self, key: &[u8]) -> Option<bool> {
-        let mut max_tx: Option<TxId> = None;
-        let mut status: Option<bool> = None;
-
-        for shard_lock in &self.shards {
-            let shard = shard_lock.read();
-            for (tx_id, (ops, _instant)) in &shard.ops {
-                for op in ops {
-                    let (op_key, is_insert) = match op {
-                        IndexOp::Insert { data, .. } => (&data.0[..], true),
-                        IndexOp::Delete { data: Some(d), .. } => (&d.0[..], false),
-                        IndexOp::Delete { data: None, .. } => continue,
-                    };
-                    if op_key == key {
-                        match max_tx {
-                            None => {
-                                max_tx = Some(*tx_id);
-                                status = Some(is_insert);
-                            }
-                            Some(m) if *tx_id > m => {
-                                max_tx = Some(*tx_id);
-                                status = Some(is_insert);
-                            }
-                            Some(m) if *tx_id == m => {
-                                status = Some(is_insert);
-                            }
-                            _ => {}
-                        }
+        let idx = self.key_shard_idx(key);
+        let shard = self.key_shards[idx].read();
+        if let Some(map) = shard.staged.get(key) {
+            let mut max_tx: Option<TxId> = None;
+            let mut status: Option<bool> = None;
+            for (&tx_id, &is_insert) in map {
+                match max_tx {
+                    None => {
+                        max_tx = Some(tx_id);
+                        status = Some(is_insert);
                     }
+                    Some(m) if tx_id > m => {
+                        max_tx = Some(tx_id);
+                        status = Some(is_insert);
+                    }
+                    _ => {}
                 }
             }
+            return status;
         }
-        status
+        None
     }
 }
 
@@ -710,7 +774,7 @@ mod tests {
         let val_a = b"val_a".to_vec();
 
         buffer
-            .stage(
+            .stage_kv(
                 tx1,
                 IndexOp::Insert {
                     doc_id: DocId::new(100),

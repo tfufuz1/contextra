@@ -36,7 +36,7 @@ pub const MAX_RPC_BYTES: usize = 4 * 1024 * 1024;
 /// Maximum allowed search query length in bytes (64 KB).
 pub const MAX_SEARCH_QUERY_BYTES: usize = 64 * 1024;
 
-// AI-TAG[SMELL][MINOR] Missing inactivity timeout on stdio read_line_bounded (ID: AGT-MCP-a4c8ea50) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863)
+// AI-TAG[SMELL][RESOLVED] Missing inactivity timeout on stdio read_line_bounded (ID: AGT-MCP-782aa62e) (TS: 2026-09-13T14:29:07Z) (SESSION: 23626761)
 // BEFUND: read_line_bounded caps byte size at 4MB but has no idle read timeout.
 // RISIKO: Slowloris-style partial request streams can hold task handles open indefinitely.
 // EMPFEHLUNG: Wrap read_line_bounded invocations with tokio::time::timeout in run_stdio loop.
@@ -278,9 +278,30 @@ impl McpServer {
         let mut stdout = tokio::io::stdout();
         let mut reader = BufReader::new(stdin);
         let mut line_buf = String::new();
+        const STDIO_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
+        let timeout_secs = std::env::var("MEMFUSE_MCP_IDLE_TIMEOUT_SECS")
+            .ok()
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .unwrap_or(30);
+        let timeout_duration = std::time::Duration::from_secs(timeout_secs);
 
         loop {
-            match read_line_bounded(&mut reader, &mut line_buf, MAX_RPC_BYTES).await {
+            let read_res = tokio::time::timeout(
+                STDIO_READ_TIMEOUT,
+                read_line_bounded(&mut reader, &mut line_buf, MAX_RPC_BYTES),
+            )
+            .await;
+
+            let read_line_res = match read_res {
+                Ok(res) => res,
+                Err(_) => {
+                    tracing::warn!("stdio read timeout after {STDIO_READ_TIMEOUT:?} inactivity");
+                    return Err("stdio idle timeout".into());
+                }
+            };
+
+            match read_line_res {
                 Ok(0) => break, // EOF
                 Ok(_) => {
                     let trimmed = line_buf.trim();
@@ -308,14 +329,14 @@ impl McpServer {
                         stdout.flush().await?;
                     }
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
+                Ok(Err(e)) if e.kind() == std::io::ErrorKind::InvalidData => {
                     let response = JsonRpcResponse::err(None, -32700, format!("Parse error: {e}"));
                     let mut out = serde_json::to_string(&response)?;
                     out.push('\n');
                     stdout.write_all(out.as_bytes()).await?;
                     stdout.flush().await?;
                 }
-                Err(e) => return Err(Box::new(e)),
+                Ok(Err(e)) => return Err(Box::new(e)),
             }
         }
         Ok(())
@@ -875,10 +896,6 @@ impl McpServer {
             }
 
             "memfuse_get" => {
-                // AI-TAG[SMELL][MINOR] Missing explicit id.len() <= 256 length check in memfuse_get (ID: AGT-MCP-a2705ed3) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863)
-                // BEFUND: memfuse_get checks empty string but does not enforce id.len() <= 256 before col.get().
-                // RISIKO: Excessively long ID strings are passed down to storage layer lookup.
-                // EMPFEHLUNG: Add explicit id.len() <= 256 check in memfuse_get handler analog to memfuse_insert.
                 let id = match args.get("id") {
                     Some(v) => {
                         let s = v.as_str().ok_or_else(|| {
@@ -886,6 +903,11 @@ impl McpServer {
                         })?;
                         if s.trim().is_empty() {
                             return Err(McpError::invalid_params("id cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "id length exceeds limit: max 256 chars",
+                            ));
                         }
                         s
                     }
