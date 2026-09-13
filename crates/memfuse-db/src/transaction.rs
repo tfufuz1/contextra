@@ -460,7 +460,17 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         Ok(())
     }
 
+    fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) {
+        if let Some(kv_store) = self.collection.kv_store() {
+            let chunk_ids: Vec<u64> = doc_ids.iter().map(|d| d.inner()).collect();
+            // Standard TenantId 1 falls Tenant nicht explizit überschrieben
+            let tenant = memfuse_core::TenantId::try_new(1).unwrap_or_default();
+            kv_store.on_rollback(tenant, &chunk_ids);
+        }
+    }
+
     async fn compensate_hnsw(&self, doc_ids: &[DocId]) {
+        self.trigger_kv_store_rollback(doc_ids);
         let comp_tx = TxId::new(
             self.collection
                 .next_tx
@@ -629,6 +639,15 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     }
 
     async fn rollback_internal(&self) {
+        let doc_ids = {
+            let guard = match self.staged_doc_ids.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            guard.clone()
+        };
+        self.trigger_kv_store_rollback(&doc_ids);
+
         if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
             tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
         }
@@ -646,6 +665,15 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     /// Rolls back any uncommitted changes applied to all 4 sub-systems in reverse commit order.
     pub async fn rollback(self) -> Result<()> {
         self.committed.store(true, Ordering::Release);
+        let doc_ids = {
+            let guard = match self.staged_doc_ids.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            guard.clone()
+        };
+        self.trigger_kv_store_rollback(&doc_ids);
+
         let graph_res = self.collection.graph_index.rollback(self.tx_id).await;
         let text_res = self.collection.text_index.rollback(self.tx_id).await;
         let index_res = self.collection.index.rollback(self.tx_id).await;
@@ -819,5 +847,36 @@ mod tests {
         let results = col.text_index.search_bm25("uncommitted", 1, None).await;
         assert!(results.is_ok());
         assert!(results.unwrap().is_empty()); // unwrap
+    }
+
+    #[tokio::test]
+    async fn test_db_transaction_rollback_cleans_kv_store_segments() {
+        use memfuse_crypto::kv_segment::KvSegment;
+        use memfuse_crypto::TenantIsolatedKvStore;
+
+        let kv_store = Arc::new(TenantIsolatedKvStore::new());
+        let tenant = memfuse_core::TenantId::try_new(1).unwrap();
+        let doc_id = DocId::new(500);
+
+        // Pre-insert segment for doc_id 500 into kv_store
+        kv_store.insert_segment(tenant, KvSegment::new(tenant, doc_id.inner(), vec![0xAA; 16]));
+        assert_eq!(kv_store.get_tenant_segment_len(tenant), 1);
+
+        let mut col = create_test_collection().await;
+        col.set_kv_store(kv_store.clone());
+
+        let tx_id = col.allocate_tx().unwrap();
+        let tx = DbTransaction::new(col, tx_id);
+        tx.record_keys(vec![1], vec![2], doc_id);
+
+        let rollback_res = tx.rollback().await;
+        assert!(rollback_res.is_ok());
+
+        // KV store must be purged of segment 500
+        assert_eq!(
+            kv_store.get_tenant_segment_len(tenant),
+            0,
+            "Rollback must purge KV store segment"
+        );
     }
 }

@@ -46,6 +46,14 @@ impl TenantIsolatedKvStore {
     // aufrufen. Dies ist der Schritt, der verwaiste Segmente verhindert.
     // Zuständig: nachgelagerte PR nach diesem Fix.
 
+    /// Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback.
+    ///
+    /// Delegiert direkt an `remove_segments_for_rollback`, um verwaiste KV-Segmente
+    /// (Karteileichen/Memory-Leaks) nach fehlgeschlagenen Multi-Index-Commits zu verhindern.
+    pub fn on_rollback(&self, tenant: TenantId, chunk_ids: &[u64]) {
+        self.remove_segments_for_rollback(tenant, chunk_ids);
+    }
+
     /// Entfernt alle Segmente mit den angegebenen `segment_ids` für den gegebenen Tenant.
     ///
     /// Muss bei transaktionalem Rollback aufgerufen werden, wenn ein `DbTransaction::commit()`
@@ -652,6 +660,27 @@ mod tests {
         store.clear_all();
         assert_eq!(store.get_tenant_segment_len(tenant_a), 0);
         assert_eq!(store.get_tenant_segment_len(tenant_b), 0);
+    }
+
+    #[test]
+    fn test_on_rollback_cleans_up_correctly() {
+        let store = TenantIsolatedKvStore::new();
+        let tenant = TenantId::try_new(42).unwrap();
+
+        for id in [10u64, 20, 30] {
+            store.insert_segment(tenant, KvSegment::new(tenant, id, vec![id as u8; 8]));
+        }
+        assert_eq!(store.get_tenant_segment_len(tenant), 3);
+
+        store.on_rollback(tenant, &[10, 30]);
+        assert_eq!(store.get_tenant_segment_len(tenant), 1);
+        assert!(store.get_segment_bytes(tenant, 10).is_none());
+        assert!(store.get_segment_bytes(tenant, 20).is_some());
+        assert!(store.get_segment_bytes(tenant, 30).is_none());
+
+        store.on_rollback(tenant, &[20]);
+        assert_eq!(store.get_tenant_segment_len(tenant), 0);
+        assert!(store.get_segments(tenant).is_empty());
     }
 
     #[test]
