@@ -1315,7 +1315,6 @@ impl LsmStorage {
     }
 }
 
-
 impl StorageEngine for LsmStorage {
     /// # ACID-Garantie
     /// Bietet Snapshot-Isolations-Point-Reads des aktuellsten committed Zustands.
@@ -1818,9 +1817,7 @@ impl StorageEngine for LsmStorage {
                 }
 
                 if let Err(e) = wal.append_batch(all_wal_entries).await {
-                    let _ = wal
-                        .restore_last_hmac(pending_queue.first_prev_hmac)
-                        .await;
+                    let _ = wal.restore_last_hmac(pending_queue.first_prev_hmac).await;
 
                     let last_tx = TxId::new(self.last_committed_tx.load(Ordering::Acquire));
                     let commit_guard = CommitGuard {
@@ -3402,7 +3399,11 @@ mod tests {
         // Put MAX_SCAN_MERGE_ACCUMULATOR + 5 items across multiple transactions (max 5000 ops per tx)
         let total = memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR + 5;
         let batch_size = 5000;
-        for (idx, chunk) in (0..total).collect::<Vec<_>>().chunks(batch_size).enumerate() {
+        for (idx, chunk) in (0..total)
+            .collect::<Vec<_>>()
+            .chunks(batch_size)
+            .enumerate()
+        {
             let tx = TxId::new((idx + 1) as u64);
             let entries: Vec<(Vec<u8>, Vec<u8>)> = chunk
                 .iter()
@@ -4424,10 +4425,7 @@ mod tests {
             .put_if_absent(tx_c, key_other, b"val_c")
             .await
             .unwrap();
-        assert!(
-            res_c,
-            "Tx C must successfully stage key_other concurrently"
-        );
+        assert!(res_c, "Tx C must successfully stage key_other concurrently");
     }
 
     #[tokio::test]

@@ -864,6 +864,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery` at a specific snapshot sequence.
+    #[allow(deprecated)]
     pub async fn hybrid_search_with_query_at(
         &self,
         query: &memfuse_core::HybridQuery,

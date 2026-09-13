@@ -368,7 +368,9 @@ async fn test_get_validates_oversized_id() {
         }),
     );
     let resp = server.handle(req).await;
-    let err = resp.error.expect("error expected for long ID in memfuse_get"); // expect
+    let err = resp
+        .error
+        .expect("error expected for long ID in memfuse_get"); // expect
     assert_eq!(err.code, -32602);
     assert!(err.message.contains("id length exceeds limit"));
 }
