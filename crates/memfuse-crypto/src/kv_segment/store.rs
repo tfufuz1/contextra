@@ -81,45 +81,90 @@ impl TenantState {
     }
 }
 
+/// Cache-Line-Padding verhindert False-Sharing auf 64-Byte-Cache-Lines.
+/// Keine externe Dependency nötig — `#[repr(align(64))]` ist stabile Safe-Rust-API.
+#[repr(align(64))]
+struct Shard {
+    lock: RwLock<AHashMap<TenantId, TenantState>>,
+}
+
+impl Shard {
+    fn new() -> Self {
+        Self {
+            lock: RwLock::new(AHashMap::new()),
+        }
+    }
+}
+
 /// Tenant-isolierter KV-Segment-Store.
 ///
 /// INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente
-/// eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps.
+/// eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps
+/// und Sharding.
 pub struct TenantIsolatedKvStore {
-    segments: RwLock<AHashMap<TenantId, TenantState>>,
-    eviction_round_offset: AtomicUsize,
-    /// Maximale Segment-Anzahl pro Tenant. Default: 256. Konfigurierbar via `with_capacity`.
+    /// 32 cache-line-gepaddete RwLock-Shards. Box<[_]> für flexible Shard-Anzahl.
+    shards: Box<[Shard]>,
+    shard_count: usize,
+    /// Globaler Offset für Shard-Rotation über Eviction-Aufrufe hinweg.
+    global_shard_offset: AtomicUsize,
+    /// Separater Eviction-Offset pro Shard für faire Round-Robin-Eviction.
+    eviction_round_offsets: Box<[AtomicUsize]>,
+    /// Maximale Segment-Kapazität pro Tenant (übergeben an TenantState::new).
     segment_capacity: NonZeroUsize,
 }
 
 impl TenantIsolatedKvStore {
+    pub const DEFAULT_SHARD_COUNT: usize = 32;
     pub const DEFAULT_SEGMENT_CAPACITY_PER_TENANT: usize = 256;
 
-    /// Erstellt einen neuen tenant-isolierten KV-Store.
+    /// Erstellt einen neuen tenant-isolierten KV-Store mit Standard-Shard-Anzahl (32).
     pub fn new() -> Self {
+        Self::with_shard_count(Self::DEFAULT_SHARD_COUNT)
+    }
+
+    /// Erstellt einen Store mit angegebener Shard-Anzahl.
+    /// Die Shard-Anzahl wird automatisch auf die nächste Zweierpotenz aufgerundet.
+    pub fn with_shard_count(n: usize) -> Self {
+        let shard_count = n.next_power_of_two().max(1);
+        let shards = (0..shard_count).map(|_| Shard::new()).collect::<Vec<_>>().into_boxed_slice();
+        let offsets = (0..shard_count)
+            .map(|_| AtomicUsize::new(0))
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
         Self {
-            segments: RwLock::new(AHashMap::new()),
-            eviction_round_offset: AtomicUsize::new(0),
-            segment_capacity: NonZeroUsize::new(Self::DEFAULT_SEGMENT_CAPACITY_PER_TENANT)
-                .unwrap(),
+            shards,
+            shard_count,
+            global_shard_offset: AtomicUsize::new(0),
+            eviction_round_offsets: offsets,
+            segment_capacity: NonZeroUsize::new(Self::DEFAULT_SEGMENT_CAPACITY_PER_TENANT).unwrap(),
         }
     }
 
     /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Tenant.
     pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self {
-        Self {
-            segments: RwLock::new(AHashMap::new()),
-            eviction_round_offset: AtomicUsize::new(0),
-            segment_capacity: NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap(),
-        }
+        let mut store = Self::new();
+        store.segment_capacity =
+            NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap();
+        store
+    }
+
+    /// Deterministisches Shard-Mapping via Bitmask (Power-of-2).
+    #[inline]
+    fn shard_idx(&self, tenant: TenantId) -> usize {
+        (tenant.inner() as usize) & (self.shard_count - 1)
     }
 
     /// Fügt ein Segment für einen bestimmten Tenant ein.
     pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
+        let idx = self.shard_idx(tenant);
         let capacity = self.segment_capacity;
-        let mut map = self.segments.write();
-        let state = map.entry(tenant).or_insert_with(|| TenantState::new(capacity));
-        let _evicted = state.insert_returning_evicted(segment);
+        let _evicted = {
+            let mut shard = self.shards[idx].lock.write();
+            let state = shard
+                .entry(tenant)
+                .or_insert_with(|| TenantState::new(capacity));
+            state.insert_returning_evicted(segment)
+        }; // ← Lock freigegeben HIER, _evicted wird ausserhalb des Locks gedroppt
     }
 
     /// Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback.
@@ -139,15 +184,22 @@ impl TenantIsolatedKvStore {
         if segment_ids.is_empty() {
             return;
         }
-        let mut map = self.segments.write();
-        if let Some(state) = map.get_mut(&tenant) {
-            for &id in segment_ids {
-                state.remove(id);
+        let idx = self.shard_idx(tenant);
+        let _deferred: Vec<KvSegment> = {
+            let mut shard = self.shards[idx].lock.write();
+            if let Some(state) = shard.get_mut(&tenant) {
+                let removed = segment_ids
+                    .iter()
+                    .filter_map(|&id| state.remove(id))
+                    .collect();
+                if state.is_empty() {
+                    shard.remove(&tenant);
+                }
+                removed
+            } else {
+                vec![]
             }
-            if state.is_empty() {
-                map.remove(&tenant);
-            }
-        }
+        }; // ← Lock freigegeben HIER, _deferred ZeroizeOnDrop läuft ausserhalb des Locks
         tracing::debug!(
             tenant_id = ?tenant,
             removed_segment_ids = ?segment_ids,
@@ -162,7 +214,9 @@ impl TenantIsolatedKvStore {
 
     /// Liefert unverschlüsselte Segment-Bytes für einen Tenant (Klartext-Modus).
     pub fn get_segment_bytes(&self, tenant: TenantId, segment_id: u64) -> Option<Vec<u8>> {
-        self.segments
+        let idx = self.shard_idx(tenant);
+        self.shards[idx]
+            .lock
             .write()
             .get_mut(&tenant)?
             .get_bytes(segment_id)
@@ -194,7 +248,9 @@ impl TenantIsolatedKvStore {
     /// INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente
     /// eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps.
     pub fn get_segments(&self, tenant: TenantId) -> Vec<u64> {
-        self.segments
+        let idx = self.shard_idx(tenant);
+        self.shards[idx]
+            .lock
             .read()
             .get(&tenant)
             .map(|state| state.segment_ids().collect())
@@ -209,8 +265,9 @@ impl TenantIsolatedKvStore {
         tenant: TenantId,
         segment_id: u64,
     ) -> Result<Option<Vec<u8>>, crate::CryptoError> {
-        let mut map = self.segments.write();
-        if let Some(state) = map.get_mut(&tenant) {
+        let idx = self.shard_idx(tenant);
+        let mut shard = self.shards[idx].lock.write();
+        if let Some(state) = shard.get_mut(&tenant) {
             if let Some(seg) = state.get_segment_ref_mut(segment_id) {
                 let decrypted = seg.decrypt_data(cipher)?;
                 return Ok(Some(decrypted));
@@ -221,7 +278,9 @@ impl TenantIsolatedKvStore {
 
     /// Gibt die Anzahl der gespeicherten Segmente für einen bestimmten Tenant zurück.
     pub fn get_tenant_segment_len(&self, tenant: TenantId) -> usize {
-        self.segments
+        let idx = self.shard_idx(tenant);
+        self.shards[idx]
+            .lock
             .read()
             .get(&tenant)
             .map(|s| s.len())
@@ -231,39 +290,55 @@ impl TenantIsolatedKvStore {
     /// Dies ist GLOBALES LRU ohne Tenant-Fairness. Für faire Multi-Tenant-Eviction siehe `evict_lru_fair()`.
     #[allow(dead_code)]
     pub(crate) fn evict_lru_global(&self, target_free_bytes: usize) -> usize {
-        let mut map = self.segments.write();
         let mut freed = 0;
 
-        while freed < target_free_bytes && !map.is_empty() {
-            let mut lru_tenant = None;
-            let mut oldest_time = None;
+        'outer: while freed < target_free_bytes {
+            let mut made_progress = false;
+            let start_shard = self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
 
-            for (tenant, state) in map.iter() {
-                if let Some((_, seg)) = state.cache.peek_lru() {
-                    let acc = seg.last_accessed();
-                    if oldest_time.is_none_or(|t| acc < t) {
-                        lru_tenant = Some(*tenant);
-                        oldest_time = Some(acc);
+            for s_idx in 0..self.shard_count {
+                if freed >= target_free_bytes {
+                    break 'outer;
+                }
+                let shard_idx = (start_shard + s_idx) % self.shard_count;
+
+                // Phase 1: Evict unter Lock — nur pop_lru, kein Zeroize
+                let evicted_opt: Option<(TenantId, KvSegment)> = {
+                    let mut shard = self.shards[shard_idx].lock.write();
+                    let tenant_opt = shard.keys().copied().next();
+                    if let Some(tenant) = tenant_opt {
+                        if let Some(state) = shard.get_mut(&tenant) {
+                            if let Some(seg) = state.pop_lru() {
+                                if state.is_empty() {
+                                    shard.remove(&tenant);
+                                }
+                                Some((tenant, seg))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
                     }
+                }; // ← Shard-Lock freigegeben
+
+                // Phase 2: Zeroize AUSSERHALB des Locks (behebt D3)
+                if let Some((tenant, evicted)) = evicted_opt {
+                    freed += evicted.len();
+                    made_progress = true;
+                    tracing::debug!(
+                        tenant_id = tenant.inner(),
+                        segment_id = evicted.segment_id,
+                        freed_bytes = evicted.len(),
+                        "KV eviction worker: evicted segment"
+                    );
+                    drop(evicted); // ZeroizeOnDrop läuft hier, Lock ist bereits freigegeben
                 }
             }
 
-            if let Some(tenant) = lru_tenant {
-                if let Some(state) = map.get_mut(&tenant) {
-                    if let Some(evicted) = state.pop_lru() {
-                        freed += evicted.len();
-                        tracing::debug!(
-                            tenant_id = tenant.inner(),
-                            segment_id = evicted.segment_id,
-                            freed_bytes = evicted.len(),
-                            "KV eviction worker: evicted segment"
-                        );
-                    }
-                    if state.is_empty() {
-                        map.remove(&tenant);
-                    }
-                }
-            } else {
+            if !made_progress {
                 break;
             }
         }
@@ -307,68 +382,79 @@ impl TenantIsolatedKvStore {
         let mut freed = 0;
 
         'outer: while freed < target_free_bytes {
-            {
-                let mut map = self.segments.write();
-                if map.is_empty() {
-                    break;
+            let mut made_progress_in_pass = false;
+            let start_shard = self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
+
+            for _round in 0..Self::MAX_ROUNDS_PER_LOCK_ACQUISITION {
+                if freed >= target_free_bytes {
+                    break 'outer;
                 }
 
-                for _round in 0..Self::MAX_ROUNDS_PER_LOCK_ACQUISITION {
+                for s_idx in 0..self.shard_count {
                     if freed >= target_free_bytes {
                         break 'outer;
                     }
 
-                    let tenants: Vec<TenantId> = map.keys().copied().collect();
-                    let n = tenants.len();
-                    if n == 0 {
-                        break 'outer;
-                    }
+                    let shard_idx = (start_shard + s_idx) % self.shard_count;
+                    let mut deferred_drop: Vec<KvSegment> = Vec::new();
+                    #[cfg(test)]
+                    let mut evicted_in_shard = false;
 
-                    let offset = self.eviction_round_offset.fetch_add(1, Ordering::Relaxed) % n;
+                    // Phase 1: Eviction unter Shard-Lock (1 Runde über Tenants des Shards)
+                    {
+                        let mut shard = self.shards[shard_idx].lock.write();
+                        if !shard.is_empty() {
+                            let tenants: Vec<TenantId> = shard.keys().copied().collect();
+                            let n = tenants.len();
+                            if n > 0 {
+                                let offset = self.eviction_round_offsets[shard_idx]
+                                    .fetch_add(1, Ordering::Relaxed) % n;
 
-                    let mut evicted_in_round = false;
-
-                    for i in (offset..n).chain(0..offset) {
-                        let tenant = tenants[i];
-                        if freed >= target_free_bytes {
-                            break;
-                        }
-
-                        if let Some(state) = map.get_mut(&tenant) {
-                            if state.is_empty() {
-                                map.remove(&tenant);
-                                continue;
-                            }
-
-                            if let Some(evicted) = state.pop_lru() {
-                                freed += evicted.len();
-                                evicted_in_round = true;
-
-                                tracing::debug!(
-                                    tenant_id = tenant.inner(),
-                                    segment_id = evicted.segment_id,
-                                    freed_bytes = evicted.len(),
-                                    "KV eviction worker: evicted segment"
-                                );
-
-                                if state.is_empty() {
-                                    map.remove(&tenant);
+                                for i in (offset..n).chain(0..offset) {
+                                    if freed >= target_free_bytes {
+                                        break;
+                                    }
+                                    let tenant = tenants[i];
+                                    if let Some(state) = shard.get_mut(&tenant) {
+                                        if let Some(evicted) = state.pop_lru() {
+                                            freed += evicted.len();
+                                            #[cfg(test)]
+                                            {
+                                                evicted_in_shard = true;
+                                            }
+                                            made_progress_in_pass = true;
+                                            tracing::debug!(
+                                                tenant_id = tenant.inner(),
+                                                segment_id = evicted.segment_id,
+                                                freed_bytes = evicted.len(),
+                                                "KV eviction worker: evicted segment"
+                                            );
+                                            deferred_drop.push(evicted);
+                                        }
+                                        if state.is_empty() {
+                                            shard.remove(&tenant);
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
+                    } // ← Shard-Lock freigegeben HIER
 
-                    if !evicted_in_round {
-                        break 'outer;
+                    // Phase 2: Zeroize AUSSERHALB des Locks (behebt D3)
+                    deferred_drop.clear(); // ZeroizeOnDrop für alle evicteten Segmente
+
+                    // Test-Hook: signalisiert, dass Lock nach Eviction-Batch freigegeben wurde
+                    #[cfg(test)]
+                    if evicted_in_shard && freed < target_free_bytes {
+                        if let Some(ref mut hook) = batch_released_hook {
+                            hook();
+                        }
                     }
                 }
             }
 
-            #[cfg(test)]
-            if freed < target_free_bytes {
-                if let Some(ref mut hook) = batch_released_hook {
-                    hook();
-                }
+            if !made_progress_in_pass {
+                break;
             }
         }
 
@@ -376,8 +462,16 @@ impl TenantIsolatedKvStore {
     }
 
     pub fn clear_all(&self) {
-        let mut map = self.segments.write();
-        map.clear();
+        let mut all_segments: Vec<KvSegment> = Vec::new();
+        for shard in self.shards.iter() {
+            let mut s = shard.lock.write();
+            for (_, mut state) in s.drain() {
+                while let Some(seg) = state.pop_lru() {
+                    all_segments.push(seg);
+                }
+            }
+        } // ← Alle Shard-Locks freigegeben HIER
+        drop(all_segments);
         tracing::warn!("KV emergency_wipe: all segments zeroized synchronously");
     }
 }
@@ -591,13 +685,10 @@ mod tests {
         for _call_num in 0..5 {
             store.evict_lru_fair(150);
 
-            let segments = store.segments.read();
             for tenant in [1u64, 2, 3, 4, 5].iter() {
                 let tenant_id = TenantId::try_new(*tenant).unwrap();
-                if let Some(state) = segments.get(&tenant_id) {
-                    let remaining = state.len();
-                    evicted_by_tenant.insert(*tenant, 10 - remaining);
-                }
+                let remaining = store.get_tenant_segment_len(tenant_id);
+                evicted_by_tenant.insert(*tenant, 10 - remaining);
             }
         }
 
