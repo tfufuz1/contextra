@@ -1,5 +1,5 @@
 use super::BoxFuture;
-use crate::{ConfigFingerprint, ModelFingerprint};
+use crate::{ConfigFingerprint, ModelFingerprint, TenantId};
 use thiserror::Error;
 
 /// Representation of a context segment passed to context-aware text generation.
@@ -100,9 +100,11 @@ pub trait LlmTextGenerator: Send + Sync + 'static {
     /// Default implementation naively concatenates segment texts with `"\n\n"` and invokes `self.generate(&concatenated)`.
     fn generate_with_context<'a>(
         &'a self,
+        tenant: TenantId,
         segments: &'a [ContextSegment<'a>],
     ) -> BoxFuture<'a, crate::Result<String>> {
         Box::pin(async move {
+            let _ = tenant;
             let concatenated = segments
                 .iter()
                 .map(|s| s.text)
@@ -226,8 +228,9 @@ mod tests {
         assert!(seg1.model_fingerprint.is_none());
         assert!(seg1.rope_offset.is_none());
 
+        let tenant = TenantId::try_new(1).unwrap();
         let llm = MockDefaultLlm;
-        let res = llm.generate_with_context(&[seg1, seg2]).await?;
+        let res = llm.generate_with_context(tenant, &[seg1, seg2]).await?;
         assert_eq!(res, "Generated: First segment\n\nSecond segment");
         Ok(())
     }
@@ -235,10 +238,11 @@ mod tests {
     #[tokio::test]
     async fn test_generate_with_context_default_matches_concatenation(
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let tenant = TenantId::try_new(1).unwrap();
         let seg1 = ContextSegment::new(101, "Hello");
         let seg2 = ContextSegment::new(102, "World");
         let llm = MockDefaultLlm;
-        let with_ctx = llm.generate_with_context(&[seg1, seg2]).await?;
+        let with_ctx = llm.generate_with_context(tenant, &[seg1, seg2]).await?;
         let direct = llm.generate("Hello\n\nWorld").await?;
         assert_eq!(with_ctx, direct);
         Ok(())
@@ -247,7 +251,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_with_context_empty_segments() -> Result<(), Box<dyn std::error::Error>> {
         let llm = MockDefaultLlm;
-        let res = llm.generate_with_context(&[]).await?;
+        let res = llm.generate_with_context(tenant, &[]).await?;
         assert_eq!(res, "Generated: ");
         Ok(())
     }
