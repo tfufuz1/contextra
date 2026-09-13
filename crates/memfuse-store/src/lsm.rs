@@ -1771,10 +1771,20 @@ impl StorageEngine for LsmStorage {
                 drop(queue_guard);
                 drop(_commit_lock);
 
-                // Wait for group commit window or until MAX_GROUP_COMMIT_BATCH_SIZE is reached
-                tokio::select! {
-                    _ = tokio::time::sleep(Duration::from_micros(self.config.group_commit_window_micros)) => {},
-                    _ = notify_full.notified() => {},
+                // Zero-Wait Heuristik: Yield to give ready followers a chance to enqueue.
+                // If no followers arrived during yield, commit immediately without waiting for the full sleep window.
+                tokio::task::yield_now().await;
+                let has_followers = {
+                    let queue_guard = self.pending_commit_queue.lock().await;
+                    queue_guard.as_ref().map_or(false, |q| !q.requests.is_empty())
+                };
+
+                if has_followers {
+                    // Wait for remaining group commit window or until MAX_GROUP_COMMIT_BATCH_SIZE is reached
+                    tokio::select! {
+                        _ = tokio::time::sleep(Duration::from_micros(self.config.group_commit_window_micros)) => {},
+                        _ = notify_full.notified() => {},
+                    }
                 }
 
                 // Acquire commit_mutex to perform bundled disk write and state updates
