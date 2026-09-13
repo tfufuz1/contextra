@@ -33,6 +33,10 @@ pub mod tenant_codec;
 pub(crate) mod util;
 pub mod wal;
 
+// WP-4.1 (UNIMPLEMENTED): mmap-basierter SSTable-Zugriff für Out-of-Core-Daten.
+// Aktuell: reguläres tokio::fs/std::fs File-I/O in sstable.rs.
+// Tracking-Issue: [ISSUE-NUMMER]
+
 pub use compaction::{CompactionConfig, CompactionEngine};
 pub use lsm::{LsmConfig, LsmStorage};
 pub use manifest::{Manifest, ManifestEntry};
