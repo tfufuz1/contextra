@@ -166,7 +166,7 @@ impl McpSandbox {
     /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
     pub fn classify_method(method: &str) -> ToolCategory {
         match method {
-            "memfuse_search" | "memfuse_get" | "memfuse_collections" => ToolCategory::DatabaseRead,
+            "memfuse_search" | "memfuse_get" | "memfuse_collections" | "memfuse_cloud_query" => ToolCategory::DatabaseRead,
             "memfuse_insert"
             | "memfuse_delete"
             | "memfuse_upsert"

@@ -73,11 +73,13 @@ async fn test_tools_list_returns_all_tools() {
         .unwrap() // unwrap
         .clone();
     let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+    assert_eq!(tools.len(), 6);
     assert!(names.contains(&"memfuse_search"));
     assert!(names.contains(&"memfuse_insert"));
     assert!(names.contains(&"memfuse_get"));
     assert!(names.contains(&"memfuse_collections"));
     assert!(names.contains(&"memfuse_consolidate"));
+    assert!(names.contains(&"memfuse_cloud_query"));
 }
 
 #[tokio::test]
@@ -778,4 +780,138 @@ async fn test_kv_bridge_adapter_consulted_on_retrieve() {
         bridge.consultation_count() > 0,
         "KvBridgeAdapter must be consulted during memfuse_search execution"
     );
+}
+
+#[tokio::test]
+async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
+    let (server, _tmp) = create_mock_server().await;
+
+    // 1. Test simulated email address payload
+    let req_email = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_cloud_query",
+            "arguments": {
+                "query": "search user data for alice@example.com"
+            }
+        }),
+    );
+    let resp_email = server.handle(req_email).await;
+    let res_val1 = serde_json::to_value(&resp_email).unwrap();
+    assert_eq!(res_val1["result"]["isError"], true);
+    let err_msg1 = res_val1["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        err_msg1.contains("Egress policy violation"),
+        "Expected block message for email input, got: '{err_msg1}'"
+    );
+
+    // 2. Test simulated API key payload (e.g. sk-...)
+    let req_apikey = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_cloud_query",
+            "arguments": {
+                "query": "query API using secret sk-abc123456789"
+            }
+        }),
+    );
+    let resp_apikey = server.handle(req_apikey).await;
+    let res_val2 = serde_json::to_value(&resp_apikey).unwrap();
+    assert_eq!(res_val2["result"]["isError"], true);
+    let err_msg2 = res_val2["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        err_msg2.contains("Egress policy violation"),
+        "Expected block message for API key input, got: '{err_msg2}'"
+    );
+}
+
+#[tokio::test]
+async fn test_cloud_query_allow_returns_success() {
+    let (server, _tmp) = create_mock_server().await;
+
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_cloud_query",
+            "arguments": {
+                "query": "safe public query for documentation"
+            }
+        }),
+    );
+
+    let resp = server.handle(req).await;
+    assert!(resp.error.is_none());
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_ne!(res_val["result"]["isError"], true);
+
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
+
+    assert_eq!(json_res["status"], "success");
+    assert_eq!(json_res["abstracted"], false);
+    assert_eq!(json_res["query"], "safe public query for documentation");
+}
+
+#[tokio::test]
+async fn test_cloud_query_requires_abstraction() {
+    let (server, _tmp) = create_mock_server().await;
+
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_cloud_query",
+            "arguments": {
+                "query": "query containing PII information to abstract"
+            }
+        }),
+    );
+
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_ne!(res_val["result"]["isError"], true);
+
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
+
+    assert_eq!(json_res["status"], "success");
+    assert_eq!(json_res["abstracted"], true);
+    assert_eq!(json_res["query"], "[REDACTED_SENSITIVE_QUERY]");
+    assert!(json_res["abstraction_notice"]
+        .as_str()
+        .unwrap()
+        .contains("abstracted before processing"));
+}
+
+#[tokio::test]
+async fn test_cloud_query_validates_empty_and_oversized_query() {
+    let (server, _tmp) = create_mock_server().await;
+
+    // 1. Whitespace / empty query
+    let req_empty = make_request(
+        "memfuse_cloud_query",
+        json!({
+            "query": "   "
+        }),
+    );
+    let resp_empty = server.handle(req_empty).await;
+    let err_empty = resp_empty
+        .error
+        .expect("error expected for empty cloud query");
+    assert_eq!(err_empty.code, -32602);
+    assert!(err_empty.message.contains("query cannot be empty"));
+
+    // 2. Oversized query (> 64KB)
+    let huge_query = "q".repeat(crate::MAX_SEARCH_QUERY_BYTES + 1);
+    let req_huge = make_request(
+        "memfuse_cloud_query",
+        json!({
+            "query": huge_query
+        }),
+    );
+    let resp_huge = server.handle(req_huge).await;
+    let err_huge = resp_huge
+        .error
+        .expect("error expected for oversized cloud query");
+    assert_eq!(err_huge.code, -32602);
+    assert!(err_huge.message.contains("query size exceeds limit"));
 }
