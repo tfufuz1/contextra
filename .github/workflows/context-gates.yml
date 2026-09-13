@@ -31,6 +31,7 @@ jobs:
       - name: "Gate 12: Duplicate-PR-Intent-Detection"
         env:
           MEMFUSE_PR_BODY: ${{ github.event.pull_request.body || '' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cargo run -p xtask -- check-duplicate-intent
 
       - name: "Gate 12b: Phantom-File-Verification"
@@ -215,14 +216,12 @@ jobs:
           MEMFUSE_CI: "true"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Claim-Crate aus PR-Body extrahieren (Pflichtfeld)
+          # Claim-Crate aus PR-Body extrahieren (falls vorhanden)
           PR_BODY="${{ github.event.pull_request.body || '' }}"
           CLAIM_CRATE=$(echo "$PR_BODY" | grep -oP '(?<=Claim-Crate: )\S+' || true)
           if [ -n "$CLAIM_CRATE" ] && [ "$CLAIM_CRATE" != "<!--" ]; then
             export MEMFUSE_CLAIM_CRATE="$CLAIM_CRATE"
             echo "ℹ️ Claim-Crate aus PR-Body: $CLAIM_CRATE"
-          else
-            echo "⚠️ Kein Claim-Crate in PR-Body gefunden — Claim-Check wird übersprungen"
           fi
           cargo run -p xtask -- jules-preflight --fast
           echo "✅ Jules Preflight: alle Checks bestanden"

@@ -100,42 +100,52 @@ pub fn check_no_active_claim_conflict(root: &Path, target_crate: Option<&str>) -
     let token = std::env::var("GITHUB_TOKEN")
         .ok()
         .filter(|t| !t.trim().is_empty());
+    let current_session = std::env::var("MEMFUSE_SESSION_HASH")
+        .or_else(|_| std::env::var("JULES_SESSION_ID"))
+        .unwrap_or_default();
 
-    if !is_ci {
-        if let Some(tok) = token {
-            let check_url = format!(
-                "https://api.github.com/repos/tfufuz1/memfuse/issues?labels=claim:{}&state=open",
-                krate
-            );
-            let output = std::process::Command::new("curl")
-                .args([
-                    "-s",
-                    "-H",
-                    &format!("Authorization: Bearer {}", tok),
-                    "-H",
-                    "User-Agent: memfuse-xtask",
-                    "-H",
-                    "Accept: application/vnd.github+json",
-                    &check_url,
-                ])
-                .output();
+    if let Some(tok) = token {
+        let check_url = format!(
+            "https://api.github.com/repos/tfufuz1/memfuse/issues?labels=claim:{}&state=open",
+            krate
+        );
+        let output = std::process::Command::new("curl")
+            .args([
+                "-s",
+                "-H",
+                &format!("Authorization: Bearer {}", tok),
+                "-H",
+                "User-Agent: memfuse-xtask",
+                "-H",
+                "Accept: application/vnd.github+json",
+                &check_url,
+            ])
+            .output();
 
-            if let Ok(out) = output {
-                if out.status.success() {
-                    let body = String::from_utf8_lossy(&out.stdout);
-                    if let Ok(issues) = serde_json::from_str::<serde_json::Value>(&body) {
-                        if let Some(arr) = issues.as_array() {
-                            if !arr.is_empty() {
-                                return CheckResult::Fail(format!(
-                                    "Aktiver Claim auf GitHub für Crate '{}' gefunden.",
-                                    krate
-                                ));
+        if let Ok(out) = output {
+            if out.status.success() {
+                let body = String::from_utf8_lossy(&out.stdout);
+                if let Ok(issues) = serde_json::from_str::<serde_json::Value>(&body) {
+                    if let Some(arr) = issues.as_array() {
+                        for issue in arr {
+                            let issue_body = issue["body"].as_str().unwrap_or_default().trim();
+                            let issue_number = issue["number"].as_i64().unwrap_or(0);
+                            if !current_session.is_empty() && issue_body == current_session {
+                                continue;
                             }
+                            return CheckResult::Fail(format!(
+                                "Aktiver Claim auf GitHub für Crate '{}' (Issue #{}) gefunden.",
+                                krate, issue_number
+                            ));
                         }
                     }
                 }
+            } else {
+                eprintln!("⚠️ [Preflight] GitHub API Request für Claims mit Fehler beendet");
             }
         }
+    } else if is_ci {
+        eprintln!("⚠️ [Preflight] GITHUB_TOKEN nicht gesetzt in CI-Kontext — GitHub-Claim-Check konnte nicht ausgeführt werden.");
     }
 
     let claims_path = root.join(".jules/claims.json");
