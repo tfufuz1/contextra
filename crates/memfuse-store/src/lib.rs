@@ -14,6 +14,7 @@
 // DATEN-PFAD: Client → TxBuffer → WAL → MemTable → SSTable → Compaction
 // INVARIANTE: tokio::fs für Metadaten/Lifecycle, std::fs::File ausschließlich innerhalb spawn_blocking für Block-Level Random-Access.
 // ANCHOR[INTEGRATION:STO-001] STATUS:RESOLVED (TS:2026-08-24T00:00:00Z)
+// REVIEW-PASS[1/2] Systematischer Tiefen-Audit von memfuse-store (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-13T01:33:57Z) (SESSION: 60ca322c)
 // MODUL-HIERARCHIE: lsm.rs orchestriert, memtable/wal/sstable sind Bausteine.
 
 // INTENT: deny unsafe_code except Windows Win32 API calls for file permissions
