@@ -36,7 +36,7 @@ pub const MAX_RPC_BYTES: usize = 4 * 1024 * 1024;
 /// Maximum allowed search query length in bytes (64 KB).
 pub const MAX_SEARCH_QUERY_BYTES: usize = 64 * 1024;
 
-// AI-TAG[SMELL][MINOR] Missing inactivity timeout on stdio read_line_bounded (ID: AGT-MCP-a4c8ea50) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863)
+// AI-TAG[SMELL][RESOLVED] Missing inactivity timeout on stdio read_line_bounded (ID: AGT-MCP-782aa62e) (TS: 2026-09-13T14:29:07Z) (SESSION: 23626761)
 // BEFUND: read_line_bounded caps byte size at 4MB but has no idle read timeout.
 // RISIKO: Slowloris-style partial request streams can hold task handles open indefinitely.
 // EMPFEHLUNG: Wrap read_line_bounded invocations with tokio::time::timeout in run_stdio loop.
@@ -280,6 +280,12 @@ impl McpServer {
         let mut line_buf = String::new();
         const STDIO_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
+        let timeout_secs = std::env::var("MEMFUSE_MCP_IDLE_TIMEOUT_SECS")
+            .ok()
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .unwrap_or(30);
+        let timeout_duration = std::time::Duration::from_secs(timeout_secs);
+
         loop {
             let read_res = tokio::time::timeout(
                 STDIO_READ_TIMEOUT,
@@ -323,14 +329,14 @@ impl McpServer {
                         stdout.flush().await?;
                     }
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
+                Ok(Err(e)) if e.kind() == std::io::ErrorKind::InvalidData => {
                     let response = JsonRpcResponse::err(None, -32700, format!("Parse error: {e}"));
                     let mut out = serde_json::to_string(&response)?;
                     out.push('\n');
                     stdout.write_all(out.as_bytes()).await?;
                     stdout.flush().await?;
                 }
-                Err(e) => return Err(Box::new(e)),
+                Ok(Err(e)) => return Err(Box::new(e)),
             }
         }
         Ok(())
