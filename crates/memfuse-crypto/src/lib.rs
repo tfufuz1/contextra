@@ -21,12 +21,17 @@
 pub mod anti_tamper;
 pub mod crypto;
 pub mod deletion_proof;
+pub mod egress_vault;
 pub mod error;
 pub mod kv_cipher;
 pub mod kv_segment;
 pub mod wal_crypto;
 
 pub use crypto::KeyManager as CryptoKey;
+pub use egress_vault::{
+    BlockReason, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
+    EgressVaultError,
+};
 pub use deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
