@@ -1540,11 +1540,9 @@ impl HnswIndexCore {
                 } else {
                     let mut v = vec![0.0f32; self.config.dimension];
                     for i in 0..self.config.dimension {
-                        v[i] = f32::from_le_bytes(
-                            bytes[i * 4..(i + 1) * 4]
-                                .try_into()
-                                .map_err(|_| MemFuseError::Index("Corrupt f32 in mmap vector".into()))?,
-                        );
+                        v[i] = f32::from_le_bytes(bytes[i * 4..(i + 1) * 4].try_into().map_err(
+                            |_| MemFuseError::Index("Corrupt f32 in mmap vector".into()),
+                        )?);
                     }
                     Ok(VectorData::F32(v))
                 };
@@ -1703,14 +1701,7 @@ impl HnswIndexCore {
         m: usize,
     ) -> Result<Vec<u32>> {
         let dummy = VectorData::F32(Vec::new());
-        self.select_neighbors_heuristic_with_batch(
-            ctx,
-            candidates,
-            m,
-            usize::MAX,
-            &dummy,
-            &[],
-        )
+        self.select_neighbors_heuristic_with_batch(ctx, candidates, m, usize::MAX, &dummy, &[])
     }
 
     pub fn compute_insert(&self, id: DocId, vector: &[f32]) -> Result<PreparedInsert> {

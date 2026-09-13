@@ -84,8 +84,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if let Some(obj) = meta_obj {
                     if let Some(imp_val) = obj.get("importance") {
                         let (base_score, created_tx) = if let Ok(imp) =
-                            serde_json::from_value::<memfuse_core::MemoryImportance>(imp_val.clone())
-                        {
+                            serde_json::from_value::<memfuse_core::MemoryImportance>(
+                                imp_val.clone(),
+                            ) {
                             (imp.base_score.value(), imp.created_at_tx.inner())
                         } else if let Some(raw_f64) = imp_val.as_f64() {
                             let created = obj

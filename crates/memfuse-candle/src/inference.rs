@@ -109,7 +109,8 @@ impl CandleLlmClient {
 
     /// Returns the total count of segment prefill skips via KV cache hits.
     pub fn prefill_skip_count(&self) -> u64 {
-        self.prefill_skip_count.load(std::sync::atomic::Ordering::SeqCst)
+        self.prefill_skip_count
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Configures maximum concurrent inference operations for backpressure control.
@@ -489,10 +490,8 @@ impl LlmTextGenerator for CandleLlmClient {
                     }
                 }
             } else {
-                self.prefill_count.fetch_add(
-                    segments.len() as u64,
-                    std::sync::atomic::Ordering::SeqCst,
-                );
+                self.prefill_count
+                    .fetch_add(segments.len() as u64, std::sync::atomic::Ordering::SeqCst);
             }
 
             let concatenated = segments
@@ -513,10 +512,8 @@ impl LlmTextGenerator for CandleLlmClient {
     ) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
             let _ = tenant;
-            self.prefill_count.fetch_add(
-                segments.len() as u64,
-                std::sync::atomic::Ordering::SeqCst,
-            );
+            self.prefill_count
+                .fetch_add(segments.len() as u64, std::sync::atomic::Ordering::SeqCst);
             let concatenated = segments
                 .iter()
                 .map(|s| s.text)
@@ -713,8 +710,10 @@ mod tests {
             .generate("Chunk 1 content\n\nChunk 2 content")
             .await
             .unwrap();
-        let context_without_adapter_res =
-            client_plain.generate_with_context(tenant, &segments).await.unwrap();
+        let context_without_adapter_res = client_plain
+            .generate_with_context(tenant, &segments)
+            .await
+            .unwrap();
 
         assert_eq!(
             direct_concat_res, context_without_adapter_res,

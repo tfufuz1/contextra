@@ -1202,10 +1202,7 @@ impl Wal {
 
     /// Prepares a batch of entries, ensuring correct HMAC chaining between them.
     /// Returns the prepared entries along with a snapshot of the pre-prepare HMAC chain link.
-    pub async fn prepare_batch(
-        &self,
-        ops: Vec<(WalOp, u64)>,
-    ) -> Result<(PreparedBatch, [u8; 32])> {
+    pub async fn prepare_batch(&self, ops: Vec<(WalOp, u64)>) -> Result<(PreparedBatch, [u8; 32])> {
         let mut last_hmac = self.last_hmac.lock().await;
         let prev_hmac = *last_hmac;
         let integrity_key = self.get_integrity_key()?;
@@ -2031,7 +2028,10 @@ mod tests {
                     key: format!("key{}", i).into_bytes(),
                     value: format!("val{}", i).into_bytes(),
                 };
-                let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("create entry");
+                let (batch, _) = wal
+                    .prepare_batch(vec![(op, i)])
+                    .await
+                    .expect("create entry");
                 wal.append_batch(batch).await.expect("append entry");
             }
         }
@@ -2402,7 +2402,10 @@ mod tests {
                 key: b"crash_k".to_vec(),
                 value: b"crash_v".to_vec(),
             };
-            let (batch, _) = wal.prepare_batch(vec![(op, 1)]).await.expect("create entry"); // expect
+            let (batch, _) = wal
+                .prepare_batch(vec![(op, 1)])
+                .await
+                .expect("create entry"); // expect
             let entry = &batch.entries()[0];
 
             // Manually simulate a write + flush to OS buffer WITHOUT file.sync_all()
@@ -3428,7 +3431,10 @@ mod tests {
                 key: format!("k{}", i).into_bytes(),
                 value: format!("v{}", i).into_bytes(),
             };
-            let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("prepare batch");
+            let (batch, _) = wal
+                .prepare_batch(vec![(op, i)])
+                .await
+                .expect("prepare batch");
             wal.append_batch(batch).await.expect("append entry");
         }
 
@@ -3769,7 +3775,10 @@ mod tests {
             value: b"direct_v".to_vec(),
         };
 
-        let (batch, _) = wal.prepare_batch(vec![(op, 1)]).await.expect("create entry");
+        let (batch, _) = wal
+            .prepare_batch(vec![(op, 1)])
+            .await
+            .expect("create entry");
 
         println!("[STRACE_MARKER_START_DIRECT_APPEND]");
         let append_res = wal.append_batch(batch).await;
@@ -3792,7 +3801,10 @@ mod tests {
                 key: format!("key_{i}").into_bytes(),
                 value: format!("val_{i}").into_bytes(),
             };
-            let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("prepare batch");
+            let (batch, _) = wal
+                .prepare_batch(vec![(op, i)])
+                .await
+                .expect("prepare batch");
             let checksum = batch.entries()[0].checksum;
             wal.append_batch(batch).await.expect("append entry");
             hmacs.push(checksum);
@@ -3885,8 +3897,9 @@ mod tests {
     async fn test_attack_a_swap_blocks_encrypted_detected() {
         let dir = tempdir().expect("tempdir");
         let wal_path = dir.path().join("encrypted_swap.wal");
-        let km =
-            Arc::new(KeyManager::try_new("pass_swap", b"salt123456789012345678901234567890").unwrap());
+        let km = Arc::new(
+            KeyManager::try_new("pass_swap", b"salt123456789012345678901234567890").unwrap(),
+        );
 
         {
             let wal = Wal::open_with_key_manager(&wal_path, Some(km.clone()))
@@ -3898,7 +3911,10 @@ mod tests {
                     key: format!("k{i}").into_bytes(),
                     value: format!("v{i}").into_bytes(),
                 };
-                let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("prepare batch");
+                let (batch, _) = wal
+                    .prepare_batch(vec![(op, i)])
+                    .await
+                    .expect("prepare batch");
                 wal.append_batch(batch).await.expect("append");
             }
         }
@@ -3914,7 +3930,9 @@ mod tests {
         tampered_data.extend_from_slice(&chunks[1]);
         tampered_data.extend_from_slice(&chunks[4]);
 
-        tokio::fs::write(&wal_path, &tampered_data).await.expect("write");
+        tokio::fs::write(&wal_path, &tampered_data)
+            .await
+            .expect("write");
 
         let open_res = Wal::open_with_key_manager(&wal_path, Some(km)).await;
 
@@ -3942,7 +3960,9 @@ mod tests {
             truncated_data.extend_from_slice(chunk);
         }
 
-        tokio::fs::write(&wal_path, &truncated_data).await.expect("write");
+        tokio::fs::write(&wal_path, &truncated_data)
+            .await
+            .expect("write");
 
         let wal = Wal::open(&wal_path).await.expect("open wal");
         let res = wal.replay().await;
@@ -3976,7 +3996,9 @@ mod tests {
         tampered_data.extend_from_slice(&chunks[3]);
         tampered_data.extend_from_slice(&chunks[4]);
 
-        tokio::fs::write(&wal_path, &tampered_data).await.expect("write");
+        tokio::fs::write(&wal_path, &tampered_data)
+            .await
+            .expect("write");
 
         let open_res = Wal::open(&wal_path).await;
 
@@ -4011,7 +4033,9 @@ mod tests {
         tampered_data.extend_from_slice(&chunks_b[3]);
         tampered_data.extend_from_slice(&chunks_b[4]);
 
-        tokio::fs::write(&wal_path_b, &tampered_data).await.expect("write");
+        tokio::fs::write(&wal_path_b, &tampered_data)
+            .await
+            .expect("write");
 
         let open_res = Wal::open(&wal_path_b).await;
 
@@ -4035,8 +4059,9 @@ mod tests {
         let wal_path_a = dir1.path().join("wal_a.wal");
         let wal_path_b = dir2.path().join("wal_b.wal");
 
-        let km =
-            Arc::new(KeyManager::try_new("cross_pass", b"salt123456789012345678901234567890").unwrap());
+        let km = Arc::new(
+            KeyManager::try_new("cross_pass", b"salt123456789012345678901234567890").unwrap(),
+        );
 
         {
             let wal_a = Wal::open_with_key_manager(&wal_path_a, Some(km.clone()))
@@ -4079,7 +4104,9 @@ mod tests {
         tampered_data.extend_from_slice(&chunks_b[3]);
         tampered_data.extend_from_slice(&chunks_b[4]);
 
-        tokio::fs::write(&wal_path_b, &tampered_data).await.expect("write");
+        tokio::fs::write(&wal_path_b, &tampered_data)
+            .await
+            .expect("write");
 
         let open_res = Wal::open_with_key_manager(&wal_path_b, Some(km)).await;
 
@@ -4105,7 +4132,10 @@ mod tests {
                 key: format!("sensor:data:{}", i).into_bytes(),
                 value: format!("payload_{:04}", i).into_bytes(),
             };
-            let (batch, _) = wal.prepare_batch(vec![(op, i as u64)]).await.expect("prepare batch");
+            let (batch, _) = wal
+                .prepare_batch(vec![(op, i as u64)])
+                .await
+                .expect("prepare batch");
             wal.append_batch(batch).await.expect("append");
         }
         wal_path
@@ -4206,7 +4236,9 @@ mod tests {
                 let mut corrupted_data = original_data.clone();
                 corrupted_data[byte_idx] ^= 0x01 << bit_idx;
 
-                tokio::fs::write(&wal_path, &corrupted_data).await.expect("write");
+                tokio::fs::write(&wal_path, &corrupted_data)
+                    .await
+                    .expect("write");
 
                 let result = async {
                     match Wal::open(&wal_path).await {

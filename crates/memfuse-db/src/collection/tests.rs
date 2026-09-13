@@ -258,9 +258,13 @@ async fn test_maintenance_pagination_over_10k_documents() {
     .await
     .unwrap();
 
-    col.next_tx.store(1_000_000, std::sync::atomic::Ordering::SeqCst);
+    col.next_tx
+        .store(1_000_000, std::sync::atomic::Ordering::SeqCst);
 
-    let evicted = col.evict_decayed_chunks(&decay_controller, 100).await.unwrap();
+    let evicted = col
+        .evict_decayed_chunks(&decay_controller, 100)
+        .await
+        .unwrap();
     assert_eq!(
         evicted, 1,
         "evict_decayed_chunks must find and evict the decayed document at index > 10,000"

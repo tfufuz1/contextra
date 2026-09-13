@@ -859,7 +859,10 @@ mod tests {
         let doc_id = DocId::new(500);
 
         // Pre-insert segment for doc_id 500 into kv_store
-        kv_store.insert_segment(tenant, KvSegment::new(tenant, doc_id.inner(), vec![0xAA; 16]));
+        kv_store.insert_segment(
+            tenant,
+            KvSegment::new(tenant, doc_id.inner(), vec![0xAA; 16]),
+        );
         assert_eq!(kv_store.get_tenant_segment_len(tenant), 1);
 
         let mut col = create_test_collection().await;

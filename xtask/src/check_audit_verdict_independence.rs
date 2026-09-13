@@ -115,7 +115,10 @@ pub fn parse_verdict_line(line: &str, file_path: &str, line_num: usize) -> Optio
 /// Checks if a verdict text represents a positive or conditional audit verdict requiring verification.
 pub fn is_actionable_verdict(verdict_text: &str) -> bool {
     let upper = verdict_text.to_uppercase();
-    upper.contains("GO") || upper.contains("APPROVED") || upper.contains("CONDITIONAL") || upper.contains("PASS")
+    upper.contains("GO")
+        || upper.contains("APPROVED")
+        || upper.contains("CONDITIONAL")
+        || upper.contains("PASS")
 }
 
 /// Validates a single `VerdictEntry` against Audit Intake Protocol v2 independence rules.
@@ -394,7 +397,10 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         let res = validate_verdict_entry(&entry, now, 72);
-        assert!(!res.is_ok, "Self-verification (SESSION == VERIFIED-BY-SESSION) must fail");
+        assert!(
+            !res.is_ok,
+            "Self-verification (SESSION == VERIFIED-BY-SESSION) must fail"
+        );
         assert!(res.error_message.is_some());
         assert!(res
             .error_message
@@ -410,10 +416,16 @@ mod tests {
 
         let now = Utc::now();
         let res = validate_verdict_entry(&entry, now, 72);
-        assert!(res.is_ok, "Legacy report without VERIFIED-BY-SESSION must pass with warning per APM-GATE-1");
+        assert!(
+            res.is_ok,
+            "Legacy report without VERIFIED-BY-SESSION must pass with warning per APM-GATE-1"
+        );
         assert!(res.is_legacy);
         assert!(res.warning_message.is_some());
-        assert!(res.warning_message.unwrap().contains("Alt-Report vor Protokoll v2"));
+        assert!(res
+            .warning_message
+            .unwrap()
+            .contains("Alt-Report vor Protokoll v2"));
     }
 
     #[test]

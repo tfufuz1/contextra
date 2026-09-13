@@ -1661,9 +1661,14 @@ mod tests {
         let res_neg_beta = apply_resonance_bonus(docs.clone(), 2, &cfg_neg_beta);
         assert_eq!(res_neg_beta.len(), 3);
         // doc_zero_signals has signal_count = 0, valid_signal_count = 2 -> 0.0^0.1 = 0.0 -> bonus = 0.0 -> score remains 0.5
-        let zero_doc = res_neg_beta.iter().find(|r| r.id == "doc_zero_signals").unwrap();
+        let zero_doc = res_neg_beta
+            .iter()
+            .find(|r| r.id == "doc_zero_signals")
+            .unwrap();
         assert_eq!(zero_doc.score, 0.5);
-        assert!(res_neg_beta.iter().all(|r| r.id == "doc_nan_score" || r.score.is_finite()));
+        assert!(res_neg_beta
+            .iter()
+            .all(|r| r.id == "doc_nan_score" || r.score.is_finite()));
 
         // 5. valid_signal_count = 0 -> early exit
         let cfg_normal = ResonanceConfig::default();
@@ -1674,7 +1679,10 @@ mod tests {
         // 6. signal_count = 0 with valid_signal_count > 0 (0.0f32.powf(beta) path)
         let res_normal = apply_resonance_bonus(docs, 2, &cfg_normal);
         assert_eq!(res_normal.len(), 3);
-        let zero_sig_doc = res_normal.iter().find(|r| r.id == "doc_zero_signals").unwrap();
+        let zero_sig_doc = res_normal
+            .iter()
+            .find(|r| r.id == "doc_zero_signals")
+            .unwrap();
         assert_eq!(zero_sig_doc.score, 0.5);
         assert_eq!(res_normal.last().unwrap().id, "doc_nan_score");
     }
