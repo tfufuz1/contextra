@@ -383,10 +383,9 @@ pub struct WalConfig {
     /// Migrationsszenarien aktiviert werden und NIEMALS dauerhaft in produktiven
     /// Umgebungen aktiv bleiben.
     pub allow_legacy_integrity_key_fallback: bool,
-    /// Minimum allowed WAL version for replay. WAL files with a version below
-    /// this minimum will be automatically migrated to V3 and backed up (`.v1.bak`).
-    ///
-    /// Default: `WalVersion::V1` for backward compatibility. Production deployments SHOULD set `WalVersion::V3`.
+    /// `min_wal_version`: Minimum akzeptierte WAL-Version beim Replay.
+    /// Default: `V3` (HMAC-signiert). Für Migration von Legacy-Daten auf `V1` setzen,
+    /// danach zwingend auf `V3` zurücksetzen. Nie dauerhaft auf V1 in Production.
     // AI-TAG[SMELL][RESOLVED] audit-M-8: Wal::replay weist unverschlüsselte V1-Einträge bei aktivem KeyManager mit MemFuseError::Encryption ab (~Zeile 1500).
     pub min_wal_version: WalVersion,
 }
@@ -396,7 +395,10 @@ impl Default for WalConfig {
         Self {
             key_manager: None,
             allow_legacy_integrity_key_fallback: false,
-            min_wal_version: WalVersion::V1,
+            // SEC-DEFAULT: V3 erfordert HMAC-Validierung für alle replayed WAL-Dateien.
+            // V1-WALs werden abgelehnt, um stille Tamper-Angriffe via Filesystem zu verhindern.
+            // Explizit auf V1 setzen nur für Migration alter Datenbestände (dokumentieren!).
+            min_wal_version: WalVersion::V3,
         }
     }
 }
@@ -474,8 +476,7 @@ impl Wal {
             path,
             WalConfig {
                 key_manager,
-                allow_legacy_integrity_key_fallback: false,
-                min_wal_version: WalVersion::V1,
+                ..Default::default()
             },
         )
         .await
