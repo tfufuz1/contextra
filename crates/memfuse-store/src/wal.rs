@@ -422,6 +422,8 @@ pub struct WalConfig {
     /// danach zwingend auf `V3` zurücksetzen. Nie dauerhaft auf V1 in Production.
     // AI-TAG[SMELL][RESOLVED] audit-M-8: Wal::replay weist unverschlüsselte V1-Einträge bei aktivem KeyManager mit MemFuseError::Encryption ab (~Zeile 1500).
     pub min_wal_version: WalVersion,
+    /// Configuration for the background flusher actor.
+    pub flusher_config: WalFlusherConfig,
 }
 
 impl Default for WalConfig {
@@ -433,6 +435,7 @@ impl Default for WalConfig {
             // V1-WALs werden abgelehnt, um stille Tamper-Angriffe via Filesystem zu verhindern.
             // Explizit auf V1 setzen nur für Migration alter Datenbestände (dokumentieren!).
             min_wal_version: WalVersion::V3,
+            flusher_config: WalFlusherConfig::default(),
         }
     }
 }
@@ -442,6 +445,28 @@ struct FlusherMessage {
     payload: Vec<u8>,
     last_hmac_val: [u8; 32],
     ack: tokio::sync::oneshot::Sender<Result<()>>,
+}
+
+/// Configuration for the WAL background flusher actor.
+///
+/// Controls how aggressively the flusher coalesces concurrent writes
+/// into a single `sync_all()` call to reduce fsync overhead under load.
+#[derive(Debug, Clone, Copy)]
+pub struct WalFlusherConfig {
+    /// Maximum time to wait for additional messages after receiving the first,
+    /// before issuing `sync_all()`. Set to 0 to disable (immediate flush).
+    ///
+    /// Typical range: 50–500 µs. Higher values coalesce more writes per fsync
+    /// at the cost of added tail latency. Default: 100 µs.
+    pub batch_window_micros: u64,
+}
+
+impl Default for WalFlusherConfig {
+    fn default() -> Self {
+        Self {
+            batch_window_micros: 100,
+        }
+    }
 }
 
 /// Write-Ahead Log for crash recovery.
@@ -607,7 +632,7 @@ impl Wal {
             flusher_tx: std::sync::RwLock::new(None),
         };
 
-        wal.enable_flusher();
+        wal.enable_flusher_with_config(config.flusher_config);
 
         // If file is not empty, find the last valid HMAC to continue the chain
         if metadata.len() > 0 {
@@ -667,7 +692,7 @@ impl Wal {
             }
         }
 
-        wal.enable_flusher();
+        wal.enable_flusher_with_config(config.flusher_config);
 
         Ok(wal)
     }
@@ -1095,8 +1120,13 @@ impl Wal {
         }
     }
 
-    /// Enables background flusher actor for coalescing concurrent WAL writes and fsync calls.
+    /// Enables background flusher with default config (100µs batch window).
     pub(crate) fn enable_flusher(&self) {
+        self.enable_flusher_with_config(WalFlusherConfig::default());
+    }
+
+    /// Enables background flusher actor for coalescing concurrent WAL writes and fsync calls.
+    pub(crate) fn enable_flusher_with_config(&self, config: WalFlusherConfig) {
         let mut tx_guard = self.flusher_tx.write().unwrap_or_else(|e| e.into_inner());
         if tx_guard.is_some() {
             return;
@@ -1118,10 +1148,36 @@ impl Wal {
                 batch_payload.extend_from_slice(&first_msg.payload);
                 acks.push(first_msg.ack);
 
+                // Drain immediately available messages (zero-cost fast path)
                 while let Ok(msg) = rx.try_recv() {
                     batch_payload.extend_from_slice(&msg.payload);
                     final_last_hmac_val = msg.last_hmac_val;
                     acks.push(msg.ack);
+                }
+
+                // Accumulation window: wait for additional messages before fsync.
+                // This coalesces concurrent writers that enqueue slightly after the
+                // first message, reducing total sync_all() call count under load.
+                if config.batch_window_micros > 0 {
+                    let deadline = tokio::time::Instant::now()
+                        + tokio::time::Duration::from_micros(config.batch_window_micros);
+                    loop {
+                        match tokio::time::timeout_at(deadline, rx.recv()).await {
+                            Ok(Some(msg)) => {
+                                batch_payload.extend_from_slice(&msg.payload);
+                                final_last_hmac_val = msg.last_hmac_val;
+                                acks.push(msg.ack);
+                                // Drain any further immediately available messages
+                                while let Ok(more) = rx.try_recv() {
+                                    batch_payload.extend_from_slice(&more.payload);
+                                    final_last_hmac_val = more.last_hmac_val;
+                                    acks.push(more.ack);
+                                }
+                            }
+                            Ok(None) => break, // Channel closed — flusher task will exit on next iteration
+                            Err(_deadline_elapsed) => break, // Window expired — proceed to fsync
+                        }
+                    }
                 }
 
                 let res: Result<()> = async {
@@ -5545,6 +5601,59 @@ mod tests {
 
         let replayed = wal.replay().await?;
         assert_eq!(replayed.len(), num_tasks as usize);
+
+        for (i, (_seq, entry, _pos)) in replayed.iter().enumerate() {
+            assert_eq!(entry.seq_no, (i + 1) as u64);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_flusher_batch_window_coalesces_writes() -> Result<()> {
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("batch_window_test.wal");
+
+        let wal = Arc::new(
+            Wal::open_with_config(
+                &wal_path,
+                WalConfig {
+                    flusher_config: WalFlusherConfig {
+                        batch_window_micros: 50,
+                    },
+                    ..Default::default()
+                },
+            )
+            .await?,
+        );
+
+        let num_tasks = 5;
+        let mut handles = Vec::new();
+
+        for i in 0u64..num_tasks {
+            let wal_clone = Arc::clone(&wal);
+            handles.push(tokio::spawn(async move {
+                let op = WalOp::Put {
+                    tx_id: TxId::new(i + 1),
+                    key: format!("key-{i}").into_bytes(),
+                    value: b"val".to_vec(),
+                };
+                let (batch, _) = wal_clone.prepare_batch(vec![(op, i + 1)]).await?;
+                wal_clone.append_batch(batch).await
+            }));
+        }
+
+        for h in handles {
+            h.await
+                .map_err(|e| MemFuseError::Storage(e.to_string()))??;
+        }
+
+        let replayed = wal.replay().await?;
+        assert_eq!(
+            replayed.len(),
+            num_tasks as usize,
+            "Alle 5 Batches müssen sicher im WAL landen"
+        );
 
         for (i, (_seq, entry, _pos)) in replayed.iter().enumerate() {
             assert_eq!(entry.seq_no, (i + 1) as u64);
