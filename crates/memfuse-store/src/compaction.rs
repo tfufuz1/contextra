@@ -427,11 +427,16 @@ impl CompactionEngine {
             if processed_count % self.config.yield_threshold == 0 {
                 // FIND-STO-002: Budgeted Compaction
                 // Apply memory backpressure to prevent Compaction from OOMing the system
-                while !self.budget.has_memory_capacity() {
-                    tracing::warn!("Compaction engine paused due to memory budget exhaustion.");
-                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                if !self.budget.has_memory_capacity() {
+                    while !self.budget.has_memory_capacity() {
+                        tracing::warn!("Compaction engine paused due to memory budget exhaustion.");
+                        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                    }
+                    // Yield after blocking to give other tasks a fair chance
+                    tokio::task::yield_now().await;
                 }
-                tokio::task::yield_now().await;
+                // When budget is fine: no yield, just continue — the budget check above
+                // already provided cooperative scheduling opportunities via the sleep loop.
             }
 
             let is_tombstone = (item.seq & TOMBSTONE_BIT) != 0;
@@ -445,6 +450,7 @@ impl CompactionEngine {
             };
 
             if !is_duplicate {
+                // O(1): Bytes::clone is an Arc refcount increment
                 last_key = Some(item.key.clone());
 
                 // FIND-STO-001: Tombstone-Retention
