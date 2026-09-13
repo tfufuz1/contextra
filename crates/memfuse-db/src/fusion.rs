@@ -13,6 +13,7 @@
 // DONE(memfuse-impl): Verified RRF Rank Fusion & Numerik handling (NaN/Inf weights, tie-breaking, and resonance bonus) [ref:eigenbau-rrf-fusion]
 
 use crate::{ProvenanceRecord, SearchResult};
+use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{BinaryHeap, HashMap};
 
@@ -97,6 +98,7 @@ pub fn apply_resonance_bonus(
     results
 }
 
+#[cfg(test)]
 struct HeapEntry {
     result: SearchResult,
 }
@@ -134,6 +136,74 @@ impl PartialOrd for HeapEntry {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum SignalKey<'a> {
+    Known(SignalKind),
+    Custom(&'a str),
+}
+
+impl<'a> SignalKey<'a> {
+    fn from_name(name: &'a str) -> Option<Self> {
+        if name.is_empty() || name == "unnamed" {
+            None
+        } else if let Some(kind) = SignalKind::from_name(name) {
+            Some(SignalKey::Known(kind))
+        } else {
+            Some(SignalKey::Custom(name))
+        }
+    }
+
+    fn as_str(&self) -> &'a str {
+        match self {
+            SignalKey::Known(kind) => kind.as_str(),
+            SignalKey::Custom(s) => s,
+        }
+    }
+}
+
+#[derive(Default)]
+struct FusedEntry<'a> {
+    score: f32,
+    matched_signals: Vec<SignalKey<'a>>,
+    vector_distance: Option<f32>,
+    bm25_score: Option<f32>,
+    graph_score: Option<f32>,
+    rerank_score: Option<f32>,
+    source_collection: Option<String>,
+    index_type: Option<String>,
+    signal_ranks: AHashMap<SignalKey<'a>, u32>,
+    extra_signal_ranks: Option<HashMap<String, u32>>,
+    signal_contributions: AHashMap<SignalKey<'a>, crate::SignalContribution>,
+    extra_signal_contributions: Option<HashMap<String, crate::SignalContribution>>,
+    deferred_metadata: Vec<Option<serde_json::Value>>,
+}
+
+struct CandidateEntry<'a> {
+    id: String,
+    score: f32,
+    entry: FusedEntry<'a>,
+}
+
+impl<'a> PartialEq for CandidateEntry<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl<'a> Eq for CandidateEntry<'a> {}
+
+impl<'a> Ord for CandidateEntry<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        cmp_scores(other.score, self.score).then_with(|| self.id.cmp(&other.id))
+    }
+}
+
+impl<'a> PartialOrd for CandidateEntry<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 /// Identifies the kind of search signal used during fusion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SignalKind {
@@ -162,6 +232,17 @@ impl SignalKind {
             | "synaptic"
             | "hebbian" => Some(SignalKind::EdgeReinforcement),
             _ => None,
+        }
+    }
+
+    /// Converts `SignalKind` to its canonical string representation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SignalKind::Vector => "vector",
+            SignalKind::Text => "text",
+            SignalKind::Graph => "graph",
+            #[cfg(feature = "edge-reinforcement-learning")]
+            SignalKind::EdgeReinforcement => "edge-reinforcement",
         }
     }
 }
@@ -457,20 +538,13 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
     // higher k prevents top-ranked outliers in one signal from completely dominating,
     // while ensuring items appearing in multiple search signals accumulate significant boost.
     let k = 60;
-    // Map: id -> (score, metadata, matched_signals, provenance)
-    let mut fused: HashMap<
-        String,
-        (
-            f32,
-            Option<serde_json::Value>,
-            Vec<String>,
-            ProvenanceRecord,
-        ),
-    > = HashMap::new();
+    // Map: id -> FusedEntry
+    let mut fused: AHashMap<String, FusedEntry> = AHashMap::new();
 
     let mut valid_signal_count = 0usize;
 
-    for (signal_name, result_set, weight) in result_sets {
+    for (signal_name, result_set, weight) in &result_sets {
+        let weight = *weight;
         // DONE(memfuse-impl): RRF fusion validates weights filtering non-finite (NaN/Inf) and non-positive (<=0) weights to prevent score corruption. [ref:eigenbau-rrf-fusion]
         if !weight.is_finite() || weight <= 0.0 {
             tracing::warn!(
@@ -481,7 +555,12 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             continue;
         }
         valid_signal_count += 1;
-        let signal_kind = SignalKind::from_name(&signal_name);
+        let sig_key = SignalKey::from_name(signal_name);
+        let signal_kind = sig_key.and_then(|k| match k {
+            SignalKey::Known(kind) => Some(kind),
+            _ => None,
+        });
+
         // RRF rank is 1-based per Cormack et al. rank=0 is invalid input. With rank >= 1, rrf_k >= 0.0 guarantees non-zero denominator.
         let rrf_k = k as f32;
         // DONE(memfuse-impl): Updated rrf_k assertion to allow k=0 boundary condition [ref:eigenbau-rrf-fusion]
@@ -490,7 +569,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             "rrf_k must be non-negative; division by zero risk"
         );
 
-        for (rank_idx, doc) in result_set.into_iter().enumerate() {
+        for (rank_idx, doc) in result_set.iter().enumerate() {
             // DONE(memfuse-impl): RRF fusion validates score calculation denominators and guards non-finite raw input scores. [ref:eigenbau-rrf-fusion]
             if !doc.score.is_finite() {
                 tracing::error!(
@@ -516,25 +595,20 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                 tracing::warn!(signal = %signal_name, weight, denom, "non-finite RRF score detected; defaulting to 0.0");
                 0.0
             };
-            let entry = fused
-                .entry(doc.id)
-                .or_insert_with(|| (0.0, None, Vec::new(), ProvenanceRecord::default()));
-            entry.0 += score;
-            merge_metadata(&mut entry.1, doc.metadata);
-            if !signal_name.is_empty()
-                && signal_name != "unnamed"
-                && !entry.2.contains(&signal_name)
-            {
-                // O(n) acceptable for n<=4 signals; revisit if signal count grows.
-                entry.2.push(signal_name.clone());
-            }
 
-            if !signal_name.is_empty() && signal_name != "unnamed" {
-                entry.3.signal_ranks.insert(signal_name.clone(), rrf_rank);
+            let entry = fused.entry(doc.id.clone()).or_default();
+            entry.score += score;
 
-                // Record per-signal RRF contribution (INV-PROV-1)
-                entry.3.signal_contributions.insert(
-                    signal_name.clone(),
+            // Phase 1: Defer metadata merging (O(M) collect, merge later in Phase 2 for Top-K)
+            entry.deferred_metadata.push(doc.metadata.clone());
+
+            if let Some(key) = sig_key {
+                if !entry.matched_signals.contains(&key) {
+                    entry.matched_signals.push(key);
+                }
+                entry.signal_ranks.insert(key, rrf_rank);
+                entry.signal_contributions.insert(
+                    key,
                     crate::SignalContribution {
                         raw_score: doc.score,
                         rank: rrf_rank,
@@ -545,77 +619,158 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
 
             match signal_kind {
                 Some(SignalKind::Vector) => {
-                    if entry.3.vector_distance.is_none() {
-                        entry.3.vector_distance = Some(doc.score);
+                    if entry.vector_distance.is_none() {
+                        entry.vector_distance = Some(doc.score);
                     }
-                    if entry.3.index_type.is_none() {
-                        entry.3.index_type = Some("hnsw".to_string());
+                    if entry.index_type.is_none() {
+                        entry.index_type = Some("hnsw".to_string());
                     }
                 }
                 Some(SignalKind::Text) => {
-                    if entry.3.bm25_score.is_none() {
-                        entry.3.bm25_score = Some(doc.score);
+                    if entry.bm25_score.is_none() {
+                        entry.bm25_score = Some(doc.score);
                     }
-                    if entry.3.index_type.is_none() {
-                        entry.3.index_type = Some("bm25".to_string());
+                    if entry.index_type.is_none() {
+                        entry.index_type = Some("bm25".to_string());
                     }
                 }
                 Some(SignalKind::Graph) => {
-                    if entry.3.graph_score.is_none() {
-                        entry.3.graph_score = Some(doc.score);
+                    if entry.graph_score.is_none() {
+                        entry.graph_score = Some(doc.score);
                     }
-                    if entry.3.index_type.is_none() {
-                        entry.3.index_type = Some("graph".to_string());
+                    if entry.index_type.is_none() {
+                        entry.index_type = Some("graph".to_string());
                     }
                 }
                 #[cfg(feature = "edge-reinforcement-learning")]
                 Some(SignalKind::EdgeReinforcement) => {
-                    if entry.3.graph_score.is_none() {
-                        entry.3.graph_score = Some(doc.score);
+                    if entry.graph_score.is_none() {
+                        entry.graph_score = Some(doc.score);
                     }
-                    if entry.3.index_type.is_none() {
-                        entry.3.index_type = Some("edge-reinforcement".to_string());
+                    if entry.index_type.is_none() {
+                        entry.index_type = Some("edge-reinforcement".to_string());
                     }
                 }
                 None => {}
             }
 
-            if let Some(doc_prov) = doc.provenance {
-                if entry.3.vector_distance.is_none() {
-                    entry.3.vector_distance = doc_prov.vector_distance;
+            if let Some(ref doc_prov) = doc.provenance {
+                if entry.vector_distance.is_none() {
+                    entry.vector_distance = doc_prov.vector_distance;
                 }
-                if entry.3.bm25_score.is_none() {
-                    entry.3.bm25_score = doc_prov.bm25_score;
+                if entry.bm25_score.is_none() {
+                    entry.bm25_score = doc_prov.bm25_score;
                 }
-                if entry.3.graph_score.is_none() {
-                    entry.3.graph_score = doc_prov.graph_score;
+                if entry.graph_score.is_none() {
+                    entry.graph_score = doc_prov.graph_score;
                 }
-                if entry.3.rerank_score.is_none() {
-                    entry.3.rerank_score = doc_prov.rerank_score;
+                if entry.rerank_score.is_none() {
+                    entry.rerank_score = doc_prov.rerank_score;
                 }
-                if entry.3.source_collection.is_none() {
-                    entry.3.source_collection = doc_prov.source_collection;
+                if entry.source_collection.is_none() {
+                    entry.source_collection = doc_prov.source_collection.clone();
                 }
-                if entry.3.index_type.is_none() {
-                    entry.3.index_type = doc_prov.index_type;
+                if entry.index_type.is_none() {
+                    entry.index_type = doc_prov.index_type.clone();
                 }
-                for (sig, r) in doc_prov.signal_ranks {
-                    entry.3.signal_ranks.entry(sig).or_insert(r);
+                for (sig, r) in &doc_prov.signal_ranks {
+                    if let Some(k) = SignalKey::from_name(sig) {
+                        entry.signal_ranks.entry(k).or_insert(*r);
+                    } else {
+                        entry
+                            .extra_signal_ranks
+                            .get_or_insert_with(HashMap::new)
+                            .entry(sig.clone())
+                            .or_insert(*r);
+                    }
                 }
-                for (sig, contrib) in doc_prov.signal_contributions {
-                    entry.3.signal_contributions.entry(sig).or_insert(contrib);
+                for (sig, contrib) in &doc_prov.signal_contributions {
+                    if let Some(k) = SignalKey::from_name(sig) {
+                        entry.signal_contributions.entry(k).or_insert(contrib.clone());
+                    } else {
+                        entry
+                            .extra_signal_contributions
+                            .get_or_insert_with(HashMap::new)
+                            .entry(sig.clone())
+                            .or_insert(contrib.clone());
+                    }
                 }
             }
         }
     }
 
-    // AGT-DB-001 [CONCURRENCY][MAJOR]: Deterministic tie-breaking via secondary sort by ID.
-    // Bounded Min-Heap O(U log K) top-K selection instead of full O(U log U) sort.
-    // Bound capacity to min(fused.len(), max_results) to avoid allocation overflow when max_results is large (e.g. usize::MAX).
+    // Phase 2: Top-K Bounded Heap Selection over CandidateEntry
     let target_cap = fused.len().min(max_results);
     let mut heap = BinaryHeap::with_capacity(target_cap.saturating_add(1));
 
-    for (id, (score, metadata, matched_signals, prov)) in fused {
+    for (id, entry) in fused {
+        let score = entry.score;
+        let cand = CandidateEntry { id, score, entry };
+
+        if heap.len() < max_results {
+            heap.push(cand);
+        } else if let Some(worst) = heap.peek() {
+            if cand < *worst {
+                heap.pop();
+                heap.push(cand);
+            }
+        }
+    }
+
+    let top_k_winners = heap.into_sorted_vec();
+    let mut results = Vec::with_capacity(top_k_winners.len());
+
+    for cand in top_k_winners {
+        let id = cand.id;
+        let score = cand.score;
+        let entry = cand.entry;
+
+        // Late Hydration: Merge metadata only for Top-K winning entries
+        let mut merged_meta: Option<serde_json::Value> = None;
+        for meta in entry.deferred_metadata {
+            merge_metadata(&mut merged_meta, meta);
+        }
+
+        let matched_signals = entry
+            .matched_signals
+            .iter()
+            .map(|k| k.as_str().to_string())
+            .collect();
+
+        let mut signal_ranks: HashMap<String, u32> = entry
+            .signal_ranks
+            .into_iter()
+            .map(|(k, v)| (k.as_str().to_string(), v))
+            .collect();
+        if let Some(extras) = entry.extra_signal_ranks {
+            for (k, v) in extras {
+                signal_ranks.entry(k).or_insert(v);
+            }
+        }
+
+        let mut signal_contributions: HashMap<String, crate::SignalContribution> = entry
+            .signal_contributions
+            .into_iter()
+            .map(|(k, v)| (k.as_str().to_string(), v))
+            .collect();
+        if let Some(extras) = entry.extra_signal_contributions {
+            for (k, v) in extras {
+                signal_contributions.entry(k).or_insert(v);
+            }
+        }
+
+        let prov = ProvenanceRecord {
+            vector_distance: entry.vector_distance,
+            bm25_score: entry.bm25_score,
+            graph_score: entry.graph_score,
+            rerank_score: entry.rerank_score,
+            signal_ranks,
+            source_collection: entry.source_collection,
+            index_type: entry.index_type,
+            signal_contributions,
+            coherence_bonus: 0.0,
+        };
+
         let provenance = if include_provenance
             && (prov.vector_distance.is_some()
                 || prov.bm25_score.is_some()
@@ -677,31 +832,14 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             None
         };
 
-        let entry = HeapEntry {
-            result: SearchResult {
-                id,
-                score,
-                metadata,
-                matched_signals,
-                provenance,
-            },
-        };
-
-        if heap.len() < max_results {
-            heap.push(entry);
-        } else if let Some(worst) = heap.peek() {
-            if entry < *worst {
-                heap.pop();
-                heap.push(entry);
-            }
-        }
+        results.push(SearchResult {
+            id,
+            score,
+            metadata: merged_meta,
+            matched_signals,
+            provenance,
+        });
     }
-
-    let results: Vec<SearchResult> = heap
-        .into_sorted_vec()
-        .into_iter()
-        .map(|e| e.result)
-        .collect();
 
     let _ = valid_signal_count;
 
@@ -732,7 +870,7 @@ mod tests {
 
     #[test]
     fn test_rrf_k_zero_boundary() {
-        let set = vec![
+        let _set = vec![
             SearchResult {
                 id: "doc1".to_string(),
                 score: 0.9,
@@ -2557,6 +2695,88 @@ mod tests {
                 let rrf_low = 1.0 / (60.0 + (rank + 1) as f32);
                 assert!(rrf_top >= rrf_low);
             }
+        }
+    }
+
+    #[test]
+    fn test_late_hydration_rrf_rank_and_metadata_equivalence() {
+        use serde_json::json;
+
+        // Build 15 candidate documents across 3 search signal sets
+        let make_set = |prefix: &str, count: usize, base_meta_key: &str| {
+            (0..count)
+                .map(|i| SearchResult {
+                    id: format!("doc_{:02}", i),
+                    score: 1.0 - (i as f32 * 0.05),
+                    metadata: Some(json!({
+                        base_meta_key: format!("{prefix}_val_{i}"),
+                        "common_field": format!("common_from_{prefix}"),
+                        "doc_index": i
+                    })),
+                    matched_signals: vec![],
+                    provenance: None,
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let vec_docs = make_set("vector", 15, "vec_specific");
+        let text_docs = make_set("text", 12, "text_specific");
+        let graph_docs = make_set("graph", 10, "graph_specific");
+
+        let input_signals = vec![
+            ("vector".to_string(), vec_docs, 1.0),
+            ("text".to_string(), text_docs, 0.8),
+            ("graph".to_string(), graph_docs, 0.6),
+        ];
+
+        let fused = weighted_reciprocal_rank_fusion(input_signals, 5);
+
+        assert_eq!(fused.len(), 5, "Must yield exactly top-5 results");
+
+        // Top 5 candidate IDs must be doc_00 through doc_04
+        for (idx, res) in fused.iter().enumerate() {
+            assert_eq!(res.id, format!("doc_{:02}", idx));
+            assert!(res.score > 0.0);
+
+            let meta = res.metadata.as_ref().expect("metadata present");
+            let meta_obj = meta.as_object().expect("metadata object");
+
+            // VectorFirst priority: common_field must come from vector
+            assert_eq!(
+                meta_obj.get("common_field"),
+                Some(&json!("common_from_vector"))
+            );
+            assert_eq!(
+                meta_obj.get("vec_specific"),
+                Some(&json!(format!("vector_val_{idx}")))
+            );
+            assert_eq!(
+                meta_obj.get("text_specific"),
+                Some(&json!(format!("text_val_{idx}")))
+            );
+            if idx < 10 {
+                assert_eq!(
+                    meta_obj.get("graph_specific"),
+                    Some(&json!(format!("graph_val_{idx}")))
+                );
+            }
+
+            // Provenance verification
+            let prov = res.provenance.as_ref().expect("provenance present");
+            assert_eq!(prov.signal_ranks.get("vector"), Some(&(idx as u32 + 1)));
+            assert_eq!(prov.signal_ranks.get("text"), Some(&(idx as u32 + 1)));
+
+            // INV-PROV-1: contribution sum must equal result score
+            let contrib_sum: f32 = prov
+                .signal_contributions
+                .values()
+                .map(|c| c.rrf_contribution)
+                .sum();
+            assert!(
+                (contrib_sum - res.score).abs() < 1e-6,
+                "INV-PROV-1: sum of contributions ({contrib_sum}) must equal score ({})",
+                res.score
+            );
         }
     }
 

@@ -2048,6 +2048,7 @@ dependencies = [
 name = "memfuse-db"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "blake3",
  "criterion",
  "libc",
