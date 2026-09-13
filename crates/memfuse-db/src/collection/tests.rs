@@ -236,6 +236,39 @@ async fn test_maintenance_pagination_over_10k_documents() {
         col.get_kv(expired_key).await.unwrap().is_none(),
         "Cleaned document past 10,000 threshold must be deleted"
     );
+
+    // Test evict_decayed_chunks with decayed importance at index 10,300
+    let decay_key = "doc_10300";
+    let decay_controller = crate::decay_controller::AdaptiveDecayController::with_defaults();
+
+    let imp = memfuse_core::MemoryImportance::new(
+        memfuse_core::ImportanceScore::new(1.0),
+        memfuse_core::DecayFunction::Exponential { half_life_tx: 10 },
+        memfuse_core::TxId::new(0),
+    );
+
+    col.insert(
+        decay_key,
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(json!({
+            "importance": imp,
+            "created_at_tx": 0
+        })),
+    )
+    .await
+    .unwrap();
+
+    col.next_tx.store(1_000_000, std::sync::atomic::Ordering::SeqCst);
+
+    let evicted = col.evict_decayed_chunks(&decay_controller, 100).await.unwrap();
+    assert_eq!(
+        evicted, 1,
+        "evict_decayed_chunks must find and evict the decayed document at index > 10,000"
+    );
+    assert!(
+        col.get_kv(decay_key).await.unwrap().is_none(),
+        "Evicted decayed document past 10,000 threshold must be deleted"
+    );
 }
 
 #[tokio::test]
@@ -2513,15 +2546,22 @@ async fn test_run_percolation_check_rebonding() -> memfuse_core::Result<()> {
 
     let col = db.collection("percolation_test").await?;
 
-    // Insert 12 documents with high similarity between doc_0 and doc_1, but no edge
-    for i in 0..12 {
-        let id = format!("doc_{i}");
-        let emb = if i == 0 {
+    // Insert documents with high similarity between doc_0 and doc_1 (at index > 10,000), but no edge
+    // To ensure doc_1 is beyond the DEFAULT_SCAN_LIMIT (10,000) boundary, insert filler items
+    for i in 0..10_010 {
+        let id = if i == 0 {
+            "doc_0".to_string()
+        } else if i == 10_005 {
+            "doc_1".to_string()
+        } else {
+            format!("doc_{i}")
+        };
+        let emb = if id == "doc_0" {
             vec![1.0, 0.0, 0.0, 0.0]
-        } else if i == 1 {
+        } else if id == "doc_1" {
             vec![0.98, 0.02, 0.0, 0.0]
         } else {
-            let val = (i as f32) / 100.0;
+            let val = ((i % 100) as f32) / 100.0;
             vec![0.0, 0.0, val, 1.0 - val]
         };
         col.insert(&id, &emb, None).await?;

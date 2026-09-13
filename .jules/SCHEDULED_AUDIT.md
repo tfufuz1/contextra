@@ -50,4 +50,4 @@ Statt manueller Issue-Zuweisung wird der Audit-Auftrag direkt als Artefakt im Re
 
 ## Audit-Workflow v2 (nach Review 2026-09)
 
-Siehe `.jules/AUDIT_INTAKE_PROTOCOL.md` Abschnitt "Verdict-Unabhängigkeitspflicht (Audit-Workflow v2)" — dort kanonisch definiert.
+Siehe `.jules/AUDIT_INTAKE_PROTOCOL.md` Abschnitt "🔒 Verdict-Unabhängigkeitspflicht (Audit-Workflow v2)" — dort kanonisch definiert.

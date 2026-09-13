@@ -63,7 +63,7 @@
 use crate::compaction::{CompactionConfig, CompactionEngine};
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache, BlockCache, SstableBuilder, SstableReader};
-use crate::wal::{Wal, WalEntry, WalOp};
+use crate::wal::{PreparedBatch, Wal, WalOp};
 use bytes::Bytes;
 use memfuse_core::{
     BoxFuture, DocId, IndexOp, MemFuseError, ResourceBudget, ResourceTracker, Result,
@@ -98,7 +98,7 @@ pub const MIN_ENTRIES_FOR_SSTABLE_REBUILD: usize = 8;
 
 struct GroupCommitRequest {
     tx_id: TxId,
-    wal_entries: Vec<WalEntry>,
+    wal_entries: PreparedBatch,
     mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
     sender: tokio::sync::oneshot::Sender<Result<()>>,
 }
@@ -1453,7 +1453,7 @@ impl StorageEngine for LsmStorage {
 
             // If group commit window is disabled (0 micros), perform immediate single commit
             if self.config.group_commit_window_micros == 0 {
-                if let Err(e) = state.wal.append_batch(&wal_entries).await {
+                if let Err(e) = state.wal.append_batch(wal_entries).await {
                     let _ = state.wal.restore_last_hmac(prev_hmac_snapshot).await;
                     // FATAL I/O ERROR: Physical Rollback to last committed transaction state
                     drop(state);
@@ -1611,11 +1611,11 @@ impl StorageEngine for LsmStorage {
 
                 // Combine leader's WAL entries with all follower WAL entries
                 let mut all_wal_entries = leader_wal_entries;
-                for r in &pending_queue.requests {
-                    all_wal_entries.extend(r.wal_entries.iter().cloned());
+                for r in pending_queue.requests.iter() {
+                    all_wal_entries.extend(r.wal_entries.clone());
                 }
 
-                if let Err(e) = state.wal.append_batch(&all_wal_entries).await {
+                if let Err(e) = state.wal.append_batch(all_wal_entries).await {
                     let _ = state
                         .wal
                         .restore_last_hmac(pending_queue.first_prev_hmac)
@@ -4872,7 +4872,7 @@ mod tests {
             )])
             .await
             .unwrap();
-        wal.append_batch(&entries1).await.unwrap();
+        wal.append_batch(entries1).await.unwrap();
         drop(wal);
 
         // 2. Create counter-based wal-5.log
@@ -4890,7 +4890,7 @@ mod tests {
             )])
             .await
             .unwrap();
-        wal5.append_batch(&entries2).await.unwrap();
+        wal5.append_batch(entries2).await.unwrap();
         drop(wal5);
 
         // 3. Create u128 overflowing wal file wal-340282366920938463463374607431768211455.log (u128::MAX)
@@ -4910,7 +4910,7 @@ mod tests {
             )])
             .await
             .unwrap();
-        wal_overflow.append_batch(&entries3).await.unwrap();
+        wal_overflow.append_batch(entries3).await.unwrap();
         drop(wal_overflow);
 
         // Open storage and verify max_wal_id safely parsed u64 value 5 (flush_counter initialized to 6)

@@ -2137,8 +2137,7 @@ fn main() {
             }
         }
         "check-audit-verdict-independence" => {
-            if let Err(e) = check_audit_verdict_independence::run_check_audit_verdict_independence() {
-                eprintln!("❌ check-audit-verdict-independence failed: {}", e);
+            if !check_audit_verdict_independence::run_check_audit_verdict_independence() {
                 process::exit(1);
             }
         }

@@ -40,45 +40,80 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         };
 
         let current_tx = self.next_tx.load(Ordering::SeqCst);
-        let docs = self.scan_prefix("", None).await?;
+        let user_prefix = self.namespaced_key(b"", 0);
         let mut evicted_ids = Vec::new();
+        let mut cursor: Option<Vec<u8>> = None;
+        const BATCH_SIZE: usize = 1000;
 
-        for (id, val) in docs {
-            if evicted_ids.len() >= max_per_tick {
+        'outer: loop {
+            let (batch, next_cursor) = self
+                .storage
+                .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
+                .await?;
+
+            if batch.is_empty() {
                 break;
             }
 
-            if self.name == "default" && id.starts_with("__") {
-                continue;
-            }
-
-            let meta_obj = val
-                .get("metadata")
-                .and_then(|m| m.as_object())
-                .or_else(|| val.as_object());
-
-            if let Some(obj) = meta_obj {
-                if let Some(imp_val) = obj.get("importance") {
-                    let (base_score, created_tx) = if let Ok(imp) =
-                        serde_json::from_value::<memfuse_core::MemoryImportance>(imp_val.clone())
-                    {
-                        (imp.base_score.value(), imp.created_at_tx.inner())
-                    } else if let Some(raw_f64) = imp_val.as_f64() {
-                        let created = obj
-                            .get("created_at_tx")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(0);
-                        (raw_f64 as f32, created)
+            for (k, v) in batch {
+                let key_str = String::from_utf8_lossy(&k).to_string();
+                let user_key = if self.name == "default" {
+                    key_str
+                } else {
+                    let prefix_len = self.prefix.len() + 1;
+                    if key_str.len() >= prefix_len {
+                        key_str[prefix_len..].to_string()
                     } else {
-                        continue;
-                    };
+                        key_str
+                    }
+                };
 
-                    let elapsed_tx = current_tx.saturating_sub(created_tx);
+                if self.name == "default" && user_key.starts_with("__") {
+                    continue;
+                }
 
-                    if decay_controller.should_evict(base_score, elapsed_tx, &inputs) {
-                        evicted_ids.push(id);
+                let Ok(val) = serde_json::from_slice::<serde_json::Value>(&v) else {
+                    continue;
+                };
+
+                let meta_obj = val
+                    .get("metadata")
+                    .and_then(|m| m.as_object())
+                    .or_else(|| val.as_object());
+
+                if let Some(obj) = meta_obj {
+                    if let Some(imp_val) = obj.get("importance") {
+                        let (base_score, created_tx) = if let Ok(imp) =
+                            serde_json::from_value::<memfuse_core::MemoryImportance>(imp_val.clone())
+                        {
+                            (imp.base_score.value(), imp.created_at_tx.inner())
+                        } else if let Some(raw_f64) = imp_val.as_f64() {
+                            let created = obj
+                                .get("created_at_tx")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            (raw_f64 as f32, created)
+                        } else {
+                            continue;
+                        };
+
+                        let elapsed_tx = current_tx.saturating_sub(created_tx);
+
+                        if decay_controller.should_evict(base_score, elapsed_tx, &inputs) {
+                            evicted_ids.push(user_key);
+                            if evicted_ids.len() >= max_per_tick {
+                                break 'outer;
+                            }
+                        }
                     }
                 }
+            }
+
+            if let Some(next) = next_cursor {
+                cursor = Some(next);
+                tokio::task::yield_now().await;
+            } else {
+                break;
             }
         }
 
@@ -791,16 +826,36 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let mut new_edges_added = 0;
 
         if rebonding_triggered {
-            let docs = self.scan_prefix("", None).await?;
+            let user_prefix = self.namespaced_key(b"", 0);
             let mut embeddings = std::collections::HashMap::new();
             let mut id_map = std::collections::HashMap::new();
+            let mut cursor: Option<Vec<u8>> = None;
+            const BATCH_SIZE: usize = 1000;
 
-            for (_key, val) in docs {
-                if let Ok(stored) = serde_json::from_value::<StoredDocument>(val) {
-                    if let Ok(eid) = EntityId::from_key(&stored.id) {
-                        id_map.insert(eid, stored.id.clone());
-                        embeddings.insert(eid, stored.embedding);
+            loop {
+                let (batch, next_cursor) = self
+                    .storage
+                    .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
+                    .await?;
+
+                if batch.is_empty() {
+                    break;
+                }
+
+                for (_k, v) in batch {
+                    if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
+                        if let Ok(eid) = EntityId::from_key(&stored.id) {
+                            id_map.insert(eid, stored.id.clone());
+                            embeddings.insert(eid, stored.embedding);
+                        }
                     }
+                }
+
+                if let Some(next) = next_cursor {
+                    cursor = Some(next);
+                    tokio::task::yield_now().await;
+                } else {
+                    break;
                 }
             }
 
