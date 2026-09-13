@@ -423,17 +423,6 @@ impl LsmStorage {
             }
         }
 
-        let manifest_path = config.path.join("MANIFEST");
-        let manifest_exists = manifest_path.exists();
-        let _valid_manifest_sstables = if manifest_exists {
-            let entries = crate::manifest::Manifest::load(&manifest_path).await?;
-            Some(crate::manifest::Manifest::reconstruct_valid_sstables(
-                &entries,
-            ))
-        } else {
-            None
-        };
-
         let tx_buffer = TxBuffer::new_with_config(16, config.tx_timeout);
 
         // Scan for pending rollback intent files resulting from a crash during rollback_to_tx_locked
@@ -459,6 +448,7 @@ impl LsmStorage {
         }
         pending_rollbacks.sort_unstable();
 
+        // Authoritative manifest load for SSTable verification during data directory scanning in `new()`.
         let manifest_path = config.path.join("MANIFEST");
         let manifest_exists = manifest_path.exists();
         let _valid_manifest_sstables: Option<std::collections::HashSet<std::path::PathBuf>> =
