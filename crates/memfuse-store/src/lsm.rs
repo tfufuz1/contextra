@@ -576,6 +576,11 @@ impl LsmStorage {
         task_tracker.close();
 
         // Build storage instance first (compaction_engine field added)
+        let pressure_monitor = crate::system_pressure::SystemPressureMonitor::new(
+            std::time::Duration::from_millis(100),
+        );
+        let pressure_rx = pressure_monitor.pressure_rx.clone();
+
         let storage = Self {
             config,
             key_manager,
@@ -602,6 +607,14 @@ impl LsmStorage {
             pending_commit_queue: tokio::sync::Mutex::new(None),
             pressure_rx,
         };
+
+        // Spawn SystemPressureMonitor background task (INV-LSM-2)
+        let monitor_cancellation = storage.cancel_token.clone();
+        tokio::spawn(async move {
+            pressure_monitor
+                .run(monitor_cancellation, || 0, || 0, 0)
+                .await;
+        });
 
         // Flush after WAL replay regardless of WAL count — ensures replayed data is persisted to SSTable before any WAL rotation/deletion can occur.
         if replayed_size > 0 && !wal_files.is_empty() {
@@ -734,6 +747,13 @@ impl LsmStorage {
             let mut file_guard = state.wal.file.lock().await;
             *file_guard = ro_file;
         }
+    }
+
+    /// Returns a watch receiver for SystemPressure metrics.
+    pub fn pressure_receiver(
+        &self,
+    ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
+        self.pressure_rx.clone()
     }
 
     #[doc(hidden)]
