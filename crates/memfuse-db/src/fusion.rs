@@ -15,7 +15,7 @@
 use crate::{ProvenanceRecord, SearchResult};
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::HashMap;
 
 /// Konfiguration für den Resonanz-Kohärenz-Bonus (F-09).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -167,7 +167,6 @@ impl<'a> SignalKey<'a> {
 
 #[derive(Default)]
 struct FusedEntry<'a> {
-    score: f32,
     matched_signals: Vec<SignalKey<'a>>,
     vector_distance: Option<f32>,
     bm25_score: Option<f32>,
@@ -180,32 +179,6 @@ struct FusedEntry<'a> {
     signal_contributions: AHashMap<SignalKey<'a>, crate::SignalContribution>,
     extra_signal_contributions: Option<HashMap<String, crate::SignalContribution>>,
     deferred_metadata: Vec<Option<serde_json::Value>>,
-}
-
-struct CandidateEntry<'a> {
-    id: String,
-    score: f32,
-    entry: FusedEntry<'a>,
-}
-
-impl<'a> PartialEq for CandidateEntry<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == std::cmp::Ordering::Equal
-    }
-}
-
-impl<'a> Eq for CandidateEntry<'a> {}
-
-impl<'a> Ord for CandidateEntry<'a> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        cmp_scores(other.score, self.score).then_with(|| self.id.cmp(&other.id))
-    }
-}
-
-impl<'a> PartialOrd for CandidateEntry<'a> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
 }
 
 /// Identifies the kind of search signal used during fusion.
@@ -542,8 +515,17 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
     // higher k prevents top-ranked outliers in one signal from completely dominating,
     // while ensuring items appearing in multiple search signals accumulate significant boost.
     let k = 60;
-    // Map: id -> FusedEntry
-    let mut fused: AHashMap<String, FusedEntry> = AHashMap::new();
+    // Phase 1: ID-Interning (kein String-Clone im Hot-Loop)
+    // Lebt für die Dauer von Phase 1. Borrows aus `result_sets` (owned, same scope).
+    let mut id_to_idx: AHashMap<&str, u32> = AHashMap::new();
+    let mut id_table: Vec<&str> = Vec::new(); // idx -> &str (für Phase-2-Auflösung)
+
+    // SoA-Layout: Ein Float-Array für Scores (Cache-freundlich für Sortierung in Phase 2)
+    let mut scores: Vec<f32> = Vec::new();
+
+    // Alle weiteren FusedEntry-Felder bleiben als AoS im existing FusedEntry-Struct,
+    // aber indexiert via u32 statt String-Key.
+    let mut entries: Vec<FusedEntry<'_>> = Vec::new(); // idx -> FusedEntry (für Metadata etc.)
 
     let mut valid_signal_count = 0usize;
 
@@ -600,8 +582,21 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                 0.0
             };
 
-            let entry = fused.entry(doc.id.clone()).or_default();
-            entry.score += score;
+            // Borrowed &str: kein String-Clone. Gültig für Laufzeit von `result_sets`.
+            let doc_id_str: &str = doc.id.as_str();
+            let idx = match id_to_idx.get(doc_id_str) {
+                Some(&i) => i as usize,
+                None => {
+                    let new_idx = id_table.len();
+                    id_to_idx.insert(doc_id_str, new_idx as u32);
+                    id_table.push(doc_id_str);
+                    scores.push(0.0_f32);
+                    entries.push(FusedEntry::default());
+                    new_idx
+                }
+            };
+            scores[idx] += score;
+            let entry = &mut entries[idx];
 
             // Phase 1: Defer metadata merging (O(M) collect, merge later in Phase 2 for Top-K)
             entry.deferred_metadata.push(doc.metadata.clone());
@@ -706,35 +701,40 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
         }
     }
 
-    // Phase 2: Top-K Bounded Heap Selection over CandidateEntry
-    let target_cap = fused.len().min(max_results);
-    let mut heap = BinaryHeap::with_capacity(target_cap.saturating_add(1));
-
-    for (id, entry) in fused {
-        let score = entry.score;
-        let cand = CandidateEntry { id, score, entry };
-
-        if heap.len() < max_results {
-            heap.push(cand);
-        } else if let Some(worst) = heap.peek() {
-            if cand < *worst {
-                heap.pop();
-                heap.push(cand);
-            }
+    #[cfg(debug_assertions)]
+    {
+        // Invariante: scores[i] >= 0.0 und finit für jeden Kandidaten (mind. 1 Signal hat ihn gesehen)
+        for &s in &scores {
+            debug_assert!(
+                s.is_finite() && s >= 0.0,
+                "RRF score muss finit und nicht-negativ sein"
+            );
         }
     }
 
-    let top_k_winners = heap.into_sorted_vec();
-    let mut results = Vec::with_capacity(top_k_winners.len());
+    // Phase 2: Sortiere Integer-Indizes nach Score (kein String-Kopieren, O(N log N))
+    // Score-Verifikation (Beispiel):
+    // Für weight=1.0, k=60, rank=1 gilt score = 1.0 / (60 + 1) = 1/61 ≈ 0.01639344.
+    // Bei 2 Signalen an rank 1 akkumuliert scores[idx] exakt 2 * (1/61) = 2/61 ≈ 0.03278688.
+    let mut ranked_indices: Vec<u32> = (0..scores.len() as u32).collect();
+    ranked_indices.sort_unstable_by(|&a, &b| {
+        cmp_scores(scores[b as usize], scores[a as usize])
+            // Tie-breaking: Lexikographischer Vergleich der Document-IDs bei gleichem Score
+            .then_with(|| id_table[a as usize].cmp(id_table[b as usize]))
+    });
+    ranked_indices.truncate(max_results);
 
-    for cand in top_k_winners {
-        let id = cand.id;
-        let score = cand.score;
-        let entry = cand.entry;
+    // Nur für Top-K: jetzt String-IDs und Metadata auflösen
+    let mut results: Vec<SearchResult> = Vec::with_capacity(ranked_indices.len());
+    for idx in ranked_indices {
+        let i = idx as usize;
+        let id = id_table[i].to_string(); // Einzige String-Allokation pro Ergebnis — hier ist sie OK
+        let score = scores[i];
+        let entry = &mut entries[i]; // FusedEntry mit Metadata
 
         // Late Hydration: Merge metadata only for Top-K winning entries
         let mut merged_meta: Option<serde_json::Value> = None;
-        for meta in entry.deferred_metadata {
+        for meta in entry.deferred_metadata.drain(..) {
             merge_metadata(&mut merged_meta, meta);
         }
 
@@ -746,10 +746,10 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
 
         let mut signal_ranks: HashMap<String, u32> = entry
             .signal_ranks
-            .into_iter()
+            .drain()
             .map(|(k, v)| (k.as_str().to_string(), v))
             .collect();
-        if let Some(extras) = entry.extra_signal_ranks {
+        if let Some(extras) = entry.extra_signal_ranks.take() {
             for (k, v) in extras {
                 signal_ranks.entry(k).or_insert(v);
             }
@@ -757,10 +757,10 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
 
         let mut signal_contributions: HashMap<String, crate::SignalContribution> = entry
             .signal_contributions
-            .into_iter()
+            .drain()
             .map(|(k, v)| (k.as_str().to_string(), v))
             .collect();
-        if let Some(extras) = entry.extra_signal_contributions {
+        if let Some(extras) = entry.extra_signal_contributions.take() {
             for (k, v) in extras {
                 signal_contributions.entry(k).or_insert(v);
             }
@@ -772,8 +772,8 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             graph_score: entry.graph_score,
             rerank_score: entry.rerank_score,
             signal_ranks,
-            source_collection: entry.source_collection,
-            index_type: entry.index_type,
+            source_collection: entry.source_collection.take(),
+            index_type: entry.index_type.take(),
             signal_contributions,
             coherence_bonus: 0.0,
         };
