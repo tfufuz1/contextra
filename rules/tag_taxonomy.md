@@ -8,7 +8,7 @@
 | `AI-TAG` | Aktuelle Probleme/Risiken | `AI-TAG[KATEGORIE][SEVERITY] Kurzbeschreibung (ID: AGT-<CRATE>-<hash>) (TS: <ISO-8601-UTC>) (SESSION: <hash>)` |
 | `ANCHOR` | Geplante/laufende Arbeit | `ANCHOR[TYP:ID] STATUS:X (TS: <ISO-8601-UTC>) (SESSION: <hash>)` |
 | `REVIEW-PASS` | Unabhängiges Mehrfach-Session-Review | `REVIEW-PASS[N/M] STATUS:PASS|FAIL|CONDITIONAL (ID: AGT-<CRATE>-<hash>) (TS: <ISO-8601-UTC>) (SESSION: <hash>)` |
-| `VERDICT` | Audit-Verdict-Tag in `docs/audits/*.md` | `VERDICT: GO/APPROVED|CONDITIONAL|BLOCKED (ID: AGT-<CRATE>-<hash>) (TS: <ISO-8601-UTC>) (SESSION: <hash>) (VERIFIED-BY-SESSION: <hash-oder-'PENDING'>)` |
+| `VERDICT` | Audit-Verdict-Tag & Gegenzeichnung in `docs/audits/*.md` | `**VERDICT: GO / APPROVED**`<br>`<!-- VERIFIED-BY-SESSION: <hash>\|PENDING (TS: <ISO-8601-UTC>) -->` |
 | `FILE-CONTEXT` | Datei-Kontext für Agenten | `// FILE-CONTEXT` Block mit `// STAND: <TS> (SESSION: <hash>)` |
 
 ## Sekundengenaue Zeitstempel-Pflicht (TS:<ISO-8601-UTC>), SESSION-Token & Hash-IDs
@@ -74,23 +74,37 @@ Grammatik:
 - `PRÜFER-KONTEXT: FRESH` ist Pflicht (Sitzung hatte keine vorherige Historiensicht auf diesen Diff).
 - Jede `STATUS:DONE`-Markierung eines `ANCHOR` erfordert 2 (Standard) bzw. 3 (`ASK`/security/unsafe) `REVIEW-PASS` Einträge von unterschiedlichen `SESSION:`-Hashes.
 
-## Audit-Verdict-Tag (VERDICT-Zeile in docs/audits/*.md)
+## Audit-Verdict-Gegenzeichnung (VERIFIED-BY-Zeile in docs/audits/*.md)
 
-Grammatik und Pflichtformat für Verzeilungsbefunde/Gesamturteile in Audit-Dokumenten unter `docs/audits/*.md`:
+Grammatik und Pflichtformat für Verdict-Zeilen und deren verpflichtende Gegenzeichnung in Audit-Dokumenten unter `docs/audits/*.md`:
 
 ```markdown
-VERDICT: <GO/APPROVED|CONDITIONAL|BLOCKED> (ID: AGT-<CRATE>-<hash>) (TS: <ISO-8601-UTC>) (SESSION: <hash>) (VERIFIED-BY-SESSION: <hash-der-pruefenden-zweitsession-oder-'PENDING'>)
+**VERDICT: GO / APPROVED**
+<!-- VERIFIED-BY-SESSION: <8-hex-hash>|PENDING (TS: <ISO-8601-UTC>) -->
 ```
 
-Felddefinitionen:
-- **`VERDICT:`**: Testergebnis (`GO/APPROVED` für freigegebene Befunde, `CONDITIONAL` für auflagengebundene Freigaben, `BLOCKED` für gefundene Mängel/Blocker).
-- **`ID:`**: Hash-basierte Tag-ID im Format `AGT-<CRATE>-<8-hex-hash>`.
-- **`TS:`**: Sekundengenauer UTC-Zeitstempel der Erstellung oder letzten Statusänderung (`YYYY-MM-DDTHH:MM:SSZ`).
-- **`SESSION:`**: 8-stelliger Hex-Hash der erstellerischen Jules-Sitzung (Draft-Autor).
-- **`VERIFIED-BY-SESSION:`**: 8-stelliger Hex-Hash einer zweiten, unabhängigen Prüfsitzung, ODER der String `'PENDING'` solange die Zweitprüfung noch aussteht.
+Alternativ sind als Verdict-Status auch `CONDITIONAL` oder `BLOCKED` zulässig:
+```markdown
+**VERDICT: CONDITIONAL**
+<!-- VERIFIED-BY-SESSION: <8-hex-hash>|PENDING (TS: <ISO-8601-UTC>) -->
+```
+```markdown
+**VERDICT: BLOCKED**
+<!-- VERIFIED-BY-SESSION: <8-hex-hash>|PENDING (TS: <ISO-8601-UTC>) -->
+```
+
+Felddefinitionen & Regeln:
+- **`VERDICT:`-Zeile**: Unverändertes Markdown-Ergebnis (`**VERDICT: GO / APPROVED**`, `**VERDICT: CONDITIONAL**` oder `**VERDICT: BLOCKED**`). Bleibt aus Kompatibilitätsgründen mit bestehenden Parsern und Berichten genau in dieser Form erhalten.
+- **`<!-- VERIFIED-BY-SESSION: ... -->`-Folgezeile**: Verpflichtende HTML-Kommentarzeile, die **direkt** auf die `VERDICT`-Zeile folgen MUSS.
+  - **Session-Hash (`<8-hex-hash>` oder `PENDING`)**: 8-stelliger Hex-Hash einer zweiten, unabhängigen Prüfsitzung ODER das Schlüsselwort `PENDING`.
+  - **`PENDING`**: Darf für maximal 72 Stunden ab dem `TS:` des umgebenden Audit-Abschnitts (nächstgelegener Zeitstempel im Dokument oberhalb der `VERDICT`-Zeile) als Übergangszustand stehen (Kulanzfrist).
+  - **Unabhängigkeitsregel**: Der im `VERIFIED-BY-SESSION`-Feld genannte Hash MUSS zwingend von der Session-ID abweichen, die den umgebenden Abschnitt (nächstgelegene `SESSION:`-Fundstelle oberhalb der `VERDICT`-Zeile im selben Dokument) verfasst hat (`hash_zweitpruefer != hash_autor`).
+  - **`TS:`**: Sekundengenauer UTC-Zeitstempel der Gegenzeichnung bzw. Statuserstellung (`YYYY-MM-DDTHH:MM:SSZ`).
 
 Invariante:
-Ein Report mit `VERIFIED-BY-SESSION: PENDING` ist ein Unverified Draft. Der Übergang zu `GO/APPROVED` setzt ein valides `VERIFIED-BY-SESSION: <zweitsession-hash>` voraus, wobei `<zweitsession-hash> != <hash>` gelten MUSS.
+Ein Report oder Abschnitt mit `VERIFIED-BY-SESSION: PENDING` ist ein unvollständiger Entwurf (Draft). Der Übergang zu einer gültigen Freigabe setzt ein valides `VERIFIED-BY-SESSION: <8-hex-hash>` mit abweichender Session-ID voraus.
+
+*Bestandsschutz*: Vor dem Merge dieser Regel erstellte `VERDICT`-Zeilen ohne `VERIFIED-BY-SESSION`-Folgezeile in `docs/audits/*.md` bleiben als Übergangsfall unangetastet und müssen nicht rückwirkend geändert werden.
 
 ## FILE-CONTEXT Header
 
