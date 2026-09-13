@@ -74,11 +74,7 @@ impl KvBridgeAdapter {
     ///
     /// Gibt `None` zurück bei Cache-Miss, Decrypt-Fehler, Fingerprint-Mismatch oder jedem anderen Fehler.
     /// NIEMALS wird ein Fehler propagiert — `None` bedeutet stets "voller Prefill".
-    pub fn try_get_cached_segment(
-        &self,
-        tenant: TenantId,
-        key: &KvCacheKey,
-    ) -> Option<Vec<u8>> {
+    pub fn try_get_cached_segment(&self, tenant: TenantId, key: &KvCacheKey) -> Option<Vec<u8>> {
         // 1. Store-Lookup (synchron, Lock wird vor Rückgabe freigegeben)
         let encrypted_bytes = self.store.get_segment_bytes(tenant, key.chunk_id)?;
 
@@ -120,27 +116,22 @@ impl KvBridgeAdapter {
     }
 
     /// Speichert ein KV-Segment im Cache. Fehler werden geloggt, nie propagiert.
-    pub fn store_segment(
-        &self,
-        tenant: TenantId,
-        key: KvCacheKey,
-        plaintext_kv_bytes: Vec<u8>,
-    ) {
-        let encrypted_layer = match self.cipher.encrypt(
-            tenant,
-            key.fingerprint,
-            &plaintext_kv_bytes,
-        ) {
-            Ok(l) => l,
-            Err(e) => {
-                tracing::warn!(
-                    chunk_id = key.chunk_id,
-                    error = %e,
-                    "KvBridgeAdapter: Encrypt failed — segment not cached"
-                );
-                return;
-            }
-        };
+    pub fn store_segment(&self, tenant: TenantId, key: KvCacheKey, plaintext_kv_bytes: Vec<u8>) {
+        let encrypted_layer =
+            match self
+                .cipher
+                .encrypt(tenant, key.fingerprint, &plaintext_kv_bytes)
+            {
+                Ok(l) => l,
+                Err(e) => {
+                    tracing::warn!(
+                        chunk_id = key.chunk_id,
+                        error = %e,
+                        "KvBridgeAdapter: Encrypt failed — segment not cached"
+                    );
+                    return;
+                }
+            };
 
         let bytes = match bincode::serialize(&encrypted_layer) {
             Ok(b) => b,

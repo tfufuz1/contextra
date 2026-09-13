@@ -84,7 +84,11 @@ mod tests {
         let wrong_adapter = KvBridgeAdapter::new(Arc::clone(&adapter.store), wrong_cipher);
 
         let corrupt_key = KvCacheKey::new(8888, fp.clone(), None);
-        wrong_adapter.store_segment(tenant, corrupt_key.clone(), b"invalid encrypted bytes".to_vec());
+        wrong_adapter.store_segment(
+            tenant,
+            corrupt_key.clone(),
+            b"invalid encrypted bytes".to_vec(),
+        );
 
         // Reading back with original adapter should catch decryption error and fall back cleanly to None without panic
         let failed_decrypt = adapter.try_get_cached_segment(tenant, &corrupt_key);

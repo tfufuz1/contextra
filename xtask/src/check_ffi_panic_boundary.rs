@@ -10,9 +10,7 @@ use std::path::Path;
 
 /// Dateien, die FFI-Boundaries implementieren und auf catch_unwind geprüft werden.
 /// ERWEITERBAR: Füge hier neue FFI-Crates hinzu, wenn sie py.allow_threads verwenden.
-const FFI_BOUNDARY_FILES: &[&str] = &[
-    "crates/memfuse-py/src/lib.rs",
-];
+const FFI_BOUNDARY_FILES: &[&str] = &["crates/memfuse-py/src/lib.rs"];
 
 /// Gibt `true` zurück, wenn das Root-Cargo.toml im `[profile.release]`-Block `panic = "abort"` enthält.
 pub fn panic_abort_active(workspace_root: &Path) -> bool {
@@ -65,7 +63,10 @@ pub fn check_file(path: &Path) -> Result<(), String> {
             path, allow_threads_count, catch_unwind_count
         );
     } else if allow_threads_count > 0 {
-        println!("[OK] {:?} ({}/{} geschützt)", path, catch_unwind_count, allow_threads_count);
+        println!(
+            "[OK] {:?} ({}/{} geschützt)",
+            path, catch_unwind_count, allow_threads_count
+        );
     }
 
     Ok(())
@@ -75,7 +76,9 @@ pub fn check_file(path: &Path) -> Result<(), String> {
 pub fn run_check_ffi_panic_boundary(workspace_root: &Path) -> bool {
     let abort_active = panic_abort_active(workspace_root);
     if !abort_active {
-        println!("[SKIP] panic != \"abort\" im Release-Profil — FFI-Panic-Boundary-Check nicht nötig.");
+        println!(
+            "[SKIP] panic != \"abort\" im Release-Profil — FFI-Panic-Boundary-Check nicht nötig."
+        );
         return true;
     }
     println!("[INFO] panic = \"abort\" aktiv — prüfe FFI-Boundary-Dateien auf catch_unwind...");

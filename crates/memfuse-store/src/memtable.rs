@@ -232,11 +232,11 @@ impl MemTable {
     /// preventing integer underflow wrap-around to `usize::MAX`.
     #[inline]
     fn saturating_sub_size(&self, n: usize) {
-        let _ = self.size.fetch_update(
-            Ordering::AcqRel,
-            Ordering::Acquire,
-            |v| Some(v.saturating_sub(n)),
-        );
+        let _ = self
+            .size
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| {
+                Some(v.saturating_sub(n))
+            });
     }
 
     /// Returns the approximate size in bytes.

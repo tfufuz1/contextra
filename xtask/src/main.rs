@@ -58,6 +58,7 @@ mod check_compile;
 mod check_doc_references;
 mod check_duplicate_intent;
 mod check_duplicate_symbols;
+mod check_ffi_panic_boundary;
 mod check_jules_context_freshness;
 mod check_phantom_files;
 mod check_placeholder_refs;
@@ -73,7 +74,6 @@ mod generate_adr;
 mod init_audit_fix;
 mod jules_preflight;
 mod jules_submit_gate;
-mod check_ffi_panic_boundary;
 mod lint_unsafe_slice_bounds;
 mod record_mutation_score;
 mod validate_pr_checklist;
@@ -2137,8 +2137,7 @@ fn main() {
         }
         "check-ffi-panic-boundary" => {
             let workspace_root = std::path::PathBuf::from(
-                std::env::var("CARGO_WORKSPACE_DIR")
-                    .unwrap_or_else(|_| ".".to_string())
+                std::env::var("CARGO_WORKSPACE_DIR").unwrap_or_else(|_| ".".to_string()),
             );
             if !check_ffi_panic_boundary::run_check_ffi_panic_boundary(&workspace_root) {
                 std::process::exit(1);

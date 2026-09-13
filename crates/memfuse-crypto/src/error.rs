@@ -62,11 +62,9 @@ impl From<CryptoError> for memfuse_core::MemFuseError {
         match e {
             CryptoError::WalCorruption { offset, reason } => Self::wal_corruption(offset, reason),
             CryptoError::InvalidInput(msg) => Self::InvalidInput(msg),
-            CryptoError::KvFormatVersionMismatch { expected, found } => {
-                Self::InvalidInput(format!(
-                    "KV cache format version mismatch: expected {expected}, found {found}"
-                ))
-            }
+            CryptoError::KvFormatVersionMismatch { expected, found } => Self::InvalidInput(
+                format!("KV cache format version mismatch: expected {expected}, found {found}"),
+            ),
             other => Self::Crypto(other.to_string()),
         }
     }
