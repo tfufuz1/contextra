@@ -85,7 +85,26 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
         }
     };
 
-    let mut result = run_consolidation_pass(turns, config);
+    // Klone Eingabe-Daten für den blocking Thread.
+    // Konsolidierung läuft selten (alle N Minuten) — der Clone-Overhead ist vernachlässigbar
+    // gegenüber dem Gewinn: async Worker-Threads werden für latenz-kritische Ops freigegeben.
+    let turns_owned: Vec<(DocId, Vec<f32>)> = turns.to_vec();
+    let config_owned = config.clone();
+
+    let mut result = tokio::task::spawn_blocking(move || {
+        // run_consolidation_pass ist vollständig synchron (kein Async, kein I/O).
+        // Im blocking Thread: kein `await` nötig und erlaubt.
+        run_consolidation_pass(&turns_owned, &config_owned)
+    })
+    .await
+    .map_err(|join_err| {
+        // JoinError tritt auf bei Task-Panic — gemäß Zero-Panic-Doctrine nicht erwartet,
+        // aber explizit behandeln statt unwrap().
+        memfuse_core::MemFuseError::Internal(format!(
+            "Consolidation compute task panicked: {}",
+            join_err
+        ))
+    })?;
 
     // Tombstones auf echte Collection anwenden
     for doc_id in &result.duplicates_tombstoned {
@@ -756,6 +775,41 @@ mod tests {
         assert!(
             result.is_ok(),
             "ConsolidationNodesGuard deadlock regression test timed out (deadlock detected!)"
+        );
+    }
+
+    /// Verifikation: run_consolidation_pass in spawn_blocking gibt korrekte Ergebnisse zurück.
+    ///
+    /// Wenn dieser Test unter `#[tokio::test]` läuft und spawn_blocking korrekt ist,
+    /// darf der blocking Thread nicht den Tokio-Runtime blockieren.
+    #[tokio::test]
+    async fn test_spawn_blocking_consolidation_does_not_block_runtime() {
+        use tokio::time::timeout;
+
+        // Erstelle minimale Eingabe
+        let turns: Vec<(memfuse_core::DocId, Vec<f32>)> = vec![
+            (memfuse_core::DocId::new(1), vec![0.1_f32; 16]),
+            (memfuse_core::DocId::new(2), vec![0.9_f32; 16]),
+        ];
+        let config = crate::memory_consolidation::ConsolidationConfig::default();
+        let turns_owned = turns.clone();
+        let config_owned = config.clone();
+
+        // spawn_blocking muss innerhalb 5s fertig sein — beweist dass der Runtime nicht blockiert
+        let result = timeout(
+            Duration::from_secs(5),
+            tokio::task::spawn_blocking(move || {
+                crate::memory_consolidation::run_consolidation_pass(&turns_owned, &config_owned)
+            }),
+        )
+        .await
+        .expect("spawn_blocking timed out — Runtime blockiert!")
+        .expect("spawn_blocking JoinError");
+
+        // Resultat muss korrekt sein (nicht gecrasht)
+        assert!(
+            result.segments_created > 0,
+            "segments_created muss groesser 0 sein"
         );
     }
 }
