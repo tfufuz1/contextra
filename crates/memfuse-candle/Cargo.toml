@@ -19,6 +19,7 @@ tokio = { workspace = true }
 futures-util = "0.3"
 serde = { workspace = true }
 tracing = { workspace = true }
+bincode = { workspace = true, optional = true }
 memfuse-core = { workspace = true }
 memfuse-calibration = { workspace = true }
 memfuse-security = { workspace = true, optional = true }
@@ -30,6 +31,6 @@ proptest = "1.4"
 [features]
 default = []
 candle = []
-kv-bridge = ["dep:memfuse-security", "memfuse-security/kv-encryption"]
+kv-bridge = ["dep:memfuse-security", "memfuse-security/kv-encryption", "dep:bincode"]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]

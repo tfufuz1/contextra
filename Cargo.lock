@@ -1983,6 +1983,7 @@ dependencies = [
 name = "memfuse-candle"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "candle-core",
  "candle-nn",
  "candle-transformers",
