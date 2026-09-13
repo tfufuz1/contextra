@@ -1,7 +1,6 @@
 //! Test suite for fsync syscall discipline, call sequence verification, and performance overhead measurements.
 
 use memfuse_core::{StorageEngine, TxId};
-use memfuse_store::wal::{Wal, WalOp};
 use memfuse_store::{LsmConfig, LsmStorage};
 use std::time::Instant;
 use tempfile::tempdir;
@@ -72,26 +71,4 @@ async fn test_measure_fsync_overhead_benchmark() {
     );
 
     assert!(num_ops > 0);
-}
-
-#[tokio::test]
-async fn test_wal_direct_append_batch_fsync_discipline() {
-    let dir = tempdir().expect("tempdir");
-    let wal_path = dir.path().join("wal_direct.log");
-
-    let wal = Wal::open(&wal_path).await.expect("wal open");
-
-    let op = WalOp::Put {
-        tx_id: TxId::new(1),
-        key: b"direct_k".to_vec(),
-        value: b"direct_v".to_vec(),
-    };
-
-    let entry = wal.create_entry(op, 1).await.expect("create entry");
-
-    println!("[STRACE_MARKER_START_DIRECT_APPEND]");
-    let append_res = wal.append(&entry).await;
-    println!("[STRACE_MARKER_END_DIRECT_APPEND]");
-
-    assert!(append_res.is_ok());
 }

@@ -77,6 +77,40 @@ pub(crate) const fn legacy_integrity_key() -> [u8; 32] {
     out
 }
 
+/// A batch of prepared WAL entries bound to a specific HMAC chain.
+///
+/// `PreparedBatch` has a private inner field and cannot be constructed outside `wal.rs`.
+/// It can only be created by calling [`Wal::prepare_batch`].
+#[derive(Debug, Clone)]
+pub struct PreparedBatch(pub(crate) Vec<WalEntry>);
+
+impl PreparedBatch {
+    /// Returns `true` if the batch contains no entries.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns the number of entries in the batch.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns a slice of the inner WAL entries.
+    pub fn entries(&self) -> &[WalEntry] {
+        &self.0
+    }
+
+    /// Consumes the `PreparedBatch` and returns the inner vector of entries.
+    pub fn into_inner(self) -> Vec<WalEntry> {
+        self.0
+    }
+
+    /// Extends this prepared batch with entries from another prepared batch.
+    pub(crate) fn extend(&mut self, other: PreparedBatch) {
+        self.0.extend(other.0);
+    }
+}
+
 /// A single entry in the Write-Ahead Log.
 #[derive(Debug, Clone)]
 pub struct WalEntry {
@@ -1040,14 +1074,10 @@ impl Wal {
         }
     }
 
-    /// Appends an entry to the WAL.
-    pub async fn append(&self, entry: &WalEntry) -> Result<()> {
-        self.append_batch(std::slice::from_ref(entry)).await
-    }
-
     /// Appends a batch of entries to the WAL and performs a single fsync.
-    // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: Exklusiver Mutex-Lock self.file.lock() in append_batch serialisiert Header-Check (write_header) und Dateischreibzugriffe vollständig. (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8)
-    pub async fn append_batch(&self, entries: &[WalEntry]) -> Result<()> {
+    // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: Exklusiver Mutex-Lock self.file.lock() in append_batch serialisiert Header-Check (write_header) und Dateischreibzugriffe vollständig. Die HMAC-Korrektheit wird NICHT durch die self.file-Mutex-Serialisierung, sondern durch den separaten last_hmac-Mutex in prepare_batch garantiert (siehe last_hmac.lock() in prepare_batch). (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8)
+    pub(crate) async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
+        let entries = &batch.0;
         if entries.is_empty() {
             return Ok(());
         }
@@ -1143,7 +1173,11 @@ impl Wal {
     }
 
     /// Helper for creating entries bound to this WAL's current chain.
-    pub async fn create_entry(&self, op: WalOp, seq_no: u64) -> Result<WalEntry> {
+    #[allow(dead_code)]
+    #[deprecated(
+        note = "Use prepare_batch with a single-element Vec instead — direct use bypasses chain-fork protection"
+    )]
+    pub(crate) async fn create_entry(&self, op: WalOp, seq_no: u64) -> Result<WalEntry> {
         let last_hmac = self.last_hmac.lock().await;
         let integrity_key = self.get_integrity_key()?;
         WalEntry::try_new(op, seq_no, &integrity_key, *last_hmac)
@@ -1151,7 +1185,10 @@ impl Wal {
 
     /// Prepares a batch of entries, ensuring correct HMAC chaining between them.
     /// Returns the prepared entries along with a snapshot of the pre-prepare HMAC chain link.
-    pub async fn prepare_batch(&self, ops: Vec<(WalOp, u64)>) -> Result<(Vec<WalEntry>, [u8; 32])> {
+    pub async fn prepare_batch(
+        &self,
+        ops: Vec<(WalOp, u64)>,
+    ) -> Result<(PreparedBatch, [u8; 32])> {
         let mut last_hmac = self.last_hmac.lock().await;
         let prev_hmac = *last_hmac;
         let integrity_key = self.get_integrity_key()?;
@@ -1167,7 +1204,7 @@ impl Wal {
 
         *last_hmac = current_chain;
 
-        Ok((entries, prev_hmac))
+        Ok((PreparedBatch(entries), prev_hmac))
     }
 
     /// Restores the in-memory last HMAC to a previous snapshot state.
@@ -1837,15 +1874,15 @@ mod tests {
                 key: b"user:1".to_vec(),
                 value: b"Alice".to_vec(),
             };
-            let entry1 = wal.create_entry(op1, 10).await.expect("valid"); // expect
-            wal.append(&entry1).await.expect("append 1"); // expect
+            let (batch1, _) = wal.prepare_batch(vec![(op1, 10)]).await.expect("valid");
+            wal.append_batch(batch1).await.expect("append 1");
 
             let op2 = WalOp::Delete {
                 tx_id: TxId::new(2),
                 key: b"user:1".to_vec(),
             };
-            let entry2 = wal.create_entry(op2, 11).await.expect("valid"); // expect
-            wal.append(&entry2).await.expect("append 2"); // expect
+            let (batch2, _) = wal.prepare_batch(vec![(op2, 11)]).await.expect("valid");
+            wal.append_batch(batch2).await.expect("append 2");
         }
 
         let wal2 = Wal::open(&wal_path).await.expect("reopen WAL"); // expect
@@ -1867,16 +1904,16 @@ mod tests {
                 key: b"k1".to_vec(),
                 value: b"v1".to_vec(),
             };
-            let entry1 = wal.create_entry(op1, 1).await.expect("entry1"); // expect
-            wal.append(&entry1).await.expect("append1"); // expect
+            let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await.expect("entry1");
+            wal.append_batch(batch1).await.expect("append1");
 
             let op2 = WalOp::Put {
                 tx_id: TxId::new(2),
                 key: b"k2".to_vec(),
                 value: b"v2".to_vec(),
             };
-            let entry2 = wal.create_entry(op2, 2).await.expect("entry2"); // expect
-            wal.append(&entry2).await.expect("append2"); // expect
+            let (batch2, _) = wal.prepare_batch(vec![(op2, 2)]).await.expect("entry2");
+            wal.append_batch(batch2).await.expect("append2");
         }
 
         {
@@ -1909,8 +1946,8 @@ mod tests {
                     key: b"key".to_vec(),
                     value: b"val".to_vec(),
                 };
-                let entry = wal.create_entry(op, i).await.expect("entry"); // expect
-                wal.append(&entry).await.expect("append"); // expect
+                let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("entry");
+                wal.append_batch(batch).await.expect("append");
             }
         }
 
@@ -1939,8 +1976,8 @@ mod tests {
                     key: format!("k{}", i).into_bytes(),
                     value: format!("v{}", i).into_bytes(),
                 };
-                let entry = wal.create_entry(op, i).await.expect("entry"); // expect
-                wal.append(&entry).await.expect("append"); // expect
+                let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("entry");
+                wal.append_batch(batch).await.expect("append");
             }
         }
 
@@ -1977,8 +2014,8 @@ mod tests {
                     key: format!("key{}", i).into_bytes(),
                     value: format!("val{}", i).into_bytes(),
                 };
-                let entry = wal.create_entry(op, i).await.expect("create entry"); // expect
-                wal.append(&entry).await.expect("append entry"); // expect
+                let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("create entry");
+                wal.append_batch(batch).await.expect("append entry");
             }
         }
 
@@ -2011,8 +2048,8 @@ mod tests {
                     key: format!("k{}", i).into_bytes(),
                     value: format!("v{}", i).into_bytes(),
                 };
-                let entry = wal.create_entry(op, i).await.expect("entry"); // expect
-                wal.append(&entry).await.expect("append"); // expect
+                let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("entry");
+                wal.append_batch(batch).await.expect("append");
             }
         }
 
@@ -2073,8 +2110,8 @@ mod tests {
                 key: b"k".to_vec(),
                 value: b"v".to_vec(),
             };
-            let entry = wal.create_entry(op, 1).await.expect("entry"); // expect
-            wal.append(&entry).await.expect("append"); // expect
+            let (batch, _) = wal.prepare_batch(vec![(op, 1)]).await.expect("entry");
+            wal.append_batch(batch).await.expect("append");
             drop(wal);
             fs::read(&wal_path).await.expect("read") // expect
         };
@@ -2199,11 +2236,11 @@ mod tests {
 
         {
             let wal = Wal::open(&wal_path).await.expect("open wal"); // expect
-            let entry = wal
-                .create_entry(valid_op.clone(), 1)
+            let (batch, _) = wal
+                .prepare_batch(vec![(valid_op.clone(), 1)])
                 .await
                 .expect("create entry"); // expect
-            wal.append(&entry).await.expect("append valid entry"); // expect
+            wal.append_batch(batch).await.expect("append valid entry"); // expect
         }
 
         {
@@ -2348,7 +2385,8 @@ mod tests {
                 key: b"crash_k".to_vec(),
                 value: b"crash_v".to_vec(),
             };
-            let entry = wal.create_entry(op, 1).await.expect("create entry"); // expect
+            let (batch, _) = wal.prepare_batch(vec![(op, 1)]).await.expect("create entry"); // expect
+            let entry = &batch.entries()[0];
 
             // Manually simulate a write + flush to OS buffer WITHOUT file.sync_all()
             let mut file = tokio::fs::OpenOptions::new()
@@ -2422,7 +2460,7 @@ mod tests {
 
         // Serialize all 3 entries into a single bytes payload
         let mut batch_bytes = Vec::new();
-        for e in &entries {
+        for e in entries.entries() {
             batch_bytes.extend_from_slice(&e.to_bytes().expect("to_bytes")); // expect
         }
 
@@ -2498,7 +2536,7 @@ mod tests {
         let (batch, _) = wal.prepare_batch(ops).await.expect("prepare batch"); // expect
         assert_eq!(batch.len(), 3);
 
-        wal.append_batch(&batch).await.expect("append batch"); // expect
+        wal.append_batch(batch).await.expect("append batch"); // expect
 
         let file_bytes = fs::read(&wal_path).await.expect("read wal file"); // expect
 
@@ -2556,7 +2594,7 @@ mod tests {
         ];
 
         let (batch, _) = wal.prepare_batch(ops).await.expect("prepare_batch"); // expect
-        wal.append_batch(&batch).await.expect("append_batch"); // expect
+        wal.append_batch(batch).await.expect("append_batch"); // expect
 
         let wal_reopen = Wal::open_with_key_manager(&wal_path, Some(km))
             .await
@@ -2692,7 +2730,7 @@ mod tests {
                 ),
             ];
             let (batch1, _) = wal.prepare_batch(ops1).await.expect("prepare 1"); // expect
-            wal.append_batch(&batch1).await.expect("append 1"); // expect
+            wal.append_batch(batch1).await.expect("append 1"); // expect
 
             // Batch 2: 2 entries
             let ops2 = vec![
@@ -2714,7 +2752,7 @@ mod tests {
                 ),
             ];
             let (batch2, _) = wal.prepare_batch(ops2).await.expect("prepare 2"); // expect
-            wal.append_batch(&batch2).await.expect("append 2"); // expect
+            wal.append_batch(batch2).await.expect("append 2"); // expect
         }
 
         // Truncate the file mid-ciphertext of Batch 2
@@ -3045,8 +3083,8 @@ mod tests {
         let (batch1, _) = res1.expect("join 1"); // expect
         let (batch2, _) = res2.expect("join 2"); // expect
 
-        let prev1 = batch1[0].prev_hmac;
-        let prev2 = batch2[0].prev_hmac;
+        let prev1 = batch1.entries()[0].prev_hmac;
+        let prev2 = batch2.entries()[0].prev_hmac;
 
         // One batch must have chained off the initial [0u8; 32] HMAC, and the second batch off the first's checksum.
         // Crucially, their starting prev_hmac values must NOT be identical.
@@ -3056,9 +3094,9 @@ mod tests {
         );
 
         if prev1 == [0u8; 32] {
-            assert_eq!(prev2, batch1[0].checksum);
+            assert_eq!(prev2, batch1.entries()[0].checksum);
         } else {
-            assert_eq!(prev1, batch2[0].checksum);
+            assert_eq!(prev1, batch2.entries()[0].checksum);
             assert_eq!(prev2, [0u8; 32]);
         }
     }
@@ -3177,7 +3215,7 @@ mod tests {
             .prepare_batch(vec![(op1, 1)])
             .await
             .expect("prepare batch 1");
-        wal.append_batch(&batch1).await.expect("append batch 1");
+        wal.append_batch(batch1).await.expect("append batch 1");
 
         let hmac_before = wal.last_hmac_snapshot().await;
 
@@ -3210,7 +3248,7 @@ mod tests {
             *guard = ro_file;
         }
 
-        let append_res = wal.append_batch(&batch2).await;
+        let append_res = wal.append_batch(batch2).await;
         assert!(
             append_res.is_err(),
             "append_batch must fail on read-only file handle"
@@ -3262,7 +3300,7 @@ mod tests {
                     ),
                 ];
                 let (batch, _) = wal_trunc.prepare_batch(ops).await.expect("prepare_batch");
-                wal_trunc.append_batch(&batch).await.expect("append_batch");
+                wal_trunc.append_batch(batch).await.expect("append_batch");
 
                 // Truncate back to offset 4 (length of WAL_V3_HEADER)
                 wal_trunc
@@ -3317,7 +3355,7 @@ mod tests {
                     .prepare_batch(vec![(op, i + 1)])
                     .await
                     .expect("prepare_batch");
-                wal_clone.append_batch(&batch).await.expect("append_batch");
+                wal_clone.append_batch(batch).await.expect("append_batch");
             }));
         }
 
@@ -3373,8 +3411,8 @@ mod tests {
                 key: format!("k{}", i).into_bytes(),
                 value: format!("v{}", i).into_bytes(),
             };
-            let entry = wal.create_entry(op, i).await.expect("create entry");
-            wal.append(&entry).await.expect("append entry");
+            let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("prepare batch");
+            wal.append_batch(batch).await.expect("append entry");
         }
 
         let initial_size = tokio::fs::metadata(&wal_path).await.expect("meta").len();
@@ -3644,16 +3682,17 @@ mod tests {
             key: b"k10".to_vec(),
             value: b"v10".to_vec(),
         };
-        let entry1 = wal.create_entry(op1, 1).await.unwrap();
-        wal.append(&entry1).await.unwrap();
+        let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await.unwrap();
+        let entry1 = batch1.entries()[0].clone();
+        wal.append_batch(batch1).await.unwrap();
 
         let op2 = WalOp::Put {
             tx_id: TxId::new(20),
             key: b"k20".to_vec(),
             value: b"v20".to_vec(),
         };
-        let entry2 = wal.create_entry(op2, 2).await.unwrap();
-        wal.append(&entry2).await.unwrap();
+        let (batch2, _) = wal.prepare_batch(vec![(op2, 2)]).await.unwrap();
+        wal.append_batch(batch2).await.unwrap();
 
         // Append system tx: TxId::INTERNAL_BASE + 1
         let sys_tx = TxId::new(TxId::INTERNAL_BASE + 1);
@@ -3662,8 +3701,8 @@ mod tests {
             key: b"sys_k".to_vec(),
             value: b"sys_v".to_vec(),
         };
-        let entry_sys = wal.create_entry(op_sys, 3).await.unwrap();
-        wal.append(&entry_sys).await.unwrap();
+        let (batch_sys, _) = wal.prepare_batch(vec![(op_sys, 3)]).await.unwrap();
+        wal.append_batch(batch_sys).await.unwrap();
 
         // Append user tx: 30
         let op3 = WalOp::Put {
@@ -3671,8 +3710,8 @@ mod tests {
             key: b"k30".to_vec(),
             value: b"v30".to_vec(),
         };
-        let entry3 = wal.create_entry(op3, 4).await.unwrap();
-        wal.append(&entry3).await.unwrap();
+        let (batch3, _) = wal.prepare_batch(vec![(op3, 4)]).await.unwrap();
+        wal.append_batch(batch3).await.unwrap();
 
         let replayed = wal.replay().await.unwrap();
         assert_eq!(replayed.len(), 4);
@@ -3698,5 +3737,832 @@ mod tests {
         let (offset100, hmac100) = wal.find_tx_offset(TxId::new(100)).await.unwrap();
         assert_eq!(offset100, *offset3);
         assert_eq!(hmac100, e3.checksum);
+    }
+
+    #[tokio::test]
+    async fn test_wal_direct_append_batch_fsync_discipline() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = dir.path().join("wal_direct.log");
+
+        let wal = Wal::open(&wal_path).await.expect("wal open");
+
+        let op = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"direct_k".to_vec(),
+            value: b"direct_v".to_vec(),
+        };
+
+        let (batch, _) = wal.prepare_batch(vec![(op, 1)]).await.expect("create entry");
+
+        println!("[STRACE_MARKER_START_DIRECT_APPEND]");
+        let append_res = wal.append_batch(batch).await;
+        println!("[STRACE_MARKER_END_DIRECT_APPEND]");
+
+        assert!(append_res.is_ok());
+    }
+
+    async fn create_5_entry_wal_unencrypted(
+        dir: &std::path::Path,
+    ) -> (std::path::PathBuf, Vec<[u8; 32]>) {
+        let wal_path = dir.join("test_5_entries.wal");
+        let wal = Wal::open(&wal_path).await.expect("open WAL");
+
+        let mut hmacs = Vec::new();
+
+        for i in 1..=5 {
+            let op = WalOp::Put {
+                tx_id: TxId::new(i),
+                key: format!("key_{i}").into_bytes(),
+                value: format!("val_{i}").into_bytes(),
+            };
+            let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("prepare batch");
+            let checksum = batch.entries()[0].checksum;
+            wal.append_batch(batch).await.expect("append entry");
+            hmacs.push(checksum);
+        }
+
+        (wal_path, hmacs)
+    }
+
+    async fn read_unencrypted_raw_entries(path: &std::path::Path) -> Vec<Vec<u8>> {
+        let data = tokio::fs::read(path).await.expect("read file");
+        let mut offset = 0;
+        if data.starts_with(&WAL_V3_HEADER) {
+            offset = 4;
+        }
+
+        let mut entry_chunks = Vec::new();
+        while offset < data.len() {
+            if offset + 4 > data.len() {
+                break;
+            }
+            let len = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+            let total_chunk_len = 4 + len;
+            if offset + total_chunk_len > data.len() {
+                break;
+            }
+            entry_chunks.push(data[offset..offset + total_chunk_len].to_vec());
+            offset += total_chunk_len;
+        }
+        entry_chunks
+    }
+
+    async fn read_encrypted_raw_chunks(path: &std::path::Path) -> Vec<Vec<u8>> {
+        let data = tokio::fs::read(path).await.expect("read file");
+        let mut offset = 0;
+        if data.starts_with(&WAL_V3_HEADER) {
+            offset = 4;
+        }
+
+        let mut chunks = Vec::new();
+        while offset < data.len() {
+            if offset + 4 > data.len() {
+                break;
+            }
+            let len = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
+            let total_chunk_len = 4 + len;
+            if offset + total_chunk_len > data.len() {
+                break;
+            }
+            chunks.push(data[offset..offset + total_chunk_len].to_vec());
+            offset += total_chunk_len;
+        }
+        chunks
+    }
+
+    #[tokio::test]
+    async fn test_attack_a_swap_blocks_unencrypted_detected() {
+        let dir = tempdir().expect("tempdir");
+        let (wal_path, _) = create_5_entry_wal_unencrypted(dir.path()).await;
+
+        let chunks = read_unencrypted_raw_entries(&wal_path).await;
+        assert_eq!(chunks.len(), 5, "Expected 5 raw entry chunks");
+
+        let mut tampered_data = Vec::new();
+        tampered_data.extend_from_slice(&WAL_V3_HEADER);
+        tampered_data.extend_from_slice(&chunks[0]);
+        tampered_data.extend_from_slice(&chunks[3]);
+        tampered_data.extend_from_slice(&chunks[2]);
+        tampered_data.extend_from_slice(&chunks[1]);
+        tampered_data.extend_from_slice(&chunks[4]);
+
+        tokio::fs::write(&wal_path, &tampered_data)
+            .await
+            .expect("write tampered file");
+
+        let open_res = Wal::open(&wal_path).await;
+
+        assert!(
+            open_res.is_err(),
+            "Attack a (swap blocks) MUST be detected during open/recovery"
+        );
+        let err = open_res.unwrap_err();
+        assert!(
+            matches!(err, MemFuseError::WalCorruption { .. }),
+            "Expected WalCorruption error, got: {:?}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn test_attack_a_swap_blocks_encrypted_detected() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = dir.path().join("encrypted_swap.wal");
+        let km =
+            Arc::new(KeyManager::try_new("pass_swap", b"salt123456789012345678901234567890").unwrap());
+
+        {
+            let wal = Wal::open_with_key_manager(&wal_path, Some(km.clone()))
+                .await
+                .expect("open wal");
+            for i in 1..=5 {
+                let op = WalOp::Put {
+                    tx_id: TxId::new(i),
+                    key: format!("k{i}").into_bytes(),
+                    value: format!("v{i}").into_bytes(),
+                };
+                let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("prepare batch");
+                wal.append_batch(batch).await.expect("append");
+            }
+        }
+
+        let chunks = read_encrypted_raw_chunks(&wal_path).await;
+        assert_eq!(chunks.len(), 5);
+
+        let mut tampered_data = Vec::new();
+        tampered_data.extend_from_slice(&WAL_V3_HEADER);
+        tampered_data.extend_from_slice(&chunks[0]);
+        tampered_data.extend_from_slice(&chunks[3]);
+        tampered_data.extend_from_slice(&chunks[2]);
+        tampered_data.extend_from_slice(&chunks[1]);
+        tampered_data.extend_from_slice(&chunks[4]);
+
+        tokio::fs::write(&wal_path, &tampered_data).await.expect("write");
+
+        let open_res = Wal::open_with_key_manager(&wal_path, Some(km)).await;
+
+        assert!(
+            open_res.is_err(),
+            "Encrypted Attack a (swap blocks) MUST be detected during open/recovery"
+        );
+        assert!(matches!(
+            open_res.unwrap_err(),
+            MemFuseError::WalCorruption { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_attack_b_truncation_last_block_behavior() {
+        let dir = tempdir().expect("tempdir");
+        let (wal_path, _) = create_5_entry_wal_unencrypted(dir.path()).await;
+
+        let chunks = read_unencrypted_raw_entries(&wal_path).await;
+        assert_eq!(chunks.len(), 5);
+
+        let mut truncated_data = Vec::new();
+        truncated_data.extend_from_slice(&WAL_V3_HEADER);
+        for chunk in &chunks[0..4] {
+            truncated_data.extend_from_slice(chunk);
+        }
+
+        tokio::fs::write(&wal_path, &truncated_data).await.expect("write");
+
+        let wal = Wal::open(&wal_path).await.expect("open wal");
+        let res = wal.replay().await;
+
+        assert!(
+            res.is_ok(),
+            "Replay of clean tail truncation succeeds for prefix entries"
+        );
+        let entries = res.unwrap();
+        assert_eq!(
+            entries.len(),
+            4,
+            "Block 5 was truncated; replay returns first 4 entries without error"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_attack_c_duplicate_block_3_unencrypted_detected() {
+        let dir = tempdir().expect("tempdir");
+        let (wal_path, _) = create_5_entry_wal_unencrypted(dir.path()).await;
+
+        let chunks = read_unencrypted_raw_entries(&wal_path).await;
+        assert_eq!(chunks.len(), 5);
+
+        let mut tampered_data = Vec::new();
+        tampered_data.extend_from_slice(&WAL_V3_HEADER);
+        tampered_data.extend_from_slice(&chunks[0]);
+        tampered_data.extend_from_slice(&chunks[1]);
+        tampered_data.extend_from_slice(&chunks[2]);
+        tampered_data.extend_from_slice(&chunks[2]);
+        tampered_data.extend_from_slice(&chunks[3]);
+        tampered_data.extend_from_slice(&chunks[4]);
+
+        tokio::fs::write(&wal_path, &tampered_data).await.expect("write");
+
+        let open_res = Wal::open(&wal_path).await;
+
+        assert!(
+            open_res.is_err(),
+            "Attack c (duplicate block) MUST be detected during open/recovery"
+        );
+        let err = open_res.unwrap_err();
+        assert!(
+            matches!(err, MemFuseError::WalCorruption { .. }),
+            "Expected WalCorruption error, got: {:?}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn test_attack_d_cross_file_replay_unencrypted_detected() {
+        let dir1 = tempdir().expect("dir1");
+        let dir2 = tempdir().expect("dir2");
+
+        let (wal_path_a, _) = create_5_entry_wal_unencrypted(dir1.path()).await;
+        let (wal_path_b, _) = create_5_entry_wal_unencrypted(dir2.path()).await;
+
+        let chunks_a = read_unencrypted_raw_entries(&wal_path_a).await;
+        let chunks_b = read_unencrypted_raw_entries(&wal_path_b).await;
+
+        let mut tampered_data = Vec::new();
+        tampered_data.extend_from_slice(&WAL_V3_HEADER);
+        tampered_data.extend_from_slice(&chunks_b[0]);
+        tampered_data.extend_from_slice(&chunks_b[1]);
+        tampered_data.extend_from_slice(&chunks_a[2]);
+        tampered_data.extend_from_slice(&chunks_b[3]);
+        tampered_data.extend_from_slice(&chunks_b[4]);
+
+        tokio::fs::write(&wal_path_b, &tampered_data).await.expect("write");
+
+        let open_res = Wal::open(&wal_path_b).await;
+
+        assert!(
+            open_res.is_err(),
+            "Attack d (cross-file replay unencrypted) MUST be detected during open/recovery"
+        );
+        let err = open_res.unwrap_err();
+        assert!(
+            matches!(err, MemFuseError::WalCorruption { .. }),
+            "Expected WalCorruption error, got: {:?}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn test_attack_d_cross_file_replay_encrypted_detected() {
+        let dir1 = tempdir().expect("dir1");
+        let dir2 = tempdir().expect("dir2");
+
+        let wal_path_a = dir1.path().join("wal_a.wal");
+        let wal_path_b = dir2.path().join("wal_b.wal");
+
+        let km =
+            Arc::new(KeyManager::try_new("cross_pass", b"salt123456789012345678901234567890").unwrap());
+
+        {
+            let wal_a = Wal::open_with_key_manager(&wal_path_a, Some(km.clone()))
+                .await
+                .unwrap();
+            for i in 1..=5 {
+                let op = WalOp::Put {
+                    tx_id: TxId::new(i),
+                    key: format!("a_k{i}").into_bytes(),
+                    value: format!("a_v{i}").into_bytes(),
+                };
+                let (batch, _) = wal_a.prepare_batch(vec![(op, i)]).await.unwrap();
+                wal_a.append_batch(batch).await.unwrap();
+            }
+        }
+
+        {
+            let wal_b = Wal::open_with_key_manager(&wal_path_b, Some(km.clone()))
+                .await
+                .unwrap();
+            for i in 1..=5 {
+                let op = WalOp::Put {
+                    tx_id: TxId::new(i),
+                    key: format!("b_k{i}").into_bytes(),
+                    value: format!("b_v{i}").into_bytes(),
+                };
+                let (batch, _) = wal_b.prepare_batch(vec![(op, i)]).await.unwrap();
+                wal_b.append_batch(batch).await.unwrap();
+            }
+        }
+
+        let chunks_a = read_encrypted_raw_chunks(&wal_path_a).await;
+        let chunks_b = read_encrypted_raw_chunks(&wal_path_b).await;
+
+        let mut tampered_data = Vec::new();
+        tampered_data.extend_from_slice(&WAL_V3_HEADER);
+        tampered_data.extend_from_slice(&chunks_b[0]);
+        tampered_data.extend_from_slice(&chunks_b[1]);
+        tampered_data.extend_from_slice(&chunks_a[2]);
+        tampered_data.extend_from_slice(&chunks_b[3]);
+        tampered_data.extend_from_slice(&chunks_b[4]);
+
+        tokio::fs::write(&wal_path_b, &tampered_data).await.expect("write");
+
+        let open_res = Wal::open_with_key_manager(&wal_path_b, Some(km)).await;
+
+        assert!(
+            open_res.is_err(),
+            "Attack d (cross-file encrypted replay) MUST be detected during open/recovery"
+        );
+        let err = open_res.unwrap_err();
+        assert!(
+            matches!(err, MemFuseError::WalCorruption { .. }),
+            "Expected WalCorruption error due to per-file UUID key isolation failure, got: {:?}",
+            err
+        );
+    }
+
+    async fn write_valid_wal_fuzz(dir: &std::path::Path, n: usize) -> std::path::PathBuf {
+        let wal_path = dir.join(format!("fuzz_test_{}.wal", rand::random::<u64>()));
+        let wal = Wal::open(&wal_path).await.expect("open WAL");
+
+        for i in 0..n {
+            let op = WalOp::Put {
+                tx_id: TxId::new(i as u64),
+                key: format!("sensor:data:{}", i).into_bytes(),
+                value: format!("payload_{:04}", i).into_bytes(),
+            };
+            let (batch, _) = wal.prepare_batch(vec![(op, i as u64)]).await.expect("prepare batch");
+            wal.append_batch(batch).await.expect("append");
+        }
+        wal_path
+    }
+
+    #[tokio::test]
+    async fn test_wal_bitflip_property_integrity() {
+        use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
+        let dir = tempdir().expect("tempdir");
+        let mut rng = StdRng::seed_from_u64(0xFEED_FACE_CAFE_4242);
+
+        for _iteration in 0..30u32 {
+            let wal_path = write_valid_wal_fuzz(dir.path(), 5).await;
+            let mut data = tokio::fs::read(&wal_path).await.expect("read WAL");
+
+            if data.len() > 12 {
+                let flip_offset = rng.gen_range(4..data.len());
+                data[flip_offset] ^= 0x01 << rng.gen_range(0..8);
+                tokio::fs::write(&wal_path, &data).await.expect("write WAL");
+
+                let result = async {
+                    match Wal::open(&wal_path).await {
+                        Err(e) => Err(e),
+                        Ok(wal) => wal.replay().await.map(|_| ()),
+                    }
+                }
+                .await;
+
+                assert!(
+                    result.is_err() || result.is_ok(),
+                    "Replay must cleanly handle bit-flip alterations"
+                );
+            }
+            let _ = tokio::fs::remove_file(&wal_path).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wal_random_bitflip_never_panics() {
+        use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
+        let dir = tempdir().expect("tempdir");
+        let n_entries = 10;
+
+        let mut rng = StdRng::seed_from_u64(0xDEAD_BEEF_CAFE_1337);
+
+        let mut corruption_detected = 0u32;
+        let mut truncation_tolerated = 0u32;
+
+        for _iteration in 0..50u32 {
+            let wal_path = write_valid_wal_fuzz(dir.path(), n_entries).await;
+            let mut data = tokio::fs::read(&wal_path).await.expect("read WAL");
+
+            if data.is_empty() {
+                continue;
+            }
+
+            let skip_header = (data.len() / 10).min(8);
+            let flip_offset = rng.gen_range(skip_header..data.len());
+            data[flip_offset] ^= 0x01 << rng.gen_range(0..8);
+            tokio::fs::write(&wal_path, &data)
+                .await
+                .expect("write corrupted WAL");
+
+            let result = async {
+                match Wal::open(&wal_path).await {
+                    Err(e) => Err(e),
+                    Ok(wal) => wal.replay().await.map(|_| ()),
+                }
+            }
+            .await;
+
+            match result {
+                Err(_) => {
+                    corruption_detected += 1;
+                }
+                Ok(_) => {
+                    truncation_tolerated += 1;
+                }
+            }
+            let _ = tokio::fs::remove_file(&wal_path).await;
+        }
+
+        assert!(corruption_detected + truncation_tolerated == 50);
+    }
+
+    #[tokio::test]
+    async fn test_wal_systematic_header_corruption() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = write_valid_wal_fuzz(dir.path(), 5).await;
+        let original_data = tokio::fs::read(&wal_path).await.expect("read");
+
+        let test_limit = 12.min(original_data.len());
+
+        for byte_idx in 0..test_limit {
+            for bit_idx in 0..8 {
+                let mut corrupted_data = original_data.clone();
+                corrupted_data[byte_idx] ^= 0x01 << bit_idx;
+
+                tokio::fs::write(&wal_path, &corrupted_data).await.expect("write");
+
+                let result = async {
+                    match Wal::open(&wal_path).await {
+                        Err(e) => Err(e),
+                        Ok(wal) => wal.replay().await.map(|_| ()),
+                    }
+                }
+                .await;
+
+                assert!(
+                    result.is_err(),
+                    "Bit-flip at byte {}, bit {} must be detected as error.",
+                    byte_idx,
+                    bit_idx
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wal_crc_field_corruption_detected() {
+        let dir = tempdir().expect("tempdir");
+        let wal_path = write_valid_wal_fuzz(dir.path(), 5).await;
+        let mut data = tokio::fs::read(&wal_path).await.expect("read");
+
+        if data.len() >= 8 {
+            data[4] ^= 0xFF;
+            tokio::fs::write(&wal_path, &data).await.expect("write");
+        }
+
+        let result = async {
+            match Wal::open(&wal_path).await {
+                Err(e) => Err(e),
+                Ok(wal) => wal.replay().await.map(|_| ()),
+            }
+        }
+        .await;
+
+        assert!(result.is_err(), "Corrupted CRC MUST be detected");
+    }
+
+    #[tokio::test]
+    async fn test_truncate_at_offset_zero_yields_empty_wal() -> Result<()> {
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("test_truncate_zero.wal");
+
+        let wal = Wal::open(&wal_path).await?;
+        for i in 1..=5 {
+            let op = WalOp::Put {
+                tx_id: TxId::new(i),
+                key: format!("k{i}").into_bytes(),
+                value: format!("v{i}").into_bytes(),
+            };
+            let (batch, _) = wal.prepare_batch(vec![(op, i)]).await?;
+            wal.append_batch(batch).await?;
+        }
+
+        let meta_before = tokio::fs::metadata(&wal_path).await?;
+        assert!(
+            meta_before.len() > 0,
+            "WAL file should contain written bytes before truncation"
+        );
+
+        wal.truncate(0, [0u8; 32]).await?;
+
+        let meta_after = tokio::fs::metadata(&wal_path).await?;
+        assert_eq!(
+            meta_after.len(),
+            0,
+            "Physical file length must be exactly 0 bytes after truncate(0)"
+        );
+
+        drop(wal);
+        let wal_reopened = Wal::open(&wal_path).await?;
+        let entries = wal_reopened.replay().await?;
+        assert_eq!(
+            entries.len(),
+            0,
+            "Reopened WAL after truncate(0) must yield 0 entries"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_append_batch_concurrent_double_header_write_race() -> Result<()> {
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("test_concurrent_header.wal");
+
+        let wal = Wal::open(&wal_path).await?;
+
+        let op1 = WalOp::Put {
+            tx_id: TxId::new(10),
+            key: b"concurrent_key_1".to_vec(),
+            value: b"val_1".to_vec(),
+        };
+        let op2 = WalOp::Put {
+            tx_id: TxId::new(11),
+            key: b"concurrent_key_2".to_vec(),
+            value: b"val_2".to_vec(),
+        };
+
+        let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await?;
+        let (batch2, _) = wal.prepare_batch(vec![(op2, 2)]).await?;
+
+        let handle1 = wal.append_batch(batch1);
+        let handle2 = wal.append_batch(batch2);
+        let (res1, res2) = tokio::join!(handle1, handle2);
+
+        res1?;
+        res2?;
+
+        let file_bytes = tokio::fs::read(&wal_path).await?;
+
+        let header_magic_count = file_bytes
+            .windows(4)
+            .filter(|win| *win == WAL_V3_HEADER)
+            .count();
+
+        assert_eq!(
+            header_magic_count, 1,
+            "Header magic 'MFW3' must appear EXACTLY ONCE in physical WAL file, found {}",
+            header_magic_count
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_seq_no_near_u64_max_boundary() -> Result<()> {
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("test_seq_max.wal");
+        let wal = Wal::open(&wal_path).await?;
+
+        let seq_max_minus_2 = u64::MAX - 2;
+        let seq_max_minus_1 = u64::MAX - 1;
+        let seq_max = u64::MAX;
+
+        let op1 = WalOp::Put {
+            tx_id: TxId::new(100),
+            key: b"seq_near_max_1".to_vec(),
+            value: b"v1".to_vec(),
+        };
+        let op2 = WalOp::Put {
+            tx_id: TxId::new(101),
+            key: b"seq_near_max_2".to_vec(),
+            value: b"v2".to_vec(),
+        };
+        let op3 = WalOp::Put {
+            tx_id: TxId::new(102),
+            key: b"seq_near_max_3".to_vec(),
+            value: b"v3".to_vec(),
+        };
+
+        let (batch1, _) = wal.prepare_batch(vec![(op1, seq_max_minus_2)]).await?;
+        wal.append_batch(batch1).await?;
+
+        let (batch2, _) = wal.prepare_batch(vec![(op2, seq_max_minus_1)]).await?;
+        wal.append_batch(batch2).await?;
+
+        let (batch3, _) = wal.prepare_batch(vec![(op3, seq_max)]).await?;
+        wal.append_batch(batch3).await?;
+
+        drop(wal);
+        let wal_reopened = Wal::open(&wal_path).await?;
+        let replayed = wal_reopened.replay().await?;
+
+        assert_eq!(replayed.len(), 3);
+        assert_eq!(replayed[0].1.seq_no, seq_max_minus_2);
+        assert_eq!(replayed[1].1.seq_no, seq_max_minus_1);
+        assert_eq!(replayed[2].1.seq_no, seq_max);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_empty_wal_file_zero_bytes_replay() -> Result<()> {
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("empty_zero_byte.wal");
+
+        tokio::fs::File::create(&wal_path).await?;
+        let meta = tokio::fs::metadata(&wal_path).await?;
+        assert_eq!(meta.len(), 0, "Created test file must be 0 bytes");
+
+        let wal = Wal::open(&wal_path).await?;
+        let entries = wal.replay().await?;
+
+        assert_eq!(
+            entries.len(),
+            0,
+            "Replaying 0-byte empty file must return 0 entries without error"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_single_entry_no_commit_marker_replay() -> Result<()> {
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("uncommitted_tail.wal");
+
+        {
+            let wal = Wal::open(&wal_path).await?;
+            let op1 = WalOp::Put {
+                tx_id: TxId::new(1),
+                key: b"committed_key".to_vec(),
+                value: b"committed_val".to_vec(),
+            };
+            let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await?;
+            wal.append_batch(batch1).await?;
+        }
+
+        let mut file = std::fs::OpenOptions::new().append(true).open(&wal_path)?;
+        use std::io::Write;
+        file.write_all(&[0xFF, 0x00, 0x7A, 0x11])?;
+        file.sync_all()?;
+
+        let wal = Wal::open(&wal_path).await?;
+        let entries = wal.replay().await?;
+
+        assert_eq!(
+            entries.len(),
+            1,
+            "Replay must recover valid entry and discard partial trailing write"
+        );
+        assert_eq!(entries[0].1.seq_no, 1);
+
+        Ok(())
+    }
+
+    fn compute_v3_hmac_reference_independent(
+        key: &[u8],
+        prev_hmac: &[u8; 32],
+        seq_no: u64,
+        tx_id: u64,
+        op: &WalOp,
+    ) -> Result<[u8; 32]> {
+        let mut mac = WalHmac::new(key)?;
+        mac.update(prev_hmac);
+        mac.update(&seq_no.to_le_bytes());
+        mac.update(&tx_id.to_le_bytes());
+
+        match op {
+            WalOp::Put { key, value, .. } => {
+                mac.update(&[0u8]);
+                mac.update(&(key.len() as u32).to_le_bytes());
+                mac.update(key);
+                mac.update(&(value.len() as u32).to_le_bytes());
+                mac.update(value);
+            }
+            WalOp::Delete { key, .. } => {
+                mac.update(&[1u8]);
+                mac.update(&(key.len() as u32).to_le_bytes());
+                mac.update(key);
+            }
+        }
+
+        Ok(mac.finalize())
+    }
+
+    #[tokio::test]
+    async fn test_hmac_chain_prev_hash_independent_reference() -> Result<()> {
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("hmac_ref.wal");
+        let wal = Wal::open(&wal_path).await?;
+
+        let key_path = dir.path().join(".wal_integrity_key");
+        let integrity_key = tokio::fs::read(&key_path).await?;
+
+        let ops = vec![
+            WalOp::Put {
+                tx_id: TxId::new(10),
+                key: b"k1".to_vec(),
+                value: b"v1".to_vec(),
+            },
+            WalOp::Put {
+                tx_id: TxId::new(11),
+                key: b"k2".to_vec(),
+                value: b"v2".to_vec(),
+            },
+            WalOp::Delete {
+                tx_id: TxId::new(12),
+                key: b"k1".to_vec(),
+            },
+        ];
+
+        let mut current_chain = [0u8; 32];
+        for (idx, op) in ops.into_iter().enumerate() {
+            let seq_no = (idx + 1) as u64;
+            let (batch, _) = wal.prepare_batch(vec![(op.clone(), seq_no)]).await?;
+            let entry = &batch.entries()[0];
+
+            let expected_hmac = compute_v3_hmac_reference_independent(
+                &integrity_key,
+                &current_chain,
+                seq_no,
+                op.tx_id().inner(),
+                &op,
+            )?;
+
+            assert_eq!(
+                entry.checksum, expected_hmac,
+                "WAL entry checksum at seq {} must match independent HMAC-SHA256 reference calculation",
+                seq_no
+            );
+            assert_eq!(
+                entry.prev_hmac, current_chain,
+                "WAL entry prev_hmac at seq {} must match previous chain digest",
+                seq_no
+            );
+
+            let checksum = entry.checksum;
+            wal.append_batch(batch).await?;
+            current_chain = checksum;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "fault-injection")]
+    #[tokio::test]
+    async fn test_disk_full_mid_append_batch_rollback() -> Result<()> {
+        use std::sync::atomic::Ordering;
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("disk_full_batch.wal");
+
+        let wal = Wal::open(&wal_path).await?;
+
+        let op_base = WalOp::Put {
+            tx_id: TxId::new(10),
+            key: b"base_k".to_vec(),
+            value: b"base_v".to_vec(),
+        };
+        let (batch_base, _) = wal.prepare_batch(vec![(op_base, 1)]).await?;
+        wal.append_batch(batch_base).await?;
+
+        let fail_tx = TxId::new(20);
+        let op_fail1 = WalOp::Put {
+            tx_id: fail_tx,
+            key: b"fail_k1".to_vec(),
+            value: b"fail_v1".to_vec(),
+        };
+        let op_fail2 = WalOp::Put {
+            tx_id: fail_tx,
+            key: b"fail_k2".to_vec(),
+            value: b"fail_v2".to_vec(),
+        };
+
+        let (batch, prev_hmac_snapshot) = wal
+            .prepare_batch(vec![(op_fail1, 2), (op_fail2, 3)])
+            .await?;
+
+        FAIL_APPEND_FOR_TX.store(fail_tx.inner(), Ordering::SeqCst);
+
+        let append_res = wal.append_batch(batch).await;
+        assert!(
+            append_res.is_err(),
+            "append_batch must return Err when fault injection triggers WAL append failure"
+        );
+
+        wal.restore_last_hmac(prev_hmac_snapshot).await?;
+
+        drop(wal);
+        let wal_reopened = Wal::open(&wal_path).await?;
+        let entries = wal_reopened.replay().await?;
+
+        assert_eq!(
+            entries.len(),
+            1,
+            "WAL must contain exactly 1 baseline entry after batch failure rollback"
+        );
+        assert_eq!(entries[0].1.seq_no, 1);
+
+        Ok(())
     }
 }
