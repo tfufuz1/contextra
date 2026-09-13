@@ -14,6 +14,45 @@ use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 
+/// Teilt einen Endpoint-String sicher in Programm + Argumente auf.
+/// Unterstützt einfache Anführungszeichen: 'arg with spaces'.
+/// Gibt Err bei leerem String oder nicht-geschlossenen Anführungszeichen zurück.
+fn split_endpoint(s: &str) -> Result<(String, Vec<String>)> {
+    let mut parts: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_single_quote = false;
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\'' if !in_single_quote => in_single_quote = true,
+            '\'' if in_single_quote => in_single_quote = false,
+            ' ' | '\t' if !in_single_quote => {
+                if !current.is_empty() {
+                    parts.push(std::mem::take(&mut current));
+                }
+            }
+            other => current.push(other),
+        }
+    }
+
+    if in_single_quote {
+        return Err(MemFuseError::InvalidInput(
+            "Unclosed single quote in MCP endpoint string".into(),
+        ));
+    }
+    if !current.is_empty() {
+        parts.push(current);
+    }
+
+    let mut iter = parts.into_iter();
+    let program = iter
+        .next()
+        .ok_or_else(|| MemFuseError::InvalidInput("Empty MCP endpoint".into()))?;
+    let args: Vec<String> = iter.collect();
+    Ok((program, args))
+}
+
 /// Dispatches the prepared context from a [`RoutingDecision`] to the target SLM's MCP endpoint
 /// over stdio JSON-RPC 2.0 (ADR-010 compliant).
 ///
@@ -38,9 +77,9 @@ pub async fn dispatch_to_slm(decision: &RoutingDecision) -> Result<String> {
     let mut payload_bytes = serde_json::to_vec(&request_payload)?;
     payload_bytes.push(b'\n');
 
-    let mut child = Command::new("sh")
-        .arg("-c")
-        .arg(endpoint)
+    let (program, args) = split_endpoint(endpoint)?;
+    let mut child = Command::new(&program)
+        .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -131,6 +170,49 @@ mod tests {
     use super::*;
     use crate::profile::SlmProfile;
     use memfuse_core::{ContextChunk, ContextWindow, DocId, TokenBudget};
+
+    #[test]
+    fn test_split_endpoint_simple() {
+        let (prog, args) = split_endpoint("/usr/bin/my-slm").unwrap();
+        assert_eq!(prog, "/usr/bin/my-slm");
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn test_split_endpoint_with_args() {
+        let (prog, args) = split_endpoint("/usr/bin/node /opt/slm/server.js --port 9000").unwrap();
+        assert_eq!(prog, "/usr/bin/node");
+        assert_eq!(args, vec!["/opt/slm/server.js", "--port", "9000"]);
+    }
+
+    #[test]
+    fn test_split_endpoint_quoted_spaces() {
+        let (prog, args) = split_endpoint("'/path with spaces/slm' --mode fast").unwrap();
+        assert_eq!(prog, "/path with spaces/slm");
+        assert_eq!(args, vec!["--mode", "fast"]);
+    }
+
+    #[test]
+    fn test_split_endpoint_empty_fails() {
+        assert!(split_endpoint("").is_err());
+        assert!(split_endpoint("   ").is_err());
+    }
+
+    #[test]
+    fn test_split_endpoint_unclosed_quote_fails() {
+        assert!(split_endpoint("'/unclosed arg").is_err());
+    }
+
+    #[test]
+    fn test_split_endpoint_no_shell_injection() {
+        // Diese Strings dürfen NICHT zur Shell-Ausführung führen — split_endpoint
+        // trennt nur Tokens, der zurückgegebene `program`-String wird direkt an
+        // Command::new() übergeben, kein Shell-Intermediär.
+        let (prog, args) = split_endpoint("myslm; rm -rf /").unwrap();
+        assert_eq!(prog, "myslm;");
+        // 'rm' wird als Argument übergeben, nicht als zweites Kommando
+        assert!(args.iter().any(|a| a == "rm"));
+    }
 
     #[tokio::test]
     async fn test_dispatch_to_slm_invalid_endpoint_fails_gracefully() {

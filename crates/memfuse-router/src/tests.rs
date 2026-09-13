@@ -849,7 +849,7 @@ mod tests {
         // 3. RPC Error response
         let profile_rpc_err = SlmProfile::new(
             "slm-rpc-err",
-            "cat > /dev/null; echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}'",
+            "sh -c 'cat > /dev/null; echo \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"error\\\":{\\\"code\\\":-32601,\\\"message\\\":\\\"Method not found\\\"}}\"'",
             vec![1],
             TokenBudget::new(50, 0),
             0.1,
@@ -871,7 +871,7 @@ mod tests {
         // 4. Custom JSON object result (no "answer" key)
         let profile_obj = SlmProfile::new(
             "slm-obj",
-            "cat > /dev/null; echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"custom_data\":42}}'",
+            "sh -c 'cat > /dev/null; echo \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"result\\\":{\\\"custom_data\\\":42}}\"'",
             vec![1],
             TokenBudget::new(50, 0),
             0.1,
@@ -889,7 +889,7 @@ mod tests {
         // 5. Neither result nor error present
         let profile_empty = SlmProfile::new(
             "slm-empty",
-            "cat > /dev/null; echo '{\"jsonrpc\":\"2.0\",\"id\":1}'",
+            "sh -c 'cat > /dev/null; echo \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1}\"'",
             vec![1],
             TokenBudget::new(50, 0),
             0.1,
@@ -1195,7 +1195,7 @@ mod tests {
     async fn test_dispatch_invalid_json_response() {
         let profile = SlmProfile::new(
             "bad-json-slm",
-            "cat > /dev/null; echo '{invalid json'",
+            "sh -c 'cat > /dev/null; echo {invalid json'",
             vec![1],
             TokenBudget::new(50, 0),
             0.1,
@@ -2968,7 +2968,7 @@ mod tests {
         // Test response returning result object without "answer" key
         let profile_json_obj = SlmProfile::new(
             "test-json-obj",
-            "cat > /dev/null; echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"custom_key\":\"val\"}}'",
+            "sh -c 'cat > /dev/null; echo \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"result\\\":{\\\"custom_key\\\":\\\"val\\\"}}\"'",
             vec![],
             TokenBudget::default(),
             0.5,
