@@ -716,6 +716,20 @@ impl LsmStorage {
         Ok(storage)
     }
 
+    /// Removes all intent lock registrations associated with the specified transaction ID.
+    pub fn clear_intent_locks_for_tx(&self, tx_id: TxId) {
+        if let Ok(mut locks) = self.intent_locks.lock() {
+            locks.retain(|_, locked_tx| *locked_tx != tx_id);
+        }
+    }
+
+    /// Removes all intent lock registrations associated with transactions strictly newer than target_tx.
+    pub fn clear_intent_locks_above_tx(&self, target_tx: TxId) {
+        if let Ok(mut locks) = self.intent_locks.lock() {
+            locks.retain(|_, locked_tx| *locked_tx <= target_tx);
+        }
+    }
+
     /// Forces a flush (to be used by PersistentCheckpointStore or tests).
     pub async fn force_flush(&self) -> Result<()> {
         self.flush().await
@@ -823,6 +837,8 @@ impl LsmStorage {
     /// holding `commit_mutex` violates lock ordering and leads to state corruption and race conditions.
     // AI-TAG[SMELL][MINOR] RESOLVED(audit-NC-3/C-4): Rollback transaction crash-atomicity via rollback-{txid}.intent file and startup recovery confirmed fully operational in LsmStorage::new() and verified by test_rollback_crash_recovery_startup. (ID: AGT-STORE-27a11909) (TS: 2026-09-11T19:30:00Z) (SESSION: 4a9ccf21)
     async fn rollback_to_tx_locked(&self, target_tx: TxId, _guard: &CommitGuard<'_>) -> Result<()> {
+        self.clear_intent_locks_above_tx(target_tx);
+
         // NC-3-RECOVERY-NOTE: Implement recovery in P1 fix/lsm-startup-recovery
         // NC-3: Write crash-atomic rollback intent file before any mutation.
         // On recovery in new(), this file signals that rollback must be completed.
@@ -1600,6 +1616,14 @@ impl StorageEngine for LsmStorage {
             if !self.budget.has_memory_capacity() {
                 return Err(MemFuseError::Storage("Memory budget exceeded (95%)".into()));
             }
+
+            struct IntentLockGuard<'a>(&'a LsmStorage, TxId);
+            impl<'a> Drop for IntentLockGuard<'a> {
+                fn drop(&mut self) {
+                    self.0.clear_intent_locks_for_tx(self.1);
+                }
+            }
+            let _intent_guard = IntentLockGuard(self, tx_id);
 
             // ANCHOR[ALG-FIX:D6-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Snapshot-Inversion bei parallel commit (INV-MVCC-1)
             // FIX: Commit-Mutex serialisiert fetch_add + wal.prepare_batch.
@@ -4276,6 +4300,28 @@ mod tests {
         } else {
             assert_eq!(stored_val, b"val2");
         }
+    }
+
+    #[tokio::test]
+    async fn test_put_if_absent_no_deadlock_and_no_commit_mutex_holding() {
+        let (storage, _tmp) = test_storage().await;
+        let storage = Arc::new(storage);
+
+        // Lock commit_mutex to simulate an active long-running commit or operation holding commit_mutex
+        let commit_guard = storage.commit_mutex.lock().await;
+
+        let key = b"no_commit_mutex_block_key";
+        let tx = TxId::new(100);
+
+        // put_if_absent should complete without waiting for commit_mutex!
+        let res = storage.put_if_absent(tx, key, b"val").await;
+        assert!(
+            res.is_ok() && res.unwrap(),
+            "put_if_absent must proceed without being blocked by commit_mutex"
+        );
+
+        drop(commit_guard);
+        storage.commit(tx).await.unwrap();
     }
 
     #[tokio::test]
