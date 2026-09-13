@@ -2,6 +2,7 @@
 //! Layer-7-Rand-Crate ohne jegliche unsafe-Toleranz — verarbeitet direkt untrusted stdio-Input, siehe ADR-010.
 
 pub mod config;
+pub mod egress_gateway;
 pub mod prompt_injection;
 pub mod protocol;
 pub mod sandbox;
@@ -9,6 +10,11 @@ pub mod sandbox;
 mod tests;
 
 pub use config::*;
+
+pub use egress_gateway::{
+    CloudQueryRequest, CloudQueryResponse, DefaultEgressClassifier, EgressClassification,
+    EgressClassifier,
+};
 
 pub use prompt_injection::{
     PromptInjectionConfig, PromptInjectionGuard, QuarantinePolicy, SecurityAuditLogger,
@@ -201,6 +207,7 @@ pub struct McpServer {
     pub embedder: Arc<dyn EmbeddingProvider>,
     pub sandbox: Arc<McpSandbox>,
     pub injection_guard: Arc<PromptInjectionGuard>,
+    pub egress_classifier: Arc<dyn EgressClassifier>,
     pub routing: Option<Arc<RoutingHandle>>,
     #[cfg(feature = "kv-bridge")]
     pub kv_bridge: Option<Arc<memfuse_candle::KvBridgeAdapter>>,
@@ -243,6 +250,7 @@ impl McpServer {
             embedder,
             sandbox,
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
+            egress_classifier: Arc::new(DefaultEgressClassifier::default()),
             routing: None,
             #[cfg(feature = "kv-bridge")]
             kv_bridge,
@@ -260,6 +268,14 @@ impl McpServer {
 
     pub fn with_injection_guard(mut self, injection_guard: Arc<PromptInjectionGuard>) -> Self {
         self.injection_guard = injection_guard;
+        self
+    }
+
+    pub fn with_egress_classifier(
+        mut self,
+        classifier: Arc<dyn EgressClassifier>,
+    ) -> Self {
+        self.egress_classifier = classifier;
         self
     }
 
@@ -520,6 +536,19 @@ impl McpServer {
                                     "collection": { "type": "string", "default": "default" }
                                 }
                             }
+                        },
+                        {
+                            "name": "memfuse_cloud_query",
+                            "description": "Führt eine externe Cloud-Abfrage unter Egress-Klassifikationsprüfung und automatischer Abstraktion aus.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "query":       { "type": "string" },
+                                    "collection":  { "type": "string", "default": "default" },
+                                    "max_results": { "type": "integer", "default": 10 }
+                                },
+                                "required": ["query"]
+                            }
                         }
                     ]
                 }),
@@ -564,7 +593,8 @@ impl McpServer {
             | "memfuse_insert"
             | "memfuse_get"
             | "memfuse_collections"
-            | "memfuse_consolidate" => {
+            | "memfuse_consolidate"
+            | "memfuse_cloud_query" => {
                 let tool_name = req.method.as_str();
                 match self
                     .sandbox
@@ -1033,6 +1063,73 @@ impl McpServer {
                     "cascade_edge_tombstones_needed": cascade_tombstones_count,
                     "cascade_errors": consolidation_res.cascade_errors,
                 }))
+            }
+
+            "memfuse_cloud_query" => {
+                let query = match args.get("query") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'query' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("query cannot be empty"));
+                        }
+                        if s.len() > MAX_SEARCH_QUERY_BYTES {
+                            return Err(McpError::invalid_params(format!(
+                                "query size exceeds limit: {} bytes > {} limit",
+                                s.len(),
+                                MAX_SEARCH_QUERY_BYTES
+                            )));
+                        }
+                        s.to_string()
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'query'"));
+                    }
+                };
+
+                let collection = if let Some(col_val) = args.get("collection") {
+                    let s = col_val.as_str().ok_or_else(|| {
+                        McpError::invalid_params("Invalid params: 'collection' must be a string")
+                    })?;
+                    if s.trim().is_empty() {
+                        Some("default".to_string())
+                    } else {
+                        validate_collection_name(s)?;
+                        Some(s.to_string())
+                    }
+                } else {
+                    Some("default".to_string())
+                };
+
+                let max_results = if let Some(k_val) = args.get("max_results").or_else(|| args.get("k")) {
+                    match k_val {
+                        Value::Number(n) => {
+                            let k_raw = n.as_u64().ok_or_else(|| {
+                                McpError::invalid_params("max_results muss eine positive Ganzzahl sein")
+                            })? as usize;
+                            Some(k_raw.min(MAX_SEARCH_K))
+                        }
+                        _ => return Err(McpError::invalid_params("max_results muss eine Zahl sein")),
+                    }
+                } else {
+                    Some(10)
+                };
+
+                let request = CloudQueryRequest {
+                    query,
+                    collection,
+                    max_results,
+                };
+
+                let response = egress_gateway::handle_cloud_query(
+                    request,
+                    self.egress_classifier.as_ref(),
+                )
+                .await?;
+
+                serde_json::to_value(&response)
+                    .map_err(|e| McpError::internal_error(format!("Response serialization error: {e}")))
             }
 
             other => Err(McpError::invalid_params(format!(
