@@ -147,6 +147,7 @@ pub mod homeostat;
 pub mod maintenance_config;
 pub mod maintenance_scheduler;
 pub mod multistep;
+pub mod pid_latency_controller;
 pub mod transaction;
 
 // Jarvis-Erweiterungs-Module (Feature-gated)
@@ -165,6 +166,9 @@ pub use maintenance_config::MaintenanceConfig;
 pub use maintenance_scheduler::MaintenanceScheduler;
 
 pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
+pub use pid_latency_controller::{
+    LatencyBudgetGuard, PidConfig, PidLatencyController, DEFAULT_TARGET_LATENCY_MS,
+};
 
 pub use collection::crud::MAX_SCAN_RESULTS;
 #[cfg(feature = "graph-connectivity-health")]

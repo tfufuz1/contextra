@@ -7,6 +7,7 @@
 // memfuse-db/src/multistep.rs
 // Multi-Step Iterative Retrieval Engine (MemFuse Iterative Multi-Step Retrieval)
 
+use crate::pid_latency_controller::{LatencyBudgetGuard, PidLatencyController};
 use crate::{Collection, SearchResult};
 use memfuse_core::{BoxFuture, Result, StorageEngine};
 use std::sync::Arc;
@@ -20,6 +21,8 @@ pub struct MultiStepConfig {
     pub quality_threshold: f32,
     /// Minimale Anzahl an Treffern die den Threshold überschreiten müssen.
     pub min_quality_hits: usize,
+    /// Optionales Latenz-Budget in Millisekunden (Default: None).
+    pub latency_budget_ms: Option<f64>,
 }
 
 impl Default for MultiStepConfig {
@@ -28,6 +31,7 @@ impl Default for MultiStepConfig {
             max_rounds: 3,
             quality_threshold: 0.5,
             min_quality_hits: 2,
+            latency_budget_ms: None,
         }
     }
 }
@@ -52,6 +56,7 @@ pub struct MultiStepResult {
 pub struct MultiStepEngine<S: StorageEngine> {
     collection: Arc<Collection<S>>,
     config: MultiStepConfig,
+    pid_controller: parking_lot::Mutex<PidLatencyController>,
 }
 
 /// Trait für Query-Rewriting (LLM-agnostisch).
@@ -70,7 +75,16 @@ pub trait QueryRewriter: Send + Sync {
 
 impl<S: StorageEngine> MultiStepEngine<S> {
     pub fn new(collection: Arc<Collection<S>>, config: MultiStepConfig) -> Self {
-        Self { collection, config }
+        let target_lat = config
+            .latency_budget_ms
+            .unwrap_or(crate::pid_latency_controller::DEFAULT_TARGET_LATENCY_MS);
+        let pid_controller =
+            parking_lot::Mutex::new(PidLatencyController::with_target_latency(target_lat));
+        Self {
+            collection,
+            config,
+            pid_controller,
+        }
     }
 
     /// Führt iterative Hybrid-Suche durch.
@@ -92,7 +106,9 @@ impl<S: StorageEngine> MultiStepEngine<S> {
     ) -> Result<MultiStepResult> {
         use crate::fusion::reciprocal_rank_fusion;
 
+        let budget_guard = LatencyBudgetGuard::new(self.config.latency_budget_ms);
         let k = k.min(memfuse_core::MAX_SEARCH_K);
+        let mut current_k = k;
         let mut all_result_sets: Vec<Vec<SearchResult>> = Vec::new();
         let mut sub_queries: Vec<String> = Vec::new();
         let mut rounds_executed = 0;
@@ -103,7 +119,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             .query()
             .text(original_query)
             .vector(vector)
-            .k(k * 2)
+            .k(current_k * 2)
             .execute()
             .await?;
         all_result_sets.push(round1);
@@ -139,6 +155,22 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         // If SearchResult metadata structures (serde_json::Value) grow large in future extensions,
         // using `Arc<SearchResult>` will further optimize internal fusion moves.
         for _round in 2..=self.config.max_rounds {
+            // Budget-Guard Check: kontrollierter, panic-freier Abbruch bei Budget-Überschreitung
+            if budget_guard.is_exceeded() {
+                tracing::info!(
+                    elapsed_ms = budget_guard.elapsed_ms(),
+                    budget_ms = ?self.config.latency_budget_ms,
+                    "Multi-step search latency budget exceeded; stopping round expansion gracefully"
+                );
+                break;
+            }
+
+            // PID-Regelung des k_pool für Folgerunden basierend auf gemessener Latenz
+            let elapsed_ms = budget_guard.elapsed_ms();
+            let scale = self.pid_controller.lock().compute_adjustment(elapsed_ms);
+            current_k = ((k as f64) * scale).round() as usize;
+            current_k = current_k.clamp(1, memfuse_core::MAX_SEARCH_K);
+
             let current_results = all_result_sets.last().map(|v| v.as_slice()).unwrap_or(&[]);
             let sub_qs = match rewriter.rewrite(original_query, current_results).await {
                 Ok(qs) => qs,
@@ -163,7 +195,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 // 3. The original vector contributes via Round-1 results in RRF fusion
                 // ANCHOR[MULTISTEP:SUBQUERY-EMBEDDING] STATUS:DONE (TS:2026-06-01T00:00:00Z) — See TRACKING-ISSUE #143 for
                 // future improvement: inject TextEmbeddingEngine for sub-query vectors.
-                match self.collection.query().text(sub_q).k(k).execute().await {
+                match self.collection.query().text(sub_q).k(current_k).execute().await {
                     Ok(sub_results) => {
                         all_result_sets.push(sub_results);
                         sub_queries.push(sub_q.clone());
@@ -289,6 +321,7 @@ mod tests {
             max_rounds: 3,
             quality_threshold: 0.001,
             min_quality_hits: 1,
+            latency_budget_ms: None,
         };
         let engine = MultiStepEngine::new(col, config);
 
@@ -321,6 +354,7 @@ mod tests {
             max_rounds: 3,
             quality_threshold: 0.99, // high threshold, round 1 won't meet min_quality_hits=2
             min_quality_hits: 2,
+            latency_budget_ms: None,
         };
         let engine = MultiStepEngine::new(col, config);
 
@@ -371,6 +405,7 @@ mod tests {
             max_rounds: 2,
             quality_threshold: 0.99,
             min_quality_hits: 2,
+            latency_budget_ms: None,
         };
         let engine = MultiStepEngine::new(col, config);
 
@@ -419,6 +454,7 @@ mod tests {
             max_rounds: 3,
             quality_threshold: 0.99,
             min_quality_hits: 2,
+            latency_budget_ms: None,
         };
         let engine = MultiStepEngine::new(col, config);
         let rewriter = FailingRewriter;
@@ -430,5 +466,69 @@ mod tests {
 
         assert_eq!(result.rounds_executed, 1);
         assert!(result.sub_queries.is_empty());
+    }
+
+    struct SlowRewriter;
+
+    impl QueryRewriter for SlowRewriter {
+        fn rewrite<'a>(
+            &'a self,
+            _original_query: &'a str,
+            _current_results: &'a [SearchResult],
+        ) -> BoxFuture<'a, Result<Vec<String>>> {
+            Box::pin(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                Ok(vec!["sub query 1".to_string()])
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_multistep_latency_budget_guard_exceeded() {
+        let col = create_test_collection().await;
+        col.insert(
+            "doc1",
+            &[1.0, 0.0, 0.0, 0.0],
+            Some(serde_json::json!({"text": "rust programming"})),
+        )
+        .await
+        .expect("insert");
+
+        let config = MultiStepConfig {
+            max_rounds: 5,
+            quality_threshold: 0.99,
+            min_quality_hits: 2,
+            latency_budget_ms: Some(10.0), // Tight 10ms budget
+        };
+        let engine = MultiStepEngine::new(col, config);
+        let rewriter = SlowRewriter;
+
+        let result = engine
+            .search("rust", &[1.0, 0.0, 0.0, 0.0], 5, Some(&rewriter))
+            .await
+            .expect("search should succeed with partial results under budget exhaustion");
+
+        assert_eq!(result.rounds_executed, 2); // Round 1 executed, round 2 rewriter took 20ms (> 10ms budget), so round 3 loop check stops further expansion
+        assert!(!result.results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_multistep_latency_budget_exhaustion_on_empty_db() {
+        let col = create_test_collection().await;
+        let config = MultiStepConfig {
+            max_rounds: 5,
+            quality_threshold: 0.99,
+            min_quality_hits: 2,
+            latency_budget_ms: Some(1.0),
+        };
+        let engine = MultiStepEngine::new(col, config);
+        let rewriter = SlowRewriter;
+
+        let result = engine
+            .search("nonexistent", &[1.0, 0.0, 0.0, 0.0], 5, Some(&rewriter))
+            .await
+            .expect("search on empty DB over budget must return empty result without panic");
+
+        assert!(result.results.is_empty());
     }
 }
