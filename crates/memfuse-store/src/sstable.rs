@@ -16,6 +16,14 @@
 //!   block to its byte offset, enabling efficient binary search.
 //! - **Trailer**: Contains the index offset (8 bytes) and a magic number `0x4D465354` ("MFST").
 //!
+//! ## Two-Tier Search Strategy
+//! SSTable lookups employ a two-tier search strategy:
+//! - **Pre-check**: Whole-SSTable Bloom Filter `may_contain` fast-rejects keys absent from the file.
+//! - **Tier 1 (Sparse Index)**: Binary search on `self.index` locates the specific 4KB data block.
+//! - **Block Bloom Check**: Intra-block Bloom filter pre-checks whether the key exists inside the block.
+//! - **Tier 2 (Block Binary Search)**: `binary_search_in_block` performs binary search over the block's
+//!   internal sorted `offsets` array to locate the exact key entry in O(log K) time.
+//!
 //! ## Invariants
 //! - **Immutability**: Once written, SSTables are never modified. Compaction creates new ones.
 //! - **Sorted Order**: Entries within blocks and blocks within the file are sorted lexicographically by key.
@@ -65,8 +73,72 @@ fn pread_exact(file: &std::fs::File, mut buf: &mut [u8], mut offset: u64) -> std
     Ok(())
 }
 
-/// Cache for SSTable blocks. Key is (file_id, block_offset).
-pub type BlockCache = RwLock<LruCache<(u64, u64), Bytes>>;
+/// Cache-line-padded shard to avoid false sharing across CPU cores.
+#[repr(align(64))]
+struct BlockCacheShard {
+    lock: RwLock<LruCache<(u64, u64), Bytes>>,
+}
+
+/// Sharded LRU BlockCache for SSTable blocks.
+/// Provides lock-free shard selection via hash of `(file_id, block_offset)` across 16 shards.
+pub struct BlockCache {
+    shards: Box<[BlockCacheShard]>,
+    shard_count: usize,
+}
+
+impl BlockCache {
+    pub const DEFAULT_SHARD_COUNT: usize = 16;
+
+    /// Creates a new `BlockCache` with total capacity in MB (assuming 4KB blocks).
+    pub fn new(capacity_mb: usize) -> Self {
+        Self::with_shard_count(capacity_mb, Self::DEFAULT_SHARD_COUNT)
+    }
+
+    /// Creates a `BlockCache` with explicit capacity and shard count (rounded up to power of 2).
+    pub fn with_shard_count(capacity_mb: usize, shard_count: usize) -> Self {
+        let shard_count = shard_count.next_power_of_two().max(1);
+
+        let total_blocks = capacity_mb.saturating_mul(256).clamp(256, 8 * 1024 * 256);
+
+        let per_shard_blocks = if capacity_mb == 0 {
+            1
+        } else {
+            (total_blocks / shard_count).max(1)
+        };
+        let non_zero_cap = NonZeroUsize::new(per_shard_blocks).unwrap_or(NonZeroUsize::MIN);
+
+        let shards = (0..shard_count)
+            .map(|_| BlockCacheShard {
+                lock: RwLock::new(LruCache::new(non_zero_cap)),
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+
+        Self {
+            shards,
+            shard_count,
+        }
+    }
+
+    #[inline]
+    fn shard_idx(&self, key: &(u64, u64)) -> usize {
+        let mut h = (key.0 ^ key.1.wrapping_mul(0x9E37_79B9_7F4A_7C15)) as usize;
+        h ^= h >> 16;
+        h & (self.shard_count - 1)
+    }
+
+    /// Retrieves a block from the cache by `(file_id, block_offset)`.
+    pub fn get(&self, key: &(u64, u64)) -> Option<Bytes> {
+        let idx = self.shard_idx(key);
+        self.shards[idx].lock.write().get(key).cloned()
+    }
+
+    /// Puts a block into the cache under `(file_id, block_offset)`.
+    pub fn put(&self, key: (u64, u64), value: Bytes) {
+        let idx = self.shard_idx(&key);
+        self.shards[idx].lock.write().put(key, value);
+    }
+}
 
 /// Magic bytes for SSTable file trailer.
 pub const SSTABLE_MAGIC_MFSX: u32 = 0x5853_464D; // "MFSX" in hex
@@ -74,15 +146,7 @@ pub const SSTABLE_MAGIC_LEGACY: u32 = 0x4D46_5354; // "MFST" in hex
 
 /// Creates a new block cache instance. Capacity is in MB (assuming 4KB blocks).
 pub fn create_block_cache(capacity_mb: usize) -> Arc<BlockCache> {
-    // 1 MB = 256 Blöcke à 4 KB
-    // Saturating-Mul verhindert Overflow-Wrapping in Release-Mode
-    let capacity = capacity_mb
-        .saturating_mul(256) // Overflow → usize::MAX (sicher)
-        .clamp(256, 8 * 1024 * 256); // Minimum: 1 MB, Maximum: 8 GB Cache
-
-    let non_zero_cap = NonZeroUsize::new(capacity).unwrap_or(NonZeroUsize::MIN);
-
-    Arc::new(RwLock::new(LruCache::new(non_zero_cap)))
+    Arc::new(BlockCache::new(capacity_mb))
 }
 
 /// Block size for SSTable data blocks (4KB).
@@ -294,6 +358,84 @@ impl BlockBuilder {
         }
         self.data.put_u16_le(self.offsets.len() as u16);
         self.data.freeze()
+    }
+}
+
+/// Fast binary search inside a single 4KB data block using the sorted offsets table at the end of the block.
+///
+/// Returns index `Ok(Ok(idx))` if exact key match is found, or `Ok(Err(idx))` returning the insertion index.
+fn binary_search_in_block_index(
+    block_data: &[u8],
+    offsets_start: usize,
+    num_offsets: usize,
+    key: &[u8],
+) -> Result<std::result::Result<usize, usize>> {
+    if num_offsets == 0 {
+        return Ok(Err(0));
+    }
+
+    let mut low = 0;
+    let mut high = num_offsets;
+
+    while low < high {
+        let mid = low + (high - low) / 2;
+        let off_pos = offsets_start + mid * 2;
+        let entry_off = u16::from_le_bytes(
+            block_data
+                .get(off_pos..off_pos + 2)
+                .ok_or_else(|| MemFuseError::Storage("malformed block: off_pos".into()))?
+                .try_into()
+                .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+        ) as usize;
+
+        let k_len = u16::from_le_bytes(
+            block_data
+                .get(entry_off..entry_off + 2)
+                .ok_or_else(|| MemFuseError::Storage("malformed block: k_len".into()))?
+                .try_into()
+                .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+        ) as usize;
+
+        let entry_key = block_data
+            .get(entry_off + 2..entry_off + 2 + k_len)
+            .ok_or_else(|| MemFuseError::Storage("malformed block: entry_key".into()))?;
+
+        match entry_key.cmp(key) {
+            std::cmp::Ordering::Less => low = mid + 1,
+            std::cmp::Ordering::Greater => high = mid,
+            std::cmp::Ordering::Equal => return Ok(Ok(mid)),
+        }
+    }
+
+    Ok(Err(low))
+}
+
+/// Helper to resolve offset index `idx` to the entry byte offset in `block_data`.
+fn get_entry_off(block_data: &[u8], offsets_start: usize, idx: usize) -> Result<usize> {
+    let off_pos = offsets_start + idx * 2;
+    let entry_off = u16::from_le_bytes(
+        block_data
+            .get(off_pos..off_pos + 2)
+            .ok_or_else(|| MemFuseError::Storage("malformed block: off_pos".into()))?
+            .try_into()
+            .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+    ) as usize;
+    Ok(entry_off)
+}
+
+/// Fast binary search inside a single 4KB data block using the sorted offsets table.
+///
+/// Returns `Ok(Some(entry_off))` if `key` matches an entry starting at `entry_off`,
+/// or `Ok(None)` if `key` is absent from the block.
+fn binary_search_in_block(
+    block_data: &[u8],
+    offsets_start: usize,
+    num_offsets: usize,
+    key: &[u8],
+) -> Result<Option<usize>> {
+    match binary_search_in_block_index(block_data, offsets_start, num_offsets, key)? {
+        Ok(idx) => Ok(Some(get_entry_off(block_data, offsets_start, idx)?)),
+        Err(_) => Ok(None),
     }
 }
 
@@ -1003,12 +1145,7 @@ impl SstableReader {
     }
 
     async fn get_block(&self, offset: u64, next_offset: u64) -> Result<Bytes> {
-        let cached = {
-            let mut cache = self.block_cache.write();
-            cache.get(&(self.file_id, offset)).cloned()
-        };
-
-        if let Some(block) = cached {
+        if let Some(block) = self.block_cache.get(&(self.file_id, offset)) {
             Ok(block)
         } else {
             let block = Self::read_block_at_file(
@@ -1020,9 +1157,7 @@ impl SstableReader {
                 &self.file_path,
             )
             .await?;
-            self.block_cache
-                .write()
-                .put((self.file_id, offset), block.clone());
+            self.block_cache.put((self.file_id, offset), block.clone());
             Ok(block)
         }
     }
@@ -1120,16 +1255,9 @@ impl SstableReader {
             return Ok(None);
         }
 
-        for i in 0..num_offsets {
-            let off_pos = offsets_start + i * 2;
-            let entry_off = u16::from_le_bytes(
-                block_data
-                    .get(off_pos..off_pos + 2)
-                    .ok_or_else(|| MemFuseError::Storage("malformed block: off_pos".into()))?
-                    .try_into()
-                    .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
-            ) as usize;
-
+        if let Some(entry_off) =
+            binary_search_in_block(&block_data, offsets_start, num_offsets, key)?
+        {
             let mut ep = entry_off;
             let k_len = u16::from_le_bytes(
                 block_data
@@ -1138,45 +1266,39 @@ impl SstableReader {
                     .try_into()
                     .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
             ) as usize;
-            ep += 2;
-            let entry_key = block_data
-                .get(ep..ep + k_len)
-                .ok_or_else(|| MemFuseError::Storage("malformed block: entry_key".into()))?;
-            ep += k_len;
+            ep += 2 + k_len;
 
-            if entry_key == key {
-                let seq_no = u64::from_le_bytes(
-                    block_data
-                        .get(ep..ep + 8)
-                        .ok_or_else(|| MemFuseError::Storage("malformed block: seq_no".into()))?
-                        .try_into()
-                        .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
-                );
-                ep += 8;
-                let tx_id = u64::from_le_bytes(
-                    block_data
-                        .get(ep..ep + 8)
-                        .ok_or_else(|| MemFuseError::Storage("malformed block: tx_id".into()))?
-                        .try_into()
-                        .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
-                );
-                ep += 8;
-                let v_len = u32::from_le_bytes(
-                    block_data
-                        .get(ep..ep + 4)
-                        .ok_or_else(|| MemFuseError::Storage("malformed block: v_len".into()))?
-                        .try_into()
-                        .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
-                ) as usize;
-                ep += 4;
-                if ep + v_len > block_data.len() {
-                    return Err(MemFuseError::Storage(
-                        "malformed block: value length out of bounds".into(),
-                    ));
-                }
-                let entry_val = block_data.slice(ep..ep + v_len);
-                return Ok(Some((entry_val, seq_no, tx_id)));
+            let seq_no = u64::from_le_bytes(
+                block_data
+                    .get(ep..ep + 8)
+                    .ok_or_else(|| MemFuseError::Storage("malformed block: seq_no".into()))?
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+            );
+            ep += 8;
+            let tx_id = u64::from_le_bytes(
+                block_data
+                    .get(ep..ep + 8)
+                    .ok_or_else(|| MemFuseError::Storage("malformed block: tx_id".into()))?
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+            );
+            ep += 8;
+            let v_len = u32::from_le_bytes(
+                block_data
+                    .get(ep..ep + 4)
+                    .ok_or_else(|| MemFuseError::Storage("malformed block: v_len".into()))?
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+            ) as usize;
+            ep += 4;
+            if ep + v_len > block_data.len() {
+                return Err(MemFuseError::Storage(
+                    "malformed block: value length out of bounds".into(),
+                ));
             }
+            let entry_val = block_data.slice(ep..ep + v_len);
+            return Ok(Some((entry_val, seq_no, tx_id)));
         }
         Ok(None)
     }
@@ -1268,36 +1390,12 @@ impl SstableReader {
             return (true, true, true, false);
         }
 
-        for i in 0..num_offsets {
-            let off_pos = offsets_start + i * 2;
-            let entry_off = match block_data.get(off_pos..off_pos + 2) {
-                Some(slice) => match slice.try_into() {
-                    Ok(arr) => u16::from_le_bytes(arr) as usize,
-                    Err(_) => continue,
-                },
-                None => continue,
-            };
+        let key_found = matches!(
+            binary_search_in_block(&block_data, offsets_start, num_offsets, key),
+            Ok(Some(_))
+        );
 
-            let mut ep = entry_off;
-            let k_len = match block_data.get(ep..ep + 2) {
-                Some(slice) => match slice.try_into() {
-                    Ok(arr) => u16::from_le_bytes(arr) as usize,
-                    Err(_) => continue,
-                },
-                None => continue,
-            };
-            ep += 2;
-            let entry_key = match block_data.get(ep..ep + k_len) {
-                Some(slice) => slice,
-                None => continue,
-            };
-
-            if entry_key == key {
-                return (true, true, true, true);
-            }
-        }
-
-        (true, true, true, false)
+        (true, true, true, key_found)
     }
 
     pub fn metadata(&self) -> &SstableMetadata {
@@ -1609,8 +1707,18 @@ impl SstableReader {
             }
             let offsets_start = n - 2 - offsets_len;
 
+            let start_offset_idx = match binary_search_in_block_index(
+                &block_data,
+                offsets_start,
+                num_offsets,
+                prefix,
+            )? {
+                Ok(idx) => idx,
+                Err(idx) => idx,
+            };
+
             let mut broke = false;
-            for i in 0..num_offsets {
+            for i in start_offset_idx..num_offsets {
                 let off_pos = offsets_start + i * 2;
                 let entry_off = u16::from_le_bytes(
                     block_data
@@ -1735,7 +1843,18 @@ impl SstableReader {
             }
             let offsets_start = n - 2 - offsets_len;
 
-            for i in 0..num_offsets {
+            let start_offset_idx = match start {
+                Bound::Included(s) | Bound::Excluded(s) => {
+                    match binary_search_in_block_index(&block_data, offsets_start, num_offsets, s)?
+                    {
+                        Ok(idx) => idx,
+                        Err(idx) => idx,
+                    }
+                }
+                Bound::Unbounded => 0,
+            };
+
+            for i in start_offset_idx..num_offsets {
                 let off_pos = offsets_start + i * 2;
                 let entry_off = u16::from_le_bytes(
                     block_data
@@ -2261,10 +2380,8 @@ mod tests {
         let tmp = TempDir::new().expect("temp dir"); // expect #[cfg(test)]
         let path = tmp.path().join("cache_eviction_test.sst");
 
-        // Create a 1-block cache directly (capacity = 1 block)
-        let cache = Arc::new(RwLock::new(LruCache::new(
-            NonZeroUsize::new(1).expect("non-zero"), // expect
-        ))); // expect #[cfg(test)]
+        // Create a 0 MB capacity cache with 1 shard (capacity = 1 entry per shard)
+        let cache = Arc::new(BlockCache::with_shard_count(0, 1));
 
         // Build an SSTable with 3 distinct blocks by inserting large values (>3000 bytes)
         let mut builder = SstableBuilder::create(&path).await.expect("create"); // expect #[cfg(test)]
@@ -2287,23 +2404,20 @@ mod tests {
         // 1. Read key1 -> populates cache with block 1
         let res1 = reader.get(b"key1").await.expect("get key1"); // expect #[cfg(test)]
         assert!(res1.is_some());
-        assert_eq!(cache.read().len(), 1);
-        assert!(cache.read().contains(&(reader.file_id, offset1)));
+        assert!(cache.get(&(reader.file_id, offset1)).is_some());
 
         // 2. Read key2 -> cache miss, evicts block 1, populates block 2
         let res2 = reader.get(b"key2").await.expect("get key2"); // expect #[cfg(test)]
         assert!(res2.is_some());
-        assert_eq!(cache.read().len(), 1);
-        assert!(!cache.read().contains(&(reader.file_id, offset1)));
-        assert!(cache.read().contains(&(reader.file_id, offset2)));
+        assert!(cache.get(&(reader.file_id, offset1)).is_none());
+        assert!(cache.get(&(reader.file_id, offset2)).is_some());
 
         // 3. Read key3 -> cache miss, evicts block 2, populates block 3
         let res3 = reader.get(b"key3").await.expect("get key3"); // expect #[cfg(test)]
         assert!(res3.is_some());
-        assert_eq!(cache.read().len(), 1);
-        assert!(!cache.read().contains(&(reader.file_id, offset1)));
-        assert!(!cache.read().contains(&(reader.file_id, offset2)));
-        assert!(cache.read().contains(&(reader.file_id, offset3)));
+        assert!(cache.get(&(reader.file_id, offset1)).is_none());
+        assert!(cache.get(&(reader.file_id, offset2)).is_none());
+        assert!(cache.get(&(reader.file_id, offset3)).is_some());
     }
 
     #[tokio::test]
@@ -2428,5 +2542,104 @@ mod tests {
         let oversized_val = vec![0xBB; crate::lsm::MAX_VALUE_SIZE + 1];
         let err_val = builder.add(b"valid_key", &oversized_val, 1, 1).await;
         assert!(matches!(err_val, Err(MemFuseError::InvalidInput(_))));
+    }
+
+    #[test]
+    fn test_binary_search_vs_linear_search_equivalence() {
+        for num_keys in 1..=64 {
+            let mut builder = BlockBuilder::new(64 * 1024);
+            let mut keys = Vec::new();
+            for i in 0..num_keys {
+                let key = format!("k_{:04}", i).into_bytes();
+                let val = format!("v_{:04}", i).into_bytes();
+                builder.add(&key, &val, i as u64, 0);
+                keys.push(key);
+            }
+            let block = builder.build();
+            let n = block.len();
+            let num_offsets = u16::from_le_bytes(block[n - 2..n].try_into().unwrap()) as usize;
+            let offsets_start = n - 2 - (num_offsets * 2);
+
+            let linear_find = |target: &[u8]| -> Option<usize> {
+                for i in 0..num_offsets {
+                    let off_pos = offsets_start + i * 2;
+                    let entry_off =
+                        u16::from_le_bytes(block[off_pos..off_pos + 2].try_into().unwrap())
+                            as usize;
+                    let k_len =
+                        u16::from_le_bytes(block[entry_off..entry_off + 2].try_into().unwrap())
+                            as usize;
+                    let entry_key = &block[entry_off + 2..entry_off + 2 + k_len];
+                    if entry_key == target {
+                        return Some(entry_off);
+                    }
+                }
+                None
+            };
+
+            for key in &keys {
+                let linear_res = linear_find(key);
+                let binary_res =
+                    binary_search_in_block(&block, offsets_start, num_offsets, key).unwrap();
+                assert_eq!(
+                    linear_res, binary_res,
+                    "Mismatch for existing key in block with {} keys",
+                    num_keys
+                );
+            }
+
+            for non_existent in ["k_0000_missing", "k_9999", "k_-1", "a", "z"] {
+                let linear_res = linear_find(non_existent.as_bytes());
+                let binary_res = binary_search_in_block(
+                    &block,
+                    offsets_start,
+                    num_offsets,
+                    non_existent.as_bytes(),
+                )
+                .unwrap();
+                assert_eq!(
+                    linear_res, binary_res,
+                    "Mismatch for missing key {:?} in block with {} keys",
+                    non_existent, num_keys
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sharded_block_cache_concurrency_stress() {
+        let tmp = TempDir::new().expect("temp dir");
+        let path = tmp.path().join("sharded_cache_stress.sst");
+        let cache = create_block_cache(16);
+
+        let mut builder = SstableBuilder::create(&path).await.expect("create");
+        let large_val = vec![0xFF; 2000];
+        for i in 0..64 {
+            let key = format!("stress_key_{:03}", i);
+            builder
+                .add(key.as_bytes(), &large_val, i, 0)
+                .await
+                .expect("add");
+        }
+        builder.finish().await.expect("finish");
+
+        let reader = Arc::new(SstableReader::open(&path, cache).await.expect("open"));
+        let mut handles = Vec::new();
+
+        for thread_idx in 0..16 {
+            let r = Arc::clone(&reader);
+            handles.push(tokio::spawn(async move {
+                for i in 0..100 {
+                    let key_idx = (thread_idx + i) % 64;
+                    let key = format!("stress_key_{:03}", key_idx);
+                    let res = r.get(key.as_bytes()).await.expect("get").expect("exists");
+                    assert_eq!(res.0.len(), 2000);
+                }
+            }));
+        }
+
+        for h in handles {
+            h.await.expect("task completed without panic");
+        }
     }
 }
