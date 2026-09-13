@@ -10,7 +10,7 @@ mod tests {
     use memfuse_candle::{CandleLlmClient, GaspValidator, KvBridgeAdapter};
     use memfuse_core::traits::ResponseGroundingValidator;
     use memfuse_core::{ModelFingerprint, Result, TenantId};
-    use memfuse_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+    use memfuse_security::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
     use std::sync::Arc;
     use tokenizers::Tokenizer;
 
