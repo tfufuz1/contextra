@@ -3,6 +3,9 @@
 // ZWECK: In-Memory BTreeMap MemTable-Sharding mit MVCC Snapshot-Isolation.
 // INVARIANTEN: Sharding per 64-Bit-Avalanche-Hash-Mixer modulo SHARD_COUNT; tombstone via TOMBSTONE_BIT in seq_no.
 // NICHT-OFFENSICHTLICH: Rollback(tx_id) entfernt alle Einträge der Transaktion atomar aus allen Shards.
+//   iter() nutzt size()-basierte Kapazitätsschätzung (AVG_ENTRY_BYTES=64) um Reallokationen
+//   beim Flush zu minimieren. put() pre-allokiert Vec<MemTableEntry> mit capacity=2 für den
+//   1-2-Versionen-Normalfall (MVCC-Muster).
 // HOTSPOTS: MemTable::put, MemTable::get_at_seq, MemTable::rollback
 // SIEHE AUCH: crates/memfuse-store/AGENTS.md, DECISIONS.md
 
@@ -121,7 +124,7 @@ impl MemTable {
         let shard_idx = Self::shard_for(&key);
         let mut entries = self.shards[shard_idx].entries.write();
 
-        let versions = entries.entry(key).or_default();
+        let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
         versions.push((seq_no, value, tx_id));
 
         // Note: Simple size tracking (sums all versions)
@@ -275,7 +278,12 @@ impl MemTable {
     /// Collects from all shards and sorts by key to maintain the global
     /// sorted-order invariant. Called only during flush (low-frequency).
     pub fn iter(&self) -> Vec<(Bytes, Bytes, u64, u64)> {
-        let mut results = Vec::new();
+        let estimated_entries = {
+            let total_bytes = self.size.load(Ordering::Relaxed);
+            const AVG_ENTRY_BYTES: usize = 64; // konservative Schätzung: 32B Key + 24B Val + 8B Seq
+            std::cmp::max(16, total_bytes / AVG_ENTRY_BYTES)
+        };
+        let mut results = Vec::with_capacity(estimated_entries);
         for shard in &self.shards {
             let entries = shard.entries.read();
             for (k, versions) in entries.iter() {
