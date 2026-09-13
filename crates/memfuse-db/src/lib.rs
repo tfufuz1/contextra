@@ -2332,7 +2332,7 @@ mod tests {
             // Manually write a Pending intent
             let intent_key = col.namespaced_key(tx.inner().to_le_bytes().as_ref(), 3);
             let intent = crate::transaction::CommitIntent::Pending {
-                doc_ids: vec![doc_id],
+                doc_ids: Arc::new(vec![doc_id]),
                 has_text: false,
                 has_graph: false,
             };
@@ -2402,7 +2402,7 @@ mod tests {
             // Write pending intent (key_type=3) referencing doc_id
             let intent_key = col.namespaced_key(tx.inner().to_le_bytes().as_ref(), 3);
             let intent = crate::transaction::CommitIntent::Pending {
-                doc_ids: vec![doc_id],
+                doc_ids: Arc::new(vec![doc_id]),
                 has_text: false,
                 has_graph: false,
             };

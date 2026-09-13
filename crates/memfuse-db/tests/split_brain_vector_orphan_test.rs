@@ -265,7 +265,7 @@ async fn test_duplicate_insert_transaction_replay_no_double_vector_entry() {
         // Write CommitIntent::Pending to simulate crash right after WAL/LSM commit
         let intent_key = col.namespaced_key(&tx.inner().to_le_bytes(), 3);
         let intent = CommitIntent::Pending {
-            doc_ids: vec![doc_id],
+            doc_ids: std::sync::Arc::new(vec![doc_id]),
             has_text: false,
             has_graph: false,
         };

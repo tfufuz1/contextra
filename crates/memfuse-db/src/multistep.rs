@@ -536,7 +536,7 @@ mod tests {
             max_rounds: 5,
             quality_threshold: 0.99,
             min_quality_hits: 2,
-            latency_budget_ms: Some(10.0), // Tight 10ms budget
+            latency_budget_ms: 10.0, // Tight 10ms budget
         };
         let engine = MultiStepEngine::new(col, config);
         let rewriter = SlowRewriter;
@@ -557,7 +557,7 @@ mod tests {
             max_rounds: 5,
             quality_threshold: 0.99,
             min_quality_hits: 2,
-            latency_budget_ms: Some(1.0),
+            latency_budget_ms: 1.0,
         };
         let engine = MultiStepEngine::new(col, config);
         let rewriter = SlowRewriter;
