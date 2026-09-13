@@ -27,6 +27,14 @@ memfuse-security = { workspace = true, optional = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 proptest = "1.4"
+criterion = { workspace = true }
+memfuse-core = { workspace = true }
+memfuse-security = { workspace = true }
+
+[[bench]]
+name = "kv_bridge_bench"
+harness = false
+required-features = ["kv-bridge"]
 
 [features]
 default = []
