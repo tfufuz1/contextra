@@ -568,7 +568,7 @@ impl LsmStorage {
         // INV-LSM-2: SystemPressureMonitor must be spawned as a background task before LsmStorage accepts its first insert.
         let monitor =
             crate::system_pressure::SystemPressureMonitor::new(Duration::from_millis(100));
-        let pressure_rx = monitor.pressure_rx.clone();
+        let _pressure_rx = monitor.pressure_rx.clone();
         let ct_pressure = cancel_token.clone();
         task_tracker.spawn(async move {
             monitor.run(ct_pressure, || 0, || 0, 0).await;
@@ -580,6 +580,11 @@ impl LsmStorage {
             std::time::Duration::from_millis(100),
         );
         let pressure_rx = pressure_monitor.pressure_rx.clone();
+        let ct_pressure = cancel_token.clone();
+        task_tracker.spawn(async move {
+            pressure_monitor.run(ct_pressure, || 0, || 0, 0).await;
+        });
+        task_tracker.close();
 
         let storage = Self {
             config,
@@ -608,13 +613,6 @@ impl LsmStorage {
             pressure_rx,
         };
 
-        // Spawn SystemPressureMonitor background task (INV-LSM-2)
-        let monitor_cancellation = storage.cancel_token.clone();
-        tokio::spawn(async move {
-            pressure_monitor
-                .run(monitor_cancellation, || 0, || 0, 0)
-                .await;
-        });
 
         // Flush after WAL replay regardless of WAL count — ensures replayed data is persisted to SSTable before any WAL rotation/deletion can occur.
         if replayed_size > 0 && !wal_files.is_empty() {
@@ -749,12 +747,6 @@ impl LsmStorage {
         }
     }
 
-    /// Returns a watch receiver for SystemPressure metrics.
-    pub fn pressure_receiver(
-        &self,
-    ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
-        self.pressure_rx.clone()
-    }
 
     #[doc(hidden)]
     pub async fn restore_wal_file_handle_for_test(&self) {
@@ -1208,6 +1200,12 @@ impl StorageEngine for LsmStorage {
 
             let _commit_lock = self.commit_mutex.lock().await;
 
+            // 1. Read-Your-Writes check: Atomic single-shard check for current transaction scope.
+            if self.tx_buffer.is_key_staged_for_tx(tx_id, key) {
+                return Ok(false);
+            }
+
+            // 2. Global heuristic check: Best-effort cross-transaction staging detection across all shards.
             if self.tx_buffer.is_key_staged_globally(key) {
                 return Ok(false);
             }

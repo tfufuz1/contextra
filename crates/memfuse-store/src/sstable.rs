@@ -19,7 +19,9 @@
 //! ## Invariants
 //! - **Immutability**: Once written, SSTables are never modified. Compaction creates new ones.
 //! - **Sorted Order**: Entries within blocks and blocks within the file are sorted lexicographically by key.
-//! - **Async I/O**: All disk operations use `tokio::fs` or `memmap2` with `spawn_blocking`.
+//! - **Async I/O**: All disk operations use `tokio::fs` with `spawn_blocking`.
+//!           mmap-based access (WP-4.1) is not yet implemented for the LSM storage layer.
+//!           mmap IS used in `memfuse-index` for HNSW/DiskANN index persistence.
 //! - **Zero Panic**: Production code paths avoid `unwrap()` and `expect()`, favoring explicit error handling.
 
 // FILE-CONTEXT

@@ -30,6 +30,22 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 
+/// Configuration for a collection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollectionConfig {
+    /// Configurable backpressure delay in milliseconds when system pressure is Critical.
+    /// Default: Some(50)
+    pub backpressure_delay_ms: Option<u64>,
+}
+
+impl Default for CollectionConfig {
+    fn default() -> Self {
+        Self {
+            backpressure_delay_ms: Some(50),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct StoredDocument {
     pub id: String,
@@ -244,6 +260,11 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) community_detection_trigger_threshold: Arc<AtomicU64>,
     /// Koordination des Konsolidierungslaufs zur Vermeidung von Double-Triggern (Engine + Scheduler).
     pub(super) consolidation_in_progress: Arc<AtomicBool>,
+    /// Collection configuration (e.g. backpressure settings).
+    pub(super) config: parking_lot::RwLock<CollectionConfig>,
+    /// Watch receiver for monitoring system pressure levels.
+    pub(super) pressure_rx:
+        parking_lot::RwLock<Option<tokio::sync::watch::Receiver<memfuse_store::SystemPressure>>>,
 }
 
 impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
@@ -266,6 +287,8 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
                 .community_detection_trigger_threshold
                 .clone(),
             consolidation_in_progress: self.consolidation_in_progress.clone(),
+            config: parking_lot::RwLock::new(self.config.read().clone()),
+            pressure_rx: parking_lot::RwLock::new(self.pressure_rx.read().clone()),
         }
     }
 }
@@ -319,6 +342,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let text_index = InvertedIndex::new_with_language(storage.clone(), &name, language);
 
+        let pressure_rx = (storage.as_ref() as &dyn std::any::Any)
+            .downcast_ref::<LsmStorage>()
+            .map(|lsm| lsm.pressure_receiver());
+
         Self {
             name,
             prefix,
@@ -335,7 +362,42 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             mutations_since_community_detection: Arc::new(AtomicU64::new(0)),
             community_detection_trigger_threshold: Arc::new(AtomicU64::new(100)),
             consolidation_in_progress: Arc::new(AtomicBool::new(false)),
+            config: parking_lot::RwLock::new(CollectionConfig::default()),
+            pressure_rx: parking_lot::RwLock::new(pressure_rx),
         }
+    }
+
+    /// Sets or updates the collection configuration.
+    pub fn with_config(self, config: CollectionConfig) -> Self {
+        *self.config.write() = config;
+        self
+    }
+
+    /// Sets or updates the collection configuration.
+    pub fn set_config(&self, config: CollectionConfig) {
+        *self.config.write() = config;
+    }
+
+    /// Returns a copy of the current collection configuration.
+    pub fn config(&self) -> CollectionConfig {
+        self.config.read().clone()
+    }
+
+    /// Sets or overrides the pressure receiver channel.
+    pub fn with_pressure_receiver(
+        self,
+        pressure_rx: tokio::sync::watch::Receiver<memfuse_store::SystemPressure>,
+    ) -> Self {
+        *self.pressure_rx.write() = Some(pressure_rx);
+        self
+    }
+
+    /// Sets or overrides the pressure receiver channel.
+    pub fn set_pressure_receiver(
+        &self,
+        pressure_rx: tokio::sync::watch::Receiver<memfuse_store::SystemPressure>,
+    ) {
+        *self.pressure_rx.write() = Some(pressure_rx);
     }
 
     /// Returns a reference handle to the collection's consolidation lock flag.

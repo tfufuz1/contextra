@@ -156,14 +156,13 @@ impl KeyManager {
         })
     }
 
-    /// Derives a sub-key specifically for KV-cache segment encryption, bound to a
-    /// specific `(tenant_id, model_fingerprint)` tuple.
+    /// Derives a sub-key for KV-cache segment encryption, bound to `(tenant_id, model_fingerprint)`.
     ///
-    /// Cryptographically enforces both tenant isolation and model quantization separation via HKDF-Expand.
-    ///
-    /// # HKDF Domain Separator (v2)
-    /// The HKDF domain separator is set to `b"memfuse-kv-layer-v2:"` combined with length-prefixed
-    /// variable fields (`model_id` and `quantization`) to prevent concatenation ambiguity (RFC 5869).
+    /// # Format Version
+    /// Uses HKDF info string `"memfuse-kv-layer-v2:"` with length-prefixed variable fields (S-2 fix).
+    /// All KV-cache segments encrypted before v2 are cryptographically unreadable under v2 keys
+    /// and will fail at the `format_version` check in `KvSegmentCipher::decrypt()` with
+    /// `CryptoError::KvFormatVersionMismatch` — never with a silent garbage-data result.
     pub fn derive_kv_key(
         &self,
         tenant_id: memfuse_core::TenantId,

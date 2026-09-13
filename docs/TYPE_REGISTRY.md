@@ -22,6 +22,7 @@
 | `StoredDocument` | `memfuse-db` | `crates/memfuse-db/src/collection/mod.rs:34` | In-Storage Repräsentation eines Dokuments inklusive Embeddings |
 | `StoredDocumentMeta` | `memfuse-db` | `crates/memfuse-db/src/collection/mod.rs:43` | In-Storage Repräsentation für schnelle Result-Hydration (ohne Vektoren) |
 | `MemoryType` | `memfuse-core` | `crates/memfuse-core/src/types/domain.rs:535` | Klassifikation kognitiver Gedächtnistypen (Episodic, Semantic, Procedural, Working) (ADR-041) |
+| `ModelFingerprint` | `memfuse-core` | `crates/memfuse-core/src/model_fingerprint.rs:12` | SHA-256-basierter Fingerabdruck über Modellgewichte und Quantisierungsstufe; Grundlage der KV-Cache-Schlüsselableitung |
 
 ---
 

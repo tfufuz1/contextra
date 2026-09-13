@@ -25,6 +25,15 @@
       "session_id": "15939913485339184752",
       "active": true,
       "expires_at": "2026-09-13T05:24:56.709269853+00:00"
+    },
+    {
+      "krate": "memfuse-core",
+      "issue": "model-fingerprint",
+      "timestamp": "2026-09-13T04:17:58.521268245+00:00",
+      "session_id": "7943793575095916440",
+      "active": false,
+      "expires_at": "2026-09-13T08:17:58.521251377+00:00",
+      "released_at": "2026-09-13T04:33:35.119679882+00:00"
     }
   ]
 }
