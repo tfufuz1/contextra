@@ -16,3 +16,4 @@ memfuse-core = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+wat = "1"

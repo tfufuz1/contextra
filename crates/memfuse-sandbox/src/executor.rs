@@ -15,6 +15,7 @@ use crate::{
 
 struct SandboxState {
     max_pages: u32,
+    allow_cloud_egress: bool,
 }
 
 impl wasmtime::ResourceLimiter for SandboxState {
@@ -82,6 +83,7 @@ impl WasmExecutor {
             &self.engine,
             SandboxState {
                 max_pages: capabilities.max_memory_pages,
+                allow_cloud_egress: capabilities.allow_cloud_egress,
             },
         );
 
@@ -103,6 +105,9 @@ impl WasmExecutor {
         }
         if capabilities.allow_network {
             warn!("WasmExecutor: allow_network=true — erhöhtes Risiko");
+        }
+        if capabilities.allow_cloud_egress {
+            warn!("WasmExecutor: allow_cloud_egress=true — erhöhtes Risiko");
         }
 
         // Linker mit minimalen WASI-Imports
@@ -140,6 +145,23 @@ impl WasmExecutor {
             )
             .map_err(|e| SandboxError::Runtime(format!("Linker proc_exit failed: {}", e)))?;
 
+        // Host Cloud Query function enforcement
+        linker
+            .func_wrap(
+                "memfuse",
+                "host_cloud_query",
+                move |caller: wasmtime::Caller<'_, SandboxState>| -> Result<i32, wasmtime::Error> {
+                    if !caller.data().allow_cloud_egress {
+                        Err(wasmtime::Error::msg(
+                            "WASM capability violation: allow_cloud_egress is disabled",
+                        ))
+                    } else {
+                        Ok(0)
+                    }
+                },
+            )
+            .map_err(|e| SandboxError::Runtime(format!("Linker host_cloud_query failed: {}", e)))?;
+
         // Wall-Clock-Timeout wrapping der Instanziierung + Ausführung
         let execute_future = async {
             let instance = linker
@@ -150,11 +172,16 @@ impl WasmExecutor {
             // _start / main aufrufen
             if let Ok(start_fn) = instance.get_typed_func::<(), ()>(&mut store, "_start") {
                 start_fn.call_async(&mut store, ()).await.map_err(|e| {
-                    if e.to_string().contains("fuel") {
+                    let err_msg = format!("{:#}", e);
+                    if err_msg.contains("fuel") {
                         let consumed = capabilities.max_fuel;
                         SandboxError::FuelExhausted { consumed }
+                    } else if err_msg.contains("allow_cloud_egress") || err_msg.contains("capability violation") {
+                        SandboxError::CapabilityViolation {
+                            capability: "allow_cloud_egress".to_string(),
+                        }
                     } else {
-                        SandboxError::WasmTrap(e.to_string())
+                        SandboxError::WasmTrap(err_msg)
                     }
                 })?;
             }
@@ -191,5 +218,47 @@ mod tests {
             .execute(b"not a wasm binary", b"", &caps, Duration::from_secs(1))
             .await;
         assert!(matches!(result, Err(SandboxError::InvalidModule(_))));
+    }
+
+    #[tokio::test]
+    async fn test_cloud_egress_enforcement() {
+        let wat = r#"
+            (module
+                (import "memfuse" "host_cloud_query" (func $host_cloud_query (result i32)))
+                (func (export "_start")
+                    (drop (call $host_cloud_query))
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+
+        let executor = WasmExecutor::new().expect("WasmExecutor");
+
+        // Test case 1: allow_cloud_egress = false (default) -> CapabilityViolation
+        let mut caps_denied = WasmCapabilities::default();
+        caps_denied.allow_cloud_egress = false;
+        let res_denied = executor
+            .execute(&wasm_bytes, b"", &caps_denied, Duration::from_secs(1))
+            .await;
+        assert!(
+            matches!(
+                res_denied,
+                Err(SandboxError::CapabilityViolation { ref capability }) if capability == "allow_cloud_egress"
+            ),
+            "Expected CapabilityViolation for allow_cloud_egress, got: {:?}",
+            res_denied
+        );
+
+        // Test case 2: allow_cloud_egress = true -> Execution succeeds
+        let mut caps_allowed = WasmCapabilities::default();
+        caps_allowed.allow_cloud_egress = true;
+        let res_allowed = executor
+            .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(1))
+            .await;
+        assert!(
+            res_allowed.is_ok(),
+            "Expected execution to succeed when allow_cloud_egress is true, got: {:?}",
+            res_allowed
+        );
     }
 }
