@@ -233,6 +233,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_generate_with_context_default_matches_concatenation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let seg1 = ContextSegment::new(101, "Hello");
+        let seg2 = ContextSegment::new(102, "World");
+        let llm = MockDefaultLlm;
+        let with_ctx = llm.generate_with_context(&[seg1, seg2]).await?;
+        let direct = llm.generate("Hello\n\nWorld").await?;
+        assert_eq!(with_ctx, direct);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_generate_with_context_empty_segments(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let llm = MockDefaultLlm;
+        let res = llm.generate_with_context(&[]).await?;
+        assert_eq!(res, "Generated: ");
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_mock_embedder_methods() -> Result<(), Box<dyn std::error::Error>> {
         let embedder = MockEmbedder::new(4);
         assert_eq!(embedder.provider_name(), "mock");

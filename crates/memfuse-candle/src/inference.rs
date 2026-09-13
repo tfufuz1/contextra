@@ -17,7 +17,9 @@ use candle_core::Device;
 use candle_transformers::generation::LogitsProcessor;
 use candle_transformers::models::quantized_llama::ModelWeights;
 use futures_util::stream;
-use memfuse_core::traits::{BoxFuture, BoxStream, ContextSegment};
+#[cfg(feature = "kv-bridge")]
+use memfuse_core::traits::ContextSegment;
+use memfuse_core::traits::{BoxFuture, BoxStream};
 use memfuse_core::{
     ConfigFingerprint, LlmTextGenerator, LlmTextGeneratorStreaming, MemFuseError, Result,
 };
@@ -439,12 +441,12 @@ impl LlmTextGenerator for CandleLlmClient {
         })
     }
 
+    #[cfg(feature = "kv-bridge")]
     fn generate_with_context<'a>(
         &'a self,
         segments: &'a [ContextSegment<'a>],
     ) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
-            #[cfg(feature = "kv-bridge")]
             if let Some(ref adapter) = self.kv_bridge {
                 for segment in segments {
                     adapter.consult_segment(segment);
@@ -607,6 +609,7 @@ mod tests {
         assert_eq!(sync_resp, assembled);
     }
 
+    #[cfg(feature = "kv-bridge")]
     #[tokio::test]
     async fn test_generate_with_context_text_identical_and_kv_bridge_consultation() {
         let mock_model = Box::new(MockCandleModel {
