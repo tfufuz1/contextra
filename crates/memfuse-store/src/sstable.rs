@@ -73,44 +73,44 @@ fn pread_exact(file: &std::fs::File, mut buf: &mut [u8], mut offset: u64) -> std
     Ok(())
 }
 
-/// Cache-line-padded shard to avoid false sharing across CPU cores.
+/// Shard count for the sharded block cache (16 shards).
+pub const BLOCK_CACHE_SHARD_COUNT: usize = 16;
+
+/// Cache-line aligned shard for `BlockCache` to prevent false sharing under high concurrency.
 #[repr(align(64))]
 struct BlockCacheShard {
     lock: RwLock<LruCache<(u64, u64), Bytes>>,
 }
 
-/// Sharded LRU BlockCache for SSTable blocks.
-/// Provides lock-free shard selection via hash of `(file_id, block_offset)` across 16 shards.
+impl BlockCacheShard {
+    fn new(capacity: NonZeroUsize) -> Self {
+        Self {
+            lock: RwLock::new(LruCache::new(capacity)),
+        }
+    }
+}
+
+/// Sharded cache for SSTable blocks. Key is (file_id, block_offset).
 pub struct BlockCache {
     shards: Box<[BlockCacheShard]>,
     shard_count: usize,
 }
 
 impl BlockCache {
-    pub const DEFAULT_SHARD_COUNT: usize = 16;
-
-    /// Creates a new `BlockCache` with total capacity in MB (assuming 4KB blocks).
+    /// Creates a new sharded block cache with specified total capacity in MB.
     pub fn new(capacity_mb: usize) -> Self {
-        Self::with_shard_count(capacity_mb, Self::DEFAULT_SHARD_COUNT)
+        let capacity_blocks = capacity_mb.saturating_mul(256).clamp(256, 8 * 1024 * 256);
+        Self::with_block_capacity_and_shards(capacity_blocks, BLOCK_CACHE_SHARD_COUNT)
     }
 
-    /// Creates a `BlockCache` with explicit capacity and shard count (rounded up to power of 2).
-    pub fn with_shard_count(capacity_mb: usize, shard_count: usize) -> Self {
-        let shard_count = shard_count.next_power_of_two().max(1);
-
-        let total_blocks = capacity_mb.saturating_mul(256).clamp(256, 8 * 1024 * 256);
-
-        let per_shard_blocks = if capacity_mb == 0 {
-            1
-        } else {
-            (total_blocks / shard_count).max(1)
-        };
-        let non_zero_cap = NonZeroUsize::new(per_shard_blocks).unwrap_or(NonZeroUsize::MIN);
+    /// Creates a sharded block cache with exact block capacity and shard count.
+    pub fn with_block_capacity_and_shards(total_blocks: usize, num_shards: usize) -> Self {
+        let shard_count = num_shards.next_power_of_two().max(1);
+        let per_shard_cap = (total_blocks / shard_count).max(1);
+        let non_zero_cap = NonZeroUsize::new(per_shard_cap).unwrap_or(NonZeroUsize::MIN);
 
         let shards = (0..shard_count)
-            .map(|_| BlockCacheShard {
-                lock: RwLock::new(LruCache::new(non_zero_cap)),
-            })
+            .map(|_| BlockCacheShard::new(non_zero_cap))
             .collect::<Vec<_>>()
             .into_boxed_slice();
 
@@ -122,21 +122,126 @@ impl BlockCache {
 
     #[inline]
     fn shard_idx(&self, key: &(u64, u64)) -> usize {
-        let mut h = (key.0 ^ key.1.wrapping_mul(0x9E37_79B9_7F4A_7C15)) as usize;
-        h ^= h >> 16;
-        h & (self.shard_count - 1)
+        let hash = key.0.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ key.1;
+        (hash as usize) & (self.shard_count - 1)
     }
 
-    /// Retrieves a block from the cache by `(file_id, block_offset)`.
+    /// Gets a block from the cache, locking only the relevant shard.
     pub fn get(&self, key: &(u64, u64)) -> Option<Bytes> {
         let idx = self.shard_idx(key);
         self.shards[idx].lock.write().get(key).cloned()
     }
 
-    /// Puts a block into the cache under `(file_id, block_offset)`.
+    /// Puts a block into the cache, locking only the relevant shard.
     pub fn put(&self, key: (u64, u64), value: Bytes) {
         let idx = self.shard_idx(&key);
         self.shards[idx].lock.write().put(key, value);
+    }
+
+    /// Returns the total number of cached blocks across all shards.
+    pub fn len(&self) -> usize {
+        self.shards.iter().map(|s| s.lock.read().len()).sum()
+    }
+
+    /// Returns whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Checks if a key exists in the cache without updating LRU order.
+    pub fn contains(&self, key: &(u64, u64)) -> bool {
+        let idx = self.shard_idx(key);
+        self.shards[idx].lock.read().contains(key)
+    }
+}
+
+/// Binary search for a key index inside a SSTable data block.
+///
+/// Returns `Ok(Ok(index))` if the exact key is found, or `Ok(Err(index))`
+/// indicating the insertion index (lower-bound entry offset index) if not found.
+fn binary_search_index_in_block(
+    block_data: &[u8],
+    offsets_start: usize,
+    num_offsets: usize,
+    key: &[u8],
+) -> Result<std::result::Result<usize, usize>> {
+    if num_offsets == 0 {
+        return Ok(Err(0));
+    }
+
+    let mut low = 0;
+    let mut high = num_offsets;
+
+    while low < high {
+        let mid = low + (high - low) / 2;
+        let off_pos = offsets_start + mid * 2;
+        let entry_off = u16::from_le_bytes(
+            block_data
+                .get(off_pos..off_pos + 2)
+                .ok_or_else(|| MemFuseError::Storage("malformed block: off_pos".into()))?
+                .try_into()
+                .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+        ) as usize;
+
+        let k_len = u16::from_le_bytes(
+            block_data
+                .get(entry_off..entry_off + 2)
+                .ok_or_else(|| MemFuseError::Storage("malformed block: k_len".into()))?
+                .try_into()
+                .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+        ) as usize;
+
+        let ep = entry_off + 2;
+        let entry_key = block_data
+            .get(ep..ep + k_len)
+            .ok_or_else(|| MemFuseError::Storage("malformed block: entry_key".into()))?;
+
+        match entry_key.cmp(key) {
+            std::cmp::Ordering::Less => {
+                low = mid + 1;
+            }
+            std::cmp::Ordering::Greater => {
+                high = mid;
+            }
+            std::cmp::Ordering::Equal => {
+                return Ok(Ok(mid));
+            }
+        }
+    }
+
+    Ok(Err(low))
+}
+
+/// Binary search for a key inside a SSTable data block.
+///
+/// Returns `Ok(Some((entry_offset, key_len)))` if the key is found,
+/// or `Ok(None)` if the key does not exist in the block.
+fn binary_search_in_block(
+    block_data: &[u8],
+    offsets_start: usize,
+    num_offsets: usize,
+    key: &[u8],
+) -> Result<Option<(usize, usize)>> {
+    match binary_search_index_in_block(block_data, offsets_start, num_offsets, key)? {
+        Ok(idx) => {
+            let off_pos = offsets_start + idx * 2;
+            let entry_off = u16::from_le_bytes(
+                block_data
+                    .get(off_pos..off_pos + 2)
+                    .ok_or_else(|| MemFuseError::Storage("malformed block: off_pos".into()))?
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+            ) as usize;
+            let k_len = u16::from_le_bytes(
+                block_data
+                    .get(entry_off..entry_off + 2)
+                    .ok_or_else(|| MemFuseError::Storage("malformed block: k_len".into()))?
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+            ) as usize;
+            Ok(Some((entry_off, k_len)))
+        }
+        Err(_) => Ok(None),
     }
 }
 
@@ -1145,7 +1250,8 @@ impl SstableReader {
     }
 
     async fn get_block(&self, offset: u64, next_offset: u64) -> Result<Bytes> {
-        if let Some(block) = self.block_cache.get(&(self.file_id, offset)) {
+        let key = (self.file_id, offset);
+        if let Some(block) = self.block_cache.get(&key) {
             Ok(block)
         } else {
             let block = Self::read_block_at_file(
@@ -1157,7 +1263,7 @@ impl SstableReader {
                 &self.file_path,
             )
             .await?;
-            self.block_cache.put((self.file_id, offset), block.clone());
+            self.block_cache.put(key, block.clone());
             Ok(block)
         }
     }
@@ -1255,19 +1361,10 @@ impl SstableReader {
             return Ok(None);
         }
 
-        if let Some(entry_off) =
+        if let Some((entry_off, entry_key_len)) =
             binary_search_in_block(&block_data, offsets_start, num_offsets, key)?
         {
-            let mut ep = entry_off;
-            let k_len = u16::from_le_bytes(
-                block_data
-                    .get(ep..ep + 2)
-                    .ok_or_else(|| MemFuseError::Storage("malformed block: k_len".into()))?
-                    .try_into()
-                    .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
-            ) as usize;
-            ep += 2 + k_len;
-
+            let mut ep = entry_off + 2 + entry_key_len;
             let seq_no = u64::from_le_bytes(
                 block_data
                     .get(ep..ep + 8)
@@ -1298,9 +1395,10 @@ impl SstableReader {
                 ));
             }
             let entry_val = block_data.slice(ep..ep + v_len);
-            return Ok(Some((entry_val, seq_no, tx_id)));
+            Ok(Some((entry_val, seq_no, tx_id)))
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 
     /// Metrics result for point lookup instrumentation.
@@ -1390,12 +1488,10 @@ impl SstableReader {
             return (true, true, true, false);
         }
 
-        let key_found = matches!(
-            binary_search_in_block(&block_data, offsets_start, num_offsets, key),
-            Ok(Some(_))
-        );
-
-        (true, true, true, key_found)
+        match binary_search_in_block(&block_data, offsets_start, num_offsets, key) {
+            Ok(Some(_)) => (true, true, true, true),
+            _ => (true, true, true, false),
+        }
     }
 
     pub fn metadata(&self) -> &SstableMetadata {
@@ -1707,18 +1803,18 @@ impl SstableReader {
             }
             let offsets_start = n - 2 - offsets_len;
 
-            let start_offset_idx = match binary_search_in_block_index(
+            let block_start_i = match binary_search_index_in_block(
                 &block_data,
                 offsets_start,
                 num_offsets,
                 prefix,
             )? {
-                Ok(idx) => idx,
-                Err(idx) => idx,
+                Ok(i) => i,
+                Err(i) => i,
             };
 
             let mut broke = false;
-            for i in start_offset_idx..num_offsets {
+            for i in block_start_i..num_offsets {
                 let off_pos = offsets_start + i * 2;
                 let entry_off = u16::from_le_bytes(
                     block_data
@@ -2380,8 +2476,8 @@ mod tests {
         let tmp = TempDir::new().expect("temp dir"); // expect #[cfg(test)]
         let path = tmp.path().join("cache_eviction_test.sst");
 
-        // Create a 0 MB capacity cache with 1 shard (capacity = 1 entry per shard)
-        let cache = Arc::new(BlockCache::with_shard_count(0, 1));
+        // Create a 1-block cache directly (capacity = 1 block total across 1 shard)
+        let cache = Arc::new(BlockCache::with_block_capacity_and_shards(1, 1));
 
         // Build an SSTable with 3 distinct blocks by inserting large values (>3000 bytes)
         let mut builder = SstableBuilder::create(&path).await.expect("create"); // expect #[cfg(test)]
@@ -2404,20 +2500,23 @@ mod tests {
         // 1. Read key1 -> populates cache with block 1
         let res1 = reader.get(b"key1").await.expect("get key1"); // expect #[cfg(test)]
         assert!(res1.is_some());
-        assert!(cache.get(&(reader.file_id, offset1)).is_some());
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains(&(reader.file_id, offset1)));
 
         // 2. Read key2 -> cache miss, evicts block 1, populates block 2
         let res2 = reader.get(b"key2").await.expect("get key2"); // expect #[cfg(test)]
         assert!(res2.is_some());
-        assert!(cache.get(&(reader.file_id, offset1)).is_none());
-        assert!(cache.get(&(reader.file_id, offset2)).is_some());
+        assert_eq!(cache.len(), 1);
+        assert!(!cache.contains(&(reader.file_id, offset1)));
+        assert!(cache.contains(&(reader.file_id, offset2)));
 
         // 3. Read key3 -> cache miss, evicts block 2, populates block 3
         let res3 = reader.get(b"key3").await.expect("get key3"); // expect #[cfg(test)]
         assert!(res3.is_some());
-        assert!(cache.get(&(reader.file_id, offset1)).is_none());
-        assert!(cache.get(&(reader.file_id, offset2)).is_none());
-        assert!(cache.get(&(reader.file_id, offset3)).is_some());
+        assert_eq!(cache.len(), 1);
+        assert!(!cache.contains(&(reader.file_id, offset1)));
+        assert!(!cache.contains(&(reader.file_id, offset2)));
+        assert!(cache.contains(&(reader.file_id, offset3)));
     }
 
     #[tokio::test]
@@ -2546,23 +2645,28 @@ mod tests {
 
     #[test]
     fn test_binary_search_vs_linear_search_equivalence() {
-        for num_keys in 1..=64 {
+        // Test randomized blocks with 1..=64 entries to ensure binary search matches linear search exactly
+        for num_entries in 1..=64 {
             let mut builder = BlockBuilder::new(64 * 1024);
-            let mut keys = Vec::new();
-            for i in 0..num_keys {
-                let key = format!("k_{:04}", i).into_bytes();
-                let val = format!("v_{:04}", i).into_bytes();
+            let mut expected_entries = Vec::new();
+            for i in 0..num_entries {
+                let key = format!("key_{:04}", i).into_bytes();
+                let val = format!("val_{:04}", i).into_bytes();
                 builder.add(&key, &val, i as u64, 0);
-                keys.push(key);
+                expected_entries.push((key, val));
             }
             let block = builder.build();
             let n = block.len();
             let num_offsets = u16::from_le_bytes(block[n - 2..n].try_into().unwrap()) as usize;
-            let offsets_start = n - 2 - (num_offsets * 2);
+            let offsets_len = num_offsets * 2;
+            let offsets_start = n - 2 - offsets_len;
 
-            let linear_find = |target: &[u8]| -> Option<usize> {
-                for i in 0..num_offsets {
-                    let off_pos = offsets_start + i * 2;
+            // 1. Verify all present keys
+            for (key, _val) in &expected_entries {
+                // Linear search
+                let mut linear_res = None;
+                for idx in 0..num_offsets {
+                    let off_pos = offsets_start + idx * 2;
                     let entry_off =
                         u16::from_le_bytes(block[off_pos..off_pos + 2].try_into().unwrap())
                             as usize;
@@ -2570,37 +2674,43 @@ mod tests {
                         u16::from_le_bytes(block[entry_off..entry_off + 2].try_into().unwrap())
                             as usize;
                     let entry_key = &block[entry_off + 2..entry_off + 2 + k_len];
-                    if entry_key == target {
-                        return Some(entry_off);
+                    if entry_key == key {
+                        linear_res = Some((entry_off, k_len));
+                        break;
                     }
                 }
-                None
-            };
 
-            for key in &keys {
-                let linear_res = linear_find(key);
-                let binary_res =
-                    binary_search_in_block(&block, offsets_start, num_offsets, key).unwrap();
+                // Binary search
+                let bin_res = binary_search_in_block(&block, offsets_start, num_offsets, key)
+                    .expect("binary search should not error");
+
                 assert_eq!(
-                    linear_res, binary_res,
-                    "Mismatch for existing key in block with {} keys",
-                    num_keys
+                    linear_res,
+                    bin_res,
+                    "Mismatch for key {:?} in block with {} entries",
+                    String::from_utf8_lossy(key),
+                    num_entries
                 );
+
+                if let Some((off, klen)) = bin_res {
+                    assert_eq!(&block[off + 2..off + 2 + klen], key.as_slice());
+                }
             }
 
-            for non_existent in ["k_0000_missing", "k_9999", "k_-1", "a", "z"] {
-                let linear_res = linear_find(non_existent.as_bytes());
-                let binary_res = binary_search_in_block(
-                    &block,
-                    offsets_start,
-                    num_offsets,
-                    non_existent.as_bytes(),
-                )
-                .unwrap();
-                assert_eq!(
-                    linear_res, binary_res,
-                    "Mismatch for missing key {:?} in block with {} keys",
-                    non_existent, num_keys
+            // 2. Verify non-existent keys
+            let non_existent_keys = [
+                b"key_-001".as_slice(),
+                b"key_9999".as_slice(),
+                b"key_0000_foo".as_slice(),
+            ];
+            for nek in non_existent_keys {
+                let bin_res = binary_search_in_block(&block, offsets_start, num_offsets, nek)
+                    .expect("binary search should not error");
+                assert!(
+                    bin_res.is_none(),
+                    "Non-existent key {:?} found in block with {} entries",
+                    String::from_utf8_lossy(nek),
+                    num_entries
                 );
             }
         }
@@ -2608,38 +2718,39 @@ mod tests {
 
     #[tokio::test]
     async fn test_sharded_block_cache_concurrency_stress() {
-        let tmp = TempDir::new().expect("temp dir");
-        let path = tmp.path().join("sharded_cache_stress.sst");
-        let cache = create_block_cache(16);
+        use std::sync::atomic::{AtomicUsize, Ordering};
 
-        let mut builder = SstableBuilder::create(&path).await.expect("create");
-        let large_val = vec![0xFF; 2000];
-        for i in 0..64 {
-            let key = format!("stress_key_{:03}", i);
-            builder
-                .add(key.as_bytes(), &large_val, i, 0)
-                .await
-                .expect("add");
-        }
-        builder.finish().await.expect("finish");
+        let cache = Arc::new(BlockCache::new(16));
+        let num_tasks = 32;
+        let ops_per_task = 1000;
+        let completed = Arc::new(AtomicUsize::new(0));
 
-        let reader = Arc::new(SstableReader::open(&path, cache).await.expect("open"));
         let mut handles = Vec::new();
+        for task_id in 0..num_tasks {
+            let cache_ref = Arc::clone(&cache);
+            let completed_ref = Arc::clone(&completed);
 
-        for thread_idx in 0..16 {
-            let r = Arc::clone(&reader);
             handles.push(tokio::spawn(async move {
-                for i in 0..100 {
-                    let key_idx = (thread_idx + i) % 64;
-                    let key = format!("stress_key_{:03}", key_idx);
-                    let res = r.get(key.as_bytes()).await.expect("get").expect("exists");
-                    assert_eq!(res.0.len(), 2000);
+                for i in 0..ops_per_task {
+                    // Unique key targeting different shards
+                    let file_id = (task_id as u64) + 1;
+                    let block_offset = (i as u64) * 4096;
+                    let key = (file_id, block_offset);
+                    let val = Bytes::from(format!("data_{}_{}", task_id, i));
+
+                    cache_ref.put(key, val.clone());
+                    let retrieved = cache_ref.get(&key);
+                    assert_eq!(retrieved, Some(val));
                 }
+                completed_ref.fetch_add(1, Ordering::SeqCst);
             }));
         }
 
         for h in handles {
-            h.await.expect("task completed without panic");
+            h.await.expect("task panicked");
         }
+
+        assert_eq!(completed.load(Ordering::SeqCst), num_tasks);
+        assert!(cache.len() > 0);
     }
 }
