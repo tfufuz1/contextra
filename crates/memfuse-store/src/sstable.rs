@@ -16,6 +16,14 @@
 //!   block to its byte offset, enabling efficient binary search.
 //! - **Trailer**: Contains the index offset (8 bytes) and a magic number `0x4D465354` ("MFST").
 //!
+//! ## Two-Tier Search Strategy
+//! SSTable lookups employ a two-tier search strategy:
+//! - **Pre-check**: Whole-SSTable Bloom Filter `may_contain` fast-rejects keys absent from the file.
+//! - **Tier 1 (Sparse Index)**: Binary search on `self.index` locates the specific 4KB data block.
+//! - **Block Bloom Check**: Intra-block Bloom filter pre-checks whether the key exists inside the block.
+//! - **Tier 2 (Block Binary Search)**: `binary_search_in_block` performs binary search over the block's
+//!   internal sorted `offsets` array to locate the exact key entry in O(log K) time.
+//!
 //! ## Invariants
 //! - **Immutability**: Once written, SSTables are never modified. Compaction creates new ones.
 //! - **Sorted Order**: Entries within blocks and blocks within the file are sorted lexicographically by key.
@@ -468,6 +476,84 @@ impl BlockBuilder {
         }
         self.data.put_u16_le(self.offsets.len() as u16);
         self.data.freeze()
+    }
+}
+
+/// Fast binary search inside a single 4KB data block using the sorted offsets table at the end of the block.
+///
+/// Returns index `Ok(Ok(idx))` if exact key match is found, or `Ok(Err(idx))` returning the insertion index.
+fn binary_search_in_block_index(
+    block_data: &[u8],
+    offsets_start: usize,
+    num_offsets: usize,
+    key: &[u8],
+) -> Result<std::result::Result<usize, usize>> {
+    if num_offsets == 0 {
+        return Ok(Err(0));
+    }
+
+    let mut low = 0;
+    let mut high = num_offsets;
+
+    while low < high {
+        let mid = low + (high - low) / 2;
+        let off_pos = offsets_start + mid * 2;
+        let entry_off = u16::from_le_bytes(
+            block_data
+                .get(off_pos..off_pos + 2)
+                .ok_or_else(|| MemFuseError::Storage("malformed block: off_pos".into()))?
+                .try_into()
+                .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+        ) as usize;
+
+        let k_len = u16::from_le_bytes(
+            block_data
+                .get(entry_off..entry_off + 2)
+                .ok_or_else(|| MemFuseError::Storage("malformed block: k_len".into()))?
+                .try_into()
+                .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+        ) as usize;
+
+        let entry_key = block_data
+            .get(entry_off + 2..entry_off + 2 + k_len)
+            .ok_or_else(|| MemFuseError::Storage("malformed block: entry_key".into()))?;
+
+        match entry_key.cmp(key) {
+            std::cmp::Ordering::Less => low = mid + 1,
+            std::cmp::Ordering::Greater => high = mid,
+            std::cmp::Ordering::Equal => return Ok(Ok(mid)),
+        }
+    }
+
+    Ok(Err(low))
+}
+
+/// Helper to resolve offset index `idx` to the entry byte offset in `block_data`.
+fn get_entry_off(block_data: &[u8], offsets_start: usize, idx: usize) -> Result<usize> {
+    let off_pos = offsets_start + idx * 2;
+    let entry_off = u16::from_le_bytes(
+        block_data
+            .get(off_pos..off_pos + 2)
+            .ok_or_else(|| MemFuseError::Storage("malformed block: off_pos".into()))?
+            .try_into()
+            .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
+    ) as usize;
+    Ok(entry_off)
+}
+
+/// Fast binary search inside a single 4KB data block using the sorted offsets table.
+///
+/// Returns `Ok(Some(entry_off))` if `key` matches an entry starting at `entry_off`,
+/// or `Ok(None)` if `key` is absent from the block.
+fn binary_search_in_block(
+    block_data: &[u8],
+    offsets_start: usize,
+    num_offsets: usize,
+    key: &[u8],
+) -> Result<Option<usize>> {
+    match binary_search_in_block_index(block_data, offsets_start, num_offsets, key)? {
+        Ok(idx) => Ok(Some(get_entry_off(block_data, offsets_start, idx)?)),
+        Err(_) => Ok(None),
     }
 }
 
@@ -1869,17 +1955,18 @@ impl SstableReader {
             }
             let offsets_start = n - 2 - offsets_len;
 
-            let block_start_i = match start {
+            let start_offset_idx = match start {
                 Bound::Included(s) | Bound::Excluded(s) => {
-                    match binary_search_index_in_block(&block_data, offsets_start, num_offsets, s)? {
-                        Ok(i) => i,
-                        Err(i) => i,
+                    match binary_search_in_block_index(&block_data, offsets_start, num_offsets, s)?
+                    {
+                        Ok(idx) => idx,
+                        Err(idx) => idx,
                     }
                 }
                 Bound::Unbounded => 0,
             };
 
-            for i in block_start_i..num_offsets {
+            for i in start_offset_idx..num_offsets {
                 let off_pos = offsets_start + i * 2;
                 let entry_off = u16::from_le_bytes(
                     block_data
