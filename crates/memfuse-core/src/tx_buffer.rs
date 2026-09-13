@@ -339,7 +339,39 @@ impl<T: Clone> TxBuffer<T> {
 }
 
 impl TxBuffer<(Vec<u8>, Vec<u8>)> {
-    /// Checks if a key is staged for insertion in ANY active (uncommitted) transaction in the buffer.
+    /// Checks if `key` is staged for insertion in the specified transaction `tx_id`.
+    ///
+    /// This method is atomic because all operations for a given `tx_id` land in the same shard
+    /// (since `shard_idx` is a pure function of `tx.inner()`), requiring only a single shard read-lock acquisition.
+    /// Use this for Read-Your-Writes isolation decisions within a specific transaction scope.
+    pub fn is_key_staged_for_tx(&self, tx_id: TxId, key: &[u8]) -> bool {
+        let shard_idx = self.shard_idx(tx_id);
+        let shard = self.shards[shard_idx].read();
+        if let Some((ops, _)) = shard.ops.get(&tx_id) {
+            for op in ops {
+                if let IndexOp::Insert { data, .. } = op {
+                    if data.0 == key {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Prüft ob `key` in irgendeinem Shard des TxBuffers gespeichert ist.
+    ///
+    /// # TOCTOU-Warnung
+    /// Diese Methode ist KEIN atomarer Snapshot. Zwischen dem Lesen von Shard N und
+    /// Shard N+1 kann ein concurrent Commit den Key aus Shard N entfernt haben.
+    /// Das Ergebnis ist eine "approximately true" Aussage, nicht eine strikt
+    /// serialisierbare Garantie.
+    ///
+    /// # Korrekte Verwendung
+    /// Nur für Optimierungen (Cache-Hints, Fast-Path-Bypass) verwenden, NIEMALS
+    /// für Korrektheitsentscheidungen (z.B. "ist dieser Key committed?").
+    /// Für Read-Your-Writes-Isolation: verwende stattdessen den tx-spezifischen
+    /// `is_key_staged_for_tx(tx_id, key)` auf dem einzelnen Shard.
     ///
     /// # Locking Strategy
     /// Iterates through all shards sequentially, acquiring a read lock (`shard_lock.read()`) on each
@@ -663,6 +695,36 @@ mod tests {
             },
         );
         assert!(buffer.validate_pending_ops(tx).is_ok());
+    }
+
+    #[test]
+    fn test_is_key_staged_for_tx_semantics() {
+        let buffer = TxBuffer::<(Vec<u8>, Vec<u8>)>::new();
+        let tx1 = TxId::new(1);
+        let tx2 = TxId::new(2);
+
+        buffer.begin(tx1);
+        buffer.begin(tx2);
+
+        let key_a = b"key_a".to_vec();
+        let val_a = b"val_a".to_vec();
+
+        buffer
+            .stage(
+                tx1,
+                IndexOp::Insert {
+                    doc_id: DocId::new(100),
+                    data: (key_a.clone(), val_a.clone()),
+                },
+            )
+            .expect("stage tx1");
+
+        // tx1 has key_a staged
+        assert!(buffer.is_key_staged_for_tx(tx1, &key_a));
+        // tx2 does NOT have key_a staged in its transaction scope
+        assert!(!buffer.is_key_staged_for_tx(tx2, &key_a));
+        // Globally key_a is staged in buffer
+        assert!(buffer.is_key_staged_globally(&key_a));
     }
 
     #[test]
