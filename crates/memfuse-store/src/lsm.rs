@@ -60,6 +60,25 @@
 //! 3. `sstables` write lock (`tokio::sync::RwLock<Vec<Arc<SstableReader>>>`) - Protects SSTable set.
 //!    Read locks on `state` and `sstables` may be acquired concurrently without holding `commit_mutex`.
 
+enum SstableScanMode<'a> {
+    Prefix(&'a [u8]),
+    Range(std::ops::Bound<&'a [u8]>, std::ops::Bound<&'a [u8]>),
+}
+
+#[inline]
+fn check_in_range(k: &[u8], start: std::ops::Bound<&[u8]>, end: std::ops::Bound<&[u8]>) -> bool {
+    use std::ops::Bound;
+    (match start {
+        Bound::Included(s) => k >= s,
+        Bound::Excluded(s) => k > s,
+        Bound::Unbounded => true,
+    }) && (match end {
+        Bound::Included(e) => k <= e,
+        Bound::Excluded(e) => k < e,
+        Bound::Unbounded => true,
+    })
+}
+
 use crate::compaction::{CompactionConfig, CompactionEngine};
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache, BlockCache, SstableBuilder, SstableReader};
@@ -1026,6 +1045,66 @@ impl LsmStorage {
         }
     }
 
+    /// Advances the MVCC visible transaction horizon (`last_committed_tx`) atomically.
+    /// Internal transactions (`>= TxId::INTERNAL_BASE`) are ignored as they are never MVCC-visible.
+    /// `tx_id == 0` is ignored with a warning to prevent MVCC blackout.
+    #[inline]
+    fn advance_visibility(&self, tx_id: TxId) {
+        if tx_id.inner() < TxId::INTERNAL_BASE {
+            let mut current = self.last_committed_tx.load(Ordering::Acquire);
+            while tx_id.inner() > current {
+                match self.last_committed_tx.compare_exchange_weak(
+                    current,
+                    tx_id.inner(),
+                    Ordering::SeqCst,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(actual) => current = actual,
+                }
+            }
+            if tx_id.inner() == 0 {
+                tracing::warn!(
+                    "LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout"
+                );
+            }
+        }
+    }
+
+    /// Applies memory updates to the provided `MemTable` and updates budget tracking.
+    ///
+    /// # Lock Invariants
+    /// The caller must hold appropriate lock access (read or write guard on `LsmState`)
+    /// guarding the `MemTable`. `MemTable` internally uses `parking_lot::RwLock` for safe
+    /// concurrent mutations.
+    fn apply_mem_updates(
+        &self,
+        memtable: &MemTable,
+        mem_updates: &[(Vec<u8>, Vec<u8>, u64)],
+        tx_id: TxId,
+    ) {
+        for (key, value, seq) in mem_updates {
+            let entry_size = key.len() + value.len() + 8;
+            if let Err(e) = self.budget.consume_memory(entry_size as u64) {
+                self.budget_tracking_drift_bytes
+                    .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
+                tracing::warn!(
+                    drift_bytes = entry_size,
+                    total_drift_bytes = self
+                        .budget_tracking_drift_bytes
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    "Memory budget tracking warning during commit: {e}"
+                );
+            }
+            memtable.put(
+                Bytes::from(key.clone()),
+                Bytes::from(value.clone()),
+                *seq,
+                tx_id.inner(),
+            );
+        }
+    }
+
     /// Evaluates detailed traversal metrics (evaluated_sstables, bloom_passes, range_passes, block_reads, found) for point lookups.
     pub async fn point_lookup_metrics(&self, key: &[u8]) -> (usize, usize, usize, usize, bool) {
         let sstables = self.sstables.read().await;
@@ -1061,7 +1140,146 @@ impl LsmStorage {
             found,
         )
     }
+
+    /// Internal helper that collects visible entries across SSTables, immutable MemTables,
+    /// and active MemTable according to MVCC visibility, tombstone masking, and optional accumulator limits.
+    async fn collect_visible_entries<F>(
+        &self,
+        mode: SstableScanMode<'_>,
+        entry_filter: F,
+        check_accumulator: bool,
+        per_source_limit: Option<usize>,
+        context_name: &str,
+    ) -> Result<std::collections::BTreeMap<Bytes, (Bytes, u64)>>
+    where
+        F: Fn(&[u8], u64, u64) -> bool,
+    {
+        let mut map: std::collections::BTreeMap<Bytes, (Bytes, u64)> =
+            std::collections::BTreeMap::new();
+        let state = self.state.read().await;
+        let sstables = self.sstables.read().await;
+        // H-7 FIX: last_tx NACH Lock-Erwerb laden für korrekte Snapshot-Isolation.
+        let last_tx = self.last_committed_tx.load(Ordering::Acquire);
+
+        // 1. SSTables
+        for sst in sstables.iter() {
+            let entries = match mode {
+                SstableScanMode::Prefix(prefix) => {
+                    let first = sst.first_key();
+                    let last = sst.last_key();
+                    if !first.is_empty() && !last.is_empty() {
+                        if prefix > last.as_ref() {
+                            continue;
+                        }
+                        let mut prefix_end = prefix.to_vec();
+                        if let Some(last_byte) = prefix_end.last_mut() {
+                            if let Some(next_byte) = last_byte.checked_add(1) {
+                                *last_byte = next_byte;
+                                if first.as_ref() >= prefix_end.as_slice() {
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    sst.scan_prefix(prefix).await?
+                }
+                SstableScanMode::Range(start, end) => {
+                    sst.scan_range(start.map(|s| s), end.map(|e| e)).await?
+                }
+            };
+
+            let mut source_count = 0usize;
+            for (k, v, seq, tx) in entries {
+                let raw_seq = seq & !TOMBSTONE_BIT;
+                if (tx <= last_tx || tx >= TxId::INTERNAL_BASE)
+                    && entry_filter(k.as_ref(), raw_seq, tx)
+                {
+                    let entry = map.entry(k).or_insert_with(|| (v.clone(), seq));
+                    if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
+                        *entry = (v, seq);
+                    }
+                    if check_accumulator && map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
+                        return Err(MemFuseError::LimitExceeded {
+                            limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
+                            context: format!(
+                                "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
+                            ),
+                        });
+                    }
+                    source_count += 1;
+                    if let Some(lim) = per_source_limit {
+                        if source_count >= lim {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Immutable memtables (older -> newer)
+        for mt in &state.immutable_memtables {
+            let mut source_count = 0usize;
+            for (k, v, seq, tx) in mt.iter() {
+                if tx > last_tx && tx < TxId::INTERNAL_BASE {
+                    continue;
+                }
+                let raw_seq = seq & !TOMBSTONE_BIT;
+                if entry_filter(k.as_ref(), raw_seq, tx) {
+                    let entry = map.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
+                    if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
+                        *entry = (v.clone(), seq);
+                    }
+                    if check_accumulator && map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
+                        return Err(MemFuseError::LimitExceeded {
+                            limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
+                            context: format!(
+                                "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
+                            ),
+                        });
+                    }
+                    source_count += 1;
+                    if let Some(lim) = per_source_limit {
+                        if source_count >= lim {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Active memtable
+        let mut source_count = 0usize;
+        for (k, v, seq, tx) in state.memtable.iter() {
+            if tx > last_tx && tx < TxId::INTERNAL_BASE {
+                continue;
+            }
+            let raw_seq = seq & !TOMBSTONE_BIT;
+            if entry_filter(k.as_ref(), raw_seq, tx) {
+                let entry = map.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
+                if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
+                    *entry = (v.clone(), seq);
+                }
+                if check_accumulator && map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
+                    return Err(MemFuseError::LimitExceeded {
+                        limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
+                        context: format!(
+                            "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
+                        ),
+                    });
+                }
+                source_count += 1;
+                if let Some(lim) = per_source_limit {
+                    if source_count >= lim {
+                        break;
+                    }
+                }
+            }
+        }
+
+        Ok(map)
+    }
 }
+
 
 impl StorageEngine for LsmStorage {
     /// # ACID-Garantie
@@ -1465,41 +1683,8 @@ impl StorageEngine for LsmStorage {
                     )));
                 }
 
-                if tx_id.inner() < TxId::INTERNAL_BASE {
-                    let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                    while tx_id.inner() > current {
-                        match self.last_committed_tx.compare_exchange_weak(
-                            current,
-                            tx_id.inner(),
-                            Ordering::SeqCst,
-                            Ordering::Relaxed,
-                        ) {
-                            Ok(_) => break,
-                            Err(actual) => current = actual,
-                        }
-                    }
-                    if tx_id.inner() == 0 {
-                        tracing::warn!("LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout");
-                    }
-                }
-
-                for (key, value, seq) in mem_updates {
-                    let entry_size = key.len() + value.len() + 8;
-                    if let Err(e) = self.budget.consume_memory(entry_size as u64) {
-                        self.budget_tracking_drift_bytes
-                            .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
-                        tracing::warn!(
-                            drift_bytes = entry_size,
-                            total_drift_bytes = self
-                                .budget_tracking_drift_bytes
-                                .load(std::sync::atomic::Ordering::Relaxed),
-                            "Memory budget tracking warning during commit: {e}"
-                        );
-                    }
-                    state
-                        .memtable
-                        .put(Bytes::from(key), Bytes::from(value), seq, tx_id.inner());
-                }
+                self.advance_visibility(tx_id);
+                self.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
 
                 let should_flush = state.memtable.size() > self.config.memtable_size_limit;
                 drop(state);
@@ -1581,6 +1766,10 @@ impl StorageEngine for LsmStorage {
                             "Group commit leader: pending_commit_queue unexpectedly missing. \
                              This is a bug — notifying all followers."
                         );
+                        debug_assert!(
+                            false,
+                            "Group commit queue invariant violated — queue was Some at leader init and must remain Some until leader re-acquisition"
+                        );
                         return Err(MemFuseError::Internal(
                             "Group commit queue invariant violated".into(),
                         ));
@@ -1657,44 +1846,8 @@ impl StorageEngine for LsmStorage {
                 }
 
                 for (req_tx_id, mem_updates) in all_updates {
-                    if req_tx_id.inner() < TxId::INTERNAL_BASE {
-                        let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                        while req_tx_id.inner() > current {
-                            match self.last_committed_tx.compare_exchange_weak(
-                                current,
-                                req_tx_id.inner(),
-                                Ordering::SeqCst,
-                                Ordering::Relaxed,
-                            ) {
-                                Ok(_) => break,
-                                Err(actual) => current = actual,
-                            }
-                        }
-                        if req_tx_id.inner() == 0 {
-                            tracing::warn!("LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout");
-                        }
-                    }
-
-                    for (key, value, seq) in mem_updates {
-                        let entry_size = key.len() + value.len() + 8;
-                        if let Err(e) = self.budget.consume_memory(entry_size as u64) {
-                            self.budget_tracking_drift_bytes
-                                .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
-                            tracing::warn!(
-                                drift_bytes = entry_size,
-                                total_drift_bytes = self
-                                    .budget_tracking_drift_bytes
-                                    .load(std::sync::atomic::Ordering::Relaxed),
-                                "Memory budget tracking warning during group commit: {e}"
-                            );
-                        }
-                        state.memtable.put(
-                            Bytes::from(key.clone()),
-                            Bytes::from(value.clone()),
-                            *seq,
-                            req_tx_id.inner(),
-                        );
-                    }
+                    self.advance_visibility(req_tx_id);
+                    self.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
                 }
 
                 let needs_flush = state.memtable.size() > self.config.memtable_size_limit;
@@ -1895,20 +2048,7 @@ impl StorageEngine for LsmStorage {
 
                 // last_committed_tx MUSS vor sstables.push() aktualisiert werden — sonst Race-Fenster für parallele Reader, siehe DECISIONS.md ADR-043.
                 let sst_max_tx = reader.metadata().max_tx_id;
-                if sst_max_tx < TxId::INTERNAL_BASE {
-                    let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                    while sst_max_tx > current {
-                        match self.last_committed_tx.compare_exchange_weak(
-                            current,
-                            sst_max_tx,
-                            Ordering::SeqCst,
-                            Ordering::Relaxed,
-                        ) {
-                            Ok(_) => break,
-                            Err(actual) => current = actual,
-                        }
-                    }
-                }
+                self.advance_visibility(TxId::new(sst_max_tx));
 
                 sstables.push(Arc::new(reader));
                 sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
@@ -2016,96 +2156,22 @@ impl StorageEngine for LsmStorage {
         Box::pin(async move {
             let cur_bytes = cursor.map(Bytes::copy_from_slice);
 
-            let last_tx = self.last_committed_tx.load(Ordering::Acquire);
-            let mut map: std::collections::BTreeMap<Bytes, (Bytes, u64)> =
-                std::collections::BTreeMap::new();
-            let state = self.state.read().await;
-            let sstables = self.sstables.read().await;
-
-            // Collect from SSTables
-            for sst in sstables.iter() {
-                let first = sst.first_key();
-                let last = sst.last_key();
-                if !first.is_empty() && !last.is_empty() {
-                    if prefix > last.as_ref() {
-                        continue;
-                    }
-                    let mut prefix_end = prefix.to_vec();
-                    if let Some(last_byte) = prefix_end.last_mut() {
-                        if let Some(next_byte) = last_byte.checked_add(1) {
-                            *last_byte = next_byte;
-                            if first.as_ref() >= prefix_end.as_slice() {
-                                continue;
+            let map = self
+                .collect_visible_entries(
+                    SstableScanMode::Prefix(prefix),
+                    |k, _raw_seq, _tx| {
+                        if let Some(cb) = cursor {
+                            if k <= cb {
+                                return false;
                             }
                         }
-                    }
-                }
-
-                let entries = sst.scan_prefix(prefix).await?;
-                for (k, v, seq, tx) in entries {
-                    if let Some(cb) = cursor {
-                        if k.as_ref() <= cb {
-                            continue;
-                        }
-                    }
-                    if tx <= last_tx || tx >= TxId::INTERNAL_BASE {
-                        let entry = map.entry(k).or_insert_with(|| (v.clone(), seq));
-                        if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v, seq);
-                        }
-                        if map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
-                            return Err(MemFuseError::LimitExceeded {
-                                limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
-                                context: "scan_prefix_bounded(): internal merge accumulator exceeded — range too wide, narrow the scan range".to_string(),
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Collect bounded candidates from immutable memtables
-            for mt in &state.immutable_memtables {
-                for (k, v, seq, tx) in mt.iter() {
-                    if let Some(cb) = cursor {
-                        if k.as_ref() <= cb {
-                            continue;
-                        }
-                    }
-                    if k.starts_with(prefix) && (tx <= last_tx || tx >= TxId::INTERNAL_BASE) {
-                        let entry = map.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
-                        if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v.clone(), seq);
-                        }
-                        if map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
-                            return Err(MemFuseError::LimitExceeded {
-                                limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
-                                context: "scan_prefix_bounded(): internal merge accumulator exceeded — range too wide, narrow the scan range".to_string(),
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Collect bounded candidates from active memtable
-            for (k, v, seq, tx) in state.memtable.iter() {
-                if let Some(cb) = cursor {
-                    if k.as_ref() <= cb {
-                        continue;
-                    }
-                }
-                if k.starts_with(prefix) && (tx <= last_tx || tx >= TxId::INTERNAL_BASE) {
-                    let entry = map.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
-                    if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                        *entry = (v.clone(), seq);
-                    }
-                    if map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
-                        return Err(MemFuseError::LimitExceeded {
-                            limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
-                            context: "scan_prefix_bounded(): internal merge accumulator exceeded — range too wide, narrow the scan range".to_string(),
-                        });
-                    }
-                }
-            }
+                        k.starts_with(prefix)
+                    },
+                    true,
+                    None,
+                    "scan_prefix_bounded()",
+                )
+                .await?;
 
             // Cursor-Bound ableiten für den Paginierungs-Iterator
             let range_bound = match &cur_bytes {
@@ -2153,75 +2219,15 @@ impl StorageEngine for LsmStorage {
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move {
-            let mut map: std::collections::BTreeMap<Bytes, (Bytes, u64)> =
-                std::collections::BTreeMap::new();
-            let state = self.state.read().await;
-            let sstables = self.sstables.read().await;
-            // H-7 FIX: last_tx NACH Lock-Erwerb laden für korrekte Snapshot-Isolation.
-            // Ein Commit zwischen load() und read()-Erwerb würde sonst neue Daten sichtbar
-            // machen, die last_tx nicht autorisiert — Read-Committed statt Snapshot.
-            let last_tx = self.last_committed_tx.load(Ordering::Acquire);
-
-            // Collect from SSTables
-            for sst in sstables.iter() {
-                let first = sst.first_key();
-                let last = sst.last_key();
-                if !first.is_empty() && !last.is_empty() {
-                    if prefix > last.as_ref() {
-                        continue;
-                    }
-                    let mut prefix_end = prefix.to_vec();
-                    if let Some(last_byte) = prefix_end.last_mut() {
-                        if let Some(next_byte) = last_byte.checked_add(1) {
-                            *last_byte = next_byte;
-                            if first.as_ref() >= prefix_end.as_slice() {
-                                continue;
-                            }
-                        }
-                    }
-                }
-
-                let entries = sst.scan_prefix(prefix).await?;
-                for (k, v, seq, tx) in entries {
-                    let raw_seq = seq & !TOMBSTONE_BIT;
-                    if raw_seq <= seq_no && (tx <= last_tx || tx >= TxId::INTERNAL_BASE) {
-                        let entry = map.entry(k).or_insert_with(|| (v.clone(), seq));
-                        if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v, seq);
-                        }
-                    }
-                }
-            }
-
-            // Collect from immutable memtables
-            for mt in &state.immutable_memtables {
-                for (k, v, seq, tx) in mt.iter() {
-                    let raw_seq = seq & !TOMBSTONE_BIT;
-                    if k.starts_with(prefix)
-                        && raw_seq <= seq_no
-                        && (tx <= last_tx || tx >= TxId::INTERNAL_BASE)
-                    {
-                        let entry = map.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
-                        if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v.clone(), seq);
-                        }
-                    }
-                }
-            }
-
-            // Collect from active memtable
-            for (k, v, seq, tx) in state.memtable.iter() {
-                let raw_seq = seq & !TOMBSTONE_BIT;
-                if k.starts_with(prefix)
-                    && raw_seq <= seq_no
-                    && (tx <= last_tx || tx >= TxId::INTERNAL_BASE)
-                {
-                    let entry = map.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
-                    if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                        *entry = (v.clone(), seq);
-                    }
-                }
-            }
+            let map = self
+                .collect_visible_entries(
+                    SstableScanMode::Prefix(prefix),
+                    |k, raw_seq, _tx| raw_seq <= seq_no && k.starts_with(prefix),
+                    false,
+                    None,
+                    "scan_prefix_at()",
+                )
+                .await?;
 
             let mut results = Vec::with_capacity(map.len());
             for (k, (v, seq)) in map {
@@ -2249,89 +2255,15 @@ impl StorageEngine for LsmStorage {
                 None => start,
             };
 
-            let mut map = std::collections::BTreeMap::<Vec<u8>, (Vec<u8>, u64)>::new();
-            let state = self.state.read().await;
-            let sstables = self.sstables.read().await;
-            let last_tx = self.last_committed_tx.load(Ordering::Acquire);
-
-            // 1. SSTables (filtered by visibility tx <= last_tx)
-            for sst in sstables.iter() {
-                let entries = sst
-                    .scan_range(effective_start.map(|s| s), end.map(|e| e))
-                    .await?;
-                for (k, v, seq, tx) in entries {
-                    if tx <= last_tx || tx >= TxId::INTERNAL_BASE {
-                        let entry = map.entry(k.to_vec()).or_insert((v.to_vec(), seq));
-                        if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v.to_vec(), seq);
-                        }
-                        if map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
-                            return Err(MemFuseError::LimitExceeded {
-                                limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
-                                context: "scan_bounded(): internal merge accumulator exceeded — range too wide, narrow the scan range".to_string(),
-                            });
-                        }
-                    }
-                }
-            }
-
-            // 2. Immutable memtables (older → newer)
-            for mt in &state.immutable_memtables {
-                for (k, v, seq, tx) in mt.iter() {
-                    if tx > last_tx && tx < TxId::INTERNAL_BASE {
-                        continue;
-                    }
-                    let in_range = match effective_start {
-                        Bound::Included(s) => k.as_ref() >= s,
-                        Bound::Excluded(s) => k.as_ref() > s,
-                        Bound::Unbounded => true,
-                    } && match end {
-                        Bound::Included(e) => k.as_ref() <= e,
-                        Bound::Excluded(e) => k.as_ref() < e,
-                        Bound::Unbounded => true,
-                    };
-                    if in_range {
-                        let entry = map.entry(k.to_vec()).or_insert((v.to_vec(), seq));
-                        if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v.to_vec(), seq);
-                        }
-                        if map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
-                            return Err(MemFuseError::LimitExceeded {
-                                limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
-                                context: "scan_bounded(): internal merge accumulator exceeded — range too wide, narrow the scan range".to_string(),
-                            });
-                        }
-                    }
-                }
-            }
-
-            // 3. Active memtable
-            for (k, v, seq, tx) in state.memtable.iter() {
-                if tx > last_tx && tx < TxId::INTERNAL_BASE {
-                    continue;
-                }
-                let in_range = match effective_start {
-                    Bound::Included(s) => k.as_ref() >= s,
-                    Bound::Excluded(s) => k.as_ref() > s,
-                    Bound::Unbounded => true,
-                } && match end {
-                    Bound::Included(e) => k.as_ref() <= e,
-                    Bound::Excluded(e) => k.as_ref() < e,
-                    Bound::Unbounded => true,
-                };
-                if in_range {
-                    let entry = map.entry(k.to_vec()).or_insert((v.to_vec(), seq));
-                    if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                        *entry = (v.to_vec(), seq);
-                    }
-                    if map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
-                        return Err(MemFuseError::LimitExceeded {
-                            limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
-                            context: "scan_bounded(): internal merge accumulator exceeded — range too wide, narrow the scan range".to_string(),
-                        });
-                    }
-                }
-            }
+            let map = self
+                .collect_visible_entries(
+                    SstableScanMode::Range(effective_start, end),
+                    |k, _raw_seq, _tx| check_in_range(k, effective_start, end),
+                    true,
+                    None,
+                    "scan_bounded()",
+                )
+                .await?;
 
             // 4. Apply limit (cursor is already handled via effective_start)
             let mut results = Vec::new();
@@ -2339,7 +2271,7 @@ impl StorageEngine for LsmStorage {
 
             for (k, (v, seq)) in iter.by_ref() {
                 if (seq & TOMBSTONE_BIT) == 0 {
-                    results.push((k, v));
+                    results.push((k.to_vec(), v.to_vec()));
                     if results.len() == limit {
                         break;
                     }
@@ -2374,98 +2306,21 @@ impl StorageEngine for LsmStorage {
         limit: Option<usize>,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move {
-            use std::ops::Bound;
-
-            let last_tx = self.last_committed_tx.load(Ordering::Acquire);
-            let mut map = std::collections::BTreeMap::<Vec<u8>, (Vec<u8>, u64)>::new();
-            let state = self.state.read().await;
-            let sstables = self.sstables.read().await;
-
-            // 1. SSTables (filtered by visibility tx <= last_tx)
-            for sst in sstables.iter() {
-                let entries = sst.scan_range(start.map(|s| s), end.map(|e| e)).await?;
-                let mut found_count = 0usize;
-                for (k, v, seq, tx) in entries {
-                    if tx <= last_tx || tx >= TxId::INTERNAL_BASE {
-                        let entry = map.entry(k.to_vec()).or_insert((v.to_vec(), seq));
-                        if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v.to_vec(), seq);
-                        }
-                        found_count += 1;
-                        if let Some(lim) = limit {
-                            if found_count >= lim {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Immutable memtables (older → newer)
-            for mt in &state.immutable_memtables {
-                let mut found_count = 0usize;
-                for (k, v, seq, tx) in mt.iter() {
-                    if tx > last_tx && tx < TxId::INTERNAL_BASE {
-                        continue;
-                    }
-                    let in_range = match start {
-                        Bound::Included(s) => k.as_ref() >= s,
-                        Bound::Excluded(s) => k.as_ref() > s,
-                        Bound::Unbounded => true,
-                    } && match end {
-                        Bound::Included(e) => k.as_ref() <= e,
-                        Bound::Excluded(e) => k.as_ref() < e,
-                        Bound::Unbounded => true,
-                    };
-                    if in_range {
-                        let entry = map.entry(k.to_vec()).or_insert((v.to_vec(), seq));
-                        if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                            *entry = (v.to_vec(), seq);
-                        }
-                        found_count += 1;
-                        if let Some(lim) = limit {
-                            if found_count >= lim {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Active memtable
-            let mut found_count = 0usize;
-            for (k, v, seq, tx) in state.memtable.iter() {
-                if tx > last_tx && tx < TxId::INTERNAL_BASE {
-                    continue;
-                }
-                let in_range = match start {
-                    Bound::Included(s) => k.as_ref() >= s,
-                    Bound::Excluded(s) => k.as_ref() > s,
-                    Bound::Unbounded => true,
-                } && match end {
-                    Bound::Included(e) => k.as_ref() <= e,
-                    Bound::Excluded(e) => k.as_ref() < e,
-                    Bound::Unbounded => true,
-                };
-                if in_range {
-                    let entry = map.entry(k.to_vec()).or_insert((v.to_vec(), seq));
-                    if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                        *entry = (v.to_vec(), seq);
-                    }
-                    found_count += 1;
-                    if let Some(lim) = limit {
-                        if found_count >= lim {
-                            break;
-                        }
-                    }
-                }
-            }
+            let map = self
+                .collect_visible_entries(
+                    SstableScanMode::Range(start, end),
+                    |k, _raw_seq, _tx| check_in_range(k, start, end),
+                    false,
+                    limit,
+                    "scan()",
+                )
+                .await?;
 
             // 4. Filter tombstones and apply limit
             let mut results = Vec::new();
             for (k, (v, seq)) in map {
                 if (seq & TOMBSTONE_BIT) == 0 {
-                    results.push((k, v));
+                    results.push((k.to_vec(), v.to_vec()));
                     if let Some(lim) = limit {
                         if results.len() == lim {
                             break;
