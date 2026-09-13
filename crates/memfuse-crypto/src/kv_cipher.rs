@@ -298,7 +298,10 @@ mod tests {
         assert!(
             matches!(
                 err,
-                CryptoError::KvFormatVersionMismatch { expected: 2, found: 1 }
+                CryptoError::KvFormatVersionMismatch {
+                    expected: 2,
+                    found: 1
+                }
             ),
             "Expected KvFormatVersionMismatch, got: {err:?}"
         );

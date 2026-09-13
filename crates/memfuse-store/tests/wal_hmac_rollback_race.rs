@@ -24,6 +24,7 @@ async fn test_concurrent_commit_during_wal_rollback_preserves_hmac_chain() {
     let dir = tempdir().expect("tempdir creation failed");
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
+        group_commit_window_micros: 0,
         ..Default::default()
     };
 

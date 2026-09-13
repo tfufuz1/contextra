@@ -435,6 +435,14 @@ pub const MAX_WAL_ENTRY_SIZE: u32 = 64 * 1024 * 1024;
 #[cfg(feature = "fault-injection")]
 pub static FAIL_APPEND_FOR_TX: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
+/// Global fault injection flag to delay `append_batch` for a specific transaction ID during tests.
+#[cfg(feature = "fault-injection")]
+pub static DELAY_APPEND_FOR_TX: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Duration in milliseconds to delay `append_batch` when `DELAY_APPEND_FOR_TX` matches.
+#[cfg(feature = "fault-injection")]
+pub static DELAY_APPEND_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 impl Wal {
     fn handle_wal_entry_parse_error(
         e: MemFuseError,
@@ -1060,6 +1068,15 @@ impl Wal {
                 return Err(MemFuseError::Storage(
                     "Simulated WAL append_batch I/O failure via fault injection".into(),
                 ));
+            }
+
+            let delay_tx = DELAY_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
+            if delay_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == delay_tx) {
+                let delay_ms = DELAY_APPEND_MS.load(std::sync::atomic::Ordering::SeqCst);
+                DELAY_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
+                if delay_ms > 0 {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                }
             }
         }
 
