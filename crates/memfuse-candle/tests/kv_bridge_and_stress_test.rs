@@ -7,6 +7,7 @@
 mod tests {
     use candle_core::Device;
     use memfuse_candle::inference::CandleModelInner;
+    use memfuse_candle::kv_bridge::KvCacheKey;
     use memfuse_candle::{CandleLlmClient, GaspValidator, KvBridgeAdapter};
     use memfuse_core::traits::ResponseGroundingValidator;
     use memfuse_core::{ModelFingerprint, Result, TenantId};
@@ -68,9 +69,10 @@ mod tests {
         let adapter = create_test_kv_bridge();
         let tenant = TenantId::try_new(777).unwrap();
         let fp = dummy_fingerprint("Q4_K_M");
+        let key = KvCacheKey::new(9999, fp.clone(), None);
 
         // Request a chunk ID that was never stored (simulating store cache miss/missing key)
-        let cached = adapter.try_get_cached_segment(tenant, 9999, &fp, None);
+        let cached = adapter.try_get_cached_segment(tenant, &key);
         assert!(
             cached.is_none(),
             "KV-Bridge lookup for non-existent segment MUST fall back to None (prefill)"
@@ -81,10 +83,11 @@ mod tests {
         let wrong_cipher = Arc::new(KvSegmentCipher::new(wrong_km));
         let wrong_adapter = KvBridgeAdapter::new(Arc::clone(&adapter.store), wrong_cipher);
 
-        wrong_adapter.store_segment(tenant, 8888, fp.clone(), None, b"invalid encrypted bytes");
+        let corrupt_key = KvCacheKey::new(8888, fp.clone(), None);
+        wrong_adapter.store_segment(tenant, corrupt_key.clone(), b"invalid encrypted bytes".to_vec());
 
         // Reading back with original adapter should catch decryption error and fall back cleanly to None without panic
-        let failed_decrypt = adapter.try_get_cached_segment(tenant, 8888, &fp, None);
+        let failed_decrypt = adapter.try_get_cached_segment(tenant, &corrupt_key);
         assert!(
             failed_decrypt.is_none(),
             "KV-Bridge decryption failure MUST return None (fail-open to prefill) without panicking"
@@ -98,20 +101,21 @@ mod tests {
         let fp_q4 = dummy_fingerprint("Q4_K_M");
         let fp_q8 = dummy_fingerprint("Q8_0");
         let chunk_id = 101;
-        let payload = b"cached KV activation layer weights for Q4_K_M";
+        let payload = b"cached KV activation layer weights for Q4_K_M".to_vec();
 
-        adapter.store_segment(tenant, chunk_id, fp_q4.clone(), Some(64), payload);
+        let key_q4 = KvCacheKey::new(chunk_id, fp_q4, Some(64));
+        adapter.store_segment(tenant, key_q4.clone(), payload.clone());
 
         // Fetching with matching fingerprint returns payload
-        let hit = adapter.try_get_cached_segment(tenant, chunk_id, &fp_q4, Some(64));
-        assert_eq!(hit, Some(payload.to_vec()));
+        let hit = adapter.try_get_cached_segment(tenant, &key_q4);
+        assert_eq!(hit, Some(payload));
 
-        // Documenting AGT-CANDLE-d0dacdd8 tag:
-        // try_get_cached_segment currently ignores requested fingerprint and returns the stored segment.
-        let result = adapter.try_get_cached_segment(tenant, chunk_id, &fp_q8, Some(64));
+        // Fetching with mismatched fingerprint returns None (cache miss)
+        let key_q8 = KvCacheKey::new(chunk_id, fp_q8, Some(64));
+        let result = adapter.try_get_cached_segment(tenant, &key_q8);
         assert!(
-            result.is_some(),
-            "Currently returns cached segment regardless of requested fingerprint (tracked in AGT-CANDLE-d0dacdd8)"
+            result.is_none(),
+            "Requesting a segment with a mismatched fingerprint MUST return None (cache miss)"
         );
     }
 

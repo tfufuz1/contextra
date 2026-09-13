@@ -1,8 +1,8 @@
 // FILE-CONTEXT
-// STAND: 2026-09-12T00:00:00Z (SESSION: KV-BRIDGE-ADAPTER-IMPL)
-// ZWECK: Adapter connecting retrieval segments to Candle inference engine using encrypted tenant-isolated KV cache store.
-// INVARIANTEN: Zero-panic policy on cache miss or crypto error (fallback to full prefill).
-// Synchronous parking_lot locks are never held across async await points.
+// STAND: 2026-09-13T00:00:00Z (SESSION: KV-BRIDGE-ADAPTER-IMPL)
+// ZWECK: KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store.
+// INVARIANTEN: Cache-Miss und jeder Fehler ergeben transparenten Fallback auf vollen Prefill.
+//              Kein parking_lot-Lock über .await-Punkt.
 
 //! KV-Bridge Adapter connecting Candle inference to tenant-isolated encrypted KV cache store.
 
@@ -10,22 +10,41 @@
 
 use memfuse_core::traits::ContextSegment;
 use memfuse_core::{ModelFingerprint, TenantId};
-use memfuse_security::{KvSegmentCipher, TenantIsolatedKvStore};
+use memfuse_security::{KvSegment, KvSegmentCipher, TenantIsolatedKvStore};
 use std::sync::Arc;
 
-/// Adapter bridge managing encrypted KV-cache segment lookup and storage for Candle inference sessions.
+/// Cache-Lookup-Schlüssel: eindeutige Kombination aus Chunk-ID, Modell und optionalem RoPE-Offset.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KvCacheKey {
+    pub chunk_id: u64,
+    pub fingerprint: ModelFingerprint,
+    pub rope_offset: Option<usize>,
+}
+
+impl KvCacheKey {
+    pub fn new(chunk_id: u64, fingerprint: ModelFingerprint, rope_offset: Option<usize>) -> Self {
+        Self {
+            chunk_id,
+            fingerprint,
+            rope_offset,
+        }
+    }
+}
+
+/// Verbindet Retrieval-Chunks mit dem mandantenisolierten, verschlüsselten KV-Cache.
+///
+/// # Fail-Safe-Garantie
+/// Jede Methode fällt bei Fehler oder Cache-Miss transparent auf den normalen Prefill zurück.
+/// Kein Fehler aus dem KV-Store oder der Krypto-Schicht darf eine Anfrage abbrechen.
 #[derive(Clone)]
 pub struct KvBridgeAdapter {
-    /// Tenant-isolated KV segment storage engine.
     pub store: Arc<TenantIsolatedKvStore>,
-    /// High-level cipher engine for segment encryption and decryption.
     pub cipher: Arc<KvSegmentCipher>,
-    /// Number of segment consultations performed.
     pub consultations: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl KvBridgeAdapter {
-    /// Creates a new `KvBridgeAdapter` wrapping the given store and cipher handles.
+    /// Erstellt einen neuen Adapter mit gegebenem Store und Cipher.
     pub fn new(store: Arc<TenantIsolatedKvStore>, cipher: Arc<KvSegmentCipher>) -> Self {
         Self {
             store,
@@ -51,65 +70,92 @@ impl KvBridgeAdapter {
         self.consultations.load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    /// Attempts to retrieve and decrypt a cached KV segment for a tenant and chunk ID.
+    /// Versucht, ein gecachetes KV-Segment zu laden.
     ///
-    /// Returns `None` on cache miss, format mismatch, or decryption failure,
-    /// triggering a transparent fallback to full prefill in the inference pipeline (APM-HARD-FAIL-ON-CACHE-MISS).
-    // AI-TAG[SECURITY][MAJOR] ModelFingerprint parameter ignored during KV segment lookup in try_get_cached_segment (ID: AGT-CANDLE-fb44dd85) (TS: 2026-09-13T01:25:50Z) (SESSION: 38de9c27)
-    // BEFUND: try_get_cached_segment ignoriert den _fingerprint Parameter und delegiert an get_decrypted_segment(cipher, tenant, chunk_id). Während get_decrypted_segment die Entschlüsselung mit der gespeicherten Segment-Fingerprint durchführt, erfolgt keine vorherige Prüfung/Match gegen den angeforderten Fingerprint.
-    // RISIKO: Ein Wechsel von Modell/Quantisierung könnte bei übereinstimmender Chunk-ID und Tenant-ID versuchten Zugriff auf ein Segment mit abweichendem Fingerprint auslösen (wird zwar durch Crypto/AEAD-Tag abgefangen und scheitert, aber Fingerprint-Mismatch sollte explizit vorab als Cache-Miss behandelt werden).
-    // EMPFEHLUNG: Im Folge-Task Fingerprint-Validierung in try_get_cached_segment ergänzen.
+    /// Gibt `None` zurück bei Cache-Miss, Decrypt-Fehler, Fingerprint-Mismatch oder jedem anderen Fehler.
+    /// NIEMALS wird ein Fehler propagiert — `None` bedeutet stets "voller Prefill".
     pub fn try_get_cached_segment(
         &self,
         tenant: TenantId,
-        chunk_id: u64,
-        _fingerprint: &ModelFingerprint,
-        _rope_offset: Option<usize>,
+        key: &KvCacheKey,
     ) -> Option<Vec<u8>> {
-        match self
-            .store
-            .get_decrypted_segment(&self.cipher, tenant, chunk_id)
-        {
-            Ok(Some(bytes)) => Some(bytes),
-            Ok(None) => None,
-            Err(err) => {
-                tracing::debug!(
-                    tenant_id = tenant.inner(),
-                    chunk_id = chunk_id,
-                    error = %err,
-                    "KV-Bridge cache miss due to decryption/format error, falling back to prefill"
+        // 1. Store-Lookup (synchron, Lock wird vor Rückgabe freigegeben)
+        let encrypted_bytes = self.store.get_segment_bytes(tenant, key.chunk_id)?;
+
+        // 2. Deserialisieren (außerhalb des Store-Locks)
+        let encrypted_layer: memfuse_security::EncryptedKvLayer =
+            match bincode::deserialize(&encrypted_bytes) {
+                Ok(l) => l,
+                Err(e) => {
+                    tracing::warn!(
+                        chunk_id = key.chunk_id,
+                        error = %e,
+                        "KvBridgeAdapter: Deserialization failed — cache miss"
+                    );
+                    return None;
+                }
+            };
+
+        // 3. Fingerprint-Validierung
+        if encrypted_layer.model_fingerprint != key.fingerprint {
+            tracing::warn!(
+                chunk_id = key.chunk_id,
+                "KvBridgeAdapter: Model fingerprint mismatch — cache miss"
+            );
+            return None;
+        }
+
+        // 4. Entschlüsseln (außerhalb des Store-Locks)
+        match self.cipher.decrypt(&encrypted_layer) {
+            Ok(plaintext) => Some(plaintext),
+            Err(e) => {
+                tracing::warn!(
+                    chunk_id = key.chunk_id,
+                    error = %e,
+                    "KvBridgeAdapter: Decrypt failed — cache miss (possible format version mismatch)"
                 );
                 None
             }
         }
     }
 
-    /// Encrypts and stores a KV-cache segment for a given tenant and chunk ID.
-    ///
-    /// Failures during store/encryption are logged as warnings and non-fatal (never propagated).
+    /// Speichert ein KV-Segment im Cache. Fehler werden geloggt, nie propagiert.
     pub fn store_segment(
         &self,
         tenant: TenantId,
-        chunk_id: u64,
-        fingerprint: ModelFingerprint,
-        rope_offset: Option<usize>,
-        plaintext_kv_bytes: &[u8],
+        key: KvCacheKey,
+        plaintext_kv_bytes: Vec<u8>,
     ) {
-        if let Err(err) = self.store.insert_encrypted_segment(
-            &self.cipher,
+        let encrypted_layer = match self.cipher.encrypt(
             tenant,
-            chunk_id,
-            fingerprint,
-            rope_offset,
-            plaintext_kv_bytes,
+            key.fingerprint,
+            &plaintext_kv_bytes,
         ) {
-            tracing::warn!(
-                tenant_id = tenant.inner(),
-                chunk_id = chunk_id,
-                error = %err,
-                "Failed to insert encrypted segment into KV-Bridge store"
-            );
-        }
+            Ok(l) => l,
+            Err(e) => {
+                tracing::warn!(
+                    chunk_id = key.chunk_id,
+                    error = %e,
+                    "KvBridgeAdapter: Encrypt failed — segment not cached"
+                );
+                return;
+            }
+        };
+
+        let bytes = match bincode::serialize(&encrypted_layer) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!(
+                    chunk_id = key.chunk_id,
+                    error = %e,
+                    "KvBridgeAdapter: Serialization failed — segment not cached"
+                );
+                return;
+            }
+        };
+
+        let segment = KvSegment::new(tenant, key.chunk_id, bytes);
+        self.store.insert_segment(tenant, segment);
     }
 }
 
@@ -141,12 +187,12 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_miss_returns_none() {
+    fn test_cache_miss_returns_none_without_panic() {
         let adapter = create_test_adapter();
         let tenant = TenantId::try_new(1).unwrap();
-        let fp = dummy_fp();
+        let key = KvCacheKey::new(999, dummy_fp(), None);
 
-        let cached = adapter.try_get_cached_segment(tenant, 999, &fp, None);
+        let cached = adapter.try_get_cached_segment(tenant, &key);
         assert!(
             cached.is_none(),
             "Cache miss MUST return None without panic"
@@ -154,40 +200,59 @@ mod tests {
     }
 
     #[test]
-    fn test_store_and_get_roundtrip() {
+    fn test_roundtrip_store_then_get() {
         let adapter = create_test_adapter();
         let tenant = TenantId::try_new(10).unwrap();
         let fp = dummy_fp();
         let chunk_id = 42;
-        let payload = b"KV tensor keys and values plaintext cache payload";
+        let payload = b"KV tensor keys and values plaintext cache payload".to_vec();
+        let key = KvCacheKey::new(chunk_id, fp, Some(128));
 
-        adapter.store_segment(tenant, chunk_id, fp.clone(), Some(128), payload);
+        adapter.store_segment(tenant, key.clone(), payload.clone());
 
-        let retrieved = adapter.try_get_cached_segment(tenant, chunk_id, &fp, Some(128));
+        let retrieved = adapter.try_get_cached_segment(tenant, &key);
         assert!(retrieved.is_some(), "Stored segment MUST be retrievable");
         assert_eq!(retrieved.unwrap(), payload);
     }
 
     #[test]
-    fn test_tenant_isolation_strictness() {
+    fn test_tenant_isolation() {
         let adapter = create_test_adapter();
         let tenant_a = TenantId::try_new(101).unwrap();
         let tenant_b = TenantId::try_new(202).unwrap();
         let fp = dummy_fp();
         let chunk_id = 1;
-        let payload_a = b"Secret payload of Tenant A";
+        let payload_a = b"Secret payload of Tenant A".to_vec();
+        let key = KvCacheKey::new(chunk_id, fp, None);
 
-        adapter.store_segment(tenant_a, chunk_id, fp.clone(), None, payload_a);
+        adapter.store_segment(tenant_a, key.clone(), payload_a.clone());
 
         // Tenant A gets its data
-        let retrieved_a = adapter.try_get_cached_segment(tenant_a, chunk_id, &fp, None);
-        assert_eq!(retrieved_a, Some(payload_a.to_vec()));
+        let retrieved_a = adapter.try_get_cached_segment(tenant_a, &key);
+        assert_eq!(retrieved_a, Some(payload_a));
 
         // Tenant B trying to get chunk_id 1 under tenant_b gets None
-        let retrieved_b = adapter.try_get_cached_segment(tenant_b, chunk_id, &fp, None);
+        let retrieved_b = adapter.try_get_cached_segment(tenant_b, &key);
         assert!(
             retrieved_b.is_none(),
             "Tenant B MUST NOT access Tenant A's cached segment"
+        );
+    }
+
+    #[test]
+    fn test_corrupt_payload_returns_none() {
+        let adapter = create_test_adapter();
+        let tenant = TenantId::try_new(55).unwrap();
+        let key = KvCacheKey::new(777, dummy_fp(), None);
+
+        // Store garbage bytes in store under tenant and chunk_id
+        let corrupt_segment = KvSegment::new(tenant, key.chunk_id, vec![0xFF, 0xFE, 0xFD, 0xFC]);
+        adapter.store.insert_segment(tenant, corrupt_segment);
+
+        let result = adapter.try_get_cached_segment(tenant, &key);
+        assert!(
+            result.is_none(),
+            "Corrupt payload MUST return None without panic"
         );
     }
 
@@ -212,8 +277,9 @@ mod tests {
         let handle1 = thread::spawn(move || {
             for chunk_id in 0..50 {
                 let data = vec![(chunk_id % 256) as u8; 128];
-                adapter1.store_segment(tenant1, chunk_id, fp1.clone(), None, &data);
-                let _ = adapter1.try_get_cached_segment(tenant1, chunk_id, &fp1, None);
+                let key = KvCacheKey::new(chunk_id, fp1.clone(), None);
+                adapter1.store_segment(tenant1, key.clone(), data);
+                let _ = adapter1.try_get_cached_segment(tenant1, &key);
             }
         });
 
@@ -221,8 +287,9 @@ mod tests {
         let handle2 = thread::spawn(move || {
             for chunk_id in 100..150 {
                 let data = vec![(chunk_id % 256) as u8; 128];
-                adapter2.store_segment(tenant2, chunk_id, fp2.clone(), None, &data);
-                let _ = adapter2.try_get_cached_segment(tenant2, chunk_id, &fp2, None);
+                let key = KvCacheKey::new(chunk_id, fp2.clone(), None);
+                adapter2.store_segment(tenant2, key.clone(), data);
+                let _ = adapter2.try_get_cached_segment(tenant2, &key);
             }
         });
 
