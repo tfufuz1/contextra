@@ -614,7 +614,6 @@ impl LsmStorage {
             pressure_rx,
         };
 
-
         // Flush after WAL replay regardless of WAL count — ensures replayed data is persisted to SSTable before any WAL rotation/deletion can occur.
         if replayed_size > 0 && !wal_files.is_empty() {
             tracing::info!(
@@ -747,7 +746,6 @@ impl LsmStorage {
             *file_guard = ro_file;
         }
     }
-
 
     #[doc(hidden)]
     pub async fn restore_wal_file_handle_for_test(&self) {

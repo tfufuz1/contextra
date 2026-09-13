@@ -42,3 +42,8 @@ jobs:
 
       - name: Fast Unit Tests
         run: cargo test --workspace --exclude memfuse-tauri --lib --quiet
+
+      # TODO: Nach 1 Sprint (ab 2026-09-27) auf blockierend hochstufen (continue-on-error: true entfernen)
+      - name: FFI Panic Boundary Check
+        continue-on-error: true
+        run: cargo xtask check-ffi-panic-boundary

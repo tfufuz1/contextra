@@ -505,7 +505,10 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             // SICHERHEITS-INVARIANTE: denom = rrf_k + rrf_rank, wobei rrf_k > 0 (const)
             // und rrf_rank >= 1. denom ist daher garantiert > 0.
             // Falls rrf_k je konfigurierbar wird: diesen Constraint hier prüfen.
-            debug_assert!(denom > 0.0, "RRF denominator must be positive; check rrf_k config");
+            debug_assert!(
+                denom > 0.0,
+                "RRF denominator must be positive; check rrf_k config"
+            );
             let score = weight / denom;
             let score = if score.is_finite() {
                 score
