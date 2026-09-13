@@ -56,7 +56,7 @@ async fn test_group_commit_fault_injection_all_participants_fail() {
         );
         if let Err(MemFuseError::Storage(err_msg)) = result {
             assert!(
-                err_msg.contains("Commit failed (at WAL append)"),
+                err_msg.contains("WAL append failed"),
                 "Error message should indicate WAL append failure, got: {}",
                 err_msg
             );
