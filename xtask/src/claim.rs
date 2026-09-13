@@ -214,11 +214,13 @@ fn run_claim_local(args: &[String]) -> bool {
     let claims_path = root.join(".jules/claims.json");
     let mut db = ClaimsDatabase::load(&claims_path);
 
+    let current_session = std::env::var("JULES_SESSION_ID").unwrap_or_else(|_| "local".to_string());
+
     if let Some(existing) = db.find_active_claim(&krate) {
-        if existing.issue != issue {
+        if existing.issue != issue || existing.session_id != current_session {
             eprintln!(
-                "⚠️ KONFLIKT: Crate '{}' ist bereits aktiv reserviert durch Issue '{}' (seit {}).",
-                krate, existing.issue, existing.timestamp
+                "⚠️ KONFLIKT: Crate '{}' ist bereits aktiv reserviert durch Issue '{}' (Session '{}', seit {}).",
+                krate, existing.issue, existing.session_id, existing.timestamp
             );
             if !dry_run {
                 eprintln!(
@@ -228,8 +230,8 @@ fn run_claim_local(args: &[String]) -> bool {
             }
         } else {
             println!(
-                "ℹ️ Crate '{}' ist bereits für Issue '{}' beansprucht.",
-                krate, issue
+                "ℹ️ Crate '{}' ist bereits für Issue '{}' beansprucht (Session '{}').",
+                krate, issue, current_session
             );
             return true;
         }
@@ -240,7 +242,7 @@ fn run_claim_local(args: &[String]) -> bool {
         krate: krate.clone(),
         issue: issue.clone(),
         timestamp: Utc::now().to_rfc3339(),
-        session_id: std::env::var("JULES_SESSION_ID").unwrap_or_else(|_| "local".to_string()),
+        session_id: current_session,
         active: true,
         expires_at: Some(expires_at),
         released_at: None,

@@ -2398,7 +2398,7 @@ function COMPONENT_SCOPE(crate) {
 
 ## Ziel-Scope: keine Komponente ausgewählt
 
-⚠️ Kein Datei-Scope für diese Crate festgelegt. Lies \`crates/${crate}/src/\` vollständig (inkl. aller in Schritt 0 zusätzlich gefundenen Dateien) und lege selbst fest, welche Dateien für diese Aufgabe relevant sind, bevor du fortfährst.
+⚠️ Kein Datei-Scope für diese Crate festgelegt. Ohne Datei-Scope kein Prompt-Export möglich. Bitte brich ab und erstelle den Prompt neu mit ausgewählten Komponenten.
 `;
   }
   if (selected.length === all.length) {
@@ -4483,11 +4483,11 @@ function renderComponents() {
   el.innerHTML = list.map(c => {
     const noFocus = !c.focus || !c.focus.trim();
     return `
-    <div class="comp-item ${SS.components.has(c.file) ? 'on' : ''}" onclick="toggleComponent('${c.file.replace(/'/g,"\\'")}')">
+    <div class="comp-item ${SS.components.has(c.file) ? 'on' : ''}" onclick="toggleComponent('${escapeHtml(c.file.replace(/'/g,"\\'"))}')">
       <div class="comp-chk">✓</div>
       <div class="comp-body">
-        <span class="comp-name">${noFocus ? '⚠️ ' : ''}${c.file}</span><span class="comp-size sz-${c.size}">${c.size}</span>
-        <div class="comp-desc">${c.desc}${noFocus ? ' — <span style="color:var(--warn)">neu/unkommentiert, noch keine Fokus-Notiz</span>' : ''}</div>
+        <span class="comp-name">${noFocus ? '⚠️ ' : ''}${escapeHtml(c.file)}</span><span class="comp-size sz-${escapeHtml(c.size)}">${escapeHtml(c.size)}</span>
+        <div class="comp-desc">${escapeHtml(c.desc)}${noFocus ? ' — <span style="color:var(--warn)">neu/unkommentiert, noch keine Fokus-Notiz</span>' : ''}</div>
       </div>
     </div>`;
   }).join('');
@@ -4807,10 +4807,25 @@ function selLoop(v) { SS.loop = v; ['on','off'].forEach(x => document.getElement
 function selGithub(v) { SS.github = v; ['on','off'].forEach(x => document.getElementById('gh-'+x).classList.toggle('on', x===v)); generate(); }
 function selMaxLoop(v) { SS.maxLoop = v; ['3','5','8'].forEach(x => document.getElementById('ml-'+x).classList.toggle('on', x===v)); generate(); }
 
-function generateTaskId(taskTitle) {
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/[&<>'"]/g, 
+    tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+  );
+}
+
+function generateTaskId(crateId, taskTitle) {
   const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
-  const slug = (taskTitle || '').replace(/[^a-zA-Z0-9]/g,'').slice(0,6).toUpperCase();
-  return `JULES-${date}-${slug || 'TASK'}`;
+  const crateSlug = (crateId || 'NONE').replace(/[^a-zA-Z0-9]/g,'').slice(0,10).toUpperCase();
+  const taskSlug = (taskTitle || '').replace(/[^a-zA-Z0-9]/g,'').slice(0,6).toUpperCase();
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `JULES-${date}-${crateSlug}-${taskSlug || 'TASK'}-${rand}`;
 }
 
 function getSelectedCrate() {
@@ -4827,7 +4842,7 @@ function generateSubsystemPrompt() {
   const fn_ = SUBSYSTEM_TASKS[SS.subsystemTask];
   if (!fn_) return;
 
-  const taskId = generateTaskId(SS.subsystemTask);
+  const taskId = generateTaskId(sub.crate, SS.subsystemTask);
   const mandatoryBootstrap = buildMandatoryBootstrap(sub.crate, taskId);
   const promptBody = fn_(sub);
 
@@ -4852,7 +4867,7 @@ function generateEigenbauPrompt() {
   if (!eb) return;
 
   const claimCrate = eb.crate;
-  const taskId = generateTaskId(`eigenbau_${eb.id}_${SS.eigenbauTask}`);
+  const taskId = generateTaskId(claimCrate, `eigenbau_${eb.id}_${SS.eigenbauTask}`);
   const mandatoryBootstrap = buildMandatoryBootstrap(claimCrate, taskId);
 
   let body = `${PREAMBLE(claimCrate)}${FULL_PROTOCOL(claimCrate)}
@@ -4940,7 +4955,7 @@ function generateProcessPrompt() {
   if (!po) return;
 
   const claimCrate = 'memfuse-core';
-  const taskId = generateTaskId(`process_${po.id}_${SS.processTask}`);
+  const taskId = generateTaskId(claimCrate, `process_${po.id}_${SS.processTask}`);
   const mandatoryBootstrap = buildMandatoryBootstrap(claimCrate, taskId);
 
   let body = `${PREAMBLE(claimCrate)}${FULL_PROTOCOL(claimCrate)}
@@ -4993,6 +5008,9 @@ ${ROLE_LOCK_BLOCK('prozess_ingenieur', claimCrate)}
   document.getElementById('ochar2').textContent = chars + ' Zeichen';
 }
 function generate() {
+  if (INVENTORY_SOURCE === 'bundled') {
+      toast('⚠️ Warnung: Veraltete (bundled) Daten!');
+  }
   if (SS.eigenbau) { generateEigenbauPrompt(); return; }
   if (SS.process) { generateProcessPrompt(); return; }
   if (SS.subsystem) { generateSubsystemPrompt(); return; }
@@ -5010,11 +5028,18 @@ function generate() {
   }
 
   const effectiveCrate = SS.crate || 'memfuse-core';
+  
+  const comps = COMPONENTS[effectiveCrate] || [];
+  if (comps.length > 0 && (!SS.components || SS.components.size === 0)) {
+      alert('⚠️ Ohne Datei-Scope kein Prompt-Export möglich. Bitte wähle mindestens eine Komponente aus, bevor du fortfährst.');
+      return;
+  }
+
   const p = CRATE_PROFILES[effectiveCrate] || {};
   const fn_ = TASKS[SS.task];
   if (!fn_) return;
 
-  const taskId = generateTaskId(SS.task);
+  const taskId = generateTaskId(effectiveCrate, SS.task);
   const mandatoryBootstrap = buildMandatoryBootstrap(claimCrate, taskId);
 
   let promptBody = fn_(effectiveCrate, p, SS.par);
@@ -5091,7 +5116,7 @@ function genBatch() {
     const p = CRATE_PROFILES[c.id] || {};
     SS.crate = c.id;
     SS.components = new Set((COMPONENTS[c.id] || []).map(x => x.file));
-    const taskId = generateTaskId('audit');
+    const taskId = generateTaskId(c.id, 'audit');
     const mandatoryBootstrap = buildMandatoryBootstrap(c.id, taskId);
     const prompt = mandatoryBootstrap + TASKS.audit(c.id, p, 'on');
     QUEUE.push({ key: `${c.id}:audit`, crate: c.id, task: 'audit', prompt });
@@ -5107,7 +5132,7 @@ function genBatch() {
   document.getElementById('s-crate').textContent = `Alle ${CRATES.length}`;
   document.getElementById('s-task').textContent = 'Tages-Audit';
   document.getElementById('ochar').textContent = combined.length.toLocaleString('de') + ' Z.';
-  toast('15 Audit-Prompts generiert!');
+  toast(`${CRATES.length} Audit-Prompts generiert!`);
 }
 
 function genCliScript() {
