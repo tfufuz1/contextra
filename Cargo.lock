@@ -5150,6 +5150,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "memfuse-bench",
+ "memfuse-router",
  "proc-macro2",
  "quote",
  "regex",

@@ -19,3 +19,4 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 memfuse-bench = { path = "../benchmarks/memfuse-bench" }
+memfuse-router = { path = "../crates/memfuse-router", features = ["bandit-routing"] }
