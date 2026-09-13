@@ -1379,20 +1379,10 @@ impl Wal {
     /// Replays the WAL using memory mapping (`memmap2`) for zero-copy entry decoding.
     /// Falls back to stream replay if mmap or parsing fails.
     pub async fn replay(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
-        self.replay_mmap().await
-    }
-
-    /// Replays the WAL using memory mapping (`memmap2`) for zero-copy entry decoding.
-    /// Falls back to stream-based scanning if mmap mapping or slice parsing fails.
-    pub async fn replay_mmap(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
-        let metadata = tokio::fs::metadata(&self.path)
-            .await
-            .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-        let (entries, _) = self
-            .replay_mmap_with_size_and_version(metadata.len())
-            .await?;
+        let (entries, _) = self.replay_mmap().await?;
         Ok(entries)
     }
+
 
     /// Replays the WAL using the stream reader (`BufReader`).
     pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
