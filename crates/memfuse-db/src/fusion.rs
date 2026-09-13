@@ -98,20 +98,7 @@ pub fn apply_resonance_bonus(
     results
 }
 
-#[cfg(test)]
-struct HeapEntry {
-    result: SearchResult,
-}
-
-impl PartialEq for HeapEntry {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == std::cmp::Ordering::Equal
-    }
-}
-
-impl Eq for HeapEntry {}
-
-// DONE(memfuse-impl): Robust NaN and tie-breaking handling in HeapEntry for RRF fusion [ref:eigenbau-rrf-fusion]
+// DONE(memfuse-impl): Robust NaN and tie-breaking handling for RRF fusion [ref:eigenbau-rrf-fusion]
 fn cmp_scores(a: f32, b: f32) -> std::cmp::Ordering {
     match (a.is_nan(), b.is_nan()) {
         (true, false) => std::cmp::Ordering::Less,
@@ -120,6 +107,22 @@ fn cmp_scores(a: f32, b: f32) -> std::cmp::Ordering {
     }
 }
 
+#[cfg(test)]
+struct HeapEntry {
+    result: SearchResult,
+}
+
+#[cfg(test)]
+impl PartialEq for HeapEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+#[cfg(test)]
+impl Eq for HeapEntry {}
+
+#[cfg(test)]
 impl Ord for HeapEntry {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // We want BinaryHeap (a max-heap by default) to keep the worst item at the top (peek),
@@ -130,6 +133,7 @@ impl Ord for HeapEntry {
     }
 }
 
+#[cfg(test)]
 impl PartialOrd for HeapEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -686,7 +690,10 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                 }
                 for (sig, contrib) in &doc_prov.signal_contributions {
                     if let Some(k) = SignalKey::from_name(sig) {
-                        entry.signal_contributions.entry(k).or_insert(contrib.clone());
+                        entry
+                            .signal_contributions
+                            .entry(k)
+                            .or_insert(contrib.clone());
                     } else {
                         entry
                             .extra_signal_contributions

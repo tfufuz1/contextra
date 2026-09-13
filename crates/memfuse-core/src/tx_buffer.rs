@@ -384,7 +384,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
             };
             let idx = self.key_shard_idx(key);
             let mut shard = self.key_shards[idx].write();
-            if let std::collections::hash_map::Entry::Occupied(mut entry) = shard.staged.entry(key.to_vec()) {
+            if let std::collections::hash_map::Entry::Occupied(mut entry) =
+                shard.staged.entry(key.to_vec())
+            {
                 entry.get_mut().remove(&tx);
                 if entry.get().is_empty() {
                     entry.remove();
@@ -409,7 +411,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
             // Roll back key tracking if staging fails capacity check
             let idx = self.key_shard_idx(&key_vec);
             let mut shard = self.key_shards[idx].write();
-            if let std::collections::hash_map::Entry::Occupied(mut entry) = shard.staged.entry(key_vec) {
+            if let std::collections::hash_map::Entry::Occupied(mut entry) =
+                shard.staged.entry(key_vec)
+            {
                 entry.get_mut().remove(&tx);
                 if entry.get().is_empty() {
                     entry.remove();

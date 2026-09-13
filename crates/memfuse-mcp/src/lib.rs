@@ -278,8 +278,6 @@ impl McpServer {
         let mut stdout = tokio::io::stdout();
         let mut reader = BufReader::new(stdin);
         let mut line_buf = String::new();
-        const STDIO_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
-
         let timeout_secs = std::env::var("MEMFUSE_MCP_IDLE_TIMEOUT_SECS")
             .ok()
             .and_then(|s| s.trim().parse::<u64>().ok())
@@ -288,7 +286,7 @@ impl McpServer {
 
         loop {
             let read_res = tokio::time::timeout(
-                STDIO_READ_TIMEOUT,
+                timeout_duration,
                 read_line_bounded(&mut reader, &mut line_buf, MAX_RPC_BYTES),
             )
             .await;
@@ -296,7 +294,7 @@ impl McpServer {
             let read_line_res = match read_res {
                 Ok(res) => res,
                 Err(_) => {
-                    tracing::warn!("stdio read timeout after {STDIO_READ_TIMEOUT:?} inactivity");
+                    tracing::warn!("stdio read timeout after {timeout_duration:?} inactivity");
                     return Err("stdio idle timeout".into());
                 }
             };
@@ -329,14 +327,14 @@ impl McpServer {
                         stdout.flush().await?;
                     }
                 }
-                Ok(Err(e)) if e.kind() == std::io::ErrorKind::InvalidData => {
+                Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
                     let response = JsonRpcResponse::err(None, -32700, format!("Parse error: {e}"));
                     let mut out = serde_json::to_string(&response)?;
                     out.push('\n');
                     stdout.write_all(out.as_bytes()).await?;
                     stdout.flush().await?;
                 }
-                Ok(Err(e)) => return Err(Box::new(e)),
+                Err(e) => return Err(Box::new(e)),
             }
         }
         Ok(())

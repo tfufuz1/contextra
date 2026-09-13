@@ -159,6 +159,7 @@ pub use volatile_vault::{
 };
 
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
+#[allow(deprecated)]
 pub use homeostat::{pid_regulated_candidate_pool, RerankDeadline, RerankPidController};
 pub use maintenance_config::MaintenanceConfig;
 pub use maintenance_scheduler::MaintenanceScheduler;

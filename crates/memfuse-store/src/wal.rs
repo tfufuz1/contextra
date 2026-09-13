@@ -1122,8 +1122,7 @@ impl Wal {
 
                 let res: Result<()> = async {
                     let mut file_guard = file.lock().await;
-                    let write_header = !header_written
-                        .load(std::sync::atomic::Ordering::Acquire)
+                    let write_header = !header_written.load(std::sync::atomic::Ordering::Acquire)
                         && size.load(std::sync::atomic::Ordering::Acquire) == 0;
 
                     if write_header {
@@ -1226,11 +1225,12 @@ impl Wal {
             }
 
             let km_clone = Arc::clone(km);
-            let encrypted_result = tokio::task::spawn_blocking(move || {
-                km_clone.encrypt_auto_nonce(&batch_plaintext)
-            })
-            .await
-            .map_err(|e| MemFuseError::Storage(format!("WAL encryption task panicked: {e}")))?;
+            let encrypted_result =
+                tokio::task::spawn_blocking(move || km_clone.encrypt_auto_nonce(&batch_plaintext))
+                    .await
+                    .map_err(|e| {
+                        MemFuseError::Storage(format!("WAL encryption task panicked: {e}"))
+                    })?;
 
             let (encrypted, nonce) = encrypted_result?;
             let chunk_len = (12 + encrypted.len()) as u32;
@@ -1311,10 +1311,8 @@ impl Wal {
 
             let written_len =
                 (if write_header { WAL_V3_HEADER.len() } else { 0 }) + payload_bytes.len();
-            self.size.fetch_add(
-                written_len as u64,
-                std::sync::atomic::Ordering::SeqCst,
-            );
+            self.size
+                .fetch_add(written_len as u64, std::sync::atomic::Ordering::SeqCst);
         }
 
         let mut last_hmac = self.last_hmac.lock().await;
@@ -4628,7 +4626,8 @@ mod tests {
         }
 
         for h in handles {
-            h.await.map_err(|e| MemFuseError::Storage(e.to_string()))??;
+            h.await
+                .map_err(|e| MemFuseError::Storage(e.to_string()))??;
         }
 
         let replayed = wal.replay().await?;

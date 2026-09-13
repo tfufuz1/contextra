@@ -126,7 +126,10 @@ impl TenantIsolatedKvStore {
     /// Die Shard-Anzahl wird automatisch auf die nächste Zweierpotenz aufgerundet.
     pub fn with_shard_count(n: usize) -> Self {
         let shard_count = n.next_power_of_two().max(1);
-        let shards = (0..shard_count).map(|_| Shard::new()).collect::<Vec<_>>().into_boxed_slice();
+        let shards = (0..shard_count)
+            .map(|_| Shard::new())
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
         let offsets = (0..shard_count)
             .map(|_| AtomicUsize::new(0))
             .collect::<Vec<_>>()
@@ -143,8 +146,7 @@ impl TenantIsolatedKvStore {
     /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Tenant.
     pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self {
         let mut store = Self::new();
-        store.segment_capacity =
-            NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap();
+        store.segment_capacity = NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap();
         store
     }
 
@@ -294,7 +296,8 @@ impl TenantIsolatedKvStore {
 
         'outer: while freed < target_free_bytes {
             let mut made_progress = false;
-            let start_shard = self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
+            let start_shard =
+                self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
 
             for s_idx in 0..self.shard_count {
                 if freed >= target_free_bytes {
@@ -383,7 +386,8 @@ impl TenantIsolatedKvStore {
 
         'outer: while freed < target_free_bytes {
             let mut made_progress_in_pass = false;
-            let start_shard = self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
+            let start_shard =
+                self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
 
             for _round in 0..Self::MAX_ROUNDS_PER_LOCK_ACQUISITION {
                 if freed >= target_free_bytes {
@@ -408,7 +412,8 @@ impl TenantIsolatedKvStore {
                             let n = tenants.len();
                             if n > 0 {
                                 let offset = self.eviction_round_offsets[shard_idx]
-                                    .fetch_add(1, Ordering::Relaxed) % n;
+                                    .fetch_add(1, Ordering::Relaxed)
+                                    % n;
 
                                 for i in (offset..n).chain(0..offset) {
                                     if freed >= target_free_bytes {
