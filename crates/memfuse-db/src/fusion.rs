@@ -502,12 +502,11 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             }
             let rrf_rank = (rank_idx + 1) as u32;
             let denom = rrf_k + rrf_rank as f32;
-            let score = if denom == 0.0 {
-                tracing::warn!(signal = %signal_name, rank = rrf_rank, "rrf_k=0 and rank=0: defaulting rrf_contrib to 0.0");
-                0.0
-            } else {
-                weight / denom
-            };
+            // SICHERHEITS-INVARIANTE: denom = rrf_k + rrf_rank, wobei rrf_k > 0 (const)
+            // und rrf_rank >= 1. denom ist daher garantiert > 0.
+            // Falls rrf_k je konfigurierbar wird: diesen Constraint hier prüfen.
+            debug_assert!(denom > 0.0, "RRF denominator must be positive; check rrf_k config");
+            let score = weight / denom;
             let score = if score.is_finite() {
                 score
             } else {

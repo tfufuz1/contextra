@@ -566,6 +566,16 @@ impl LsmStorage {
         });
 
         // INV-LSM-2: SystemPressureMonitor must be spawned as a background task before LsmStorage accepts its first insert.
+        let monitor =
+            crate::system_pressure::SystemPressureMonitor::new(Duration::from_millis(100));
+        let _pressure_rx = monitor.pressure_rx.clone();
+        let ct_pressure = cancel_token.clone();
+        task_tracker.spawn(async move {
+            monitor.run(ct_pressure, || 0, || 0, 0).await;
+        });
+        task_tracker.close();
+
+        // Build storage instance first (compaction_engine field added)
         let pressure_monitor = crate::system_pressure::SystemPressureMonitor::new(
             std::time::Duration::from_millis(100),
         );
@@ -736,6 +746,7 @@ impl LsmStorage {
             *file_guard = ro_file;
         }
     }
+
 
     #[doc(hidden)]
     pub async fn restore_wal_file_handle_for_test(&self) {
