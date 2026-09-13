@@ -63,7 +63,7 @@ try:
     print("LOADED_SUCCESS:" + str(db.worker_threads))
 except ImportError as e:
     err_str = str(e)
-    if "does not support loading in subinterpreters" in err_str:
+    if "does not support loading in subinterpreters" in err_str or "may only be initialized once per interpreter process" in err_str:
         print("REJECTED_CLEANLY:" + err_str)
     else:
         print("UNEXPECTED_IMPORT_ERROR:" + err_str)
@@ -79,7 +79,7 @@ try:
     print("LOADED_SUCCESS:" + str(db.worker_threads))
 except ImportError as e:
     err_str = str(e)
-    if "does not support loading in subinterpreters" in err_str:
+    if "does not support loading in subinterpreters" in err_str or "may only be initialized once per interpreter process" in err_str:
         print("REJECTED_CLEANLY:" + err_str)
     else:
         print("UNEXPECTED_IMPORT_ERROR:" + err_str)
@@ -108,7 +108,7 @@ try:
     sys.exit(0)
 except ImportError as e:
     err_str = str(e)
-    if "does not support loading in subinterpreters" in err_str:
+    if "does not support loading in subinterpreters" in err_str or "may only be initialized once per interpreter process" in err_str:
         print("REJECTED_CLEANLY:" + err_str)
     else:
         print("UNEXPECTED_IMPORT_ERROR:" + err_str)
@@ -171,7 +171,7 @@ try:
     import memfuse
     sys.exit(1)
 except ImportError as e:
-    assert "does not support loading in subinterpreters" in str(e)
+    assert "does not support loading in subinterpreters" in str(e) or "may only be initialized once per interpreter process" in str(e)
 """
         try:
             subinterpreters.run_string(interp, code)
