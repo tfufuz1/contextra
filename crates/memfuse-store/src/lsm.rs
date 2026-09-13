@@ -138,7 +138,6 @@ impl Drop for WalQueueGuard {
 }
 
 struct PendingCommitQueue {
-    _leader_mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
     requests: Vec<GroupCommitRequest>,
     first_prev_hmac: [u8; 32],
     notify_full: Arc<tokio::sync::Notify>,
@@ -469,6 +468,8 @@ impl LsmStorage {
         pending_rollbacks.sort_unstable();
 
         // Authoritative manifest load for SSTable verification during data directory scanning in `new()`.
+        // This is the sole authorized manifest loading call during `LsmStorage::new()`. The resulting
+        // `HashSet<PathBuf>` is used below to filter out unmanifested/orphaned SSTable files during data directory scanning.
         let manifest_path = config.path.join("MANIFEST");
         let manifest_exists = manifest_path.exists();
         let _valid_manifest_sstables: Option<std::collections::HashSet<std::path::PathBuf>> =
@@ -1044,6 +1045,11 @@ impl LsmStorage {
         self.last_committed_tx
             .store(target_tx.inner(), Ordering::SeqCst);
 
+        {
+            let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+            locks.retain(|_, v| v.inner() <= target_tx.inner());
+        }
+
         tracing::info!(
             "Rollback to TX {} successful. Max seq: {}, WAL offset: {}",
             target_tx.inner(),
@@ -1054,12 +1060,82 @@ impl LsmStorage {
         Ok(())
     }
 
+    fn cleanup_intent_locks_for_tx(&self, tx_id: TxId) {
+        let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+        locks.retain(|_, v| *v != tx_id);
+    }
+
+    fn cleanup_intent_locks_for_txs(&self, tx_ids: &[TxId]) {
+        let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+        locks.retain(|_, v| !tx_ids.contains(v));
+    }
+
     /// Suspends execution briefly if memory usage exceeds 80% to apply backpressure.
     async fn apply_backpressure(&self) {
         if self.budget.memory_used()
             >= (self.config.max_ram_mb as f64 * 1024.0 * 1024.0 * 0.80) as u64
         {
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    }
+
+    /// Advances the MVCC visible transaction horizon (`last_committed_tx`) atomically.
+    /// Internal transactions (`>= TxId::INTERNAL_BASE`) are ignored as they are never MVCC-visible.
+    /// `tx_id == 0` is ignored with a warning to prevent MVCC blackout.
+    #[inline]
+    fn advance_visibility(&self, tx_id: TxId) {
+        if tx_id.inner() < TxId::INTERNAL_BASE {
+            let mut current = self.last_committed_tx.load(Ordering::Acquire);
+            while tx_id.inner() > current {
+                match self.last_committed_tx.compare_exchange_weak(
+                    current,
+                    tx_id.inner(),
+                    Ordering::SeqCst,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(actual) => current = actual,
+                }
+            }
+            if tx_id.inner() == 0 {
+                tracing::warn!(
+                    "LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout"
+                );
+            }
+        }
+    }
+
+    /// Applies memory updates to the provided `MemTable` and updates budget tracking.
+    ///
+    /// # Lock Invariants
+    /// The caller must hold appropriate lock access (read or write guard on `LsmState`)
+    /// guarding the `MemTable`. `MemTable` internally uses `parking_lot::RwLock` for safe
+    /// concurrent mutations.
+    fn apply_mem_updates(
+        &self,
+        memtable: &MemTable,
+        mem_updates: &[(Vec<u8>, Vec<u8>, u64)],
+        tx_id: TxId,
+    ) {
+        for (key, value, seq) in mem_updates {
+            let entry_size = key.len() + value.len() + 8;
+            if let Err(e) = self.budget.consume_memory(entry_size as u64) {
+                self.budget_tracking_drift_bytes
+                    .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
+                tracing::warn!(
+                    drift_bytes = entry_size,
+                    total_drift_bytes = self
+                        .budget_tracking_drift_bytes
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    "Memory budget tracking warning during commit: {e}"
+                );
+            }
+            memtable.put(
+                Bytes::from(key.clone()),
+                Bytes::from(value.clone()),
+                *seq,
+                tx_id.inner(),
+            );
         }
     }
 
@@ -1383,20 +1459,16 @@ impl StorageEngine for LsmStorage {
                 return Err(MemFuseError::Storage("Memory budget exceeded (95%)".into()));
             }
 
-            // 1. Read-Your-Writes check: Single-shard check for current transaction scope.
+            // 1. Read-Your-Writes check for current transaction scope.
             if self.tx_buffer.is_key_staged_for_tx(tx_id, key) {
                 return Ok(false);
             }
 
-            // 2. Intent-Lock acquisition: Acquire short-lived per-key lock without holding commit_mutex
-            // or reading uncommitted staging data of other transactions.
+            // 2. Intent Lock check and registration
             {
-                let mut locks = self
-                    .intent_locks
-                    .lock()
-                    .map_err(|_| MemFuseError::Internal("Intent lock mutex poisoned".into()))?;
-                if let Some(&owner_tx) = locks.get(key) {
-                    if owner_tx != tx_id {
+                let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(&existing_tx) = locks.get(key) {
+                    if existing_tx != tx_id {
                         return Ok(false);
                     }
                 } else {
@@ -1404,30 +1476,28 @@ impl StorageEngine for LsmStorage {
                 }
             }
 
-            // 3. Check committed MVCC state as of current_max_seq
+            // 3. Query committed state
             let current_max_seq = self.next_seq_no.load(Ordering::Acquire);
-            match self.get_at_seq(key, current_max_seq).await {
-                Ok(Some(_)) => {
-                    // Key already exists in committed state; release intent lock and return false
-                    if let Ok(mut locks) = self.intent_locks.lock() {
-                        if locks.get(key) == Some(&tx_id) {
-                            locks.remove(key);
-                        }
-                    }
-                    return Ok(false);
-                }
-                Ok(None) => {}
+            let is_present = match self.get_at_seq(key, current_max_seq).await {
+                Ok(opt) => opt.is_some(),
                 Err(e) => {
-                    // Release intent lock on read error
-                    if let Ok(mut locks) = self.intent_locks.lock() {
-                        if locks.get(key) == Some(&tx_id) {
-                            locks.remove(key);
-                        }
+                    let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+                    if locks.get(key) == Some(&tx_id) {
+                        locks.remove(key);
                     }
                     return Err(e);
                 }
+            };
+
+            if is_present {
+                let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+                if locks.get(key) == Some(&tx_id) {
+                    locks.remove(key);
+                }
+                return Ok(false);
             }
 
+            // 4. Stage operation in tx_buffer
             let doc_id = {
                 let hash = blake3::hash(key);
                 let mut bytes = [0u8; 8];
@@ -1442,10 +1512,9 @@ impl StorageEngine for LsmStorage {
                     data: (key.to_vec(), value.to_vec()),
                 },
             ) {
-                if let Ok(mut locks) = self.intent_locks.lock() {
-                    if locks.get(key) == Some(&tx_id) {
-                        locks.remove(key);
-                    }
+                let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+                if locks.get(key) == Some(&tx_id) {
+                    locks.remove(key);
                 }
                 return Err(e);
             }
@@ -1562,6 +1631,7 @@ impl StorageEngine for LsmStorage {
 
             let ops = self.tx_buffer.drain_kv(tx_id);
             if ops.is_empty() {
+                self.cleanup_intent_locks_for_tx(tx_id);
                 return Ok(());
             }
 
@@ -1596,6 +1666,7 @@ impl StorageEngine for LsmStorage {
                         }
                     }
                     _ => {
+                        self.cleanup_intent_locks_for_tx(tx_id);
                         return Err(MemFuseError::InvalidInput(
                             "Unsupported operation type staged in LSM commit".to_string(),
                         ));
@@ -1635,47 +1706,15 @@ impl StorageEngine for LsmStorage {
                             rollback_err
                         );
                     }
+                    self.cleanup_intent_locks_for_tx(tx_id);
                     return Err(MemFuseError::Storage(format!(
                         "Commit failed (at WAL append), WAL rollback executed: {}",
                         e
                     )));
                 }
 
-                if tx_id.inner() < TxId::INTERNAL_BASE {
-                    let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                    while tx_id.inner() > current {
-                        match self.last_committed_tx.compare_exchange_weak(
-                            current,
-                            tx_id.inner(),
-                            Ordering::SeqCst,
-                            Ordering::Relaxed,
-                        ) {
-                            Ok(_) => break,
-                            Err(actual) => current = actual,
-                        }
-                    }
-                    if tx_id.inner() == 0 {
-                        tracing::warn!("LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout");
-                    }
-                }
-
-                for (key, value, seq) in mem_updates {
-                    let entry_size = key.len() + value.len() + 8;
-                    if let Err(e) = self.budget.consume_memory(entry_size as u64) {
-                        self.budget_tracking_drift_bytes
-                            .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
-                        tracing::warn!(
-                            drift_bytes = entry_size,
-                            total_drift_bytes = self
-                                .budget_tracking_drift_bytes
-                                .load(std::sync::atomic::Ordering::Relaxed),
-                            "Memory budget tracking warning during commit: {e}"
-                        );
-                    }
-                    state
-                        .memtable
-                        .put(Bytes::from(key), Bytes::from(value), seq, tx_id.inner());
-                }
+                self.advance_visibility(tx_id);
+                self.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
 
                 let should_flush = state.memtable.size() > self.config.memtable_size_limit;
                 drop(state);
@@ -1683,6 +1722,7 @@ impl StorageEngine for LsmStorage {
                     self.flush().await?;
                 }
 
+                self.cleanup_intent_locks_for_tx(tx_id);
                 return Ok(());
             }
 
@@ -1716,12 +1756,14 @@ impl StorageEngine for LsmStorage {
                     notify.notify_one();
                 }
 
-                match rx.await {
+                let res = match rx.await {
                     Ok(res) => res,
                     Err(_) => Err(MemFuseError::Internal(
                         "Group commit leader dropped without sending result".to_string(),
                     )),
-                }
+                };
+                self.cleanup_intent_locks_for_tx(tx_id);
+                res
             } else {
                 // Batch Leader task: initialize batch for followers without pushing leader's own channel.
                 // Leader retains its own tx_id, wal_entries, mem_updates locally.
@@ -1731,7 +1773,6 @@ impl StorageEngine for LsmStorage {
 
                 let notify_full = Arc::new(tokio::sync::Notify::new());
                 *queue_guard = Some(PendingCommitQueue {
-                    _leader_mem_updates: leader_mem_updates.clone(),
                     requests: Vec::new(),
                     first_prev_hmac: prev_hmac_snapshot,
                     notify_full: notify_full.clone(),
@@ -1756,6 +1797,10 @@ impl StorageEngine for LsmStorage {
                         tracing::error!(
                             "Group commit leader: pending_commit_queue unexpectedly missing. \
                              This is a bug — notifying all followers."
+                        );
+                        debug_assert!(
+                            false,
+                            "Group commit queue invariant violated — queue was Some at leader init and must remain Some until leader re-acquisition"
                         );
                         return Err(MemFuseError::Internal(
                             "Group commit queue invariant violated".into(),
@@ -1807,6 +1852,10 @@ impl StorageEngine for LsmStorage {
                         format!("Commit failed (at WAL append), WAL rollback executed: {e}")
                     };
 
+                    let mut batch_txs = vec![leader_tx_id];
+                    batch_txs.extend(pending_queue.requests.iter().map(|r| r.tx_id));
+                    self.cleanup_intent_locks_for_txs(&batch_txs);
+
                     // Invariant: Every follower sender MUST be notified exactly once, even in double-fault (commit+rollback fail) paths.
                     for r in pending_queue.requests {
                         if r.sender
@@ -1833,44 +1882,8 @@ impl StorageEngine for LsmStorage {
                 }
 
                 for (req_tx_id, mem_updates) in all_updates {
-                    if req_tx_id.inner() < TxId::INTERNAL_BASE {
-                        let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                        while req_tx_id.inner() > current {
-                            match self.last_committed_tx.compare_exchange_weak(
-                                current,
-                                req_tx_id.inner(),
-                                Ordering::SeqCst,
-                                Ordering::Relaxed,
-                            ) {
-                                Ok(_) => break,
-                                Err(actual) => current = actual,
-                            }
-                        }
-                        if req_tx_id.inner() == 0 {
-                            tracing::warn!("LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout");
-                        }
-                    }
-
-                    for (key, value, seq) in mem_updates {
-                        let entry_size = key.len() + value.len() + 8;
-                        if let Err(e) = self.budget.consume_memory(entry_size as u64) {
-                            self.budget_tracking_drift_bytes
-                                .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
-                            tracing::warn!(
-                                drift_bytes = entry_size,
-                                total_drift_bytes = self
-                                    .budget_tracking_drift_bytes
-                                    .load(std::sync::atomic::Ordering::Relaxed),
-                                "Memory budget tracking warning during group commit: {e}"
-                            );
-                        }
-                        state.memtable.put(
-                            Bytes::from(key.clone()),
-                            Bytes::from(value.clone()),
-                            *seq,
-                            req_tx_id.inner(),
-                        );
-                    }
+                    self.advance_visibility(req_tx_id);
+                    self.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
                 }
 
                 let needs_flush = state.memtable.size() > self.config.memtable_size_limit;
@@ -1880,6 +1893,10 @@ impl StorageEngine for LsmStorage {
                         tracing::error!("Flush failed after group commit: {}", flush_err);
                     }
                 }
+
+                let mut batch_txs = vec![leader_tx_id];
+                batch_txs.extend(pending_queue.requests.iter().map(|r| r.tx_id));
+                self.cleanup_intent_locks_for_txs(&batch_txs);
 
                 // Invariant: Every follower sender MUST be notified exactly once, even in double-fault (commit+rollback fail) paths.
                 for r in pending_queue.requests {
@@ -1914,6 +1931,7 @@ impl StorageEngine for LsmStorage {
     fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             self.tx_buffer.discard_kv(tx_id);
+            self.cleanup_intent_locks_for_tx(tx_id);
             Ok(())
         })
     }
@@ -2071,20 +2089,7 @@ impl StorageEngine for LsmStorage {
 
                 // last_committed_tx MUSS vor sstables.push() aktualisiert werden — sonst Race-Fenster für parallele Reader, siehe DECISIONS.md ADR-043.
                 let sst_max_tx = reader.metadata().max_tx_id;
-                if sst_max_tx < TxId::INTERNAL_BASE {
-                    let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                    while sst_max_tx > current {
-                        match self.last_committed_tx.compare_exchange_weak(
-                            current,
-                            sst_max_tx,
-                            Ordering::SeqCst,
-                            Ordering::Relaxed,
-                        ) {
-                            Ok(_) => break,
-                            Err(actual) => current = actual,
-                        }
-                    }
-                }
+                self.advance_visibility(TxId::new(sst_max_tx));
 
                 sstables.push(Arc::new(reader));
                 sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
@@ -4387,6 +4392,51 @@ mod tests {
         assert_eq!(
             stored_val, expected_val,
             "Stored value must match winning task's value"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_put_if_absent_no_commit_mutex_hold() {
+        let (storage, _tmp) = test_storage().await;
+
+        let tx_a = TxId::new(100);
+        let tx_b = TxId::new(200);
+        let tx_c = TxId::new(300);
+
+        let key_shared = b"key_shared";
+        let key_other = b"key_other";
+
+        // 1. Tx A calls put_if_absent on key_shared without committing.
+        let res_a = storage
+            .put_if_absent(tx_a, key_shared, b"val_a")
+            .await
+            .unwrap();
+        assert!(res_a, "Tx A must stage insert successfully");
+
+        // 2. Tx B calls put_if_absent on key_shared while Tx A is uncommitted.
+        // It must NOT block indefinitely or fail; it should return Ok(false) immediately via IntentLock.
+        let start = std::time::Instant::now();
+        let res_b = storage
+            .put_if_absent(tx_b, key_shared, b"val_b")
+            .await
+            .unwrap();
+        let elapsed = start.elapsed();
+
+        assert!(!res_b, "Tx B must see Tx A's intent lock and return false");
+        assert!(
+            elapsed < std::time::Duration::from_millis(100),
+            "Tx B put_if_absent must complete without lock contention stall (elapsed: {elapsed:?})"
+        );
+
+        // 3. Tx C calls put_if_absent on a different key (key_other).
+        // It must succeed independently despite Tx A having an active uncommitted intent lock on key_shared.
+        let res_c = storage
+            .put_if_absent(tx_c, key_other, b"val_c")
+            .await
+            .unwrap();
+        assert!(
+            res_c,
+            "Tx C must successfully stage key_other concurrently"
         );
     }
 

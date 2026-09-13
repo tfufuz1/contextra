@@ -457,7 +457,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         false
     }
 
-
     /// Atomisch ermittelt den Staging-Status eines Keys über alle uncommitted Transaktionen.
     ///
     /// Gibt `Some(true)` für Insert, `Some(false)` für Delete, oder `None` zurück.
