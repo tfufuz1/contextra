@@ -468,6 +468,8 @@ impl LsmStorage {
         pending_rollbacks.sort_unstable();
 
         // Authoritative manifest load for SSTable verification during data directory scanning in `new()`.
+        // This is the sole authorized manifest loading call during `LsmStorage::new()`. The resulting
+        // `HashSet<PathBuf>` is used below to filter out unmanifested/orphaned SSTable files during data directory scanning.
         let manifest_path = config.path.join("MANIFEST");
         let manifest_exists = manifest_path.exists();
         let _valid_manifest_sstables: Option<std::collections::HashSet<std::path::PathBuf>> =
