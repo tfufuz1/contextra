@@ -1,0 +1,38 @@
+//! WasmCapabilities — Capability-Whitelist für WASM-Guest-Module (§4.18).
+
+/// Whitelist für WASM-Guest-Capabilities.
+///
+/// # Sicherheitsmodell
+/// Kein Dateisystem- und Netzwerkzugriff per Default.
+/// Monotone Uhr ist erlaubt (deterministisch, kein Side-Channel).
+#[derive(Debug, Clone)]
+pub struct WasmCapabilities {
+    /// Stdout-Ausgabe erlaubt. Default: true.
+    pub allow_stdout: bool,
+    /// Stderr-Ausgabe erlaubt. Default: false (kein Logging-Leak).
+    pub allow_stderr: bool,
+    /// Max. WASM-Memory-Pages (1 Page = 64 KB). Default: 16 = 1 MB.
+    pub max_memory_pages: u32,
+    /// Max. Fuel (CPU-Ticks). Default: 10_000_000.
+    pub max_fuel: u64,
+    /// Dateisystemzugriff. Default: false.
+    pub allow_filesystem: bool,
+    /// Netzwerkzugriff. Default: false.
+    pub allow_network: bool,
+    /// Monotone Uhr (WASI clock_time_get). Default: true.
+    pub allow_clock: bool,
+}
+
+impl Default for WasmCapabilities {
+    fn default() -> Self {
+        Self {
+            allow_stdout: true,
+            allow_stderr: false,
+            max_memory_pages: 16,   // 1 MB
+            max_fuel: 10_000_000,
+            allow_filesystem: false,
+            allow_network: false,
+            allow_clock: true,
+        }
+    }
+}
