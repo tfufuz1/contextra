@@ -10,7 +10,7 @@
 
 use memfuse_core::traits::ContextSegment;
 use memfuse_core::{ModelFingerprint, TenantId};
-use memfuse_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
+use memfuse_security::{KvSegmentCipher, TenantIsolatedKvStore};
 use std::sync::Arc;
 
 /// Adapter bridge managing encrypted KV-cache segment lookup and storage for Candle inference sessions.
@@ -125,7 +125,7 @@ impl std::fmt::Debug for KvBridgeAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use memfuse_crypto::{CryptoKey, EvictionWorker};
+    use memfuse_security::{CryptoKey, EvictionWorker};
     use std::sync::Arc;
     use std::thread;
 
