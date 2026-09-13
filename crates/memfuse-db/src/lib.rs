@@ -86,6 +86,7 @@ pub mod background_workers;
 pub mod chunker;
 pub mod collection;
 pub mod consolidation_executor;
+pub mod consolidation_locks;
 pub mod context;
 pub mod context_compaction;
 pub mod export;
@@ -110,6 +111,7 @@ pub use consolidation_executor::{
     execute_background_consolidation, execute_consolidation_pass, execute_sleep_cycle,
     ConsolidationEngine,
 };
+pub use consolidation_locks::ConsolidationNodesGuard;
 pub use context_compaction::{
     cleanup_orphaned_consolidation_intents, CompactedContext, CompactionStrategy,
     ConsolidationSession, ContextCompactor, StatusToken,
@@ -147,6 +149,7 @@ pub mod homeostat;
 pub mod maintenance_config;
 pub mod maintenance_scheduler;
 pub mod multistep;
+pub mod pid_latency_controller;
 pub mod transaction;
 
 // Jarvis-Erweiterungs-Module (Feature-gated)
@@ -165,6 +168,10 @@ pub use maintenance_config::MaintenanceConfig;
 pub use maintenance_scheduler::MaintenanceScheduler;
 
 pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
+pub use pid_latency_controller::{
+    LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
+    MIN_SCALING_FACTOR,
+};
 
 pub use collection::crud::MAX_SCAN_RESULTS;
 #[cfg(feature = "graph-connectivity-health")]
