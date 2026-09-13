@@ -25,10 +25,12 @@ parking_lot = { workspace = true }
 tokio = { workspace = true }
 ahash = { workspace = true }
 lru = "0.16.4"
+regex = { workspace = true }
 
 [features]
 test-utils = []
 kv-encryption = []
+cloud-egress-guard = []
 
 [dev-dependencies]
 memfuse-security = { path = ".", features = ["test-utils"] }
