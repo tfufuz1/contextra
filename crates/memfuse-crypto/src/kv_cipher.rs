@@ -29,7 +29,8 @@ use zeroize::Zeroize;
 
 pub use memfuse_core::ModelFingerprint;
 
-/// Current persisted format version for KV-cache segment layers.
+/// Current serialized format version for [`EncryptedKvLayer`].
+/// Increment when the serialized layout changes in a breaking way.
 pub const CURRENT_KV_FORMAT_VERSION: u8 = 2;
 
 /// Container for an encrypted KV-cache segment layer.
@@ -39,7 +40,7 @@ pub const CURRENT_KV_FORMAT_VERSION: u8 = 2;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Zeroize)]
 #[zeroize(drop)]
 pub struct EncryptedKvLayer {
-    /// Format version number of this encrypted KV layer.
+    /// Serialized format version. Must equal [`CURRENT_KV_FORMAT_VERSION`] on decrypt.
     #[zeroize(skip)]
     pub format_version: u8,
     /// AES-256-GCM-SIV ciphertext containing encrypted KV tensor payload and 16-byte auth tag.
@@ -279,5 +280,27 @@ mod tests {
             }
             res => panic!("Expected KvFormatVersionMismatch error, got: {:?}", res),
         }
+    }
+
+    #[test]
+    fn test_format_version_mismatch_returns_specific_error() {
+        let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
+        let cipher = KvSegmentCipher::new(master_km);
+        let tenant = TenantId::try_new(1).unwrap();
+        let fp = dummy_fingerprint("model-v1");
+        let plaintext = b"test payload";
+
+        let mut layer = cipher.encrypt(tenant, fp, plaintext).unwrap();
+        // Tamper with format_version to simulate a v1-format segment
+        layer.format_version = 1;
+
+        let err = cipher.decrypt(&layer).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                CryptoError::KvFormatVersionMismatch { expected: 2, found: 1 }
+            ),
+            "Expected KvFormatVersionMismatch, got: {err:?}"
+        );
     }
 }
