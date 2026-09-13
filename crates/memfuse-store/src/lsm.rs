@@ -2,7 +2,8 @@
 // FILE-CONTEXT
 // STAND: 2026-08-30T21:49:55Z (SESSION: 283abf0f)
 // ZWECK: LSM-Tree-Implementierung (MemTable + SSTable + Compaction)
-// INVARIANTEN: Compaction darf keine Daten verlieren; WAL-Replay vor MemTable-Aufbau
+// INVARIANTEN: Compaction darf keine Daten verlieren; WAL-Replay vor MemTable-Aufbau; LOCK-REIHENFOLGE: commit_mutex → state.write/read → MemTable-RwLock
+//              Single-Commit: state.write (Flush-Schutz). Group-Commit-Leader: state.read (commit_mutex hält Isolation).
 // NICHT-OFFENSICHTLICH: Compaction-Lock muss VOR MemTable-Lock genommen werden (Deadlock-Gefahr)
 // SIEHE AUCH: wal.rs, sstable.rs, DECISIONS.md ADR-003
 
@@ -1419,6 +1420,16 @@ impl StorageEngine for LsmStorage {
             }
 
             // --- PHASE 2: Prepare WAL entries under commit_mutex ---
+            // INVARIANT-LOCK-1 (Commit ↔ Flush Exklusivität):
+            // Exklusiver Write-Lock auf `state` ist hier zwingend, nicht optional.
+            // Begründung: `flush()` benötigt ebenfalls `state.write()` für den atomaren Memtable-Swap
+            // (Arc::new(MemTable::new()) + std::mem::replace). Würde dieser Pfad `state.read()` nutzen,
+            // könnte ein parallel laufender `flush()` den Memtable-Swap vollziehen, während wir
+            // `memtable.put()` aufrufen — der Eintrag landete dann im *alten*, bereits gedropten Memtable.
+            // Der Group-Commit-Leader-Pfad darf `state.read()` verwenden, weil er `commit_mutex`
+            // re-acquired, bevor er in den State schreibt, und damit parallele flush()-Swaps serialisiert.
+            // ADR-003: "Compaction-Lock muss VOR MemTable-Lock genommen werden."
+            // Siehe auch: DECISIONS.md ADR-003, lsm.rs flush() ~Zeile 1774.
             let state = self.state.write().await;
             let (wal_entries, prev_hmac_snapshot) = state.wal.prepare_batch(wal_ops).await?;
 
@@ -1566,6 +1577,15 @@ impl StorageEngine for LsmStorage {
                 };
                 drop(queue_guard);
 
+                // INVARIANT-LOCK-3 (Group-Commit Read-Lock ist korrekt und beabsichtigt):
+                // Der Group-Commit-Leader hält hier `commit_mutex`. Dadurch ist garantiert, dass kein
+                // paralleler Single-Commit (der state.write() bräuchte) oder flush()-Swap (der state.write()
+                // bräuchte) concurrent abläuft. Read-Lock reicht, weil MemTable intern per
+                // parking_lot::RwLock granular synchronisiert (memtable.rs:35,60) — concurrent puts() sind
+                // threadsicher. Diese Asymmetrie (write im Single-, read im Group-Pfad) ist BEABSICHTIGT und
+                // darf nicht "vereinheitlicht" werden, ohne diese Analyse zu wiederholen.
+                // ⚠ WARNUNG: Diesen Lock NICHT auf state.write() ändern — das würde unter commit_mutex
+                // zu einem verschachtelten Write-Lock führen, der mit flush() deadlocken kann.
                 let state = self.state.read().await;
 
                 // Combine leader's WAL entries with all follower WAL entries
@@ -1771,6 +1791,12 @@ impl StorageEngine for LsmStorage {
 
             // ── Phase 2: Atomarer Swap unter Write-Lock ──────────────────────────
             let (to_flush, old_wal_path) = {
+                // INVARIANT-LOCK-2 (Atomarer Memtable-Swap):
+                // Write-Lock serialisiert diesen Swap atomar gegen alle parallelen commit()-Aufrufe im
+                // Single-Commit-Pfad (die ebenfalls state.write() halten). Nach erfolgreichem Swap zeigt
+                // `state.memtable` auf einen frischen, leeren Memtable; der alte wird als immutable weitergeführt.
+                // Group-Commit-Leader-Pfade halten hier bereits commit_mutex, sodass kein Commit simultan
+                // in den neu-swapped Memtable schreibt, bevor dieser korrekt initialisiert ist.
                 let mut state = self.state.write().await;
                 if state.memtable.is_empty() && state.immutable_memtables.is_empty() {
                     return Ok(());
