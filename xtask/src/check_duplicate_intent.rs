@@ -133,7 +133,13 @@ pub fn get_historical_commits() -> Result<Vec<CommitEntry>, String> {
 
 pub fn get_remote_branch_commits() -> Vec<CommitEntry> {
     let output = Command::new("git")
-        .args(["log", "--remotes", "--not", "HEAD", "--format=%H%x09%ci%x09%s"])
+        .args([
+            "log",
+            "--remotes",
+            "--not",
+            "HEAD",
+            "--format=%H%x09%ci%x09%s",
+        ])
         .output();
 
     if let Ok(out) = output {
@@ -305,7 +311,9 @@ pub fn check_duplicate_intent() -> Result<(), String> {
 
     let is_ci = env::var("MEMFUSE_CI").map(|v| v == "true").unwrap_or(false)
         || env::var("GITHUB_ACTIONS").is_ok();
-    let token = env::var("GITHUB_TOKEN").ok().filter(|t| !t.trim().is_empty());
+    let token = env::var("GITHUB_TOKEN")
+        .ok()
+        .filter(|t| !t.trim().is_empty());
 
     if let Some(tok) = token {
         match fetch_open_prs_from_github(&tok) {
@@ -466,36 +474,54 @@ mod tests {
         let pr1_commit1 = CommitEntry {
             hash: "a238752e".to_string(),
             date: "2026-09-13T17:43:00Z".to_string(),
-            raw_message: "fix(store): replace dirty-read with IntentLockManager in put_if_absent (#2373)".to_string(),
+            raw_message:
+                "fix(store): replace dirty-read with IntentLockManager in put_if_absent (#2373)"
+                    .to_string(),
             scope: "store".to_string(),
-            subject: "replace dirty-read with IntentLockManager in put_if_absent (#2373)".to_string(),
-            normalized_subject: normalize_subject("replace dirty-read with IntentLockManager in put_if_absent"),
+            subject: "replace dirty-read with IntentLockManager in put_if_absent (#2373)"
+                .to_string(),
+            normalized_subject: normalize_subject(
+                "replace dirty-read with IntentLockManager in put_if_absent",
+            ),
         };
         let pr2_commit1 = CommitEntry {
             hash: "486fe929".to_string(),
             date: "2026-09-13T17:58:00Z".to_string(),
-            raw_message: "fix(store): replace dirty-read with IntentLockManager in put_if_absent (#2378)".to_string(),
+            raw_message:
+                "fix(store): replace dirty-read with IntentLockManager in put_if_absent (#2378)"
+                    .to_string(),
             scope: "store".to_string(),
-            subject: "replace dirty-read with IntentLockManager in put_if_absent (#2378)".to_string(),
-            normalized_subject: normalize_subject("replace dirty-read with IntentLockManager in put_if_absent"),
+            subject: "replace dirty-read with IntentLockManager in put_if_absent (#2378)"
+                .to_string(),
+            normalized_subject: normalize_subject(
+                "replace dirty-read with IntentLockManager in put_if_absent",
+            ),
         };
 
         // Pair 2: 6b40d84a (#2372) vs 916a20a0 (#2377)
         let pr1_commit2 = CommitEntry {
             hash: "6b40d84a".to_string(),
             date: "2026-09-13T17:43:00Z".to_string(),
-            raw_message: "refactor(store): extract advance_visibility and apply_mem_updates (#2372)".to_string(),
+            raw_message:
+                "refactor(store): extract advance_visibility and apply_mem_updates (#2372)"
+                    .to_string(),
             scope: "store".to_string(),
             subject: "extract advance_visibility and apply_mem_updates (#2372)".to_string(),
-            normalized_subject: normalize_subject("extract advance_visibility and apply_mem_updates"),
+            normalized_subject: normalize_subject(
+                "extract advance_visibility and apply_mem_updates",
+            ),
         };
         let pr2_commit2 = CommitEntry {
             hash: "916a20a0".to_string(),
             date: "2026-09-13T17:58:00Z".to_string(),
-            raw_message: "refactor(store): extract advance_visibility and apply_mem_updates (#2377)".to_string(),
+            raw_message:
+                "refactor(store): extract advance_visibility and apply_mem_updates (#2377)"
+                    .to_string(),
             scope: "store".to_string(),
             subject: "extract advance_visibility and apply_mem_updates (#2377)".to_string(),
-            normalized_subject: normalize_subject("extract advance_visibility and apply_mem_updates"),
+            normalized_subject: normalize_subject(
+                "extract advance_visibility and apply_mem_updates",
+            ),
         };
 
         let new_commits = vec![pr2_commit1.clone(), pr2_commit2.clone()];
@@ -503,13 +529,23 @@ mod tests {
 
         let hits = evaluate_duplicate_hits(&new_commits, &candidate_commits);
 
-        assert_eq!(hits.len(), 2, "Expected 2 duplicate intent hits for the incident commit pairs");
+        assert_eq!(
+            hits.len(),
+            2,
+            "Expected 2 duplicate intent hits for the incident commit pairs"
+        );
 
-        let hit1 = hits.iter().find(|h| h.new_commit.hash == "486fe929").unwrap();
+        let hit1 = hits
+            .iter()
+            .find(|h| h.new_commit.hash == "486fe929")
+            .unwrap();
         assert_eq!(hit1.historical_commit.hash, "a238752e");
         assert!(hit1.similarity >= 0.85);
 
-        let hit2 = hits.iter().find(|h| h.new_commit.hash == "916a20a0").unwrap();
+        let hit2 = hits
+            .iter()
+            .find(|h| h.new_commit.hash == "916a20a0")
+            .unwrap();
         assert_eq!(hit2.historical_commit.hash, "6b40d84a");
         assert!(hit2.similarity >= 0.85);
     }
