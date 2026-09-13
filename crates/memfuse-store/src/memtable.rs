@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-08-30T15:00:19Z (SESSION: 283abf0f)
 // ZWECK: In-Memory BTreeMap MemTable-Sharding mit MVCC Snapshot-Isolation.
-// INVARIANTEN: Sharding per BLAKE3-Hash modulo SHARD_COUNT; tombstone via TOMBSTONE_BIT in seq_no.
+// INVARIANTEN: Sharding per 64-Bit-Avalanche-Hash-Mixer modulo SHARD_COUNT; tombstone via TOMBSTONE_BIT in seq_no.
 // NICHT-OFFENSICHTLICH: Rollback(tx_id) entfernt alle Einträge der Transaktion atomar aus allen Shards.
 // HOTSPOTS: MemTable::put, MemTable::get_at_seq, MemTable::rollback
 // SIEHE AUCH: crates/memfuse-store/AGENTS.md, DECISIONS.md
@@ -13,8 +13,9 @@
 //! contention when multiple coroutines insert concurrently (e.g. the 8-way
 //! `buffer_unordered` ingestion pipeline).
 //!
-//! The shard for a given key is selected deterministically via the full-key
-//! BLAKE3 hash modulo `SHARD_COUNT` to prevent lock contention on shared key
+//! The shard for a given key is selected deterministically via a fast
+//! (<5ns) 64-bit avalanche hash mixer over the full key, taken modulo
+//! `SHARD_COUNT` to prevent lock contention on shared key
 //! prefixes (e.g. `__col:`, `__docid:`).
 //!
 //! Within each shard, each key maps to a versioned list of values, enabling

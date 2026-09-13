@@ -191,7 +191,7 @@ LSM-Tree-basierte Storage-Engine. Abhängigkeiten: `memfuse-core`, `memfuse-secu
   - **WAL-Rotation für passives Shipping** (§14.3): Abgeschlossene WAL-Segmente werden durch `Wal::rotate_and_seal()` atomar versiegelt (via `rename()` + `fsync()` auf Directory) und danach `O_RDONLY`-reflaggt. Nur versiegelte, read-only-geflaggite Segmente werden für das passive WAL-Shipping (Syncthing, iCloud Drive, One-Shot-HTTP-Push) freigegeben. Der Flusher-Actor schreibt ausschließlich in das aktive, nicht-versiegelte Segment; damit sind TOCTOU-Konflikte zwischen Flusher und externem Sync-Daemon strukturell ausgeschlossen.
 - `memtable.rs` — 16-Shard-MemTable, Avalanche-64-Bit-Mixer, `scan_prefix_into`/`scan_prefix_into_matching`.
 - `sstable.rs` — SSTable mit Block-Binärsuche (`binary_search_in_block()`, `binary_search_in_block_index()`, `binary_search_index_in_block()`), `BlockCacheShard` (`BLOCK_CACHE_SHARDS = 16` Shards, cache-line-ausgerichtet).
-- `compaction.rs` (mit plattformneutraler I/O-Drosselung/Rate-Limiting auf Anwendungsebene zur Entkopplung von Compaction-Hintergrundarbeit und Hot-Path-Lese-Latenzen), `lsm.rs` (Group-Commit, Zero-Wait-Heuristik: Bei fehlender Commit-Warteschlange verzichtet der Leader über eine `has_followers`-Prüfung auf das künstliche Warteintervall), `manifest.rs`, `mmap.rs`, `checkpoint.rs` (`pub(crate)`), `system_pressure.rs`, `tenant_codec.rs`, `util.rs`.
+- `compaction.rs`, `lsm.rs` (Group-Commit, Zero-Wait-Heuristik: Bei fehlender Commit-Warteschlange verzichtet der Leader über eine `has_followers`-Prüfung auf das künstliche Warteintervall), `manifest.rs`, `mmap.rs`, `checkpoint.rs` (`pub(crate)`), `system_pressure.rs`, `tenant_codec.rs`, `util.rs`.
 
 **Feature-Flags:** `default = []`, `fault-injection`.
 
@@ -575,7 +575,7 @@ Dieses Feature ist **standardmäßig deaktiviert** und verletzt P5 (Kein Cloud-Z
 
 1. **Strukturierte PII** (E-Mail, IP, API-Key-Muster, Kreditkarten-Luhn-Check):
    - Aho-Corasick-Multi-Pattern-Automat, worst-case O(n) über den Payload unabhängig von Musterzahl.
-   - Reguläre-Ausdruck-Nachvalidierung **nur** auf den Aho-Corasick-Treffern (nicht auf dem Gesamttext — verhindert ReDoS). Jede Regex-Nachvalidierung MUSS an einen Wall-Clock-Timeout gekoppelt sein; bei Überschreitung wird der Treffer konservativ als PII behandelt (Fail-Closed für Layer 1, konsistent mit dessen deterministischem Charakter).
+   - Reguläre-Ausdruck-Nachvalidierung **nur** auf den Aho-Corasick-Treffern (nicht auf dem Gesamttext — verhindert ReDoS).
 2. **Unstrukturierte Entitäten** (Personen, Organisationen):
    - Wiederverwendung der ONNX-Runtime aus `memfuse-embed` (P10) für ein quantisiertes Token-Classification-NER-Modell.
    - Kein zweiter Inferenzpfad, keine neue Abhängigkeit.
