@@ -129,6 +129,9 @@ jobs:
           cargo run -p xtask -- check-review-coverage
           echo "✅ Mehrfach-Session-Review-Abdeckung verifiziert"
 
+      - name: "Gate 8b: Audit-Verdict-Unabhängigkeit verifiziert"
+        run: cargo run -p xtask -- check-audit-verdict-independence
+
       - name: "Gate 9: Konsistenzprüfung der Dokumentation"
         run: |
           cargo run -p xtask -- check-consistency
