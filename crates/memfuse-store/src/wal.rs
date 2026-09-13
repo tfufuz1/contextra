@@ -437,17 +437,25 @@ impl Default for WalConfig {
     }
 }
 
+#[derive(Debug)]
+struct FlusherMessage {
+    payload: Vec<u8>,
+    last_hmac_val: [u8; 32],
+    ack: tokio::sync::oneshot::Sender<Result<()>>,
+}
+
 /// Write-Ahead Log for crash recovery.
 pub struct Wal {
     path: PathBuf,
-    pub(crate) file: tokio::sync::Mutex<tokio::fs::File>,
-    size: std::sync::atomic::AtomicU64,
-    header_written: std::sync::atomic::AtomicBool,
+    pub(crate) file: Arc<tokio::sync::Mutex<tokio::fs::File>>,
+    size: Arc<std::sync::atomic::AtomicU64>,
+    header_written: Arc<std::sync::atomic::AtomicBool>,
     key_manager: Option<Arc<KeyManager>>,
     fallback_integrity_key: Option<[u8; 32]>,
     allow_legacy_integrity_key_fallback: bool,
     /// Last HMAC written to the log, used for hash-chaining.
-    last_hmac: tokio::sync::Mutex<[u8; 32]>,
+    last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,
+    flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<FlusherMessage>>>,
 }
 
 impl std::fmt::Debug for Wal {
@@ -589,13 +597,14 @@ impl Wal {
 
         let wal = Self {
             path: path.clone(),
-            size: std::sync::atomic::AtomicU64::new(metadata.len()),
-            header_written: std::sync::atomic::AtomicBool::new(metadata.len() > 0),
-            file: tokio::sync::Mutex::new(file),
+            size: Arc::new(std::sync::atomic::AtomicU64::new(metadata.len())),
+            header_written: Arc::new(std::sync::atomic::AtomicBool::new(metadata.len() > 0)),
+            file: Arc::new(tokio::sync::Mutex::new(file)),
             key_manager: derived_key_manager,
             fallback_integrity_key,
             allow_legacy_integrity_key_fallback: config.allow_legacy_integrity_key_fallback,
-            last_hmac: tokio::sync::Mutex::new([0u8; 32]),
+            last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
+            flusher_tx: std::sync::RwLock::new(None),
         };
 
         // If file is not empty, find the last valid HMAC to continue the chain
@@ -1082,6 +1091,100 @@ impl Wal {
         }
     }
 
+    /// Enables background flusher actor for coalescing concurrent WAL writes and fsync calls.
+    pub fn enable_flusher(&self) {
+        let mut tx_guard = self.flusher_tx.write().unwrap_or_else(|e| e.into_inner());
+        if tx_guard.is_some() {
+            return;
+        }
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<FlusherMessage>();
+        let file = Arc::clone(&self.file);
+        let path = self.path.clone();
+        let header_written = Arc::clone(&self.header_written);
+        let size = Arc::clone(&self.size);
+        let last_hmac = Arc::clone(&self.last_hmac);
+
+        tokio::spawn(async move {
+            while let Some(first_msg) = rx.recv().await {
+                let mut batch_payload = Vec::new();
+                let mut acks = Vec::new();
+                let mut final_last_hmac_val = first_msg.last_hmac_val;
+
+                batch_payload.extend_from_slice(&first_msg.payload);
+                acks.push(first_msg.ack);
+
+                while let Ok(msg) = rx.try_recv() {
+                    batch_payload.extend_from_slice(&msg.payload);
+                    final_last_hmac_val = msg.last_hmac_val;
+                    acks.push(msg.ack);
+                }
+
+                let res: Result<()> = async {
+                    let mut file_guard = file.lock().await;
+                    let write_header = !header_written
+                        .load(std::sync::atomic::Ordering::Acquire)
+                        && size.load(std::sync::atomic::Ordering::Acquire) == 0;
+
+                    if write_header {
+                        file_guard.write_all(&WAL_V3_HEADER).await.map_err(|e| {
+                            MemFuseError::Storage(format!(
+                                "WAL flusher header write failed for {}: {}",
+                                path.display(),
+                                e
+                            ))
+                        })?;
+                    }
+                    file_guard.write_all(&batch_payload).await.map_err(|e| {
+                        MemFuseError::Storage(format!(
+                            "WAL flusher write failed for {}: {}",
+                            path.display(),
+                            e
+                        ))
+                    })?;
+                    file_guard.flush().await.map_err(|e| {
+                        MemFuseError::Storage(format!(
+                            "WAL flusher flush failed for {}: {}",
+                            path.display(),
+                            e
+                        ))
+                    })?;
+                    file_guard.sync_all().await.map_err(|e| {
+                        MemFuseError::Storage(format!(
+                            "WAL flusher fsync failed for {}: {}",
+                            path.display(),
+                            e
+                        ))
+                    })?;
+
+                    if write_header {
+                        header_written.store(true, std::sync::atomic::Ordering::Release);
+                    }
+
+                    let written_len =
+                        (if write_header { WAL_V3_HEADER.len() } else { 0 }) + batch_payload.len();
+                    size.fetch_add(written_len as u64, std::sync::atomic::Ordering::SeqCst);
+
+                    let mut last_hmac_guard = last_hmac.lock().await;
+                    *last_hmac_guard = final_last_hmac_val;
+
+                    Ok(())
+                }
+                .await;
+
+                for ack in acks {
+                    let send_res = match &res {
+                        Ok(()) => Ok(()),
+                        Err(e) => Err(MemFuseError::Storage(e.to_string())),
+                    };
+                    let _ = ack.send(send_res);
+                }
+            }
+        });
+
+        *tx_guard = Some(tx);
+    }
+
     /// Appends a batch of entries to the WAL and performs a single fsync.
     // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: Exklusiver Mutex-Lock self.file.lock() in append_batch serialisiert Header-Check (write_header) und Dateischreibzugriffe vollständig. Die HMAC-Korrektheit wird NICHT durch die self.file-Mutex-Serialisierung, sondern durch den separaten last_hmac-Mutex in prepare_batch garantiert (siehe last_hmac.lock() in prepare_batch). (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8)
     pub(crate) async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
@@ -1110,18 +1213,26 @@ impl Wal {
             }
         }
 
-        let mut payload_bytes = Vec::new();
+        let estimated_size = entries.len() * 256;
+        let mut payload_bytes = Vec::with_capacity(estimated_size);
         let mut last_hmac_val = [0u8; 32];
 
         if let Some(km) = &self.key_manager {
-            let mut batch_plaintext = Vec::new();
+            let mut batch_plaintext = Vec::with_capacity(estimated_size);
             for entry in entries {
                 let bytes = entry.to_bytes()?;
                 batch_plaintext.extend_from_slice(&bytes);
                 last_hmac_val = entry.checksum;
             }
 
-            let (encrypted, nonce) = km.encrypt_auto_nonce(&batch_plaintext)?;
+            let km_clone = Arc::clone(km);
+            let encrypted_result = tokio::task::spawn_blocking(move || {
+                km_clone.encrypt_auto_nonce(&batch_plaintext)
+            })
+            .await
+            .map_err(|e| MemFuseError::Storage(format!("WAL encryption task panicked: {e}")))?;
+
+            let (encrypted, nonce) = encrypted_result?;
             let chunk_len = (12 + encrypted.len()) as u32;
 
             payload_bytes.extend_from_slice(&chunk_len.to_le_bytes());
@@ -1135,53 +1246,76 @@ impl Wal {
             }
         }
 
-        let mut file = self.file.lock().await;
-
-        let write_header = !self
-            .header_written
-            .load(std::sync::atomic::Ordering::Acquire)
-            && self.size.load(std::sync::atomic::Ordering::Acquire) == 0;
-
-        let total_bytes = if write_header {
-            let mut buf = Vec::with_capacity(WAL_V3_HEADER.len() + payload_bytes.len());
-            buf.extend_from_slice(&WAL_V3_HEADER);
-            buf.extend_from_slice(&payload_bytes);
-            buf
-        } else {
-            payload_bytes
+        let flusher_tx = {
+            let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
+            guard.clone()
         };
 
-        file.write_all(&total_bytes).await.map_err(|e| {
-            MemFuseError::Storage(format!(
-                "WAL batch write failed for {}: {}",
-                self.path.display(),
-                e
-            ))
-        })?;
-        file.flush().await.map_err(|e| {
-            MemFuseError::Storage(format!(
-                "WAL batch flush failed for {}: {}",
-                self.path.display(),
-                e
-            ))
-        })?;
-        file.sync_all().await.map_err(|e| {
-            MemFuseError::Storage(format!(
-                "WAL batch fsync failed for {}: {}",
-                self.path.display(),
-                e
-            ))
-        })?;
+        if let Some(tx) = flusher_tx {
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            tx.send(FlusherMessage {
+                payload: payload_bytes,
+                last_hmac_val,
+                ack: ack_tx,
+            })
+            .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
 
-        if write_header {
-            self.header_written
-                .store(true, std::sync::atomic::Ordering::Release);
+            ack_rx
+                .await
+                .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
+            return Ok(());
+        } else {
+            let mut file = self.file.lock().await;
+
+            let write_header = !self
+                .header_written
+                .load(std::sync::atomic::Ordering::Acquire)
+                && self.size.load(std::sync::atomic::Ordering::Acquire) == 0;
+
+            if write_header {
+                file.write_all(&WAL_V3_HEADER).await.map_err(|e| {
+                    MemFuseError::Storage(format!(
+                        "WAL header write failed for {}: {}",
+                        self.path.display(),
+                        e
+                    ))
+                })?;
+            }
+
+            file.write_all(&payload_bytes).await.map_err(|e| {
+                MemFuseError::Storage(format!(
+                    "WAL batch write failed for {}: {}",
+                    self.path.display(),
+                    e
+                ))
+            })?;
+            file.flush().await.map_err(|e| {
+                MemFuseError::Storage(format!(
+                    "WAL batch flush failed for {}: {}",
+                    self.path.display(),
+                    e
+                ))
+            })?;
+            file.sync_all().await.map_err(|e| {
+                MemFuseError::Storage(format!(
+                    "WAL batch fsync failed for {}: {}",
+                    self.path.display(),
+                    e
+                ))
+            })?;
+
+            if write_header {
+                self.header_written
+                    .store(true, std::sync::atomic::Ordering::Release);
+            }
+
+            let written_len =
+                (if write_header { WAL_V3_HEADER.len() } else { 0 }) + payload_bytes.len();
+            self.size.fetch_add(
+                written_len as u64,
+                std::sync::atomic::Ordering::SeqCst,
+            );
         }
-
-        self.size.fetch_add(
-            total_bytes.len() as u64,
-            std::sync::atomic::Ordering::SeqCst,
-        );
 
         let mut last_hmac = self.last_hmac.lock().await;
         *last_hmac = last_hmac_val;
@@ -4465,6 +4599,44 @@ mod tests {
             "Replay must recover valid entry and discard partial trailing write"
         );
         assert_eq!(entries[0].1.seq_no, 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wal_flusher_actor_coalescing() -> Result<()> {
+        let dir = tempdir()?;
+        let wal_path = dir.path().join("test_flusher.wal");
+
+        let wal = Arc::new(Wal::open(&wal_path).await?);
+        wal.enable_flusher();
+
+        let num_tasks = 10;
+        let mut handles = Vec::new();
+
+        for i in 0..num_tasks {
+            let wal_clone = Arc::clone(&wal);
+            handles.push(tokio::spawn(async move {
+                let op = WalOp::Put {
+                    tx_id: TxId::new(i + 1),
+                    key: format!("flusher_k_{i}").into_bytes(),
+                    value: format!("flusher_v_{i}").into_bytes(),
+                };
+                let (batch, _) = wal_clone.prepare_batch(vec![(op, i + 1)]).await?;
+                wal_clone.append_batch(batch).await
+            }));
+        }
+
+        for h in handles {
+            h.await.map_err(|e| MemFuseError::Storage(e.to_string()))??;
+        }
+
+        let replayed = wal.replay().await?;
+        assert_eq!(replayed.len(), num_tasks as usize);
+
+        for (i, (_seq, entry, _pos)) in replayed.iter().enumerate() {
+            assert_eq!(entry.seq_no, (i + 1) as u64);
+        }
 
         Ok(())
     }
