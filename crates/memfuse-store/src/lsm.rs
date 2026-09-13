@@ -103,6 +103,21 @@ struct GroupCommitRequest {
     sender: tokio::sync::oneshot::Sender<Result<()>>,
 }
 
+struct WalQueueGuard(Arc<std::sync::atomic::AtomicUsize>);
+
+impl WalQueueGuard {
+    fn new(counter: Arc<std::sync::atomic::AtomicUsize>) -> Self {
+        counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Self(counter)
+    }
+}
+
+impl Drop for WalQueueGuard {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 struct PendingCommitQueue {
     leader_mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
     requests: Vec<GroupCommitRequest>,
@@ -266,6 +281,7 @@ pub struct LsmStorage {
     segment_counter: AtomicU64,
     budget_tracking_drift_bytes: std::sync::atomic::AtomicU64,
     pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,
+    wal_queue_depth: Arc<std::sync::atomic::AtomicUsize>,
     pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
 }
 
@@ -567,23 +583,26 @@ impl LsmStorage {
         });
 
         // INV-LSM-2: SystemPressureMonitor must be spawned as a background task before LsmStorage accepts its first insert.
-        let monitor =
-            crate::system_pressure::SystemPressureMonitor::new(Duration::from_millis(100));
-        let _pressure_rx = monitor.pressure_rx.clone();
-        let ct_pressure = cancel_token.clone();
-        task_tracker.spawn(async move {
-            monitor.run(ct_pressure, || 0, || 0, 0).await;
-        });
-        task_tracker.close();
+        let wal_queue_depth = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let wal_queue_depth_clone = Arc::clone(&wal_queue_depth);
 
-        // Build storage instance first (compaction_engine field added)
         let pressure_monitor = crate::system_pressure::SystemPressureMonitor::new(
             std::time::Duration::from_millis(100),
         );
         let pressure_rx = pressure_monitor.pressure_rx.clone();
         let ct_pressure = cancel_token.clone();
         task_tracker.spawn(async move {
-            pressure_monitor.run(ct_pressure, || 0, || 0, 0).await;
+            // Note: embedding_permits_fn and max_embedding_permits are passed as || 0, 0 because memfuse-store
+            // is a standalone KV storage engine crate decoupled from vector embedding subsystems. Embedding backpressure
+            // is managed at higher layers (e.g. Collection/TextEmbedder in memfuse-embed / memfuse-db).
+            pressure_monitor
+                .run(
+                    ct_pressure,
+                    move || wal_queue_depth_clone.load(Ordering::Relaxed),
+                    || 0,
+                    0,
+                )
+                .await;
         });
         task_tracker.close();
 
@@ -611,6 +630,7 @@ impl LsmStorage {
             segment_counter: AtomicU64::new(0),
             budget_tracking_drift_bytes: std::sync::atomic::AtomicU64::new(0),
             pending_commit_queue: tokio::sync::Mutex::new(None),
+            wal_queue_depth,
             pressure_rx,
         };
 
@@ -1506,6 +1526,9 @@ impl StorageEngine for LsmStorage {
             let mut queue_guard = self.pending_commit_queue.lock().await;
 
             if let Some(ref mut queue) = *queue_guard {
+                // RAII guard increments wal_queue_depth while follower is waiting in group commit queue
+                let _wal_queue_guard = WalQueueGuard::new(Arc::clone(&self.wal_queue_depth));
+
                 // Follower task: enqueue request with oneshot channel and await leader's notification
                 let (tx, rx) = tokio::sync::oneshot::channel();
                 let req = GroupCommitRequest {
@@ -4981,6 +5004,75 @@ mod tests {
             crate::system_pressure::PressureLevel::Normal
         );
         assert_eq!(pressure.wal_queue_depth, 0);
+
+        storage.shutdown();
+    }
+
+    #[tokio::test]
+    async fn test_system_pressure_wal_queue_backpressure_transition() {
+        let tmp = TempDir::new().expect("temp dir");
+        let config = LsmConfig {
+            path: tmp.path().to_path_buf(),
+            group_commit_window_micros: 200_000, // 200ms group commit window
+            ..Default::default()
+        };
+        let storage = Arc::new(LsmStorage::new(config).await.expect("create storage"));
+        let mut pressure_rx = storage.pressure_receiver();
+
+        let num_tasks = 600;
+        let barrier = Arc::new(tokio::sync::Barrier::new(num_tasks));
+        let mut handles = Vec::with_capacity(num_tasks);
+
+        for i in 0..num_tasks {
+            let storage = Arc::clone(&storage);
+            let barrier = Arc::clone(&barrier);
+            handles.push(tokio::spawn(async move {
+                let tx = TxId::new((i + 1) as u64);
+                let key = format!("k{:05}", i).into_bytes();
+                let val = format!("v{:05}", i).into_bytes();
+                storage.put(tx, &key, &val).await.expect("put");
+                barrier.wait().await;
+                storage.commit(tx).await.expect("commit");
+            }));
+        }
+
+        let mut max_wal_depth = 0;
+        let mut critical_observed = false;
+
+        let monitor_handle = tokio::spawn(async move {
+            let timeout = Duration::from_secs(5);
+            let start = std::time::Instant::now();
+            loop {
+                let current = pressure_rx.borrow().clone();
+                if current.wal_queue_depth > max_wal_depth {
+                    max_wal_depth = current.wal_queue_depth;
+                }
+                if current.pressure_level == crate::system_pressure::PressureLevel::Critical {
+                    critical_observed = true;
+                    break;
+                }
+                if start.elapsed() > timeout {
+                    break;
+                }
+                if pressure_rx.changed().await.is_err() {
+                    break;
+                }
+            }
+            (max_wal_depth, critical_observed)
+        });
+
+        for h in handles {
+            h.await.expect("task join");
+        }
+
+        let (max_depth, transitioned) = monitor_handle.await.expect("monitor join");
+
+        assert!(
+            transitioned || max_depth > crate::system_pressure::WAL_QUEUE_CRITICAL_THRESHOLD,
+            "Production pressure_rx should transition to Critical when WAL queue depth ({}) exceeds threshold ({})",
+            max_depth,
+            crate::system_pressure::WAL_QUEUE_CRITICAL_THRESHOLD
+        );
 
         storage.shutdown();
     }
