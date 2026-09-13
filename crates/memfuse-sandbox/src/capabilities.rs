@@ -30,7 +30,7 @@ impl Default for WasmCapabilities {
         Self {
             allow_stdout: true,
             allow_stderr: false,
-            max_memory_pages: 16,   // 1 MB
+            max_memory_pages: 16, // 1 MB
             max_fuel: 10_000_000,
             allow_filesystem: false,
             allow_network: false,

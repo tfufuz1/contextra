@@ -28,12 +28,12 @@ pub mod kv_segment;
 pub mod wal_crypto;
 
 pub use crypto::KeyManager as CryptoKey;
+pub use deletion_proof::{
+    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
+};
 pub use egress_vault::{
     BlockReason, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
     EgressVaultError,
-};
-pub use deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
 pub use error::{CryptoError, Result};
 pub use kv_cipher::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};

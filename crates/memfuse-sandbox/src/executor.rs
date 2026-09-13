@@ -7,11 +7,7 @@ use std::time::Duration;
 use tracing::warn;
 use wasmtime::{Config, Engine, Module, Store};
 
-use crate::{
-    capabilities::WasmCapabilities,
-    error::SandboxError,
-    output::WasmOutput,
-};
+use crate::{capabilities::WasmCapabilities, error::SandboxError, output::WasmOutput};
 
 struct SandboxState {
     max_pages: u32,
@@ -19,12 +15,22 @@ struct SandboxState {
 }
 
 impl wasmtime::ResourceLimiter for SandboxState {
-    fn memory_growing(&mut self, _current: usize, desired: usize, _max: Option<usize>) -> anyhow::Result<bool> {
+    fn memory_growing(
+        &mut self,
+        _current: usize,
+        desired: usize,
+        _max: Option<usize>,
+    ) -> anyhow::Result<bool> {
         let desired_pages = (desired / 65536) as u32;
         Ok(desired_pages <= self.max_pages)
     }
 
-    fn table_growing(&mut self, _current: u32, _desired: u32, _max: Option<u32>) -> anyhow::Result<bool> {
+    fn table_growing(
+        &mut self,
+        _current: u32,
+        _desired: u32,
+        _max: Option<u32>,
+    ) -> anyhow::Result<bool> {
         Ok(true)
     }
 }
@@ -47,8 +53,8 @@ impl WasmExecutor {
     pub fn new() -> Result<Self, SandboxError> {
         let mut config = Config::new();
         config.async_support(true);
-        config.consume_fuel(true);  // Fuel-Mechanismus aktivieren (CPU-Limit)
-        // Cranelift-Backend (standard, sicher)
+        config.consume_fuel(true); // Fuel-Mechanismus aktivieren (CPU-Limit)
+                                   // Cranelift-Backend (standard, sicher)
         let engine = Engine::new(&config)
             .map_err(|e| SandboxError::Runtime(format!("Engine init failed: {}", e)))?;
         Ok(Self { engine })
@@ -176,7 +182,9 @@ impl WasmExecutor {
                     if err_msg.contains("fuel") {
                         let consumed = capabilities.max_fuel;
                         SandboxError::FuelExhausted { consumed }
-                    } else if err_msg.contains("allow_cloud_egress") || err_msg.contains("capability violation") {
+                    } else if err_msg.contains("allow_cloud_egress")
+                        || err_msg.contains("capability violation")
+                    {
                         SandboxError::CapabilityViolation {
                             capability: "allow_cloud_egress".to_string(),
                         }

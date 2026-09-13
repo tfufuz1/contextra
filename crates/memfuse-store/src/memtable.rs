@@ -329,7 +329,9 @@ impl MemTable {
 
         for shard in &self.shards {
             let entries = shard.entries.read();
-            for (k, versions) in entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded)) {
+            for (k, versions) in
+                entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
+            {
                 if !k.starts_with(prefix) {
                     break;
                 }
@@ -354,7 +356,9 @@ impl MemTable {
                 }
                 if let Some((val, seq)) = best_version {
                     let raw_seq = seq & !TOMBSTONE_BIT;
-                    let entry = target.entry(k.clone()).or_insert_with(|| (val.clone(), seq));
+                    let entry = target
+                        .entry(k.clone())
+                        .or_insert_with(|| (val.clone(), seq));
                     if raw_seq > (entry.1 & !TOMBSTONE_BIT) {
                         *entry = (val.clone(), seq);
                     }
@@ -417,7 +421,9 @@ impl MemTable {
                 }
                 if let Some((val, seq)) = best_version {
                     let raw_seq = seq & !TOMBSTONE_BIT;
-                    let entry = target.entry(k.clone()).or_insert_with(|| (val.clone(), seq));
+                    let entry = target
+                        .entry(k.clone())
+                        .or_insert_with(|| (val.clone(), seq));
                     if raw_seq > (entry.1 & !TOMBSTONE_BIT) {
                         *entry = (val.clone(), seq);
                     }
@@ -773,14 +779,23 @@ mod tests {
         let mut target = BTreeMap::new();
         mt.scan_prefix_into(b"prefix:", 25, TxId(2), &mut target);
         assert_eq!(target.len(), 2);
-        assert_eq!(target.get(b"prefix:a".as_slice()), Some(&(Bytes::from("val_a_v2"), 20)));
-        assert_eq!(target.get(b"prefix:b".as_slice()), Some(&(Bytes::from("val_b_v1"), 15)));
+        assert_eq!(
+            target.get(b"prefix:a".as_slice()),
+            Some(&(Bytes::from("val_a_v2"), 20))
+        );
+        assert_eq!(
+            target.get(b"prefix:b".as_slice()),
+            Some(&(Bytes::from("val_b_v1"), 15))
+        );
 
         // Test scan_prefix_into at max_seq=12, max_tx=TxId(1)
         let mut target2 = BTreeMap::new();
         mt.scan_prefix_into(b"prefix:", 12, TxId(1), &mut target2);
         assert_eq!(target2.len(), 1);
-        assert_eq!(target2.get(b"prefix:a".as_slice()), Some(&(Bytes::from("val_a_v1"), 10)));
+        assert_eq!(
+            target2.get(b"prefix:a".as_slice()),
+            Some(&(Bytes::from("val_a_v1"), 10))
+        );
 
         // Test scan_range_into bounded range [prefix:a, prefix:z]
         let mut target3 = BTreeMap::new();
@@ -792,8 +807,14 @@ mod tests {
             &mut target3,
         );
         assert_eq!(target3.len(), 2);
-        assert_eq!(target3.get(b"prefix:a".as_slice()), Some(&(Bytes::from("val_a_v2"), 20)));
-        assert_eq!(target3.get(b"prefix:b".as_slice()), Some(&(Bytes::from("val_b_v1"), 15)));
+        assert_eq!(
+            target3.get(b"prefix:a".as_slice()),
+            Some(&(Bytes::from("val_a_v2"), 20))
+        );
+        assert_eq!(
+            target3.get(b"prefix:b".as_slice()),
+            Some(&(Bytes::from("val_b_v1"), 15))
+        );
     }
 
     #[test]
@@ -807,7 +828,12 @@ mod tests {
             mt.put(k.clone(), v.clone(), i + 1, (i % 5) + 1);
             // Put a second version for even keys
             if i % 2 == 0 {
-                mt.put(k, Bytes::from(format!("val_v2_{}", i)), i + 101, (i % 5) + 1);
+                mt.put(
+                    k,
+                    Bytes::from(format!("val_v2_{}", i)),
+                    i + 101,
+                    (i % 5) + 1,
+                );
             }
         }
 
@@ -834,7 +860,10 @@ mod tests {
             }
         }
 
-        assert_eq!(fast_target, legacy_target, "Fast range/prefix scan results must be bit-identical to legacy iter-based filtering");
+        assert_eq!(
+            fast_target, legacy_target,
+            "Fast range/prefix scan results must be bit-identical to legacy iter-based filtering"
+        );
     }
 
     #[test]

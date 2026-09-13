@@ -77,7 +77,11 @@ fn test_bandit_vs_cascade_regret_comparison() {
             // Ground-Truth Rewards für alle Profile
             let rewards: Vec<f32> = (0..num_profiles)
                 .map(|p| {
-                    let dot: f32 = true_weights[p].iter().zip(x.iter()).map(|(w, xi)| w * xi).sum();
+                    let dot: f32 = true_weights[p]
+                        .iter()
+                        .zip(x.iter())
+                        .map(|(w, xi)| w * xi)
+                        .sum();
                     dot.clamp(0.0, 1.0)
                 })
                 .collect();
@@ -100,9 +104,13 @@ fn test_bandit_vs_cascade_regret_comparison() {
             // 2. Contextual Bandit Router:
             let bandit_choice = (0..num_profiles)
                 .max_by(|&a, &b| {
-                    let score_a = bandit_states[a].score(&x, profile_props[a].0, profile_props[a].1);
-                    let score_b = bandit_states[b].score(&x, profile_props[b].0, profile_props[b].1);
-                    score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                    let score_a =
+                        bandit_states[a].score(&x, profile_props[a].0, profile_props[a].1);
+                    let score_b =
+                        bandit_states[b].score(&x, profile_props[b].0, profile_props[b].1);
+                    score_a
+                        .partial_cmp(&score_b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 })
                 .unwrap_or(0);
 

@@ -3,7 +3,69 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>MEMFUSE.PROMPTER v30 — SDLC COCKPIT · 4 EBENEN (CRATE, SUBSYSTEM, EIGENBAU, PROZESS) · PLAN→IMPLEMENT→REVIEW TRIAS · ROLE-LOCK · CLAIM-KEYS</title>
+<title>MEMFUSE.PROMPTER v32.1 — SDLC COCKPIT · 4 EBENEN (CRATE, SUBSYSTEM, EIGENBAU, PROZESS) · PLAN→IMPLEMENT→REVIEW TRIAS · ROLE-LOCK · CLAIM-KEYS · PROOF-OF-WORK-SCHRANKEN · JULES-VM-VERIFIZIERT</title>
+<!-- v32 CHANGELOG (2026-09-13, gegen .jules/JULES_LOG.md + .jules/JULES_LOG_2.md sowie den realen
+     xtask-Quellcode im Repo abgeglichen — Fokus: Korrektheit der generierten Befehle in der
+     tatsächlichen Google-Jules-VM-Sandbox, nicht nur inhaltliche Vollständigkeit):
+  * KRITISCHER BUGFIX: PKG('memfuse-crypto') erzeugte bisher `-p memfuse-crypto`. Das tatsächliche
+    Cargo-Package in crates/memfuse-crypto/Cargo.toml heißt aber `memfuse-security` (einziger
+    Verzeichnisname≠Package-Name-Fall im gesamten Workspace, gegen ALLE Cargo.toml-Dateien per grep
+    verifiziert). Jeder bisher generierte `cargo -p memfuse-crypto ...`-Befehl wäre in der echten
+    Jules-VM mit "package not found" fehlgeschlagen — betraf 6 hartkodierte Stellen (Crypto-Profil-
+    Audit-Commands, KV-Cache-Bridge-Subsystem-Audit) plus JEDE ${'`${PKG(crate)}`'}-Template-Stelle.
+    PKG() bildet jetzt zentral auf den korrekten Cargo-Package-Namen ab.
+  * buildMandatoryBootstrap() korrigiert gegen die in JULES_LOG.md/JULES_LOG_2.md protokollierte
+    TATSÄCHLICHE Tool-Aufruf-Chronologie: .jules/JULES_CONTEXT.md ("permanenter Ambient Context
+    Snapshot") fehlte bisher komplett im Bootstrap, obwohl beide Logs es als Standard-Lesepflicht
+    führen — ergänzt. Zusätzlich: explizite git status/log/remote-Prüfung als allererster Schritt,
+    sowie `cargo run -p xtask -- check-duplicate-intent` (Gate 12) vor Arbeitsbeginn, um die im
+    Analysebericht dokumentierte Parallel-Implementierungs-Kollision (3 Agenten, dieselbe Funktion,
+    #1627/#1634/#1645) strukturell zu verhindern.
+  * Phase 6 (Pre-Submit) um VM-Hinweis ergänzt: git push/pull sind in der Jules-Sandbox gesperrt
+    (abgefangen von der Sicherheitskontrollschicht) — Submit läuft ausschließlich über das
+    plattformeigene submit-Tool, lokale Historien-Korrekturen (commit --amend/reset/rebase -i) sind
+    dagegen erlaubt und für Schritt 6-A vorgesehen. Zusätzlich: `jules-submit-gate --crate=<crate>`
+    als empfohlener atomarer Quer-Check zur manuellen 6-A/6-B/6-C-Sequenz ergänzt (bündelt Rebase-
+    Check + Compile + Phantom-File-Check + Claim-Release in einem Kommando mit sauberem Exit-Code).
+  * TOOLING_HARDFAIL_BLOCK() um Hinweis ergänzt: Netzwerk-Restriktionen der VM-Sandbox (Installation
+    scheitert nicht am Binary, sondern am Netzwerkzugriff) müssen im Report von gewöhnlichen
+    Tooling-Lücken unterschieden werden, da die Abhilfe unterschiedlich ist (Devcontainer-Image vs.
+    Sandbox-Netzwerkregel).
+  * Live gegen .jules/prompter-data.json (den autogenerierten `cargo xtask gen-prompter-data`-Snapshot,
+    Stand HEAD b61fbb2) abgeglichen: bestätigt memfuse-core-ipc-gen als realen 18. Workspace-Member
+    (bereits in v30 nachgetragen) und dass memfuse-tauri zum Generierungszeitpunkt noch vorhanden war
+    — die physische Entfernung (ADR-077) erfolgte nachweislich später im selben Tag.
+-->
+
+<!-- v31 CHANGELOG (2026-09-13, gegen ANALYSEBERICHT_8TAGE.md, design_plan_kv_cache_optimierung.md sowie
+     6 Implementierungspläne WAL/LSM/KV-Cache/DB und Live-Repo-Stand tfufuz1/memfuse@486fe929 abgeglichen):
+  * STRUKTURELLE PROZESS-HÄRTUNG gegen "Schein-Verifikation" (belegter Kernbefund des Analyseberichts,
+    Fall A: put_if_absent wurde per Audit "OK (VERIFIED)" deklariert und 2 Std. später als TOCTOU-Bug
+    gefixt): neue globale Blöcke PROOF_OF_WORK_BLOCK() (OK/VERIFIED nur mit ausführbarem Negativ-Test),
+    TOOLING_HARDFAIL_BLOCK() (Audit-Abbruch statt manuellem Fortfahren bei fehlenden Tools wie
+    cargo-llvm-cov/cargo-mutants — Negativbeispiel: memfuse-index-Audit vergab GO/APPROVED trotz
+    SKIPPED-Coverage), GOVERNANCE_BLOCK() (Shell-Commit-Verbot + Write-Lock für WORKING_STATE.md/
+    CHANGELOG.md/SOURCE_OF_TRUTH.md außerhalb ADR-/Korrektur-Sessions). Verdrahtet in audit/deep/test/
+    fix/plan/review-Tasks.
+  * HOTSPOT_FILES/HOTSPOT_GUARDRAIL(): Architektur-Leitplanken für Dateien mit belegter Bugfix-Zyklen-
+    Historie (lsm.rs: 67 Änderungen/8 Tage, fusion.rs: 39, wal.rs: 31) — erzwingt Lock-Hierarchie-Erklärung
+    vor Änderung statt punktuellem Patchen derselben Fehlerklasse. In ROLE_LOCK_BLOCK() verdrahtet.
+  * SIZE_LABELS L/XL: passive Lese-Pflicht → aktive 3-Satz-Zusammenfassungs-Pflicht vor Codeänderung.
+  * AI-TAG-HYGIENE-Regel im fix-Task: Status-Änderung auf RESOLVED ohne funktionale Codeänderung
+    im Diff ist untersagt (verhindert reines Relabeling, siehe Analysebericht Fall C).
+  * LIVE-REPO-ABGLEICH ergab: mehrere im Analysebericht als offen dokumentierte Befunde sind inzwischen
+    behoben und wurden entsprechend korrigiert statt weiter als Lücke geführt — Homoglyphen-Bypass in
+    memfuse-mcp/prompt_injection.rs (skeletonize_char), put_if_absent-TOCTOU in memfuse-store/lsm.rs
+    (vollständiges IntentLockManager-Pattern, PR #2378, geht über den im Bericht erwähnten Zwischenfix
+    hinaus), fusion.rs:45-NaN-AI-TAG (korrekt auf RESOLVED mit Testverweis).
+  * OFFENE, NOCH NICHT GENEHMIGTE DESIGN-PLÄNE als Kontext in Crate-Profile aufgenommen (memfuse-store:
+    WAL-Actor-Modell + MemTable-Scan-Optimierung; memfuse-crypto: KV-Segment-Store-Sharding/O(1)-LRU;
+    memfuse-db: RRF-Late-Hydration + PID-Latenzregler) — live gegen aktuellen Code verifiziert, dass
+    diese Optimierungen tatsächlich noch nicht umgesetzt sind (kein Sharding in kv_segment/store.rs
+    etc.), damit künftige Prompt-Läufe nicht versehentlich bereits vorgeschlagene, aber unautorisierte
+    Architekturänderungen ohne Planer-Session umsetzen.
+-->
+
 <!-- v30 CHANGELOG (2026-09-13, gegen GESAMTSPEZIFIKATION_FINAL_2 + JULES_PROMPTS_KV_CRYPTO_GAP + JULES_PROMPTS_MEMFUSE_1 + Live-Repo-Stand tfufuz1/memfuse@main abgeglichen):
   * memfuse-tauri VOLLSTÄNDIG ENTFERNT (nicht mehr nur deprecated) — ADR-077 wurde am 2026-09-12 physisch umgesetzt, Crate existiert nicht mehr im Workspace. Alle `--exclude memfuse-tauri`-Gate-Aufrufe entfernt (kein Exclude eines nicht-existenten Members nötig), CRATE_PROFILES-Eintrag, COMPONENTS-Block, TARGET_ARCH-Eintrag, Domain-Profile-Referenzen entfernt.
   * KV-Cache-Bridge (neues Alleinstellungsmerkmal §2.3.6 der Spezifikation) ergänzt: memfuse-crypto (derive_kv_key, kv_cipher.rs jetzt VERDRAHTET statt "Migration ausstehend", kv_segment/eviction_worker.rs neu), memfuse-candle (kv_bridge.rs/KvBridgeAdapter, model_registry.rs/ModelFingerprint, gasp.rs/GaspConfig, generate_with_context() Fallback-Pfad), memfuse-core (model_fingerprint.rs).
@@ -230,9 +292,9 @@ kbd{font-family:monospace;font-size:8px}
 
 <header class="hdr">
   <div class="hdr-in">
-    <span class="logo"><em>MEMFUSE</em>.BAUKASTEN<span class="lver">v29</span></span>
+    <span class="logo"><em>MEMFUSE</em>.BAUKASTEN<span class="lver">v32</span></span>
     <span class="hdot"></span>
-    <span class="hsub">SDLC Cockpit v29 · 4 Ebenen (Crate, Subsystem, Eigenbau, Prozess) · PLAN→IMPLEMENT→REVIEW Trias · ROLE-LOCK · Claim-Keys</span>
+    <span class="hsub">SDLC Cockpit v32 · 4 Ebenen (Crate, Subsystem, Eigenbau, Prozess) · PLAN→IMPLEMENT→REVIEW Trias · ROLE-LOCK · Claim-Keys</span>
     <div class="hright">
       <span class="hbadge hb-a">16 CRATES · 4 SUBSYSTEME · 4 EIGENBAU · GATES/DOCS/COMMITS</span>
       <span class="hbadge" style="background:rgba(255,107,157,.12);color:#ff6b9d;border:1px solid rgba(255,107,157,.3)">3 SUBSYSTEME (KEIN MISCHEN)</span>
@@ -345,10 +407,10 @@ kbd{font-family:monospace;font-size:8px}
     </div>
 
     <!-- CRATE -->
-        <!-- SDLC COCKPIT v29: EBENE WÄHLEN TAB BAR -->
+        <!-- SDLC COCKPIT v32: EBENE WÄHLEN TAB BAR -->
     <div class="card" style="padding:10px;background:var(--s2);border-color:var(--b2);margin-bottom:12px;">
       <div style="font-size:10px;font-weight:700;color:var(--ac);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px">
-        <span>⚙️ SDLC COCKPIT v29 — PROMPTER-EBENE WÄHLEN</span>
+        <span>⚙️ SDLC COCKPIT v32 — PROMPTER-EBENE WÄHLEN</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
         <button id="tab-ebene-crate" class="chip on" style="justify-content:center;font-weight:700;padding:6px 2px" onclick="setEbene('crate')">1. Crate</button>
@@ -444,7 +506,7 @@ kbd{font-family:monospace;font-size:8px}
         <span class="carr">▼</span>
       </div>
       <div class="cb">
-        <div class="sl"><span class="sl-dot" style="background:var(--ac)"></span>SDLC Task Triad (v29 — PLAN → IMPLEMENT → REVIEW Cycle)</div>
+        <div class="sl"><span class="sl-dot" style="background:var(--ac)"></span>SDLC Task Triad (v32 — PLAN → IMPLEMENT → REVIEW Cycle)</div>
         <div class="task-grid">
           <div class="thero" id="tt-plan" onclick="selTask('plan')">
             <div class="th-ico">📐</div>
@@ -764,9 +826,18 @@ const TIER_INFO = {
 // PKG() ist die EINZIGE Stelle, die dieses Package-Flag erzeugt — alle
 // Gate-Vorlagen rufen ausschließlich PKG(crate) statt "-p ${crate}" auf.
 function PKG(crateId) {
+  // v32 BUGFIX (kritisch, gegen Jules-VM-Realität verifiziert): das Cargo-Package in
+  // crates/memfuse-crypto/Cargo.toml heißt tatsächlich "memfuse-security" (einziger
+  // Verzeichnisname≠Package-Name-Fall im gesamten Workspace, per `grep "^name ="` gegen
+  // alle Cargo.toml-Dateien verifiziert). Ohne dieses Mapping schlägt JEDER generierte
+  // `cargo -p memfuse-crypto ...`-Befehl in der echten Jules-VM mit "package not found"
+  // fehl — Verzeichnispfade (crates/memfuse-crypto/src/...) bleiben davon unberührt und
+  // verwenden weiterhin den Verzeichnisnamen.
+  const CARGO_PACKAGE_NAME = { 'memfuse-crypto': 'memfuse-security' };
+  const pkgName = CARGO_PACKAGE_NAME[crateId] || crateId;
   return crateId === 'memfuse-py'
     ? '--manifest-path crates/memfuse-py/Cargo.toml'
-    : `-p ${crateId}`;
+    : `-p ${pkgName}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -812,9 +883,45 @@ const RISK_LABELS = {
 const SIZE_LABELS = {
   S:{ name:'Klein',  care:'Vollständige Lektüre genügt; Änderungen sind i.d.R. lokal begrenzt und mit überschaubarem Kontext sicher überprüfbar.' },
   M:{ name:'Mittel',  care:'Vollständige Lektüre der Datei UND ihrer direkten Aufrufer vor jeder Änderung; Seiteneffekte über die Dateigrenze hinweg aktiv suchen.' },
-  L:{ name:'Groß',    care:'Vollständige Lektüre der Datei, aller direkten Aufrufer/Importeure sowie des zugehörigen Test-Moduls Pflicht. Änderungen nur inkrementell, nie als Gesamt-Rewrite. Nach jeder Teiländerung erneut `cargo check` und betroffene Tests laufen lassen.' },
-  XL:{ name:'Sehr groß / zentral', care:'Höchste Sorgfaltspflicht: vollständige Lektüre der Datei, aller Aufrufer, aller Geschwisterdateien im selben Modul sowie des Audit-Reports zu dieser Datei Pflicht VOR jeder Zeile Code. Änderungen ausschließlich in minimalen, einzeln testbaren Schritten. Nach jedem Schritt vollständigen Gate-Stack laufen lassen — nicht erst am Ende. Bei Unsicherheit: Plan zuerst in Prosa skizzieren, dann erst Code schreiben.' },
+  L:{ name:'Groß',    care:'Vollständige Lektüre der Datei, aller direkten Aufrufer/Importeure sowie des zugehörigen Test-Moduls Pflicht. Änderungen nur inkrementell, nie als Gesamt-Rewrite. Nach jeder Teiländerung erneut `cargo check` und betroffene Tests laufen lassen. AKTIVE AUSGABE-PFLICHT (v31, statt passiver Lese-Pflicht): Beginne deine Antwort ZWINGEND mit einer 3-Satz-Zusammenfassung der bestehenden Datenflüsse/Kontrollstrukturen dieser Datei, bevor du Änderungen vorschlägst — eine reine Bestätigung "gelesen" genügt nicht.' },
+  XL:{ name:'Sehr groß / zentral', care:'Höchste Sorgfaltspflicht: vollständige Lektüre der Datei, aller Aufrufer, aller Geschwisterdateien im selben Modul sowie des Audit-Reports zu dieser Datei Pflicht VOR jeder Zeile Code. Änderungen ausschließlich in minimalen, einzeln testbaren Schritten. Nach jedem Schritt vollständigen Gate-Stack laufen lassen — nicht erst am Ende. Bei Unsicherheit: Plan zuerst in Prosa skizzieren, dann erst Code schreiben. AKTIVE AUSGABE-PFLICHT (v31): Beginne deine Antwort ZWINGEND mit einer 3-Satz-Zusammenfassung der bestehenden Datenflüsse/Kontrollstrukturen UND — falls diese Datei ein Nebenläufigkeits-Hotspot ist (siehe HOTSPOT_FILES) — mit einer kurzen Erklärung der bestehenden Lock-Hierarchie, bevor du Änderungen vorschlägst. Reines "Datei gelesen" ist kein Nachweis geladenen Kontexts.' },
 };
+
+// v31 NEU (aus ANALYSEBERICHT_8TAGE.md, Abschnitt 3/4.5 — Hotspot-Analyse der 8-Tage-Commit-Historie):
+// Dateien mit nachgewiesener, wiederkehrender Bugfix-Zyklen-Historie (Race Conditions, Atomarität).
+// Punktuelle Patches an diesen Dateien sind ein belegtes Antipattern (lsm.rs: 67 Änderungen/8 Tage,
+// wiederholt dieselben Fehlerklassen). Bei Auswahl einer HOTSPOT_FILES-Datei wird ein zusätzlicher
+// Architektur-Leitplanken-Block in den Prompt injiziert (siehe HOTSPOT_GUARDRAIL()).
+const HOTSPOT_FILES = {
+  'crates/memfuse-store/src/lsm.rs': { changes8d: 67, pattern: 'Race Conditions, Rollback, Group-Commit, WAL-Sicherheit, TOCTOU' },
+  'crates/memfuse-db/src/fusion.rs': { changes8d: 39, pattern: 'AI-TAG-Drift (NaN-Guard-Doku vs. Code), RRF-Hot-Path' },
+  'crates/memfuse-store/src/wal.rs': { changes8d: 31, pattern: 'HMAC-Chain-Ordering, fsync-Timing, Group-Commit' },
+  'crates/memfuse-db/src/lib.rs': { changes8d: 55, pattern: 'Hoher struktureller Umbau-Druck — vor jeder Änderung DAG-Auswirkung prüfen' },
+};
+function HOTSPOT_GUARDRAIL(file) {
+  const h = HOTSPOT_FILES[file];
+  if (!h) return '';
+  return `
+### ⚠️ ARCHITEKTUR-LEITPLANKE (v31, aus ANALYSEBERICHT_8TAGE.md — belegtes Hotspot-Muster)
+\`${file}\` hat in den letzten 8 Tagen ${h.changes8d} Änderungen erfahren, überwiegend wiederkehrende
+Fixes derselben Fehlerklassen (${h.pattern}). Das ist ein dokumentiertes Symptom architektonischer
+Flickschusterei, nicht punktueller Einzelbugs. Für JEDE Änderung, die Locks, Transaktionen, atomare
+Zustände oder die Commit-/Rollback-Pipeline dieser Datei betrifft, gilt zusätzlich:
+1. Erkläre VOR der Code-Änderung explizit die bestehende Lock-Hierarchie/Reihenfolge (welches Lock
+   wird wann gegenüber welchem anderen gehalten) — nicht nur die lokale Änderung isoliert betrachten.
+2. Punktuelles Patchen einer einzelnen Fehlerinstanz ist NICHT ausreichend — prüfe aktiv, ob dieselbe
+   Fehlerklasse (z.B. TOCTOU, Dirty-Read, fehlende Atomarität) an weiteren Stellen derselben Datei
+   vorliegt, bevor du den Fix als abgeschlossen betrachtest.
+3. Falls verfügbar: nutze \`cargo loom\` für Nebenläufigkeits-Modelle oder generiere gezielte
+   Property-/Stress-Tests für die betroffene Race-Condition-Klasse, nicht nur einen einzelnen
+   deterministischen Regressionstest.
+4. Ein "VERIFIED"/"OK"-Verdikt in einem Audit-Report für diese Datei ist NUR zulässig, wenn im selben
+   Prompt-Lauf ein ausführbarer, negativer Testcase geschrieben wurde, der die Abwesenheit der
+   konkret geprüften Fehlerklasse beweist (siehe PROOF_OF_WORK_BLOCK) — eine reine Prosa-Bewertung
+   genügt nicht (siehe ANALYSEBERICHT_8TAGE.md Fall A: put_if_absent wurde am 2026-09-13 04:14 Uhr
+   als "OK (VERIFIED)" deklariert und 2 Std. später als TOCTOU-Bug gefixt).
+`;
+}
 
 const DEFAULT_COMPONENTS = {
   'memfuse-agent': [
@@ -1176,8 +1283,20 @@ done
 • WAL-HMAC-Chaining v3 KRITISCH: Reihenfolge domain-separator → prev_hmac → seq_no → tx_id → op_type+kv MUSS exakt eingehalten werden
 • Krypto-Isolation: KEIN anderes Crate darf eigene Ad-hoc-Crypto-Primitiven verwenden — ausschließlich memfuse-crypto
 • KV-Cache-Bridge (v30, siehe JULES_PROMPTS_KV_CRYPTO_GAP_2026-09-12.md): derive_kv_key() bindet an (TenantId, ModelFingerprint) — jeder Modell-/Quantisierungswechsel MUSS einen anderen Schlüssel erzeugen (P8-Fingerprint-Invalidierung). EvictionWorker läuft auf eigenem OS-Thread (nicht Tokio-Task) — synchrones Zeroizing darf den Async-Executor niemals blockieren
-• cargo audit: RUSTSEC-Einträge bekannt in lopdf (memfuse-text) und pyo3 (memfuse-py) — memfuse-crypto selbst muss isoliert bleiben`,
-    audit_cmds:`cargo test -p memfuse-crypto -- rfc_vectors --nocapture
+• cargo audit: RUSTSEC-Einträge bekannt in lopdf (memfuse-text) und pyo3 (memfuse-py) — memfuse-crypto selbst muss isoliert bleiben
+• OFFENER DESIGN-PLAN (v31, aus implementation_plan-kv2.md — NOCH NICHT genehmigt/umgesetzt; live gegen
+  kv_segment/store.rs verifiziert: aktuell EIN globales \`segments: RwLock<AHashMap<TenantId, TenantState>>\`,
+  kein Sharding): vorgeschlagen wird Lock-Sharding (z.B. 32× \`CachePadded<RwLock<AHashMap<TenantId, TenantState>>>\`,
+  Tenant hasht deterministisch auf genau einen Shard → Zero Cross-Tenant Contention), O(1)-Lookups per
+  AHashMap<u64, KvSegment> statt O(N)-Vec-Scan, eine sichere intrusive Index-LRU-Liste für O(1)-Eviction
+  statt O(N)-Linear-Scan der ältesten AtomicU64, sowie "Deferred Zeroization" (verdrängte KvSegment-Instanzen
+  werden ERST NACH Freigabe des Shard-Locks gedroppt/gezeroized, damit der P9-Sicherheitspfad keine
+  parallelen Requests blockiert). Offene Design-Frage im Plan selbst: Eigenentwicklung einer
+  #![forbid(unsafe_code)]-konformen Array-LRU vs. externes Crate (moka/lru) — noch keine Entscheidung
+  getroffen, NICHT eigenmächtig ohne Rückfrage entscheiden. Vor Umsetzung: Planer-Session Pflicht, da
+  dies die TenantIsolatedKvStore-Grundlage der KV-Cache-Bridge (siehe kv_bridge.rs) direkt betrifft —
+  jede Sharding-Änderung MUSS gegen die bestehenden Tenant-Isolationstests weiterhin grün bleiben.`,
+    audit_cmds:`cargo test -p memfuse-security -- rfc_vectors --nocapture
 grep -n "fn encrypt_auto_nonce\\|OsRng\\|NONCE_SIZE" crates/memfuse-crypto/src/*.rs
 grep -n "memfuse-aes-256\\|memfuse-hmac\\|memfuse-file-key" crates/memfuse-crypto/src/*.rs
 grep -n "ConstantTimeEq\\|ct_eq" crates/memfuse-crypto/src/*.rs
@@ -1185,16 +1304,16 @@ grep -n "ZeroizeOnDrop\\|Zeroize" crates/memfuse-crypto/src/*.rs
 grep -n "compute_checksum_v3\\|verify_and_update_v3\\|WalHmac" crates/memfuse-crypto/src/wal_crypto.rs
 grep -n "derive_kv_key\\|derive_file_key" crates/memfuse-crypto/src/crypto.rs
 grep -rn "evict_lru_fair\\|EvictionWorker" crates/memfuse-crypto/src/kv_segment/
-cargo audit -p memfuse-crypto 2>/dev/null | grep -E "RUSTSEC|Severity"`,
+cargo audit -p memfuse-security 2>/dev/null | grep -E "RUSTSEC|Severity"`,
     deep_extra:`**Nonce-Kollisions-Simulation (statistisch):**
 \`\`\`bash
 # 10^6 Nonces generieren, Kollisionen zählen (Referenzwert p≈2.71e-8 bei 10^6)
-cargo test -p memfuse-crypto -- nonce_collision_stress --nocapture 2>&1 | tail -20
+cargo test -p memfuse-security -- nonce_collision_stress --nocapture 2>&1 | tail -20
 \`\`\`
 **Ciphertext-Malleability / Tag-Fälschung:**
 \`\`\`bash
 # 1 Bit im Ciphertext/Tag flippen → MUSS Entschlüsselung mit Auth-Fehler ablehnen (nie stillschweigend falsche Klartext)
-cargo test -p memfuse-crypto -- tamper --nocapture 2>&1 | grep -E "ok|FAILED"
+cargo test -p memfuse-security -- tamper --nocapture 2>&1 | grep -E "ok|FAILED"
 \`\`\`
 **Key-Domain-Separation exhaustiv:**
 \`\`\`bash
@@ -1204,7 +1323,7 @@ grep -n "fn derive_\\|hkdf" crates/memfuse-crypto/src/*.rs
 **KV-Cache-Bridge Fingerprint-Isolation (v30, NEU):**
 \`\`\`bash
 # Zwei verschiedene ModelFingerprints (unterschiedliche Quantisierung, gleiches Modell) MÜSSEN disjunkte KV-Schlüssel liefern
-cargo test -p memfuse-crypto -- kv_key_fingerprint_isolation --nocapture 2>&1 | grep -E "ok|FAILED"
+cargo test -p memfuse-security -- kv_key_fingerprint_isolation --nocapture 2>&1 | grep -E "ok|FAILED"
 # EvictionWorker darf Tokio-Executor nicht blockieren — Laufzeit auf separatem OS-Thread verifizieren
 grep -n "thread::spawn\\|std::thread" crates/memfuse-crypto/src/kv_segment/eviction_worker.rs
 \`\`\``
@@ -1219,7 +1338,23 @@ grep -n "thread::spawn\\|std::thread" crates/memfuse-crypto/src/kv_segment/evict
 • APM-6: load_or_create_integrity_key() korrekt → alle anderen load_or_create_X() gleich robust?
 • std::fs in async: KEIN direktes std::fs::File außerhalb spawn_blocking (Executor-Starvation)
 • Compaction-Tombstone: gepinnte Snapshots schützen Tombstones korrekt vor GC?
-• WAL-HMAC-Binding: Sequenznummer + Datei-ID in HMAC eingebettet (nicht nur Payload)?`,
+• WAL-HMAC-Binding: Sequenznummer + Datei-ID in HMAC eingebettet (nicht nur Payload)?
+• STATUS v31 (implementiert, siehe PR #2378 "fix(store): replace dirty read with IntentLockManager in
+  put_if_absent"): das früher als kritisch dokumentierte TOCTOU-Race in put_if_absent (siehe
+  ANALYSEBERICHT_8TAGE.md Fall A) ist durch ein formalisiertes IntentLockManager-Pattern
+  (intent_locks: Mutex<HashMap<Vec<u8>, TxId>> in LsmStorage) strukturell behoben — is_key_staged_globally
+  wurde entfernt, Dirty-Reads über TxBuffer-Grenzen sind nicht mehr möglich. Bei jeder weiteren Änderung
+  an put_if_absent/commit/rollback_to_tx: clear_intent_locks_for_tx()/clear_intent_locks_above_tx() MÜSSEN
+  konsistent bei jedem Commit-/Rollback-/Abbruch-Pfad aufgerufen werden — ein vergessener Cleanup-Pfad
+  wäre ein neuer Deadlock-/Starvation-Kandidat für zukünftige Schreiber auf denselben Key.
+• OFFENE DESIGN-PLÄNE (v31, aus implementation_plan_wal.md/-wal2.md/-lsm.md/-lsm-2.md — NOCH NICHT
+  genehmigt/umgesetzt, NUR als Kontext für künftige Planungs-Sessions, nicht als Ist-Zustand behandeln):
+  (1) Actor-basierter WAL-Flusher (Entkopplung von CPU-bound Batch-Prep und I/O-bound fsync via
+  mpsc-Channel statt tokio::sync::Mutex<File>), (2) Herauslösen von \`wal\` aus \`LsmState\` damit Reader
+  nie durch fsync blockiert werden, (3) MemTable scan_prefix_into()/scan_range_into() statt globalem
+  mt.iter()+sort, (4) binäre statt lineare Suche in SSTable-Datenblöcken, (5) Sharded BlockCache
+  (Lock-Striping) statt globalem RwLock<LruCache>. Vor Umsetzung: explizite Planer-Session (tt-audit
+  Rollensperre PLANER), da mehrere dieser Änderungen die Lock-Hierarchie fundamental verschieben.`,
     audit_cmds:`grep -rn "tokio::fs::write\\|std::fs::write" crates/memfuse-store/src/ | grep -v test
 grep -rn "sync_all\\|sync_data" crates/memfuse-store/src/wal.rs
 grep -n "commit_mutex" crates/memfuse-store/src/ -r | head -15
@@ -1374,7 +1509,22 @@ cargo test -p memfuse-checkpoint -- guard_panic_isolation --nocapture 2>&1 | gre
 • APM-2: Community-Filter + Tombstone → beide kumulativ (nicht if/else-if)
 • RRF-Skalierung (bekannter Befund): weighted_reciprocal_rank_fusion() materialisiert und sortiert VOLLSTÄNDIG (O(U log U) Latenz, O(U) Speicher) — Sub-Engines deckeln über MAX_SEARCH_K=1000, die Fusionsfunktion selbst NICHT. Jede neue Aufruferstelle muss diese Grenze respektieren, sonst Speicher-/Latenz-Explosion bei großen Treffermengen
 • Cross-Signal-Snapshot-Isolation (bekannte architektonische Lücke): LSM/BM25/Metadaten binden an seq_no, HNSW und CSR-Graph lesen unpinnten Live-State — neuer Code darf sich NICHT auf implizite Snapshot-Konsistenz von HNSW/Graph verlassen, nachgelagerte Filterung muss veraltete/gelöschte Treffer aktiv verwerfen
-• Reranker-Rank-Hijacking (bei aktivem memfuse-embed): pre_rerank_k = k*3 begrenzt den Kandidatenpool VOR Cross-Encoder-Reranking — jede Änderung an diesem Faktor beeinflusst direkt die Angriffsfläche für Keyword-Stuffing`,
+• Reranker-Rank-Hijacking (bei aktivem memfuse-embed): pre_rerank_k = k*3 begrenzt den Kandidatenpool VOR Cross-Encoder-Reranking — jede Änderung an diesem Faktor beeinflusst direkt die Angriffsfläche für Keyword-Stuffing
+• STATUS v31 (implementiert, verifiziert): der zuvor als offen/vermutlich-obsolet dokumentierte AI-TAG zu
+  fusion.rs:45 (ResonanceConfig-NaN-Behauptung) ist korrekt auf RESOLVED aktualisiert — apply_resonance_bonus()
+  validiert Scores lückenlos mit r.score.is_finite() vor dem Bonus, mit begleitendem Test
+  test_apply_resonance_bonus_nan_safety. Ebenso RESOLVED: merge_metadata()-Typkonsistenz (audit-M-1),
+  weighted_reciprocal_rank_fusion_with_options() NaN/Inf/≤0-Gewichtsfilterung (audit-H-4).
+• OFFENE DESIGN-PLÄNE (v31, aus implementation_plan_db.md/-db2.md — NOCH NICHT genehmigt/umgesetzt, nur
+  Kontext für künftige Planungs-Sessions): (1) "Late Hydration"/Two-Phase-Retrieval — RRF akkumuliert
+  zunächst nur DocId+Score (FxHashMap/AHashMap statt SipHash), Metadaten-Merging via merge_metadata()
+  und ProvenanceRecord-Bau NUR für die finalen Top-K statt für alle Kandidaten (adressiert direkt die
+  oben dokumentierte RRF-Skalierungs-Lücke); (2) PidLatencyController in multistep.rs zur dynamischen
+  Begrenzung von k_pool/max_hops unter P95-Latenzdruck, inkl. Backpressure-Kopplung an die
+  memfuse-candle-Inferenz-Semaphore; (3) NodesGuard-typisierte Locks in consolidation_executor.rs für
+  Deadlock-Freiheit beim kaskadierenden CSR-Kanten-Invalidieren. ACHTUNG bei Umsetzung: (1) ändert
+  interne Signaturen (Referenzen statt Vec<SearchResult>-Klone) — vor Umsetzung Planer-Session mit
+  Prüfung, dass Tie-Breaker- und NaN/Inf-Guard-Verhalten bit-identisch bleibt (Regressionstest Pflicht).`,
     audit_cmds:`grep -n "score\\|rrf\\|rank\\|weight" crates/memfuse-db/src/fusion.rs | head -20
 grep -n "snapshot\\|seq\\|pinned" crates/memfuse-db/src/collection/search.rs | head -15
 grep -n "collections.*lock\\|embedder.*lock" crates/memfuse-db/src/ -r | head -10
@@ -1561,7 +1711,13 @@ grep -rn "memfuse_mcp\\|memfuse-mcp" crates/memfuse-router/Cargo.toml crates/mem
 • Slowloris: Inaktivitäts-Timeout für sehr langsame Clients → sonst Ressourcen-DoS
 • Binär-Input: nicht-UTF8 auf stdin → kontrollierter Err, kein Panic
 • Informations-Leck: interne Pfade/Stacktraces nicht in Fehlermeldungen an Client
-• JSON-RPC 2.0: id-Handling, error-Codes, Notification-Semantik korrekt?`,
+• JSON-RPC 2.0: id-Handling, error-Codes, Notification-Semantik korrekt?
+• STATUS v31 (implementiert): der zuvor als MAJOR/offen dokumentierte Homoglyphen-Bypass
+  (kyrillisch/griechisch, z.B. 'о'→'o', 'і'→'i') in PromptInjectionGuard::normalize_text() ist behoben
+  — skeletonize_char() wird jetzt VOR der lowercase-Stufe angewendet (AI-TAG als RESOLVED geführt).
+  Bei jeder Änderung an normalize_text()/skeletonize_char(): PFLICHT-Regressionstest mit mindestens
+  den historisch bekannten Bypass-Zeichen ('о','і','е' kyrillisch, 'Α' griechisch) gegen ein bekanntes
+  Injection-Payload — ein Wiederauftreten dieser exakten Fehlerklasse ist ein kritischer Rückschritt.`,
     audit_cmds:`grep -rn "axum\\|TcpListener\\|HttpServer\\|bind(" crates/memfuse-mcp/src/ | grep -v test
 grep -n "MAX_RPC_BYTES\\|MAX_SEARCH_QUERY\\|16.*1024\\|64.*1024" crates/memfuse-mcp/src/ -r | head -5
 grep -n "timeout\\|deadline\\|inactivity" crates/memfuse-mcp/src/ -r | head -5`,
@@ -1819,6 +1975,13 @@ function SESSIONEND_BLOCK(crate) {
 
 Diese Phase ist kein Stilhinweis. Der Mensch merged blind. Beweislast liegt vollständig hier. Alle drei Schritte müssen grün sein — in dieser Reihenfolge, ohne Ausnahme. Ein grüner Testlauf gegen einen veralteten main-Stand ist KEINE gültige Verifikation — nur der Stand unmittelbar vor Submit zählt.
 
+**v32 VM-Hinweis (Google-Jules-Sandbox):** \`git push\`/\`git pull\` sind in der Jules-VM-Sandbox
+gesperrt und werden von der Sicherheitskontrollschicht abgefangen. Lokale Historien-Korrekturen
+(\`git commit --amend\`, \`git reset --soft HEAD~1\`, \`git rebase -i\`, \`git cherry-pick\`) auf dem
+eigenen Feature-Branch sind erlaubt und für Schritt 6-A explizit vorgesehen. Das finale Einreichen
+(Push + PR-Erstellung) läuft AUSSCHLIESSLICH über das plattformeigene \`submit\`-Tool, nicht über
+einen manuellen \`git push\`-Aufruf in \`run_in_bash_session\`.
+
 ### Schritt 6-A: Rebase-Retest + Gate-Stack (gegen den AKTUELLEN main)
 \`\`\`bash
 git fetch origin main
@@ -1858,6 +2021,15 @@ Test-Ergebnisse im PR/Session-Report NUR aus echtem Kommando-Output kopieren, ni
 cargo xtask claim --release --crate ${crate} --issue "\$TASK_ID" 2>&1 | tail -5
 \`\`\`
 Ein am Sessionanfang gesetzter Claim ohne passende Freigabe am Sessionende ist selbst ein Befund — auch ein abgebrochener/BLOCKED-Task gibt seinen Claim frei.
+
+**v32 EMPFOHLENER ATOMARER QUER-CHECK** (zusätzlich zu 6-A/6-B/6-C, ersetzt sie NICHT — der xtask-Gate
+prüft weder \`cargo fmt\`/\`just sync-docs\` noch Shell-Commit-Messages):
+\`\`\`bash
+cargo run -p xtask -- jules-submit-gate --crate=${crate}
+\`\`\`
+Dieser Gate bündelt Rebase-Check, \`cargo check --workspace\`, Phantom-File-Check und Claim-Release
+atomar in EINEM Kommando mit sauberem Exit-Code — nutze ihn als zusätzliche Absicherung gegen einen
+Schritt, der in der manuellen 6-A/6-B/6-C-Sequenz versehentlich übersprungen wurde.
 
 Falls diese Sitzung eine reine Review-Sitzung war (kein eigener Code-Beitrag): hinterlasse vor \`just sync-docs\` mindestens einen \`REVIEW-PASS\`-Eintrag mit \`PRÜFER-KONTEXT: FRESH\`. \`WORKING_STATE.md\` niemals manuell editieren — bei Merge-Konflikten stets \`just sync-docs\`.
 `;
@@ -2032,6 +2204,11 @@ function ROLE_LOCK_BLOCK(mode, crate) {
   const scopeNote = partial
     ? `Diese Sitzung ist zusätzlich auf ${selected.length === 1 ? `die Komponente \`${selected[0].file}\`` : `${selected.length} explizit gewählte Komponenten (${selected.map(c=>'`'+c.file+'`').join(', ')})`} eingegrenzt.`
     : '';
+  // v31 NEU: crate-relative Pfade der Komponenten-Liste enthalten kein "crates/<crate>/src/"-Präfix —
+  // gegen HOTSPOT_FILES (volle Repo-Pfade) matchen wir daher sowohl den vollen als auch den
+  // zusammengesetzten Pfad je ausgewählter/aller Dateien dieses Crates.
+  const filesToCheck = (selected.length ? selected : all).map(c => `crates/${crate}/src/${c.file}`);
+  const hotspotBlock = filesToCheck.map(HOTSPOT_GUARDRAIL).filter(Boolean).join('');
 
   if (mode === 'planer') {
     return `---
@@ -2040,7 +2217,7 @@ function ROLE_LOCK_BLOCK(mode, crate) {
 
 Du agierst in dieser Session als **Planer**.
 - **ERLAUBT:** Platziere Inline-Kommentare \`// TODO(memfuse-plan): ...\` an den Zielstellen und erstelle den Durchführungsplan im PR-Body.
-- **VERBOTEN:** Schreiben von funktionaler Logik, Refactorings oder Fixes. Der Diff dieser Session darf AUSSCHLIESSLICH Kommentare und unimplemented!() Stubs enthalten! ${scopeNote}`;
+- **VERBOTEN:** Schreiben von funktionaler Logik, Refactorings oder Fixes. Der Diff dieser Session darf AUSSCHLIESSLICH Kommentare und unimplemented!() Stubs enthalten! ${scopeNote}${hotspotBlock}`;
   }
 
   if (mode === 'implementer' || mode === 'fixer') {
@@ -2051,7 +2228,7 @@ Du agierst in dieser Session als **Planer**.
 Du agierst in dieser Session als **Implementer**.
 - **Ablauf:** Finde alle \`// TODO(memfuse-plan)\` Marker im Scope.
 - **Abarbeitung:** Setze die Logik um und aktualisiere jeden Marker zu \`// DONE(memfuse-impl)\` oder \`// BLOCKED(memfuse-impl)\`.
-- **Verbot:** Niemals Marker stillschweigend löschen oder Dateien außerhalb des deklarierten Claims berühren! ${scopeNote}`;
+- **Verbot:** Niemals Marker stillschweigend löschen oder Dateien außerhalb des deklarierten Claims berühren! ${scopeNote}${hotspotBlock}`;
   }
 
   if (mode === 'reviewer') {
@@ -2062,7 +2239,7 @@ Du agierst in dieser Session als **Implementer**.
 Du agierst in dieser Session als **Reviewer**.
 - **Ablauf:** Du bewertest den Diff der vorangegangenen IMPLEMENT-Session.
 - **ERLAUBT:** Ausführen von Tests, Bauen von künstlichen Regressionsnachweisen / Crashes, Schreiben eines REVIEW-PASS/FAIL Kommentars.
-- **VERBOTEN:** Eigenen produktiven Code schreiben oder den Diff der Implementierung direkt abändern! ${scopeNote}`;
+- **VERBOTEN:** Eigenen produktiven Code schreiben oder den Diff der Implementierung direkt abändern! ${scopeNote}${hotspotBlock}`;
   }
 
   if (mode === 'prozess_ingenieur') {
@@ -2072,7 +2249,7 @@ Du agierst in dieser Session als **Reviewer**.
 
 Du agierst als **Prozess- / Gate-Ingenieur**.
 - **ERLAUBT:** Bearbeitung von CI-Gates, Workflow-Skripten, Dokumentation und Commit-Audits im expliziten Scope.
-- **VERBOTEN:** Änderungen an Produktionscode (\`crates/*/src/**/*.rs\`) außerhalb der expliziten Gate- / Doku-Pfade! ${scopeNote}`;
+- **VERBOTEN:** Änderungen an Produktionscode (\`crates/*/src/**/*.rs\`) außerhalb der expliziten Gate- / Doku-Pfade! ${scopeNote}${hotspotBlock}`;
   }
 
   if (mode === 'auditor') {
@@ -2081,15 +2258,82 @@ Du agierst als **Prozess- / Gate-Ingenieur**.
 ## Rollensperre: AUSSCHLIESSLICH Auditor/Analyst in dieser Sitzung
 
 Du bist in dieser Sitzung **kein Implementierer**.
-- **Verboten:** Jede Änderung an funktionalem Code. Befunde werden getaggt (\`AI-TAG\`), nicht in dieser Session behoben. ${scopeNote}`;
+- **Verboten:** Jede Änderung an funktionalem Code. Befunde werden getaggt (\`AI-TAG\`), nicht in dieser Session behoben. ${scopeNote}${hotspotBlock}`;
   }
 
   return `---
 
 ## Rollensperre: STANDARD SDLC SESSION
 
-Achte strikt auf den vereinbarten Scope und vermeide Scope-Creep. ${scopeNote}`;
+Achte strikt auf den vereinbarten Scope und vermeide Scope-Creep. ${scopeNote}${hotspotBlock}`;
 }
+// v31 NEU (aus design_plan_kv_cache_optimierung.md / Meta-Analyse gegen ANALYSEBERICHT_8TAGE.md):
+// Ersetzt passive "prüfe systematisch"-Anweisungen durch harte, unumgängliche
+// Proof-of-Work-Schranken. Grund: Fall A im Analysebericht — put_if_absent wurde
+// am 2026-09-13 04:14 Uhr per Audit-Report als "OK (VERIFIED)" deklariert und um
+// 06:37 Uhr (2 Std. später) als TOCTOU-Race-Condition gefixt. Der Report enthielt
+// KEINEN ausführbaren Negativ-Test — reine Prosa-Bewertung war ausreichend, um ein
+// GO/APPROVED-Siegel zu vergeben. Dieser Block macht das strukturell unmöglich.
+function PROOF_OF_WORK_BLOCK() {
+  return `
+### ⛔ PROOF-OF-WORK-SCHRANKE (v31, verbindlich — ersetzt reine Prosa-Verifikation)
+Ein Modul/eine Invariante darf in diesem Report NUR dann als \`OK\`/\`VERIFIED\` markiert
+werden, wenn EINE der folgenden Bedingungen in DIESEM Prompt-Lauf nachweislich erfüllt wurde:
+1. Ein ausführbarer, negativer Testcase wurde geschrieben und lief GRÜN, der beweist,
+   dass der konkret geprüfte Fehler (Race Condition, TOCTOU, Panic-Pfad, NaN-Leck, …)
+   NICHT auftritt — Testname UND \`cargo test\`-Ausgabe (ok/FAILED) gehören in den Report.
+2. Ein bestehender, bereits vorhandener Test deckt exakt diese Invariante nachweislich ab
+   — in diesem Fall zitiere Testname UND die konkrete Codezeile, die geprüft wird, statt
+   nur "Tests bestehen" zu behaupten.
+Eine Bewertung ohne einen dieser zwei Nachweise MUSS als \`UNVERIFIED (Prosa-only)\` markiert
+werden, NIEMALS als \`OK\`/\`VERIFIED\`/\`GO\`. "Der Code sieht korrekt aus" ist kein Nachweis.
+Bei Nebenläufigkeits-/Atomaritäts-Invarianten (Locks, TOCTOU, CAS): ein einzelner
+deterministischer Testlauf genügt NICHT als alleiniger Nachweis — führe den Test mindestens
+${'`--test-threads=8`'} mehrfach hintereinander (Stress-Wiederholung) aus, bevor du OK vergibst.`;
+}
+
+// v31 NEU: Hard-Fail statt manuellem Fortfahren bei fehlenden Audit-Tools.
+// Grund: Der memfuse-index-Audit (Commit cfbd5961) vergab "VERDICT: GO/APPROVED",
+// obwohl cargo-llvm-cov und cargo-mutants im Environment fehlten und der Report dies
+// selbst als "ÜBERSPRUNGEN" dokumentierte — die Lücke wurde nicht zum Abbruchgrund.
+function TOOLING_HARDFAIL_BLOCK() {
+  return `
+### ⛔ TOOLING-HARD-FAIL (v31, erste Aktion dieser Sitzung — vor jeder inhaltlichen Prüfung)
+\`\`\`bash
+for tool in cargo-llvm-cov cargo-mutants cargo-audit; do
+  command -v "$tool" >/dev/null 2>&1 || cargo "$tool" --version >/dev/null 2>&1 || echo "MISSING: $tool"
+done
+\`\`\`
+Wenn EIN benötigtes Tool fehlt: BRICH DIESEN AUDIT AB. Fahre NICHT manuell/approximativ fort
+und vergib KEIN GO/APPROVED-Verdikt auf Basis einer Teilprüfung. Dokumentiere das Tooling-Problem
+stattdessen als eigenen Fix-Commit (z.B. Ergänzung im CI-Image/Devcontainer) und markiere den
+betroffenen Prüfschritt im Report explizit als \`SKIPPED (Tooling fehlt)\` statt als \`OK\`.
+Ein Verdikt "GO/APPROVED" trotz \`SKIPPED\`-Prüfschritten ist NICHT zulässig (siehe
+ANALYSEBERICHT_8TAGE.md Abschnitt 4.3 — memfuse-index-Audit als Negativbeispiel).
+**v32 VM-Hinweis:** Falls die Installation (\`cargo install ...\`) an fehlendem Netzwerkzugriff der
+Sandbox scheitert (nicht nur an fehlendem Binary), ist das ein struktureller VM-Umgebungsbefund, kein
+punktueller Tooling-Fehler — dokumentiere explizit "Netzwerk-Restriktion" statt "Installation fehlgeschlagen",
+damit menschliche Reviewer den Unterschied zwischen "Devcontainer-Image ergänzen" und "Sandbox-Netzwerkregel
+anpassen" erkennen.`;
+}
+
+// v31 NEU: Globales Commit-Message- und Governance-Datei-Antipattern, siehe
+// ANALYSEBERICHT_8TAGE.md Abschnitt 4.1 (41/784 Commits = 5,2% ohne jede inhaltliche
+// Beschreibung: "Shell-Commit") und Abschnitt 4.5 (WORKING_STATE.md/SOURCE_OF_TRUTH.md/
+// CHANGELOG.md zusammen 219 Änderungen in 8 Tagen — mehr als lsm.rs).
+function GOVERNANCE_BLOCK(taskKind) {
+  const isGovernanceTask = taskKind === 'adr' || taskKind === 'korrektur';
+  return `
+### 📋 COMMIT- UND GOVERNANCE-DISZIPLIN (v31, verbindlich für JEDE Sitzung)
+- **Commit-Messages:** "Shell-Commit" oder vergleichbare inhaltsleere Messages sind STRIKT
+  VERBOTEN. Jeder Commit MUSS das geänderte Subsystem und den Grund ("Warum", nicht nur
+  "Was") benennen — insbesondere bei sicherheits-/durability-relevanten Dateien
+  (\`lsm.rs\`, \`wal.rs\`, \`fusion.rs\`, \`kv_cipher.rs\`).
+- **Governance-Write-Lock:** ${isGovernanceTask
+    ? 'Diese Sitzung ist eine ADR-/Korrektur-Session — Änderungen an `WORKING_STATE.md`, `docs/CHANGELOG.md`, `docs/SOURCE_OF_TRUTH.md` sind hier ausdrücklich erlaubt.'
+    : 'Dateien wie `WORKING_STATE.md`, `docs/CHANGELOG.md` oder `docs/SOURCE_OF_TRUTH.md` dürfen in DIESER Sitzung NICHT modifiziert werden (nur `tt-adr`/`tt-korrektur`-Sessions dürfen das). Falls `just sync-docs` diese Dateien automatisch regeneriert, ist das zulässig — eine manuelle inhaltliche Bearbeitung darüber hinaus nicht.'}`;
+}
+
   function TIER_BLOCK(crate) {
   const c = CRATES.find(x => x.id === crate);
   const tier = c ? c.tier : '2';
@@ -2251,6 +2495,25 @@ ${SESSIONEND_BLOCK(crate)}`;
 // Subsysteme lassen sich als reine Datenerweiterung ergänzen (neuer
 // Eintrag hier + Eintrag in SUBSYSTEM_TASKS), ohne UI-Code anzufassen.
 // ═══════════════════════════════════════════════════════════════════
+// ARCHITEKTUR-KLARSTELLUNG (betrifft den v32-Feedback-Punkt "Isolierung der Subsystem-Daten"):
+// SUBSYSTEMS referenziert bewusst DIESELBEN Dateien wie DEFAULT_COMPONENTS (wal.rs/lsm.rs/sandbox.rs
+// erscheinen dort ZUSÄTZLICH als normale Komponente ihrer Owner-Crate). Das ist KEINE versehentliche
+// Duplikation, sondern zwei unterschiedliche, gleichzeitig gültige Zugriffspfade auf dieselbe Datei:
+//   (a) Crate-Ebene: "Audit den gesamten memfuse-store" schließt wal.rs als eine von vielen Dateien
+//       mit ein (Breite) — für einen normalen Crate-Audit/-Fix/-Review-Task.
+//   (b) Subsystem-Ebene: "WAL-Sub-Audit" behandelt AUSSCHLIESSLICH wal.rs mit einem eigenen,
+//       hochspezialisierten Invarianten-Katalog (Tiefe) — siehe SUBSYSTEM_TASKS.wal_audit.
+// selSubsystem()/selCrate() erzwingen bereits die gegenseitige Exklusivität DIESER SITZUNG (nicht der
+// Datenhaltung) — man kann nicht gleichzeitig Crate- UND Subsystem-Modus aktiv haben.
+// Um Drift zwischen den beiden `loc`-Angaben zu vermeiden (die tatsächliche Ursache eines berechtigten
+// Datenpflege-Risikos), löst SUBSYS_LOC() die LOC-Zahl LIVE aus der jeweiligen COMPONENTS-Definition
+// auf, statt einen zweiten, unabhängig zu pflegenden Wert zu duplizieren — Single Source of Truth
+// bleibt DEFAULT_COMPONENTS, SUBSYSTEMS.loc ist nur noch ein Fallback falls die Datei dort fehlt.
+function SUBSYS_LOC(crate, filename) {
+  const entry = (COMPONENTS[crate] || []).find(c => c.file === filename);
+  return entry && entry.loc ? entry.loc : null;
+}
+
 const SUBSYSTEMS = [
   { id:'wal', crate:'memfuse-store', file:'crates/memfuse-store/src/wal.rs',
     loc:'3598', size:'XL', icon:'📜', name:'WAL',
@@ -2265,6 +2528,12 @@ const SUBSYSTEMS = [
     loc:'—', size:'M', icon:'🔐', name:'KV-Cache-Bridge',
     desc:'NEU (v30): KvBridgeAdapter — verbindet Retrieval-Chunks mandantenisoliert-verschlüsselt mit dem Candle-Inferenz-Pfad (Feature kv-bridge). Cross-Cutting über memfuse-candle/kv_bridge.rs + memfuse-crypto/kv_cipher.rs + kv_segment/. Kernrisiko: Fail-Open-Pflicht bei Cache-Miss/Krypto-Fehler UND ModelFingerprint-Isolation — siehe JULES_PROMPTS_KV_CRYPTO_GAP_2026-09-12.md.' },
 ];
+// Live-Auflösung der LOC-Werte gegen COMPONENTS direkt nach Deklaration (Single-Source-of-Truth-Patch):
+SUBSYSTEMS.forEach(s => {
+  const filename = s.file.split('/').pop();
+  const live = SUBSYS_LOC(s.crate, filename);
+  if (live) s.loc = live;
+});
 
 const EIGENBAU_COMPONENTS = [
   {
@@ -2433,6 +2702,7 @@ const TASKS = {
 plan: (crate, p, showPar) => {
   return `${PREAMBLE(crate)}${FULL_PROTOCOL(crate)}
 ${ROLE_LOCK_BLOCK('planer', crate)}
+${GOVERNANCE_BLOCK('plan')}
 ${TIER_BLOCK(crate)}
 ${DOMAIN_BLOCK(crate)}
 ---
@@ -2552,6 +2822,9 @@ ${p.focus || '— Lies crates/' + crate + '/src/ vollständig —'}
 ---
 
 ## Audit-Ablauf
+${TOOLING_HARDFAIL_BLOCK()}
+${GOVERNANCE_BLOCK('audit')}
+${PROOF_OF_WORK_BLOCK()}
 
 ### Schritt 1: Baseline lesen
 \`\`\`bash
@@ -2790,6 +3063,9 @@ ${DOMAIN_BLOCK(crate)}
 ---
 
 ## Tiefen-Audit — Fault-Injection, Concurrency, Property-Tests
+${TOOLING_HARDFAIL_BLOCK()}
+${GOVERNANCE_BLOCK('deep')}
+${PROOF_OF_WORK_BLOCK()}
 
 ### Phase 1: Property-Based Tests (proptest)
 \`\`\`bash
@@ -2937,6 +3213,16 @@ ${ROLE_LOCK_BLOCK('fixer', crate)}
 ---
 
 ## Fix / Refactoring-Auftrag
+${GOVERNANCE_BLOCK('fix')}
+
+### ⛔ AI-TAG-HYGIENE (v31, verbindlich — Audit≠Fix Role-Lock nur wirksam mit dieser Regel)
+Falls dieser Fix einen bestehenden \`AI-TAG[...]\`-Kommentar adressiert: es ist UNTERSAGT, dessen
+Status auf \`RESOLVED\`/\`ANALYZED-SAFE\` zu setzen, wenn der Diff dieser Sitzung KEINE funktionale
+Code-Änderung in der direkten Umgebung des Tags enthält. Reines Umlabeln ("Relabeling") ohne echten
+Bugfix ist nicht zulässig — Ausnahme: du weist im Kommentar konkret nach (mit Zeilenverweis), dass
+ein bereits vorhandener Guard/Test den Tag bereits entkräftet (siehe ANALYSEBERICHT_8TAGE.md Fall B/C
+zu \`fusion.rs:45\` — Tag-Drift ist erlaubt zu korrigieren, aber nur mit explizitem Code-Zitat als Beleg,
+nicht durch bloße Statusänderung).
 
 ### Schritt 1: Befund validieren (PFLICHT vor Code-Änderung)
 \`\`\`bash
@@ -2997,6 +3283,7 @@ test: (crate, p, showPar) => {
 ---
 
 ## Test-Ausbau-Auftrag
+${GOVERNANCE_BLOCK('test')}
 
 ### Schritt 1: Coverage-Analyse
 \`\`\`bash
@@ -3008,6 +3295,10 @@ cargo llvm-cov ${PKG(crate)} --all-features --html 2>&1 | tail -10
 # Identifiziere Dateien mit <80% Coverage
 # Priorität: Dateien mit kritischer Geschäftslogik
 \`\`\`
+**v31 HARD-FAIL-NACHTRAG:** Falls die Installation fehlschlägt UND dieser Testlauf Teil einer
+begleitenden Audit-Session ist, DARF diese Session KEIN GO/APPROVED-Gesamtverdikt für den
+betroffenen Coverage-Schritt vergeben — nur \`SKIPPED (Tooling fehlt)\`, siehe ANALYSEBERICHT_8TAGE.md
+Abschnitt 4.3 (memfuse-index-Audit als dokumentiertes Negativbeispiel für genau diesen Fehler).
 
 ### Schritt 2: Bestehende Tests analysieren (Anti-Mirroring-Prüfung)
 \`\`\`bash
@@ -3125,6 +3416,8 @@ ${DOD(crate)}`;
 review: (crate, p, showPar) => {
   return `${PREAMBLE(crate)}${FULL_PROTOCOL(crate)}
 ${ROLE_LOCK_BLOCK('auditor', crate)}
+${GOVERNANCE_BLOCK('review')}
+${PROOF_OF_WORK_BLOCK()}
 ---
 
 ## Unabhängiges Review — REVIEW-PASS-Sitzung (kein eigener Code-Beitrag)
@@ -4088,7 +4381,7 @@ grep -n "version\\|Version" crates/memfuse-crypto/src/kv_cipher.rs
 ### Phase K-3: Fail-Open- und Isolationstests laufen lassen
 \`\`\`bash
 cargo test -p memfuse-candle --features kv-bridge -- kv_bridge --nocapture 2>&1 | grep -E "ok|FAILED|panicked"
-cargo test -p memfuse-crypto -- kv_segment --nocapture 2>&1 | grep -E "ok|FAILED|panicked"
+cargo test -p memfuse-security -- kv_segment --nocapture 2>&1 | grep -E "ok|FAILED|panicked"
 # Gezielt: simulierter Store-/Krypto-Fehler MUSS zu vollem Prefill führen, nie zu Err() am Aufrufer
 cargo test -p memfuse-candle --features kv-bridge -- kv_bridge_fallback_on_error kv_bridge_fingerprint_mismatch --nocapture 2>&1 | grep -E "ok|FAILED"
 \`\`\`
@@ -4479,15 +4772,29 @@ function renderProcessTaskGrid(po) {
 
 
 function buildMandatoryBootstrap(claimCrate, taskId) {
+  // v32 KORRIGIERT gegen .jules/JULES_LOG.md und .jules/JULES_LOG_2.md — beide protokollieren die
+  // TATSÄCHLICHE, empirisch beobachtete Tool-Aufruf-Chronologie von Google-Jules in dieser Sandbox.
+  // Zwei reale Lücken der Vorversion behoben: (1) .jules/JULES_CONTEXT.md ("permanenter Ambient
+  // Context Snapshot") wurde bisher NIE gelesen, obwohl beide Logs es als Standard-Lesepflicht führen;
+  // (2) es fehlte eine explizite git-Zustandsprüfung (status/remote) vor jeder inhaltlichen Arbeit.
   return `---MANDATORY BOOTSTRAP (nicht überspringen, nicht kürzen)---
-[SCHRITT 0 — Inventar-Realitätsabgleich, IMMER ZUERST]
-1. read_file("AGENTS.md") — vollständig lesen
-2. read_file(".jules/SESSION_BOOTSTRAP.md") — vollständig lesen
-3. run_in_bash_session("head -80 WORKING_STATE.md") — Crate-Stand prüfen
-4. run_in_bash_session("export TASK_ID='${taskId}'   # DIESE ID bei Claim-Freigabe in Phase 6-D exakt wiederverwenden — NICHT neu generieren")
-5. run_in_bash_session("cargo xtask claim --crate ${claimCrate} --issue \"$TASK_ID\"")
+[SCHRITT 0 — Inventar-Realitätsabgleich, IMMER ZUERST, in dieser Reihenfolge]
+1. run_in_bash_session("git status; git log -n 5 --oneline; git remote -v")
+   — Working-Tree sauber? Aktueller Branch? Ist origin/main erreichbar? (git push/pull sind in
+   dieser VM-Sandbox gesperrt — nur lesende git-Befehle + submit-Tool für das finale Einreichen.)
+2. read_file("AGENTS.md") — vollständig lesen (höchste Priorität für Entwicklungsstandards)
+3. read_file(".jules/SESSION_BOOTSTRAP.md") — maschinenausführbare Bootstrap-Checkliste
+4. read_file(".jules/JULES_CONTEXT.md") — permanenter Ambient-Context-Snapshot (NICHT automatisch
+   im Hintergrund geladen — MUSS explizit per Tool-Call gelesen werden, sonst fehlt Session-Kontinuität)
+5. run_in_bash_session("head -80 WORKING_STATE.md") — Crate-Stand prüfen
+6. run_in_bash_session("export TASK_ID='${taskId}'   # DIESE ID bei Claim-Freigabe in Phase 6-D exakt wiederverwenden — NICHT neu generieren")
+7. run_in_bash_session("cargo xtask claim --crate ${claimCrate} --issue \"$TASK_ID\"")
    — Bei Claim-Konflikt: STOP. Nicht fortfahren. Meldung ausgeben.
-6. run_in_bash_session("cargo run -p xtask -- jules-preflight --fast")
+8. run_in_bash_session("cargo run -p xtask -- check-duplicate-intent")
+   — Prüft auf bereits offene, inhaltlich überlappende PR-Intents anderer Agenten-Sessions (Gate 12).
+   Bei Treffer: STOP, bevor Arbeit an potenziell redundantem Feature beginnt (siehe docs/GITHUB_ANALYSE.md
+   — 3 Agenten implementierten dieselbe Kalibrierungsfunktion parallel in #1627/#1634/#1645 und brachen main).
+9. run_in_bash_session("cargo run -p xtask -- jules-preflight --fast")
    — Bei Failure: Befund lesen, beheben, dann fortfahren
 ---END MANDATORY BOOTSTRAP---
 

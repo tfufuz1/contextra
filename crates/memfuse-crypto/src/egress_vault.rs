@@ -4,11 +4,11 @@
 // Bei Timeout, Regex-Fehlern oder Laufzeitfehlern gilt strikt Fail-Closed (EgressClassification::Block).
 // STAND: TS:2026-09-13 (SESSION: HEAD)
 
+use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
 /// Type alias for boxed dyn futures in `EgressClassifier` trait to ensure dyn compatibility.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -85,9 +85,7 @@ pub async fn classify_layer1(
     let eval_task = tokio::task::spawn_blocking(move || {
         for cp in &patterns_owned {
             if cp.regex.is_match(&payload_owned) {
-                return EgressClassification::Block(BlockReason::SensitivePattern(
-                    cp.name.clone(),
-                ));
+                return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
             }
         }
         EgressClassification::Allow
@@ -98,9 +96,7 @@ pub async fn classify_layer1(
         Ok(Err(join_err)) => EgressClassification::Block(BlockReason::InternalError(format!(
             "Evaluation task failed: {join_err}"
         ))),
-        Err(_timeout_elapsed) => {
-            EgressClassification::Block(BlockReason::ClassificationTimeout)
-        }
+        Err(_timeout_elapsed) => EgressClassification::Block(BlockReason::ClassificationTimeout),
     }
 }
 
@@ -204,11 +200,8 @@ mod tests {
         let mut huge_payload = "a".repeat(2_000_000);
         huge_payload.push_str("!");
 
-        let patterns = vec![
-            CompiledPattern::new("slow_pattern", r"(a+)+b").unwrap_or_else(|_| {
-                CompiledPattern::new("fallback_pattern", r"a{1000,}").unwrap()
-            }),
-        ];
+        let patterns = vec![CompiledPattern::new("slow_pattern", r"(a+)+b")
+            .unwrap_or_else(|_| CompiledPattern::new("fallback_pattern", r"a{1000,}").unwrap())];
 
         let start = Instant::now();
         // Setze extrem kurzes Timeout (1 Microsekunde / 10 Mikros), um Timeout-Pfad sicher zu triggern

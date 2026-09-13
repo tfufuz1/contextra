@@ -50,11 +50,11 @@ fn chrono_or_today() -> String {
 // AUFGABE: chrono_or_today() lieferte statischen String "2026-08-27" — behoben durch Systemaufruf
 // GATE:    grep -v "2026-08-27" WORKING_STATE.md
 mod bench_gate;
-mod check_bandit_latency_budget;
 mod check_adr_deadlines;
 mod check_agents_integrity;
 mod check_audit_duplication;
 mod check_audit_verdict_independence;
+mod check_bandit_latency_budget;
 mod check_commit_messages;
 mod check_compile;
 mod check_doc_references;

@@ -58,7 +58,11 @@ impl BanditProfileState {
     ///
     /// r̂_p(x) = θᵀx + α√(Σ(x)) - λ·cost - μ·is_cloud
     pub fn score(&self, x: &[f32], cost: f32, is_cloud_transport: bool) -> f32 {
-        debug_assert_eq!(x.len(), self.theta.len(), "Embedding-Dimension muss übereinstimmen");
+        debug_assert_eq!(
+            x.len(),
+            self.theta.len(),
+            "Embedding-Dimension muss übereinstimmen"
+        );
 
         let dot: f32 = self.theta.iter().zip(x.iter()).map(|(t, xi)| t * xi).sum();
 
@@ -120,7 +124,10 @@ mod tests {
         let x = vec![1.0f32; 4];
         // Cold-Start: θᵀx = 0, Varianzterm > 0 → Score > 0
         let score = state.score(&x, 0.0, false);
-        assert!(score > 0.0, "Cold-Start Score muss durch Exploration > 0 sein");
+        assert!(
+            score > 0.0,
+            "Cold-Start Score muss durch Exploration > 0 sein"
+        );
     }
 
     #[test]
@@ -128,7 +135,10 @@ mod tests {
         let mut state = BanditProfileState::cold_start(2, 0.5);
         let x = vec![1.0f32, 0.0f32];
         state.update(&x, 1.0, 0.0, false); // Success = 1.0
-        assert!(state.theta[0] > 0.0, "θ[0] muss nach positivem Reward steigen");
+        assert!(
+            state.theta[0] > 0.0,
+            "θ[0] muss nach positivem Reward steigen"
+        );
         assert_eq!(state.theta[1], 0.0, "θ[1] bleibt 0 da x[1]=0");
     }
 
@@ -138,7 +148,10 @@ mod tests {
         let x = vec![1.0f32, 1.0f32];
         let score_local = state.score(&x, 0.0, false);
         let score_cloud = state.score(&x, 0.0, true);
-        assert!(score_local > score_cloud, "Cloud-Transport-Penalty muss Score reduzieren");
+        assert!(
+            score_local > score_cloud,
+            "Cloud-Transport-Penalty muss Score reduzieren"
+        );
     }
 
     #[test]

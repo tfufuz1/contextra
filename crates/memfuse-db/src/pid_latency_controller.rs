@@ -76,7 +76,11 @@ impl PidLatencyController {
 
         Self {
             kp: if kp.is_finite() && kp >= 0.0 { kp } else { 0.5 },
-            ki: if ki.is_finite() && ki >= 0.0 { ki } else { 0.05 },
+            ki: if ki.is_finite() && ki >= 0.0 {
+                ki
+            } else {
+                0.05
+            },
             kd: if kd.is_finite() && kd >= 0.0 { kd } else { 0.1 },
             target_latency_ms,
             integral: 0.0,

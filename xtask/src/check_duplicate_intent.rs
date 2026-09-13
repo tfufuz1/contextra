@@ -329,9 +329,7 @@ fn parse_diff_file_path(line: &str) -> Option<PathBuf> {
 /// - Macro-generated symbols are not detected.
 /// - Multiline function/struct/enum/trait signatures with newlines before the identifier name may be missed.
 /// - Non-standard formatting or non-Rust code may lead to undetected or false symbols.
-pub fn extract_changed_files_and_symbols(
-    diff_text: &str,
-) -> HashMap<PathBuf, HashSet<String>> {
+pub fn extract_changed_files_and_symbols(diff_text: &str) -> HashMap<PathBuf, HashSet<String>> {
     let mut map: HashMap<PathBuf, HashSet<String>> = HashMap::new();
     let mut current_file: Option<PathBuf> = None;
 
@@ -339,7 +337,8 @@ pub fn extract_changed_files_and_symbols(
         r#"^\+\s*(?:pub(?:\([^)]+\))?\s+)?(?:const\s+|async\s+|unsafe\s+|extern\s+(?:"[^"]+"\s+)?)*fn\s+([a-zA-Z_]\w*)"#,
     )
     .unwrap();
-    let struct_re = Regex::new(r#"^\+\s*(?:pub(?:\([^)]+\))?\s+)?struct\s+([a-zA-Z_]\w*)"#).unwrap();
+    let struct_re =
+        Regex::new(r#"^\+\s*(?:pub(?:\([^)]+\))?\s+)?struct\s+([a-zA-Z_]\w*)"#).unwrap();
     let enum_re = Regex::new(r#"^\+\s*(?:pub(?:\([^)]+\))?\s+)?enum\s+([a-zA-Z_]\w*)"#).unwrap();
     let trait_re = Regex::new(r#"^\+\s*(?:pub(?:\([^)]+\))?\s+)?trait\s+([a-zA-Z_]\w*)"#).unwrap();
 
@@ -489,9 +488,7 @@ pub fn get_remote_branch_diffs() -> Vec<BranchDiffEntry> {
     diff_entries
 }
 
-pub fn fetch_open_pr_diffs_from_github(
-    token: &str,
-) -> Result<Vec<BranchDiffEntry>, String> {
+pub fn fetch_open_pr_diffs_from_github(token: &str) -> Result<Vec<BranchDiffEntry>, String> {
     let url = "https://api.github.com/repos/tfufuz1/memfuse/pulls?state=open&per_page=100";
     let output = Command::new("curl")
         .args([
@@ -508,7 +505,10 @@ pub fn fetch_open_pr_diffs_from_github(
         .map_err(|e| format!("curl command failed when listing open PRs: {}", e))?;
 
     if !output.status.success() {
-        return Err(format!("curl returned exit status {} when listing open PRs", output.status));
+        return Err(format!(
+            "curl returned exit status {} when listing open PRs",
+            output.status
+        ));
     }
 
     let body = String::from_utf8_lossy(&output.stdout);
@@ -538,7 +538,10 @@ pub fn fetch_open_pr_diffs_from_github(
 
         attempt_count += 1;
         let title = pr["title"].as_str().unwrap_or_default();
-        let pr_url = format!("https://api.github.com/repos/tfufuz1/memfuse/pulls/{}", pr_number);
+        let pr_url = format!(
+            "https://api.github.com/repos/tfufuz1/memfuse/pulls/{}",
+            pr_number
+        );
 
         let diff_output = Command::new("curl")
             .args([
@@ -625,10 +628,7 @@ pub fn get_current_diff() -> String {
         }
     }
 
-    if let Ok(diff_out) = Command::new("git")
-        .args(["diff", "HEAD~1..HEAD"])
-        .output()
-    {
+    if let Ok(diff_out) = Command::new("git").args(["diff", "HEAD~1..HEAD"]).output() {
         if diff_out.status.success() {
             return String::from_utf8_lossy(&diff_out.stdout).to_string();
         }
@@ -678,7 +678,10 @@ pub fn check_duplicate_intent() -> Result<(), String> {
                 let msg = format!("❌ Gate 12: GitHub REST API PR diff call failed: {}", e);
                 eprintln!("{}", msg);
                 if is_ci {
-                    return Err(format!("GitHub API PR diff call failed in CI context: {}", e));
+                    return Err(format!(
+                        "GitHub API PR diff call failed in CI context: {}",
+                        e
+                    ));
                 }
             }
         }
@@ -1098,7 +1101,11 @@ diff --git a/crates/memfuse-store/src/sstable.rs b/crates/memfuse-store/src/ssta
 
         let overlaps = compute_symbol_overlap(&map_pr1, &map_pr2);
 
-        assert_eq!(overlaps.len(), 1, "Must detect symbol overlap in sstable.rs");
+        assert_eq!(
+            overlaps.len(),
+            1,
+            "Must detect symbol overlap in sstable.rs"
+        );
         let (file, symbols) = &overlaps[0];
         assert_eq!(file, &PathBuf::from("crates/memfuse-store/src/sstable.rs"));
         assert!(symbols.contains("BlockCache"), "Must contain BlockCache");

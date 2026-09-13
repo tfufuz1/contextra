@@ -68,7 +68,10 @@ async fn test_group_commit_concurrency_stress_200_tasks() {
     }
 }
 
-async fn run_latency_benchmark(num_writers: usize, num_commits_per_writer: usize) -> (Duration, Duration, Duration) {
+async fn run_latency_benchmark(
+    num_writers: usize,
+    num_commits_per_writer: usize,
+) -> (Duration, Duration, Duration) {
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
@@ -78,11 +81,7 @@ async fn run_latency_benchmark(num_writers: usize, num_commits_per_writer: usize
         ..Default::default()
     };
 
-    let storage = Arc::new(
-        LsmStorage::new(config)
-            .await
-            .expect("create storage"),
-    );
+    let storage = Arc::new(LsmStorage::new(config).await.expect("create storage"));
 
     let mut set = tokio::task::JoinSet::new();
 
@@ -127,9 +126,18 @@ async fn test_group_commit_latency_benchmark_zero_wait() {
     let (avg_64, p50_64, p99_64) = run_latency_benchmark(64, 10).await;
 
     println!("\n=== GROUP COMMIT ZERO-WAIT LATENCY BENCHMARK ===");
-    println!("1  writer  (50 commits):  avg = {:?}, p50 = {:?}, p99 = {:?}", avg_1, p50_1, p99_1);
-    println!("16 writers (320 commits): avg = {:?}, p50 = {:?}, p99 = {:?}", avg_16, p50_16, p99_16);
-    println!("64 writers (640 commits): avg = {:?}, p50 = {:?}, p99 = {:?}", avg_64, p50_64, p99_64);
+    println!(
+        "1  writer  (50 commits):  avg = {:?}, p50 = {:?}, p99 = {:?}",
+        avg_1, p50_1, p99_1
+    );
+    println!(
+        "16 writers (320 commits): avg = {:?}, p50 = {:?}, p99 = {:?}",
+        avg_16, p50_16, p99_16
+    );
+    println!(
+        "64 writers (640 commits): avg = {:?}, p50 = {:?}, p99 = {:?}",
+        avg_64, p50_64, p99_64
+    );
     println!("================================================\n");
 
     // Single writer P50 must be reasonable for I/O + fsync without adding the mandatory group_commit_window delay.

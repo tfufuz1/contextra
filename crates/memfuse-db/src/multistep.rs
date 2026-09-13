@@ -196,7 +196,14 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 // 3. The original vector contributes via Round-1 results in RRF fusion
                 // ANCHOR[MULTISTEP:SUBQUERY-EMBEDDING] STATUS:DONE (TS:2026-06-01T00:00:00Z) — See TRACKING-ISSUE #143 for
                 // future improvement: inject TextEmbeddingEngine for sub-query vectors.
-                match self.collection.query().text(sub_q).k(scaled_k).execute().await {
+                match self
+                    .collection
+                    .query()
+                    .text(sub_q)
+                    .k(scaled_k)
+                    .execute()
+                    .await
+                {
                     Ok(sub_results) => {
                         all_result_sets.push(sub_results);
                         sub_queries.push(sub_q.clone());
