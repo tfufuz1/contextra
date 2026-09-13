@@ -457,18 +457,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         false
     }
 
-    /// Atomisch prüft ob `key` in irgendeiner uncommitted Transaktion als Insert gestaged ist.
-    ///
-    /// Bietet O(1) atomare Einzel-Shard-Abfrage ohne sweep über 64 Shards.
-    pub fn is_key_staged_globally(&self, key: &[u8]) -> bool {
-        let idx = self.key_shard_idx(key);
-        let shard = self.key_shards[idx].read();
-        if let Some(map) = shard.staged.get(key) {
-            return map.values().any(|&is_insert| is_insert);
-        }
-        false
-    }
-
     /// Atomisch ermittelt den Staging-Status eines Keys über alle uncommitted Transaktionen.
     ///
     /// Gibt `Some(true)` für Insert, `Some(false)` für Delete, oder `None` zurück.
@@ -787,8 +775,6 @@ mod tests {
         assert!(buffer.is_key_staged_for_tx(tx1, &key_a));
         // tx2 does NOT have key_a staged in its transaction scope
         assert!(!buffer.is_key_staged_for_tx(tx2, &key_a));
-        // Globally key_a is staged in buffer
-        assert!(buffer.is_key_staged_globally(&key_a));
     }
 
     #[test]
