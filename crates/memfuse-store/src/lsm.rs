@@ -1251,64 +1251,55 @@ impl LsmStorage {
             }
         }
 
-        // 2. Immutable memtables (older -> newer)
-        for mt in &state.immutable_memtables {
-            let mut source_count = 0usize;
-            for (k, v, seq, tx) in mt.iter() {
-                if tx > last_tx && tx < TxId::INTERNAL_BASE {
-                    continue;
+        // Helper inline closure to scan a MemTable using range/prefix or full-scan fallback
+        let scan_memtable = |mt: &MemTable, target: &mut std::collections::BTreeMap<Bytes, (Bytes, u64)>| {
+            match mode {
+                SstableScanMode::Prefix(prefix) => {
+                    mt.scan_prefix_into_matching(prefix, u64::MAX, TxId(last_tx), target, &entry_filter);
                 }
-                let raw_seq = seq & !TOMBSTONE_BIT;
-                if entry_filter(k.as_ref(), raw_seq, tx) {
-                    let entry = map.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
-                    if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                        *entry = (v.clone(), seq);
-                    }
-                    if check_accumulator && map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
-                        return Err(MemFuseError::LimitExceeded {
-                            limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
-                            context: format!(
-                                "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
-                            ),
-                        });
-                    }
-                    source_count += 1;
-                    if let Some(lim) = per_source_limit {
-                        if source_count >= lim {
-                            break;
+                SstableScanMode::Range(std::ops::Bound::Unbounded, std::ops::Bound::Unbounded) => {
+                    // Fallback: Vollscan ohne Range-Einschränkung iteriert über alle Einträge
+                    for (k, v, seq, tx) in mt.iter() {
+                        if tx > last_tx && tx < TxId::INTERNAL_BASE {
+                            continue;
+                        }
+                        let raw_seq = seq & !TOMBSTONE_BIT;
+                        if entry_filter(k.as_ref(), raw_seq, tx) {
+                            let entry = target.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
+                            if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
+                                *entry = (v.clone(), seq);
+                            }
                         }
                     }
                 }
+                SstableScanMode::Range(start, end) => {
+                    mt.scan_range_into_matching(start, end, u64::MAX, TxId(last_tx), target, &entry_filter);
+                }
+            }
+        };
+
+        // 2. Immutable memtables (older -> newer)
+        for mt in &state.immutable_memtables {
+            scan_memtable(mt, &mut map);
+            if check_accumulator && map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
+                return Err(MemFuseError::LimitExceeded {
+                    limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
+                    context: format!(
+                        "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
+                    ),
+                });
             }
         }
 
         // 3. Active memtable
-        let mut source_count = 0usize;
-        for (k, v, seq, tx) in state.memtable.iter() {
-            if tx > last_tx && tx < TxId::INTERNAL_BASE {
-                continue;
-            }
-            let raw_seq = seq & !TOMBSTONE_BIT;
-            if entry_filter(k.as_ref(), raw_seq, tx) {
-                let entry = map.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
-                if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                    *entry = (v.clone(), seq);
-                }
-                if check_accumulator && map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
-                    return Err(MemFuseError::LimitExceeded {
-                        limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
-                        context: format!(
-                            "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
-                        ),
-                    });
-                }
-                source_count += 1;
-                if let Some(lim) = per_source_limit {
-                    if source_count >= lim {
-                        break;
-                    }
-                }
-            }
+        scan_memtable(&state.memtable, &mut map);
+        if check_accumulator && map.len() > memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR {
+            return Err(MemFuseError::LimitExceeded {
+                limit: memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR,
+                context: format!(
+                    "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
+                ),
+            });
         }
 
         Ok(map)
