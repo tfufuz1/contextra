@@ -1,9 +1,18 @@
-//! INTEGRATION GUIDE (post-JULES-01-merge):
-//! 1. In LsmStorage::new(): spawn SystemPressureMonitor::run() als background task.
-//! 2. In Collection::insert(): pressure_rx.borrow().pressure_level != Critical prüfen;
-//!    bei Critical: tokio::time::sleep(backpressure_delay).await vor dem Insert.
-//! 3. In memfuse-embed/TextEmbedder: pressure_rx subscriben; bei Critical:
-//!    embed()-Calls mit Timeout versehen oder in Warteschlange einreihen.
+//! INTEGRATION GUIDE:
+//! 1. In LsmStorage::new(): SystemPressureMonitor::run() is spawned as a background task
+//!    monitoring group-commit follower queue depth (`wal_queue_depth_fn`).
+//! 2. In Collection::insert(): pressure_rx.borrow().pressure_level != Critical is checked;
+//!    if Critical: tokio::time::sleep(backpressure_delay).await before insert.
+//! 3. In memfuse-embed/TextEmbedder: pressure_rx subscriber handles Critical state for embeddings.
+//!
+//! IMPLEMENTATION NOTES & LIMITATIONS:
+//! - `wal_queue_depth`: Fully implemented in `LsmStorage` via AtomicUsize tracking pending
+//!   group-commit followers awaiting disk write/notification.
+//! - `blocking_util`: Currently measures Tokio async scheduler global queue depth
+//!   (`metrics.global_queue_depth()`), NOT dedicated blocking thread pool utilization.
+//! - `embedding_queue_depth`: Defaults to `0/0` in `LsmStorage` because `memfuse-store` is a pure
+//!   KV engine decoupled from embedding crates (`memfuse-embed` / `memfuse-candle`), which manage
+//!   their own semaphore permits.
 
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
