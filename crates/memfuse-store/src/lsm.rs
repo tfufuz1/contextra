@@ -271,7 +271,6 @@ struct CommitGuard<'a> {
 struct LsmState {
     memtable: Arc<MemTable>,
     immutable_memtables: Vec<Arc<MemTable>>,
-    wal: Wal,
 }
 
 /// LSM-Tree based storage engine.
@@ -284,6 +283,7 @@ pub struct LsmStorage {
     tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
     budget: Arc<ResourceTracker>,
     block_cache: Arc<BlockCache>,
+    wal: RwLock<Arc<Wal>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
@@ -623,12 +623,12 @@ impl LsmStorage {
             state: RwLock::new(LsmState {
                 memtable: Arc::new(memtable),
                 immutable_memtables: Vec::new(),
-                wal,
             }),
             sstables,
             tx_buffer,
             budget: resource_tracker,
             block_cache,
+            wal: RwLock::new(Arc::new(wal)),
             snapshot_registry,
             compaction_engine, // H-3: persistent field
             manifest,
@@ -660,8 +660,8 @@ impl LsmStorage {
         // WAL cleanup: now safe, replayed data is on disk in SSTable
         if wal_files.len() > 1 {
             let active_wal_path = {
-                let state = storage.state.read().await;
-                state.wal.path().to_path_buf()
+                let wal = storage.wal.read().await;
+                wal.path().to_path_buf()
             };
             for (_ts, old_wal_path) in &wal_files[..wal_files.len() - 1] {
                 if old_wal_path != &active_wal_path {
@@ -780,30 +780,30 @@ impl LsmStorage {
 
     #[doc(hidden)]
     pub async fn simulate_wal_append_failure_for_test(&self) {
-        let state = self.state.read().await;
-        let wal_path = state.wal.path().to_path_buf();
+        let wal = self.wal.read().await;
+        let wal_path = wal.path().to_path_buf();
         if let Ok(ro_file) = tokio::fs::OpenOptions::new()
             .read(true)
             .write(false)
             .open(&wal_path)
             .await
         {
-            let mut file_guard = state.wal.file.lock().await;
+            let mut file_guard = wal.file.lock().await;
             *file_guard = ro_file;
         }
     }
 
     #[doc(hidden)]
     pub async fn restore_wal_file_handle_for_test(&self) {
-        let state = self.state.read().await;
-        let wal_path = state.wal.path().to_path_buf();
+        let wal = self.wal.read().await;
+        let wal_path = wal.path().to_path_buf();
         if let Ok(rw_file) = tokio::fs::OpenOptions::new()
             .read(true)
             .append(true)
             .open(&wal_path)
             .await
         {
-            let mut file_guard = state.wal.file.lock().await;
+            let mut file_guard = wal.file.lock().await;
             *file_guard = rw_file;
         }
     }
@@ -870,10 +870,11 @@ impl LsmStorage {
         }
 
         let mut state = self.state.write().await;
+        let wal = self.wal.read().await.clone();
 
         // 1. Truncate WAL to the position after target_tx
-        let (target_offset, target_hmac) = state.wal.find_tx_offset(target_tx).await?;
-        state.wal.truncate(target_offset, target_hmac).await?;
+        let (target_offset, target_hmac) = wal.find_tx_offset(target_tx).await?;
+        wal.truncate(target_offset, target_hmac).await?;
 
         // 2. Clear current memtable (it might have data > target_tx)
         state.memtable = Arc::new(MemTable::new());
@@ -1015,7 +1016,7 @@ impl LsmStorage {
         }
 
         // 5. Re-populate memtable from truncated WAL
-        let entries = state.wal.replay().await?;
+        let entries = wal.replay().await?;
         // TOMBSTONE_BIT-Disziplin (DECISIONS.md): Bit 63 darf niemals in next_seq_no einfließen.
         for (seq, entry, _offset) in entries {
             if (seq & !TOMBSTONE_BIT) > max_seq {
@@ -1675,25 +1676,15 @@ impl StorageEngine for LsmStorage {
             }
 
             // --- PHASE 2: Prepare WAL entries under commit_mutex ---
-            // INVARIANT-LOCK-1 (Commit ↔ Flush Exklusivität):
-            // Exklusiver Write-Lock auf `state` ist hier zwingend, nicht optional.
-            // Begründung: `flush()` benötigt ebenfalls `state.write()` für den atomaren Memtable-Swap
-            // (Arc::new(MemTable::new()) + std::mem::replace). Würde dieser Pfad `state.read()` nutzen,
-            // könnte ein parallel laufender `flush()` den Memtable-Swap vollziehen, während wir
-            // `memtable.put()` aufrufen — der Eintrag landete dann im *alten*, bereits gedropten Memtable.
-            // Der Group-Commit-Leader-Pfad darf `state.read()` verwenden, weil er `commit_mutex`
-            // re-acquired, bevor er in den State schreibt, und damit parallele flush()-Swaps serialisiert.
-            // ADR-003: "Compaction-Lock muss VOR MemTable-Lock genommen werden."
-            // Siehe auch: DECISIONS.md ADR-003, lsm.rs flush() ~Zeile 1774.
-            let state = self.state.write().await;
-            let (wal_entries, prev_hmac_snapshot) = state.wal.prepare_batch(wal_ops).await?;
+            // commit_mutex ist gehalten; WAL I/O erfolgt außerhalb des state-Locks.
+            let wal = self.wal.read().await.clone();
+            let (wal_entries, prev_hmac_snapshot) = wal.prepare_batch(wal_ops).await?;
 
             // If group commit window is disabled (0 micros), perform immediate single commit
             if self.config.group_commit_window_micros == 0 {
-                if let Err(e) = state.wal.append_batch(wal_entries).await {
-                    let _ = state.wal.restore_last_hmac(prev_hmac_snapshot).await;
+                if let Err(e) = wal.append_batch(wal_entries).await {
+                    let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
                     // FATAL I/O ERROR: Physical Rollback to last committed transaction state
-                    drop(state);
                     let last_tx = TxId::new(self.last_committed_tx.load(Ordering::Acquire));
                     let commit_guard = CommitGuard {
                         _lock: &_commit_lock,
@@ -1713,6 +1704,8 @@ impl StorageEngine for LsmStorage {
                     )));
                 }
 
+                // PHASE 4: MemTable-Update — kurzer Write-Lock nur für In-Memory-Schreibvorgang
+                let state = self.state.write().await;
                 self.advance_visibility(tx_id);
                 self.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
 
@@ -1749,7 +1742,6 @@ impl StorageEngine for LsmStorage {
                     None
                 };
                 drop(queue_guard);
-                drop(state);
                 drop(_commit_lock);
 
                 if let Some(notify) = notify_full {
@@ -1778,7 +1770,6 @@ impl StorageEngine for LsmStorage {
                     notify_full: notify_full.clone(),
                 });
                 drop(queue_guard);
-                drop(state);
                 drop(_commit_lock);
 
                 // Wait for group commit window or until MAX_GROUP_COMMIT_BATCH_SIZE is reached
@@ -1818,7 +1809,7 @@ impl StorageEngine for LsmStorage {
                 // darf nicht "vereinheitlicht" werden, ohne diese Analyse zu wiederholen.
                 // ⚠ WARNUNG: Diesen Lock NICHT auf state.write() ändern — das würde unter commit_mutex
                 // zu einem verschachtelten Write-Lock führen, der mit flush() deadlocken kann.
-                let state = self.state.read().await;
+                let wal = self.wal.read().await.clone();
 
                 // Combine leader's WAL entries with all follower WAL entries
                 let mut all_wal_entries = leader_wal_entries;
@@ -1826,12 +1817,10 @@ impl StorageEngine for LsmStorage {
                     all_wal_entries.extend(r.wal_entries.clone());
                 }
 
-                if let Err(e) = state.wal.append_batch(all_wal_entries).await {
-                    let _ = state
-                        .wal
+                if let Err(e) = wal.append_batch(all_wal_entries).await {
+                    let _ = wal
                         .restore_last_hmac(pending_queue.first_prev_hmac)
                         .await;
-                    drop(state);
 
                     let last_tx = TxId::new(self.last_committed_tx.load(Ordering::Acquire));
                     let commit_guard = CommitGuard {
@@ -1881,14 +1870,15 @@ impl StorageEngine for LsmStorage {
                     all_updates.push((r.tx_id, &r.mem_updates));
                 }
 
+                let state = self.state.read().await;
                 for (req_tx_id, mem_updates) in all_updates {
                     self.advance_visibility(req_tx_id);
                     self.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
                 }
 
                 let needs_flush = state.memtable.size() > self.config.memtable_size_limit;
+                drop(state);
                 if needs_flush {
-                    drop(state);
                     if let Err(flush_err) = self.flush().await {
                         tracing::error!("Flush failed after group commit: {}", flush_err);
                     }
@@ -2020,7 +2010,10 @@ impl StorageEngine for LsmStorage {
 
                     let old_memtable =
                         std::mem::replace(&mut state.memtable, Arc::new(MemTable::new()));
-                    let old_wal = std::mem::replace(&mut state.wal, new_wal);
+                    let old_wal = {
+                        let mut wal_guard = self.wal.write().await;
+                        std::mem::replace(&mut *wal_guard, Arc::new(new_wal))
+                    };
                     state.immutable_memtables.push(old_memtable);
                     let path = old_wal.path().to_path_buf();
                     drop(old_wal);
@@ -3409,10 +3402,8 @@ mod tests {
         // Put MAX_SCAN_MERGE_ACCUMULATOR + 5 items across multiple transactions (max 5000 ops per tx)
         let total = memfuse_core::MAX_SCAN_MERGE_ACCUMULATOR + 5;
         let batch_size = 5000;
-        let mut tx_num = 1;
-
-        for chunk in (0..total).collect::<Vec<_>>().chunks(batch_size) {
-            let tx = TxId::new(tx_num);
+        for (idx, chunk) in (0..total).collect::<Vec<_>>().chunks(batch_size).enumerate() {
+            let tx = TxId::new((idx + 1) as u64);
             let entries: Vec<(Vec<u8>, Vec<u8>)> = chunk
                 .iter()
                 .map(|i| {
@@ -3424,7 +3415,6 @@ mod tests {
                 .collect();
             storage.put_batch(tx, &entries).await.unwrap();
             storage.commit(tx).await.unwrap();
-            tx_num += 1;
         }
 
         // Calling scan_bounded over unbounded range must fail with LimitExceeded
@@ -4448,9 +4438,9 @@ mod tests {
         storage.put(tx1, b"k1", b"v1").await.unwrap();
         storage.commit(tx1).await.unwrap();
 
-        let state = storage.state.read().await;
-        let hmac_before = state.wal.last_hmac_snapshot().await;
-        let wal_path = state.wal.path().to_path_buf();
+        let wal = storage.wal.read().await;
+        let hmac_before = wal.last_hmac_snapshot().await;
+        let wal_path = wal.path().to_path_buf();
 
         // Replace file with read-only handle to simulate WAL append failure
         {
@@ -4460,18 +4450,18 @@ mod tests {
                 .open(&wal_path)
                 .await
                 .unwrap();
-            let mut file_guard = state.wal.file.lock().await;
+            let mut file_guard = wal.file.lock().await;
             *file_guard = ro_file;
         }
-        drop(state);
+        drop(wal);
 
         let tx2 = TxId::new(2);
         storage.put(tx2, b"k2", b"v2").await.unwrap();
         let commit_res = storage.commit(tx2).await;
         assert!(commit_res.is_err(), "Commit must fail when WAL write fails");
 
-        let state = storage.state.read().await;
-        let hmac_after = state.wal.last_hmac_snapshot().await;
+        let wal = storage.wal.read().await;
+        let hmac_after = wal.last_hmac_snapshot().await;
         assert_eq!(
             hmac_after, hmac_before,
             "last_hmac must be restored to pre-commit state after commit failure"
