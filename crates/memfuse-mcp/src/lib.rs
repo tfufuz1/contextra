@@ -278,9 +278,24 @@ impl McpServer {
         let mut stdout = tokio::io::stdout();
         let mut reader = BufReader::new(stdin);
         let mut line_buf = String::new();
+        const STDIO_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
         loop {
-            match read_line_bounded(&mut reader, &mut line_buf, MAX_RPC_BYTES).await {
+            let read_res = tokio::time::timeout(
+                STDIO_READ_TIMEOUT,
+                read_line_bounded(&mut reader, &mut line_buf, MAX_RPC_BYTES),
+            )
+            .await;
+
+            let read_line_res = match read_res {
+                Ok(res) => res,
+                Err(_) => {
+                    tracing::warn!("stdio read timeout after {STDIO_READ_TIMEOUT:?} inactivity");
+                    return Err("stdio idle timeout".into());
+                }
+            };
+
+            match read_line_res {
                 Ok(0) => break, // EOF
                 Ok(_) => {
                     let trimmed = line_buf.trim();
@@ -875,10 +890,6 @@ impl McpServer {
             }
 
             "memfuse_get" => {
-                // AI-TAG[SMELL][MINOR] Missing explicit id.len() <= 256 length check in memfuse_get (ID: AGT-MCP-a2705ed3) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863)
-                // BEFUND: memfuse_get checks empty string but does not enforce id.len() <= 256 before col.get().
-                // RISIKO: Excessively long ID strings are passed down to storage layer lookup.
-                // EMPFEHLUNG: Add explicit id.len() <= 256 check in memfuse_get handler analog to memfuse_insert.
                 let id = match args.get("id") {
                     Some(v) => {
                         let s = v.as_str().ok_or_else(|| {
@@ -886,6 +897,11 @@ impl McpServer {
                         })?;
                         if s.trim().is_empty() {
                             return Err(McpError::invalid_params("id cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "id length exceeds limit: max 256 chars",
+                            ));
                         }
                         s
                     }
