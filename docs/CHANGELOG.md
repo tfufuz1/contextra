@@ -4,6 +4,7 @@
 
 | Zeitstempel | Crate/Datei | Typ | ID | Session | Status | Review-Pässe (unabhängig) | Beschreibung |
 |---|---|---|---|---|---|---|---|
+| `TS:2026-09-13T01:36:52Z (SESSION: c1c85419)` | `crates/memfuse-agent/tests/proptest_workflow_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-based testing for memfuse-agent structural invariants (StateGraph, AgentContext, BackgroundEvent). |
 | `TS:2026-09-12T00:00:00Z` | `crates/memfuse-db/tests/consolidation_double_trigger_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrierter Test zur Verifizierung des Double-Trigger-Schutzes zwischen ConsolidationEngine und MaintenanceScheduler. |
 | `TS:2026-09-12` | `crates/memfuse-db/src/export.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Export-Funktionalität für Memory-Export-Format v1 (Schema Version "1.0"). |
 | `TS:2026-09-12` | `crates/memfuse-db/src/import.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Import-Funktionalität & Zusammenfassung für Memory-Export-Format v1 (Schema Version "1.0"). |
@@ -301,6 +302,7 @@
 | `` | `crates/memfuse-index/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/memfuse-index/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/memfuse-index/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |
 | `` | `crates/memfuse-store/examples/chaos_writer.rs` | `FILE-CONTEXT` | `-` | `chaos_power_cut` | `-` | `-` |  |
 | `` | `crates/memfuse-store/src/compaction.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-H-3: LsmStorage hält eine persistente CompactionEngine-Instanz (LsmStorage.compaction_engine), wodurch Compaction-State & Zähler erhalten bleiben. |
