@@ -223,6 +223,48 @@ async fn test_read_line_bounded_enforces_limit() {
 }
 
 #[tokio::test]
+async fn test_read_line_bounded_idle_timeout_soft_reset() {
+    use crate::read_line_bounded;
+    use tokio::io::{AsyncWriteExt, BufReader};
+    use tokio::time::{timeout, Duration};
+
+    let (mut client_tx, server_rx) = tokio::io::duplex(1024);
+    let mut reader = BufReader::new(server_rx);
+    let mut line_buf = String::new();
+
+    // 1. Reader times out when client is idle (soft timeout simulation)
+    let timed_out = timeout(
+        Duration::from_millis(10),
+        read_line_bounded(&mut reader, &mut line_buf, 1024),
+    )
+    .await;
+    assert!(
+        timed_out.is_err(),
+        "Expected timeout error when reader receives no input"
+    );
+
+    // 2. Client sends valid line after idle period
+    client_tx
+        .write_all(b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}\n")
+        .await
+        .unwrap();
+
+    // 3. Reader resumes normally on next iteration without connection termination
+    let res = timeout(
+        Duration::from_millis(500),
+        read_line_bounded(&mut reader, &mut line_buf, 1024),
+    )
+    .await;
+    assert!(res.is_ok(), "Expected successful read after soft reset");
+    let len = res.unwrap().unwrap();
+    assert!(len > 0);
+    assert_eq!(
+        line_buf.trim(),
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}"
+    );
+}
+
+#[tokio::test]
 async fn test_stdout_not_polluted_by_logs() {
     let source = std::fs::read_to_string("src/lib.rs")
         .or_else(|_| std::fs::read_to_string("crates/memfuse-mcp/src/lib.rs"))
@@ -309,6 +351,24 @@ async fn test_insert_validates_oversized_id() {
     );
     let resp = server.handle(req).await;
     let err = resp.error.expect("error expected for long ID"); // expect
+    assert_eq!(err.code, -32602);
+    assert!(err.message.contains("id length exceeds limit"));
+}
+
+#[tokio::test]
+async fn test_get_validates_oversized_id() {
+    let (server, _tmp) = create_mock_server().await;
+
+    let long_id = "g".repeat(257);
+    let req = make_request(
+        "memfuse_get",
+        json!({
+            "id": long_id,
+            "collection": "default"
+        }),
+    );
+    let resp = server.handle(req).await;
+    let err = resp.error.expect("error expected for long ID in memfuse_get"); // expect
     assert_eq!(err.code, -32602);
     assert!(err.message.contains("id length exceeds limit"));
 }
