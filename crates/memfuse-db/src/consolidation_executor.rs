@@ -67,10 +67,11 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
         });
     }
 
-    // Erwerbe consolidation_guard per try_lock(), um parallele Durchläufe auf derselben Collection zu verhindern (ADR-081)
-    let _guard = match collection.consolidation_guard.try_lock() {
-        Ok(guard) => guard,
-        Err(_) => {
+    // Erwerbe ConsolidationNodesGuard per try_acquire(), um parallele Durchläufe auf derselben Collection
+    // zu verhindern und geordnete Kaskaden-Invalidierung zu erzwingen (ADR-081)
+    let guard = match crate::consolidation_locks::ConsolidationNodesGuard::try_acquire(collection) {
+        Some(guard) => guard,
+        None => {
             tracing::warn!(
                 collection = %collection.name(),
                 "Konsolidierungsdurchlauf übersprungen — anderer Pfad aktiv (H-19-Schutz)"
@@ -117,36 +118,13 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
         }
     }
 
-    // Kaskadierende Graph-Edge-Tombstones für supersedete Dokumente anwenden (INV-GRAPH-PROV-1)
+    // Kaskadierende Graph-Edge-Tombstones für supersedete Dokumente kanonisch geordnet anwenden (INV-GRAPH-PROV-1)
     if !result.cascade_edge_tombstones_needed.is_empty() {
         let tx = collection.allocate_tx()?;
-        for doc_id in &result.cascade_edge_tombstones_needed {
-            match memfuse_graph::cascade_invalidate_edges_for_superseded_doc(
-                &collection.graph_index,
-                *doc_id,
-                tx.inner(),
-            )
-            .await
-            {
-                Ok(report) => {
-                    tracing::debug!(
-                        doc_id = ?doc_id,
-                        tombstoned_edges = report.tombstoned_edge_count,
-                        "Consolidation pass: cascade edge invalidation successful"
-                    );
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        doc_id = ?doc_id,
-                        error = %e,
-                        "Consolidation pass: cascade edge invalidation failed"
-                    );
-                    result
-                        .cascade_errors
-                        .push(format!("DocId {:?}: {}", doc_id, e));
-                }
-            }
-        }
+        let (_reports, errors) = guard
+            .cascade_invalidate_edges_ordered(&result.cascade_edge_tombstones_needed, tx.inner())
+            .await;
+        result.cascade_errors.extend(errors);
     }
 
     Ok(result)
@@ -725,5 +703,59 @@ mod tests {
         let phase_res = res.unwrap();
         assert_eq!(phase_res.segments_created, 0);
         assert!(phase_res.duplicates_tombstoned.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_consolidation_nodes_guard_deadlock_regression() {
+        let (col, _dir) = create_test_collection().await;
+
+        for i in 1..=5 {
+            let id = format!("doc_{}", i);
+            col.insert(&id, &[1.0, 0.0, 0.0, 0.0], Some(json!({"idx": i})))
+                .await
+                .expect("insert");
+        }
+        col.relate("doc_1", "doc_2", "link").await.expect("relate");
+        col.relate("doc_2", "doc_3", "link").await.expect("relate");
+        col.relate("doc_3", "doc_4", "link").await.expect("relate");
+
+        let doc1 = DocId::new(100);
+        let doc2 = DocId::new(200);
+        let doc3 = DocId::new(300);
+
+        let col1 = col.clone();
+        let col2 = col.clone();
+
+        let task1 = tokio::spawn(async move {
+            let guard = crate::consolidation_locks::ConsolidationNodesGuard::try_acquire(&col1);
+            if let Some(g) = guard {
+                let tx = col1.allocate_tx().unwrap();
+                // Pass DocIds in REVERSE order [300, 200, 100]
+                let _ = g
+                    .cascade_invalidate_edges_ordered(&[doc3, doc2, doc1], tx.inner())
+                    .await;
+            }
+        });
+
+        let task2 = tokio::spawn(async move {
+            let guard = crate::consolidation_locks::ConsolidationNodesGuard::try_acquire(&col2);
+            if let Some(g) = guard {
+                let tx = col2.allocate_tx().unwrap();
+                // Pass DocIds in FORWARD order [100, 200, 300]
+                let _ = g
+                    .cascade_invalidate_edges_ordered(&[doc1, doc2, doc3], tx.inner())
+                    .await;
+            }
+        });
+
+        let result = tokio::time::timeout(Duration::from_secs(5), async {
+            let _ = tokio::join!(task1, task2);
+        })
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "ConsolidationNodesGuard deadlock regression test timed out (deadlock detected!)"
+        );
     }
 }
