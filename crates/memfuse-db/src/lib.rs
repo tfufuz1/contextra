@@ -86,6 +86,7 @@ pub mod background_workers;
 pub mod chunker;
 pub mod collection;
 pub mod consolidation_executor;
+pub mod consolidation_locks;
 pub mod context;
 pub mod context_compaction;
 pub mod export;
@@ -110,6 +111,7 @@ pub use consolidation_executor::{
     execute_background_consolidation, execute_consolidation_pass, execute_sleep_cycle,
     ConsolidationEngine,
 };
+pub use consolidation_locks::ConsolidationNodesGuard;
 pub use context_compaction::{
     cleanup_orphaned_consolidation_intents, CompactedContext, CompactionStrategy,
     ConsolidationSession, ContextCompactor, StatusToken,
