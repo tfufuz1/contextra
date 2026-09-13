@@ -57,11 +57,80 @@ fn bench_hmac_integrity(c: &mut Criterion) {
     });
 }
 
+// ADR-082 Performance-Nachweis Benchmarks
+
+use memfuse_core::TenantId;
+use memfuse_security::kv_segment::{KvSegment, TenantIsolatedKvStore};
+
+fn bench_kv_insert_n_segments(c: &mut Criterion) {
+    let mut group = c.benchmark_group("kv_insert_n_segments");
+    for n in [10usize, 100, 1000] {
+        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
+            let store = TenantIsolatedKvStore::new();
+            let tenant = TenantId::try_new(1).unwrap();
+            // Prefill
+            for id in 0..n as u64 {
+                store.insert_segment(tenant, KvSegment::new(tenant, id, vec![0u8; 256]));
+            }
+            b.iter(|| {
+                // Benchmark: insert eines weiteren Segments
+                store.insert_segment(tenant, KvSegment::new(tenant, n as u64, vec![0u8; 256]));
+            });
+        });
+    }
+    group.finish();
+}
+
+fn bench_kv_get_concurrent_n_tenants(c: &mut Criterion) {
+    let mut group = c.benchmark_group("kv_get_concurrent_n_tenants");
+    for n in [4usize, 16, 32] {
+        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
+            let store = std::sync::Arc::new(TenantIsolatedKvStore::new());
+            for t in 1..=n as u64 {
+                let tenant = TenantId::try_new(t).unwrap();
+                store.insert_segment(tenant, KvSegment::new(tenant, 1, vec![0u8; 256]));
+            }
+            b.iter(|| {
+                let handles: Vec<_> = (1..=n as u64)
+                    .map(|t| {
+                        let s = std::sync::Arc::clone(&store);
+                        std::thread::spawn(move || {
+                            let tenant = TenantId::try_new(t).unwrap();
+                            let _ = s.get_segment_bytes(tenant, 1);
+                        })
+                    })
+                    .collect();
+                for h in handles {
+                    h.join().unwrap();
+                }
+            });
+        });
+    }
+    group.finish();
+}
+
+fn bench_kv_evict_lock_held_duration(c: &mut Criterion) {
+    c.bench_function("kv_evict_lru_lock_held_duration", |b| {
+        b.iter(|| {
+            let store = TenantIsolatedKvStore::new();
+            let tenant = TenantId::try_new(1).unwrap();
+            for id in 0..10u64 {
+                store.insert_segment(tenant, KvSegment::new(tenant, id, vec![0xFFu8; 65_536]));
+            }
+            // Eviction mit Deferred-Drop — Zeroize läuft NACH Lock-Freigabe
+            store.evict_lru_fair(500_000)
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_aes_256_gcm_siv_encrypt,
     bench_aes_256_gcm_siv_decrypt,
     bench_hkdf_derivation,
-    bench_hmac_integrity
+    bench_hmac_integrity,
+    bench_kv_insert_n_segments,
+    bench_kv_get_concurrent_n_tenants,
+    bench_kv_evict_lock_held_duration
 );
 criterion_main!(benches);

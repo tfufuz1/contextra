@@ -106,11 +106,12 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             .k(k * 2)
             .execute()
             .await?;
-        all_result_sets.push(round1.clone());
+        all_result_sets.push(round1);
         rounds_executed += 1;
 
-        // Qualitätsprüfung
-        if self.quality_sufficient(&round1) || rewriter.is_none() {
+        // Qualitätsprüfung über leihende Referenz auf den ersten Ergebnissatz in all_result_sets
+        let round1_ref = all_result_sets.first().map(|v| v.as_slice()).unwrap_or(&[]);
+        if self.quality_sufficient(round1_ref) || rewriter.is_none() {
             let fused = reciprocal_rank_fusion(all_result_sets, k);
             return Ok(MultiStepResult {
                 results: fused,
@@ -132,10 +133,14 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             }
         };
 
-        let mut current_results = round1;
-
+        // Note on result set ownership:
+        // `all_result_sets` owns historical result sets directly (moved without cloning).
+        // `quality_sufficient` and `rewriter.rewrite` receive borrowed slices `&[SearchResult]`.
+        // If SearchResult metadata structures (serde_json::Value) grow large in future extensions,
+        // using `Arc<SearchResult>` will further optimize internal fusion moves.
         for _round in 2..=self.config.max_rounds {
-            let sub_qs = match rewriter.rewrite(original_query, &current_results).await {
+            let current_results = all_result_sets.last().map(|v| v.as_slice()).unwrap_or(&[]);
+            let sub_qs = match rewriter.rewrite(original_query, current_results).await {
                 Ok(qs) => qs,
                 Err(e) => {
                     tracing::warn!(
@@ -160,8 +165,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 // future improvement: inject TextEmbeddingEngine for sub-query vectors.
                 match self.collection.query().text(sub_q).k(k).execute().await {
                     Ok(sub_results) => {
-                        all_result_sets.push(sub_results.clone());
-                        current_results = sub_results;
+                        all_result_sets.push(sub_results);
                         sub_queries.push(sub_q.clone());
                         executed_sub_query = true;
                     }
@@ -179,7 +183,8 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 rounds_executed += 1;
             }
 
-            if self.quality_sufficient(&current_results) {
+            let latest_results = all_result_sets.last().map(|v| v.as_slice()).unwrap_or(&[]);
+            if self.quality_sufficient(latest_results) {
                 break;
             }
         }

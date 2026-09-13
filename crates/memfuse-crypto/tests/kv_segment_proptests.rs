@@ -13,27 +13,19 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
     #[test]
-    fn prop_kv_segment_creation_and_clock_monotonicity(
+    fn prop_kv_segment_creation(
         tenant_num in 1u64..10000u64,
         segment_id in 1u64..100000u64,
         data in prop::collection::vec(any::<u8>(), 0..1024),
     ) {
         let tenant = TenantId::try_new(tenant_num).unwrap();
         let seg1 = KvSegment::new(tenant, segment_id, data.clone());
-        let seg2 = KvSegment::new(tenant, segment_id + 1, data.clone());
 
         prop_assert_eq!(seg1.tenant_id, tenant);
         prop_assert_eq!(seg1.segment_id, segment_id);
         prop_assert_eq!(seg1.len(), data.len());
         prop_assert_eq!(seg1.is_empty(), data.is_empty());
         prop_assert_eq!(seg1.as_bytes(), data.as_slice());
-
-        // Logical clock of seg2 must be strictly greater than seg1
-        prop_assert!(seg2.last_accessed() > seg1.last_accessed());
-
-        // Touching seg1 updates its logical clock beyond seg2
-        seg1.touch();
-        prop_assert!(seg1.last_accessed() > seg2.last_accessed());
     }
 
     #[test]

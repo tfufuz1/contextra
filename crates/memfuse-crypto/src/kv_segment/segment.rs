@@ -3,7 +3,6 @@
 // STAND: TS:2026-09-08T00:00:00Z (SESSION: a413a598)
 
 use memfuse_core::TenantId;
-use std::sync::atomic::{AtomicU64, Ordering};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(feature = "kv-encryption")]
@@ -12,9 +11,6 @@ use crate::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
 /// Aktuelle Version der KV-Segment-Schlüsselableitung.
 /// Erhöhe diesen Wert, wenn sich der HKDF-Info-String oder der Salt-Aufbau ändert.
 pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1;
-
-/// Monotoner Logical-Clock-Zähler für Recency-Ordering (P3: Keine SystemTime als Kausalitätsgarant).
-static GLOBAL_KV_ACCESS_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Encrypted layer representation stored inside a KvSegment when encryption is active.
 #[cfg(feature = "kv-encryption")]
@@ -53,8 +49,6 @@ pub struct KvSegment {
     pub model_fingerprint: Option<ModelFingerprint>,
     #[zeroize(skip)]
     pub rope_offset: Option<usize>,
-    #[zeroize(skip)] // AtomicU64 enthält keine sensiblen Tensor-Daten
-    last_accessed: AtomicU64,
     /// Rohe Tensor-Bytes (Klartext oder Ciphertext). WIRD gezeroized beim Drop.
     data: Vec<u8>,
     #[cfg(feature = "kv-encryption")]
@@ -64,7 +58,6 @@ pub struct KvSegment {
 impl KvSegment {
     /// Erstellt ein neues Klartext-KV-Cache-Segment (Default / Zero-Config, P12-konform).
     pub fn new(tenant_id: TenantId, segment_id: u64, data: Vec<u8>) -> Self {
-        let initial_clock = GLOBAL_KV_ACCESS_COUNTER.fetch_add(1, Ordering::Relaxed);
         Self {
             tenant_id,
             segment_id,
@@ -73,7 +66,6 @@ impl KvSegment {
             #[cfg(feature = "kv-encryption")]
             model_fingerprint: None,
             rope_offset: None,
-            last_accessed: AtomicU64::new(initial_clock),
             data,
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
@@ -88,7 +80,6 @@ impl KvSegment {
         #[cfg(feature = "kv-encryption")] model_fingerprint: Option<ModelFingerprint>,
         rope_offset: Option<usize>,
     ) -> Self {
-        let initial_clock = GLOBAL_KV_ACCESS_COUNTER.fetch_add(1, Ordering::Relaxed);
         Self {
             tenant_id,
             segment_id,
@@ -97,7 +88,6 @@ impl KvSegment {
             #[cfg(feature = "kv-encryption")]
             model_fingerprint,
             rope_offset,
-            last_accessed: AtomicU64::new(initial_clock),
             data,
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
@@ -114,7 +104,6 @@ impl KvSegment {
         rope_offset: Option<usize>,
         plaintext: &[u8],
     ) -> Result<Self, crate::CryptoError> {
-        let initial_clock = GLOBAL_KV_ACCESS_COUNTER.fetch_add(1, Ordering::Relaxed);
         let encrypted_layer = cipher.encrypt_with_version(
             tenant_id,
             segment_id,
@@ -131,7 +120,6 @@ impl KvSegment {
             encrypted: true,
             model_fingerprint: Some(model_fingerprint),
             rope_offset,
-            last_accessed: AtomicU64::new(initial_clock),
             data: ciphertext_copy,
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
@@ -170,17 +158,6 @@ impl KvSegment {
                 "Missing model fingerprint for encrypted segment decryption".into(),
             ))
         }
-    }
-
-    /// Aktualisiert den atomaren Zugriffs-Zeitstempel (Logical Clock) für LRU-Eviction-Heuristiken.
-    pub fn touch(&self) {
-        let now = GLOBAL_KV_ACCESS_COUNTER.fetch_add(1, Ordering::Relaxed);
-        self.last_accessed.store(now, Ordering::Relaxed);
-    }
-
-    /// Gibt den aktuellen atomaren Logical-Clock-Wert des letzten Zugriffs zurück.
-    pub fn last_accessed(&self) -> u64 {
-        self.last_accessed.load(Ordering::Relaxed)
     }
 
     /// Read-Only-Zugriff. Kein Klartext-Export nach außen ohne expliziten Call.
@@ -303,7 +280,6 @@ mod tests {
             encrypted: true,
             model_fingerprint: Some(fp),
             rope_offset: None,
-            last_accessed: AtomicU64::new(1),
             data: ciphertext_copy,
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
