@@ -1045,6 +1045,60 @@ impl LsmStorage {
         }
     }
 
+    /// Atomically updates `last_committed_tx` if `tx_id` is higher and strictly lower than `TxId::INTERNAL_BASE`.
+    #[inline]
+    fn advance_visibility(&self, tx_id: TxId) {
+        if tx_id.inner() < TxId::INTERNAL_BASE {
+            let mut current = self.last_committed_tx.load(Ordering::Acquire);
+            while tx_id.inner() > current {
+                match self.last_committed_tx.compare_exchange_weak(
+                    current,
+                    tx_id.inner(),
+                    Ordering::SeqCst,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(actual) => current = actual,
+                }
+            }
+            if tx_id.inner() == 0 {
+                tracing::warn!("LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout");
+            }
+        }
+    }
+
+    /// Consumes memory budget and applies key-value updates to the specified MemTable.
+    ///
+    /// # Locking Invariant
+    /// The caller MUST already hold appropriate write or read access to the state containing `memtable`.
+    fn apply_mem_updates(
+        &self,
+        memtable: &MemTable,
+        mem_updates: &[(Vec<u8>, Vec<u8>, u64)],
+        tx_id: TxId,
+    ) {
+        for (key, value, seq) in mem_updates {
+            let entry_size = key.len() + value.len() + 8;
+            if let Err(e) = self.budget.consume_memory(entry_size as u64) {
+                self.budget_tracking_drift_bytes
+                    .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
+                tracing::warn!(
+                    drift_bytes = entry_size,
+                    total_drift_bytes = self
+                        .budget_tracking_drift_bytes
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    "Memory budget tracking warning during commit: {e}"
+                );
+            }
+            memtable.put(
+                Bytes::from(key.clone()),
+                Bytes::from(value.clone()),
+                *seq,
+                tx_id.inner(),
+            );
+        }
+    }
+
     /// Evaluates detailed traversal metrics (evaluated_sstables, bloom_passes, range_passes, block_reads, found) for point lookups.
     pub async fn point_lookup_metrics(&self, key: &[u8]) -> (usize, usize, usize, usize, bool) {
         let sstables = self.sstables.read().await;
@@ -1623,41 +1677,8 @@ impl StorageEngine for LsmStorage {
                     )));
                 }
 
-                if tx_id.inner() < TxId::INTERNAL_BASE {
-                    let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                    while tx_id.inner() > current {
-                        match self.last_committed_tx.compare_exchange_weak(
-                            current,
-                            tx_id.inner(),
-                            Ordering::SeqCst,
-                            Ordering::Relaxed,
-                        ) {
-                            Ok(_) => break,
-                            Err(actual) => current = actual,
-                        }
-                    }
-                    if tx_id.inner() == 0 {
-                        tracing::warn!("LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout");
-                    }
-                }
-
-                for (key, value, seq) in mem_updates {
-                    let entry_size = key.len() + value.len() + 8;
-                    if let Err(e) = self.budget.consume_memory(entry_size as u64) {
-                        self.budget_tracking_drift_bytes
-                            .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
-                        tracing::warn!(
-                            drift_bytes = entry_size,
-                            total_drift_bytes = self
-                                .budget_tracking_drift_bytes
-                                .load(std::sync::atomic::Ordering::Relaxed),
-                            "Memory budget tracking warning during commit: {e}"
-                        );
-                    }
-                    state
-                        .memtable
-                        .put(Bytes::from(key), Bytes::from(value), seq, tx_id.inner());
-                }
+                self.advance_visibility(tx_id);
+                self.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
 
                 let should_flush = state.memtable.size() > self.config.memtable_size_limit;
                 drop(state);
@@ -1739,6 +1760,10 @@ impl StorageEngine for LsmStorage {
                             "Group commit leader: pending_commit_queue unexpectedly missing. \
                              This is a bug — notifying all followers."
                         );
+                        debug_assert!(
+                            false,
+                            "Group commit queue invariant violated — queue was Some at leader init and must remain Some until leader re-acquisition"
+                        );
                         return Err(MemFuseError::Internal(
                             "Group commit queue invariant violated".into(),
                         ));
@@ -1815,44 +1840,8 @@ impl StorageEngine for LsmStorage {
                 }
 
                 for (req_tx_id, mem_updates) in all_updates {
-                    if req_tx_id.inner() < TxId::INTERNAL_BASE {
-                        let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                        while req_tx_id.inner() > current {
-                            match self.last_committed_tx.compare_exchange_weak(
-                                current,
-                                req_tx_id.inner(),
-                                Ordering::SeqCst,
-                                Ordering::Relaxed,
-                            ) {
-                                Ok(_) => break,
-                                Err(actual) => current = actual,
-                            }
-                        }
-                        if req_tx_id.inner() == 0 {
-                            tracing::warn!("LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout");
-                        }
-                    }
-
-                    for (key, value, seq) in mem_updates {
-                        let entry_size = key.len() + value.len() + 8;
-                        if let Err(e) = self.budget.consume_memory(entry_size as u64) {
-                            self.budget_tracking_drift_bytes
-                                .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
-                            tracing::warn!(
-                                drift_bytes = entry_size,
-                                total_drift_bytes = self
-                                    .budget_tracking_drift_bytes
-                                    .load(std::sync::atomic::Ordering::Relaxed),
-                                "Memory budget tracking warning during group commit: {e}"
-                            );
-                        }
-                        state.memtable.put(
-                            Bytes::from(key.clone()),
-                            Bytes::from(value.clone()),
-                            *seq,
-                            req_tx_id.inner(),
-                        );
-                    }
+                    self.advance_visibility(req_tx_id);
+                    self.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
                 }
 
                 let needs_flush = state.memtable.size() > self.config.memtable_size_limit;
@@ -2053,20 +2042,7 @@ impl StorageEngine for LsmStorage {
 
                 // last_committed_tx MUSS vor sstables.push() aktualisiert werden — sonst Race-Fenster für parallele Reader, siehe DECISIONS.md ADR-043.
                 let sst_max_tx = reader.metadata().max_tx_id;
-                if sst_max_tx < TxId::INTERNAL_BASE {
-                    let mut current = self.last_committed_tx.load(Ordering::Acquire);
-                    while sst_max_tx > current {
-                        match self.last_committed_tx.compare_exchange_weak(
-                            current,
-                            sst_max_tx,
-                            Ordering::SeqCst,
-                            Ordering::Relaxed,
-                        ) {
-                            Ok(_) => break,
-                            Err(actual) => current = actual,
-                        }
-                    }
-                }
+                self.advance_visibility(TxId::new(sst_max_tx));
 
                 sstables.push(Arc::new(reader));
                 sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
