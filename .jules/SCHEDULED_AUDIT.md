@@ -52,15 +52,4 @@ Da kein direkter Jules-GitHub-App-Webhook automatisch ohne Zuweisung reagiert:
 
 ## Audit-Workflow v2 (nach Review 2026-09)
 
-1. Automatisches Audit-Issue wird wie bisher erstellt.
-2. Agent führt statische Analyse durch und erstellt Draft-Report.
-3. **NEU: Draft-Report darf NICHT selbst als VERIFIED markiert werden.**
-   Der Status bleibt auf DRAFT, bis Schritt 4 abgeschlossen ist.
-4. **NEU: Stichproben-Pflicht.** Jeder Audit-Zyklus muss mindestens
-   EINEN der folgenden menschlichen Review-Schritte enthalten:
-   a) Manuelle Code-Review des Reports durch einen Menschen, ODER
-   b) Cross-Crate-Invarianten-Test durch einen zweiten Agenten mit
-      separatem System-Prompt (anderer Kontext, kein Zugriff auf
-      den Draft-Report des ersten Agenten), ODER
-   c) Externes Fuzzing-/Property-Test-Ergebnis als Gate.
-5. Status "VERIFIED" darf nur gesetzt werden wenn Schritt 4 belegt ist.
+Siehe `.jules/AUDIT_INTAKE_PROTOCOL.md` Abschnitt "Verdict-Unabhängigkeitspflicht (Audit-Workflow v2)" — dort kanonisch definiert.

@@ -8,11 +8,12 @@
 | `AI-TAG` | Aktuelle Probleme/Risiken | `AI-TAG[KATEGORIE][SEVERITY] Kurzbeschreibung (ID: AGT-<CRATE>-<hash>) (TS: <ISO-8601-UTC>) (SESSION: <hash>)` |
 | `ANCHOR` | Geplante/laufende Arbeit | `ANCHOR[TYP:ID] STATUS:X (TS: <ISO-8601-UTC>) (SESSION: <hash>)` |
 | `REVIEW-PASS` | Unabhängiges Mehrfach-Session-Review | `REVIEW-PASS[N/M] STATUS:PASS|FAIL|CONDITIONAL (ID: AGT-<CRATE>-<hash>) (TS: <ISO-8601-UTC>) (SESSION: <hash>)` |
+| `VERDICT` | Audit-Verdict-Tag in `docs/audits/*.md` | `VERDICT: GO/APPROVED|CONDITIONAL|BLOCKED (ID: AGT-<CRATE>-<hash>) (TS: <ISO-8601-UTC>) (SESSION: <hash>) (VERIFIED-BY-SESSION: <hash-oder-'PENDING'>)` |
 | `FILE-CONTEXT` | Datei-Kontext für Agenten | `// FILE-CONTEXT` Block mit `// STAND: <TS> (SESSION: <hash>)` |
 
 ## Sekundengenaue Zeitstempel-Pflicht (TS:<ISO-8601-UTC>), SESSION-Token & Hash-IDs
 
-Alle Tag-Typen (`AI-TAG`, `ANCHOR`, `REVIEW-PASS`) sowie der `FILE-CONTEXT`-Header haben drei VERPFLICHTENDE maschinenlesbare Pflichtfelder:
+Alle Tag-Typen (`AI-TAG`, `ANCHOR`, `REVIEW-PASS`, `VERDICT`) sowie der `FILE-CONTEXT`-Header haben drei VERPFLICHTENDE maschinenlesbare Pflichtfelder:
 1. **`TS:`-Zeitstempel**: Sekundengenaues Format `YYYY-MM-DDTHH:MM:SSZ` (z.B. `2026-08-29T09:14:07Z`), ermittelt via `date -u +%Y-%m-%dT%H:%M:%SZ`.
 2. **`SESSION:`-Token**: 8-stelliger Hex-Hash der Jules-Sitzung (z.B. `SESSION:a3f29c1d`), bereitgestellt durch das Environment-Setup-Skript (`[10/10] Session identity`).
 3. **Hash-basierte ID**: `AGT-<CRATE>-<8-hex-hash>` für ALLE NEUEN Tags (z.B. `AGT-STORE-a3f29c1d`). Der Hash entspricht den ersten 8 Zeichen von `sha256(crate + dateipfad + zeile_bei_erstellung + ts)`.
@@ -72,6 +73,24 @@ Grammatik:
 
 - `PRÜFER-KONTEXT: FRESH` ist Pflicht (Sitzung hatte keine vorherige Historiensicht auf diesen Diff).
 - Jede `STATUS:DONE`-Markierung eines `ANCHOR` erfordert 2 (Standard) bzw. 3 (`ASK`/security/unsafe) `REVIEW-PASS` Einträge von unterschiedlichen `SESSION:`-Hashes.
+
+## Audit-Verdict-Tag (VERDICT-Zeile in docs/audits/*.md)
+
+Grammatik und Pflichtformat für Verzeilungsbefunde/Gesamturteile in Audit-Dokumenten unter `docs/audits/*.md`:
+
+```markdown
+VERDICT: <GO/APPROVED|CONDITIONAL|BLOCKED> (ID: AGT-<CRATE>-<hash>) (TS: <ISO-8601-UTC>) (SESSION: <hash>) (VERIFIED-BY-SESSION: <hash-der-pruefenden-zweitsession-oder-'PENDING'>)
+```
+
+Felddefinitionen:
+- **`VERDICT:`**: Testergebnis (`GO/APPROVED` für freigegebene Befunde, `CONDITIONAL` für auflagengebundene Freigaben, `BLOCKED` für gefundene Mängel/Blocker).
+- **`ID:`**: Hash-basierte Tag-ID im Format `AGT-<CRATE>-<8-hex-hash>`.
+- **`TS:`**: Sekundengenauer UTC-Zeitstempel der Erstellung oder letzten Statusänderung (`YYYY-MM-DDTHH:MM:SSZ`).
+- **`SESSION:`**: 8-stelliger Hex-Hash der erstellerischen Jules-Sitzung (Draft-Autor).
+- **`VERIFIED-BY-SESSION:`**: 8-stelliger Hex-Hash einer zweiten, unabhängigen Prüfsitzung, ODER der String `'PENDING'` solange die Zweitprüfung noch aussteht.
+
+Invariante:
+Ein Report mit `VERIFIED-BY-SESSION: PENDING` ist ein Unverified Draft. Der Übergang zu `GO/APPROVED` setzt ein valides `VERIFIED-BY-SESSION: <zweitsession-hash>` voraus, wobei `<zweitsession-hash> != <hash>` gelten MUSS.
 
 ## FILE-CONTEXT Header
 
