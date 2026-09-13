@@ -170,7 +170,15 @@ impl MemTable {
         }
 
         if total_freed_size > 0 {
-            self.size.fetch_sub(total_freed_size, Ordering::Relaxed);
+            #[cfg(debug_assertions)]
+            {
+                let before = self.size.load(Ordering::Acquire);
+                debug_assert!(
+                    before >= total_freed_size,
+                    "MemTable size underflow detected: before={before}, freed={total_freed_size}"
+                );
+            }
+            self.saturating_sub_size(total_freed_size);
         }
 
         if !has_entries {
@@ -218,6 +226,17 @@ impl MemTable {
             }
         }
         None
+    }
+
+    /// Atomically subtracts `n` from `self.size` with saturation to zero,
+    /// preventing integer underflow wrap-around to `usize::MAX`.
+    #[inline]
+    fn saturating_sub_size(&self, n: usize) {
+        let _ = self.size.fetch_update(
+            Ordering::AcqRel,
+            Ordering::Acquire,
+            |v| Some(v.saturating_sub(n)),
+        );
     }
 
     /// Returns the approximate size in bytes.
@@ -573,5 +592,19 @@ mod tests {
         assert!(mt.is_empty());
         assert_eq!(mt.size(), 0);
         assert_eq!(mt.tx_range(), (u64::MAX, 0));
+    }
+
+    #[test]
+    fn test_saturating_sub_size_underflow_saturates_to_zero() {
+        let mt = MemTable::new();
+        mt.put(Bytes::from("key1"), Bytes::from("val1"), 1, 1);
+        assert!(mt.size() > 0);
+
+        // Directly invoke saturating_sub_size with an amount far larger than current size
+        let current_size = mt.size();
+        mt.saturating_sub_size(current_size + 1000);
+
+        // Verify size saturates at 0 and does not wrap around to usize::MAX
+        assert_eq!(mt.size(), 0);
     }
 }
