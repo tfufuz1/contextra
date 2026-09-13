@@ -21,6 +21,8 @@ pub struct WasmCapabilities {
     pub allow_network: bool,
     /// Monotone Uhr (WASI clock_time_get). Default: true.
     pub allow_clock: bool,
+    /// Cloud-Egress-Zugriff (dedizierte Cloud-Query-Calls). Default: false.
+    pub allow_cloud_egress: bool,
 }
 
 impl Default for WasmCapabilities {
@@ -33,6 +35,21 @@ impl Default for WasmCapabilities {
             allow_filesystem: false,
             allow_network: false,
             allow_clock: true,
+            allow_cloud_egress: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wasm_capabilities_default_cloud_egress_is_false() {
+        let caps = WasmCapabilities::default();
+        assert!(
+            !caps.allow_cloud_egress,
+            "allow_cloud_egress MUST default to false (Least Privilege)"
+        );
     }
 }
