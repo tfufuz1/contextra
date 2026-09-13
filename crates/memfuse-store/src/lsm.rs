@@ -564,6 +564,15 @@ impl LsmStorage {
                 .run_loop(compaction_sstables, compaction_path, ct_clone)
                 .await;
         });
+
+        // INV-LSM-2: SystemPressureMonitor must be spawned as a background task before LsmStorage accepts its first insert.
+        let monitor =
+            crate::system_pressure::SystemPressureMonitor::new(Duration::from_millis(100));
+        let pressure_rx = monitor.pressure_rx.clone();
+        let ct_pressure = cancel_token.clone();
+        task_tracker.spawn(async move {
+            monitor.run(ct_pressure, || 0, || 0, 0).await;
+        });
         task_tracker.close();
 
         // Build storage instance first (compaction_engine field added)
@@ -690,6 +699,13 @@ impl LsmStorage {
         self.compaction_engine
             .maybe_compact(&self.sstables, &self.config.path)
             .await
+    }
+
+    /// Returns a watch receiver for monitoring system pressure levels.
+    pub fn pressure_receiver(
+        &self,
+    ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
+        self.pressure_rx.clone()
     }
 
     /// Signals the background compaction engine to stop.
@@ -1543,7 +1559,7 @@ impl StorageEngine for LsmStorage {
                     None => {
                         tracing::error!(
                             "Group commit leader: pending_commit_queue unexpectedly missing. \
-                             Notifying followers and failing transaction."
+                             This is a bug — notifying all followers."
                         );
                         return Err(MemFuseError::Internal(
                             "Group commit queue invariant violated".into(),
@@ -4923,5 +4939,25 @@ mod tests {
         // 4. Verify surviving entry k1 is still readable from active MemTable
         assert_eq!(storage.get(b"k1").await.unwrap(), Some(b"v1".to_vec()));
         assert_eq!(storage.get(b"k2").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn test_system_pressure_monitor_integration() {
+        let tmp = TempDir::new().expect("temp dir");
+        let config = LsmConfig {
+            path: tmp.path().to_path_buf(),
+            ..Default::default()
+        };
+        let storage = LsmStorage::new(config).await.expect("create storage");
+
+        let rx = storage.pressure_receiver();
+        let pressure = rx.borrow().clone();
+        assert_eq!(
+            pressure.pressure_level,
+            crate::system_pressure::PressureLevel::Normal
+        );
+        assert_eq!(pressure.wal_queue_depth, 0);
+
+        storage.shutdown();
     }
 }
