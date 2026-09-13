@@ -50,6 +50,7 @@ fn chrono_or_today() -> String {
 // AUFGABE: chrono_or_today() lieferte statischen String "2026-08-27" — behoben durch Systemaufruf
 // GATE:    grep -v "2026-08-27" WORKING_STATE.md
 mod bench_gate;
+mod check_bandit_latency_budget;
 mod check_adr_deadlines;
 mod check_agents_integrity;
 mod check_audit_duplication;
@@ -2255,6 +2256,12 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-bandit-latency-budget" => {
+            if let Err(e) = check_bandit_latency_budget::check_bandit_latency_budget() {
+                eprintln!("❌ check-bandit-latency-budget failed: {}", e);
+                process::exit(1);
+            }
+        }
         "check-adr-deadlines" => {
             if let Err(e) = check_adr_deadlines::check_adr_deadlines() {
                 eprintln!("❌ check-adr-deadlines failed: {}", e);
@@ -2428,7 +2435,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TYPE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>]");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>]");
             process::exit(1);
         }
     }

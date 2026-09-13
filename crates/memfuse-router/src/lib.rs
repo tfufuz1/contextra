@@ -16,6 +16,8 @@ pub mod guarded_payload;
 #[cfg(feature = "bandit-routing")]
 pub mod bandit;
 
+#[cfg(all(test, feature = "bandit-routing"))]
+mod bandit_regret_tests;
 #[cfg(test)]
 mod tests;
 
