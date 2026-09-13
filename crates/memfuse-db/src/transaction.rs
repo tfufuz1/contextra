@@ -29,6 +29,7 @@ use memfuse_core::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::sync::Mutex;
 
 /// Status of a multi-index transaction during the 2-phase commit.
@@ -36,7 +37,7 @@ use std::sync::Mutex;
 pub enum CommitIntent {
     /// Transaction is in the "Prepared" state. Stored DocIds assist recovery.
     Pending {
-        doc_ids: Vec<DocId>,
+        doc_ids: Arc<Vec<DocId>>,
         #[serde(default)]
         has_text: bool,
         #[serde(default)]
@@ -65,7 +66,7 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = memfuse_index::HnswI
     collection: Collection<S, V>,
     staged_forward_keys: Mutex<Vec<StagedKeyOp>>,
     staged_reverse_keys: Mutex<Vec<StagedKeyOp>>,
-    staged_doc_ids: Mutex<Vec<DocId>>,
+    staged_doc_ids: Mutex<Arc<Vec<DocId>>>,
     staged_text_ops: Mutex<Vec<(DocId, String)>>,
     staged_text_deletes: Mutex<Vec<DocId>>,
     staged_graph_entities: Mutex<Vec<Entity>>,
@@ -82,7 +83,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             collection,
             staged_forward_keys: Mutex::new(Vec::with_capacity(16)),
             staged_reverse_keys: Mutex::new(Vec::with_capacity(16)),
-            staged_doc_ids: Mutex::new(Vec::with_capacity(16)),
+            staged_doc_ids: Mutex::new(Arc::new(Vec::with_capacity(16))),
             staged_text_ops: Mutex::new(Vec::with_capacity(16)),
             staged_text_deletes: Mutex::new(Vec::with_capacity(16)),
             staged_graph_entities: Mutex::new(Vec::with_capacity(16)),
@@ -123,7 +124,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             Ok(g) => g,
             Err(p) => p.into_inner(),
         };
-        ids.push(doc_id);
+        Arc::make_mut(&mut ids).push(doc_id);
     }
 
     pub fn stage_text_insert(&self, doc_id: DocId, text: String) {
@@ -291,7 +292,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
-            guard.clone()
+            Arc::clone(&guard)
         };
 
         let has_text = {
@@ -339,7 +340,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         // 1. Prepare phase: Write intent marker with staged IDs
         let intent = CommitIntent::Pending {
-            doc_ids: doc_ids.clone(),
+            doc_ids: Arc::clone(&doc_ids),
             has_text,
             has_graph,
         };
@@ -644,7 +645,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
-            guard.clone()
+            Arc::clone(&guard)
         };
         self.trigger_kv_store_rollback(&doc_ids);
 
@@ -670,7 +671,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
-            guard.clone()
+            Arc::clone(&guard)
         };
         self.trigger_kv_store_rollback(&doc_ids);
 
@@ -881,5 +882,36 @@ mod tests {
             0,
             "Rollback must purge KV store segment"
         );
+    }
+
+    #[test]
+    fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
+        // Verifikation: Arc<Vec<DocId>> serialisiert und deserialisiert identisch wie Vec<DocId>
+        let doc_ids_vec = vec![memfuse_core::DocId::new(1), memfuse_core::DocId::new(2)];
+        let doc_ids_arc: Arc<Vec<memfuse_core::DocId>> = Arc::new(doc_ids_vec.clone());
+
+        // Format mit Arc:
+        let intent_arc = CommitIntent::Pending {
+            doc_ids: doc_ids_arc,
+            has_text: false,
+            has_graph: false,
+        };
+        let json_arc = serde_json::to_string(&intent_arc).expect("serialize Arc");
+
+        // Simulierte Legacy-JSON-Struktur (wie sie von altem Vec<DocId> erzeugt würde):
+        let legacy_json = r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"has_graph":false}}"#;
+
+        // Round-Trip & Format-Vergleich:
+        assert_eq!(json_arc, legacy_json, "Arc<Vec<DocId>> and Vec<DocId> must produce identical JSON representations");
+
+        let roundtrip: CommitIntent = serde_json::from_str(&json_arc).expect("deserialize json");
+        match roundtrip {
+            CommitIntent::Pending { doc_ids, .. } => {
+                assert_eq!(doc_ids.len(), 2);
+                assert_eq!(doc_ids[0], memfuse_core::DocId::new(1));
+                assert_eq!(doc_ids[1], memfuse_core::DocId::new(2));
+            }
+            _ => panic!("Unexpected CommitIntent variant"),
+        }
     }
 }

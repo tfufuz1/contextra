@@ -605,7 +605,7 @@ async fn test_2e_crash_points_and_repair_on_open() {
         // Write CommitIntent::Pending (key_type = 3)
         let intent_key = namespaced_key_helper("crash_col", tx.inner().to_le_bytes().as_ref(), 3);
         let intent = memfuse_db::transaction::CommitIntent::Pending {
-            doc_ids: vec![doc_id],
+            doc_ids: Arc::new(vec![doc_id]),
             has_text: true,
             has_graph: true,
         };

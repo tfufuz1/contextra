@@ -194,7 +194,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         let target_doc_key =
                             self.namespaced_key(&target_id.inner().to_le_bytes(), 1);
                         if self.storage.get(&target_doc_key).await?.is_some() {
-                            (vec![target_id], true, false)
+                            (Arc::new(vec![target_id]), true, false)
                         } else {
                             if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
                                 tracing::warn!(key = ?intent_key, "Failed to delete interrupted consolidation intent: {e}");
@@ -212,7 +212,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     has_graph
                 );
 
-                for doc_id in doc_ids {
+                for &doc_id in doc_ids.iter() {
                     let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
                     if let Some(val) = self.storage.get(&doc_key).await? {
                         let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
