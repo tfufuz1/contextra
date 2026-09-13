@@ -42,7 +42,7 @@ impl Default for ResonanceConfig {
 /// Feature-Flag: Nur aufrufen wenn `coherence-bonus-fusion` aktiv.
 #[cfg(feature = "coherence-bonus-fusion")]
 // AI-TAG[SMELL][RESOLVED] audit-NC-6: apply_resonance_bonus validiert Scores mit r.score.is_finite() bevor der Bonus berechnet wird.
-// AI-TAG[SMELL][MAJOR] ResonanceConfig beta/gamma clamp returns NaN if input is NaN (ID: AGT-DB-b31d8a72) (TS: 2026-09-12T18:43:13Z) (SESSION: e6ab3646)
+// AI-TAG[SMELL][RESOLVED] AGT-DB-b31d8a72 — ResonanceConfig NaN-safety verified by test_apply_resonance_bonus_nan_safety; is_finite guard and clamp prevent NaN score propagation (TS: 2026-09-13T13:15:12Z) (SESSION: 82036541)
 pub fn apply_resonance_bonus(
     results: Vec<SearchResult>,
     valid_signal_count: usize,
@@ -1608,6 +1608,75 @@ mod tests {
             None => panic!("provenance present"),
         };
         assert!((prov.coherence_bonus - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    #[cfg(feature = "coherence-bonus-fusion")]
+    fn test_apply_resonance_bonus_nan_safety() {
+        let make_doc = |id: &str, score: f32, signals: Vec<&str>| SearchResult {
+            id: id.to_string(),
+            score,
+            metadata: None,
+            matched_signals: signals.into_iter().map(String::from).collect(),
+            provenance: None,
+        };
+
+        let docs = vec![
+            make_doc("doc_zero_signals", 0.5, vec![]),
+            make_doc("doc_one_signal", 0.8, vec!["vector"]),
+            make_doc("doc_nan_score", f32::NAN, vec!["vector", "text"]),
+        ];
+
+        // 1. Beta is NaN -> early exit returns unmodified results safely
+        let cfg_nan_beta = ResonanceConfig {
+            beta: f32::NAN,
+            gamma: 0.3,
+        };
+        let res_nan_beta = apply_resonance_bonus(docs.clone(), 2, &cfg_nan_beta);
+        assert_eq!(res_nan_beta.len(), 3);
+        assert_eq!(res_nan_beta[0].score, 0.5);
+
+        // 2. Gamma is NaN -> early exit returns unmodified results safely
+        let cfg_nan_gamma = ResonanceConfig {
+            beta: 0.5,
+            gamma: f32::NAN,
+        };
+        let res_nan_gamma = apply_resonance_bonus(docs.clone(), 2, &cfg_nan_gamma);
+        assert_eq!(res_nan_gamma.len(), 3);
+        assert_eq!(res_nan_gamma[0].score, 0.5);
+
+        // 3. Beta is INFINITY -> early exit
+        let cfg_inf_beta = ResonanceConfig {
+            beta: f32::INFINITY,
+            gamma: 0.3,
+        };
+        let res_inf_beta = apply_resonance_bonus(docs.clone(), 2, &cfg_inf_beta);
+        assert_eq!(res_inf_beta.len(), 3);
+
+        // 4. Negative Beta (e.g. -10.0) -> clamped to 0.1 (> 0), 0.0f32.powf(0.1) = 0.0 (finite)
+        let cfg_neg_beta = ResonanceConfig {
+            beta: -10.0,
+            gamma: 0.3,
+        };
+        let res_neg_beta = apply_resonance_bonus(docs.clone(), 2, &cfg_neg_beta);
+        assert_eq!(res_neg_beta.len(), 3);
+        // doc_zero_signals has signal_count = 0, valid_signal_count = 2 -> 0.0^0.1 = 0.0 -> bonus = 0.0 -> score remains 0.5
+        let zero_doc = res_neg_beta.iter().find(|r| r.id == "doc_zero_signals").unwrap();
+        assert_eq!(zero_doc.score, 0.5);
+        assert!(res_neg_beta.iter().all(|r| r.id == "doc_nan_score" || r.score.is_finite()));
+
+        // 5. valid_signal_count = 0 -> early exit
+        let cfg_normal = ResonanceConfig::default();
+        let res_zero_valid = apply_resonance_bonus(docs.clone(), 0, &cfg_normal);
+        assert_eq!(res_zero_valid.len(), 3);
+        assert_eq!(res_zero_valid[0].score, 0.5);
+
+        // 6. signal_count = 0 with valid_signal_count > 0 (0.0f32.powf(beta) path)
+        let res_normal = apply_resonance_bonus(docs, 2, &cfg_normal);
+        assert_eq!(res_normal.len(), 3);
+        let zero_sig_doc = res_normal.iter().find(|r| r.id == "doc_zero_signals").unwrap();
+        assert_eq!(zero_sig_doc.score, 0.5);
+        assert_eq!(res_normal.last().unwrap().id, "doc_nan_score");
     }
 
     #[test]
