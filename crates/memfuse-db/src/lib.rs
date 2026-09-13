@@ -169,7 +169,7 @@ pub use collection::crud::MAX_SCAN_RESULTS;
 #[cfg(feature = "graph-connectivity-health")]
 pub use collection::maintenance::PercolationResult;
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
-pub use collection::Collection;
+pub use collection::{Collection, CollectionConfig};
 #[allow(deprecated)]
 pub use filter::MetadataFilter;
 pub use memfuse_checkpoint;
