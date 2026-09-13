@@ -2774,6 +2774,88 @@ impl Wal {
         *self.last_hmac.lock().await
     }
 
+    /// Versiegelt das aktuelle WAL-Segment atomar für passives WAL-Shipping (§14.2).
+    ///
+    /// # Garantien
+    /// - Atomares Rename: Keine Lese-/Schreiblücke während der Rotation.
+    /// - TOCTOU-Schutz: Der Flusher-Actor hört vor dem Rename auf zu schreiben.
+    /// - Read-Only nach Seal: Das versiegelte Segment ist nicht mehr beschreibbar.
+    /// - HMAC-Kette: Der letzte HMAC wird vor dem Seal in `last_hmac` eingefroren.
+    ///
+    /// # Returns
+    /// `PathBuf` — Pfad des versiegelten Segments (für externe Sync-Daemons).
+    ///
+    /// # Errors
+    /// Storage-Fehler bei fsync, rename oder chmod.
+    pub async fn rotate_and_seal(&self) -> Result<PathBuf> {
+        // 1. Flusher stoppen: Sender droppen → Flusher-Task beendet sich sauber
+        //    nach Verarbeitung aller ausstehenden Nachrichten.
+        let old_tx = {
+            let mut guard = self
+                .flusher_tx
+                .write()
+                .map_err(|_| MemFuseError::Storage("flusher_tx RwLock poisoned".into()))?;
+            guard.take()
+        };
+        // Sender explizit droppen um den Flusher-Channel zu schließen.
+        drop(old_tx);
+
+        // 2. Letzten HMAC einfrieren (vor fsync, damit keine neuen Writes folgen).
+        let _hmac_guard = self.last_hmac.lock().await;
+
+        // 3. fsync des aktuellen WAL-Files.
+        {
+            let file = self.file.lock().await;
+            file.sync_all().await.map_err(|e| {
+                MemFuseError::Storage(format!("WAL fsync vor rotate_and_seal fehlgeschlagen: {}", e))
+            })?;
+        }
+
+        // 4. Sealed-Pfad konstruieren: <original>.sealed.<unix_micros>
+        let micros = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_micros();
+        let sealed_name = format!(
+            "{}.sealed.{}",
+            self.path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("wal"),
+            micros
+        );
+        let sealed_path = self.path.with_file_name(sealed_name);
+
+        // 5. Atomares Rename (Filesystem-Garantie: keine partielle Sichtbarkeit).
+        tokio::fs::rename(&self.path, &sealed_path)
+            .await
+            .map_err(|e| {
+                MemFuseError::Storage(format!(
+                    "WAL rotate_and_seal rename {} → {} fehlgeschlagen: {}",
+                    self.path.display(),
+                    sealed_path.display(),
+                    e
+                ))
+            })?;
+
+        // 6. fsync des Parent-Verzeichnisses (Garantiert Sichtbarkeit des Rename).
+        crate::util::fsync_parent_dir(&sealed_path).await?;
+
+        // 7. Read-Only setzen (O_RDONLY-Äquivalent via Permissions).
+        let mut perms = tokio::fs::metadata(&sealed_path)
+            .await
+            .map_err(|e| {
+                MemFuseError::Storage(format!("WAL metadata nach seal fehlgeschlagen: {}", e))
+            })?
+            .permissions();
+        perms.set_readonly(true);
+        tokio::fs::set_permissions(&sealed_path, perms)
+            .await
+            .map_err(|e| MemFuseError::Storage(format!("WAL set_readonly fehlgeschlagen: {}", e)))?;
+
+        Ok(sealed_path)
+    }
+
     /// Finds the offset and the previous HMAC for the given `TxId`.
     /// Returns the offset AFTER which the `TxId`'s commits start (effectively the rollback point).
     ///
@@ -5656,5 +5738,54 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wal_rotate_and_seal_readonly_guarantee() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let wal_path = dir.path().join("test.wal");
+
+        // WAL öffnen und einen Eintrag schreiben
+        let wal = Wal::open(&wal_path).await.expect("open WAL");
+        let op = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"hello".to_vec(),
+            value: b"world".to_vec(),
+        };
+        let (batch, _hmac) = wal.prepare_batch(vec![(op, 1)]).await.expect("prepare batch");
+        wal.append_batch(batch).await.expect("append batch");
+
+        // rotate_and_seal aufrufen
+        let sealed_path = wal.rotate_and_seal().await.expect("rotate_and_seal");
+
+        // Invariante 1: Sealed-Datei existiert am neuen Pfad
+        assert!(sealed_path.exists(), "Sealed WAL muss existieren");
+        assert!(
+            sealed_path.to_str().unwrap().contains(".sealed."),
+            "Sealed-Pfad muss '.sealed.' enthalten"
+        );
+
+        // Invariante 2: Originalpfad existiert nicht mehr
+        assert!(
+            !wal_path.exists(),
+            "Originaler WAL-Pfad muss nach Rotate verschwunden sein"
+        );
+
+        // Invariante 3: Sealed-Datei ist read-only
+        let meta = tokio::fs::metadata(&sealed_path).await.expect("metadata");
+        assert!(
+            meta.permissions().readonly(),
+            "Versiegeltes WAL-Segment MUSS read-only sein"
+        );
+
+        // Invariante 4: Schreibversuch auf sealed-Datei schlägt fehl
+        let write_result = tokio::fs::OpenOptions::new()
+            .write(true)
+            .open(&sealed_path)
+            .await;
+        assert!(
+            write_result.is_err(),
+            "Schreibversuch auf versiegeltes WAL-Segment muss fehlschlagen"
+        );
     }
 }
