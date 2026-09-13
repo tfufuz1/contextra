@@ -45,6 +45,18 @@ pub struct SlmProfile {
     /// INVARIANTE INV-P8-1: Bei Fingerprint-Wechsel MUSS invalidate() aufgerufen werden.
     #[serde(default)]
     pub fingerprint: Option<ConfigFingerprint>,
+
+    /// MCP-Transport-Kanal (Default: StdioMcp).
+    /// Feature `cloud-egress-guard`: Aktiviert HttpCloud-Variante.
+    #[cfg(feature = "cloud-egress-guard")]
+    #[serde(default)]
+    pub transport: crate::transport::Transport,
+
+    /// LinUCB-Bandit-Zustand (None = Cascade-Routing aktiv).
+    /// Feature `bandit-routing`: Aktiviert Contextual-Bandit-Routing.
+    #[cfg(feature = "bandit-routing")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bandit_state: Option<crate::bandit::BanditProfileState>,
 }
 
 impl SlmProfile {
@@ -64,6 +76,10 @@ impl SlmProfile {
             min_relevance_score,
             resource_cost_estimate: 0.0,
             fingerprint: None,
+            #[cfg(feature = "cloud-egress-guard")]
+            transport: crate::transport::Transport::default(),
+            #[cfg(feature = "bandit-routing")]
+            bandit_state: None,
         }
     }
 

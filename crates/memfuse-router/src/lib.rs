@@ -7,6 +7,15 @@ pub mod profile;
 pub mod router;
 pub mod serde_helpers;
 
+#[cfg(feature = "cloud-egress-guard")]
+pub mod transport;
+#[cfg(feature = "bandit-routing")]
+pub mod routing_strategy;
+#[cfg(feature = "cloud-egress-guard")]
+pub mod guarded_payload;
+#[cfg(feature = "bandit-routing")]
+pub mod bandit;
+
 #[cfg(test)]
 mod tests;
 
@@ -15,3 +24,12 @@ pub use lyapunov::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
 pub use outcome::{DecisionId, RoutingOutcome};
 pub use profile::SlmProfile;
 pub use router::{RouterEngine, RoutingDecision};
+
+#[cfg(feature = "cloud-egress-guard")]
+pub use transport::Transport;
+#[cfg(feature = "bandit-routing")]
+pub use routing_strategy::RoutingStrategy;
+#[cfg(feature = "cloud-egress-guard")]
+pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
+#[cfg(feature = "bandit-routing")]
+pub use bandit::{BanditImplementation, BanditProfileState};

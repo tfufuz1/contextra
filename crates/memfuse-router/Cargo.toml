@@ -10,8 +10,12 @@ license.workspace = true
 [features]
 default = []
 ollama = ["dep:memfuse-ollama"]
+bandit-routing = []
+cloud-egress-guard = []
+egress-sherman-morrison = ["bandit-routing"]
 
 [dependencies]
+shlex = "1"
 memfuse-core = { workspace = true }
 memfuse-store = { workspace = true }
 memfuse-db = { workspace = true }
