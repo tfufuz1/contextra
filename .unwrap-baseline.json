@@ -1388,6 +1388,42 @@
     "hash": "b768ba2736a2035a"
   },
   {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "04dbc2ba0cc150c2"
+  },
+  {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "6184fde09cded1ae"
+  },
+  {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "644a1f739614ce8b"
+  },
+  {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "6942ce7f01f3b9b0"
+  },
+  {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "6d9313fe52cf2473"
+  },
+  {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "83ab30ad1964cba5"
+  },
+  {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "b067de5d2e022fd0"
+  },
+  {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "b149dd3f3abca944"
+  },
+  {
+    "file": "crates/memfuse-candle/tests/kv_bridge_and_stress_test.rs",
+    "hash": "dfe7059980909fef"
+  },
+  {
     "file": "crates/memfuse-candle/tests/proptest_candle.rs",
     "hash": "0a26ee6b5571478c"
   },
@@ -3497,15 +3533,15 @@
   },
   {
     "file": "crates/memfuse-crypto/src/kv_segment/segment.rs",
-    "hash": "61898ea5f7ab3d76"
-  },
-  {
-    "file": "crates/memfuse-crypto/src/kv_segment/segment.rs",
     "hash": "6c758e570ccbd7d7"
   },
   {
     "file": "crates/memfuse-crypto/src/kv_segment/segment.rs",
     "hash": "794914e1222ab120"
+  },
+  {
+    "file": "crates/memfuse-crypto/src/kv_segment/segment.rs",
+    "hash": "9a2dfeea0e73d1bd"
   },
   {
     "file": "crates/memfuse-crypto/src/kv_segment/segment.rs",
@@ -3517,7 +3553,7 @@
   },
   {
     "file": "crates/memfuse-crypto/src/kv_segment/segment.rs",
-    "hash": "b8193d73797095c4"
+    "hash": "abc7eb1b7a3718d2"
   },
   {
     "file": "crates/memfuse-crypto/src/kv_segment/segment.rs",
@@ -13269,6 +13305,10 @@
   },
   {
     "file": "crates/memfuse-mcp/src/tests.rs",
+    "hash": "2e0c6d90c657255d"
+  },
+  {
+    "file": "crates/memfuse-mcp/src/tests.rs",
     "hash": "3ad42741f6a2035b"
   },
   {
@@ -13290,10 +13330,6 @@
   {
     "file": "crates/memfuse-mcp/src/tests.rs",
     "hash": "6d1f47ca102f169a"
-  },
-  {
-    "file": "crates/memfuse-mcp/src/tests.rs",
-    "hash": "711193602560853f"
   },
   {
     "file": "crates/memfuse-mcp/src/tests.rs",

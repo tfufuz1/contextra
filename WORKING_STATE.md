@@ -17,12 +17,15 @@
 
 Stand letzter Prüfung: 2026-09-13
 Befehl: `cargo xtask sync-docs` / `grep -rn "AI-TAG\[SMELL\]\[CRITICAL\]" crates/ --include="*.rs" | grep -v RESOLVED`
-Ergebnis: **5 offene Tags**
+Ergebnis: **6 offene Tags**
 
 | Crate/Datei | Zeile | ID | Kat. | Sev. | Zeitstempel | Beschreibung |
 |---|---|---|---|---|---|---|
 | `crates/memfuse-crypto/src/kv_segment/store.rs` | 443 | `AGT-SECURITY-3edfea62` | `TEST` | `ANALYZED-SAFE` | `2026-09-12T09:35:00Z` | // AI-TAG[TEST][ANALYZED-SAFE] Lock release test timing dependency resolved via Notify handshake (ID: AGT-SECURITY-3edfea62) (TS: 2026-09-12T09:35:00Z) (SESSION: 5f10d4f0) |
 | `crates/memfuse-db/src/fusion.rs` | 45 | `AGT-DB-b31d8a72` | `SMELL` | `MAJOR` | `2026-09-12T18:43:13Z` | // AI-TAG[SMELL][MAJOR] ResonanceConfig beta/gamma clamp returns NaN if input is NaN (ID: AGT-DB-b31d8a72) (TS: 2026-09-12T18:43:13Z) (SESSION: e6ab3646) |
+| `crates/memfuse-mcp/src/lib.rs` | 39 | `AGT-MCP-a4c8ea50` | `SMELL` | `MINOR` | `2026-09-13T01:25:57Z` | // AI-TAG[SMELL][MINOR] Missing inactivity timeout on stdio read_line_bounded (ID: AGT-MCP-a4c8ea50) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863) |
+| `crates/memfuse-mcp/src/lib.rs` | 882 | `AGT-MCP-a2705ed3` | `SMELL` | `MINOR` | `2026-09-13T01:25:57Z` | // AI-TAG[SMELL][MINOR] Missing explicit id.len() <= 256 length check in memfuse_get (ID: AGT-MCP-a2705ed3) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863) |
+| `crates/memfuse-mcp/src/prompt_injection.rs` | 399 | `AGT-MCP-cb8e9af7` | `SMELL` | `MAJOR` | `2026-09-13T01:25:57Z` | // AI-TAG[SMELL][MAJOR] Homoglyph script bypass in PromptInjectionGuard normalize_text (ID: AGT-MCP-cb8e9af7) (TS: 2026-09-13T01:25:57Z) (SESSION: bbfaa863) |
 | `crates/memfuse-store/src/wal.rs` | 1048 | `AGT-STORE-d73203c0` | `SMELL` | `ANALYZED-SAFE` | `2026-09-10T19:14:58Z` | // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: Exklusiver Mutex-Lock self.file.lock() in append_batch serialisiert Header-Check (write_header) und Dateischreibzugriffe vollständig. (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8) |
 | `crates/memfuse-store/tests/wal_boundary_and_mutation_hardening.rs` | 213 | `-` | `SMELL` | `MINOR` | `2026-09-11T12:00:00Z` | // AI-TAG[SMELL][MINOR] audit-M-9: WAL replay treats all valid WalEntry payloads on disk as implicitly committed unless corrupted. (TS: 2026-09-11T12:00:00Z) (SESSION: 504d02fc) |
 | `crates/memfuse-store/tests/wal_boundary_and_mutation_hardening.rs` | 372 | `-` | `SMELL` | `MINOR` | `2026-09-11T12:00:00Z` | // AI-TAG[SMELL][MINOR] audit-M-10: Restoring last HMAC manually after failed batch append ensures in-memory HMAC continuity. (TS: 2026-09-11T12:00:00Z) (SESSION: 504d02fc) |
@@ -38,7 +41,7 @@ Ergebnis: **5 offene Tags**
 | `memfuse-checkpoint` | 2 | 5791 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-graph` | 2 | 10625 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-security` | 2 | 5466 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
-| `memfuse-text` | 2 | 5463 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
+| `memfuse-text` | 2 | 5464 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-candle` | 3 | 3492 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-index` | 3 | 15955 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-ollama` | 3 | 4247 | 🟢 Clean |  |
