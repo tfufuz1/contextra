@@ -8,6 +8,7 @@
 | `TS:2026-09-13T00:00:00Z (SESSION: pid-regler-impl)` | `crates/memfuse-db/src/pid_latency_controller.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | PID Latency Controller & Latency Budget Guard für Multi-Step Retrieval. |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-crypto/src/kv_segment/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation). |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-db/src/consolidation_locks.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Guard-Konstrukt fuer typsicheres Locking und geordnete Kaskaden-Invalidierung in der Sleep-Cycle-Konsolidierung. |
+| `TS:2026-09-13 (SESSION: HEAD)` | `crates/memfuse-crypto/src/egress_vault.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cloud-Egress-Vault mit Layer-1-Regex-Klassifikation und Fail-Closed-Semantik. |
 | `TS:2026-09-12T00:00:00Z` | `crates/memfuse-db/tests/consolidation_double_trigger_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrierter Test zur Verifizierung des Double-Trigger-Schutzes zwischen ConsolidationEngine und MaintenanceScheduler. |
 | `TS:2026-09-12` | `crates/memfuse-db/src/export.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Export-Funktionalität für Memory-Export-Format v1 (Schema Version "1.0"). |
 | `TS:2026-09-12` | `crates/memfuse-db/src/import.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Import-Funktionalität & Zusammenfassung für Memory-Export-Format v1 (Schema Version "1.0"). |
@@ -92,6 +93,7 @@
 | `2026-09-13T01:25:00Z` | `crates/memfuse-text/src/lib.rs` | `REVIEW-PASS` | `-` | `89a61398` | `-` | `-` | // REVIEW-PASS[2/2] Tier-2 audit verified: gate-stack green, 0 unsafe, APM-14/16/22/23/24/36 validated, 3x concurrency runs clean. (TS: 2026-09-13T01:25:00Z) (SESSION: 89a61398) (PRÜFER-KONTEXT: FRESH) |
 | `2026-09-13T01:22:55Z (SESSION: 0b05483b)` | `crates/memfuse-checkpoint/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RAII CheckpointGuard + persistente Snapshot-Verwaltung |
 | `2026-09-13T00:00:00Z (SESSION: KV-BRIDGE-ADAPTER-IMPL)` | `crates/memfuse-candle/src/kv_bridge.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store. |
+| `2026-09-13` | `crates/memfuse-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries |
 | `2026-09-12T18:43:13Z` | `crates/memfuse-db/src/collection/maintenance.rs` | `AI-TAG` | `AGT-DB-f18d79a2` | `-` | `RESOLVED` | `0` | // AI-TAG[SMELL][MAJOR] RESOLVED: AGT-DB-f18d79a2 — reap_expired_documents uses cursor-based batch pagination to avoid 10k silent truncation limit (TS: 2026-09-12T18:43:13Z) |
 | `2026-09-12T12:00:00Z` | `crates/memfuse-store/src/lsm.rs` | `AI-TAG` | `AGT-STORE-5a195b0b` | `c16d73e9` | `RESOLVED` | `0` | // AI-TAG[SMELL][MINOR] RESOLVED(audit-NC-5/u64 try_from overflow safety): Verified safe u128 -> u64 sequence parsing with try_from and fallback warning logging to ensure monotonic flush_counter initialization. (ID: AGT-STORE-5a195b0b) (TS: 2026-09-12T12:00:00Z) (SESSION: c16d73e9) |
 | `2026-09-12T12:00:00Z` | `crates/memfuse-store/src/lsm.rs` | `AI-TAG` | `AGT-STORE-cbd72ab9` | `c16d73e9` | `RESOLVED` | `0` | // AI-TAG[SMELL][MINOR] RESOLVED(clippy::map_or_identity): Simplified map_or(0, \|m\| m) to unwrap_or(0). (ID: AGT-STORE-cbd72ab9) (TS: 2026-09-12T12:00:00Z) (SESSION: c16d73e9) |
@@ -306,6 +308,7 @@
 | `` | `crates/memfuse-index/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/memfuse-index/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/memfuse-index/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/memfuse-mcp/src/egress_gateway.rs` | `AI-TAG` | `-` | `-` | `OPEN` | `-` | // AI-TAG[SMELL][MAJOR] TEMP-INTERFACE: EgressClassifier trait placeholder until crates/memfuse-crypto/src/egress_vault.rs is merged. Reconcile with official contract once merged. |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |
 | `` | `crates/memfuse-store/examples/chaos_writer.rs` | `FILE-CONTEXT` | `-` | `chaos_power_cut` | `-` | `-` |  |
