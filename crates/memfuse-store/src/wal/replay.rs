@@ -900,9 +900,7 @@ impl Wal {
 
         Ok(version)
     }
-
 }
-
 
 pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> Result<bool> {
     for suffix in &["v1.bak", "v2.bak"] {

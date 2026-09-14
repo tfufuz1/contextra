@@ -249,10 +249,11 @@ mod tests {
 
         // Erstelle echte Patterns — der Inhalt ist irrelevant,
         // da der Test per Timeout blockt bevor Patterns geprüft werden.
-        let patterns = vec![
-            CompiledPattern::new("email", r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
-                .expect("valid email pattern"),
-        ];
+        let patterns = vec![CompiledPattern::new(
+            "email",
+            r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
+        )
+        .expect("valid email pattern")];
 
         // Benutze ein ausreichend großes Payload, sodass `spawn_blocking`
         // nicht sofort vor dem Timeout-Tick abschließt.

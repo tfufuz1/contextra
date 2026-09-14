@@ -19,10 +19,7 @@ pub(crate) const fn legacy_integrity_key() -> [u8; 32] {
 
 impl Wal {
     /// Prepares a batch of WAL operations with sequential sequence numbers and HMAC hash-chaining.
-    pub async fn prepare_batch(
-        &self,
-        ops: Vec<(WalOp, u64)>,
-    ) -> Result<(PreparedBatch, [u8; 32])> {
+    pub async fn prepare_batch(&self, ops: Vec<(WalOp, u64)>) -> Result<(PreparedBatch, [u8; 32])> {
         let mut last_hmac = self.last_hmac.lock().await;
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
