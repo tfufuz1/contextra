@@ -127,7 +127,8 @@ impl BlockCache {
 ///
 /// Returns `Ok(Ok(index))` if the exact key is found, or `Ok(Err(index))`
 /// indicating the insertion index (lower-bound entry offset index) if not found.
-fn binary_search_index_in_block(
+/// Exposed as `pub` for fuzz testing in `memfuse-store-fuzz`.
+pub fn binary_search_index_in_block(
     block_data: &[u8],
     offsets_start: usize,
     num_offsets: usize,
@@ -184,7 +185,8 @@ fn binary_search_index_in_block(
 ///
 /// Returns `Ok(Some((entry_offset, key_len)))` if the key is found,
 /// or `Ok(None)` if the key does not exist in the block.
-fn binary_search_entry_in_block(
+/// Exposed as `pub` for fuzz testing in `memfuse-store-fuzz`.
+pub fn binary_search_entry_in_block(
     block_data: &[u8],
     offsets_start: usize,
     num_offsets: usize,
@@ -223,7 +225,8 @@ fn binary_search_entry_in_block(
 /// `offsets_start`: byte position of the first 2-byte offset entry.
 /// `num_offsets`: number of entries in the offsets array.
 /// `key`: the key to search for.
-fn block_binary_search(
+/// Exposed as `pub` for fuzz testing in `memfuse-store-fuzz`.
+pub fn block_binary_search(
     block_data: &[u8],
     offsets_start: usize,
     num_offsets: usize,
