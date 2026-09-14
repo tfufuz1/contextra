@@ -25,23 +25,11 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 /// Edge type representation for CSR edges.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum EdgeType {
     #[default]
     Default,
-    Custom(String),
-}
-
-impl From<&str> for EdgeType {
-    fn from(s: &str) -> Self {
-        EdgeType::Custom(s.to_string())
-    }
-}
-
-impl From<String> for EdgeType {
-    fn from(s: String) -> Self {
-        EdgeType::Custom(s)
-    }
 }
 
 /// Edge structure in CSR graph representation.
@@ -262,11 +250,11 @@ pub(crate) struct GraphInner {
     pub(crate) doc_to_edges: ahash::AHashMap<DocId, HashSet<(EntityId, EntityId)>>,
 
     /// Staging for entities not yet committed, grouped by TxId.
-    staged_entities: HashMap<TxId, HashMap<EntityId, Entity>>,
+    staged_entities: ahash::AHashMap<TxId, ahash::AHashMap<EntityId, Entity>>,
     /// Staging for edges not yet committed, grouped by TxId.
-    staged_edges: HashMap<TxId, HashMap<EntityId, Vec<StagedEdgePayload>>>,
+    staged_edges: ahash::AHashMap<TxId, ahash::AHashMap<EntityId, Vec<StagedEdgePayload>>>,
     /// Staging for edge removals not yet committed, grouped by TxId.
-    staged_removals: HashMap<TxId, Vec<(EntityId, EntityId)>>,
+    staged_removals: ahash::AHashMap<TxId, Vec<(EntityId, EntityId)>>,
     /// Edges that have been committed but not yet compacted into CSR arrays (delta buffer).
     pending_edges: HashMap<InternalIndex, Vec<EdgePayload>>,
     /// Tombstoned edges that have been removed and should be excluded during compaction and traversal.
@@ -296,9 +284,9 @@ impl GraphInner {
             business_valid_tos: Vec::new(),
             source_doc_ids: Vec::new(),
             doc_to_edges: ahash::AHashMap::new(),
-            staged_entities: HashMap::new(),
-            staged_edges: HashMap::new(),
-            staged_removals: HashMap::new(),
+            staged_entities: ahash::AHashMap::new(),
+            staged_edges: ahash::AHashMap::new(),
+            staged_removals: ahash::AHashMap::new(),
             pending_edges: HashMap::new(),
             tombstoned_edges: HashSet::new(),
             pending_edge_count: 0,
@@ -422,6 +410,8 @@ impl GraphInner {
         self.tombstoned_edges.clear();
         self.pending_edge_count = 0;
         self.is_dirty = false;
+        #[cfg(feature = "edge-reinforcement-learning")]
+        self.edge_store.clear();
     }
 }
 
