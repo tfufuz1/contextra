@@ -271,10 +271,7 @@ impl McpServer {
         self
     }
 
-    pub fn with_egress_classifier(
-        mut self,
-        classifier: Arc<dyn EgressClassifier>,
-    ) -> Self {
+    pub fn with_egress_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self {
         self.egress_classifier = classifier;
         self
     }
@@ -1102,15 +1099,21 @@ impl McpServer {
                     Some("default".to_string())
                 };
 
-                let max_results = if let Some(k_val) = args.get("max_results").or_else(|| args.get("k")) {
+                let max_results = if let Some(k_val) =
+                    args.get("max_results").or_else(|| args.get("k"))
+                {
                     match k_val {
                         Value::Number(n) => {
                             let k_raw = n.as_u64().ok_or_else(|| {
-                                McpError::invalid_params("max_results muss eine positive Ganzzahl sein")
+                                McpError::invalid_params(
+                                    "max_results muss eine positive Ganzzahl sein",
+                                )
                             })? as usize;
                             Some(k_raw.min(MAX_SEARCH_K))
                         }
-                        _ => return Err(McpError::invalid_params("max_results muss eine Zahl sein")),
+                        _ => {
+                            return Err(McpError::invalid_params("max_results muss eine Zahl sein"))
+                        }
                     }
                 } else {
                     Some(10)
@@ -1122,14 +1125,13 @@ impl McpServer {
                     max_results,
                 };
 
-                let response = egress_gateway::handle_cloud_query(
-                    request,
-                    self.egress_classifier.as_ref(),
-                )
-                .await?;
+                let response =
+                    egress_gateway::handle_cloud_query(request, self.egress_classifier.as_ref())
+                        .await?;
 
-                serde_json::to_value(&response)
-                    .map_err(|e| McpError::internal_error(format!("Response serialization error: {e}")))
+                serde_json::to_value(&response).map_err(|e| {
+                    McpError::internal_error(format!("Response serialization error: {e}"))
+                })
             }
 
             other => Err(McpError::invalid_params(format!(

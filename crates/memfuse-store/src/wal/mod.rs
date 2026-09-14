@@ -58,7 +58,8 @@ pub struct Wal {
     pub(crate) fallback_integrity_key: Option<[u8; 32]>,
     pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,
-    pub(crate) flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<FlusherMessage>>>,
+    pub(crate) flusher_tx:
+        std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<FlusherMessage>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -234,7 +235,6 @@ impl Wal {
 
     /// Helper to expose integrity key for tests
 
-
     pub fn size(&self) -> u64 {
         self.size.load(std::sync::atomic::Ordering::Relaxed)
     }
@@ -246,5 +246,4 @@ impl Wal {
     pub fn is_sealed(&self) -> bool {
         self.sealed.load(std::sync::atomic::Ordering::SeqCst)
     }
-
 }

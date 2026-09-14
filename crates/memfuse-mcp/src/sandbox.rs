@@ -76,10 +76,7 @@ impl VolatileToolResult {
     }
 
     /// Entschlüsselt und gibt den Klartext zeroized zurück.
-    pub fn decrypt(
-        &self,
-        key: &memfuse_crypto::CryptoKey,
-    ) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    pub fn decrypt(&self, key: &memfuse_crypto::CryptoKey) -> Result<zeroize::Zeroizing<Vec<u8>>> {
         if self.nonce.len() != 12 {
             return Err(MemFuseError::Internal(
                 "Sandbox decrypt: Invalid nonce length".into(),
@@ -166,7 +163,9 @@ impl McpSandbox {
     /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
     pub fn classify_method(method: &str) -> ToolCategory {
         match method {
-            "memfuse_search" | "memfuse_get" | "memfuse_collections" | "memfuse_cloud_query" => ToolCategory::DatabaseRead,
+            "memfuse_search" | "memfuse_get" | "memfuse_collections" | "memfuse_cloud_query" => {
+                ToolCategory::DatabaseRead
+            }
             "memfuse_insert"
             | "memfuse_delete"
             | "memfuse_upsert"

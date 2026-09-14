@@ -216,11 +216,9 @@ impl Wal {
                     version = WalVersion::V2;
                     pos = 4;
                 } else {
-                    file.seek(std::io::SeekFrom::Start(0))
-                        .await
-                        .map_err(|e| {
-                            MemFuseError::Storage(format!("WAL replay seek failed: {}", e))
-                        })?;
+                    file.seek(std::io::SeekFrom::Start(0)).await.map_err(|e| {
+                        MemFuseError::Storage(format!("WAL replay seek failed: {}", e))
+                    })?;
                     reader = tokio::io::BufReader::new(&mut *file);
                     pos = 0;
                 }
@@ -406,12 +404,8 @@ impl Wal {
                     };
 
                     let verify_res = match version {
-                        WalVersion::V3 => {
-                            verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
-                        }
-                        WalVersion::V2 => {
-                            verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
-                        }
+                        WalVersion::V3 => verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
+                        WalVersion::V2 => verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
                         WalVersion::V1 => {
                             verifier.skip_hmac_verify_legacy(&snapshot);
                             Ok(())
@@ -423,16 +417,17 @@ impl Wal {
                             let mut legacy_verifier =
                                 IntegrityVerifier::new(&legacy_integrity_key());
                             legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
-                            let legacy_res = match version {
-                                WalVersion::V3 => legacy_verifier
-                                    .verify_and_update_v3(&snapshot, chunk_start_pos),
-                                WalVersion::V2 => legacy_verifier
-                                    .verify_and_update_v2(&snapshot, chunk_start_pos),
-                                WalVersion::V1 => {
-                                    legacy_verifier.skip_hmac_verify_legacy(&snapshot);
-                                    Ok(())
-                                }
-                            };
+                            let legacy_res =
+                                match version {
+                                    WalVersion::V3 => legacy_verifier
+                                        .verify_and_update_v3(&snapshot, chunk_start_pos),
+                                    WalVersion::V2 => legacy_verifier
+                                        .verify_and_update_v2(&snapshot, chunk_start_pos),
+                                    WalVersion::V1 => {
+                                        legacy_verifier.skip_hmac_verify_legacy(&snapshot);
+                                        Ok(())
+                                    }
+                                };
                             if legacy_res.is_ok() {
                                 tracing::warn!(
                                     "WAL nutzt veralteten Integritätsschlüssel — Datenbank sollte neu initialisiert werden"

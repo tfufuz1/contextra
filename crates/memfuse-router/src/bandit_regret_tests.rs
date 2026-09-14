@@ -224,6 +224,8 @@ fn test_bandit_diagonal_vs_linucb_latency_budget() {
         "LATENZBUDGET-VERLETZUNG (§13.3): BanditProfileState::score + update P95 = {}µs \
          bei d={} überschreitet Budget {}µs. \
          Kein O(d³) in Diagonal-Implementierung erlaubt!",
-        p95_us, DIM, BUDGET_P95_US
+        p95_us,
+        DIM,
+        BUDGET_P95_US
     );
 }

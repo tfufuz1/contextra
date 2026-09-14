@@ -1562,14 +1562,25 @@ mod tests {
         let mut entries1 = Vec::new();
         let mut entries2 = Vec::new();
         for i in 0..20u8 {
-            entries1.push((format!("key1-{:02}", i).into_bytes(), b"val1".to_vec(), i as u64 + 1));
-            entries2.push((format!("key2-{:02}", i).into_bytes(), b"val2".to_vec(), i as u64 + 21));
+            entries1.push((
+                format!("key1-{:02}", i).into_bytes(),
+                b"val1".to_vec(),
+                i as u64 + 1,
+            ));
+            entries2.push((
+                format!("key2-{:02}", i).into_bytes(),
+                b"val2".to_vec(),
+                i as u64 + 21,
+            ));
         }
 
         let sst1 = create_test_sstable(
             tmp.path(),
             "sst1.sst",
-            &entries1.iter().map(|(k, v, s)| (k.as_slice(), v.as_slice(), *s)).collect::<Vec<_>>(),
+            &entries1
+                .iter()
+                .map(|(k, v, s)| (k.as_slice(), v.as_slice(), *s))
+                .collect::<Vec<_>>(),
             Arc::clone(&bc),
         )
         .await;
@@ -1577,7 +1588,10 @@ mod tests {
         let sst2 = create_test_sstable(
             tmp.path(),
             "sst2.sst",
-            &entries2.iter().map(|(k, v, s)| (k.as_slice(), v.as_slice(), *s)).collect::<Vec<_>>(),
+            &entries2
+                .iter()
+                .map(|(k, v, s)| (k.as_slice(), v.as_slice(), *s))
+                .collect::<Vec<_>>(),
             Arc::clone(&bc),
         )
         .await;
@@ -1586,7 +1600,12 @@ mod tests {
         let normal_out = tmp.path().join("normal_merged.sst");
         let start_normal = std::time::Instant::now();
         engine
-            .merge_sstables(&[Arc::clone(&sst1), Arc::clone(&sst2)], &normal_out, u64::MAX, true)
+            .merge_sstables(
+                &[Arc::clone(&sst1), Arc::clone(&sst2)],
+                &normal_out,
+                u64::MAX,
+                true,
+            )
             .await
             .expect("merge under normal pressure");
         let duration_normal = start_normal.elapsed();
@@ -1627,7 +1646,11 @@ mod tests {
             .await
             .expect("open critical sst");
         let entries = reader.iter().await.expect("iter entries");
-        assert_eq!(entries.len(), 40, "All entries must be preserved after backpressure merge");
+        assert_eq!(
+            entries.len(),
+            40,
+            "All entries must be preserved after backpressure merge"
+        );
     }
 
     #[tokio::test]

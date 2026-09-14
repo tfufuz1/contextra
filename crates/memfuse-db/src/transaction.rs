@@ -902,7 +902,10 @@ mod tests {
         let legacy_json = r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"has_graph":false}}"#;
 
         // Round-Trip & Format-Vergleich:
-        assert_eq!(json_arc, legacy_json, "Arc<Vec<DocId>> and Vec<DocId> must produce identical JSON representations");
+        assert_eq!(
+            json_arc, legacy_json,
+            "Arc<Vec<DocId>> and Vec<DocId> must produce identical JSON representations"
+        );
 
         let roundtrip: CommitIntent = serde_json::from_str(&json_arc).expect("deserialize json");
         match roundtrip {
