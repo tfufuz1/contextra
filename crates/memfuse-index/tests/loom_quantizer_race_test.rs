@@ -47,7 +47,6 @@ mod loom_tests {
                 let index_clone = Arc::clone(&index);
                 let handle = thread::spawn(move || {
                     let rt = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
                         .build()
                         .unwrap();
                     rt.block_on(async {
