@@ -1057,6 +1057,97 @@ mod tests {
     }
 
     #[test]
+    fn test_symbol_overlap_different_fns_same_file_not_detected() {
+        let diff_a = r#"
+--- a/crates/memfuse-store/src/sstable.rs
++++ b/crates/memfuse-store/src/sstable.rs
+@@ -100,6 +100,10 @@
++fn foo() -> u32 {
++    1
++}
+"#;
+
+        let diff_b = r#"
+--- a/crates/memfuse-store/src/sstable.rs
++++ b/crates/memfuse-store/src/sstable.rs
+@@ -200,6 +200,10 @@
++fn bar() -> u32 {
++    2
++}
+"#;
+
+        let map_a = extract_changed_files_and_symbols(diff_a);
+        let map_b = extract_changed_files_and_symbols(diff_b);
+
+        let overlaps = compute_symbol_overlap(&map_a, &map_b);
+        assert!(
+            overlaps.is_empty(),
+            "Different functions in the same file must return an empty overlap list"
+        );
+    }
+
+    #[test]
+    fn test_symbol_overlap_same_fn_different_files_not_detected() {
+        let diff_a = r#"
+--- a/crates/memfuse-store/src/sstable.rs
++++ b/crates/memfuse-store/src/sstable.rs
+@@ -100,6 +100,10 @@
++fn process_entry(id: u64) {
++}
+"#;
+
+        let diff_b = r#"
+--- a/crates/memfuse-store/src/wal.rs
++++ b/crates/memfuse-store/src/wal.rs
+@@ -100,6 +100,10 @@
++fn process_entry(id: u64) {
++}
+"#;
+
+        let map_a = extract_changed_files_and_symbols(diff_a);
+        let map_b = extract_changed_files_and_symbols(diff_b);
+
+        let overlaps = compute_symbol_overlap(&map_a, &map_b);
+        assert!(
+            overlaps.is_empty(),
+            "Same function in different files must return an empty overlap list"
+        );
+    }
+
+    #[test]
+    fn test_symbol_overlap_regression_binary_search_in_block() {
+        let diff_a = r#"
+--- a/crates/memfuse-store/src/sstable.rs
++++ b/crates/memfuse-store/src/sstable.rs
+@@ -100,6 +100,10 @@
++fn binary_search_in_block(data: &[u8]) -> usize {
++    0
++}
+"#;
+
+        let diff_b = r#"
+--- a/crates/memfuse-store/src/sstable.rs
++++ b/crates/memfuse-store/src/sstable.rs
+@@ -100,6 +100,10 @@
++pub fn binary_search_in_block(block: &[u8], key: &[u8]) -> Option<usize> {
++    None
++}
+"#;
+
+        let map_a = extract_changed_files_and_symbols(diff_a);
+        let map_b = extract_changed_files_and_symbols(diff_b);
+
+        let overlaps = compute_symbol_overlap(&map_a, &map_b);
+        assert_eq!(overlaps.len(), 1, "Expected 1 overlapping file");
+        let (file, symbols) = &overlaps[0];
+        assert_eq!(file, &PathBuf::from("crates/memfuse-store/src/sstable.rs"));
+        assert!(
+            symbols.contains("binary_search_in_block"),
+            "Expected binary_search_in_block symbol overlap"
+        );
+    }
+
+    #[test]
     fn test_regression_incident_sstable_symbol_overlap_detected() {
         let diff_pr1 = r#"
 diff --git a/crates/memfuse-store/src/sstable.rs b/crates/memfuse-store/src/sstable.rs
