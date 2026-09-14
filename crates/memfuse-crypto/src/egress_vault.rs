@@ -234,4 +234,51 @@ mod tests {
             EgressClassification::Block(BlockReason::SensitivePattern(_))
         ));
     }
+
+    /// Verifiziert die Fail-Closed-Semantik von `classify_layer1` (§10.14, §12.2.4).
+    ///
+    /// "Fail-Closed" bedeutet: Bei Timeout, internem Fehler oder Panic
+    /// MUSS Block(...) zurückgegeben werden — niemals Allow.
+    ///
+    /// Dieser Test simuliert einen Timeout indem das Zeitlimit auf
+    /// eine extrem kurze Duration (1 Nanosekunde) gesetzt wird.
+    #[cfg(all(test, feature = "cloud-egress-guard"))]
+    #[tokio::test]
+    async fn test_egress_guard_fail_closed_on_index_unavailable() {
+        use std::time::Duration;
+
+        // Erstelle ein Pattern mit ReDoS / hohem Rechenaufwand oder extrem großem Payload,
+        // damit `spawn_blocking` nicht schneller als die Timer-Auflösung fertig wird.
+        let mut huge_payload = "a".repeat(1_000_000);
+        huge_payload.push('!');
+
+        let patterns = vec![
+            CompiledPattern::new("slow_pattern", r"(a+)+b")
+                .unwrap_or_else(|_| CompiledPattern::new("email", r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}").unwrap()),
+        ];
+
+        // Simuliere "Index unavailable" / Timeout: 1 Nanosekunde — wird immer überschritten
+        // da `spawn_blocking` allein mehrere Mikrosekunden braucht.
+        let result = classify_layer1(&huge_payload, &patterns, Duration::from_nanos(1)).await;
+
+        // INVARIANTE: Fail-Closed — bei Timeout MUSS Block zurückgegeben werden.
+        assert!(
+            matches!(result, EgressClassification::Block(BlockReason::ClassificationTimeout)),
+            "Fail-Closed-Verletzung: classify_layer1 gab bei Timeout nicht Block(ClassificationTimeout) zurück. Got: {:?}",
+            result
+        );
+
+        // Negativ-Test: Normaler Aufruf mit angemessener Zeit und harmlosen Payload MUSS Allow zurückgeben
+        let benign_payload = "This is a benign payload without any sensitive data.";
+        let benign_patterns = vec![
+            CompiledPattern::new("email", r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+                .expect("valid email pattern"),
+        ];
+        let result_ok = classify_layer1(benign_payload, &benign_patterns, Duration::from_millis(500)).await;
+        assert!(
+            matches!(result_ok, EgressClassification::Allow),
+            "Fehler: Bei ausreichend Zeit und harmlosen Payload sollte Allow zurückgegeben werden. Got: {:?}",
+            result_ok
+        );
+    }
 }

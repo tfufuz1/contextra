@@ -34,6 +34,14 @@
       "active": false,
       "expires_at": "2026-09-13T08:17:58.521251377+00:00",
       "released_at": "2026-09-13T04:33:35.119679882+00:00"
+    },
+    {
+      "krate": "memfuse-security",
+      "issue": "JULES-CRYPTO-EGRESS-TEST",
+      "timestamp": "2026-09-14T09:35:10.361663632+00:00",
+      "session_id": "3919605607977493785",
+      "active": true,
+      "expires_at": "2026-09-14T13:35:10.361648041+00:00"
     }
   ]
 }
