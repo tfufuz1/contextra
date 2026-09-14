@@ -6,22 +6,11 @@
 // SIEHE AUCH:  crates/memfuse-crypto/src/egress_vault.rs
 
 use memfuse_core::BoxFuture;
+pub use memfuse_security::egress_vault::{BlockReason, EgressClassification, EgressClassifier};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::protocol::McpError;
-
-// AI-TAG[SMELL][MAJOR] TEMP-INTERFACE: EgressClassifier trait placeholder until crates/memfuse-crypto/src/egress_vault.rs is merged. Reconcile with official contract once merged.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EgressClassification {
-    Allow,
-    Block { reason: String },
-    RequiresAbstraction,
-}
-
-pub trait EgressClassifier: Send + Sync {
-    fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>;
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudQueryRequest {
@@ -58,8 +47,8 @@ pub async fn handle_cloud_query(
     let classification = classifier.classify(&request.query).await;
 
     match classification {
-        EgressClassification::Block { reason } => Err(McpError::invalid_params(format!(
-            "Egress policy violation: query blocked: {reason}"
+        EgressClassification::Block(reason) => Err(McpError::invalid_params(format!(
+            "Egress policy violation: query blocked: {reason:?}"
         ))),
         EgressClassification::Allow => Ok(CloudQueryResponse {
             status: "success".to_string(),
@@ -77,6 +66,9 @@ pub async fn handle_cloud_query(
                 "Payload was abstracted before processing due to egress policy".to_string(),
             ),
         }),
+        _ => Err(McpError::invalid_params(
+            "Egress policy violation: query blocked due to unknown classification",
+        )),
     }
 }
 
@@ -103,9 +95,9 @@ impl EgressClassifier for DefaultEgressClassifier {
                 || payload.contains("password")
                 || payload.contains('@')
             {
-                EgressClassification::Block {
-                    reason: "Sensitive pattern detected in payload".to_string(),
-                }
+                EgressClassification::Block(BlockReason::SensitivePattern(
+                    "Sensitive pattern detected in payload".to_string(),
+                ))
             } else if payload.contains("abstract") || payload.contains("PII") {
                 EgressClassification::RequiresAbstraction
             } else {
