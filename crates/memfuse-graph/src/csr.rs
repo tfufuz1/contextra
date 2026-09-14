@@ -3000,7 +3000,7 @@ mod tests {
         let inner = graph.inner.read();
         let idx = inner.id_map.get(&EntityId::new(10)).unwrap(); // unwrap
         let entity = inner.entities[*idx].as_ref().unwrap(); // unwrap
-        assert_eq!(entity.name, "EntityFromB");
+        assert_eq!(&*entity.name, "EntityFromB");
     }
 
     #[tokio::test]

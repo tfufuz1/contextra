@@ -635,7 +635,7 @@ impl CheckpointMeta {
     pub fn into_workflow_state(&self) -> WorkflowState {
         WorkflowState {
             tx: self.tx_id,
-            graph_hash: format!("seq-{}", self.seq_no),
+            graph_hash: *blake3::hash(format!("seq-{}", self.seq_no).as_bytes()).as_bytes(),
         }
     }
 }
@@ -1591,7 +1591,7 @@ impl<S: memfuse_core::StorageEngine> memfuse_core::traits::Checkpoint
             let seq_no = self.storage.last_seq_no().await?;
             Ok(WorkflowState {
                 tx,
-                graph_hash: format!("seq-{}", seq_no),
+                graph_hash: *blake3::hash(format!("seq-{}", seq_no).as_bytes()).as_bytes(),
             })
         })
     }
@@ -2604,7 +2604,10 @@ mod tests {
 
         // Independent expected value assertions
         assert_eq!(state.tx, TxId::new(2026));
-        assert!(!state.graph_hash.is_empty());
+        assert_eq!(
+            state.graph_hash,
+            *blake3::hash(b"seq-15").as_bytes()
+        );
     }
 
     #[allow(non_snake_case)]
