@@ -11,7 +11,7 @@ use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
-use memfuse_core::{ContextChunk, ContextWindow, EntityId, MemFuseError, Result};
+use memfuse_core::{ContextChunk, ContextWindow, EntityId, MemFuseError, Result, StorageEngine};
 use memfuse_db::{collection::Collection, context::ContextManager};
 use memfuse_store::LsmStorage;
 use parking_lot::RwLock;
@@ -101,8 +101,8 @@ pub struct RouterState {
 ///   independently per `DecisionId` and do not affect the atomic snapshot guarantees of `RouterState`.
 /// - **Concurrency Safety**: This separation presents **zero concurrency risk**. Routing queries read `RouterState`
 ///   lock-free and briefly acquire a write lock on `pending_decisions` solely to record decision IDs.
-pub struct RouterEngine {
-    collection: Arc<Collection<LsmStorage>>,
+pub struct RouterEngine<S: StorageEngine = LsmStorage> {
+    collection: Arc<Collection<S>>,
     /// Atomic state snapshot via `ArcSwap`: active profiles, conformal calibration, and Lyapunov drift
     /// watchers are maintained together as an immutable, atomically replaceable snapshot.
     pub(crate) state: ArcSwap<RouterState>,
@@ -115,10 +115,10 @@ pub struct RouterEngine {
     pub(crate) pending_decisions: RwLock<HashMap<DecisionId, (String, Instant)>>,
 }
 
-impl RouterEngine {
+impl<S: StorageEngine> RouterEngine<S> {
     /// Creates a new `RouterEngine` instance.
     pub fn new(
-        collection: Arc<Collection<LsmStorage>>,
+        collection: Arc<Collection<S>>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
     ) -> Self {
@@ -168,7 +168,7 @@ impl RouterEngine {
 
     /// Validates all profiles and creates a new `RouterEngine` instance.
     pub fn try_new(
-        collection: Arc<Collection<LsmStorage>>,
+        collection: Arc<Collection<S>>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
     ) -> Result<Self> {
@@ -880,7 +880,7 @@ pub(crate) fn select_profile_from_chunks(
     }
 }
 
-impl memfuse_db::DriftStatusProvider for RouterEngine {
+impl<S: StorageEngine> memfuse_db::DriftStatusProvider for RouterEngine<S> {
     fn overall_drift_status(&self) -> String {
         self.overall_drift_status()
     }
