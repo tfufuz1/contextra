@@ -437,7 +437,9 @@ impl MemTable {
     ///
     /// Collects from all shards and sorts by key. Called only during flush.
     pub fn iter_latest(&self) -> Vec<(Bytes, Bytes, u64, u64)> {
-        let mut results = Vec::new();
+        // Exact capacity estimate: total unique keys across all shards (1 entry per key in iter_latest).
+        let estimated_entries: usize = self.shards.iter().map(|s| s.entries.read().len()).sum();
+        let mut results = Vec::with_capacity(estimated_entries);
         for shard in &self.shards {
             let entries = shard.entries.read();
             for (k, versions) in entries.iter() {
