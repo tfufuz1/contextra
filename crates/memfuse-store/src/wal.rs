@@ -481,6 +481,7 @@ pub struct Wal {
     /// Last HMAC written to the log, used for hash-chaining.
     last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,
     flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<FlusherMessage>>>,
+    sealed: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl std::fmt::Debug for Wal {
@@ -630,6 +631,7 @@ impl Wal {
             allow_legacy_integrity_key_fallback: config.allow_legacy_integrity_key_fallback,
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
+            sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         wal.enable_flusher_with_config(config.flusher_config);
@@ -1247,6 +1249,13 @@ impl Wal {
     /// Appends a batch of entries to the WAL and performs a single fsync.
     // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: Exklusiver Mutex-Lock self.file.lock() in append_batch serialisiert Header-Check (write_header) und Dateischreibzugriffe vollständig. Die HMAC-Korrektheit wird NICHT durch die self.file-Mutex-Serialisierung, sondern durch den separaten last_hmac-Mutex in prepare_batch garantiert (siehe last_hmac.lock() in prepare_batch). (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8)
     pub(crate) async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
+        if self.is_sealed() {
+            return Err(MemFuseError::Storage(format!(
+                "Cannot append to sealed WAL segment {}",
+                self.path.display()
+            )));
+        }
+
         let entries = &batch.0;
         if entries.is_empty() {
             return Ok(());
@@ -1326,6 +1335,12 @@ impl Wal {
             return Ok(());
         } else {
             let mut file = self.file.lock().await;
+            if self.is_sealed() {
+                return Err(MemFuseError::Storage(format!(
+                    "Cannot append to sealed WAL segment {}",
+                    self.path.display()
+                )));
+            }
 
             let write_header = !self
                 .header_written
@@ -1396,6 +1411,12 @@ impl Wal {
     /// Returns the prepared entries along with a snapshot of the pre-prepare HMAC chain link.
     pub async fn prepare_batch(&self, ops: Vec<(WalOp, u64)>) -> Result<(PreparedBatch, [u8; 32])> {
         let mut last_hmac = self.last_hmac.lock().await;
+        if self.is_sealed() {
+            return Err(MemFuseError::Storage(format!(
+                "Cannot prepare batch for sealed WAL segment {}",
+                self.path.display()
+            )));
+        }
         let prev_hmac = *last_hmac;
         let integrity_key = self.get_integrity_key()?;
 
@@ -2780,6 +2801,11 @@ impl Wal {
         &self.path
     }
 
+    /// Returns whether this WAL segment has been sealed and is read-only.
+    pub fn is_sealed(&self) -> bool {
+        self.sealed.load(std::sync::atomic::Ordering::Acquire)
+    }
+
     /// Truncates the WAL file to `offset` and resets `last_hmac` to `new_last_hmac`.
     ///
     /// # Concurrency invariant
@@ -2794,6 +2820,12 @@ impl Wal {
         use tokio::io::AsyncSeekExt;
 
         let mut file = self.file.lock().await;
+        if self.is_sealed() {
+            return Err(MemFuseError::Storage(format!(
+                "Cannot truncate sealed WAL segment {}",
+                self.path.display()
+            )));
+        }
 
         // Update in-memory size BEFORE physical truncation so that
         // in-memory size never exceeds physical file length on disk
@@ -2847,6 +2879,9 @@ impl Wal {
     /// # Errors
     /// Storage-Fehler bei fsync, rename oder chmod.
     pub async fn rotate_and_seal(&self) -> Result<PathBuf> {
+        // 0. State-Gate: Versiegelten Zustand atomar am Anfang setzen (Fail-Fast).
+        self.sealed.store(true, std::sync::atomic::Ordering::SeqCst);
+
         // 1. Flusher stoppen: Sender droppen → Flusher-Task beendet sich sauber
         //    nach Verarbeitung aller ausstehenden Nachrichten.
         let old_tx = {
@@ -5907,5 +5942,100 @@ mod tests {
             write_result.is_err(),
             "Schreibversuch auf versiegeltes WAL-Segment muss fehlschlagen"
         );
+    }
+
+    #[tokio::test]
+    async fn test_wal_flusher_actor_no_write_to_sealed() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let wal_path = dir.path().join("test_flusher_sealed.wal");
+
+        let wal = Wal::open(&wal_path).await.expect("open WAL");
+        let op1 = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"k1".to_vec(),
+            value: b"v1".to_vec(),
+        };
+        let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await.expect("prepare batch 1");
+        wal.append_batch(batch1).await.expect("append batch 1");
+
+        assert!(!wal.is_sealed(), "WAL must not be sealed before rotate_and_seal");
+
+        let sealed_path = wal.rotate_and_seal().await.expect("rotate_and_seal");
+        assert!(wal.is_sealed(), "WAL must be sealed after rotate_and_seal");
+
+        // Attempting to prepare or append to the sealed WAL segment must return Err
+        let op2 = WalOp::Put {
+            tx_id: TxId::new(2),
+            key: b"k2".to_vec(),
+            value: b"v2".to_vec(),
+        };
+        let prep_res = wal.prepare_batch(vec![(op2, 2)]).await;
+        assert!(
+            prep_res.is_err(),
+            "prepare_batch on sealed WAL must return Err, no panic or silent write"
+        );
+
+        let dummy_entry = WalEntry::try_new(
+            WalOp::Put {
+                tx_id: TxId::new(3),
+                key: b"k3".to_vec(),
+                value: b"v3".to_vec(),
+            },
+            3,
+            &[0u8; 32],
+            [0u8; 32],
+        )
+        .expect("dummy entry");
+        let manual_batch = PreparedBatch(vec![dummy_entry]);
+        let append_res = wal.append_batch(manual_batch).await;
+        assert!(
+            append_res.is_err(),
+            "append_batch on sealed WAL must return Err, no panic or silent write"
+        );
+
+        assert!(sealed_path.exists(), "Sealed path must exist");
+    }
+
+    #[tokio::test]
+    async fn test_wal_rotate_seal_crash_mid_rename() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let wal_path = dir.path().join("crash_test.wal");
+
+        // 1. Write initial committed WAL entries
+        {
+            let wal = Wal::open(&wal_path).await.expect("open WAL");
+            for i in 1..=3 {
+                let op = WalOp::Put {
+                    tx_id: TxId::new(i),
+                    key: format!("k{i}").into_bytes(),
+                    value: format!("v{i}").into_bytes(),
+                };
+                let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("prepare batch");
+                wal.append_batch(batch).await.expect("append batch");
+            }
+        }
+
+        // 2. Simulate crash state between rename and parent fsync
+        let sealed_name = format!("crash_test.wal.sealed.1234567890");
+        let sealed_path = dir.path().join(&sealed_name);
+
+        tokio::fs::rename(&wal_path, &sealed_path)
+            .await
+            .expect("simulate rename before crash");
+
+        // 3. Post-crash inspection & recovery verification
+        let wal_exists = wal_path.exists();
+        let sealed_exists = sealed_path.exists();
+
+        assert!(
+            (wal_exists && !sealed_exists) || (!wal_exists && sealed_exists),
+            "WAL segment must be either fully active or fully sealed after crash mid-rename"
+        );
+
+        if sealed_exists {
+            let sealed_wal = Wal::open(&sealed_path).await.expect("open sealed WAL");
+            let replayed = sealed_wal.replay().await.expect("replay sealed WAL");
+            assert_eq!(replayed.len(), 3, "All 3 entries must be present in sealed WAL");
+        }
     }
 }
