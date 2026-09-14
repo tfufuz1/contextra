@@ -442,8 +442,9 @@ fn merge_metadata_ref(target: &mut Option<serde_json::Value>, source: &Option<se
                     }
                 } else if t_val != s_val {
                     // Scalar-Kollision: bewusste Array-Konvertierung (flach gehalten), siehe Doc-Kommentar oben.
+                    let taken_t_val = std::mem::take(t_val);
                     let arr = if let Some(s_arr) = s_val.as_array() {
-                        let mut a = vec![t_val.clone()];
+                        let mut a = vec![taken_t_val];
                         for item in s_arr {
                             if !a.contains(item) {
                                 a.push(item.clone());
@@ -451,7 +452,7 @@ fn merge_metadata_ref(target: &mut Option<serde_json::Value>, source: &Option<se
                         }
                         a
                     } else {
-                        vec![t_val.clone(), s_val.clone()]
+                        vec![taken_t_val, s_val.clone()]
                     };
                     *t_val = serde_json::Value::Array(arr);
                 }
