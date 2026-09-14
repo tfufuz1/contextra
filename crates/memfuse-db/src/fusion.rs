@@ -172,13 +172,13 @@ struct FusedEntry<'a> {
     bm25_score: Option<f32>,
     graph_score: Option<f32>,
     rerank_score: Option<f32>,
-    source_collection: Option<String>,
-    index_type: Option<String>,
+    source_collection: Option<&'a str>,
+    index_type: Option<&'a str>,
     signal_ranks: AHashMap<SignalKey<'a>, u32>,
     extra_signal_ranks: Option<HashMap<String, u32>>,
     signal_contributions: AHashMap<SignalKey<'a>, crate::SignalContribution>,
     extra_signal_contributions: Option<HashMap<String, crate::SignalContribution>>,
-    deferred_metadata: Vec<Option<serde_json::Value>>,
+    deferred_metadata: Vec<&'a Option<serde_json::Value>>,
 }
 
 /// Identifies the kind of search signal used during fusion.
@@ -430,35 +430,36 @@ pub fn reciprocal_rank_fusion(
 /// aus mehreren Fusion-Signalen aufruft MUSS damit rechnen, dass der Wert ein
 /// `serde_json::Value::Array` statt eines Scalars ist.
 // AI-TAG[SMELL][RESOLVED] audit-M-1: merge_metadata checks t_val != &s_val and preserves identical scalar field types across sources.
-fn merge_metadata(target: &mut Option<serde_json::Value>, source: Option<serde_json::Value>) {
-    match (target, source) {
-        (Some(t_val), Some(s_val)) => {
-            if let (Some(t_obj), Some(s_obj)) = (t_val.as_object_mut(), s_val.as_object()) {
-                for (k, v) in s_obj {
-                    if !t_obj.contains_key(k) {
-                        t_obj.insert(k.clone(), v.clone());
-                    }
-                }
-            } else if t_val != &s_val {
-                // Scalar-Kollision: bewusste Array-Konvertierung (flach gehalten), siehe Doc-Kommentar oben.
-                let arr = if let Some(s_arr) = s_val.as_array() {
-                    let mut a = vec![t_val.clone()];
-                    for item in s_arr {
-                        if !a.contains(item) {
-                            a.push(item.clone());
+fn merge_metadata_ref(target: &mut Option<serde_json::Value>, source: &Option<serde_json::Value>) {
+    if let Some(s_val) = source {
+        match target {
+            Some(t_val) => {
+                if let (Some(t_obj), Some(s_obj)) = (t_val.as_object_mut(), s_val.as_object()) {
+                    for (k, v) in s_obj {
+                        if !t_obj.contains_key(k) {
+                            t_obj.insert(k.clone(), v.clone());
                         }
                     }
-                    a
-                } else {
-                    vec![t_val.clone(), s_val]
-                };
-                *t_val = serde_json::Value::Array(arr);
+                } else if t_val != s_val {
+                    // Scalar-Kollision: bewusste Array-Konvertierung (flach gehalten), siehe Doc-Kommentar oben.
+                    let arr = if let Some(s_arr) = s_val.as_array() {
+                        let mut a = vec![t_val.clone()];
+                        for item in s_arr {
+                            if !a.contains(item) {
+                                a.push(item.clone());
+                            }
+                        }
+                        a
+                    } else {
+                        vec![t_val.clone(), s_val.clone()]
+                    };
+                    *t_val = serde_json::Value::Array(arr);
+                }
+            }
+            None => {
+                *target = Some(s_val.clone());
             }
         }
-        (t @ None, Some(s_val)) => {
-            *t = Some(s_val);
-        }
-        _ => {}
     }
 }
 
@@ -599,7 +600,9 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             let entry = &mut entries[idx];
 
             // Phase 1: Defer metadata merging (O(M) collect, merge later in Phase 2 for Top-K)
-            entry.deferred_metadata.push(doc.metadata.clone());
+            if doc.metadata.is_some() {
+                entry.deferred_metadata.push(&doc.metadata);
+            }
 
             if let Some(key) = sig_key {
                 if !entry.matched_signals.contains(&key) {
@@ -622,7 +625,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                         entry.vector_distance = Some(doc.score);
                     }
                     if entry.index_type.is_none() {
-                        entry.index_type = Some("hnsw".to_string());
+                        entry.index_type = Some("hnsw");
                     }
                 }
                 Some(SignalKind::Text) => {
@@ -630,7 +633,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                         entry.bm25_score = Some(doc.score);
                     }
                     if entry.index_type.is_none() {
-                        entry.index_type = Some("bm25".to_string());
+                        entry.index_type = Some("bm25");
                     }
                 }
                 Some(SignalKind::Graph) => {
@@ -638,7 +641,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                         entry.graph_score = Some(doc.score);
                     }
                     if entry.index_type.is_none() {
-                        entry.index_type = Some("graph".to_string());
+                        entry.index_type = Some("graph");
                     }
                 }
                 #[cfg(feature = "edge-reinforcement-learning")]
@@ -647,7 +650,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                         entry.graph_score = Some(doc.score);
                     }
                     if entry.index_type.is_none() {
-                        entry.index_type = Some("edge-reinforcement".to_string());
+                        entry.index_type = Some("edge-reinforcement");
                     }
                 }
                 None => {}
@@ -667,13 +670,13 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                     entry.rerank_score = doc_prov.rerank_score;
                 }
                 if entry.source_collection.is_none() {
-                    entry.source_collection = doc_prov.source_collection.clone();
+                    entry.source_collection = doc_prov.source_collection.as_deref();
                 }
                 if entry.index_type.is_none() {
-                    entry.index_type = doc_prov.index_type.clone();
+                    entry.index_type = doc_prov.index_type.as_deref();
                 }
                 for (sig, r) in &doc_prov.signal_ranks {
-                    if let Some(k) = SignalKey::from_name(sig) {
+                    if let Some(k) = SignalKey::from_name(sig.as_str()) {
                         entry.signal_ranks.entry(k).or_insert(*r);
                     } else {
                         entry
@@ -684,17 +687,17 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                     }
                 }
                 for (sig, contrib) in &doc_prov.signal_contributions {
-                    if let Some(k) = SignalKey::from_name(sig) {
+                    if let Some(k) = SignalKey::from_name(sig.as_str()) {
                         entry
                             .signal_contributions
                             .entry(k)
-                            .or_insert(contrib.clone());
+                            .or_insert_with(|| contrib.clone());
                     } else {
                         entry
                             .extra_signal_contributions
                             .get_or_insert_with(HashMap::new)
                             .entry(sig.clone())
-                            .or_insert(contrib.clone());
+                            .or_insert_with(|| contrib.clone());
                     }
                 }
             }
@@ -735,7 +738,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
         // Late Hydration: Merge metadata only for Top-K winning entries
         let mut merged_meta: Option<serde_json::Value> = None;
         for meta in entry.deferred_metadata.drain(..) {
-            merge_metadata(&mut merged_meta, meta);
+            merge_metadata_ref(&mut merged_meta, meta);
         }
 
         let matched_signals = entry
@@ -772,8 +775,8 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             graph_score: entry.graph_score,
             rerank_score: entry.rerank_score,
             signal_ranks,
-            source_collection: entry.source_collection.take(),
-            index_type: entry.index_type.take(),
+            source_collection: entry.source_collection.map(|s| s.to_string()),
+            index_type: entry.index_type.map(|s| s.to_string()),
             signal_contributions,
             coherence_bonus: 0.0,
         };
@@ -1196,7 +1199,7 @@ mod tests {
 
         let mut scalar_target = Some(json!(0.9));
         let scalar_source = Some(json!(0.7));
-        merge_metadata(&mut scalar_target, scalar_source);
+        merge_metadata_ref(&mut scalar_target, &scalar_source);
 
         // INTENTIONAL: Scalar-Kollision -> Array (nicht First-Wins). Verifiziert bewusste Designentscheidung.
         assert_eq!(scalar_target, Some(json!([0.9, 0.7])));
@@ -2443,7 +2446,7 @@ mod tests {
         let mut target = Some(serde_json::json!("string_val_1"));
         let source = Some(serde_json::json!("string_val_2"));
 
-        merge_metadata(&mut target, source);
+        merge_metadata_ref(&mut target, &source);
 
         assert_eq!(
             target,
@@ -2454,7 +2457,7 @@ mod tests {
         let mut target_same = Some(serde_json::json!("identical_val"));
         let source_same = Some(serde_json::json!("identical_val"));
 
-        merge_metadata(&mut target_same, source_same);
+        merge_metadata_ref(&mut target_same, &source_same);
 
         assert_eq!(
             target_same,

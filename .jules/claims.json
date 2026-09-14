@@ -43,6 +43,14 @@
       "active": false,
       "expires_at": "2026-09-14T13:38:06.712106375+00:00",
       "released_at": "2026-09-14T09:43:18.647890671+00:00"
+    },
+    {
+      "krate": "memfuse-db",
+      "issue": "fusion-hotpath-perf",
+      "timestamp": "2026-09-14T13:59:30.299608463+00:00",
+      "session_id": "9821550504464222634",
+      "active": true,
+      "expires_at": "2026-09-14T17:59:30.299591055+00:00"
     }
   ]
 }
