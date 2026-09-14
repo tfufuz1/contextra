@@ -269,4 +269,58 @@ mod tests {
             res_allowed
         );
     }
+
+    #[tokio::test]
+    async fn test_wasm_fuel_exhaustion_returns_error() {
+        let wat = r#"
+            (module
+                (func (export "_start")
+                    (loop (br 0))
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+
+        let executor = WasmExecutor::new().expect("WasmExecutor");
+        let mut caps = WasmCapabilities::default();
+        caps.max_fuel = 1_000;
+
+        let result = executor
+            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
+            .await;
+
+        assert!(
+            matches!(result, Err(SandboxError::FuelExhausted { consumed }) if consumed > 0),
+            "Expected FuelExhausted error with consumed > 0, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_wasm_memory_isolation() {
+        let wat = r#"
+            (module
+                (memory 32)
+                (func (export "_start"))
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+
+        let executor = WasmExecutor::new().expect("WasmExecutor");
+        let mut caps = WasmCapabilities::default();
+        caps.max_memory_pages = 2;
+
+        let result = executor
+            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
+            .await;
+
+        assert!(
+            matches!(
+                result,
+                Err(SandboxError::MemoryExceeded { .. }) | Err(SandboxError::Runtime(_))
+            ),
+            "Expected MemoryExceeded or Runtime error, got: {:?}",
+            result
+        );
+    }
 }
