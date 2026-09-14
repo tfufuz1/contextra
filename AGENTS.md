@@ -10,7 +10,7 @@
 <!-- §7 = Non-Obvious Decisions (would cause wrong code without this knowledge) -->
 
 <a id="1"></a>
-## Verifizierter Codestand · HEAD `dabdc6317455a9e8111321dd883351eacc7f5b8d` · Stand 2026-09-12
+## Verifizierter Codestand · HEAD `6a7ca31d42841ffa80afc583c1a3389410a2e9e2` · Stand 2026-09-14
 
 > **Für AI-Assistenten:** Diese Datei beschreibt was TATSÄCHLICH implementiert ist,
 > nicht was die Spec behauptet. Bei Widerspruch zwischen dieser Datei und Spec/README:
@@ -23,30 +23,34 @@
 
 MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspace-Crates (17 Crates im Hauptworkspace + `memfuse-py` als isoliertes Workspace) halten sich an einen strikten gerichteten azyklischen Graphen (DAG):
 
-- **Layer 0 — Fundament**:
+- **Layer 0 — Fundament (IPC Gen)**:
+  - `memfuse-core-ipc-gen`: Auto-generated FlatBuffers IPC code (`crates/memfuse-core-ipc-gen`)
+- **Layer 1 — Core Infrastructure**:
   - `memfuse-core`: Core types (`TenantId`, `ConfigFingerprint`, etc.), traits, and error handling (`crates/memfuse-core`)
-- **Layer 1 — Storage-Primitiven & Vertikalen**:
+- **Layer 2 — Storage-Primitiven & Vertikalen**:
   - `memfuse-calibration`: Calibration scalers (Platt, Isotonic, Replicator) (`crates/memfuse-calibration`)
   - `memfuse-checkpoint`: Snapshot & backup management (`crates/memfuse-checkpoint`)
   - `memfuse-graph`: CSR-Graph, `ConsistencyEnforcer` (F-04), `PathRAGEngine`, `EdgeProvenance` (`crates/memfuse-graph`)
   - `memfuse-security`: Encryption at Rest, `DeletionProof`, and KV-Cache Security (`crates/memfuse-crypto`, Package Name: `memfuse-security`; `memfuse-kv-bridge` ist in `crates/memfuse-crypto/src/kv_segment/` konsolidiert)
   - `memfuse-text`: BM25 full-text search & DACH compound splitting (`crates/memfuse-text`)
-- **Layer 2 — Subsysteme**:
+- **Layer 3 — Subsysteme**:
   - `memfuse-candle`: Native Candle GGUF ML inference backend (`crates/memfuse-candle`)
   - `memfuse-index`: HNSW vector index, SQ8 quantization, DiskANN (`crates/memfuse-index`)
   - `memfuse-ollama`: Ollama HTTP client & context prefix engine (`crates/memfuse-ollama`)
   - `memfuse-store`: LSM-Tree storage engine & WAL (`crates/memfuse-store`)
-- **Layer 3 — Embeddings & Reranking**:
+- **Layer 4 — Embeddings & Reranking**:
   - `memfuse-embed`: Text embeddings & Cross-Encoder reranking (`crates/memfuse-embed`, optional)
-- **Layer 4 — Hauptdatenbank**:
+- **Layer 5 — Hauptdatenbank**:
   - `memfuse-db`: Embedded hybrid search & collection engine (`crates/memfuse-db`)
-- **Layer 5 — Benchmarking, Routing & Desktop-Shell**:
+- **Layer 6 — Benchmarking & Routing**:
   - `memfuse-bench`: Reproducible benchmark harness (`benchmarks/memfuse-bench`)
   - `memfuse-router`: Conformal router engine & SLM profiles (`crates/memfuse-router`)
   - `memfuse-tauri`: Deprecated/Entfernt (Produktfokus auf PyPI Library & MCP Server, ADR-077)
-- **Layer 6 — Agenten-Engine**:
+- **Layer 6.5 — WASM Execution Boundary**:
+  - `memfuse-sandbox`: WASM Execution Boundary for MemFuse MCP CodeExecution Permission (`crates/memfuse-sandbox`)
+- **Layer 7 — Agenten-Engine**:
   - `memfuse-agent`: Persistent agent workflow loop (`crates/memfuse-agent`)
-- **Layer 7 — Protocol & Sandbox**:
+- **Layer 8 — Protocol & Server**:
   - `memfuse-mcp`: Model Context Protocol (MCP) stdio JSON-RPC 2.0 server & `uvx`-paketierte Distribution (`crates/memfuse-mcp`)
 
 ---
@@ -89,6 +93,11 @@ MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspa
 | `ExportDocumentV1` & `ExportCollectionV1` | `crates/memfuse-db/src/export.rs:17` | Memory-Export-Format v1 mit Schema Version "1.0" und Idempotenz |
 | `LlmTextGeneratorStreaming` | `crates/memfuse-core/src/traits/embedding.rs:63` | Streaming Trait-Abstraktion für LLM-Textgenerierung |
 | `PyDbStats` Metriken | `crates/memfuse-py/src/lib.rs:518` | FFI Export von `drift_status`, `calibration_ece` und `last_calibration_at` in Python API |
+| `Wal::rotate_and_seal()` | `crates/memfuse-store/src/wal.rs:554` | Atomares Versiegeln und Read-Only-Flagging für passives WAL-Shipping (PR #2419) |
+| `WalFlusherConfig` `batch_window_micros` | `crates/memfuse-store/src/wal.rs:172` | Konfigurierbares Batch-Window für WAL-Flusher-Actor (PR #2436) |
+| `memfuse_cloud_query` MCP-Tool & `egress_gateway.rs` | `crates/memfuse-mcp/src/egress_gateway.rs` | Scaffolded MCP-Tool & Gateway für Egress-Shield (AI-TAG[SMELL][MAJOR] offen, PR #2437) |
+| `BanditRouter` Module | `crates/memfuse-router/src/` | `bandit.rs`, `routing_strategy.rs`, `transport.rs`, `guarded_payload.rs` scaffolded (PR #2422, #2433) |
+| `check-bandit-latency-budget` xtask | `xtask/src/check_bandit_latency_budget.rs` | Latenz-Budget-Prüfung für LinUCB-Bandit implementiert (PR #2433, noch nicht in merge-gate.yml) |
 
 ### Fehlt / Nicht integriert ❌
 
@@ -107,6 +116,14 @@ MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspa
 
 1. **`rebuild_region()` ohne Recall-Tests (F-02, `crates/memfuse-index/src/hnsw.rs:1812`)**:
    `rebuild_region()` führt reines Tombstone-Pruning durch, ohne dass wissenschaftliche Recall-Tests oder ein offizielles ADR vorliegen. Das Feature-Flag `partial-rebuild-pruning` MUSS deaktiviert bleiben, bis entsprechende Regressionstests vorliegen.
+2. **`egress_gateway.rs` AI-TAG[SMELL][MAJOR] (F1)**:
+   Verwendet lokale Stub-Typen statt des offiziellen `memfuse-security`-Contracts (`egress_vault.rs`).
+3. **`memfuse-mcp` Sandbox-Kopplung (F2)**:
+   `memfuse-mcp` hat kein `wasm-sandbox`-Feature und keine `memfuse-sandbox`-Abhängigkeit in Cargo.toml.
+4. **Fehlende Pflicht-Tests §10.14 (F3)**:
+   4 Pflicht-Tests aus Spec §10.14 fehlen im Test-Suite (`test_wasm_memory_isolation`, `test_wasm_fuel_exhaustion_returns_error`, `test_egress_guard_fail_closed_on_index_unavailable`, `test_bandit_diagonal_vs_linucb_latency_budget`).
+5. **`check-bandit-latency-budget` xtask nicht in CI (F4)**:
+   `check-bandit-latency-budget` xtask ist implementiert, aber noch NICHT in `.github/workflows/merge-gate.yml` eingebunden.
 
 ---
 

@@ -56,3 +56,9 @@ jobs:
 
       - name: Audit Verdict Independence Check
         run: cargo run -p xtask -- check-audit-verdict-independence
+
+      - name: Bandit Latency Budget Gate
+        # Prüft dass LinUCB-Diagonal-Approximation das Latenzbudget (P95 ≤ 1ms) einhält.
+        # Verhindert versehentliche O(d³)-Implementierungen im Hot-Path (§9.1, §13.2).
+        run: cargo run -p xtask --features bandit-routing -- check-bandit-latency-budget
+        # Feature-Flag nötig da check_bandit_latency_budget memfuse_router::BanditProfileState nutzt.

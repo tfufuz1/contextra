@@ -247,19 +247,20 @@ mod tests {
     async fn test_egress_guard_fail_closed_on_index_unavailable() {
         use std::time::Duration;
 
-        // Erstelle ein Pattern mit ReDoS / hohem Rechenaufwand oder extrem großem Payload,
-        // damit `spawn_blocking` nicht schneller als die Timer-Auflösung fertig wird.
-        let mut huge_payload = "a".repeat(1_000_000);
-        huge_payload.push('!');
-
+        // Erstelle echte Patterns — der Inhalt ist irrelevant,
+        // da der Test per Timeout blockt bevor Patterns geprüft werden.
         let patterns = vec![
-            CompiledPattern::new("slow_pattern", r"(a+)+b")
-                .unwrap_or_else(|_| CompiledPattern::new("email", r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}").unwrap()),
+            CompiledPattern::new("email", r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+                .expect("valid email pattern"),
         ];
+
+        // Benutze ein ausreichend großes Payload, sodass `spawn_blocking`
+        // nicht sofort vor dem Timeout-Tick abschließt.
+        let payload = "This is a benign payload without any sensitive data. ".repeat(50_000);
 
         // Simuliere "Index unavailable" / Timeout: 1 Nanosekunde — wird immer überschritten
         // da `spawn_blocking` allein mehrere Mikrosekunden braucht.
-        let result = classify_layer1(&huge_payload, &patterns, Duration::from_nanos(1)).await;
+        let result = classify_layer1(&payload, &patterns, Duration::from_nanos(1)).await;
 
         // INVARIANTE: Fail-Closed — bei Timeout MUSS Block zurückgegeben werden.
         assert!(
@@ -268,13 +269,8 @@ mod tests {
             result
         );
 
-        // Negativ-Test: Normaler Aufruf mit angemessener Zeit und harmlosen Payload MUSS Allow zurückgeben
-        let benign_payload = "This is a benign payload without any sensitive data.";
-        let benign_patterns = vec![
-            CompiledPattern::new("email", r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
-                .expect("valid email pattern"),
-        ];
-        let result_ok = classify_layer1(benign_payload, &benign_patterns, Duration::from_millis(500)).await;
+        // Negativ-Test: Normaler Aufruf mit angemessener Zeit MUSS Allow zurückgeben
+        let result_ok = classify_layer1(&payload, &patterns, Duration::from_millis(500)).await;
         assert!(
             matches!(result_ok, EgressClassification::Allow),
             "Fehler: Bei ausreichend Zeit und harmlosen Payload sollte Allow zurückgegeben werden. Got: {:?}",
