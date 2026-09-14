@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: HNSW Vector Index mit Layer Descent, Soft-Deletes und transaktionalem Staging (TxBuffer).
-// INVARIANTEN: Lock-Hierarchie: write_mutex (exklusive Mutation/Rebuild) -> entry_point -> nodes / doc_to_node / deleted_nodes.
+// INVARIANTEN: Lock-Hierarchie: write_mutex (exklusive Mutation/Rebuild) -> entry_point -> nodes / doc_to_node / deleted_nodes (HotState/ColdState).
 // NICHT-OFFENSICHTLICH: Multi-threaded Reads sperren nie write_mutex; background rebuild tauscht Core atomar via Swap.
 // HOTSPOTS:hnsw.rs (HnswIndex::insert, search, delete, rebuild, save)
 // STAND: TS:2026-08-30T18:53:53Z (SESSION: 37b1d991)
@@ -258,7 +258,7 @@ pub enum VectorData {
 struct HnswNode {
     doc_id: DocId,
     vector: VectorData,
-    connections: Vec<RwLock<Vec<u32>>>,
+    connections: RwLock<Vec<Vec<u32>>>,
     max_layer: usize,
     committed_tx: u64,
 }
@@ -303,14 +303,14 @@ struct SnapshotPinGuard<'a>(&'a HnswIndexCore, u64);
 
 impl<'a> SnapshotPinGuard<'a> {
     fn new(core: &'a HnswIndexCore, seq_no: u64) -> Self {
-        core.seq_log.write().pin_snapshot(seq_no);
+        core.cold.seq_log.write().pin_snapshot(seq_no);
         Self(core, seq_no)
     }
 }
 
 impl<'a> Drop for SnapshotPinGuard<'a> {
     fn drop(&mut self) {
-        self.0.seq_log.write().unpin_snapshot(self.1);
+        self.0.cold.seq_log.write().unpin_snapshot(self.1);
     }
 }
 
@@ -319,30 +319,40 @@ pub struct HnswIndex {
     inner: std::sync::Arc<HnswIndexCore>,
 }
 
-/// The core implementation of the HNSW index.
-pub struct HnswIndexCore {
-    config: HnswConfig,
-    validation_error: Option<String>,
+/// Hot fields accessed on every search operation, cache-line aligned to 64 bytes.
+#[repr(align(64))]
+struct HotState {
     nodes: RwLock<Vec<HnswNode>>,
     doc_to_node: RwLock<AHashMap<u64, usize>>,
     entry_point: RwLock<Option<usize>>,
     ram_entry_point: RwLock<Option<usize>>,
+}
+
+/// Cold fields accessed less frequently during normal search operations.
+struct ColdState {
+    pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
+    mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
+    seq_log: RwLock<memfuse_core::SequenceLog>,
+    deleted_nodes: RwLock<RoaringTreemap>,
+    #[cfg(feature = "partial-index-rebuild")]
+    pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
+}
+
+/// The core implementation of the HNSW index.
+pub struct HnswIndexCore {
+    config: HnswConfig,
+    validation_error: Option<String>,
+    hot: HotState,
     max_layer: AtomicU64,
     ml: f64,
     tx_buffer: TxBuffer<Vec<f32>>,
-    deleted_nodes: RwLock<RoaringTreemap>,
     deleted_count: AtomicU64,
     rebuilding: AtomicBool,
     write_mutex: Mutex<()>,
-    pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
-    mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
+    cold: ColdState,
     last_tx_id: AtomicU64,
-    /// Sequence log tracking insertions and deletions for snapshot isolation (`search_at`).
-    seq_log: RwLock<memfuse_core::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
-    #[cfg(feature = "partial-index-rebuild")]
-    pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
 }
 
 impl HnswIndex {
@@ -352,28 +362,33 @@ impl HnswIndex {
         let ml = 1.0 / (config.m as f64).ln();
         Ok(Self {
             inner: std::sync::Arc::new(HnswIndexCore {
-                #[cfg(feature = "partial-index-rebuild")]
-                traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
-                    config.partial_rebuild_config.clone(),
-                )),
+
                 config,
                 validation_error: None,
-                nodes: RwLock::new(Vec::new()),
-                doc_to_node: RwLock::new(AHashMap::new()),
-                entry_point: RwLock::new(None),
-                ram_entry_point: RwLock::new(None),
+                hot: HotState {
+                    nodes: RwLock::new(Vec::new()),
+                    doc_to_node: RwLock::new(AHashMap::new()),
+                    entry_point: RwLock::new(None),
+                    ram_entry_point: RwLock::new(None),
+                },
                 max_layer: AtomicU64::new(0),
 
                 ml,
                 tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
-                deleted_nodes: RwLock::new(RoaringTreemap::new()),
                 deleted_count: AtomicU64::new(0),
                 rebuilding: AtomicBool::new(false),
                 write_mutex: Mutex::new(()),
-                quantizer: RwLock::new(None),
-                mmap_index: RwLock::new(None),
+                cold: ColdState {
+                    quantizer: RwLock::new(None),
+                    mmap_index: RwLock::new(None),
+                    seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    #[cfg(feature = "partial-index-rebuild")]
+                    traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
+                        config.partial_rebuild_config.clone(),
+                    )),
+                },
                 last_tx_id: AtomicU64::new(0),
-                seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
                 rebuild_count: AtomicU64::new(0),
                 visited_dead_nodes: AtomicU64::new(0),
             }),
@@ -389,28 +404,33 @@ impl HnswIndex {
         let ml = 1.0 / (config.m as f64).ln();
         Self {
             inner: std::sync::Arc::new(HnswIndexCore {
-                #[cfg(feature = "partial-index-rebuild")]
-                traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
-                    config.partial_rebuild_config.clone(),
-                )),
+
                 config,
                 validation_error,
-                nodes: RwLock::new(Vec::new()),
-                doc_to_node: RwLock::new(AHashMap::new()),
-                entry_point: RwLock::new(None),
-                ram_entry_point: RwLock::new(None),
+                hot: HotState {
+                    nodes: RwLock::new(Vec::new()),
+                    doc_to_node: RwLock::new(AHashMap::new()),
+                    entry_point: RwLock::new(None),
+                    ram_entry_point: RwLock::new(None),
+                },
                 max_layer: AtomicU64::new(0),
 
                 ml,
                 tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
-                deleted_nodes: RwLock::new(RoaringTreemap::new()),
                 deleted_count: AtomicU64::new(0),
                 rebuilding: AtomicBool::new(false),
                 write_mutex: Mutex::new(()),
-                quantizer: RwLock::new(None),
-                mmap_index: RwLock::new(None),
+                cold: ColdState {
+                    quantizer: RwLock::new(None),
+                    mmap_index: RwLock::new(None),
+                    seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    #[cfg(feature = "partial-index-rebuild")]
+                    traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
+                        config.partial_rebuild_config.clone(),
+                    )),
+                },
                 last_tx_id: AtomicU64::new(0),
-                seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
                 rebuild_count: AtomicU64::new(0),
                 visited_dead_nodes: AtomicU64::new(0),
             }),
@@ -419,13 +439,13 @@ impl HnswIndex {
 
     /// Returns a snapshot clone of the current quantizer if trained.
     pub fn quantizer(&self) -> Option<crate::quantize::ScalarQuantizer> {
-        self.inner.quantizer.read().clone()
+        self.inner.cold.quantizer.read().clone()
     }
 
     /// Returns a reference to the quantizer RwLock for crate-internal access.
     #[allow(dead_code)]
     pub(crate) fn quantizer_lock(&self) -> &RwLock<Option<crate::quantize::ScalarQuantizer>> {
-        &self.inner.quantizer
+        &self.inner.cold.quantizer
     }
 
     async fn search_filtered_internal(
@@ -475,7 +495,7 @@ impl HnswIndex {
 
         let query_quantized = if self.inner.config.quantize {
             self.inner
-                .quantizer
+                .cold.quantizer
                 .read()
                 .as_ref()
                 .map(|q| q.quantize(query))
@@ -485,21 +505,21 @@ impl HnswIndex {
         };
 
         let mut ep = Vec::new();
-        if let Some(global_ep) = *self.inner.entry_point.read() {
+        if let Some(global_ep) = *self.inner.hot.entry_point.read() {
             ep.push(global_ep);
         }
-        if let Some(ram_ep) = *self.inner.ram_entry_point.read() {
+        if let Some(ram_ep) = *self.inner.hot.ram_entry_point.read() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
         }
 
-        let nodes = self.inner.nodes.read();
-        let deleted = self.inner.deleted_nodes.read();
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
 
         let mut filter_eps = Vec::new();
         if let Some(f) = filter {
-            let mmap_guard = self.inner.mmap_index.read();
+            let mmap_guard = self.inner.cold.mmap_index.read();
             let mmap_node_count = mmap_guard
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -549,7 +569,7 @@ impl HnswIndex {
         }
 
         // Add RAM entry point back for the final layer search to ensure hybrid recall
-        if let Some(ram_ep) = *self.inner.ram_entry_point.read() {
+        if let Some(ram_ep) = *self.inner.hot.ram_entry_point.read() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -583,7 +603,7 @@ impl HnswIndex {
         let mut results = Vec::with_capacity(k);
 
         let seq_log_guard = if snapshot_seq.is_some() {
-            Some(self.inner.seq_log.read())
+            Some(self.inner.cold.seq_log.read())
         } else {
             None
         };
@@ -619,7 +639,7 @@ impl HnswIndex {
             // Phase 2: Exact Reranking (Asymmetric for SQ8)
             let final_dist = if self.inner.config.quantize {
                 if let VectorData::U8(v) = &node.vector {
-                    let guard = self.inner.quantizer.read();
+                    let guard = self.inner.cold.quantizer.read();
                     let q = guard.as_ref().ok_or_else(|| {
                         memfuse_core::MemFuseError::Index("Quantizer not trained".into())
                     })?;
@@ -702,11 +722,11 @@ impl HnswIndex {
     #[cfg(feature = "partial-index-rebuild")]
     pub fn check_and_trigger_partial_rebuild(&self) -> Option<tokio::task::JoinHandle<Result<()>>> {
         let global_tombstone_ratio = self.deleted_ratio() as f32;
-        let tracker = self.inner.traversal_tracker.read();
+        let tracker = self.inner.cold.traversal_tracker.read();
 
         let mut tombstone_map = ahash::AHashMap::new();
-        let total_nodes = self.inner.nodes.read().len();
-        let deleted_guard = self.inner.deleted_nodes.read();
+        let total_nodes = self.inner.hot.nodes.read().len();
+        let deleted_guard = self.inner.cold.deleted_nodes.read();
 
         for i in 0..total_nodes {
             let id = i as u64;
@@ -739,17 +759,17 @@ impl HnswIndex {
 
     /// Prunes sequence log entries that are tombstoned and older than `min_active_seqno`.
     pub fn compact_seq_log(&self, min_active_seqno: u64) {
-        self.inner.seq_log.write().compact(min_active_seqno);
+        self.inner.cold.seq_log.write().compact(min_active_seqno);
     }
 
     /// Pins a sequence number to preserve historical snapshot readability across rebuilds.
     pub fn pin_snapshot(&self, seq_no: u64) {
-        self.inner.seq_log.write().pin_snapshot(seq_no);
+        self.inner.cold.seq_log.write().pin_snapshot(seq_no);
     }
 
     /// Unpins a sequence number previously pinned with `pin_snapshot`.
     pub fn unpin_snapshot(&self, seq_no: u64) {
-        self.inner.seq_log.write().unpin_snapshot(seq_no);
+        self.inner.cold.seq_log.write().unpin_snapshot(seq_no);
     }
 
     /// Returns all active (non-deleted) DocIds by reading the `doc_to_node` map directly.
@@ -760,8 +780,8 @@ impl HnswIndex {
     ///
     /// # FIND-DB-004: HNSW Repair Acceleration
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
-        let map = self.inner.doc_to_node.read();
-        let deleted = self.inner.deleted_nodes.read();
+        let map = self.inner.hot.doc_to_node.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
         map.iter()
             .filter(|(&_doc_id_raw, &node_idx)| !deleted.contains(node_idx as u64))
             .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw))
@@ -814,9 +834,9 @@ impl HnswIndex {
         tokio::task::spawn_blocking(move || {
             use std::io::{Seek, Write};
 
-            let nodes = inner.nodes.read();
-            let entry_point = inner.entry_point.read();
-            let q_guard = inner.quantizer.read();
+            let nodes = inner.hot.nodes.read();
+            let entry_point = inner.hot.entry_point.read();
+            let q_guard = inner.cold.quantizer.read();
 
             // INTENT: Atomic Save to prevent SIGBUS on mmap
             let temp_path = path_buf.with_extension("hnsw.tmp");
@@ -914,24 +934,25 @@ impl HnswIndex {
             let mut conn_pos = connections_offset;
             for (i, node) in nodes.iter().enumerate() {
                 node_records[i].connections_offset = conn_pos;
-                let num_layers = node.connections.len() as u8;
+                let conns_guard = node.connections.read();
+                let num_layers = conns_guard.len() as u8;
                 writer
                     .write_all(&[num_layers])
                     .map_err(|e| MemFuseError::Storage(e.to_string()))?;
                 conn_pos += 1;
 
                 for layer in 0..num_layers as usize {
-                    let conns_guard = node.connections[layer].read();
-                    let len = conns_guard.len() as u32;
+                    let layer_conns = &conns_guard[layer];
+                    let len = layer_conns.len() as u32;
                     writer
                         .write_all(&len.to_le_bytes())
                         .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-                    for &conn in conns_guard.iter() {
+                    for &conn in layer_conns.iter() {
                         writer
                             .write_all(&conn.to_le_bytes())
                             .map_err(|e| MemFuseError::Storage(e.to_string()))?;
                     }
-                    conn_pos += 4 + (conns_guard.len() * 4) as u64;
+                    conn_pos += 4 + (len as u64) * 4;
                 }
             }
             writer
@@ -1007,9 +1028,9 @@ impl HnswIndex {
         };
 
         {
-            let mut ep_guard = self.inner.entry_point.write();
+            let mut ep_guard = self.inner.hot.entry_point.write();
             *ep_guard = ep;
-            *self.inner.ram_entry_point.write() = None;
+            *self.inner.hot.ram_entry_point.write() = None;
             self.inner.max_layer.store(max_layer, Ordering::SeqCst);
         }
 
@@ -1024,7 +1045,7 @@ impl HnswIndex {
             };
             let scale = 255.0 / range;
             let inv_scale = range / 255.0;
-            let mut q_guard = self.inner.quantizer.write();
+            let mut q_guard = self.inner.cold.quantizer.write();
             *q_guard = Some(crate::quantize::ScalarQuantizer {
                 mins: vec![q_min; dim],
                 maxes: vec![q_max; dim],
@@ -1036,7 +1057,7 @@ impl HnswIndex {
             });
         }
 
-        let mut guard = self.inner.mmap_index.write();
+        let mut guard = self.inner.cold.mmap_index.write();
         self.inner
             .last_tx_id
             .store(mmap_index.header.last_tx_id(), Ordering::SeqCst);
@@ -1083,8 +1104,8 @@ impl BatchContext {
     pub fn new(core: &HnswIndexCore) -> Self {
         Self {
             running_max_layer: core.max_layer.load(Ordering::SeqCst) as usize,
-            has_entry_point: core.entry_point.read().is_some(),
-            has_ram_entry_point: core.ram_entry_point.read().is_some(),
+            has_entry_point: core.hot.entry_point.read().is_some(),
+            has_ram_entry_point: core.hot.ram_entry_point.read().is_some(),
         }
     }
 }
@@ -1121,8 +1142,7 @@ fn get_neighbor_conns_in_batch(
 
     nodes_read
         .get(neighbor_ram_idx)
-        .and_then(|node| node.connections.get(layer))
-        .map(|v| v.read().clone())
+        .and_then(|node| node.connections.read().get(layer).cloned())
         .unwrap_or_default()
 }
 
@@ -1196,7 +1216,7 @@ impl HnswIndexCore {
         match data {
             VectorData::F32(v) => compute_distance(query_exact, v, self.config.distance_metric),
             VectorData::U8(v) => {
-                let guard = self.quantizer.read();
+                let guard = self.cold.quantizer.read();
                 let q = guard.as_ref().ok_or_else(|| {
                     memfuse_core::MemFuseError::Index("Quantizer not trained".into())
                 })?;
@@ -1217,7 +1237,7 @@ impl HnswIndexCore {
     ) -> Result<f32> {
         let vector_bytes = mmap.get_vector(record)?;
         if mmap.header.is_quantized() {
-            let guard = self.quantizer.read();
+            let guard = self.cold.quantizer.read();
             let q = guard
                 .as_ref()
                 .ok_or_else(|| memfuse_core::MemFuseError::Index("Quantizer not trained".into()))?;
@@ -1249,7 +1269,7 @@ impl HnswIndexCore {
                 compute_distance(a, b, self.config.distance_metric)
             }
             (VectorData::U8(a), VectorData::U8(b)) => {
-                let guard = self.quantizer.read();
+                let guard = self.cold.quantizer.read();
                 guard
                     .as_ref()
                     .ok_or_else(|| {
@@ -1317,8 +1337,9 @@ impl HnswIndexCore {
             let ram_idx = idx - ctx.mmap_node_count;
             let conns = ctx.nodes[ram_idx]
                 .connections
+                .read()
                 .get(layer)
-                .map(|v| v.read().clone())
+                .cloned()
                 .unwrap_or_default();
 
             for prepared in ctx.prior_prepared.iter().rev() {
@@ -1333,8 +1354,9 @@ impl HnswIndexCore {
 
         let conns = ctx.nodes[idx]
             .connections
+            .read()
             .get(layer)
-            .map(|v| v.read().clone())
+            .cloned()
             .unwrap_or_default();
 
         for prepared in ctx.prior_prepared.iter().rev() {
@@ -1386,8 +1408,8 @@ impl HnswIndexCore {
         layer: usize,
         prior_prepared: &[PreparedInsert],
     ) -> Result<Vec<Candidate>> {
-        let nodes_guard = self.nodes.read();
-        let mmap_guard = self.mmap_index.read();
+        let nodes_guard = self.hot.nodes.read();
+        let mmap_guard = self.cold.mmap_index.read();
         let mmap_node_count = mmap_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -1430,7 +1452,7 @@ impl HnswIndexCore {
             }
 
             let connections = self.resolve_connections(current.index, layer, &ctx)?;
-            let deleted_guard = self.deleted_nodes.read();
+            let deleted_guard = self.cold.deleted_nodes.read();
             let mut has_dead_neighbors = false;
 
             for &neighbor_u32 in connections.iter() {
@@ -1469,11 +1491,11 @@ impl HnswIndexCore {
             if has_dead_neighbors && current.index >= mmap_node_count {
                 let ram_idx = current.index - mmap_node_count;
                 if let Some(node) = nodes_guard.get(ram_idx) {
-                    if let Some(conn_rwlock) = node.connections.get(layer) {
-                        let seq_log = self.seq_log.read();
-                        let min_retention_seq = seq_log.min_retention_seq();
-                        let mut conn_writer = conn_rwlock.write();
-                        conn_writer.retain(|&neighbor_u32| {
+                    let seq_log = self.cold.seq_log.read();
+                    let min_retention_seq = seq_log.min_retention_seq();
+                    let mut conns_guard = node.connections.write();
+                    if let Some(layer_conns) = conns_guard.get_mut(layer) {
+                        layer_conns.retain(|&neighbor_u32| {
                             if !deleted_guard.contains(neighbor_u32 as u64) {
                                 true
                             } else if let Some(min_ret_seq) = min_retention_seq {
@@ -1499,7 +1521,7 @@ impl HnswIndexCore {
         }
         #[cfg(feature = "partial-index-rebuild")]
         if layer == 0 && !visited_node_ids.is_empty() {
-            self.traversal_tracker
+            self.cold.traversal_tracker
                 .write()
                 .record_traversal(visited_node_ids);
         }
@@ -1751,7 +1773,7 @@ impl HnswIndexCore {
         //   SQ8-Quantizer-Bounds-Expansion bei Insert garantiert; loom-Regressionstest
         //   in tests/loom_quantizer_race_test.rs
         let vector_data = if self.config.quantize {
-            let mut q_guard = self.quantizer.write();
+            let mut q_guard = self.cold.quantizer.write();
             if let Some(q) = q_guard.as_mut() {
                 q.expand_bounds_to_fit(vector);
                 VectorData::U8(q.quantize(vector)?)
@@ -1763,22 +1785,22 @@ impl HnswIndexCore {
         };
 
         let new_layer = self.random_layer();
-        let entry_point_opt = *self.entry_point.read();
+        let entry_point_opt = *self.hot.entry_point.read();
 
         let mmap_node_count = self
-            .mmap_index
+            .cold.mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
-        let nodes_read = self.nodes.read();
+        let nodes_read = self.hot.nodes.read();
         let ram_nodes_count = nodes_read.len();
         let new_idx = mmap_node_count + ram_nodes_count + offset;
 
         let query_quantized: Option<Vec<u8>> = None;
 
-        let mmap_guard = self.mmap_index.read();
+        let mmap_guard = self.cold.mmap_index.read();
 
         let mut ep = Vec::new();
         let mut batch_global_ep = None;
@@ -1803,7 +1825,7 @@ impl HnswIndexCore {
             if !ep.contains(&b_ram_ep) {
                 ep.push(b_ram_ep);
             }
-        } else if let Some(ram_ep) = *self.ram_entry_point.read() {
+        } else if let Some(ram_ep) = *self.hot.ram_entry_point.read() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -1854,7 +1876,7 @@ impl HnswIndexCore {
         let mut final_connections = vec![vec![]; new_layer + 1];
 
         for layer in (0..=new_layer.min(current_max_layer)).rev() {
-            let ram_ep_candidate = batch_ram_ep.or_else(|| *self.ram_entry_point.read());
+            let ram_ep_candidate = batch_ram_ep.or_else(|| *self.hot.ram_entry_point.read());
             if let Some(ram_ep) = ram_ep_candidate {
                 if !ep.contains(&ram_ep) {
                     ep.push(ram_ep);
@@ -1998,41 +2020,37 @@ impl HnswIndexCore {
     }
 
     pub fn apply_insert(&self, prepared: PreparedInsert) {
-        let mut conns = Vec::with_capacity(prepared.final_connections.len());
-        for layer_conns in prepared.final_connections {
-            conns.push(RwLock::new(layer_conns));
-        }
-
         let node = HnswNode {
             doc_id: prepared.doc_id,
             vector: prepared.vector_data,
-            connections: conns,
+            connections: RwLock::new(prepared.final_connections),
             max_layer: prepared.new_layer,
             committed_tx: 0,
         };
 
-        self.nodes.write().push(node);
-        self.doc_to_node
+        self.hot.nodes.write().push(node);
+        self.hot.doc_to_node
             .write()
             .insert(prepared.doc_id.inner(), prepared.new_idx);
 
-        let nodes = self.nodes.read();
+        let nodes = self.hot.nodes.read();
         for backlink in prepared.neighbor_backlinks {
             if let Some(neighbor_node) = nodes.get(backlink.neighbor_ram_idx) {
-                if let Some(conn_layer_lock) = neighbor_node.connections.get(backlink.layer) {
-                    *conn_layer_lock.write() = backlink.updated_connections;
+                let mut conns_guard = neighbor_node.connections.write();
+                if let Some(layer_conns) = conns_guard.get_mut(backlink.layer) {
+                    *layer_conns = backlink.updated_connections;
                 }
             }
         }
 
         if prepared.should_update_entry_point {
-            *self.entry_point.write() = Some(prepared.new_idx);
+            *self.hot.entry_point.write() = Some(prepared.new_idx);
             self.max_layer
                 .store(prepared.new_layer as u64, Ordering::SeqCst);
         }
 
         if prepared.should_update_ram_entry_point {
-            *self.ram_entry_point.write() = Some(prepared.new_idx);
+            *self.hot.ram_entry_point.write() = Some(prepared.new_idx);
         }
     }
 
@@ -2043,25 +2061,25 @@ impl HnswIndexCore {
     }
 
     fn do_delete(&self, id: DocId) -> Result<()> {
-        let node_idx = self.doc_to_node.write().remove(&id.inner());
+        let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
         if let Some(idx) = node_idx {
-            self.deleted_nodes.write().insert(idx as u64);
+            self.cold.deleted_nodes.write().insert(idx as u64);
             self.deleted_count.fetch_add(1, Ordering::SeqCst);
 
             // ANCHOR[ALG-FIX:D2-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Entry-Point-Aktualisierung nach Delete (INV-HNSW-4)
             // INVARIANTE (INV-HNSW-4): Wenn der gelöschte Knoten der aktuelle Entry-Point (oder RAM-Entry-Point) war,
             // wird unter den verbleibenden nicht-gelöschten Knoten derjenige mit der höchsten Schicht (max_layer) als neuer Entry-Point gewählt.
-            let mut ep = self.entry_point.write();
-            let mut ram_ep = self.ram_entry_point.write();
+            let mut ep = self.hot.entry_point.write();
+            let mut ram_ep = self.hot.ram_entry_point.write();
 
             if *ep == Some(idx) || *ram_ep == Some(idx) {
-                let nodes = self.nodes.read();
-                let mmap_guard = self.mmap_index.read();
+                let nodes = self.hot.nodes.read();
+                let mmap_guard = self.cold.mmap_index.read();
                 let mmap_node_count = mmap_guard
                     .as_ref()
                     .map(|m| m.header.node_count() as usize)
                     .unwrap_or(0);
-                let deleted = self.deleted_nodes.read();
+                let deleted = self.cold.deleted_nodes.read();
 
                 let mut best_node = None;
                 let mut best_ram_node = None;
@@ -2147,12 +2165,12 @@ impl HnswIndexCore {
     pub fn connectivity_score(&self) -> f64 {
         let deleted = self.deleted_count.load(Ordering::SeqCst);
         let mmap_count = self
-            .mmap_index
+            .cold.mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
-        let total = mmap_count + self.nodes.read().len();
+        let total = mmap_count + self.hot.nodes.read().len();
         if total == 0 {
             return 1.0;
         }
@@ -2218,14 +2236,14 @@ impl HnswIndexCore {
         let region_set: AHashSet<u64> = region_node_ids.into_iter().collect();
 
         let mmap_count = self
-            .mmap_index
+            .cold.mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
-        let nodes = self.nodes.read();
-        let mut deleted_nodes = self.deleted_nodes.write();
+        let nodes = self.hot.nodes.read();
+        let mut deleted_nodes = self.cold.deleted_nodes.write();
 
         let mut tombstoned_in_region = Vec::new();
         for &node_id in &region_set {
@@ -2248,14 +2266,14 @@ impl HnswIndexCore {
                 continue;
             }
 
-            for conn_rwlock in &node.connections {
-                let mut conns = conn_rwlock.write();
+            let mut conns_guard = node.connections.write();
+            for conns in conns_guard.iter_mut() {
                 conns.retain(|neighbor_id| !tombstoned_set.contains(neighbor_id));
             }
         }
 
         // Remove tombstoned node IDs from doc_to_node and update deleted_count
-        let mut doc_map = self.doc_to_node.write();
+        let mut doc_map = self.hot.doc_to_node.write();
         for &ts_id in &tombstoned_in_region {
             if ts_id >= mmap_count as u64 {
                 let ram_idx = (ts_id as usize) - mmap_count;
@@ -2282,15 +2300,15 @@ impl HnswIndexCore {
         // AI-TAG[SMELL][RESOLVED] audit-JULES-16-followup: HNSW-Rebuild respektiert jetzt aktive search_at()-Snapshots via retention window / seq_log pinning.
         // 1. Snapshot active and soft-deleted retained nodes (RAM segment only) up to snapshot_tx
         let (all_nodes, config, snapshot_tx) = {
-            let nodes = self.nodes.read();
+            let nodes = self.hot.nodes.read();
             let mmap_count = self
-                .mmap_index
+                .cold.mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let deleted_nodes = self.deleted_nodes.read();
-            let seq_log = self.seq_log.read();
+            let deleted_nodes = self.cold.deleted_nodes.read();
+            let seq_log = self.cold.seq_log.read();
             let min_retention_seq = seq_log.min_retention_seq();
             let snapshot_tx = self.last_tx_id.load(Ordering::SeqCst);
             let mut all = Vec::with_capacity(nodes.len());
@@ -2319,17 +2337,17 @@ impl HnswIndexCore {
 
         // 2. Build fresh index (this will be the NEW RAM segment)
         let new_index = HnswIndex::try_new(config)?;
-        *new_index.inner.seq_log.write() = self.seq_log.read().clone();
+        *new_index.inner.cold.seq_log.write() = self.cold.seq_log.read().clone();
 
         // Ensure new_index knows about the Mmap segment to link against it
         {
-            let mmap_guard = self.mmap_index.read();
+            let mmap_guard = self.cold.mmap_index.read();
             if let Some(mmap) = mmap_guard.as_ref() {
                 new_index.load_mmap_from_instance(mmap.clone())?;
             }
         }
 
-        let quantizer_guard = self.quantizer.read();
+        let quantizer_guard = self.cold.quantizer.read();
         if let Some(old_q) = quantizer_guard.as_ref() {
             // Train a new quantizer on a sample of active nodes to prevent clamping loss
             let sample_size = self
@@ -2354,9 +2372,9 @@ impl HnswIndexCore {
                 let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
                 let new_q =
                     crate::quantize::ScalarQuantizer::train(&training_refs, self.config.dimension);
-                *new_index.inner.quantizer.write() = Some(new_q);
+                *new_index.inner.cold.quantizer.write() = Some(new_q);
             } else {
-                *new_index.inner.quantizer.write() = Some(old_q.clone());
+                *new_index.inner.cold.quantizer.write() = Some(old_q.clone());
             }
         }
 
@@ -2377,15 +2395,15 @@ impl HnswIndexCore {
             }
             let mmap_count = new_index
                 .inner
-                .mmap_index
+                .cold.mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            if let Some(&global_idx) = new_index.inner.doc_to_node.read().get(&doc_id.inner()) {
+            if let Some(&global_idx) = new_index.inner.hot.doc_to_node.read().get(&doc_id.inner()) {
                 if global_idx >= mmap_count {
                     let ram_idx = global_idx - mmap_count;
-                    let mut nodes = new_index.inner.nodes.write();
+                    let mut nodes = new_index.inner.hot.nodes.write();
                     if let Some(node) = nodes.get_mut(ram_idx) {
                         node.committed_tx = committed_tx;
                     }
@@ -2407,7 +2425,7 @@ impl HnswIndexCore {
         let _write_lock = self.write_mutex.lock().await;
 
         // 1. Fetch delta changes committed since snapshot_tx
-        let delta_changes = self.seq_log.read().changes_since(snapshot_tx);
+        let delta_changes = self.cold.seq_log.read().changes_since(snapshot_tx);
 
         // 2. Replay delta changes into new_index
         for change in delta_changes {
@@ -2415,9 +2433,9 @@ impl HnswIndexCore {
                 memfuse_core::SeqLogChange::Insert { doc_id, seq } => {
                     // Check if document is currently present in old index RAM segment
                     let vector_opt = {
-                        let doc_map = self.doc_to_node.read();
+                        let doc_map = self.hot.doc_to_node.read();
                         let mmap_count = self
-                            .mmap_index
+                            .cold.mmap_index
                             .read()
                             .as_ref()
                             .map(|m| m.header.node_count() as usize)
@@ -2425,7 +2443,7 @@ impl HnswIndexCore {
                         if let Some(&global_idx) = doc_map.get(&doc_id.inner()) {
                             if global_idx >= mmap_count {
                                 let ram_idx = global_idx - mmap_count;
-                                let nodes = self.nodes.read();
+                                let nodes = self.hot.nodes.read();
                                 nodes.get(ram_idx).map(|n| n.vector.clone())
                             } else {
                                 None
@@ -2439,7 +2457,7 @@ impl HnswIndexCore {
                         let f32_vec = match vector {
                             VectorData::F32(v) => v,
                             VectorData::U8(v) => {
-                                let q_guard = self.quantizer.read();
+                                let q_guard = self.cold.quantizer.read();
                                 let q = q_guard.as_ref().ok_or_else(|| {
                                     MemFuseError::Index(
                                         "Quantizer missing during rebuild phase 2 delta replay"
@@ -2455,17 +2473,17 @@ impl HnswIndexCore {
                         // Set committed_tx on newly inserted node in new_index
                         let mmap_count = new_index
                             .inner
-                            .mmap_index
+                            .cold.mmap_index
                             .read()
                             .as_ref()
                             .map(|m| m.header.node_count() as usize)
                             .unwrap_or(0);
                         if let Some(&global_idx) =
-                            new_index.inner.doc_to_node.read().get(&doc_id.inner())
+                            new_index.inner.hot.doc_to_node.read().get(&doc_id.inner())
                         {
                             if global_idx >= mmap_count {
                                 let ram_idx = global_idx - mmap_count;
-                                let mut nodes = new_index.inner.nodes.write();
+                                let mut nodes = new_index.inner.hot.nodes.write();
                                 if let Some(node) = nodes.get_mut(ram_idx) {
                                     node.committed_tx = seq;
                                 }
@@ -2481,20 +2499,20 @@ impl HnswIndexCore {
 
         // 3. Atomic swap
         {
-            let mut nodes = self.nodes.write();
-            let mut doc_to_node = self.doc_to_node.write();
-            let mut entry_point = self.entry_point.write();
-            let mut ram_entry_point = self.ram_entry_point.write();
-            let mut deleted_nodes = self.deleted_nodes.write();
+            let mut nodes = self.hot.nodes.write();
+            let mut doc_to_node = self.hot.doc_to_node.write();
+            let mut entry_point = self.hot.entry_point.write();
+            let mut ram_entry_point = self.hot.ram_entry_point.write();
+            let mut deleted_nodes = self.cold.deleted_nodes.write();
 
-            let new_nodes = std::mem::take(&mut *new_index.inner.nodes.write());
-            let new_doc_to_node = std::mem::take(&mut *new_index.inner.doc_to_node.write());
-            let new_entry_point = *new_index.inner.entry_point.read();
-            let new_ram_entry_point = *new_index.inner.ram_entry_point.read();
+            let new_nodes = std::mem::take(&mut *new_index.inner.hot.nodes.write());
+            let new_doc_to_node = std::mem::take(&mut *new_index.inner.hot.doc_to_node.write());
+            let new_entry_point = *new_index.inner.hot.entry_point.read();
+            let new_ram_entry_point = *new_index.inner.hot.ram_entry_point.read();
 
-            let new_quantizer = new_index.inner.quantizer.write().take();
+            let new_quantizer = new_index.inner.cold.quantizer.write().take();
             if new_quantizer.is_some() {
-                *self.quantizer.write() = new_quantizer;
+                *self.cold.quantizer.write() = new_quantizer;
             }
 
             *nodes = new_nodes;
@@ -2508,7 +2526,7 @@ impl HnswIndexCore {
 
             // Preserve mmap deletions, plus any deletions recorded in new_index
             let mmap_count = self
-                .mmap_index
+                .cold.mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2519,7 +2537,7 @@ impl HnswIndexCore {
                     new_deleted.insert(del_idx);
                 }
             }
-            for del_idx in new_index.inner.deleted_nodes.read().iter() {
+            for del_idx in new_index.inner.cold.deleted_nodes.read().iter() {
                 new_deleted.insert(del_idx);
             }
 
@@ -2606,17 +2624,17 @@ impl VectorIndex for HnswIndex {
 
         let query_quantized: Option<Vec<u8>> = None;
 
-        let mmap_guard = self.inner.mmap_index.read();
+        let mmap_guard = self.inner.cold.mmap_index.read();
         let mmap_node_count = mmap_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
         let mut ep = Vec::new();
-        if let Some(global_ep) = *self.inner.entry_point.read() {
+        if let Some(global_ep) = *self.inner.hot.entry_point.read() {
             ep.push(global_ep);
         }
-        if let Some(ram_ep) = *self.inner.ram_entry_point.read() {
+        if let Some(ram_ep) = *self.inner.hot.ram_entry_point.read() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -2639,7 +2657,7 @@ impl VectorIndex for HnswIndex {
         }
 
         // Add RAM entry point back for the final layer search to ensure hybrid recall
-        if let Some(ram_ep) = *self.inner.ram_entry_point.read() {
+        if let Some(ram_ep) = *self.inner.hot.ram_entry_point.read() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -2667,8 +2685,8 @@ impl VectorIndex for HnswIndex {
             );
         }
 
-        let nodes = self.inner.nodes.read();
-        let deleted = self.inner.deleted_nodes.read();
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
         let mut results = Vec::with_capacity(k);
 
         let ctx = SearchContext {
@@ -2756,7 +2774,7 @@ impl VectorIndex for HnswIndex {
         let mut deleted_any = false;
 
         // ANCHOR[SPEC:WP-2.2-SQ8TRAIN-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Lazy Training logic (Stabilized)
-        if self.inner.config.quantize && self.inner.quantizer.read().is_none() {
+        if self.inner.config.quantize && self.inner.cold.quantizer.read().is_none() {
             let mut train_data = Vec::with_capacity(256.min(ops.len()));
             for op in &ops {
                 if let IndexOp::Insert { data, .. } = op {
@@ -2769,7 +2787,7 @@ impl VectorIndex for HnswIndex {
 
             // If we don't have enough in this batch, check existing nodes
             if train_data.len() < 256 {
-                let nodes = self.inner.nodes.read();
+                let nodes = self.inner.hot.nodes.read();
                 for node in nodes.iter() {
                     if let VectorData::F32(v) = &node.vector {
                         train_data.push(v.clone());
@@ -2786,9 +2804,9 @@ impl VectorIndex for HnswIndex {
                     &training_refs,
                     self.inner.config.dimension,
                 );
-                *self.inner.quantizer.write() = Some(q.clone());
+                *self.inner.cold.quantizer.write() = Some(q.clone());
 
-                let mut nodes = self.inner.nodes.write();
+                let mut nodes = self.inner.hot.nodes.write();
                 for node in nodes.iter_mut() {
                     if let VectorData::F32(v) = &node.vector {
                         node.vector = VectorData::U8(q.quantize(v)?);
@@ -2799,7 +2817,7 @@ impl VectorIndex for HnswIndex {
 
         // INVARIANTE: Compute-then-Commit Transaktionsatomarität:
         // Phase 1: Compute all fallible operations for ALL ops in the transaction.
-        // Purely read-only with respect to self.inner.nodes and self.inner.doc_to_node.
+        // Purely read-only with respect to self.inner.hot.nodes and self.inner.hot.doc_to_node.
         let mut prepared_inserts = Vec::new();
         let mut deletes_to_apply = Vec::new();
         let mut batch_ctx = BatchContext::new(&self.inner);
@@ -2847,7 +2865,7 @@ impl VectorIndex for HnswIndex {
 
         // Record ops into seq_log for search_at snapshot isolation
         let seq = tx.inner();
-        let mut seq_log = self.inner.seq_log.write();
+        let mut seq_log = self.inner.cold.seq_log.write();
         for op in &ops {
             match op {
                 IndexOp::Insert { doc_id, .. } => {
@@ -2865,13 +2883,13 @@ impl VectorIndex for HnswIndex {
         if !inserted_doc_ids.is_empty() {
             let mmap_count = self
                 .inner
-                .mmap_index
+                .cold.mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let doc_map = self.inner.doc_to_node.read();
-            let mut nodes = self.inner.nodes.write();
+            let doc_map = self.inner.hot.doc_to_node.read();
+            let mut nodes = self.inner.hot.nodes.write();
 
             for doc_id in inserted_doc_ids {
                 if let Some(&global_idx) = doc_map.get(&doc_id.inner()) {
@@ -2903,7 +2921,7 @@ impl VectorIndex for HnswIndex {
     /// Searches for nearest neighbors at a specific snapshot sequence number.
     async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         let _pin_guard = SnapshotPinGuard::new(&self.inner, seq_no);
-        let log = self.inner.seq_log.read().clone();
+        let log = self.inner.cold.seq_log.read().clone();
         let filter_fn = move |doc_id: DocId| -> bool { log.is_visible(doc_id, seq_no) };
         self.search_filtered_internal(query, k, Some(&filter_fn), Some(seq_no))
             .await
@@ -2935,7 +2953,7 @@ impl VectorIndex for HnswIndex {
 
         // 1. Sammle alle Nodes mit committed_tx > target_tx_id
         let indices_to_remove: Vec<usize> = {
-            let nodes = self.inner.nodes.read();
+            let nodes = self.inner.hot.nodes.read();
             nodes
                 .iter()
                 .enumerate()
@@ -2951,8 +2969,8 @@ impl VectorIndex for HnswIndex {
 
         // 2. Aus doc_to_node-Map entfernen
         {
-            let nodes = self.inner.nodes.read();
-            let mut map = self.inner.doc_to_node.write();
+            let nodes = self.inner.hot.nodes.read();
+            let mut map = self.inner.hot.doc_to_node.write();
             for &idx in &indices_to_remove {
                 if let Some(node) = nodes.get(idx) {
                     map.remove(&node.doc_id.inner());
@@ -2964,12 +2982,12 @@ impl VectorIndex for HnswIndex {
         {
             let mmap_count = self
                 .inner
-                .mmap_index
+                .cold.mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let mut deleted = self.inner.deleted_nodes.write();
+            let mut deleted = self.inner.cold.deleted_nodes.write();
             for &idx in &indices_to_remove {
                 deleted.insert((mmap_count + idx) as u64);
             }
@@ -3001,13 +3019,13 @@ impl VectorIndex for HnswIndex {
         if self.inner.validation_error.is_some() {
             return Ok(Vec::new());
         }
-        let nodes = self.inner.nodes.read();
-        let mmap_guard = self.inner.mmap_index.read();
+        let nodes = self.inner.hot.nodes.read();
+        let mmap_guard = self.inner.cold.mmap_index.read();
         let mmap_node_count = mmap_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
-        let deleted = self.inner.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
 
         let ctx = SearchContext {
             nodes: &nodes,
@@ -3033,12 +3051,12 @@ impl VectorIndex for HnswIndex {
         }
         let mmap_count = self
             .inner
-            .mmap_index
+            .cold.mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
-        let total = mmap_count + self.inner.nodes.read().len();
+        let total = mmap_count + self.inner.hot.nodes.read().len();
         let deleted = self.inner.deleted_count.load(Ordering::SeqCst) as usize;
         total.saturating_sub(deleted)
     }
@@ -3052,8 +3070,8 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn stats(&self) -> Result<VectorIndexStats> {
-        let nodes = self.inner.nodes.read();
-        let mmap_guard = self.inner.mmap_index.read();
+        let nodes = self.inner.hot.nodes.read();
+        let mmap_guard = self.inner.cold.mmap_index.read();
         let mmap_count = mmap_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -3074,8 +3092,9 @@ impl VectorIndex for HnswIndex {
             .iter()
             .map(|n| {
                 n.connections
+                    .read()
                     .iter()
-                    .map(|c| c.read().len() * std::mem::size_of::<u32>())
+                    .map(|c| c.len() * std::mem::size_of::<u32>())
                     .sum::<usize>()
             })
             .sum();
@@ -3921,7 +3940,7 @@ mod tests {
                 for &target_seq in &tx_checkpoints {
                     // Reference model state at target_seq
                     let active_docs: std::collections::HashSet<_> = {
-                        let log = index.inner.seq_log.read();
+                        let log = index.inner.cold.seq_log.read();
                         (1u64..30)
                             .map(DocId::new)
                             .filter(|&doc_id| log.is_visible(doc_id, target_seq))
@@ -4482,8 +4501,8 @@ mod tests {
         index.commit(tx1).await.unwrap();
 
         // Snapshot counts before batch commit
-        let initial_nodes_count = index.inner.nodes.read().len();
-        let initial_doc_map_count = index.inner.doc_to_node.read().len();
+        let initial_nodes_count = index.inner.hot.nodes.read().len();
+        let initial_doc_map_count = index.inner.hot.doc_to_node.read().len();
         assert_eq!(initial_nodes_count, 2);
         assert_eq!(initial_doc_map_count, 2);
 
@@ -4516,8 +4535,8 @@ mod tests {
         FAIL_HNSW_COMPUTE_INSERT_COUNT.store(0, Ordering::SeqCst);
 
         // 5. Verify snapshot node and doc_to_node counts AFTER failed commit
-        let final_nodes_count = index.inner.nodes.read().len();
-        let final_doc_map_count = index.inner.doc_to_node.read().len();
+        let final_nodes_count = index.inner.hot.nodes.read().len();
+        let final_doc_map_count = index.inner.hot.doc_to_node.read().len();
 
         assert_eq!(
             initial_nodes_count, final_nodes_count,
@@ -4531,7 +4550,7 @@ mod tests {
         );
 
         // Verify none of the transaction batch DocIds exist in doc_to_node
-        let doc_map = index.inner.doc_to_node.read();
+        let doc_map = index.inner.hot.doc_to_node.read();
         for i in 100..105u64 {
             assert!(
                 !doc_map.contains_key(&i),

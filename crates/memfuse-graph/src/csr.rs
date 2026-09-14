@@ -30,6 +30,11 @@ use serde::{Deserialize, Serialize};
 pub enum EdgeType {
     #[default]
     Default,
+    #[deprecated(
+        since = "0.1.0",
+        note = "EdgeType::Custom wird nirgends im Workspace produktiv erzeugt — für benutzerdefinierte Kantentypen bitte Issue öffnen"
+    )]
+    Custom(String),
 }
 
 /// Edge structure in CSR graph representation.
@@ -249,10 +254,10 @@ pub(crate) struct GraphInner {
     /// Reverse lookup index mapping DocId to Set of EdgeId (EntityId, EntityId)
     pub(crate) doc_to_edges: ahash::AHashMap<DocId, HashSet<(EntityId, EntityId)>>,
 
-    /// Staging for entities not yet committed, grouped by TxId.
-    staged_entities: ahash::AHashMap<TxId, ahash::AHashMap<EntityId, Entity>>,
-    /// Staging for edges not yet committed, grouped by TxId.
-    staged_edges: ahash::AHashMap<TxId, ahash::AHashMap<EntityId, Vec<StagedEdgePayload>>>,
+    /// Staging for entities not yet committed, indexed by (TxId, EntityId).
+    staged_entities: ahash::AHashMap<(TxId, EntityId), Entity>,
+    /// Staging for edges not yet committed, indexed by (TxId, EntityId).
+    staged_edges: ahash::AHashMap<(TxId, EntityId), Vec<StagedEdgePayload>>,
     /// Staging for edge removals not yet committed, grouped by TxId.
     staged_removals: ahash::AHashMap<TxId, Vec<(EntityId, EntityId)>>,
     /// Edges that have been committed but not yet compacted into CSR arrays (delta buffer).
@@ -263,6 +268,9 @@ pub(crate) struct GraphInner {
     pending_edge_count: usize,
     /// Flag indicating if there are uncompacted pending edges or modifications.
     is_dirty: bool,
+    /// On-demand adjacency list cache for edge reinforcement learning.
+    /// INVALIDATION STRATEGY: Cleared completely during `compact()` to prevent stale or removed edges
+    /// from being served after pending/tombstone edge compaction.
     #[cfg(feature = "edge-reinforcement-learning")]
     pub(crate) edge_store: HashMap<EntityId, Vec<Edge>>,
 }
@@ -284,9 +292,9 @@ impl GraphInner {
             business_valid_tos: Vec::new(),
             source_doc_ids: Vec::new(),
             doc_to_edges: ahash::AHashMap::new(),
-            staged_entities: ahash::AHashMap::new(),
-            staged_edges: ahash::AHashMap::new(),
-            staged_removals: ahash::AHashMap::new(),
+            staged_entities: ahash::AHashMap::default(),
+            staged_edges: ahash::AHashMap::default(),
+            staged_removals: ahash::AHashMap::default(),
             pending_edges: HashMap::new(),
             tombstoned_edges: HashSet::new(),
             pending_edge_count: 0,
@@ -408,6 +416,8 @@ impl GraphInner {
         self.business_valid_tos = new_business_valid_tos;
         self.pending_edges.clear();
         self.tombstoned_edges.clear();
+        #[cfg(feature = "edge-reinforcement-learning")]
+        self.edge_store.clear();
         self.pending_edge_count = 0;
         self.is_dirty = false;
         #[cfg(feature = "edge-reinforcement-learning")]
@@ -1536,7 +1546,7 @@ impl CsrGraph {
             + inner
                 .staged_edges
                 .values()
-                .map(|tx_map| tx_map.values().map(|v| v.len()).sum::<usize>())
+                .map(|v| v.len())
                 .sum::<usize>()
     }
 
@@ -1682,9 +1692,7 @@ impl GraphIndex for CsrGraph {
                 let mut inner = self.inner.write();
                 inner
                     .staged_entities
-                    .entry(tx)
-                    .or_default()
-                    .insert(entity.id, entity.clone());
+                    .insert((tx, entity.id), entity.clone());
             }
 
             if let Some(ref storage) = self.storage {
@@ -1758,9 +1766,7 @@ impl GraphIndex for CsrGraph {
                 let mut inner = self.inner.write();
                 inner
                     .staged_edges
-                    .entry(tx)
-                    .or_default()
-                    .entry(edge.from)
+                    .entry((tx, edge.from))
                     .or_default()
                     .push(StagedEdgePayload {
                         target: edge.to,
@@ -2165,20 +2171,37 @@ impl GraphIndex for CsrGraph {
             let mut inner = self.inner.write();
 
             // 1. Commit entities
-            if let Some(tx_entities) = inner.staged_entities.remove(&tx) {
+            let mut tx_entities = Vec::new();
+            inner.staged_entities.retain(|&(t, id), entity| {
+                if t == tx {
+                    tx_entities.push((id, entity.clone()));
+                    false
+                } else {
+                    true
+                }
+            });
+            if !tx_entities.is_empty() {
                 for (id, entity) in tx_entities {
                     let idx = inner.get_or_create_index(id);
                     if idx >= inner.entities.len() {
                         inner.entities.resize(idx + 1, None);
                     }
                     inner.entities[idx] = Some(entity);
-                    inner.is_dirty = true;
                 }
+                inner.is_dirty = true;
             }
-            inner.is_dirty = true;
 
             // 2. Commit edges (lazy index resolution occurs here)
-            if let Some(tx_edges) = inner.staged_edges.remove(&tx) {
+            let mut tx_edges = Vec::new();
+            inner.staged_edges.retain(|&(t, from_id), edges| {
+                if t == tx {
+                    tx_edges.push((from_id, std::mem::take(edges)));
+                    false
+                } else {
+                    true
+                }
+            });
+            if !tx_edges.is_empty() {
                 for (from_id, edges) in tx_edges {
                     let from_idx = inner.get_or_create_index(from_id);
                     let mut converted_edges = Vec::with_capacity(edges.len());
@@ -2297,8 +2320,8 @@ impl GraphIndex for CsrGraph {
     fn rollback<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let mut inner = self.inner.write();
-            inner.staged_entities.remove(&tx);
-            inner.staged_edges.remove(&tx);
+            inner.staged_entities.retain(|&(t, _), _| t != tx);
+            inner.staged_edges.retain(|&(t, _), _| t != tx);
             inner.staged_removals.remove(&tx);
             Ok(())
         })
@@ -2329,7 +2352,7 @@ impl GraphIndex for CsrGraph {
                 + inner
                     .staged_edges
                     .values()
-                    .map(|tx_map| tx_map.values().map(|v| v.len()).sum::<usize>())
+                    .map(|v| v.len())
                     .sum::<usize>();
 
             let mem = (inner.reverse_map.len() * std::mem::size_of::<EntityId>())
@@ -4587,5 +4610,47 @@ mod tests {
         assert!(graph.is_entity_deleted(entity_deleted).await);
         // Live entity still returns false
         assert!(!graph.is_entity_deleted(entity_live).await);
+    }
+
+    #[test]
+    #[cfg(feature = "edge-reinforcement-learning")]
+    fn test_edge_store_invalidated_after_compact() {
+        let mut inner = GraphInner::new();
+        let entity_a = EntityId::new(1);
+        let entity_b = EntityId::new(2);
+
+        let idx_a = inner.get_or_create_index(entity_a);
+        let idx_b = inner.get_or_create_index(entity_b);
+
+        // (1) Anlegen einer Kante A -> B in pending_edges
+        inner.pending_edges.entry(idx_a).or_default().push(EdgePayload {
+            target: idx_b,
+            weight: 1.0,
+            tx_valid_from: None,
+            tx_valid_to: None,
+            business_valid_from: None,
+            business_valid_to: None,
+            source_doc_id: None,
+        });
+        inner.pending_edge_count += 1;
+
+        // (2) `outgoing_edges_mut(A)` aufrufen um den edge_store-Cache zu befüllen
+        let cached = inner.outgoing_edges_mut(entity_a);
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].target, entity_b);
+
+        // (3) Kante über Tombstone-Mechanismus entfernen
+        inner.tombstoned_edges.insert((idx_a, idx_b));
+
+        // (4) `compact()` aufrufen
+        inner.compact();
+
+        // (5) Beweisen, dass `outgoing_edges_mut(A)` danach die Kante NICHT mehr zurückgibt
+        let cached_after_compact = inner.outgoing_edges_mut(entity_a);
+        assert_eq!(
+            cached_after_compact.len(),
+            0,
+            "edge_store must be cleared by compact() so deleted/tombstoned edges are no longer returned"
+        );
     }
 }
