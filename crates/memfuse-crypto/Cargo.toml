@@ -37,6 +37,7 @@ memfuse-security = { path = ".", features = ["test-utils"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
 criterion = { workspace = true }
+loom = "0.7"
 
 [[bench]]
 name = "crypto_benchmarks"
