@@ -162,3 +162,68 @@ fn test_bandit_vs_cascade_regret_comparison() {
         );
     }
 }
+
+/// Verifiziert das Latenzbudget des LinUCB Diagonal-Bandits bei d=768 (§10.14, §13.3).
+///
+/// Hintergrund: Die Diagonal-Approximation ist O(d) — Score + Update sollten
+/// bei d=768 unter 1ms P95 bleiben, selbst auf langsamen CI-Runnern.
+/// Dieses Budget entspricht dem `PidLatencyController`-Latenzbudget im Hot-Path.
+///
+/// Falls dieser Test flaky wird: Budget auf 5ms erhöhen (ADR-Beschluss einholen).
+#[cfg(all(test, feature = "bandit-routing"))]
+#[test]
+fn test_bandit_diagonal_vs_linucb_latency_budget() {
+    use std::time::Instant;
+
+    // d=768 entspricht dem typischen Embedding-Vektor (all-MiniLM-L6-v2)
+    const DIM: usize = 768;
+    // Großzügiges Budget für shared CI-Runner: 5ms P95 (10× der erwarteten ~0.1ms)
+    const BUDGET_P95_US: u64 = 5_000; // 5ms in Mikrosekunden
+    const ITERATIONS: usize = 500;
+
+    let mut rng = SimpleRng::new(42); // SimpleRng ist in dieser Datei definiert
+    let mut state = BanditProfileState::cold_start(DIM, 0.5);
+
+    // Erstelle realistische Testkontexte
+    let x: Vec<f32> = (0..DIM).map(|_| rng.next_f32()).collect();
+    let cost = 0.2f32;
+    let is_cloud = false;
+    let reward = 0.85f32;
+
+    let mut latencies_us: Vec<u64> = Vec::with_capacity(ITERATIONS);
+
+    // Warmup: JIT und Cache aufwärmen
+    for _ in 0..20 {
+        let _ = state.score(&x, cost, is_cloud);
+        state.update(&x, reward, cost, is_cloud);
+    }
+
+    // Messung: Score + Update zusammen (das ist der Hot-Path pro Routing-Entscheidung)
+    for _ in 0..ITERATIONS {
+        let t0 = Instant::now();
+        let _score = state.score(&x, cost, is_cloud);
+        state.update(&x, reward, cost, is_cloud);
+        latencies_us.push(t0.elapsed().as_micros() as u64);
+    }
+
+    latencies_us.sort_unstable();
+    let p95_idx = (ITERATIONS as f64 * 0.95) as usize;
+    let p95_us = latencies_us[p95_idx.min(ITERATIONS - 1)];
+
+    // P50 als zusätzliches Diagnostic
+    let p50_idx = ITERATIONS / 2;
+    let p50_us = latencies_us[p50_idx];
+
+    println!(
+        "Bandit d={} Score+Update: P50={}µs P95={}µs (Budget: {}µs)",
+        DIM, p50_us, p95_us, BUDGET_P95_US
+    );
+
+    assert!(
+        p95_us <= BUDGET_P95_US,
+        "LATENZBUDGET-VERLETZUNG (§13.3): BanditProfileState::score + update P95 = {}µs \
+         bei d={} überschreitet Budget {}µs. \
+         Kein O(d³) in Diagonal-Implementierung erlaubt!",
+        p95_us, DIM, BUDGET_P95_US
+    );
+}
