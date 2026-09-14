@@ -25,6 +25,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 /// Edge type representation for CSR edges.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum EdgeType {
     #[default]
@@ -419,6 +420,8 @@ impl GraphInner {
         self.edge_store.clear();
         self.pending_edge_count = 0;
         self.is_dirty = false;
+        #[cfg(feature = "edge-reinforcement-learning")]
+        self.edge_store.clear();
     }
 }
 
