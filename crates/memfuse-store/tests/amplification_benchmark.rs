@@ -139,6 +139,7 @@ async fn run_amplification_benchmark() {
             check_interval: Duration::from_millis(50),
             yield_threshold: 1000,
             max_memory_bytes: Some(128 * 1024 * 1024),
+            ..Default::default()
         },
         encryption_passphrase: None,
         ..Default::default()
