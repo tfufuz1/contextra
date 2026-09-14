@@ -738,10 +738,10 @@ async fn test_kv_bridge_adapter_consulted_on_retrieve() {
     let dim = collection.dimension();
     let embedder = Arc::new(MockEmbedder { dimension: dim });
 
-    let store = Arc::new(memfuse_security::TenantIsolatedKvStore::new());
+    let store = Arc::new(memfuse_crypto::TenantIsolatedKvStore::new());
     let master_km =
-        memfuse_security::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
-    let cipher = Arc::new(memfuse_security::KvSegmentCipher::new(master_km));
+        memfuse_crypto::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
+    let cipher = Arc::new(memfuse_crypto::KvSegmentCipher::new(master_km));
     let bridge_adapter = Arc::new(memfuse_candle::KvBridgeAdapter::new(store, cipher));
 
     let server = Arc::new(
@@ -822,6 +822,25 @@ async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
     assert!(
         err_msg2.contains("Egress policy violation"),
         "Expected block message for API key input, got: '{err_msg2}'"
+    );
+
+    // 3. Test sensitive keyword pattern (api_key, password)
+    let req_password = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_cloud_query",
+            "arguments": {
+                "query": "retrieve my password for admin account"
+            }
+        }),
+    );
+    let resp_password = server.handle(req_password).await;
+    let res_val3 = serde_json::to_value(&resp_password).unwrap();
+    assert_eq!(res_val3["result"]["isError"], true);
+    let err_msg3 = res_val3["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        err_msg3.contains("Egress policy violation"),
+        "Expected block message for password input, got: '{err_msg3}'"
     );
 }
 

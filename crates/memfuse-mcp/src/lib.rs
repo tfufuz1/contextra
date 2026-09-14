@@ -250,7 +250,7 @@ impl McpServer {
             embedder,
             sandbox,
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
-            egress_classifier: Arc::new(DefaultEgressClassifier),
+            egress_classifier: Arc::new(DefaultEgressClassifier::default()),
             routing: None,
             #[cfg(feature = "kv-bridge")]
             kv_bridge,
