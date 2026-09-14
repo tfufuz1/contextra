@@ -1,12 +1,15 @@
 // FILE-CONTEXT
-// STAND:       2026-09-13
+// STAND:       2026-09-14
 // ZWECK:       Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries
 // INVARIANTEN: APM-EGRESS-BYPASS: Jede Anfrage MUSS EgressClassifier::classify() durchlaufen.
-//              APM-PANIC-ON-MISSING-FIELD: Keine unwrap()-Aufrufe auf Client-Eingaben.
+//              APM-PANIC-ON-MISSING-FIELD: Keine unwrap()/expect()-Aufrufe bei Initialization/Execution (Fail-Closed).
 // SIEHE AUCH:  crates/memfuse-crypto/src/egress_vault.rs
 
 use memfuse_core::BoxFuture;
-pub use memfuse_security::egress_vault::{BlockReason, EgressClassification, EgressClassifier};
+pub use memfuse_crypto::egress_vault::{
+    BlockReason, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
+    EgressVaultError,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -72,11 +75,21 @@ pub async fn handle_cloud_query(
     }
 }
 
-pub struct DefaultEgressClassifier;
+pub struct DefaultEgressClassifier {
+    vault: Result<EgressVault, EgressVaultError>,
+}
 
 impl DefaultEgressClassifier {
     pub fn new() -> Self {
-        Self
+        let default_patterns = vec![
+            r"sk-".to_string(),
+            r"AKIA".to_string(),
+            r"api_key".to_string(),
+            r"password".to_string(),
+            r"@".to_string(),
+        ];
+        let vault = EgressVault::new(default_patterns);
+        Self { vault }
     }
 }
 
@@ -89,19 +102,15 @@ impl Default for DefaultEgressClassifier {
 impl EgressClassifier for DefaultEgressClassifier {
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {
         Box::pin(async move {
-            if payload.contains("sk-")
-                || payload.contains("AKIA")
-                || payload.contains("api_key")
-                || payload.contains("password")
-                || payload.contains('@')
-            {
-                EgressClassification::Block(BlockReason::SensitivePattern(
-                    "Sensitive pattern detected in payload".to_string(),
-                ))
-            } else if payload.contains("abstract") || payload.contains("PII") {
+            if payload.contains("abstract") || payload.contains("PII") {
                 EgressClassification::RequiresAbstraction
             } else {
-                EgressClassification::Allow
+                match &self.vault {
+                    Ok(vault) => vault.classify(payload).await,
+                    Err(err) => EgressClassification::Block(BlockReason::InternalError(format!(
+                        "EgressVault initialization failed: {err}"
+                    ))),
+                }
             }
         })
     }

@@ -17,7 +17,7 @@ test-utils = ["memfuse-core/test-utils"]
 [dependencies]
 memfuse-db = { workspace = true }
 memfuse-core = { workspace = true }
-memfuse-security = { workspace = true }
+memfuse-crypto = { workspace = true }
 memfuse-ollama = { workspace = true }
 memfuse-router = { workspace = true }
 memfuse-calibration = { workspace = true }

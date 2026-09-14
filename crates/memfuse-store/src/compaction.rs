@@ -90,6 +90,7 @@ pub struct CompactionEngine {
     budget: Arc<memfuse_core::ResourceTracker>,
     manifest: Option<Arc<crate::manifest::Manifest>>,
     compaction_counter: AtomicU64,
+    pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,
 }
 
 impl CompactionEngine {
@@ -110,7 +111,17 @@ impl CompactionEngine {
             budget,
             manifest,
             compaction_counter: AtomicU64::new(0),
+            pressure_rx: None,
         }
+    }
+
+    /// Attaches a system pressure watch receiver to enable pressure-aware compaction backpressure.
+    pub fn with_pressure_rx(
+        mut self,
+        rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
+    ) -> Self {
+        self.pressure_rx = Some(rx);
+        self
     }
 
     /// Evaluates whether compaction should run and performs it if needed.
@@ -436,6 +447,19 @@ impl CompactionEngine {
         while let Some(item) = heap.pop() {
             processed_count += 1;
             if processed_count % self.config.yield_threshold == 0 {
+                // PERF-3: System Pressure-Awareness
+                // Check pressure_rx at batch boundaries between merge iterations.
+                // Critical pressure level triggers a 50ms backpressure sleep delay to reduce NVMe / CPU contention.
+                if let Some(ref pressure_rx) = self.pressure_rx {
+                    let level = pressure_rx.borrow().pressure_level;
+                    if level == crate::system_pressure::PressureLevel::Critical {
+                        tracing::warn!("Compaction merge delayed due to Critical system pressure.");
+                        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                    } else if level == crate::system_pressure::PressureLevel::Elevated {
+                        tracing::debug!("Compaction merge active under Elevated system pressure.");
+                    }
+                }
+
                 // FIND-STO-002: Budgeted Compaction
                 // Apply memory backpressure to prevent Compaction from OOMing the system
                 if !self.budget.has_memory_capacity() {
@@ -1498,6 +1522,112 @@ mod tests {
             res_full.is_none(),
             "Tombstone should be REMOVED in full compaction"
         );
+    }
+
+    #[tokio::test]
+    async fn test_compaction_pressure_awareness() {
+        use crate::system_pressure::{PressureLevel, SystemPressure};
+
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let config = CompactionConfig {
+            min_sstables_per_tier: 2,
+            yield_threshold: 5, // Yield/check pressure every 5 entries
+            ..Default::default()
+        };
+
+        let (pressure_tx, pressure_rx) = tokio::sync::watch::channel(SystemPressure {
+            wal_queue_depth: 0,
+            blocking_thread_utilization: 0.0,
+            embedding_queue_depth: 0,
+            pressure_level: PressureLevel::Normal,
+        });
+
+        let engine = CompactionEngine::new(
+            config,
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        )
+        .with_pressure_rx(pressure_rx);
+
+        // Create 2 SSTables with 20 entries each
+        let mut entries1 = Vec::new();
+        let mut entries2 = Vec::new();
+        for i in 0..20u8 {
+            entries1.push((format!("key1-{:02}", i).into_bytes(), b"val1".to_vec(), i as u64 + 1));
+            entries2.push((format!("key2-{:02}", i).into_bytes(), b"val2".to_vec(), i as u64 + 21));
+        }
+
+        let sst1 = create_test_sstable(
+            tmp.path(),
+            "sst1.sst",
+            &entries1.iter().map(|(k, v, s)| (k.as_slice(), v.as_slice(), *s)).collect::<Vec<_>>(),
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst2 = create_test_sstable(
+            tmp.path(),
+            "sst2.sst",
+            &entries2.iter().map(|(k, v, s)| (k.as_slice(), v.as_slice(), *s)).collect::<Vec<_>>(),
+            Arc::clone(&bc),
+        )
+        .await;
+
+        // Measure merge duration with Normal pressure
+        let normal_out = tmp.path().join("normal_merged.sst");
+        let start_normal = std::time::Instant::now();
+        engine
+            .merge_sstables(&[Arc::clone(&sst1), Arc::clone(&sst2)], &normal_out, u64::MAX, true)
+            .await
+            .expect("merge under normal pressure");
+        let duration_normal = start_normal.elapsed();
+
+        // Switch pressure level to Critical
+        pressure_tx
+            .send(SystemPressure {
+                wal_queue_depth: 600,
+                blocking_thread_utilization: 0.9,
+                embedding_queue_depth: 0,
+                pressure_level: PressureLevel::Critical,
+            })
+            .expect("send pressure");
+
+        // Measure merge duration with Critical pressure (yielding 4 times across 40 items -> 4 * 50ms = ~200ms delay)
+        let critical_out = tmp.path().join("critical_merged.sst");
+        let start_critical = std::time::Instant::now();
+        engine
+            .merge_sstables(&[sst1, sst2], &critical_out, u64::MAX, true)
+            .await
+            .expect("merge under critical pressure");
+        let duration_critical = start_critical.elapsed();
+
+        assert!(
+            duration_critical >= Duration::from_millis(150),
+            "Compaction under Critical pressure should take at least ~150ms due to backpressure delays, took {:?}",
+            duration_critical
+        );
+        assert!(
+            duration_critical > duration_normal,
+            "Compaction under Critical pressure ({:?}) should be measurably slower than under Normal pressure ({:?})",
+            duration_critical,
+            duration_normal
+        );
+
+        // Verify output file content correctness under critical pressure
+        let reader = SstableReader::open(&critical_out, Arc::clone(&bc))
+            .await
+            .expect("open critical sst");
+        let entries = reader.iter().await.expect("iter entries");
+        assert_eq!(entries.len(), 40, "All entries must be preserved after backpressure merge");
     }
 
     #[tokio::test]

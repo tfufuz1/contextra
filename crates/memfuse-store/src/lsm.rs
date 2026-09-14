@@ -566,32 +566,8 @@ impl LsmStorage {
 
         let snapshot_registry = Arc::new(SnapshotRegistry::new());
 
-        // Spawn background compaction task
-        // COMP-001 — Implementiere CompactionEngine::run_loop.
-        // TEST: cargo test -p memfuse-store test_concurrent_reads_during_compaction
-        // DONE: Triple-Test grün, keine Deadlocks in tokio::spawn.
-        // AI-TAG[SMELL][RESOLVED] audit-C-1: Startup-Flush erzwungen vor Löschung alter WAL-Dateien in LsmStorage::new (Zeilen ~480-490).
-        let compaction_engine = Arc::new(CompactionEngine::new(
-            config.compaction.clone(),
-            Arc::clone(&snapshot_registry),
-            Arc::clone(&block_cache),
-            key_manager.clone(),
-            Arc::clone(&resource_tracker),
-            Some(Arc::clone(&manifest)),
-        ));
-        // Clone für den Hintergrund-Task, original bleibt als Struct-Feld
-        let compaction_engine_for_loop = Arc::clone(&compaction_engine);
-        let compaction_sstables = Arc::clone(&sstables);
-        let compaction_path = config.path.clone();
         let cancel_token = tokio_util::sync::CancellationToken::new();
         let task_tracker = tokio_util::task::TaskTracker::new();
-
-        let ct_clone = cancel_token.clone();
-        task_tracker.spawn(async move {
-            compaction_engine_for_loop
-                .run_loop(compaction_sstables, compaction_path, ct_clone)
-                .await;
-        });
 
         // INV-LSM-2: SystemPressureMonitor must be spawned as a background task before LsmStorage accepts its first insert.
         let wal_queue_depth = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -613,6 +589,34 @@ impl LsmStorage {
                     || 0,
                     0,
                 )
+                .await;
+        });
+
+        // Spawn background compaction task
+        // COMP-001 — Implementiere CompactionEngine::run_loop.
+        // TEST: cargo test -p memfuse-store test_concurrent_reads_during_compaction
+        // DONE: Triple-Test grün, keine Deadlocks in tokio::spawn.
+        // AI-TAG[SMELL][RESOLVED] audit-C-1: Startup-Flush erzwungen vor Löschung alter WAL-Dateien in LsmStorage::new (Zeilen ~480-490).
+        let compaction_engine = Arc::new(
+            CompactionEngine::new(
+                config.compaction.clone(),
+                Arc::clone(&snapshot_registry),
+                Arc::clone(&block_cache),
+                key_manager.clone(),
+                Arc::clone(&resource_tracker),
+                Some(Arc::clone(&manifest)),
+            )
+            .with_pressure_rx(pressure_rx.clone()),
+        );
+        // Clone für den Hintergrund-Task, original bleibt als Struct-Feld
+        let compaction_engine_for_loop = Arc::clone(&compaction_engine);
+        let compaction_sstables = Arc::clone(&sstables);
+        let compaction_path = config.path.clone();
+
+        let ct_clone = cancel_token.clone();
+        task_tracker.spawn(async move {
+            compaction_engine_for_loop
+                .run_loop(compaction_sstables, compaction_path, ct_clone)
                 .await;
         });
         task_tracker.close();
