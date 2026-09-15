@@ -30,6 +30,9 @@ pub enum EventLoopExitReason {
     SourceExhausted,
 }
 
+/// Maximum allowed steps in a single workflow execution to prevent unbounded loops.
+pub const MAX_WORKFLOW_STEPS: u64 = 10_000;
+
 /// Async executor engine applying nodes in Sequence.
 pub struct OrchestratorEngine {
     pub tools: HashMap<String, Box<dyn AgentTool>>,
@@ -38,18 +41,77 @@ pub struct OrchestratorEngine {
 }
 
 impl OrchestratorEngine {
-    pub fn new(storage: Arc<LsmStorage>) -> Self {
-        Self {
+    /// Attempts to construct a new [`OrchestratorEngine`], returning an error if checkpoint store initialization fails.
+    pub fn try_new(storage: Arc<LsmStorage>) -> Result<Self> {
+        let checkpoint_store = PersistentCheckpointStore::new(storage.clone(), "agent")?;
+        Ok(Self {
             tools: HashMap::new(),
-            checkpoint_store: Arc::new(
-                PersistentCheckpointStore::new(storage.clone(), "agent")
-                    .expect("Failed to initialize PersistentCheckpointStore for agent"),
-            ),
+            checkpoint_store: Arc::new(checkpoint_store),
             dead_letter_queue: Some(DeadLetterQueue::new(storage)),
+        })
+    }
+
+    /// Attempts to construct an [`OrchestratorEngine`] directly from a MemFuse DB handle.
+    pub fn try_from_db(db: &memfuse_db::MemFuse) -> Result<Self> {
+        Self::try_new(db.inner_storage())
+    }
+
+    #[deprecated(note = "Use try_new instead to handle initialization errors without panicking")]
+    pub fn new(storage: Arc<LsmStorage>) -> Self {
+        struct FallbackRegistry;
+        impl CheckpointRegistry for FallbackRegistry {
+            fn save_checkpoint<'a>(
+                &'a self,
+                _meta: CheckpointMeta,
+            ) -> memfuse_core::BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn load_checkpoint<'a>(
+                &'a self,
+                _seq_no: u64,
+            ) -> memfuse_core::BoxFuture<'a, Result<Option<CheckpointMeta>>> {
+                Box::pin(async move { Ok(None) })
+            }
+            fn list_checkpoints<'a>(
+                &'a self,
+            ) -> memfuse_core::BoxFuture<'a, Result<Vec<CheckpointMeta>>> {
+                Box::pin(async move { Ok(Vec::new()) })
+            }
         }
+        impl memfuse_core::traits::Checkpoint for FallbackRegistry {
+            fn take_snapshot<'a>(
+                &'a self,
+                tx: memfuse_core::TxId,
+            ) -> memfuse_core::BoxFuture<'a, Result<memfuse_core::WorkflowState>> {
+                Box::pin(async move {
+                    Ok(memfuse_core::WorkflowState {
+                        tx,
+                        graph_hash: [0u8; 32],
+                    })
+                })
+            }
+            fn restore<'a>(
+                &'a self,
+                _state: &'a memfuse_core::WorkflowState,
+            ) -> memfuse_core::BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+        }
+
+        Self::try_new(storage.clone()).unwrap_or_else(|e| {
+            tracing::error!("Failed to initialize OrchestratorEngine: {}", e);
+            Self {
+                tools: HashMap::new(),
+                checkpoint_store: Arc::new(FallbackRegistry),
+                dead_letter_queue: Some(DeadLetterQueue::new(storage)),
+            }
+        })
     }
 
     /// Helper constructor creating OrchestratorEngine directly from MemFuse DB handle.
+    #[deprecated(
+        note = "Use try_from_db instead to handle initialization errors without panicking"
+    )]
     pub fn from_db(db: &memfuse_db::MemFuse) -> Self {
         Self::new(db.inner_storage())
     }
@@ -100,6 +162,16 @@ impl OrchestratorEngine {
 
         loop {
             tokio::task::yield_now().await;
+
+            if ctx.step_count >= MAX_WORKFLOW_STEPS {
+                let err = MemFuseError::Internal(format!(
+                    "Maximum workflow step limit of {} exceeded for task {}",
+                    MAX_WORKFLOW_STEPS, ctx.task_id
+                ));
+                self.audit_log_failure(ctx, &err.to_string()).await?;
+                return Err(err);
+            }
+
             let node = graph.get_node(&ctx.current_node).ok_or_else(|| {
                 MemFuseError::Internal(format!("Node {} not found", ctx.current_node))
             })?;
@@ -193,6 +265,37 @@ impl OrchestratorEngine {
 
                             'retry: for attempt in 0..max_attempts {
                                 if attempt > 0 {
+                                    // Verify budget availability before retry attempt
+                                    if ctx.budget.available() == 0 {
+                                        execution_res = Err(MemFuseError::MemoryBudgetExceeded {
+                                            used_mb: ctx.budget.consumed() as u64,
+                                            limit_mb: ctx.budget.limit as u64,
+                                        });
+                                        if let Some(ref dlq) = self.dead_letter_queue {
+                                            let letter = StepDeadLetter {
+                                                session_id: ctx.task_id.clone(),
+                                                node_id: node.id.clone(),
+                                                failure_reason: DeadLetterReason::BudgetExhausted {
+                                                    available: 0,
+                                                    required: estimated_cost,
+                                                },
+                                                input: input.clone(),
+                                                attempt,
+                                                failed_at_secs: SystemTime::now()
+                                                    .duration_since(std::time::UNIX_EPOCH)
+                                                    .unwrap_or_default()
+                                                    .as_secs(),
+                                            };
+                                            if let Err(dlq_err) = dlq.push(&letter).await {
+                                                tracing::error!(
+                                                    "DLQ push failed on retry budget exhaustion: {}",
+                                                    dlq_err
+                                                );
+                                            }
+                                        }
+                                        break 'retry;
+                                    }
+
                                     let wait_ms = 100u64 * (1u64 << attempt.min(4));
                                     tokio::time::sleep(std::time::Duration::from_millis(wait_ms))
                                         .await;

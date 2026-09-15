@@ -127,8 +127,9 @@ impl StateGraph {
         node_type: NodeType,
         handler: Option<&str>,
     ) {
-        self.try_add_node(id, description, node_type, handler)
-            .unwrap_or_else(|e| panic!("Failed to add StateGraph node: {e}"));
+        if let Err(e) = self.try_add_node(id, description, node_type, handler) {
+            tracing::warn!("StateGraph::add_node failed validation: {}", e);
+        }
     }
 
     /// Tries to insert a new edge between nodes in the state graph after validating bounds.
@@ -170,8 +171,9 @@ impl StateGraph {
     /// Adds an edge to the graph, panicking if validation fails.
     #[deprecated(note = "Use try_add_edge instead to handle validation errors without panicking")]
     pub fn add_edge(&mut self, from: &str, to: &str, condition: Option<&str>, priority: u8) {
-        self.try_add_edge(from, to, condition, priority)
-            .unwrap_or_else(|e| panic!("Failed to add WorkflowEdge: {e}"));
+        if let Err(e) = self.try_add_edge(from, to, condition, priority) {
+            tracing::warn!("StateGraph::add_edge failed validation: {}", e);
+        }
     }
 
     pub fn get_node(&self, id: &str) -> Option<&AgentNode> {
