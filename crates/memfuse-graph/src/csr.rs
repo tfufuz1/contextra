@@ -324,6 +324,8 @@ impl GraphInner {
             }
             self.pending_edge_count = 0;
             self.is_dirty = false;
+            #[cfg(feature = "edge-reinforcement-learning")]
+            self.edge_store.clear();
             return;
         }
 
@@ -2172,6 +2174,7 @@ impl GraphIndex for CsrGraph {
                 }
             });
             if !tx_entities.is_empty() {
+                tx_entities.sort_by_key(|(id, _)| *id);
                 for (id, entity) in tx_entities {
                     let idx = inner.get_or_create_index(id);
                     if idx >= inner.entities.len() {
@@ -2193,6 +2196,7 @@ impl GraphIndex for CsrGraph {
                 }
             });
             if !tx_edges.is_empty() {
+                tx_edges.sort_by_key(|(from_id, _)| *from_id);
                 for (from_id, edges) in tx_edges {
                     let from_idx = inner.get_or_create_index(from_id);
                     let mut converted_edges = Vec::with_capacity(edges.len());
