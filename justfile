@@ -98,6 +98,23 @@ session-context:
     echo "OFFENE ANCHORS:"
     grep -rn "ANCHOR\[.*\] STATUS:IN-PROGRESS" crates/ --include='*.rs' || echo "  (keine)"
 
+# Target checks for xtask audit lints
+check-max-results-unbound:
+    cargo xtask check-max-results-unbound
+
+check-toctou-defaults:
+    cargo xtask check-toctou-defaults
+
+check-nan-hot-loop:
+    cargo xtask check-nan-hot-loop
+
+check-result-dropped-io:
+    cargo xtask check-result-dropped-io
+
+coverage-gate:
+    cargo llvm-cov --workspace --exclude memfuse-py --json --output-path coverage.json
+    cargo xtask check-coverage-gate coverage.json
+
 # Modular check for memfuse-py
 check-py:
     nix develop -c cargo check --manifest-path crates/memfuse-py/Cargo.toml || cargo check --manifest-path crates/memfuse-py/Cargo.toml
