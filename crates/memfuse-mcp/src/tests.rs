@@ -898,13 +898,70 @@ async fn test_removed_substring_early_branch_runs_through_regex_vault() {
     let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
 
-    // Since it contains no sensitive regex patterns (sk-, AKIA, password, @, etc.), it returns Allow (status: success, abstracted: false).
+    // Since it contains no sensitive regex patterns (sk-, AKIA, password, email, etc.), it returns Allow (status: success, abstracted: false).
     assert_eq!(json_res["status"], "success");
     assert_eq!(json_res["abstracted"], false);
     assert_eq!(
         json_res["query"],
         "safe query mentioning abstract concepts and PII terminology"
     );
+}
+
+#[tokio::test]
+async fn test_cloud_query_secret_with_abstract_word_is_blocked_by_vault() {
+    let (server, _tmp) = create_mock_server().await;
+
+    // Payload containing the word "abstract" PLUS a sensitive key pattern "sk-abc123456789"
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_cloud_query",
+            "arguments": {
+                "query": "please abstract this secret key sk-abc123456789 for me"
+            }
+        }),
+    );
+
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
+
+    let err_msg = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(
+        err_msg.contains("Egress policy violation: query blocked by rule R-001"),
+        "Expected opaque rule ID R-001 in block message, got: '{err_msg}'"
+    );
+    assert!(
+        !err_msg.contains("sk-"),
+        "Error message must not leak raw pattern, got: '{err_msg}'"
+    );
+}
+
+#[tokio::test]
+async fn test_cloud_query_at_sign_without_email_is_allowed() {
+    let (server, _tmp) = create_mock_server().await;
+
+    // Text containing '@' but NOT matching email address regex
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_cloud_query",
+            "arguments": {
+                "query": "meeting @ 5pm in office"
+            }
+        }),
+    );
+
+    let resp = server.handle(req).await;
+    assert!(resp.error.is_none());
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_ne!(res_val["result"]["isError"], true);
+
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
+
+    assert_eq!(json_res["status"], "success");
+    assert_eq!(json_res["query"], "meeting @ 5pm in office");
 }
 
 #[tokio::test]

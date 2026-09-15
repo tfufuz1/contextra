@@ -25,8 +25,6 @@ pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex = memfuse_index
     consolidation_config: ConsolidationConfig,
     #[cfg(feature = "edge-reinforcement-learning")]
     edge_reinforcement_buffer: Option<Arc<memfuse_graph::EdgeReinforcementBuffer>>,
-    #[cfg(feature = "replicator-dynamics-weights")]
-    replicator_state: Option<Arc<parking_lot::RwLock<memfuse_calibration::ReplicatorState>>>,
     active_sessions: Arc<AtomicUsize>,
 }
 
@@ -43,8 +41,6 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
             consolidation_config,
             #[cfg(feature = "edge-reinforcement-learning")]
             edge_reinforcement_buffer: None,
-            #[cfg(feature = "replicator-dynamics-weights")]
-            replicator_state: None,
             active_sessions: Arc::new(AtomicUsize::new(0)),
         }
     }
@@ -56,16 +52,6 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
         buffer: Arc<memfuse_graph::EdgeReinforcementBuffer>,
     ) -> Self {
         self.edge_reinforcement_buffer = Some(buffer);
-        self
-    }
-
-    /// Setzt den optionalen `ReplicatorState` für F-07.
-    #[cfg(feature = "replicator-dynamics-weights")]
-    pub fn with_replicator_state(
-        mut self,
-        state: Arc<parking_lot::RwLock<memfuse_calibration::ReplicatorState>>,
-    ) -> Self {
-        self.replicator_state = Some(state);
         self
     }
 
@@ -193,21 +179,6 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
                         );
                     }
                 }
-            }
-        }
-
-        // Step e: F-07 Replikatordynamik-Update & F-09 Kohärenz-Bonus Parameter-Adaption
-        // HINWEIS: Die periodische Aktualisierung greift auf `ReplicatorState` zu, sofern ein Shared Arc vorhanden ist.
-        // Event-getriebene Feedback-Updates erfolgen separat über `record_retrieval_feedback`.
-        if self.config.replicator_enabled {
-            #[cfg(feature = "replicator-dynamics-weights")]
-            if let Some(ref state_arc) = self.replicator_state {
-                let guard = state_arc.read();
-                tracing::debug!(
-                    update_count = guard.update_count,
-                    weights = ?guard.weights,
-                    "MaintenanceScheduler: ReplicatorState verified"
-                );
             }
         }
 

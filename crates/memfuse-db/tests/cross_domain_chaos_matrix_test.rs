@@ -1,20 +1,12 @@
-#![cfg(feature = "replicator-dynamics-weights")]
-// FILE-CONTEXT: Cross-domain chaos matrix integration tests combining Candle ML inference, storage fault injection, fusion aborts, and checkpoint pinning.
+// FILE-CONTEXT: Cross-domain chaos matrix integration tests combining Candle ML inference and storage fault injection.
 //! Cross-Domain Chaos Matrix Integration Tests.
 //!
-//! Evaluates systemic resiliency across Candle embedding inference, LsmStorage disk I/O faults,
-//! ReplicatorState weighted fusion cancellation, and concurrent ConfigFingerprint model switches under pinned checkpoints.
+//! Evaluates systemic resiliency across Candle embedding inference and LsmStorage disk I/O faults.
 
-#[cfg(feature = "replicator-dynamics-weights")]
-use memfuse_calibration::ReplicatorState;
 use memfuse_core::traits::embedding::EmbeddingError;
 use memfuse_core::traits::{BoxFuture, EmbeddingProvider, TextEmbeddingEngine};
-#[cfg(feature = "replicator-dynamics-weights")]
-use memfuse_core::ConfigFingerprint;
 use memfuse_core::{DocId, StorageEngine, VectorIndex};
 use memfuse_db::collection::Collection;
-#[cfg(feature = "replicator-dynamics-weights")]
-use memfuse_db::fusion::{weighted_reciprocal_rank_fusion_with_options, MetadataMergePriority};
 use memfuse_graph::csr::CsrGraph;
 use memfuse_index::{HnswConfig, HnswIndex};
 use memfuse_store::lsm::{LsmConfig, LsmStorage};
@@ -49,12 +41,6 @@ impl SimpleRng {
             return min;
         }
         min + (self.next_u64() % (max - min))
-    }
-
-    #[cfg(feature = "replicator-dynamics-weights")]
-    fn gen_range_f32(&mut self, min: f32, max: f32) -> f32 {
-        let frac = (self.next_u64() as f64) / (u64::MAX as f64);
-        (min as f64 + frac * ((max - min) as f64)) as f32
     }
 }
 
@@ -307,185 +293,4 @@ async fn chaos_gpu_busy_disk_full_no_orphaned_embedding() {
             );
         }
     }
-}
-
-/// Scenario B: Tokio task cancellation during weighted fusion preserves ReplicatorState weight invariant.
-#[cfg(feature = "replicator-dynamics-weights")]
-#[tokio::test]
-#[cfg(feature = "replicator-dynamics-weights")]
-#[ignore]
-#[cfg(feature = "replicator-dynamics-weights")]
-async fn chaos_tokio_abort_during_weighted_fusion_preserves_weight_invariant() {
-    let seed = resolve_and_log_seed();
-    let mut rng = SimpleRng::seed_from_u64(seed);
-
-    let state: Arc<parking_lot::RwLock<ReplicatorState>> =
-        Arc::new(parking_lot::RwLock::new(ReplicatorState::new(
-            vec![
-                "vector".to_string(),
-                "text".to_string(),
-                "graph".to_string(),
-            ],
-            0.05,
-        )));
-
-    let state_clone: Arc<parking_lot::RwLock<ReplicatorState>> = Arc::clone(&state);
-
-    // Spawn task performing continuous fusion updates
-    let fusion_task = tokio::spawn(async move {
-        let mut loop_rng = SimpleRng::seed_from_u64(seed.wrapping_add(1));
-        loop {
-            let r0 = loop_rng.gen_range_f32(0.0, 1.0);
-            let r1 = loop_rng.gen_range_f32(0.0, 1.0);
-            let r2 = loop_rng.gen_range_f32(0.0, 1.0);
-
-            {
-                let mut guard = state_clone.write();
-                guard.update(&[r0, r1, r2]);
-            }
-
-            let weights = {
-                let guard = state_clone.read();
-                guard.weights.clone()
-            };
-
-            let vec_set = (
-                "vector".to_string(),
-                vec![memfuse_db::SearchResult {
-                    id: "doc1".to_string(),
-                    score: 0.9,
-                    metadata: None,
-                    matched_signals: vec!["vector".to_string()],
-                    provenance: None,
-                }],
-                weights[0],
-            );
-            let text_set = (
-                "text".to_string(),
-                vec![memfuse_db::SearchResult {
-                    id: "doc2".to_string(),
-                    score: 0.8,
-                    metadata: None,
-                    matched_signals: vec!["text".to_string()],
-                    provenance: None,
-                }],
-                weights[1],
-            );
-
-            let _fused = weighted_reciprocal_rank_fusion_with_options(
-                vec![vec_set, text_set],
-                10,
-                MetadataMergePriority::default(),
-                true,
-                None,
-            );
-
-            tokio::task::yield_now().await;
-        }
-    });
-
-    // Abort at a randomized point in time derived from CHAOS_SEED
-    let abort_delay_micros = rng.gen_range_u64(500, 5000);
-    tokio::time::sleep(Duration::from_micros(abort_delay_micros)).await;
-
-    // Execute abrupt abort
-    fusion_task.abort();
-    let _ = fusion_task.await;
-
-    // Immediately inspect state post-abort
-    let guard = state.read();
-    let sum: f32 = guard.weights.iter().sum();
-
-    assert!(
-        (sum - 1.0).abs() < 1e-5,
-        "ReplicatorState sum invariant violated post-abort: sum={sum}, weights={:?}",
-        guard.weights
-    );
-
-    for (idx, &w) in guard.weights.iter().enumerate() {
-        assert!(
-            w > 0.0 && w.is_finite(),
-            "Weight at index {idx} is invalid: {w}"
-        );
-    }
-}
-
-/// Scenario C: Fingerprint change during pinned checkpoint and inference causes no deadlock.
-#[cfg(feature = "replicator-dynamics-weights")]
-#[tokio::test]
-#[cfg(feature = "replicator-dynamics-weights")]
-#[ignore]
-#[cfg(feature = "replicator-dynamics-weights")]
-async fn chaos_fingerprint_change_during_pinned_checkpoint_and_inference_no_deadlock() {
-    let seed = resolve_and_log_seed();
-
-    let tmp_dir = TempDir::new().expect("temp dir");
-    let config = LsmConfig {
-        path: tmp_dir.path().to_path_buf(),
-        ..Default::default()
-    };
-
-    let storage = Arc::new(LsmStorage::new(config).await.expect("storage init"));
-    let embedder = Arc::new(MockCandleEmbedder::new(32, Duration::from_millis(10)));
-    #[cfg(feature = "replicator-dynamics-weights")]
-    let replicator: Arc<parking_lot::RwLock<ReplicatorState>> = Arc::new(parking_lot::RwLock::new(
-        ReplicatorState::new(vec!["vector".to_string(), "text".to_string()], 0.05),
-    ));
-
-    // Pin checkpoint seq 1
-    storage.pin_checkpoint(1).await.expect("pin checkpoint");
-
-    let timeout_res = tokio::time::timeout(Duration::from_secs(30), async move {
-        // Concurrently run 3 tasks: pinned checkpoint queries, candle inference, and fingerprint model switches
-        let storage_task = {
-            let s = Arc::clone(&storage);
-            tokio::spawn(async move {
-                for _ in 0..10 {
-                    let _scan = s.scan_prefix_at(b"__docid:", 1).await;
-                    tokio::time::sleep(Duration::from_millis(1)).await;
-                }
-            })
-        };
-
-        let inference_task = {
-            let e = Arc::clone(&embedder);
-            tokio::spawn(async move {
-                for i in 0..10 {
-                    let text = format!("inference test query {}", i);
-                    let _vec = EmbeddingProvider::embed(e.as_ref(), &text).await;
-                    tokio::time::sleep(Duration::from_millis(1)).await;
-                }
-            })
-        };
-
-        #[cfg(feature = "replicator-dynamics-weights")]
-        let fingerprint_task = {
-            let r = Arc::clone(&replicator);
-            tokio::spawn(async move {
-                let mut fp_rng = SimpleRng::seed_from_u64(seed.wrapping_add(42));
-                for _ in 0..10 {
-                    let model_id = format!("model-v{}", fp_rng.gen_range_u64(1, 100));
-                    let fp = ConfigFingerprint::new(&model_id, "Q4_K_M", "default", 0.05);
-                    r.write().invalidate_on_config_change(fp);
-                    tokio::time::sleep(Duration::from_millis(1)).await;
-                }
-            })
-        };
-        #[cfg(not(feature = "replicator-dynamics-weights"))]
-        let fingerprint_task = tokio::spawn(async move {});
-
-        let (r1, r2, r3) = tokio::join!(storage_task, inference_task, fingerprint_task);
-        r1.unwrap();
-        r2.unwrap();
-        r3.unwrap();
-
-        // Unpin checkpoint
-        storage.unpin_checkpoint(1).await.expect("unpin checkpoint");
-    })
-    .await;
-
-    assert!(
-        timeout_res.is_ok(),
-        "CRITICAL DEADLOCK DETECTED: Concurrent pinned checkpoint, Candle inference, and ConfigFingerprint switch timed out after 30s!"
-    );
 }

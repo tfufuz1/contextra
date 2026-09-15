@@ -233,7 +233,10 @@ mod tests {
 
         assert_eq!(seg2.chunk_id, 102);
         assert_eq!(seg2.rope_offset, Some(42));
-        assert_eq!(seg2.model_fingerprint.map(|f| f.model_id.as_str()), Some("test-model"));
+        assert_eq!(
+            seg2.model_fingerprint.map(|f| f.model_id.as_str()),
+            Some("test-model")
+        );
 
         let tenant = TenantId::try_new(1).unwrap();
         let llm = MockDefaultLlm;
