@@ -98,14 +98,19 @@ async fn proof_put_if_absent_sees_uncommitted_staged_write() {
         path: temp_dir.path().to_path_buf(),
         ..Default::default()
     };
-    let storage = LsmStorage::new(config).await.expect("LsmStorage::new failed");
+    let storage = LsmStorage::new(config)
+        .await
+        .expect("LsmStorage::new failed");
 
     let key = b"mvcc_key";
     let tx_a = TxId::new(200);
     let tx_b = TxId::new(201);
 
     // TX-A stages put(key, v1) without commit
-    storage.put(tx_a, key, b"v1").await.expect("put staged failed");
+    storage
+        .put(tx_a, key, b"v1")
+        .await
+        .expect("put staged failed");
 
     // TX-B calls put_if_absent(key, v2) - must return Ok(false) because it sees staged write
     let put_if_absent_res = storage
@@ -130,7 +135,11 @@ async fn proof_put_if_absent_atomicity_under_contention() {
         path: temp_dir.path().to_path_buf(),
         ..Default::default()
     };
-    let storage = Arc::new(LsmStorage::new(config).await.expect("LsmStorage::new failed"));
+    let storage = Arc::new(
+        LsmStorage::new(config)
+            .await
+            .expect("LsmStorage::new failed"),
+    );
 
     let key = b"contention_key";
     let mut handles = Vec::new();
@@ -196,13 +205,9 @@ async fn proof_put_if_absent_atomicity() {
     let s1 = storage.clone();
     let s2 = storage.clone();
 
-    let task_a = tokio::spawn(async move {
-        s1.put_if_absent(tx_a, key, b"val_a").await
-    });
+    let task_a = tokio::spawn(async move { s1.put_if_absent(tx_a, key, b"val_a").await });
 
-    let task_b = tokio::spawn(async move {
-        s2.put_if_absent(tx_b, key, b"val_b").await
-    });
+    let task_b = tokio::spawn(async move { s2.put_if_absent(tx_b, key, b"val_b").await });
 
     let (res_a, res_b) = tokio::join!(task_a, task_b);
     let ok_a = res_a.unwrap().unwrap();

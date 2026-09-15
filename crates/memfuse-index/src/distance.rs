@@ -71,7 +71,9 @@ use std::arch::x86_64::*;
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> memfuse_core::Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
-        return Err(MemFuseError::invalid_input("NaN or Infinity detected in vector"));
+        return Err(MemFuseError::invalid_input(
+            "NaN or Infinity detected in vector",
+        ));
     }
     Ok(())
 }
@@ -1545,7 +1547,6 @@ mod tests {
         assert!((norm_sq - 1.0).abs() < 1e-6);
     }
 
-
     #[test]
     fn test_scalar_metric_independent_values() {
         // Anti-mirroring check: Expected values independently derived
@@ -1935,7 +1936,6 @@ mod tests {
         assert!((v[0] - 0.6).abs() < 1e-6);
         assert!((v[1] - 0.8).abs() < 1e-6);
     }
-
 
     #[test]
     fn test_avx2_u8_unequal_length_no_oob() {

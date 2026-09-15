@@ -288,8 +288,7 @@ async fn test_uuid_sidecar_crash_fault_injection() {
     let uuid_path = dir.path().join("fault_uuid.wal.uuid");
 
     let km = Arc::new(
-        KeyManager::try_new("passphrase123", b"salt123456789012345678901234567890")
-            .expect("km"), // expect
+        KeyManager::try_new("passphrase123", b"salt123456789012345678901234567890").expect("km"), // expect
     );
 
     // 1. Simulate a leftover interrupted temp file from a crashed write
@@ -378,8 +377,7 @@ async fn test_open_with_key_manager_is_new_race_condition() {
     let wal_path = dir.path().join("race_open.wal");
 
     let km = Arc::new(
-        KeyManager::try_new("passphrase123", b"salt123456789012345678901234567890")
-            .expect("km"), // expect
+        KeyManager::try_new("passphrase123", b"salt123456789012345678901234567890").expect("km"), // expect
     );
 
     // Pre-create the UUID sidecar so both calls race purely on the WAL file open
