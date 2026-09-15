@@ -79,7 +79,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-core-ipc-gen` | 0 | 1174 | 🟢 Clean | Auto-generated FlatBuffers IPC code for MemFuse Core |
 | `memfuse-core` | 1 | 9812 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
 | `memfuse-calibration` | 2 | 1897 | 🟢 Clean |  |
-| `memfuse-checkpoint` | 2 | 5967 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
+| `memfuse-checkpoint` | 2 | 6030 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-crypto` | 2 | 6417 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
 | `memfuse-graph` | 2 | 11616 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-sandbox` | 2 | 459 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |

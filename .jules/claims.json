@@ -64,13 +64,13 @@
       "released_at": "2026-09-15T14:50:31.257041469+00:00"
     },
     {
-      "krate": "memfuse-text",
-      "issue": "JULES-20260915-MEMFUSETEX-TEST-RTJ7",
-      "timestamp": "2026-09-15T16:08:59.384434084+00:00",
-      "session_id": "10690953846461706684",
+      "krate": "memfuse-checkpoint",
+      "issue": "JULES-20260915-MEMFUSECHE-TEST-UVNG",
+      "timestamp": "2026-09-15T15:54:43.274738223+00:00",
+      "session_id": "5973714571352502155",
       "active": false,
-      "expires_at": "2026-09-15T20:08:59.384414972+00:00",
-      "released_at": "2026-09-15T16:21:05.824973376+00:00"
+      "expires_at": "2026-09-15T19:54:43.274721930+00:00",
+      "released_at": "2026-09-15T16:09:10.966303390+00:00"
     }
   ]
 }

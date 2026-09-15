@@ -519,6 +519,36 @@ mod tests {
         assert!(registry.get_orphaned_checkpoints().is_empty());
     }
 
+    #[test]
+    fn test_instance_orphan_registry_clear_nonexistent() {
+        let registry = InstanceOrphanRegistry::new("");
+        registry.register_orphan_sync(PinnedSeqNoOrphan {
+            seq_no: 50,
+            timestamp_ms: 100,
+        });
+        registry.register_checkpoint_sync(StateCheckpoint {
+            tx_id: TxId::new(60),
+            timestamp_ms: 200,
+            namespace: None,
+        });
+
+        // Clearing non-existent pin or checkpoint should preserve existing ones
+        registry.clear_orphan_pin(999);
+        registry.clear_orphaned_checkpoint(TxId::new(999));
+
+        assert_eq!(registry.get_orphan_pins().len(), 1);
+        assert_eq!(registry.get_orphaned_checkpoints().len(), 1);
+    }
+
+    #[test]
+    fn test_instance_orphan_registry_empty_path_persistence_noop() {
+        let registry = InstanceOrphanRegistry::new("");
+        assert!(registry.persist_sync().is_ok());
+
+        let state = OrphanState::default();
+        assert!(state.persist_sync().is_ok());
+    }
+
     proptest::proptest! {
         #[test]
         fn prop_monotonic_timestamp_ms_increases_or_equals(_n: u8) {
