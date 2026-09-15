@@ -16,7 +16,6 @@ impl LsmStorage {
     }
 
     /// Forces a flush (to be used by PersistentCheckpointStore or tests).
-
     pub(super) fn cleanup_intent_locks_for_tx(&self, tx_id: TxId) {
         let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
         locks.retain(|_, v| *v != tx_id);

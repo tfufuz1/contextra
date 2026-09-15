@@ -100,13 +100,12 @@ impl MemTable {
         // Uses a fast 64-bit avalanche mixer (< 5ns) processing 8-byte chunks with finalizer fold.
         // Zero-panic: modulo a compile-time const > 0.
         let mut hash: u64 = 0xa076_1d64_78bd_642f;
-        let mut chunks = key.chunks_exact(8);
-        for chunk in chunks.by_ref() {
-            let val = u64::from_le_bytes(chunk.try_into().unwrap_or([0; 8]));
+        let (chunks, remainder) = key.as_chunks::<8>();
+        for chunk in chunks {
+            let val = u64::from_le_bytes(*chunk);
             hash = hash.wrapping_add(val).wrapping_mul(0x9e37_79b9_7f4a_7c15);
             hash = (hash ^ (hash >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
         }
-        let remainder = chunks.remainder();
         if !remainder.is_empty() {
             let mut buf = [0u8; 8];
             buf[..remainder.len()].copy_from_slice(remainder);

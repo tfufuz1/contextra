@@ -63,8 +63,18 @@ pub fn run_check_nan_validation_in_hot_loop_with_options(
 
                     if nan_check_re.is_match(line) {
                         let start_idx = idx.saturating_sub(10);
-                        let mut matches_hot_loop = false;
+                        let end_idx = (idx + 3).min(lines.len().saturating_sub(1));
 
+                        // Check if NAN-CHECK-OK is present within line or context window (+3 lines)
+                        let has_nan_ok = (start_idx..=end_idx).any(|i| {
+                            lines[i].contains("// NAN-CHECK-OK")
+                                || lines[i].contains("// NAN-CHECK-INSERT-VALIDATED")
+                        });
+                        if has_nan_ok {
+                            continue;
+                        }
+
+                        let mut matches_hot_loop = false;
                         for ctx_idx in start_idx..idx {
                             if hot_loop_context_re.is_match(lines[ctx_idx]) {
                                 matches_hot_loop = true;

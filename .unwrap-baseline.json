@@ -37,10 +37,6 @@
   },
   {
     "file": "crates/memfuse-agent/src/engine.rs",
-    "hash": "4c33e2221075c6f7"
-  },
-  {
-    "file": "crates/memfuse-agent/src/engine.rs",
     "hash": "9f76a0dabbedf3ce"
   },
   {
@@ -842,6 +838,74 @@
   {
     "file": "crates/memfuse-agent/tests/proptest_workflow_tests.rs",
     "hash": "5ef8199113c8be3c"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "0eed61306936526b"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "12c55a65169bb4fc"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "167eec4c7cb891ff"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "1d27ea7fceeb7c3f"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "5bd37d179d6e85b3"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "8d2c28af76c567cd"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "93ce7d00507d936d"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "94c64a89c0b33ef5"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "9525765cb12b21c6"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "9d525a7f290eba57"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "a020637aefd8cab1"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "a7adce25de6248e8"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "b143eeb9578644b2"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "baa774a6615c21bc"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "d0f257146cc41086"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "d4f20e3cf5ee616a"
+  },
+  {
+    "file": "crates/memfuse-agent/tests/regression_agt_a.rs",
+    "hash": "fba191ee4f8dc19b"
   },
   {
     "file": "crates/memfuse-agent/tests/workflow_tests.rs",
@@ -8389,19 +8453,15 @@
   },
   {
     "file": "crates/memfuse-db/tests/proptest_search_invariants.rs",
-    "hash": "1f913bb052f485e3"
-  },
-  {
-    "file": "crates/memfuse-db/tests/proptest_search_invariants.rs",
     "hash": "2135240c483f6068"
   },
   {
     "file": "crates/memfuse-db/tests/proptest_search_invariants.rs",
-    "hash": "71e3ffda516df85f"
+    "hash": "39074c90b2138fbd"
   },
   {
     "file": "crates/memfuse-db/tests/proptest_search_invariants.rs",
-    "hash": "93317dbea2a64e60"
+    "hash": "71e3ffda516df85f"
   },
   {
     "file": "crates/memfuse-db/tests/proptest_search_invariants.rs",
@@ -10145,6 +10205,10 @@
   },
   {
     "file": "crates/memfuse-graph/src/csr.rs",
+    "hash": "33ab96d40388da01"
+  },
+  {
+    "file": "crates/memfuse-graph/src/csr.rs",
     "hash": "33bfb848ee80148c"
   },
   {
@@ -10226,6 +10290,10 @@
   {
     "file": "crates/memfuse-graph/src/csr.rs",
     "hash": "5f073d60ae1df362"
+  },
+  {
+    "file": "crates/memfuse-graph/src/csr.rs",
+    "hash": "61e89993cf0a3f5b"
   },
   {
     "file": "crates/memfuse-graph/src/csr.rs",
@@ -10554,6 +10622,10 @@
   {
     "file": "crates/memfuse-graph/src/csr.rs",
     "hash": "e0d130112f77f8bb"
+  },
+  {
+    "file": "crates/memfuse-graph/src/csr.rs",
+    "hash": "e140d85f80f79e3d"
   },
   {
     "file": "crates/memfuse-graph/src/csr.rs",

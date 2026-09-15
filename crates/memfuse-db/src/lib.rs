@@ -579,7 +579,7 @@ impl MemFuse {
         let default_col = db.collection("default").await?;
 
         if config.consolidation_enabled {
-            // TODO(H-19-followup): Siehe ADR-081 in DECISIONS.md. Eine künftige Aktivierung des MaintenanceSchedulers
+            // NOTE(H-19-followup): Siehe ADR-081 in DECISIONS.md. Eine künftige Aktivierung des MaintenanceSchedulers
             // nutzt automatisch den in Collection integrierten consolidation_guard-Mechanismus per try_lock(),
             // um Doppelverarbeitung derselben Collection durch MaintenanceScheduler und ConsolidationEngine sicher zu verhindern.
             let synthesis_config = memory_consolidation::SynthesisConfig {

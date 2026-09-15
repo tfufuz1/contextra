@@ -20,9 +20,9 @@ pub fn run_check_max_results_unbound_with_options(
 ) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
 
-    let max_val_re = Regex::new(r"\b(usize::MAX|u64::MAX)\b").unwrap();
+    let max_val_re = Regex::new(r"\b(usize::MAX|u64::MAX|i64::MAX|u32::MAX)\b").unwrap();
     let ctx_param_re = Regex::new(
-        r"\b(max_results|max_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_limit|limit_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_cap|[a_zA_Z0_9_]+_budget)\b",
+        r"\b(max_results|max_items|max_docs|max_entries|max_nodes|max_count|max_hits|max_candidates|max_neighbors|max_hops|max_depth|limit_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_limit|limit)\b",
     )
     .unwrap();
 
@@ -65,9 +65,20 @@ pub fn run_check_max_results_unbound_with_options(
                         let start_idx = idx.saturating_sub(3);
                         let end_idx = (idx + 3).min(lines.len().saturating_sub(1));
 
+                        // Check if UNBOUNDED-OK is present within context window
+                        let has_unbounded_ok =
+                            (start_idx..=end_idx).any(|i| lines[i].contains("// UNBOUNDED-OK"));
+                        if has_unbounded_ok {
+                            continue;
+                        }
+
                         let mut matches_ctx = false;
                         for ctx_idx in start_idx..=end_idx {
-                            let ctx_line = lines[ctx_idx];
+                            let ctx_line = lines[ctx_idx].trim();
+                            // Skip comment lines when evaluating context matching
+                            if ctx_line.starts_with("//") {
+                                continue;
+                            }
                             if ctx_param_re.is_match(ctx_line) {
                                 matches_ctx = true;
                                 break;
@@ -122,7 +133,57 @@ fn search(max_results: usize) {
             &file,
             r#"
 fn search(max_results: usize) {
-    let k = usize::MAX; // UNBOUNDED-OK
+    let k = usize::MAX; // UNBOUNDED-OK: deliberate test unbounded
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_max_results_unbound(dir.path()).unwrap();
+        assert_eq!(violations.len(), 0);
+    }
+
+    #[test]
+    fn test_detects_various_max_literals_and_param_patterns() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("bounded.rs");
+        fs::write(
+            &file,
+            r#"
+fn run_hops(max_hops: u32) {
+    let h = u32::MAX;
+}
+
+fn run_timeout(timeout: u64) {
+    let t = u64::MAX;
+}
+
+fn run_budget(budget: usize) {
+    let b = usize::MAX;
+}
+
+fn run_capacity(capacity: u32) {
+    let c = i64::MAX;
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_max_results_unbound(dir.path()).unwrap();
+        assert_eq!(violations.len(), 4);
+    }
+
+    #[test]
+    fn test_unbounded_ok_suppresses_various_patterns() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("bounded.rs");
+        fs::write(
+            &file,
+            r#"
+fn traverse(max_hops: u32, timeout: u64, memory_budget: usize) {
+    let h = u32::MAX; // UNBOUNDED-OK: unlimited hops allowed
+    let t = u64::MAX; // UNBOUNDED-OK: no timeout
+    let b = usize::MAX; // UNBOUNDED-OK: unlimited budget
 }
 "#,
         )

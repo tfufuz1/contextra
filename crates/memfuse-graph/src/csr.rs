@@ -674,6 +674,17 @@ impl CsrGraph {
     /// Returns the optional source document ID from which the edge (from, to) was derived.
     pub fn source_doc_id_at(&self, from: EntityId, to: EntityId) -> Option<DocId> {
         let inner = self.inner.read();
+
+        for ((_, staged_from), staged_vec) in inner.staged_edges.iter() {
+            if *staged_from == from {
+                if let Some(staged) = staged_vec.iter().find(|e| e.target == to) {
+                    if staged.source_doc_id.is_some() {
+                        return staged.source_doc_id;
+                    }
+                }
+            }
+        }
+
         let from_idx = *inner.id_map.get(&from)?;
         let to_idx = *inner.id_map.get(&to)?;
 
@@ -824,6 +835,13 @@ impl CsrGraph {
             let mut inner = self.inner.write();
             let from_idx = inner.get_or_create_index(from);
             let to_idx = inner.get_or_create_index(to);
+            if let Some(doc_id) = source_doc_id {
+                inner
+                    .doc_to_edges
+                    .entry(doc_id)
+                    .or_default()
+                    .insert((from, to));
+            }
             inner
                 .pending_edges
                 .entry(from_idx)
@@ -841,6 +859,10 @@ impl CsrGraph {
             inner.is_dirty = true;
             inner.pending_edge_count >= self.config.rebuild_threshold
         }; // Write-Lock freigegeben
+
+        if let Some(doc_id) = source_doc_id {
+            self.doc_edge_index.record(doc_id, (from, to));
+        }
 
         // Phase 2: Compact außerhalb des Write-Locks (falls nötig)
         if needs_compact {
@@ -1747,10 +1769,9 @@ impl GraphIndex for CsrGraph {
             let tx_valid_from = edge.tx_valid_from.or(Some(tx));
 
             // Register source document provenance for cascading invalidation
-            self.doc_edge_index
-                .record(memfuse_core::DocId(edge.from.inner()), (edge.from, edge.to));
-            self.doc_edge_index
-                .record(memfuse_core::DocId(edge.to.inner()), (edge.from, edge.to));
+            if let Some(doc_id) = edge.source_doc_id {
+                self.doc_edge_index.record(doc_id, (edge.from, edge.to));
+            }
 
             // Lazy index allocation: Store EntityIds directly in staged_edges.
             // Internal indices via get_or_create_index are allocated only during commit(),
@@ -4648,5 +4669,102 @@ mod tests {
             0,
             "edge_store must be cleared by compact() so deleted/tombstoned edges are no longer returned"
         );
+    }
+
+    #[tokio::test]
+    async fn test_source_doc_id_provenance_and_compact_isolation() {
+        let graph = Arc::new(CsrGraph::new());
+        let tx = TxId::new(1);
+
+        let id1 = EntityId::new(10);
+        let id2 = EntityId::new(20);
+        let id3 = EntityId::new(30);
+
+        let doc100 = DocId(100);
+        let doc200 = DocId(200);
+
+        graph
+            .insert_entity_direct(Entity::new(id1, "N1", "Type"))
+            .unwrap();
+        graph
+            .insert_entity_direct(Entity::new(id2, "N2", "Type"))
+            .unwrap();
+        graph
+            .insert_entity_direct(Entity::new(id3, "N3", "Type"))
+            .unwrap();
+
+        // Edge 10 -> 20 from doc100
+        graph
+            .add_edge(
+                id1,
+                id2,
+                1.0,
+                Some(tx),
+                None,
+                None,
+                None,
+                Some(doc100),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Edge 20 -> 30 from doc200
+        graph
+            .add_edge(
+                id2,
+                id3,
+                1.0,
+                Some(tx),
+                None,
+                None,
+                None,
+                Some(doc200),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Before compact
+        assert_eq!(graph.source_doc_id_at(id1, id2), Some(doc100));
+        assert_eq!(graph.source_doc_id_at(id2, id3), Some(doc200));
+
+        let edges_doc100_pre = graph.edges_for_doc(doc100);
+        assert!(edges_doc100_pre.contains(&(id1, id2)));
+        assert!(!edges_doc100_pre.contains(&(id2, id3)));
+
+        // Ensure querying DocId(10) (which equals EntityId 10) does NOT contain foreign edge (id1, id2)
+        let edges_bogus_doc = graph.edges_for_doc(DocId(10));
+        assert!(!edges_bogus_doc.contains(&(id1, id2)));
+
+        // Compact CSR graph
+        graph.compact();
+
+        // After compact
+        assert_eq!(graph.source_doc_id_at(id1, id2), Some(doc100));
+        assert_eq!(graph.source_doc_id_at(id2, id3), Some(doc200));
+
+        let edges_doc100_post = graph.edges_for_doc(doc100);
+        assert!(edges_doc100_post.contains(&(id1, id2)));
+        assert!(!edges_doc100_post.contains(&(id2, id3)));
+
+        let edges_doc200_post = graph.edges_for_doc(doc200);
+        assert!(edges_doc200_post.contains(&(id2, id3)));
+        assert!(!edges_doc200_post.contains(&(id1, id2)));
+
+        // Verify parallel arrays source_doc_ids in GraphInner
+        let inner = graph.inner.read();
+        assert_eq!(inner.targets.len(), inner.source_doc_ids.len());
+        for (idx, target_idx) in inner.targets.iter().enumerate() {
+            let target_id = inner.reverse_map[*target_idx];
+            let source_doc = inner.source_doc_ids[idx];
+            if target_id == id2 {
+                assert_eq!(source_doc, Some(doc100));
+            } else if target_id == id3 {
+                assert_eq!(source_doc, Some(doc200));
+            }
+        }
     }
 }

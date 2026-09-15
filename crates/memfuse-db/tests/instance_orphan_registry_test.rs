@@ -29,7 +29,9 @@ async fn test_multi_instance_orphan_registry_physical_path_and_gc_isolation() {
         timestamp_ms: 12345678,
     };
     reg1.register_orphan_sync(pin_orphan1.clone());
-    let _ = reg1.persist_sync();
+    if let Err(e) = reg1.persist_sync() {
+        panic!("persist_sync reg1 failed: {e}");
+    }
 
     let cp_orphan2 = StateCheckpoint {
         tx_id: TxId::new(20002),
@@ -37,7 +39,9 @@ async fn test_multi_instance_orphan_registry_physical_path_and_gc_isolation() {
         namespace: Some("default".to_string()),
     };
     reg2.register_checkpoint_sync(cp_orphan2.clone());
-    let _ = reg2.persist_sync();
+    if let Err(e) = reg2.persist_sync() {
+        panic!("persist_sync reg2 failed: {e}");
+    }
 
     // Verify physical persistence files exist and are distinct
     assert!(
@@ -133,7 +137,9 @@ async fn test_custom_orphan_registry_path_config() {
             seq_no: 999,
             timestamp_ms: 5000,
         });
-    let _ = db.orphan_registry().persist_sync();
+    if let Err(e) = db.orphan_registry().persist_sync() {
+        panic!("persist_sync custom registry failed: {e}");
+    }
 
     assert!(
         custom_orphan_file.exists(),

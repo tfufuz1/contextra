@@ -21,9 +21,9 @@ fn split_endpoint(s: &str) -> Result<(String, Vec<String>)> {
     let mut parts: Vec<String> = Vec::new();
     let mut current = String::new();
     let mut in_single_quote = false;
-    let mut chars = s.chars().peekable();
+    let chars = s.chars().peekable();
 
-    while let Some(c) = chars.next() {
+    for c in chars {
         match c {
             '\'' if !in_single_quote => in_single_quote = true,
             '\'' if in_single_quote => in_single_quote = false,
