@@ -64,6 +64,7 @@ mod check_ffi_panic_boundary;
 mod check_jules_context_freshness;
 mod check_orphan_modules;
 mod check_phantom_files;
+mod check_reachable_modules;
 mod check_placeholder_refs;
 mod check_recall_stability;
 mod check_stale_tags;
