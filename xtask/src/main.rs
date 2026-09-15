@@ -63,6 +63,7 @@ mod check_duplicate_symbols;
 mod check_ffi_panic_boundary;
 mod check_jules_context_freshness;
 mod check_phantom_files;
+mod check_reachable_modules;
 mod check_placeholder_refs;
 mod check_recall_stability;
 mod check_stale_tags;
@@ -2134,6 +2135,11 @@ fn main() {
             let check_only = args.iter().any(|arg| arg == "--check");
             let success = run_sync_docs(check_only);
             if !success {
+                process::exit(1);
+            }
+        }
+        "check-reachable-modules" => {
+            if !check_reachable_modules::run_check_reachable_modules() {
                 process::exit(1);
             }
         }
