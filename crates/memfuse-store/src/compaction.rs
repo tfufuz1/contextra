@@ -249,14 +249,14 @@ impl CompactionEngine {
                 let insert_idx = (insertion_point as usize).min(ssts.len());
                 ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
                 let final_idx = insert_idx.min(ssts.len());
-                ssts.insert(final_idx, new_reader);
+                ssts.insert(final_idx, Arc::clone(&new_reader));
             } else {
                 tracing::warn!(
                     "Input SSTables removed during MANIFEST write (rare concurrent modification) — replacing state from MANIFEST"
                 );
                 ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
                 let final_idx = (insertion_point as usize).min(ssts.len());
-                ssts.insert(final_idx, new_reader);
+                ssts.insert(final_idx, Arc::clone(&new_reader));
             }
 
             // Find insertion point: position of the earliest input SSTable in current list

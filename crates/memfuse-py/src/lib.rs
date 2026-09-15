@@ -1413,7 +1413,7 @@ mod tests {
 
         std::env::set_var("MEMFUSE_WORKER_THREADS", "invalid");
         let val = parse_worker_threads_env();
-        assert!(val >= 1 && val <= 256);
+        assert!((1..=256).contains(&val));
 
         std::env::remove_var("MEMFUSE_WORKER_THREADS");
     }
