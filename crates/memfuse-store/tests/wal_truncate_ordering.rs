@@ -1,7 +1,9 @@
 // FILE-CONTEXT
 // ZWECK: Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität.
 // INVARIANT 1: WAL-Size-Zähler (self.size) DARF erst NACH erfolgreichem set_len() aktualisiert werden.
-// INVARIANT 2: truncate() und append_batch() müssen durch Mutex serialisiert sein.
+//              Beweis: FAIL_TRUNCATE_ONCE lässt flusher-seitiges set_len() scheitern BEVOR size.store().
+// INVARIANT 2: truncate() und append_batch() sind über truncate_lock serialisiert.
+// REQUIRES: Feature "fault-injection" für Test 1.
 
 use memfuse_core::{Result, TxId};
 use memfuse_store::wal::{Wal, WalEntry, WalOp};
@@ -192,21 +194,14 @@ async fn proof_wal_size_counter_consistent_after_failed_truncate() -> Result<()>
     let initial_size = wal.size();
     assert!(initial_size > 4, "WAL size should be greater than header length");
 
-    // 2. Simulate I/O failure for truncate by injecting a read-only file handle into wal.file
-    {
-        let ro_file = tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(false)
-            .open(&wal_path)
-            .await?;
-        wal.replace_file_handle_for_test(ro_file).await;
-    }
+    // 2. Arm next truncate to fail via fault-injection
+    wal.arm_truncate_failure_for_test();
 
-    // 3. Call truncate to offset 4 (should fail due to read-only file handle)
+    // 3. Call truncate to offset 4 (should fail due to FAIL_TRUNCATE_ONCE)
     let truncate_res = wal.truncate(4, [0xBB; 32]).await;
     assert!(
         truncate_res.is_err(),
-        "truncate must return Err when underlying file handle is read-only"
+        "truncate must return Err when fault-injected"
     );
 
     // 4. Invariant Check: wal.size() MUST NOT have been updated to 4
