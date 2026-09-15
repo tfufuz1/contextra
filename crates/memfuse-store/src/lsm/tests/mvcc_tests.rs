@@ -496,3 +496,50 @@ async fn test_put_if_absent_no_commit_mutex_hold() {
         .unwrap();
     assert!(res_c, "Tx C must successfully stage key_other concurrently");
 }
+
+#[tokio::test]
+async fn test_commit_mutex_released_before_flusher_await() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        memtable_size_limit: 1024 * 1024,
+        max_ram_mb: 64,
+        tx_timeout: Duration::from_secs(60),
+        group_commit_window_micros: 10_000, // 10ms window to force group commit
+        compaction: CompactionConfig::default(),
+        encryption_passphrase: None,
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(config).await.expect("create storage"));
+
+    let num_tasks = 10;
+    let mut handles = Vec::new();
+
+    for i in 1..=num_tasks {
+        let storage = Arc::clone(&storage);
+        handles.push(tokio::spawn(async move {
+            let tx_id = TxId::new(i);
+            let key = format!("concurrent_key_{i}").into_bytes();
+            let val = format!("concurrent_val_{i}").into_bytes();
+
+            storage.put(tx_id, &key, &val).await.unwrap();
+            storage.commit(tx_id).await.unwrap();
+        }));
+    }
+
+    for h in handles {
+        h.await.unwrap();
+    }
+
+    // Verify all keys written concurrently under group commit are readable and isolated
+    for i in 1..=num_tasks {
+        let key = format!("concurrent_key_{i}").into_bytes();
+        let expected_val = format!("concurrent_val_{i}").into_bytes();
+        let val = storage.get(&key).await.unwrap();
+        assert_eq!(
+            val,
+            Some(expected_val),
+            "Key concurrent_key_{i} must be persisted and readable"
+        );
+    }
+}
