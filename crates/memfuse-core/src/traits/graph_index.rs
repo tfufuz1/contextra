@@ -57,10 +57,7 @@ pub trait GraphIndex: Send + Sync + 'static {
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>>;
 
     /// Returns direct (1-hop) neighbor EntityIds for the given entity.
-    fn neighbors<'a>(
-        &'a self,
-        start_node: EntityId,
-    ) -> BoxFuture<'a, Result<Vec<EntityId>>> {
+    fn neighbors<'a>(&'a self, start_node: EntityId) -> BoxFuture<'a, Result<Vec<EntityId>>> {
         Box::pin(async move {
             let results = self.traverse(start_node, 1).await?;
             Ok(results.into_iter().map(|(id, _)| id).collect())
@@ -89,10 +86,8 @@ pub trait GraphIndex: Send + Sync + 'static {
         label: &'a str,
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            self.add_edge(tx, Edge::new(from, to, label))
-                .await?;
-            self.add_edge(tx, Edge::new(to, from, label))
-                .await?;
+            self.add_edge(tx, Edge::new(from, to, label)).await?;
+            self.add_edge(tx, Edge::new(to, from, label)).await?;
             Ok(())
         })
     }
@@ -231,18 +226,10 @@ pub trait GraphIndex: Send + Sync + 'static {
     }
 
     /// Inserts or updates a node entity.
-    fn add_entity<'a>(
-        &'a self,
-        tx: TxId,
-        entity: Entity,
-    ) -> BoxFuture<'a, Result<()>>;
+    fn add_entity<'a>(&'a self, tx: TxId, entity: Entity) -> BoxFuture<'a, Result<()>>;
 
     /// Inserts or updates an edge between two entities.
-    fn add_edge<'a>(
-        &'a self,
-        tx: TxId,
-        edge: Edge,
-    ) -> BoxFuture<'a, Result<()>>;
+    fn add_edge<'a>(&'a self, tx: TxId, edge: Edge) -> BoxFuture<'a, Result<()>>;
 
     /// Commits a transaction.
     fn commit<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<()>>;
@@ -394,18 +381,10 @@ mod tests {
             ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
                 Box::pin(async move { Ok(vec![]) })
             }
-            fn add_entity<'a>(
-                &'a self,
-                _: TxId,
-                _: Entity,
-            ) -> BoxFuture<'a, Result<()>> {
+            fn add_entity<'a>(&'a self, _: TxId, _: Entity) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
-            fn add_edge<'a>(
-                &'a self,
-                _: TxId,
-                _: Edge,
-            ) -> BoxFuture<'a, Result<()>> {
+            fn add_edge<'a>(&'a self, _: TxId, _: Edge) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
             fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
@@ -414,10 +393,7 @@ mod tests {
             fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
-            fn rollback_to_tx<'a>(
-                &'a self,
-                _: TxId,
-            ) -> BoxFuture<'a, Result<()>> {
+            fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
             fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
@@ -438,9 +414,7 @@ mod tests {
         }
 
         let index = MockGraphIndex;
-        let res = index
-            .traverse_at(EntityId::new(1), 2, 42)
-            .await;
+        let res = index.traverse_at(EntityId::new(1), 2, 42).await;
         match res {
             Err(crate::error::MemFuseError::CapabilityUnsupported { capability, reason }) => {
                 assert_eq!(capability, "graph_traverse_at");
@@ -450,11 +424,7 @@ mod tests {
         }
 
         let res_time = index
-            .traverse_at_time(
-                EntityId::new(1),
-                2,
-                TxId::new(10),
-            )
+            .traverse_at_time(EntityId::new(1), 2, TxId::new(10))
             .await;
         match res_time {
             Err(crate::error::MemFuseError::CapabilityUnsupported { capability, .. }) => {
@@ -464,10 +434,7 @@ mod tests {
         }
 
         let res_ppr = index
-            .personalized_page_rank(
-                &[EntityId::new(1)],
-                &PprConfig::default(),
-            )
+            .personalized_page_rank(&[EntityId::new(1)], &PprConfig::default())
             .await;
         match res_ppr {
             Err(crate::error::MemFuseError::CapabilityUnsupported { capability, .. }) => {

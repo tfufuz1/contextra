@@ -159,10 +159,11 @@ impl EgressVault {
             .collect::<Result<Vec<_>, _>>()?;
 
         let set_patterns: Vec<&str> = compiled.iter().map(|p| p.regex.as_str()).collect();
-        let regex_set = regex::RegexSet::new(&set_patterns).map_err(|e| EgressVaultError::InvalidPattern {
-            pattern: "RegexSet".to_string(),
-            reason: e.to_string(),
-        })?;
+        let regex_set =
+            regex::RegexSet::new(&set_patterns).map_err(|e| EgressVaultError::InvalidPattern {
+                pattern: "RegexSet".to_string(),
+                reason: e.to_string(),
+            })?;
 
         Ok(Self {
             patterns: Arc::new(compiled),
@@ -224,12 +225,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_payload_with_abstract_and_sensitive_pattern_is_blocked() {
-        let patterns = vec![
-            r"sk-[a-zA-Z0-9]{32}".to_string(),
-        ];
+        let patterns = vec![r"sk-[a-zA-Z0-9]{32}".to_string()];
         let vault = EgressVault::new(patterns).expect("valid vault");
 
-        let payload = "This abstract concept includes secret key sk-01234567890123456789012345678901 inside";
+        let payload =
+            "This abstract concept includes secret key sk-01234567890123456789012345678901 inside";
         let res = vault.classify(payload).await;
         assert_eq!(
             res,
@@ -287,7 +287,10 @@ mod tests {
         if let EgressClassification::Block(BlockReason::PolicyDenied(reason)) = res {
             assert!(reason.contains("Payload size exceeds limit"));
         } else {
-            panic!("Expected PolicyDenied block for oversized payload, got {:?}", res);
+            panic!(
+                "Expected PolicyDenied block for oversized payload, got {:?}",
+                res
+            );
         }
     }
 
@@ -374,5 +377,26 @@ mod tests {
             "Fehler: Bei ausreichend Zeit und harmlosen Payload sollte Allow zurückgegeben werden. Got: {:?}",
             result_ok
         );
+    }
+
+    #[tokio::test]
+    async fn test_egress_vault_accessors_and_with_timeout() {
+        let patterns = vec![r"sk-[a-zA-Z0-9]{32}".to_string()];
+        let vault = EgressVault::new(patterns)
+            .expect("valid vault")
+            .with_timeout(Duration::from_millis(250));
+
+        assert_eq!(vault.timeout(), Duration::from_millis(250));
+        assert_eq!(vault.patterns().len(), 1);
+        assert_eq!(vault.patterns()[0].name, "R-001");
+    }
+
+    #[tokio::test]
+    async fn test_exact_payload_boundary_allowed() {
+        let exact_payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES);
+        let patterns = vec![CompiledPattern::new("R-001", r"secret_pattern_xyz").unwrap()];
+
+        let res = classify_layer1(&exact_payload, &patterns, Duration::from_millis(200)).await;
+        assert_eq!(res, EgressClassification::Allow);
     }
 }

@@ -29,11 +29,7 @@ impl StorageEngine for MVCCMockStorage {
         Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
     }
 
-    fn get_at_seq<'a>(
-        &'a self,
-        key: &'a [u8],
-        seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
         Box::pin(async move {
             let store = self.store.read();
             if let Some(versions) = store.get(key) {
@@ -51,12 +47,7 @@ impl StorageEngine for MVCCMockStorage {
         })
     }
 
-    fn put<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
+    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let seq = self
                 .next_seq
@@ -213,7 +204,9 @@ async fn proof_deleted_doc_not_in_search_results() -> Result<()> {
 
     // 1. Insert document: "rust programming language"
     let tx1 = TxId::new(1);
-    index.insert(tx1, doc_id, "rust programming language").await?;
+    index
+        .insert(tx1, doc_id, "rust programming language")
+        .await?;
     index.commit(tx1).await?;
 
     // Search matches doc 42
@@ -271,12 +264,16 @@ async fn proof_tombstone_snapshot_isolation() -> Result<()> {
 
     // Tx2: Update doc 100 to "performance optimization"
     let tx2 = TxId::new(2);
-    index.insert(tx2, doc_id, "performance optimization").await?;
+    index
+        .insert(tx2, doc_id, "performance optimization")
+        .await?;
     index.commit(tx2).await?;
     let seq_after_update = storage.last_seq_no().await?;
 
     // At seq_after_insert (BEFORE update): searching "architecture" MUST find doc 100
-    let res_before = index.search_at("architecture", 10, seq_after_insert).await?;
+    let res_before = index
+        .search_at("architecture", 10, seq_after_insert)
+        .await?;
     assert_eq!(
         res_before.len(),
         1,
@@ -285,7 +282,9 @@ async fn proof_tombstone_snapshot_isolation() -> Result<()> {
     assert_eq!(res_before[0].doc_id, doc_id);
 
     // At seq_after_update (AFTER update): searching "architecture" MUST NOT find doc 100
-    let res_after = index.search_at("architecture", 10, seq_after_update).await?;
+    let res_after = index
+        .search_at("architecture", 10, seq_after_update)
+        .await?;
     assert!(
         res_after.is_empty(),
         "Snapshot after update must NOT return the document for tombstoned term 'architecture'"

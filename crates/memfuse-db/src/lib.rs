@@ -456,8 +456,7 @@ pub struct MemFuse {
     dimension: usize,
     expiry_reaper_interval: std::time::Duration,
     community_detection_threshold: u64,
-    collections:
-        tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
+    collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
     cancel_token: tokio_util::sync::CancellationToken,
     task_tracker: tokio_util::task::TaskTracker,
     /// Global text embedder for default collection.

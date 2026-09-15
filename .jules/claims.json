@@ -53,6 +53,34 @@
       "active": false,
       "expires_at": "2026-09-14T17:59:30.299591055+00:00",
       "released_at": "2026-09-15T02:29:10.212659296+00:00 [TTL-EXPIRED]"
+    },
+    {
+<<<<<<< Updated upstream
+      "krate": "memfuse-text",
+      "issue": "JULES-20260915-MEMFUSETEX-DEEP-97S3",
+      "timestamp": "2026-09-15T14:41:42.693687802+00:00",
+      "session_id": "13574539195997574320",
+      "active": false,
+      "expires_at": "2026-09-15T18:41:42.693675252+00:00",
+      "released_at": "2026-09-15T14:50:31.257041469+00:00"
+    },
+    {
+      "krate": "memfuse-checkpoint",
+      "issue": "JULES-20260915-MEMFUSECHE-TEST-UVNG",
+      "timestamp": "2026-09-15T15:54:43.274738223+00:00",
+      "session_id": "5973714571352502155",
+      "active": false,
+      "expires_at": "2026-09-15T19:54:43.274721930+00:00",
+      "released_at": "2026-09-15T16:09:10.966303390+00:00"
+=======
+      "krate": "memfuse-graph",
+      "issue": "JULES-20260915-MEMFUSEGRA-DEEP-B1JB",
+      "timestamp": "2026-09-15T16:06:22.587534918+00:00",
+      "session_id": "4242661569703678029",
+      "active": false,
+      "expires_at": "2026-09-15T20:06:22.587514675+00:00",
+      "released_at": "2026-09-15T16:14:02.754073104+00:00"
+>>>>>>> Stashed changes
     }
   ]
 }

@@ -14,32 +14,36 @@ fn bench_lsm_concurrent_commits(c: &mut Criterion) {
 
     for n_writers in [1usize, 4, 16, 32] {
         group.throughput(Throughput::Elements((n_writers * 100) as u64));
-        group.bench_with_input(BenchmarkId::new("tps_writers", n_writers), &n_writers, |b, &nw| {
-            b.to_async(&rt).iter(|| async move {
-                let tmp = TempDir::new().unwrap();
-                let config = LsmConfig {
-                    path: tmp.path().to_path_buf(),
-                    ..Default::default()
-                };
-                let engine = Arc::new(LsmStorage::new(config).await.unwrap());
-                let handles: Vec<_> = (0..nw)
-                    .map(|w| {
-                        let e = engine.clone();
-                        tokio::spawn(async move {
-                            for i in 0..100u64 {
-                                let tx = TxId::new(w as u64 * 100 + i);
-                                e.put(tx, &[w as u8, i as u8], b"v").await.unwrap();
-                                e.commit(tx).await.unwrap();
-                            }
+        group.bench_with_input(
+            BenchmarkId::new("tps_writers", n_writers),
+            &n_writers,
+            |b, &nw| {
+                b.to_async(&rt).iter(|| async move {
+                    let tmp = TempDir::new().unwrap();
+                    let config = LsmConfig {
+                        path: tmp.path().to_path_buf(),
+                        ..Default::default()
+                    };
+                    let engine = Arc::new(LsmStorage::new(config).await.unwrap());
+                    let handles: Vec<_> = (0..nw)
+                        .map(|w| {
+                            let e = engine.clone();
+                            tokio::spawn(async move {
+                                for i in 0..100u64 {
+                                    let tx = TxId::new(w as u64 * 100 + i);
+                                    e.put(tx, &[w as u8, i as u8], b"v").await.unwrap();
+                                    e.commit(tx).await.unwrap();
+                                }
+                            })
                         })
-                    })
-                    .collect();
-                for h in handles {
-                    h.await.unwrap();
-                }
-                black_box(engine);
-            });
-        });
+                        .collect();
+                    for h in handles {
+                        h.await.unwrap();
+                    }
+                    black_box(engine);
+                });
+            },
+        );
     }
     group.finish();
 }
