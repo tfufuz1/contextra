@@ -123,4 +123,23 @@ mod tests {
         assert_eq!(state.tx, TxId::new(2026));
         assert_ne!(state.graph_hash, [0u8; 32]);
     }
+
+    #[test]
+    fn test_validate_identifier_boundary_oversized_257() {
+        let name_256 = "a".repeat(256);
+        assert!(validate_identifier("field", &name_256).is_ok());
+
+        let name_257 = "a".repeat(257);
+        let res = validate_identifier("field", &name_257);
+        assert!(matches!(res, Err(MemFuseError::InvalidInput(_))));
+    }
+
+    #[test]
+    fn test_validate_identifier_empty_or_whitespace() {
+        let res_empty = validate_identifier("field", "");
+        assert!(matches!(res_empty, Err(MemFuseError::InvalidInput(_))));
+
+        let res_ws = validate_identifier("field", "   \t\n  ");
+        assert!(matches!(res_ws, Err(MemFuseError::InvalidInput(_))));
+    }
 }

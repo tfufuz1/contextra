@@ -189,7 +189,127 @@ mod tests {
     fn test_known_dimension_nomic() {
         assert_eq!(known_dimension("nomic-embed-text"), Some(768));
         assert_eq!(known_dimension("nomic-embed-text:latest"), Some(768));
+        assert_eq!(known_dimension("mxbai-embed-large"), Some(1024));
+        assert_eq!(known_dimension("all-minilm"), Some(384));
+        assert_eq!(known_dimension("snowflake-arctic-embed"), Some(1024));
+        assert_eq!(known_dimension("text-embedding-ada-002"), Some(1536));
+        assert_eq!(known_dimension("text-embedding-3-small"), Some(1536));
+        assert_eq!(known_dimension("text-embedding-3-large"), Some(3072));
+        assert_eq!(known_dimension("bge-large-en-v1.5"), Some(1024));
+        assert_eq!(known_dimension("bge-m3"), Some(1024));
         assert_eq!(known_dimension("unknown-model-xyz"), None);
+    }
+
+    #[tokio::test]
+    async fn test_show_model_success_and_error_paths() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_url = format!("http://{}", addr);
+
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener.accept().await {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let body = serde_json::json!({
+                    "modelfile": "FROM nomic-embed-text",
+                    "details": {
+                        "parameter_size": "137M",
+                        "quantization_level": "Q4_0"
+                    }
+                })
+                .to_string();
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                socket.write_all(response.as_bytes()).await.ok();
+            }
+        });
+
+        let client = OllamaClient::new(server_url);
+        let info = client.show_model("nomic-embed-text").await.unwrap();
+        assert_eq!(info.modelfile.as_deref(), Some("FROM nomic-embed-text"));
+        assert_eq!(info.parameter_size.as_deref(), Some("137M"));
+        assert_eq!(info.quantization_level.as_deref(), Some("Q4_0"));
+    }
+
+    #[tokio::test]
+    async fn test_show_model_http_404_and_500_error_mappings() {
+        // HTTP 404 test
+        let listener_404 = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr_404 = listener_404.local_addr().unwrap();
+        let server_url_404 = format!("http://{}", addr_404);
+
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener_404.accept().await {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let body = r#"{"error":"model 'missing-model' not found"}"#;
+                let response = format!(
+                    "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                socket.write_all(response.as_bytes()).await.ok();
+            }
+        });
+
+        let client_404 = OllamaClient::new(server_url_404);
+        let err_404 = client_404.show_model("missing-model").await.unwrap_err();
+        assert!(matches!(err_404, MemFuseError::NotFound(_)));
+
+        // HTTP 500 test
+        let listener_500 = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr_500 = listener_500.local_addr().unwrap();
+        let server_url_500 = format!("http://{}", addr_500);
+
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener_500.accept().await {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let body = "Internal error";
+                let response = format!(
+                    "HTTP/1.1 500 Internal Server Error\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                socket.write_all(response.as_bytes()).await.ok();
+            }
+        });
+
+        let client_500 = OllamaClient::new(server_url_500);
+        let err_500 = client_500.show_model("some-model").await.unwrap_err();
+        assert!(matches!(err_500, MemFuseError::Storage(_)));
+    }
+
+    #[tokio::test]
+    async fn test_show_model_invalid_json_returns_internal_error() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_url = format!("http://{}", addr);
+
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener.accept().await {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let body = "invalid-json";
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                socket.write_all(response.as_bytes()).await.ok();
+            }
+        });
+
+        let client = OllamaClient::new(server_url);
+        let err = client.show_model("test-model").await.unwrap_err();
+        assert!(matches!(err, MemFuseError::Internal(_)));
     }
 
     #[test]
