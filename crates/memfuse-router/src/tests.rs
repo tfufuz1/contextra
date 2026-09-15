@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-09-10T19:16:25Z (SESSION: 3f3e4637)
+// STAND: 2026-09-15T16:15:00Z (SESSION: 1a43706f)
 // ZWECK: Unit- und Integrationstest-Suite für memfuse-router.
 // INVARIANTEN: Determinismus, NaN-Safety, Hot-Reload Concurrent Safety.
 // SIEHE AUCH: docs/decisions/ADR-020-memfuse-brain.md, rules/tag_taxonomy.md
@@ -20,31 +20,58 @@ mod tests {
     struct MockStorageEngine;
 
     impl StorageEngine for MockStorageEngine {
-        fn get<'a>(&'a self, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
+        fn get<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
+        fn get_at_seq<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn put<'a>(&'a self, _: memfuse_core::TxId, _: &'a [u8], _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn put<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+            _: &'a [u8],
+            _: &'a [u8],
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn delete<'a>(&'a self, _: memfuse_core::TxId, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn delete<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+            _: &'a [u8],
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn commit<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn commit<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn rollback<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn rollback<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn rollback_to_tx<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn rollback_to_tx<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
         fn flush<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn stats<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::StorageStats>> {
+        fn stats<'a>(
+            &'a self,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::StorageStats>> {
             Box::pin(async move {
                 Ok(memfuse_core::StorageStats {
                     num_segments: 0,
@@ -56,19 +83,35 @@ mod tests {
         fn last_seq_no<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<u64>> {
             Box::pin(async move { Ok(0) })
         }
-        fn last_tx_id<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::TxId>> {
+        fn last_tx_id<'a>(
+            &'a self,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::TxId>> {
             Box::pin(async move { Ok(memfuse_core::TxId(0)) })
         }
-        fn pin_checkpoint<'a>(&'a self, _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn pin_checkpoint<'a>(
+            &'a self,
+            _: u64,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn unpin_checkpoint<'a>(&'a self, _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn unpin_checkpoint<'a>(
+            &'a self,
+            _: u64,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn scan_prefix<'a>(&'a self, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn scan_prefix<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
             Box::pin(async move { Ok(vec![]) })
         }
-        fn scan<'a>(&'a self, _: std::ops::Bound<&'a [u8]>, _: std::ops::Bound<&'a [u8]>, _: Option<usize>) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
             Box::pin(async move { Ok(vec![]) })
         }
     }
@@ -3299,5 +3342,91 @@ mod tests {
         )
         .with_resource_cost_estimate(-10.0);
         assert!(profile_neg_cost.validate().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_overall_drift_status_aggregation() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config = MemFuseConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = MemFuse::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let p1 = SlmProfile::new("p1", "http://ep1", vec![1], TokenBudget::default(), 0.1);
+        let p2 = SlmProfile::new("p2", "http://ep2", vec![2], TokenBudget::default(), 0.1);
+
+        let router = RouterEngine::new(collection, vec![p1, p2], None);
+
+        // Initial state before score observation -> "unbekannt"
+        assert_eq!(router.overall_drift_status(), "unbekannt");
+
+        // Force stable result on p1 -> "stabil"
+        {
+            let current = router.state.load_full();
+            let mut new_state = (*current).clone();
+            if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p1") {
+                watcher.latest_result = Some(crate::lyapunov::LyapunovResult::Stable {
+                    lyapunov_exponent: -0.1,
+                });
+            }
+            router.state.store(Arc::new(new_state));
+        }
+
+        assert_eq!(router.overall_drift_status(), "stabil");
+
+        // Set baseline for p1 and observe scores that trigger warning or critical
+        let baseline: Vec<f32> = (0..100).map(|i| (i as f32 / 100.0) * 0.1).collect();
+        router.set_lyapunov_baseline("p1", &baseline);
+
+        {
+            let current = router.state.load_full();
+            let mut new_state = (*current).clone();
+            if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p1") {
+                // Force a warning level drift
+                watcher.latest_result = Some(crate::lyapunov::LyapunovResult::DriftDetected {
+                    lyapunov_exponent: 0.1,
+                    reason: crate::lyapunov::DriftReason {
+                        kl_divergence: 0.5,
+                        lyapunov_exponent: 0.1,
+                    },
+                });
+            }
+            router.state.store(Arc::new(new_state));
+        }
+
+        assert_eq!(router.overall_drift_status(), "warnung");
+
+        {
+            let current = router.state.load_full();
+            let mut new_state = (*current).clone();
+            if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p2") {
+                // Force a critical level drift (> 0.2)
+                watcher.latest_result = Some(crate::lyapunov::LyapunovResult::DriftDetected {
+                    lyapunov_exponent: 0.3,
+                    reason: crate::lyapunov::DriftReason {
+                        kl_divergence: 1.5,
+                        lyapunov_exponent: 0.3,
+                    },
+                });
+            }
+            router.state.store(Arc::new(new_state));
+        }
+
+        assert_eq!(router.overall_drift_status(), "kritisch");
+        Ok(())
+    }
+
+    #[test]
+    fn test_slm_profile_estimated_cost_fallback() {
+        let budget = TokenBudget::new(4096, 512);
+        let profile_default =
+            SlmProfile::new("default-cost", "http://mcp", vec![], budget.clone(), 0.1);
+        assert_eq!(profile_default.estimated_cost(), 4096.0);
+
+        let profile_explicit = SlmProfile::new("explicit-cost", "http://mcp", vec![], budget, 0.1)
+            .with_resource_cost_estimate(12.5);
+        assert_eq!(profile_explicit.estimated_cost(), 12.5);
     }
 }

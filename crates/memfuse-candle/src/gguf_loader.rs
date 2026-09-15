@@ -56,3 +56,38 @@ pub fn parse_gguf_metadata(model_path: &Path) -> Result<GgufMetadata, MemFuseErr
         metadata_keys,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_gguf_metadata_nonexistent_path_returns_io_error() {
+        let path = Path::new("/nonexistent/file/path.gguf");
+        let res = parse_gguf_metadata(path);
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            MemFuseError::Io(e) => assert_eq!(e.kind(), std::io::ErrorKind::NotFound),
+            other => panic!("Expected MemFuseError::Io, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_gguf_metadata_invalid_header_bytes_returns_internal_error(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let mut tmp_file = NamedTempFile::new()?;
+        tmp_file.write_all(b"CORRUPT_NOT_GGUF_HEADER_BYTES_12345678")?;
+
+        let res = parse_gguf_metadata(tmp_file.path());
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            MemFuseError::Internal(msg) => {
+                assert!(msg.contains("Failed to parse GGUF container header"));
+            }
+            other => panic!("Expected MemFuseError::Internal, got {:?}", other),
+        }
+        Ok(())
+    }
+}

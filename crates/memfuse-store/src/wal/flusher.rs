@@ -34,18 +34,28 @@ pub(crate) enum WalCommand {
 impl std::fmt::Debug for WalCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Append { payload, last_hmac_val, .. } => f
+            Self::Append {
+                payload,
+                last_hmac_val,
+                ..
+            } => f
                 .debug_struct("Append")
                 .field("payload_len", &payload.len())
                 .field("last_hmac_val", last_hmac_val)
                 .finish(),
-            Self::Truncate { offset, new_last_hmac, .. } => f
+            Self::Truncate {
+                offset,
+                new_last_hmac,
+                ..
+            } => f
                 .debug_struct("Truncate")
                 .field("offset", offset)
                 .field("new_last_hmac", new_last_hmac)
                 .finish(),
             Self::Seal { .. } => f.debug_struct("Seal").finish(),
-            Self::Rewrite { replayed_entries, .. } => f
+            Self::Rewrite {
+                replayed_entries, ..
+            } => f
                 .debug_struct("Rewrite")
                 .field("replayed_entries_len", &replayed_entries.len())
                 .finish(),
@@ -83,7 +93,11 @@ use tokio::io::AsyncSeekExt;
 
 impl Wal {
     /// Enables background flusher actor for processing WAL I/O commands sequentially.
-    pub(crate) fn enable_flusher_with_config(&self, mut file: tokio::fs::File, config: WalFlusherConfig) {
+    pub(crate) fn enable_flusher_with_config(
+        &self,
+        mut file: tokio::fs::File,
+        config: WalFlusherConfig,
+    ) {
         let mut tx_guard = self.flusher_tx.write().unwrap_or_else(|e| e.into_inner());
         if tx_guard.is_some() {
             return;
@@ -259,16 +273,16 @@ impl Wal {
                                 .is_ok()
                             {
                                 return Err(MemFuseError::Storage(
-                                    "Simulated WAL truncate I/O failure (FAIL_TRUNCATE_ONCE)".into(),
+                                    "Simulated WAL truncate I/O failure (FAIL_TRUNCATE_ONCE)"
+                                        .into(),
                                 ));
                             }
 
-                            let old_size = size.load(std::sync::atomic::Ordering::SeqCst);
+                            file.set_len(offset).await.map_err(|e| {
+                                MemFuseError::Storage(format!("WAL truncate failed: {e}"))
+                            })?;
                             size.store(offset, std::sync::atomic::Ordering::SeqCst);
-                            if let Err(e) = file.set_len(offset).await {
-                                size.store(old_size, std::sync::atomic::Ordering::SeqCst);
-                                return Err(MemFuseError::Storage(format!("WAL truncate failed: {e}")));
-                            }
+
                             if offset < 4 {
                                 header_written.store(false, std::sync::atomic::Ordering::Release);
                             }
@@ -310,9 +324,7 @@ impl Wal {
                                 .as_micros();
                             let sealed_name = format!(
                                 "{}.sealed.{}",
-                                path.file_name()
-                                    .and_then(|n| n.to_str())
-                                    .unwrap_or("wal"),
+                                path.file_name().and_then(|n| n.to_str()).unwrap_or("wal"),
                                 micros
                             );
                             let sealed_path = path.with_file_name(sealed_name);
@@ -414,22 +426,13 @@ impl Wal {
                             }
 
                             file.write_all(&total_bytes).await.map_err(|e| {
-                                MemFuseError::Storage(format!(
-                                    "WAL migration write failed: {}",
-                                    e
-                                ))
+                                MemFuseError::Storage(format!("WAL migration write failed: {}", e))
                             })?;
                             file.flush().await.map_err(|e| {
-                                MemFuseError::Storage(format!(
-                                    "WAL migration flush failed: {}",
-                                    e
-                                ))
+                                MemFuseError::Storage(format!("WAL migration flush failed: {}", e))
                             })?;
                             file.sync_all().await.map_err(|e| {
-                                MemFuseError::Storage(format!(
-                                    "WAL migration fsync failed: {}",
-                                    e
-                                ))
+                                MemFuseError::Storage(format!("WAL migration fsync failed: {}", e))
                             })?;
 
                             size.store(

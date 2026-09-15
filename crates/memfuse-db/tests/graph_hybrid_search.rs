@@ -206,12 +206,18 @@ async fn test_hybrid_search_with_ppr_strategy() {
         )
         .await;
 
-    assert!(res.is_err(), "PPR under snapshot isolation must fail-closed with error");
+    assert!(
+        res.is_err(),
+        "PPR under snapshot isolation must fail-closed with error"
+    );
     match res.unwrap_err() {
         memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
             assert!(msg.contains("PersonalizedPageRank"));
         }
-        other => panic!("Expected SnapshotUnsupportedForSignal error, got: {:?}", other),
+        other => panic!(
+            "Expected SnapshotUnsupportedForSignal error, got: {:?}",
+            other
+        ),
     }
 }
 
@@ -281,12 +287,18 @@ async fn test_hybrid_search_with_pathrag_strategy() {
         )
         .await;
 
-    assert!(res.is_err(), "PathRag under snapshot isolation must fail-closed with error");
+    assert!(
+        res.is_err(),
+        "PathRag under snapshot isolation must fail-closed with error"
+    );
     match res.unwrap_err() {
         memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
             assert!(msg.contains("PathRag"));
         }
-        other => panic!("Expected SnapshotUnsupportedForSignal error, got: {:?}", other),
+        other => panic!(
+            "Expected SnapshotUnsupportedForSignal error, got: {:?}",
+            other
+        ),
     }
 
     // Test query builder API with SearchStrategy::PathRag
@@ -302,11 +314,17 @@ async fn test_hybrid_search_with_pathrag_strategy() {
         .execute()
         .await;
 
-    assert!(builder_res.is_err(), "QueryBuilder PathRag under snapshot isolation must fail-closed with error");
+    assert!(
+        builder_res.is_err(),
+        "QueryBuilder PathRag under snapshot isolation must fail-closed with error"
+    );
     match builder_res.unwrap_err() {
         memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
             assert!(msg.contains("PathRag"));
         }
-        other => panic!("Expected SnapshotUnsupportedForSignal error, got: {:?}", other),
+        other => panic!(
+            "Expected SnapshotUnsupportedForSignal error, got: {:?}",
+            other
+        ),
     }
 }

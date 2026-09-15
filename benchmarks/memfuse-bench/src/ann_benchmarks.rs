@@ -117,7 +117,10 @@ pub fn recall_at_k(retrieved: &[u64], ground_truth: &[usize], k: usize) -> f64 {
     let limit = k.min(retrieved.len());
     let gt_limit = k.min(ground_truth.len());
 
-    let gt_set: HashSet<u64> = ground_truth[..gt_limit].iter().map(|&idx| idx as u64).collect();
+    let gt_set: HashSet<u64> = ground_truth[..gt_limit]
+        .iter()
+        .map(|&idx| idx as u64)
+        .collect();
     let mut hits = 0usize;
 
     for &id in &retrieved[..limit] {

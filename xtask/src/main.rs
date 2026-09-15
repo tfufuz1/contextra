@@ -2465,7 +2465,10 @@ fn main() {
         "check-max-results-unbound" => {
             let root = find_root_dir();
             let include_tests = args.iter().any(|arg| arg == "--include-tests");
-            match check_max_results_unbound::run_check_max_results_unbound_with_options(&root, include_tests) {
+            match check_max_results_unbound::run_check_max_results_unbound_with_options(
+                &root,
+                include_tests,
+            ) {
                 Ok(violations) => {
                     if !violations.is_empty() {
                         eprintln!(
@@ -2488,7 +2491,10 @@ fn main() {
         "check-toctou-defaults" => {
             let root = find_root_dir();
             let include_tests = args.iter().any(|arg| arg == "--include-tests");
-            match check_toctou_trait_defaults::run_check_toctou_trait_defaults_with_options(&root, include_tests) {
+            match check_toctou_trait_defaults::run_check_toctou_trait_defaults_with_options(
+                &root,
+                include_tests,
+            ) {
                 Ok(violations) => {
                     if !violations.is_empty() {
                         eprintln!(
@@ -2537,7 +2543,10 @@ fn main() {
         "check-result-dropped-io" => {
             let root = find_root_dir();
             let include_tests = args.iter().any(|arg| arg == "--include-tests");
-            match check_result_dropped_on_io::run_check_result_dropped_on_io_with_options(&root, include_tests) {
+            match check_result_dropped_on_io::run_check_result_dropped_on_io_with_options(
+                &root,
+                include_tests,
+            ) {
                 Ok(violations) => {
                     if !violations.is_empty() {
                         eprintln!(
