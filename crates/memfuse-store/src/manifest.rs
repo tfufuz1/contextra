@@ -429,12 +429,21 @@ impl Manifest {
             let mut entry_raw = vec![0u8; len];
             match reader.read_exact(&mut entry_raw).await {
                 Ok(_) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof && is_tail => {
+                    // Tail-Truncation: letzter Eintrag wurde durch Power-Loss abgeschnitten — ok.
                     tracing::warn!(
                         "MANIFEST tail truncation detected (incomplete payload) at offset {}",
                         pos
                     );
                     break;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    // Mid-File-Korruption: UnexpectedEof in der Dateimitte = SSTable-Resurrection-Risiko.
+                    return Err(MemFuseError::Storage(format!(
+                        "MANIFEST mid-file corruption at offset {}: \
+                         incomplete payload read (not tail position — possible SSTable resurrection risk)",
+                        pos
+                    )));
                 }
                 Err(e) => {
                     return Err(MemFuseError::Storage(format!(

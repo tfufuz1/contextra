@@ -413,7 +413,6 @@ where
 }
 
 impl Wal {
-    // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: WAL-Operationen werden sequenziell durch den Flusher-Actor verarbeitet. Die HMAC-Korrektheit wird durch den last_hmac-Mutex in prepare_batch garantiert (siehe last_hmac.lock() in prepare_batch). (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8)
     pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
         let _truncate_guard = self.truncate_lock.lock().await;
         if self.is_sealed() {

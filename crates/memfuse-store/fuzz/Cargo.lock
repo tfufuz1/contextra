@@ -506,7 +506,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-security"
+name = "memfuse-crypto"
 version = "0.1.0"
 dependencies = [
  "aes-gcm-siv",
@@ -539,7 +539,7 @@ dependencies = [
  "crc32fast",
  "lru",
  "memfuse-core",
- "memfuse-security",
+ "memfuse-crypto",
  "memmap2",
  "parking_lot",
  "rand",

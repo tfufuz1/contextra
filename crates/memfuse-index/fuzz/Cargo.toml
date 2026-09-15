@@ -21,3 +21,9 @@ name = "hnsw_insert_search"
 path = "fuzz_targets/hnsw_insert_search.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_hnsw_persistence"
+path = "fuzz_targets/fuzz_hnsw_persistence.rs"
+test = false
+doc = false
