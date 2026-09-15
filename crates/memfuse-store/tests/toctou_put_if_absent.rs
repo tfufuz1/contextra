@@ -1,3 +1,4 @@
+use futures::future::join_all;
 use memfuse_core::error::MemFuseError;
 use memfuse_core::traits::{BoxFuture, StorageEngine, StorageStats};
 use memfuse_core::types::*;
@@ -69,7 +70,7 @@ impl StorageEngine for DummyStorageEngine {
 #[tokio::test]
 async fn proof_trait_default_removed() {
     let dummy = DummyStorageEngine;
-    let res = dummy.put_if_absent(TxId(1), b"key", b"val").await;
+    let res = dummy.put_if_absent(TxId::new(1), b"key", b"val").await;
     match res {
         Err(MemFuseError::CapabilityUnsupported { capability, .. }) => {
             assert_eq!(capability, "put_if_absent");
@@ -81,9 +82,111 @@ async fn proof_trait_default_removed() {
     }
 }
 
+#[test]
+fn proof_put_if_absent_default_trait_removed() {
+    let source = include_str!("../../memfuse-core/src/traits/storage.rs");
+    let has_toctou = source.contains("fn put_if_absent")
+        && source.contains("self.get(key)")
+        && source.contains("self.put(tx_id");
+    assert!(!has_toctou, "REGRESSION B-1: TOCTOU-Default zurückgekehrt");
+}
+
+#[tokio::test]
+async fn proof_put_if_absent_sees_uncommitted_staged_write() {
+    let temp_dir = tempfile::tempdir().expect("tempdir creation failed");
+    let config = LsmConfig {
+        path: temp_dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config).await.expect("LsmStorage::new failed");
+
+    let key = b"mvcc_key";
+    let tx_a = TxId::new(200);
+    let tx_b = TxId::new(201);
+
+    // TX-A stages put(key, v1) without commit
+    storage.put(tx_a, key, b"v1").await.expect("put staged failed");
+
+    // TX-B calls put_if_absent(key, v2) - must return Ok(false) because it sees staged write
+    let put_if_absent_res = storage
+        .put_if_absent(tx_b, key, b"v2")
+        .await
+        .expect("put_if_absent failed");
+    assert!(
+        !put_if_absent_res,
+        "put_if_absent must return false when uncommitted staged write exists"
+    );
+
+    // After commit of TX-A, get(key) returns Some(v1)
+    storage.commit(tx_a).await.expect("commit tx_a failed");
+    let val = storage.get(key).await.expect("get key failed");
+    assert_eq!(val, Some(b"v1".to_vec()));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn proof_put_if_absent_atomicity_under_contention() {
+    let temp_dir = tempfile::tempdir().expect("tempdir creation failed");
+    let config = LsmConfig {
+        path: temp_dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(config).await.expect("LsmStorage::new failed"));
+
+    let key = b"contention_key";
+    let mut handles = Vec::new();
+
+    for i in 1..=64u64 {
+        let s = Arc::clone(&storage);
+        let val = format!("val_{i}").into_bytes();
+        handles.push(tokio::spawn(async move {
+            let tx_id = TxId::new(i);
+            let res = s
+                .put_if_absent(tx_id, key, &val)
+                .await
+                .expect("put_if_absent failed");
+            if res {
+                s.commit(tx_id).await.expect("commit failed");
+            } else {
+                let _ = s.rollback(tx_id).await;
+            }
+            res
+        }));
+    }
+
+    let results = join_all(handles).await;
+    let mut success_count = 0;
+    let mut false_count = 0;
+
+    for r in results {
+        match r.expect("task panicked") {
+            true => success_count += 1,
+            false => false_count += 1,
+        }
+    }
+
+    assert_eq!(
+        success_count, 1,
+        "Exakt genau 1 Task muss Ok(true) von put_if_absent zurückgeben, got {success_count}"
+    );
+    assert_eq!(
+        false_count, 63,
+        "Exakt 63 Tasks müssen Ok(false) zurückgeben, got {false_count}"
+    );
+
+    let get_res = storage.get(key).await.expect("get failed");
+    assert!(
+        get_res.is_some(),
+        "storage.get(key) muss Some(_) zurückgeben nach erfolgreichem put_if_absent + commit"
+    );
+}
+
 #[tokio::test]
 async fn proof_put_if_absent_atomicity() {
-    let config = LsmConfig::default();
+    let temp_dir = tempfile::tempdir().expect("tempdir creation failed");
+    let config = LsmConfig {
+        path: temp_dir.path().to_path_buf(),
+        ..Default::default()
+    };
     let storage = Arc::new(LsmStorage::new(config).await.unwrap());
 
     let key = b"atomic_key";
