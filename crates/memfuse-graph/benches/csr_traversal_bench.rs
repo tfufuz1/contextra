@@ -12,9 +12,8 @@ pub trait CsrGraphBenchExt {
         max_hops: usize,
     ) -> std::pin::Pin<
         Box<
-            dyn std::future::Future<
-                    Output = memfuse_core::Result<Vec<(EntityId, f32)>>,
-                > + Send
+            dyn std::future::Future<Output = memfuse_core::Result<Vec<(EntityId, f32)>>>
+                + Send
                 + '_,
         >,
     >;
@@ -23,12 +22,7 @@ pub trait CsrGraphBenchExt {
         &self,
         doc_id: DocId,
     ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<
-                    Output = memfuse_core::Result<Vec<EntityId>>,
-                > + Send
-                + '_,
-        >,
+        Box<dyn std::future::Future<Output = memfuse_core::Result<Vec<EntityId>>> + Send + '_>,
     >;
 }
 
@@ -39,9 +33,8 @@ impl CsrGraphBenchExt for CsrGraph {
         max_hops: usize,
     ) -> std::pin::Pin<
         Box<
-            dyn std::future::Future<
-                    Output = memfuse_core::Result<Vec<(EntityId, f32)>>,
-                > + Send
+            dyn std::future::Future<Output = memfuse_core::Result<Vec<(EntityId, f32)>>>
+                + Send
                 + '_,
         >,
     > {
@@ -52,12 +45,7 @@ impl CsrGraphBenchExt for CsrGraph {
         &self,
         doc_id: DocId,
     ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<
-                    Output = memfuse_core::Result<Vec<EntityId>>,
-                > + Send
-                + '_,
-        >,
+        Box<dyn std::future::Future<Output = memfuse_core::Result<Vec<EntityId>>> + Send + '_>,
     > {
         Box::pin(self.neighbors(EntityId::new(doc_id.inner())))
     }
@@ -82,11 +70,7 @@ fn build_test_graph(rt: &Runtime, n_nodes: usize, n_edges: usize) -> Arc<CsrGrap
             seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
             let dst = (seed as usize) % n_nodes;
             let _ = graph
-                .insert_edge_direct(
-                    EntityId::new(src as u64),
-                    EntityId::new(dst as u64),
-                    1.0,
-                )
+                .insert_edge_direct(EntityId::new(src as u64), EntityId::new(dst as u64), 1.0)
                 .await;
         }
         graph.compact();
@@ -135,26 +119,38 @@ fn bench_csr_traversal(c: &mut Criterion) {
         let graph = build_test_graph(&rt, n, e);
 
         // BFS-2-Hop-Traversal
-        group.bench_with_input(BenchmarkId::new("bfs_2hop", format!("n={n}_e={e}")), &n, |b, _| {
-            b.to_async(&rt).iter(|| async {
-                black_box(graph.bfs(black_box(DocId::new(0)), 2).await.unwrap())
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("bfs_2hop", format!("n={n}_e={e}")),
+            &n,
+            |b, _| {
+                b.to_async(&rt).iter(|| async {
+                    black_box(graph.bfs(black_box(DocId::new(0)), 2).await.unwrap())
+                });
+            },
+        );
 
         // get_neighbors (single-hop)
-        group.bench_with_input(BenchmarkId::new("get_neighbors", format!("n={n}_e={e}")), &n, |b, _| {
-            b.to_async(&rt).iter(|| async {
-                black_box(graph.get_neighbors(black_box(DocId::new(0))).await.unwrap())
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("get_neighbors", format!("n={n}_e={e}")),
+            &n,
+            |b, _| {
+                b.to_async(&rt).iter(|| async {
+                    black_box(graph.get_neighbors(black_box(DocId::new(0))).await.unwrap())
+                });
+            },
+        );
 
         // Mit pending_edges (vor compact): Overhead messen
         let graph_dirty = build_test_graph_with_pending(&rt, n, e, 100); // 100 uncompacted edges
-        group.bench_with_input(BenchmarkId::new("bfs_2hop_with_pending", format!("n={n}_e={e}_p=100")), &n, |b, _| {
-            b.to_async(&rt).iter(|| async {
-                black_box(graph_dirty.bfs(black_box(DocId::new(0)), 2).await.unwrap())
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::new("bfs_2hop_with_pending", format!("n={n}_e={e}_p=100")),
+            &n,
+            |b, _| {
+                b.to_async(&rt).iter(|| async {
+                    black_box(graph_dirty.bfs(black_box(DocId::new(0)), 2).await.unwrap())
+                });
+            },
+        );
     }
     group.finish();
 }

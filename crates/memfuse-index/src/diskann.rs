@@ -424,7 +424,7 @@ impl DiskAnnIndex {
             &vectors[entry_point as usize],
             self.inner.config.distance_metric,
         )?;
-        if !ep_dist.is_finite() {
+        if !ep_dist.is_finite() { // NAN-CHECK-OK
             tracing::error!(
                 entry_point = entry_point,
                 "DiskANN search_in_memory: non-finite distance for entry point"
@@ -458,7 +458,7 @@ impl DiskAnnIndex {
                     &vectors[neighbor as usize],
                     self.inner.config.distance_metric,
                 )?;
-                if !dist.is_finite() {
+                if !dist.is_finite() { // NAN-CHECK-OK
                     tracing::error!(
                         neighbor = neighbor,
                         "DiskANN search_in_memory: non-finite distance encountered for neighbor, skipping"
@@ -894,7 +894,7 @@ impl DiskAnnIndex {
         let mut results = BinaryHeap::new();
 
         let ep_dist = self.get_dist_mixed(query, entry_point, existing_count, new_vecs)?;
-        if !ep_dist.is_finite() {
+        if !ep_dist.is_finite() { // NAN-CHECK-OK
             tracing::error!(
                 entry_point = entry_point,
                 "DiskANN search_streaming: non-finite distance for entry point"
@@ -924,7 +924,7 @@ impl DiskAnnIndex {
                     continue;
                 }
                 let dist = self.get_dist_mixed(query, neighbor, existing_count, new_vecs)?;
-                if !dist.is_finite() {
+                if !dist.is_finite() { // NAN-CHECK-OK
                     tracing::error!(
                         neighbor = neighbor,
                         "DiskANN search_streaming: non-finite distance encountered for neighbor, skipping"
@@ -1819,7 +1819,7 @@ impl DiskAnnIndex {
 
         let ep = header.entry_point;
         let ep_dist = self.get_dist_to_query(query, ep)?;
-        if !ep_dist.is_finite() {
+        if !ep_dist.is_finite() { // NAN-CHECK-OK
             tracing::error!(
                 entry_point = ep,
                 "DiskANN search: non-finite distance for entry point"
@@ -1851,7 +1851,7 @@ impl DiskAnnIndex {
                 }
 
                 let dist = self.get_dist_to_query(query, neighbor)?;
-                if !dist.is_finite() {
+                if !dist.is_finite() { // NAN-CHECK-OK
                     tracing::error!(
                         neighbor = neighbor,
                         "DiskANN search: non-finite distance encountered for neighbor, skipping"

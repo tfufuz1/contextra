@@ -583,11 +583,10 @@ impl<S: StorageEngine> InvertedIndex<S> {
                                 continue; // Stale posting masked by tombstone at seq
                             }
 
-                            let tf = u32::from_le_bytes(
-                                val_bytes[..4]
-                                    .try_into()
-                                    .map_err(|_| MemFuseError::Storage("Invalid posting tf length".into()))?,
-                            );
+                            let tf =
+                                u32::from_le_bytes(val_bytes[..4].try_into().map_err(|_| {
+                                    MemFuseError::Storage("Invalid posting tf length".into())
+                                })?);
                             valid_postings.push((doc_id, tf, doc_len));
                         }
                     }

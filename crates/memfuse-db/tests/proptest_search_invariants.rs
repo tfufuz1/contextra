@@ -17,20 +17,16 @@ use tokio::runtime::Runtime;
 
 // Strategy for generating arbitrary SearchResult objects with realistic or edge-case scores
 fn search_result_strategy() -> impl Strategy<Value = SearchResult> {
-    (
-        0u64..50000,
-        prop::option::of(prop::num::f32::ANY),
-    )
-        .prop_map(|(id_num, score_opt)| {
-            let score = score_opt.unwrap_or(0.0);
-            SearchResult {
-                id: format!("doc_{id_num}"),
-                score,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            }
-        })
+    (0u64..50000, prop::option::of(prop::num::f32::ANY)).prop_map(|(id_num, score_opt)| {
+        let score = score_opt.unwrap_or(0.0);
+        SearchResult {
+            id: format!("doc_{id_num}"),
+            score,
+            metadata: None,
+            matched_signals: vec![],
+            provenance: None,
+        }
+    })
 }
 
 // Strategy for generating lists of SearchResult sets

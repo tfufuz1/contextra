@@ -55,13 +55,13 @@
       "released_at": "2026-09-15T02:29:10.212659296+00:00 [TTL-EXPIRED]"
     },
     {
-      "krate": "memfuse-core",
-      "issue": "JULES-20260915-MEMFUSECOR-DEEP-EI4I",
-      "timestamp": "2026-09-15T14:45:32.156411458+00:00",
-      "session_id": "5174868413731788340",
+      "krate": "memfuse-text",
+      "issue": "JULES-20260915-MEMFUSETEX-DEEP-97S3",
+      "timestamp": "2026-09-15T14:41:42.693687802+00:00",
+      "session_id": "13574539195997574320",
       "active": false,
-      "expires_at": "2026-09-15T18:45:32.156393544+00:00",
-      "released_at": "2026-09-15T14:58:38.033124519+00:00"
+      "expires_at": "2026-09-15T18:41:42.693675252+00:00",
+      "released_at": "2026-09-15T14:50:31.257041469+00:00"
     }
   ]
 }
