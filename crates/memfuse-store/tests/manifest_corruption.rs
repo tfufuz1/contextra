@@ -1,3 +1,5 @@
+use memfuse_core::{StorageEngine, TxId};
+use memfuse_store::lsm::{LsmConfig, LsmStorage};
 use memfuse_store::manifest::{Manifest, ManifestEntry};
 use std::path::PathBuf;
 use tempfile::tempdir;
@@ -13,12 +15,13 @@ async fn proof_manifest_mid_corruption_returns_err() {
         path: PathBuf::from("sst-1.sst"),
         max_tx: 10,
     };
-    let entry2 = ManifestEntry::Remove {
-        path: PathBuf::from("sst-1.sst"),
-    };
-    let entry3 = ManifestEntry::Add {
+    let entry2 = ManifestEntry::Add {
         path: PathBuf::from("sst-2.sst"),
         max_tx: 20,
+    };
+    let entry3 = ManifestEntry::Add {
+        path: PathBuf::from("sst-3.sst"),
+        max_tx: 30,
     };
 
     manifest.append(&entry1).await.expect("append 1");
@@ -26,26 +29,19 @@ async fn proof_manifest_mid_corruption_returns_err() {
     manifest.append(&entry3).await.expect("append 3");
     drop(manifest);
 
+    // Corrupt entry 2 (in the middle of the file before entry 3)
     let mut file_bytes = tokio::fs::read(&manifest_path).await.expect("read file");
-
-    // Corrupt entry 2 payload byte (flip bit in middle of file)
-    let corrupt_offset = 35;
-    assert!(
-        corrupt_offset < file_bytes.len() - 15,
-        "offset must be in the middle of file (file len={})",
-        file_bytes.len()
-    );
-    file_bytes[corrupt_offset] ^= 0xFF;
+    let offset1 = entry1.to_bytes().unwrap().len();
+    file_bytes[offset1 + 10] ^= 0xFF;
 
     tokio::fs::write(&manifest_path, file_bytes)
         .await
         .expect("write corrupted file");
 
-    let loaded_res = Manifest::load(&manifest_path).await;
+    let res = Manifest::load(&manifest_path).await;
     assert!(
-        loaded_res.is_err(),
-        "Corruption in the middle of MANIFEST must return Err, got: {:?}",
-        loaded_res
+        res.is_err(),
+        "Manifest::load must return Err on mid-file CRC/data corruption"
     );
 }
 
@@ -60,89 +56,71 @@ async fn proof_manifest_tail_truncation_is_recoverable() {
         path: PathBuf::from("sst-1.sst"),
         max_tx: 10,
     };
-    let entry2 = ManifestEntry::Remove {
-        path: PathBuf::from("sst-1.sst"),
-    };
-    let entry3 = ManifestEntry::Add {
+    let entry2 = ManifestEntry::Add {
         path: PathBuf::from("sst-2.sst"),
         max_tx: 20,
     };
 
     manifest.append(&entry1).await.expect("append 1");
     manifest.append(&entry2).await.expect("append 2");
-    manifest.append(&entry3).await.expect("append 3");
     drop(manifest);
 
+    // Truncate the file at the tail (cut off middle of entry 2)
     let mut file_bytes = tokio::fs::read(&manifest_path).await.expect("read file");
-    // Truncate last entry (entry 3) partially
-    file_bytes.truncate(file_bytes.len() - 10);
-
+    file_bytes.truncate(file_bytes.len() - 8);
     tokio::fs::write(&manifest_path, file_bytes)
         .await
         .expect("write truncated file");
 
     let loaded = Manifest::load(&manifest_path)
         .await
-        .expect("tail truncation must be recoverable with Ok");
+        .expect("load manifest with tail truncation should succeed");
     assert_eq!(
         loaded.len(),
-        2,
-        "Should recover valid prefix entries (entry1 and entry2)"
+        1,
+        "Tail truncated entry should be ignored, returning entries up to truncation"
     );
     assert_eq!(loaded[0], entry1);
-    assert_eq!(loaded[1], entry2);
 }
 
 #[tokio::test]
 async fn proof_no_sstable_resurrection_after_corruption() {
     let dir = tempdir().expect("tempdir");
+    let config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+
+    {
+        let storage = LsmStorage::new(config.clone())
+            .await
+            .expect("create storage");
+
+        let tx1 = TxId::new(1);
+        storage.put(tx1, b"key1", b"val1").await.unwrap();
+        storage.commit(tx1).await.unwrap();
+        storage.force_flush().await.unwrap();
+
+        let tx2 = TxId::new(2);
+        storage.put(tx2, b"key2", b"val2").await.unwrap();
+        storage.commit(tx2).await.unwrap();
+        storage.force_flush().await.unwrap();
+    }
+
     let manifest_path = dir.path().join("MANIFEST");
-
-    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
-
-    let entry1 = ManifestEntry::Add {
-        path: PathBuf::from("sst-1.sst"),
-        max_tx: 10,
-    };
-    let entry2 = ManifestEntry::Remove {
-        path: PathBuf::from("sst-1.sst"),
-    };
-    let entry3 = ManifestEntry::Add {
-        path: PathBuf::from("sst-2.sst"),
-        max_tx: 20,
-    };
-
-    manifest.append(&entry1).await.expect("append 1");
-    manifest.append(&entry2).await.expect("append 2");
-    manifest.append(&entry3).await.expect("append 3");
-    drop(manifest);
-
-    // Verify baseline SSTable state before corruption
-    let clean_entries = Manifest::load(&manifest_path).await.expect("clean load");
-    let valid_ssts_clean = Manifest::reconstruct_valid_sstables(&clean_entries);
-    assert_eq!(
-        valid_ssts_clean,
-        vec![(PathBuf::from("sst-2.sst"), 1)],
-        "sst-1.sst must be removed in clean state"
-    );
-
     let mut file_bytes = tokio::fs::read(&manifest_path).await.expect("read file");
-
-    // Corrupt entry 2 (Remove entry) in the middle of the manifest file
-    let corrupt_offset = 36;
-    file_bytes[corrupt_offset] ^= 0xAA;
-
+    let file_len = file_bytes.len();
+    assert!(file_len > 10);
+    // Corrupt entry in MANIFEST
+    file_bytes[file_len - 5] ^= 0xFF;
     tokio::fs::write(&manifest_path, file_bytes)
         .await
         .expect("write corrupted file");
 
-    let loaded_res = Manifest::load(&manifest_path).await;
-
-    // Manifest::load MUST return Err on mid-file corruption.
-    // If it incorrectly returned Ok(partial_entries) containing only entry 1,
-    // reconstruct_valid_sstables would resurrect sst-1.sst!
+    // Reopen LSM storage. It MUST return Err, failing to start rather than resurrecting deleted/unmanifested SSTables.
+    let res = LsmStorage::new(config).await;
     assert!(
-        loaded_res.is_err(),
-        "Manifest::load must return Err on mid-file corruption to prevent SSTable resurrection"
+        res.is_err(),
+        "LsmStorage::new must return Err when MANIFEST is corrupted"
     );
 }

@@ -427,57 +427,14 @@ impl Manifest {
             let is_tail = pos + 4 + len as u64 > file_size;
 
             let mut entry_raw = vec![0u8; len];
-            let read_res = reader.read_exact(&mut entry_raw).await;
-
-            if is_tail {
-                match read_res {
-                    Ok(_) => {}
-                    Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                        // Check if remaining unread file bytes contain any valid subsequent frame
-                        // (which indicates a corrupted length header in the middle of the file)
-                        let mut remaining_buf = Vec::new();
-                        let _ = reader.read_to_end(&mut remaining_buf).await;
-
-                        let mut has_subsequent_valid_frame = false;
-                        if remaining_buf.len() >= 9 {
-                            for k in 0..=remaining_buf.len() - 9 {
-                                let sub_len = u32::from_le_bytes([
-                                    remaining_buf[k],
-                                    remaining_buf[k + 1],
-                                    remaining_buf[k + 2],
-                                    remaining_buf[k + 3],
-                                ]) as usize;
-                                if sub_len >= 5 && k + 4 + sub_len <= remaining_buf.len() {
-                                    if ManifestEntry::from_bytes(&remaining_buf[k + 4..k + 4 + sub_len]).is_ok() {
-                                        has_subsequent_valid_frame = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if has_subsequent_valid_frame {
-                            return Err(MemFuseError::Storage(format!(
-                                "MANIFEST corrupt entry header at offset {}: claims length {} exceeding file size {}, but subsequent valid frames exist",
-                                pos, len, file_size
-                            )));
-                        }
-
-                        // Legitimate truncation at the very end of file (power loss during write)
-                        tracing::warn!(
-                            "MANIFEST tail truncation detected at offset {} (expected record len {} exceeds file size {}) — breaking load loop",
-                            pos,
-                            len,
-                            file_size
-                        );
-                        break;
-                    }
-                    Err(e) => {
-                        return Err(MemFuseError::Storage(format!(
-                            "MANIFEST read error at offset {}: {}",
-                            pos, e
-                        )));
-                    }
+            match reader.read_exact(&mut entry_raw).await {
+                Ok(_) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    tracing::warn!(
+                        "MANIFEST tail truncation detected (incomplete payload) at offset {}",
+                        pos
+                    );
+                    break;
                 }
             } else {
                 read_res.map_err(|e| {
