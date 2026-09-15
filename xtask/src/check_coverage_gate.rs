@@ -49,6 +49,7 @@ pub fn get_threshold_for_crate(crate_name: &str) -> f64 {
     }
 }
 
+#[allow(dead_code)]
 pub fn run_check_coverage_gate(root: &Path) -> Result<Vec<CrateCoverageResult>, String> {
     run_check_coverage_gate_file(&root.join("coverage.json"))
 }
@@ -64,8 +65,13 @@ pub fn run_check_coverage_gate_file(cov_path: &Path) -> Result<Vec<CrateCoverage
     let content = fs::read_to_string(cov_path)
         .map_err(|e| format!("Failed to read coverage json {}: {}", cov_path.display(), e))?;
 
-    let report: LlvmCovReport = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse coverage json {}: {}", cov_path.display(), e))?;
+    let report: LlvmCovReport = serde_json::from_str(&content).map_err(|e| {
+        format!(
+            "Failed to parse coverage json {}: {}",
+            cov_path.display(),
+            e
+        )
+    })?;
 
     let mut crate_stats: BTreeMap<String, (u64, u64)> = BTreeMap::new();
 

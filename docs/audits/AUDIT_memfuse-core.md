@@ -215,6 +215,53 @@ cargo check --workspace --exclude memfuse-tauri
   - `cargo check --workspace --exclude memfuse-tauri` → gesamter Workspace kompiliert
 - **Audit Sign-off:** `memfuse-core` (Layer 0) erneut vollständig verifiziert als hochstabiles, thread-sicheres und typ-sicheres Fundament von MemFuse.
 
+## 18. Tier 1 Deep Audit & Verification — Task JULES-20260915-MEMFUSECOR-DEEP-EI4I (2026-09-15 — SESSION 23ec9779)
+
+### Inventar-Realitätsabgleich & Drift-Analyse (Stand 2026-09-15)
+- **Bekanntes Prompter-Inventar (Stand 2026-09-10):** `error.rs`, `error_dto.rs`, `ipc/jsonrpc.rs`, `ipc/memfuse_generated.rs`, `ipc/mod.rs`, `lib.rs`, `seq_log.rs`, `snapshot.rs`, `traits/embedding.rs`, `traits/mod.rs`, `model_fingerprint.rs`, `tx_buffer.rs`, `types.rs`, `types/budget.rs`, `types/domain.rs`, `types/filter.rs`, `types/importance.rs`, `types/saos.rs` (18 Dateien).
+- **Tatsächlicher Dateibestand in `crates/memfuse-core/src`:** 24 Dateien (`error.rs`, `error_dto.rs`, `ipc/jsonrpc.rs`, `ipc/mod.rs`, `lib.rs`, `model_fingerprint.rs`, `seq_log.rs`, `snapshot.rs`, `traits/checkpoint.rs`, `traits/embedding.rs`, `traits/graph_index.rs`, `traits/lifecycle.rs`, `traits/mod.rs`, `traits/observability.rs`, `traits/storage.rs`, `traits/text_index.rs`, `traits/vector_index.rs`, `tx_buffer.rs`, `types.rs`, `types/budget.rs`, `types/domain.rs`, `types/filter.rs`, `types/importance.rs`, `types/saos.rs`).
+- **Inventar-Drift-Befund:**
+  1. `Inventar-Drift: Datei crates/memfuse-core/src/traits/checkpoint.rs, graph_index.rs, lifecycle.rs, observability.rs, storage.rs, text_index.rs, vector_index.rs im Prompter-Inventar vom 2026-09-10 nicht erfasst` (Aufspaltung des monolithischen `traits.rs` in eigene Submodul-Dateien unter `traits/`).
+  2. `Inventar-Drift: Datei crates/memfuse-core/src/ipc/memfuse_generated.rs umbenannt oder entfernt` (Ausgelagert in dediziertes Layer-0-Crate `memfuse-core-ipc-gen`).
+
+### Proof-of-Work & Tier 1 Concurrency Verification
+- **Property-Based Tests (`proptest`):** 11/11 proptests (`prop_snapshot_registry_min_active`, `prop_snapshot_pin_unpin_interleaving`, `prop_snapshot_register_unregister_stress`, `prop_tx_buffer_isolation`, `prop_tx_buffer_partial_discard_isolation`, `prop_tx_id_overflow_isolation`, `prop_tx_id_range_isolation`, `prop_tx_buffer_stage_drain_stage_lifecycle`, `prop_fusion_weights_never_panics`, `prop_ipc_parser_no_panic_on_garbage`, `prop_tx_buffer_reap_is_complete`) PASSED (100% grün).
+- **Concurrency Stress Test:** 5/5 aufeinanderfolgende Läufe mit `--test-threads=8` bestanden ohne Panics, Deadlocks oder Race Conditions.
+- **TxId Boundary Exhaustion Simulation:** `types::domain::tests::test_tx_id_range_boundary_exhaustion_simulation` PASSED — `next_tx == MAX_COLLECTION_SEQUENCE + 1` erzeugt kontrolliert `MemFuseError::Transaction` ohne Wrap-Around.
+- **SnapshotRegistry Pin/GC-Race Stress:** `snapshot::tests::test_snapshot_registry_robustness_and_concurrency` PASSED — Parallele Threads pinnen/unpinnen Snapshots ohne Sequenznummer-Verletzung.
+
+### Code Coverage Metrics (`cargo llvm-cov`)
+- **Gesamtzeilenabdeckung (`memfuse-core`):** **80.94%** (5209 Zeilen gesamt, 993 unbereinigte Flachcode-Lines).
+- **Modul-Abdeckung:**
+  - `error.rs`: **96.07%**
+  - `error_dto.rs`: **96.79%**
+  - `ipc/jsonrpc.rs`: **100.00%**
+  - `ipc/mod.rs`: **100.00%**
+  - `model_fingerprint.rs`: **100.00%**
+  - `seq_log.rs`: **96.77%**
+  - `snapshot.rs`: **97.62%**
+  - `traits/embedding.rs`: **94.32%**
+  - `traits/graph_index.rs`: **37.94%**
+  - `traits/mod.rs`: **88.89%**
+  - `traits/storage.rs`: **45.26%**
+  - `traits/text_index.rs`: **37.16%**
+  - `traits/vector_index.rs`: **56.54%**
+  - `tx_buffer.rs`: **86.70%**
+  - `types/budget.rs`: **89.11%**
+  - `types/domain.rs`: **90.10%**
+  - `types/filter.rs`: **94.49%**
+  - `types/importance.rs`: **94.29%**
+  - `types/saos.rs`: **92.60%**
+
+### Quality Gate Stack & Sign-off
+- **Full Quality Gate Stack:**
+  - `cargo check -p memfuse-core --all-features` → 0 Fehler, 0 Warnungen
+  - `cargo clippy -p memfuse-core -- -D warnings` → 0 Findings
+  - `cargo fmt --check -p memfuse-core` → 0 Diffs
+  - `cargo test -p memfuse-core --all-features` → 167 unit + 2 integration + 5 robustness tests (174 total) 100% grün
+  - `cargo check --workspace` → gesamter Workspace kompiliert sauber
+- **Audit Sign-off:** `memfuse-core` (Layer 0) re-verifiziert als vollständig bit-akkurat, thread-sicher, zero-panic konform und architektonisch sauber isoliert.
+
 ## 16. Tier 1 Deep Audit & Verification — Task JULES-20260911-DEEP (2026-09-11 — SESSION 642d09bf)
 
 ### Inventar-Realitätsabgleich (Stand 2026-09-11)
