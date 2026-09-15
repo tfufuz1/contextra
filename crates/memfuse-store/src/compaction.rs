@@ -166,7 +166,55 @@ impl CompactionEngine {
         )
         .await?;
 
-        // 4. Open the new SSTable
+        // Explicit fsync of output file and parent directory
+        crate::util::fsync_parent_dir(&output_path).await?;
+
+        // 4. Check consistency under read-lock before writing MANIFEST
+        let (all_present, insertion_point, old_paths) = {
+            let ssts = sstables.read().await;
+
+            let all_present = input_ssts
+                .iter()
+                .all(|inp| ssts.iter().any(|sst| Arc::ptr_eq(inp, sst)));
+
+            if !all_present {
+                (false, 0, Vec::new())
+            } else {
+                let insertion_point = ssts
+                    .iter()
+                    .position(|sst| input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)))
+                    .unwrap_or(ssts.len());
+
+                let old_paths: Vec<PathBuf> = input_ssts
+                    .iter()
+                    .filter_map(|inp| {
+                        ssts.iter()
+                            .find(|sst| Arc::ptr_eq(inp, sst))
+                            .map(|sst| sst.file_path().to_path_buf())
+                    })
+                    .collect();
+
+                (true, insertion_point as u64, old_paths)
+            }
+        };
+
+        if !all_present {
+            // Concurrent modification detected — abort compaction, clean up output file without writing MANIFEST entry
+            tracing::warn!(
+                "Compaction aborted: input SSTables modified during merge \
+                 (concurrent flush or rollback detected)"
+            );
+            if let Err(e) = tokio::fs::remove_file(&output_path).await {
+                tracing::warn!(
+                    "Failed to clean up aborted compaction output {:?}: {}",
+                    output_path,
+                    e
+                );
+            }
+            return Ok(false);
+        }
+
+        // Open the new SSTable reader
         let new_reader = Arc::new(
             SstableReader::open_with_key_manager(
                 &output_path,
@@ -176,45 +224,39 @@ impl CompactionEngine {
             .await?,
         );
 
-        // === SSTABLE MANIFEST INTEGRATION START ===
+        // 5. Write EXACTLY ONE atomic `Replace` entry to MANIFEST and fsync
         if let Some(ref manifest) = self.manifest {
             manifest
-                .append(&crate::manifest::ManifestEntry::Add {
-                    path: output_path.clone(),
-                    max_tx: new_reader.metadata().max_tx_id,
+                .append(&crate::manifest::ManifestEntry::Replace {
+                    removed: old_paths.clone(),
+                    added: output_path.clone(),
+                    added_max_tx: new_reader.metadata().max_tx_id,
+                    rank: insertion_point,
                 })
                 .await?;
         }
-        // === SSTABLE MANIFEST INTEGRATION END ===
 
-        // 5. Atomic swap under write-lock — identity-based (Arc::ptr_eq), not index-based.
-        // DECISION-REF: Replaces stale-index swap that was documented as
-        // AI-TAG[CONCURRENCY][CRITICAL] RESOLVED: AGT-STORE-002 — Indices computed before the lock was taken. (TS:2026-08-25T00:00:00Z)
-        // dropped could become invalid if a concurrent flush or rollback modifies the SSTable
-        // list. Arc::ptr_eq is immune to such reordering.
-        let old_paths: Vec<PathBuf> = {
+        // 6. In-memory SSTable swap under write-lock — mirroring already-persisted MANIFEST state
+        {
             let mut ssts = sstables.write().await;
 
-            // Verify all input SSTables are still present (concurrent flush/rollback safety)
-            let all_present = input_ssts
+            // Verify input SSTables are still present
+            let still_present = input_ssts
                 .iter()
                 .all(|inp| ssts.iter().any(|sst| Arc::ptr_eq(inp, sst)));
 
-            if !all_present {
-                // Concurrent modification detected — abort compaction, clean up output file
-                drop(ssts);
+            if still_present {
+                let insert_idx = (insertion_point as usize).min(ssts.len());
+                ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
+                let final_idx = insert_idx.min(ssts.len());
+                ssts.insert(final_idx, new_reader);
+            } else {
                 tracing::warn!(
-                    "Compaction aborted: input SSTables modified during merge \
-                     (concurrent flush or rollback detected)"
+                    "Input SSTables removed during MANIFEST write (rare concurrent modification) — replacing state from MANIFEST"
                 );
-                if let Err(e) = tokio::fs::remove_file(&output_path).await {
-                    tracing::warn!(
-                        "Failed to clean up aborted compaction output {:?}: {}",
-                        output_path,
-                        e
-                    );
-                }
-                return Ok(false);
+                ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
+                let final_idx = (insertion_point as usize).min(ssts.len());
+                ssts.insert(final_idx, new_reader);
             }
 
             // Find insertion point: position of the earliest input SSTable in current list
@@ -253,22 +295,8 @@ impl CompactionEngine {
             old_paths
         };
 
-        // 6. Delete old SSTable files (best-effort, outside lock)
-        // RESOLVED: .uuid-Sidecar wird jetzt analog zum WAL-Cleanup-Pfad (lsm.rs) mitgelöscht.
+        // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
-            // === SSTABLE MANIFEST INTEGRATION START ===
-            if let Some(ref manifest) = self.manifest {
-                if let Err(e) = manifest
-                    .append(&crate::manifest::ManifestEntry::Remove { path: path.clone() })
-                    .await
-                {
-                    tracing::warn!(
-                        "Failed to write Manifest Remove entry during compaction: {}",
-                        e
-                    );
-                }
-            }
-            // === SSTABLE MANIFEST INTEGRATION END ===
             if let Err(e) = tokio::fs::remove_file(path).await {
                 tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
             }
@@ -446,6 +474,7 @@ impl CompactionEngine {
         let mut builder =
             SstableBuilder::create_with_key_manager(output_path, self.key_manager.clone()).await?;
         let mut last_key: Option<bytes::Bytes> = None;
+        let mut floor_emitted = false;
         let mut processed_count = 0;
 
         // Token-Bucket-State für I/O-Rate-Limiting (§4.12 C-2)
@@ -485,20 +514,34 @@ impl CompactionEngine {
             let is_tombstone = (item.seq & TOMBSTONE_BIT) != 0;
             let raw_seq = item.seq & !TOMBSTONE_BIT;
 
-            // Deduplicate: older versions of the same key are dropped unless an active snapshot covers raw_seq
-            let is_duplicate = if let Some(ref lk) = last_key {
-                lk == &item.key && (min_snapshot_seq == u64::MAX || raw_seq < min_snapshot_seq)
+            if last_key.as_ref() != Some(&item.key) {
+                floor_emitted = false;
+            }
+
+            // LSM Retention Rule:
+            // Keep all versions with raw_seq >= min_snapshot_seq (visible to active or future snapshots)
+            // PLUS the newest version with raw_seq < min_snapshot_seq (the "floor" version).
+            // All further, older versions for the key below min_snapshot_seq are discarded.
+            let keep = if raw_seq >= min_snapshot_seq {
+                true
+            } else if !floor_emitted {
+                floor_emitted = true;
+                true
             } else {
                 false
             };
 
-            if !is_duplicate {
+            if keep {
                 // O(1): Bytes::clone is an Arc refcount increment
                 last_key = Some(item.key.clone());
 
                 // FIND-STO-001: Tombstone-Retention
                 // Only GC tombstones during FULL compaction when no snapshot references them
                 // and no older SSTables outside this compaction round can contain older values.
+                // NOTE: If raw_seq < min_snapshot_seq and is_full_compaction is true, this tombstone
+                // is the floor version below min_snapshot_seq. Being a tombstone below min_snapshot_seq
+                // during full compaction, no active snapshot references a non-deleted version below it
+                // and no older SSTables exist, so GC'ing it is safe.
                 let should_gc_tombstone =
                     is_tombstone && is_full_compaction && raw_seq < min_snapshot_seq;
                 if !should_gc_tombstone {
@@ -808,6 +851,126 @@ mod tests {
             "Merge must preserve newer version regardless of file size"
         );
         assert_eq!(seq, 20);
+    }
+
+    #[tokio::test]
+    async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let engine = CompactionEngine::new(
+            CompactionConfig::default(),
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        );
+
+        // Two SSTables with versions 100 and 90 of key "k1"
+        // Active snapshot is at min_snapshot_seq = 95
+        let sst1 = create_test_sstable(
+            tmp.path(),
+            "sst1.sst",
+            &[(b"k1", b"v100", 100)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst2 = create_test_sstable(
+            tmp.path(),
+            "sst2.sst",
+            &[(b"k1", b"v90", 90)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let output = tmp.path().join("merged_mvcc2.sst");
+        engine
+            .merge_sstables(&[sst1, sst2], &output, 95, true)
+            .await
+            .expect("merge");
+
+        let reader = SstableReader::open(&output, Arc::clone(&bc))
+            .await
+            .expect("open merged");
+        let entries = reader.iter().await.expect("iter");
+
+        // Both versions (100 and 90) must be retained:
+        // seq 100 >= 95 (kept), seq 90 < 95 (kept as floor version)
+        assert_eq!(entries.len(), 2, "Both seq 100 and floor version 90 must be retained");
+        assert_eq!(entries[0].0.as_ref(), b"k1");
+        assert_eq!(entries[0].2, 100);
+        assert_eq!(entries[1].0.as_ref(), b"k1");
+        assert_eq!(entries[1].2, 90);
+    }
+
+    #[tokio::test]
+    async fn test_mvcc_retention_older_versions_below_floor_discarded() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let engine = CompactionEngine::new(
+            CompactionConfig::default(),
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        );
+
+        // Three SSTables with versions 100, 90, 80 of key "k1"
+        // Active snapshot is at min_snapshot_seq = 95
+        let sst1 = create_test_sstable(
+            tmp.path(),
+            "sst1.sst",
+            &[(b"k1", b"v100", 100)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst2 = create_test_sstable(
+            tmp.path(),
+            "sst2.sst",
+            &[(b"k1", b"v90", 90)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst3 = create_test_sstable(
+            tmp.path(),
+            "sst3.sst",
+            &[(b"k1", b"v80", 80)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let output = tmp.path().join("merged_mvcc3.sst");
+        engine
+            .merge_sstables(&[sst1, sst2, sst3], &output, 95, true)
+            .await
+            .expect("merge");
+
+        let reader = SstableReader::open(&output, Arc::clone(&bc))
+            .await
+            .expect("open merged");
+        let entries = reader.iter().await.expect("iter");
+
+        // Only versions 100 (>= 95) and 90 (floor version for < 95) must be retained.
+        // Version 80 (< 95 and floor already emitted) must be discarded.
+        assert_eq!(entries.len(), 2, "Only seq 100 and floor version 90 must be retained, seq 80 discarded");
+        assert_eq!(entries[0].0.as_ref(), b"k1");
+        assert_eq!(entries[0].2, 100);
+        assert_eq!(entries[1].0.as_ref(), b"k1");
+        assert_eq!(entries[1].2, 90);
     }
 
     #[tokio::test]

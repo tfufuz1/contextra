@@ -1,8 +1,11 @@
-//! Observability module re-exports and lifecycle observability traits.
+//! Observability traits and re-exports for memory lifecycle and grounding validation.
 
 // FILE-CONTEXT
 // STAND: 2026-09-15T00:00:00Z
-// ZWECK: Re-Exports für Lifecycle- und Grounding-Observability-Traits (in lifecycle.rs definiert).
-// INVARIANTEN: Abwärtskompatibilität für Importpfade unter memfuse_core::traits::observability.
+// ZWECK: Observability-Modul für Memory-Lifecycle und Grounding-Validierung.
+// INVARIANTEN: Re-exportiert primäre Lifecycle & Grounding Trait-Definitionen aus `lifecycle`.
 
-pub use super::lifecycle::*;
+pub use super::lifecycle::{
+    ConsolidationAction, GroundingAssessment, GroundingValidator, LifecycleSweepReport,
+    MemoryLifecycleManager, ResponseGroundingValidator,
+};

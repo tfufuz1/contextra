@@ -5,7 +5,7 @@
 
 // FILE-CONTEXT
 // STAND: 2026-09-15T00:00:00Z
-// ZWECK: Kern-Trait-Hierarchien (StorageEngine, VectorIndex, TextIndex, GraphIndex, Checkpoint, Lifecycle, etc.) für Layer 0.
+// ZWECK: Kern-Trait-Hierarchien (StorageEngine, VectorIndex, TextIndex, GraphIndex, Checkpoint, etc.) für Layer 0.
 // INVARIANTEN: Downward-only Trait interfaces; neue Trait-Methoden brauchen Default-Impls (Abwärtskompatibilität).
 // HOTSPOTS: mod declaration & re-exports
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-024)
@@ -26,17 +26,17 @@ pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> +
 pub mod checkpoint;
 /// Embedding provider and LLM generation traits.
 pub mod embedding;
-/// Graph index traits.
+/// Graph index traits and CSR statistics.
 pub mod graph_index;
-/// Memory lifecycle and grounding traits.
+/// Memory lifecycle, grounding validator, and distance calculator contracts.
 pub mod lifecycle;
-/// Observability re-exports.
+/// Observability and lifecycle re-exports.
 pub mod observability;
 /// Key-value storage engine traits.
 pub mod storage;
-/// Text retrieval index traits.
+/// Text retrieval and indexing traits (BM25 / Inverted Index).
 pub mod text_index;
-/// Vector search index traits.
+/// Vector retrieval and HNSW indexing traits.
 pub mod vector_index;
 
 pub use checkpoint::*;
