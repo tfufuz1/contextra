@@ -90,7 +90,7 @@ pub struct AgentContext {
     pub events: VecDeque<crate::event_source::BackgroundEvent>,
     /// Offene Routing-Entscheidung, deren Ergebnis nach Tool-Ausführung zurückgemeldet werden soll.
     pub pending_routing_decision: Option<(
-        Arc<memfuse_router::RouterEngine>,
+        Arc<memfuse_router::DefaultRouterEngine>,
         memfuse_router::DecisionId,
     )>,
 }

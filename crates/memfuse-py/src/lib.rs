@@ -1058,7 +1058,7 @@ macro_rules! memfuse_batch_methods {
 /// Hält starke Arc-Referenzen, damit die Weak-Pointer in `MemFuse.set_router()` etc.
 /// nicht sofort droppen. Analog zu `RoutingHandle` in memfuse-mcp.
 struct PyRoutingHandle {
-    _router: Arc<memfuse_router::RouterEngine>,
+    _router: Arc<memfuse_router::DefaultRouterEngine>,
     _calibrator: Arc<parking_lot::Mutex<memfuse_calibration::IsotonicCalibrator>>,
     _pid_controller: Arc<parking_lot::Mutex<memfuse_calibration::PidController>>,
 }

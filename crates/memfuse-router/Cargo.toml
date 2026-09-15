@@ -29,6 +29,9 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+memfuse-index = { workspace = true }
+memfuse-graph = { workspace = true }
+memfuse-text = { workspace = true }
 tempfile = "3"
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
