@@ -44,44 +44,26 @@ async fn create_test_collection(
 }
 
 #[tokio::test]
-async fn proof_search_bounded_by_k() {
-    let (collection, _dir) = create_test_collection("test_bound", 4).await;
+async fn proof_search_never_exceeds_k() {
+    let (collection, _dir) = create_test_collection("test_never_exceeds_k", 4).await;
 
-    // Insert 20 documents
+    // Index 500 documents with dummy embeddings
     let mut batch = Vec::new();
-    for i in 0..20 {
-        let vec = vec![0.1 * (i as f32), 0.2, 0.3, 0.4];
-        let meta = json!({ "title": format!("doc{}", i), "idx": i, "text": format!("doc content {}", i) });
+    for i in 0..500 {
+        let vec = vec![0.1 * ((i % 10) as f32), 0.2, 0.3, 0.4];
+        let meta = json!({
+            "title": format!("doc{}", i),
+            "idx": i,
+            "text": format!("doc content number {}", i)
+        });
         batch.push((format!("doc_{}", i), vec, Some(meta)));
     }
     collection.insert_many(&batch).await.unwrap();
 
     let query_vec = vec![0.1, 0.2, 0.3, 0.4];
-    let k = 5;
+    let k = 10;
 
-    // Direct vector search
-    #[allow(deprecated)]
-    let results = collection.search(&query_vec, k).await.unwrap();
-    assert!(
-        results.len() <= k,
-        "search(k=5) returned {} items, expected <= 5",
-        results.len()
-    );
-
-    // Hybrid search
-    #[allow(deprecated)]
-    let hybrid_results = collection
-        .hybrid_search("doc", &query_vec, k, None)
-        .await
-        .unwrap();
-    assert!(
-        hybrid_results.len() <= k,
-        "hybrid_search(k=5) returned {} items, expected <= 5",
-        hybrid_results.len()
-    );
-
-    // Query builder
-    let builder_results = collection
+    let results = collection
         .query()
         .text("doc")
         .vector(&query_vec)
@@ -89,10 +71,91 @@ async fn proof_search_bounded_by_k() {
         .execute()
         .await
         .unwrap();
+
     assert!(
-        builder_results.len() <= k,
-        "query().k(5) returned {} items, expected <= 5",
-        builder_results.len()
+        results.len() <= k,
+        "search returned {} items, expected <= {}",
+        results.len(),
+        k
+    );
+
+    // Explicit Regression Guard
+    let source = include_str!("../src/collection/search.rs");
+    let violations = source
+        .lines()
+        .filter(|l| l.contains("usize::MAX") && !l.contains("UNBOUNDED-OK"))
+        .count();
+    assert_eq!(
+        violations, 0,
+        "B-3 REGRESSION: usize::MAX ohne UNBOUNDED-OK in search.rs: {} Vorkommen",
+        violations
+    );
+}
+
+#[tokio::test]
+async fn proof_search_returns_nonzero_results_for_matching_query() {
+    let (collection, _dir) = create_test_collection("test_matching_query", 4).await;
+
+    // Index 100 documents containing "rust programming language"
+    let mut batch = Vec::new();
+    for i in 0..100 {
+        let vec = vec![0.1, 0.2, 0.3, 0.4];
+        let meta = json!({
+            "title": format!("doc{}", i),
+            "text": format!("rust programming language document {}", i)
+        });
+        batch.push((format!("doc_{}", i), vec, Some(meta)));
+    }
+    collection.insert_many(&batch).await.unwrap();
+
+    let k = 5;
+    let results = collection
+        .query()
+        .text("programming")
+        .k(k)
+        .execute()
+        .await
+        .unwrap();
+
+    assert!(
+        !results.is_empty(),
+        "search('programming') returned 0 results, expected >= 1"
+    );
+    assert!(
+        results.len() <= k,
+        "search('programming') returned {} results, expected <= {}",
+        results.len(),
+        k
+    );
+}
+
+#[tokio::test]
+async fn proof_search_with_k_zero_returns_empty() {
+    let (collection, _dir) = create_test_collection("test_k_zero", 4).await;
+
+    let mut batch = Vec::new();
+    for i in 0..10 {
+        let vec = vec![0.1, 0.2, 0.3, 0.4];
+        let meta = json!({ "title": format!("doc{}", i), "text": format!("content {}", i) });
+        batch.push((format!("doc_{}", i), vec, Some(meta)));
+    }
+    collection.insert_many(&batch).await.unwrap();
+
+    let query_vec = vec![0.1, 0.2, 0.3, 0.4];
+
+    let results = collection
+        .query()
+        .text("content")
+        .vector(&query_vec)
+        .k(0)
+        .execute()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        results.len(),
+        0,
+        "search with k=0 must return empty vector without panicking"
     );
 }
 
