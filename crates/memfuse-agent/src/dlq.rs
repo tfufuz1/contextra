@@ -107,3 +107,60 @@ impl DeadLetterQueue {
         Ok(TxId::new(tx_val))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audit::InMemoryStorageEngine;
+    use crate::step::DeadLetterReason;
+
+    #[tokio::test]
+    async fn test_dlq_push_list_drain() -> Result<()> {
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let dlq = DeadLetterQueue::new(storage);
+
+        let letter1 = StepDeadLetter {
+            session_id: "sess-1".to_string(),
+            node_id: "node-a".to_string(),
+            failure_reason: DeadLetterReason::Timeout { timeout_ms: 5000 },
+            input: serde_json::json!({"query": "test"}),
+            attempt: 0,
+            failed_at_secs: 1000,
+        };
+
+        let letter2 = StepDeadLetter {
+            session_id: "sess-1".to_string(),
+            node_id: "node-b".to_string(),
+            failure_reason: DeadLetterReason::ToolError {
+                message: "Tool failed".to_string(),
+            },
+            input: serde_json::json!({"action": "exec"}),
+            attempt: 1,
+            failed_at_secs: 1005,
+        };
+
+        dlq.push(&letter1).await?;
+        dlq.push(&letter2).await?;
+
+        let listed = dlq.list().await?;
+        assert_eq!(listed.len(), 2);
+
+        let drained = dlq.drain().await?;
+        assert_eq!(drained.len(), 2);
+
+        let listed_after_drain = dlq.list().await?;
+        assert!(listed_after_drain.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_dlq_allocate_tx_uniqueness() -> Result<()> {
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let dlq = DeadLetterQueue::new(storage);
+
+        let tx1 = dlq.allocate_tx().await?;
+        let tx2 = dlq.allocate_tx().await?;
+        assert_ne!(tx1, tx2);
+        Ok(())
+    }
+}
