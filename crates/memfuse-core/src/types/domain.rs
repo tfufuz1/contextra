@@ -1069,6 +1069,23 @@ mod tests {
     use proptest::{prop_assert, prop_assert_eq};
 
     #[test]
+    fn test_workflow_state_hex_serde_roundtrip() {
+        let hash = *blake3::hash(b"test_graph_hash_state").as_bytes();
+        let state = WorkflowState {
+            tx: TxId::new(42),
+            graph_hash: hash,
+        };
+
+        let json = serde_json::to_string(&state).expect("serialize WorkflowState");
+        assert!(json.contains("\"graph_hash\":"));
+
+        let deserialized: WorkflowState =
+            serde_json::from_str(&json).expect("deserialize WorkflowState");
+        assert_eq!(state, deserialized);
+        assert_eq!(deserialized.graph_hash, hash);
+    }
+
+    #[test]
     fn test_tenant_id_defaults_and_constants() {
         let default_tenant = TenantId::default();
         assert_eq!(default_tenant, TenantId::SYSTEM);

@@ -595,6 +595,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
             has_graph,
+            stages_completed: 0,
         };
         let intent_bytes = serde_json::to_vec(&intent).map_err(|e| {
             MemFuseError::Transaction(format!("Failed to serialize commit intent: {}", e))
@@ -1147,6 +1148,7 @@ mod tests {
             doc_ids: doc_ids_arc,
             has_text: false,
             has_graph: false,
+            stages_completed: 0,
         };
         let json_arc = serde_json::to_string(&intent_arc).expect("serialize Arc");
 
