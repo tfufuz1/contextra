@@ -191,6 +191,10 @@ pub enum MemFuseError {
         reason: String,
     },
 
+    /// Snapshot isolation is unsupported for the requested search signal or graph strategy.
+    #[error("Snapshot unsupported for signal/strategy: {0}")]
+    SnapshotUnsupportedForSignal(String),
+
     /// Optimistic concurrency control stale read or version conflict.
     #[error("Stale read / OCC conflict: {0}")]
     StaleRead(String),
@@ -242,6 +246,11 @@ impl MemFuseError {
             path: path.into(),
             reason: reason.into(),
         }
+    }
+
+    /// Creates a `SnapshotUnsupportedForSignal` error.
+    pub fn snapshot_unsupported_for_signal(strategy: impl Into<String>) -> Self {
+        Self::SnapshotUnsupportedForSignal(strategy.into())
     }
 
     /// Creates an `OrphanedVectorReference` error.

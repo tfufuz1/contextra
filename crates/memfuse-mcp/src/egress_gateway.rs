@@ -1,5 +1,4 @@
 // FILE-CONTEXT
-// STAND:       2026-09-14
 // ZWECK:       Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries
 // INVARIANTEN: APM-EGRESS-BYPASS: Jede Anfrage MUSS EgressClassifier::classify() durchlaufen.
 //              APM-PANIC-ON-MISSING-FIELD: Keine unwrap()/expect()-Aufrufe bei Initialization/Execution (Fail-Closed).
@@ -64,15 +63,6 @@ pub async fn handle_cloud_query(
             abstracted: false,
             results: vec![],
             abstraction_notice: None,
-        }),
-        EgressClassification::RequiresAbstraction => Ok(CloudQueryResponse {
-            status: "success".to_string(),
-            query: "[REDACTED_SENSITIVE_QUERY]".to_string(),
-            abstracted: true,
-            results: vec![],
-            abstraction_notice: Some(
-                "Payload was abstracted before processing due to egress policy".to_string(),
-            ),
         }),
         _ => Err(McpError::invalid_params(
             "Egress policy violation: query blocked due to unknown classification",

@@ -11,7 +11,7 @@ description = "HNSW vector index with SIMD distance computation for MemFuse"
 
 [dependencies]
 memfuse-core = { workspace = true }
-memfuse-security = { workspace = true }
+memfuse-crypto = { workspace = true }
 subtle = "2.6"
 ahash = { workspace = true }
 parking_lot = { workspace = true }
@@ -57,6 +57,10 @@ name = "hnsw_bench"
 harness = false
 
 [[bench]]
+name = "hnsw_delete_search_bench"
+harness = false
+
+[[bench]]
 name = "audit_benchmarks"
 harness = false
 
@@ -68,6 +72,10 @@ harness = false
 name = "partial_rebuild_recall_bench"
 harness = false
 required-features = ["partial-index-rebuild"]
+
+[[bench]]
+name = "distance_nan_impact_bench"
+harness = false
 
 [[test]]
 name = "diskann_fault_injection_test"

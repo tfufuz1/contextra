@@ -70,7 +70,7 @@ use memfuse_core::{
     BoxFuture, DocId, IndexOp, MemFuseError, ResourceTracker, Result, SnapshotRegistry,
     StorageEngine, TxBuffer, TxId, TOMBSTONE_BIT,
 };
-use memfuse_security::crypto::KeyManager;
+use memfuse_crypto::crypto::KeyManager;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -251,31 +251,13 @@ impl LsmStorage {
     #[doc(hidden)]
     pub async fn simulate_wal_append_failure_for_test(&self) {
         let wal = self.wal.read().await;
-        let wal_path = wal.path().to_path_buf();
-        if let Ok(ro_file) = tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(false)
-            .open(&wal_path)
-            .await
-        {
-            let mut file_guard = wal.file.lock().await;
-            *file_guard = ro_file;
-        }
+        wal.simulate_append_failure.store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
     pub async fn restore_wal_file_handle_for_test(&self) {
         let wal = self.wal.read().await;
-        let wal_path = wal.path().to_path_buf();
-        if let Ok(rw_file) = tokio::fs::OpenOptions::new()
-            .read(true)
-            .append(true)
-            .open(&wal_path)
-            .await
-        {
-            let mut file_guard = wal.file.lock().await;
-            *file_guard = rw_file;
-        }
+        wal.simulate_append_failure.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Returns the accumulated total memory budget tracking drift in bytes caused by

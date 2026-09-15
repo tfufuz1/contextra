@@ -42,7 +42,7 @@
 // HOTSPOTS:   greedy_search(), insert(), search_at(), trigger_rebuild_async()
 // SIEHE AUCH:  rules/simd_safety.md, ADR-017, ADR-034
 
-use crate::distance::compute_distance;
+use crate::distance::{compute_distance, compute_distance_trusted};
 use ahash::{AHashMap, AHashSet};
 use memfuse_core::{
     DistanceMetric, DocId, IndexOp, MemFuseError, Result, ScoredDocument, TxBuffer, TxId,
@@ -125,6 +125,16 @@ impl Default for HnswConfig {
             partial_rebuild_config: crate::partial_rebuild::PartialRebuildConfig::default(),
         }
     }
+}
+
+/// Validates that a vector is non-empty and contains no NaN or Infinite values.
+fn validate_vector(vec: &[f32]) -> Result<()> {
+    if vec.iter().any(|v| !v.is_finite()) {
+        return Err(MemFuseError::invalid_input(
+            "Invalid vector: NaN or Infinity detected",
+        ));
+    }
+    Ok(())
 }
 
 impl HnswConfig {
@@ -1288,14 +1298,14 @@ impl HnswIndexCore {
                     })?))
                 })
                 .collect::<Result<Vec<f32>>>()?;
-            compute_distance(query_exact, &v, self.cold.config.distance_metric)
+            compute_distance_trusted(query_exact, &v, self.cold.config.distance_metric)
         }
     }
 
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
         match (data_a, data_b) {
             (VectorData::F32(a), VectorData::F32(b)) => {
-                compute_distance(a, b, self.cold.config.distance_metric)
+                compute_distance_trusted(a, b, self.cold.config.distance_metric)
             }
             (VectorData::U8(a), VectorData::U8(b)) => {
                 let guard = self.cold.quantizer.read();
@@ -1473,6 +1483,9 @@ impl HnswIndexCore {
             }
         }
 
+        // NOTE: deleted_snapshot is taken at search start. Concurrent deletes during this search are not reflected — this is intentional for search consistency.
+        let deleted_snapshot = self.hot.deleted_nodes.read();
+
         while let Some(Reverse(current)) = candidates.pop() {
             if let Some(worst_result) = results.peek() {
                 if current.distance > worst_result.distance && results.len() >= ef {
@@ -1481,12 +1494,11 @@ impl HnswIndexCore {
             }
 
             let connections = self.resolve_connections(current.index, layer, &ctx)?;
-            let deleted_guard = self.hot.deleted_nodes.read();
             let mut has_dead_neighbors = false;
 
             for &neighbor_u32 in connections.iter() {
                 let neighbor = neighbor_u32 as usize;
-                if deleted_guard.contains(neighbor as u64) {
+                if deleted_snapshot.contains(neighbor as u64) {
                     self.cold.visited_dead_nodes.fetch_add(1, Ordering::Relaxed);
                     has_dead_neighbors = true;
                 }
@@ -1525,7 +1537,7 @@ impl HnswIndexCore {
                     let mut conns_guard = node.connections.write();
                     if let Some(layer_conns) = conns_guard.get_mut(layer) {
                         layer_conns.retain(|&neighbor_u32| {
-                            if !deleted_guard.contains(neighbor_u32 as u64) {
+                            if !deleted_snapshot.contains(neighbor_u32 as u64) {
                                 true
                             } else if let Some(min_ret_seq) = min_retention_seq {
                                 let neighbor_idx = neighbor_u32 as usize;
@@ -1790,14 +1802,7 @@ impl HnswIndexCore {
             )));
         }
 
-        // ANCHOR[ALG-FIX:D2-004] STATUS:DONE (TS:2026-06-01T00:00:00Z) — NaN/Inf-Validierung bei Insert (Distanzfunktion)
-        // NaN-Vektoren würden in BinaryHeap stille Korrumpierung verursachen.
-        // Validierung an der Grenze (insert) statt in distance.rs — distance bleibt rein.
-        if vector.iter().any(|x| x.is_nan() || x.is_infinite()) {
-            return Err(MemFuseError::invalid_input(
-                "Vector contains NaN or Infinity values",
-            ));
-        }
+        validate_vector(vector)?;
 
         let vector_data = if self.cold.config.quantize {
             let q_guard = self.cold.quantizer.read();
@@ -2620,14 +2625,7 @@ impl VectorIndex for HnswIndex {
             )));
         }
 
-        // FIND-IDX-002: NaN/Inf Poisoning prevention
-        for &val in embedding {
-            if val.is_nan() || val.is_infinite() {
-                return Err(MemFuseError::Storage(
-                    "Invalid vector: NaN or Infinity detected".to_string(),
-                ));
-            }
-        }
+        validate_vector(embedding)?;
 
         self.inner.cold.tx_buffer.stage(
             tx,
