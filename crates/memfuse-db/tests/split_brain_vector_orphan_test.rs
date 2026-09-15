@@ -268,6 +268,7 @@ async fn test_duplicate_insert_transaction_replay_no_double_vector_entry() {
             doc_ids: std::sync::Arc::new(vec![doc_id]),
             has_text: false,
             has_graph: false,
+            stages_completed: 0,
         };
         col.storage()
             .put(tx, &intent_key, &serde_json::to_vec(&intent).unwrap())

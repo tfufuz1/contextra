@@ -53,6 +53,15 @@
       "active": false,
       "expires_at": "2026-09-14T17:59:30.299591055+00:00",
       "released_at": "2026-09-15T02:29:10.212659296+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-db",
+      "issue": "JULES-20260915-MEMFUSEDB-DEEP-KLI8",
+      "timestamp": "2026-09-15T14:40:56.762666527+00:00",
+      "session_id": "18131823307515536807",
+      "active": false,
+      "expires_at": "2026-09-15T18:40:56.762597187+00:00",
+      "released_at": "2026-09-15T15:12:40.657700836+00:00"
     }
   ]
 }

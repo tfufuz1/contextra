@@ -1153,7 +1153,7 @@ mod tests {
         let json_arc = serde_json::to_string(&intent_arc).expect("serialize Arc");
 
         // Simulierte Legacy-JSON-Struktur (wie sie von altem Vec<DocId> erzeugt würde):
-        let legacy_json = r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"has_graph":false}}"#;
+        let legacy_json = r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"has_graph":false,"stages_completed":0}}"#;
 
         // Round-Trip & Format-Vergleich:
         assert_eq!(
