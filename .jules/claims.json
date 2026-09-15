@@ -53,6 +53,15 @@
       "active": false,
       "expires_at": "2026-09-14T17:59:30.299591055+00:00",
       "released_at": "2026-09-15T02:29:10.212659296+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-crypto",
+      "issue": "JULES-20260915-MEMFUSECRY-DEEP-AG7W",
+      "timestamp": "2026-09-15T15:17:54.558827415+00:00",
+      "session_id": "13811869113667625768",
+      "active": false,
+      "expires_at": "2026-09-15T19:17:54.558807186+00:00",
+      "released_at": "2026-09-15T15:18:42.280374741+00:00"
     }
   ]
 }
