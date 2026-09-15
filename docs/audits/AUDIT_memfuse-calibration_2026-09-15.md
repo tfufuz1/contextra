@@ -51,3 +51,18 @@ Der Realitätsabgleich am Dateisystem (`find crates/memfuse-calibration/src -nam
 - `cargo fmt --check -p memfuse-calibration`: PASSED
 - `cargo test -p memfuse-calibration --all-features`: PASSED
 - Concurrency Stress (`--test-threads=8` x10): PASSED (0 race conditions, 0 deadlocks)
+
+---
+
+## 4. Test-Ausbau & Anti-Mirroring Hardening (Session `1b1680a8`)
+
+**Task ID:** `JULES-20260915-MEMFUSECAL-TEST-CR31`
+**Zeitstempel:** `2026-09-15T16:15:00Z`
+
+### Ergänzte Tests in `tests/calibration_deep_tests.rs`:
+1. `test_isotonic_pava_block_merging_fluctuating_sequence`: Verifiziert mehrstufiges PAVA-Merging bei abwechselnd korrekten/falschen Signalen über ansteigende Scores (Handberechneter Erwartungswert 0.5).
+2. `test_platt_scaler_gradient_clipping_and_extreme_logits`: Testet Gradient-Clipping und L2-Regularisierung bei stark separierten Eingaben mit extremen Logits (±500).
+3. `test_pid_controller_hard_floor_50_enforcement_in_constructor`: Stellt sicher, dass `PidController::new` auch bei ungültigen Eingaben (`min_pool_size < 50`) das wissenschaftliche Hard-Floor-Minimum $k_{min} = 50$ (arXiv:2604.01733) strikt durchsetzt.
+
+### Verifikationsergebnis:
+- **Alle 66 Tests in `memfuse-calibration` PASSED.**

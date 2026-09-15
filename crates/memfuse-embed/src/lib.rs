@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-09-11T10:21:21Z (SESSION: fe92d654)
+// STAND: 2026-09-15T16:10:40Z (SESSION: ec33599e)
 // ZWECK: In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG).
 // INVARIANTEN: Default-Build ohne ONNX hat leere Feature-Flags (ADR-005, Pure-Rust-USP).
 // NICHT-OFFENSICHTLICH: Threading via tokio::task::spawn_blocking zur Vermeidung von Executor-Starvation.
@@ -823,6 +823,19 @@ mod tests {
             panic!("Expected InvalidInput error for oversized embed batch");
         }
         Ok(())
+    }
+
+    #[tokio::test]
+    #[cfg(not(feature = "onnx"))]
+    async fn test_ensure_onnx_model_download_disabled_feature() {
+        let res = ensure_onnx_model_download("nomic-embed-text", None).await;
+        assert!(res.is_err());
+        if let Err(err) = res {
+            assert!(matches!(
+                err,
+                memfuse_core::MemFuseError::CapabilityUnsupported { .. }
+            ));
+        }
     }
 }
 
