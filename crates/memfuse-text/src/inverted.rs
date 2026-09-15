@@ -205,6 +205,17 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k
     }
 
+    /// Generates a tombstone storage key for document updating or deletion.
+    ///
+    /// # Tombstone Key & Value Schema
+    /// - **Key Format**: `__txt:{namespace}:tbs:{doc_id}:{term}`
+    /// - **Value Schema**: Empty byte slice (`&[]`).
+    /// - **Storage Layer**: Written to the transactional LSM `StorageEngine` during `upsert_document()` (updates)
+    ///   and `delete_document()` (deletions).
+    /// - **MVCC & Snapshot Isolation**: Evaluated during `search_bm25_at()` via `storage.get_at_seq(&tbs_key, seq)`.
+    ///   If a tombstone key exists at or before `seq`, the posting entry for `(term, doc_id)` is masked out.
+    /// - **Compaction Strategy**: Tombstone keys persist in storage until resolved via `resolve_tombstones()`
+    ///   or removed during background compaction when all snapshots prior to tombstone creation are no longer active.
     fn key_tombstone(&self, doc_id: DocId, term: &str) -> Vec<u8> {
         let mut itoa_buf = itoa::Buffer::new();
         let id_str = itoa_buf.format(doc_id.inner());
@@ -378,12 +389,14 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
         self.storage.delete(tx, &dl_key).await?;
 
-        // Remove from posting lists using forward index
+        // Remove from posting lists using forward index and write tombstone markers
         if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
             if let Ok(old_terms) = bincode::deserialize::<Vec<String>>(&fw_bytes) {
                 for term in old_terms {
                     let pl_doc_key = self.key_with_term_doc(&term, doc_id);
                     self.storage.delete(tx, &pl_doc_key).await?;
+                    let tbs_key = self.key_tombstone(doc_id, &term);
+                    self.storage.put(tx, &tbs_key, &[]).await?;
                 }
             }
         }
@@ -570,7 +583,11 @@ impl<S: StorageEngine> InvertedIndex<S> {
                                 continue; // Stale posting masked by tombstone at seq
                             }
 
-                            let tf = u32::from_le_bytes(val_bytes[..4].try_into().unwrap());
+                            let tf = u32::from_le_bytes(
+                                val_bytes[..4]
+                                    .try_into()
+                                    .map_err(|_| MemFuseError::Storage("Invalid posting tf length".into()))?,
+                            );
                             valid_postings.push((doc_id, tf, doc_len));
                         }
                     }

@@ -10,11 +10,18 @@ pub struct Violation {
 }
 
 pub fn run_check_max_results_unbound(root: &Path) -> Result<Vec<Violation>, String> {
+    run_check_max_results_unbound_with_options(root, false)
+}
+
+pub fn run_check_max_results_unbound_with_options(
+    root: &Path,
+    include_tests: bool,
+) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
 
     let max_val_re = Regex::new(r"\b(usize::MAX|u64::MAX)\b").unwrap();
     let ctx_param_re = Regex::new(
-        r"\b(max_results|max_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_limit|[a_zA_Z0_9_]+_cap|[a_zA_Z0_9_]+_budget)\b",
+        r"\b(max_results|max_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_limit|limit_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_cap|[a_zA_Z0_9_]+_budget)\b",
     )
     .unwrap();
 
@@ -38,18 +45,18 @@ pub fn run_check_max_results_unbound(root: &Path) -> Result<Vec<Violation>, Stri
                 continue;
             }
 
+            if !include_tests && (rel_path.ends_with("_test.rs") || rel_path.contains("/tests/")) {
+                continue;
+            }
+
             if let Ok(content) = fs::read_to_string(path) {
                 let lines: Vec<&str> = content.lines().collect();
 
                 for (idx, line) in lines.iter().enumerate() {
                     let trimmed = line.trim();
 
-                    // Skip comment lines, lines with // UNBOUNDED-OK, or test files
-                    if trimmed.starts_with("//")
-                        || trimmed.contains("// UNBOUNDED-OK")
-                        || rel_path.ends_with("_test.rs")
-                        || rel_path.contains("/tests/")
-                    {
+                    // Skip comment lines, lines with // UNBOUNDED-OK
+                    if trimmed.starts_with("//") || trimmed.contains("// UNBOUNDED-OK") {
                         continue;
                     }
 

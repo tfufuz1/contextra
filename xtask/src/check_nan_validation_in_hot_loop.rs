@@ -10,9 +10,16 @@ pub struct Violation {
 }
 
 pub fn run_check_nan_validation_in_hot_loop(root: &Path) -> Result<Vec<Violation>, String> {
+    run_check_nan_validation_in_hot_loop_with_options(root, false)
+}
+
+pub fn run_check_nan_validation_in_hot_loop_with_options(
+    root: &Path,
+    include_tests: bool,
+) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
 
-    let is_nan_re = Regex::new(r"\.is_nan\(\)").unwrap();
+    let nan_check_re = Regex::new(r"\.(is_nan|is_finite)\(\)").unwrap();
     let hot_loop_context_re =
         Regex::new(r"\b(candidates|neighbor|connections|col_idx|pop\(\))\b").unwrap();
 
@@ -36,6 +43,10 @@ pub fn run_check_nan_validation_in_hot_loop(root: &Path) -> Result<Vec<Violation
                 continue;
             }
 
+            if !include_tests && (rel_path.ends_with("_test.rs") || rel_path.contains("/tests/")) {
+                continue;
+            }
+
             if let Ok(content) = fs::read_to_string(path) {
                 let lines: Vec<&str> = content.lines().collect();
 
@@ -43,14 +54,13 @@ pub fn run_check_nan_validation_in_hot_loop(root: &Path) -> Result<Vec<Violation
                     let trimmed = line.trim();
 
                     if trimmed.starts_with("//")
+                        || trimmed.contains("// NAN-CHECK-OK")
                         || trimmed.contains("// NAN-CHECK-INSERT-VALIDATED")
-                        || rel_path.ends_with("_test.rs")
-                        || rel_path.contains("/tests/")
                     {
                         continue;
                     }
 
-                    if is_nan_re.is_match(line) {
+                    if nan_check_re.is_match(line) {
                         let start_idx = idx.saturating_sub(10);
                         let mut matches_hot_loop = false;
 
@@ -107,7 +117,7 @@ fn traverse(candidates: &mut Vec<usize>) {
     }
 
     #[test]
-    fn test_ignores_nan_check_insert_validated() {
+    fn test_ignores_nan_check_ok() {
         let dir = tempdir().unwrap();
         let file = dir.path().join("distance.rs");
         fs::write(
@@ -116,7 +126,7 @@ fn traverse(candidates: &mut Vec<usize>) {
 fn traverse(candidates: &mut Vec<usize>) {
     while let Some(curr) = candidates.pop() {
         let dist = compute_dist(curr);
-        if dist.is_nan() { // NAN-CHECK-INSERT-VALIDATED
+        if dist.is_nan() { // NAN-CHECK-OK
             panic!("nan");
         }
     }

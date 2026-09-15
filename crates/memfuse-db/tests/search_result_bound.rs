@@ -45,17 +45,13 @@ async fn create_test_collection(
 
 #[tokio::test]
 async fn proof_search_never_exceeds_k() {
-    let (collection, _dir) = create_test_collection("test_never_exceeds_k", 4).await;
+    let (collection, _dir) = create_test_collection("test_bound_k", 4).await;
 
-    // Index 500 documents with dummy embeddings
+    // 500 documents
     let mut batch = Vec::new();
     for i in 0..500 {
-        let vec = vec![0.1 * ((i % 10) as f32), 0.2, 0.3, 0.4];
-        let meta = json!({
-            "title": format!("doc{}", i),
-            "idx": i,
-            "text": format!("doc content number {}", i)
-        });
+        let vec = vec![0.1 * (i as f32 % 10.0), 0.2, 0.3, 0.4];
+        let meta = json!({ "title": format!("doc{}", i), "idx": i, "text": format!("rust programming language doc {}", i) });
         batch.push((format!("doc_{}", i), vec, Some(meta)));
     }
     collection.insert_many(&batch).await.unwrap();
@@ -65,7 +61,7 @@ async fn proof_search_never_exceeds_k() {
 
     let results = collection
         .query()
-        .text("doc")
+        .text("programming")
         .vector(&query_vec)
         .k(k)
         .execute()
@@ -74,14 +70,18 @@ async fn proof_search_never_exceeds_k() {
 
     assert!(
         results.len() <= k,
-        "search returned {} items, expected <= {}",
-        results.len(),
-        k
+        "query().k(10) returned {} items, expected <= 10",
+        results.len()
     );
 
-    // Explicit Regression Guard
-    let source = include_str!("../src/collection/search.rs");
-    let violations = source
+    // B-1 Regression Guard: Ensure no unannotated usize::MAX in search.rs
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let search_rs_path = Path::new(&manifest_dir).join("src/collection/search.rs");
+    let file_content = std::fs::read_to_string(&search_rs_path)
+        .or_else(|_| std::fs::read_to_string("crates/memfuse-db/src/collection/search.rs"))
+        .expect("Failed to read search.rs");
+
+    let violations = file_content
         .lines()
         .filter(|l| l.contains("usize::MAX") && !l.contains("UNBOUNDED-OK"))
         .count();
@@ -94,38 +94,35 @@ async fn proof_search_never_exceeds_k() {
 
 #[tokio::test]
 async fn proof_search_returns_nonzero_results_for_matching_query() {
-    let (collection, _dir) = create_test_collection("test_matching_query", 4).await;
+    let (collection, _dir) = create_test_collection("test_matching", 4).await;
 
-    // Index 100 documents containing "rust programming language"
+    // 100 documents with "rust programming language"
     let mut batch = Vec::new();
     for i in 0..100 {
         let vec = vec![0.1, 0.2, 0.3, 0.4];
-        let meta = json!({
-            "title": format!("doc{}", i),
-            "text": format!("rust programming language document {}", i)
-        });
-        batch.push((format!("doc_{}", i), vec, Some(meta)));
+        let meta = json!({ "text": format!("rust programming language document {}", i) });
+        batch.push((format!("match_doc_{}", i), vec, Some(meta)));
     }
     collection.insert_many(&batch).await.unwrap();
 
-    let k = 5;
+    let query_vec = vec![0.1, 0.2, 0.3, 0.4];
     let results = collection
         .query()
         .text("programming")
-        .k(k)
+        .vector(&query_vec)
+        .k(5)
         .execute()
         .await
         .unwrap();
 
     assert!(
         !results.is_empty(),
-        "search('programming') returned 0 results, expected >= 1"
+        "search for matching query 'programming' returned 0 results, expected >= 1"
     );
     assert!(
-        results.len() <= k,
-        "search('programming') returned {} results, expected <= {}",
-        results.len(),
-        k
+        results.len() <= 5,
+        "search k=5 returned {} items, expected <= 5",
+        results.len()
     );
 }
 
@@ -136,13 +133,12 @@ async fn proof_search_with_k_zero_returns_empty() {
     let mut batch = Vec::new();
     for i in 0..10 {
         let vec = vec![0.1, 0.2, 0.3, 0.4];
-        let meta = json!({ "title": format!("doc{}", i), "text": format!("content {}", i) });
-        batch.push((format!("doc_{}", i), vec, Some(meta)));
+        let meta = json!({ "text": format!("doc {}", i) });
+        batch.push((format!("doc_zero_{}", i), vec, Some(meta)));
     }
     collection.insert_many(&batch).await.unwrap();
 
     let query_vec = vec![0.1, 0.2, 0.3, 0.4];
-
     let results = collection
         .query()
         .text("content")
@@ -155,7 +151,7 @@ async fn proof_search_with_k_zero_returns_empty() {
     assert_eq!(
         results.len(),
         0,
-        "search with k=0 must return empty vector without panicking"
+        "search with k=0 must return 0 results without panic"
     );
 }
 
