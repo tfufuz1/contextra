@@ -89,9 +89,9 @@
 | `2026-09-15T16:05:00Z` | `crates/memfuse-sandbox/src/executor.rs` | `AI-TAG` | `AGT-SANDBOX-12a4a39c` | `acf8fe72` | `OPEN` | `0` | // AI-TAG[SMELL][MINOR] WASI fd_write stub does not parse iovs buffer slices into stdout_buf/stderr_buf (ID: AGT-SANDBOX-12a4a39c) (TS: 2026-09-15T16:05:00Z) (SESSION: acf8fe72) |
 | `2026-09-15T16:00:00Z (SESSION: acf8fe72)` | `crates/memfuse-sandbox/src/capabilities.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Capability Whitelist & Configuration for WASM Execution Boundary |
 | `2026-09-15T16:00:00Z (SESSION: acf8fe72)` | `crates/memfuse-sandbox/src/executor.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | WASM execution engine with WASI and fuel enforcement |
+| `2026-09-15T16:00:00Z` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `AGT-INDEX-f38b1a90` | `-` | `RESOLVED` | `0` | // AI-TAG[TEST][MINOR] RESOLVED: AGT-INDEX-f38b1a90 — Global statics replaced with instance-bound AtomicU64 fields on HnswColdCore (TS: 2026-09-15T16:00:00Z) |
 | `2026-09-15T15:09:43Z (SESSION: 2e382e86)` | `crates/memfuse-checkpoint/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RAII CheckpointGuard + persistente Snapshot-Verwaltung (Re-Exports) |
 | `2026-09-15T15:09:43Z` | `crates/memfuse-checkpoint/src/lib.rs` | `REVIEW-PASS` | `-` | `2e382e86` | `-` | `-` | // REVIEW-PASS[1/2] (TS: 2026-09-15T15:09:43Z) (SESSION: 2e382e86) PRÜFER-KONTEXT: FRESH |
-| `2026-09-15T14:50:00Z` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `AGT-INDEX-f38b1a90` | `acf8fe72` | `OPEN` | `0` | // AI-TAG[TEST][MINOR] Global mutable atomic statics cause multi-threaded test harness races (ID: AGT-INDEX-f38b1a90) (TS: 2026-09-15T14:50:00Z) (SESSION: acf8fe72) |
 | `2026-09-15T14:48:58Z` | `crates/memfuse-ollama/src/lib.rs` | `REVIEW-PASS` | `-` | `1d6e3667` | `PASS` | `-` | // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-15T14:48:58Z) (SESSION: 1d6e3667) PRÜFER-KONTEXT: FRESH - Tier 3 deep audit verified: zero unsafe, proptests green, 10x 8-thread concurrency stress test green, prompt injection evasion matrix passed. |
 | `2026-09-15T14:45:00Z (SESSION: 527bbb50)` | `crates/memfuse-calibration/tests/calibration_stress_and_fault_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Stress, fault-injection, and multi-threading concurrency tests for memfuse-calibration. |
 | `2026-09-15T00:00:00Z` | `crates/memfuse-core/src/traits/graph_index.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | GraphIndex Trait & GraphIndexStats für CSR-basierte Entity-Relation-Graph-Operationen. |
@@ -308,6 +308,7 @@
 | `` | `crates/memfuse-index/benches/hnsw_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/memfuse-index/benches/partial_rebuild_recall_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-JULES-16-followup: HNSW-Rebuild respektiert jetzt aktive search_at()-Snapshots via retention window / seq_log pinning. |
+| `` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `AGT-INDEX-f38b1a90` | `-` | `RESOLVED` | `0` | // AI-TAG[TEST][REGRESSION] RESOLVED: AGT-INDEX-f38b1a90 — Multi-instance fault injection isolation test. |
 | `` | `crates/memfuse-index/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/memfuse-index/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/memfuse-index/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |

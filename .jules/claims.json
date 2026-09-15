@@ -8,6 +8,14 @@
       "active": false,
       "expires_at": "2026-09-15T22:45:51.897370635+00:00",
       "released_at": "2026-09-15T18:54:52.173782787+00:00"
+    },
+    {
+      "krate": "memfuse-index",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-15T21:33:51.356801177+00:00",
+      "session_id": "4797804474291600240",
+      "active": true,
+      "expires_at": "2026-09-16T01:33:51.356781637+00:00"
     }
   ]
 }
