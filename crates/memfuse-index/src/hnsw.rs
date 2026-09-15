@@ -994,6 +994,42 @@ impl HnswIndex {
                     conn_pos += 4 + (len as u64) * 4;
                 }
             }
+
+            // 5. Calibration Block (per-dimension mins and maxes)
+            let cal_offset = conn_pos;
+            let mut cal_len = 0u32;
+
+            if let Some(ref q) = *q_guard {
+                let dim = q.mins().len();
+                cal_len = (dim * 4 * 2) as u32;
+                for &m in q.mins() {
+                    writer
+                        .write_all(&m.to_le_bytes())
+                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+                }
+                for &m in q.maxes() {
+                    writer
+                        .write_all(&m.to_le_bytes())
+                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+                }
+            }
+
+            header = crate::persistence::HnswHeader::new_v2(
+                inner.cold.config.dimension as u32,
+                inner.cold.config.m as u32,
+                inner.cold.config.distance_metric as u8,
+                if inner.cold.config.quantize { 1 } else { 0 },
+                q_min,
+                q_max,
+                node_count as u64,
+                entry_point.map(|i| i as i64).unwrap_or(-1),
+                nodes_offset,
+                connections_offset,
+                inner.hot.last_tx_id.load(Ordering::SeqCst),
+                cal_offset,
+                cal_len,
+            );
+
             writer
                 .flush()
                 .map_err(|e| MemFuseError::Storage(e.to_string()))?;
@@ -1075,21 +1111,60 @@ impl HnswIndex {
 
         if mmap_index.header.is_quantized() {
             let dim = self.inner.cold.config.dimension;
-            let q_min = mmap_index.header.q_min();
-            let q_max = mmap_index.header.q_max();
-            let range = if (q_max - q_min).abs() < f32::EPSILON {
-                1e-6
+            let header = &mmap_index.header;
+
+            let mut mins = Vec::new();
+            let mut maxes = Vec::new();
+
+            if header.version() == 2
+                && header.quant_calibration_offset() > 0
+                && header.quant_calibration_len() as usize >= dim * 4 * 2
+            {
+                let offset = header.quant_calibration_offset() as usize;
+                let cal_bytes = mmap_index
+                    .mmap
+                    .get(offset..offset + dim * 4 * 2)
+                    .ok_or_else(|| {
+                        MemFuseError::Storage("Calibration segment out of bounds".into())
+                    })?;
+
+                for i in 0..dim {
+                    let min_bytes = &cal_bytes[i * 4..(i + 1) * 4];
+                    mins.push(f32::from_le_bytes(min_bytes.try_into().map_err(|_| {
+                        MemFuseError::Storage("Invalid calibration min float".into())
+                    })?));
+                }
+                for i in 0..dim {
+                    let max_bytes = &cal_bytes[(dim + i) * 4..(dim + i + 1) * 4];
+                    maxes.push(f32::from_le_bytes(max_bytes.try_into().map_err(|_| {
+                        MemFuseError::Storage("Invalid calibration max float".into())
+                    })?));
+                }
             } else {
-                q_max - q_min
-            };
-            let scale = 255.0 / range;
-            let inv_scale = range / 255.0;
+                let q_min = header.q_min();
+                let q_max = header.q_max();
+                mins = vec![q_min; dim];
+                maxes = vec![q_max; dim];
+            }
+
+            let mut scales = Vec::with_capacity(dim);
+            let mut inv_scales = Vec::with_capacity(dim);
+
+            for i in 0..dim {
+                let mut range = maxes[i] - mins[i];
+                if range.abs() < f32::EPSILON {
+                    range = 1e-6;
+                }
+                scales.push(255.0 / range);
+                inv_scales.push(range / 255.0);
+            }
+
             let mut q_guard = self.inner.cold.quantizer.write();
             *q_guard = Some(crate::quantize::ScalarQuantizer {
-                mins: vec![q_min; dim],
-                maxes: vec![q_max; dim],
-                scales: vec![scale; dim],
-                inv_scales: vec![inv_scale; dim],
+                mins,
+                maxes,
+                scales,
+                inv_scales,
                 dimension: dim,
                 total_queries: AtomicU64::new(0),
                 out_of_range_queries: AtomicU64::new(0),
@@ -1817,6 +1892,10 @@ impl HnswIndexCore {
         } else {
             VectorData::F32(vector.to_vec())
         };
+
+        if trigger_rebuild {
+            // Rebuild threshold trigger check handled asynchronously
+        }
 
         let new_layer = self.random_layer();
         let entry_point_opt = *self.hot.entry_point.read();
