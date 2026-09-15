@@ -2513,6 +2513,94 @@ mod tests {
         assert!(matches!(err, MemFuseError::NotFound(_)));
     }
 
+    #[tokio::test]
+    async fn test_list_models_http_error_and_invalid_json() {
+        // HTTP 500 error test
+        let listener_500 = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr_500 = listener_500.local_addr().unwrap();
+        let server_url_500 = format!("http://{}", addr_500);
+
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener_500.accept().await {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let response = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 13\r\n\r\nServer Error";
+                socket.write_all(response.as_bytes()).await.ok();
+            }
+        });
+
+        let client_500 = OllamaClient::new(server_url_500);
+        let err_500 = client_500.list_models().await.unwrap_err();
+        assert!(matches!(err_500, MemFuseError::Storage(_)));
+
+        // Invalid JSON response test
+        let listener_json = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr_json = listener_json.local_addr().unwrap();
+        let server_url_json = format!("http://{}", addr_json);
+
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener_json.accept().await {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let body = "invalid-json";
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                socket.write_all(response.as_bytes()).await.ok();
+            }
+        });
+
+        let client_json = OllamaClient::new(server_url_json);
+        let err_json = client_json.list_models().await.unwrap_err();
+        assert!(matches!(err_json, MemFuseError::Internal(_)));
+    }
+
+    #[tokio::test]
+    async fn test_try_generate_mock_success_and_errors() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_url = format!("http://{}", addr);
+
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 2048];
+                let n = socket.read(&mut buf).await.unwrap_or(0);
+                let req_str = String::from_utf8_lossy(&buf[..n]);
+
+                if req_str.contains("bad-request-model") {
+                    let response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 11\r\n\r\nBad Request";
+                    socket.write_all(response.as_bytes()).await.ok();
+                } else if req_str.contains("missing-gen-model") {
+                    let response = "HTTP/1.1 404 Not Found\r\nContent-Length: 15\r\n\r\nModel not found";
+                    socket.write_all(response.as_bytes()).await.ok();
+                } else {
+                    let body = serde_json::json!({ "response": "Generierter Text" }).to_string();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    socket.write_all(response.as_bytes()).await.ok();
+                }
+            }
+        });
+
+        let client = OllamaClient::new(server_url);
+        let text = client.generate("test-model", "prompt").await.unwrap();
+        assert_eq!(text, "Generierter Text");
+
+        let err_400 = client.try_generate("bad-request-model", "prompt").await.unwrap_err();
+        assert!(matches!(err_400, MemFuseError::InvalidInput(_)));
+
+        let err_404 = client.try_generate("missing-gen-model", "prompt").await.unwrap_err();
+        assert!(matches!(err_404, MemFuseError::NotFound(_)));
+    }
+
     #[test]
     fn test_parse_prompt_template_valid_xml() {
         let prompt = "<system>Sys</system>\n<instructions>Inst</instructions>\n<context>Ctx</context>\n<user_query>Q</user_query>";
