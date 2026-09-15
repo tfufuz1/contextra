@@ -222,11 +222,18 @@ mod tests {
     async fn test_context_segment_and_generate_with_context_default(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let seg1 = ContextSegment::new(101, "First segment");
-        let seg2 = ContextSegment::new(102, "Second segment");
+        let fp = ModelFingerprint::new([0u8; 32], "test-model".to_string(), "fp16".to_string());
+        let seg2 = ContextSegment::new(102, "Second segment")
+            .with_fingerprint(&fp)
+            .with_rope_offset(42);
         assert_eq!(seg1.chunk_id, 101);
         assert_eq!(seg1.text, "First segment");
         assert!(seg1.model_fingerprint.is_none());
         assert!(seg1.rope_offset.is_none());
+
+        assert_eq!(seg2.chunk_id, 102);
+        assert_eq!(seg2.rope_offset, Some(42));
+        assert_eq!(seg2.model_fingerprint.map(|f| f.model_id.as_str()), Some("test-model"));
 
         let tenant = TenantId::try_new(1).unwrap();
         let llm = MockDefaultLlm;

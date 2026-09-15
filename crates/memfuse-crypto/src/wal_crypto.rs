@@ -683,4 +683,29 @@ mod tests {
             "WalHmac checksum MUST match independent HMAC-SHA256 reference calculation!"
         );
     }
+
+    #[test]
+    fn test_integrity_verifier_handoff_via_snapshot() {
+        let key = b"integrity-key-32-bytes-handoff-";
+        let mut verifier_a = IntegrityVerifier::new(key);
+
+        // Process entry 1 with verifier A
+        let e1 = create_entry(key, [0u8; 32], 1, 0, b"key1", b"val1");
+        verifier_a.verify_and_update(&e1, 10).expect("e1 valid");
+
+        // Take snapshot of chain state
+        let snapshot = verifier_a.last_hmac_snapshot();
+        assert_eq!(snapshot, e1.checksum);
+
+        // Initialize verifier B and transfer snapshot state
+        let mut verifier_b = IntegrityVerifier::new(key);
+        verifier_b.set_last_hmac(snapshot);
+        assert_eq!(verifier_b.last_hmac_snapshot(), snapshot);
+
+        // Process entry 2 with verifier B
+        let e2 = create_entry(key, e1.checksum, 2, 0, b"key2", b"val2");
+        verifier_b
+            .verify_and_update(&e2, 20)
+            .expect("e2 valid with verifier B after handoff");
+    }
 }
