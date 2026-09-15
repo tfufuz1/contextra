@@ -800,9 +800,10 @@ async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
     assert_eq!(res_val1["result"]["isError"], true);
     let err_msg1 = res_val1["result"]["content"][0]["text"].as_str().unwrap();
     assert!(
-        err_msg1.contains("Egress policy violation"),
-        "Expected block message for email input, got: '{err_msg1}'"
+        err_msg1.contains("Egress policy violation: query blocked by rule R-005"),
+        "Expected opaque rule ID in block message for email input, got: '{err_msg1}'"
     );
+    assert!(!err_msg1.contains("@"), "Error message must not leak raw regex pattern");
 
     // 2. Test simulated API key payload (e.g. sk-...)
     let req_apikey = make_request(
@@ -819,8 +820,8 @@ async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
     assert_eq!(res_val2["result"]["isError"], true);
     let err_msg2 = res_val2["result"]["content"][0]["text"].as_str().unwrap();
     assert!(
-        err_msg2.contains("Egress policy violation"),
-        "Expected block message for API key input, got: '{err_msg2}'"
+        err_msg2.contains("Egress policy violation: query blocked by rule R-001"),
+        "Expected opaque rule ID in block message for API key input, got: '{err_msg2}'"
     );
 
     // 3. Test sensitive keyword pattern (api_key, password)
@@ -838,8 +839,8 @@ async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
     assert_eq!(res_val3["result"]["isError"], true);
     let err_msg3 = res_val3["result"]["content"][0]["text"].as_str().unwrap();
     assert!(
-        err_msg3.contains("Egress policy violation"),
-        "Expected block message for password input, got: '{err_msg3}'"
+        err_msg3.contains("Egress policy violation: query blocked by rule R-004"),
+        "Expected opaque rule ID in block message for password input, got: '{err_msg3}'"
     );
 }
 
@@ -871,33 +872,36 @@ async fn test_cloud_query_allow_returns_success() {
 }
 
 #[tokio::test]
-async fn test_cloud_query_requires_abstraction() {
+async fn test_removed_substring_early_branch_runs_through_regex_vault() {
     let (server, _tmp) = create_mock_server().await;
 
+    // Previously, queries containing "abstract" or "PII" were intercepted by a substring early branch.
+    // Now they must run through DefaultEgressClassifier's EgressVault patterns.
     let req = make_request(
         "tools/call",
         json!({
             "name": "memfuse_cloud_query",
             "arguments": {
-                "query": "query containing PII information to abstract"
+                "query": "safe query mentioning abstract concepts and PII terminology"
             }
         }),
     );
 
     let resp = server.handle(req).await;
+    assert!(resp.error.is_none());
     let res_val = serde_json::to_value(&resp).unwrap();
     assert_ne!(res_val["result"]["isError"], true);
 
     let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
 
+    // Since it contains no sensitive regex patterns (sk-, AKIA, password, @, etc.), it returns Allow (status: success, abstracted: false).
     assert_eq!(json_res["status"], "success");
-    assert_eq!(json_res["abstracted"], true);
-    assert_eq!(json_res["query"], "[REDACTED_SENSITIVE_QUERY]");
-    assert!(json_res["abstraction_notice"]
-        .as_str()
-        .unwrap()
-        .contains("abstracted before processing"));
+    assert_eq!(json_res["abstracted"], false);
+    assert_eq!(
+        json_res["query"],
+        "safe query mentioning abstract concepts and PII terminology"
+    );
 }
 
 #[tokio::test]

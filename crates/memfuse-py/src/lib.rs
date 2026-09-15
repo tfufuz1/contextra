@@ -20,13 +20,13 @@
 
 #![forbid(unsafe_code)]
 
-
 use memfuse_db::{Collection as MemFuseCollection, MemFuse, MemFuseConfig};
 use numpy::PyReadonlyArray1;
 use pyo3::exceptions::{PyKeyError, PyPermissionError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pythonize::{depythonize, pythonize};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -40,6 +40,35 @@ pyo3::create_exception!(_memfuse, MemFuseCryptoError, MemFuseError);
 pyo3::create_exception!(_memfuse, MemFuseInternalError, MemFuseError);
 
 // ─── Per-Interpreter Tokio Runtime State ───────────────────────────────────
+
+/// Minimum allowed worker threads for Tokio multi-thread runtime.
+/// Minimum of 1 thread is required because Tokio panics on 0 worker threads ("Core threads cannot be zero").
+const MIN_WORKER_THREADS: usize = 1;
+/// Maximum allowed worker threads for Tokio multi-thread runtime.
+/// Prevents thread exhaustion attacks while accommodating high core-count systems.
+const MAX_WORKER_THREADS: usize = 256;
+
+/// Parses and clamps `MEMFUSE_WORKER_THREADS` environment variable to `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]`.
+///
+/// If `MEMFUSE_WORKER_THREADS` is unset or invalid (e.g. non-numeric, negative), falls back to
+/// `(available_parallelism / 2).clamp(1, 256)`.
+fn parse_worker_threads_env() -> usize {
+    let default_threads = (std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        / 2)
+    .clamp(MIN_WORKER_THREADS, MAX_WORKER_THREADS);
+
+    std::env::var("MEMFUSE_WORKER_THREADS")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .map(|val| val.clamp(MIN_WORKER_THREADS, MAX_WORKER_THREADS))
+        .unwrap_or(default_threads)
+}
+
+/// Fallback Tokio runtime instance used if module state attachment (`setattr`) fails.
+/// Prevents thread/runtime leaks across repeated FFI invocations.
+static FALLBACK_RUNTIME: std::sync::OnceLock<Arc<Runtime>> = std::sync::OnceLock::new();
 
 /// Holds the per-interpreter/per-module Tokio runtime state and worker thread configuration.
 #[pyclass(name = "RuntimeState")]
@@ -62,16 +91,11 @@ fn get_runtime(py: Python<'_>) -> PyResult<Arc<Runtime>> {
         }
     }
 
-    let worker_threads = std::env::var("MEMFUSE_WORKER_THREADS")
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or_else(|| {
-            (std::thread::available_parallelism()
-                .map(|n| n.get())
-                .unwrap_or(4)
-                / 2)
-            .max(2)
-        });
+    if let Some(fallback_rt) = FALLBACK_RUNTIME.get() {
+        return Ok(fallback_rt.clone());
+    }
+
+    let worker_threads = parse_worker_threads_env();
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(worker_threads)
@@ -91,8 +115,24 @@ fn get_runtime(py: Python<'_>) -> PyResult<Arc<Runtime>> {
         worker_threads,
     };
 
-    let py_state = Py::new(py, state)?;
-    let _ = module.setattr("_runtime_state", py_state);
+    match Py::new(py, state) {
+        Ok(py_state) => {
+            if let Err(e) = module.setattr("_runtime_state", py_state) {
+                eprintln!(
+                    "Warning: Failed to persist Tokio runtime state on module '_memfuse': {}. Using fallback runtime.",
+                    e
+                );
+                let _ = FALLBACK_RUNTIME.get_or_init(|| runtime.clone());
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "Warning: Failed to create PyRuntimeState object: {}. Using fallback runtime.",
+                e
+            );
+            let _ = FALLBACK_RUNTIME.get_or_init(|| runtime.clone());
+        }
+    }
 
     Ok(runtime)
 }
@@ -314,16 +354,25 @@ fn check_subinterpreter_guard(py: Python<'_>) -> PyResult<()> {
 // für die vollständige Begründung dieser Workspace-Trennung.
 /// Safely executes a blocking closure across FFI boundaries with thread state release
 /// and panic containment to guarantee no Rust panic propagates across FFI boundaries into Python.
-fn run_blocking_ffi<F, R>(py: Python<'_>, f: F) -> PyResult<R>
+///
+/// Checks the `poisoned` flag prior to execution and sets `poisoned = true` if a Rust panic is caught,
+/// preventing further operations against a potentially corrupted internal state.
+fn run_blocking_ffi<F, R>(py: Python<'_>, poisoned: &AtomicBool, f: F) -> PyResult<R>
 where
     F: FnOnce() -> PyResult<R> + Send,
     R: Send,
 {
+    if poisoned.load(Ordering::SeqCst) {
+        return Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "engine poisoned after previous panic, create a new instance",
+        ));
+    }
     let panic_result =
         py.allow_threads(|| std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)));
     match panic_result {
         Ok(res) => res,
         Err(panic_payload) => {
+            poisoned.store(true, Ordering::SeqCst);
             let panic_msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
                 (*s).to_string()
             } else if let Some(s) = panic_payload.downcast_ref::<String>() {
@@ -540,7 +589,9 @@ impl PyDbStats {
             self.index_stats.num_vectors,
             self.active_memory_count,
             self.drift_status,
-            self.calibration_ece.map(|e| format!("{:.4}", e)).unwrap_or_else(|| "None".to_string()),
+            self.calibration_ece
+                .map(|e| format!("{:.4}", e))
+                .unwrap_or_else(|| "None".to_string()),
             self.storage_stats.total_size_bytes + self.storage_stats.memtable_size_bytes
         )
     }
@@ -574,7 +625,7 @@ macro_rules! memfuse_crud_methods {
                 validate_vector(v)?;
                 let m = opt_dict_to_json(metadata.as_ref())?;
                 let v_owned = v.to_vec();
-                run_blocking_ffi(py, || rt.block_on(self.inner.insert(&id_str, &v_owned, m)).map_err(memfuse_err))
+                run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.insert(&id_str, &v_owned, m)).map_err(memfuse_err))
             }
 
             /// Retrieves a document by its user-provided string or numeric ID.
@@ -585,7 +636,7 @@ macro_rules! memfuse_crud_methods {
             ) -> PyResult<Option<PyDocument>> {
                 let id_str = validate_id_obj(id)?;
                 let rt = &self.runtime;
-                let doc = run_blocking_ffi(py, || rt.block_on(self.inner.get(&id_str)).map_err(memfuse_err))?;
+                let doc = run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.get(&id_str)).map_err(memfuse_err))?;
                 match doc {
                     Some(d) => Ok(Some(doc_to_py(py, d)?)),
                     None => Ok(None),
@@ -609,7 +660,7 @@ macro_rules! memfuse_crud_methods {
                 validate_vector(v)?;
                 let m = opt_dict_to_json(metadata.as_ref())?;
                 let v_owned = v.to_vec();
-                run_blocking_ffi(py, || rt.block_on(self.inner.update(&id_str, &v_owned, m)).map_err(memfuse_err))
+                run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.update(&id_str, &v_owned, m)).map_err(memfuse_err))
             }
 
             /// Upserts a document (inserts if missing, updates if exists).
@@ -629,7 +680,7 @@ macro_rules! memfuse_crud_methods {
                 validate_vector(v)?;
                 let m = opt_dict_to_json(metadata.as_ref())?;
                 let v_owned = v.to_vec();
-                run_blocking_ffi(py, || rt.block_on(self.inner.upsert(&id_str, &v_owned, m)).map_err(memfuse_err))
+                run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.upsert(&id_str, &v_owned, m)).map_err(memfuse_err))
             }
 
             /// Deletes a document by its ID.
@@ -640,7 +691,7 @@ macro_rules! memfuse_crud_methods {
             ) -> PyResult<()> {
                 let id_str = validate_id_obj(id)?;
                 let rt = &self.runtime;
-                run_blocking_ffi(py, || rt.block_on(self.inner.delete(&id_str)).map_err(memfuse_err))
+                run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.delete(&id_str)).map_err(memfuse_err))
             }
 
             /// Performs semantic k-NN search over the embeddings.
@@ -663,7 +714,7 @@ macro_rules! memfuse_crud_methods {
                 })?;
                 validate_vector(v)?;
                 let v_owned = v.to_vec();
-                let results = run_blocking_ffi(py, || rt.block_on(self.inner.search(&v_owned, k)).map_err(memfuse_err))?;
+                let results = run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.search(&v_owned, k)).map_err(memfuse_err))?;
                 results_to_py(py, results)
             }
 
@@ -677,11 +728,6 @@ macro_rules! memfuse_crud_methods {
                 vector: PyReadonlyArray1<'py, f32>,
                 k: usize,
             ) -> PyResult<Bound<'py, PyBytes>> {
-                // Note on Zero-Copy: True zero-copy return via Python Buffer Protocol is not safely
-                // feasible here without `unsafe` code (`__getbuffer__`) and lifetime management risks,
-                // because `FlatBufferBuilder` produces a temporary stack/heap buffer during search execution.
-                // Returning `PyBytes::new(py, data)` copies the buffer into Python-managed memory safely,
-                // preserving `#![forbid(unsafe_code)]` compliance and zero use-after-free risk.
                 if k == 0 || k > 1000 {
                     return Err(PyValueError::new_err(format!(
                         "Search k must be between 1 and 1000. Got: {}",
@@ -694,7 +740,7 @@ macro_rules! memfuse_crud_methods {
                 })?;
                 validate_vector(v)?;
                 let v_owned = v.to_vec();
-                let results = run_blocking_ffi(py, || rt.block_on(self.inner.search(&v_owned, k)).map_err(memfuse_err))?;
+                let results = run_blocking_ffi(py, &self.poisoned, || rt.block_on(self.inner.search(&v_owned, k)).map_err(memfuse_err))?;
 
                 let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
                 let mut res_offsets = Vec::with_capacity(results.len());
@@ -768,7 +814,7 @@ macro_rules! memfuse_crud_methods {
                 validate_vector(v)?;
                 let text_owned = text.to_string();
                 let v_owned = v.to_vec();
-                let results = run_blocking_ffi(py, || {
+                let results = run_blocking_ffi(py, &self.poisoned, || {
                     rt.block_on(self.inner.hybrid_search_with_weights(&text_owned, &v_owned, k, None, weights.as_ref()))
                         .map_err(memfuse_err)
                 })?;
@@ -790,11 +836,6 @@ macro_rules! memfuse_crud_methods {
                 text_weight: Option<f32>,
                 graph_weight: Option<f32>,
             ) -> PyResult<Bound<'py, PyBytes>> {
-                // Note on Zero-Copy: True zero-copy return via Python Buffer Protocol is not safely
-                // feasible here without `unsafe` code (`__getbuffer__`) and lifetime management risks,
-                // because `FlatBufferBuilder` produces a temporary stack/heap buffer during search execution.
-                // Returning `PyBytes::new(py, data)` copies the buffer into Python-managed memory safely,
-                // preserving `#![forbid(unsafe_code)]` compliance and zero use-after-free risk.
                 validate_query_text(text)?;
                 if k == 0 || k > 1000 {
                     return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -819,7 +860,7 @@ macro_rules! memfuse_crud_methods {
                 validate_vector(v)?;
                 let text_owned = text.to_string();
                 let v_owned = v.to_vec();
-                let results = run_blocking_ffi(py, || {
+                let results = run_blocking_ffi(py, &self.poisoned, || {
                     rt.block_on(self.inner.hybrid_search_with_weights(&text_owned, &v_owned, k, None, weights.as_ref()))
                         .map_err(memfuse_err)
                 })?;
@@ -872,7 +913,7 @@ macro_rules! memfuse_crud_methods {
                 validate_label(label)?;
                 let rt = &self.runtime;
                 let label_owned = label.to_string();
-                run_blocking_ffi(py, || {
+                run_blocking_ffi(py, &self.poisoned, || {
                     rt.block_on(self.inner.relate(&from_str, &to_str, &label_owned))
                         .map_err(memfuse_err)
                 })
@@ -888,7 +929,7 @@ macro_rules! memfuse_crud_methods {
             ) -> PyResult<Vec<(String, PyObject)>> {
                 let rt = &self.runtime;
                 let prefix_owned = prefix.to_string();
-                let results = run_blocking_ffi(py, || {
+                let results = run_blocking_ffi(py, &self.poisoned, || {
                     rt.block_on(self.inner.scan_prefix(&prefix_owned, limit))
                         .map_err(memfuse_err)
                 })?;
@@ -915,7 +956,7 @@ macro_rules! memfuse_crud_methods {
                 let start_bytes: Option<Vec<u8>> = start.map(|s| s.as_bytes().to_vec());
                 let end_bytes: Option<Vec<u8>> = end.map(|s| s.as_bytes().to_vec());
 
-                let results = run_blocking_ffi(py, || {
+                let results = run_blocking_ffi(py, &self.poisoned, || {
                     use std::ops::Bound;
                     let start_bound = match &start_bytes {
                         Some(b) => Bound::Included(b.as_slice()),
@@ -972,7 +1013,7 @@ macro_rules! memfuse_batch_methods {
                     let m = opt_dict_to_json(metadata.as_ref())?;
                     batch.push((id_str, v.to_vec(), m));
                 }
-                run_blocking_ffi(py, || {
+                run_blocking_ffi(py, &self.poisoned, || {
                     rt.block_on(self.inner.insert_many(&batch))
                         .map_err(memfuse_err)
                 })
@@ -1003,7 +1044,7 @@ macro_rules! memfuse_batch_methods {
                     let m = opt_dict_to_json(metadata.as_ref())?;
                     batch.push((id_str, v.to_vec(), m));
                 }
-                run_blocking_ffi(py, || {
+                run_blocking_ffi(py, &self.poisoned, || {
                     rt.block_on(self.inner.upsert_many(&batch))
                         .map_err(memfuse_err)
                 })
@@ -1017,7 +1058,7 @@ macro_rules! memfuse_batch_methods {
 /// Hält starke Arc-Referenzen, damit die Weak-Pointer in `MemFuse.set_router()` etc.
 /// nicht sofort droppen. Analog zu `RoutingHandle` in memfuse-mcp.
 struct PyRoutingHandle {
-    _router: Arc<memfuse_router::RouterEngine>,
+    _router: Arc<memfuse_router::DefaultRouterEngine>,
     _calibrator: Arc<parking_lot::Mutex<memfuse_calibration::IsotonicCalibrator>>,
     _pid_controller: Arc<parking_lot::Mutex<memfuse_calibration::PidController>>,
 }
@@ -1035,6 +1076,7 @@ pub struct PyMemFuse {
     runtime: Arc<Runtime>,
     worker_threads: usize,
     _routing: Option<PyRoutingHandle>,
+    poisoned: Arc<AtomicBool>,
 }
 
 #[pymethods]
@@ -1043,6 +1085,21 @@ impl PyMemFuse {
     #[getter]
     pub fn worker_threads(&self) -> usize {
         self.worker_threads
+    }
+
+    /// Returns true if the database engine was poisoned by a previous caught Rust panic.
+    #[getter]
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned.load(Ordering::SeqCst)
+    }
+
+    /// Internal helper method for testing FFI panic isolation and engine poisoning.
+    #[pyo3(signature = (message=None))]
+    pub fn _trigger_panic_for_test(&self, py: Python<'_>, message: Option<String>) -> PyResult<()> {
+        let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
+        run_blocking_ffi(py, &self.poisoned, move || -> PyResult<()> {
+            panic!("{}", msg);
+        })
     }
 
     // ── Context Manager Protocol ──
@@ -1062,7 +1119,9 @@ impl PyMemFuse {
         _exc_tb: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<bool> {
         let rt = &self.runtime;
-        run_blocking_ffi(py, || rt.block_on(self.inner.flush()).map_err(memfuse_err))?;
+        run_blocking_ffi(py, &self.poisoned, || {
+            rt.block_on(self.inner.flush()).map_err(memfuse_err)
+        })?;
         Ok(false) // Do not suppress exceptions
     }
 
@@ -1074,20 +1133,21 @@ impl PyMemFuse {
         validate_collection_name(name)?;
         let rt = &self.runtime;
         let name_owned = name.to_string();
-        let col = run_blocking_ffi(py, || {
+        let col = run_blocking_ffi(py, &self.poisoned, || {
             rt.block_on(self.inner.collection(&name_owned))
                 .map_err(memfuse_err)
         })?;
         Ok(PyCollection {
             inner: col,
             runtime: self.runtime.clone(),
+            poisoned: self.poisoned.clone(),
         })
     }
 
     /// Lists all existing collection names.
     pub fn list_collections(&self, py: Python<'_>) -> PyResult<Vec<String>> {
         let rt = &self.runtime;
-        run_blocking_ffi(py, || {
+        run_blocking_ffi(py, &self.poisoned, || {
             rt.block_on(self.inner.list_collections())
                 .map_err(memfuse_err)
         })
@@ -1099,7 +1159,7 @@ impl PyMemFuse {
         let rt = &self.runtime;
         let name_owned = name.to_string();
         let tenant_id = memfuse_core::TenantId::try_new(1).map_err(memfuse_err)?;
-        run_blocking_ffi(py, || {
+        run_blocking_ffi(py, &self.poisoned, || {
             rt.block_on(
                 self.inner
                     .drop_collection(&name_owned, tenant_id, &[0u8; 32]),
@@ -1112,13 +1172,17 @@ impl PyMemFuse {
     /// Flushes all pending writes to disk.
     pub fn flush(&self, py: Python<'_>) -> PyResult<()> {
         let rt = &self.runtime;
-        run_blocking_ffi(py, || rt.block_on(self.inner.flush()).map_err(memfuse_err))
+        run_blocking_ffi(py, &self.poisoned, || {
+            rt.block_on(self.inner.flush()).map_err(memfuse_err)
+        })
     }
 
     /// Returns combined statistics for the vector index and storage engine.
     pub fn stats(&self, py: Python<'_>) -> PyResult<PyDbStats> {
         let rt = &self.runtime;
-        let stats = run_blocking_ffi(py, || rt.block_on(self.inner.stats()).map_err(memfuse_err))?;
+        let stats = run_blocking_ffi(py, &self.poisoned, || {
+            rt.block_on(self.inner.stats()).map_err(memfuse_err)
+        })?;
 
         Ok(PyDbStats {
             drift_status: stats.drift_status,
@@ -1142,13 +1206,15 @@ impl PyMemFuse {
     /// Returns the number of documents.
     pub fn len(&self, py: Python<'_>) -> PyResult<usize> {
         let rt = &self.runtime;
-        run_blocking_ffi(py, || rt.block_on(self.inner.len()).map_err(memfuse_err))
+        run_blocking_ffi(py, &self.poisoned, || {
+            rt.block_on(self.inner.len()).map_err(memfuse_err)
+        })
     }
 
     /// Returns true if the collection/database is empty.
     pub fn is_empty(&self, py: Python<'_>) -> PyResult<bool> {
         let rt = &self.runtime;
-        run_blocking_ffi(py, || {
+        run_blocking_ffi(py, &self.poisoned, || {
             rt.block_on(self.inner.is_empty()).map_err(memfuse_err)
         })
     }
@@ -1164,14 +1230,32 @@ memfuse_batch_methods!(PyMemFuse);
 pub struct PyCollection {
     inner: Arc<MemFuseCollection>,
     runtime: Arc<Runtime>,
+    poisoned: Arc<AtomicBool>,
 }
 
 #[pymethods]
 impl PyCollection {
+    /// Returns true if the collection/database engine was poisoned by a previous caught Rust panic.
+    #[getter]
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned.load(Ordering::SeqCst)
+    }
+
+    /// Internal helper method for testing FFI panic isolation and engine poisoning.
+    #[pyo3(signature = (message=None))]
+    pub fn _trigger_panic_for_test(&self, py: Python<'_>, message: Option<String>) -> PyResult<()> {
+        let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
+        run_blocking_ffi(py, &self.poisoned, move || -> PyResult<()> {
+            panic!("{}", msg);
+        })
+    }
+
     /// Returns statistics for the collection's vector index.
     pub fn stats(&self, py: Python<'_>) -> PyResult<PyVectorIndexStats> {
         let rt = &self.runtime;
-        let stats = run_blocking_ffi(py, || rt.block_on(self.inner.stats()).map_err(memfuse_err))?;
+        let stats = run_blocking_ffi(py, &self.poisoned, || {
+            rt.block_on(self.inner.stats()).map_err(memfuse_err)
+        })?;
 
         Ok(PyVectorIndexStats {
             num_vectors: stats.num_vectors,
@@ -1183,13 +1267,17 @@ impl PyCollection {
     /// Returns the number of documents.
     pub fn len(&self, py: Python<'_>) -> PyResult<usize> {
         let rt = &self.runtime;
-        run_blocking_ffi(py, || Ok(rt.block_on(self.inner.len())))
+        run_blocking_ffi(py, &self.poisoned, || Ok(rt.block_on(self.inner.len())))
     }
 
     /// Returns true if the collection is empty.
     pub fn is_empty(&self, py: Python<'_>) -> PyResult<bool> {
         let rt = &self.runtime;
-        run_blocking_ffi(py, || Ok(rt.block_on(self.inner.is_empty())))
+        run_blocking_ffi(
+            py,
+            &self.poisoned,
+            || Ok(rt.block_on(self.inner.is_empty())),
+        )
     }
 }
 
@@ -1257,8 +1345,9 @@ fn open(
         };
     }
 
+    let poisoned = Arc::new(AtomicBool::new(false));
     let path_string = path.to_string();
-    let db = run_blocking_ffi(py, || {
+    let db = run_blocking_ffi(py, &poisoned, || {
         rt.block_on(MemFuse::open_with_config(path_string, config))
             .map_err(memfuse_err)
     })?;
@@ -1266,7 +1355,7 @@ fn open(
     // --- Routing-Setup (analog zu memfuse-mcp/src/lib.rs setup_routing()) ---
     // Lese Router-Config aus MemFuseConfig oder setze Default.
     // Da memfuse-py derzeit keine externe Router-Config-API hat, verwende Default.
-    let routing_handle = run_blocking_ffi(py, || {
+    let routing_handle = run_blocking_ffi(py, &poisoned, || {
         rt.block_on(async {
             let router_config = RouterConfig::default();
             if router_config.profiles.is_empty() {
@@ -1284,8 +1373,8 @@ fn open(
             let pid_controller = Arc::new(parking_lot::Mutex::new(
                 memfuse_calibration::PidController::default(),
             ));
-            let router_weak = Arc::downgrade(&router)
-                as std::sync::Weak<dyn memfuse_db::DriftStatusProvider>;
+            let router_weak =
+                Arc::downgrade(&router) as std::sync::Weak<dyn memfuse_db::DriftStatusProvider>;
             db.set_router(router_weak);
             db.set_calibrator(Arc::downgrade(&calibrator));
             db.set_pid_controller(Arc::downgrade(&pid_controller));
@@ -1304,6 +1393,7 @@ fn open(
         runtime: rt,
         worker_threads,
         _routing: routing_handle,
+        poisoned,
     })
 }
 
@@ -1312,6 +1402,21 @@ mod tests {
     use super::*;
     use memfuse_core::MemFuseError;
     use pyo3::exceptions::*;
+
+    #[test]
+    fn test_parse_worker_threads_env_clamping() {
+        std::env::set_var("MEMFUSE_WORKER_THREADS", "0");
+        assert_eq!(parse_worker_threads_env(), 1);
+
+        std::env::set_var("MEMFUSE_WORKER_THREADS", "1000");
+        assert_eq!(parse_worker_threads_env(), 256);
+
+        std::env::set_var("MEMFUSE_WORKER_THREADS", "invalid");
+        let val = parse_worker_threads_env();
+        assert!((1..=256).contains(&val));
+
+        std::env::remove_var("MEMFUSE_WORKER_THREADS");
+    }
 
     #[test]
     fn test_py_runtime_state_initialization() {
@@ -1456,16 +1561,25 @@ mod tests {
     fn test_run_blocking_ffi_panic_containment() {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
-            let res: PyResult<i32> = run_blocking_ffi(py, || {
+            let poison = AtomicBool::new(false);
+            let res: PyResult<i32> = run_blocking_ffi(py, &poison, || {
                 _simulate_panic_for_test();
             });
             assert!(res.is_err());
+            assert!(poison.load(Ordering::SeqCst));
             if let Err(py_err) = res {
                 assert!(py_err.is_instance_of::<PyRuntimeError>(py));
                 let bound_val = py_err.value(py);
                 let msg: String = bound_val.to_string();
                 assert!(msg.contains("Rust panic caught at FFI boundary"));
                 assert!(msg.contains("Simulated Rust core panic"));
+            }
+
+            let res_after: PyResult<i32> = run_blocking_ffi(py, &poison, || Ok(42));
+            assert!(res_after.is_err());
+            if let Err(py_err) = res_after {
+                let msg = py_err.value(py).to_string();
+                assert!(msg.contains("engine poisoned after previous panic"));
             }
         });
     }
@@ -1474,8 +1588,10 @@ mod tests {
     fn test_run_blocking_ffi_success() {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
-            let res: PyResult<i32> = run_blocking_ffi(py, || Ok(42));
+            let poison = AtomicBool::new(false);
+            let res: PyResult<i32> = run_blocking_ffi(py, &poison, || Ok(42));
             assert!(matches!(res, Ok(42)));
+            assert!(!poison.load(Ordering::SeqCst));
         });
     }
 
@@ -1670,7 +1786,8 @@ mod tests {
 #[pyfunction]
 fn _trigger_panic_for_test(py: Python<'_>, message: Option<String>) -> PyResult<()> {
     let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
-    run_blocking_ffi(py, move || -> PyResult<()> {
+    let dummy_poison = AtomicBool::new(false);
+    run_blocking_ffi(py, &dummy_poison, move || -> PyResult<()> {
         panic!("{}", msg);
     })
 }
@@ -1681,16 +1798,7 @@ fn _memfuse(_py: Python<'_>, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<(
     m.add("__version__", "0.1.0")?;
 
     // Initialize per-interpreter Tokio runtime state
-    let worker_threads = std::env::var("MEMFUSE_WORKER_THREADS")
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or_else(|| {
-            (std::thread::available_parallelism()
-                .map(|n| n.get())
-                .unwrap_or(4)
-                / 2)
-            .max(2)
-        });
+    let worker_threads = parse_worker_threads_env();
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(worker_threads)

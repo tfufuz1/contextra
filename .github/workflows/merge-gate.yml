@@ -48,8 +48,14 @@ jobs:
       - name: Clippy Check
         run: cargo clippy --workspace --exclude memfuse-tauri -- -D warnings
 
+      - name: Clippy Check (memfuse-py)
+        run: cargo clippy --manifest-path crates/memfuse-py/Cargo.toml --all-targets -- -D warnings
+
       - name: Fast Unit Tests
         run: cargo test --workspace --exclude memfuse-tauri --lib --quiet
+
+      - name: Fast Unit Tests (memfuse-py)
+        run: cargo test --manifest-path crates/memfuse-py/Cargo.toml --quiet
 
       - name: FFI Panic Boundary Check
         run: cargo xtask check-ffi-panic-boundary

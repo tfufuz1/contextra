@@ -42,7 +42,7 @@
 // HOTSPOTS:   greedy_search(), insert(), search_at(), trigger_rebuild_async()
 // SIEHE AUCH:  rules/simd_safety.md, ADR-017, ADR-034
 
-use crate::distance::compute_distance;
+use crate::distance::{compute_distance, compute_distance_trusted};
 use ahash::{AHashMap, AHashSet};
 use memfuse_core::{
     DistanceMetric, DocId, IndexOp, MemFuseError, Result, ScoredDocument, TxBuffer, TxId,
@@ -99,6 +99,9 @@ pub struct HnswConfig {
     /// Sample size used for ScalarQuantizer recalibration during rebuilds.
     /// Default is 10,000 to balance speed and accuracy.
     pub quantizer_recalibration_sample_size: usize,
+    /// Quantizer drift ratio threshold above which an index rebuild is recommended.
+    /// Default is `0.10` (10% out-of-range queries).
+    pub quantizer_drift_threshold: f32,
     /// Partial rebuild configuration for hot-path local rebuilds (F-02).
     #[cfg(feature = "partial-index-rebuild")]
     pub partial_rebuild_config: crate::partial_rebuild::PartialRebuildConfig,
@@ -117,10 +120,16 @@ impl Default for HnswConfig {
             rebuild_threshold: 1.0 - HNSW_REBUILD_DELETION_RATIO,
             quantize: false,
             quantizer_recalibration_sample_size: 10_000,
+            quantizer_drift_threshold: 0.10,
             #[cfg(feature = "partial-index-rebuild")]
             partial_rebuild_config: crate::partial_rebuild::PartialRebuildConfig::default(),
         }
     }
+}
+
+/// Validates that a vector is non-empty and contains no NaN or Infinite values.
+fn validate_vector(vec: &[f32]) -> Result<()> {
+    crate::distance::validate_vector(vec)
 }
 
 impl HnswConfig {
@@ -151,6 +160,12 @@ impl HnswConfig {
             return Err(MemFuseError::invalid_input(format!(
                 "rebuild_threshold ({}) must be between 0.0 and 1.0",
                 self.rebuild_threshold
+            )));
+        }
+        if !(0.0..=1.0).contains(&self.quantizer_drift_threshold) {
+            return Err(MemFuseError::invalid_input(format!(
+                "quantizer_drift_threshold ({}) must be between 0.0 and 1.0",
+                self.quantizer_drift_threshold
             )));
         }
         Ok(())
@@ -216,6 +231,13 @@ impl HnswConfigBuilder {
         self
     }
 
+    /// Sets the drift ratio threshold for ScalarQuantizer recalibration and rebuilds.
+    /// Default is `0.10` (10% out-of-range queries).
+    pub fn quantizer_drift_threshold(mut self, threshold: f32) -> Self {
+        self.config.quantizer_drift_threshold = threshold.clamp(0.0, 1.0);
+        self
+    }
+
     /// Sets the rebuild threshold (fraction of active non-deleted nodes remaining below which rebuild is triggered).
     /// Value must be in range `0.0..=1.0`. For example, `0.90` triggers rebuild when >10% of nodes are deleted.
     ///
@@ -254,6 +276,14 @@ pub enum VectorData {
 }
 
 /// A node in the HNSW graph.
+///
+/// # Concurrency & Lock Context
+/// - `connections` uses `RwLock<Vec<Vec<u32>>>` per node (Option B) rather than per-layer locks,
+///   reducing total lock overhead from `N_nodes * max_layer` to `N_nodes`.
+/// - Search operations acquire `hot.nodes.read()` to look up nodes and `node.connections.read()`
+///   to traverse neighbors.
+/// - Incremental lazy neighbor pruning during search acquires `node.connections.write()`
+///   without needing `hot.write_mutex` or an exclusive lock on `hot.nodes`.
 #[derive(Debug)]
 pub struct HnswNode {
     doc_id: DocId,
@@ -327,7 +357,6 @@ pub struct HnswHotCore {
     pub ram_entry_point: RwLock<Option<usize>>,
     pub max_layer: AtomicU64,
     pub ml: f64,
-    pub deleted_nodes: RwLock<RoaringTreemap>,
     pub deleted_count: AtomicU64,
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
@@ -343,6 +372,7 @@ pub struct HnswColdCore {
     pub seq_log: RwLock<memfuse_core::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
+    pub deleted_nodes: RwLock<RoaringTreemap>,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
 }
@@ -358,6 +388,9 @@ impl HnswIndex {
     pub fn try_new(config: HnswConfig) -> Result<Self> {
         config.validate()?;
         let ml = 1.0 / (config.m as f64).ln();
+        #[cfg(feature = "partial-index-rebuild")]
+        let partial_rebuild_config = config.partial_rebuild_config.clone();
+
         Ok(Self {
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
@@ -367,7 +400,6 @@ impl HnswIndex {
                     ram_entry_point: RwLock::new(None),
                     max_layer: AtomicU64::new(0),
                     ml,
-                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
@@ -382,9 +414,10 @@ impl HnswIndex {
                     seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
-                        config.partial_rebuild_config.clone(),
+                        partial_rebuild_config,
                     )),
                 },
             }),
@@ -398,6 +431,9 @@ impl HnswIndex {
     pub fn new(config: HnswConfig) -> Self {
         let validation_error = config.validate().err().map(|e| e.to_string());
         let ml = 1.0 / (config.m as f64).ln();
+        #[cfg(feature = "partial-index-rebuild")]
+        let partial_rebuild_config = config.partial_rebuild_config.clone();
+
         Self {
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
@@ -407,7 +443,6 @@ impl HnswIndex {
                     ram_entry_point: RwLock::new(None),
                     max_layer: AtomicU64::new(0),
                     ml,
-                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
@@ -422,9 +457,10 @@ impl HnswIndex {
                     seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
-                        config.partial_rebuild_config.clone(),
+                        partial_rebuild_config,
                     )),
                 },
             }),
@@ -489,7 +525,8 @@ impl HnswIndex {
 
         let query_quantized = if self.inner.cold.config.quantize {
             self.inner
-                .cold.quantizer
+                .cold
+                .quantizer
                 .read()
                 .as_ref()
                 .map(|q| q.quantize(query))
@@ -509,7 +546,7 @@ impl HnswIndex {
         }
 
         let nodes = self.inner.hot.nodes.read();
-        let deleted = self.inner.hot.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
 
         let mut filter_eps = Vec::new();
         if let Some(f) = filter {
@@ -525,7 +562,11 @@ impl HnswIndex {
                 prior_prepared: &[],
             };
 
-            let factor = if self.inner.cold.config.quantize { 4 } else { 2 };
+            let factor = if self.inner.cold.config.quantize {
+                4
+            } else {
+                2
+            };
             let max_filter_eps = self.inner.cold.config.ef_search.max(k) * factor;
 
             let total_nodes = mmap_node_count + nodes.len();
@@ -576,7 +617,11 @@ impl HnswIndex {
         }
 
         // Over-fetch to compensate for filtered-out results and reranking
-        let factor = if self.inner.cold.config.quantize { 4 } else { 2 };
+        let factor = if self.inner.cold.config.quantize {
+            4
+        } else {
+            2
+        };
         let ef = self.inner.cold.config.ef_search.max(k) * factor;
         let candidates = self
             .inner
@@ -720,7 +765,7 @@ impl HnswIndex {
 
         let mut tombstone_map = ahash::AHashMap::new();
         let total_nodes = self.inner.hot.nodes.read().len();
-        let deleted_guard = self.inner.hot.deleted_nodes.read();
+        let deleted_guard = self.inner.cold.deleted_nodes.read();
 
         for i in 0..total_nodes {
             let id = i as u64;
@@ -775,7 +820,7 @@ impl HnswIndex {
     /// # FIND-DB-004: HNSW Repair Acceleration
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
         let map = self.inner.hot.doc_to_node.read();
-        let deleted = self.inner.hot.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
         map.iter()
             .filter(|(&_doc_id_raw, &node_idx)| !deleted.contains(node_idx as u64))
             .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw))
@@ -1053,7 +1098,8 @@ impl HnswIndex {
 
         let mut guard = self.inner.cold.mmap_index.write();
         self.inner
-            .hot.last_tx_id
+            .hot
+            .last_tx_id
             .store(mmap_index.header.last_tx_id(), Ordering::SeqCst);
         *guard = Some(mmap_index);
         Ok(())
@@ -1208,7 +1254,9 @@ impl HnswIndexCore {
         data: &VectorData,
     ) -> Result<f32> {
         match data {
-            VectorData::F32(v) => compute_distance(query_exact, v, self.cold.config.distance_metric),
+            VectorData::F32(v) => {
+                compute_distance_trusted(query_exact, v, self.cold.config.distance_metric)
+            }
             VectorData::U8(v) => {
                 let guard = self.cold.quantizer.read();
                 let q = guard.as_ref().ok_or_else(|| {
@@ -1253,14 +1301,14 @@ impl HnswIndexCore {
                     })?))
                 })
                 .collect::<Result<Vec<f32>>>()?;
-            compute_distance(query_exact, &v, self.cold.config.distance_metric)
+            compute_distance_trusted(query_exact, &v, self.cold.config.distance_metric)
         }
     }
 
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
         match (data_a, data_b) {
             (VectorData::F32(a), VectorData::F32(b)) => {
-                compute_distance(a, b, self.cold.config.distance_metric)
+                compute_distance_trusted(a, b, self.cold.config.distance_metric)
             }
             (VectorData::U8(a), VectorData::U8(b)) => {
                 let guard = self.cold.quantizer.read();
@@ -1438,6 +1486,9 @@ impl HnswIndexCore {
             }
         }
 
+        // NOTE: deleted_snapshot is taken at search start. Concurrent deletes during this search are not reflected — this is intentional for search consistency.
+        let deleted_snapshot = self.hot.deleted_nodes.read();
+
         while let Some(Reverse(current)) = candidates.pop() {
             if let Some(worst_result) = results.peek() {
                 if current.distance > worst_result.distance && results.len() >= ef {
@@ -1446,12 +1497,11 @@ impl HnswIndexCore {
             }
 
             let connections = self.resolve_connections(current.index, layer, &ctx)?;
-            let deleted_guard = self.hot.deleted_nodes.read();
             let mut has_dead_neighbors = false;
 
             for &neighbor_u32 in connections.iter() {
                 let neighbor = neighbor_u32 as usize;
-                if deleted_guard.contains(neighbor as u64) {
+                if deleted_snapshot.contains(neighbor as u64) {
                     self.cold.visited_dead_nodes.fetch_add(1, Ordering::Relaxed);
                     has_dead_neighbors = true;
                 }
@@ -1490,7 +1540,7 @@ impl HnswIndexCore {
                     let mut conns_guard = node.connections.write();
                     if let Some(layer_conns) = conns_guard.get_mut(layer) {
                         layer_conns.retain(|&neighbor_u32| {
-                            if !deleted_guard.contains(neighbor_u32 as u64) {
+                            if !deleted_snapshot.contains(neighbor_u32 as u64) {
                                 true
                             } else if let Some(min_ret_seq) = min_retention_seq {
                                 let neighbor_idx = neighbor_u32 as usize;
@@ -1515,7 +1565,8 @@ impl HnswIndexCore {
         }
         #[cfg(feature = "partial-index-rebuild")]
         if layer == 0 && !visited_node_ids.is_empty() {
-            self.cold.traversal_tracker
+            self.cold
+                .traversal_tracker
                 .write()
                 .record_traversal(visited_node_ids);
         }
@@ -1754,22 +1805,11 @@ impl HnswIndexCore {
             )));
         }
 
-        // ANCHOR[ALG-FIX:D2-004] STATUS:DONE (TS:2026-06-01T00:00:00Z) — NaN/Inf-Validierung bei Insert (Distanzfunktion)
-        // NaN-Vektoren würden in BinaryHeap stille Korrumpierung verursachen.
-        // Validierung an der Grenze (insert) statt in distance.rs — distance bleibt rein.
-        if vector.iter().any(|x| x.is_nan() || x.is_infinite()) {
-            return Err(MemFuseError::invalid_input(
-                "Vector contains NaN or Infinity values",
-            ));
-        }
+        validate_vector(vector)?;
 
-        // AI-TAG[CONCURRENCY][MAJOR] RESOLVED: AGT-INDEX-b2c3d4e5 (TS:2026-09-01T11:30:00Z) (SESSION:016eab33) — Write-Lock für
-        //   SQ8-Quantizer-Bounds-Expansion bei Insert garantiert; loom-Regressionstest
-        //   in tests/loom_quantizer_race_test.rs
         let vector_data = if self.cold.config.quantize {
-            let mut q_guard = self.cold.quantizer.write();
-            if let Some(q) = q_guard.as_mut() {
-                q.expand_bounds_to_fit(vector);
+            let q_guard = self.cold.quantizer.read();
+            if let Some(q) = q_guard.as_ref() {
                 VectorData::U8(q.quantize(vector)?)
             } else {
                 VectorData::F32(vector.to_vec())
@@ -1782,7 +1822,8 @@ impl HnswIndexCore {
         let entry_point_opt = *self.hot.entry_point.read();
 
         let mmap_node_count = self
-            .cold.mmap_index
+            .cold
+            .mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -2023,7 +2064,8 @@ impl HnswIndexCore {
         };
 
         self.hot.nodes.write().push(node);
-        self.hot.doc_to_node
+        self.hot
+            .doc_to_node
             .write()
             .insert(prepared.doc_id.inner(), prepared.new_idx);
 
@@ -2039,7 +2081,8 @@ impl HnswIndexCore {
 
         if prepared.should_update_entry_point {
             *self.hot.entry_point.write() = Some(prepared.new_idx);
-            self.hot.max_layer
+            self.hot
+                .max_layer
                 .store(prepared.new_layer as u64, Ordering::SeqCst);
         }
 
@@ -2057,7 +2100,7 @@ impl HnswIndexCore {
     fn do_delete(&self, id: DocId) -> Result<()> {
         let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
         if let Some(idx) = node_idx {
-            self.hot.deleted_nodes.write().insert(idx as u64);
+            self.cold.deleted_nodes.write().insert(idx as u64);
             self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
 
             // ANCHOR[ALG-FIX:D2-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Entry-Point-Aktualisierung nach Delete (INV-HNSW-4)
@@ -2073,7 +2116,7 @@ impl HnswIndexCore {
                     .as_ref()
                     .map(|m| m.header.node_count() as usize)
                     .unwrap_or(0);
-                let deleted = self.hot.deleted_nodes.read();
+                let deleted = self.cold.deleted_nodes.read();
 
                 let mut best_node = None;
                 let mut best_ram_node = None;
@@ -2125,7 +2168,8 @@ impl HnswIndexCore {
                         } else {
                             nodes[new_idx].max_layer
                         };
-                        self.hot.max_layer
+                        self.hot
+                            .max_layer
                             .store(node_max_layer as u64, Ordering::SeqCst);
                     } else {
                         self.hot.max_layer.store(0, Ordering::SeqCst);
@@ -2159,7 +2203,8 @@ impl HnswIndexCore {
     pub fn connectivity_score(&self) -> f64 {
         let deleted = self.hot.deleted_count.load(Ordering::SeqCst);
         let mmap_count = self
-            .cold.mmap_index
+            .cold
+            .mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -2185,9 +2230,19 @@ impl HnswIndexCore {
         Ok(())
     }
 
-    /// Checks if a rebuild is required based on the deletion ratio.
+    /// Checks if a rebuild is required based on the deletion ratio or quantizer drift.
     pub fn is_rebuild_required(&self) -> bool {
-        self.connectivity_score() < self.cold.config.rebuild_threshold
+        if self.connectivity_score() < self.cold.config.rebuild_threshold {
+            return true;
+        }
+        if self.cold.config.quantize {
+            if let Some(q) = self.cold.quantizer.read().as_ref() {
+                if q.is_rebuild_required(self.cold.config.quantizer_drift_threshold) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Rebuilds the HNSW index from scratch, removing all deleted nodes.
@@ -2230,14 +2285,15 @@ impl HnswIndexCore {
         let region_set: AHashSet<u64> = region_node_ids.into_iter().collect();
 
         let mmap_count = self
-            .cold.mmap_index
+            .cold
+            .mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
         let nodes = self.hot.nodes.read();
-        let mut deleted_nodes = self.hot.deleted_nodes.write();
+        let mut deleted_nodes = self.cold.deleted_nodes.write();
 
         let mut tombstoned_in_region = Vec::new();
         for &node_id in &region_set {
@@ -2278,7 +2334,8 @@ impl HnswIndexCore {
             deleted_nodes.insert(ts_id);
         }
 
-        self.hot.deleted_count
+        self.hot
+            .deleted_count
             .store(deleted_nodes.len(), Ordering::SeqCst);
 
         tracing::info!(
@@ -2296,12 +2353,13 @@ impl HnswIndexCore {
         let (all_nodes, config, snapshot_tx) = {
             let nodes = self.hot.nodes.read();
             let mmap_count = self
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let deleted_nodes = self.hot.deleted_nodes.read();
+            let deleted_nodes = self.cold.deleted_nodes.read();
             let seq_log = self.cold.seq_log.read();
             let min_retention_seq = seq_log.min_retention_seq();
             let snapshot_tx = self.hot.last_tx_id.load(Ordering::SeqCst);
@@ -2345,7 +2403,8 @@ impl HnswIndexCore {
         if let Some(old_q) = quantizer_guard.as_ref() {
             // Train a new quantizer on a sample of active nodes to prevent clamping loss
             let sample_size = self
-                .cold.config
+                .cold
+                .config
                 .quantizer_recalibration_sample_size
                 .min(all_nodes.len());
             let mut train_data = Vec::with_capacity(sample_size);
@@ -2364,8 +2423,10 @@ impl HnswIndexCore {
 
             if !train_data.is_empty() {
                 let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
-                let new_q =
-                    crate::quantize::ScalarQuantizer::train(&training_refs, self.cold.config.dimension);
+                let new_q = crate::quantize::ScalarQuantizer::train(
+                    &training_refs,
+                    self.cold.config.dimension,
+                );
                 *new_index.inner.cold.quantizer.write() = Some(new_q);
             } else {
                 *new_index.inner.cold.quantizer.write() = Some(old_q.clone());
@@ -2389,7 +2450,8 @@ impl HnswIndexCore {
             }
             let mmap_count = new_index
                 .inner
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2429,7 +2491,8 @@ impl HnswIndexCore {
                     let vector_opt = {
                         let doc_map = self.hot.doc_to_node.read();
                         let mmap_count = self
-                            .cold.mmap_index
+                            .cold
+                            .mmap_index
                             .read()
                             .as_ref()
                             .map(|m| m.header.node_count() as usize)
@@ -2467,7 +2530,8 @@ impl HnswIndexCore {
                         // Set committed_tx on newly inserted node in new_index
                         let mmap_count = new_index
                             .inner
-                            .cold.mmap_index
+                            .cold
+                            .mmap_index
                             .read()
                             .as_ref()
                             .map(|m| m.header.node_count() as usize)
@@ -2497,7 +2561,7 @@ impl HnswIndexCore {
             let mut doc_to_node = self.hot.doc_to_node.write();
             let mut entry_point = self.hot.entry_point.write();
             let mut ram_entry_point = self.hot.ram_entry_point.write();
-            let mut deleted_nodes = self.hot.deleted_nodes.write();
+            let mut deleted_nodes = self.cold.deleted_nodes.write();
 
             let new_nodes = std::mem::take(&mut *new_index.inner.hot.nodes.write());
             let new_doc_to_node = std::mem::take(&mut *new_index.inner.hot.doc_to_node.write());
@@ -2520,7 +2584,8 @@ impl HnswIndexCore {
 
             // Preserve mmap deletions, plus any deletions recorded in new_index
             let mmap_count = self
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2531,12 +2596,13 @@ impl HnswIndexCore {
                     new_deleted.insert(del_idx);
                 }
             }
-            for del_idx in new_index.inner.hot.deleted_nodes.read().iter() {
+            for del_idx in new_index.inner.cold.deleted_nodes.read().iter() {
                 new_deleted.insert(del_idx);
             }
 
             *deleted_nodes = new_deleted;
-            self.hot.deleted_count
+            self.hot
+                .deleted_count
                 .store(deleted_nodes.len(), Ordering::SeqCst);
         }
 
@@ -2562,14 +2628,7 @@ impl VectorIndex for HnswIndex {
             )));
         }
 
-        // FIND-IDX-002: NaN/Inf Poisoning prevention
-        for &val in embedding {
-            if val.is_nan() || val.is_infinite() {
-                return Err(MemFuseError::Storage(
-                    "Invalid vector: NaN or Infinity detected".to_string(),
-                ));
-            }
-        }
+        validate_vector(embedding)?;
 
         self.inner.cold.tx_buffer.stage(
             tx,
@@ -2680,7 +2739,7 @@ impl VectorIndex for HnswIndex {
         }
 
         let nodes = self.inner.hot.nodes.read();
-        let deleted = self.inner.hot.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
         let mut results = Vec::with_capacity(k);
 
         let ctx = SearchContext {
@@ -2765,7 +2824,6 @@ impl VectorIndex for HnswIndex {
         }
         let _lock = self.inner.hot.write_mutex.lock().await;
         let ops = self.inner.cold.tx_buffer.drain(tx);
-        let mut deleted_any = false;
 
         // ANCHOR[SPEC:WP-2.2-SQ8TRAIN-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Lazy Training logic (Stabilized)
         if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
@@ -2854,7 +2912,6 @@ impl VectorIndex for HnswIndex {
 
         for doc_id in deletes_to_apply {
             self.inner.do_delete(doc_id)?;
-            deleted_any = true;
         }
 
         // Record ops into seq_log for search_at snapshot isolation
@@ -2877,7 +2934,8 @@ impl VectorIndex for HnswIndex {
         if !inserted_doc_ids.is_empty() {
             let mmap_count = self
                 .inner
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2897,10 +2955,11 @@ impl VectorIndex for HnswIndex {
             }
         }
 
-        if deleted_any && self.inner.is_rebuild_required() {
+        if self.inner.is_rebuild_required() {
             tracing::warn!(
-                "HNSW index rebuild threshold reached (threshold: {:.2})",
-                self.inner.cold.config.rebuild_threshold
+                "HNSW index rebuild threshold reached (rebuild_threshold: {:.2}, quantizer_drift_threshold: {:.2})",
+                self.inner.cold.config.rebuild_threshold,
+                self.inner.cold.config.quantizer_drift_threshold
             );
             self.trigger_rebuild_async();
         }
@@ -2908,7 +2967,10 @@ impl VectorIndex for HnswIndex {
         #[cfg(feature = "partial-index-rebuild")]
         self.check_and_trigger_partial_rebuild();
 
-        self.inner.hot.last_tx_id.store(tx.inner(), Ordering::SeqCst);
+        self.inner
+            .hot
+            .last_tx_id
+            .store(tx.inner(), Ordering::SeqCst);
         Ok(())
     }
 
@@ -2976,17 +3038,19 @@ impl VectorIndex for HnswIndex {
         {
             let mmap_count = self
                 .inner
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let mut deleted = self.inner.hot.deleted_nodes.write();
+            let mut deleted = self.inner.cold.deleted_nodes.write();
             for &idx in &indices_to_remove {
                 deleted.insert((mmap_count + idx) as u64);
             }
             self.inner
-                .hot.deleted_count
+                .hot
+                .deleted_count
                 .fetch_add(indices_to_remove.len() as u64, Ordering::SeqCst);
         }
 
@@ -3019,7 +3083,7 @@ impl VectorIndex for HnswIndex {
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
-        let deleted = self.inner.hot.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
 
         let ctx = SearchContext {
             nodes: &nodes,
@@ -3045,7 +3109,8 @@ impl VectorIndex for HnswIndex {
         }
         let mmap_count = self
             .inner
-            .cold.mmap_index
+            .cold
+            .mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -4104,10 +4169,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_do_insert_deterministic_quantizer_bound_expansion_under_contention() {
+    async fn test_do_insert_clamping_preserves_codebook_stability_under_contention() {
         let config = HnswConfig {
             dimension: 4,
             quantize: true,
+            quantizer_drift_threshold: 0.90, // High threshold to prevent automatic rebuild during test
             ..test_config(4)
         };
         let index = std::sync::Arc::new(HnswIndex::try_new(config).unwrap()); // unwrap
@@ -4120,8 +4186,8 @@ mod tests {
         }
         index.commit(tx1).await.unwrap(); // unwrap
 
-        // Verify quantizer is initialized with initial bounds
-        assert!(index.quantizer().is_some());
+        let initial_mins = index.quantizer().as_ref().unwrap().mins().to_vec(); // unwrap
+        let initial_maxes = index.quantizer().as_ref().unwrap().maxes().to_vec(); // unwrap
 
         // 2. Spawn multiple concurrent search tasks holding read lock on quantizer
         let mut tasks = Vec::new();
@@ -4149,76 +4215,156 @@ mod tests {
             task.await.unwrap(); // unwrap
         }
 
-        // 4. Verify check_drift for out_of_bounds_vector returns 0.0 (bounds were deterministically expanded)
+        // 4. Verify quantizer bounds remain stable (no mutation during insert)
         let q_opt = index.quantizer();
         let q = q_opt.as_ref().expect("Quantizer must be present"); // expect
+        assert_eq!(q.mins(), initial_mins.as_slice());
+        assert_eq!(q.maxes(), initial_maxes.as_slice());
+
+        // 5. Verify check_drift detects out of bounds vector
         let drift = q.check_drift(&out_of_bounds_vector);
         assert_eq!(
-            drift, 0.0,
-            "Quantizer bounds must expand deterministically during insert even under read lock contention"
+            drift, 1.0,
+            "All 4 dimensions of outlier vector are out of bounds"
         );
     }
 
     #[tokio::test]
-    async fn test_concurrent_search_and_insert_expands_quantizer_bounds() {
+    async fn test_sq8_outlier_insert_clamping_numerical_precision() {
+        // Concrete numerical verification test:
+        // Dimension i initialized with range [0.0, 1.0].
+        // Stored code 128 decodes to a specific value.
+        // Insert outlier value 10.0 in dimension i.
+        // Codebook bounds/scales MUST NOT be mutated; stored code 128 MUST still decode identically.
+        let config = HnswConfig {
+            dimension: 2,
+            quantize: true,
+            quantizer_drift_threshold: 0.90,
+            ..test_config(2)
+        };
+        let index = HnswIndex::try_new(config).unwrap();
+
+        // 1. Train quantizer with range [0.0, 1.0]
+        let tx1 = TxId::new(1);
+        for i in 0..=60u64 {
+            let v = [i as f32 / 60.0, 0.5];
+            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+        }
+        index.commit(tx1).await.unwrap();
+
+        let q_before = index.quantizer().unwrap();
+        let code_128 = vec![128u8, 128u8];
+        let initial_decoded = q_before.dequantize(&code_128).unwrap();
+        let initial_min_d0 = q_before.mins()[0];
+        let initial_max_d0 = q_before.maxes()[0];
+
+        // 2. Insert outlier vector [10.0, 0.5]
+        let tx2 = TxId::new(2);
+        index
+            .insert(tx2, DocId::new(100), &[10.0, 0.5])
+            .await
+            .unwrap();
+        index.commit(tx2).await.unwrap();
+
+        let q_after = index.quantizer().unwrap();
+        assert_eq!(q_after.mins()[0], initial_min_d0);
+        assert_eq!(q_after.maxes()[0], initial_max_d0);
+
+        // Verify stored code 128 still decodes identically
+        let after_decoded = q_after.dequantize(&code_128).unwrap();
+        assert_eq!(initial_decoded[0], after_decoded[0]);
+    }
+
+    #[tokio::test]
+    async fn test_quantizer_drift_rebuild_triggers_and_recalibrates() {
+        let config = HnswConfigBuilder::new(2)
+            .m(8)
+            .ef_construction(16)
+            .ef_search(16)
+            .quantize(true)
+            .rebuild_threshold(0.0) // Disable deletion rebuild trigger
+            .quantizer_drift_threshold(0.05) // Trigger rebuild if >5% out of range queries
+            .build()
+            .unwrap();
+
+        let index = HnswIndex::try_new(config).unwrap();
+
+        // 1. Insert 60 initial vectors in range [0.0, 1.0]
+        let tx1 = TxId::new(1);
+        for i in 1..=60u64 {
+            let v = [i as f32 / 60.0, 0.5];
+            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+        }
+        index.commit(tx1).await.unwrap();
+        assert_eq!(index.rebuild_count(), 0);
+
+        let initial_max = index.quantizer().unwrap().maxes()[0];
+        assert!(initial_max <= 1.05);
+
+        // 2. Insert outlier vectors far outside range [0.0, 1.0] (e.g., [10.0, 10.0])
+        // To exceed 5% drift ratio with 60 initial queries, insert 20 outlier queries (20/80 = 25% drift)
+        let tx2 = TxId::new(2);
+        for i in 61..=80u64 {
+            let v = [10.0 + (i as f32), 10.0];
+            index.insert(tx2, DocId::new(i), &v).await.unwrap();
+        }
+        index.commit(tx2).await.unwrap(); // commit triggers trigger_rebuild_async()
+
+        // Give background rebuild task time to start, then wait for completion or execute rebuild directly
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        if index.rebuild_count() == 0 {
+            index.rebuild().await.unwrap();
+        }
+
+        assert!(index.rebuild_count() >= 1, "Rebuild count should increase");
+
+        // 3. Verify post-rebuild quantizer has reset drift counters and rebuild_count increased
+        let q_new = index.quantizer().unwrap();
+        assert_eq!(
+            q_new.drift_ratio(),
+            0.0,
+            "Post-rebuild quantizer drift ratio should reset to 0"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_inserts_read_lock_fast_path() {
         let config = HnswConfig {
             dimension: 4,
             quantize: true,
+            quantizer_drift_threshold: 0.90,
             ..test_config(4)
         };
-        let index = std::sync::Arc::new(HnswIndex::try_new(config).unwrap()); // unwrap
+        let index = std::sync::Arc::new(HnswIndex::try_new(config).unwrap());
 
-        // 1. Train quantizer with initial vectors
-        let tx1 = TxId::new(1);
-        for i in 1..=60u64 {
-            let v = [1.0, 2.0, 3.0, 4.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap(); // unwrap
+        // Initial commit to train quantizer
+        let tx0 = TxId::new(0);
+        index
+            .insert(tx0, DocId::new(0), &[1.0, 2.0, 3.0, 4.0])
+            .await
+            .unwrap();
+        index.commit(tx0).await.unwrap();
+
+        // Spawn 8 concurrent insertion tasks
+        let mut handles = Vec::new();
+        for thread_id in 1..=8u64 {
+            let idx = std::sync::Arc::clone(&index);
+            handles.push(tokio::spawn(async move {
+                for i in 1..=20u64 {
+                    let doc_val = thread_id * 100 + i;
+                    let tx = TxId::new(doc_val);
+                    let v = [i as f32, (i * 2) as f32, 1.0, 2.0];
+                    idx.insert(tx, DocId::new(doc_val), &v).await.unwrap();
+                    idx.commit(tx).await.unwrap();
+                }
+            }));
         }
-        index.commit(tx1).await.unwrap(); // unwrap
 
-        let initial_mins = index.quantizer().as_ref().unwrap().mins().to_vec(); // unwrap
-        let initial_maxes = index.quantizer().as_ref().unwrap().maxes().to_vec(); // unwrap
+        for handle in handles {
+            handle.await.unwrap();
+        }
 
-        // 2. Parallele search() und insert() Aufrufe via tokio::join!
-        let out_of_bounds_vector = [1000.0, -1000.0, 500.0, -500.0];
-        let idx_search = std::sync::Arc::clone(&index);
-        let idx_insert = std::sync::Arc::clone(&index);
-
-        let search_handle = tokio::spawn(async move {
-            for _ in 0..100 {
-                let _ = idx_search.search(&[1.0, 2.0, 3.0, 4.0], 5).await;
-                tokio::task::yield_now().await;
-            }
-        });
-
-        let insert_handle = tokio::spawn(async move {
-            let tx2 = TxId::new(2);
-            idx_insert
-                .insert(tx2, DocId::new(100), &out_of_bounds_vector)
-                .await
-                .unwrap(); // unwrap
-            idx_insert.commit(tx2).await.unwrap(); // unwrap
-        });
-
-        let (res_search, res_insert) = tokio::join!(search_handle, insert_handle);
-        res_search.unwrap(); // unwrap
-        res_insert.unwrap(); // unwrap
-
-        // 3. Verifiziere min/max Grenzen des Quantizers direkt
-        let q_opt = index.quantizer();
-        let q = q_opt.as_ref().expect("Quantizer must be present"); // expect
-        assert!(
-            q.maxes()[0] >= 1000.0,
-            "maxes[0] was {}, expected >= 1000.0",
-            q.maxes()[0]
-        );
-        assert!(
-            q.mins()[1] <= -1000.0,
-            "mins[1] was {}, expected <= -1000.0",
-            q.mins()[1]
-        );
-        assert!(q.maxes()[0] > initial_maxes[0]);
-        assert!(q.mins()[1] < initial_mins[1]);
+        assert_eq!(index.len().await, 161);
     }
 
     #[tokio::test]

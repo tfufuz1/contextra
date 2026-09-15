@@ -23,8 +23,9 @@
       "issue": "JULES-20260913-MCPSAN",
       "timestamp": "2026-09-13T01:24:56.709294514+00:00",
       "session_id": "15939913485339184752",
-      "active": true,
-      "expires_at": "2026-09-13T05:24:56.709269853+00:00"
+      "active": false,
+      "expires_at": "2026-09-13T05:24:56.709269853+00:00",
+      "released_at": "2026-09-15T02:29:10.212659296+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-core",
@@ -49,8 +50,9 @@
       "issue": "fusion-hotpath-perf",
       "timestamp": "2026-09-14T13:59:30.299608463+00:00",
       "session_id": "9821550504464222634",
-      "active": true,
-      "expires_at": "2026-09-14T17:59:30.299591055+00:00"
+      "active": false,
+      "expires_at": "2026-09-14T17:59:30.299591055+00:00",
+      "released_at": "2026-09-15T02:29:10.212659296+00:00 [TTL-EXPIRED]"
     }
   ]
 }

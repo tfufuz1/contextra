@@ -52,11 +52,11 @@
 //! ## `commit_mutex` Role
 //! `commit_mutex` serializes sequence allocation and WAL batch preparation during commits, preventing
 //! snapshot inversion. In the group commit leader path, `commit_mutex` is released prior to executing physical
-//! disk I/O (`wal.append_batch`) and re-acquired on error for WAL rollback.
+//! disk I/O (`wal.append_batch`) and re-acquired afterwards for MemTable updates / visibility advancement (and on error for WAL rollback).
 //!
 //! ## Lock Hierarchy & Concurrency Control
 //! To prevent deadlocks, locks across the LSM storage engine must be acquired in the following order:
-//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations. Released before disk I/O in group commit leader happy path.
+//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations. Released before disk I/O in group commit leader happy path, and re-acquired for MemTable update and visibility advancement.
 //! 2. `state` write lock (`tokio::sync::RwLock<LsmState>`) - Protects active/immutable memtable pointers & WAL.
 //! 3. `sstables` write lock (`tokio::sync::RwLock<Vec<Arc<SstableReader>>>`) - Protects SSTable set.
 //!    Read locks on `state` and `sstables` may be acquired concurrently without holding `commit_mutex`.
@@ -70,7 +70,7 @@ use memfuse_core::{
     BoxFuture, DocId, IndexOp, MemFuseError, ResourceTracker, Result, SnapshotRegistry,
     StorageEngine, TxBuffer, TxId, TOMBSTONE_BIT,
 };
-use memfuse_security::crypto::KeyManager;
+use memfuse_crypto::crypto::KeyManager;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -84,7 +84,7 @@ pub mod recovery;
 pub mod scan;
 
 #[cfg(test)]
-mod concurrency_tests;
+mod tests;
 
 use group_commit::{GroupCommitRequest, PendingCommitQueue, WalQueueGuard};
 use scan::{check_in_range, SstableScanMode};
@@ -251,31 +251,13 @@ impl LsmStorage {
     #[doc(hidden)]
     pub async fn simulate_wal_append_failure_for_test(&self) {
         let wal = self.wal.read().await;
-        let wal_path = wal.path().to_path_buf();
-        if let Ok(ro_file) = tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(false)
-            .open(&wal_path)
-            .await
-        {
-            let mut file_guard = wal.file.lock().await;
-            *file_guard = ro_file;
-        }
+        wal.simulate_append_failure.store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
     pub async fn restore_wal_file_handle_for_test(&self) {
         let wal = self.wal.read().await;
-        let wal_path = wal.path().to_path_buf();
-        if let Ok(rw_file) = tokio::fs::OpenOptions::new()
-            .read(true)
-            .append(true)
-            .open(&wal_path)
-            .await
-        {
-            let mut file_guard = wal.file.lock().await;
-            *file_guard = rw_file;
-        }
+        wal.simulate_append_failure.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Returns the accumulated total memory budget tracking drift in bytes caused by
@@ -858,6 +840,9 @@ impl StorageEngine for LsmStorage {
                     all_updates.push((r.tx_id, &r.mem_updates));
                 }
 
+                // Re-acquire commit_mutex for MemTable update and visibility advancement
+                let _commit_lock = self.commit_mutex.lock().await;
+
                 let state = self.state.read().await;
                 for (req_tx_id, mem_updates) in all_updates {
                     self.advance_visibility(req_tx_id);
@@ -1074,6 +1059,12 @@ impl StorageEngine for LsmStorage {
 
                 sstables.push(Arc::new(reader));
                 sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
+
+                debug_assert!(
+                    sstables.windows(2).all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                        <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                    "SSTable list must be sorted by max_seq in ascending order after flush"
+                );
 
                 drop(sstables);
                 drop(state);

@@ -113,3 +113,115 @@ pub trait TextIndex: Send + Sync + 'static {
     /// Returns index statistics.
     fn stats(&self) -> impl Future<Output = Result<TextIndexStats>> + Send;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_text_index_stats_serialization() {
+        let t_stats = TextIndexStats {
+            num_documents: 10,
+            num_tokens: 1000,
+            memory_usage_bytes: 256,
+        };
+        let ser = serde_json::to_string(&t_stats).unwrap();
+        let deser: TextIndexStats = serde_json::from_str(&ser).unwrap();
+        assert_eq!(t_stats.num_documents, deser.num_documents);
+    }
+
+    #[tokio::test]
+    async fn test_text_index_search_at_capability() {
+        struct TextIndexPlaceholder;
+        impl TextIndex for TextIndexPlaceholder {
+            async fn search(&self, _: &str, _: usize) -> Result<Vec<ScoredDocument>> {
+                Ok(vec![])
+            }
+            async fn search_at(&self, _: &str, _: usize, _: u64) -> Result<Vec<ScoredDocument>> {
+                Ok(vec![])
+            }
+            async fn insert(&self, _: TxId, _: DocId, _: &str) -> Result<()> {
+                Ok(())
+            }
+            async fn delete(&self, _: TxId, _: DocId) -> Result<()> {
+                Ok(())
+            }
+            async fn commit(&self, _: TxId) -> Result<()> {
+                Ok(())
+            }
+            async fn rollback(&self, _: TxId) -> Result<()> {
+                Ok(())
+            }
+            async fn rollback_to_tx(&self, _: TxId) -> Result<()> {
+                Ok(())
+            }
+            async fn last_tx_id(&self) -> Result<TxId> {
+                Ok(TxId(0))
+            }
+            async fn len(&self) -> usize {
+                0
+            }
+            async fn stats(&self) -> Result<TextIndexStats> {
+                Ok(TextIndexStats {
+                    num_documents: 0,
+                    num_tokens: 0,
+                    memory_usage_bytes: 0,
+                })
+            }
+        }
+        let text_index = TextIndexPlaceholder;
+        let res = text_index.search_at("test", 5, 1).await;
+        assert!(
+            !matches!(res, Err(crate::MemFuseError::CapabilityUnsupported { .. })),
+            "search_at returned CapabilityUnsupported"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_text_index_defaults() {
+        struct MockTextIndex;
+        impl TextIndex for MockTextIndex {
+            async fn search(&self, _: &str, _: usize) -> Result<Vec<ScoredDocument>> {
+                Ok(vec![])
+            }
+            async fn insert(&self, _: TxId, _: DocId, _: &str) -> Result<()> {
+                Ok(())
+            }
+            async fn delete(&self, _: TxId, _: DocId) -> Result<()> {
+                Ok(())
+            }
+            async fn commit(&self, _: TxId) -> Result<()> {
+                Ok(())
+            }
+            async fn rollback(&self, _: TxId) -> Result<()> {
+                Ok(())
+            }
+            async fn rollback_to_tx(&self, _: TxId) -> Result<()> {
+                Ok(())
+            }
+            async fn last_tx_id(&self) -> Result<TxId> {
+                Ok(TxId(0))
+            }
+            async fn len(&self) -> usize {
+                0
+            }
+            async fn stats(&self) -> Result<TextIndexStats> {
+                Ok(TextIndexStats {
+                    num_documents: 0,
+                    num_tokens: 0,
+                    memory_usage_bytes: 0,
+                })
+            }
+        }
+
+        let index = MockTextIndex;
+        let res = index.search_at("query", 10, 42).await;
+        match res {
+            Err(crate::error::MemFuseError::CapabilityUnsupported { capability, reason }) => {
+                assert_eq!(capability, "snapshot_read_at");
+                assert!(reason.contains("ADR-024"), "Unexpected reason: {reason}");
+            }
+            _ => panic!("Expected CapabilityUnsupported for search_at"),
+        }
+    }
+}
