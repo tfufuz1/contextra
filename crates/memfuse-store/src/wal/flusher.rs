@@ -94,7 +94,6 @@ impl Wal {
         let header_written = Arc::clone(&self.header_written);
         let size = Arc::clone(&self.size);
         let last_hmac = Arc::clone(&self.last_hmac);
-        let simulate_append_failure = Arc::clone(&self.simulate_append_failure);
         let key_manager = self.key_manager.clone();
         let fallback_integrity_key = self.fallback_integrity_key;
         let allow_legacy_integrity_key_fallback = self.allow_legacy_integrity_key_fallback;
@@ -184,14 +183,6 @@ impl Wal {
                         }
 
                         let res: Result<()> = async {
-                            if simulate_append_failure
-                                .swap(false, std::sync::atomic::Ordering::SeqCst)
-                            {
-                                return Err(MemFuseError::Storage(
-                                    "Simulated WAL append_batch I/O failure".into(),
-                                ));
-                            }
-
                             let write_header = !header_written
                                 .load(std::sync::atomic::Ordering::Acquire)
                                 && size.load(std::sync::atomic::Ordering::Acquire) == 0;

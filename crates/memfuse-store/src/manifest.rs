@@ -436,13 +436,12 @@ impl Manifest {
                     );
                     break;
                 }
-            } else {
-                read_res.map_err(|e| {
-                    MemFuseError::Storage(format!(
+                Err(e) => {
+                    return Err(MemFuseError::Storage(format!(
                         "MANIFEST read error at offset {}: {}",
                         pos, e
-                    ))
-                })?;
+                    )));
+                }
             }
 
             let entry_pos = pos;

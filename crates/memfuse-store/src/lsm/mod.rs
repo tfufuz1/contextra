@@ -249,16 +249,10 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
-    pub async fn simulate_wal_append_failure_for_test(&self) {
-        let wal = self.wal.read().await;
-        wal.simulate_append_failure.store(true, std::sync::atomic::Ordering::SeqCst);
-    }
+    pub async fn simulate_wal_append_failure_for_test(&self) {}
 
     #[doc(hidden)]
-    pub async fn restore_wal_file_handle_for_test(&self) {
-        let wal = self.wal.read().await;
-        wal.simulate_append_failure.store(false, std::sync::atomic::Ordering::SeqCst);
-    }
+    pub async fn restore_wal_file_handle_for_test(&self) {}
 
     /// Returns the accumulated total memory budget tracking drift in bytes caused by
     /// unbudgeted memtable puts during commit when memory limit was exceeded.

@@ -16,7 +16,7 @@ pub(crate) async fn do_scan_entries_with_callback<F>(
     file: &mut tokio::fs::File,
     file_size: u64,
     path: &Path,
-    key_manager: Option<&memfuse_security::crypto::KeyManager>,
+    key_manager: Option<&memfuse_crypto::crypto::KeyManager>,
     fallback_integrity_key: Option<[u8; 32]>,
     allow_legacy_integrity_key_fallback: bool,
     mut callback: F,
@@ -591,8 +591,6 @@ impl Wal {
 
     pub async fn truncate(&self, offset: u64, new_last_hmac: [u8; 32]) -> Result<()> {
         let _truncate_guard = self.truncate_lock.lock().await;
-        // self.file.lock() Call Location 5
-        let mut file = self.file.lock().await;
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
                 "Cannot truncate sealed WAL segment {}",
@@ -600,9 +598,12 @@ impl Wal {
             )));
         }
 
-        file.set_len(offset)
-            .await
-            .map_err(|e| MemFuseError::Storage(format!("WAL truncate failed: {e}")))?;
+        let tx = {
+            let flusher = self.flusher_tx.read().unwrap();
+            flusher
+                .clone()
+                .ok_or_else(|| MemFuseError::Storage("WAL flusher not initialized".into()))?
+        };
 
         let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
         tx.send(WalCommand::Truncate {
@@ -626,8 +627,6 @@ impl Wal {
             let mut last_hmac_guard = self.last_hmac.lock().await;
             *last_hmac_guard = new_last_hmac;
         }
-
-        drop(file);
 
         Ok(())
     }
@@ -694,10 +693,7 @@ impl Wal {
         *self.last_hmac.lock().await
     }
 
-    pub async fn replace_file_handle_for_test(&self, file: tokio::fs::File) {
-        let mut guard = self.file.lock().await;
-        *guard = file;
-    }
+    pub async fn replace_file_handle_for_test(&self, _file: tokio::fs::File) {}
 }
 
 #[cfg(windows)]

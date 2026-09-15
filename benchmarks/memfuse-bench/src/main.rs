@@ -1168,6 +1168,65 @@ async fn run_pathrag_sweep_cmd(
 async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
+    #[cfg(feature = "external-benchmarks")]
+    {
+        if args.iter().any(|a| a == "--synthetic-only" || a == "synthetic-only" || a == "--ann") {
+            println!("=== Running ANN-Benchmark (Synthetic CI Version) ===");
+            let res = memfuse_bench::ann_benchmarks::run_ann_benchmark_synthetic_ci().await?;
+            println!("\nANN Synthetic CI Benchmark Summary:");
+            println!("  Dataset          : {}", res.dataset_name);
+            println!("  Vectors          : {} ({}d)", res.n_vectors, res.dimension);
+            println!("  Max Recall@10    : {:.4}", res.max_recall_at_10);
+            println!("  QPS @ Recall 0.90: {:.1}", res.qps_at_recall_90);
+            println!("  QPS @ Recall 0.95: {:.1}", res.qps_at_recall_95);
+            println!("  QPS @ Recall 0.99: {:.1}", res.qps_at_recall_99);
+            println!("  P50 Latency      : {:.3} ms", res.p50_latency_ms);
+            println!("  P99 Latency      : {:.3} ms", res.p99_latency_ms);
+
+            println!("\nExpected Baseline Thresholds:");
+            println!("  - BEIR NFCorpus : NDCG@10 >= 0.25 (BM25 Baseline: ~0.32)");
+            println!("  - ANN synthetic : Recall@10 >= 0.95, QPS >= 500");
+
+            return Ok(());
+        } else if args.iter().any(|a| a == "--beir" || a == "beir") {
+            println!("=== Running BEIR Evaluation Benchmark ===");
+            let dataset_dir = PathBuf::from("benchmarks/data/nfcorpus");
+            let corpus_file = dataset_dir.join("corpus.jsonl");
+            let queries_file = dataset_dir.join("queries.jsonl");
+            let qrels_file = dataset_dir.join("qrels/test.tsv");
+
+            if !corpus_file.exists() || !queries_file.exists() || !qrels_file.exists() {
+                println!("[WARN] BEIR dataset files not found in benchmarks/data/nfcorpus. Run benchmarks/bin/download_beir.sh first.");
+                println!("Fallback: running synthetic ANN benchmark instead.");
+                let res = memfuse_bench::ann_benchmarks::run_ann_benchmark_synthetic_ci().await?;
+                println!("Max Recall@10: {:.4}", res.max_recall_at_10);
+                return Ok(());
+            }
+
+            let corpus = memfuse_bench::beir_eval::load_beir_corpus(&corpus_file)?;
+            let queries = memfuse_bench::beir_eval::load_beir_queries(&queries_file, &qrels_file)?;
+            println!("Loaded BEIR dataset: {} docs, {} queries", corpus.len(), queries.len());
+
+            let temp_dir = TempDir::new()?;
+            let res = memfuse_bench::beir_eval::run_beir_eval(
+                temp_dir.path(),
+                &corpus,
+                &queries,
+                "nfcorpus",
+                false,
+            ).await?;
+
+            println!("\nBEIR Evaluation Summary (nfcorpus):");
+            println!("  NDCG@10    : {:.4} (Baseline target: >= 0.25)", res.ndcg_at_10);
+            println!("  Recall@10  : {:.4}", res.recall_at_10);
+            println!("  MAP@100    : {:.4}", res.map_at_100);
+            println!("  P50 Latency: {:.3} ms", res.latency_p50_ms);
+            println!("  P99 Latency: {:.3} ms", res.latency_p99_ms);
+
+            return Ok(());
+        }
+    }
+
     if args.len() > 1 && (args[1] == "pathrag-sweep" || args[1] == "pathrag_sweep") {
         let locomo_dataset_path =
             PathBuf::from("benchmarks/memfuse-bench/tests/fixtures/locomo_fixture.json");

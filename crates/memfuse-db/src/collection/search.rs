@@ -758,10 +758,29 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             "PersonalizedPageRank strategy does not support snapshot-isolated retrieval",
                         ));
                     }
-                    memfuse_core::GraphTraversalStrategy::PathRag { .. } => {
-                        return Err(memfuse_core::MemFuseError::snapshot_unsupported_for_signal(
-                            "PathRag strategy does not support snapshot-isolated retrieval",
-                        ));
+                    memfuse_core::GraphTraversalStrategy::PathRag {
+                        max_hops,
+                        sufficiency_threshold,
+                    } => {
+                        let engine = memfuse_graph::PathRAGEngine::new(
+                            self.graph_index.as_ref(),
+                            *max_hops,
+                            *sufficiency_threshold,
+                        );
+                        let mut raw_tuples = Vec::new();
+                        for anchor in anchors {
+                            let paths = engine.find_all_paths(*anchor);
+                            for path in paths {
+                                if let Some(&target) = path.nodes.last() {
+                                    if target != *anchor {
+                                        raw_tuples.push((target, path.confidence as f32));
+                                    }
+                                }
+                            }
+                        }
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(k);
+                        raw_tuples
                     }
                 };
                 let doc_tuples = tuples
@@ -1109,10 +1128,29 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             "PersonalizedPageRank strategy does not support snapshot-isolated retrieval",
                         ));
                     }
-                    memfuse_core::GraphTraversalStrategy::PathRag { .. } => {
-                        return Err(memfuse_core::MemFuseError::snapshot_unsupported_for_signal(
-                            "PathRag strategy does not support snapshot-isolated retrieval",
-                        ));
+                    memfuse_core::GraphTraversalStrategy::PathRag {
+                        max_hops,
+                        sufficiency_threshold,
+                    } => {
+                        let engine = memfuse_graph::PathRAGEngine::new(
+                            self.graph_index.as_ref(),
+                            *max_hops,
+                            *sufficiency_threshold,
+                        );
+                        let mut raw_tuples = Vec::new();
+                        for anchor in anchors {
+                            let paths = engine.find_all_paths(*anchor);
+                            for path in paths {
+                                if let Some(&target) = path.nodes.last() {
+                                    if target != *anchor {
+                                        raw_tuples.push((target, path.confidence as f32));
+                                    }
+                                }
+                            }
+                        }
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(candidate_k);
+                        raw_tuples
                     }
                 };
                 let doc_tuples = tuples
@@ -1162,7 +1200,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 .saturating_mul(Self::OVERFETCH_FACTOR)
                 .min(memfuse_core::MAX_SEARCH_K);
 
-            let fused = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
+            let mut fused_results = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
                 signal_sets,
                 max_fusion_results,
                 crate::fusion::MetadataMergePriority::default(),
