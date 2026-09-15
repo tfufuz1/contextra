@@ -49,7 +49,7 @@ impl CsrGraph {
     pub async fn load_from_storage<S: StorageEngine>(storage: &S) -> Result<Self>;
     pub async fn persist_entity<S: StorageEngine>(&self, tx: TxId, entity: Entity, storage: &S) -> Result<()>;
     pub async fn persist_edge<S: StorageEngine>(&self, tx: TxId, edge: Edge, storage: &S) -> Result<()>;
-    pub fn personalized_page_rank_with_context(&self, start: EntityId, ctx: &mut PprContext) -> Vec<(EntityId, f32)>;
+    pub async fn personalized_page_rank_with_context_async(&self, seed_nodes: &[EntityId], config: &PprConfig, ctx: &mut PprContext) -> Vec<(EntityId, f32)>;
 }
 
 // === Session DAG (session_dag.rs) ===

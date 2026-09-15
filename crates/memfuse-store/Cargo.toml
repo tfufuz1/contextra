@@ -20,10 +20,10 @@ fault-injection = []
 
 [dependencies]
 memfuse-core = { workspace = true }
+memfuse-crypto = { workspace = true }
 bytes = { workspace = true }
 blake3 = { workspace = true }
 crc32fast = { workspace = true }
-memfuse-security = { workspace = true }
 parking_lot = { workspace = true }
 tokio = { workspace = true }
 memmap2 = { workspace = true }

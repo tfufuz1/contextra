@@ -67,7 +67,7 @@ pub use percolation::{
     compute_percolation_health, find_rebonding_candidates, should_trigger_rebonding,
     PercolationConfig,
 };
-pub use ppr::PprContext;
+pub use ppr::{DeletedView, PprContext};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
 pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,

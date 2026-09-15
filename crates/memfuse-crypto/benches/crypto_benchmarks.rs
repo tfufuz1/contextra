@@ -4,7 +4,7 @@
 // STAND: TS:2026-08-30T19:50:00Z (SESSION: 20260830)
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use memfuse_security::CryptoKey;
+use memfuse_crypto::CryptoKey;
 
 fn bench_aes_256_gcm_siv_encrypt(c: &mut Criterion) {
     let km = CryptoKey::try_new("bench-passphrase", b"bench-salt-123456").unwrap();
@@ -60,7 +60,7 @@ fn bench_hmac_integrity(c: &mut Criterion) {
 // ADR-082 Performance-Nachweis Benchmarks
 
 use memfuse_core::TenantId;
-use memfuse_security::kv_segment::{KvSegment, TenantIsolatedKvStore};
+use memfuse_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 
 fn bench_kv_insert_n_segments(c: &mut Criterion) {
     let mut group = c.benchmark_group("kv_insert_n_segments");

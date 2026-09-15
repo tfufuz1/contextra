@@ -137,45 +137,40 @@ impl LsmStorage {
         }
 
         let scan_memtable =
-            |mt: &MemTable, target: &mut std::collections::BTreeMap<Bytes, (Bytes, u64)>| {
-                match mode {
-                    SstableScanMode::Prefix(prefix) => {
-                        mt.scan_prefix_into_matching(
-                            prefix,
-                            u64::MAX,
-                            TxId(last_tx),
-                            target,
-                            &entry_filter,
-                        );
-                    }
-                    SstableScanMode::Range(
-                        std::ops::Bound::Unbounded,
-                        std::ops::Bound::Unbounded,
-                    ) => {
-                        for (k, v, seq, tx) in mt.iter() {
-                            if tx > last_tx && tx < TxId::INTERNAL_BASE {
-                                continue;
-                            }
-                            let raw_seq = seq & !TOMBSTONE_BIT;
-                            if entry_filter(k.as_ref(), raw_seq, tx) {
-                                let entry =
-                                    target.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
-                                if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
-                                    *entry = (v.clone(), seq);
-                                }
+            |mt: &MemTable, target: &mut std::collections::BTreeMap<Bytes, (Bytes, u64)>| match mode
+            {
+                SstableScanMode::Prefix(prefix) => {
+                    mt.scan_prefix_into_matching(
+                        prefix,
+                        u64::MAX,
+                        TxId(last_tx),
+                        target,
+                        &entry_filter,
+                    );
+                }
+                SstableScanMode::Range(std::ops::Bound::Unbounded, std::ops::Bound::Unbounded) => {
+                    for (k, v, seq, tx) in mt.iter() {
+                        if tx > last_tx && tx < TxId::INTERNAL_BASE {
+                            continue;
+                        }
+                        let raw_seq = seq & !TOMBSTONE_BIT;
+                        if entry_filter(k.as_ref(), raw_seq, tx) {
+                            let entry = target.entry(k.clone()).or_insert_with(|| (v.clone(), seq));
+                            if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
+                                *entry = (v.clone(), seq);
                             }
                         }
                     }
-                    SstableScanMode::Range(start, end) => {
-                        mt.scan_range_into_matching(
-                            start,
-                            end,
-                            u64::MAX,
-                            TxId(last_tx),
-                            target,
-                            &entry_filter,
-                        );
-                    }
+                }
+                SstableScanMode::Range(start, end) => {
+                    mt.scan_range_into_matching(
+                        start,
+                        end,
+                        u64::MAX,
+                        TxId(last_tx),
+                        target,
+                        &entry_filter,
+                    );
                 }
             };
 

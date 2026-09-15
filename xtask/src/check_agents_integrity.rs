@@ -92,7 +92,7 @@ fn is_type_or_crate_implemented(item: &str, root: &Path) -> bool {
         return false;
     }
 
-    // If item is a crate name (e.g., memfuse-security or memfuse-core)
+    // If item is a crate name (e.g., memfuse-crypto or memfuse-core)
     if item.starts_with("memfuse-") {
         if root.join("crates").join(item).exists() {
             return true;
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_is_type_or_crate_implemented_finds_security() {
         let root = find_root_dir();
-        assert!(is_type_or_crate_implemented("memfuse-security", &root));
+        assert!(is_type_or_crate_implemented("memfuse-crypto", &root));
     }
 
     #[test]
