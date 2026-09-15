@@ -104,6 +104,15 @@
       "active": false,
       "expires_at": "2026-09-15T19:57:12.077892145+00:00",
       "released_at": "2026-09-15T16:15:25.323409438+00:00"
+
+      "krate": "memfuse-store",
+      "issue": "JULES-20260915-MEMFUSESTO-DEEP-S8HA",
+      "timestamp": "2026-09-15T14:50:19.692545811+00:00",
+      "session_id": "6703594472276147864",
+      "active": false,
+      "expires_at": "2026-09-15T18:50:19.692528672+00:00",
+      "released_at": "2026-09-15T16:13:21.094098761+00:00"
+
       "krate": "memfuse-mcp",
       "issue": "JULES-20260915-MEMFUSEMCP-DEEP-CFJ1",
       "timestamp": "2026-09-15T16:05:23.063610731+00:00",
