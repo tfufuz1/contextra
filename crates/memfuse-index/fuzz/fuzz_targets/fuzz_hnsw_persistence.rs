@@ -107,9 +107,9 @@ fuzz_target!(|input: HnswPersistInput| {
                 if let Ok(len) = file.metadata().map(|m| m.len()) {
                     if len > 0 {
                         let offset = (len * (input.corrupt_offset_pct as u64 % 100)) / 100;
-                        let _ = file.seek(SeekFrom::Start(offset));
-                        let _ = file.write_all(&input.corrupt_bytes);
-                        let _ = file.sync_all();
+                        let _ = file.seek(SeekFrom::Start(offset)); // INTENTIONAL-DROP
+                        let _ = file.write_all(&input.corrupt_bytes); // INTENTIONAL-DROP
+                        let _ = file.sync_all(); // INTENTIONAL-DROP
                     }
                 }
             }

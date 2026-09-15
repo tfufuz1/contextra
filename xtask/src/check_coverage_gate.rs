@@ -49,6 +49,7 @@ pub fn get_threshold_for_crate(crate_name: &str) -> f64 {
     }
 }
 
+#[allow(dead_code)]
 pub fn run_check_coverage_gate(root: &Path) -> Result<Vec<CrateCoverageResult>, String> {
     run_check_coverage_gate_file(&root.join("coverage.json"))
 }
