@@ -42,7 +42,7 @@
 // HOTSPOTS:   greedy_search(), insert(), search_at(), trigger_rebuild_async()
 // SIEHE AUCH:  rules/simd_safety.md, ADR-017, ADR-034
 
-use crate::distance::compute_distance;
+use crate::distance::compute_distance_trusted;
 use ahash::{AHashMap, AHashSet};
 use memfuse_core::{
     DistanceMetric, DocId, IndexOp, MemFuseError, Result, ScoredDocument, TxBuffer, TxId,
@@ -125,6 +125,16 @@ impl Default for HnswConfig {
             partial_rebuild_config: crate::partial_rebuild::PartialRebuildConfig::default(),
         }
     }
+}
+
+/// Validates that a vector is non-empty and contains no NaN or Infinite values.
+fn validate_vector(vec: &[f32]) -> Result<()> {
+    if vec.iter().any(|v| !v.is_finite()) {
+        return Err(MemFuseError::invalid_input(
+            "Invalid vector: NaN or Infinity detected",
+        ));
+    }
+    Ok(())
 }
 
 impl HnswConfig {
@@ -1288,14 +1298,14 @@ impl HnswIndexCore {
                     })?))
                 })
                 .collect::<Result<Vec<f32>>>()?;
-            compute_distance(query_exact, &v, self.cold.config.distance_metric)
+            compute_distance_trusted(query_exact, &v, self.cold.config.distance_metric)
         }
     }
 
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
         match (data_a, data_b) {
             (VectorData::F32(a), VectorData::F32(b)) => {
-                compute_distance(a, b, self.cold.config.distance_metric)
+                compute_distance_trusted(a, b, self.cold.config.distance_metric)
             }
             (VectorData::U8(a), VectorData::U8(b)) => {
                 let guard = self.cold.quantizer.read();
@@ -1790,14 +1800,7 @@ impl HnswIndexCore {
             )));
         }
 
-        // ANCHOR[ALG-FIX:D2-004] STATUS:DONE (TS:2026-06-01T00:00:00Z) — NaN/Inf-Validierung bei Insert (Distanzfunktion)
-        // NaN-Vektoren würden in BinaryHeap stille Korrumpierung verursachen.
-        // Validierung an der Grenze (insert) statt in distance.rs — distance bleibt rein.
-        if vector.iter().any(|x| x.is_nan() || x.is_infinite()) {
-            return Err(MemFuseError::invalid_input(
-                "Vector contains NaN or Infinity values",
-            ));
-        }
+        validate_vector(vector)?;
 
         let vector_data = if self.cold.config.quantize {
             let q_guard = self.cold.quantizer.read();
@@ -2620,14 +2623,7 @@ impl VectorIndex for HnswIndex {
             )));
         }
 
-        // FIND-IDX-002: NaN/Inf Poisoning prevention
-        for &val in embedding {
-            if val.is_nan() || val.is_infinite() {
-                return Err(MemFuseError::Storage(
-                    "Invalid vector: NaN or Infinity detected".to_string(),
-                ));
-            }
-        }
+        validate_vector(embedding)?;
 
         self.inner.cold.tx_buffer.stage(
             tx,

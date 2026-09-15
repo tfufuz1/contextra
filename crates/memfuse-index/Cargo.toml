@@ -69,6 +69,10 @@ name = "partial_rebuild_recall_bench"
 harness = false
 required-features = ["partial-index-rebuild"]
 
+[[bench]]
+name = "distance_nan_impact_bench"
+harness = false
+
 [[test]]
 name = "diskann_fault_injection_test"
 required-features = ["experimental-diskann"]
