@@ -30,11 +30,6 @@ use serde::{Deserialize, Serialize};
 pub enum EdgeType {
     #[default]
     Default,
-    #[deprecated(
-        since = "0.1.0",
-        note = "EdgeType::Custom wird nirgends im Workspace produktiv erzeugt — für benutzerdefinierte Kantentypen bitte Issue öffnen"
-    )]
-    Custom(String),
 }
 
 /// Edge structure in CSR graph representation.
@@ -420,8 +415,6 @@ impl GraphInner {
         self.source_doc_ids = new_source_doc_ids;
         self.pending_edges.clear();
         self.tombstoned_edges.clear();
-        #[cfg(feature = "edge-reinforcement-learning")]
-        self.edge_store.clear();
         self.pending_edge_count = 0;
         self.is_dirty = false;
         #[cfg(feature = "edge-reinforcement-learning")]
