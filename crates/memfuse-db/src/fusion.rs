@@ -297,8 +297,8 @@ pub fn build_provenance(
         "rrf_k must be non-negative; division by zero risk"
     );
 
-    let mut signal_ranks = HashMap::new();
-    let mut signal_contributions = HashMap::new();
+    let mut signal_ranks = AHashMap::new();
+    let mut signal_contributions = AHashMap::new();
 
     let v_w = vector_weight.unwrap_or(1.0);
     let t_w = text_weight.unwrap_or(1.0);
@@ -748,7 +748,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             .map(|k| k.as_str().to_string())
             .collect();
 
-        let mut signal_ranks: HashMap<String, u32> = entry
+        let mut signal_ranks: AHashMap<String, u32> = entry
             .signal_ranks
             .drain()
             .map(|(k, v)| (k.as_str().to_string(), v))
@@ -759,7 +759,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
             }
         }
 
-        let mut signal_contributions: HashMap<String, crate::SignalContribution> = entry
+        let mut signal_contributions: AHashMap<String, crate::SignalContribution> = entry
             .signal_contributions
             .drain()
             .map(|(k, v)| (k.as_str().to_string(), v))

@@ -217,7 +217,7 @@ pub struct ProvenanceRecord {
 
     /// RRF-Rang pro Signal vor Fusion: (signal_name → rang)
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
-    pub signal_ranks: std::collections::HashMap<String, u32>,
+    pub signal_ranks: ahash::AHashMap<String, u32>,
 
     /// Collection-Name aus der das Ergebnis stammt
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -230,7 +230,7 @@ pub struct ProvenanceRecord {
     /// Per-signal RRF attribution: maps signal name to its contribution details.
     /// INV-PROV-1: The sum of all rrf_contribution values equals the unboosted RRF score.
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
-    pub signal_contributions: std::collections::HashMap<String, SignalContribution>,
+    pub signal_contributions: ahash::AHashMap<String, SignalContribution>,
 
     /// Kohärenz-Bonus aus F-09 (0.0 wenn Feature inaktiv oder Dokument nur in einem Signal).
     #[serde(default)]
@@ -240,7 +240,7 @@ pub struct ProvenanceRecord {
 impl ProvenanceRecord {
     /// Ergänzt einen Herkunftsnachweis für synthetisierte / konsolidierte Dokumente.
     pub fn synthesized_from(source_doc_ids: &[DocId]) -> Self {
-        let mut signal_ranks = std::collections::HashMap::new();
+        let mut signal_ranks = ahash::AHashMap::new();
         for (idx, id) in source_doc_ids.iter().enumerate() {
             signal_ranks.insert(id.0.to_string(), (idx + 1) as u32);
         }
@@ -457,7 +457,7 @@ pub struct MemFuse {
     expiry_reaper_interval: std::time::Duration,
     community_detection_threshold: u64,
     collections:
-        tokio::sync::RwLock<std::collections::HashMap<String, Arc<Collection<LsmStorage>>>>,
+        tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
     cancel_token: tokio_util::sync::CancellationToken,
     task_tracker: tokio_util::task::TaskTracker,
     /// Global text embedder for default collection.
@@ -549,7 +549,7 @@ impl MemFuse {
             dimension: config.dimension,
             expiry_reaper_interval: config.expiry_reaper_interval,
             community_detection_threshold: config.community_detection.auto_trigger_threshold,
-            collections: tokio::sync::RwLock::new(std::collections::HashMap::new()),
+            collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),
             cancel_token: cancel_token.clone(),
             task_tracker: task_tracker.clone(),
             embedder: parking_lot::RwLock::new(None),
@@ -2578,14 +2578,14 @@ mod tests {
             graph_score: None,
             rerank_score: None,
             signal_ranks: {
-                let mut m = std::collections::HashMap::new();
+                let mut m = ahash::AHashMap::new();
                 m.insert("vector".to_string(), 1u32);
                 m.insert("bm25".to_string(), 3u32);
                 m
             },
             source_collection: Some("test_col".to_string()),
             index_type: Some("hnsw".to_string()),
-            signal_contributions: std::collections::HashMap::new(),
+            signal_contributions: ahash::AHashMap::new(),
             coherence_bonus: 0.0,
         };
         let json = serde_json::to_string(&p).expect("serialize");
