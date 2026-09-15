@@ -690,18 +690,27 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let default_strategy = memfuse_core::GraphTraversalStrategy::default();
             let graph_strat = strategy.unwrap_or(&default_strategy);
 
-            // 1. Vector Signal
+            // 1. Vector Signal (Candidate overfetching for RRF fusion)
             let vector_results = if is_vector_zero {
                 Vec::new()
             } else {
-                self.search_filtered_at(vector, k, None, seq).await?
+                self.search_filtered_at(
+                    vector,
+                    k.saturating_mul(Self::OVERFETCH_FACTOR),
+                    None,
+                    seq,
+                )
+                .await?
             };
 
-            // 2. Text Signal
+            // 2. Text Signal (Candidate overfetching for RRF fusion)
             let text_results = if is_text_empty {
                 Vec::new()
             } else {
-                let bm25_results = self.text_index.search_at(text, k, seq).await?;
+                let bm25_results = self
+                    .text_index
+                    .search_at(text, k.saturating_mul(Self::OVERFETCH_FACTOR), seq)
+                    .await?;
                 self.hydrate_from_tuples_at(
                     bm25_results
                         .into_iter()
@@ -918,6 +927,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let rerank_k = k.saturating_mul(mult).min(max_pool);
             candidate_k = candidate_k
                 .max(rerank_k)
+                .saturating_mul(Self::OVERFETCH_FACTOR)
                 .min(memfuse_core::MAX_SEARCH_K)
                 .max(k);
 
