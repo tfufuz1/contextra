@@ -467,6 +467,65 @@ mod tests {
             );
         }
     }
+
+    #[tokio::test]
+    async fn test_migrate_legacy_audit_entries() -> memfuse_core::Result<()> {
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let index = Arc::new(
+            HnswIndex::try_new(HnswConfig::default())
+                .map_err(|e| memfuse_core::MemFuseError::Internal(e.to_string()))?,
+        );
+        let graph_index = Arc::new(CsrGraph::new());
+        let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
+
+        let collection = Arc::new(Collection::new(
+            "test_audit_migrate".to_string(),
+            storage.clone(),
+            index,
+            graph_index,
+            next_tx,
+            1536,
+            memfuse_text::Language::English,
+        ));
+
+        let key = "audit:task-mig:step:1";
+        let doc_id = memfuse_core::DocId::from_key(key)?;
+        let tx = memfuse_core::TxId::new(1);
+
+        let legacy_doc = serde_json::json!({
+            "id": key,
+            "embedding": vec![0.0f32; 1536],
+            "metadata": {
+                "task_id": "task-mig",
+                "step_count": 1,
+                "node_id": "node-1",
+                "tokens_consumed": 15,
+                "payload": {"status": "ok"}
+            }
+        });
+
+        let user_key = collection.namespaced_key(key.as_bytes(), 0);
+        let doc_key = collection.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+        let data = serde_json::to_vec(&legacy_doc)
+            .map_err(|e| memfuse_core::MemFuseError::Serialization(e.to_string()))?;
+
+        storage.put(tx, &user_key, &data).await?;
+        storage.put(tx, &doc_key, &data).await?;
+
+        let stats = migrate_legacy_audit_entries(&collection).await?;
+        assert_eq!(stats.migrated, 1);
+        assert_eq!(stats.failed, 0);
+
+        let migrated_val = collection.get_kv(key).await?;
+        assert!(migrated_val.is_some());
+        if let Some(entry_obj) = migrated_val {
+            assert_eq!(
+                entry_obj.get("node_id").and_then(|v| v.as_str()),
+                Some("node-1")
+            );
+        }
+        Ok(())
+    }
 }
 
 /// Minimal in-memory implementation of [`StorageEngine`] backed by a thread-safe map.
@@ -519,6 +578,26 @@ impl StorageEngine for InMemoryStorageEngine {
                 .map_err(|e| memfuse_core::MemFuseError::Internal(format!("Lock poisoned: {e}")))?;
             guard.insert(key.to_vec(), value.to_vec());
             Ok(())
+        })
+    }
+
+    fn put_if_absent<'a>(
+        &'a self,
+        _tx_id: memfuse_core::TxId,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(async move {
+            let mut guard = self
+                .data
+                .lock()
+                .map_err(|e| memfuse_core::MemFuseError::Internal(format!("Lock poisoned: {e}")))?;
+            if guard.contains_key(key) {
+                Ok(false)
+            } else {
+                guard.insert(key.to_vec(), value.to_vec());
+                Ok(true)
+            }
         })
     }
 

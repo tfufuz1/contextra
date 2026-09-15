@@ -32,6 +32,7 @@ impl DeletedView {
     }
 
     /// Creates an empty `DeletedView` when no nodes are deleted or for testing when explicitly intended.
+    #[allow(dead_code)]
     pub(crate) fn empty() -> Self {
         Self {
             deleted_nodes: HashSet::new(),
@@ -1372,6 +1373,24 @@ mod tests {
             (total_mass - 1.0).abs() < 1e-4,
             "Rank mass must conserve to 1.0 across remaining live nodes, got {total_mass}"
         );
+    }
+
+    #[test]
+    fn test_deleted_view_methods() {
+        let empty_view = DeletedView::empty();
+        assert!(empty_view.is_empty());
+        assert_eq!(empty_view.len(), 0);
+        assert!(!empty_view.contains(1));
+
+        let mut set = HashSet::new();
+        set.insert(5);
+        set.insert(10);
+        let view = DeletedView::from_nodes(set);
+        assert!(!view.is_empty());
+        assert_eq!(view.len(), 2);
+        assert!(view.contains(5));
+        assert!(view.contains(10));
+        assert!(!view.contains(1));
     }
 
     #[tokio::test]
