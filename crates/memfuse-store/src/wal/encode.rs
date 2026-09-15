@@ -66,7 +66,7 @@ impl PreparedBatch {
     }
 
     /// Extends this prepared batch with entries from another prepared batch.
-    pub(crate) fn extend(&mut self, other: PreparedBatch) {
+    pub fn extend(&mut self, other: PreparedBatch) {
         self.0.extend(other.0);
     }
 }
