@@ -12,6 +12,7 @@
 
 // INVARIANT: Trait-Contracts sind das API-Rückgrat des Workspace.
 // REGEL: Neue Methoden MÜSSEN Default-Impl haben (backward compat).
+// TODO(GOV-D): `xtask check_duplicate_symbols` soll künftig auf Verzeichnisebene (cross-file über alle .rs-Dateien eines Modulverzeichnisses hinweg) Symbolduplikate automatisch erkennen.
 
 use std::future::Future;
 use std::pin::Pin;
