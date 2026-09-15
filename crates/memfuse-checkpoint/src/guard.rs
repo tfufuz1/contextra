@@ -289,14 +289,14 @@ mod tests {
     }
 
     impl StorageEngine for MockStorage {
-        fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
-            Box::pin(async move { Ok(self.data.lock().get(key).cloned()) })
+        fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
         }
         fn get_at_seq<'a>(
             &'a self,
             key: &'a [u8],
             _seq: u64,
-        ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { self.get(key).await })
         }
         fn put<'a>(

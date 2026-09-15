@@ -65,7 +65,7 @@ async fn test_flush_ordering_wal_deleted_after_sstable() -> Result<()> {
 
     // Data must still be readable
     let val = storage.get(b"key1").await?;
-    assert_eq!(val, Some(b"value1".to_vec()));
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"value1")));
 
     Ok(())
 }
@@ -101,11 +101,11 @@ async fn test_recovery_after_flush_via_reopen() -> Result<()> {
         // Verify before close
         assert_eq!(
             storage.get(b"persist-key1").await?,
-            Some(b"persist-val1".to_vec())
+            Some(bytes::Bytes::from_static(b"persist-val1"))
         );
         assert_eq!(
             storage.get(b"persist-key2").await?,
-            Some(b"persist-val2".to_vec())
+            Some(bytes::Bytes::from_static(b"persist-val2"))
         );
 
         storage.wait_shutdown().await;
@@ -118,14 +118,14 @@ async fn test_recovery_after_flush_via_reopen() -> Result<()> {
         let val1 = storage.get(b"persist-key1").await?;
         assert_eq!(
             val1,
-            Some(b"persist-val1".to_vec()),
+            Some(bytes::Bytes::from_static(b"persist-val1")),
             "Key1 must survive reopen after flush"
         );
 
         let val2 = storage.get(b"persist-key2").await?;
         assert_eq!(
             val2,
-            Some(b"persist-val2".to_vec()),
+            Some(bytes::Bytes::from_static(b"persist-val2")),
             "Key2 must survive reopen after flush"
         );
 
@@ -165,7 +165,7 @@ async fn test_wal_replay_recovery_without_flush() -> Result<()> {
         let val = storage.get(b"wal-key").await?;
         assert_eq!(
             val,
-            Some(b"wal-val".to_vec()),
+            Some(bytes::Bytes::from_static(b"wal-val")),
             "WAL replay must recover uncommitted-to-SSTable data"
         );
         storage.wait_shutdown().await;
@@ -196,7 +196,7 @@ async fn test_multiple_flush_cycles_preserve_data() -> Result<()> {
         let val = storage.get(key.as_bytes()).await?;
         assert_eq!(
             val,
-            Some(expected.into_bytes()),
+            Some(bytes::Bytes::from(expected)),
             "Key {} must survive multi-flush cycle",
             i
         );

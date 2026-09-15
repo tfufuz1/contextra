@@ -98,17 +98,17 @@ mod tests {
         storage.put(tx2, b"key2", b"val2").await.unwrap(); // unwrap
         storage.commit(tx2).await.unwrap(); // unwrap
 
-        assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec())); // unwrap
-        assert_eq!(storage.get(b"key2").await.unwrap(), Some(b"val2".to_vec())); // unwrap
+        assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1"))); // unwrap
+        assert_eq!(storage.get(b"key2").await.unwrap(), Some(bytes::Bytes::from_static(b"val2"))); // unwrap
 
         checkpointer.rollback_to(&cp1).await.expect("rollback"); // expect
 
-        assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec())); // unwrap
+        assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1"))); // unwrap
         assert_eq!(storage.get(b"key2").await.unwrap(), None); // unwrap
 
         let tx3 = TxId::new(3);
         storage.put(tx3, b"key3", b"val3").await.unwrap(); // unwrap
         storage.commit(tx3).await.unwrap(); // unwrap
-        assert_eq!(storage.get(b"key3").await.unwrap(), Some(b"val3".to_vec()));
+        assert_eq!(storage.get(b"key3").await.unwrap(), Some(bytes::Bytes::from_static(b"val3")));
     }
 }

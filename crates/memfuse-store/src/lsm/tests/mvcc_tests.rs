@@ -68,7 +68,7 @@ async fn test_flush_during_read_transaction_snapshot_isolation() {
         .get_at_seq(b"key_flush", seq1)
         .await
         .expect("get_at_seq");
-    assert_eq!(val, Some(b"v1".to_vec()));
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"v1")));
     assert_eq!(snap_tx1, TxId::new(1));
 }
 
@@ -111,7 +111,7 @@ async fn test_concurrent_flush_and_get_at_seq_isolation() {
                 .expect("get_at_seq");
 
             if let Some(val_bytes) = res {
-                let val_str = String::from_utf8(val_bytes).expect("utf8");
+                let val_str = String::from_utf8(val_bytes.to_vec()).expect("utf8");
                 if let Some(num_str) = val_str.strip_prefix("val_") {
                     if num_str != "base" {
                         let tx_num: u64 = num_str.parse().expect("parse tx num");
@@ -166,7 +166,7 @@ async fn test_flush_during_active_snapshot_isolation_stress() {
                 .await
                 .unwrap();
             if let Some(bytes) = get_val {
-                let val_str = String::from_utf8(bytes).unwrap();
+                let val_str = String::from_utf8(bytes.to_vec()).unwrap();
                 let tx_num: u64 = val_str.strip_prefix("v_").unwrap().parse().unwrap();
                 assert!(
                     tx_num <= snapshot_tx,
@@ -365,9 +365,9 @@ async fn test_lsm_put_if_absent_parallel_two_tasks() {
 
     let stored_val = storage.get(key).await.unwrap().expect("value must exist");
     if r1 {
-        assert_eq!(stored_val, b"val1");
+        assert_eq!(&stored_val[..], b"val1");
     } else {
-        assert_eq!(stored_val, b"val2");
+        assert_eq!(&stored_val[..], b"val2");
     }
 }
 
@@ -538,7 +538,7 @@ async fn test_commit_mutex_released_before_flusher_await() {
         let val = storage.get(&key).await.unwrap();
         assert_eq!(
             val,
-            Some(expected_val),
+            Some(bytes::Bytes::from(expected_val)),
             "Key concurrent_key_{i} must be persisted and readable"
         );
     }

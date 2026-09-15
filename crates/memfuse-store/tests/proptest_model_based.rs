@@ -40,7 +40,7 @@ async fn test_failing_proptest_sequence() -> memfuse_core::Result<()> {
     let val_k1 = storage.get(b"prop_k_1").await?;
     assert_eq!(
         val_k1,
-        Some(b"prop_v_0".to_vec()),
+        Some(bytes::Bytes::from_static(b"prop_v_0")),
         "prop_k_1 must equal prop_v_0 after restart"
     );
 
@@ -122,8 +122,8 @@ proptest! {
             for (key, expected_val) in &shadow {
                 let actual_val = storage.get(key).await.unwrap();
                 assert_eq!(
-                    actual_val.as_ref(),
-                    Some(expected_val),
+                    actual_val.as_deref(),
+                    Some(expected_val.as_slice()),
                     "Proptest mismatch for key {:?}",
                     String::from_utf8_lossy(key)
                 );

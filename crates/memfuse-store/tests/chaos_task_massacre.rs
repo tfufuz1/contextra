@@ -117,7 +117,7 @@ async fn test_chaos_task_massacre() {
     let confirmed = confirmed_commits.lock().clone();
 
     // 5a & 5b Assertions: Check every key in ground truth
-    let mut pre_reopen_snapshot: HashMap<Vec<u8>, Option<Vec<u8>>> = HashMap::new();
+    let mut pre_reopen_snapshot: HashMap<Vec<u8>, Option<bytes::Bytes>> = HashMap::new();
 
     for (key, (task_id, expected_val)) in &all_ground_truth_keys {
         let actual_val = storage.get(key).await.expect("get failed");
@@ -136,8 +136,8 @@ async fn test_chaos_task_massacre() {
                 task_id
             );
             assert_eq!(
-                actual_val,
-                Some(expected_val.clone()),
+                actual_val.as_deref(),
+                Some(expected_val.as_slice()),
                 "Key {:?} from non-aborted task {} returned incorrect or missing value",
                 String::from_utf8_lossy(key),
                 task_id
@@ -147,8 +147,8 @@ async fn test_chaos_task_massacre() {
             if commit_confirmed {
                 // Commit returned Ok(()) before abort -> MUST be correctly readable
                 assert_eq!(
-                    actual_val,
-                    Some(expected_val.clone()),
+                    actual_val.as_deref(),
+                    Some(expected_val.as_slice()),
                     "Confirmed key {:?} from aborted task {} returned incorrect value",
                     String::from_utf8_lossy(key),
                     task_id
@@ -157,8 +157,8 @@ async fn test_chaos_task_massacre() {
                 // Commit did not complete before abort -> MUST be either fully visible or fully invisible (None), never corrupt
                 if let Some(ref val) = actual_val {
                     assert_eq!(
-                        val,
-                        expected_val,
+                        val.as_ref(),
+                        expected_val.as_slice(),
                         "Key {:?} from aborted task {} has corrupted/partial value",
                         String::from_utf8_lossy(key),
                         task_id

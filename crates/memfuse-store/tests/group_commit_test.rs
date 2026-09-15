@@ -144,7 +144,7 @@ async fn test_group_commit_mid_batch_fsync_failure_atomicity() {
 
     // Verify storage state consistency: base key remains intact, failed keys are NOT visible
     let base_val = storage.get(b"base_key").await.expect("get base");
-    assert_eq!(base_val, Some(b"base_val".to_vec()));
+    assert_eq!(base_val, Some(bytes::Bytes::from_static(b"base_val")));
 
     for i in 5..=14u64 {
         let key = format!("batch_fail_key_{}", i).into_bytes();

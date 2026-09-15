@@ -27,8 +27,8 @@ impl TrackingMockStorage {
 }
 
 impl StorageEngine for TrackingMockStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
-        Box::pin(async move { Ok(self.data.lock().get(key).cloned()) })
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
@@ -92,7 +92,7 @@ impl StorageEngine for TrackingMockStorage {
         &'a self,
         key: &'a [u8],
         _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.get(key).await })
     }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
@@ -332,7 +332,7 @@ async fn test_guard_uncommitted_drop_with_newer_committed_tx_preserves_newer_tx(
     // Verify the newer transaction's state is preserved intact
     assert_eq!(
         storage.get(b"beta_key").await.unwrap(),
-        Some(b"beta_val".to_vec()),
+        Some(bytes::Bytes::from_static(b"beta_val")),
         "Newer committed transaction at TxId 200 must NOT be destroyed by late rollback of TxId 100"
     );
 

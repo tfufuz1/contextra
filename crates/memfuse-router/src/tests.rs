@@ -23,14 +23,14 @@ mod tests {
         fn get<'a>(
             &'a self,
             _: &'a [u8],
-        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
         fn get_at_seq<'a>(
             &'a self,
             _: &'a [u8],
             _: u64,
-        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
         fn put<'a>(

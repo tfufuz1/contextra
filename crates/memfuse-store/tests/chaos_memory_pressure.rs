@@ -198,7 +198,7 @@ async fn test_chaos_memory_pressure_sequential_and_concurrent() {
             let retrieved = storage.get(key).await.expect("get operation");
             assert_eq!(
                 retrieved,
-                Some(expected_val.clone()),
+                Some(bytes::Bytes::from(expected_val.clone())),
                 "Ground-truth key {:?} must be correctly stored and retrieved",
                 String::from_utf8_lossy(key)
             );

@@ -17,10 +17,10 @@ async fn test_collection_scan_prefix_batches_via_mock_storage() {
     }
 
     impl StorageEngine for BoundedScanMockStorage {
-        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
         fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
@@ -406,10 +406,10 @@ async fn test_relate_rollback_semantics_on_storage_commit_failure() {
     struct FailOnStorageCommit;
 
     impl StorageEngine for FailOnStorageCommit {
-        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
         fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
@@ -516,10 +516,10 @@ async fn test_relate_rollback_semantics_on_graph_commit_failure() {
     }
 
     impl StorageEngine for FailOnPutStorage {
-        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
         fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
@@ -3036,10 +3036,10 @@ async fn test_checkpoint_unpin_on_search_error_path() {
     }
 
     impl StorageEngine for PinTrackingFailingStorage {
-        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
         fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
@@ -3398,10 +3398,10 @@ async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
     struct FailingRollbackMockStorage;
 
     impl StorageEngine for FailingRollbackMockStorage {
-        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { Ok(None) })
         }
         fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {

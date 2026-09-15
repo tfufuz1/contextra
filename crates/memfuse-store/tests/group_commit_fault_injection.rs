@@ -77,7 +77,7 @@ async fn test_group_commit_fault_injection_all_participants_fail() {
         .await
         .expect("get base")
         .expect("value exists");
-    assert_eq!(&base_val, b"base_v");
+    assert_eq!(&base_val[..], b"base_v");
 
     // Failed batch keys must NOT exist in storage
     for i in 2..=num_tasks + 1 {
@@ -102,5 +102,5 @@ async fn test_group_commit_fault_injection_all_participants_fail() {
         .await
         .expect("get new")
         .expect("new value exists");
-    assert_eq!(&new_val, b"new_v");
+    assert_eq!(&new_val[..], b"new_v");
 }

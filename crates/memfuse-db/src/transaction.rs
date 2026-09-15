@@ -23,6 +23,7 @@
 //! to ensure fail-safe operation without panics.
 
 use crate::Collection;
+use bytes::Bytes;
 use memfuse_core::{
     BoxFuture, DocId, Edge, Entity, EntityId, GraphIndex, MemFuseError, Result, StorageEngine,
     TenantId, TextIndex, TxId, VectorIndex,
@@ -310,7 +311,7 @@ pub enum CommitIntent {
 }
 
 /// Staged key operation representing (key, optional_value).
-type StagedKeyOp = (Vec<u8>, Option<Vec<u8>>);
+type StagedKeyOp = (Vec<u8>, Option<Bytes>);
 
 /// A transaction wrapper that ensures atomic multi-index commits across LSM-Store, HNSW-Index, Text-Index, and Graph-Index.
 pub struct DbTransaction<S: StorageEngine, V: VectorIndex = memfuse_index::HnswIndex> {
@@ -355,9 +356,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     pub fn record_keys_with_old_values(
         &self,
         forward: Vec<u8>,
-        old_forward: Option<Vec<u8>>,
+        old_forward: Option<Bytes>,
         reverse: Vec<u8>,
-        old_reverse: Option<Vec<u8>>,
+        old_reverse: Option<Bytes>,
         doc_id: DocId,
     ) {
         let mut fw = match self.staged_forward_keys.lock() {

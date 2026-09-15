@@ -64,7 +64,7 @@ async fn test_fsync_timeout_triggers_clean_rollback() {
         .expect("get baseline key failed");
     assert_eq!(
         val_base,
-        Some(b"val_base".to_vec()),
+        Some(bytes::Bytes::from_static(b"val_base")),
         "Baseline key must remain intact"
     );
 

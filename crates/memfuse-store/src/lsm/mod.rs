@@ -280,7 +280,7 @@ impl StorageEngine for LsmStorage {
     ///
     /// # Panics
     /// Panikt nicht in Produktionscode.
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
         Box::pin(async move {
             validate_key(key)?;
             let current_max_seq = self.next_seq_no.load(Ordering::Acquire);
@@ -307,7 +307,7 @@ impl StorageEngine for LsmStorage {
         &'a self,
         key: &'a [u8],
         seq_no: u64,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
         Box::pin(async move {
             validate_key(key)?;
             // Genau EINMAL laden — Snapshot-Konsistenz über die gesamte Methode (INVARIANT-2)
@@ -325,7 +325,7 @@ impl StorageEngine for LsmStorage {
                 if (seq & TOMBSTONE_BIT) != 0 {
                     return Ok(None);
                 }
-                return Ok(Some(val.to_vec()));
+                return Ok(Some(val));
             }
 
             // 2. Immutable MemTables (newest first)
@@ -334,7 +334,7 @@ impl StorageEngine for LsmStorage {
                     if (seq & TOMBSTONE_BIT) != 0 {
                         return Ok(None);
                     }
-                    return Ok(Some(val.to_vec()));
+                    return Ok(Some(val));
                 }
             }
 
@@ -357,7 +357,7 @@ impl StorageEngine for LsmStorage {
                             return Ok(None);
                         }
                         tracing::debug!("LsmStorage::get_at_seq MATCH found in SSTable");
-                        return Ok(Some(val.to_vec()));
+                        return Ok(Some(val));
                     }
                     tracing::debug!("LsmStorage::get_at_seq SKIPPED entry due to seq/tx filter");
                 }

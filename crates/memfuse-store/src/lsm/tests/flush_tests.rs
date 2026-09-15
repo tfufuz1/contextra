@@ -18,14 +18,14 @@ async fn test_sstable_ordering_after_consecutive_flushes() {
         let current_val = storage.get(b"seq_key").await.expect("get");
         assert_eq!(
             current_val,
-            Some(val.into_bytes()),
+            Some(bytes::Bytes::from(val)),
             "After flush {}, get must return latest value",
             i
         );
     }
 
     let final_val = storage.get(b"seq_key").await.expect("final get");
-    assert_eq!(final_val, Some(b"val-10".to_vec()));
+    assert_eq!(final_val, Some(bytes::Bytes::from_static(b"val-10")));
 }
 
 #[tokio::test]
@@ -59,7 +59,7 @@ async fn test_flush_creates_sstable() {
         let val = storage.get(key.as_bytes()).await.expect("get");
         assert_eq!(
             val,
-            Some(expected.into_bytes()),
+            Some(bytes::Bytes::from(expected)),
             "key {} missing after flush",
             key
         );
@@ -169,8 +169,8 @@ async fn test_compaction_roundtrip() {
     let compact_res = storage.maybe_compact().await.expect("compact");
     assert!(compact_res, "Compaction should occur");
 
-    assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec()));
-    assert_eq!(storage.get(b"key2").await.unwrap(), Some(b"val2".to_vec()));
+    assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
+    assert_eq!(storage.get(b"key2").await.unwrap(), Some(bytes::Bytes::from_static(b"val2")));
 }
 
 #[tokio::test]
@@ -197,7 +197,7 @@ async fn test_close_durability() {
     {
         let storage = LsmStorage::new(config).await.unwrap();
         let val = storage.get(b"close_key").await.unwrap();
-        assert_eq!(val, Some(b"close_val".to_vec()));
+        assert_eq!(val, Some(bytes::Bytes::from_static(b"close_val")));
     }
 }
 
@@ -240,7 +240,7 @@ async fn test_flush_phase3_failure_retains_immutable_memtable_and_data() {
     let val = storage.get(b"key1").await.unwrap();
     assert_eq!(
         val,
-        Some(b"val1".to_vec()),
+        Some(bytes::Bytes::from_static(b"val1")),
         "Key must remain readable from retained immutable memtable after flush failure"
     );
 }

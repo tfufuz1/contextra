@@ -11,7 +11,7 @@ async fn test_put_get_roundtrip() {
     storage.commit(tx).await.expect("commit");
 
     let val = storage.get(b"hello").await.expect("get");
-    assert_eq!(val, Some(b"world".to_vec()));
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"world")));
 }
 
 #[tokio::test]
@@ -51,7 +51,7 @@ async fn test_delete_prefix_removes_all_matching_keys() {
     assert_eq!(storage.get(b"test:3").await.unwrap(), None);
     assert_eq!(
         storage.get(b"other:1").await.unwrap(),
-        Some(b"val4".to_vec())
+        Some(bytes::Bytes::from_static(b"val4"))
     );
 }
 
@@ -110,7 +110,7 @@ async fn test_overwrite() {
     storage.commit(tx2).await.expect("commit2");
 
     let val = storage.get(b"key").await.expect("get");
-    assert_eq!(val, Some(b"val2".to_vec()));
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"val2")));
 }
 
 #[tokio::test]

@@ -23,8 +23,8 @@ impl MockStorage {
 }
 
 impl StorageEngine for MockStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
-        Box::pin(async move { Ok(self.store.read().get(key).cloned()) })
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { Ok(self.store.read().get(key).cloned().map(bytes::Bytes::from)) })
     }
     fn put<'a>(&'a self, _tx: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
@@ -51,7 +51,7 @@ impl StorageEngine for MockStorage {
         &'a self,
         key: &'a [u8],
         _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.get(key).await })
     }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {

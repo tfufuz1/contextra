@@ -75,8 +75,8 @@ impl FastRamStorage {
 }
 
 impl StorageEngine for FastRamStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
-        Box::pin(async move { Ok(self.store.read().get(key).cloned()) })
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, memfuse_core::Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { Ok(self.store.read().get(key).cloned().map(bytes::Bytes::from)) })
     }
     fn put<'a>(
         &'a self,
@@ -112,8 +112,8 @@ impl StorageEngine for FastRamStorage {
         &'a self,
         key: &'a [u8],
         _seq: u64,
-    ) -> BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
-        Box::pin(async move { Ok(self.store.read().get(key).cloned()) })
+    ) -> BoxFuture<'a, memfuse_core::Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { Ok(self.store.read().get(key).cloned().map(bytes::Bytes::from)) })
     }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, memfuse_core::Result<u64>> {
         Box::pin(async move { Ok(1) })

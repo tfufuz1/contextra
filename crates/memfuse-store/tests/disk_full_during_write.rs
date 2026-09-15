@@ -30,7 +30,7 @@ async fn test_disk_full_during_embedding_write_leaves_no_phantom_state() {
     // Verify baseline key is readable
     assert_eq!(
         storage.get(b"key_baseline").await.expect("get baseline"),
-        Some(b"val_baseline".to_vec())
+        Some(bytes::Bytes::from_static(b"val_baseline"))
     );
 
     // 2. Prepare transaction tx2 and activate fault injection simulating disk full / I/O error during WAL append
@@ -78,10 +78,10 @@ async fn test_disk_full_during_embedding_write_leaves_no_phantom_state() {
     // Verify key_recovery is stored and baseline remains intact
     assert_eq!(
         storage.get(b"key_recovery").await.expect("get recovery"),
-        Some(b"val_recovery".to_vec())
+        Some(bytes::Bytes::from_static(b"val_recovery"))
     );
     assert_eq!(
         storage.get(b"key_baseline").await.expect("get baseline"),
-        Some(b"val_baseline".to_vec())
+        Some(bytes::Bytes::from_static(b"val_baseline"))
     );
 }

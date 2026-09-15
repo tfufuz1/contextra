@@ -31,11 +31,11 @@ async fn test_wal_replay_after_restart() {
 
         assert_eq!(
             storage.get(b"key1").await.expect("get key1"),
-            Some(b"val1".to_vec())
+            Some(bytes::Bytes::from_static(b"val1"))
         );
         assert_eq!(
             storage.get(b"key2").await.expect("get key2"),
-            Some(b"val2".to_vec())
+            Some(bytes::Bytes::from_static(b"val2"))
         );
     }
 }
@@ -93,7 +93,7 @@ async fn test_compaction_preserves_all_data() {
             .expect("get after compaction");
         assert_eq!(
             res,
-            Some(expected_val.into_bytes()),
+            Some(bytes::Bytes::from(expected_val)),
             "key mismatch at index {}",
             i
         );
@@ -120,6 +120,6 @@ async fn test_memtable_flush_atomic() {
 
     assert_eq!(
         storage.get(b"atomic_key").await.expect("get"),
-        Some(b"atomic_val".to_vec())
+        Some(bytes::Bytes::from_static(b"atomic_val"))
     );
 }

@@ -78,7 +78,7 @@ async fn test_commit_failure_no_deadlock() {
         storage.rollback_to_tx(tx1).await.expect("rollback to tx1");
 
         // Verify key2 is gone and key1 remains
-        assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec()));
+        assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
         assert_eq!(storage.get(b"key2").await.unwrap(), None);
     })
     .await;
@@ -150,7 +150,7 @@ async fn test_multi_cycle_crash_recovery_wal_cleanup() {
             let val = format!("cycle_val_{}", c);
             assert_eq!(
                 storage.get(key.as_bytes()).await.unwrap(),
-                Some(val.into_bytes()),
+                Some(bytes::Bytes::from(val)),
                 "Data from cycle {} missing post-recovery",
                 c
             );

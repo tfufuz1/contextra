@@ -25,7 +25,7 @@ async fn test_multigenerational_overwrites_and_tombstones() -> Result<()> {
 
     assert_eq!(
         storage.get(b"key1").await?,
-        Some(b"v2".to_vec()),
+        Some(bytes::Bytes::from_static(b"v2")),
         "Newer version v2 in SSTable 2 must shadow v1 in SSTable 1"
     );
     assert_eq!(
@@ -39,7 +39,7 @@ async fn test_multigenerational_overwrites_and_tombstones() -> Result<()> {
     storage.commit(tx3).await?;
     storage.force_flush().await?;
 
-    assert_eq!(storage.get(b"key1").await?, Some(b"v3".to_vec()));
+    assert_eq!(storage.get(b"key1").await?, Some(bytes::Bytes::from_static(b"v3")));
 
     Ok(())
 }
@@ -73,12 +73,12 @@ async fn test_compaction_gc_unpinned_vs_pinned() -> Result<()> {
     storage.maybe_compact().await?;
 
     assert_eq!(storage.get(b"keyA").await?, None);
-    assert_eq!(storage.get(b"keyB").await?, Some(b"valB".to_vec()));
+    assert_eq!(storage.get(b"keyB").await?, Some(bytes::Bytes::from_static(b"valB")));
 
     let key_a_at_tx2 = storage.get_at_seq(b"keyA", 2).await?;
     assert_eq!(
         key_a_at_tx2,
-        Some(b"valA".to_vec()),
+        Some(bytes::Bytes::from_static(b"valA")),
         "Pinned snapshot must preserve historical version during compaction"
     );
 
