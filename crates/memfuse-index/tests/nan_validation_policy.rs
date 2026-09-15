@@ -6,8 +6,10 @@ use memfuse_index::HnswConfig;
 // BEWEIST: [Invariante] Vektoren mit NaN, Infinity oder Negative Infinity werden beim Einfügen in den Index konsistent mit Err(InvalidInput) abgelehnt.
 #[tokio::test]
 async fn proof_nan_rejected_at_insert() {
-    let mut config = HnswConfig::default();
-    config.dimension = 4;
+    let config = HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
     let index = HnswIndex::try_new(config).expect("failed to create hnsw index");
     let tx = TxId::new(1);
 
@@ -66,8 +68,10 @@ fn proof_compute_distance_trusted_never_scans_nan() {
 // BEWEIST: [Invariante] Nach einer Ablehnung wegen NaN-Werten bleibt der Index-Zustand sauber, sodass nachfolgende valide Inserts derselben DocId erfolgreich indiziert werden.
 #[tokio::test]
 async fn proof_valid_insert_after_nan_rejection() {
-    let mut config = HnswConfig::default();
-    config.dimension = 4;
+    let config = HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
     let index = HnswIndex::try_new(config).expect("failed to create hnsw index");
     let tx = TxId::new(1);
     let target_doc = DocId::new(10);
@@ -142,8 +146,10 @@ fn proof_validate_vector_covers_all_positions() {
 // BEWEIST: [Invariante] NaN in Query-Vektoren wird beim search()-Aufruf direkt abgelehnt, ohne den Index-Zustand oder bestehende Dokumente zu beeinträchtigen.
 #[tokio::test]
 async fn proof_nan_in_query_rejected_at_search() {
-    let mut config = HnswConfig::default();
-    config.dimension = 4;
+    let config = HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
     let index = HnswIndex::try_new(config).expect("failed to create hnsw index");
     let tx = TxId::new(1);
 

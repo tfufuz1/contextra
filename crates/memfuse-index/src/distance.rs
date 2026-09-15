@@ -71,13 +71,14 @@ use std::arch::x86_64::*;
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> memfuse_core::Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
-        return Err(MemFuseError::invalid_input("Vector contains NaN or Inf"));
+        return Err(MemFuseError::invalid_input("NaN or Infinity detected in vector"));
     }
     Ok(())
 }
 
 pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> memfuse_core::Result<f32> {
     validate_vector(a)?;
+    validate_vector(b)?;
     compute_distance_trusted(a, b, metric)
 }
 
@@ -870,6 +871,7 @@ pub(crate) fn euclidean_distance_sq_f32_u8(
 /// Parts required to compute asymmetric cosine similarity.
 #[cfg(test)]
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct CosineSimilarityPartsF32U8 {
     pub dot_f32_u8: f32,
     pub sum_u8: u32,
