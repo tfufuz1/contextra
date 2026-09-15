@@ -1375,6 +1375,24 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_deleted_view_methods() {
+        let empty_view = DeletedView::empty();
+        assert!(empty_view.is_empty());
+        assert_eq!(empty_view.len(), 0);
+        assert!(!empty_view.contains(1));
+
+        let mut set = HashSet::new();
+        set.insert(5);
+        set.insert(10);
+        let view = DeletedView::from_nodes(set);
+        assert!(!view.is_empty());
+        assert_eq!(view.len(), 2);
+        assert!(view.contains(5));
+        assert!(view.contains(10));
+        assert!(!view.contains(1));
+    }
+
     #[tokio::test]
     async fn test_deleted_view_tombstone_filtering_all_entry_points() {
         use memfuse_core::StorageEngine;
