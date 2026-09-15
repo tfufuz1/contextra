@@ -803,7 +803,10 @@ async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
         err_msg1.contains("Egress policy violation: query blocked by rule R-005"),
         "Expected opaque rule ID in block message for email input, got: '{err_msg1}'"
     );
-    assert!(!err_msg1.contains("@"), "Error message must not leak raw regex pattern");
+    assert!(
+        !err_msg1.contains("@"),
+        "Error message must not leak raw regex pattern"
+    );
 
     // 2. Test simulated API key payload (e.g. sk-...)
     let req_apikey = make_request(

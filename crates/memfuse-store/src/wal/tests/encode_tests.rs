@@ -119,8 +119,7 @@ async fn test_batch_encryption_single_nonce_layout() {
     let wal_path = dir.path().join("single_nonce_test.wal");
 
     let km = Arc::new(
-        KeyManager::try_new("test_passphrase", b"salt123456789012345678901234567890")
-            .expect("km"), // expect
+        KeyManager::try_new("test_passphrase", b"salt123456789012345678901234567890").expect("km"), // expect
     );
     let wal = Wal::open_with_key_manager(&wal_path, Some(km))
         .await

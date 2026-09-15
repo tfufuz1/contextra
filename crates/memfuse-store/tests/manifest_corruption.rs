@@ -129,7 +129,9 @@ async fn scenario3_prevent_sstable_resurrection() {
     if let Ok(entries) = Manifest::load(&manifest_path).await {
         let valid = Manifest::reconstruct_valid_sstables(&entries);
         assert!(
-            !valid.iter().any(|(p, _)| p == &PathBuf::from("sst-dead.sst")),
+            !valid
+                .iter()
+                .any(|(p, _)| p == &PathBuf::from("sst-dead.sst")),
             "B-4 SSTable-Resurrection: sst-dead.sst ist in valid_set nach Remove-Korruption"
         );
     }

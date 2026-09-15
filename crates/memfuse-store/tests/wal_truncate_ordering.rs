@@ -103,7 +103,11 @@ async fn proof_size_counter_consistent_after_truncate() -> Result<()> {
 
     wal.truncate(0, [0u8; 32]).await?;
 
-    assert_eq!(wal.size(), 0, "In-memory wal.size() must be 0 after truncate(0)");
+    assert_eq!(
+        wal.size(),
+        0,
+        "In-memory wal.size() must be 0 after truncate(0)"
+    );
 
     let file_meta = tokio::fs::metadata(&wal_path).await?;
     assert_eq!(
@@ -168,7 +172,10 @@ async fn proof_concurrent_flush_and_truncate_no_panic() -> Result<()> {
     })
     .await;
 
-    assert!(res.is_ok(), "Concurrent flush and truncate timed out or failed");
+    assert!(
+        res.is_ok(),
+        "Concurrent flush and truncate timed out or failed"
+    );
     res.unwrap()?;
     Ok(())
 }
@@ -192,7 +199,10 @@ async fn proof_wal_size_counter_consistent_after_failed_truncate() -> Result<()>
     }
 
     let initial_size = wal.size();
-    assert!(initial_size > 4, "WAL size should be greater than header length");
+    assert!(
+        initial_size > 4,
+        "WAL size should be greater than header length"
+    );
 
     // 2. Arm next truncate to fail via fault-injection
     wal.arm_truncate_failure_for_test();

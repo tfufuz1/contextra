@@ -2724,7 +2724,10 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> memfuse_core::R
         )
         .await;
 
-    assert!(path_res.is_err(), "PathRag under snapshot isolation must fail");
+    assert!(
+        path_res.is_err(),
+        "PathRag under snapshot isolation must fail"
+    );
     match path_res.unwrap_err() {
         memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
             assert!(msg.contains("PathRag"));
