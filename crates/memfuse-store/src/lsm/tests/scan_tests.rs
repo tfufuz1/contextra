@@ -20,7 +20,11 @@ async fn test_scan_range() {
     storage.commit(tx1).await.unwrap();
 
     let results = storage
-        .scan(Bound::Included(b"b".as_ref()), Bound::Excluded(b"d".as_ref()), None)
+        .scan(
+            Bound::Included(b"b".as_ref()),
+            Bound::Excluded(b"d".as_ref()),
+            None,
+        )
         .await
         .unwrap();
 
@@ -53,10 +57,7 @@ async fn test_bounded_scan_and_prefix_bounded_limits_candidate_evaluation() {
     assert_eq!(res_range[9].0, b"k:009");
     assert_eq!(cur_range, Some(b"k:009".to_vec()));
 
-    let (res_prefix, cur_prefix) = storage
-        .scan_prefix_bounded(b"k:", 10, None)
-        .await
-        .unwrap();
+    let (res_prefix, cur_prefix) = storage.scan_prefix_bounded(b"k:", 10, None).await.unwrap();
     assert_eq!(res_prefix.len(), 10);
     assert_eq!(res_prefix[0].0, b"k:000");
     assert_eq!(res_prefix[9].0, b"k:009");
@@ -125,10 +126,7 @@ async fn test_get_at_seq_mvcc_sequence_correctness() {
         storage.get_at_seq(b"key1", seq1 + 1).await.unwrap(),
         Some(b"v2".to_vec())
     );
-    assert_eq!(
-        storage.get_at_seq(b"key1", seq1 + 2).await.unwrap(),
-        None
-    );
+    assert_eq!(storage.get_at_seq(b"key1", seq1 + 2).await.unwrap(), None);
 }
 
 #[tokio::test]
@@ -219,10 +217,7 @@ async fn test_scan_prefix_bounded_pagination() {
     }
     storage.commit(tx).await.unwrap();
 
-    let (p1, cur1) = storage
-        .scan_prefix_bounded(b"k:", 10, None)
-        .await
-        .unwrap();
+    let (p1, cur1) = storage.scan_prefix_bounded(b"k:", 10, None).await.unwrap();
     assert_eq!(p1.len(), 10);
     assert_eq!(p1[0].0, b"k:00");
     assert_eq!(p1[9].0, b"k:09");

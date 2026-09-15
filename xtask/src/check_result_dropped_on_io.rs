@@ -55,9 +55,7 @@ pub fn run_check_result_dropped_on_io_with_options(
                 for (idx, line) in lines.iter().enumerate() {
                     let trimmed = line.trim();
 
-                    if trimmed.starts_with("//")
-                        || trimmed.contains("// INTENTIONAL-DROP")
-                    {
+                    if trimmed.starts_with("//") || trimmed.contains("// INTENTIONAL-DROP") {
                         continue;
                     }
 

@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use memfuse_core::DistanceMetric;
-use memfuse_index::distance::{cosine_distance, compute_distance};
+use memfuse_index::distance::{compute_distance, cosine_distance};
 
 fn bench_distance_nan_impact(c: &mut Criterion) {
     let dim = 768;
@@ -20,9 +20,7 @@ fn bench_distance_nan_impact(c: &mut Criterion) {
     });
 
     group.bench_function("cosine_distance_direct", |bench| {
-        bench.iter(|| {
-            black_box(cosine_distance(black_box(&a), black_box(&b)))
-        });
+        bench.iter(|| black_box(cosine_distance(black_box(&a), black_box(&b))));
     });
 
     group.finish();

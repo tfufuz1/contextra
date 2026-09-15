@@ -22,7 +22,10 @@ async fn proof_no_deadlock_concurrent_delete_search() {
         let tx1 = TxId::new(1);
         for i in 1..=500u64 {
             let vec = vec![(i % 10) as f32; 16];
-            index.insert(tx1, DocId::new(i), &vec).await.expect("insert failed");
+            index
+                .insert(tx1, DocId::new(i), &vec)
+                .await
+                .expect("insert failed");
         }
         index.commit(tx1).await.expect("commit failed");
 
@@ -133,7 +136,10 @@ async fn proof_search_throughput_not_degraded_by_deletes() {
 
     for i in 1..=500u64 {
         let vec = vec![(i as f32) * 0.01; dim];
-        index_a.insert(tx1, DocId::new(i), &vec).await.expect("insert_a");
+        index_a
+            .insert(tx1, DocId::new(i), &vec)
+            .await
+            .expect("insert_a");
     }
     index_a.commit(tx1).await.expect("commit_a1");
 
@@ -158,7 +164,10 @@ async fn proof_search_throughput_not_degraded_by_deletes() {
 
     for i in 1..=500u64 {
         let vec = vec![(i as f32) * 0.01; dim];
-        index_b.insert(tx_b, DocId::new(i), &vec).await.expect("insert_b");
+        index_b
+            .insert(tx_b, DocId::new(i), &vec)
+            .await
+            .expect("insert_b");
     }
     index_b.commit(tx_b).await.expect("commit_b");
 

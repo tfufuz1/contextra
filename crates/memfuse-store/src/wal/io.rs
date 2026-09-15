@@ -59,9 +59,11 @@ where
                 version = WalVersion::V2;
                 pos = 4;
             } else {
-                reader.get_mut().seek(std::io::SeekFrom::Start(0)).await.map_err(|e| {
-                    MemFuseError::Storage(format!("WAL replay seek failed: {}", e))
-                })?;
+                reader
+                    .get_mut()
+                    .seek(std::io::SeekFrom::Start(0))
+                    .await
+                    .map_err(|e| MemFuseError::Storage(format!("WAL replay seek failed: {}", e)))?;
                 reader = tokio::io::BufReader::new(reader.into_inner());
                 pos = 0;
             }
@@ -257,20 +259,20 @@ where
 
                 if let Err(e) = verify_res {
                     if !using_legacy_key && allow_legacy_integrity_key_fallback {
-                        let mut legacy_verifier =
-                            IntegrityVerifier::new(&legacy_integrity_key());
+                        let mut legacy_verifier = IntegrityVerifier::new(&legacy_integrity_key());
                         legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
-                        let legacy_res =
-                            match version {
-                                WalVersion::V3 => legacy_verifier
-                                    .verify_and_update_v3(&snapshot, chunk_start_pos),
-                                WalVersion::V2 => legacy_verifier
-                                    .verify_and_update_v2(&snapshot, chunk_start_pos),
-                                WalVersion::V1 => {
-                                    legacy_verifier.skip_hmac_verify_legacy(&snapshot);
-                                    Ok(())
-                                }
-                            };
+                        let legacy_res = match version {
+                            WalVersion::V3 => {
+                                legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
+                            }
+                            WalVersion::V2 => {
+                                legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
+                            }
+                            WalVersion::V1 => {
+                                legacy_verifier.skip_hmac_verify_legacy(&snapshot);
+                                Ok(())
+                            }
+                        };
                         if legacy_res.is_ok() {
                             tracing::warn!(
                                 "WAL nutzt veralteten Integritätsschlüssel — Datenbank sollte neu initialisiert werden"
@@ -430,7 +432,11 @@ impl Wal {
         #[cfg(feature = "fault-injection")]
         {
             let fail_tx = FAIL_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
-            if fail_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == fail_tx || fail_tx == u64::MAX) {
+            if fail_tx != 0
+                && entries
+                    .iter()
+                    .any(|e| e.tx_id().inner() == fail_tx || fail_tx == u64::MAX)
+            {
                 FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
                 return Err(MemFuseError::Storage(
                     "Simulated WAL append_batch I/O failure via fault injection".into(),
@@ -613,11 +619,9 @@ impl Wal {
         })
         .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
 
-        ack_rx
-            .await
-            .map_err(|_| {
-                MemFuseError::Storage("WAL flusher dropped ack for truncate command".into())
-            })??;
+        ack_rx.await.map_err(|_| {
+            MemFuseError::Storage("WAL flusher dropped ack for truncate command".into())
+        })??;
 
         Ok(())
     }
