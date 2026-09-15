@@ -424,7 +424,7 @@ impl Manifest {
                 )));
             }
 
-            let _is_tail = pos + 4 + len as u64 > file_size;
+            let is_tail = pos + 4 + len as u64 > file_size;
 
             let mut entry_raw = vec![0u8; len];
             match reader.read_exact(&mut entry_raw).await {
