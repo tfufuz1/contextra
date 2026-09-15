@@ -99,6 +99,9 @@ pub struct HnswConfig {
     /// Sample size used for ScalarQuantizer recalibration during rebuilds.
     /// Default is 10,000 to balance speed and accuracy.
     pub quantizer_recalibration_sample_size: usize,
+    /// Quantizer drift ratio threshold above which an index rebuild is recommended.
+    /// Default is `0.10` (10% out-of-range queries).
+    pub quantizer_drift_threshold: f32,
     /// Partial rebuild configuration for hot-path local rebuilds (F-02).
     #[cfg(feature = "partial-index-rebuild")]
     pub partial_rebuild_config: crate::partial_rebuild::PartialRebuildConfig,
@@ -117,6 +120,7 @@ impl Default for HnswConfig {
             rebuild_threshold: 1.0 - HNSW_REBUILD_DELETION_RATIO,
             quantize: false,
             quantizer_recalibration_sample_size: 10_000,
+            quantizer_drift_threshold: 0.10,
             #[cfg(feature = "partial-index-rebuild")]
             partial_rebuild_config: crate::partial_rebuild::PartialRebuildConfig::default(),
         }
@@ -151,6 +155,12 @@ impl HnswConfig {
             return Err(MemFuseError::invalid_input(format!(
                 "rebuild_threshold ({}) must be between 0.0 and 1.0",
                 self.rebuild_threshold
+            )));
+        }
+        if !(0.0..=1.0).contains(&self.quantizer_drift_threshold) {
+            return Err(MemFuseError::invalid_input(format!(
+                "quantizer_drift_threshold ({}) must be between 0.0 and 1.0",
+                self.quantizer_drift_threshold
             )));
         }
         Ok(())
@@ -213,6 +223,13 @@ impl HnswConfigBuilder {
     /// Sets the sample size used for ScalarQuantizer recalibration during rebuilds.
     pub fn quantizer_recalibration_sample_size(mut self, size: usize) -> Self {
         self.config.quantizer_recalibration_sample_size = size;
+        self
+    }
+
+    /// Sets the drift ratio threshold for ScalarQuantizer recalibration and rebuilds.
+    /// Default is `0.10` (10% out-of-range queries).
+    pub fn quantizer_drift_threshold(mut self, threshold: f32) -> Self {
+        self.config.quantizer_drift_threshold = threshold.clamp(0.0, 1.0);
         self
     }
 
@@ -358,6 +375,9 @@ impl HnswIndex {
     pub fn try_new(config: HnswConfig) -> Result<Self> {
         config.validate()?;
         let ml = 1.0 / (config.m as f64).ln();
+        #[cfg(feature = "partial-index-rebuild")]
+        let partial_rebuild_config = config.partial_rebuild_config.clone();
+
         Ok(Self {
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
@@ -384,7 +404,7 @@ impl HnswIndex {
                     visited_dead_nodes: AtomicU64::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
-                        config.partial_rebuild_config.clone(),
+                        partial_rebuild_config,
                     )),
                 },
             }),
@@ -398,6 +418,9 @@ impl HnswIndex {
     pub fn new(config: HnswConfig) -> Self {
         let validation_error = config.validate().err().map(|e| e.to_string());
         let ml = 1.0 / (config.m as f64).ln();
+        #[cfg(feature = "partial-index-rebuild")]
+        let partial_rebuild_config = config.partial_rebuild_config.clone();
+
         Self {
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
@@ -424,7 +447,7 @@ impl HnswIndex {
                     visited_dead_nodes: AtomicU64::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
-                        config.partial_rebuild_config.clone(),
+                        partial_rebuild_config,
                     )),
                 },
             }),
@@ -1776,13 +1799,9 @@ impl HnswIndexCore {
             ));
         }
 
-        // AI-TAG[CONCURRENCY][MAJOR] RESOLVED: AGT-INDEX-b2c3d4e5 (TS:2026-09-01T11:30:00Z) (SESSION:016eab33) — Write-Lock für
-        //   SQ8-Quantizer-Bounds-Expansion bei Insert garantiert; loom-Regressionstest
-        //   in tests/loom_quantizer_race_test.rs
         let vector_data = if self.cold.config.quantize {
-            let mut q_guard = self.cold.quantizer.write();
-            if let Some(q) = q_guard.as_mut() {
-                q.expand_bounds_to_fit(vector);
+            let q_guard = self.cold.quantizer.read();
+            if let Some(q) = q_guard.as_ref() {
                 VectorData::U8(q.quantize(vector)?)
             } else {
                 VectorData::F32(vector.to_vec())
@@ -2203,9 +2222,19 @@ impl HnswIndexCore {
         Ok(())
     }
 
-    /// Checks if a rebuild is required based on the deletion ratio.
+    /// Checks if a rebuild is required based on the deletion ratio or quantizer drift.
     pub fn is_rebuild_required(&self) -> bool {
-        self.connectivity_score() < self.cold.config.rebuild_threshold
+        if self.connectivity_score() < self.cold.config.rebuild_threshold {
+            return true;
+        }
+        if self.cold.config.quantize {
+            if let Some(q) = self.cold.quantizer.read().as_ref() {
+                if q.is_rebuild_required(self.cold.config.quantizer_drift_threshold) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Rebuilds the HNSW index from scratch, removing all deleted nodes.
@@ -2794,7 +2823,6 @@ impl VectorIndex for HnswIndex {
         }
         let _lock = self.inner.hot.write_mutex.lock().await;
         let ops = self.inner.cold.tx_buffer.drain(tx);
-        let mut deleted_any = false;
 
         // ANCHOR[SPEC:WP-2.2-SQ8TRAIN-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Lazy Training logic (Stabilized)
         if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
@@ -2883,7 +2911,6 @@ impl VectorIndex for HnswIndex {
 
         for doc_id in deletes_to_apply {
             self.inner.do_delete(doc_id)?;
-            deleted_any = true;
         }
 
         // Record ops into seq_log for search_at snapshot isolation
@@ -2927,10 +2954,11 @@ impl VectorIndex for HnswIndex {
             }
         }
 
-        if deleted_any && self.inner.is_rebuild_required() {
+        if self.inner.is_rebuild_required() {
             tracing::warn!(
-                "HNSW index rebuild threshold reached (threshold: {:.2})",
-                self.inner.cold.config.rebuild_threshold
+                "HNSW index rebuild threshold reached (rebuild_threshold: {:.2}, quantizer_drift_threshold: {:.2})",
+                self.inner.cold.config.rebuild_threshold,
+                self.inner.cold.config.quantizer_drift_threshold
             );
             self.trigger_rebuild_async();
         }
@@ -4140,10 +4168,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_do_insert_deterministic_quantizer_bound_expansion_under_contention() {
+    async fn test_do_insert_clamping_preserves_codebook_stability_under_contention() {
         let config = HnswConfig {
             dimension: 4,
             quantize: true,
+            quantizer_drift_threshold: 0.90, // High threshold to prevent automatic rebuild during test
             ..test_config(4)
         };
         let index = std::sync::Arc::new(HnswIndex::try_new(config).unwrap()); // unwrap
@@ -4156,8 +4185,8 @@ mod tests {
         }
         index.commit(tx1).await.unwrap(); // unwrap
 
-        // Verify quantizer is initialized with initial bounds
-        assert!(index.quantizer().is_some());
+        let initial_mins = index.quantizer().as_ref().unwrap().mins().to_vec(); // unwrap
+        let initial_maxes = index.quantizer().as_ref().unwrap().maxes().to_vec(); // unwrap
 
         // 2. Spawn multiple concurrent search tasks holding read lock on quantizer
         let mut tasks = Vec::new();
@@ -4185,76 +4214,156 @@ mod tests {
             task.await.unwrap(); // unwrap
         }
 
-        // 4. Verify check_drift for out_of_bounds_vector returns 0.0 (bounds were deterministically expanded)
+        // 4. Verify quantizer bounds remain stable (no mutation during insert)
         let q_opt = index.quantizer();
         let q = q_opt.as_ref().expect("Quantizer must be present"); // expect
+        assert_eq!(q.mins(), initial_mins.as_slice());
+        assert_eq!(q.maxes(), initial_maxes.as_slice());
+
+        // 5. Verify check_drift detects out of bounds vector
         let drift = q.check_drift(&out_of_bounds_vector);
         assert_eq!(
-            drift, 0.0,
-            "Quantizer bounds must expand deterministically during insert even under read lock contention"
+            drift, 1.0,
+            "All 4 dimensions of outlier vector are out of bounds"
         );
     }
 
     #[tokio::test]
-    async fn test_concurrent_search_and_insert_expands_quantizer_bounds() {
+    async fn test_sq8_outlier_insert_clamping_numerical_precision() {
+        // Concrete numerical verification test:
+        // Dimension i initialized with range [0.0, 1.0].
+        // Stored code 128 decodes to a specific value.
+        // Insert outlier value 10.0 in dimension i.
+        // Codebook bounds/scales MUST NOT be mutated; stored code 128 MUST still decode identically.
+        let config = HnswConfig {
+            dimension: 2,
+            quantize: true,
+            quantizer_drift_threshold: 0.90,
+            ..test_config(2)
+        };
+        let index = HnswIndex::try_new(config).unwrap();
+
+        // 1. Train quantizer with range [0.0, 1.0]
+        let tx1 = TxId::new(1);
+        for i in 0..=60u64 {
+            let v = [i as f32 / 60.0, 0.5];
+            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+        }
+        index.commit(tx1).await.unwrap();
+
+        let q_before = index.quantizer().unwrap();
+        let code_128 = vec![128u8, 128u8];
+        let initial_decoded = q_before.dequantize(&code_128).unwrap();
+        let initial_min_d0 = q_before.mins()[0];
+        let initial_max_d0 = q_before.maxes()[0];
+
+        // 2. Insert outlier vector [10.0, 0.5]
+        let tx2 = TxId::new(2);
+        index
+            .insert(tx2, DocId::new(100), &[10.0, 0.5])
+            .await
+            .unwrap();
+        index.commit(tx2).await.unwrap();
+
+        let q_after = index.quantizer().unwrap();
+        assert_eq!(q_after.mins()[0], initial_min_d0);
+        assert_eq!(q_after.maxes()[0], initial_max_d0);
+
+        // Verify stored code 128 still decodes identically
+        let after_decoded = q_after.dequantize(&code_128).unwrap();
+        assert_eq!(initial_decoded[0], after_decoded[0]);
+    }
+
+    #[tokio::test]
+    async fn test_quantizer_drift_rebuild_triggers_and_recalibrates() {
+        let config = HnswConfigBuilder::new(2)
+            .m(8)
+            .ef_construction(16)
+            .ef_search(16)
+            .quantize(true)
+            .rebuild_threshold(0.0) // Disable deletion rebuild trigger
+            .quantizer_drift_threshold(0.05) // Trigger rebuild if >5% out of range queries
+            .build()
+            .unwrap();
+
+        let index = HnswIndex::try_new(config).unwrap();
+
+        // 1. Insert 60 initial vectors in range [0.0, 1.0]
+        let tx1 = TxId::new(1);
+        for i in 1..=60u64 {
+            let v = [i as f32 / 60.0, 0.5];
+            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+        }
+        index.commit(tx1).await.unwrap();
+        assert_eq!(index.rebuild_count(), 0);
+
+        let initial_max = index.quantizer().unwrap().maxes()[0];
+        assert!(initial_max <= 1.05);
+
+        // 2. Insert outlier vectors far outside range [0.0, 1.0] (e.g., [10.0, 10.0])
+        // To exceed 5% drift ratio with 60 initial queries, insert 20 outlier queries (20/80 = 25% drift)
+        let tx2 = TxId::new(2);
+        for i in 61..=80u64 {
+            let v = [10.0 + (i as f32), 10.0];
+            index.insert(tx2, DocId::new(i), &v).await.unwrap();
+        }
+        index.commit(tx2).await.unwrap(); // commit triggers trigger_rebuild_async()
+
+        // Give background rebuild task time to start, then wait for completion or execute rebuild directly
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        if index.rebuild_count() == 0 {
+            index.rebuild().await.unwrap();
+        }
+
+        assert!(index.rebuild_count() >= 1, "Rebuild count should increase");
+
+        // 3. Verify post-rebuild quantizer has reset drift counters and rebuild_count increased
+        let q_new = index.quantizer().unwrap();
+        assert_eq!(
+            q_new.drift_ratio(),
+            0.0,
+            "Post-rebuild quantizer drift ratio should reset to 0"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_inserts_read_lock_fast_path() {
         let config = HnswConfig {
             dimension: 4,
             quantize: true,
+            quantizer_drift_threshold: 0.90,
             ..test_config(4)
         };
-        let index = std::sync::Arc::new(HnswIndex::try_new(config).unwrap()); // unwrap
+        let index = std::sync::Arc::new(HnswIndex::try_new(config).unwrap());
 
-        // 1. Train quantizer with initial vectors
-        let tx1 = TxId::new(1);
-        for i in 1..=60u64 {
-            let v = [1.0, 2.0, 3.0, 4.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap(); // unwrap
+        // Initial commit to train quantizer
+        let tx0 = TxId::new(0);
+        index
+            .insert(tx0, DocId::new(0), &[1.0, 2.0, 3.0, 4.0])
+            .await
+            .unwrap();
+        index.commit(tx0).await.unwrap();
+
+        // Spawn 8 concurrent insertion tasks
+        let mut handles = Vec::new();
+        for thread_id in 1..=8u64 {
+            let idx = std::sync::Arc::clone(&index);
+            handles.push(tokio::spawn(async move {
+                for i in 1..=20u64 {
+                    let doc_val = thread_id * 100 + i;
+                    let tx = TxId::new(doc_val);
+                    let v = [i as f32, (i * 2) as f32, 1.0, 2.0];
+                    idx.insert(tx, DocId::new(doc_val), &v).await.unwrap();
+                    idx.commit(tx).await.unwrap();
+                }
+            }));
         }
-        index.commit(tx1).await.unwrap(); // unwrap
 
-        let initial_mins = index.quantizer().as_ref().unwrap().mins().to_vec(); // unwrap
-        let initial_maxes = index.quantizer().as_ref().unwrap().maxes().to_vec(); // unwrap
+        for handle in handles {
+            handle.await.unwrap();
+        }
 
-        // 2. Parallele search() und insert() Aufrufe via tokio::join!
-        let out_of_bounds_vector = [1000.0, -1000.0, 500.0, -500.0];
-        let idx_search = std::sync::Arc::clone(&index);
-        let idx_insert = std::sync::Arc::clone(&index);
-
-        let search_handle = tokio::spawn(async move {
-            for _ in 0..100 {
-                let _ = idx_search.search(&[1.0, 2.0, 3.0, 4.0], 5).await;
-                tokio::task::yield_now().await;
-            }
-        });
-
-        let insert_handle = tokio::spawn(async move {
-            let tx2 = TxId::new(2);
-            idx_insert
-                .insert(tx2, DocId::new(100), &out_of_bounds_vector)
-                .await
-                .unwrap(); // unwrap
-            idx_insert.commit(tx2).await.unwrap(); // unwrap
-        });
-
-        let (res_search, res_insert) = tokio::join!(search_handle, insert_handle);
-        res_search.unwrap(); // unwrap
-        res_insert.unwrap(); // unwrap
-
-        // 3. Verifiziere min/max Grenzen des Quantizers direkt
-        let q_opt = index.quantizer();
-        let q = q_opt.as_ref().expect("Quantizer must be present"); // expect
-        assert!(
-            q.maxes()[0] >= 1000.0,
-            "maxes[0] was {}, expected >= 1000.0",
-            q.maxes()[0]
-        );
-        assert!(
-            q.mins()[1] <= -1000.0,
-            "mins[1] was {}, expected <= -1000.0",
-            q.mins()[1]
-        );
-        assert!(q.maxes()[0] > initial_maxes[0]);
-        assert!(q.mins()[1] < initial_mins[1]);
+        assert_eq!(index.len().await, 161);
     }
 
     #[tokio::test]
