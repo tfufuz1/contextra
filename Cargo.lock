@@ -2554,6 +2554,8 @@ dependencies = [
  "bytes",
  "crc32fast",
  "criterion",
+ "futures",
+ "loom",
  "lru",
  "memfuse-core",
  "memfuse-crypto",
