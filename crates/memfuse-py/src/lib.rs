@@ -48,10 +48,12 @@ const MIN_WORKER_THREADS: usize = 1;
 /// Prevents thread exhaustion attacks while accommodating high core-count systems.
 const MAX_WORKER_THREADS: usize = 256;
 
+// AI-TAG[FIX][PY-1] Clamp MEMFUSE_WORKER_THREADS to valid range [MIN_WORKER_THREADS, MAX_WORKER_THREADS]
+// Prevents Tokio Builder panic on worker_threads == 0 when MEMFUSE_WORKER_THREADS=0 is set in environment.
 /// Parses and clamps `MEMFUSE_WORKER_THREADS` environment variable to `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]`.
 ///
-/// If `MEMFUSE_WORKER_THREADS` is unset or invalid (e.g. non-numeric, negative), falls back to
-/// `(available_parallelism / 2).clamp(1, 256)`.
+/// If `MEMFUSE_WORKER_THREADS` is unset, invalid, or 0, clamps to `MIN_WORKER_THREADS..=MAX_WORKER_THREADS`
+/// to guarantee that Tokio multi-thread runtime builder is never called with 0 worker threads.
 fn parse_worker_threads_env() -> usize {
     let default_threads = (std::thread::available_parallelism()
         .map(|n| n.get())
@@ -66,10 +68,6 @@ fn parse_worker_threads_env() -> usize {
         .unwrap_or(default_threads)
 }
 
-/// Fallback Tokio runtime instance used if module state attachment (`setattr`) fails.
-/// Prevents thread/runtime leaks across repeated FFI invocations.
-static FALLBACK_RUNTIME: std::sync::OnceLock<Arc<Runtime>> = std::sync::OnceLock::new();
-
 /// Holds the per-interpreter/per-module Tokio runtime state and worker thread configuration.
 #[pyclass(name = "RuntimeState")]
 #[derive(Clone)]
@@ -78,9 +76,13 @@ pub struct PyRuntimeState {
     pub worker_threads: usize,
 }
 
+// AI-TAG[FIX][PY-2] Evaluate Result of module.setattr("_runtime_state", py_state)
+// Propagates PyRuntimeError on failure instead of silently falling back or building duplicate runtimes.
 /// Retrieves or initializes the per-interpreter Tokio runtime attached to the `_memfuse` module state.
 ///
 /// Reads `MEMFUSE_WORKER_THREADS` on initialization for the current interpreter/module context.
+/// Evaluates the `Result` of attaching `_runtime_state` to the `_memfuse` module via `setattr`.
+/// On failure, propagates a `PyRuntimeError` to prevent runtime leaks and repeated runtime instantiation.
 fn get_runtime(py: Python<'_>) -> PyResult<Arc<Runtime>> {
     let module = py
         .import("memfuse._memfuse")
@@ -89,10 +91,6 @@ fn get_runtime(py: Python<'_>) -> PyResult<Arc<Runtime>> {
         if let Ok(state) = state_attr.extract::<PyRef<'_, PyRuntimeState>>() {
             return Ok(state.runtime.clone());
         }
-    }
-
-    if let Some(fallback_rt) = FALLBACK_RUNTIME.get() {
-        return Ok(fallback_rt.clone());
     }
 
     let worker_threads = parse_worker_threads_env();
@@ -115,24 +113,13 @@ fn get_runtime(py: Python<'_>) -> PyResult<Arc<Runtime>> {
         worker_threads,
     };
 
-    match Py::new(py, state) {
-        Ok(py_state) => {
-            if let Err(e) = module.setattr("_runtime_state", py_state) {
-                eprintln!(
-                    "Warning: Failed to persist Tokio runtime state on module '_memfuse': {}. Using fallback runtime.",
-                    e
-                );
-                let _ = FALLBACK_RUNTIME.get_or_init(|| runtime.clone());
-            }
-        }
-        Err(e) => {
-            eprintln!(
-                "Warning: Failed to create PyRuntimeState object: {}. Using fallback runtime.",
-                e
-            );
-            let _ = FALLBACK_RUNTIME.get_or_init(|| runtime.clone());
-        }
-    }
+    let py_state = Py::new(py, state)?;
+    module.setattr("_runtime_state", py_state).map_err(|e| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "Failed to attach '_runtime_state' to '_memfuse' module: {}",
+            e
+        ))
+    })?;
 
     Ok(runtime)
 }
@@ -352,6 +339,8 @@ fn check_subinterpreter_guard(py: Python<'_>) -> PyResult<()> {
 // BEHOBEN: `std::panic::catch_unwind` in `run_blocking_ffi` intercepts panics in release builds, converting them into catchable PyRuntimeError exceptions without aborting CPython via SIGABRT.
 // Siehe docs/decisions/ADR-064-memfuse-py-separater-workspace-panic-strategie.md
 // für die vollständige Begründung dieser Workspace-Trennung.
+// AI-TAG[FIX][PY-3] Poison engine instance on caught panic (APM-PY-A)
+// Checks poisoned AtomicBool prior to execution and sets poisoned = true when catch_unwind catches a panic.
 /// Safely executes a blocking closure across FFI boundaries with thread state release
 /// and panic containment to guarantee no Rust panic propagates across FFI boundaries into Python.
 ///
@@ -362,16 +351,20 @@ where
     F: FnOnce() -> PyResult<R> + Send,
     R: Send,
 {
+    // Poison-nach-Panic-Invariante (APM-PY-A): Check poison flag before executing FFI operation
     if poisoned.load(Ordering::SeqCst) {
         return Err(pyo3::exceptions::PyRuntimeError::new_err(
             "engine poisoned after previous panic, create a new instance",
         ));
     }
+
     let panic_result =
         py.allow_threads(|| std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)));
+
     match panic_result {
         Ok(res) => res,
         Err(panic_payload) => {
+            // Set poison flag atomically so subsequent calls are immediately blocked
             poisoned.store(true, Ordering::SeqCst);
             let panic_msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
                 (*s).to_string()
