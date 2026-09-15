@@ -91,8 +91,7 @@ impl BanditProfileState {
         let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
         let r_adj = r_outcome - self.lambda * cost - privacy_penalty;
 
-        for i in 0..self.theta.len() {
-            let xi = x[i];
+        for (i, &xi) in x.iter().enumerate().take(self.theta.len()) {
             self.theta[i] += r_adj * xi / self.sigma_sq[i].max(1e-8);
             self.sigma_sq[i] += xi * xi;
         }

@@ -237,7 +237,6 @@ impl Wal {
     }
 
     /// Helper to expose integrity key for tests
-
     pub fn size(&self) -> u64 {
         self.size.load(std::sync::atomic::Ordering::Relaxed)
     }

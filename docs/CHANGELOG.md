@@ -141,6 +141,9 @@
 | `2026-09-10T19:25:24Z (SESSION: ae8c2fb9)` | `crates/memfuse-mcp/src/sandbox.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | MCP Sandbox & Zero-Trust Tool Isolation Layer |
 | `2026-09-10T19:23:40Z` | `crates/memfuse-graph/src/lib.rs` | `REVIEW-PASS` | `-` | `bd6ff800` | `PASS` | `-` | // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-10T19:23:40Z) (SESSION: bd6ff800) |
 | `2026-09-10T19:22:55Z (SESSION: 0b2ff57d)` | `crates/memfuse-py/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | PyO3 FFI bindings bridging MemFuse embedded vector DB functionality to Python. |
+| `2026-09-10T19:22:55Z` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `0b2ff57d` | `OPEN` | `-` | // AI-TAG[FIX][PY-1] Clamp MEMFUSE_WORKER_THREADS to valid range [MIN_WORKER_THREADS, MAX_WORKER_THREADS] (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d) |
+| `2026-09-10T19:22:55Z` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `0b2ff57d` | `OPEN` | `-` | // AI-TAG[FIX][PY-2] Evaluate Result of module.setattr("_runtime_state", py_state) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d) |
+| `2026-09-10T19:22:55Z` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `0b2ff57d` | `OPEN` | `-` | // AI-TAG[FIX][PY-3] Poison engine instance on caught panic (APM-PY-A) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d) |
 | `2026-09-10T19:21:35Z` | `crates/memfuse-text/src/morphology.rs` | `REVIEW-PASS` | `TEST:TXT-001` | `4dd1c98c` | `PASS` | `8` | // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-10T19:21:35Z) (SESSION: 4dd1c98c) |
 | `2026-09-10T19:16:25Z (SESSION: 3f3e4637)` | `crates/memfuse-router/src/dispatch.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Client-seitiger MCP-Dispatch-Mechanismus über Stdio JSON-RPC 2.0 (ADR-010). |
 | `2026-09-10T19:16:25Z (SESSION: 3f3e4637)` | `crates/memfuse-router/src/outcome.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Outcome-Typen und DecisionId-Identifier für konformale Router-Kalibrierung. |
@@ -311,9 +314,6 @@
 | `` | `crates/memfuse-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |
-| `` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `-` | `OPEN` | `-` | // AI-TAG[FIX][PY-1] Clamp MEMFUSE_WORKER_THREADS to valid range [MIN_WORKER_THREADS, MAX_WORKER_THREADS] |
-| `` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `-` | `OPEN` | `-` | // AI-TAG[FIX][PY-2] Evaluate Result of module.setattr("_runtime_state", py_state) |
-| `` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `-` | `OPEN` | `-` | // AI-TAG[FIX][PY-3] Poison engine instance on caught panic (APM-PY-A) |
 | `` | `crates/memfuse-store/examples/chaos_writer.rs` | `FILE-CONTEXT` | `-` | `chaos_power_cut` | `-` | `-` |  |
 | `` | `crates/memfuse-store/src/compaction.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-H-3: LsmStorage hält eine persistente CompactionEngine-Instanz (LsmStorage.compaction_engine), wodurch Compaction-State & Zähler erhalten bleiben. |
 | `` | `crates/memfuse-store/src/lsm/mod.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-M-6: Drift-Counter budget_tracking_drift_bytes wird in LsmStorage::flush nach erfolgreichem Flush auf 0 zurückgesetzt. |

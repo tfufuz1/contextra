@@ -172,7 +172,6 @@ impl Default for LsmConfig {
 }
 
 /// Proof that `commit_mutex` is currently held by the calling task.
-
 /// Can only be constructed while holding the mutex guard.
 pub(super) struct CommitGuard<'a> {
     _lock: &'a tokio::sync::MutexGuard<'a, ()>,
@@ -734,7 +733,7 @@ impl StorageEngine for LsmStorage {
                 tokio::task::yield_now().await;
                 let has_followers = {
                     let q = self.pending_commit_queue.lock().await;
-                    q.as_ref().map_or(false, |q| !q.requests.is_empty())
+                    q.as_ref().is_some_and(|q| !q.requests.is_empty())
                 };
 
                 if has_followers {

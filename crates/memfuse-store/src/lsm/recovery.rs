@@ -285,10 +285,10 @@ impl LsmStorage {
             if raw_sst_max_seq > max_seq {
                 max_seq = raw_sst_max_seq;
             }
-            if reader.metadata().max_tx_id > max_tx {
-                if reader.metadata().max_tx_id < TxId::INTERNAL_BASE {
-                    max_tx = reader.metadata().max_tx_id;
-                }
+            if reader.metadata().max_tx_id > max_tx
+                && reader.metadata().max_tx_id < TxId::INTERNAL_BASE
+            {
+                max_tx = reader.metadata().max_tx_id;
             }
 
             sstables.push(Arc::new(reader));

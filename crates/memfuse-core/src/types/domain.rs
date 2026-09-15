@@ -30,7 +30,9 @@ mod hex {
         let mut hex_str = String::with_capacity(64);
         for &b in bytes {
             use std::fmt::Write;
-            let _ = write!(&mut hex_str, "{:02x}", b);
+            if write!(&mut hex_str, "{:02x}", b).is_err() {
+                return Err(serde::ser::Error::custom("formatting hex failed"));
+            }
         }
         serializer.serialize_str(&hex_str)
     }
