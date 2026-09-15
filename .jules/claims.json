@@ -104,6 +104,13 @@
       "active": false,
       "expires_at": "2026-09-15T19:57:12.077892145+00:00",
       "released_at": "2026-09-15T16:15:25.323409438+00:00"
+      "krate": "memfuse-bench",
+      "issue": "JULES-20260915-MEMFUSEBEN-TEST-QVXO",
+      "timestamp": "2026-09-15T16:33:57.708952898+00:00",
+      "session_id": "2778400594369163498",
+      "active": false,
+      "expires_at": "2026-09-15T20:33:57.708934006+00:00",
+      "released_at": "2026-09-15T16:34:54.376197002+00:00"
       "krate": "memfuse-sandbox",
       "issue": "JULES-20260915-MEMFUSESAN-DEEP-KKPC",
       "timestamp": "2026-09-15T16:05:28.721793404+00:00",
