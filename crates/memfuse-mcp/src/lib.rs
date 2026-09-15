@@ -148,7 +148,7 @@ fn validate_collection_name(name: &str) -> Result<(), McpError> {
 
 /// Holds strong Arc references to routing and calibration components to maintain live Weak references in `MemFuse`.
 pub struct RoutingHandle {
-    pub router: Arc<memfuse_router::RouterEngine>,
+    pub router: Arc<memfuse_router::DefaultRouterEngine>,
     pub calibrator: Arc<parking_lot::Mutex<memfuse_calibration::IsotonicCalibrator>>,
     pub pid_controller: Arc<parking_lot::Mutex<memfuse_calibration::PidController>>,
 }

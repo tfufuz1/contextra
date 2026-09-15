@@ -25,7 +25,7 @@ pub use dispatch::dispatch_to_slm;
 pub use lyapunov::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
 pub use outcome::{DecisionId, RoutingOutcome};
 pub use profile::SlmProfile;
-pub use router::{RouterEngine, RoutingDecision};
+pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 
 #[cfg(feature = "bandit-routing")]
 pub use bandit::{BanditImplementation, BanditProfileState};
