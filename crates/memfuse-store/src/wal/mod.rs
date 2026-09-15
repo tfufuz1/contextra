@@ -15,7 +15,7 @@ pub(crate) use hmac::*;
 pub(crate) use replay::*;
 
 use memfuse_core::{MemFuseError, Result};
-use memfuse_security::crypto::KeyManager;
+use memfuse_crypto::crypto::KeyManager;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 

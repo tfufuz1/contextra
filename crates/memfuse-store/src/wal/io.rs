@@ -1,5 +1,5 @@
 use memfuse_core::{MemFuseError, Result, TxId};
-use memfuse_security::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use memfuse_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
