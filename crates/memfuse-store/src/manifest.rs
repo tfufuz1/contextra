@@ -364,8 +364,9 @@ impl Manifest {
     /// Loads all valid manifest entries from `path`.
     ///
     /// If the file does not exist, returns an empty vector.
-    /// If corruption or truncation occurs at the tail of the file, logs a warning and
-    /// returns all valid entries read up to the point of failure (WAL chain break recovery pattern).
+    /// Tail-truncation (an incomplete frame at EOF caused by interrupted write / power cut) is recovered
+    /// safely by returning valid entries read up to the point of truncation.
+    /// Mid-file corruption or CRC mismatches on complete frames return `Err`.
     pub async fn load(path: &Path) -> Result<Vec<ManifestEntry>> {
         if !tokio::fs::try_exists(path).await.unwrap_or(false) {
             return Ok(Vec::new());
@@ -393,13 +394,25 @@ impl Manifest {
         let mut pos = 0u64;
 
         loop {
+            if pos == file_size {
+                break;
+            }
+
             let mut len_bytes = [0u8; 4];
             match reader.read_exact(&mut len_bytes).await {
                 Ok(_) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
-                Err(e) => {
-                    tracing::warn!("MANIFEST read error at offset {}: {}", pos, e);
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    tracing::warn!(
+                        "MANIFEST tail truncation detected (incomplete length header) at offset {}",
+                        pos
+                    );
                     break;
+                }
+                Err(e) => {
+                    return Err(MemFuseError::Storage(format!(
+                        "MANIFEST read error at offset {}: {}",
+                        pos, e
+                    )));
                 }
             }
 
@@ -426,7 +439,10 @@ impl Manifest {
             match reader.read_exact(&mut entry_raw).await {
                 Ok(_) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    tracing::warn!("MANIFEST truncated tail payload at offset {}", pos);
+                    tracing::warn!(
+                        "MANIFEST tail truncation detected (incomplete payload) at offset {}",
+                        pos
+                    );
                     break;
                 }
                 Err(e) => {
