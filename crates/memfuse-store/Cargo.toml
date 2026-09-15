@@ -54,3 +54,7 @@ harness = false
 [[bench]]
 name = "wal_bench"
 harness = false
+
+[[bench]]
+name = "lsm_concurrency_bench"
+harness = false

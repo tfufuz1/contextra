@@ -2421,6 +2421,7 @@ dependencies = [
  "ahash",
  "bincode",
  "blake3",
+ "criterion",
  "futures",
  "memfuse-core",
  "memfuse-store",
