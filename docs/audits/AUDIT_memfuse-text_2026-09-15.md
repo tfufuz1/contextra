@@ -86,6 +86,12 @@ Ein umfassendes Tiefen-Audit (Tier 2) der Crate `memfuse-text` wurde am 15. Sept
 
 ---
 
-## 4. Audit-Historie & Aktualisierung
+## 4. Re-Verification & Unit Test Extension (`2026-09-15T16:15:00Z`)
+
+Im Rahmen der Qualitätssicherungs-Session `JULES-20260915-MEMFUSETEX-TEST-RTJ7` wurden folgende Punkte verifiziert und ergänzt:
+- **Test-Erweiterung:** `test_bm25_boundary_params_zero_tf` in `crates/memfuse-text/src/bm25.rs` zur expliziten Prüfung von Randparametern (`k1=0.0, b=0.0`) hinzugefügt.
+- **Gate-Stack Verification:** `cargo check -p memfuse-text --all-features`, `cargo clippy -p memfuse-text -- -D warnings`, `cargo fmt --check -p memfuse-text`, `cargo test -p memfuse-text --all-features` (84 Passed, 0 Failed) sowie `just sync-docs-check` vollständig grün.
+
+## 5. Audit-Historie & Aktualisierung
 
 Dieser Bericht aktualisiert und erweitert die bestehende Audit-Dokumentation in `docs/audits/AUDIT_memfuse-text_2026-09-13.md`.
