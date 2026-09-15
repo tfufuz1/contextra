@@ -1,0 +1,126 @@
+use regex::Regex;
+use std::fs;
+use std::path::Path;
+use walkdir::WalkDir;
+
+pub struct Violation {
+    pub file_path: String,
+    pub line_num: usize,
+    pub line_content: String,
+}
+
+pub fn run_check_max_results_unbound(root: &Path) -> Result<Vec<Violation>, String> {
+    let mut violations = Vec::new();
+
+    let max_val_re = Regex::new(r"\b(usize::MAX|u64::MAX)\b").unwrap();
+    let ctx_param_re = Regex::new(
+        r"\b(max_results|max_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_limit|[a_zA_Z0_9_]+_cap|[a_zA_Z0_9_]+_budget)\b",
+    )
+    .unwrap();
+
+    for entry in WalkDir::new(root)
+        .into_iter()
+        .filter_entry(|e| {
+            let name = e.file_name().to_string_lossy();
+            name != "target" && name != ".git" && name != ".cargo" && name != "node_modules"
+        })
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            let rel_path = path
+                .strip_prefix(root)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            if rel_path.starts_with("xtask/") {
+                continue;
+            }
+
+            if let Ok(content) = fs::read_to_string(path) {
+                let lines: Vec<&str> = content.lines().collect();
+
+                for (idx, line) in lines.iter().enumerate() {
+                    let trimmed = line.trim();
+
+                    // Skip comment lines, lines with // UNBOUNDED-OK, or test files
+                    if trimmed.starts_with("//")
+                        || trimmed.contains("// UNBOUNDED-OK")
+                        || rel_path.ends_with("_test.rs")
+                        || rel_path.contains("/tests/")
+                    {
+                        continue;
+                    }
+
+                    if max_val_re.is_match(line) {
+                        let start_idx = idx.saturating_sub(3);
+                        let end_idx = (idx + 3).min(lines.len().saturating_sub(1));
+
+                        let mut matches_ctx = false;
+                        for ctx_idx in start_idx..=end_idx {
+                            let ctx_line = lines[ctx_idx];
+                            if ctx_param_re.is_match(ctx_line) {
+                                matches_ctx = true;
+                                break;
+                            }
+                        }
+
+                        if matches_ctx {
+                            violations.push(Violation {
+                                file_path: rel_path.clone(),
+                                line_num: idx + 1,
+                                line_content: trimmed.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(violations)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_detects_unbounded_max_results() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("search.rs");
+        fs::write(
+            &file,
+            r#"
+fn search(max_results: usize) {
+    let k = usize::MAX;
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_max_results_unbound(dir.path()).unwrap();
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].line_num, 3);
+    }
+
+    #[test]
+    fn test_ignores_unbounded_ok() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("search.rs");
+        fs::write(
+            &file,
+            r#"
+fn search(max_results: usize) {
+    let k = usize::MAX; // UNBOUNDED-OK
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_max_results_unbound(dir.path()).unwrap();
+        assert_eq!(violations.len(), 0);
+    }
+}

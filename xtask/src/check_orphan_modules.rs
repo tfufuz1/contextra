@@ -152,7 +152,10 @@ pub fn check_crate_orphan_modules(crate_root: &Path) -> Vec<String> {
         let sibling_lib_rs = parent_dir.join("lib.rs");
         let sibling_main_rs = parent_dir.join("main.rs");
 
-        let parent_dir_name = parent_dir.file_name().and_then(|s| s.to_str()).unwrap_or("");
+        let parent_dir_name = parent_dir
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
         let parent_dir_file = parent_dir
             .parent()
             .map(|p| p.join(format!("{}.rs", parent_dir_name)));
@@ -255,15 +258,15 @@ mod tests {
         .unwrap();
 
         fs::write(src_dir.join("lib.rs"), "pub mod sub;\n").unwrap();
-        fs::write(
-            sub_dir.join("mod.rs"),
-            "pub mod first;\npub mod second;\n",
-        )
-        .unwrap();
+        fs::write(sub_dir.join("mod.rs"), "pub mod first;\npub mod second;\n").unwrap();
         fs::write(sub_dir.join("first.rs"), "// first\n").unwrap();
         fs::write(sub_dir.join("second.rs"), "// second\n").unwrap();
 
         let orphans = check_crate_orphan_modules(&crate_dir);
-        assert!(orphans.is_empty(), "Expected no orphans, got: {:?}", orphans);
+        assert!(
+            orphans.is_empty(),
+            "Expected no orphans, got: {:?}",
+            orphans
+        );
     }
 }
