@@ -15,7 +15,6 @@
 use crate::{ProvenanceRecord, SearchResult};
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Konfiguration für den Resonanz-Kohärenz-Bonus (F-09).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -175,9 +174,9 @@ struct FusedEntry<'a> {
     source_collection: Option<&'a str>,
     index_type: Option<&'a str>,
     signal_ranks: AHashMap<SignalKey<'a>, u32>,
-    extra_signal_ranks: Option<HashMap<String, u32>>,
+    extra_signal_ranks: Option<AHashMap<String, u32>>,
     signal_contributions: AHashMap<SignalKey<'a>, crate::SignalContribution>,
-    extra_signal_contributions: Option<HashMap<String, crate::SignalContribution>>,
+    extra_signal_contributions: Option<AHashMap<String, crate::SignalContribution>>,
     deferred_metadata: Vec<&'a Option<serde_json::Value>>,
 }
 
@@ -682,7 +681,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                     } else {
                         entry
                             .extra_signal_ranks
-                            .get_or_insert_with(HashMap::new)
+                            .get_or_insert_with(AHashMap::new)
                             .entry(sig.clone())
                             .or_insert(*r);
                     }
@@ -696,7 +695,7 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                     } else {
                         entry
                             .extra_signal_contributions
-                            .get_or_insert_with(HashMap::new)
+                            .get_or_insert_with(AHashMap::new)
                             .entry(sig.clone())
                             .or_insert_with(|| contrib.clone());
                     }

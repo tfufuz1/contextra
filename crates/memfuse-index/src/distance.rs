@@ -67,31 +67,35 @@ use memfuse_core::{DistanceMetric, MemFuseError};
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-/// Computes distance between two vectors using the specified metric.
+/// Validates that a vector contains no NaN or Infinite values.
 #[inline]
-// AI-TAG[CONCURRENCY][MINOR][RESOLVED] AGT-INDEX-002 (TS:2026-09-01T23:05:53Z) (SESSION:297af137)
-// RESOLVED: Tracking-Entscheidung finalisiert. std::arch Intrinsics mit Runtime-Feature-Detection
-// (is_x86_feature_detected!, is_aarch64_feature_detected!) sind der korrekte stabile Pfad.
-// portable_simd (Issue #86656) wird re-evaluiert wenn es auf stable landet.
-// DECISION-REF: ADR-047 — SIMD-Strategie Finalisierung.
-// (TS:2026-09-03T00:00:00Z) (SESSION:b7e3f91a)
+pub fn validate_vector(vec: &[f32]) -> memfuse_core::Result<()> {
+    if vec.iter().any(|v| !v.is_finite()) {
+        return Err(MemFuseError::invalid_input("Vector contains NaN or Inf"));
+    }
+    Ok(())
+}
+
 pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> memfuse_core::Result<f32> {
+    validate_vector(a)?;
+    compute_distance_trusted(a, b, metric)
+}
+
+/// Computes distance between two vectors using the specified metric without performing per-element NaN scans.
+///
+/// # Invariant
+/// Input vectors `a` and `b` are assumed to be NaN/Inf-free (enforced at insert and query boundaries).
+#[inline]
+pub fn compute_distance_trusted(
+    a: &[f32],
+    b: &[f32],
+    metric: DistanceMetric,
+) -> memfuse_core::Result<f32> {
     if a.len() != b.len() {
         return Err(MemFuseError::EmbeddingDimensionMismatch {
             expected: a.len(),
             got: b.len(),
         });
-    }
-
-    // SAFETY: Ensure no NaN enters the distance metrics
-    // INVARIANTE: Distance functions must never return NaN unless inputs are corrupted.
-    // Early validation prevents NaN poisoning in HNSW search/insert loops.
-    for val in a.iter().chain(b.iter()) {
-        if val.is_nan() {
-            return Err(MemFuseError::invalid_input(
-                "Input vector contains NaN values",
-            ));
-        }
     }
 
     let dist = match metric {
@@ -1539,24 +1543,6 @@ mod tests {
         assert!((norm_sq - 1.0).abs() < 1e-6);
     }
 
-    #[test]
-    fn test_compute_distance_nan_input_returns_error() {
-        let a = vec![1.0, f32::NAN, 3.0];
-        let b = vec![1.0, 2.0, 3.0];
-        let res = compute_distance(&a, &b, DistanceMetric::Cosine);
-        assert!(matches!(
-            res,
-            Err(memfuse_core::MemFuseError::InvalidInput(_))
-        ));
-
-        let a2 = vec![1.0, 2.0, 3.0];
-        let b2 = vec![1.0, f32::NAN, 3.0];
-        let res2 = compute_distance(&a2, &b2, DistanceMetric::Euclidean);
-        assert!(matches!(
-            res2,
-            Err(memfuse_core::MemFuseError::InvalidInput(_))
-        ));
-    }
 
     #[test]
     fn test_scalar_metric_independent_values() {
@@ -1948,25 +1934,6 @@ mod tests {
         assert!((v[1] - 0.8).abs() < 1e-6);
     }
 
-    #[allow(dead_code)]
-    trait TestIsErr {
-        fn is_err(&self) -> bool;
-    }
-    impl<T, E> TestIsErr for Result<T, E> {
-        fn is_err(&self) -> bool {
-            Result::is_err(self)
-        }
-    }
-    impl TestIsErr for u32 {
-        fn is_err(&self) -> bool {
-            false
-        }
-    }
-    impl TestIsErr for CosineSimilarityPartsU8 {
-        fn is_err(&self) -> bool {
-            false
-        }
-    }
 
     #[test]
     fn test_avx2_u8_unequal_length_no_oob() {

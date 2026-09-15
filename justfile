@@ -34,6 +34,13 @@ check:
     $RUNNER cargo fmt --all -- --check
     $RUNNER cargo clippy --all-targets -- -D warnings
     $RUNNER cargo check --all-targets --workspace
+    $RUNNER cargo xtask check-max-results-unbound
+    $RUNNER cargo xtask check-toctou-defaults
+    $RUNNER cargo xtask check-nan-hot-loop
+    $RUNNER cargo xtask check-result-dropped-io
+    if [ -f coverage.json ]; then
+        $RUNNER cargo xtask check-coverage-gate
+    fi
 
 # Modular check for memfuse-core
 check-core:

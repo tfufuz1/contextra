@@ -3,7 +3,7 @@
 // STAND: TS:2026-09-09T16:15:00Z (SESSION: dafac391)
 
 use memfuse_core::TenantId;
-use memfuse_security::kv_segment::{
+use memfuse_crypto::kv_segment::{
     emergency_wipe, EvictionWorker, KvSegment, TenantIsolatedKvStore,
 };
 use std::sync::Arc;
