@@ -104,6 +104,12 @@
       "active": false,
       "expires_at": "2026-09-15T19:57:12.077892145+00:00",
       "released_at": "2026-09-15T16:15:25.323409438+00:00"
+      "krate": "memfuse-mcp",
+      "issue": "JULES-20260915-MEMFUSEMCP-DEEP-CFJ1",
+      "timestamp": "2026-09-15T16:05:23.063610731+00:00",
+      "session_id": "3816368572581715910",
+      "active": true,
+      "expires_at": "2026-09-15T20:05:23.063591073+00:00"
       "krate": "memfuse-agent",
       "issue": "JULES-20260915-MEMFUSEAGE-DEEP-W462",
       "timestamp": "2026-09-15T16:06:35.323284104+00:00",
