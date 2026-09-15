@@ -24,6 +24,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "wal_mutation_chaos"
+path = "fuzz_targets/wal_mutation_chaos.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "fuzz_sstable_binary_search"
 path = "fuzz_targets/fuzz_sstable_binary_search.rs"
 test = false
