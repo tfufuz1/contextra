@@ -405,7 +405,7 @@ impl Wal {
                 let copy_res = self::fs::copy(&wal.path, &bak_path).await;
                 if copy_res.is_ok() {
                     // Backup-Datei fsyncen: Recovery-Sicherheit VOR der Truncation der Original-WAL.
-                    match self::fs::OpenOptions::new()
+                    let bak_file = self::fs::OpenOptions::new()
                         .write(true)
                         .open(&bak_path)
                         .await
