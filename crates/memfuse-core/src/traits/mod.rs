@@ -4,20 +4,15 @@
 //! must fulfill, enabling modularity and testability.
 
 // FILE-CONTEXT
-// STAND: 2026-08-30T21:51:46Z (SESSION: a43b7682)
-// ZWECK: Kern-Trait-Hierarchien (StorageEngine, VectorIndex, TextIndex, GraphIndex) für Layer 0.
+// STAND: 2026-09-15T00:00:00Z (SESSION: Zerlegung traits/mod.rs)
+// ZWECK: Kern-Trait-Hierarchien für Layer 0.
 // INVARIANTEN: Downward-only Trait interfaces; neue Trait-Methoden brauchen Default-Impls (Abwärtskompatibilität).
-// HOTSPOTS: 30-500
-// NICHT-OFFENSICHTLICH: Default-Impls für nicht unterstützte Subsystem-Features werfen standardisiertes CapabilityUnsupported.
+// HOTSPOTS: mod declaration & re-exports
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-024)
 
 // INVARIANT: Trait-Contracts sind das API-Rückgrat des Workspace.
 // REGEL: Neue Methoden MÜSSEN Default-Impl haben (backward compat).
 
-use crate::types::*;
-use crate::Result;
-use ahash::AHashMap;
-use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -31,930 +26,29 @@ pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> +
 pub mod embedding;
 pub use embedding::*;
 
-/// Abstract contract for generating consistent checkpoints.
-pub trait Checkpoint: Send + Sync + 'static {
-    /// Takes a deterministic snapshot of the current state.
-    fn take_snapshot<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<WorkflowState>>;
-
-    /// Rolls the state back to the specified checkpoint.
-    fn restore<'a>(&'a self, state: &'a WorkflowState) -> BoxFuture<'a, Result<()>>;
-}
-
-/// Unified Checkpoint Coordinator Trait combining named, TxId+seq_no-scoped, persistent checkpoints.
-///
-/// # Dyn-Safety Note
-/// This trait is intentionally NOT dyn-compatible without specifying the associated type `Meta`
-/// (e.g. `Arc<dyn CheckpointCoordinator<Meta = ...>>`) or using a concrete type, due to the
-/// associated type `type Meta: Send + Sync`.
-///
-/// # DECISION-REF
-/// ADR-011 — Consolidated Checkpoint Subsystem Architecture (resolving AGT-STORE-002).
-pub trait CheckpointCoordinator: Send + Sync + 'static {
-    /// Type representing checkpoint metadata.
-    type Meta: Send + Sync;
-
-    /// Creates and persists a new named checkpoint.
-    fn create_named_checkpoint(
-        &self,
-        name: &str,
-        collection_id: &str,
-        seq_no: u64,
-        tx_id: TxId,
-        metadata: serde_json::Value,
-    ) -> impl Future<Output = Result<Self::Meta>> + Send;
-
-    /// Restores database state to a named checkpoint.
-    fn restore_named_checkpoint(
-        &self,
-        name: &str,
-    ) -> impl Future<Output = Result<Self::Meta>> + Send;
-
-    /// Deletes a checkpoint by name.
-    fn drop_named_checkpoint(&self, name: &str) -> impl Future<Output = Result<()>> + Send;
-
-    /// Lists all active checkpoints.
-    fn list_named_checkpoints(&self) -> impl Future<Output = Result<Vec<Self::Meta>>> + Send;
-}
-
-/// Represents a point-in-time view of the database.
-pub trait Snapshot: Send + Sync {
-    /// Returns the sequence number for this snapshot.
-    fn seq_no(&self) -> u64;
-}
-
-/// Statistics for a vector index.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct VectorIndexStats {
-    /// Number of active (non-deleted) vectors.
-    pub num_vectors: usize,
-    /// Estimated memory usage in bytes.
-    pub memory_usage_bytes: usize,
-    /// Number of HNSW layers.
-    pub num_layers: usize,
-    /// Fraction of deleted vectors (0.0 to 1.0).
-    #[serde(default)]
-    pub deleted_ratio: f64,
-    /// Number of full index rebuilds completed.
-    #[serde(default)]
-    pub rebuild_count: u64,
-}
-
-/// Statistics for the storage engine.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StorageStats {
-    /// Number of SSTable segments.
-    pub num_segments: usize,
-    /// Total size of all SSTables in bytes.
-    pub total_size_bytes: u64,
-    /// Total size of memtables in bytes.
-    pub memtable_size_bytes: u64,
-}
-
-// INVARIANT: Implementor: LsmStorage (memfuse-store/src/lsm.rs)
-// Lifecycle: put/delete → commit/rollback → flush(background).
-
-/// Harte Obergrenze für die Anzahl distinkter Keys, die eine StorageEngine-
-/// Implementierung während eines einzelnen scan()/scan_prefix_bounded()-Aufrufs
-/// intern akkumulieren darf, BEVOR limit/cursor angewendet wird. Verhindert
-/// unbegrenztes Speicherwachstum bei sehr breiten Scans, unabhängig vom vom
-/// Aufrufer angeforderten `limit`. Muss größer als jedes sinnvolle `limit` sein,
-/// um normale paginierte Nutzung nicht zu beeinträchtigen.
-pub const MAX_SCAN_MERGE_ACCUMULATOR: usize = 100_000;
-
-/// Storage Engine trait — abstrahiert die LSM-Tree-Persistenz.
-///
-/// # Dyn-Kompatibilität
-/// Dieser Trait ist durch explizite `BoxFuture`-Rückgabetypen vtable-kompatibel (dyn-safe).
-///
-/// # Invarianten
-/// - Implementierungen DÜRFEN NICHT paniken (Zero-Panic Doctrine)
-/// - Alle Fehler werden über `crate::Result<T>` propagiert
-pub trait StorageEngine: Send + Sync + 'static {
-    /// Retrieves a value by key.
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>>;
-
-    /// Retrieves a value by key at a specific sequence number (MVCC).
-    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>>;
-
-    /// Stores a key-value pair as part of a transaction.
-    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>>;
-
-    /// Atomically writes `value` under `key` within the given transaction ONLY IF no value
-    /// currently exists for `key` (as observed within the same transaction's read view and uncommitted staged state).
-    ///
-    /// # Semantics & MVCC Guarantees
-    /// Checks key existence against the storage engine's current committed snapshot and any uncommitted
-    /// staged writes for `tx_id`. If the key exists and is non-tombstoned, no write is staged and `Ok(false)`
-    /// is returned. The transaction is NOT automatically rolled back by this call.
-    /// If the key does not exist (or is tombstoned), `value` is staged for `tx_id` and `Ok(true)` is returned.
-    fn put_if_absent<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<bool>> {
-        Box::pin(async move {
-            if self.get(key).await?.is_some() {
-                Ok(false)
-            } else {
-                self.put(tx_id, key, value).await?;
-                Ok(true)
-            }
-        })
-    }
-
-    /// Stores multiple key-value pairs as part of a transaction.
-    fn put_batch<'a>(
-        &'a self,
-        tx_id: TxId,
-        entries: &'a [(Vec<u8>, Vec<u8>)],
-    ) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move {
-            for (key, value) in entries {
-                self.put(tx_id, key, value).await?;
-            }
-            Ok(())
-        })
-    }
-
-    /// Deletes a key as part of a transaction.
-    fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>>;
-
-    /// Deletes multiple keys as a single logical batch operation.
-    ///
-    /// # Performance
-    /// Default implementation delegates to sequential `delete()` calls.
-    /// Implementors handling large batches (e.g. from `delete_prefix()`)
-    /// SHOULD override this with a true batch operation (single lock
-    /// acquisition) to avoid per-key lock contention.
-    fn delete_many<'a>(&'a self, tx_id: TxId, keys: Vec<Vec<u8>>) -> BoxFuture<'a, Result<u64>> {
-        Box::pin(async move {
-            let mut deleted = 0u64;
-            for key in keys {
-                self.delete(tx_id, &key).await?;
-                deleted += 1;
-            }
-            Ok(deleted)
-        })
-    }
-
-    /// Deletes all key-value pairs whose key starts with `prefix` as part of a transaction.
-    ///
-    /// Returns the number of keys staged for deletion.
-    ///
-    /// Default implementation scans all matching keys, then delegates to [`delete_many`][Self::delete_many].
-    /// Concrete implementors handling batch mutations should override `delete_many()` or `delete_prefix()`
-    /// with a true batch operation to avoid per-key lock overhead.
-    fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> BoxFuture<'a, Result<u64>> {
-        Box::pin(async move {
-            let matching_keys: Vec<Vec<u8>> = self
-                .scan_prefix(prefix)
-                .await?
-                .into_iter()
-                .map(|(key, _)| key)
-                .collect();
-            self.delete_many(tx_id, matching_keys).await
-        })
-    }
-
-    /// Commits a transaction — makes writes visible.
-    fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
-
-    /// Rolls back a transaction — discards staged uncommitted writes for the given ID.
-    ///
-    /// **Note**: `rollback()` only discards entries currently in the staging buffer.
-    /// Once `commit()` has completed, `rollback()` on that `tx_id` is a no-op.
-    /// Undoing a physically committed transaction requires a compensating transaction or `rollback_to_tx()`.
-    fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
-
-    /// Rolls back the entire storage state to a specific transaction ID.
-    ///
-    /// **Implementor contract**: MUST physically revert all state beyond `tx_id`.
-    fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
-
-    /// Flushes the memtable to disk.
-    fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>>;
-
-    /// Returns storage statistics.
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>>;
-
-    /// Returns the last sequence number committed to storage.
-    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>>;
-
-    /// Returns the last transaction ID committed to storage.
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>>;
-
-    /// Pins a checkpoint for the given sequence number.
-    fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
-
-    /// Unpins a checkpoint for the given sequence number.
-    fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
-
-    /// Scans a range of keys with the given prefix.
-    ///
-    /// Für neue Call-Sites bevorzuge `scan_prefix_bounded` — lädt unbegrenzt und kann bei großen Prefixes das Speicherbudget sprengen.
-    #[allow(clippy::type_complexity)]
-    fn scan_prefix<'a>(
-        &'a self,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>>;
-
-    /// Wie `scan_prefix`, aber mit hartem Limit auf die Anzahl zurückgegebener Einträge und
-    /// optionalem Cursor (letzter zurückgegebener Key aus dem vorherigen Aufruf) für Pagination.
-    ///
-    /// # Cursor-Semantik
-    /// Der Cursor dient als exklusive untere Schranke (`Bound::Excluded(cursor)`): Es werden nur Einträge
-    /// zurückgegeben, deren Key lexikographisch *strikt größer* als der `cursor` ist (`k > cursor`).
-    /// Falls der Cursor-Key nicht (mehr) im Datensatz existiert (z. B. durch Löschedits zwischen
-    /// paginierten Aufrufen), setzt die Pagination nahtlos ab dem nächstgrößeren Key fort,
-    /// anstatt ein leeres Ergebnis zurückzugeben.
-    ///
-    /// Bevorzugt gegenüber `scan_prefix` für jeden neuen Call-Site, der potenziell große
-    /// Ergebnismengen erwarten muss.
-    #[allow(clippy::type_complexity)]
-    fn scan_prefix_bounded<'a>(
-        &'a self,
-        prefix: &'a [u8],
-        limit: usize,
-        cursor: Option<&'a [u8]>,
-    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        Box::pin(async move {
-            let all = self.scan_prefix(prefix).await?;
-            let mut results = Vec::new();
-
-            for (k, v) in all {
-                if let Some(cur_bytes) = cursor {
-                    if k.as_slice() <= cur_bytes {
-                        continue;
-                    }
-                }
-                results.push((k, v));
-                if results.len() == limit {
-                    break;
-                }
-            }
-
-            let next_cursor = if results.len() == limit {
-                results.last().map(|(k, _)| k.clone())
-            } else {
-                None
-            };
-
-            Ok((results, next_cursor))
-        })
-    }
-
-    /// Scans keys with a prefix, returning only entries visible at or before `seq_no`.
-    ///
-    /// # Contract
-    /// Must respect MVCC snapshot isolation.
-    ///
-    /// # Errors
-    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
-    /// with capability `"snapshot_read_at"` if snapshot-isolated prefix scan is not implemented.
-    /// Tested via `capability_coverage` test module.
-    #[allow(clippy::type_complexity)]
-    fn scan_prefix_at<'a>(
-        &'a self,
-        _prefix: &'a [u8],
-        _seq_no: u64,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move {
-            Err(crate::error::MemFuseError::capability_unsupported(
-                "snapshot_read_at",
-                "Storage-level snapshot-isolated prefix scan (scan_prefix_at) is not supported by default — implementors must override this method to guarantee MVCC snapshot isolation.",
-            ))
-        })
-    }
-
-    /// Scans a range of keys between `start` and `end` bounds, optionally capped at `limit`.
-    #[allow(clippy::type_complexity)]
-    fn scan<'a>(
-        &'a self,
-        start: std::ops::Bound<&'a [u8]>,
-        end: std::ops::Bound<&'a [u8]>,
-        limit: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>>;
-
-    /// Scans a range of keys with start and end bounds, limit, and pagination cursor.
-    #[allow(clippy::type_complexity)]
-    fn scan_bounded<'a>(
-        &'a self,
-        _start: std::ops::Bound<&'a [u8]>,
-        _end: std::ops::Bound<&'a [u8]>,
-        _limit: usize,
-        _cursor: Option<&'a [u8]>,
-    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        Box::pin(async move {
-            Err(crate::error::MemFuseError::capability_unsupported(
-                "scan_bounded",
-                "Bounded range scan (scan_bounded) is not supported by default",
-            ))
-        })
-    }
-}
-
-// INVARIANT: Implementor: HnswIndex (memfuse-index/src/hnsw.rs)
-// Rebuild: Automatisch bei >20% gelöschten Nodes.
-
-/// Vector Index Trait — abstrahiert die HNSW-Vektorsuche.
-///
-/// # Dyn-Kompatibilität
-/// Verwendet native `async fn` (AFIT) für statischen Dispatch.
-pub trait VectorIndex: Send + Sync + 'static {
-    /// Inserts a vector with an associated document ID.
-    fn insert(
-        &self,
-        tx: TxId,
-        id: DocId,
-        embedding: &[f32],
-    ) -> impl Future<Output = Result<()>> + Send;
-
-    /// Returns all active (non-deleted) document IDs in the index.
-    fn all_doc_ids(&self) -> impl Future<Output = Result<Vec<DocId>>> + Send {
-        async { Ok(Vec::new()) }
-    }
-
-    /// Inserts multiple vectors with associated document IDs.
-    fn insert_batch(
-        &self,
-        tx: TxId,
-        vectors: &[(DocId, &[f32])],
-    ) -> impl Future<Output = Result<()>> + Send {
-        async move {
-            for (id, embedding) in vectors {
-                self.insert(tx, *id, embedding).await?;
-            }
-            Ok(())
-        }
-    }
-
-    /// Searches for the k nearest neighbors to a query vector.
-    fn search(
-        &self,
-        query: &[f32],
-        k: usize,
-    ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send;
-
-    /// Searches for the k nearest neighbors to a query vector at a specific sequence number.
-    ///
-    /// # Errors
-    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
-    /// with capability `"snapshot_read_at"` if snapshot-isolated vector search is not implemented.
-    /// Tested via `capability_coverage` test module.
-    fn search_at(
-        &self,
-        query: &[f32],
-        k: usize,
-        seq_no: u64,
-    ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
-        async move {
-            let _ = (query, k, seq_no);
-            Err(crate::error::MemFuseError::capability_unsupported(
-                "snapshot_read_at",
-                "Vector search snapshot isolation (search_at) is not supported by default — tracked in ADR-024",
-            ))
-        }
-    }
-
-    /// Searches with an optional filter predicate.
-    ///
-    /// # Default Behaviour
-    /// Returns an error if a filter is provided. Implementors **MUST** override
-    /// this method if filtered search is supported by their vector engine.
-    ///
-    /// # Errors
-    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
-    /// with capability `"vector_filtered_search"` if a filter predicate is passed to an engine without filter support.
-    /// Tested via `capability_coverage` test module.
-    ///
-    /// # Note
-    /// This default exists solely for backward compatibility.
-    fn search_filtered(
-        &self,
-        query: &[f32],
-        k: usize,
-        filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
-    ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
-        async move {
-            if filter.is_some() {
-                return Err(crate::error::MemFuseError::capability_unsupported(
-                    "vector_filtered_search",
-                    "Filtered vector search is not supported by default for this vector engine",
-                ));
-            }
-            self.search(query, k).await
-        }
-    }
-
-    /// Deletes a vector by its document ID.
-    fn delete(&self, tx: TxId, id: DocId) -> impl Future<Output = Result<()>> + Send;
-
-    /// Commits a transaction.
-    fn commit(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
-
-    /// Rolls back a transaction.
-    fn rollback(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
-
-    /// Rolls back the entire index state to a specific transaction ID.
-    fn rollback_to_tx(&self, tx_id: TxId) -> impl Future<Output = Result<()>> + Send;
-
-    /// Returns the last transaction ID processed by the index.
-    fn last_tx_id(&self) -> impl Future<Output = Result<TxId>> + Send;
-
-    /// Returns the number of vectors in the index.
-    fn len(&self) -> impl Future<Output = usize> + Send;
-
-    /// Returns true if the index is empty.
-    fn is_empty(&self) -> impl Future<Output = bool> + Send {
-        async { self.len().await == 0 }
-    }
-
-    /// Returns index statistics.
-    fn stats(&self) -> impl Future<Output = Result<VectorIndexStats>> + Send;
-
-    /// Returns true if the index requires a background rebuild (e.g. due to tombstone accumulation).
-    fn is_rebuild_required(&self) -> bool {
-        false
-    }
-
-    /// Triggers an asynchronous background rebuild of the index if supported.
-    fn trigger_rebuild_async(&self) {}
-}
-
-/// Text embedding engine trait.
-pub trait TextEmbeddingEngine: Send + Sync + 'static {
-    /// Generates an embedding for the given text.
-    fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, Result<Vec<f32>>>;
-
-    /// Generates embeddings for multiple texts.
-    /// Default implementation executes sequential calls.
-    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Vec<f32>>>> {
-        Box::pin(async move {
-            let mut results = Vec::with_capacity(texts.len());
-            for text in texts {
-                results.push(self.embed(text).await?);
-            }
-            Ok(results)
-        })
-    }
-}
-
-/// Trait-Abstraktion für LLM-Synthesizer zur Segment-Zusammenfassung (REM-Phase).
-pub trait SegmentSynthesizer: Send + Sync {
-    /// Synthetisiert ein Segment von Texten zu einer abstrakten Zusammenfassung.
-    fn synthesize_segment<'a>(
-        &'a self,
-        segment_texts: &'a [&'a str],
-    ) -> BoxFuture<'a, Result<String>>;
-    /// Gibt die Modell-ID des Synthesizers zurück.
-    fn model_id(&self) -> &str;
-}
-
-/// Statistics for a text index.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TextIndexStats {
-    /// Total number of documents indexed.
-    pub num_documents: usize,
-    /// Total number of tokens across all documents.
-    pub num_tokens: usize,
-    /// Estimated memory usage in bytes.
-    pub memory_usage_bytes: usize,
-}
-
-/// Text-Index Trait — abstrahiert BM25/Inverted-Index-Operationen.
-///
-/// # Dyn-Kompatibilität
-/// Verwendet native `async fn` (AFIT) für statischen Dispatch.
-pub trait TextIndex: Send + Sync + 'static {
-    /// Searches for documents matching the query.
-    fn search(
-        &self,
-        query: &str,
-        k: usize,
-    ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send;
-
-    /// Searches for documents matching the query at a specific sequence number.
-    ///
-    /// # Errors
-    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
-    /// with capability `"snapshot_read_at"` if snapshot-isolated text search is not implemented.
-    /// Tested via `capability_coverage` test module.
-    fn search_at(
-        &self,
-        query: &str,
-        k: usize,
-        seq_no: u64,
-    ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
-        async move {
-            let _ = (query, k, seq_no);
-            Err(crate::error::MemFuseError::capability_unsupported(
-                "snapshot_read_at",
-                "Text search snapshot isolation (search_at) is not supported by default — tracked in ADR-024",
-            ))
-        }
-    }
-
-    /// Inserts or updates a document in the index.
-    fn insert(&self, tx: TxId, id: DocId, text: &str) -> impl Future<Output = Result<()>> + Send;
-
-    /// Deletes a document from the index.
-    fn delete(&self, tx: TxId, id: DocId) -> impl Future<Output = Result<()>> + Send;
-
-    /// Commits a transaction.
-    fn commit(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
-
-    /// Rolls back a transaction.
-    fn rollback(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
-
-    /// Rolls back the entire index state to a specific transaction ID.
-    fn rollback_to_tx(&self, tx_id: TxId) -> impl Future<Output = Result<()>> + Send;
-
-    /// Returns the last transaction ID processed by the index.
-    fn last_tx_id(&self) -> impl Future<Output = Result<TxId>> + Send;
-
-    /// Returns the number of documents in the index.
-    fn len(&self) -> impl Future<Output = usize> + Send;
-
-    /// Returns true if the index is empty.
-    fn is_empty(&self) -> impl Future<Output = bool> + Send {
-        async { self.len().await == 0 }
-    }
-
-    /// Returns index statistics.
-    fn stats(&self) -> impl Future<Output = Result<TextIndexStats>> + Send;
-}
-
-// INVARIANT: Graph Engine Trait (Signal 3)
-
-/// Graph-Index Trait — CSR-basierte Entity-Relation-Traversal.
-///
-/// # Dyn-Kompatibilität
-/// Dieser Trait ist durch explizite `BoxFuture`-Rückgabetypen vtable-kompatibel (dyn-safe).
-///
-/// # TxId-Origin-Invariant (AGT-GRAPH-001)
-///
-/// **Aufrufer MÜSSEN tx entweder aus der Collection-eigenen next_tx-Sequenz oder aus TxId::INTERNAL_BASE-Offset-Bereich beziehen.**
-///
-/// **Aufrufer MÜSSEN sicherstellen, dass `tx`-Argumente für [`add_entity`],
-/// [`add_edge`] und [`commit`] ausschließlich aus einer der folgenden beiden
-/// kanonischen Quellen stammen:**
-///
-/// 1. **Collection-eigene Sequenz**: Der `next_tx: Arc<AtomicU64>` Zähler in
-///    `memfuse-db/src/collection.rs`, der kollisionsfrei aufsteigend inkrementiert
-///    wird. Solche TxIds liegen typischerweise im Bereich `[1, ~10^12]`.
-///
-/// 2. **Interner Systembereich**: `TxId::INTERNAL_BASE` (`u64::MAX - 1_000_000`)
-///    aufwärts — reserviert für Checkpoint, WAL-Replay und andere
-///    System-Transaktionen (Muster: `memfuse-checkpoint/src/lib.rs:76-79`).
-///
-/// **Verbotene Quellen:**
-/// - Wall-Clock-abgeleitete TxIds (z.B. `SystemTime::now().as_nanos() as u64`
-///   ≈ `1.7×10¹⁸`). Diese liegen zufällig zwischen den beiden erlaubten
-///   Bereichen und korrumpieren die `rollback_to_tx()`-Kausalordnung: Der Graph
-///   "vergisst" nie committed Daten, aber Time-Travel-Wiederherstellung kann
-///   die falsche Transaktionsgrenze wählen.
-/// - Beliebige fremde IDs ohne Korrelation zur Collection-eigenen Sequenz.
-///
-/// Implementierungen DÜRFEN bei Verletzung dieses Vertrags eine Warnung loggen
-/// (mittels `tracing::warn!`), aber MÜSSEN die Operation nicht hart ablehnen,
-/// da der `next_tx`-Höchststand der aufrufenden Collection dem Graph nicht
-/// bekannt ist.
-///
-/// [`add_entity`]: GraphIndex::add_entity
-/// [`add_edge`]: GraphIndex::add_edge
-/// [`commit`]: GraphIndex::commit
-pub trait GraphIndex: Send + Sync + 'static {
-    /// Traverses the entity graph using BFS up to a maximum number of hops.
-    /// Distributes traversing decay weights across related entities.
-    fn traverse<'a>(
-        &'a self,
-        start_node: crate::types::EntityId,
-        max_hops: usize,
-    ) -> BoxFuture<'a, crate::Result<Vec<(crate::types::EntityId, f32)>>>;
-
-    /// Returns direct (1-hop) neighbor EntityIds for the given entity.
-    fn neighbors<'a>(
-        &'a self,
-        start_node: crate::types::EntityId,
-    ) -> BoxFuture<'a, crate::Result<Vec<crate::types::EntityId>>> {
-        Box::pin(async move {
-            let results = self.traverse(start_node, 1).await?;
-            Ok(results.into_iter().map(|(id, _)| id).collect())
-        })
-    }
-
-    /// Removes an edge between two entities.
-    fn remove_edge<'a>(
-        &'a self,
-        tx: crate::types::TxId,
-        from: crate::types::EntityId,
-        to: crate::types::EntityId,
-    ) -> BoxFuture<'a, crate::Result<()>> {
-        Box::pin(async move {
-            let _ = (tx, from, to);
-            Ok(())
-        })
-    }
-
-    /// Adds a bidirectional edge between two entities.
-    fn add_bidirectional<'a>(
-        &'a self,
-        tx: crate::types::TxId,
-        from: crate::types::EntityId,
-        to: crate::types::EntityId,
-        label: &'a str,
-    ) -> BoxFuture<'a, crate::Result<()>> {
-        Box::pin(async move {
-            self.add_edge(tx, crate::types::Edge::new(from, to, label))
-                .await?;
-            self.add_edge(tx, crate::types::Edge::new(to, from, label))
-                .await?;
-            Ok(())
-        })
-    }
-
-    /// Traverses the entity graph starting from multiple anchor entities up to max_hops.
-    /// Aggregates decay weights (keeping max score per entity) across anchors.
-    fn multi_traverse<'a>(
-        &'a self,
-        start_nodes: &'a [crate::types::EntityId],
-        max_hops: usize,
-    ) -> BoxFuture<'a, crate::Result<Vec<(crate::types::EntityId, f32)>>> {
-        Box::pin(async move {
-            let mut combined: AHashMap<crate::types::EntityId, f32> = AHashMap::default();
-            for &start in start_nodes {
-                let results = self.traverse(start, max_hops).await?;
-                for (entity_id, score) in results {
-                    combined
-                        .entry(entity_id)
-                        .and_modify(|s| *s = s.max(score))
-                        .or_insert(score);
-                }
-            }
-            let mut results: Vec<(crate::types::EntityId, f32)> = combined.into_iter().collect();
-            results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            Ok(results)
-        })
-    }
-
-    /// Traverses the entity graph starting from multiple anchor entities up to max_hops at a specific sequence number.
-    /// Aggregates decay weights (keeping max score per entity) across anchors.
-    fn multi_traverse_at<'a>(
-        &'a self,
-        start_nodes: &'a [crate::types::EntityId],
-        max_hops: usize,
-        seq_no: u64,
-    ) -> BoxFuture<'a, crate::Result<Vec<(crate::types::EntityId, f32)>>> {
-        Box::pin(async move {
-            let mut combined: AHashMap<crate::types::EntityId, f32> = AHashMap::default();
-            for &start in start_nodes {
-                let results = self.traverse_at(start, max_hops, seq_no).await?;
-                for (entity_id, score) in results {
-                    combined
-                        .entry(entity_id)
-                        .and_modify(|s| *s = s.max(score))
-                        .or_insert(score);
-                }
-            }
-            let mut results: Vec<(crate::types::EntityId, f32)> = combined.into_iter().collect();
-            results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            Ok(results)
-        })
-    }
-
-    /// Traverses the entity graph using BFS up to a maximum number of hops at a specific sequence number.
-    ///
-    /// # Errors
-    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
-    /// with capability `"graph_traverse_at"` if snapshot-isolated graph traversal is not implemented.
-    /// Tested via `capability_coverage` test module.
-    fn traverse_at<'a>(
-        &'a self,
-        _start_node: crate::types::EntityId,
-        _max_hops: usize,
-        _seq_no: u64,
-    ) -> BoxFuture<'a, crate::Result<Vec<(crate::types::EntityId, f32)>>> {
-        Box::pin(async move {
-            Err(crate::error::MemFuseError::capability_unsupported(
-                "graph_traverse_at",
-                "Graph traversal snapshot isolation (traverse_at) is not supported by default — tracked in ADR-024",
-            ))
-        })
-    }
-
-    /// Traverses the entity graph using BFS at a specific point in time (bi-temporal edge filtering).
-    ///
-    /// # Errors
-    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
-    /// with capability `"graph_traverse_at_time"` if bi-temporal graph traversal is not implemented.
-    /// Tested via `capability_coverage` test module.
-    fn traverse_at_time<'a>(
-        &'a self,
-        _start_node: crate::types::EntityId,
-        _max_hops: usize,
-        _as_of: crate::types::TxId,
-    ) -> BoxFuture<'a, crate::Result<Vec<(crate::types::EntityId, f32)>>> {
-        Box::pin(async move {
-            Err(crate::error::MemFuseError::capability_unsupported(
-                "graph_traverse_at_time",
-                "Bi-temporal graph traversal (traverse_at_time) is not supported by default",
-            ))
-        })
-    }
-
-    /// Traverses the entity graph using BFS with independent system time and business time constraints.
-    ///
-    /// # Errors
-    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
-    /// with capability `"graph_traverse_at_bitemporal"` if bitemporal graph traversal is not implemented.
-    fn traverse_at_bitemporal<'a>(
-        &'a self,
-        _start_node: crate::types::EntityId,
-        _max_hops: usize,
-        _as_of_tx: crate::types::TxId,
-        _as_of_business: Option<i64>,
-    ) -> BoxFuture<'a, crate::Result<Vec<(crate::types::EntityId, f32)>>> {
-        Box::pin(async move {
-            Err(crate::error::MemFuseError::capability_unsupported(
-                "graph_traverse_at_bitemporal",
-                "Bi-temporal graph traversal (traverse_at_bitemporal) is not supported by default",
-            ))
-        })
-    }
-
-    /// Calculates Personalized PageRank (PPR) starting from seed nodes.
-    ///
-    /// # Convergence Behavior
-    /// Power iteration terminates when the L1 norm difference between iterations drops below `config.convergence_epsilon`,
-    /// or when `config.max_iterations` is reached. If `config.max_iterations` is reached without full convergence,
-    /// the function returns the best-effort intermediate ranking state (no `Err`) and emits a `tracing::warn!` log entry.
-    ///
-    /// # Errors
-    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
-    /// with capability `"graph_ppr"` if Personalized PageRank is not supported by this implementation.
-    /// Tested via `capability_coverage` test module.
-    fn personalized_page_rank<'a>(
-        &'a self,
-        _seed_nodes: &'a [crate::types::EntityId],
-        _config: &'a crate::types::PprConfig,
-    ) -> BoxFuture<'a, crate::Result<Vec<(crate::types::EntityId, f32)>>> {
-        Box::pin(async move {
-            Err(crate::error::MemFuseError::capability_unsupported(
-                "graph_ppr",
-                "Personalized PageRank (personalized_page_rank) is not supported by default for this GraphIndex implementation",
-            ))
-        })
-    }
-
-    /// Inserts or updates a node entity.
-    fn add_entity<'a>(
-        &'a self,
-        tx: crate::types::TxId,
-        entity: crate::types::Entity,
-    ) -> BoxFuture<'a, crate::Result<()>>;
-
-    /// Inserts or updates an edge between two entities.
-    fn add_edge<'a>(
-        &'a self,
-        tx: crate::types::TxId,
-        edge: crate::types::Edge,
-    ) -> BoxFuture<'a, crate::Result<()>>;
-
-    /// Commits a transaction.
-    fn commit<'a>(&'a self, tx: crate::types::TxId) -> BoxFuture<'a, crate::Result<()>>;
-
-    /// Rolls back a transaction.
-    fn rollback<'a>(&'a self, tx: crate::types::TxId) -> BoxFuture<'a, crate::Result<()>>;
-
-    /// Rolls back the entire graph state to a specific transaction ID.
-    fn rollback_to_tx<'a>(&'a self, tx_id: crate::types::TxId) -> BoxFuture<'a, crate::Result<()>>;
-
-    /// Returns the last transaction ID processed by the index.
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, crate::Result<crate::types::TxId>>;
-
-    /// Returns the number of entities in the index.
-    fn len<'a>(&'a self) -> BoxFuture<'a, usize>;
-
-    /// Returns true if the index is empty.
-    fn is_empty<'a>(&'a self) -> BoxFuture<'a, bool> {
-        Box::pin(async move { self.len().await == 0 })
-    }
-
-    /// Collects statistics for the Graph.
-    fn stats<'a>(&'a self) -> BoxFuture<'a, crate::Result<GraphIndexStats>>;
-}
-
-/// Statistics for the GraphIndex layer.
-#[derive(Debug, Clone)]
-pub struct GraphIndexStats {
-    /// Number of active nodes (Entities).
-    pub num_entities: usize,
-    /// Number of active edges.
-    pub num_edges: usize,
-    /// Total bytes allocated by CSR representation.
-    pub memory_usage_bytes: usize,
-}
-
-/// Distance calculator trait for vector comparison.
-pub trait DistanceCalculator: Send + Sync {
-    /// Computes the distance between two f32 vectors.
-    fn compute_f32(&self, a: &[f32], b: &[f32]) -> Result<f32>;
-
-    /// Computes the distance between two u8 vectors.
-    fn compute_u8(&self, a: &[u8], b: &[u8]) -> Result<u32>;
-}
-
-/// Report summarizing statistics of a memory lifecycle sweep operation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LifecycleSweepReport {
-    /// Total number of entries evaluated during the sweep.
-    pub swept_count: u64,
-    /// Number of entries deleted due to time-to-live (TTL) expiration.
-    pub deleted_by_ttl: u64,
-    /// Number of entries deleted due to importance score recency decay.
-    pub deleted_by_decay: u64,
-    /// Number of entries skipped because they are pinned or exempt.
-    pub skipped_pinned: u64,
-}
-
-/// Actions planned during memory consolidation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum ConsolidationAction {
-    /// Keep document as is.
-    Keep {
-        /// ID of the document to keep.
-        doc_id: DocId,
-    },
-    /// Merge two or more documents into a new consolidated entry.
-    Merge {
-        /// Source document IDs to merge.
-        source_ids: Vec<DocId>,
-        /// Hint or context summary for the consolidated entry.
-        summary_hint: String,
-    },
-    /// Replace an old document with a new updated entry.
-    Supersede {
-        /// Old document ID to supersede.
-        old_id: DocId,
-        /// Replacement document ID.
-        new_id: DocId,
-    },
-    /// Drop a document due to obsolete or low-relevance memory state.
-    Drop {
-        /// ID of the document to drop.
-        doc_id: DocId,
-    },
-}
-
-/// Trait controlling active Memory Lifecycle management: Decay sweep and Consolidation planning.
-///
-/// Decouples decision planning (`plan_consolidation`) from execution (`sweep`) for auditability.
-pub trait MemoryLifecycleManager: Send + Sync {
-    /// Performs a decay and TTL sweep.
-    /// Returns a report summarizing deleted, retained, and skipped entries.
-    fn sweep(&self, now_tx: TxId) -> impl Future<Output = Result<LifecycleSweepReport>> + Send;
-
-    /// Plans consolidation of similar entries (Mem0 ADD/UPDATE/NOOP pattern).
-    /// Returns an action plan without performing automatic execution.
-    fn plan_consolidation(
-        &self,
-        candidates: &[DocId],
-    ) -> impl Future<Output = Result<Vec<ConsolidationAction>>> + Send;
-}
-
-/// Result of a post-hoc grounding / attribution validation check.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct GroundingAssessment {
-    /// Raw or calibrated confidence score in [0.0, 1.0] indicating attribution quality.
-    pub score: f32,
-    /// Indicates whether the grounding score meets the required threshold.
-    pub is_grounded: bool,
-    /// Optional detail explanation or ungrounded claims identified.
-    pub reason: Option<String>,
-}
-
-/// Abstract contract for post-hoc hallucination / grounding validation.
-pub trait GroundingValidator: Send + Sync {
-    /// Validates an LLM-generated response against retrieval context chunks.
-    ///
-    /// Returns `Ok(GroundingAssessment)` if confidence meets threshold,
-    /// or `Err(MemFuseError)` (e.g. `MemFuseError::PolicyViolation` or low-confidence signal)
-    /// on grounding failure or abstention.
-    fn validate_grounding<'a>(
-        &'a self,
-        response: &'a str,
-        context_chunks: &'a [ContextChunk],
-    ) -> BoxFuture<'a, Result<GroundingAssessment>>;
-}
-
-/// Abstract contract for grounding validation of LLM-generated responses against raw source strings.
-pub trait ResponseGroundingValidator: Send + Sync {
-    /// Evaluates the grounding score for an LLM-generated response against source text slices.
-    /// Returns a float score in [0.0, 1.0].
-    fn score_grounding(&self, response: &str, sources: &[&str]) -> Result<f32>;
-}
+/// Storage engine traits and stats.
+pub mod storage;
+pub use storage::*;
+
+/// Vector index traits and stats.
+pub mod vector_index;
+pub use vector_index::*;
+
+/// Text index traits, embedding engines, synthesizers, and stats.
+pub mod text_index;
+pub use text_index::*;
+
+/// Graph index traits and stats.
+pub mod graph_index;
+pub use graph_index::*;
+
+/// Checkpoint, coordinator, and snapshot traits.
+pub mod checkpoint;
+pub use checkpoint::*;
+
+/// Memory lifecycle, grounding validator, and distance calculator traits.
+pub mod lifecycle;
+pub use lifecycle::*;
 
 #[cfg(test)]
 mod dyn_safety {
@@ -976,6 +70,8 @@ mod dyn_safety {
 #[cfg(test)]
 mod capability_coverage {
     use super::*;
+    use crate::types::*;
+    use crate::Result;
 
     /// Verifies that calling search_at on a productive VectorIndex instance
     /// does NOT return CapabilityUnsupported.
@@ -1263,6 +359,8 @@ mod capability_coverage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::*;
+    use ahash::AHashMap;
 
     #[test]
     fn test_stats_serialization() {
@@ -1783,44 +881,44 @@ mod tests {
         impl GraphIndex for MockGraphIndex {
             fn traverse<'a>(
                 &'a self,
-                _: crate::types::EntityId,
+                _: EntityId,
                 _: usize,
-            ) -> BoxFuture<'a, crate::Result<Vec<(crate::types::EntityId, f32)>>> {
+            ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
                 Box::pin(async move { Ok(vec![]) })
             }
             fn add_entity<'a>(
                 &'a self,
-                _: crate::types::TxId,
-                _: crate::types::Entity,
-            ) -> BoxFuture<'a, crate::Result<()>> {
+                _: TxId,
+                _: Entity,
+            ) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
             fn add_edge<'a>(
                 &'a self,
-                _: crate::types::TxId,
-                _: crate::types::Edge,
-            ) -> BoxFuture<'a, crate::Result<()>> {
+                _: TxId,
+                _: Edge,
+            ) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
-            fn commit<'a>(&'a self, _: crate::types::TxId) -> BoxFuture<'a, crate::Result<()>> {
+            fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
-            fn rollback<'a>(&'a self, _: crate::types::TxId) -> BoxFuture<'a, crate::Result<()>> {
+            fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
             fn rollback_to_tx<'a>(
                 &'a self,
-                _: crate::types::TxId,
-            ) -> BoxFuture<'a, crate::Result<()>> {
+                _: TxId,
+            ) -> BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
-            fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, crate::Result<crate::types::TxId>> {
+            fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
                 Box::pin(async move { Ok(TxId(0)) })
             }
             fn len<'a>(&'a self) -> BoxFuture<'a, usize> {
                 Box::pin(async move { 0 })
             }
-            fn stats<'a>(&'a self) -> BoxFuture<'a, crate::Result<GraphIndexStats>> {
+            fn stats<'a>(&'a self) -> BoxFuture<'a, Result<GraphIndexStats>> {
                 Box::pin(async move {
                     Ok(GraphIndexStats {
                         num_entities: 0,
@@ -1833,7 +931,7 @@ mod tests {
 
         let index = MockGraphIndex;
         let res = index
-            .traverse_at(crate::types::EntityId::new(1), 2, 42)
+            .traverse_at(EntityId::new(1), 2, 42)
             .await;
         match res {
             Err(crate::error::MemFuseError::CapabilityUnsupported { capability, reason }) => {
@@ -1845,9 +943,9 @@ mod tests {
 
         let res_time = index
             .traverse_at_time(
-                crate::types::EntityId::new(1),
+                EntityId::new(1),
                 2,
-                crate::types::TxId::new(10),
+                TxId::new(10),
             )
             .await;
         match res_time {
@@ -1859,8 +957,8 @@ mod tests {
 
         let res_ppr = index
             .personalized_page_rank(
-                &[crate::types::EntityId::new(1)],
-                &crate::types::PprConfig::default(),
+                &[EntityId::new(1)],
+                &PprConfig::default(),
             )
             .await;
         match res_ppr {
