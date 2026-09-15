@@ -67,8 +67,20 @@ impl BackgroundEvent {
         source: impl Into<String>,
         observed_at_seq: u64,
     ) -> Self {
-        Self::try_new(payload, source, observed_at_seq)
-            .unwrap_or_else(|e| panic!("Failed to construct BackgroundEvent: {e}"))
+        let raw_source = source.into();
+        Self::try_new(payload.clone(), &raw_source, observed_at_seq).unwrap_or_else(|_| Self {
+            payload,
+            source: if raw_source.trim().is_empty() {
+                "unknown".to_string()
+            } else {
+                raw_source
+                    .chars()
+                    .filter(|c| *c != '\0')
+                    .take(MAX_ID_LEN)
+                    .collect()
+            },
+            observed_at_seq,
+        })
     }
 }
 

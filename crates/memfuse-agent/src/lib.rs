@@ -82,7 +82,7 @@ pub mod step;
 
 pub use context::{AgentContext, AgentStatus};
 pub use dlq::DeadLetterQueue;
-pub use engine::{EventLoopExitReason, OrchestratorEngine};
+pub use engine::{EventLoopExitReason, OrchestratorEngine, MAX_WORKFLOW_STEPS};
 pub use event_source::{BackgroundEvent, EventSource, PollingDocumentEventSource, VecEventSource};
 pub use graph::{AgentNode, NodeType, StateGraph, WorkflowEdge};
 pub use step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};

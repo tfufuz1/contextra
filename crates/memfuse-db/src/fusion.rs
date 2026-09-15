@@ -106,6 +106,61 @@ fn cmp_scores(a: f32, b: f32) -> std::cmp::Ordering {
     }
 }
 
+/// Size-bounded min-heap for Top-K candidate selection during Reciprocal Rank Fusion.
+///
+/// Maintains at most `k` items in memory during candidate aggregation.
+/// When capacity `k` is exceeded, the item with the worst score (or highest document ID on score tie) is evicted.
+pub struct BoundedTopK<T> {
+    heap: std::collections::BinaryHeap<T>,
+    capacity: usize,
+}
+
+impl<T: Ord> BoundedTopK<T> {
+    /// Creates a new `BoundedTopK` container with maximum capacity `k` (clamped to `memfuse_core::MAX_SEARCH_K`).
+    pub fn new(capacity: usize) -> Self {
+        let capacity = capacity.min(memfuse_core::MAX_SEARCH_K);
+        Self {
+            heap: std::collections::BinaryHeap::with_capacity(capacity.saturating_add(1)),
+            capacity,
+        }
+    }
+
+    /// Returns maximum allowed capacity `k`.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Returns current number of items held in the container.
+    pub fn len(&self) -> usize {
+        self.heap.len()
+    }
+
+    /// Returns `true` if the container holds zero items.
+    pub fn is_empty(&self) -> bool {
+        self.heap.is_empty()
+    }
+
+    /// Pushes an item into top-K container, evicting the worst candidate if size exceeds capacity `k`.
+    pub fn push(&mut self, item: T) {
+        if self.capacity == 0 {
+            return;
+        }
+        if self.heap.len() < self.capacity {
+            self.heap.push(item);
+        } else if let Some(worst) = self.heap.peek() {
+            if item < *worst {
+                self.heap.pop();
+                self.heap.push(item);
+            }
+        }
+    }
+
+    /// Consumes the container and returns items sorted from best to worst.
+    pub fn into_sorted_vec(self) -> Vec<T> {
+        self.heap.into_sorted_vec()
+    }
+}
+
 #[cfg(test)]
 struct HeapEntry {
     result: SearchResult,
@@ -492,6 +547,35 @@ pub fn weighted_reciprocal_rank_fusion_with_priority(
     weighted_reciprocal_rank_fusion_with_options(result_sets, max_results, priority, true, None)
 }
 
+struct TopKCandidate<'a> {
+    idx: u32,
+    score: f32,
+    id: &'a str,
+}
+
+impl<'a> PartialEq for TopKCandidate<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl<'a> Eq for TopKCandidate<'a> {}
+
+impl<'a> Ord for TopKCandidate<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // BinaryHeap is max-heap by default. We want peek() to return the candidate with
+        // the worst score (or highest ID on tie).
+        // Therefore, lower score => Greater priority in max-heap.
+        cmp_scores(other.score, self.score).then_with(|| self.id.cmp(other.id))
+    }
+}
+
+impl<'a> PartialOrd for TopKCandidate<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 /// Weighted Reciprocal Rank Fusion with explicit metadata merge priority and provenance toggle.
 // AI-TAG[SMELL][RESOLVED] audit-H-4: weighted_reciprocal_rank_fusion_with_options filtert nicht-finite oder <=0.0 Gewichte heraus und zählt nur valid_signal_count hoch.
 pub fn weighted_reciprocal_rank_fusion_with_options(
@@ -715,22 +799,23 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
         }
     }
 
-    // Phase 2: Sortiere Integer-Indizes nach Score (kein String-Kopieren, O(N log N))
-    // Score-Verifikation (Beispiel):
-    // Für weight=1.0, k=60, rank=1 gilt score = 1.0 / (60 + 1) = 1/61 ≈ 0.01639344.
-    // Bei 2 Signalen an rank 1 akkumuliert scores[idx] exakt 2 * (1/61) = 2/61 ≈ 0.03278688.
-    let mut ranked_indices: Vec<u32> = (0..scores.len() as u32).collect();
-    ranked_indices.sort_unstable_by(|&a, &b| {
-        cmp_scores(scores[b as usize], scores[a as usize])
-            // Tie-breaking: Lexikographischer Vergleich der Document-IDs bei gleichem Score
-            .then_with(|| id_table[a as usize].cmp(id_table[b as usize]))
-    });
-    ranked_indices.truncate(max_results);
+    // Phase 2: Top-K Aggregation via BoundedTopK (O(N log k) Zeit, O(k) Speicher-Deckelung)
+    let mut top_k = BoundedTopK::new(max_results);
+    for idx in 0..scores.len() as u32 {
+        let i = idx as usize;
+        top_k.push(TopKCandidate {
+            idx,
+            score: scores[i],
+            id: id_table[i],
+        });
+    }
+
+    let ranked_candidates = top_k.into_sorted_vec();
 
     // Nur für Top-K: jetzt String-IDs und Metadata auflösen
-    let mut results: Vec<SearchResult> = Vec::with_capacity(ranked_indices.len());
-    for idx in ranked_indices {
-        let i = idx as usize;
+    let mut results: Vec<SearchResult> = Vec::with_capacity(ranked_candidates.len());
+    for cand in ranked_candidates {
+        let i = cand.idx as usize;
         let id = id_table[i].to_string(); // Einzige String-Allokation pro Ergebnis — hier ist sie OK
         let score = scores[i];
         let entry = &mut entries[i]; // FusedEntry mit Metadata
@@ -2856,5 +2941,61 @@ mod tests {
         // Scores are derived from RRF rank (1/61, 1/62, 1/63) and remain finite despite NaN raw score
         assert!(fused.iter().all(|r| r.score.is_finite()));
         assert_eq!(fused[0].id, "doc_nan");
+    }
+
+    #[test]
+    fn test_bounded_top_k_memory_cap() {
+        const TOTAL_CANDIDATES: usize = 10_000;
+        const K: usize = 10;
+
+        let mut top_k = BoundedTopK::new(K);
+        assert_eq!(top_k.capacity(), K);
+        assert_eq!(top_k.len(), 0);
+
+        // Keep string allocations alive for borrowing during push
+        let ids: Vec<String> = (0..TOTAL_CANDIDATES)
+            .map(|i| format!("doc_{:05}", i))
+            .collect();
+
+        // Simulate 10,000 candidates pushed sequentially
+        for i in 0..TOTAL_CANDIDATES {
+            top_k.push(TopKCandidate {
+                idx: i as u32,
+                score: (i as f32) / (TOTAL_CANDIDATES as f32),
+                id: &ids[i],
+            });
+            // APM-DB-A invariant: BoundedTopK size NEVER exceeds k
+            assert!(
+                top_k.len() <= K,
+                "BoundedTopK length {} exceeded k = {}",
+                top_k.len(),
+                K
+            );
+        }
+
+        let winners = top_k.into_sorted_vec();
+        assert_eq!(winners.len(), K);
+
+        // Winners are sorted from best to worst (candidates 9999 down to 9990)
+        for (rank, cand) in winners.iter().enumerate() {
+            let expected_idx = (TOTAL_CANDIDATES - 1 - rank) as u32;
+            assert_eq!(cand.idx, expected_idx);
+        }
+
+        // Verification via full reciprocal_rank_fusion
+        let large_set: Vec<SearchResult> = (0..TOTAL_CANDIDATES)
+            .map(|i| SearchResult {
+                id: format!("doc_{:05}", i),
+                score: i as f32,
+                metadata: None,
+                matched_signals: vec![],
+                provenance: None,
+            })
+            .collect();
+
+        let fused = reciprocal_rank_fusion(vec![large_set], K);
+        assert_eq!(fused.len(), K);
+        // Best rank in RRF is doc_00000 (rank 1 -> 1/61)
+        assert_eq!(fused[0].id, "doc_00000");
     }
 }

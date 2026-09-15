@@ -1,28 +1,13 @@
 {
   "claims": [
     {
-      "krate": "memfuse-store",
-      "issue": "JULES-20260915-STAB",
-      "timestamp": "2026-09-15T19:00:55.677354689+00:00",
-      "session_id": "18077200778276011852",
-      "active": true,
-      "expires_at": "2026-09-15T23:00:55.677332933+00:00"
-    },
-    {
-      "krate": "memfuse-db",
-      "issue": "JULES-20260915-STAB",
-      "timestamp": "2026-09-15T19:01:00.249844787+00:00",
-      "session_id": "18077200778276011852",
-      "active": true,
-      "expires_at": "2026-09-15T23:01:00.249794434+00:00"
-    },
-    {
-      "krate": "memfuse-py",
-      "issue": "JULES-20260915-STAB",
-      "timestamp": "2026-09-15T19:01:04.588212647+00:00",
-      "session_id": "18077200778276011852",
-      "active": true,
-      "expires_at": "2026-09-15T23:01:04.588191956+00:00"
+      "krate": "memfuse-core",
+      "issue": "JULES-20260915-MEMFUSECOR-PROCES-GLMN",
+      "timestamp": "2026-09-15T18:45:51.897397389+00:00",
+      "session_id": "13938544853952390441",
+      "active": false,
+      "expires_at": "2026-09-15T22:45:51.897370635+00:00",
+      "released_at": "2026-09-15T18:54:52.173782787+00:00"
     }
   ]
 }
