@@ -149,6 +149,22 @@ impl EgressVault {
     /// Standard-Timeout für Klassifikationsprüfungen (100 ms).
     pub const DEFAULT_TIMEOUT: Duration = Duration::from_millis(100);
 
+    /// Standard-DLP-Muster für Egress-Klassifikationen (Secrets, API-Keys, PII, E-Mail).
+    pub fn default_patterns() -> Vec<String> {
+        vec![
+            r"sk-".to_string(),
+            r"AKIA".to_string(),
+            r"api_key".to_string(),
+            r"password".to_string(),
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b".to_string(),
+        ]
+    }
+
+    /// Versucht, eine `EgressVault`-Instanz mit den Standard-DLP-Mustern zu erstellen.
+    pub fn try_default() -> Result<Self, EgressVaultError> {
+        Self::new(Self::default_patterns())
+    }
+
     /// Erstellt eine neue `EgressVault`-Instanz aus einer Liste von Regex-Patterns.
     /// Jedem Pattern wird eine opake Regel-ID ("R-001", "R-002", ...) zugewiesen.
     pub fn new(patterns: Vec<String>) -> Result<Self, EgressVaultError> {
@@ -193,6 +209,23 @@ impl EgressVault {
 pub trait EgressClassifier: Send + Sync {
     /// Klassifiziert einen Text-Payload für den Egress-Export.
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>;
+}
+
+impl Default for EgressVault {
+    fn default() -> Self {
+        Self::try_default().unwrap_or_else(|err| {
+            tracing::error!(error = %err, "Failed to initialize default EgressVault, using empty fallback");
+            let empty_set = regex::RegexSet::new(Vec::<&str>::new()).unwrap_or_else(|_| {
+                // In practice RegexSet::new([]) never fails
+                regex::RegexSet::empty()
+            });
+            Self {
+                patterns: Arc::new(Vec::new()),
+                regex_set: Arc::new(empty_set),
+                timeout: Self::DEFAULT_TIMEOUT,
+            }
+        })
+    }
 }
 
 impl EgressClassifier for EgressVault {
@@ -376,6 +409,19 @@ mod tests {
             matches!(result_ok, EgressClassification::Allow),
             "Fehler: Bei ausreichend Zeit und harmlosen Payload sollte Allow zurückgegeben werden. Got: {:?}",
             result_ok
+        );
+    }
+
+    #[tokio::test]
+    async fn test_egress_vault_default_implementation() {
+        let vault = EgressVault::default();
+        assert_eq!(vault.patterns().len(), 5);
+        assert_eq!(vault.timeout(), EgressVault::DEFAULT_TIMEOUT);
+
+        let res = vault.classify("hello user alice@example.com").await;
+        assert_eq!(
+            res,
+            EgressClassification::Block(BlockReason::SensitivePattern("R-005".to_string()))
         );
     }
 
