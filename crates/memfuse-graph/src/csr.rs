@@ -30,11 +30,6 @@ use serde::{Deserialize, Serialize};
 pub enum EdgeType {
     #[default]
     Default,
-    #[deprecated(
-        since = "0.1.0",
-        note = "EdgeType::Custom wird nirgends im Workspace produktiv erzeugt — für benutzerdefinierte Kantentypen bitte Issue öffnen"
-    )]
-    Custom(String),
 }
 
 /// Edge structure in CSR graph representation.
@@ -343,6 +338,8 @@ impl GraphInner {
             Vec::with_capacity(self.business_valid_froms.len() + self.pending_edge_count);
         let mut new_business_valid_tos =
             Vec::with_capacity(self.business_valid_tos.len() + self.pending_edge_count);
+        let mut new_source_doc_ids =
+            Vec::with_capacity(self.source_doc_ids.len() + self.pending_edge_count);
 
         let mut current_offset = 0;
         new_offsets.push(current_offset);
@@ -396,6 +393,7 @@ impl GraphInner {
                 new_tx_valid_tos.push(edge.tx_valid_to);
                 new_business_valid_froms.push(edge.business_valid_from);
                 new_business_valid_tos.push(edge.business_valid_to);
+                new_source_doc_ids.push(edge.source_doc_id);
                 current_offset += 1;
             }
 
@@ -414,10 +412,9 @@ impl GraphInner {
         self.tx_valid_tos = new_tx_valid_tos;
         self.business_valid_froms = new_business_valid_froms;
         self.business_valid_tos = new_business_valid_tos;
+        self.source_doc_ids = new_source_doc_ids;
         self.pending_edges.clear();
         self.tombstoned_edges.clear();
-        #[cfg(feature = "edge-reinforcement-learning")]
-        self.edge_store.clear();
         self.pending_edge_count = 0;
         self.is_dirty = false;
         #[cfg(feature = "edge-reinforcement-learning")]
@@ -664,6 +661,12 @@ impl CsrGraph {
     /// Returns a reference to the optional persistent storage handle.
     pub fn storage(&self) -> Option<Arc<dyn StorageEngine>> {
         self.storage.clone()
+    }
+
+    /// Returns the optional source document ID stored at the given edge index in `source_doc_ids`.
+    pub fn get_source_doc_id(&self, index: usize) -> Option<DocId> {
+        let inner = self.inner.read();
+        inner.source_doc_ids.get(index).copied().flatten()
     }
 
     /// Returns the optional source document ID from which the edge (from, to) was derived.
@@ -1487,6 +1490,11 @@ impl CsrGraph {
         deleted_indices
     }
 
+    /// Loads tombstone status of all graph nodes and constructs an authoritative [`crate::DeletedView`].
+    pub async fn deleted_view(&self) -> crate::DeletedView {
+        crate::DeletedView::from_nodes(self.get_deleted_node_indices().await)
+    }
+
     /// Calculates Personalized PageRank (PPR) using a reusable [`crate::PprContext`] buffer to avoid allocations.
     pub async fn personalized_page_rank_with_context_async(
         &self,
@@ -1494,23 +1502,10 @@ impl CsrGraph {
         config: &memfuse_core::PprConfig,
         ctx: &mut crate::PprContext,
     ) -> Vec<(EntityId, f32)> {
-        let deleted_nodes = self.get_deleted_node_indices().await;
+        let deleted_view = self.deleted_view().await;
         self.compact();
         let inner = self.inner.read();
-        crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_nodes, ctx)
-    }
-
-    /// Calculates Personalized PageRank (PPR) using a reusable [`crate::PprContext`] buffer to avoid allocations.
-    pub fn personalized_page_rank_with_context(
-        &self,
-        seed_nodes: &[EntityId],
-        config: &memfuse_core::PprConfig,
-        ctx: &mut crate::PprContext,
-    ) -> Vec<(EntityId, f32)> {
-        self.compact();
-        let inner = self.inner.read();
-        let deleted_nodes = HashSet::new();
-        crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_nodes, ctx)
+        crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_view, ctx)
     }
 
     /// Returns the number of committed entities in the graph.
@@ -1543,11 +1538,7 @@ impl CsrGraph {
         let inner = self.inner.read();
         inner.targets.len()
             + inner.pending_edge_count
-            + inner
-                .staged_edges
-                .values()
-                .map(|v| v.len())
-                .sum::<usize>()
+            + inner.staged_edges.values().map(|v| v.len()).sum::<usize>()
     }
 
     /// Removes an entity node and all its incident (outgoing and incoming) edges from the graph.
@@ -1801,14 +1792,14 @@ impl GraphIndex for CsrGraph {
         config: &'a memfuse_core::PprConfig,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
-            let deleted_nodes = self.get_deleted_node_indices().await;
+            let deleted_view = self.deleted_view().await;
             self.compact();
             let inner = self.inner.read();
             Ok(crate::ppr::compute_ppr(
                 &inner,
                 seed_nodes,
                 config,
-                &deleted_nodes,
+                &deleted_view,
             ))
         })
     }
@@ -2349,11 +2340,7 @@ impl GraphIndex for CsrGraph {
             let num_entities = inner.entities.iter().flatten().count();
             let num_edges = inner.targets.len()
                 + inner.pending_edge_count
-                + inner
-                    .staged_edges
-                    .values()
-                    .map(|v| v.len())
-                    .sum::<usize>();
+                + inner.staged_edges.values().map(|v| v.len()).sum::<usize>();
 
             let mem = (inner.reverse_map.len() * std::mem::size_of::<EntityId>())
                 + (inner.entities.len() * std::mem::size_of::<Option<Entity>>())
@@ -4267,12 +4254,13 @@ mod tests {
                 // Invariant 3: final offset must match targets length
                 proptest::prop_assert_eq!(*inner.offsets.last().unwrap(), inner.targets.len()); // unwrap
 
-                // Invariant 4: parallel arrays (targets, weights, tx_valid_froms, tx_valid_tos, business_valid_froms, business_valid_tos) must have equal lengths
+                // Invariant 4: parallel arrays (targets, weights, tx_valid_froms, tx_valid_tos, business_valid_froms, business_valid_tos, source_doc_ids) must have equal lengths
                 proptest::prop_assert_eq!(inner.targets.len(), inner.weights.len());
                 proptest::prop_assert_eq!(inner.targets.len(), inner.tx_valid_froms.len());
                 proptest::prop_assert_eq!(inner.targets.len(), inner.tx_valid_tos.len());
                 proptest::prop_assert_eq!(inner.targets.len(), inner.business_valid_froms.len());
                 proptest::prop_assert_eq!(inner.targets.len(), inner.business_valid_tos.len());
+                proptest::prop_assert_eq!(inner.targets.len(), inner.source_doc_ids.len());
                 Ok(())
             });
             res?;
@@ -4623,15 +4611,19 @@ mod tests {
         let idx_b = inner.get_or_create_index(entity_b);
 
         // (1) Anlegen einer Kante A -> B in pending_edges
-        inner.pending_edges.entry(idx_a).or_default().push(EdgePayload {
-            target: idx_b,
-            weight: 1.0,
-            tx_valid_from: None,
-            tx_valid_to: None,
-            business_valid_from: None,
-            business_valid_to: None,
-            source_doc_id: None,
-        });
+        inner
+            .pending_edges
+            .entry(idx_a)
+            .or_default()
+            .push(EdgePayload {
+                target: idx_b,
+                weight: 1.0,
+                tx_valid_from: None,
+                tx_valid_to: None,
+                business_valid_from: None,
+                business_valid_to: None,
+                source_doc_id: None,
+            });
         inner.pending_edge_count += 1;
 
         // (2) `outgoing_edges_mut(A)` aufrufen um den edge_store-Cache zu befüllen
