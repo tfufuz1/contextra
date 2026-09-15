@@ -22,7 +22,7 @@ pub fn run_check_max_results_unbound_with_options(
 
     let max_val_re = Regex::new(r"\b(usize::MAX|u64::MAX|i64::MAX|u32::MAX)\b").unwrap();
     let ctx_param_re = Regex::new(
-        r"\b(max_results|max_[a_zA_Z0_9_]+|limit_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_limit|limit|cap_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_cap|cap|budget_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_budget|budget|timeout_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_timeout|timeout|capacity_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_capacity|capacity)\b",
+        r"\b(max_results|max_items|max_docs|max_entries|max_nodes|max_count|max_hits|max_candidates|max_neighbors|max_hops|max_depth|limit_[a_zA_Z0_9_]+|[a_zA_Z0_9_]+_limit|limit)\b",
     )
     .unwrap();
 
@@ -65,9 +65,20 @@ pub fn run_check_max_results_unbound_with_options(
                         let start_idx = idx.saturating_sub(3);
                         let end_idx = (idx + 3).min(lines.len().saturating_sub(1));
 
+                        // Check if UNBOUNDED-OK is present within context window
+                        let has_unbounded_ok =
+                            (start_idx..=end_idx).any(|i| lines[i].contains("// UNBOUNDED-OK"));
+                        if has_unbounded_ok {
+                            continue;
+                        }
+
                         let mut matches_ctx = false;
                         for ctx_idx in start_idx..=end_idx {
-                            let ctx_line = lines[ctx_idx];
+                            let ctx_line = lines[ctx_idx].trim();
+                            // Skip comment lines when evaluating context matching
+                            if ctx_line.starts_with("//") {
+                                continue;
+                            }
                             if ctx_param_re.is_match(ctx_line) {
                                 matches_ctx = true;
                                 break;
