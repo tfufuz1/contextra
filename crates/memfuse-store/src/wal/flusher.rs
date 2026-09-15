@@ -257,6 +257,21 @@ impl Wal {
                         ack,
                     } => {
                         let res: Result<()> = async {
+                            #[cfg(feature = "fault-injection")]
+                            if crate::wal::FAIL_TRUNCATE_ONCE
+                                .compare_exchange(
+                                    true,
+                                    false,
+                                    std::sync::atomic::Ordering::SeqCst,
+                                    std::sync::atomic::Ordering::SeqCst,
+                                )
+                                .is_ok()
+                            {
+                                return Err(MemFuseError::Storage(
+                                    "Simulated WAL truncate I/O failure (FAIL_TRUNCATE_ONCE)".into(),
+                                ));
+                            }
+
                             file.set_len(offset).await.map_err(|e| {
                                 MemFuseError::Storage(format!("WAL truncate failed: {e}"))
                             })?;
