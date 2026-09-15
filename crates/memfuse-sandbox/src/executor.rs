@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-15T16:00:00Z (SESSION: acf8fe72)
+// ZWECK: WASM execution engine with WASI and fuel enforcement
+// INVARIANTEN: #![forbid(unsafe_code)], fresh store/instance per call, strict fuel & timeout bounds
+// NICHT-OFFENSICHTLICH: host_cloud_query host function checks allow_cloud_egress dynamically
+// SIEHE AUCH: AGENTS.md §4.18, P9 Security Invariant
+
 //! WasmExecutor — WASM Execution Engine (§4.18).
 //!
 //! Jeder execute()-Aufruf startet eine frische Store+Instance (kein Zustandsüberlauf).
@@ -124,6 +131,10 @@ impl WasmExecutor {
         let stdout_clone = stdout_buf.clone();
         let stderr_clone = stderr_buf.clone();
 
+        // AI-TAG[SMELL][MINOR] WASI fd_write stub does not parse iovs buffer slices into stdout_buf/stderr_buf (ID: AGT-SANDBOX-12a4a39c) (TS: 2026-09-15T16:05:00Z) (SESSION: acf8fe72)
+        // BEFUND: Linker stub for WASI fd_write discards iovs memory buffers and returns 0 without writing to stdout_buf or stderr_buf.
+        // RISIKO: WASM modules using WASI fd_write will execute without error but produce empty WasmOutput stdout/stderr buffers.
+        // EMPFEHLUNG: Parse guest memory iovs structures via WASI preview1 buffer reader when allow_stdout / allow_stderr is enabled.
         // Minimalste WASI-fd_write Implementierung für stdout
         linker
             .func_wrap(

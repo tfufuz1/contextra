@@ -17,11 +17,12 @@
 
 Stand letzter Prüfung: 2026-09-15
 Befehl: `cargo xtask sync-docs` / `grep -rn "AI-TAG\[SMELL\]\[CRITICAL\]" crates/ --include="*.rs" | grep -v RESOLVED`
-Ergebnis: **1 offene Tags**
+Ergebnis: **2 offene Tags**
 
 | Crate/Datei | Zeile | ID | Kat. | Sev. | Zeitstempel | Beschreibung |
 |---|---|---|---|---|---|---|
 | `crates/memfuse-index/src/hnsw.rs` | 1184 | `AGT-INDEX-f38b1a90` | `TEST` | `MINOR` | `2026-09-15T14:50:00Z` | // AI-TAG[TEST][MINOR] Global mutable atomic statics cause multi-threaded test harness races (ID: AGT-INDEX-f38b1a90) (TS: 2026-09-15T14:50:00Z) (SESSION: acf8fe72) |
+| `crates/memfuse-sandbox/src/executor.rs` | 134 | `AGT-SANDBOX-12a4a39c` | `SMELL` | `MINOR` | `2026-09-15T16:05:00Z` | // AI-TAG[SMELL][MINOR] WASI fd_write stub does not parse iovs buffer slices into stdout_buf/stderr_buf (ID: AGT-SANDBOX-12a4a39c) (TS: 2026-09-15T16:05:00Z) (SESSION: acf8fe72) |
 
 
 ## Crate-Inventar & Status
@@ -43,7 +44,7 @@ Ergebnis: **1 offene Tags**
 | `memfuse-embed` | 4 | 2201 | 🧊 Optional |  |
 | `memfuse-db` | 5 | 35672 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 6 | 5380 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
-| `memfuse-router` | 6 | 6339 | 🟢 Clean |  |
+| `memfuse-router` | 6 | 6425 | 🟢 Clean |  |
 | `memfuse-agent` | 7 | 6027 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
 | `memfuse-mcp` | 8 | 5655 | 🟢 Clean |  |
 
