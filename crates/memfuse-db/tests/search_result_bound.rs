@@ -141,7 +141,7 @@ async fn proof_search_with_k_zero_returns_empty() {
     let query_vec = vec![0.1, 0.2, 0.3, 0.4];
     let results = collection
         .query()
-        .text("doc")
+        .text("content")
         .vector(&query_vec)
         .k(0)
         .execute()
