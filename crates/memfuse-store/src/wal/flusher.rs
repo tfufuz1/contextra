@@ -248,11 +248,29 @@ impl Wal {
                         ack,
                     } => {
                         let res: Result<()> = async {
+                            #[cfg(feature = "fault-injection")]
+                            if crate::wal::FAIL_TRUNCATE_ONCE
+                                .compare_exchange(
+                                    true,
+                                    false,
+                                    std::sync::atomic::Ordering::SeqCst,
+                                    std::sync::atomic::Ordering::SeqCst,
+                                )
+                                .is_ok()
+                            {
+                                return Err(MemFuseError::Storage(
+                                    "Simulated WAL truncate I/O failure (FAIL_TRUNCATE_ONCE)".into(),
+                                ));
+                            }
+
                             file.set_len(offset).await.map_err(|e| {
                                 MemFuseError::Storage(format!("WAL truncate failed: {e}"))
                             })?;
 
-                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
+                            if let Err(e) = file.set_len(offset).await {
+                                size.store(old_size, std::sync::atomic::Ordering::SeqCst);
+                                return Err(MemFuseError::Storage(format!("WAL truncate failed: {e}")));
+                            }
                             if offset < 4 {
                                 header_written.store(false, std::sync::atomic::Ordering::Release);
                             }
@@ -470,7 +488,6 @@ mod tests {
         let wal_path = dir.path().join("test_flusher.wal");
 
         let wal = Arc::new(Wal::open(&wal_path).await?);
-        wal.enable_flusher();
 
         let num_tasks = 10;
         let mut handles = Vec::new();

@@ -11,17 +11,14 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-
       - name: Run Criterion Benchmarks
         run: |
           cargo bench -p memfuse-index --bench distance_nan_impact_bench -- --save-baseline current
           cargo bench -p memfuse-index --bench hnsw_delete_search_bench -- --save-baseline current
           cargo bench -p memfuse-db --bench rrf_allocation_bench -- --save-baseline current
           cargo bench -p memfuse-store --bench wal_throughput_bench -- --save-baseline current
-
       - name: Assert No Regression (±5%)
-        run: cargo xtask bench-gate --tolerance 0.05 --baseline benchmarks/results/criterion-baseline.json
-
+        run: cargo xtask bench-gate --tolerance 0.05
       - name: Upload Benchmark Results
         uses: actions/upload-artifact@v4
         with:

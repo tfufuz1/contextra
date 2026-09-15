@@ -249,10 +249,16 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
-    pub async fn simulate_wal_append_failure_for_test(&self) {}
+    pub async fn simulate_wal_append_failure_for_test(&self) {
+        #[cfg(feature = "fault-injection")]
+        crate::wal::FAIL_APPEND_FOR_TX.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
+    }
 
     #[doc(hidden)]
-    pub async fn restore_wal_file_handle_for_test(&self) {}
+    pub async fn restore_wal_file_handle_for_test(&self) {
+        #[cfg(feature = "fault-injection")]
+        crate::wal::FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
+    }
 
     /// Returns the accumulated total memory budget tracking drift in bytes caused by
     /// unbudgeted memtable puts during commit when memory limit was exceeded.

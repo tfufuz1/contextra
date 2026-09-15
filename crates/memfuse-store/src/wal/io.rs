@@ -413,7 +413,6 @@ where
 }
 
 impl Wal {
-    // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: Exklusiver Mutex-Lock self.file.lock() in append_batch serialisiert Header-Check (write_header) und Dateischreibzugriffe vollständig. Die HMAC-Korrektheit wird NICHT durch die self.file-Mutex-Serialisierung, sondern durch den separaten last_hmac-Mutex in prepare_batch garantiert (siehe last_hmac.lock() in prepare_batch). (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8)
     pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
         let _truncate_guard = self.truncate_lock.lock().await;
         if self.is_sealed() {
@@ -431,7 +430,7 @@ impl Wal {
         #[cfg(feature = "fault-injection")]
         {
             let fail_tx = FAIL_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
-            if fail_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == fail_tx) {
+            if fail_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == fail_tx || fail_tx == u64::MAX) {
                 FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
                 return Err(MemFuseError::Storage(
                     "Simulated WAL append_batch I/O failure via fault injection".into(),
@@ -591,6 +590,7 @@ impl Wal {
 
     pub async fn truncate(&self, offset: u64, new_last_hmac: [u8; 32]) -> Result<()> {
         let _truncate_guard = self.truncate_lock.lock().await;
+
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
                 "Cannot truncate sealed WAL segment {}",
@@ -598,12 +598,12 @@ impl Wal {
             )));
         }
 
-        let tx = {
-            let flusher = self.flusher_tx.read().unwrap();
-            flusher
-                .clone()
-                .ok_or_else(|| MemFuseError::Storage("WAL flusher not initialized".into()))?
+        let flusher_tx = {
+            let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
+            guard.clone()
         };
+        let tx = flusher_tx
+            .ok_or_else(|| MemFuseError::Storage("WAL flusher actor is not enabled".into()))?;
 
         let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
         tx.send(WalCommand::Truncate {
@@ -615,18 +615,9 @@ impl Wal {
 
         ack_rx
             .await
-            .map_err(|e| MemFuseError::Storage(format!("WAL seek after truncate failed: {e}")))?;
-
-        self.size.store(offset, std::sync::atomic::Ordering::SeqCst);
-        if offset < 4 {
-            self.header_written
-                .store(false, std::sync::atomic::Ordering::Release);
-        }
-
-        {
-            let mut last_hmac_guard = self.last_hmac.lock().await;
-            *last_hmac_guard = new_last_hmac;
-        }
+            .map_err(|_| {
+                MemFuseError::Storage("WAL flusher dropped ack for truncate command".into())
+            })??;
 
         Ok(())
     }
@@ -693,7 +684,15 @@ impl Wal {
         *self.last_hmac.lock().await
     }
 
-    pub async fn replace_file_handle_for_test(&self, _file: tokio::fs::File) {}
+    /// Aktiviert eine einmalige simulierte Truncate-I/O-Failure für Tests.
+    /// Der Flusher gibt beim nächsten `WalCommand::Truncate` einen Fehler zurück,
+    /// ohne `set_len()` auszuführen. `size` wird daher nicht aktualisiert.
+    ///
+    /// Setzt `FAIL_TRUNCATE_ONCE = true`. Wird vom Flusher nach Auslösung zurückgesetzt.
+    #[cfg(feature = "fault-injection")]
+    pub fn arm_truncate_failure_for_test(&self) {
+        crate::wal::FAIL_TRUNCATE_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 
 #[cfg(windows)]

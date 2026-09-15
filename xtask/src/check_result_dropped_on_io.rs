@@ -10,11 +10,19 @@ pub struct Violation {
 }
 
 pub fn run_check_result_dropped_on_io(root: &Path) -> Result<Vec<Violation>, String> {
+    run_check_result_dropped_on_io_with_options(root, false)
+}
+
+pub fn run_check_result_dropped_on_io_with_options(
+    root: &Path,
+    include_tests: bool,
+) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
 
     let drop_re = Regex::new(r"\blet\s+_\s*=").unwrap();
     let io_expr_re =
-        Regex::new(r"\b(write|flush|set_len|fsync|store|truncate|sync_all)\s*\(").unwrap();
+        Regex::new(r"\b(write|write_all|flush|set_len|fsync|sync_all|seek|store|truncate)\s*\(")
+            .unwrap();
 
     for entry in WalkDir::new(root)
         .into_iter()
@@ -36,6 +44,10 @@ pub fn run_check_result_dropped_on_io(root: &Path) -> Result<Vec<Violation>, Str
                 continue;
             }
 
+            if !include_tests && (rel_path.ends_with("_test.rs") || rel_path.contains("/tests/")) {
+                continue;
+            }
+
             if let Ok(content) = fs::read_to_string(path) {
                 let lines: Vec<&str> = content.lines().collect();
 
@@ -44,8 +56,6 @@ pub fn run_check_result_dropped_on_io(root: &Path) -> Result<Vec<Violation>, Str
 
                     if trimmed.starts_with("//")
                         || trimmed.contains("// INTENTIONAL-DROP")
-                        || rel_path.ends_with("_test.rs")
-                        || rel_path.contains("/tests/")
                     {
                         continue;
                     }
