@@ -62,6 +62,24 @@
       "active": false,
       "expires_at": "2026-09-15T18:41:42.693675252+00:00",
       "released_at": "2026-09-15T14:50:31.257041469+00:00"
+    },
+    {
+<<<<<<< HEAD
+      "krate": "memfuse-checkpoint",
+      "issue": "JULES-20260915-MEMFUSECHE-TEST-UVNG",
+      "timestamp": "2026-09-15T15:54:43.274738223+00:00",
+      "session_id": "5973714571352502155",
+      "active": false,
+      "expires_at": "2026-09-15T19:54:43.274721930+00:00",
+      "released_at": "2026-09-15T16:09:10.966303390+00:00"
+=======
+      "krate": "memfuse-router",
+      "issue": "JULES-20260915-MEMFUSEROU-DEEP-ILH7",
+      "timestamp": "2026-09-15T16:04:39.709757734+00:00",
+      "session_id": "4350041739732073727",
+      "active": true,
+      "expires_at": "2026-09-15T20:04:39.709738134+00:00"
+>>>>>>> f67a662 (docs(memfuse-router): add Tier 3 Deep Audit Report 2026-09-15)
     }
   ]
 }
