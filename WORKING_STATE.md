@@ -35,7 +35,7 @@ Ergebnis: **1 offene Tags**
 | `memfuse-crypto` | 2 | 6417 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
 | `memfuse-graph` | 2 | 11616 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-sandbox` | 2 | 459 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
-| `memfuse-text` | 2 | 6162 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
+| `memfuse-text` | 2 | 6170 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-candle` | 3 | 4011 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-index` | 3 | 17474 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-ollama` | 3 | 4249 | 🟢 Clean |  |
