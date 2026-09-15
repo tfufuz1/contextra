@@ -71,6 +71,13 @@
       "active": false,
       "expires_at": "2026-09-15T19:54:43.274721930+00:00",
       "released_at": "2026-09-15T16:09:10.966303390+00:00"
+      "krate": "memfuse-graph",
+      "issue": "JULES-20260915-MEMFUSEGRA-DEEP-B1JB",
+      "timestamp": "2026-09-15T16:06:22.587534918+00:00",
+      "session_id": "4242661569703678029",
+      "active": false,
+      "expires_at": "2026-09-15T20:06:22.587514675+00:00",
+      "released_at": "2026-09-15T16:14:02.754073104+00:00"
       "krate": "memfuse-router",
       "issue": "JULES-20260915-MEMFUSEROU-DEEP-ILH7",
       "timestamp": "2026-09-15T16:04:39.709757734+00:00",
