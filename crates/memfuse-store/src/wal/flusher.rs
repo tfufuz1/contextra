@@ -278,10 +278,7 @@ impl Wal {
                                 ));
                             }
 
-                            file.set_len(offset).await.map_err(|e| {
-                                MemFuseError::Storage(format!("WAL truncate failed: {e}"))
-                            })?;
-                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
+                            let old_size = size.swap(offset, std::sync::atomic::Ordering::SeqCst);
 
                             if let Err(e) = file.set_len(offset).await {
                                 size.store(old_size, std::sync::atomic::Ordering::SeqCst);
