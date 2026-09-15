@@ -4,7 +4,6 @@ use tempfile::tempdir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
-
 #[tokio::test]
 async fn test_wal_append_and_replay_valid() {
     let dir = tempdir().expect("tempdir"); // expect
@@ -178,7 +177,6 @@ async fn test_wal_crc_tail_corruption() {
     assert_eq!(entries.len(), 2);
 }
 
-
 #[tokio::test]
 async fn test_wal_header_systematic_fuzzing() {
     let dir = tempdir().expect("tempdir"); // expect
@@ -240,8 +238,6 @@ async fn test_wal_header_systematic_fuzzing() {
         }
     }
 }
-
-
 
 #[tokio::test]
 async fn test_wal_tampered_wrong_key_entry_detected() {
@@ -368,10 +364,6 @@ async fn test_wal_legacy_key_fallback_migration() {
         panic!("Expected Put op");
     }
 }
-
-
-
-
 
 #[tokio::test]
 async fn test_batch_encrypted_wal_roundtrip() {
@@ -598,15 +590,8 @@ async fn test_batch_encrypted_wal_truncation_crash_consistency() {
     assert_eq!(replayed[1].1.seq_no, 2);
 }
 
-
 /// Windows ACL verification test.
 /// Note: This test executes only on Windows platforms (e.g. `windows-latest` CI runner).
-
-
-
-
-
-
 
 #[tokio::test]
 async fn test_wal_v1_auto_migration_on_min_version_v3() {
@@ -666,10 +651,6 @@ async fn test_wal_v1_auto_migration_on_min_version_v3() {
         "Migrated file must start with WAL_V3_HEADER"
     );
 }
-
-
-
-
 
 #[tokio::test]
 async fn test_recover_from_bak_if_present_cases() {
@@ -976,7 +957,6 @@ async fn test_find_tx_offset_invariants() {
     assert_eq!(offset100, *offset3);
     assert_eq!(hmac100, e3.checksum);
 }
-
 
 async fn create_5_entry_wal_unencrypted(
     dir: &std::path::Path,
@@ -1469,8 +1449,6 @@ async fn test_wal_crc_field_corruption_detected() {
     assert!(result.is_err(), "Corrupted CRC MUST be detected");
 }
 
-
-
 #[tokio::test]
 async fn test_seq_no_near_u64_max_boundary() -> Result<()> {
     let dir = tempdir()?;
@@ -1573,11 +1551,6 @@ async fn test_single_entry_no_commit_marker_replay() -> Result<()> {
     Ok(())
 }
 
-
-
-
-
-
 #[tokio::test]
 async fn test_wal_replay_stream_vs_mmap_parity() -> Result<()> {
     let dir = tempdir()?;
@@ -1618,6 +1591,3 @@ async fn test_wal_replay_stream_vs_mmap_parity() -> Result<()> {
 
     Ok(())
 }
-
-
-
