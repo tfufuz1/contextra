@@ -292,6 +292,11 @@ impl From<&MemFuseError> for MemFuseErrorDto {
                     "index_id": index_id,
                 })),
             },
+            MemFuseError::SnapshotUnsupportedForSignal(msg) => Self {
+                kind: "SnapshotUnsupportedForSignal".to_string(),
+                message: msg.clone(),
+                details: None,
+            },
         }
     }
 }

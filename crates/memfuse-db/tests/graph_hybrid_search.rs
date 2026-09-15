@@ -194,7 +194,7 @@ async fn test_hybrid_search_with_ppr_strategy() {
         warn_on_non_convergence: true,
     });
 
-    let results = col
+    let res = col
         .hybrid_search_with_strategy(
             "nonmatchingtext",
             &[0.0, 1.0, 0.0, 0.0],
@@ -204,17 +204,15 @@ async fn test_hybrid_search_with_ppr_strategy() {
             Some(&ppr_strategy),
             None,
         )
-        .await
-        .expect("hybrid_search_with_strategy");
+        .await;
 
-    assert!(
-        results.iter().any(|r| r.id == "doc_b"),
-        "doc_b should be retrieved via PPR graph signal"
-    );
-    assert!(
-        results.iter().any(|r| r.id == "doc_c"),
-        "doc_c should be retrieved via PPR multi-hop graph signal"
-    );
+    assert!(res.is_err(), "PPR under snapshot isolation must fail-closed with error");
+    match res.unwrap_err() {
+        memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
+            assert!(msg.contains("PersonalizedPageRank"));
+        }
+        other => panic!("Expected SnapshotUnsupportedForSignal error, got: {:?}", other),
+    }
 }
 
 #[tokio::test]
@@ -271,7 +269,7 @@ async fn test_hybrid_search_with_pathrag_strategy() {
         sufficiency_threshold: 0.1,
     };
 
-    let results = col
+    let res = col
         .hybrid_search_with_strategy(
             "nonmatchingtext",
             &[0.0, 1.0, 0.0, 0.0],
@@ -281,20 +279,18 @@ async fn test_hybrid_search_with_pathrag_strategy() {
             Some(&pathrag_strategy),
             None,
         )
-        .await
-        .expect("hybrid_search_with_strategy PathRag");
+        .await;
 
-    assert!(
-        results.iter().any(|r| r.id == "doc_b"),
-        "doc_b should be retrieved via PathRAG graph signal"
-    );
-    assert!(
-        results.iter().any(|r| r.id == "doc_c"),
-        "doc_c should be retrieved via PathRAG transitive multi-hop graph signal"
-    );
+    assert!(res.is_err(), "PathRag under snapshot isolation must fail-closed with error");
+    match res.unwrap_err() {
+        memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
+            assert!(msg.contains("PathRag"));
+        }
+        other => panic!("Expected SnapshotUnsupportedForSignal error, got: {:?}", other),
+    }
 
     // Test query builder API with SearchStrategy::PathRag
-    let builder_results = col
+    let builder_res = col
         .query()
         .anchors(vec![anchor_eid])
         .strategy(SearchStrategy::PathRag {
@@ -304,15 +300,13 @@ async fn test_hybrid_search_with_pathrag_strategy() {
         .fusion_weights(memfuse_core::FusionWeights::new(0.33, 0.33, 0.34).expect("weights"))
         .k(10)
         .execute()
-        .await
-        .expect("query builder PathRag");
+        .await;
 
-    assert!(
-        builder_results.iter().any(|r| r.id == "doc_b"),
-        "doc_b should be retrieved via QueryBuilder PathRag"
-    );
-    assert!(
-        builder_results.iter().any(|r| r.id == "doc_c"),
-        "doc_c should be retrieved via QueryBuilder PathRag multi-hop"
-    );
+    assert!(builder_res.is_err(), "QueryBuilder PathRag under snapshot isolation must fail-closed with error");
+    match builder_res.unwrap_err() {
+        memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
+            assert!(msg.contains("PathRag"));
+        }
+        other => panic!("Expected SnapshotUnsupportedForSignal error, got: {:?}", other),
+    }
 }

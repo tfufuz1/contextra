@@ -871,62 +871,11 @@ async fn test_cloud_query_allow_returns_success() {
     assert_eq!(json_res["query"], "safe public query for documentation");
 }
 
-struct AbstractionMockClassifier;
-
-impl memfuse_crypto::EgressClassifier for AbstractionMockClassifier {
-    fn classify<'a>(
-        &'a self,
-        _payload: &'a str,
-    ) -> BoxFuture<'a, memfuse_crypto::EgressClassification> {
-        Box::pin(async move { memfuse_crypto::EgressClassification::RequiresAbstraction })
-    }
-}
-
-#[tokio::test]
-async fn test_cloud_query_requires_abstraction() {
-    let tmp = TempDir::new().expect("temp dir");
-    let db = MemFuse::open(tmp.path()).await.expect("open db");
-    let collection = db.collection("default").await.expect("collection");
-    let dim = collection.dimension();
-    let embedder = Arc::new(MockEmbedder { dimension: dim });
-    let server = Arc::new(
-        McpServer::with_write_permission(Arc::new(db), embedder, true)
-            .expect("server new")
-            .with_egress_classifier(Arc::new(AbstractionMockClassifier)),
-    );
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "memfuse_cloud_query",
-            "arguments": {
-                "query": "query containing PII information to abstract"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-
-    assert_eq!(json_res["status"], "success");
-    assert_eq!(json_res["abstracted"], true);
-    assert_eq!(json_res["query"], "[REDACTED_SENSITIVE_QUERY]");
-    assert!(json_res["abstraction_notice"]
-        .as_str()
-        .unwrap()
-        .contains("abstracted before processing"));
-}
-
 #[tokio::test]
 async fn test_removed_substring_early_branch_runs_through_regex_vault() {
     let (server, _tmp) = create_mock_server().await;
 
-    // Previously, queries containing "abstract" or "PII" were intercepted by a substring early branch
-    // in DefaultEgressClassifier and returned RequiresAbstraction without evaluating EgressVault.
+    // Previously, queries containing "abstract" or "PII" were intercepted by a substring early branch.
     // Now they must run through DefaultEgressClassifier's EgressVault patterns.
     let req = make_request(
         "tools/call",

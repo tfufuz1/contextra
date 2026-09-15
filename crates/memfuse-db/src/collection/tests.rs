@@ -2593,6 +2593,149 @@ async fn test_run_percolation_check_rebonding() -> memfuse_core::Result<()> {
 }
 
 #[tokio::test]
+async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> memfuse_core::Result<()> {
+    use memfuse_graph::csr::CsrGraph;
+    use memfuse_index::{HnswConfig, HnswIndex};
+    use memfuse_store::lsm::{LsmConfig, LsmStorage};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::TempDir::new().map_err(memfuse_core::MemFuseError::from)?;
+    let lsm_config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await?);
+    let hnsw_config = HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let index = Arc::new(HnswIndex::try_new(hnsw_config)?);
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "test_fusion_capping".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        memfuse_text::Language::English,
+    );
+
+    // Insert documents
+    col.insert(
+        "doc_valid_1",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "rust vector search", "type": "semantic"})),
+    )
+    .await?;
+    col.insert(
+        "doc_valid_2",
+        &[0.9, 0.1, 0.0, 0.0],
+        Some(serde_json::json!({"text": "rust text search", "type": "semantic"})),
+    )
+    .await?;
+
+    // Call hybrid_search with k=1
+    let results = col
+        .hybrid_search("rust", &[1.0, 0.0, 0.0, 0.0], 1, None)
+        .await?;
+
+    assert_eq!(results.len(), 1, "Fusion result must be capped to k=1");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_hybrid_search_snapshot_unsupported_strategies() -> memfuse_core::Result<()> {
+    use memfuse_graph::csr::CsrGraph;
+    use memfuse_index::{HnswConfig, HnswIndex};
+    use memfuse_store::lsm::{LsmConfig, LsmStorage};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::TempDir::new().map_err(memfuse_core::MemFuseError::from)?;
+    let lsm_config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await?);
+    let hnsw_config = HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let index = Arc::new(HnswIndex::try_new(hnsw_config)?);
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "test_snapshot_unsupported".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        memfuse_text::Language::English,
+    );
+
+    col.insert(
+        "doc_1",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "graph node 1"})),
+    )
+    .await?;
+
+    let ppr_strat = memfuse_core::GraphTraversalStrategy::PersonalizedPageRank(
+        memfuse_core::PprConfig::default(),
+    );
+    let ppr_res = col
+        .hybrid_search_with_strategy(
+            "graph",
+            &[1.0, 0.0, 0.0, 0.0],
+            5,
+            None,
+            None,
+            Some(&ppr_strat),
+            None,
+        )
+        .await;
+
+    assert!(ppr_res.is_err(), "PPR under snapshot isolation must fail");
+    match ppr_res.unwrap_err() {
+        memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
+            assert!(msg.contains("PersonalizedPageRank"));
+        }
+        other => panic!("Expected SnapshotUnsupportedForSignal, got: {:?}", other),
+    }
+
+    let path_rag_strat = memfuse_core::GraphTraversalStrategy::PathRag {
+        max_hops: 2,
+        sufficiency_threshold: 0.5,
+    };
+    let path_res = col
+        .hybrid_search_with_strategy(
+            "graph",
+            &[1.0, 0.0, 0.0, 0.0],
+            5,
+            None,
+            None,
+            Some(&path_rag_strat),
+            None,
+        )
+        .await;
+
+    assert!(path_res.is_err(), "PathRag under snapshot isolation must fail");
+    match path_res.unwrap_err() {
+        memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
+            assert!(msg.contains("PathRag"));
+        }
+        other => panic!("Expected SnapshotUnsupportedForSignal, got: {:?}", other),
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_single_pid_controller_instantiation_in_query_builder() {
     // Regression test: verify that exactly one PID controller type (memfuse_calibration::PidController)
     // is instantiated across production collection search and query_builder modules.

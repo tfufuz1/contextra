@@ -12,11 +12,10 @@ mod replay_tests;
 pub use encode::*;
 pub use flusher::*;
 pub(crate) use hmac::*;
-pub(crate) use io::*;
 pub(crate) use replay::*;
 
 use memfuse_core::{MemFuseError, Result};
-use memfuse_security::crypto::KeyManager;
+use memfuse_crypto::crypto::KeyManager;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -60,7 +59,7 @@ pub struct Wal {
     pub(crate) flusher_tx:
         std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<WalCommand>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
-    pub(crate) simulate_append_failure: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) truncate_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl std::fmt::Debug for Wal {
@@ -165,7 +164,7 @@ impl Wal {
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
         };
 
         wal.enable_flusher_with_config(file, config.flusher_config);

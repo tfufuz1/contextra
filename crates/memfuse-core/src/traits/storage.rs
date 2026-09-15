@@ -53,19 +53,21 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// staged writes for `tx_id`. If the key exists and is non-tombstoned, no write is staged and `Ok(false)`
     /// is returned. The transaction is NOT automatically rolled back by this call.
     /// If the key does not exist (or is tombstoned), `value` is staged for `tx_id` and `Ok(true)` is returned.
+    ///
+    /// # Default Implementation
+    /// Returns [`MemFuseError::CapabilityUnsupported`][crate::MemFuseError::CapabilityUnsupported]
+    /// because atomic `put_if_absent` requires concurrency control implemented by concrete storage engines.
     fn put_if_absent<'a>(
         &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
+        _tx_id: TxId,
+        _key: &'a [u8],
+        _value: &'a [u8],
     ) -> BoxFuture<'a, Result<bool>> {
         Box::pin(async move {
-            if self.get(key).await?.is_some() {
-                Ok(false)
-            } else {
-                self.put(tx_id, key, value).await?;
-                Ok(true)
-            }
+            Err(crate::error::MemFuseError::capability_unsupported(
+                "put_if_absent",
+                "Atomic put_if_absent is not supported by default — concrete storage engines must implement it atomically.",
+            ))
         })
     }
 
