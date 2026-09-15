@@ -286,6 +286,7 @@ impl Wal {
                                     "WAL truncate failed: {e}"
                                 )));
                             }
+                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
                             if offset < 4 {
                                 header_written.store(false, std::sync::atomic::Ordering::Release);
                             }
