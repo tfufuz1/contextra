@@ -134,6 +134,16 @@ impl CompactionEngine {
         sstables: &RwLock<Vec<Arc<SstableReader>>>,
         data_path: &std::path::Path,
     ) -> Result<bool> {
+        self.maybe_compact_with_cancel(sstables, data_path, None).await
+    }
+
+    /// Evaluates whether compaction should run and performs it with an optional cancellation token.
+    pub async fn maybe_compact_with_cancel(
+        &self,
+        sstables: &RwLock<Vec<Arc<SstableReader>>>,
+        data_path: &std::path::Path,
+        cancel_token: Option<&tokio_util::sync::CancellationToken>,
+    ) -> Result<bool> {
         // 1. Select candidates under a single read-lock window.
         // Both candidate decision, Arc cloning, and full-compaction determination
         // happen atomically under one lock acquisition to prevent TOCTOU race conditions.
@@ -158,11 +168,12 @@ impl CompactionEngine {
         // 2. Perform the merge (no lock held — this is the expensive part)
         let min_snapshot_seq = self.snapshot_registry.min_active_seqno();
         let output_path = self.generate_sst_path(data_path)?;
-        self.merge_sstables(
+        self.merge_sstables_with_cancel(
             &input_ssts,
             &output_path,
             min_snapshot_seq,
             is_full_compaction,
+            cancel_token,
         )
         .await?;
 
@@ -361,11 +372,12 @@ impl CompactionEngine {
             let mut placed = false;
 
             for tier in &mut tiers {
-                let tier_size = ssts[tier[0]].metadata().file_size;
-                let ratio = if size > tier_size {
-                    size as f64 / tier_size.max(1) as f64
+                let neighbor_idx = *tier.last().unwrap();
+                let neighbor_size = ssts[neighbor_idx].metadata().file_size;
+                let ratio = if size > neighbor_size {
+                    size as f64 / neighbor_size.max(1) as f64
                 } else {
-                    tier_size as f64 / size.max(1) as f64
+                    neighbor_size as f64 / size.max(1) as f64
                 };
 
                 if ratio <= self.config.size_ratio {
@@ -426,12 +438,64 @@ impl CompactionEngine {
     /// During merge:
     /// - Duplicate keys: newest sequence number wins
     /// - Tombstones: removed if `seq_no < min_snapshot_seq` (no snapshot references them)
-    async fn merge_sstables(
+    pub async fn merge_sstables(
         &self,
         inputs: &[Arc<SstableReader>],
         output_path: &std::path::Path,
         min_snapshot_seq: u64,
         is_full_compaction: bool,
+    ) -> Result<()> {
+        self.merge_sstables_with_cancel(
+            inputs,
+            output_path,
+            min_snapshot_seq,
+            is_full_compaction,
+            None,
+        )
+        .await
+    }
+
+    /// Performs a multi-way merge with an optional cancellation token.
+    pub async fn merge_sstables_with_cancel(
+        &self,
+        inputs: &[Arc<SstableReader>],
+        output_path: &std::path::Path,
+        min_snapshot_seq: u64,
+        is_full_compaction: bool,
+        cancel_token: Option<&tokio_util::sync::CancellationToken>,
+    ) -> Result<()> {
+        let merge_res = self
+            .merge_sstables_inner(
+                inputs,
+                output_path,
+                min_snapshot_seq,
+                is_full_compaction,
+                cancel_token,
+            )
+            .await;
+
+        if merge_res.is_err() {
+            if let Err(e) = tokio::fs::remove_file(output_path).await {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    tracing::warn!(
+                        "Failed to clean up partial compaction output file {:?}: {}",
+                        output_path,
+                        e
+                    );
+                }
+            }
+        }
+
+        merge_res
+    }
+
+    async fn merge_sstables_inner(
+        &self,
+        inputs: &[Arc<SstableReader>],
+        output_path: &std::path::Path,
+        min_snapshot_seq: u64,
+        is_full_compaction: bool,
+        cancel_token: Option<&tokio_util::sync::CancellationToken>,
     ) -> Result<()> {
         struct HeapItem {
             key: bytes::Bytes,
@@ -503,6 +567,14 @@ impl CompactionEngine {
         let mut io_token_last_reset = std::time::Instant::now();
 
         while let Some(item) = heap.pop() {
+            if let Some(ct) = cancel_token {
+                if ct.is_cancelled() {
+                    return Err(memfuse_core::MemFuseError::Internal(
+                        "Compaction cancelled during merge stream processing".into(),
+                    ));
+                }
+            }
+
             processed_count += 1;
             if processed_count % self.config.yield_threshold == 0 {
                 // PERF-3: System Pressure-Awareness
@@ -522,6 +594,13 @@ impl CompactionEngine {
                 // Apply memory backpressure to prevent Compaction from OOMing the system
                 if !self.budget.has_memory_capacity() {
                     while !self.budget.has_memory_capacity() {
+                        if let Some(ct) = cancel_token {
+                            if ct.is_cancelled() {
+                                return Err(memfuse_core::MemFuseError::Internal(
+                                    "Compaction cancelled during memory budget wait".into(),
+                                ));
+                            }
+                        }
                         tracing::warn!("Compaction engine paused due to memory budget exhaustion.");
                         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                     }
@@ -585,8 +664,12 @@ impl CompactionEngine {
                                 // INVARIANTE: Kein MVCC-Write-Lock aktiv an dieser Stelle (merge läuft lock-frei).
                                 // Verifiziert durch Lektüre von merge_sstables() — kein RwLock::write() im Merge-Loop.
                                 tokio::time::sleep(delay).await;
-                                // Nach Sleep: Token-Bucket zurücksetzen
-                                io_token_bytes_written = 0;
+                                // Deduct allowed bytes based on actual elapsed time instead of wiping to 0
+                                let total_elapsed = io_token_last_reset.elapsed();
+                                let allowed_bytes =
+                                    (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
+                                io_token_bytes_written =
+                                    io_token_bytes_written.saturating_sub(allowed_bytes);
                                 io_token_last_reset = std::time::Instant::now();
                             }
                         }
@@ -641,7 +724,7 @@ impl CompactionEngine {
             // Wait for interval OR shutdown signal
             tokio::select! {
                 _ = tokio::time::sleep(self.config.check_interval) => {
-                    match self.maybe_compact(&sstables, &data_path).await {
+                    match self.maybe_compact_with_cancel(&sstables, &data_path, Some(&shutdown)).await {
                         Ok(true) => {
                             tracing::debug!("Background compaction cycle completed successfully");
                         }
@@ -2318,5 +2401,137 @@ mod tests {
             .expect("open merged sst");
         let entries = reader.iter().await.expect("iter entries");
         assert_eq!(entries.len(), 3, "All 3 original Arc candidates must be merged safely");
+    }
+
+    #[tokio::test]
+    async fn test_mvcc_floor_version_retained_for_active_snapshot() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let engine = CompactionEngine::new(
+            CompactionConfig::default(),
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        );
+
+        // Key "k1" has 3 versions: seq 30 ("v30"), seq 20 ("v20"), seq 10 ("v10")
+        let sst3 = create_test_sstable(
+            tmp.path(),
+            "sst3.sst",
+            &[(b"k1", b"v30", 30)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst2 = create_test_sstable(
+            tmp.path(),
+            "sst2.sst",
+            &[(b"k1", b"v20", 20)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst1 = create_test_sstable(
+            tmp.path(),
+            "sst1.sst",
+            &[(b"k1", b"v10", 10)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let output = tmp.path().join("merged_mvcc_floor.sst");
+
+        // Active snapshot pinned at min_snapshot_seq = 15.
+        // Versions > 15: seq 30, seq 20 (MUST both be retained).
+        // Floor version (newest <= 15): seq 10 ("v10") (MUST be retained).
+        engine
+            .merge_sstables(&[sst1, sst2, sst3], &output, 15, true)
+            .await
+            .expect("merge");
+
+        let reader = SstableReader::open(&output, Arc::clone(&bc))
+            .await
+            .expect("open merged");
+        let entries = reader.iter().await.expect("iter");
+
+        assert_eq!(
+            entries.len(),
+            3,
+            "All 3 versions (seq 30, seq 20, seq 10) must be retained when min_snapshot_seq = 15"
+        );
+        assert_eq!(entries[0].2 & !TOMBSTONE_BIT, 30);
+        assert_eq!(entries[1].2 & !TOMBSTONE_BIT, 20);
+        assert_eq!(entries[2].2 & !TOMBSTONE_BIT, 10);
+    }
+
+    #[tokio::test]
+    async fn test_chain_linkage_tier_grouping() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let config = CompactionConfig {
+            min_sstables_per_tier: 3,
+            size_ratio: 2.0,
+            ..CompactionConfig::default()
+        };
+        let engine = CompactionEngine::new(
+            config,
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        );
+
+        // SSTables with sizes 100, 180, 320
+        // Under single-linkage (against 100):
+        // 180 / 100 = 1.8 <= 2.0 (fits)
+        // 320 / 100 = 3.2 > 2.0 (would NOT fit)
+        // Under chain-linkage (against neighbor 180):
+        // 180 / 100 = 1.8 <= 2.0
+        // 320 / 180 = 1.77 <= 2.0 (FITS in tier under chain-linkage!)
+
+        async fn create_padded_sst(
+            dir: &std::path::Path,
+            name: &str,
+            size_target_kb: usize,
+            seq: u64,
+            bc: Arc<BlockCache>,
+        ) -> Arc<SstableReader> {
+            let path = dir.join(name);
+            let mut builder = SstableBuilder::create(&path).await.unwrap();
+            let pad = vec![0u8; 1024];
+            for i in 0..size_target_kb {
+                let k = format!("k-{:06}", i);
+                builder.add(k.as_bytes(), &pad, seq, seq).await.unwrap();
+            }
+            builder.finish().await.unwrap();
+            Arc::new(SstableReader::open(&path, bc).await.unwrap())
+        }
+
+        let sst1 = create_padded_sst(tmp.path(), "sst1.sst", 10, 1, Arc::clone(&bc)).await;
+        let sst2 = create_padded_sst(tmp.path(), "sst2.sst", 18, 2, Arc::clone(&bc)).await;
+        let sst3 = create_padded_sst(tmp.path(), "sst3.sst", 32, 3, Arc::clone(&bc)).await;
+
+        let candidates = engine
+            .select_compaction_candidates(&[sst1, sst2, sst3])
+            .expect("chain linkage should select all 3 SSTables into a single tier");
+
+        assert_eq!(
+            candidates.len(),
+            3,
+            "Chain linkage must group [10, 18, 32] into a tier with size_ratio = 2.0"
+        );
     }
 }
