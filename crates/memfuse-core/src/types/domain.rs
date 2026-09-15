@@ -19,8 +19,44 @@ use crate::error::{MemFuseError, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Serde helper module for `[u8; 32]` hex string serialization/deserialization.
+mod hex {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut hex_str = String::with_capacity(64);
+        for &b in bytes {
+            use std::fmt::Write;
+            let _ = write!(&mut hex_str, "{:02x}", b);
+        }
+        serializer.serialize_str(&hex_str)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s.len() != 64 {
+            return Err(serde::de::Error::custom(format!(
+                "invalid hex string length {}, expected 64",
+                s.len()
+            )));
+        }
+        let mut bytes = [0u8; 32];
+        for i in 0..32 {
+            bytes[i] = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16)
+                .map_err(serde::de::Error::custom)?;
+        }
+        Ok(bytes)
+    }
+}
+
 /// Defines a frozen workflow state acting as a savepoint.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkflowState {
     /// Associated transaction.
     pub tx: TxId,

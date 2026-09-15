@@ -7,8 +7,7 @@
 // STAND: 2026-09-14T00:00:00Z
 // ZWECK: Kern-Trait-Hierarchien (StorageEngine, VectorIndex, TextIndex, GraphIndex, Checkpoint, etc.) für Layer 0.
 // INVARIANTEN: Downward-only Trait interfaces; neue Trait-Methoden brauchen Default-Impls (Abwärtskompatibilität).
-// HOTSPOTS: 30-500
-// NICHT-OFFENSICHTLICH: Default-Impls für nicht unterstützte Subsystem-Features werfen standardisiertes CapabilityUnsupported.
+// HOTSPOTS: mod declaration & re-exports
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-024)
 
 // INVARIANT: Trait-Contracts sind das API-Rückgrat des Workspace.
