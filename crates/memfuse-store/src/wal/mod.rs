@@ -7,7 +7,7 @@ pub mod io;
 pub mod replay;
 
 #[cfg(test)]
-mod replay_tests;
+mod tests;
 
 pub use encode::*;
 pub use flusher::*;
