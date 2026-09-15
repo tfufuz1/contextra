@@ -3,7 +3,8 @@
 // INVARIANTEN: Re-exports core workflow primitives; Layer 3 orchestrator integration for MemFuse.
 // NICHT-OFFENSICHTLICH: Preserves public API boundaries for persistent checkpoint-execute-commit-audit loops.
 // HOTSPOTS: Module re-exports (ll. 75-85).
-// STAND: TS:2026-09-01T23:11:04Z (SESSION: 5a38054a)
+// REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-AGENT-692d9982) (TS: 2026-09-15T16:46:26Z) (SESSION: 692d9982) (PRÜFER-KONTEXT: FRESH)
+// STAND: TS:2026-09-15T16:46:26Z (SESSION: 692d9982)
 
 //! MemFuse Agent — Persistent workflow engine for multi-step agent execution.
 //!

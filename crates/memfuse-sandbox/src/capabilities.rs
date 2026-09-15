@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-15T16:00:00Z (SESSION: acf8fe72)
+// ZWECK: Capability Whitelist & Configuration for WASM Execution Boundary
+// INVARIANTEN: allow_cloud_egress defaults to false (Least Privilege)
+// NICHT-OFFENSICHTLICH: Memory pages are capped at 16 pages (1MB) by default to avoid OOM
+// SIEHE AUCH: AGENTS.md §4.18 WASM Execution Boundary
+
 //! WasmCapabilities — Capability-Whitelist für WASM-Guest-Module (§4.18).
 
 /// Whitelist für WASM-Guest-Capabilities.
