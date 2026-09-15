@@ -409,16 +409,10 @@ impl Wal {
                         .write(true)
                         .open(&bak_path)
                         .await
-                    {
-                        Ok(bak_file) => {
-                            if let Err(e) = bak_file.sync_all().await {
-                                tracing::warn!("WAL backup fsync failed before rewrite: {e}");
-                            }
-                        }
-                        Err(e) => {
-                            tracing::warn!("Could not reopen WAL backup for fsync: {e}");
-                        }
-                    }
+                        .map_err(|e| MemFuseError::Storage(format!("Could not reopen WAL backup for fsync: {e}")))?;
+                    bak_file.sync_all().await.map_err(|e| {
+                        MemFuseError::Storage(format!("WAL backup fsync failed before rewrite: {e}"))
+                    })?;
                 }
                 let rewrite_res = wal.rewrite_as_v3(&entries).await;
 
