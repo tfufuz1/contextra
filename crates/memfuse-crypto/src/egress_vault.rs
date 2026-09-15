@@ -378,4 +378,25 @@ mod tests {
             result_ok
         );
     }
+
+    #[tokio::test]
+    async fn test_egress_vault_accessors_and_with_timeout() {
+        let patterns = vec![r"sk-[a-zA-Z0-9]{32}".to_string()];
+        let vault = EgressVault::new(patterns)
+            .expect("valid vault")
+            .with_timeout(Duration::from_millis(250));
+
+        assert_eq!(vault.timeout(), Duration::from_millis(250));
+        assert_eq!(vault.patterns().len(), 1);
+        assert_eq!(vault.patterns()[0].name, "R-001");
+    }
+
+    #[tokio::test]
+    async fn test_exact_payload_boundary_allowed() {
+        let exact_payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES);
+        let patterns = vec![CompiledPattern::new("R-001", r"secret_pattern_xyz").unwrap()];
+
+        let res = classify_layer1(&exact_payload, &patterns, Duration::from_millis(200)).await;
+        assert_eq!(res, EgressClassification::Allow);
+    }
 }
