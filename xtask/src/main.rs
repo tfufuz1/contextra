@@ -2464,7 +2464,8 @@ fn main() {
         }
         "check-max-results-unbound" => {
             let root = find_root_dir();
-            match check_max_results_unbound::run_check_max_results_unbound(&root) {
+            let include_tests = args.iter().any(|arg| arg == "--include-tests");
+            match check_max_results_unbound::run_check_max_results_unbound_with_options(&root, include_tests) {
                 Ok(violations) => {
                     if !violations.is_empty() {
                         eprintln!(
@@ -2476,7 +2477,7 @@ fn main() {
                         }
                         process::exit(1);
                     }
-                    println!("✅ check-max-results-unbound passed");
+                    println!("✅ No violations found (check-max-results-unbound)");
                 }
                 Err(e) => {
                     eprintln!("❌ check-max-results-unbound error: {}", e);
@@ -2486,7 +2487,8 @@ fn main() {
         }
         "check-toctou-defaults" => {
             let root = find_root_dir();
-            match check_toctou_trait_defaults::run_check_toctou_trait_defaults(&root) {
+            let include_tests = args.iter().any(|arg| arg == "--include-tests");
+            match check_toctou_trait_defaults::run_check_toctou_trait_defaults_with_options(&root, include_tests) {
                 Ok(violations) => {
                     if !violations.is_empty() {
                         eprintln!(
@@ -2501,7 +2503,7 @@ fn main() {
                         }
                         process::exit(1);
                     }
-                    println!("✅ check-toctou-defaults passed");
+                    println!("✅ No violations found (check-toctou-defaults)");
                 }
                 Err(e) => {
                     eprintln!("❌ check-toctou-defaults error: {}", e);
@@ -2511,7 +2513,8 @@ fn main() {
         }
         "check-nan-hot-loop" => {
             let root = find_root_dir();
-            match check_nan_validation_in_hot_loop::run_check_nan_validation_in_hot_loop(&root) {
+            let include_tests = args.iter().any(|arg| arg == "--include-tests");
+            match check_nan_validation_in_hot_loop::run_check_nan_validation_in_hot_loop_with_options(&root, include_tests) {
                 Ok(violations) => {
                     if !violations.is_empty() {
                         eprintln!(
@@ -2523,7 +2526,7 @@ fn main() {
                         }
                         process::exit(1);
                     }
-                    println!("✅ check-nan-hot-loop passed");
+                    println!("✅ No violations found (check-nan-hot-loop)");
                 }
                 Err(e) => {
                     eprintln!("❌ check-nan-hot-loop error: {}", e);
@@ -2533,7 +2536,8 @@ fn main() {
         }
         "check-result-dropped-io" => {
             let root = find_root_dir();
-            match check_result_dropped_on_io::run_check_result_dropped_on_io(&root) {
+            let include_tests = args.iter().any(|arg| arg == "--include-tests");
+            match check_result_dropped_on_io::run_check_result_dropped_on_io_with_options(&root, include_tests) {
                 Ok(violations) => {
                     if !violations.is_empty() {
                         eprintln!(
@@ -2545,7 +2549,7 @@ fn main() {
                         }
                         process::exit(1);
                     }
-                    println!("✅ check-result-dropped-io passed");
+                    println!("✅ No violations found (check-result-dropped-io)");
                 }
                 Err(e) => {
                     eprintln!("❌ check-result-dropped-io error: {}", e);
@@ -2555,7 +2559,9 @@ fn main() {
         }
         "check-coverage-gate" => {
             let root = find_root_dir();
-            match check_coverage_gate::run_check_coverage_gate(&root) {
+            let cov_file_arg = args.get(2).map(PathBuf::from);
+            let cov_path = cov_file_arg.unwrap_or_else(|| root.join("coverage.json"));
+            match check_coverage_gate::run_check_coverage_gate_file(&cov_path) {
                 Ok(results) => {
                     let mut failed = false;
                     println!(

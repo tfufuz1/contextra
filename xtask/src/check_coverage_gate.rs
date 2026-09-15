@@ -39,17 +39,21 @@ struct LlvmCovMetric {
 
 pub fn get_threshold_for_crate(crate_name: &str) -> f64 {
     match crate_name {
-        "memfuse-store" => 75.0,
-        "memfuse-index" => 70.0,
+        "memfuse-store" => 80.0,
+        "memfuse-db" => 75.0,
+        "memfuse-index" => 75.0,
+        "memfuse-graph" => 70.0,
         "memfuse-text" => 70.0,
-        "memfuse-graph" => 65.0,
-        "memfuse-db" => 60.0,
-        _ => 55.0,
+        "memfuse-core" => 85.0,
+        _ => 50.0,
     }
 }
 
 pub fn run_check_coverage_gate(root: &Path) -> Result<Vec<CrateCoverageResult>, String> {
-    let cov_path = root.join("coverage.json");
+    run_check_coverage_gate_file(&root.join("coverage.json"))
+}
+
+pub fn run_check_coverage_gate_file(cov_path: &Path) -> Result<Vec<CrateCoverageResult>, String> {
     if !cov_path.exists() {
         return Err(format!(
             "coverage.json not found at {}. Please run llvm-cov first.",
@@ -57,11 +61,11 @@ pub fn run_check_coverage_gate(root: &Path) -> Result<Vec<CrateCoverageResult>, 
         ));
     }
 
-    let content = fs::read_to_string(&cov_path)
-        .map_err(|e| format!("Failed to read coverage.json: {}", e))?;
+    let content = fs::read_to_string(cov_path)
+        .map_err(|e| format!("Failed to read coverage json {}: {}", cov_path.display(), e))?;
 
     let report: LlvmCovReport = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse coverage.json: {}", e))?;
+        .map_err(|e| format!("Failed to parse coverage json {}: {}", cov_path.display(), e))?;
 
     let mut crate_stats: BTreeMap<String, (u64, u64)> = BTreeMap::new();
 
@@ -113,12 +117,12 @@ mod tests {
 
     #[test]
     fn test_coverage_thresholds() {
-        assert_eq!(get_threshold_for_crate("memfuse-store"), 75.0);
-        assert_eq!(get_threshold_for_crate("memfuse-index"), 70.0);
+        assert_eq!(get_threshold_for_crate("memfuse-store"), 80.0);
+        assert_eq!(get_threshold_for_crate("memfuse-db"), 75.0);
+        assert_eq!(get_threshold_for_crate("memfuse-index"), 75.0);
+        assert_eq!(get_threshold_for_crate("memfuse-graph"), 70.0);
         assert_eq!(get_threshold_for_crate("memfuse-text"), 70.0);
-        assert_eq!(get_threshold_for_crate("memfuse-graph"), 65.0);
-        assert_eq!(get_threshold_for_crate("memfuse-db"), 60.0);
-        assert_eq!(get_threshold_for_crate("memfuse-core"), 55.0);
+        assert_eq!(get_threshold_for_crate("memfuse-core"), 85.0);
     }
 
     #[test]

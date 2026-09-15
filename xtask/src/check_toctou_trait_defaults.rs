@@ -9,6 +9,13 @@ pub struct Violation {
 }
 
 pub fn run_check_toctou_trait_defaults(root: &Path) -> Result<Vec<Violation>, String> {
+    run_check_toctou_trait_defaults_with_options(root, false)
+}
+
+pub fn run_check_toctou_trait_defaults_with_options(
+    root: &Path,
+    include_tests: bool,
+) -> Result<Vec<Violation>, String> {
     let mut violations = Vec::new();
 
     for entry in WalkDir::new(root)
@@ -16,7 +23,7 @@ pub fn run_check_toctou_trait_defaults(root: &Path) -> Result<Vec<Violation>, St
         .filter_entry(|e| {
             let name = e.file_name().to_string_lossy();
             name != "target"
-                && name != "tests"
+                && (include_tests || name != "tests")
                 && name != ".git"
                 && name != ".cargo"
                 && name != "node_modules"
@@ -24,11 +31,7 @@ pub fn run_check_toctou_trait_defaults(root: &Path) -> Result<Vec<Violation>, St
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
-        if path.is_file()
-            && path.extension().and_then(|s| s.to_str()) == Some("rs")
-            && !path.to_string_lossy().contains("/tests/")
-            && !path.to_string_lossy().ends_with("_test.rs")
-        {
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rs") {
             let rel_path = path
                 .strip_prefix(root)
                 .unwrap_or(path)
@@ -36,6 +39,10 @@ pub fn run_check_toctou_trait_defaults(root: &Path) -> Result<Vec<Violation>, St
                 .replace('\\', "/");
 
             if rel_path.starts_with("xtask/") {
+                continue;
+            }
+
+            if !include_tests && (rel_path.contains("/tests/") || rel_path.ends_with("_test.rs")) {
                 continue;
             }
 
