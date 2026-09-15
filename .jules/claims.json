@@ -71,6 +71,13 @@
       "active": false,
       "expires_at": "2026-09-15T19:54:43.274721930+00:00",
       "released_at": "2026-09-15T16:09:10.966303390+00:00"
+      "krate": "memfuse-core",
+      "issue": "JULES-20260915-MEMFUSECOR-TEST-ABGJ",
+      "timestamp": "2026-09-15T15:57:12.077907881+00:00",
+      "session_id": "14825362975822341207",
+      "active": false,
+      "expires_at": "2026-09-15T19:57:12.077892145+00:00",
+      "released_at": "2026-09-15T16:15:25.323409438+00:00"
     }
   ]
 }
