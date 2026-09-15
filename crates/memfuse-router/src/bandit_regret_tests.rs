@@ -229,3 +229,69 @@ fn test_bandit_diagonal_vs_linucb_latency_budget() {
         BUDGET_P95_US
     );
 }
+
+/// Reproduktionstest Befund 1: `debug_assert_eq!` Panics bei Dimensionen-Mismatch im Produktivpfad.
+///
+/// Weist nach, dass `score()` und `update()` unter `cfg(debug_assertions)` unaufgefangen panicken,
+/// falls die Dimensionen des Eingabevektors `x` nicht exakt mit `self.theta` übereinstimmen.
+#[cfg(all(test, feature = "bandit-routing"))]
+#[test]
+#[should_panic(expected = "Embedding-Dimension muss übereinstimmen")]
+fn test_reproduce_debug_assert_dimension_mismatch_score() {
+    let state = BanditProfileState::cold_start(4, 0.5);
+    let x_invalid = vec![1.0f32; 3]; // Dim 3 statt 4
+    let _ = state.score(&x_invalid, 0.1, false);
+}
+
+/// Reproduktionstest Befund 1 (Update): `debug_assert_eq!` Panics bei Dimensionen-Mismatch in update().
+#[cfg(all(test, feature = "bandit-routing"))]
+#[test]
+#[should_panic]
+fn test_reproduce_debug_assert_dimension_mismatch_update() {
+    let mut state = BanditProfileState::cold_start(4, 0.5);
+    let x_invalid = vec![1.0f32; 5]; // Dim 5 statt 4
+    state.update(&x_invalid, 1.0, 0.1, false);
+}
+
+/// Reproduktionstest Befund 2: Abweichung der `theta`-Update-Formel vom mathematischen LinUCB-Standard.
+///
+/// Quantifiziert die numerische Abweichung zwischen dem in `update()` implementierten Inkrement
+/// `theta[i] += r_adj * x[i] / sigma_sq[i]` und der mathematischen LinUCB-Referenz θ = A^{-1} b = b / σ².
+#[cfg(all(test, feature = "bandit-routing"))]
+#[test]
+fn test_reproduce_linucb_theta_update_math_deviation() {
+    let mut state = BanditProfileState::cold_start(1, 0.5);
+    let x = vec![1.0f32];
+
+    // Schritt 1: r_adj = 1.0
+    // Standard LinUCB: b = 1.0, σ² = 2.0 -> θ_expected = b / σ² = 0.5
+    // Aktuelle Implementierung: θ = 0 + 1.0/1.0 = 1.0, σ² = 2.0
+    state.update(&x, 1.0, 0.0, false);
+    let current_theta_step1 = state.theta[0];
+    let expected_linucb_theta_step1 = 0.5f32;
+
+    // Schritt 2: r_adj = 1.0
+    // Standard LinUCB: b = 2.0, σ² = 3.0 -> θ_expected = b / σ² = 2/3 = 0.6667
+    // Aktuelle Implementierung: θ = 1.0 + 1.0/2.0 = 1.5, σ² = 3.0
+    state.update(&x, 1.0, 0.0, false);
+    let current_theta_step2 = state.theta[0];
+    let expected_linucb_theta_step2 = 2.0f32 / 3.0f32;
+
+    println!(
+        "LinUCB Theta Abweichung nach Schritt 1: ist {:.4}, Referenz LinUCB (b/σ²) = {:.4}",
+        current_theta_step1, expected_linucb_theta_step1
+    );
+    println!(
+        "LinUCB Theta Abweichung nach Schritt 2: ist {:.4}, Referenz LinUCB (b/σ²) = {:.4}",
+        current_theta_step2, expected_linucb_theta_step2
+    );
+
+    // Belegt die mathematische Abweichung der Inkrement-Formel
+    let diff_step2 = (current_theta_step2 - expected_linucb_theta_step2).abs();
+    assert!(
+        diff_step2 > 0.5,
+        "Belegt die mathematische Abweichung: Ist-Theta ({:.4}) weicht signifikant von LinUCB-Referenz ({:.4}) ab",
+        current_theta_step2,
+        expected_linucb_theta_step2
+    );
+}

@@ -1448,6 +1448,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-crypto"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm-siv",
+ "ahash",
+ "bincode",
+ "blake3",
+ "hkdf",
+ "hmac",
+ "lru",
+ "memfuse-core",
+ "parking_lot",
+ "rand 0.8.8",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "memfuse-db"
 version = "0.1.0"
 dependencies = [
@@ -1458,10 +1483,10 @@ dependencies = [
  "memfuse-candle",
  "memfuse-checkpoint",
  "memfuse-core",
+ "memfuse-crypto",
  "memfuse-graph",
  "memfuse-index",
  "memfuse-ollama",
- "memfuse-security",
  "memfuse-store",
  "memfuse-text",
  "parking_lot",
@@ -1495,7 +1520,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "memfuse-core",
- "memfuse-security",
+ "memfuse-crypto",
  "memmap2",
  "parking_lot",
  "rand 0.8.8",
@@ -1560,31 +1585,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-security"
-version = "0.1.0"
-dependencies = [
- "aes-gcm-siv",
- "ahash",
- "bincode",
- "blake3",
- "hkdf",
- "hmac",
- "lru",
- "memfuse-core",
- "parking_lot",
- "rand 0.8.8",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "subtle",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
 name = "memfuse-store"
 version = "0.1.0"
 dependencies = [
@@ -1593,7 +1593,7 @@ dependencies = [
  "crc32fast",
  "lru",
  "memfuse-core",
- "memfuse-security",
+ "memfuse-crypto",
  "memmap2",
  "parking_lot",
  "rand 0.8.8",

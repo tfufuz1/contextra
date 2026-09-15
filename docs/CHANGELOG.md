@@ -311,6 +311,9 @@
 | `` | `crates/memfuse-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |
+| `` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `-` | `OPEN` | `-` | // AI-TAG[FIX][PY-1] Clamp MEMFUSE_WORKER_THREADS to valid range [MIN_WORKER_THREADS, MAX_WORKER_THREADS] |
+| `` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `-` | `OPEN` | `-` | // AI-TAG[FIX][PY-2] Evaluate Result of module.setattr("_runtime_state", py_state) |
+| `` | `crates/memfuse-py/src/lib.rs` | `AI-TAG` | `-` | `-` | `OPEN` | `-` | // AI-TAG[FIX][PY-3] Poison engine instance on caught panic (APM-PY-A) |
 | `` | `crates/memfuse-store/examples/chaos_writer.rs` | `FILE-CONTEXT` | `-` | `chaos_power_cut` | `-` | `-` |  |
 | `` | `crates/memfuse-store/src/compaction.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-H-3: LsmStorage hält eine persistente CompactionEngine-Instanz (LsmStorage.compaction_engine), wodurch Compaction-State & Zähler erhalten bleiben. |
 | `` | `crates/memfuse-store/src/lsm/mod.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-M-6: Drift-Counter budget_tracking_drift_bytes wird in LsmStorage::flush nach erfolgreichem Flush auf 0 zurückgesetzt. |

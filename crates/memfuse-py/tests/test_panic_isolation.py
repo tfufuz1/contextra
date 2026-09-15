@@ -98,18 +98,33 @@ def test_worker_threads_clamped_on_zero():
     assert "WORKER_THREADS_OK:1" in res.stdout
 
 
-def test_failing_setattr_uses_fallback_runtime():
+def test_failing_setattr_raises_runtime_error():
     """Verifies that if setting `_runtime_state` fails on the Python module,
-    subsequent calls reuse the fallback runtime rather than constructing new multi-thread runtimes.
+    `get_runtime` evaluates the Result and propagates a PyRuntimeError rather than
+    silently discarding the failure and creating new un-tracked runtimes.
     """
-    import tempfile, numpy as np, memfuse
+    import tempfile, types, memfuse
     module = sys.modules.get("memfuse._memfuse") or sys.modules.get("_memfuse")
 
-    with tempfile.TemporaryDirectory() as tmp1, tempfile.TemporaryDirectory() as tmp2:
-        db1 = memfuse.open(tmp1, dimension=128)
-        db2 = memfuse.open(tmp2, dimension=128)
-        assert db1 is not None
-        assert db2 is not None
+    if hasattr(module, "_runtime_state"):
+        delattr(module, "_runtime_state")
+
+    orig_class = module.__class__
+
+    class ReadOnlyModule(types.ModuleType):
+        def __setattr__(self, name, value):
+            if name == "_runtime_state":
+                raise AttributeError("Attribute '_runtime_state' is read-only")
+            super().__setattr__(name, value)
+
+    try:
+        module.__class__ = ReadOnlyModule
+        with tempfile.TemporaryDirectory() as tmp:
+            with pytest.raises(RuntimeError) as exc_info:
+                memfuse.open(tmp, dimension=128)
+            assert "Failed to attach '_runtime_state'" in str(exc_info.value)
+    finally:
+        module.__class__ = orig_class
 
 
 def test_db_and_collection_poisoning_after_panic():
