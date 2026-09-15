@@ -622,4 +622,42 @@ mod tests {
             "observation_count must be preserved when fingerprint is unchanged"
         );
     }
+
+    #[tokio::test]
+    async fn test_gasp_multibyte_german_and_emoji_word_boundary_matching() {
+        let validator = GaspValidator::new();
+        let chunks = vec![sample_chunk(
+            1,
+            "Die Übernahme von Überlingen e.V. kostete 500000 € 🚀.",
+        )];
+
+        // Multibyte umlaut word match "Übernahme" and emoji
+        let res = validator
+            .compute_raw_grounding_score("Übernahme 🚀", &chunks)
+            .unwrap();
+        assert!(
+            res > 0.0,
+            "Multibyte German word 'Übernahme' and emoji '🚀' should match correctly"
+        );
+
+        // Substring inside multibyte string "Über" vs "Übernahme" at word boundary
+        let sub_score = validator
+            .compute_raw_grounding_score("Über", &chunks)
+            .unwrap();
+        assert_eq!(
+            sub_score, 0.6,
+            "Word 'Über' should not match as full word boundary inside 'Übernahme'"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_gasp_whitespace_or_punctuation_only_response_handling() {
+        let validator = GaspValidator::new();
+        let chunks = vec![sample_chunk(1, "Kontext-Inhalt für Test.")];
+
+        let err = validator
+            .compute_raw_grounding_score("   \n\t   ", &chunks)
+            .unwrap_err();
+        assert!(matches!(err, MemFuseError::InvalidInput(_)));
+    }
 }
