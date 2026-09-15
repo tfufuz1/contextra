@@ -118,8 +118,6 @@
 | `2026-09-11T10:21:34Z (SESSION: 31ada253)` | `crates/memfuse-store/src/compaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Size-Tiered Compaction Strategy (STCS) für SSTables |
 | `2026-09-11T10:21:34Z (SESSION: 31ada253)` | `crates/memfuse-store/src/sstable.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Immutables SSTable Format (Data Blocks + Index Block + Bloom Filter) |
 | `2026-09-11T10:21:34Z (SESSION: 31ada253)` | `crates/memfuse-store/src/tenant_codec.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Tenant Key Isolation & Encoding für LSM Storage Engine |
-| `2026-09-11T10:21:21Z (SESSION: fe92d654)` | `crates/memfuse-embed/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG). |
-| `2026-09-11T10:21:21Z (SESSION: fe92d654)` | `crates/memfuse-embed/src/reranker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cross-Encoder Reranking für Post-RRF Präzisionsverbesserung. |
 | `2026-09-11T00:00:00Z (SESSION: JULES-20260911-MUTATION-HARDENING)` | `crates/memfuse-calibration/tests/isotonic_mutation_hardening_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Mutation hardening test suite for IsotonicCalibrator (PAVA/ECE). |
 | `2026-09-11T00:00:00Z` | `crates/memfuse-calibration/src/pid.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Adaptive Reranking candidate pool-size regulation via PID latency control (F-08 & P11). |
 | `2026-09-11` | `crates/memfuse-candle/tests/real_inference_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integration tests for Candle real forward-pass GGUF LLM and Bert embedding inference. |
