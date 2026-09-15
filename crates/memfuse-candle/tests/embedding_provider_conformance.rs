@@ -111,15 +111,24 @@ async fn test_embedding_provider_batch_conformance() {
 }
 
 #[tokio::test]
-async fn test_embedding_provider_oversized_batch_rejection() {
+async fn test_embedding_provider_exact_batch_size_boundary_success_and_rejection() {
     let client = create_test_client(128);
     let provider: Box<dyn EmbeddingProvider> = Box::new(client);
 
-    let oversized_texts: Vec<&str> = vec!["item"; MAX_CANDLE_EMBED_BATCH_SIZE + 1];
-    let res = provider.embed_batch(&oversized_texts).await;
+    // Exactly MAX_CANDLE_EMBED_BATCH_SIZE (256 items) MUST succeed
+    let exact_boundary_texts: Vec<&str> = vec!["item"; MAX_CANDLE_EMBED_BATCH_SIZE];
+    let res_exact = provider.embed_batch(&exact_boundary_texts).await;
+    assert!(
+        res_exact.is_ok(),
+        "Batch of size exactly MAX_CANDLE_EMBED_BATCH_SIZE (256) must succeed"
+    );
+    assert_eq!(res_exact.unwrap().len(), MAX_CANDLE_EMBED_BATCH_SIZE);
 
-    assert!(res.is_err(), "Oversized batch must be rejected");
-    if let Err(err) = res {
+    // MAX_CANDLE_EMBED_BATCH_SIZE + 1 (257 items) MUST fail with EmbeddingError::Unavailable
+    let oversized_texts: Vec<&str> = vec!["item"; MAX_CANDLE_EMBED_BATCH_SIZE + 1];
+    let res_oversized = provider.embed_batch(&oversized_texts).await;
+    assert!(res_oversized.is_err(), "Batch of size 257 must be rejected");
+    if let Err(err) = res_oversized {
         assert!(
             matches!(err, EmbeddingError::Unavailable(_)),
             "Expected EmbeddingError::Unavailable, got {err:?}"
