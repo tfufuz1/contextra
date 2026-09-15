@@ -182,6 +182,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         doc_ids,
                         has_text,
                         has_graph,
+                        ..
                     } => (doc_ids, has_text, has_graph),
                     CommitIntent::Consolidation {
                         source_docs: _,
