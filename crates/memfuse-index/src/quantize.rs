@@ -200,35 +200,6 @@ impl ScalarQuantizer {
         self.drift_ratio() >= threshold
     }
 
-    /// Expands mins/maxes to accommodate out-of-bounds vectors, recomputing scales.
-    #[deprecated(
-        note = "Expanding bounds mutates codebook scales and invalidates previously stored u8 quantization codes. Clamping with index rebuild is used instead."
-    )]
-    pub fn expand_bounds_to_fit(&mut self, vector: &[f32]) -> bool {
-        let mut changed = false;
-        for (i, &val) in vector.iter().take(self.dimension).enumerate() {
-            if val < self.mins[i] {
-                self.mins[i] = val;
-                changed = true;
-            }
-            if val > self.maxes[i] {
-                self.maxes[i] = val;
-                changed = true;
-            }
-        }
-        if changed {
-            for i in 0..self.dimension {
-                if (self.maxes[i] - self.mins[i]).abs() < f32::EPSILON {
-                    self.maxes[i] = self.mins[i] + 1e-6;
-                }
-                let range = self.maxes[i] - self.mins[i];
-                self.scales[i] = 255.0 / range;
-                self.inv_scales[i] = range / 255.0;
-            }
-        }
-        changed
-    }
-
     /// Quantizes an `f32` vector to `u8`.
     pub fn quantize(&self, vector: &[f32]) -> memfuse_core::Result<Vec<u8>> {
         if self.mins.len() < self.dimension
@@ -447,27 +418,6 @@ mod tests {
         assert_eq!(original.scales, deserialized.scales);
         assert_eq!(original.inv_scales, deserialized.inv_scales);
         assert_eq!(original.dimension, deserialized.dimension);
-    }
-
-    #[test]
-    fn test_expand_bounds_to_fit() {
-        let v1 = vec![0.0, 0.0];
-        let v2 = vec![1.0, 1.0];
-        let mut q = ScalarQuantizer::train(&[v1.as_slice(), v2.as_slice()], 2);
-
-        // Vector inside range -> false, bounds unchanged
-        let in_range = vec![0.5, 0.5];
-        assert!(!q.expand_bounds_to_fit(&in_range));
-        assert_eq!(q.mins, vec![0.0, 0.0]);
-        assert_eq!(q.maxes, vec![1.0, 1.0]);
-
-        // Vector expanding bounds -> true, bounds updated
-        let out_range = vec![-1.0, 5.0];
-        assert!(q.expand_bounds_to_fit(&out_range));
-        assert_eq!(q.mins, vec![-1.0, 0.0]);
-        assert_eq!(q.maxes, vec![1.0, 5.0]);
-        // Scale updated: range for dim 0 is 2.0 -> scale = 255.0/2.0 = 127.5 (Anti-mirroring hand calculated)
-        assert!((q.scales[0] - 127.5).abs() < 1e-4);
     }
 
     #[test]
@@ -829,6 +779,32 @@ mod tests {
         let res_mismatch = ScalarQuantizer::try_train(&batch, 3);
         assert!(res_mismatch.is_err());
         assert!(res_mismatch.unwrap_err().to_string().contains("expected 3"));
+    }
+
+    #[test]
+    fn test_quantize_clamping_and_drift_counting() -> memfuse_core::Result<()> {
+        let v1 = vec![0.0, 0.0];
+        let v2 = vec![1.0, 1.0];
+        let q = ScalarQuantizer::train(&[&v1, &v2], 2);
+
+        assert_eq!(q.drift_ratio(), 0.0);
+
+        // Quantize in-range vector -> 0 drift
+        let in_range = vec![0.5, 0.5];
+        let res_in = q.quantize(&in_range)?;
+        assert_eq!(res_in.len(), 2);
+        assert_eq!(q.drift_ratio(), 0.0);
+
+        // Quantize out-of-range vector -> values clamped, drift ratio increases
+        let out_range = vec![-5.0, 10.0];
+        let res_out = q.quantize(&out_range)?;
+        assert_eq!(res_out, vec![0, 255]);
+        assert!(q.drift_ratio() > 0.0);
+
+        // Codebook mins/maxes must remain unchanged (Codebook Invariance)
+        assert_eq!(q.mins(), &[0.0, 0.0]);
+        assert_eq!(q.maxes(), &[1.0, 1.0]);
+        Ok(())
     }
 
     #[test]

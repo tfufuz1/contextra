@@ -68,7 +68,6 @@ mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
 mod check_placeholder_refs;
-mod check_reachable_modules;
 mod check_recall_stability;
 mod check_result_dropped_on_io;
 mod check_stale_tags;

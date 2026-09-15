@@ -278,7 +278,8 @@ impl Wal {
                                 ));
                             }
 
-                            let old_size = size.load(std::sync::atomic::Ordering::SeqCst);
+                            let old_size = size.swap(offset, std::sync::atomic::Ordering::SeqCst);
+
                             if let Err(e) = file.set_len(offset).await {
                                 size.store(old_size, std::sync::atomic::Ordering::SeqCst);
                                 return Err(MemFuseError::Storage(format!(
