@@ -71,6 +71,12 @@
       "active": false,
       "expires_at": "2026-09-15T19:54:43.274721930+00:00",
       "released_at": "2026-09-15T16:09:10.966303390+00:00"
+      "krate": "memfuse-router",
+      "issue": "JULES-20260915-MEMFUSEROU-DEEP-ILH7",
+      "timestamp": "2026-09-15T16:04:39.709757734+00:00",
+      "session_id": "4350041739732073727",
+      "active": true,
+      "expires_at": "2026-09-15T20:04:39.709738134+00:00"
       "krate": "memfuse-ollama",
       "issue": "JULES-20260915-MEMFUSEOLL-TEST-VF9G",
       "timestamp": "2026-09-15T16:00:25.034851728+00:00",
