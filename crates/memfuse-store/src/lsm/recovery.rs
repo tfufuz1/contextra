@@ -226,15 +226,12 @@ impl LsmStorage {
         let manifest_exists = manifest_path.exists();
         let _valid_manifest_sstables: Option<std::collections::HashSet<std::path::PathBuf>> =
             if manifest_exists {
-                if let Ok(entries) = crate::manifest::Manifest::load(&manifest_path).await {
-                    Some(
-                        crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
-                            .into_iter()
-                            .collect(),
-                    )
-                } else {
-                    None
-                }
+                let entries = crate::manifest::Manifest::load(&manifest_path).await?;
+                Some(
+                    crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
+                        .into_iter()
+                        .collect(),
+                )
             } else {
                 None
             };
