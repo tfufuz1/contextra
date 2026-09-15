@@ -179,7 +179,31 @@ impl ScalarQuantizer {
         out_count as f32 / self.dimension as f32
     }
 
+    /// Returns the fraction of quantized queries that contained values outside the trained min/max range.
+    pub fn drift_ratio(&self) -> f32 {
+        let total = self.total_queries.load(Ordering::Relaxed);
+        if total == 0 {
+            return 0.0;
+        }
+        let out = self.out_of_range_queries.load(Ordering::Relaxed);
+        out as f32 / total as f32
+    }
+
+    /// Checks if recalibration / index rebuild is required based on cumulative quantization drift ratio.
+    ///
+    /// Requires at least 20 queries to avoid false positives on small initial samples.
+    pub fn is_rebuild_required(&self, threshold: f32) -> bool {
+        let total = self.total_queries.load(Ordering::Relaxed);
+        if total < 20 {
+            return false;
+        }
+        self.drift_ratio() >= threshold
+    }
+
     /// Expands mins/maxes to accommodate out-of-bounds vectors, recomputing scales.
+    #[deprecated(
+        note = "Expanding bounds mutates codebook scales and invalidates previously stored u8 quantization codes. Clamping with index rebuild is used instead."
+    )]
     pub fn expand_bounds_to_fit(&mut self, vector: &[f32]) -> bool {
         let mut changed = false;
         for (i, &val) in vector.iter().take(self.dimension).enumerate() {

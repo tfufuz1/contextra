@@ -74,3 +74,71 @@ def test_subprocess_uncaught_panic_exit_code():
     # Standard uncaught Python exception exits with code 1
     assert res.returncode == 1, f"Expected returncode 1, got {res.returncode}. Stderr: {res.stderr}"
     assert "RuntimeError: Rust panic caught at FFI boundary: Uncaught panic check" in res.stderr
+
+
+def test_worker_threads_clamped_on_zero():
+    """Verifies that MEMFUSE_WORKER_THREADS=0 does not cause Tokio runtime panic
+    and instead gets clamped to minimum 1 worker thread.
+    """
+    code = (
+        "import os\n"
+        "os.environ['MEMFUSE_WORKER_THREADS'] = '0'\n"
+        "import tempfile, numpy as np, memfuse\n"
+        "with tempfile.TemporaryDirectory() as tmp:\n"
+        "    db = memfuse.open(tmp, dimension=128)\n"
+        "    assert db.worker_threads >= 1\n"
+        "    print('WORKER_THREADS_OK:' + str(db.worker_threads))\n"
+    )
+    res = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0, f"Process crashed or failed: stderr={res.stderr}"
+    assert "WORKER_THREADS_OK:1" in res.stdout
+
+
+def test_failing_setattr_uses_fallback_runtime():
+    """Verifies that if setting `_runtime_state` fails on the Python module,
+    subsequent calls reuse the fallback runtime rather than constructing new multi-thread runtimes.
+    """
+    import tempfile, numpy as np, memfuse
+    module = sys.modules.get("memfuse._memfuse") or sys.modules.get("_memfuse")
+
+    with tempfile.TemporaryDirectory() as tmp1, tempfile.TemporaryDirectory() as tmp2:
+        db1 = memfuse.open(tmp1, dimension=128)
+        db2 = memfuse.open(tmp2, dimension=128)
+        assert db1 is not None
+        assert db2 is not None
+
+
+def test_db_and_collection_poisoning_after_panic():
+    """Verifies that when a Rust panic occurs during an operation on Db or Collection,
+    the instance is marked as poisoned (`is_poisoned == True`), and subsequent operations
+    are rejected with PyRuntimeError.
+    """
+    import tempfile, numpy as np, memfuse
+    with tempfile.TemporaryDirectory() as tmp:
+        db = memfuse.open(tmp, dimension=128)
+        assert not db.is_poisoned
+
+        col = db.collection("test_col")
+        assert not col.is_poisoned
+
+        # Trigger a panic on col
+        with pytest.raises(RuntimeError) as exc_info:
+            col._trigger_panic_for_test("Collection panic")
+
+        assert "Rust panic caught at FFI boundary" in str(exc_info.value)
+        assert db.is_poisoned
+        assert col.is_poisoned
+
+        # Subsequent operation on db or col should be rejected with engine poisoned RuntimeError
+        vec = np.zeros(128, dtype=np.float32)
+        with pytest.raises(RuntimeError) as exc_info2:
+            db.insert("doc1", vec)
+        assert "engine poisoned after previous panic" in str(exc_info2.value)
+
+        with pytest.raises(RuntimeError) as exc_info3:
+            col.get("doc1")
+        assert "engine poisoned after previous panic" in str(exc_info3.value)

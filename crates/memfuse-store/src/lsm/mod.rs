@@ -52,11 +52,11 @@
 //! ## `commit_mutex` Role
 //! `commit_mutex` serializes sequence allocation and WAL batch preparation during commits, preventing
 //! snapshot inversion. In the group commit leader path, `commit_mutex` is released prior to executing physical
-//! disk I/O (`wal.append_batch`) and re-acquired on error for WAL rollback.
+//! disk I/O (`wal.append_batch`) and re-acquired afterwards for MemTable updates / visibility advancement (and on error for WAL rollback).
 //!
 //! ## Lock Hierarchy & Concurrency Control
 //! To prevent deadlocks, locks across the LSM storage engine must be acquired in the following order:
-//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations. Released before disk I/O in group commit leader happy path.
+//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations. Released before disk I/O in group commit leader happy path, and re-acquired for MemTable update and visibility advancement.
 //! 2. `state` write lock (`tokio::sync::RwLock<LsmState>`) - Protects active/immutable memtable pointers & WAL.
 //! 3. `sstables` write lock (`tokio::sync::RwLock<Vec<Arc<SstableReader>>>`) - Protects SSTable set.
 //!    Read locks on `state` and `sstables` may be acquired concurrently without holding `commit_mutex`.
@@ -857,6 +857,9 @@ impl StorageEngine for LsmStorage {
                 for r in &pending_queue.requests {
                     all_updates.push((r.tx_id, &r.mem_updates));
                 }
+
+                // Re-acquire commit_mutex for MemTable update and visibility advancement
+                let _commit_lock = self.commit_mutex.lock().await;
 
                 let state = self.state.read().await;
                 for (req_tx_id, mem_updates) in all_updates {
