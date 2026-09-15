@@ -1487,6 +1487,11 @@ impl CsrGraph {
         deleted_indices
     }
 
+    /// Loads tombstone status of all graph nodes and constructs an authoritative [`crate::DeletedView`].
+    pub async fn deleted_view(&self) -> crate::DeletedView {
+        crate::DeletedView::from_nodes(self.get_deleted_node_indices().await)
+    }
+
     /// Calculates Personalized PageRank (PPR) using a reusable [`crate::PprContext`] buffer to avoid allocations.
     pub async fn personalized_page_rank_with_context_async(
         &self,
@@ -1494,23 +1499,10 @@ impl CsrGraph {
         config: &memfuse_core::PprConfig,
         ctx: &mut crate::PprContext,
     ) -> Vec<(EntityId, f32)> {
-        let deleted_nodes = self.get_deleted_node_indices().await;
+        let deleted_view = self.deleted_view().await;
         self.compact();
         let inner = self.inner.read();
-        crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_nodes, ctx)
-    }
-
-    /// Calculates Personalized PageRank (PPR) using a reusable [`crate::PprContext`] buffer to avoid allocations.
-    pub fn personalized_page_rank_with_context(
-        &self,
-        seed_nodes: &[EntityId],
-        config: &memfuse_core::PprConfig,
-        ctx: &mut crate::PprContext,
-    ) -> Vec<(EntityId, f32)> {
-        self.compact();
-        let inner = self.inner.read();
-        let deleted_nodes = HashSet::new();
-        crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_nodes, ctx)
+        crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_view, ctx)
     }
 
     /// Returns the number of committed entities in the graph.
@@ -1543,11 +1535,7 @@ impl CsrGraph {
         let inner = self.inner.read();
         inner.targets.len()
             + inner.pending_edge_count
-            + inner
-                .staged_edges
-                .values()
-                .map(|v| v.len())
-                .sum::<usize>()
+            + inner.staged_edges.values().map(|v| v.len()).sum::<usize>()
     }
 
     /// Removes an entity node and all its incident (outgoing and incoming) edges from the graph.
@@ -1801,14 +1789,14 @@ impl GraphIndex for CsrGraph {
         config: &'a memfuse_core::PprConfig,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
-            let deleted_nodes = self.get_deleted_node_indices().await;
+            let deleted_view = self.deleted_view().await;
             self.compact();
             let inner = self.inner.read();
             Ok(crate::ppr::compute_ppr(
                 &inner,
                 seed_nodes,
                 config,
-                &deleted_nodes,
+                &deleted_view,
             ))
         })
     }
@@ -2349,11 +2337,7 @@ impl GraphIndex for CsrGraph {
             let num_entities = inner.entities.iter().flatten().count();
             let num_edges = inner.targets.len()
                 + inner.pending_edge_count
-                + inner
-                    .staged_edges
-                    .values()
-                    .map(|v| v.len())
-                    .sum::<usize>();
+                + inner.staged_edges.values().map(|v| v.len()).sum::<usize>();
 
             let mem = (inner.reverse_map.len() * std::mem::size_of::<EntityId>())
                 + (inner.entities.len() * std::mem::size_of::<Option<Entity>>())
@@ -4623,15 +4607,19 @@ mod tests {
         let idx_b = inner.get_or_create_index(entity_b);
 
         // (1) Anlegen einer Kante A -> B in pending_edges
-        inner.pending_edges.entry(idx_a).or_default().push(EdgePayload {
-            target: idx_b,
-            weight: 1.0,
-            tx_valid_from: None,
-            tx_valid_to: None,
-            business_valid_from: None,
-            business_valid_to: None,
-            source_doc_id: None,
-        });
+        inner
+            .pending_edges
+            .entry(idx_a)
+            .or_default()
+            .push(EdgePayload {
+                target: idx_b,
+                weight: 1.0,
+                tx_valid_from: None,
+                tx_valid_to: None,
+                business_valid_from: None,
+                business_valid_to: None,
+                source_doc_id: None,
+            });
         inner.pending_edge_count += 1;
 
         // (2) `outgoing_edges_mut(A)` aufrufen um den edge_store-Cache zu befüllen

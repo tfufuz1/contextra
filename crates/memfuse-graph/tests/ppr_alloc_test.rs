@@ -89,14 +89,18 @@ async fn test_ppr_alloc_reduction_100k_nodes() {
     // --- First run (fresh PprContext) ---
     let mut ctx = PprContext::new();
     reset_stats();
-    let res1 = graph.personalized_page_rank_with_context(&[seed], &config, &mut ctx);
+    let res1 = graph
+        .personalized_page_rank_with_context_async(&[seed], &config, &mut ctx)
+        .await;
     let (allocs_run1, bytes_run1) = get_stats();
 
     println!("Run 1 Allocs: {allocs_run1}, Bytes: {bytes_run1}");
 
     // --- Second run (reusing PprContext) ---
     reset_stats();
-    let res2 = graph.personalized_page_rank_with_context(&[seed], &config, &mut ctx);
+    let res2 = graph
+        .personalized_page_rank_with_context_async(&[seed], &config, &mut ctx)
+        .await;
     let (allocs_run2, bytes_run2) = get_stats();
 
     println!("Run 2 Allocs: {allocs_run2}, Bytes: {bytes_run2}");
