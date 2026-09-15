@@ -61,6 +61,7 @@ pub struct WorkflowState {
     /// Associated transaction.
     pub tx: TxId,
     /// Agent memory graph state footprint (BLAKE3 hash digest).
+    #[serde(with = "hex")]
     pub graph_hash: [u8; 32],
 }
 
