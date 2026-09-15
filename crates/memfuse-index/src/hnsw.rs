@@ -129,12 +129,7 @@ impl Default for HnswConfig {
 
 /// Validates that a vector is non-empty and contains no NaN or Infinite values.
 fn validate_vector(vec: &[f32]) -> Result<()> {
-    if vec.iter().any(|v| !v.is_finite()) {
-        return Err(MemFuseError::invalid_input(
-            "Invalid vector: NaN or Infinity detected",
-        ));
-    }
-    Ok(())
+    crate::distance::validate_vector(vec)
 }
 
 impl HnswConfig {
@@ -281,6 +276,14 @@ pub enum VectorData {
 }
 
 /// A node in the HNSW graph.
+///
+/// # Concurrency & Lock Context
+/// - `connections` uses `RwLock<Vec<Vec<u32>>>` per node (Option B) rather than per-layer locks,
+///   reducing total lock overhead from `N_nodes * max_layer` to `N_nodes`.
+/// - Search operations acquire `hot.nodes.read()` to look up nodes and `node.connections.read()`
+///   to traverse neighbors.
+/// - Incremental lazy neighbor pruning during search acquires `node.connections.write()`
+///   without needing `hot.write_mutex` or an exclusive lock on `hot.nodes`.
 #[derive(Debug)]
 pub struct HnswNode {
     doc_id: DocId,
@@ -354,7 +357,6 @@ pub struct HnswHotCore {
     pub ram_entry_point: RwLock<Option<usize>>,
     pub max_layer: AtomicU64,
     pub ml: f64,
-    pub deleted_nodes: RwLock<RoaringTreemap>,
     pub deleted_count: AtomicU64,
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
@@ -370,6 +372,7 @@ pub struct HnswColdCore {
     pub seq_log: RwLock<memfuse_core::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
+    pub deleted_nodes: RwLock<RoaringTreemap>,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
 }
@@ -397,7 +400,6 @@ impl HnswIndex {
                     ram_entry_point: RwLock::new(None),
                     max_layer: AtomicU64::new(0),
                     ml,
-                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
@@ -412,6 +414,7 @@ impl HnswIndex {
                     seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
@@ -440,7 +443,6 @@ impl HnswIndex {
                     ram_entry_point: RwLock::new(None),
                     max_layer: AtomicU64::new(0),
                     ml,
-                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
@@ -455,6 +457,7 @@ impl HnswIndex {
                     seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
@@ -543,7 +546,7 @@ impl HnswIndex {
         }
 
         let nodes = self.inner.hot.nodes.read();
-        let deleted = self.inner.hot.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
 
         let mut filter_eps = Vec::new();
         if let Some(f) = filter {
@@ -762,7 +765,7 @@ impl HnswIndex {
 
         let mut tombstone_map = ahash::AHashMap::new();
         let total_nodes = self.inner.hot.nodes.read().len();
-        let deleted_guard = self.inner.hot.deleted_nodes.read();
+        let deleted_guard = self.inner.cold.deleted_nodes.read();
 
         for i in 0..total_nodes {
             let id = i as u64;
@@ -817,7 +820,7 @@ impl HnswIndex {
     /// # FIND-DB-004: HNSW Repair Acceleration
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
         let map = self.inner.hot.doc_to_node.read();
-        let deleted = self.inner.hot.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
         map.iter()
             .filter(|(&_doc_id_raw, &node_idx)| !deleted.contains(node_idx as u64))
             .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw))
@@ -1252,7 +1255,7 @@ impl HnswIndexCore {
     ) -> Result<f32> {
         match data {
             VectorData::F32(v) => {
-                compute_distance(query_exact, v, self.cold.config.distance_metric)
+                compute_distance_trusted(query_exact, v, self.cold.config.distance_metric)
             }
             VectorData::U8(v) => {
                 let guard = self.cold.quantizer.read();
@@ -1483,6 +1486,9 @@ impl HnswIndexCore {
             }
         }
 
+        // Lock-hoisted: read deleted_nodes snapshot once before the search traversal loop.
+        let deleted_guard = self.cold.deleted_nodes.read();
+
         while let Some(Reverse(current)) = candidates.pop() {
             if let Some(worst_result) = results.peek() {
                 if current.distance > worst_result.distance && results.len() >= ef {
@@ -1491,7 +1497,6 @@ impl HnswIndexCore {
             }
 
             let connections = self.resolve_connections(current.index, layer, &ctx)?;
-            let deleted_guard = self.hot.deleted_nodes.read();
             let mut has_dead_neighbors = false;
 
             for &neighbor_u32 in connections.iter() {
@@ -2095,7 +2100,7 @@ impl HnswIndexCore {
     fn do_delete(&self, id: DocId) -> Result<()> {
         let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
         if let Some(idx) = node_idx {
-            self.hot.deleted_nodes.write().insert(idx as u64);
+            self.cold.deleted_nodes.write().insert(idx as u64);
             self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
 
             // ANCHOR[ALG-FIX:D2-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Entry-Point-Aktualisierung nach Delete (INV-HNSW-4)
@@ -2111,7 +2116,7 @@ impl HnswIndexCore {
                     .as_ref()
                     .map(|m| m.header.node_count() as usize)
                     .unwrap_or(0);
-                let deleted = self.hot.deleted_nodes.read();
+                let deleted = self.cold.deleted_nodes.read();
 
                 let mut best_node = None;
                 let mut best_ram_node = None;
@@ -2288,7 +2293,7 @@ impl HnswIndexCore {
             .unwrap_or(0);
 
         let nodes = self.hot.nodes.read();
-        let mut deleted_nodes = self.hot.deleted_nodes.write();
+        let mut deleted_nodes = self.cold.deleted_nodes.write();
 
         let mut tombstoned_in_region = Vec::new();
         for &node_id in &region_set {
@@ -2354,7 +2359,7 @@ impl HnswIndexCore {
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let deleted_nodes = self.hot.deleted_nodes.read();
+            let deleted_nodes = self.cold.deleted_nodes.read();
             let seq_log = self.cold.seq_log.read();
             let min_retention_seq = seq_log.min_retention_seq();
             let snapshot_tx = self.hot.last_tx_id.load(Ordering::SeqCst);
@@ -2556,7 +2561,7 @@ impl HnswIndexCore {
             let mut doc_to_node = self.hot.doc_to_node.write();
             let mut entry_point = self.hot.entry_point.write();
             let mut ram_entry_point = self.hot.ram_entry_point.write();
-            let mut deleted_nodes = self.hot.deleted_nodes.write();
+            let mut deleted_nodes = self.cold.deleted_nodes.write();
 
             let new_nodes = std::mem::take(&mut *new_index.inner.hot.nodes.write());
             let new_doc_to_node = std::mem::take(&mut *new_index.inner.hot.doc_to_node.write());
@@ -2591,7 +2596,7 @@ impl HnswIndexCore {
                     new_deleted.insert(del_idx);
                 }
             }
-            for del_idx in new_index.inner.hot.deleted_nodes.read().iter() {
+            for del_idx in new_index.inner.cold.deleted_nodes.read().iter() {
                 new_deleted.insert(del_idx);
             }
 
@@ -2734,7 +2739,7 @@ impl VectorIndex for HnswIndex {
         }
 
         let nodes = self.inner.hot.nodes.read();
-        let deleted = self.inner.hot.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
         let mut results = Vec::with_capacity(k);
 
         let ctx = SearchContext {
@@ -3039,7 +3044,7 @@ impl VectorIndex for HnswIndex {
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let mut deleted = self.inner.hot.deleted_nodes.write();
+            let mut deleted = self.inner.cold.deleted_nodes.write();
             for &idx in &indices_to_remove {
                 deleted.insert((mmap_count + idx) as u64);
             }
@@ -3078,7 +3083,7 @@ impl VectorIndex for HnswIndex {
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
-        let deleted = self.inner.hot.deleted_nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
 
         let ctx = SearchContext {
             nodes: &nodes,

@@ -67,15 +67,17 @@ use memfuse_core::{DistanceMetric, MemFuseError};
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-/// Computes distance between two vectors using the specified metric.
+/// Validates that a vector contains no NaN or Infinite values.
 #[inline]
-// AI-TAG[CONCURRENCY][MINOR][RESOLVED] AGT-INDEX-002 (TS:2026-09-01T23:05:53Z) (SESSION:297af137)
-// RESOLVED: Tracking-Entscheidung finalisiert. std::arch Intrinsics mit Runtime-Feature-Detection
-// (is_x86_feature_detected!, is_aarch64_feature_detected!) sind der korrekte stabile Pfad.
-// portable_simd (Issue #86656) wird re-evaluiert wenn es auf stable landet.
-// DECISION-REF: ADR-047 — SIMD-Strategie Finalisierung.
-// (TS:2026-09-03T00:00:00Z) (SESSION:b7e3f91a)
+pub fn validate_vector(vec: &[f32]) -> memfuse_core::Result<()> {
+    if vec.iter().any(|v| !v.is_finite()) {
+        return Err(MemFuseError::invalid_input("Vector contains NaN or Inf"));
+    }
+    Ok(())
+}
+
 pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> memfuse_core::Result<f32> {
+    validate_vector(a)?;
     compute_distance_trusted(a, b, metric)
 }
 
@@ -1932,25 +1934,6 @@ mod tests {
         assert!((v[1] - 0.8).abs() < 1e-6);
     }
 
-    #[allow(dead_code)]
-    trait TestIsErr {
-        fn is_err(&self) -> bool;
-    }
-    impl<T, E> TestIsErr for Result<T, E> {
-        fn is_err(&self) -> bool {
-            Result::is_err(self)
-        }
-    }
-    impl TestIsErr for u32 {
-        fn is_err(&self) -> bool {
-            false
-        }
-    }
-    impl TestIsErr for CosineSimilarityPartsU8 {
-        fn is_err(&self) -> bool {
-            false
-        }
-    }
 
     #[test]
     fn test_avx2_u8_unequal_length_no_oob() {
