@@ -50,12 +50,13 @@
 //! deduplicating key versions and garbage-collecting tombstones not pinned by active snapshots.
 //!
 //! ## `commit_mutex` Role
-//! `commit_mutex` serializes commits, ensuring that sequence number allocation, WAL logging,
-//! and MemTable updates are strictly atomic and sequential, preventing snapshot inversion.
+//! `commit_mutex` serializes sequence allocation and WAL batch preparation during commits, preventing
+//! snapshot inversion. In the group commit leader path, `commit_mutex` is released prior to executing physical
+//! disk I/O (`wal.append_batch`) and re-acquired on error for WAL rollback.
 //!
 //! ## Lock Hierarchy & Concurrency Control
 //! To prevent deadlocks, locks across the LSM storage engine must be acquired in the following order:
-//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during commit, rollback_to_tx, and state mutations.
+//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations. Released before disk I/O in group commit leader happy path.
 //! 2. `state` write lock (`tokio::sync::RwLock<LsmState>`) - Protects active/immutable memtable pointers & WAL.
 //! 3. `sstables` write lock (`tokio::sync::RwLock<Vec<Arc<SstableReader>>>`) - Protects SSTable set.
 //!    Read locks on `state` and `sstables` may be acquired concurrently without holding `commit_mutex`.
@@ -83,7 +84,7 @@ pub mod recovery;
 pub mod scan;
 
 #[cfg(test)]
-mod tests;
+mod concurrency_tests;
 
 use group_commit::{GroupCommitRequest, PendingCommitQueue, WalQueueGuard};
 use scan::{check_in_range, SstableScanMode};
@@ -785,14 +786,12 @@ impl StorageEngine for LsmStorage {
                 drop(queue_guard);
 
                 // INVARIANT-LOCK-3 (Group-Commit Read-Lock ist korrekt und beabsichtigt):
-                // Der Group-Commit-Leader hält hier `commit_mutex`. Dadurch ist garantiert, dass kein
-                // paralleler Single-Commit (der state.write() bräuchte) oder flush()-Swap (der state.write()
-                // bräuchte) concurrent abläuft. Read-Lock reicht, weil MemTable intern per
-                // parking_lot::RwLock granular synchronisiert (memtable.rs:35,60) — concurrent puts() sind
-                // threadsicher. Diese Asymmetrie (write im Single-, read im Group-Pfad) ist BEABSICHTIGT und
-                // darf nicht "vereinheitlicht" werden, ohne diese Analyse zu wiederholen.
-                // ⚠ WARNUNG: Diesen Lock NICHT auf state.write() ändern — das würde unter commit_mutex
-                // zu einem verschachtelten Write-Lock führen, der mit flush() deadlocken kann.
+                // Im Happy Path gibt der Group-Commit-Leader `commit_mutex` vor dem physischen
+                // Disk-I/O (`wal.append_batch`) frei. `state.read()` schützt die MemTable-Sichtbarkeit.
+                // Read-Lock reicht, weil MemTable intern per parking_lot::RwLock granular
+                // synchronisiert (memtable.rs) — concurrent puts() sind threadsicher.
+                // ⚠ WARNUNG: Diesen Lock NICHT auf state.write() ändern — das würde zu einem
+                // verschachtelten Write-Lock führen, der mit flush() deadlocken kann.
                 let wal = self.wal.read().await.clone();
 
                 // Combine leader's WAL entries with all follower WAL entries
@@ -801,7 +800,14 @@ impl StorageEngine for LsmStorage {
                     all_wal_entries.extend(r.wal_entries.clone());
                 }
 
+                // PERF-FIX: Release commit_mutex before disk I/O (fsync)
+                // This allows the next batch/commit to start sequence allocation and WAL preparation while fsync runs.
+                drop(_commit_lock);
+
                 if let Err(e) = wal.append_batch(all_wal_entries).await {
+                    // Re-acquire commit_mutex on error path to restore HMAC chain and execute rollback_to_tx_locked
+                    let _commit_lock = self.commit_mutex.lock().await;
+
                     let _ = wal.restore_last_hmac(pending_queue.first_prev_hmac).await;
 
                     let last_tx = TxId::new(self.last_committed_tx.load(Ordering::Acquire));

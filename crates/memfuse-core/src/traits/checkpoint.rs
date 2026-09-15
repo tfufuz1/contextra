@@ -1,12 +1,7 @@
-//! Abstract contracts for snapshot and checkpoint management.
-
-// FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
-// ZWECK: Checkpoint, CheckpointCoordinator & Snapshot Trait-Definitionen für Layer 0.
-// INVARIANTEN: Downward-only Trait interfaces; dyn-safety constraints in CheckpointCoordinator.
+//! Checkpoint and Snapshot subsystem trait definitions.
 
 use super::BoxFuture;
-use crate::types::{TxId, WorkflowState};
+use crate::types::*;
 use crate::Result;
 use std::future::Future;
 

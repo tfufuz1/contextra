@@ -17,6 +17,7 @@
 
 use crate::error::{MemFuseError, Result};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Serde helper module for `[u8; 32]` hex string serialization/deserialization.
 mod hex {
@@ -59,8 +60,7 @@ mod hex {
 pub struct WorkflowState {
     /// Associated transaction.
     pub tx: TxId,
-    /// Agent memory graph state footprint (BLAKE3 256-bit hash).
-    #[serde(with = "hex")]
+    /// Agent memory graph state footprint (BLAKE3 hash digest).
     pub graph_hash: [u8; 32],
 }
 
@@ -719,12 +719,12 @@ pub struct Entity {
     /// Unique entity ID.
     pub id: EntityId,
     /// Canonical human-readable name.
-    pub name: String,
+    pub name: Arc<str>,
     /// Categorical entity type.
-    pub entity_type: String,
+    pub entity_type: Arc<str>,
     /// Flexible key-value attribute metadata map.
     #[serde(default)]
-    pub attributes: std::collections::HashMap<String, serde_json::Value>,
+    pub attributes: ahash::AHashMap<String, serde_json::Value>,
 }
 
 impl Entity {
@@ -732,8 +732,8 @@ impl Entity {
     pub fn new(id: EntityId, name: impl Into<String>, entity_type: impl Into<String>) -> Self {
         Self {
             id,
-            name: name.into(),
-            entity_type: entity_type.into(),
+            name: name.into().into(),
+            entity_type: entity_type.into().into(),
             attributes: Default::default(),
         }
     }
@@ -761,8 +761,8 @@ impl Entity {
         }
         Ok(Self {
             id,
-            name: name_str,
-            entity_type: type_str,
+            name: name_str.into(),
+            entity_type: type_str.into(),
             attributes: Default::default(),
         })
     }
@@ -776,7 +776,7 @@ pub struct Edge {
     /// Destination entity identifier.
     pub to: EntityId,
     /// Relationship label.
-    pub label: String,
+    pub label: Arc<str>,
     /// Numeric relationship weight (default 1.0).
     pub weight: f32,
     /// Start of transaction validity (system time / MVCC); None = valid from beginning of transaction history.
@@ -802,7 +802,7 @@ impl Edge {
         Self {
             from,
             to,
-            label: label.into(),
+            label: label.into().into(),
             weight: 1.0,
             tx_valid_from: None,
             tx_valid_to: None,
@@ -842,7 +842,7 @@ impl Edge {
         Ok(Self {
             from,
             to,
-            label: label_str,
+            label: label_str.into(),
             weight,
             tx_valid_from: None,
             tx_valid_to: None,
@@ -1601,9 +1601,19 @@ mod tests {
 
     #[test]
     fn test_entity_and_edge() {
-        let entity = Entity::new(EntityId::new(1), "node1", "typeA");
+        let mut entity = Entity::new(EntityId::new(1), "node1", "typeA");
+        entity
+            .attributes
+            .insert("key1".to_string(), serde_json::json!("val1"));
         assert_eq!(entity.id.inner(), 1);
-        assert_eq!(entity.name, "node1");
+        assert_eq!(&*entity.name, "node1");
+        assert_eq!(&*entity.entity_type, "typeA");
+        assert_eq!(entity.attributes.get("key1"), Some(&serde_json::json!("val1")));
+
+        // Test Entity Serde roundtrip with Arc<str> and AHashMap
+        let entity_json = serde_json::to_string(&entity).expect("Entity serialization");
+        let deser_entity: Entity = serde_json::from_str(&entity_json).expect("Entity deserialization");
+        assert_eq!(entity, deser_entity);
 
         let edge = Edge::new(EntityId::new(1), EntityId::new(2), "rel")
             .with_weight(0.5)
@@ -1611,11 +1621,19 @@ mod tests {
             .with_business_validity(Some(1672531200000), Some(1767139200000));
         assert_eq!(edge.from.inner(), 1);
         assert_eq!(edge.to.inner(), 2);
+        assert_eq!(&*edge.label, "rel");
         assert_eq!(edge.weight, 0.5);
         assert_eq!(edge.tx_valid_from, Some(TxId::new(10)));
         assert_eq!(edge.tx_valid_to, Some(TxId::new(20)));
         assert_eq!(edge.business_valid_from, Some(1672531200000));
         assert_eq!(edge.business_valid_to, Some(1767139200000));
+
+        // Test Edge Serde roundtrip with Arc<str>
+        let edge_json = serde_json::to_string(&edge).expect("Edge serialization");
+        let deser_edge_rt: Edge = serde_json::from_str(&edge_json).expect("Edge deserialization");
+        assert_eq!(&*deser_edge_rt.label, "rel");
+        assert_eq!(deser_edge_rt.from, edge.from);
+        assert_eq!(deser_edge_rt.to, edge.to);
 
         // Test serde backward compatibility with legacy valid_from/valid_to keys
         let json_legacy =
@@ -1640,7 +1658,7 @@ mod tests {
         assert!(Entity::try_new(EntityId::new(1), "", "Person").is_err());
         assert!(Entity::try_new(EntityId::new(1), "Alice", "   ").is_err());
         let valid_ent = Entity::try_new(EntityId::new(1), "Alice", "Person").unwrap(); // unwrap
-        assert_eq!(valid_ent.name, "Alice");
+        assert_eq!(&*valid_ent.name, "Alice");
 
         assert!(Edge::try_new(EntityId::new(1), EntityId::new(2), "", 1.0).is_err());
         assert!(Edge::try_new(EntityId::new(1), EntityId::new(2), "KNOWS", f32::NAN).is_err());

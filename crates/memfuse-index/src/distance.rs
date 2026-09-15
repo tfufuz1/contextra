@@ -686,7 +686,7 @@ unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
 }
 
 /// Normalizes a vector in-place to unit length (L2 norm = 1.0).
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn normalize_inplace(v: &mut [f32]) {
     let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 0.0 {
@@ -698,7 +698,8 @@ pub(crate) fn normalize_inplace(v: &mut [f32]) {
 
 /// Computes the dot product of two u8 vectors.
 #[inline]
-#[allow(dead_code, unsafe_code)]
+#[cfg(test)]
+#[allow(unsafe_code)]
 pub(crate) fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, MemFuseError> {
     if a.len() != b.len() {
         return Err(MemFuseError::EmbeddingDimensionMismatch {
@@ -724,7 +725,7 @@ pub(crate) fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, MemFuseError> {
     Ok(dot_product_u8_scalar(a, b))
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn dot_product_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
     a.iter()
         .zip(b.iter())
@@ -734,7 +735,8 @@ pub(crate) fn dot_product_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
 
 /// Computes the squared Euclidean distance between two u8 vectors.
 #[inline]
-#[allow(dead_code, unsafe_code)]
+#[cfg(test)]
+#[allow(unsafe_code)]
 pub(crate) fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, MemFuseError> {
     if a.len() != b.len() {
         return Err(MemFuseError::EmbeddingDimensionMismatch {
@@ -760,7 +762,7 @@ pub(crate) fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, MemFus
     Ok(euclidean_distance_sq_u8_scalar(a, b))
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn euclidean_distance_sq_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
     a.iter()
         .zip(b.iter())
@@ -781,7 +783,8 @@ pub struct CosineSimilarityPartsU8 {
 
 /// Computes the parts required for cosine similarity between two u8 vectors.
 #[inline]
-#[allow(dead_code, unsafe_code)]
+#[cfg(test)]
+#[allow(unsafe_code)]
 pub(crate) fn cosine_similarity_parts_u8(
     a: &[u8],
     b: &[u8],
@@ -813,7 +816,7 @@ pub(crate) fn cosine_similarity_parts_u8(
     Ok(cosine_similarity_parts_u8_scalar(a, b))
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn cosine_similarity_parts_u8_scalar(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
     let mut dot = 0;
     let mut norm_a_sq = 0;
@@ -835,7 +838,7 @@ pub(crate) fn cosine_similarity_parts_u8_scalar(a: &[u8], b: &[u8]) -> CosineSim
 }
 
 /// Computes the dot product between an f32 vector and a u8 vector.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn dot_product_f32_u8(a: &[f32], b: &[u8]) -> f32 {
     a.iter().zip(b.iter()).map(|(&x, &y)| x * (y as f32)).sum()
 }
@@ -861,7 +864,7 @@ pub(crate) fn euclidean_distance_sq_f32_u8(
 }
 
 /// Parts required to compute asymmetric cosine similarity.
-#[allow(dead_code)]
+#[cfg(test)]
 #[derive(Debug, Clone, Copy)]
 pub struct CosineSimilarityPartsF32U8 {
     pub dot_f32_u8: f32,
@@ -870,7 +873,7 @@ pub struct CosineSimilarityPartsF32U8 {
 }
 
 /// Computes the parts required for asymmetric cosine similarity between an f32 and a u8 vector.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn cosine_similarity_parts_f32_u8(a: &[f32], b: &[u8]) -> CosineSimilarityPartsF32U8 {
     let mut dot_f32_u8 = 0.0;
     let mut sum_u8 = 0;
@@ -902,7 +905,7 @@ pub(crate) fn cosine_similarity_parts_f32_u8(a: &[f32], b: &[u8]) -> CosineSimil
 // BEGRÜNDUNG: Caller muss Hardware-Support garantieren.
 /// # Safety
 /// This function is unsafe because it uses AVX-512 VNNI intrinsics. The caller must ensure that the CPU supports AVX-512 VNNI.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     let n = a.len().min(b.len());
     let mut i = 0;
@@ -941,7 +944,7 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
 // BEGRÜNDUNG: Caller muss Hardware-Support garantieren.
 /// # Safety
 /// This function is unsafe because it uses AVX-512 intrinsics. The caller must ensure that the CPU supports AVX-512F and AVX-512BW.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
     let n = a.len().min(b.len());
     let mut i = 0;
@@ -993,7 +996,7 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 
 // BEGRÜNDUNG: Caller muss Hardware-Support garantieren.
 /// # Safety
 /// This function is unsafe because it uses AVX-512 VNNI intrinsics. The caller must ensure that the CPU supports AVX-512F, BW, and VNNI.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
     a: &[u8],
     b: &[u8],
@@ -1056,7 +1059,7 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
 #[allow(unsafe_code)]
 // SAFETY: Horizontal Sum epi32 AVX-512.
 // BEGRÜNDUNG: Caller muss Hardware-Support garantieren.
-#[allow(dead_code)]
+#[cfg(test)]
 unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
     // SAFETY: Standard AVX-512 to AVX2 reduction is safe on supported hardware.
     // BEGRÜNDUNG: Caller garantiert Support und korrekte bounds.
@@ -1080,7 +1083,7 @@ unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
 // BEGRÜNDUNG: Caller muss Hardware-Support garantieren. Dimensionen müssen gleich sein.
 /// # Safety
 /// This function is unsafe because it uses AVX2 intrinsics. The caller must ensure that the CPU supports AVX2.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let n = a.len().min(b.len());
     // SAFETY: n = a.len().min(b.len()) garantiert, dass alle Indexzugriffe auf
@@ -1131,7 +1134,7 @@ pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 // BEGRÜNDUNG: Caller muss Hardware-Support garantieren. Dimensionen müssen gleich sein.
 /// # Safety
 /// This function is unsafe because it uses AVX2 intrinsics. The caller must ensure that the CPU supports AVX2.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let n = a.len().min(b.len());
     // SAFETY: n = a.len().min(b.len()) garantiert, dass alle Indexzugriffe auf
@@ -1185,7 +1188,7 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 // BEGRÜNDUNG: Caller muss Hardware-Support garantieren. Dimensionen müssen gleich sein.
 /// # Safety
 /// This function is unsafe because it uses AVX2 intrinsics. The caller must ensure that the CPU supports AVX2.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(
     a: &[u8],
     b: &[u8],
@@ -1264,7 +1267,7 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(
 #[allow(unsafe_code)]
 // SAFETY: Horizontal Sum epi32.
 // BEGRÜNDUNG: Caller muss Hardware-Support garantieren.
-#[allow(dead_code)]
+#[cfg(test)]
 unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
     // SAFETY: AVX2 Reduktion.
     // BEGRÜNDUNG: Standard AVX2 Befehle zur horizontalen Reduktion.

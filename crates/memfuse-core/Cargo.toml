@@ -24,7 +24,7 @@ serde_json = { workspace = true }
 # Thread synchronization primitives for in-memory structures (e.g., SnapshotRegistry, TxBuffer).
 parking_lot = { workspace = true }
 # High-performance hashing for internal collections and buffers.
-ahash = { workspace = true }
+ahash = { workspace = true, features = ["serde"] }
 # Async trait object support (desugars async trait methods for dyn-compatibility).
 # Cryptographic hashing for deterministic key derivation (DocId/EntityId).
 blake3 = { workspace = true }
