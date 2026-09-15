@@ -101,6 +101,20 @@ mod tests {
         assert!(matches!(res, Err(MemFuseError::Serialization(_))));
     }
 
+    #[test]
+    fn test_manifest_creation_invalid_meta_name() {
+        let meta = CheckpointMeta {
+            name: "   ".to_string(),
+            collection_id: "col_valid".to_string(),
+            seq_no: 1,
+            tx_id: TxId::new(10),
+            metadata: serde_json::json!({}),
+            created_at: 100,
+        };
+        let res = CheckpointManifest::new(meta, vec!["comp1".to_string()]);
+        assert!(matches!(res, Err(MemFuseError::InvalidInput(_))));
+    }
+
     proptest::proptest! {
         #[test]
         fn prop_manifest_roundtrip(
