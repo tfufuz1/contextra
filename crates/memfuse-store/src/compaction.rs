@@ -166,7 +166,55 @@ impl CompactionEngine {
         )
         .await?;
 
-        // 4. Open the new SSTable
+        // Explicit fsync of output file and parent directory
+        crate::util::fsync_parent_dir(&output_path).await?;
+
+        // 4. Check consistency under read-lock before writing MANIFEST
+        let (all_present, insertion_point, old_paths) = {
+            let ssts = sstables.read().await;
+
+            let all_present = input_ssts
+                .iter()
+                .all(|inp| ssts.iter().any(|sst| Arc::ptr_eq(inp, sst)));
+
+            if !all_present {
+                (false, 0, Vec::new())
+            } else {
+                let insertion_point = ssts
+                    .iter()
+                    .position(|sst| input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)))
+                    .unwrap_or(ssts.len());
+
+                let old_paths: Vec<PathBuf> = input_ssts
+                    .iter()
+                    .filter_map(|inp| {
+                        ssts.iter()
+                            .find(|sst| Arc::ptr_eq(inp, sst))
+                            .map(|sst| sst.file_path().to_path_buf())
+                    })
+                    .collect();
+
+                (true, insertion_point as u64, old_paths)
+            }
+        };
+
+        if !all_present {
+            // Concurrent modification detected — abort compaction, clean up output file without writing MANIFEST entry
+            tracing::warn!(
+                "Compaction aborted: input SSTables modified during merge \
+                 (concurrent flush or rollback detected)"
+            );
+            if let Err(e) = tokio::fs::remove_file(&output_path).await {
+                tracing::warn!(
+                    "Failed to clean up aborted compaction output {:?}: {}",
+                    output_path,
+                    e
+                );
+            }
+            return Ok(false);
+        }
+
+        // Open the new SSTable reader
         let new_reader = Arc::new(
             SstableReader::open_with_key_manager(
                 &output_path,
@@ -176,45 +224,39 @@ impl CompactionEngine {
             .await?,
         );
 
-        // === SSTABLE MANIFEST INTEGRATION START ===
+        // 5. Write EXACTLY ONE atomic `Replace` entry to MANIFEST and fsync
         if let Some(ref manifest) = self.manifest {
             manifest
-                .append(&crate::manifest::ManifestEntry::Add {
-                    path: output_path.clone(),
-                    max_tx: new_reader.metadata().max_tx_id,
+                .append(&crate::manifest::ManifestEntry::Replace {
+                    removed: old_paths.clone(),
+                    added: output_path.clone(),
+                    added_max_tx: new_reader.metadata().max_tx_id,
+                    rank: insertion_point,
                 })
                 .await?;
         }
-        // === SSTABLE MANIFEST INTEGRATION END ===
 
-        // 5. Atomic swap under write-lock — identity-based (Arc::ptr_eq), not index-based.
-        // DECISION-REF: Replaces stale-index swap that was documented as
-        // AI-TAG[CONCURRENCY][CRITICAL] RESOLVED: AGT-STORE-002 — Indices computed before the lock was taken. (TS:2026-08-25T00:00:00Z)
-        // dropped could become invalid if a concurrent flush or rollback modifies the SSTable
-        // list. Arc::ptr_eq is immune to such reordering.
-        let old_paths: Vec<PathBuf> = {
+        // 6. In-memory SSTable swap under write-lock — mirroring already-persisted MANIFEST state
+        {
             let mut ssts = sstables.write().await;
 
-            // Verify all input SSTables are still present (concurrent flush/rollback safety)
-            let all_present = input_ssts
+            // Verify input SSTables are still present
+            let still_present = input_ssts
                 .iter()
                 .all(|inp| ssts.iter().any(|sst| Arc::ptr_eq(inp, sst)));
 
-            if !all_present {
-                // Concurrent modification detected — abort compaction, clean up output file
-                drop(ssts);
+            if still_present {
+                let insert_idx = (insertion_point as usize).min(ssts.len());
+                ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
+                let final_idx = insert_idx.min(ssts.len());
+                ssts.insert(final_idx, new_reader);
+            } else {
                 tracing::warn!(
-                    "Compaction aborted: input SSTables modified during merge \
-                     (concurrent flush or rollback detected)"
+                    "Input SSTables removed during MANIFEST write (rare concurrent modification) — replacing state from MANIFEST"
                 );
-                if let Err(e) = tokio::fs::remove_file(&output_path).await {
-                    tracing::warn!(
-                        "Failed to clean up aborted compaction output {:?}: {}",
-                        output_path,
-                        e
-                    );
-                }
-                return Ok(false);
+                ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
+                let final_idx = (insertion_point as usize).min(ssts.len());
+                ssts.insert(final_idx, new_reader);
             }
 
             // Find insertion point: position of the earliest input SSTable in current list
@@ -253,22 +295,8 @@ impl CompactionEngine {
             old_paths
         };
 
-        // 6. Delete old SSTable files (best-effort, outside lock)
-        // RESOLVED: .uuid-Sidecar wird jetzt analog zum WAL-Cleanup-Pfad (lsm.rs) mitgelöscht.
+        // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
-            // === SSTABLE MANIFEST INTEGRATION START ===
-            if let Some(ref manifest) = self.manifest {
-                if let Err(e) = manifest
-                    .append(&crate::manifest::ManifestEntry::Remove { path: path.clone() })
-                    .await
-                {
-                    tracing::warn!(
-                        "Failed to write Manifest Remove entry during compaction: {}",
-                        e
-                    );
-                }
-            }
-            // === SSTABLE MANIFEST INTEGRATION END ===
             if let Err(e) = tokio::fs::remove_file(path).await {
                 tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
             }

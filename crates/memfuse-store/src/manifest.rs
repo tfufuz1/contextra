@@ -5,7 +5,6 @@
 // INVARIANTEN: fsync NACH jedem Manifest-Eintrag; Add erst nach fsync der SSTable-Datei.
 
 use memfuse_core::{MemFuseError, Result};
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -21,6 +20,13 @@ pub enum ManifestEntry {
     Remove { path: PathBuf },
     /// A transaction rollback operation completed.
     RollbackComplete { target_tx: u64 },
+    /// An atomic replacement of multiple input SSTables by a single compacted output SSTable.
+    Replace {
+        removed: Vec<PathBuf>,
+        added: PathBuf,
+        added_max_tx: u64,
+        rank: u64,
+    },
 }
 
 impl ManifestEntry {
@@ -46,6 +52,27 @@ impl ManifestEntry {
             ManifestEntry::RollbackComplete { target_tx } => {
                 payload.push(2u8); // op_tag = 2
                 payload.extend_from_slice(&target_tx.to_le_bytes());
+            }
+            ManifestEntry::Replace {
+                removed,
+                added,
+                added_max_tx,
+                rank,
+            } => {
+                payload.push(3u8); // op_tag = 3
+                payload.extend_from_slice(&added_max_tx.to_le_bytes());
+                payload.extend_from_slice(&rank.to_le_bytes());
+                let added_str = added.to_string_lossy();
+                let added_bytes = added_str.as_bytes();
+                payload.extend_from_slice(&(added_bytes.len() as u32).to_le_bytes());
+                payload.extend_from_slice(added_bytes);
+                payload.extend_from_slice(&(removed.len() as u32).to_le_bytes());
+                for p in removed {
+                    let p_str = p.to_string_lossy();
+                    let p_bytes = p_str.as_bytes();
+                    payload.extend_from_slice(&(p_bytes.len() as u32).to_le_bytes());
+                    payload.extend_from_slice(p_bytes);
+                }
             }
         }
 
@@ -155,6 +182,82 @@ impl ManifestEntry {
                         MemFuseError::Serialization("Invalid target_tx format".into())
                     })?);
                 Ok(ManifestEntry::RollbackComplete { target_tx })
+            }
+            3 => {
+                // Replace
+                if remaining.len() < 24 {
+                    return Err(MemFuseError::Serialization(
+                        "Replace payload header too short".into(),
+                    ));
+                }
+                let added_max_tx =
+                    u64::from_le_bytes(remaining[0..8].try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid added_max_tx format".into())
+                    })?);
+                let rank =
+                    u64::from_le_bytes(remaining[8..16].try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid rank format".into())
+                    })?);
+                let added_path_len =
+                    u32::from_le_bytes(remaining[16..20].try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid added_path_len format".into())
+                    })?) as usize;
+                let mut offset = 20;
+                if remaining.len() < offset + added_path_len {
+                    return Err(MemFuseError::Serialization(
+                        "Replace added path data truncated".into(),
+                    ));
+                }
+                let added_str = std::str::from_utf8(&remaining[offset..offset + added_path_len])
+                    .map_err(|e| {
+                        MemFuseError::Serialization(format!("Invalid added path UTF-8: {}", e))
+                    })?;
+                let added = PathBuf::from(added_str);
+                offset += added_path_len;
+
+                if remaining.len() < offset + 4 {
+                    return Err(MemFuseError::Serialization(
+                        "Replace removed count truncated".into(),
+                    ));
+                }
+                let removed_count =
+                    u32::from_le_bytes(remaining[offset..offset + 4].try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid removed_count format".into())
+                    })?) as usize;
+                offset += 4;
+
+                let mut removed = Vec::with_capacity(removed_count);
+                for _ in 0..removed_count {
+                    if remaining.len() < offset + 4 {
+                        return Err(MemFuseError::Serialization(
+                            "Replace removed path length truncated".into(),
+                        ));
+                    }
+                    let r_len = u32::from_le_bytes(
+                        remaining[offset..offset + 4]
+                            .try_into()
+                            .map_err(|_| MemFuseError::Serialization("Invalid r_len format".into()))?,
+                    ) as usize;
+                    offset += 4;
+                    if remaining.len() < offset + r_len {
+                        return Err(MemFuseError::Serialization(
+                            "Replace removed path data truncated".into(),
+                        ));
+                    }
+                    let r_str =
+                        std::str::from_utf8(&remaining[offset..offset + r_len]).map_err(|e| {
+                            MemFuseError::Serialization(format!("Invalid removed path UTF-8: {}", e))
+                        })?;
+                    removed.push(PathBuf::from(r_str));
+                    offset += r_len;
+                }
+
+                Ok(ManifestEntry::Replace {
+                    removed,
+                    added,
+                    added_max_tx,
+                    rank,
+                })
             }
             _ => Err(MemFuseError::Serialization(format!(
                 "Unknown Manifest op tag: {}",
@@ -298,11 +401,20 @@ impl Manifest {
             }
 
             let len = u32::from_le_bytes(len_bytes) as usize;
-            if len > MAX_MANIFEST_ENTRY_SIZE as usize || pos + 4 + len as u64 > file_size {
+            if len > MAX_MANIFEST_ENTRY_SIZE as usize {
+                return Err(MemFuseError::Storage(format!(
+                    "MANIFEST entry length ({}) exceeds max size ({}) at offset {}",
+                    len, MAX_MANIFEST_ENTRY_SIZE, pos
+                )));
+            }
+
+            if pos + 4 + len as u64 > file_size {
+                // Legitimate tail-truncation after crash during write
                 tracing::warn!(
-                    "MANIFEST truncation or corrupt entry length ({}) at offset {}",
+                    "MANIFEST tail truncation detected at offset {} (expected record len {} exceeds file size {}) — breaking load loop",
+                    pos,
                     len,
-                    pos
+                    file_size
                 );
                 break;
             }
@@ -315,22 +427,23 @@ impl Manifest {
                     break;
                 }
                 Err(e) => {
-                    tracing::warn!("MANIFEST read error at offset {}: {}", pos, e);
-                    break;
+                    return Err(MemFuseError::Storage(format!(
+                        "MANIFEST read error at offset {}: {}",
+                        pos, e
+                    )));
                 }
             }
 
+            let entry_pos = pos;
             pos += 4 + len as u64;
 
             match ManifestEntry::from_bytes(&entry_raw) {
                 Ok(entry) => entries.push(entry),
                 Err(e) => {
-                    tracing::warn!(
-                        "MANIFEST entry corruption at offset {}: {} — discarding tail",
-                        pos,
-                        e
-                    );
-                    break;
+                    return Err(MemFuseError::Storage(format!(
+                        "MANIFEST entry corruption at offset {}: {}",
+                        entry_pos, e
+                    )));
                 }
             }
         }
@@ -338,10 +451,12 @@ impl Manifest {
         Ok(entries)
     }
 
-    /// Reconstructs the set of currently valid SSTable file names (or path components)
-    /// from a sequence of manifest entries by applying `Add` and `Remove` operations sequentially.
-    pub fn reconstruct_valid_sstables(entries: &[ManifestEntry]) -> HashSet<PathBuf> {
-        let mut valid = HashSet::new();
+    /// Reconstructs the ordered list of currently valid SSTable file names (or path components)
+    /// and their rank (shadowing order: smaller rank = older) from a sequence of manifest entries.
+    pub fn reconstruct_valid_sstables(entries: &[ManifestEntry]) -> Vec<(PathBuf, u64)> {
+        let mut valid_map = std::collections::HashMap::new();
+        let mut next_rank = 0u64;
+
         for entry in entries {
             match entry {
                 ManifestEntry::Add { path, .. } => {
@@ -349,19 +464,45 @@ impl Manifest {
                         .file_name()
                         .map(PathBuf::from)
                         .unwrap_or_else(|| path.clone());
-                    valid.insert(key);
+                    valid_map.insert(key, next_rank);
+                    next_rank += 1;
                 }
                 ManifestEntry::Remove { path } => {
                     let key = path
                         .file_name()
                         .map(PathBuf::from)
                         .unwrap_or_else(|| path.clone());
-                    valid.remove(&key);
+                    valid_map.remove(&key);
                 }
                 ManifestEntry::RollbackComplete { .. } => {}
+                ManifestEntry::Replace {
+                    removed,
+                    added,
+                    rank,
+                    ..
+                } => {
+                    for p in removed {
+                        let key = p
+                            .file_name()
+                            .map(PathBuf::from)
+                            .unwrap_or_else(|| p.clone());
+                        valid_map.remove(&key);
+                    }
+                    let key = added
+                        .file_name()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| added.clone());
+                    valid_map.insert(key, *rank);
+                    if *rank >= next_rank {
+                        next_rank = rank + 1;
+                    }
+                }
             }
         }
-        valid
+
+        let mut sorted: Vec<(PathBuf, u64)> = valid_map.into_iter().collect();
+        sorted.sort_by_key(|(_, rank)| *rank);
+        sorted
     }
 
     pub fn path(&self) -> &Path {
@@ -385,6 +526,15 @@ mod tests {
                 path: PathBuf::from("sst-00000000000000000001-000000.sst"),
             },
             ManifestEntry::RollbackComplete { target_tx: 100 },
+            ManifestEntry::Replace {
+                removed: vec![
+                    PathBuf::from("sst-00000000000000000001-000000.sst"),
+                    PathBuf::from("sst-00000000000000000002-000000.sst"),
+                ],
+                added: PathBuf::from("sst-compact-00000000000000000003-0000.sst"),
+                added_max_tx: 50,
+                rank: 1,
+            },
         ];
 
         for entry in entries {
@@ -424,13 +574,11 @@ mod tests {
             .await
             .expect("write corrupted file");
 
-        let loaded = Manifest::load(&manifest_path).await.expect("load manifest");
-        assert_eq!(
-            loaded.len(),
-            1,
-            "Should recover entry 1 and stop before corrupted entry 2"
+        let loaded_res = Manifest::load(&manifest_path).await;
+        assert!(
+            loaded_res.is_err(),
+            "Internal corruption in MANIFEST must return Err instead of silent degradation"
         );
-        assert_eq!(loaded[0], entry1);
     }
 
     #[tokio::test]
@@ -487,12 +635,16 @@ mod tests {
                 path: PathBuf::from("sst-3.sst"),
                 max_tx: 30,
             },
+            ManifestEntry::Replace {
+                removed: vec![PathBuf::from("sst-2.sst"), PathBuf::from("sst-3.sst")],
+                added: PathBuf::from("sst-compact-1.sst"),
+                added_max_tx: 30,
+                rank: 1,
+            },
         ];
 
         let valid = Manifest::reconstruct_valid_sstables(&entries);
-        assert!(!valid.contains(Path::new("sst-1.sst")));
-        assert!(valid.contains(Path::new("sst-2.sst")));
-        assert!(valid.contains(Path::new("sst-3.sst")));
-        assert_eq!(valid.len(), 2);
+        assert_eq!(valid.len(), 1);
+        assert_eq!(valid[0], (PathBuf::from("sst-compact-1.sst"), 1));
     }
 }
