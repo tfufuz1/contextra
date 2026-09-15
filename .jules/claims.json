@@ -1,10 +1,10 @@
 {
   "claims": [
     {
-      "krate": "memfuse-router",
-      "issue": "FIX-ROUTER-1-docs",
-      "timestamp": "2026-09-12T13:46:07.517649038+00:00",
-      "session_id": "9821766463430893175",
+      "krate": "memfuse-candle",
+      "issue": "JULES-20260915-MEMFUSECAN-TEST-XSAL",
+      "timestamp": "2026-09-15T16:20:59.254583793+00:00",
+      "session_id": "2595808727786483798",
       "active": false,
       "expires_at": "2026-09-12T17:46:07.517633575+00:00",
       "released_at": "2026-09-12T13:52:32.403973247+00:00"
@@ -62,6 +62,51 @@
       "active": false,
       "expires_at": "2026-09-15T18:41:42.693675252+00:00",
       "released_at": "2026-09-15T14:50:31.257041469+00:00"
+    },
+    {
+<<<<<<< HEAD
+      "krate": "memfuse-checkpoint",
+      "issue": "JULES-20260915-MEMFUSECHE-TEST-UVNG",
+      "timestamp": "2026-09-15T15:54:43.274738223+00:00",
+      "session_id": "5973714571352502155",
+      "active": false,
+      "expires_at": "2026-09-15T19:54:43.274721930+00:00",
+      "released_at": "2026-09-15T16:09:10.966303390+00:00"
+      "krate": "memfuse-router",
+      "issue": "JULES-20260915-MEMFUSEROU-DEEP-ILH7",
+      "timestamp": "2026-09-15T16:04:39.709757734+00:00",
+      "session_id": "4350041739732073727",
+      "active": true,
+      "expires_at": "2026-09-15T20:04:39.709738134+00:00"
+      "krate": "memfuse-ollama",
+      "issue": "JULES-20260915-MEMFUSEOLL-TEST-VF9G",
+      "timestamp": "2026-09-15T16:00:25.034851728+00:00",
+      "session_id": "2432509696717743690",
+      "active": false,
+      "expires_at": "2026-09-15T20:00:25.034832481+00:00",
+      "released_at": "2026-09-15T16:23:49.556322973+00:00"
+      "krate": "memfuse-router",
+      "issue": "JULES-20260915-MEMFUSEROU-TEST-K4A0",
+      "timestamp": "2026-09-15T15:59:07.238163639+00:00",
+      "session_id": "4050058354796875230",
+      "active": true,
+      "expires_at": "2026-09-15T19:59:07.238146683+00:00"
+      "krate": "memfuse-core",
+      "issue": "JULES-20260915-MEMFUSECOR-TEST-ABGJ",
+      "timestamp": "2026-09-15T15:57:12.077907881+00:00",
+      "session_id": "14825362975822341207",
+      "active": false,
+      "expires_at": "2026-09-15T19:57:12.077892145+00:00",
+      "released_at": "2026-09-15T16:15:25.323409438+00:00"
+=======
+      "krate": "memfuse-store",
+      "issue": "JULES-20260915-MEMFUSESTO-TEST-BC0N",
+      "timestamp": "2026-09-15T16:11:01.649235047+00:00",
+      "session_id": "11038523247727605286",
+      "active": false,
+      "expires_at": "2026-09-15T20:11:01.649221122+00:00",
+      "released_at": "2026-09-15T16:46:05.643790581+00:00"
+>>>>>>> dd1c2eb (memfuse-store: fix TOCTOU race condition in WAL truncate size ordering)
     }
   ]
 }
