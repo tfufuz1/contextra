@@ -1058,7 +1058,7 @@ macro_rules! memfuse_batch_methods {
 /// Hält starke Arc-Referenzen, damit die Weak-Pointer in `MemFuse.set_router()` etc.
 /// nicht sofort droppen. Analog zu `RoutingHandle` in memfuse-mcp.
 struct PyRoutingHandle {
-    _router: Arc<memfuse_router::RouterEngine>,
+    _router: Arc<memfuse_router::DefaultRouterEngine>,
     _calibrator: Arc<parking_lot::Mutex<memfuse_calibration::IsotonicCalibrator>>,
     _pid_controller: Arc<parking_lot::Mutex<memfuse_calibration::PidController>>,
 }
@@ -1413,7 +1413,7 @@ mod tests {
 
         std::env::set_var("MEMFUSE_WORKER_THREADS", "invalid");
         let val = parse_worker_threads_env();
-        assert!(val >= 1 && val <= 256);
+        assert!((1..=256).contains(&val));
 
         std::env::remove_var("MEMFUSE_WORKER_THREADS");
     }

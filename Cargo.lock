@@ -2280,7 +2280,7 @@ dependencies = [
  "futures-util",
  "memfuse-calibration",
  "memfuse-core",
- "memfuse-security",
+ "memfuse-crypto",
  "proptest",
  "serde",
  "sha2",
@@ -2335,6 +2335,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-crypto"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm-siv",
+ "ahash",
+ "bincode",
+ "blake3",
+ "criterion",
+ "hkdf",
+ "hmac",
+ "loom",
+ "lru",
+ "memfuse-core",
+ "memfuse-crypto",
+ "parking_lot",
+ "proptest",
+ "rand 0.8.8",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "memfuse-db"
 version = "0.1.0"
 dependencies = [
@@ -2346,11 +2375,11 @@ dependencies = [
  "memfuse-candle",
  "memfuse-checkpoint",
  "memfuse-core",
+ "memfuse-crypto",
  "memfuse-embed",
  "memfuse-graph",
  "memfuse-index",
  "memfuse-ollama",
- "memfuse-security",
  "memfuse-store",
  "memfuse-text",
  "parking_lot",
@@ -2414,7 +2443,7 @@ dependencies = [
  "criterion",
  "loom",
  "memfuse-core",
- "memfuse-security",
+ "memfuse-crypto",
  "memmap2",
  "parking_lot",
  "proptest",
@@ -2436,11 +2465,11 @@ dependencies = [
  "memfuse-calibration",
  "memfuse-candle",
  "memfuse-core",
+ "memfuse-crypto",
  "memfuse-db",
  "memfuse-embed",
  "memfuse-ollama",
  "memfuse-router",
- "memfuse-security",
  "parking_lot",
  "rand 0.8.8",
  "serde",
@@ -2485,8 +2514,11 @@ dependencies = [
  "criterion",
  "memfuse-core",
  "memfuse-db",
+ "memfuse-graph",
+ "memfuse-index",
  "memfuse-ollama",
  "memfuse-store",
+ "memfuse-text",
  "parking_lot",
  "proptest",
  "serde",
@@ -2514,35 +2546,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-security"
-version = "0.1.0"
-dependencies = [
- "aes-gcm-siv",
- "ahash",
- "bincode",
- "blake3",
- "criterion",
- "hkdf",
- "hmac",
- "loom",
- "lru",
- "memfuse-core",
- "memfuse-security",
- "parking_lot",
- "proptest",
- "rand 0.8.8",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "subtle",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
 name = "memfuse-store"
 version = "0.1.0"
 dependencies = [
@@ -2552,7 +2555,7 @@ dependencies = [
  "criterion",
  "lru",
  "memfuse-core",
- "memfuse-security",
+ "memfuse-crypto",
  "memmap2",
  "parking_lot",
  "proptest",

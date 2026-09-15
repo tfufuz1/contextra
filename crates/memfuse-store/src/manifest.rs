@@ -424,16 +424,7 @@ impl Manifest {
                 )));
             }
 
-            if pos + 4 + len as u64 > file_size {
-                // Legitimate tail-truncation after crash during write
-                tracing::warn!(
-                    "MANIFEST tail truncation detected at offset {} (expected record len {} exceeds file size {}) — breaking load loop",
-                    pos,
-                    len,
-                    file_size
-                );
-                break;
-            }
+            let is_tail = pos + 4 + len as u64 > file_size;
 
             let mut entry_raw = vec![0u8; len];
             match reader.read_exact(&mut entry_raw).await {
@@ -445,12 +436,13 @@ impl Manifest {
                     );
                     break;
                 }
-                Err(e) => {
-                    return Err(MemFuseError::Storage(format!(
+            } else {
+                read_res.map_err(|e| {
+                    MemFuseError::Storage(format!(
                         "MANIFEST read error at offset {}: {}",
                         pos, e
-                    )));
-                }
+                    ))
+                })?;
             }
 
             let entry_pos = pos;

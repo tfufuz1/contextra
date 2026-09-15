@@ -42,7 +42,7 @@
 // HOTSPOTS:   greedy_search(), insert(), search_at(), trigger_rebuild_async()
 // SIEHE AUCH:  rules/simd_safety.md, ADR-017, ADR-034
 
-use crate::distance::compute_distance_trusted;
+use crate::distance::{compute_distance, compute_distance_trusted};
 use ahash::{AHashMap, AHashSet};
 use memfuse_core::{
     DistanceMetric, DocId, IndexOp, MemFuseError, Result, ScoredDocument, TxBuffer, TxId,
@@ -1486,8 +1486,8 @@ impl HnswIndexCore {
             }
         }
 
-        // Lock-hoisted: read deleted_nodes snapshot once before the search traversal loop.
-        let deleted_guard = self.cold.deleted_nodes.read();
+        // NOTE: deleted_snapshot is taken at search start. Concurrent deletes during this search are not reflected — this is intentional for search consistency.
+        let deleted_snapshot = self.hot.deleted_nodes.read();
 
         while let Some(Reverse(current)) = candidates.pop() {
             if let Some(worst_result) = results.peek() {
@@ -1501,7 +1501,7 @@ impl HnswIndexCore {
 
             for &neighbor_u32 in connections.iter() {
                 let neighbor = neighbor_u32 as usize;
-                if deleted_guard.contains(neighbor as u64) {
+                if deleted_snapshot.contains(neighbor as u64) {
                     self.cold.visited_dead_nodes.fetch_add(1, Ordering::Relaxed);
                     has_dead_neighbors = true;
                 }
@@ -1540,7 +1540,7 @@ impl HnswIndexCore {
                     let mut conns_guard = node.connections.write();
                     if let Some(layer_conns) = conns_guard.get_mut(layer) {
                         layer_conns.retain(|&neighbor_u32| {
-                            if !deleted_guard.contains(neighbor_u32 as u64) {
+                            if !deleted_snapshot.contains(neighbor_u32 as u64) {
                                 true
                             } else if let Some(min_ret_seq) = min_retention_seq {
                                 let neighbor_idx = neighbor_u32 as usize;

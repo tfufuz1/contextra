@@ -105,11 +105,10 @@ fn check_src_dir(src_dir: &Path, unreachable: &mut Vec<String>) {
             } else {
                 // z.B. src/a/b/mod.rs -> Modulname "b", Elterndatei src/a.rs oder src/a/mod.rs
                 mod_name = components[components.len() - 2];
-                let parent_dir = src_dir.join(PathBuf::from_iter(&components[..components.len() - 2]));
-                candidate_parents = vec![
-                    parent_dir.with_extension("rs"),
-                    parent_dir.join("mod.rs"),
-                ];
+                let parent_dir =
+                    src_dir.join(PathBuf::from_iter(&components[..components.len() - 2]));
+                candidate_parents =
+                    vec![parent_dir.with_extension("rs"), parent_dir.join("mod.rs")];
             }
         } else {
             mod_name = file_name.strip_suffix(".rs").unwrap_or(file_name);
@@ -118,11 +117,10 @@ fn check_src_dir(src_dir: &Path, unreachable: &mut Vec<String>) {
                 candidate_parents = vec![src_dir.join("lib.rs"), src_dir.join("main.rs")];
             } else {
                 // z.B. src/a/b.rs -> Modulname "b", Elterndatei src/a.rs oder src/a/mod.rs
-                let parent_dir = src_dir.join(PathBuf::from_iter(&components[..components.len() - 1]));
-                candidate_parents = vec![
-                    parent_dir.with_extension("rs"),
-                    parent_dir.join("mod.rs"),
-                ];
+                let parent_dir =
+                    src_dir.join(PathBuf::from_iter(&components[..components.len() - 1]));
+                candidate_parents =
+                    vec![parent_dir.with_extension("rs"), parent_dir.join("mod.rs")];
             }
         }
 

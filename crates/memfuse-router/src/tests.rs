@@ -17,6 +17,93 @@ mod tests {
     use serde_json::json;
     use std::sync::Arc;
 
+    struct MockStorageEngine;
+
+    impl StorageEngine for MockStorageEngine {
+        fn get<'a>(&'a self, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn put<'a>(&'a self, _: memfuse_core::TxId, _: &'a [u8], _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn delete<'a>(&'a self, _: memfuse_core::TxId, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn commit<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback_to_tx<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn flush<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::StorageStats>> {
+            Box::pin(async move {
+                Ok(memfuse_core::StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn last_seq_no<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<u64>> {
+            Box::pin(async move { Ok(0) })
+        }
+        fn last_tx_id<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::TxId>> {
+            Box::pin(async move { Ok(memfuse_core::TxId(0)) })
+        }
+        fn pin_checkpoint<'a>(&'a self, _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(&'a self, _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan_prefix<'a>(&'a self, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+        fn scan<'a>(&'a self, _: std::ops::Bound<&'a [u8]>, _: std::ops::Bound<&'a [u8]>, _: Option<usize>) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_instantiation_with_mock_storage() {
+        let storage = Arc::new(MockStorageEngine);
+        let mut hnsw_config = memfuse_index::HnswConfig::default();
+        hnsw_config.dimension = 4;
+        let hnsw = Arc::new(memfuse_index::HnswIndex::try_new(hnsw_config).unwrap());
+        let graph = Arc::new(memfuse_graph::CsrGraph::new());
+        let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
+        let collection = Arc::new(memfuse_db::Collection::new(
+            "test_collection".to_string(),
+            storage,
+            hnsw,
+            graph,
+            next_tx,
+            4,
+            memfuse_text::Language::English,
+        ));
+
+        let profile = SlmProfile::new(
+            "mock-slm",
+            "http://localhost:8000",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.5,
+        );
+
+        let router = RouterEngine::new(collection, vec![profile], None);
+        assert_eq!(router.profiles().len(), 1);
+        assert_eq!(router.profiles()[0].name, "mock-slm");
+    }
+
     #[tokio::test]
     async fn test_route_deterministic_community_assignment() {
         let dir = tempfile::tempdir().unwrap(); // unwrap
