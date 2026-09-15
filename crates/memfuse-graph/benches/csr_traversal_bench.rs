@@ -6,6 +6,7 @@ use tokio::runtime::Runtime;
 
 // Helper trait to support benchmark invocation syntax `graph.bfs(...)` and `graph.get_neighbors(...)`
 pub trait CsrGraphBenchExt {
+    #[allow(clippy::type_complexity)]
     fn bfs(
         &self,
         doc_id: DocId,
