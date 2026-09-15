@@ -1078,7 +1078,7 @@ impl StorageEngine for LsmStorage {
                 debug_assert!(
                     sstables.windows(2).all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
                         <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
-                    "SSTable list must be sorted ascending by max_seq after flush"
+                    "SSTable list must be sorted by max_seq in ascending order after flush"
                 );
 
                 drop(sstables);
