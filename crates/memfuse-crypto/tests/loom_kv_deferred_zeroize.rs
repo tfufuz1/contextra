@@ -136,8 +136,8 @@ mod loom_tests {
 #[cfg(test)]
 mod normal_tests {
     use memfuse_core::TenantId;
-    use memfuse_security::kv_segment::segment::KvSegment;
-    use memfuse_security::kv_segment::store::TenantIsolatedKvStore;
+    use memfuse_crypto::kv_segment::segment::KvSegment;
+    use memfuse_crypto::kv_segment::store::TenantIsolatedKvStore;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::thread;

@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use memfuse_core::TxId;
-use memfuse_security::crypto::KeyManager;
+use memfuse_crypto::crypto::KeyManager;
 use memfuse_store::wal::{Wal, WalOp};
 use std::sync::Arc;
 use tempfile::TempDir;

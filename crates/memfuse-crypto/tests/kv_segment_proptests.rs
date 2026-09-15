@@ -3,7 +3,7 @@
 // STAND: TS:2026-09-09T13:17:00Z (SESSION: a413a598)
 
 use memfuse_core::TenantId;
-use memfuse_security::kv_segment::{KvSegment, TenantIsolatedKvStore};
+use memfuse_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use proptest::prelude::*;
 use std::collections::HashSet;
 use std::mem::ManuallyDrop;

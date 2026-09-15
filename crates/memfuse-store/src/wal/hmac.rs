@@ -281,8 +281,8 @@ mod tests {
     use super::*;
     use crate::wal::Wal;
     use memfuse_core::TxId;
-    use memfuse_security::crypto::KeyManager;
-    use memfuse_security::wal_crypto::WalHmac;
+    use memfuse_crypto::crypto::KeyManager;
+    use memfuse_crypto::wal_crypto::WalHmac;
     use std::sync::Arc;
     use tempfile::tempdir;
     use tokio::fs;

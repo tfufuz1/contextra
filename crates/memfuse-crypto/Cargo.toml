@@ -1,5 +1,5 @@
 [package]
-name = "memfuse-security"
+name = "memfuse-crypto"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -33,7 +33,7 @@ kv-encryption = []
 cloud-egress-guard = []
 
 [dev-dependencies]
-memfuse-security = { path = ".", features = ["test-utils"] }
+memfuse-crypto = { path = ".", features = ["test-utils"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
 criterion = { workspace = true }

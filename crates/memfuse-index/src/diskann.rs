@@ -584,7 +584,7 @@ impl DiskAnnIndex {
             entry_bytes.extend_from_slice(&val.to_le_bytes());
         }
 
-        let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
         hmac.update(&entry_bytes);
         let computed_hmac = hmac.finalize();
 
@@ -688,7 +688,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
             hmac.update(&buf_id);
             hmac.update(&buf_dim);
             hmac.update(&vec_bytes);
@@ -1304,7 +1304,7 @@ impl DiskAnnIndex {
             q_max,
         };
 
-        let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
@@ -1450,7 +1450,7 @@ impl DiskAnnIndex {
                         MemFuseError::Storage("DiskANN payload slice out of bounds".into())
                     })?;
 
-                let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+                let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
                 hmac.update(payload);
                 let computed_hmac = hmac.finalize();
 
@@ -2319,7 +2319,7 @@ mod tests {
             .copy_from_slice(&corrupt_count.to_le_bytes());
 
         // Recompute HMAC for the modified payload so header & footer integrity passes, allowing load_node to test node parsing
-        let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
         let footer_start = data.len() - DiskAnnFooter::SIZE;
         hmac.update(&data[..footer_start]);
         let computed = hmac.finalize();
@@ -2764,7 +2764,7 @@ mod tests {
         assert_eq!(&footer.magic, DISKANN_FOOTER_MAGIC);
 
         // Verify HMAC calculation over payload
-        let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
         let payload = &file_bytes[..file_bytes.len() - DiskAnnFooter::SIZE];
         hmac.update(payload);
         let expected_hmac = hmac.finalize();

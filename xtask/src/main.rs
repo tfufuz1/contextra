@@ -3475,7 +3475,7 @@ description = "Core crate"
             ("memfuse-calibration", 2),
             ("memfuse-candle", 3),
             ("memfuse-checkpoint", 2),
-            ("memfuse-security", 2),
+            ("memfuse-crypto", 2),
             ("memfuse-graph", 2),
             ("memfuse-text", 2),
             ("memfuse-embed", 4),

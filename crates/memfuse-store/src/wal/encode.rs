@@ -1,5 +1,5 @@
 use memfuse_core::{MemFuseError, Result, TxId};
-use memfuse_security::wal_crypto::WalHmac;
+use memfuse_crypto::wal_crypto::WalHmac;
 
 use super::MAX_WAL_ENTRY_SIZE;
 
@@ -366,7 +366,7 @@ impl WalEntry {
 mod tests {
     use super::*;
     use crate::wal::Wal;
-    use memfuse_security::crypto::KeyManager;
+    use memfuse_crypto::crypto::KeyManager;
     use std::sync::Arc;
     use tempfile::tempdir;
     use tokio::fs;
