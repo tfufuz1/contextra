@@ -250,14 +250,14 @@ impl LsmStorage {
 
     #[doc(hidden)]
     pub async fn simulate_wal_append_failure_for_test(&self) {
-        let wal = self.wal.read().await;
-        wal.simulate_append_failure.store(true, std::sync::atomic::Ordering::SeqCst);
+        #[cfg(feature = "fault-injection")]
+        crate::wal::FAIL_APPEND_FOR_TX.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
     pub async fn restore_wal_file_handle_for_test(&self) {
-        let wal = self.wal.read().await;
-        wal.simulate_append_failure.store(false, std::sync::atomic::Ordering::SeqCst);
+        #[cfg(feature = "fault-injection")]
+        crate::wal::FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Returns the accumulated total memory budget tracking drift in bytes caused by

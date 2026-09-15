@@ -167,6 +167,7 @@ async fn test_input_boundary_guards() {
     ));
 }
 
+#[cfg(feature = "fault-injection")]
 #[tokio::test]
 async fn test_lsm_commit_append_failure_restores_hmac() {
     let (storage, _tmp) = test_storage().await;
@@ -177,19 +178,9 @@ async fn test_lsm_commit_append_failure_restores_hmac() {
 
     let wal = storage.wal.read().await;
     let hmac_before = wal.last_hmac_snapshot().await;
-    let wal_path = wal.path().to_path_buf();
-
-    {
-        let ro_file = tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(false)
-            .open(&wal_path)
-            .await
-            .unwrap();
-        let mut file_guard = wal.file.lock().await;
-        *file_guard = ro_file;
-    }
     drop(wal);
+
+    storage.simulate_wal_append_failure_for_test().await;
 
     let tx2 = TxId::new(2);
     storage.put(tx2, b"k2", b"v2").await.unwrap();

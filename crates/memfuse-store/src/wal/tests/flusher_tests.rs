@@ -9,7 +9,6 @@ async fn test_wal_flusher_actor_coalescing() -> Result<()> {
     let wal_path = dir.path().join("test_flusher.wal");
 
     let wal = Arc::new(Wal::open(&wal_path).await?);
-    wal.enable_flusher();
 
     let num_tasks = 10;
     let mut handles = Vec::new();

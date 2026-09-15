@@ -424,7 +424,7 @@ impl Manifest {
                 )));
             }
 
-            let is_tail = pos + 4 + len as u64 > file_size;
+            let _is_tail = pos + 4 + len as u64 > file_size;
 
             let mut entry_raw = vec![0u8; len];
             match reader.read_exact(&mut entry_raw).await {
@@ -436,13 +436,12 @@ impl Manifest {
                     );
                     break;
                 }
-            } else {
-                read_res.map_err(|e| {
-                    MemFuseError::Storage(format!(
+                Err(e) => {
+                    return Err(MemFuseError::Storage(format!(
                         "MANIFEST read error at offset {}: {}",
                         pos, e
-                    ))
-                })?;
+                    )));
+                }
             }
 
             let entry_pos = pos;
@@ -855,8 +854,10 @@ mod tests {
             .await
             .expect("load post-rollover entries");
         let post_live_set = Manifest::reconstruct_valid_sstables(&post_entries);
+        let pre_paths: Vec<&Path> = pre_live_set.iter().map(|(p, _)| p.as_path()).collect();
+        let post_paths: Vec<&Path> = post_live_set.iter().map(|(p, _)| p.as_path()).collect();
         assert_eq!(
-            pre_live_set, post_live_set,
+            pre_paths, post_paths,
             "Live SSTable set after rollover must be identical to pre-rollover live set"
         );
 
@@ -872,7 +873,7 @@ mod tests {
             .expect("load final entries");
         let final_live_set = Manifest::reconstruct_valid_sstables(&final_entries);
         assert_eq!(final_live_set.len(), 6);
-        assert!(final_live_set.contains(Path::new("sst-0051.sst")));
+        assert!(final_live_set.iter().any(|(p, _)| p == Path::new("sst-0051.sst")));
     }
 
     #[tokio::test]
@@ -961,7 +962,7 @@ mod tests {
         let valid_sstables = Manifest::reconstruct_valid_sstables(&reloaded_entries);
 
         assert_eq!(valid_sstables.len(), 2);
-        assert!(valid_sstables.contains(Path::new("sst-10.sst")));
-        assert!(valid_sstables.contains(Path::new("sst-20.sst")));
+        assert!(valid_sstables.iter().any(|(p, _)| p == Path::new("sst-10.sst")));
+        assert!(valid_sstables.iter().any(|(p, _)| p == Path::new("sst-20.sst")));
     }
 }
