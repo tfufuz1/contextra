@@ -95,7 +95,7 @@ MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspa
 | `PyDbStats` Metriken | `crates/memfuse-py/src/lib.rs:518` | FFI Export von `drift_status`, `calibration_ece` und `last_calibration_at` in Python API |
 | `Wal::rotate_and_seal()` | `crates/memfuse-store/src/wal.rs:554` | Atomares Versiegeln und Read-Only-Flagging für passives WAL-Shipping (PR #2419) |
 | `WalFlusherConfig` `batch_window_micros` | `crates/memfuse-store/src/wal.rs:172` | Konfigurierbares Batch-Window für WAL-Flusher-Actor (PR #2436) |
-| `memfuse_cloud_query` MCP-Tool & `egress_gateway.rs` | `crates/memfuse-mcp/src/egress_gateway.rs` | Scaffolded MCP-Tool & Gateway für Egress-Shield (AI-TAG[SMELL][MAJOR] offen, PR #2437) |
+| `memfuse_cloud_query` MCP-Tool & `egress_gateway.rs` | `crates/memfuse-mcp/src/egress_gateway.rs` | Scaffolded MCP-Tool & Gateway für Egress-Shield (AI-TAG[SMELL][MAJOR] behoben, verwendet offiziellen `memfuse-security`-Contract `EgressVault`) |
 | `BanditRouter` Module | `crates/memfuse-router/src/` | `bandit.rs`, `routing_strategy.rs`, `transport.rs`, `guarded_payload.rs` scaffolded (PR #2422, #2433) |
 | `check-bandit-latency-budget` xtask | `xtask/src/check_bandit_latency_budget.rs` | Latenz-Budget-Prüfung für LinUCB-Bandit implementiert (PR #2433, noch nicht in merge-gate.yml) |
 
@@ -116,8 +116,8 @@ MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspa
 
 1. **`rebuild_region()` ohne Recall-Tests (F-02, `crates/memfuse-index/src/hnsw.rs:1812`)**:
    `rebuild_region()` führt reines Tombstone-Pruning durch, ohne dass wissenschaftliche Recall-Tests oder ein offizielles ADR vorliegen. Das Feature-Flag `partial-rebuild-pruning` MUSS deaktiviert bleiben, bis entsprechende Regressionstests vorliegen.
-2. **`egress_gateway.rs` AI-TAG[SMELL][MAJOR] (F1)**:
-   Verwendet lokale Stub-Typen statt des offiziellen `memfuse-security`-Contracts (`egress_vault.rs`).
+2. **`egress_gateway.rs` Egress Contract Alignment (F1) [BEHOBEN]**:
+   Direkte Einbindung des offiziellen `memfuse-security`-Contracts (`EgressVault`) ohne lokale Stub-Typen.
 3. **`memfuse-mcp` Sandbox-Kopplung (F2)**:
    `memfuse-mcp` hat kein `wasm-sandbox`-Feature und keine `memfuse-sandbox`-Abhängigkeit in Cargo.toml.
 4. **Fehlende Pflicht-Tests §10.14 (F3)**:

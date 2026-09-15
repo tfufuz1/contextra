@@ -4,7 +4,6 @@
 //              APM-PANIC-ON-MISSING-FIELD: Keine unwrap()/expect()-Aufrufe bei Initialization/Execution (Fail-Closed).
 // SIEHE AUCH:  crates/memfuse-crypto/src/egress_vault.rs
 
-use memfuse_core::BoxFuture;
 pub use memfuse_crypto::egress_vault::{
     BlockReason, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
     EgressVaultError,
@@ -13,6 +12,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::protocol::McpError;
+
+// AI-TAG[SMELL][MAJOR][RESOLVED] AGT-MCP-egress-gateway — Replaced local stub DefaultEgressClassifier with official EgressVault contract from memfuse-security (TS: 2026-09-14T10:00:00Z) (SESSION: HEAD)
+pub type DefaultEgressClassifier = EgressVault;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudQueryRequest {
@@ -73,42 +75,5 @@ pub async fn handle_cloud_query(
         _ => Err(McpError::invalid_params(
             "Egress policy violation: query blocked due to unknown classification",
         )),
-    }
-}
-
-pub struct DefaultEgressClassifier {
-    vault: Result<EgressVault, EgressVaultError>,
-}
-
-impl DefaultEgressClassifier {
-    pub fn new() -> Self {
-        let default_patterns = vec![
-            r"sk-".to_string(),
-            r"AKIA".to_string(),
-            r"api_key".to_string(),
-            r"password".to_string(),
-            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b".to_string(),
-        ];
-        let vault = EgressVault::new(default_patterns);
-        Self { vault }
-    }
-}
-
-impl Default for DefaultEgressClassifier {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EgressClassifier for DefaultEgressClassifier {
-    fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {
-        Box::pin(async move {
-            match &self.vault {
-                Ok(vault) => vault.classify(payload).await,
-                Err(err) => EgressClassification::Block(BlockReason::InternalError(format!(
-                    "EgressVault initialization failed: {err}"
-                ))),
-            }
-        })
     }
 }

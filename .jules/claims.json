@@ -8,6 +8,14 @@
       "active": false,
       "expires_at": "2026-09-15T22:45:51.897370635+00:00",
       "released_at": "2026-09-15T18:54:52.173782787+00:00"
+    },
+    {
+      "krate": "memfuse-mcp",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-15T21:15:17.650922493+00:00",
+      "session_id": "5172984810570330285",
+      "active": true,
+      "expires_at": "2026-09-16T01:15:17.650904558+00:00"
     }
   ]
 }
