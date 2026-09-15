@@ -375,6 +375,10 @@ pub struct HnswColdCore {
     pub deleted_nodes: RwLock<RoaringTreemap>,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
+    #[cfg(test)]
+    pub fault_injection_insert_target: AtomicU64,
+    #[cfg(test)]
+    pub fault_injection_insert_count: AtomicU64,
 }
 
 /// The core implementation of the HNSW index.
@@ -419,6 +423,10 @@ impl HnswIndex {
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
                     )),
+                    #[cfg(test)]
+                    fault_injection_insert_target: AtomicU64::new(0),
+                    #[cfg(test)]
+                    fault_injection_insert_count: AtomicU64::new(0),
                 },
             }),
         })
@@ -462,9 +470,26 @@ impl HnswIndex {
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
                     )),
+                    #[cfg(test)]
+                    fault_injection_insert_target: AtomicU64::new(0),
+                    #[cfg(test)]
+                    fault_injection_insert_count: AtomicU64::new(0),
                 },
             }),
         }
+    }
+
+    /// Sets the target insertion count for simulating compute_insert fault injection in tests.
+    #[cfg(test)]
+    pub fn set_fault_injection_insert_target(&self, target: u64) {
+        self.inner
+            .cold
+            .fault_injection_insert_target
+            .store(target, Ordering::SeqCst);
+        self.inner
+            .cold
+            .fault_injection_insert_count
+            .store(0, Ordering::SeqCst);
     }
 
     /// Returns a snapshot clone of the current quantizer if trained.
@@ -1181,14 +1206,7 @@ impl HnswIndex {
     }
 }
 
-// AI-TAG[TEST][MINOR] Global mutable atomic statics cause multi-threaded test harness races (ID: AGT-INDEX-f38b1a90) (TS: 2026-09-15T14:50:00Z) (SESSION: acf8fe72)
-// BEFUND: FAIL_HNSW_COMPUTE_INSERT_COUNT and FAIL_HNSW_COMPUTE_INSERT_TARGET are mutable static atomics used for fault injection tests.
-// RISIKO: Under cargo test --test-threads > 1, parallel tests accessing HnswIndex can race on these fault injection counters causing non-deterministic test failures.
-// EMPFEHLUNG: Refactor fault injection hooks to instance-level fields or thread-local storage instead of global statics.
-#[cfg(test)]
-pub static FAIL_HNSW_COMPUTE_INSERT_COUNT: AtomicU64 = AtomicU64::new(0);
-#[cfg(test)]
-pub static FAIL_HNSW_COMPUTE_INSERT_TARGET: AtomicU64 = AtomicU64::new(0);
+// AI-TAG[TEST][MINOR] RESOLVED: AGT-INDEX-f38b1a90 — Global statics replaced with instance-bound AtomicU64 fields on HnswColdCore (TS: 2026-09-15T16:00:00Z)
 
 /// Prepared insert operation containing all fallible calculations prior to state mutation.
 #[derive(Debug)]
@@ -1865,9 +1883,16 @@ impl HnswIndexCore {
     ) -> Result<PreparedInsert> {
         #[cfg(test)]
         {
-            let target = FAIL_HNSW_COMPUTE_INSERT_TARGET.load(Ordering::SeqCst);
+            let target = self
+                .cold
+                .fault_injection_insert_target
+                .load(Ordering::SeqCst);
             if target > 0 {
-                let current = FAIL_HNSW_COMPUTE_INSERT_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+                let current = self
+                    .cold
+                    .fault_injection_insert_count
+                    .fetch_add(1, Ordering::SeqCst)
+                    + 1;
                 if current == target {
                     return Err(MemFuseError::Index(
                         "Fault injection: compute_insert simulated failure".into(),
@@ -4733,8 +4758,7 @@ mod tests {
         }
 
         // 3. Configure fault injection to fail on the 3rd element during Phase 1 compute
-        FAIL_HNSW_COMPUTE_INSERT_TARGET.store(3, Ordering::SeqCst);
-        FAIL_HNSW_COMPUTE_INSERT_COUNT.store(0, Ordering::SeqCst);
+        index.set_fault_injection_insert_target(3);
 
         // 4. Commit must fail due to fault injection in Phase 1
         let commit_res = index.commit(tx2).await;
@@ -4749,9 +4773,8 @@ mod tests {
             err_msg
         );
 
-        // Reset fault injection static flags
-        FAIL_HNSW_COMPUTE_INSERT_TARGET.store(0, Ordering::SeqCst);
-        FAIL_HNSW_COMPUTE_INSERT_COUNT.store(0, Ordering::SeqCst);
+        // Reset fault injection flags
+        index.set_fault_injection_insert_target(0);
 
         // 5. Verify snapshot node and doc_to_node counts AFTER failed commit
         let final_nodes_count = index.inner.hot.nodes.read().len();
@@ -4777,5 +4800,53 @@ mod tests {
                 i
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_parallel_hnsw_instances_fault_injection_isolation() {
+        // AI-TAG[TEST][REGRESSION] RESOLVED: AGT-INDEX-f38b1a90 — Multi-instance fault injection isolation test.
+        // Confirms that fault injection target set on index_fault does not spill over to parallel index_normal.
+        let index_fault = std::sync::Arc::new(HnswIndex::try_new(test_config(4)).unwrap());
+        let index_normal = std::sync::Arc::new(HnswIndex::try_new(test_config(4)).unwrap());
+
+        // Configure fault injection ONLY on index_fault
+        index_fault.set_fault_injection_insert_target(3);
+
+        let idx_f = std::sync::Arc::clone(&index_fault);
+        let handle_f = tokio::spawn(async move {
+            let tx = TxId::new(10);
+            for i in 1..=5u64 {
+                let vec = [i as f32, 0.0, 0.0, 0.0];
+                idx_f.insert(tx, DocId::new(i), &vec).await.unwrap();
+            }
+            idx_f.commit(tx).await
+        });
+
+        let idx_n = std::sync::Arc::clone(&index_normal);
+        let handle_n = tokio::spawn(async move {
+            let tx = TxId::new(20);
+            for i in 1..=5u64 {
+                let vec = [i as f32, 0.0, 0.0, 0.0];
+                idx_n.insert(tx, DocId::new(i), &vec).await.unwrap();
+            }
+            idx_n.commit(tx).await
+        });
+
+        let (res_f, res_n) = tokio::join!(handle_f, handle_n);
+
+        // index_fault must fail on commit due to fault injection
+        let res_f_val = res_f.unwrap();
+        assert!(
+            res_f_val.is_err(),
+            "index_fault commit must fail due to fault injection"
+        );
+
+        // index_normal must succeed without any fault injection spillover
+        let res_n_val = res_n.unwrap();
+        assert!(
+            res_n_val.is_ok(),
+            "index_normal commit must succeed cleanly without fault injection spillover"
+        );
+        assert_eq!(index_normal.len().await, 5);
     }
 }

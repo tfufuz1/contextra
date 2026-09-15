@@ -12121,6 +12121,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "11ec8c0bc1979699"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "12f93de421269eec"
   },
   {
@@ -12185,6 +12189,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "2aade15250a44fbb"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "2ae8941d569deb96"
   },
   {
@@ -12230,6 +12238,10 @@
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "3be660b525710995"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "3d661d3cb1167ca0"
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
@@ -12294,6 +12306,10 @@
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "53f20d4c0fd7f4db"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "571fe8cb81128256"
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
@@ -12729,6 +12745,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "e9fc8f1783250f57"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "ebbff11c37be9c5c"
   },
   {
@@ -12766,6 +12786,10 @@
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "f1b73302431a7224"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "f1cddc603d199edf"
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
