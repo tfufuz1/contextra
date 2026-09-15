@@ -9,6 +9,7 @@ pub struct Violation {
     pub line_content: String,
 }
 
+#[allow(dead_code)]
 pub fn run_check_result_dropped_on_io(root: &Path) -> Result<Vec<Violation>, String> {
     run_check_result_dropped_on_io_with_options(root, false)
 }

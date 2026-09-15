@@ -3639,7 +3639,7 @@ description = "Core crate"
     fn test_workspace_crate_layers_regression() {
         let _guard = TEST_DIR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let crates = get_workspace_crates();
-        assert_eq!(crates.len(), 17, "Expected 17 workspace crates");
+        assert_eq!(crates.len(), 18, "Expected 18 workspace crates");
 
         let expected_layers: std::collections::HashMap<&str, u8> = [
             ("memfuse-core-ipc-gen", 0),
@@ -3659,6 +3659,8 @@ description = "Core crate"
             ("memfuse-router", 6),
             ("memfuse-agent", 7),
             ("memfuse-mcp", 8),
+            ("memfuse-sandbox", 2),
+            ("memfuse-tauri", 9),
         ]
         .into_iter()
         .collect();

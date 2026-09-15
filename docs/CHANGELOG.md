@@ -82,7 +82,6 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/multistep.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/transaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
-| `2026-09-15T14:45:00Z (SESSION: 527bbb50)` | `crates/memfuse-calibration/tests/calibration_stress_and_fault_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Stress, fault-injection, and multi-threading concurrency tests for memfuse-calibration. |
 | `2026-09-15T00:00:00Z` | `crates/memfuse-checkpoint/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RAII CheckpointGuard + persistente Snapshot-Verwaltung (Re-Exports) |
 | `2026-09-15T00:00:00Z` | `crates/memfuse-core/src/traits/graph_index.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | GraphIndex Trait & GraphIndexStats für CSR-basierte Entity-Relation-Graph-Operationen. |
 | `2026-09-15T00:00:00Z` | `crates/memfuse-core/src/traits/lifecycle.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | MemoryLifecycleManager, GroundingValidator, ResponseGroundingValidator & DistanceCalculator Trait-Definitionen. |
