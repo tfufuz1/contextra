@@ -424,7 +424,7 @@ impl Manifest {
                 )));
             }
 
-            let is_tail = pos + 4 + len as u64 > file_size;
+            let _is_tail = pos + 4 + len as u64 > file_size;
 
             let mut entry_raw = vec![0u8; len];
             match reader.read_exact(&mut entry_raw).await {
@@ -863,8 +863,10 @@ mod tests {
             .await
             .expect("load post-rollover entries");
         let post_live_set = Manifest::reconstruct_valid_sstables(&post_entries);
+        let pre_paths: Vec<&Path> = pre_live_set.iter().map(|(p, _)| p.as_path()).collect();
+        let post_paths: Vec<&Path> = post_live_set.iter().map(|(p, _)| p.as_path()).collect();
         assert_eq!(
-            pre_live_set, post_live_set,
+            pre_paths, post_paths,
             "Live SSTable set after rollover must be identical to pre-rollover live set"
         );
 

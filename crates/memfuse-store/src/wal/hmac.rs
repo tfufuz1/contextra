@@ -688,6 +688,7 @@ mod tests {
         assert_eq!(&key, b"memfuse-integrity-key-v1\0\0\0\0\0\0\0\0");
     }
 
+#[cfg(feature = "fault-injection")]
     #[tokio::test]
     async fn test_hmac_chain_intact_after_append_failure() {
         let dir = tempdir().expect("tempdir");
@@ -726,22 +727,13 @@ mod tests {
         );
         assert_eq!(prev_hmac, hmac_before);
 
-        // 3. Simulate append failure by replacing file with a read-only file handle
-        {
-            let ro_file = tokio::fs::OpenOptions::new()
-                .read(true)
-                .write(false)
-                .open(&wal_path)
-                .await
-                .expect("open read-only");
-            let mut guard = wal.file.lock().await;
-            *guard = ro_file;
-        }
+    // 3. Simulate append failure via fault injection
+    crate::wal::FAIL_APPEND_FOR_TX.store(2, std::sync::atomic::Ordering::SeqCst);
 
         let append_res = wal.append_batch(batch2).await;
         assert!(
             append_res.is_err(),
-            "append_batch must fail on read-only file handle"
+        "append_batch must fail on fault-injected append failure"
         );
 
         // Restore last_hmac as lsm commit would do upon append failure

@@ -1,6 +1,6 @@
 pub use super::*;
 use memfuse_core::{MemFuseError, Result};
-use memfuse_security::crypto::KeyManager;
+use memfuse_crypto::crypto::KeyManager;
 
 #[cfg(test)]
 mod encode_tests;

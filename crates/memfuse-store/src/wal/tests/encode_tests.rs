@@ -1,6 +1,6 @@
 use super::*;
 use memfuse_core::TxId;
-use memfuse_security::crypto::KeyManager;
+use memfuse_crypto::crypto::KeyManager;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;

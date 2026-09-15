@@ -430,7 +430,7 @@ impl Wal {
         #[cfg(feature = "fault-injection")]
         {
             let fail_tx = FAIL_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
-            if fail_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == fail_tx) {
+            if fail_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == fail_tx || fail_tx == u64::MAX) {
                 FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
                 return Err(MemFuseError::Storage(
                     "Simulated WAL append_batch I/O failure via fault injection".into(),
