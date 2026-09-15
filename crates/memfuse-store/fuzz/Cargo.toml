@@ -28,3 +28,9 @@ name = "fuzz_sstable_binary_search"
 path = "fuzz_targets/fuzz_sstable_binary_search.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_manifest_load"
+path = "fuzz_targets/fuzz_manifest_load.rs"
+test = false
+doc = false

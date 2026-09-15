@@ -278,3 +278,202 @@ pub struct GraphIndexStats {
     /// Total bytes allocated by CSR representation.
     pub memory_usage_bytes: usize,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_csr_graph_capability() {
+        struct GraphIndexPlaceholder;
+        impl GraphIndex for GraphIndexPlaceholder {
+            fn traverse<'a>(
+                &'a self,
+                _: EntityId,
+                _: usize,
+            ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+                Box::pin(async move { Ok(vec![]) })
+            }
+            fn traverse_at<'a>(
+                &'a self,
+                _: EntityId,
+                _: usize,
+                _: u64,
+            ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+                Box::pin(async move { Ok(vec![]) })
+            }
+            fn traverse_at_time<'a>(
+                &'a self,
+                _: EntityId,
+                _: usize,
+                _: TxId,
+            ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+                Box::pin(async move { Ok(vec![]) })
+            }
+            fn traverse_at_bitemporal<'a>(
+                &'a self,
+                _: EntityId,
+                _: usize,
+                _: TxId,
+                _: Option<i64>,
+            ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+                Box::pin(async move { Ok(vec![]) })
+            }
+            fn add_entity<'a>(&'a self, _: TxId, _: Entity) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn add_edge<'a>(&'a self, _: TxId, _: Edge) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+                Box::pin(async move { Ok(TxId(0)) })
+            }
+            fn len<'a>(&'a self) -> BoxFuture<'a, usize> {
+                Box::pin(async move { 0 })
+            }
+            fn stats<'a>(&'a self) -> BoxFuture<'a, Result<GraphIndexStats>> {
+                Box::pin(async move {
+                    Ok(GraphIndexStats {
+                        num_entities: 0,
+                        num_edges: 0,
+                        memory_usage_bytes: 0,
+                    })
+                })
+            }
+        }
+        let graph = GraphIndexPlaceholder;
+        let res_traverse_at = graph.traverse_at(EntityId::new(1), 2, 1).await;
+        assert!(
+            !matches!(
+                res_traverse_at,
+                Err(crate::MemFuseError::CapabilityUnsupported { .. })
+            ),
+            "traverse_at returned CapabilityUnsupported"
+        );
+
+        let res_traverse_at_time = graph
+            .traverse_at_time(EntityId::new(1), 2, TxId::new(1))
+            .await;
+        assert!(
+            !matches!(
+                res_traverse_at_time,
+                Err(crate::MemFuseError::CapabilityUnsupported { .. })
+            ),
+            "traverse_at_time returned CapabilityUnsupported"
+        );
+
+        let res_traverse_at_bitemporal = graph
+            .traverse_at_bitemporal(EntityId::new(1), 2, TxId::new(1), Some(1000))
+            .await;
+        assert!(
+            !matches!(
+                res_traverse_at_bitemporal,
+                Err(crate::MemFuseError::CapabilityUnsupported { .. })
+            ),
+            "traverse_at_bitemporal returned CapabilityUnsupported"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_graph_index_defaults() {
+        struct MockGraphIndex;
+        impl GraphIndex for MockGraphIndex {
+            fn traverse<'a>(
+                &'a self,
+                _: EntityId,
+                _: usize,
+            ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+                Box::pin(async move { Ok(vec![]) })
+            }
+            fn add_entity<'a>(
+                &'a self,
+                _: TxId,
+                _: Entity,
+            ) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn add_edge<'a>(
+                &'a self,
+                _: TxId,
+                _: Edge,
+            ) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn rollback_to_tx<'a>(
+                &'a self,
+                _: TxId,
+            ) -> BoxFuture<'a, Result<()>> {
+                Box::pin(async move { Ok(()) })
+            }
+            fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+                Box::pin(async move { Ok(TxId(0)) })
+            }
+            fn len<'a>(&'a self) -> BoxFuture<'a, usize> {
+                Box::pin(async move { 0 })
+            }
+            fn stats<'a>(&'a self) -> BoxFuture<'a, Result<GraphIndexStats>> {
+                Box::pin(async move {
+                    Ok(GraphIndexStats {
+                        num_entities: 0,
+                        num_edges: 0,
+                        memory_usage_bytes: 0,
+                    })
+                })
+            }
+        }
+
+        let index = MockGraphIndex;
+        let res = index
+            .traverse_at(EntityId::new(1), 2, 42)
+            .await;
+        match res {
+            Err(crate::error::MemFuseError::CapabilityUnsupported { capability, reason }) => {
+                assert_eq!(capability, "graph_traverse_at");
+                assert!(reason.contains("ADR-024"), "Unexpected reason: {reason}");
+            }
+            _ => panic!("Expected CapabilityUnsupported with ADR-024"),
+        }
+
+        let res_time = index
+            .traverse_at_time(
+                EntityId::new(1),
+                2,
+                TxId::new(10),
+            )
+            .await;
+        match res_time {
+            Err(crate::error::MemFuseError::CapabilityUnsupported { capability, .. }) => {
+                assert_eq!(capability, "graph_traverse_at_time");
+            }
+            _ => panic!("Expected CapabilityUnsupported for traverse_at_time"),
+        }
+
+        let res_ppr = index
+            .personalized_page_rank(
+                &[EntityId::new(1)],
+                &PprConfig::default(),
+            )
+            .await;
+        match res_ppr {
+            Err(crate::error::MemFuseError::CapabilityUnsupported { capability, .. }) => {
+                assert_eq!(capability, "graph_ppr");
+            }
+            _ => panic!("Expected CapabilityUnsupported for personalized_page_rank"),
+        }
+    }
+}

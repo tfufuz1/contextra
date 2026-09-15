@@ -725,7 +725,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_with_context_kv_bridge_consultation() {
         use crate::KvBridgeAdapter;
-        use memfuse_security::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+        use memfuse_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 
         let fingerprint = ModelFingerprint {
             hash: [9u8; 32],
@@ -782,7 +782,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
         use crate::kv_bridge::{KvBridgeAdapter, KvCacheKey};
-        use memfuse_security::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+        use memfuse_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 
         let fingerprint = ModelFingerprint {
             hash: [9u8; 32],
@@ -1095,7 +1095,7 @@ mod tests {
     #[tokio::test]
     async fn test_candle_llm_client_with_kv_bridge() {
         use crate::KvBridgeAdapter;
-        use memfuse_security::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+        use memfuse_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 
         let mock_model = Box::new(MockCandleModel {
             response: "KV Response".to_string(),

@@ -10,7 +10,7 @@
 
 use memfuse_core::traits::ContextSegment;
 use memfuse_core::{ModelFingerprint, TenantId};
-use memfuse_security::{KvSegment, KvSegmentCipher, TenantIsolatedKvStore};
+use memfuse_crypto::{KvSegment, KvSegmentCipher, TenantIsolatedKvStore};
 use std::sync::Arc;
 
 /// Cache-Lookup-Schlüssel: eindeutige Kombination aus Chunk-ID, Modell und optionalem RoPE-Offset.
@@ -79,7 +79,7 @@ impl KvBridgeAdapter {
         let encrypted_bytes = self.store.get_segment_bytes(tenant, key.chunk_id)?;
 
         // 2. Deserialisieren (außerhalb des Store-Locks)
-        let encrypted_layer: memfuse_security::EncryptedKvLayer =
+        let encrypted_layer: memfuse_crypto::EncryptedKvLayer =
             match bincode::deserialize(&encrypted_bytes) {
                 Ok(l) => l,
                 Err(e) => {
@@ -162,7 +162,7 @@ impl std::fmt::Debug for KvBridgeAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use memfuse_security::{CryptoKey, EvictionWorker};
+    use memfuse_crypto::{CryptoKey, EvictionWorker};
     use std::sync::Arc;
     use std::thread;
 

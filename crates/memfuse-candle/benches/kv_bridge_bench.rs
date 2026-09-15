@@ -7,7 +7,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use memfuse_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
 use memfuse_core::{ModelFingerprint, TenantId};
-use memfuse_security::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+use memfuse_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 use std::sync::Arc;
 
 /// Simulierter KV-Segment-Payload (256 KB = typischer Context-Window-Cache)

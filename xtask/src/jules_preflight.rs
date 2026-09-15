@@ -1,6 +1,6 @@
 use crate::claim::{expire_stale_claims, ClaimsDatabase};
 use crate::{
-    check_duplicate_symbols, run_check_consistency, run_check_dag,
+    check_duplicate_symbols, check_orphan_modules, run_check_consistency, run_check_dag,
     run_check_jules_context_freshness, run_check_review_coverage, run_check_unwrap_baseline,
     run_sync_docs, run_validate_tags, scan_tags,
 };
@@ -217,6 +217,33 @@ pub fn run_jules_preflight(fast_only: bool) -> bool {
         results.push(GateResult {
             name: format!(
                 "Gate 1: Kritische AI-TAGs ({:.1}s)",
+                start.elapsed().as_secs_f64()
+            ),
+            passed,
+            detail,
+        });
+    }
+
+    // Orphan Modules Check
+    {
+        let start = Instant::now();
+        let root = crate::find_root_dir();
+        let orphan_res = check_orphan_modules::run_check_orphan_modules(&root);
+        let (passed, detail) = match orphan_res {
+            Ok(orphans) if orphans.is_empty() => (true, None),
+            Ok(orphans) => (
+                false,
+                Some(format!(
+                    "{} Waisendatei(en) gefunden:\n{}",
+                    orphans.len(),
+                    orphans.join("\n")
+                )),
+            ),
+            Err(e) => (false, Some(format!("Fehler: {}", e))),
+        };
+        results.push(GateResult {
+            name: format!(
+                "Orphan Modules Check ({:.1}s)",
                 start.elapsed().as_secs_f64()
             ),
             passed,

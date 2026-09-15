@@ -35,8 +35,6 @@ pub enum EgressClassification {
     Allow,
     /// Übertragung blockiert mit Grund.
     Block(BlockReason),
-    /// Übertragung erfordert Abstraktion / Anonymisierung.
-    RequiresAbstraction,
 }
 
 /// Ein vorkompiliertes Regex-Muster für die Egress-Klassifikation.
@@ -71,6 +69,9 @@ pub enum EgressVaultError {
     InvalidPattern { pattern: String, reason: String },
 }
 
+/// Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation.
+pub const MAX_CLASSIFY_PAYLOAD_BYTES: usize = 65_536;
+
 /// Führt eine Layer-1-Regex-Klassifikation auf dem Payload mit neuem Task und hartem Timeout aus.
 ///
 /// Invariante: **Fail-Closed**. Bei Timeout, Panic oder Fehler wird stets `Block(...)` zurückgegeben.
@@ -79,12 +80,43 @@ pub async fn classify_layer1(
     patterns: &[CompiledPattern],
     timeout: Duration,
 ) -> EgressClassification {
-    let payload_owned = payload.to_string();
-    let patterns_owned = patterns.to_vec();
+    let patterns_arc = Arc::new(patterns.to_vec());
+    let set_patterns: Vec<&str> = patterns.iter().map(|p| p.regex.as_str()).collect();
+    let regex_set_arc = match regex::RegexSet::new(&set_patterns) {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            return EgressClassification::Block(BlockReason::InternalError(format!(
+                "Failed to compile RegexSet: {e}"
+            )));
+        }
+    };
+    classify_layer1_arc(payload, patterns_arc, regex_set_arc, timeout).await
+}
+
+/// Optimierter Ausführungspfad für `classify_layer1` unter Wiederverwendung von vorkompilierten `Arc`-Mengen.
+pub async fn classify_layer1_arc(
+    payload: &str,
+    patterns: Arc<Vec<CompiledPattern>>,
+    regex_set: Arc<regex::RegexSet>,
+    timeout: Duration,
+) -> EgressClassification {
+    if payload.len() > MAX_CLASSIFY_PAYLOAD_BYTES {
+        return EgressClassification::Block(BlockReason::PolicyDenied(format!(
+            "Payload size exceeds limit: {} bytes > {} limit",
+            payload.len(),
+            MAX_CLASSIFY_PAYLOAD_BYTES
+        )));
+    }
+
+    let payload_arc: Arc<str> = Arc::from(payload);
+    let patterns_cloned = patterns.clone();
+    let set_cloned = regex_set.clone();
 
     let eval_task = tokio::task::spawn_blocking(move || {
-        for cp in &patterns_owned {
-            if cp.regex.is_match(&payload_owned) {
+        let matches = set_cloned.matches(&payload_arc);
+        if matches.matched_any() {
+            if let Some(first_idx) = matches.iter().next() {
+                let cp = &patterns_cloned[first_idx];
                 tracing::warn!(
                     rule_id = %cp.name,
                     pattern = %cp.regex.as_str(),
@@ -109,6 +141,7 @@ pub async fn classify_layer1(
 #[derive(Debug, Clone)]
 pub struct EgressVault {
     patterns: Arc<Vec<CompiledPattern>>,
+    regex_set: Arc<regex::RegexSet>,
     timeout: Duration,
 }
 
@@ -125,8 +158,15 @@ impl EgressVault {
             .map(|(idx, pat)| CompiledPattern::new(format!("R-{:03}", idx + 1), &pat))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let set_patterns: Vec<&str> = compiled.iter().map(|p| p.regex.as_str()).collect();
+        let regex_set = regex::RegexSet::new(&set_patterns).map_err(|e| EgressVaultError::InvalidPattern {
+            pattern: "RegexSet".to_string(),
+            reason: e.to_string(),
+        })?;
+
         Ok(Self {
             patterns: Arc::new(compiled),
+            regex_set: Arc::new(regex_set),
             timeout: Self::DEFAULT_TIMEOUT,
         })
     }
@@ -156,7 +196,12 @@ pub trait EgressClassifier: Send + Sync {
 
 impl EgressClassifier for EgressVault {
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {
-        Box::pin(classify_layer1(payload, &self.patterns, self.timeout))
+        Box::pin(classify_layer1_arc(
+            payload,
+            self.patterns.clone(),
+            self.regex_set.clone(),
+            self.timeout,
+        ))
     }
 }
 
@@ -175,6 +220,21 @@ mod tests {
 
         let res = vault.classify("Hello world, this is public text.").await;
         assert_eq!(res, EgressClassification::Allow);
+    }
+
+    #[tokio::test]
+    async fn test_payload_with_abstract_and_sensitive_pattern_is_blocked() {
+        let patterns = vec![
+            r"sk-[a-zA-Z0-9]{32}".to_string(),
+        ];
+        let vault = EgressVault::new(patterns).expect("valid vault");
+
+        let payload = "This abstract concept includes secret key sk-01234567890123456789012345678901 inside";
+        let res = vault.classify(payload).await;
+        assert_eq!(
+            res,
+            EgressClassification::Block(BlockReason::SensitivePattern("R-001".to_string()))
+        );
     }
 
     #[tokio::test]
@@ -219,13 +279,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_redos_and_timeout_fail_closed() {
-        // Generiere ein extrem großes Payload zur Auslösungsüberprüfung des Timeouts
-        let mut huge_payload = "a".repeat(2_000_000);
-        huge_payload.push_str("!");
+    async fn test_oversized_payload_blocked_before_task_spawn() {
+        let huge_payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES + 1);
+        let patterns = vec![CompiledPattern::new("R-001", r"a+").unwrap()];
 
-        let patterns = vec![CompiledPattern::new("slow_pattern", r"(a+)+b")
-            .unwrap_or_else(|_| CompiledPattern::new("fallback_pattern", r"a{1000,}").unwrap())];
+        let res = classify_layer1(&huge_payload, &patterns, Duration::from_millis(100)).await;
+        if let EgressClassification::Block(BlockReason::PolicyDenied(reason)) = res {
+            assert!(reason.contains("Payload size exceeds limit"));
+        } else {
+            panic!("Expected PolicyDenied block for oversized payload, got {:?}", res);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_redos_and_timeout_fail_closed() {
+        // Payload genau an der Limit-Grenze
+        let mut huge_payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES - 1);
+        huge_payload.push('!');
+
+        let patterns = vec![CompiledPattern::new("R-001", r"(a+)+b")
+            .unwrap_or_else(|_| CompiledPattern::new("R-001", r"a{1000,}").unwrap())];
 
         let start = Instant::now();
         // Setze extrem kurzes Timeout (1 Microsekunde / 10 Mikros), um Timeout-Pfad sicher zu triggern

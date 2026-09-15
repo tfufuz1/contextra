@@ -825,7 +825,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let fused = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
                 signal_sets,
-                usize::MAX,
+                k.saturating_mul(Self::OVERFETCH_FACTOR),
                 crate::fusion::MetadataMergePriority::default(),
                 true,
                 None,
@@ -1206,9 +1206,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 signal_sets.push(("graph".to_string(), graph_results, gw));
             }
 
+            let max_fusion_results = candidate_k
+                .saturating_mul(Self::OVERFETCH_FACTOR)
+                .min(memfuse_core::MAX_SEARCH_K);
+
             let fused = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
                 signal_sets,
-                usize::MAX,
+                max_fusion_results,
                 crate::fusion::MetadataMergePriority::default(),
                 query.include_provenance,
                 None,
@@ -1281,6 +1285,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         })
         .await
     }
+
+    /// Standard overfetch factor applied to candidate limits before RRF fusion to balance OOM protection and recall.
+    pub const OVERFETCH_FACTOR: usize = 3;
 
     /// Standard community boost factor applied to RRF scores for matching community members.
     pub const DEFAULT_COMMUNITY_BOOST: f32 = 1.2;

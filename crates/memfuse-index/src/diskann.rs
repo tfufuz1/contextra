@@ -378,8 +378,8 @@ impl DiskAnnIndex {
     }
 
     fn check_quantizer_drift(&self, vector: &[f32]) {
-        let mut q_guard = self.inner.quantizer.write();
-        if let Some(ref mut q) = *q_guard {
+        let q_guard = self.inner.quantizer.read();
+        if let Some(ref q) = *q_guard {
             let drift = q.check_drift(vector);
             if drift > 0.10 {
                 use std::sync::atomic::Ordering;
@@ -389,14 +389,6 @@ impl DiskAnnIndex {
                     warn_count = count,
                     "Quantization drift > 10% detected — ScalarQuantizer recalibration recommended."
                 );
-                if count >= 100 {
-                    tracing::warn!(
-                        warn_count = count,
-                        "Quantization drift threshold (100) exceeded; auto-retraining quantizer via bound expansion."
-                    );
-                    q.expand_bounds_to_fit(vector);
-                    self.inner.drift_warn_count.store(0, Ordering::Relaxed);
-                }
             }
         }
     }
@@ -584,7 +576,7 @@ impl DiskAnnIndex {
             entry_bytes.extend_from_slice(&val.to_le_bytes());
         }
 
-        let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
         hmac.update(&entry_bytes);
         let computed_hmac = hmac.finalize();
 
@@ -688,7 +680,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
             hmac.update(&buf_id);
             hmac.update(&buf_dim);
             hmac.update(&vec_bytes);
@@ -1304,7 +1296,7 @@ impl DiskAnnIndex {
             q_max,
         };
 
-        let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
@@ -1450,7 +1442,7 @@ impl DiskAnnIndex {
                         MemFuseError::Storage("DiskANN payload slice out of bounds".into())
                     })?;
 
-                let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+                let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
                 hmac.update(payload);
                 let computed_hmac = hmac.finalize();
 
@@ -2319,7 +2311,7 @@ mod tests {
             .copy_from_slice(&corrupt_count.to_le_bytes());
 
         // Recompute HMAC for the modified payload so header & footer integrity passes, allowing load_node to test node parsing
-        let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
         let footer_start = data.len() - DiskAnnFooter::SIZE;
         hmac.update(&data[..footer_start]);
         let computed = hmac.finalize();
@@ -2764,7 +2756,7 @@ mod tests {
         assert_eq!(&footer.magic, DISKANN_FOOTER_MAGIC);
 
         // Verify HMAC calculation over payload
-        let mut hmac = memfuse_security::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
         let payload = &file_bytes[..file_bytes.len() - DiskAnnFooter::SIZE];
         hmac.update(payload);
         let expected_hmac = hmac.finalize();
