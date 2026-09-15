@@ -21,14 +21,23 @@
 // BEGRÜNDUNG: Sovereign Core Doctrine mandates zero unsafe outside `memfuse-index`,
 // except Windows ACL security programming (`SetNamedSecurityInfoW`, etc.).
 #![deny(unsafe_code)]
+#![allow(unexpected_cfgs)]
 
+#[cfg(not(loom))]
 pub(crate) mod checkpoint;
+#[cfg(not(loom))]
 pub mod compaction;
+#[cfg(not(loom))]
 pub mod lsm;
+#[cfg(not(loom))]
 pub mod manifest;
+#[cfg(not(loom))]
 pub mod memtable;
+#[cfg(not(loom))]
 pub mod sstable;
+#[cfg(not(loom))]
 pub mod system_pressure;
+#[cfg(not(loom))]
 pub mod tenant_codec;
 pub(crate) mod util;
 pub mod wal;
@@ -37,8 +46,13 @@ pub mod wal;
 // Aktuell: reguläres tokio::fs/std::fs File-I/O in sstable.rs.
 // Tracking-Issue: [ISSUE-NUMMER]
 
+#[cfg(not(loom))]
 pub use compaction::{CompactionConfig, CompactionEngine};
+#[cfg(not(loom))]
 pub use lsm::{LsmConfig, LsmStorage};
+#[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
+#[cfg(not(loom))]
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
+#[cfg(not(loom))]
 pub use tenant_codec::TenantKeyCodec;

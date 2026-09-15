@@ -18488,6 +18488,10 @@
     "hash": "a69e4514750e2834"
   },
   {
+    "file": "crates/memfuse-store/src/wal/mod.rs",
+    "hash": "600eb1dc726340f5"
+  },
+  {
     "file": "crates/memfuse-store/src/wal/replay.rs",
     "hash": "003bbda7f2717e3a"
   },
@@ -20745,51 +20749,23 @@
   },
   {
     "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "05e4fff480ccf7a5"
+    "hash": "0c4a72a6857e8276"
   },
   {
     "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "0934d9dabe00e9ea"
+    "hash": "1d2fbbcc01b965df"
   },
   {
     "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "0c48345bce5baf3d"
+    "hash": "c224043038bc9bb8"
   },
   {
     "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "2706218ae68b1426"
+    "hash": "d1228f7705baf81d"
   },
   {
     "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "4199306a73b12f21"
-  },
-  {
-    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "511ca7e1bf74a4a3"
-  },
-  {
-    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "87887cf5e742cc43"
-  },
-  {
-    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "89c1d3ec0f09a3d8"
-  },
-  {
-    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "a9ed2093d908e0fa"
-  },
-  {
-    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "aafc3ef0780c0756"
-  },
-  {
-    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "b9821c4ee2307514"
-  },
-  {
-    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "e5d94a5720d106dc"
+    "hash": "e64ad4f6ce9f3f6e"
   },
   {
     "file": "crates/memfuse-store/tests/lsm_robustness_fixes.rs",
