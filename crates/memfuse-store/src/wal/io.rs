@@ -13,7 +13,7 @@ use super::{
 use super::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
 
 pub(crate) async fn do_scan_entries_with_callback<F>(
-    file: &mut tokio::fs::File,
+    file: &mut super::fs::File,
     file_size: u64,
     path: &Path,
     key_manager: Option<&memfuse_crypto::crypto::KeyManager>,
@@ -652,7 +652,7 @@ impl Wal {
     }
 
     pub async fn find_tx_offset(&self, target_tx_id: TxId) -> Result<(u64, [u8; 32])> {
-        let metadata = tokio::fs::metadata(&self.path)
+        let metadata = crate::wal::fs::metadata(&self.path)
             .await
             .map_err(|e| MemFuseError::Storage(e.to_string()))?;
         let file_size = metadata.len();
@@ -700,8 +700,7 @@ impl Wal {
 }
 
 #[cfg(windows)]
-#[allow(unsafe_code)]
-#[allow(dead_code)]
+#[allow(unsafe_code, dead_code)]
 pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use std::ptr::null_mut;

@@ -95,7 +95,7 @@ impl Wal {
     /// Enables background flusher actor for processing WAL I/O commands sequentially.
     pub(crate) fn enable_flusher_with_config(
         &self,
-        mut file: tokio::fs::File,
+        mut file: crate::wal::fs::File,
         config: WalFlusherConfig,
     ) {
         let mut tx_guard = self.flusher_tx.write().unwrap_or_else(|e| e.into_inner());
@@ -127,22 +127,20 @@ impl Wal {
                 match cmd {
                     WalCommand::Append {
                         payload,
-                        last_hmac_val,
+                        last_hmac_val: _,
                         ack,
                     } => {
                         let mut batch_payload = payload;
                         let mut acks = vec![ack];
-                        let mut final_last_hmac_val = last_hmac_val;
 
                         while let Ok(next_cmd) = rx.try_recv() {
                             match next_cmd {
                                 WalCommand::Append {
                                     payload: p,
-                                    last_hmac_val: l,
+                                    last_hmac_val: _,
                                     ack: a,
                                 } => {
                                     batch_payload.extend_from_slice(&p);
-                                    final_last_hmac_val = l;
                                     acks.push(a);
                                 }
                                 other => {
@@ -159,21 +157,19 @@ impl Wal {
                                 match tokio::time::timeout_at(deadline, rx.recv()).await {
                                     Ok(Some(WalCommand::Append {
                                         payload: p,
-                                        last_hmac_val: l,
+                                        last_hmac_val: _,
                                         ack: a,
                                     })) => {
                                         batch_payload.extend_from_slice(&p);
-                                        final_last_hmac_val = l;
                                         acks.push(a);
                                         while let Ok(next_cmd) = rx.try_recv() {
                                             match next_cmd {
                                                 WalCommand::Append {
                                                     payload: p,
-                                                    last_hmac_val: l,
+                                                    last_hmac_val: _,
                                                     ack: a,
                                                 } => {
                                                     batch_payload.extend_from_slice(&p);
-                                                    final_last_hmac_val = l;
                                                     acks.push(a);
                                                 }
                                                 other => {
@@ -239,8 +235,6 @@ impl Wal {
                             let written_len = (if write_header { WAL_V3_HEADER.len() } else { 0 })
                                 + batch_payload.len();
 
-                            let mut last_hmac_guard = last_hmac.lock().await;
-                            *last_hmac_guard = final_last_hmac_val;
                             size.fetch_add(written_len as u64, std::sync::atomic::Ordering::SeqCst);
 
                             Ok(())
@@ -333,18 +327,20 @@ impl Wal {
                             );
                             let sealed_path = path.with_file_name(sealed_name);
 
-                            tokio::fs::rename(&path, &sealed_path).await.map_err(|e| {
-                                MemFuseError::Storage(format!(
-                                    "WAL rotate_and_seal rename {} → {} fehlgeschlagen: {}",
-                                    path.display(),
-                                    sealed_path.display(),
-                                    e
-                                ))
-                            })?;
+                            crate::wal::fs::rename(&path, &sealed_path)
+                                .await
+                                .map_err(|e| {
+                                    MemFuseError::Storage(format!(
+                                        "WAL rotate_and_seal rename {} → {} fehlgeschlagen: {}",
+                                        path.display(),
+                                        sealed_path.display(),
+                                        e
+                                    ))
+                                })?;
 
                             crate::util::fsync_parent_dir(&sealed_path).await?;
 
-                            let mut perms = tokio::fs::metadata(&sealed_path)
+                            let mut perms = crate::wal::fs::metadata(&sealed_path)
                                 .await
                                 .map_err(|e| {
                                     MemFuseError::Storage(format!(
@@ -354,7 +350,7 @@ impl Wal {
                                 })?
                                 .permissions();
                             perms.set_readonly(true);
-                            tokio::fs::set_permissions(&sealed_path, perms)
+                            crate::wal::fs::set_permissions(&sealed_path, perms)
                                 .await
                                 .map_err(|e| {
                                     MemFuseError::Storage(format!(

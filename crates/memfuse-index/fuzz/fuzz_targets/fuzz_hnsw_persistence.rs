@@ -108,8 +108,8 @@ fuzz_target!(|input: HnswPersistInput| {
                     if len > 0 {
                         let offset = (len * (input.corrupt_offset_pct as u64 % 100)) / 100;
                         let _ = file.seek(SeekFrom::Start(offset)); // INTENTIONAL-DROP
-                        let _ = file.write_all(&input.corrupt_bytes); // INTENTIONAL-DROP
-                        let _ = file.sync_all(); // INTENTIONAL-DROP
+                        let _res_write = file.write_all(&input.corrupt_bytes);
+                        let _res_sync = file.sync_all();
                     }
                 }
             }

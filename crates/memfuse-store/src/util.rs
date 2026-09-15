@@ -19,7 +19,7 @@ pub(crate) async fn fsync_parent_dir(path: &Path) -> Result<()> {
         parent
     };
 
-    let dir = tokio::fs::File::open(dir_path).await.map_err(|e| {
+    let dir = crate::wal::fs::File::open(dir_path).await.map_err(|e| {
         MemFuseError::Storage(format!(
             "Directory open failed for fsync on {}: {e}",
             dir_path.display()

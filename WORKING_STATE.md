@@ -17,11 +17,10 @@
 
 Stand letzter Prüfung: 2026-09-15
 Befehl: `cargo xtask sync-docs` / `grep -rn "AI-TAG\[SMELL\]\[CRITICAL\]" crates/ --include="*.rs" | grep -v RESOLVED`
-Ergebnis: **5 offene Tags**
+Ergebnis: **4 offene Tags**
 
 | Crate/Datei | Zeile | ID | Kat. | Sev. | Zeitstempel | Beschreibung |
 |---|---|---|---|---|---|---|
-| `crates/memfuse-index/src/hnsw.rs` | 1184 | `AGT-INDEX-f38b1a90` | `TEST` | `MINOR` | `2026-09-15T14:50:00Z` | // AI-TAG[TEST][MINOR] Global mutable atomic statics cause multi-threaded test harness races (ID: AGT-INDEX-f38b1a90) (TS: 2026-09-15T14:50:00Z) (SESSION: acf8fe72) |
 | `crates/memfuse-py/src/lib.rs` | 51 | `-` | `FIX` | `PY-1` | `2026-09-10T19:22:55Z` | // AI-TAG[FIX][PY-1] Clamp MEMFUSE_WORKER_THREADS to valid range [MIN_WORKER_THREADS, MAX_WORKER_THREADS] (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d) |
 | `crates/memfuse-py/src/lib.rs` | 79 | `-` | `FIX` | `PY-2` | `2026-09-10T19:22:55Z` | // AI-TAG[FIX][PY-2] Evaluate Result of module.setattr("_runtime_state", py_state) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d) |
 | `crates/memfuse-py/src/lib.rs` | 342 | `-` | `FIX` | `PY-3` | `2026-09-10T19:22:55Z` | // AI-TAG[FIX][PY-3] Poison engine instance on caught panic (APM-PY-A) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d) |
@@ -41,7 +40,7 @@ Ergebnis: **5 offene Tags**
 | `memfuse-sandbox` | 2 | 599 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
 | `memfuse-text` | 2 | 6170 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-candle` | 3 | 4166 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
-| `memfuse-index` | 3 | 17456 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
+| `memfuse-index` | 3 | 17527 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-ollama` | 3 | 4572 | 🟢 Clean |  |
 | `memfuse-store` | 3 | 25294 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-embed` | 4 | 2214 | 🧊 Optional |  |
