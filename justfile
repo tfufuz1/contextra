@@ -98,6 +98,23 @@ session-context:
     echo "OFFENE ANCHORS:"
     grep -rn "ANCHOR\[.*\] STATUS:IN-PROGRESS" crates/ --include='*.rs' || echo "  (keine)"
 
+# Target checks for xtask audit lints
+check-max-results-unbound:
+    cargo xtask check-max-results-unbound
+
+check-toctou-defaults:
+    cargo xtask check-toctou-defaults
+
+check-nan-hot-loop:
+    cargo xtask check-nan-hot-loop
+
+check-result-dropped-io:
+    cargo xtask check-result-dropped-io
+
+coverage-gate:
+    cargo llvm-cov --workspace --exclude memfuse-py --json --output-path coverage.json
+    cargo xtask check-coverage-gate coverage.json
+
 # Modular check for memfuse-py
 check-py:
     nix develop -c cargo check --manifest-path crates/memfuse-py/Cargo.toml || cargo check --manifest-path crates/memfuse-py/Cargo.toml
@@ -248,3 +265,139 @@ check-agents-integrity:
     set -euo pipefail
     cargo run -p xtask -- check-agents-integrity
 
+
+# Führt alle 8 Bug-Proof-Tests aus (L1 Unit-Tests, rote→grüne Beweise)
+prove-bugs:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "🔬 Führe Bug-Proof-Tests aus..."
+	cargo test -p memfuse-store --test toctou_put_if_absent -- --nocapture 2>&1 | tee /tmp/proof-b1.log
+	cargo test -p memfuse-index --test nan_validation_policy -- --nocapture 2>&1 | tee /tmp/proof-b2.log
+	cargo test -p memfuse-db --test search_result_bound -- --nocapture 2>&1 | tee /tmp/proof-b3.log
+	cargo test -p memfuse-store --test manifest_corruption -- --nocapture 2>&1 | tee /tmp/proof-b4.log
+	cargo test -p memfuse-text --test tombstone_read_your_writes -- --nocapture 2>&1 | tee /tmp/proof-b5.log
+	cargo test -p memfuse-graph --test source_doc_ids_populated -- --nocapture 2>&1 | tee /tmp/proof-b6.log
+	cargo test -p memfuse-store --test wal_truncate_ordering -- --nocapture 2>&1 | tee /tmp/proof-b7.log
+	cargo test -p memfuse-index --test deleted_nodes_lock_contention -- --nocapture 2>&1 | tee /tmp/proof-b8.log
+	echo "✅ Alle Bug-Proof-Tests grün"
+
+# Führt alle Property-Tests aus
+prop-tests:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "🔬 Property-Tests..."
+	cargo test -p memfuse-db --test proptest_search_invariants -- --nocapture
+	cargo test -p memfuse-text --test proptest_bm25_invariants -- --nocapture
+	cargo test -p memfuse-graph --test proptest_csr_invariants -- --nocapture
+	cargo test -p memfuse-store proptest -- --nocapture
+	cargo test -p memfuse-index proptest -- --nocapture
+	echo "✅ Alle Property-Tests grün"
+
+# Vollständige QA-Suite: L0 Lints + L1 Proofs + L2 Property + L5 Integration
+qa-full:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	just check
+	just prove-bugs
+	just prop-tests
+	cargo test --workspace --test '*integration*' -- --nocapture
+	echo "✅ Vollständige QA-Suite bestanden"
+
+# Führt kritische Race-Condition-Tests unter ThreadSanitizer aus (benötigt Nightly)
+tsan:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "🔒 ThreadSanitizer..."
+	RUSTFLAGS="-Z sanitizer=thread" \
+	cargo +nightly test \
+		-p memfuse-store --test toctou_put_if_absent \
+		-p memfuse-index --test deleted_nodes_lock_contention \
+		--target x86_64-unknown-linux-gnu \
+		-- --test-threads=1
+	echo "✅ TSan: keine Races gefunden"
+
+# Führt ausgewählte Tests unter AddressSanitizer aus
+asan:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "🔍 AddressSanitizer..."
+	RUSTFLAGS="-Z sanitizer=address" \
+	cargo +nightly test -p memfuse-store -p memfuse-index \
+		--target x86_64-unknown-linux-gnu \
+		-- --test-threads=1
+
+# Erstellt HTML-Coverage-Report (benötigt cargo-llvm-cov)
+coverage-html:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	which cargo-llvm-cov || cargo install cargo-llvm-cov
+	cargo llvm-cov --workspace --exclude memfuse-py --html --output-dir target/coverage/
+	echo "✅ Coverage-Report: target/coverage/index.html"
+	if command -v xdg-open &>/dev/null; then xdg-open target/coverage/index.html; fi
+
+# Erstellt Coverage-JSON für CI-Gate
+coverage-json:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	which cargo-llvm-cov || cargo install cargo-llvm-cov
+	cargo llvm-cov --workspace --exclude memfuse-py --json --output-path coverage.json
+	cargo xtask check-coverage-gate
+	echo "✅ Coverage-Gate bestanden"
+
+# Startet alle Fuzz-Targets für 60 Sekunden (benötigt cargo-fuzz + nightly)
+fuzz-all SECONDS="60":
+	#!/usr/bin/env bash
+	set -euo pipefail
+	which cargo-fuzz || cargo install cargo-fuzz
+	echo "🔥 Fuzzing für {{SECONDS}} Sekunden pro Target..."
+	targets=(
+		"memfuse-store:wal_roundtrip"
+		"memfuse-store:fuzz_manifest_load"
+		"memfuse-store:wal_mutation_chaos"
+		"memfuse-index:hnsw_insert_search"
+		"memfuse-index:fuzz_hnsw_persistence"
+		"memfuse-db:rrf_fusion"
+		"memfuse-text:fuzz_bm25_tokenize"
+	)
+	for entry in "${targets[@]}"; do
+		crate="${entry%%:*}"
+		target="${entry##*:}"
+		echo "  → crates/${crate} :: ${target}"
+		(cd "crates/${crate}" && cargo +nightly fuzz run "${target}" -- -max_total_time={{SECONDS}} 2>&1 | tail -3) || true
+	done
+	echo "✅ Fuzz-Suite abgeschlossen"
+
+# Minimiert Fuzz-Corpus (entfernt Duplikate, behält minimale reproduzierende Inputs)
+fuzz-minimize CRATE TARGET:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	cd "crates/{{CRATE}}" && cargo +nightly fuzz cmin {{TARGET}}
+	echo "✅ Corpus minimiert: crates/{{CRATE}}/fuzz/corpus/{{TARGET}}"
+
+# Vergleicht aktuelle Benchmark-Ergebnisse mit Baseline (±5% Gate)
+bench-delta:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "📊 Benchmark-Delta-Analyse..."
+	cargo bench --workspace --bench '*' -- --save-baseline current 2>&1 | tail -20
+	cargo xtask bench-gate --tolerance 0.05 \
+		--baseline benchmarks/results/criterion-baseline.json \
+		--current criterion/current
+	echo "✅ Kein Benchmark-Regression > 5%"
+
+# Setzt aktuelle Benchmarks als neue Baseline
+bench-set-baseline:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "📊 Setze neue Baseline..."
+	cargo bench --workspace --bench '*' -- --save-baseline current
+	cp -r criterion/current benchmarks/results/criterion-baseline.json
+	echo "✅ Baseline aktualisiert"
+
+# Externe Benchmarks (synthetisch, kein Download nötig)
+bench-external:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "🌐 Externe Benchmarks (BEIR + ANN)..."
+	cargo run -p memfuse-bench --release -- --synthetic-only 2>&1 | tee benchmarks/results/external_latest.json
+	echo "✅ Externe Benchmarks abgeschlossen: benchmarks/results/external_latest.json"
