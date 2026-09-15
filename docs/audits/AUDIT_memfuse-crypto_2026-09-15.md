@@ -76,3 +76,23 @@ Der Abgleich des tatsächlichen Dateibaums unter `crates/memfuse-crypto/src/` er
 - [x] ISO-8601 UTC Zeitstempel und SESSION tokens in allen Tags verifiziert
 - [x] Gate 10 Freshness passed
 - [x] `check-audit-verdict-independence` PASSED
+
+---
+
+## 6. Test-Ausbau-Sitzung (TASK-ID: JULES-20260915-MEMFUSECRY-TEST-7FLM, SESSION: `ef7ec920`, TS: `2026-09-15T15:54:30Z`)
+
+### Durchführung & Abdeckung
+- **Inventar-Abgleich:** Reales Dateinventar bestätigt (12 Dateien unter `src/`). Drift gegenüber Prompter-Snapshot (2026-09-10) bezüglich `egress_vault.rs`, `kv_segment/mod.rs` und `kv_segment/segment.rs` verifiziert.
+- **Unit-Tests erweitert in `deletion_proof.rs`:**
+  - `test_layer_cleanup_proof_verify_and_create`: Verifizierung von `verify_and_create` für `Ok(true)`, `Ok(false)` und `Err(...)`-Pfade.
+  - `test_deletion_proof_unsupported_signature_version`: Ablehnung unbekannter Signatur-Versionen (z.B. Version 255) mit `MemFuseError::Internal`.
+- **Unit-Tests erweitert in `crypto.rs`:**
+  - `test_derive_segment_key_determinism_and_isolation`: Verifizierung von Determinismus, Isolation und Roundtrip-Verschlüsselung/-Entschlüsselung für `derive_segment_key`.
+- **Unit-Tests erweitert in `wal_crypto.rs`:**
+  - `test_integrity_verifier_handoff_via_snapshot`: Verifizierung der HMAC-Kettenkontinuität bei Verifier-Handoffs via `last_hmac_snapshot()` und `set_last_hmac()`.
+- **Unit-Tests erweitert in `egress_vault.rs`:**
+  - `test_egress_vault_accessors_and_with_timeout`: Verifizierung von `with_timeout()`, `timeout()` und `patterns()`.
+  - `test_exact_payload_boundary_allowed`: Verifizierung der exakten Grenzlänge `MAX_CLASSIFY_PAYLOAD_BYTES`.
+- **Clippy-Fix in `tests/kv_segment_concurrency.rs`:**
+  - Entfernung unnötigen Casts (`(*id / 1000) as u64`).
+- **Verifikation:** Alle Gates (`cargo check --all-targets`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`, `cargo test`, `cargo check --workspace`) grün.
