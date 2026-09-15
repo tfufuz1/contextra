@@ -730,6 +730,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let old_user_val = self.storage.get_at_seq(&user_key, u64::MAX).await?;
         let old_doc_val = self.storage.get_at_seq(&doc_key, u64::MAX).await?;
+        let is_update = old_user_val.is_some() || old_doc_val.is_some();
 
         // Stage removal from old text index
         db_tx.stage_text_delete(doc_id);
@@ -768,11 +769,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         // Re-insert into HNSW
         // Recovery-Pfad ist HNSW-Rebuild (>20% deleted nodes) der mit LSM re-synct.
-        if let Err(e) = self.index.delete(tx, doc_id).await {
-            tracing::warn!(
-                doc_id = ?doc_id,
-                "HNSW soft-delete fehlgeschlagen: {e}. Doc wird nach HNSW-Rebuild nicht mehr in Vektorsuchen erscheinen."
-            );
+        if is_update {
+            if let Err(e) = self.index.delete(tx, doc_id).await {
+                tracing::warn!(
+                    doc_id = ?doc_id,
+                    "HNSW soft-delete fehlgeschlagen: {e}. Doc wird nach HNSW-Rebuild nicht mehr in Vektorsuchen erscheinen."
+                );
+            }
         }
         self.index.insert(tx, doc_id, embedding).await?;
 
