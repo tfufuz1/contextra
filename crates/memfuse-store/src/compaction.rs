@@ -134,38 +134,28 @@ impl CompactionEngine {
         sstables: &RwLock<Vec<Arc<SstableReader>>>,
         data_path: &std::path::Path,
     ) -> Result<bool> {
-        // 1. Read current SSTables under read-lock
-        let candidates = {
+        // 1. Select candidates under a single read-lock window.
+        // Both candidate decision, Arc cloning, and full-compaction determination
+        // happen atomically under one lock acquisition to prevent TOCTOU race conditions.
+        let (mut input_ssts, is_full_compaction) = {
             let ssts = sstables.read().await;
             if ssts.len() < self.config.min_sstables_per_tier {
                 return Ok(false);
             }
-            self.select_compaction_candidates(&ssts)
-        };
-
-        let (indices, is_full_compaction) = match candidates {
-            Some(indices) if indices.len() >= 2 => {
-                let is_full = {
-                    let ssts = sstables.read().await;
-                    indices.len() == ssts.len()
-                };
-                (indices, is_full)
+            match self.select_compaction_candidates(&ssts) {
+                Some(candidates) if candidates.len() >= 2 => {
+                    let is_full = candidates.len() == ssts.len();
+                    (candidates, is_full)
+                }
+                _ => return Ok(false),
             }
-            _ => return Ok(false),
         };
 
-        tracing::info!("Compaction triggered: merging {} SSTables", indices.len());
+        input_ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
-        // 2. Collect input SSTables (under read-lock, just clone Arcs, sorted chronologically)
-        let input_ssts: Vec<Arc<SstableReader>> = {
-            let ssts = sstables.read().await;
-            let mut input: Vec<Arc<SstableReader>> =
-                indices.iter().map(|&i| Arc::clone(&ssts[i])).collect();
-            input.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
-            input
-        };
+        tracing::info!("Compaction triggered: merging {} SSTables", input_ssts.len());
 
-        // 3. Perform the merge (no lock held — this is the expensive part)
+        // 2. Perform the merge (no lock held — this is the expensive part)
         let min_snapshot_seq = self.snapshot_registry.min_active_seqno();
         let output_path = self.generate_sst_path(data_path)?;
         self.merge_sstables(
@@ -306,7 +296,10 @@ impl CompactionEngine {
     /// Selects SSTables to compact using Size-Tiered strategy.
     ///
     /// Groups by size class and returns the first group that meets the threshold.
-    fn select_compaction_candidates(&self, ssts: &[Arc<SstableReader>]) -> Option<Vec<usize>> {
+    fn select_compaction_candidates(
+        &self,
+        ssts: &[Arc<SstableReader>],
+    ) -> Option<Vec<Arc<SstableReader>>> {
         if ssts.len() < 2 {
             return None;
         }
@@ -353,7 +346,12 @@ impl CompactionEngine {
             if tier.len() >= self.config.min_sstables_per_tier {
                 let mut sorted_tier = tier;
                 sorted_tier.sort_by_key(|&i| ssts[i].metadata().max_seq & !TOMBSTONE_BIT);
-                return Some(sorted_tier);
+                return Some(
+                    sorted_tier
+                        .into_iter()
+                        .map(|i| Arc::clone(&ssts[i]))
+                        .collect(),
+                );
             }
         }
 
@@ -368,7 +366,7 @@ impl CompactionEngine {
             let count = self.config.min_sstables_per_tier;
             let mut indices: Vec<usize> = by_size[..count].iter().map(|&(i, _)| i).collect();
             indices.sort_by_key(|&i| ssts[i].metadata().max_seq & !TOMBSTONE_BIT);
-            return Some(indices);
+            return Some(indices.into_iter().map(|i| Arc::clone(&ssts[i])).collect());
         }
 
         None
@@ -598,6 +596,7 @@ impl CompactionEngine {
             }
         }
     }
+
 }
 
 #[cfg(test)]
@@ -789,10 +788,7 @@ mod tests {
             .expect("candidates selected");
 
         // Collect inputs in selected candidate order
-        let candidate_ssts: Vec<_> = candidates
-            .iter()
-            .map(|&i| Arc::clone(&sstables[i]))
-            .collect();
+        let candidate_ssts = candidates;
 
         // Perform merge
         let output = tmp.path().join("merged_chronological.sst");
@@ -2049,5 +2045,74 @@ mod tests {
                 assert_eq!(val, expected_val.as_bytes());
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_compaction_single_lock_candidate_selection_concurrency() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let config = CompactionConfig {
+            min_sstables_per_tier: 2,
+            ..Default::default()
+        };
+        let engine = CompactionEngine::new(
+            config,
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        );
+
+        let sstables = Arc::new(RwLock::new(Vec::new()));
+        for i in 0..3u8 {
+            let sst = create_test_sstable(
+                tmp.path(),
+                &format!("sst-{}.sst", i),
+                &[(format!("key-{}", i).as_bytes(), b"val", i as u64 + 1)],
+                Arc::clone(&bc),
+            )
+            .await;
+            sstables.write().await.push(sst);
+        }
+
+        // 1. Obtain selected candidate Arcs in a single read lock call
+        let candidates = engine
+            .select_compaction_candidates(&sstables.read().await)
+            .expect("candidates selected");
+        assert_eq!(candidates.len(), 3);
+
+        // 2. Simulate concurrent modification (flush/rollback/pop/clear) on sstables
+        let extra_sst = create_test_sstable(
+            tmp.path(),
+            "sst-concurrent-flush.sst",
+            &[(b"concurrent-key", b"val", 99)],
+            Arc::clone(&bc),
+        )
+        .await;
+        {
+            let mut guard = sstables.write().await;
+            guard.remove(0); // remove item 0 (rollback/compaction modification)
+            guard.push(extra_sst); // append new sstable (concurrent flush)
+        }
+
+        // 3. Verify candidates acquired in step 1 are completely decoupled from index changes
+        // in sstables list and can be safely merged without out-of-bounds panics.
+        let output = tmp.path().join("merged_decoupled.sst");
+        let merge_res = engine
+            .merge_sstables(&candidates, &output, u64::MAX, true)
+            .await;
+        assert!(merge_res.is_ok(), "Merge of Arc candidates must succeed regardless of list modifications");
+
+        let reader = SstableReader::open(&output, Arc::clone(&bc))
+            .await
+            .expect("open merged sst");
+        let entries = reader.iter().await.expect("iter entries");
+        assert_eq!(entries.len(), 3, "All 3 original Arc candidates must be merged safely");
     }
 }
