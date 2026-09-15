@@ -232,3 +232,206 @@ pub fn compare_metrics_files(
 
     Ok(compare_metrics(&current, &baseline, threshold))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compare_metrics_happy_path_equal() {
+        let baseline = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.85,
+                total_cases: 100,
+            }),
+            locomo: Some(LocomoMetricsSummary {
+                overall_recall_at_5: 0.90,
+                overall_mrr: 0.88,
+                total_eval_cases: 50,
+            }),
+        };
+
+        let res = compare_metrics(&baseline, &baseline, 0.05);
+        assert!(!res.has_regression);
+        assert!(res.errors.is_empty());
+        assert_eq!(res.pass_messages.len(), 3);
+    }
+
+    #[test]
+    fn test_compare_metrics_regression_exceeds_threshold() {
+        let baseline = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.80,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+        let current = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.70, // 12.5% drop > 5% threshold
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+
+        let res = compare_metrics(&current, &baseline, 0.05);
+        assert!(res.has_regression);
+        assert_eq!(res.errors.len(), 1);
+        assert!(res.errors[0].contains("[REGRESSION] long_mem_eval.overall_accuracy regressed!"));
+    }
+
+    #[test]
+    fn test_compare_metrics_within_threshold_passes() {
+        let baseline = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.80,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+        let current = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.78, // 2.5% drop <= 5% threshold
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+
+        let res = compare_metrics(&current, &baseline, 0.05);
+        assert!(!res.has_regression);
+        assert!(res.errors.is_empty());
+        assert_eq!(res.pass_messages.len(), 1);
+        assert!(res.pass_messages[0].contains("within tolerance"));
+    }
+
+    #[test]
+    fn test_compare_metrics_improvement_emits_info() {
+        let baseline = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.80,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+        let current = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.88, // Improvement
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+
+        let res = compare_metrics(&current, &baseline, 0.05);
+        assert!(!res.has_regression);
+        assert_eq!(res.info_hints.len(), 1);
+        assert!(res.info_hints[0].contains("EXCEEDS baseline!"));
+    }
+
+    #[test]
+    fn test_compare_metrics_nan_and_inf_detection() {
+        let baseline = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.80,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+        let current_nan = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: f64::NAN,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+
+        let res_nan = compare_metrics(&current_nan, &baseline, 0.05);
+        assert!(res_nan.has_regression);
+        assert!(res_nan.errors[0].contains("invalid float value (NaN/Inf)"));
+
+        let current_inf = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: f64::INFINITY,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+
+        let res_inf = compare_metrics(&current_inf, &baseline, 0.05);
+        assert!(res_inf.has_regression);
+        assert!(res_inf.errors[0].contains("invalid float value (NaN/Inf)"));
+    }
+
+    #[test]
+    fn test_compare_metrics_invalid_threshold() {
+        let baseline = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.80,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+
+        let res_neg = compare_metrics(&baseline, &baseline, -0.01);
+        assert!(res_neg.has_regression);
+        assert!(res_neg.errors[0].contains("Invalid threshold value"));
+    }
+
+    #[test]
+    fn test_compare_metrics_missing_section() {
+        let baseline = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.80,
+                total_cases: 100,
+            }),
+            locomo: Some(LocomoMetricsSummary {
+                overall_recall_at_5: 0.90,
+                overall_mrr: 0.88,
+                total_eval_cases: 50,
+            }),
+        };
+        let current_missing_locomo = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.80,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+
+        let res = compare_metrics(&current_missing_locomo, &baseline, 0.05);
+        assert!(res.has_regression);
+        assert!(res.errors[0].contains("Missing 'locomo' metrics"));
+    }
+
+    #[test]
+    fn test_compare_metrics_zero_baseline() {
+        let baseline = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.0,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+        let current_zero = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: 0.0,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+        let current_negative = CombinedMetrics {
+            long_mem_eval: Some(LongMemEvalMetricsSummary {
+                overall_accuracy: -0.1,
+                total_cases: 100,
+            }),
+            locomo: None,
+        };
+
+        let res_zero = compare_metrics(&current_zero, &baseline, 0.05);
+        assert!(!res_zero.has_regression);
+        assert!(res_zero.pass_messages[0].contains("meets baseline"));
+
+        let res_neg = compare_metrics(&current_negative, &baseline, 0.05);
+        assert!(res_neg.has_regression);
+        assert!(res_neg.errors[0].contains("regressed from baseline 0.0!"));
+    }
+}
