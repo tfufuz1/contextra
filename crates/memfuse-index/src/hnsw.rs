@@ -1181,6 +1181,10 @@ impl HnswIndex {
     }
 }
 
+// AI-TAG[TEST][MINOR] Global mutable atomic statics cause multi-threaded test harness races (ID: AGT-INDEX-f38b1a90) (TS: 2026-09-15T14:50:00Z) (SESSION: acf8fe72)
+// BEFUND: FAIL_HNSW_COMPUTE_INSERT_COUNT and FAIL_HNSW_COMPUTE_INSERT_TARGET are mutable static atomics used for fault injection tests.
+// RISIKO: Under cargo test --test-threads > 1, parallel tests accessing HnswIndex can race on these fault injection counters causing non-deterministic test failures.
+// EMPFEHLUNG: Refactor fault injection hooks to instance-level fields or thread-local storage instead of global statics.
 #[cfg(test)]
 pub static FAIL_HNSW_COMPUTE_INSERT_COUNT: AtomicU64 = AtomicU64::new(0);
 #[cfg(test)]

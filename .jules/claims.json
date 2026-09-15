@@ -53,6 +53,15 @@
       "active": false,
       "expires_at": "2026-09-14T17:59:30.299591055+00:00",
       "released_at": "2026-09-15T02:29:10.212659296+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-index",
+      "issue": "JULES-20260915-MEMFUSEIND-DEEP-B2BJ",
+      "timestamp": "2026-09-15T14:41:11.098148595+00:00",
+      "session_id": "3381548412194950804",
+      "active": false,
+      "expires_at": "2026-09-15T18:41:11.098132076+00:00",
+      "released_at": "2026-09-15T15:10:35.495406799+00:00"
     }
   ]
 }
