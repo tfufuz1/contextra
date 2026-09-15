@@ -226,15 +226,13 @@ impl LsmStorage {
         let manifest_exists = manifest_path.exists();
         let _valid_manifest_sstables: Option<std::collections::HashSet<std::path::PathBuf>> =
             if manifest_exists {
-                if let Ok(entries) = crate::manifest::Manifest::load(&manifest_path).await {
-                    Some(
-                        crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
-                            .into_iter()
-                            .collect(),
-                    )
-                } else {
-                    None
-                }
+                let entries = crate::manifest::Manifest::load(&manifest_path).await?;
+                Some(
+                    crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
+                        .into_iter()
+                        .map(|(path, _rank)| path)
+                        .collect(),
+                )
             } else {
                 None
             };
@@ -247,6 +245,7 @@ impl LsmStorage {
                 if file_name.ends_with(".tmp")
                     || path.extension().is_some_and(|ext| ext == "tmp")
                     || file_name.starts_with("SALT.tmp.")
+                    || file_name.starts_with("MANIFEST.new.")
                 {
                     tracing::warn!("Removing leftover un-renamed temp file: {:?}", path);
                     if let Err(e) = tokio::fs::remove_file(&path).await {

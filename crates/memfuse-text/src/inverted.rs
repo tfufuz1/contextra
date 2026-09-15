@@ -541,8 +541,37 @@ impl<S: StorageEngine> InvertedIndex<S> {
                 if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
                     if let Ok(doc_id_raw) = suffix.parse::<u64>() {
                         if val_bytes.len() == 4 {
+                            let doc_id = DocId::new(doc_id_raw);
+
+                            // Check document existence & length at snapshot seq
+                            let doc_len = if let Some(&len) = doc_len_cache.get(&doc_id) {
+                                len
+                            } else {
+                                let dl_key = self.key_with_id("dl:", doc_id.inner());
+                                match self.storage.get_at_seq(&dl_key, seq).await? {
+                                    Some(dl_bytes) if dl_bytes.len() == 4 => {
+                                        let len = u32::from_le_bytes(
+                                            dl_bytes.as_slice().try_into().map_err(|_| {
+                                                MemFuseError::Storage(
+                                                    "Invalid doc_len length".into(),
+                                                )
+                                            })?,
+                                        );
+                                        doc_len_cache.insert(doc_id, len);
+                                        len
+                                    }
+                                    _ => continue, // Document deleted or invalid at seq
+                                }
+                            };
+
+                            // Check tombstone marker tbs:{doc_id}:{term} at snapshot seq
+                            let tbs_key = self.key_tombstone(doc_id, term);
+                            if self.storage.get_at_seq(&tbs_key, seq).await?.is_some() {
+                                continue; // Stale posting masked by tombstone at seq
+                            }
+
                             let tf = u32::from_le_bytes(val_bytes[..4].try_into().unwrap());
-                            valid_postings.push((DocId::new(doc_id_raw), tf));
+                            valid_postings.push((doc_id, tf, doc_len));
                         }
                     }
                 }
@@ -553,26 +582,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
                 continue;
             }
 
-            for (doc_id, tf) in valid_postings {
-                // Fetch doc length
-                let doc_len = if let Some(&len) = doc_len_cache.get(&doc_id) {
-                    len
-                } else {
-                    let dl_key = self.key_with_id("dl:", doc_id.inner());
-                    let mut len = 0u32;
-                    let dl_bytes_res = self.storage.get_at_seq(&dl_key, seq).await?;
-
-                    if let Some(dl_bytes) = dl_bytes_res {
-                        if dl_bytes.len() == 4 {
-                            len = u32::from_le_bytes(dl_bytes.as_slice().try_into().map_err(
-                                |_| MemFuseError::Storage("Invalid doc_len length".into()),
-                            )?);
-                        }
-                    }
-                    doc_len_cache.insert(doc_id, len);
-                    len
-                };
-
+            for (doc_id, tf, doc_len) in valid_postings {
                 let score = crate::bm25::score_term(tf, doc_len, avg_doc_len, df, n as u32);
 
                 *scores.entry(doc_id).or_insert(0.0) += score;
