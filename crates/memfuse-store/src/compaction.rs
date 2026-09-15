@@ -250,6 +250,16 @@ impl CompactionEngine {
             let insert_idx = insertion_point.min(ssts.len());
             ssts.insert(insert_idx, new_reader);
 
+            // Re-sort SSTable list by max_seq to guarantee shadowing/visibility order.
+            // Non-input SSTables might lie between the oldest and newest input SSTables.
+            ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
+
+            debug_assert!(
+                ssts.windows(2).all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                    <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                "SSTable list must be sorted by max_seq in ascending order after compaction swap"
+            );
+
             old_paths
         };
 
@@ -1406,6 +1416,121 @@ mod tests {
         assert!(
             stabilized,
             "Compaction didn't reach target segment count in time"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let config = CompactionConfig {
+            min_sstables_per_tier: 2,
+            ..CompactionConfig::default()
+        };
+        let engine = CompactionEngine::new(
+            config,
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        );
+
+        // Setup 3 SSTables (A, C, B) in chronological sequence:
+        // SSTable A (oldest, seq=10): [key = "val_A", key_common = "val_A_old"]
+        // SSTable C (middle, seq=15): [key_common = "val_C_middle"]
+        // SSTable B (newest, seq=20): [key = "val_B", key_common = "val_B_newest"]
+        let sst_a = create_test_sstable(
+            tmp.path(),
+            "sst_a.sst",
+            &[(b"key_a", b"val_A", 10), (b"key_common", b"val_A_old", 10)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst_c = create_test_sstable(
+            tmp.path(),
+            "sst_c.sst",
+            &[(b"key_common", b"val_C_middle", 15)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst_b = create_test_sstable(
+            tmp.path(),
+            "sst_b.sst",
+            &[(b"key_b", b"val_B", 20), (b"key_common", b"val_B_newest", 20)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        // SSTable list in memory in max_seq ascending order: [A (10), C (15), B (20)]
+        let sstables = Arc::new(RwLock::new(vec![
+            Arc::clone(&sst_a),
+            Arc::clone(&sst_c),
+            Arc::clone(&sst_b),
+        ]));
+
+        // Select candidates to compact A and B (e.g. tier/fallback selection or explicit input list)
+        // Here we compact input_ssts = [sst_a, sst_b] into M (max_seq = 20)
+        let min_snapshot_seq = u64::MAX;
+        let output_path = tmp.path().join("sst_merged_m.sst");
+        engine
+            .merge_sstables(&[sst_a.clone(), sst_b.clone()], &output_path, min_snapshot_seq, false)
+            .await
+            .expect("merge A and B into M");
+
+        let new_reader = Arc::new(
+            SstableReader::open(&output_path, Arc::clone(&bc))
+                .await
+                .expect("open merged M"),
+        );
+
+        // Perform the swap manually inside a write guard (replicating swap logic in maybe_compact)
+        let input_ssts = vec![sst_a, sst_b];
+        {
+            let mut ssts = sstables.write().await;
+            let insertion_point = ssts
+                .iter()
+                .position(|sst| input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)))
+                .unwrap_or(ssts.len());
+
+            ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
+
+            let insert_idx = insertion_point.min(ssts.len());
+            ssts.insert(insert_idx, new_reader);
+
+            // Re-sort SSTable list by max_seq to guarantee shadowing/visibility order.
+            ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
+
+            debug_assert!(
+                ssts.windows(2).all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                    <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                "SSTable list must be sorted by max_seq in ascending order after compaction swap"
+            );
+        }
+
+        // Simulating LSM point lookup / scan (.iter().rev()):
+        // Reading key_common from current sstables list in .iter().rev() order MUST find M first (seq=20),
+        // returning "val_B_newest", NOT "val_C_middle" from C (seq=15).
+        let ssts = sstables.read().await;
+        let mut found_val = None;
+        for sst in ssts.iter().rev() {
+            if let Ok(Some((val, _seq, _tx))) = sst.get(b"key_common").await {
+                found_val = Some(val);
+                break;
+            }
+        }
+
+        assert_eq!(
+            found_val.expect("key_common found").as_ref(),
+            b"val_B_newest",
+            "Read path (.iter().rev()) must return newest value from merged SSTable M, not stale C"
         );
     }
 
