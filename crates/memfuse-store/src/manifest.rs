@@ -429,20 +429,28 @@ impl Manifest {
             let mut entry_raw = vec![0u8; len];
             match reader.read_exact(&mut entry_raw).await {
                 Ok(_) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof && is_tail => {
+                    // Tail-Truncation: letzter Eintrag wurde durch Power-Loss abgeschnitten — ok.
                     tracing::warn!(
                         "MANIFEST tail truncation detected (incomplete payload) at offset {}",
                         pos
                     );
                     break;
                 }
-            } else {
-                read_res.map_err(|e| {
-                    MemFuseError::Storage(format!(
+                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    // Mid-File-Korruption: UnexpectedEof in der Dateimitte = SSTable-Resurrection-Risiko.
+                    return Err(MemFuseError::Storage(format!(
+                        "MANIFEST mid-file corruption at offset {}: \
+                         incomplete payload read (not tail position — possible SSTable resurrection risk)",
+                        pos
+                    )));
+                }
+                Err(e) => {
+                    return Err(MemFuseError::Storage(format!(
                         "MANIFEST read error at offset {}: {}",
                         pos, e
-                    ))
-                })?;
+                    )));
+                }
             }
 
             let entry_pos = pos;
@@ -872,7 +880,7 @@ mod tests {
             .expect("load final entries");
         let final_live_set = Manifest::reconstruct_valid_sstables(&final_entries);
         assert_eq!(final_live_set.len(), 6);
-        assert!(final_live_set.contains(Path::new("sst-0051.sst")));
+        assert!(final_live_set.iter().any(|(p, _)| p == Path::new("sst-0051.sst")));
     }
 
     #[tokio::test]
@@ -961,7 +969,7 @@ mod tests {
         let valid_sstables = Manifest::reconstruct_valid_sstables(&reloaded_entries);
 
         assert_eq!(valid_sstables.len(), 2);
-        assert!(valid_sstables.contains(Path::new("sst-10.sst")));
-        assert!(valid_sstables.contains(Path::new("sst-20.sst")));
+        assert!(valid_sstables.iter().any(|(p, _)| p == Path::new("sst-10.sst")));
+        assert!(valid_sstables.iter().any(|(p, _)| p == Path::new("sst-20.sst")));
     }
 }
