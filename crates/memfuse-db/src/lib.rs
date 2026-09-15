@@ -2335,6 +2335,7 @@ mod tests {
                 doc_ids: Arc::new(vec![doc_id]),
                 has_text: false,
                 has_graph: false,
+                stages_completed: 0,
             };
             let intent_bytes = serde_json::to_vec(&intent).expect("serialize intent"); // expect
             db.storage
@@ -2405,6 +2406,7 @@ mod tests {
                 doc_ids: Arc::new(vec![doc_id]),
                 has_text: false,
                 has_graph: false,
+                stages_completed: 0,
             };
             let intent_bytes = serde_json::to_vec(&intent).expect("intent json"); // expect
             db.storage

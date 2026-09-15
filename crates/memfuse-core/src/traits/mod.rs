@@ -43,7 +43,6 @@ pub use checkpoint::*;
 pub use embedding::*;
 pub use graph_index::*;
 pub use lifecycle::*;
-pub use observability::*;
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;

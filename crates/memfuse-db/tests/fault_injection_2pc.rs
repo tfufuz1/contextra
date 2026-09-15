@@ -608,6 +608,7 @@ async fn test_2e_crash_points_and_repair_on_open() {
             doc_ids: Arc::new(vec![doc_id]),
             has_text: true,
             has_graph: true,
+            stages_completed: 0,
         };
         let intent_bytes = serde_json::to_vec(&intent).unwrap();
         col.storage()

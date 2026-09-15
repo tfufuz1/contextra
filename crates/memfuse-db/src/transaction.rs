@@ -1148,6 +1148,7 @@ mod tests {
             doc_ids: doc_ids_arc,
             has_text: false,
             has_graph: false,
+            stages_completed: 0,
         };
         let json_arc = serde_json::to_string(&intent_arc).expect("serialize Arc");
 
