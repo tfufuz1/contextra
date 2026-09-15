@@ -101,7 +101,7 @@ pub struct RouterState {
 ///   independently per `DecisionId` and do not affect the atomic snapshot guarantees of `RouterState`.
 /// - **Concurrency Safety**: This separation presents **zero concurrency risk**. Routing queries read `RouterState`
 ///   lock-free and briefly acquire a write lock on `pending_decisions` solely to record decision IDs.
-/// Type-Alias for Backward-Compatibility using `LsmStorage`.
+///   Type-Alias for Backward-Compatibility using `LsmStorage`.
 pub type DefaultRouterEngine = RouterEngine<LsmStorage>;
 
 pub struct RouterEngine<S: StorageEngine> {

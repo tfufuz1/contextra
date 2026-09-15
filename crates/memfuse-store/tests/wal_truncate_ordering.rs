@@ -152,7 +152,9 @@ async fn proof_concurrent_flush_and_truncate_no_panic() -> Result<()> {
                     value: format!("v_{i}").into_bytes(),
                 };
                 if let Ok((batch, _)) = wal_writer.prepare_batch(vec![(op, i)]).await {
-                    let _ = wal_writer.append_batch(batch).await;
+                    if let Err(e) = wal_writer.append_batch(batch).await {
+                        tracing::debug!(error = %e, "Concurrent append_batch returned error");
+                    }
                 }
                 tokio::task::yield_now().await;
             }
@@ -161,7 +163,9 @@ async fn proof_concurrent_flush_and_truncate_no_panic() -> Result<()> {
         let wal_truncater = Arc::clone(&wal);
         let truncater_handle = tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(50)).await;
-            let _ = wal_truncater.truncate(4, [0u8; 32]).await;
+            if let Err(e) = wal_truncater.truncate(4, [0u8; 32]).await {
+                tracing::debug!(error = %e, "Truncate during flush returned error as expected under concurrency");
+            }
         });
 
         let (res_w, res_t) = tokio::join!(writer_handle, truncater_handle);
@@ -180,6 +184,7 @@ async fn proof_concurrent_flush_and_truncate_no_panic() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "fault-injection")]
 #[tokio::test]
 async fn proof_wal_size_counter_consistent_after_failed_truncate() -> Result<()> {
     let dir = tempdir()?;
@@ -257,7 +262,9 @@ async fn proof_wal_truncate_ordering_under_concurrent_flush() -> Result<()> {
                 value: b"concurrent_v".to_vec(),
             };
             if let Ok((batch, _)) = wal_writer.prepare_batch(vec![(op, seq)]).await {
-                let _ = wal_writer.append_batch(batch).await;
+                if let Err(e) = wal_writer.append_batch(batch).await {
+                    tracing::debug!(error = %e, "Concurrent append_batch returned error");
+                }
             }
             seq += 1;
             tokio::task::yield_now().await;
@@ -269,7 +276,9 @@ async fn proof_wal_truncate_ordering_under_concurrent_flush() -> Result<()> {
     let truncater_handle = tokio::spawn(async move {
         for _ in 0..50 {
             tokio::task::yield_now().await;
-            let _ = wal_truncater.truncate(base_offset, last_hmac_1).await;
+            if let Err(e) = wal_truncater.truncate(base_offset, last_hmac_1).await {
+                tracing::debug!(error = %e, "Concurrent truncate returned error");
+            }
         }
         done_truncater.store(true, std::sync::atomic::Ordering::Relaxed);
     });
