@@ -721,5 +721,32 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_derive_segment_key_determinism_and_isolation() -> Result<()> {
+        let km = KeyManager::try_new("master-passphrase-segment-key", b"salt-123")?;
+        let sub_km1 = km.derive_segment_key("memfuse-kv-v1-segment-1-100")?;
+        let sub_km2 = km.derive_segment_key("memfuse-kv-v1-segment-1-100")?;
+        let sub_km3 = km.derive_segment_key("memfuse-kv-v1-segment-1-101")?;
+
+        assert_eq!(
+            sub_km1.inspect_key_bytes_for_test(),
+            sub_km2.inspect_key_bytes_for_test(),
+            "Identical segment info strings MUST yield identical subkeys"
+        );
+        assert_ne!(
+            sub_km1.inspect_key_bytes_for_test(),
+            sub_km3.inspect_key_bytes_for_test(),
+            "Different segment info strings MUST yield distinct subkeys"
+        );
+
+        let data = b"segment tensor data";
+        let (encrypted, nonce) = sub_km1.encrypt_auto_nonce(data)?;
+        let decrypted = sub_km2.decrypt_auto_nonce(&encrypted, &nonce)?;
+        assert_eq!(decrypted, data);
+
+        assert!(sub_km3.decrypt_auto_nonce(&encrypted, &nonce).is_err());
+        Ok(())
+    }
+
     // REVIEW-PASS[8/3] STATUS:PASS (ID: AGT-CRYPTO-81653b64) (TS: 2026-09-13T01:35:00Z) (SESSION: dd990e1d) (PRÜFER-KONTEXT: FRESH)
 }

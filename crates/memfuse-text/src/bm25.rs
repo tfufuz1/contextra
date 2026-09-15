@@ -312,6 +312,14 @@ mod tests {
     }
 
     #[test]
+    fn test_bm25_boundary_params_zero_tf() {
+        let bm25 = BM25::new(0.0, 0.0).unwrap();
+        assert_eq!(bm25.score_term(0, 10, 10.0, 1, 10), 0.0);
+        let bm25_max = BM25::new(2.0, 1.0).unwrap();
+        assert!(bm25_max.score_term(1, 10, 10.0, 1, 10) > 0.0);
+    }
+
+    #[test]
     fn test_bm25_score_zero_df() {
         // Dedicated test for Befund 3 (df = 0)
         let score_std = score_term(2, 100, 150.0, 0, 1000);
