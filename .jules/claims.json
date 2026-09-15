@@ -145,6 +145,12 @@
       "active": false,
       "expires_at": "2026-09-15T20:05:28.721776475+00:00",
       "released_at": "2026-09-15T16:39:18.027431869+00:00"
+      "krate": "memfuse-db",
+      "issue": "JULES-20260915-MEMFUSEDB-TEST-60Q2",
+      "timestamp": "2026-09-15T16:13:01.903642210+00:00",
+      "session_id": "14718596563470893247",
+      "active": true,
+      "expires_at": "2026-09-15T20:13:01.903623830+00:00"
     }
   ]
 }

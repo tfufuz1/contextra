@@ -2592,6 +2592,270 @@ async fn test_run_percolation_check_rebonding() -> memfuse_core::Result<()> {
     Ok(())
 }
 
+// ============================================================================
+// MANDATORY TEST MATRIX, APM EDGE CASES & PROPERTY TESTS
+// ============================================================================
+
+#[tokio::test]
+async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> memfuse_core::Result<()> {
+    use memfuse_graph::CsrGraph;
+    use memfuse_index::HnswIndex;
+    use memfuse_store::LsmStorage;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(memfuse_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "matrix_happy".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        memfuse_text::Language::English,
+    );
+
+    let doc_id = "doc_matrix_1";
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+    let meta = serde_json::json!({ "title": "hand_calculated_constant", "value": 42 });
+
+    col.insert(doc_id, &vec, Some(meta.clone())).await?;
+
+    let retrieved = col.get(doc_id).await?;
+    assert!(retrieved.is_some());
+    let doc = retrieved.unwrap();
+    assert_eq!(doc.id, doc_id);
+    let meta_obj = doc.metadata.as_ref().unwrap().as_object().unwrap();
+    assert_eq!(meta_obj.get("title").unwrap(), "hand_calculated_constant");
+    assert_eq!(meta_obj.get("value").unwrap(), 42);
+
+    let search_res = col.search(&vec, 1).await?;
+    assert_eq!(search_res.len(), 1);
+    assert_eq!(search_res[0].id, doc_id);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_collection_mandatory_matrix_empty_inputs() -> memfuse_core::Result<()> {
+    use memfuse_graph::CsrGraph;
+    use memfuse_index::HnswIndex;
+    use memfuse_store::LsmStorage;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(memfuse_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "matrix_empty".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        memfuse_text::Language::English,
+    );
+
+    // Empty collection search must return Ok(Vec::new()) without error
+    let res = col.search(&[1.0, 0.0, 0.0, 0.0], 10).await?;
+    assert!(res.is_empty());
+
+    // Empty text query in builder must return Ok(Vec::new())
+    let builder_res = col.query().k(5).execute().await?;
+    assert!(builder_res.is_empty());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_collection_mandatory_matrix_error_paths() -> memfuse_core::Result<()> {
+    use memfuse_graph::CsrGraph;
+    use memfuse_index::HnswIndex;
+    use memfuse_store::LsmStorage;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(memfuse_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "matrix_errors".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        memfuse_text::Language::English,
+    );
+
+    // Dimension mismatch
+    let err_dim = col.insert("d1", &[1.0, 0.0], None).await;
+    assert!(matches!(
+        err_dim,
+        Err(memfuse_core::MemFuseError::InvalidInput(_))
+    ));
+
+    // Empty string ID
+    let err_id = col.insert("", &[1.0, 0.0, 0.0, 0.0], None).await;
+    assert!(matches!(
+        err_id,
+        Err(memfuse_core::MemFuseError::InvalidInput(_))
+    ));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_apm3_lock_contention_fallback() -> memfuse_core::Result<()> {
+    use memfuse_graph::CsrGraph;
+    use memfuse_index::HnswIndex;
+    use memfuse_store::LsmStorage;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(memfuse_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Arc::new(super::Collection::new(
+        "apm3_lock".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        memfuse_text::Language::English,
+    ));
+
+    // Acquire write lock on insert_lock
+    let lock_guard = col.insert_lock.try_lock();
+    assert!(lock_guard.is_ok(), "Lock guard must be acquired");
+
+    // Concurrent insert_many attempt while write lock is held
+    let col_clone = col.clone();
+    let handle = tokio::spawn(async move {
+        col_clone
+            .insert("d_blocked", &[1.0, 0.0, 0.0, 0.0], None)
+            .await
+    });
+
+    // Release write lock and verify task completes cleanly
+    drop(lock_guard);
+    let res = handle.await.unwrap();
+    assert!(
+        res.is_ok(),
+        "Insert task must complete cleanly after lock release"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_apm7_utf8_multibyte_boundary_handling() -> memfuse_core::Result<()> {
+    use memfuse_graph::CsrGraph;
+    use memfuse_index::HnswIndex;
+    use memfuse_store::LsmStorage;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(memfuse_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "apm7_utf8".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        memfuse_text::Language::German,
+    );
+
+    // Document keys and content containing German umlauts, CJK characters, and Emojis
+    let doc_id = "doc_üöä_🦀_中文";
+    let text_content = "Spezielle Retrieval-Engine mit Übereinstimmung & Emojis 🚀";
+    let vec = vec![0.5, 0.5, 0.0, 0.0];
+
+    col.insert(
+        doc_id,
+        &vec,
+        Some(serde_json::json!({ "text": text_content })),
+    )
+    .await?;
+
+    let retrieved = col.get(doc_id).await?;
+    assert!(retrieved.is_some());
+    assert_eq!(retrieved.unwrap().id, doc_id);
+
+    let search_res = col.query().text("Übereinstimmung").k(5).execute().await?;
+    assert!(!search_res.is_empty());
+    assert_eq!(search_res[0].id, doc_id);
+
+    Ok(())
+}
+
+proptest::proptest! {
+    #[test]
+    fn prop_markdown_chunker_never_panics_on_arbitrary_utf8(
+        input in proptest::prelude::any::<String>()
+    ) {
+        let chunker = crate::chunker::MarkdownChunker::with_defaults();
+        let doc_id = memfuse_core::DocId::new(1);
+        let _ = chunker.chunk(doc_id, &input);
+    }
+}
+
 #[tokio::test]
 async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> memfuse_core::Result<()> {
     use memfuse_graph::csr::CsrGraph;
