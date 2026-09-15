@@ -1,7 +1,6 @@
 {
   "claims": [
     {
-<<<<<<< Updated upstream
       "krate": "memfuse-candle",
       "issue": "JULES-20260915-MEMFUSECAN-TEST-XSAL",
       "timestamp": "2026-09-15T16:20:59.254583793+00:00",
@@ -72,6 +71,13 @@
       "active": false,
       "expires_at": "2026-09-15T19:54:43.274721930+00:00",
       "released_at": "2026-09-15T16:09:10.966303390+00:00"
+      "krate": "memfuse-graph",
+      "issue": "JULES-20260915-MEMFUSEGRA-DEEP-B1JB",
+      "timestamp": "2026-09-15T16:06:22.587534918+00:00",
+      "session_id": "4242661569703678029",
+      "active": false,
+      "expires_at": "2026-09-15T20:06:22.587514675+00:00",
+      "released_at": "2026-09-15T16:14:02.754073104+00:00"
       "krate": "memfuse-router",
       "issue": "JULES-20260915-MEMFUSEROU-DEEP-ILH7",
       "timestamp": "2026-09-15T16:04:39.709757734+00:00",
@@ -98,7 +104,6 @@
       "active": false,
       "expires_at": "2026-09-15T19:57:12.077892145+00:00",
       "released_at": "2026-09-15T16:15:25.323409438+00:00"
-=======
       "krate": "memfuse-bench",
       "issue": "JULES-20260915-MEMFUSEBEN-TEST-QVXO",
       "timestamp": "2026-09-15T16:33:57.708952898+00:00",
@@ -106,7 +111,13 @@
       "active": false,
       "expires_at": "2026-09-15T20:33:57.708934006+00:00",
       "released_at": "2026-09-15T16:34:54.376197002+00:00"
->>>>>>> Stashed changes
+      "krate": "memfuse-sandbox",
+      "issue": "JULES-20260915-MEMFUSESAN-DEEP-KKPC",
+      "timestamp": "2026-09-15T16:05:28.721793404+00:00",
+      "session_id": "13734350414661798737",
+      "active": false,
+      "expires_at": "2026-09-15T20:05:28.721776475+00:00",
+      "released_at": "2026-09-15T16:39:18.027431869+00:00"
     }
   ]
 }

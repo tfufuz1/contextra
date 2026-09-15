@@ -958,4 +958,75 @@ mod tests {
         // Verify step_count was not incremented
         assert_eq!(ctx.step_count, 0);
     }
+
+    struct MockTool {
+        tool_name: String,
+    }
+
+    impl AgentTool for MockTool {
+        fn name(&self) -> &str {
+            &self.tool_name
+        }
+
+        fn execute<'a>(
+            &'a self,
+            _ctx: &'a AgentContext,
+            _input: serde_json::Value,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<StepResult>> {
+            Box::pin(async move {
+                Ok(StepResult {
+                    node_id: "test".to_string(),
+                    output: serde_json::Value::Null,
+                    tokens_consumed: 0,
+                    next_edge: None,
+                })
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_try_register_tool_boundary_validations() {
+        let (ctx, _tmp) = create_dummy_context().await;
+        let mut orchestrator = OrchestratorEngine::from_db(&ctx.db);
+
+        // 1. Valid tool registration
+        let valid_tool = MockTool {
+            tool_name: "valid_tool".to_string(),
+        };
+        assert!(orchestrator.try_register_tool(Box::new(valid_tool)).is_ok());
+
+        // 2. Empty tool name
+        let empty_tool = MockTool {
+            tool_name: "".to_string(),
+        };
+        assert!(matches!(
+            orchestrator.try_register_tool(Box::new(empty_tool)),
+            Err(MemFuseError::InvalidInput(_))
+        ));
+
+        // 3. Null byte in tool name
+        let null_tool = MockTool {
+            tool_name: "tool\0null".to_string(),
+        };
+        assert!(matches!(
+            orchestrator.try_register_tool(Box::new(null_tool)),
+            Err(MemFuseError::InvalidInput(_))
+        ));
+
+        // 4. Oversized tool name
+        let oversized_tool = MockTool {
+            tool_name: "t".repeat(257),
+        };
+        assert!(matches!(
+            orchestrator.try_register_tool(Box::new(oversized_tool)),
+            Err(MemFuseError::InvalidInput(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_orchestrator_recover_orphans_succeeds() {
+        let (ctx, _tmp) = create_dummy_context().await;
+        let orchestrator = OrchestratorEngine::from_db(&ctx.db);
+        assert!(orchestrator.recover_orphans().await.is_ok());
+    }
 }
