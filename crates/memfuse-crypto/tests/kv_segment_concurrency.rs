@@ -305,7 +305,7 @@ fn test_adr082_concurrent_multitenant_shard_parallelism() {
         let ids = store.get_segments(tenant);
         for id in &ids {
             // Jede ID muss zum richtigen Tenant gehören
-            let expected_tenant = (*id / 1000) as u64;
+            let expected_tenant = *id / 1000;
             // IDs: t*1000..t*1000+50 → expected_tenant == t
             assert_eq!(
                 expected_tenant, t,

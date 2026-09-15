@@ -742,4 +742,40 @@ mod tests {
             "v2 export MUST NOT contain integrity_warning"
         );
     }
+
+    #[test]
+    fn test_layer_cleanup_proof_verify_and_create() {
+        // Success path: closure returns Ok(true)
+        let proof_ok = LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true));
+        assert!(proof_ok.is_ok());
+        assert_eq!(proof_ok.unwrap().layer(), &DeletionLayer::HnswIndex);
+
+        // Verification failed path: closure returns Ok(false)
+        let proof_fail =
+            LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(false));
+        assert!(
+            matches!(proof_fail, Err(MemFuseError::Internal(ref msg)) if msg.contains("verification failed"))
+        );
+
+        // Closure returns error
+        let proof_err = LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || {
+            Err(MemFuseError::Internal("db error".to_string()))
+        });
+        assert!(matches!(proof_err, Err(MemFuseError::Internal(ref msg)) if msg == "db error"));
+    }
+
+    #[test]
+    fn test_deletion_proof_unsupported_signature_version() {
+        let scope = DeletionScope::Tenant {
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let mut proof =
+            DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
+
+        proof.signature_version = 255;
+        let res = proof.verify(&test_key());
+        assert!(
+            matches!(res, Err(MemFuseError::Internal(ref msg)) if msg.contains("Unsupported DeletionProof signature_version: 255"))
+        );
+    }
 }
