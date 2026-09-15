@@ -40,7 +40,6 @@
 | `TS:2026-09-01T23:11:04Z (SESSION: 5a38054a)` | `crates/memfuse-agent/src/engine.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Deterministic graph-walker orchestrator engine for autonomous agent workflows. |
 | `TS:2026-09-01T23:11:04Z (SESSION: 5a38054a)` | `crates/memfuse-agent/src/event_source.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Continuous event stream abstractions delivering telemetry/trigger events to agents. |
 | `TS:2026-09-01T23:11:04Z (SESSION: 5a38054a)` | `crates/memfuse-agent/src/graph.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Declarative StateGraph definition routing workflow step transitions. |
-| `TS:2026-09-01T23:11:04Z (SESSION: 5a38054a)` | `crates/memfuse-agent/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Crate entry point exposing audit, context, engine, event_source, graph, and step submodules. |
 | `TS:2026-08-31T23:10:00Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/tests/cross_signal_isolation_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prüft Cross-Signal Snapshot-Isolation in memfuse-db während paralleler Writes/Updates. |
 | `TS:2026-08-31T22:30:00Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/tests/fault_injection_2pc.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prüft atomare 2PC-Transaktions-Kompensation und Crash-Recovery (repair_on_open) über alle 4 Sub-Engines. |
 | `TS:2026-08-31T21:13:05Z (SESSION: 8427f167)` | `crates/memfuse-crypto/src/anti_tamper.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cold-boot protection and explicit Zeroize discipline for volatile encryption keys. |
@@ -279,6 +278,7 @@
 | `2026-06-01T00:00:00Z` | `crates/memfuse-store/src/lsm/mod.rs` | `ANCHOR` | `ALG-FIX:D6-001` | `-` | `DONE` | `0` | // ANCHOR[ALG-FIX:D6-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Snapshot-Inversion bei parallel commit (INV-MVCC-1) |
 | `2026-05-18T00:00:00Z` | `crates/memfuse-db/tests/concurrent_collection_stress.rs` | `ANCHOR` | `INTEGRATION:STRESS-001` | `-` | `DONE` | `0` | // ANCHOR[INTEGRATION:STRESS-001] STATUS:DONE (TS:2026-05-18T00:00:00Z) |
 | `2026-05-18T00:00:00Z` | `crates/memfuse-db/tests/full_stack_e2e.rs` | `ANCHOR` | `INTEGRATION:E2E-001` | `-` | `DONE` | `0` | // ANCHOR[INTEGRATION:E2E-001] STATUS:DONE (TS:2026-05-18T00:00:00Z) |
+| `` | `crates/memfuse-agent/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Crate entry point exposing audit, context, engine, event_source, graph, and step submodules. |
 | `` | `crates/memfuse-core/src/lib.rs` | `REVIEW-PASS` | `-` | `-` | `-` | `-` | // AGENT-NOTIZ: Demonstrating second-precision TS, SESSION hash, hash-based ID and REVIEW-PASS grammar. |
 | `` | `crates/memfuse-crypto/src/deletion_proof.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-R3-1: DeletionProof signature_version 2 erweitert Signatur-Payload um covered_layers & excluded_scopes zur Vermeidung von Cross-Context-Fälschungen. |
 | `` | `crates/memfuse-db/src/collection/search.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-5.1: Vector-Suche clampt k stets auf k.min(memfuse_core::MAX_SEARCH_K) über alle Einstiegspunkte hinweg. |

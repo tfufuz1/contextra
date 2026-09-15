@@ -104,6 +104,13 @@
       "active": false,
       "expires_at": "2026-09-15T19:57:12.077892145+00:00",
       "released_at": "2026-09-15T16:15:25.323409438+00:00"
+      "krate": "memfuse-agent",
+      "issue": "JULES-20260915-MEMFUSEAGE-DEEP-W462",
+      "timestamp": "2026-09-15T16:06:35.323284104+00:00",
+      "session_id": "17103512827928862668",
+      "active": false,
+      "expires_at": "2026-09-15T20:06:35.323266039+00:00",
+      "released_at": "2026-09-15T16:45:33.080997297+00:00"
       "krate": "memfuse-embed",
       "issue": "JULES-20260915-MEMFUSEEMB-TEST-42BY",
       "timestamp": "2026-09-15T16:10:04.007477971+00:00",
