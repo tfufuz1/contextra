@@ -23,8 +23,8 @@ impl FaultyMockStorage {
 }
 
 impl StorageEngine for FaultyMockStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
-        Box::pin(async move { Ok(self.data.lock().get(key).cloned()) })
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
     fn put<'a>(
         &'a self,
@@ -88,7 +88,7 @@ impl StorageEngine for FaultyMockStorage {
         &'a self,
         key: &'a [u8],
         _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.get(key).await })
     }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {

@@ -4,6 +4,7 @@
 //! compared to the old read-modify-write approach. The new path should
 //! require O(N_new_terms) puts instead of O(N_old_terms) deletes + O(N_new_terms) puts.
 
+use bytes::Bytes;
 use memfuse_core::{BoxFuture, DocId, Result, StorageEngine, TextIndex, TxId};
 use memfuse_text::InvertedIndex;
 use parking_lot::RwLock;
@@ -41,8 +42,8 @@ impl InstrumentedStorage {
 }
 
 impl StorageEngine for InstrumentedStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
-        Box::pin(async move { Ok(self.store.read().get(key).cloned()) })
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        Box::pin(async move { Ok(self.store.read().get(key).cloned().map(Bytes::from)) })
     }
     fn put<'a>(&'a self, _tx: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
@@ -71,7 +72,7 @@ impl StorageEngine for InstrumentedStorage {
         &'a self,
         key: &'a [u8],
         _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
         Box::pin(async move { self.get(key).await })
     }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {

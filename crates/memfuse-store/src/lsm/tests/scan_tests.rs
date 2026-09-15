@@ -78,10 +78,10 @@ async fn test_mvcc_snapshot_isolation() {
     storage.commit(tx2).await.unwrap();
 
     let val1 = storage.get_at_seq(b"k1", seq1).await.unwrap();
-    assert_eq!(val1, Some(b"v1".to_vec()));
+    assert_eq!(val1, Some(bytes::Bytes::from_static(b"v1")));
 
     let val2 = storage.get(b"k1").await.unwrap();
-    assert_eq!(val2, Some(b"v2".to_vec()));
+    assert_eq!(val2, Some(bytes::Bytes::from_static(b"v2")));
 }
 
 #[tokio::test]
@@ -120,11 +120,11 @@ async fn test_get_at_seq_mvcc_sequence_correctness() {
 
     assert_eq!(
         storage.get_at_seq(b"key1", seq1).await.unwrap(),
-        Some(b"v1".to_vec())
+        Some(bytes::Bytes::from_static(b"v1"))
     );
     assert_eq!(
         storage.get_at_seq(b"key1", seq1 + 1).await.unwrap(),
-        Some(b"v2".to_vec())
+        Some(bytes::Bytes::from_static(b"v2"))
     );
     assert_eq!(storage.get_at_seq(b"key1", seq1 + 2).await.unwrap(), None);
 }

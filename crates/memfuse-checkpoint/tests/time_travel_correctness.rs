@@ -68,12 +68,12 @@ impl VersionedMockStorage {
 }
 
 impl StorageEngine for VersionedMockStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move {
             let store = self.store.lock();
             if let Some(versions) = store.get(key) {
                 if let Some((_, val_opt)) = versions.iter().next_back() {
-                    return Ok(val_opt.clone());
+                    return Ok(val_opt.clone().map(bytes::Bytes::from));
                 }
             }
             Ok(None)
@@ -151,7 +151,7 @@ impl StorageEngine for VersionedMockStorage {
         &'a self,
         key: &'a [u8],
         _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.get(key).await })
     }
 
@@ -226,11 +226,11 @@ impl NamespaceStorageEngine {
 }
 
 impl StorageEngine for NamespaceStorageEngine {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.inner.get(&self.prefixed_key(key)).await })
     }
 
-    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.inner.get_at_seq(&self.prefixed_key(key), seq).await })
     }
 
@@ -389,11 +389,11 @@ async fn test_time_travel_sequence_byte_exact_recovery() {
     // Verify individual key contents
     assert_eq!(
         storage.get(b"doc_1").await.unwrap(),
-        Some(b"content_A1".to_vec())
+        Some(bytes::Bytes::from_static(b"content_A1"))
     );
     assert_eq!(
         storage.get(b"doc_2").await.unwrap(),
-        Some(b"content_A2".to_vec())
+        Some(bytes::Bytes::from_static(b"content_A2"))
     );
     assert_eq!(storage.get(b"doc_3").await.unwrap(), None);
     assert_eq!(storage.get(b"doc_4").await.unwrap(), None);
@@ -549,13 +549,13 @@ async fn test_concurrent_two_session_time_travel_isolation() {
     // Verify key contents
     assert_eq!(
         storage_alpha.get(b"doc_1").await.unwrap(),
-        Some(b"alpha_content_v1".to_vec())
+        Some(bytes::Bytes::from_static(b"alpha_content_v1"))
     );
     assert_eq!(storage_alpha.get(b"doc_3").await.unwrap(), None);
 
     assert_eq!(
         storage_beta.get(b"doc_1").await.unwrap(),
-        Some(b"beta_content_v1".to_vec())
+        Some(bytes::Bytes::from_static(b"beta_content_v1"))
     );
     assert_eq!(storage_beta.get(b"doc_3").await.unwrap(), None);
 
@@ -766,13 +766,13 @@ async fn test_concurrent_raii_guard_unwind_isolation() {
     // Verify Session Alpha's state was rolled back to alpha_init
     assert_eq!(
         storage_alpha.get(b"doc_1").await.unwrap(),
-        Some(b"alpha_init".to_vec())
+        Some(bytes::Bytes::from_static(b"alpha_init"))
     );
 
     // Verify Session Beta's state remains committed as beta_committed_mutation
     assert_eq!(
         storage_beta.get(b"doc_1").await.unwrap(),
-        Some(b"beta_committed_mutation".to_vec())
+        Some(bytes::Bytes::from_static(b"beta_committed_mutation"))
     );
 }
 

@@ -891,7 +891,7 @@ mod tests {
     }
 
     impl StorageEngine for FaultyDeleteStorage {
-        fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { self.inner.get(key).await })
         }
 
@@ -899,7 +899,7 @@ mod tests {
             &'a self,
             key: &'a [u8],
             seq: u64,
-        ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { self.inner.get_at_seq(key, seq).await })
         }
 

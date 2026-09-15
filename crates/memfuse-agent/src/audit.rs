@@ -547,13 +547,13 @@ impl InMemoryStorageEngine {
 
 #[cfg(any(test, feature = "test-utils"))]
 impl StorageEngine for InMemoryStorageEngine {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move {
             let guard = self
                 .data
                 .lock()
                 .map_err(|e| memfuse_core::MemFuseError::Internal(format!("Lock poisoned: {e}")))?;
-            Ok(guard.get(key).cloned())
+            Ok(guard.get(key).cloned().map(bytes::Bytes::from))
         })
     }
 
@@ -561,7 +561,7 @@ impl StorageEngine for InMemoryStorageEngine {
         &'a self,
         key: &'a [u8],
         _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.get(key).await })
     }
 

@@ -28,7 +28,7 @@ async fn test_encrypted_db_roundtrip() {
         storage.force_flush().await.expect("flush");
 
         let val = storage.get(b"key1").await.expect("get");
-        assert_eq!(val, Some(b"val1".to_vec()));
+        assert_eq!(val, Some(bytes::Bytes::from_static(b"val1")));
     }
 
     // 2. Re-open with same passphrase
@@ -37,7 +37,7 @@ async fn test_encrypted_db_roundtrip() {
             .await
             .expect("reopen storage");
         let val = storage.get(b"key1").await.expect("get after reopen");
-        assert_eq!(val, Some(b"val1".to_vec()));
+        assert_eq!(val, Some(bytes::Bytes::from_static(b"val1")));
     }
 }
 

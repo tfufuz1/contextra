@@ -37,16 +37,16 @@ async fn test_rollback_after_flush() {
     storage.force_flush().await.unwrap();
 
     // Verify all data is there
-    assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec()));
-    assert_eq!(storage.get(b"key2").await.unwrap(), Some(b"val2".to_vec()));
-    assert_eq!(storage.get(b"key3").await.unwrap(), Some(b"val3".to_vec()));
+    assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
+    assert_eq!(storage.get(b"key2").await.unwrap(), Some(bytes::Bytes::from_static(b"val2")));
+    assert_eq!(storage.get(b"key3").await.unwrap(), Some(bytes::Bytes::from_static(b"val3")));
 
     // 6. Rollback to TX 2
     storage.rollback_to_tx(tx2).await.unwrap();
 
     // 7. Verify TX 1 and 2 are still there, but TX 3 is GONE
-    assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec()));
-    assert_eq!(storage.get(b"key2").await.unwrap(), Some(b"val2".to_vec()));
+    assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
+    assert_eq!(storage.get(b"key2").await.unwrap(), Some(bytes::Bytes::from_static(b"val2")));
 
     // THIS IS EXPECTED TO FAIL BEFORE THE FIX
     assert_eq!(

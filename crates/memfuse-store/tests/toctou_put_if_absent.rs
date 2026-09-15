@@ -9,10 +9,10 @@ use std::sync::Arc;
 struct DummyStorageEngine;
 
 impl StorageEngine for DummyStorageEngine {
-    fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
-    fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
     fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
@@ -125,7 +125,7 @@ async fn proof_put_if_absent_sees_uncommitted_staged_write() {
     // After commit of TX-A, get(key) returns Some(v1)
     storage.commit(tx_a).await.expect("commit tx_a failed");
     let val = storage.get(key).await.expect("get key failed");
-    assert_eq!(val, Some(b"v1".to_vec()));
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"v1")));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]

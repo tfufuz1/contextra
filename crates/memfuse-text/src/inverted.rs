@@ -254,8 +254,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         if let Some(bytes) = self.storage.get(&dl_key).await? {
             if bytes.len() == 4 {
                 old_len = u32::from_le_bytes(
-                    bytes
-                        .as_slice()
+                    (&bytes[..])
                         .try_into()
                         .map_err(|_| MemFuseError::Storage("Invalid doc_len length".into()))?,
                 );
@@ -377,8 +376,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         if let Some(bytes) = self.storage.get(&dl_key).await? {
             if bytes.len() == 4 {
                 doc_len = u32::from_le_bytes(
-                    bytes
-                        .as_slice()
+                    (&bytes[..])
                         .try_into()
                         .map_err(|_| MemFuseError::Storage("Invalid doc_len length".into()))?,
                 );
@@ -564,7 +562,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
                                 match self.storage.get_at_seq(&dl_key, seq).await? {
                                     Some(dl_bytes) if dl_bytes.len() == 4 => {
                                         let len = u32::from_le_bytes(
-                                            dl_bytes.as_slice().try_into().map_err(|_| {
+                                            (&dl_bytes[..]).try_into().map_err(|_| {
                                                 MemFuseError::Storage(
                                                     "Invalid doc_len length".into(),
                                                 )
@@ -782,7 +780,7 @@ mod tests {
     }
 
     impl StorageEngine for MockStorage {
-        fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
         }
         fn put<'a>(
@@ -859,7 +857,7 @@ mod tests {
             &'a self,
             key: &'a [u8],
             seq: u64,
-        ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move {
                 let store = self.store.read();
                 if let Some(versions) = store.get(key) {
@@ -870,7 +868,7 @@ mod tests {
                             if (v_seq & memfuse_core::TOMBSTONE_BIT) != 0 {
                                 return Ok(None);
                             }
-                            return Ok(Some(val.clone()));
+                        return Ok(Some(bytes::Bytes::from(val.clone())));
                         }
                     }
                 }

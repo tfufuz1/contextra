@@ -29,11 +29,11 @@ impl MVCCMockStorage {
 }
 
 impl StorageEngine for MVCCMockStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
     }
 
-    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move {
             let store = self.store.read();
             if let Some(versions) = store.get(key) {
@@ -43,7 +43,7 @@ impl StorageEngine for MVCCMockStorage {
                         if (v_seq & memfuse_core::TOMBSTONE_BIT) != 0 {
                             return Ok(None);
                         }
-                        return Ok(Some(val.clone()));
+                        return Ok(Some(bytes::Bytes::from(val.clone())));
                     }
                 }
             }

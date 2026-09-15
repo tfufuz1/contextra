@@ -3,6 +3,7 @@
 use super::BoxFuture;
 use crate::types::*;
 use crate::Result;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 /// Statistics for the storage engine.
@@ -37,10 +38,10 @@ pub const MAX_SCAN_MERGE_ACCUMULATOR: usize = 100_000;
 /// - Alle Fehler werden über `crate::Result<T>` propagiert
 pub trait StorageEngine: Send + Sync + 'static {
     /// Retrieves a value by key.
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>>;
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>;
 
     /// Retrieves a value by key at a specific sequence number (MVCC).
-    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Vec<u8>>>>;
+    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Bytes>>>;
 
     /// Stores a key-value pair as part of a transaction.
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>>;
@@ -283,14 +284,14 @@ mod tests {
     async fn test_storage_scan_prefix_at_capability() {
         struct StorageEnginePlaceholder;
         impl StorageEngine for StorageEnginePlaceholder {
-            fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+            fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
                 Box::pin(async move { Ok(None) })
             }
             fn get_at_seq<'a>(
                 &'a self,
                 _: &'a [u8],
                 _: u64,
-            ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+            ) -> BoxFuture<'a, Result<Option<Bytes>>> {
                 Box::pin(async move { Ok(None) })
             }
             fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
@@ -362,14 +363,14 @@ mod tests {
         type Log = std::sync::Arc<std::sync::Mutex<Vec<KVPair>>>;
         struct MockStorage(Log);
         impl StorageEngine for MockStorage {
-            fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+            fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
                 Box::pin(async move { Ok(None) })
             }
             fn get_at_seq<'a>(
                 &'a self,
                 _: &'a [u8],
                 _: u64,
-            ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+            ) -> BoxFuture<'a, Result<Option<Bytes>>> {
                 Box::pin(async move { Ok(None) })
             }
             fn put<'a>(
@@ -460,14 +461,14 @@ mod tests {
         }
 
         impl StorageEngine for MemoryStorage {
-            fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+            fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
                 Box::pin(async move { Ok(None) })
             }
             fn get_at_seq<'a>(
                 &'a self,
                 _: &'a [u8],
                 _: u64,
-            ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+            ) -> BoxFuture<'a, Result<Option<Bytes>>> {
                 Box::pin(async move { Ok(None) })
             }
             fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
@@ -609,14 +610,14 @@ mod tests {
         }
 
         impl StorageEngine for MockStorage {
-            fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
-                Box::pin(async move { Ok(self.data.lock().unwrap().get(key).cloned()) })
+            fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
+                Box::pin(async move { Ok(self.data.lock().unwrap().get(key).cloned().map(Bytes::from)) })
             }
             fn get_at_seq<'a>(
                 &'a self,
                 _: &'a [u8],
                 _: u64,
-            ) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
+            ) -> BoxFuture<'a, Result<Option<Bytes>>> {
                 Box::pin(async move { Ok(None) })
             }
             fn put<'a>(
@@ -715,6 +716,6 @@ mod tests {
         assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 2);
         assert!(store.get(b"pref:1").await.unwrap().is_none());
         assert!(store.get(b"pref:2").await.unwrap().is_none());
-        assert_eq!(store.get(b"other:1").await.unwrap().unwrap(), b"v3");
+        assert_eq!(store.get(b"other:1").await.unwrap().unwrap(), &b"v3"[..]);
     }
 }

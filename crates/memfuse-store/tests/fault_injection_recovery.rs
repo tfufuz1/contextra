@@ -45,11 +45,11 @@ async fn test_fault_injection_wal_tail_truncation_recovery() {
         // First few entries must be intact
         assert_eq!(
             storage.get(b"k1").await.expect("get k1"),
-            Some(b"v1".to_vec())
+            Some(bytes::Bytes::from_static(b"v1"))
         );
         assert_eq!(
             storage.get(b"k2").await.expect("get k2"),
-            Some(b"v2".to_vec())
+            Some(bytes::Bytes::from_static(b"v2"))
         );
     }
 }
@@ -130,6 +130,6 @@ async fn test_fault_injection_sstable_temp_files_cleaned_up_on_open() {
     storage.commit(tx).await.expect("commit");
     assert_eq!(
         storage.get(b"clean_k").await.expect("get"),
-        Some(b"clean_v".to_vec())
+        Some(bytes::Bytes::from_static(b"clean_v"))
     );
 }

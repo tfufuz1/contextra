@@ -15,6 +15,7 @@ test-utils = []
 
 [dependencies]
 memfuse-core       = { workspace = true }
+bytes = { workspace = true }
 memfuse-db         = { workspace = true }
 memfuse-graph      = { workspace = true }
 memfuse-checkpoint = { workspace = true }

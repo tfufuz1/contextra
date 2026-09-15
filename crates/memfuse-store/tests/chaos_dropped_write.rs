@@ -54,7 +54,7 @@ async fn test_chaos_dropped_write_error_propagation_and_recovery() {
     let val1 = storage.get(b"key1").await.unwrap();
     assert_eq!(
         val1,
-        Some(b"val1".to_vec()),
+        Some(bytes::Bytes::from_static(b"val1")),
         "key1 must be readable before error injection"
     );
 
@@ -186,14 +186,14 @@ async fn test_chaos_dropped_write_error_propagation_and_recovery() {
     let val1_check = storage.get(b"key1").await.unwrap();
     assert_eq!(
         val1_check,
-        Some(b"val1".to_vec()),
+        Some(bytes::Bytes::from_static(b"val1")),
         "Initial entry key1 must remain intact after recovery"
     );
 
     let val2_check = storage.get(b"key2").await.unwrap();
     assert_eq!(
         val2_check,
-        Some(b"val2".to_vec()),
+        Some(bytes::Bytes::from_static(b"val2")),
         "Re-committed entry key2 must be correctly readable"
     );
 }

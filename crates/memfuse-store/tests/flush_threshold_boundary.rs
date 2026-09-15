@@ -28,7 +28,7 @@ async fn test_flush_threshold_boundary_minus_one() -> Result<()> {
     );
 
     let val = storage.get(b"k").await?;
-    assert_eq!(val, Some(b"v".to_vec()));
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"v")));
 
     Ok(())
 }
@@ -68,7 +68,7 @@ async fn test_flush_threshold_boundary_exact_and_plus_one() -> Result<()> {
         let val = storage.get(k.as_bytes()).await?;
         assert_eq!(
             val,
-            Some(vec![0x42u8; 30]),
+            Some(bytes::Bytes::from(vec![0x42u8; 30])),
             "Key {} must be readable after boundary flush",
             i
         );

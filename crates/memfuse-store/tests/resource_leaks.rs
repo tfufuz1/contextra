@@ -28,7 +28,7 @@ async fn test_file_descriptor_leak_on_repeated_open_close() -> Result<()> {
     for i in 2..=1000 {
         let storage = LsmStorage::new(config.clone()).await?;
         let val = storage.get(b"init_key").await?;
-        assert_eq!(val, Some(b"init_val".to_vec()));
+        assert_eq!(val, Some(bytes::Bytes::from_static(b"init_val")));
 
         if i % 100 == 0 {
             let tx = TxId::new(i);

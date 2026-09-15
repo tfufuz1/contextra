@@ -127,7 +127,7 @@ async fn test_chaos_matrix_task_massacre_and_memory_pressure() {
         let actual_v = storage.get(k).await.expect("get committed key");
         assert_eq!(
             actual_v,
-            Some(expected_v.clone()),
+            Some(bytes::Bytes::from(expected_v.clone())),
             "Ground truth violation for key {:?}",
             String::from_utf8_lossy(k)
         );
@@ -260,7 +260,7 @@ async fn test_chaos_matrix_full_combos() {
     let expected_stage1 = ground_truth.snapshot();
     for (k, v) in &expected_stage1 {
         let actual = storage.get(k).await.expect("get stage 1");
-        assert_eq!(actual, Some(v.clone()), "Stage 1 ground truth match");
+        assert_eq!(actual, Some(bytes::Bytes::from(v.clone())), "Stage 1 ground truth match");
     }
 
     // Concurrent writing with random aborts
@@ -307,7 +307,7 @@ async fn test_chaos_matrix_full_combos() {
         let actual = storage.get(k).await.expect("get final");
         assert_eq!(
             actual,
-            Some(v.clone()),
+            Some(bytes::Bytes::from(v.clone())),
             "Final ground truth match for key {:?}",
             String::from_utf8_lossy(k)
         );

@@ -108,7 +108,7 @@ async fn test_concurrent_commit_during_wal_rollback_preserves_hmac_chain() {
         .expect("get successful_key failed");
     assert_eq!(
         val_successful,
-        Some(b"successful_val".to_vec()),
+        Some(bytes::Bytes::from_static(b"successful_val")),
         "Successful transaction key must be readable"
     );
 
@@ -118,7 +118,7 @@ async fn test_concurrent_commit_during_wal_rollback_preserves_hmac_chain() {
         .expect("get baseline_key failed");
     assert_eq!(
         val_baseline,
-        Some(b"baseline_val".to_vec()),
+        Some(bytes::Bytes::from_static(b"baseline_val")),
         "Baseline transaction key must remain intact"
     );
 

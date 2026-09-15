@@ -32,6 +32,8 @@ blake3 = { workspace = true }
 sha2 = "0.10"
 # Async stream types for streaming LLM generation.
 futures-util = "0.3"
+# Zero-copy byte buffer support for StorageEngine read path.
+bytes = { workspace = true }
 # Zero-copy IPC serialization support.
 flatbuffers = { workspace = true }
 memfuse-core-ipc-gen = { workspace = true }

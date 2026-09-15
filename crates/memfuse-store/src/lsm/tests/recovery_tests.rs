@@ -28,18 +28,18 @@ async fn test_lsm_rollback_persistence() {
         storage.put(tx2, b"k2", b"v2").await.unwrap();
         storage.commit(tx2).await.unwrap();
 
-        assert_eq!(storage.get(b"k1").await.unwrap(), Some(b"v1".to_vec()));
-        assert_eq!(storage.get(b"k2").await.unwrap(), Some(b"v2".to_vec()));
+        assert_eq!(storage.get(b"k1").await.unwrap(), Some(bytes::Bytes::from_static(b"v1")));
+        assert_eq!(storage.get(b"k2").await.unwrap(), Some(bytes::Bytes::from_static(b"v2")));
 
         storage.rollback_to_tx(tx1).await.expect("rollback");
 
-        assert_eq!(storage.get(b"k1").await.unwrap(), Some(b"v1".to_vec()));
+        assert_eq!(storage.get(b"k1").await.unwrap(), Some(bytes::Bytes::from_static(b"v1")));
         assert_eq!(storage.get(b"k2").await.unwrap(), None);
     }
 
     {
         let storage = LsmStorage::new(config).await.expect("restart storage");
-        assert_eq!(storage.get(b"k1").await.unwrap(), Some(b"v1".to_vec()));
+        assert_eq!(storage.get(b"k1").await.unwrap(), Some(bytes::Bytes::from_static(b"v1")));
         assert_eq!(
             storage.get(b"k2").await.unwrap(),
             None,
@@ -49,7 +49,7 @@ async fn test_lsm_rollback_persistence() {
         let tx3 = TxId::new(3);
         storage.put(tx3, b"k3", b"v3").await.unwrap();
         storage.commit(tx3).await.unwrap();
-        assert_eq!(storage.get(b"k3").await.unwrap(), Some(b"v3".to_vec()));
+        assert_eq!(storage.get(b"k3").await.unwrap(), Some(bytes::Bytes::from_static(b"v3")));
     }
 }
 
@@ -100,7 +100,7 @@ async fn test_rollback_with_sstables() {
         assert_eq!(sstables[0].metadata().max_tx_id, 2);
     }
 
-    assert_eq!(storage.get(b"k1").await.unwrap(), Some(b"v1".to_vec()));
+    assert_eq!(storage.get(b"k1").await.unwrap(), Some(bytes::Bytes::from_static(b"v1")));
     let val2 = storage.get(b"k2").await.unwrap();
     let ssts = storage.sstables.read().await;
     let sst_meta = if !ssts.is_empty() {
@@ -116,7 +116,7 @@ async fn test_rollback_with_sstables() {
     };
     assert_eq!(
         val2,
-        Some(b"v2".to_vec()),
+        Some(bytes::Bytes::from_static(b"v2")),
         "k2 should be found. SST 0 meta: {}",
         sst_meta
     );
@@ -190,7 +190,7 @@ async fn test_rollback_recompacts_spanning_sstable() {
         let key = format!("k{:02}", i);
         let expected = format!("v{:02}", i);
         let val = storage.get(key.as_bytes()).await.unwrap();
-        assert_eq!(val, Some(expected.into_bytes()));
+        assert_eq!(val, Some(bytes::Bytes::from(expected)));
     }
 
     for i in 11..=15u64 {
@@ -265,7 +265,7 @@ async fn test_wal_survives_process_restart() {
     {
         let storage = LsmStorage::new(config).await.expect("reopen storage");
         let val = storage.get(b"persistent_key").await.expect("get");
-        assert_eq!(val, Some(b"persistent_val".to_vec()));
+        assert_eq!(val, Some(bytes::Bytes::from_static(b"persistent_val")));
     }
 }
 
@@ -312,7 +312,7 @@ async fn test_rollback_tombstone_sstable() {
 
     let current_max_seq = storage.next_seq_no.load(Ordering::Acquire);
     let val = storage.get_at_seq(b"key3", current_max_seq).await.unwrap();
-    assert_eq!(val, Some(b"val3".to_vec()));
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"val3")));
 
     let last_seq = storage.last_seq_no().await.unwrap();
     assert_eq!(
@@ -346,7 +346,7 @@ async fn test_rollback_tombstone_wal() {
 
     let current_max_seq = storage.next_seq_no.load(Ordering::Acquire);
     let val = storage.get_at_seq(b"k3", current_max_seq).await.unwrap();
-    assert_eq!(val, Some(b"v3".to_vec()));
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"v3")));
 
     let last_seq = storage.last_seq_no().await.unwrap();
     assert_eq!(
@@ -404,7 +404,7 @@ async fn test_rollback_tombstone_subsequent_ops() {
 
     assert_eq!(storage.get(b"key1").await.unwrap(), None);
     assert_eq!(storage.get(b"key2").await.unwrap(), None);
-    assert_eq!(storage.get(b"key3").await.unwrap(), Some(b"val3".to_vec()));
+    assert_eq!(storage.get(b"key3").await.unwrap(), Some(bytes::Bytes::from_static(b"val3")));
 }
 
 #[tokio::test]
@@ -467,8 +467,8 @@ async fn test_startup_flush_before_wal_cleanup() {
             .await
             .expect("reopen storage after crash/restart");
 
-        assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec()));
-        assert_eq!(storage.get(b"key2").await.unwrap(), Some(b"val2".to_vec()));
+        assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
+        assert_eq!(storage.get(b"key2").await.unwrap(), Some(bytes::Bytes::from_static(b"val2")));
 
         let stats = storage.stats().await.unwrap();
         assert!(
@@ -481,8 +481,8 @@ async fn test_startup_flush_before_wal_cleanup() {
         let storage = LsmStorage::new(config)
             .await
             .expect("reopen storage after second crash");
-        assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec()));
-        assert_eq!(storage.get(b"key2").await.unwrap(), Some(b"val2".to_vec()));
+        assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
+        assert_eq!(storage.get(b"key2").await.unwrap(), Some(bytes::Bytes::from_static(b"val2")));
     }
 }
 
@@ -517,7 +517,7 @@ async fn test_rollback_small_tx_inline_no_sstable() {
 
     storage.rollback_to_tx(tx1).await.unwrap();
 
-    assert_eq!(storage.get(b"key1").await.unwrap(), Some(b"val1".to_vec()));
+    assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
     assert_eq!(storage.get(b"key2").await.unwrap(), None);
 
     let sst_count_after = storage.sstables.read().await.len();
@@ -630,7 +630,7 @@ async fn test_rollback_crash_recovery_startup() {
 
     assert_eq!(
         storage.get(b"key1").await.unwrap(),
-        Some(b"val1".to_vec()),
+        Some(bytes::Bytes::from_static(b"val1")),
         "Data committed at target_tx must remain visible"
     );
     assert_eq!(
@@ -721,9 +721,9 @@ async fn test_wal_discovery_mixed_filenames() {
         7,
         "flush_counter should be 7 (initialized to 6 + 1 for startup flush)"
     );
-    assert_eq!(storage.get(b"k1").await.unwrap(), Some(b"v1".to_vec()));
-    assert_eq!(storage.get(b"k2").await.unwrap(), Some(b"v2".to_vec()));
-    assert_eq!(storage.get(b"k3").await.unwrap(), Some(b"v3".to_vec()));
+    assert_eq!(storage.get(b"k1").await.unwrap(), Some(bytes::Bytes::from_static(b"v1")));
+    assert_eq!(storage.get(b"k2").await.unwrap(), Some(bytes::Bytes::from_static(b"v2")));
+    assert_eq!(storage.get(b"k3").await.unwrap(), Some(bytes::Bytes::from_static(b"v3")));
 }
 
 #[tokio::test]
@@ -770,6 +770,6 @@ async fn test_rollback_spanning_sstable_below_min_entries_threshold() {
         );
     }
 
-    assert_eq!(storage.get(b"k1").await.unwrap(), Some(b"v1".to_vec()));
+    assert_eq!(storage.get(b"k1").await.unwrap(), Some(bytes::Bytes::from_static(b"v1")));
     assert_eq!(storage.get(b"k2").await.unwrap(), None);
 }

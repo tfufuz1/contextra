@@ -11,6 +11,7 @@ description = "Backup and snapshot management for MemFuse storage"
 
 [dependencies]
 memfuse-core = { version = "0.1.0", path = "../memfuse-core" }
+bytes = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

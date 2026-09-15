@@ -157,7 +157,7 @@ async fn test_chaos_power_cut_sigkill_recovery() {
                 .expect("storage.get failed");
             assert_eq!(
                 res,
-                Some(val.as_bytes().to_vec()),
+                Some(bytes::Bytes::copy_from_slice(val.as_bytes())),
                 "Iteration {iteration}: Key {key} (counter {counter}) was committed before SIGKILL but not readable after reopen!"
             );
         }
