@@ -85,6 +85,11 @@ pub async fn classify_layer1(
     let eval_task = tokio::task::spawn_blocking(move || {
         for cp in &patterns_owned {
             if cp.regex.is_match(&payload_owned) {
+                tracing::warn!(
+                    rule_id = %cp.name,
+                    pattern = %cp.regex.as_str(),
+                    "Egress DLP sensitive pattern match detected"
+                );
                 return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
             }
         }
@@ -112,10 +117,12 @@ impl EgressVault {
     pub const DEFAULT_TIMEOUT: Duration = Duration::from_millis(100);
 
     /// Erstellt eine neue `EgressVault`-Instanz aus einer Liste von Regex-Patterns.
+    /// Jedem Pattern wird eine opake Regel-ID ("R-001", "R-002", ...) zugewiesen.
     pub fn new(patterns: Vec<String>) -> Result<Self, EgressVaultError> {
         let compiled = patterns
             .into_iter()
-            .map(|pat| CompiledPattern::new(pat.clone(), &pat))
+            .enumerate()
+            .map(|(idx, pat)| CompiledPattern::new(format!("R-{:03}", idx + 1), &pat))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
@@ -180,11 +187,28 @@ mod tests {
 
         let payload = "Contact me at secret_agent@example.com for info";
         let res = vault.classify(payload).await;
-        assert!(matches!(
+        assert_eq!(
             res,
-            EgressClassification::Block(BlockReason::SensitivePattern(ref pat))
-            if pat.contains("@")
-        ));
+            EgressClassification::Block(BlockReason::SensitivePattern("R-002".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_opaque_rule_ids_do_not_leak_raw_regex() {
+        let raw_pattern = r"(?i)super_secret_password_\d+";
+        let patterns = vec![raw_pattern.to_string()];
+        let vault = EgressVault::new(patterns).expect("valid vault");
+
+        let payload = "My credential is super_secret_password_12345";
+        let res = vault.classify(payload).await;
+
+        if let EgressClassification::Block(BlockReason::SensitivePattern(ref rule_id)) = res {
+            assert_eq!(rule_id, "R-001");
+            assert!(!rule_id.contains("super_secret_password"));
+            assert!(!rule_id.contains(raw_pattern));
+        } else {
+            panic!("Expected SensitivePattern block with opaque rule ID");
+        }
     }
 
     #[test]

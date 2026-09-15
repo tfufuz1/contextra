@@ -50,6 +50,11 @@ pub async fn handle_cloud_query(
     let classification = classifier.classify(&request.query).await;
 
     match classification {
+        EgressClassification::Block(BlockReason::SensitivePattern(rule_id)) => {
+            Err(McpError::invalid_params(format!(
+                "Egress policy violation: query blocked by rule {rule_id}"
+            )))
+        }
         EgressClassification::Block(reason) => Err(McpError::invalid_params(format!(
             "Egress policy violation: query blocked: {reason:?}"
         ))),
@@ -102,15 +107,11 @@ impl Default for DefaultEgressClassifier {
 impl EgressClassifier for DefaultEgressClassifier {
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {
         Box::pin(async move {
-            if payload.contains("abstract") || payload.contains("PII") {
-                EgressClassification::RequiresAbstraction
-            } else {
-                match &self.vault {
-                    Ok(vault) => vault.classify(payload).await,
-                    Err(err) => EgressClassification::Block(BlockReason::InternalError(format!(
-                        "EgressVault initialization failed: {err}"
-                    ))),
-                }
+            match &self.vault {
+                Ok(vault) => vault.classify(payload).await,
+                Err(err) => EgressClassification::Block(BlockReason::InternalError(format!(
+                    "EgressVault initialization failed: {err}"
+                ))),
             }
         })
     }
