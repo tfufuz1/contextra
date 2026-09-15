@@ -2,7 +2,7 @@ use memfuse_core::{MemFuseError, Result, TxId};
 use memfuse_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use super::{
     legacy_integrity_key, PreparedBatch, Wal, WalCommand, WalEntry, WalOp, WalVersion,
@@ -701,6 +701,7 @@ impl Wal {
 
 #[cfg(windows)]
 #[allow(unsafe_code)]
+#[allow(dead_code)]
 pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use std::ptr::null_mut;
@@ -825,6 +826,7 @@ pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
 }
 
 #[cfg(not(windows))]
+#[allow(dead_code)]
 pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
     let _ = path;
     Ok(())

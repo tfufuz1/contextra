@@ -64,6 +64,7 @@ pub struct Wal {
         std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<WalCommand>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) truncate_lock: Arc<tokio::sync::Mutex<()>>,
+    #[allow(dead_code)]
     pub(crate) simulate_append_failure: Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -192,21 +193,15 @@ impl Wal {
                 let bak_path = PathBuf::from(format!("{}.{}", wal.path.display(), bak_suffix));
                 let copy_res = tokio::fs::copy(&wal.path, &bak_path).await;
                 if copy_res.is_ok() {
-                    // Backup-Datei fsyncen: Recovery-Sicherheit VOR der Truncation der Original-WAL.
-                    match tokio::fs::OpenOptions::new()
+                    // AI-TAG[FIX][MINOR] (TS: 2026-03-31T12:00:00Z) (SESSION: c0a80101) Backup-Datei fsyncen: Recovery-Sicherheit VOR der Truncation der Original-WAL.
+                    let bak_file = tokio::fs::OpenOptions::new()
                         .write(true)
                         .open(&bak_path)
                         .await
-                    {
-                        Ok(bak_file) => {
-                            if let Err(e) = bak_file.sync_all().await {
-                                tracing::warn!("WAL backup fsync failed before rewrite: {e}");
-                            }
-                        }
-                        Err(e) => {
-                            tracing::warn!("Could not reopen WAL backup for fsync: {e}");
-                        }
-                    }
+                        .map_err(|e| MemFuseError::Storage(format!("Could not reopen WAL backup for fsync: {e}")))?;
+                    bak_file.sync_all().await.map_err(|e| {
+                        MemFuseError::Storage(format!("WAL backup fsync failed before rewrite: {e}"))
+                    })?;
                 }
                 let rewrite_res = wal.rewrite_as_v3(&entries).await;
 
