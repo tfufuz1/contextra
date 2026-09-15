@@ -61,6 +61,7 @@ pub struct Wal {
     pub(crate) flusher_tx:
         std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<FlusherMessage>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) truncate_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl std::fmt::Debug for Wal {
@@ -166,6 +167,7 @@ impl Wal {
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
         };
 
         wal.enable_flusher_with_config(config.flusher_config);
