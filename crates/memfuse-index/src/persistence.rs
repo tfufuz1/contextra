@@ -18,7 +18,7 @@ use memfuse_core::{MemFuseError, Result};
 /// Magic number for HNSW files (0x484E5357 = "HNSW").
 pub const HNSW_MAGIC: u32 = 0x484E5357;
 /// Current file format version.
-pub const HNSW_VERSION: u16 = 1;
+pub const HNSW_VERSION: u16 = 2;
 
 /// The header of an HNSW persistent file.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -29,17 +29,19 @@ pub struct HnswHeader {
     m: u32,
     metric: u8,
     quantized: u8,
-    q_min: f32, // Added for ScalarQuantizer
-    q_max: f32, // Added for ScalarQuantizer
+    q_min: f32, // Legacy v1 field (preserved for struct layout compatibility)
+    q_max: f32, // Legacy v1 field (preserved for struct layout compatibility)
     node_count: u64,
     entry_point: i64,
     nodes_offset: u64,
     connections_offset: u64,
-    last_tx_id: u64, // Added for Repair-on-Open
+    last_tx_id: u64,               // Added for Repair-on-Open
+    quant_calibration_offset: u64, // Added in v2 for per-dimension calibration
+    quant_calibration_len: u32,    // Added in v2 for per-dimension calibration
 }
 
 impl HnswHeader {
-    pub const SIZE: usize = 64;
+    pub const SIZE: usize = 80;
 
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -55,6 +57,39 @@ impl HnswHeader {
         connections_offset: u64,
         last_tx_id: u64,
     ) -> Self {
+        Self::new_v2(
+            dimension,
+            m,
+            metric,
+            quantized,
+            q_min,
+            q_max,
+            node_count,
+            entry_point,
+            nodes_offset,
+            connections_offset,
+            last_tx_id,
+            0,
+            0,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_v2(
+        dimension: u32,
+        m: u32,
+        metric: u8,
+        quantized: u8,
+        q_min: f32,
+        q_max: f32,
+        node_count: u64,
+        entry_point: i64,
+        nodes_offset: u64,
+        connections_offset: u64,
+        last_tx_id: u64,
+        quant_calibration_offset: u64,
+        quant_calibration_len: u32,
+    ) -> Self {
         Self {
             magic: HNSW_MAGIC,
             version: HNSW_VERSION,
@@ -69,6 +104,8 @@ impl HnswHeader {
             nodes_offset,
             connections_offset,
             last_tx_id,
+            quant_calibration_offset,
+            quant_calibration_len,
         }
     }
 
@@ -120,6 +157,14 @@ impl HnswHeader {
         self.last_tx_id
     }
 
+    pub fn quant_calibration_offset(&self) -> u64 {
+        self.quant_calibration_offset
+    }
+
+    pub fn quant_calibration_len(&self) -> u32 {
+        self.quant_calibration_len
+    }
+
     pub fn dimension(&self) -> u32 {
         self.dimension
     }
@@ -137,7 +182,7 @@ impl HnswHeader {
     }
 
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() < Self::SIZE {
+        if bytes.len() < 64 {
             return Err(MemFuseError::Storage("Header too small".into()));
         }
 
@@ -161,10 +206,10 @@ impl HnswHeader {
                 .try_into()
                 .map_err(|_| MemFuseError::Storage("Invalid version bytes".into()))?,
         );
-        if version != HNSW_VERSION {
+        if version != 1 && version != 2 {
             return Err(MemFuseError::Storage(format!(
-                "Unsupported HNSW version: {}, expected {}",
-                version, HNSW_VERSION
+                "Unsupported HNSW version: {}, expected 1 or 2",
+                version
             )));
         }
 
@@ -248,6 +293,36 @@ impl HnswHeader {
                 .map_err(|_| MemFuseError::Storage("Invalid last_tx_id bytes".into()))?,
         );
 
+        let (quant_calibration_offset, quant_calibration_len) = if version == 2 {
+            if bytes.len() < Self::SIZE {
+                return Err(MemFuseError::Storage("Header too small for v2".into()));
+            }
+            let off = u64::from_le_bytes(
+                bytes
+                    .get(64..72)
+                    .ok_or_else(|| {
+                        MemFuseError::Storage("Invalid quant_calibration_offset".into())
+                    })?
+                    .try_into()
+                    .map_err(|_| {
+                        MemFuseError::Storage("Invalid quant_calibration_offset bytes".into())
+                    })?,
+            );
+            let len = u32::from_le_bytes(
+                bytes
+                    .get(72..76)
+                    .ok_or_else(|| MemFuseError::Storage("Invalid quant_calibration_len".into()))?
+                    .try_into()
+                    .map_err(|_| {
+                        MemFuseError::Storage("Invalid quant_calibration_len bytes".into())
+                    })?,
+            );
+            (off, len)
+        } else {
+            tracing::warn!("Loading legacy HNSW file format version 1 — using degraded uniform quantization range fallback");
+            (0, 0)
+        };
+
         Ok(Self {
             magic,
             version,
@@ -262,6 +337,8 @@ impl HnswHeader {
             nodes_offset,
             connections_offset,
             last_tx_id,
+            quant_calibration_offset,
+            quant_calibration_len,
         })
     }
 
@@ -280,6 +357,8 @@ impl HnswHeader {
         buf[40..48].copy_from_slice(&self.nodes_offset.to_le_bytes());
         buf[48..56].copy_from_slice(&self.connections_offset.to_le_bytes());
         buf[56..64].copy_from_slice(&self.last_tx_id.to_le_bytes());
+        buf[64..72].copy_from_slice(&self.quant_calibration_offset.to_le_bytes());
+        buf[72..76].copy_from_slice(&self.quant_calibration_len.to_le_bytes());
         buf
     }
 }
@@ -710,7 +789,7 @@ mod tests {
         let path = temp_dir.path().join("unsupported_version.hnsw");
         let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 0, -1, 64, 64, 1);
         let mut bytes = header.to_bytes().to_vec();
-        let unsupported_version = HNSW_VERSION + 1;
+        let unsupported_version = 99u16;
         bytes[4..6].copy_from_slice(&unsupported_version.to_le_bytes());
         std::fs::write(&path, &bytes).map_err(|e| MemFuseError::Storage(e.to_string()))?;
 
@@ -725,6 +804,121 @@ mod tests {
         } else {
             panic!("Expected Storage error");
         }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
+        use crate::hnsw::{HnswConfig, HnswIndex};
+
+        let temp_dir = tempfile::tempdir().map_err(|e| MemFuseError::Storage(e.to_string()))?;
+        let path = temp_dir.path().join("legacy_v1.hnsw");
+
+        // Manually build a v1 header file with 64-byte header
+        let v1_header_bytes = [
+            0x57, 0x53, 0x4E, 0x48, // magic "HNSW"
+            0x01, 0x00, // version 1
+            0x02, 0x00, 0x00, 0x00, // dimension 2
+            0x10, 0x00, 0x00, 0x00, // m 16
+            0x01, // metric Euclidean
+            0x01, // quantized = 1
+            0x00, 0x00, 0x00, 0x00, // q_min = 0.0
+            0x00, 0x00, 0x80, 0x3F, // q_max = 1.0
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // node_count = 1
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // entry_point = 0
+            64, 0, 0, 0, 0, 0, 0, 0, // nodes_offset = 64
+            89, 0, 0, 0, 0, 0, 0, 0, // connections_offset = 89
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // last_tx_id = 1
+        ];
+
+        let mut file_bytes = v1_header_bytes.to_vec();
+        let record = NodeRecord {
+            doc_id: 1,
+            max_layer: 0,
+            vector_offset: 89 + 1 + 4 + 4,
+            connections_offset: 89,
+        };
+        file_bytes.extend_from_slice(&record.to_bytes()); // 25 bytes
+                                                          // Connections block: 1 layer, 1 conn = 0
+        file_bytes.push(1);
+        file_bytes.extend_from_slice(&1u32.to_le_bytes());
+        file_bytes.extend_from_slice(&0u32.to_le_bytes());
+        // Vector block: 2 bytes u8 quantized
+        file_bytes.push(127);
+        file_bytes.push(127);
+
+        std::fs::write(&path, &file_bytes).map_err(|e| MemFuseError::Storage(e.to_string()))?;
+
+        let config = HnswConfig {
+            dimension: 2,
+            quantize: true,
+            ..Default::default()
+        };
+        let index = HnswIndex::try_new(config)?;
+        index.load_mmap(&path).await?;
+
+        let q = index
+            .quantizer()
+            .expect("Quantizer must be populated on mmap load");
+        assert_eq!(q.mins(), &[0.0, 0.0]);
+        assert_eq!(q.maxes(), &[1.0, 1.0]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_v2_save_load_roundtrip_preserves_per_dim_calibration() -> Result<()> {
+        use crate::hnsw::{HnswConfig, HnswIndex};
+        use memfuse_core::{DocId, TxId, VectorIndex};
+
+        let temp_dir = tempfile::tempdir().map_err(|e| MemFuseError::Storage(e.to_string()))?;
+        let path = temp_dir.path().join("v2_roundtrip.hnsw");
+
+        let config = HnswConfig {
+            dimension: 2,
+            quantize: true,
+            ..Default::default()
+        };
+        let index = HnswIndex::try_new(config.clone())?;
+        let tx = TxId::new(1);
+
+        // Heterogeneous variance per dimension (>= 50 items to trigger lazy quantizer training)
+        for i in 0..60u64 {
+            let v0 = (i as f32) / 59.0;
+            let v1 = (i as f32) * 1000.0 / 59.0;
+            index.insert(tx, DocId::new(i + 1), &[v0, v1]).await?;
+        }
+        index.commit(tx).await?;
+
+        index.save(&path).await?;
+
+        let loaded_index = HnswIndex::try_new(config)?;
+        loaded_index.load_mmap(&path).await?;
+
+        let q = loaded_index
+            .quantizer()
+            .expect("Quantizer must be restored");
+        assert!(
+            (q.mins()[0] - 0.0).abs() < 1e-2,
+            "mins[0] was {}",
+            q.mins()[0]
+        );
+        assert!(
+            (q.mins()[1] - 0.0).abs() < 1e-2,
+            "mins[1] was {}",
+            q.mins()[1]
+        );
+        assert!(
+            (q.maxes()[0] - 1.0).abs() < 1e-2,
+            "maxes[0] was {}",
+            q.maxes()[0]
+        );
+        assert!(
+            (q.maxes()[1] - 1000.0).abs() < 10.0,
+            "maxes[1] was {}",
+            q.maxes()[1]
+        );
+
         Ok(())
     }
 
@@ -754,12 +948,24 @@ mod tests {
     fn test_get_connections_rejects_out_of_bounds_offset() -> Result<()> {
         let temp_dir = tempfile::tempdir().map_err(|e| MemFuseError::Storage(e.to_string()))?;
         let path = temp_dir.path().join("oob_connections.hnsw");
-        let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 1, 0, 64, 64 + 25, 1);
+        let header = HnswHeader::new(
+            128,
+            16,
+            1,
+            0,
+            -1.0,
+            1.0,
+            1,
+            0,
+            HnswHeader::SIZE as u64,
+            (HnswHeader::SIZE + 25) as u64,
+            1,
+        );
         let mut file_bytes = header.to_bytes().to_vec();
         let record = NodeRecord {
             doc_id: 1,
             max_layer: 1,
-            vector_offset: 64 + 25,
+            vector_offset: (HnswHeader::SIZE + 25) as u64,
             connections_offset: 9999,
         };
         file_bytes.extend_from_slice(&record.to_bytes());
@@ -787,13 +993,25 @@ mod tests {
     fn test_get_vector_rejects_out_of_bounds_offset() -> Result<()> {
         let temp_dir = tempfile::tempdir().map_err(|e| MemFuseError::Storage(e.to_string()))?;
         let path = temp_dir.path().join("oob_vector.hnsw");
-        let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 1, 0, 64, 64 + 25, 1);
+        let header = HnswHeader::new(
+            128,
+            16,
+            1,
+            0,
+            -1.0,
+            1.0,
+            1,
+            0,
+            HnswHeader::SIZE as u64,
+            (HnswHeader::SIZE + 25) as u64,
+            1,
+        );
         let mut file_bytes = header.to_bytes().to_vec();
         let record = NodeRecord {
             doc_id: 1,
             max_layer: 1,
             vector_offset: 9999,
-            connections_offset: 64 + 25,
+            connections_offset: (HnswHeader::SIZE + 25) as u64,
         };
         file_bytes.extend_from_slice(&record.to_bytes());
         std::fs::write(&path, &file_bytes).map_err(|e| MemFuseError::Storage(e.to_string()))?;
@@ -820,13 +1038,25 @@ mod tests {
     fn test_get_connections_rejects_absurd_length_field() -> Result<()> {
         let temp_dir = tempfile::tempdir().map_err(|e| MemFuseError::Storage(e.to_string()))?;
         let path = temp_dir.path().join("absurd_length.hnsw");
-        let header = HnswHeader::new(4, 16, 1, 0, -1.0, 1.0, 1, 0, 64, 64 + 25, 1);
+        let conn_offset = HnswHeader::SIZE + 25;
+        let header = HnswHeader::new(
+            4,
+            16,
+            1,
+            0,
+            -1.0,
+            1.0,
+            1,
+            0,
+            HnswHeader::SIZE as u64,
+            conn_offset as u64,
+            1,
+        );
         let mut file_bytes = header.to_bytes().to_vec();
-        let conn_offset = 64 + 25;
         let record = NodeRecord {
             doc_id: 1,
             max_layer: 1,
-            vector_offset: 64 + 25 + 100,
+            vector_offset: (conn_offset + 100) as u64,
             connections_offset: conn_offset as u64,
         };
         file_bytes.extend_from_slice(&record.to_bytes());

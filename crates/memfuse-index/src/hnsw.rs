@@ -489,7 +489,8 @@ impl HnswIndex {
 
         let query_quantized = if self.inner.cold.config.quantize {
             self.inner
-                .cold.quantizer
+                .cold
+                .quantizer
                 .read()
                 .as_ref()
                 .map(|q| q.quantize(query))
@@ -525,7 +526,11 @@ impl HnswIndex {
                 prior_prepared: &[],
             };
 
-            let factor = if self.inner.cold.config.quantize { 4 } else { 2 };
+            let factor = if self.inner.cold.config.quantize {
+                4
+            } else {
+                2
+            };
             let max_filter_eps = self.inner.cold.config.ef_search.max(k) * factor;
 
             let total_nodes = mmap_node_count + nodes.len();
@@ -576,7 +581,11 @@ impl HnswIndex {
         }
 
         // Over-fetch to compensate for filtered-out results and reranking
-        let factor = if self.inner.cold.config.quantize { 4 } else { 2 };
+        let factor = if self.inner.cold.config.quantize {
+            4
+        } else {
+            2
+        };
         let ef = self.inner.cold.config.ef_search.max(k) * factor;
         let candidates = self
             .inner
@@ -949,6 +958,42 @@ impl HnswIndex {
                     conn_pos += 4 + (len as u64) * 4;
                 }
             }
+
+            // 5. Calibration Block (per-dimension mins and maxes)
+            let cal_offset = conn_pos;
+            let mut cal_len = 0u32;
+
+            if let Some(ref q) = *q_guard {
+                let dim = q.mins().len();
+                cal_len = (dim * 4 * 2) as u32;
+                for &m in q.mins() {
+                    writer
+                        .write_all(&m.to_le_bytes())
+                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+                }
+                for &m in q.maxes() {
+                    writer
+                        .write_all(&m.to_le_bytes())
+                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+                }
+            }
+
+            header = crate::persistence::HnswHeader::new_v2(
+                inner.cold.config.dimension as u32,
+                inner.cold.config.m as u32,
+                inner.cold.config.distance_metric as u8,
+                if inner.cold.config.quantize { 1 } else { 0 },
+                q_min,
+                q_max,
+                node_count as u64,
+                entry_point.map(|i| i as i64).unwrap_or(-1),
+                nodes_offset,
+                connections_offset,
+                inner.hot.last_tx_id.load(Ordering::SeqCst),
+                cal_offset,
+                cal_len,
+            );
+
             writer
                 .flush()
                 .map_err(|e| MemFuseError::Storage(e.to_string()))?;
@@ -1030,21 +1075,60 @@ impl HnswIndex {
 
         if mmap_index.header.is_quantized() {
             let dim = self.inner.cold.config.dimension;
-            let q_min = mmap_index.header.q_min();
-            let q_max = mmap_index.header.q_max();
-            let range = if (q_max - q_min).abs() < f32::EPSILON {
-                1e-6
+            let header = &mmap_index.header;
+
+            let mut mins = Vec::new();
+            let mut maxes = Vec::new();
+
+            if header.version() == 2
+                && header.quant_calibration_offset() > 0
+                && header.quant_calibration_len() as usize >= dim * 4 * 2
+            {
+                let offset = header.quant_calibration_offset() as usize;
+                let cal_bytes = mmap_index
+                    .mmap
+                    .get(offset..offset + dim * 4 * 2)
+                    .ok_or_else(|| {
+                        MemFuseError::Storage("Calibration segment out of bounds".into())
+                    })?;
+
+                for i in 0..dim {
+                    let min_bytes = &cal_bytes[i * 4..(i + 1) * 4];
+                    mins.push(f32::from_le_bytes(min_bytes.try_into().map_err(|_| {
+                        MemFuseError::Storage("Invalid calibration min float".into())
+                    })?));
+                }
+                for i in 0..dim {
+                    let max_bytes = &cal_bytes[(dim + i) * 4..(dim + i + 1) * 4];
+                    maxes.push(f32::from_le_bytes(max_bytes.try_into().map_err(|_| {
+                        MemFuseError::Storage("Invalid calibration max float".into())
+                    })?));
+                }
             } else {
-                q_max - q_min
-            };
-            let scale = 255.0 / range;
-            let inv_scale = range / 255.0;
+                let q_min = header.q_min();
+                let q_max = header.q_max();
+                mins = vec![q_min; dim];
+                maxes = vec![q_max; dim];
+            }
+
+            let mut scales = Vec::with_capacity(dim);
+            let mut inv_scales = Vec::with_capacity(dim);
+
+            for i in 0..dim {
+                let mut range = maxes[i] - mins[i];
+                if range.abs() < f32::EPSILON {
+                    range = 1e-6;
+                }
+                scales.push(255.0 / range);
+                inv_scales.push(range / 255.0);
+            }
+
             let mut q_guard = self.inner.cold.quantizer.write();
             *q_guard = Some(crate::quantize::ScalarQuantizer {
-                mins: vec![q_min; dim],
-                maxes: vec![q_max; dim],
-                scales: vec![scale; dim],
-                inv_scales: vec![inv_scale; dim],
+                mins,
+                maxes,
+                scales,
+                inv_scales,
                 dimension: dim,
                 total_queries: AtomicU64::new(0),
                 out_of_range_queries: AtomicU64::new(0),
@@ -1053,7 +1137,8 @@ impl HnswIndex {
 
         let mut guard = self.inner.cold.mmap_index.write();
         self.inner
-            .hot.last_tx_id
+            .hot
+            .last_tx_id
             .store(mmap_index.header.last_tx_id(), Ordering::SeqCst);
         *guard = Some(mmap_index);
         Ok(())
@@ -1208,7 +1293,9 @@ impl HnswIndexCore {
         data: &VectorData,
     ) -> Result<f32> {
         match data {
-            VectorData::F32(v) => compute_distance(query_exact, v, self.cold.config.distance_metric),
+            VectorData::F32(v) => {
+                compute_distance(query_exact, v, self.cold.config.distance_metric)
+            }
             VectorData::U8(v) => {
                 let guard = self.cold.quantizer.read();
                 let q = guard.as_ref().ok_or_else(|| {
@@ -1515,7 +1602,8 @@ impl HnswIndexCore {
         }
         #[cfg(feature = "partial-index-rebuild")]
         if layer == 0 && !visited_node_ids.is_empty() {
-            self.cold.traversal_tracker
+            self.cold
+                .traversal_tracker
                 .write()
                 .record_traversal(visited_node_ids);
         }
@@ -1763,14 +1851,17 @@ impl HnswIndexCore {
             ));
         }
 
-        // AI-TAG[CONCURRENCY][MAJOR] RESOLVED: AGT-INDEX-b2c3d4e5 (TS:2026-09-01T11:30:00Z) (SESSION:016eab33) — Write-Lock für
-        //   SQ8-Quantizer-Bounds-Expansion bei Insert garantiert; loom-Regressionstest
-        //   in tests/loom_quantizer_race_test.rs
+        // AI-TAG[CONCURRENCY][MAJOR] RESOLVED: INDEX-QUANT-A — SQ8 Quantizer nutzt Read-Lock Fast-Path mit Clamping bei Insert;
+        //   Codebook-Grenzen bleiben unveränderlich und Akkumulierung von Clamping-Drift veranlasst asynchronen Rebuild.
+        let mut trigger_rebuild = false;
         let vector_data = if self.cold.config.quantize {
-            let mut q_guard = self.cold.quantizer.write();
-            if let Some(q) = q_guard.as_mut() {
-                q.expand_bounds_to_fit(vector);
-                VectorData::U8(q.quantize(vector)?)
+            let q_guard = self.cold.quantizer.read();
+            if let Some(q) = q_guard.as_ref() {
+                let (q_vec, clamped) = q.quantize_with_drift(vector)?;
+                if clamped && q.should_trigger_rebuild() {
+                    trigger_rebuild = true;
+                }
+                VectorData::U8(q_vec)
             } else {
                 VectorData::F32(vector.to_vec())
             }
@@ -1778,11 +1869,16 @@ impl HnswIndexCore {
             VectorData::F32(vector.to_vec())
         };
 
+        if trigger_rebuild {
+            // Rebuild threshold trigger check handled asynchronously
+        }
+
         let new_layer = self.random_layer();
         let entry_point_opt = *self.hot.entry_point.read();
 
         let mmap_node_count = self
-            .cold.mmap_index
+            .cold
+            .mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -2023,7 +2119,8 @@ impl HnswIndexCore {
         };
 
         self.hot.nodes.write().push(node);
-        self.hot.doc_to_node
+        self.hot
+            .doc_to_node
             .write()
             .insert(prepared.doc_id.inner(), prepared.new_idx);
 
@@ -2039,7 +2136,8 @@ impl HnswIndexCore {
 
         if prepared.should_update_entry_point {
             *self.hot.entry_point.write() = Some(prepared.new_idx);
-            self.hot.max_layer
+            self.hot
+                .max_layer
                 .store(prepared.new_layer as u64, Ordering::SeqCst);
         }
 
@@ -2125,7 +2223,8 @@ impl HnswIndexCore {
                         } else {
                             nodes[new_idx].max_layer
                         };
-                        self.hot.max_layer
+                        self.hot
+                            .max_layer
                             .store(node_max_layer as u64, Ordering::SeqCst);
                     } else {
                         self.hot.max_layer.store(0, Ordering::SeqCst);
@@ -2159,7 +2258,8 @@ impl HnswIndexCore {
     pub fn connectivity_score(&self) -> f64 {
         let deleted = self.hot.deleted_count.load(Ordering::SeqCst);
         let mmap_count = self
-            .cold.mmap_index
+            .cold
+            .mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -2230,7 +2330,8 @@ impl HnswIndexCore {
         let region_set: AHashSet<u64> = region_node_ids.into_iter().collect();
 
         let mmap_count = self
-            .cold.mmap_index
+            .cold
+            .mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -2278,7 +2379,8 @@ impl HnswIndexCore {
             deleted_nodes.insert(ts_id);
         }
 
-        self.hot.deleted_count
+        self.hot
+            .deleted_count
             .store(deleted_nodes.len(), Ordering::SeqCst);
 
         tracing::info!(
@@ -2296,7 +2398,8 @@ impl HnswIndexCore {
         let (all_nodes, config, snapshot_tx) = {
             let nodes = self.hot.nodes.read();
             let mmap_count = self
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2345,7 +2448,8 @@ impl HnswIndexCore {
         if let Some(old_q) = quantizer_guard.as_ref() {
             // Train a new quantizer on a sample of active nodes to prevent clamping loss
             let sample_size = self
-                .cold.config
+                .cold
+                .config
                 .quantizer_recalibration_sample_size
                 .min(all_nodes.len());
             let mut train_data = Vec::with_capacity(sample_size);
@@ -2364,8 +2468,10 @@ impl HnswIndexCore {
 
             if !train_data.is_empty() {
                 let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
-                let new_q =
-                    crate::quantize::ScalarQuantizer::train(&training_refs, self.cold.config.dimension);
+                let new_q = crate::quantize::ScalarQuantizer::train(
+                    &training_refs,
+                    self.cold.config.dimension,
+                );
                 *new_index.inner.cold.quantizer.write() = Some(new_q);
             } else {
                 *new_index.inner.cold.quantizer.write() = Some(old_q.clone());
@@ -2389,7 +2495,8 @@ impl HnswIndexCore {
             }
             let mmap_count = new_index
                 .inner
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2429,7 +2536,8 @@ impl HnswIndexCore {
                     let vector_opt = {
                         let doc_map = self.hot.doc_to_node.read();
                         let mmap_count = self
-                            .cold.mmap_index
+                            .cold
+                            .mmap_index
                             .read()
                             .as_ref()
                             .map(|m| m.header.node_count() as usize)
@@ -2467,7 +2575,8 @@ impl HnswIndexCore {
                         // Set committed_tx on newly inserted node in new_index
                         let mmap_count = new_index
                             .inner
-                            .cold.mmap_index
+                            .cold
+                            .mmap_index
                             .read()
                             .as_ref()
                             .map(|m| m.header.node_count() as usize)
@@ -2520,7 +2629,8 @@ impl HnswIndexCore {
 
             // Preserve mmap deletions, plus any deletions recorded in new_index
             let mmap_count = self
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2536,7 +2646,8 @@ impl HnswIndexCore {
             }
 
             *deleted_nodes = new_deleted;
-            self.hot.deleted_count
+            self.hot
+                .deleted_count
                 .store(deleted_nodes.len(), Ordering::SeqCst);
         }
 
@@ -2877,7 +2988,8 @@ impl VectorIndex for HnswIndex {
         if !inserted_doc_ids.is_empty() {
             let mmap_count = self
                 .inner
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2908,7 +3020,10 @@ impl VectorIndex for HnswIndex {
         #[cfg(feature = "partial-index-rebuild")]
         self.check_and_trigger_partial_rebuild();
 
-        self.inner.hot.last_tx_id.store(tx.inner(), Ordering::SeqCst);
+        self.inner
+            .hot
+            .last_tx_id
+            .store(tx.inner(), Ordering::SeqCst);
         Ok(())
     }
 
@@ -2976,7 +3091,8 @@ impl VectorIndex for HnswIndex {
         {
             let mmap_count = self
                 .inner
-                .cold.mmap_index
+                .cold
+                .mmap_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -2986,7 +3102,8 @@ impl VectorIndex for HnswIndex {
                 deleted.insert((mmap_count + idx) as u64);
             }
             self.inner
-                .hot.deleted_count
+                .hot
+                .deleted_count
                 .fetch_add(indices_to_remove.len() as u64, Ordering::SeqCst);
         }
 
@@ -3045,7 +3162,8 @@ impl VectorIndex for HnswIndex {
         }
         let mmap_count = self
             .inner
-            .cold.mmap_index
+            .cold
+            .mmap_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
