@@ -62,6 +62,7 @@ mod check_duplicate_intent;
 mod check_duplicate_symbols;
 mod check_ffi_panic_boundary;
 mod check_jules_context_freshness;
+mod check_orphan_modules;
 mod check_phantom_files;
 mod check_placeholder_refs;
 mod check_recall_stability;
@@ -2137,6 +2138,28 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-orphan-modules" => {
+            let root = find_root_dir();
+            match check_orphan_modules::run_check_orphan_modules(&root) {
+                Ok(orphans) => {
+                    if !orphans.is_empty() {
+                        eprintln!(
+                            "❌ check-orphan-modules failed: {} Waisendatei(en) (ohne mod-Deklaration) gefunden:",
+                            orphans.len()
+                        );
+                        for o in &orphans {
+                            eprintln!("  {}", o);
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ check-orphan-modules: keine Waisendateien gefunden");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-orphan-modules failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
         "check-audit-verdict-independence" => {
             if !check_audit_verdict_independence::run_check_audit_verdict_independence() {
                 process::exit(1);
@@ -2435,7 +2458,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>]");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>]");
             process::exit(1);
         }
     }
