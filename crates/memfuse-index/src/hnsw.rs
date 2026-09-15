@@ -255,7 +255,7 @@ pub enum VectorData {
 
 /// A node in the HNSW graph.
 #[derive(Debug)]
-struct HnswNode {
+pub struct HnswNode {
     doc_id: DocId,
     vector: VectorData,
     connections: RwLock<Vec<Vec<u32>>>,
@@ -319,40 +319,38 @@ pub struct HnswIndex {
     inner: std::sync::Arc<HnswIndexCore>,
 }
 
-/// Hot fields accessed on every search operation, cache-line aligned to 64 bytes.
 #[repr(align(64))]
-struct HotState {
-    nodes: RwLock<Vec<HnswNode>>,
-    doc_to_node: RwLock<AHashMap<u64, usize>>,
-    entry_point: RwLock<Option<usize>>,
-    ram_entry_point: RwLock<Option<usize>>,
+pub struct HnswHotCore {
+    pub nodes: RwLock<Vec<HnswNode>>,
+    pub doc_to_node: RwLock<AHashMap<u64, usize>>,
+    pub entry_point: RwLock<Option<usize>>,
+    pub ram_entry_point: RwLock<Option<usize>>,
+    pub max_layer: AtomicU64,
+    pub ml: f64,
+    pub deleted_nodes: RwLock<RoaringTreemap>,
+    pub deleted_count: AtomicU64,
+    pub write_mutex: Mutex<()>,
+    pub last_tx_id: AtomicU64,
+    pub rebuilding: AtomicBool,
 }
 
-/// Cold fields accessed less frequently during normal search operations.
-struct ColdState {
+pub struct HnswColdCore {
+    pub config: HnswConfig,
+    pub validation_error: Option<String>,
+    pub tx_buffer: TxBuffer<Vec<f32>>,
     pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
-    mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
-    seq_log: RwLock<memfuse_core::SequenceLog>,
-    deleted_nodes: RwLock<RoaringTreemap>,
+    pub mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
+    pub seq_log: RwLock<memfuse_core::SequenceLog>,
+    pub rebuild_count: AtomicU64,
+    pub visited_dead_nodes: AtomicU64,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
 }
 
 /// The core implementation of the HNSW index.
 pub struct HnswIndexCore {
-    config: HnswConfig,
-    validation_error: Option<String>,
-    hot: HotState,
-    max_layer: AtomicU64,
-    ml: f64,
-    tx_buffer: TxBuffer<Vec<f32>>,
-    deleted_count: AtomicU64,
-    rebuilding: AtomicBool,
-    write_mutex: Mutex<()>,
-    cold: ColdState,
-    last_tx_id: AtomicU64,
-    pub rebuild_count: AtomicU64,
-    pub visited_dead_nodes: AtomicU64,
+    pub hot: HnswHotCore,
+    pub cold: HnswColdCore,
 }
 
 impl HnswIndex {
@@ -362,35 +360,33 @@ impl HnswIndex {
         let ml = 1.0 / (config.m as f64).ln();
         Ok(Self {
             inner: std::sync::Arc::new(HnswIndexCore {
-
-                config,
-                validation_error: None,
-                hot: HotState {
+                hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
                     doc_to_node: RwLock::new(AHashMap::new()),
                     entry_point: RwLock::new(None),
                     ram_entry_point: RwLock::new(None),
+                    max_layer: AtomicU64::new(0),
+                    ml,
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    deleted_count: AtomicU64::new(0),
+                    write_mutex: Mutex::new(()),
+                    last_tx_id: AtomicU64::new(0),
+                    rebuilding: AtomicBool::new(false),
                 },
-                max_layer: AtomicU64::new(0),
-
-                ml,
-                tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
-                deleted_count: AtomicU64::new(0),
-                rebuilding: AtomicBool::new(false),
-                write_mutex: Mutex::new(()),
-                cold: ColdState {
+                cold: HnswColdCore {
+                    config,
+                    validation_error: None,
+                    tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
                     quantizer: RwLock::new(None),
                     mmap_index: RwLock::new(None),
                     seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
-                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    rebuild_count: AtomicU64::new(0),
+                    visited_dead_nodes: AtomicU64::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         config.partial_rebuild_config.clone(),
                     )),
                 },
-                last_tx_id: AtomicU64::new(0),
-                rebuild_count: AtomicU64::new(0),
-                visited_dead_nodes: AtomicU64::new(0),
             }),
         })
     }
@@ -404,35 +400,33 @@ impl HnswIndex {
         let ml = 1.0 / (config.m as f64).ln();
         Self {
             inner: std::sync::Arc::new(HnswIndexCore {
-
-                config,
-                validation_error,
-                hot: HotState {
+                hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
                     doc_to_node: RwLock::new(AHashMap::new()),
                     entry_point: RwLock::new(None),
                     ram_entry_point: RwLock::new(None),
+                    max_layer: AtomicU64::new(0),
+                    ml,
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    deleted_count: AtomicU64::new(0),
+                    write_mutex: Mutex::new(()),
+                    last_tx_id: AtomicU64::new(0),
+                    rebuilding: AtomicBool::new(false),
                 },
-                max_layer: AtomicU64::new(0),
-
-                ml,
-                tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
-                deleted_count: AtomicU64::new(0),
-                rebuilding: AtomicBool::new(false),
-                write_mutex: Mutex::new(()),
-                cold: ColdState {
+                cold: HnswColdCore {
+                    config,
+                    validation_error,
+                    tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
                     quantizer: RwLock::new(None),
                     mmap_index: RwLock::new(None),
                     seq_log: RwLock::new(memfuse_core::SequenceLog::new()),
-                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    rebuild_count: AtomicU64::new(0),
+                    visited_dead_nodes: AtomicU64::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         config.partial_rebuild_config.clone(),
                     )),
                 },
-                last_tx_id: AtomicU64::new(0),
-                rebuild_count: AtomicU64::new(0),
-                visited_dead_nodes: AtomicU64::new(0),
             }),
         }
     }
@@ -455,16 +449,16 @@ impl HnswIndex {
         filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
         snapshot_seq: Option<u64>,
     ) -> Result<Vec<ScoredDocument>> {
-        if let Some(ref err) = self.inner.validation_error {
+        if let Some(ref err) = self.inner.cold.validation_error {
             return Err(MemFuseError::invalid_input(format!(
                 "Invalid index configuration: {}",
                 err
             )));
         }
-        if query.len() != self.inner.config.dimension {
+        if query.len() != self.inner.cold.config.dimension {
             return Err(MemFuseError::invalid_input(format!(
                 "Expected dimension {}, got {}",
-                self.inner.config.dimension,
+                self.inner.cold.config.dimension,
                 query.len()
             )));
         }
@@ -493,7 +487,7 @@ impl HnswIndex {
             }
         }
 
-        let query_quantized = if self.inner.config.quantize {
+        let query_quantized = if self.inner.cold.config.quantize {
             self.inner
                 .cold.quantizer
                 .read()
@@ -515,7 +509,7 @@ impl HnswIndex {
         }
 
         let nodes = self.inner.hot.nodes.read();
-        let deleted = self.inner.cold.deleted_nodes.read();
+        let deleted = self.inner.hot.deleted_nodes.read();
 
         let mut filter_eps = Vec::new();
         if let Some(f) = filter {
@@ -531,8 +525,8 @@ impl HnswIndex {
                 prior_prepared: &[],
             };
 
-            let factor = if self.inner.config.quantize { 4 } else { 2 };
-            let max_filter_eps = self.inner.config.ef_search.max(k) * factor;
+            let factor = if self.inner.cold.config.quantize { 4 } else { 2 };
+            let max_filter_eps = self.inner.cold.config.ef_search.max(k) * factor;
 
             let total_nodes = mmap_node_count + nodes.len();
             for i in (0..total_nodes).rev() {
@@ -557,7 +551,7 @@ impl HnswIndex {
             return Ok(Vec::new());
         }
 
-        let max_layer = self.inner.max_layer.load(Ordering::SeqCst) as usize;
+        let max_layer = self.inner.hot.max_layer.load(Ordering::SeqCst) as usize;
 
         for layer in (1..=max_layer).rev() {
             let best = self
@@ -582,20 +576,20 @@ impl HnswIndex {
         }
 
         // Over-fetch to compensate for filtered-out results and reranking
-        let factor = if self.inner.config.quantize { 4 } else { 2 };
-        let ef = self.inner.config.ef_search.max(k) * factor;
+        let factor = if self.inner.cold.config.quantize { 4 } else { 2 };
+        let ef = self.inner.cold.config.ef_search.max(k) * factor;
         let candidates = self
             .inner
             .search_layer(query, query_quantized.as_deref(), &ep, ef, 0)?;
 
         let score = self.inner.connectivity_score();
-        if score < self.inner.config.rebuild_threshold {
+        if score < self.inner.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
             let err = memfuse_core::MemFuseError::HnswConnectivityDegraded { deleted_ratio };
             tracing::warn!(
                 error = %err,
                 connectivity_score = score,
-                rebuild_threshold = self.inner.config.rebuild_threshold,
+                rebuild_threshold = self.inner.cold.config.rebuild_threshold,
                 "HNSW index degraded — consider calling rebuild()"
             );
         }
@@ -637,13 +631,13 @@ impl HnswIndex {
             }
 
             // Phase 2: Exact Reranking (Asymmetric for SQ8)
-            let final_dist = if self.inner.config.quantize {
+            let final_dist = if self.inner.cold.config.quantize {
                 if let VectorData::U8(v) = &node.vector {
                     let guard = self.inner.cold.quantizer.read();
                     let q = guard.as_ref().ok_or_else(|| {
                         memfuse_core::MemFuseError::Index("Quantizer not trained".into())
                     })?;
-                    q.asymmetric_dist(query, v, self.inner.config.distance_metric)?
+                    q.asymmetric_dist(query, v, self.inner.cold.config.distance_metric)?
                 } else {
                     c.distance
                 }
@@ -651,7 +645,7 @@ impl HnswIndex {
                 c.distance
             };
 
-            let score = match self.inner.config.distance_metric {
+            let score = match self.inner.cold.config.distance_metric {
                 DistanceMetric::Cosine => 1.0 - final_dist,
                 DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
                 DistanceMetric::DotProduct => -final_dist,
@@ -726,7 +720,7 @@ impl HnswIndex {
 
         let mut tombstone_map = ahash::AHashMap::new();
         let total_nodes = self.inner.hot.nodes.read().len();
-        let deleted_guard = self.inner.cold.deleted_nodes.read();
+        let deleted_guard = self.inner.hot.deleted_nodes.read();
 
         for i in 0..total_nodes {
             let id = i as u64;
@@ -740,7 +734,7 @@ impl HnswIndex {
             &tracker,
             &std_map,
             global_tombstone_ratio,
-            &self.inner.config.partial_rebuild_config,
+            &self.inner.cold.config.partial_rebuild_config,
         );
 
         if let Some(region_node_ids) = regions {
@@ -781,7 +775,7 @@ impl HnswIndex {
     /// # FIND-DB-004: HNSW Repair Acceleration
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
         let map = self.inner.hot.doc_to_node.read();
-        let deleted = self.inner.cold.deleted_nodes.read();
+        let deleted = self.inner.hot.deleted_nodes.read();
         map.iter()
             .filter(|(&_doc_id_raw, &node_idx)| !deleted.contains(node_idx as u64))
             .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw))
@@ -827,7 +821,7 @@ impl HnswIndex {
     // TEST: grep "std::fs" crates/memfuse-index/src/hnsw.rs
     // DONE: Alle std::fs Aufrufe in save() sind in spawn_blocking gekapselt oder durch tokio::fs ersetzt.
     pub async fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
-        let _lock = self.inner.write_mutex.lock().await;
+        let _lock = self.inner.hot.write_mutex.lock().await;
         let inner = std::sync::Arc::clone(&self.inner);
         let path_buf = path.as_ref().to_path_buf();
 
@@ -861,17 +855,17 @@ impl HnswIndex {
 
             // Initial header
             let mut header = crate::persistence::HnswHeader::new(
-                inner.config.dimension as u32,
-                inner.config.m as u32,
-                inner.config.distance_metric as u8,
-                if inner.config.quantize { 1 } else { 0 },
+                inner.cold.config.dimension as u32,
+                inner.cold.config.m as u32,
+                inner.cold.config.distance_metric as u8,
+                if inner.cold.config.quantize { 1 } else { 0 },
                 q_min,
                 q_max,
                 node_count as u64,
                 entry_point.map(|i| i as i64).unwrap_or(-1),
                 nodes_offset,
                 0,
-                inner.last_tx_id.load(Ordering::SeqCst),
+                inner.hot.last_tx_id.load(Ordering::SeqCst),
             );
 
             // 1. Placeholder Header
@@ -1031,11 +1025,11 @@ impl HnswIndex {
             let mut ep_guard = self.inner.hot.entry_point.write();
             *ep_guard = ep;
             *self.inner.hot.ram_entry_point.write() = None;
-            self.inner.max_layer.store(max_layer, Ordering::SeqCst);
+            self.inner.hot.max_layer.store(max_layer, Ordering::SeqCst);
         }
 
         if mmap_index.header.is_quantized() {
-            let dim = self.inner.config.dimension;
+            let dim = self.inner.cold.config.dimension;
             let q_min = mmap_index.header.q_min();
             let q_max = mmap_index.header.q_max();
             let range = if (q_max - q_min).abs() < f32::EPSILON {
@@ -1059,7 +1053,7 @@ impl HnswIndex {
 
         let mut guard = self.inner.cold.mmap_index.write();
         self.inner
-            .last_tx_id
+            .hot.last_tx_id
             .store(mmap_index.header.last_tx_id(), Ordering::SeqCst);
         *guard = Some(mmap_index);
         Ok(())
@@ -1103,7 +1097,7 @@ pub struct BatchContext {
 impl BatchContext {
     pub fn new(core: &HnswIndexCore) -> Self {
         Self {
-            running_max_layer: core.max_layer.load(Ordering::SeqCst) as usize,
+            running_max_layer: core.hot.max_layer.load(Ordering::SeqCst) as usize,
             has_entry_point: core.hot.entry_point.read().is_some(),
             has_ram_entry_point: core.hot.ram_entry_point.read().is_some(),
         }
@@ -1168,7 +1162,7 @@ pub enum RebuildStatus {
 impl HnswIndexCore {
     /// Liefert den aktuellen Rebuild-Status des Index.
     pub fn rebuild_status(&self) -> RebuildStatus {
-        if self.rebuilding.load(Ordering::SeqCst) {
+        if self.hot.rebuilding.load(Ordering::SeqCst) {
             RebuildStatus::Running
         } else {
             RebuildStatus::Idle
@@ -1187,7 +1181,7 @@ impl HnswIndexCore {
     /// Gibt `true` zurück wenn Rebuild abgeschlossen, `false` bei Timeout.
     pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
         let deadline = tokio::time::Instant::now() + timeout;
-        while self.rebuilding.load(Ordering::Acquire) {
+        while self.hot.rebuilding.load(Ordering::Acquire) {
             if tokio::time::Instant::now() >= deadline {
                 return false;
             }
@@ -1203,7 +1197,7 @@ impl HnswIndexCore {
         // max(f64::EPSILON) verhindert diesen Grenzfall.
         let r: f32 = rng.gen::<f32>();
         let r_clamped = r.max(f32::EPSILON);
-        let layer = (-(r_clamped.ln()) as f64 * self.ml) as usize;
+        let layer = (-(r_clamped.ln()) as f64 * self.hot.ml) as usize;
         layer.min(32) // Hard-cap
     }
 
@@ -1214,16 +1208,16 @@ impl HnswIndexCore {
         data: &VectorData,
     ) -> Result<f32> {
         match data {
-            VectorData::F32(v) => compute_distance(query_exact, v, self.config.distance_metric),
+            VectorData::F32(v) => compute_distance(query_exact, v, self.cold.config.distance_metric),
             VectorData::U8(v) => {
                 let guard = self.cold.quantizer.read();
                 let q = guard.as_ref().ok_or_else(|| {
                     memfuse_core::MemFuseError::Index("Quantizer not trained".into())
                 })?;
                 if let Some(qq) = query_quantized {
-                    q.symmetric_dist(qq, v, self.config.distance_metric)
+                    q.symmetric_dist(qq, v, self.cold.config.distance_metric)
                 } else {
-                    q.asymmetric_dist(query_exact, v, self.config.distance_metric)
+                    q.asymmetric_dist(query_exact, v, self.cold.config.distance_metric)
                 }
             }
         }
@@ -1242,9 +1236,9 @@ impl HnswIndexCore {
                 .as_ref()
                 .ok_or_else(|| memfuse_core::MemFuseError::Index("Quantizer not trained".into()))?;
             if let Some(qq) = query_quantized {
-                q.symmetric_dist(qq, vector_bytes, self.config.distance_metric)
+                q.symmetric_dist(qq, vector_bytes, self.cold.config.distance_metric)
             } else {
-                q.asymmetric_dist(query_exact, vector_bytes, self.config.distance_metric)
+                q.asymmetric_dist(query_exact, vector_bytes, self.cold.config.distance_metric)
             }
         } else {
             // Safe unaligned F32 read
@@ -1252,21 +1246,21 @@ impl HnswIndexCore {
             #[allow(clippy::chunks_exact_to_as_chunks)]
             let v: Vec<f32> = vector_bytes
                 .chunks_exact(4)
-                .take(self.config.dimension)
+                .take(self.cold.config.dimension)
                 .map(|chunk| -> Result<f32> {
                     Ok(f32::from_le_bytes(chunk.try_into().map_err(|_| {
                         MemFuseError::Index("Corrupt f32 in mmap vector".into())
                     })?))
                 })
                 .collect::<Result<Vec<f32>>>()?;
-            compute_distance(query_exact, &v, self.config.distance_metric)
+            compute_distance(query_exact, &v, self.cold.config.distance_metric)
         }
     }
 
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
         match (data_a, data_b) {
             (VectorData::F32(a), VectorData::F32(b)) => {
-                compute_distance(a, b, self.config.distance_metric)
+                compute_distance(a, b, self.cold.config.distance_metric)
             }
             (VectorData::U8(a), VectorData::U8(b)) => {
                 let guard = self.cold.quantizer.read();
@@ -1275,7 +1269,7 @@ impl HnswIndexCore {
                     .ok_or_else(|| {
                         memfuse_core::MemFuseError::Index("Quantizer not trained".into())
                     })?
-                    .symmetric_dist(a, b, self.config.distance_metric)
+                    .symmetric_dist(a, b, self.cold.config.distance_metric)
             }
             // ANCHOR[ALG-FIX:PANIC-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Mixed VectorData Guard (Zero-Panic Policy)
             // FUNDORT: memfuse-index/src/hnsw.rs
@@ -1452,13 +1446,13 @@ impl HnswIndexCore {
             }
 
             let connections = self.resolve_connections(current.index, layer, &ctx)?;
-            let deleted_guard = self.cold.deleted_nodes.read();
+            let deleted_guard = self.hot.deleted_nodes.read();
             let mut has_dead_neighbors = false;
 
             for &neighbor_u32 in connections.iter() {
                 let neighbor = neighbor_u32 as usize;
                 if deleted_guard.contains(neighbor as u64) {
-                    self.visited_dead_nodes.fetch_add(1, Ordering::Relaxed);
+                    self.cold.visited_dead_nodes.fetch_add(1, Ordering::Relaxed);
                     has_dead_neighbors = true;
                 }
                 if visited.insert(neighbor) {
@@ -1560,8 +1554,8 @@ impl HnswIndexCore {
                 return if mmap.header.is_quantized() {
                     Ok(VectorData::U8(bytes.to_vec()))
                 } else {
-                    let mut v = vec![0.0f32; self.config.dimension];
-                    for i in 0..self.config.dimension {
+                    let mut v = vec![0.0f32; self.cold.config.dimension];
+                    for i in 0..self.cold.config.dimension {
                         v[i] = f32::from_le_bytes(bytes[i * 4..(i + 1) * 4].try_into().map_err(
                             |_| MemFuseError::Index("Corrupt f32 in mmap vector".into()),
                         )?);
@@ -1653,7 +1647,7 @@ impl HnswIndexCore {
 
         // Dynamische Lockerung: Bei hoher Dichte (geringe Varianz) erlauben wir
         // mehr Redundanz um SQ8-Artefakte zu kompensieren.
-        let relaxation = if self.config.quantize {
+        let relaxation = if self.cold.config.quantize {
             (0.1 * (1.0 / (1.0 + std_dev))).clamp(0.02, 0.2)
         } else {
             0.0
@@ -1752,10 +1746,10 @@ impl HnswIndexCore {
             }
         }
 
-        if vector.len() != self.config.dimension {
+        if vector.len() != self.cold.config.dimension {
             return Err(MemFuseError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
-                self.config.dimension,
+                self.cold.config.dimension,
                 vector.len()
             )));
         }
@@ -1772,7 +1766,7 @@ impl HnswIndexCore {
         // AI-TAG[CONCURRENCY][MAJOR] RESOLVED: AGT-INDEX-b2c3d4e5 (TS:2026-09-01T11:30:00Z) (SESSION:016eab33) — Write-Lock für
         //   SQ8-Quantizer-Bounds-Expansion bei Insert garantiert; loom-Regressionstest
         //   in tests/loom_quantizer_race_test.rs
-        let vector_data = if self.config.quantize {
+        let vector_data = if self.cold.config.quantize {
             let mut q_guard = self.cold.quantizer.write();
             if let Some(q) = q_guard.as_mut() {
                 q.expand_bounds_to_fit(vector);
@@ -1887,7 +1881,7 @@ impl HnswIndexCore {
                 vector,
                 query_quantized.as_deref(),
                 &ep,
-                self.config.ef_construction,
+                self.cold.config.ef_construction,
                 layer,
                 prior_prepared,
             )?;
@@ -1900,7 +1894,7 @@ impl HnswIndexCore {
             let selected = self.select_neighbors_heuristic_with_batch(
                 &ctx,
                 &neighbors,
-                self.config.m,
+                self.cold.config.m,
                 new_idx,
                 &vector_data,
                 prior_prepared,
@@ -1934,7 +1928,7 @@ impl HnswIndexCore {
                     conn_indices.push(new_idx as u32);
                 }
 
-                let selected = if conn_indices.len() > self.config.m * 2 {
+                let selected = if conn_indices.len() > self.cold.config.m * 2 {
                     let mut conn_cands = Vec::with_capacity(conn_indices.len());
                     for &idx_u32 in &conn_indices {
                         let idx = idx_u32 as usize;
@@ -1967,7 +1961,7 @@ impl HnswIndexCore {
                     self.select_neighbors_heuristic_with_batch(
                         &ctx,
                         &conn_cands,
-                        self.config.m * 2,
+                        self.cold.config.m * 2,
                         new_idx,
                         &vector_data,
                         prior_prepared,
@@ -2045,7 +2039,7 @@ impl HnswIndexCore {
 
         if prepared.should_update_entry_point {
             *self.hot.entry_point.write() = Some(prepared.new_idx);
-            self.max_layer
+            self.hot.max_layer
                 .store(prepared.new_layer as u64, Ordering::SeqCst);
         }
 
@@ -2063,8 +2057,8 @@ impl HnswIndexCore {
     fn do_delete(&self, id: DocId) -> Result<()> {
         let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
         if let Some(idx) = node_idx {
-            self.cold.deleted_nodes.write().insert(idx as u64);
-            self.deleted_count.fetch_add(1, Ordering::SeqCst);
+            self.hot.deleted_nodes.write().insert(idx as u64);
+            self.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
 
             // ANCHOR[ALG-FIX:D2-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Entry-Point-Aktualisierung nach Delete (INV-HNSW-4)
             // INVARIANTE (INV-HNSW-4): Wenn der gelöschte Knoten der aktuelle Entry-Point (oder RAM-Entry-Point) war,
@@ -2079,7 +2073,7 @@ impl HnswIndexCore {
                     .as_ref()
                     .map(|m| m.header.node_count() as usize)
                     .unwrap_or(0);
-                let deleted = self.cold.deleted_nodes.read();
+                let deleted = self.hot.deleted_nodes.read();
 
                 let mut best_node = None;
                 let mut best_ram_node = None;
@@ -2131,10 +2125,10 @@ impl HnswIndexCore {
                         } else {
                             nodes[new_idx].max_layer
                         };
-                        self.max_layer
+                        self.hot.max_layer
                             .store(node_max_layer as u64, Ordering::SeqCst);
                     } else {
-                        self.max_layer.store(0, Ordering::SeqCst);
+                        self.hot.max_layer.store(0, Ordering::SeqCst);
                     }
                 }
 
@@ -2153,17 +2147,17 @@ impl HnswIndexCore {
 
     /// Returns the total number of completed full index rebuilds.
     pub fn rebuild_count(&self) -> u64 {
-        self.rebuild_count.load(Ordering::SeqCst)
+        self.cold.rebuild_count.load(Ordering::SeqCst)
     }
 
     /// Returns the total count of visited dead nodes during graph search/traversal.
     pub fn visited_dead_nodes(&self) -> u64 {
-        self.visited_dead_nodes.load(Ordering::SeqCst)
+        self.cold.visited_dead_nodes.load(Ordering::SeqCst)
     }
 
     /// Graph connectivity score (1.0 = perfect, 0.0 = fully fragmented).
     pub fn connectivity_score(&self) -> f64 {
-        let deleted = self.deleted_count.load(Ordering::SeqCst);
+        let deleted = self.hot.deleted_count.load(Ordering::SeqCst);
         let mmap_count = self
             .cold.mmap_index
             .read()
@@ -2184,7 +2178,7 @@ impl HnswIndexCore {
     /// (by default `1.0 - HNSW_REBUILD_DELETION_RATIO`, where `HNSW_REBUILD_DELETION_RATIO` = 30% deleted nodes).
     pub fn check_connectivity(&self) -> memfuse_core::Result<()> {
         let score = self.connectivity_score();
-        if score < self.config.rebuild_threshold {
+        if score < self.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
             return Err(memfuse_core::MemFuseError::HnswConnectivityDegraded { deleted_ratio });
         }
@@ -2193,17 +2187,17 @@ impl HnswIndexCore {
 
     /// Checks if a rebuild is required based on the deletion ratio.
     pub fn is_rebuild_required(&self) -> bool {
-        self.connectivity_score() < self.config.rebuild_threshold
+        self.connectivity_score() < self.cold.config.rebuild_threshold
     }
 
     /// Rebuilds the HNSW index from scratch, removing all deleted nodes.
     /// Restores optimal search performance and connectivity using a 2-phase lock protocol (ADR-061).
     pub async fn rebuild(&self) -> Result<()> {
-        if self.rebuilding.swap(true, Ordering::SeqCst) {
+        if self.hot.rebuilding.swap(true, Ordering::SeqCst) {
             tracing::debug!("HNSW rebuild already in progress, skipping");
             return Ok(());
         }
-        let _guard = RebuildGuard(&self.rebuilding);
+        let _guard = RebuildGuard(&self.hot.rebuilding);
 
         tracing::info!("Starting HNSW index rebuild (Phase 1)");
         let start_time = std::time::Instant::now();
@@ -2217,7 +2211,7 @@ impl HnswIndexCore {
         self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)
             .await?;
 
-        self.rebuild_count.fetch_add(1, Ordering::SeqCst);
+        self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
         tracing::info!("HNSW rebuild completed in {:?}", start_time.elapsed());
         Ok(())
     }
@@ -2231,7 +2225,7 @@ impl HnswIndexCore {
             return Ok(());
         }
 
-        let _write_lock = self.write_mutex.lock().await;
+        let _write_lock = self.hot.write_mutex.lock().await;
 
         let region_set: AHashSet<u64> = region_node_ids.into_iter().collect();
 
@@ -2243,7 +2237,7 @@ impl HnswIndexCore {
             .unwrap_or(0);
 
         let nodes = self.hot.nodes.read();
-        let mut deleted_nodes = self.cold.deleted_nodes.write();
+        let mut deleted_nodes = self.hot.deleted_nodes.write();
 
         let mut tombstoned_in_region = Vec::new();
         for &node_id in &region_set {
@@ -2284,7 +2278,7 @@ impl HnswIndexCore {
             deleted_nodes.insert(ts_id);
         }
 
-        self.deleted_count
+        self.hot.deleted_count
             .store(deleted_nodes.len(), Ordering::SeqCst);
 
         tracing::info!(
@@ -2307,10 +2301,10 @@ impl HnswIndexCore {
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let deleted_nodes = self.cold.deleted_nodes.read();
+            let deleted_nodes = self.hot.deleted_nodes.read();
             let seq_log = self.cold.seq_log.read();
             let min_retention_seq = seq_log.min_retention_seq();
-            let snapshot_tx = self.last_tx_id.load(Ordering::SeqCst);
+            let snapshot_tx = self.hot.last_tx_id.load(Ordering::SeqCst);
             let mut all = Vec::with_capacity(nodes.len());
             for (i, node) in nodes.iter().enumerate() {
                 let global_idx = mmap_count + i;
@@ -2332,7 +2326,7 @@ impl HnswIndexCore {
                     }
                 }
             }
-            (all, self.config.clone(), snapshot_tx)
+            (all, self.cold.config.clone(), snapshot_tx)
         };
 
         // 2. Build fresh index (this will be the NEW RAM segment)
@@ -2351,7 +2345,7 @@ impl HnswIndexCore {
         if let Some(old_q) = quantizer_guard.as_ref() {
             // Train a new quantizer on a sample of active nodes to prevent clamping loss
             let sample_size = self
-                .config
+                .cold.config
                 .quantizer_recalibration_sample_size
                 .min(all_nodes.len());
             let mut train_data = Vec::with_capacity(sample_size);
@@ -2371,7 +2365,7 @@ impl HnswIndexCore {
             if !train_data.is_empty() {
                 let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
                 let new_q =
-                    crate::quantize::ScalarQuantizer::train(&training_refs, self.config.dimension);
+                    crate::quantize::ScalarQuantizer::train(&training_refs, self.cold.config.dimension);
                 *new_index.inner.cold.quantizer.write() = Some(new_q);
             } else {
                 *new_index.inner.cold.quantizer.write() = Some(old_q.clone());
@@ -2422,7 +2416,7 @@ impl HnswIndexCore {
         new_index: HnswIndex,
         snapshot_tx: u64,
     ) -> Result<()> {
-        let _write_lock = self.write_mutex.lock().await;
+        let _write_lock = self.hot.write_mutex.lock().await;
 
         // 1. Fetch delta changes committed since snapshot_tx
         let delta_changes = self.cold.seq_log.read().changes_since(snapshot_tx);
@@ -2503,7 +2497,7 @@ impl HnswIndexCore {
             let mut doc_to_node = self.hot.doc_to_node.write();
             let mut entry_point = self.hot.entry_point.write();
             let mut ram_entry_point = self.hot.ram_entry_point.write();
-            let mut deleted_nodes = self.cold.deleted_nodes.write();
+            let mut deleted_nodes = self.hot.deleted_nodes.write();
 
             let new_nodes = std::mem::take(&mut *new_index.inner.hot.nodes.write());
             let new_doc_to_node = std::mem::take(&mut *new_index.inner.hot.doc_to_node.write());
@@ -2519,8 +2513,8 @@ impl HnswIndexCore {
             *doc_to_node = new_doc_to_node;
             *entry_point = new_entry_point;
             *ram_entry_point = new_ram_entry_point;
-            self.max_layer.store(
-                new_index.inner.max_layer.load(Ordering::SeqCst),
+            self.hot.max_layer.store(
+                new_index.inner.hot.max_layer.load(Ordering::SeqCst),
                 Ordering::SeqCst,
             );
 
@@ -2537,12 +2531,12 @@ impl HnswIndexCore {
                     new_deleted.insert(del_idx);
                 }
             }
-            for del_idx in new_index.inner.cold.deleted_nodes.read().iter() {
+            for del_idx in new_index.inner.hot.deleted_nodes.read().iter() {
                 new_deleted.insert(del_idx);
             }
 
             *deleted_nodes = new_deleted;
-            self.deleted_count
+            self.hot.deleted_count
                 .store(deleted_nodes.len(), Ordering::SeqCst);
         }
 
@@ -2554,16 +2548,16 @@ impl HnswIndexCore {
 
 impl VectorIndex for HnswIndex {
     async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {
-        if let Some(ref err) = self.inner.validation_error {
+        if let Some(ref err) = self.inner.cold.validation_error {
             return Err(MemFuseError::invalid_input(format!(
                 "Invalid index configuration: {}",
                 err
             )));
         }
-        if embedding.len() != self.inner.config.dimension {
+        if embedding.len() != self.inner.cold.config.dimension {
             return Err(MemFuseError::invalid_input(format!(
                 "Expected dimension {}, got {}",
-                self.inner.config.dimension,
+                self.inner.cold.config.dimension,
                 embedding.len()
             )));
         }
@@ -2577,7 +2571,7 @@ impl VectorIndex for HnswIndex {
             }
         }
 
-        self.inner.tx_buffer.stage(
+        self.inner.cold.tx_buffer.stage(
             tx,
             IndexOp::Insert {
                 doc_id: id,
@@ -2600,16 +2594,16 @@ impl VectorIndex for HnswIndex {
                 memfuse_core::MAX_SEARCH_K
             )));
         }
-        if let Some(ref err) = self.inner.validation_error {
+        if let Some(ref err) = self.inner.cold.validation_error {
             return Err(MemFuseError::invalid_input(format!(
                 "Invalid index configuration: {}",
                 err
             )));
         }
-        if query.len() != self.inner.config.dimension {
+        if query.len() != self.inner.cold.config.dimension {
             return Err(MemFuseError::invalid_input(format!(
                 "Expected dimension {}, got {}",
-                self.inner.config.dimension,
+                self.inner.cold.config.dimension,
                 query.len()
             )));
         }
@@ -2644,7 +2638,7 @@ impl VectorIndex for HnswIndex {
             return Ok(Vec::new());
         }
 
-        let max_layer = self.inner.max_layer.load(Ordering::SeqCst) as usize;
+        let max_layer = self.inner.hot.max_layer.load(Ordering::SeqCst) as usize;
 
         for layer in (1..=max_layer).rev() {
             let layer_ef = 1;
@@ -2664,29 +2658,29 @@ impl VectorIndex for HnswIndex {
         }
 
         // Higher candidate list for reranking if quantized
-        let ef = if self.inner.config.quantize {
-            self.inner.config.ef_search.max(k) * 4
+        let ef = if self.inner.cold.config.quantize {
+            self.inner.cold.config.ef_search.max(k) * 4
         } else {
-            self.inner.config.ef_search.max(k)
+            self.inner.cold.config.ef_search.max(k)
         };
         let candidates = self
             .inner
             .search_layer(query, query_quantized.as_deref(), &ep, ef, 0)?;
 
         let score = self.inner.connectivity_score();
-        if score < self.inner.config.rebuild_threshold {
+        if score < self.inner.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
             let err = memfuse_core::MemFuseError::HnswConnectivityDegraded { deleted_ratio };
             tracing::warn!(
                 error = %err,
                 connectivity_score = score,
-                rebuild_threshold = self.inner.config.rebuild_threshold,
+                rebuild_threshold = self.inner.cold.config.rebuild_threshold,
                 "HNSW index degraded — consider calling rebuild()"
             );
         }
 
         let nodes = self.inner.hot.nodes.read();
-        let deleted = self.inner.cold.deleted_nodes.read();
+        let deleted = self.inner.hot.deleted_nodes.read();
         let mut results = Vec::with_capacity(k);
 
         let ctx = SearchContext {
@@ -2710,13 +2704,13 @@ impl VectorIndex for HnswIndex {
             let doc_id = self.inner.resolve_doc_id(c.index, &ctx)?;
 
             // Phase 2: Exact Reranking (Asymmetric for SQ8)
-            let final_dist = if self.inner.config.quantize {
+            let final_dist = if self.inner.cold.config.quantize {
                 self.inner.resolve_dist(c.index, query, None, &ctx)?
             } else {
                 c.distance
             };
 
-            let score = match self.inner.config.distance_metric {
+            let score = match self.inner.cold.config.distance_metric {
                 DistanceMetric::Cosine => 1.0 - final_dist,
                 DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
                 DistanceMetric::DotProduct => -final_dist,
@@ -2746,13 +2740,13 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
-        if let Some(ref err) = self.inner.validation_error {
+        if let Some(ref err) = self.inner.cold.validation_error {
             return Err(MemFuseError::invalid_input(format!(
                 "Invalid index configuration: {}",
                 err
             )));
         }
-        self.inner.tx_buffer.stage(
+        self.inner.cold.tx_buffer.stage(
             tx,
             IndexOp::Delete {
                 doc_id: id,
@@ -2763,18 +2757,18 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn commit(&self, tx: TxId) -> Result<()> {
-        if let Some(ref err) = self.inner.validation_error {
+        if let Some(ref err) = self.inner.cold.validation_error {
             return Err(MemFuseError::invalid_input(format!(
                 "Invalid index configuration: {}",
                 err
             )));
         }
-        let _lock = self.inner.write_mutex.lock().await;
-        let ops = self.inner.tx_buffer.drain(tx);
+        let _lock = self.inner.hot.write_mutex.lock().await;
+        let ops = self.inner.cold.tx_buffer.drain(tx);
         let mut deleted_any = false;
 
         // ANCHOR[SPEC:WP-2.2-SQ8TRAIN-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Lazy Training logic (Stabilized)
-        if self.inner.config.quantize && self.inner.cold.quantizer.read().is_none() {
+        if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
             let mut train_data = Vec::with_capacity(256.min(ops.len()));
             for op in &ops {
                 if let IndexOp::Insert { data, .. } = op {
@@ -2802,7 +2796,7 @@ impl VectorIndex for HnswIndex {
                 let training_refs: Vec<&[f32]> = train_data.iter().map(|v| v.as_slice()).collect();
                 let q = crate::quantize::ScalarQuantizer::train(
                     &training_refs,
-                    self.inner.config.dimension,
+                    self.inner.cold.config.dimension,
                 );
                 *self.inner.cold.quantizer.write() = Some(q.clone());
 
@@ -2906,7 +2900,7 @@ impl VectorIndex for HnswIndex {
         if deleted_any && self.inner.is_rebuild_required() {
             tracing::warn!(
                 "HNSW index rebuild threshold reached (threshold: {:.2})",
-                self.inner.config.rebuild_threshold
+                self.inner.cold.config.rebuild_threshold
             );
             self.trigger_rebuild_async();
         }
@@ -2914,7 +2908,7 @@ impl VectorIndex for HnswIndex {
         #[cfg(feature = "partial-index-rebuild")]
         self.check_and_trigger_partial_rebuild();
 
-        self.inner.last_tx_id.store(tx.inner(), Ordering::SeqCst);
+        self.inner.hot.last_tx_id.store(tx.inner(), Ordering::SeqCst);
         Ok(())
     }
 
@@ -2928,18 +2922,18 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn rollback(&self, tx: TxId) -> Result<()> {
-        if let Some(ref err) = self.inner.validation_error {
+        if let Some(ref err) = self.inner.cold.validation_error {
             return Err(MemFuseError::invalid_input(format!(
                 "Invalid index configuration: {}",
                 err
             )));
         }
-        self.inner.tx_buffer.discard(tx);
+        self.inner.cold.tx_buffer.discard(tx);
         Ok(())
     }
 
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
-        if let Some(ref err) = self.inner.validation_error {
+        if let Some(ref err) = self.inner.cold.validation_error {
             return Err(MemFuseError::invalid_input(format!(
                 "Invalid index configuration: {}",
                 err
@@ -2949,7 +2943,7 @@ impl VectorIndex for HnswIndex {
         let target = tx_id.inner();
 
         // Unter write_mutex um Konkurrenz mit laufenden Inserts zu verhindern
-        let _guard = self.inner.write_mutex.lock().await;
+        let _guard = self.inner.hot.write_mutex.lock().await;
 
         // 1. Sammle alle Nodes mit committed_tx > target_tx_id
         let indices_to_remove: Vec<usize> = {
@@ -2963,7 +2957,7 @@ impl VectorIndex for HnswIndex {
         };
 
         if indices_to_remove.is_empty() {
-            self.inner.last_tx_id.store(target, Ordering::SeqCst);
+            self.inner.hot.last_tx_id.store(target, Ordering::SeqCst);
             return Ok(());
         }
 
@@ -2987,20 +2981,20 @@ impl VectorIndex for HnswIndex {
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let mut deleted = self.inner.cold.deleted_nodes.write();
+            let mut deleted = self.inner.hot.deleted_nodes.write();
             for &idx in &indices_to_remove {
                 deleted.insert((mmap_count + idx) as u64);
             }
             self.inner
-                .deleted_count
+                .hot.deleted_count
                 .fetch_add(indices_to_remove.len() as u64, Ordering::SeqCst);
         }
 
         // 4. TxBuffer bereinigen
-        self.inner.tx_buffer.discard(tx_id);
+        self.inner.cold.tx_buffer.discard(tx_id);
 
         // 5. last_tx_id zurücksetzen
-        self.inner.last_tx_id.store(target, Ordering::SeqCst);
+        self.inner.hot.last_tx_id.store(target, Ordering::SeqCst);
 
         tracing::info!(
             removed = indices_to_remove.len(),
@@ -3012,11 +3006,11 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn last_tx_id(&self) -> Result<TxId> {
-        Ok(TxId::new(self.inner.last_tx_id.load(Ordering::SeqCst)))
+        Ok(TxId::new(self.inner.hot.last_tx_id.load(Ordering::SeqCst)))
     }
 
     async fn all_doc_ids(&self) -> Result<Vec<DocId>> {
-        if self.inner.validation_error.is_some() {
+        if self.inner.cold.validation_error.is_some() {
             return Ok(Vec::new());
         }
         let nodes = self.inner.hot.nodes.read();
@@ -3025,7 +3019,7 @@ impl VectorIndex for HnswIndex {
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
-        let deleted = self.inner.cold.deleted_nodes.read();
+        let deleted = self.inner.hot.deleted_nodes.read();
 
         let ctx = SearchContext {
             nodes: &nodes,
@@ -3046,7 +3040,7 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn len(&self) -> usize {
-        if self.inner.validation_error.is_some() {
+        if self.inner.cold.validation_error.is_some() {
             return 0;
         }
         let mmap_count = self
@@ -3057,7 +3051,7 @@ impl VectorIndex for HnswIndex {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
         let total = mmap_count + self.inner.hot.nodes.read().len();
-        let deleted = self.inner.deleted_count.load(Ordering::SeqCst) as usize;
+        let deleted = self.inner.hot.deleted_count.load(Ordering::SeqCst) as usize;
         total.saturating_sub(deleted)
     }
 
@@ -3077,7 +3071,7 @@ impl VectorIndex for HnswIndex {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
-        let deleted_count = self.inner.deleted_count.load(Ordering::SeqCst) as usize;
+        let deleted_count = self.inner.hot.deleted_count.load(Ordering::SeqCst) as usize;
         let num_vectors = (mmap_count + nodes.len()).saturating_sub(deleted_count);
 
         let mut vector_memory: usize = nodes
@@ -3108,7 +3102,7 @@ impl VectorIndex for HnswIndex {
             memory_usage_bytes: vector_memory
                 + connection_memory
                 + (nodes.len() * std::mem::size_of::<HnswNode>()),
-            num_layers: self.inner.max_layer.load(Ordering::SeqCst) as usize + 1,
+            num_layers: self.inner.hot.max_layer.load(Ordering::SeqCst) as usize + 1,
             deleted_ratio: self.deleted_ratio(),
             rebuild_count: self.rebuild_count(),
         })
