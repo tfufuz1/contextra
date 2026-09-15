@@ -41,7 +41,8 @@ pub struct BeirMetrics {
 
 /// Lädt BEIR-Corpus aus JSONL-Datei
 pub fn load_beir_corpus(path: &Path) -> Result<Vec<BeirDocument>> {
-    let file = File::open(path).with_context(|| format!("Konnte Corpus-Datei nicht öffnen: {:?}", path))?;
+    let file = File::open(path)
+        .with_context(|| format!("Konnte Corpus-Datei nicht öffnen: {:?}", path))?;
     let reader = BufReader::new(file);
     let mut docs = Vec::new();
 
@@ -51,13 +52,22 @@ pub fn load_beir_corpus(path: &Path) -> Result<Vec<BeirDocument>> {
             continue;
         }
         let val: serde_json::Value = serde_json::from_str(&l)?;
-        let id = val.get("_id")
+        let id = val
+            .get("_id")
             .or_else(|| val.get("id"))
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string();
-        let title = val.get("title").and_then(|v| v.as_str()).unwrap_or_default().to_string();
-        let text = val.get("text").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+        let title = val
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let text = val
+            .get("text")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
 
         if !id.is_empty() {
             docs.push(BeirDocument { id, title, text });
@@ -69,7 +79,8 @@ pub fn load_beir_corpus(path: &Path) -> Result<Vec<BeirDocument>> {
 
 /// Lädt BEIR-Queries + QRels aus JSONL / TSV-Dateien
 pub fn load_beir_queries(queries_path: &Path, qrels_path: &Path) -> Result<Vec<BeirQuery>> {
-    let q_file = File::open(queries_path).with_context(|| format!("Konnte Queries-Datei nicht öffnen: {:?}", queries_path))?;
+    let q_file = File::open(queries_path)
+        .with_context(|| format!("Konnte Queries-Datei nicht öffnen: {:?}", queries_path))?;
     let q_reader = BufReader::new(q_file);
     let mut queries_map: HashMap<String, String> = HashMap::new();
 
@@ -79,12 +90,14 @@ pub fn load_beir_queries(queries_path: &Path, qrels_path: &Path) -> Result<Vec<B
             continue;
         }
         let val: serde_json::Value = serde_json::from_str(&l)?;
-        let id = val.get("_id")
+        let id = val
+            .get("_id")
             .or_else(|| val.get("id"))
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string();
-        let query = val.get("text")
+        let query = val
+            .get("text")
             .or_else(|| val.get("query"))
             .and_then(|v| v.as_str())
             .unwrap_or_default()
@@ -96,7 +109,8 @@ pub fn load_beir_queries(queries_path: &Path, qrels_path: &Path) -> Result<Vec<B
     }
 
     // Load QRels (support both JSONL and TSV)
-    let qr_file = File::open(qrels_path).with_context(|| format!("Konnte QRels-Datei nicht öffnen: {:?}", qrels_path))?;
+    let qr_file = File::open(qrels_path)
+        .with_context(|| format!("Konnte QRels-Datei nicht öffnen: {:?}", qrels_path))?;
     let qr_reader = BufReader::new(qr_file);
     let mut qrels: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -110,17 +124,20 @@ pub fn load_beir_queries(queries_path: &Path, qrels_path: &Path) -> Result<Vec<B
         if trimmed.starts_with('{') {
             // JSONL format
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
-                let qid = val.get("qid")
+                let qid = val
+                    .get("qid")
                     .or_else(|| val.get("query-id"))
                     .and_then(|v| v.as_str())
                     .unwrap_or_default()
                     .to_string();
-                let docid = val.get("docid")
+                let docid = val
+                    .get("docid")
                     .or_else(|| val.get("corpus-id"))
                     .and_then(|v| v.as_str())
                     .unwrap_or_default()
                     .to_string();
-                let rel = val.get("relevance")
+                let rel = val
+                    .get("relevance")
                     .or_else(|| val.get("score"))
                     .and_then(|v| v.as_i64())
                     .unwrap_or(0);
@@ -141,7 +158,10 @@ pub fn load_beir_queries(queries_path: &Path, qrels_path: &Path) -> Result<Vec<B
 
                 let rel: i64 = score_str.parse().unwrap_or(0);
                 if rel > 0 {
-                    qrels.entry(qid.to_string()).or_default().push(docid.to_string());
+                    qrels
+                        .entry(qid.to_string())
+                        .or_default()
+                        .push(docid.to_string());
                 }
             }
         }
@@ -294,11 +314,7 @@ pub async fn run_beir_eval(
                 .execute()
                 .await?
         } else {
-            col.query()
-                .text(&q.query)
-                .k(100)
-                .execute()
-                .await?
+            col.query().text(&q.query).k(100).execute().await?
         };
 
         let elapsed_us = start.elapsed().as_micros() as u64;

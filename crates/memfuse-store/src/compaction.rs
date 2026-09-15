@@ -134,7 +134,8 @@ impl CompactionEngine {
         sstables: &RwLock<Vec<Arc<SstableReader>>>,
         data_path: &std::path::Path,
     ) -> Result<bool> {
-        self.maybe_compact_with_cancel(sstables, data_path, None).await
+        self.maybe_compact_with_cancel(sstables, data_path, None)
+            .await
     }
 
     /// Evaluates whether compaction should run and performs it with an optional cancellation token.
@@ -163,7 +164,10 @@ impl CompactionEngine {
 
         input_ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
-        tracing::info!("Compaction triggered: merging {} SSTables", input_ssts.len());
+        tracing::info!(
+            "Compaction triggered: merging {} SSTables",
+            input_ssts.len()
+        );
 
         // 2. Perform the merge (no lock held — this is the expensive part)
         let min_snapshot_seq = self.snapshot_registry.min_active_seqno();
@@ -298,8 +302,9 @@ impl CompactionEngine {
             ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
             debug_assert!(
-                ssts.windows(2).all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
-                    <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                ssts.windows(2)
+                    .all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                        <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
                 "SSTable list must be sorted by max_seq in ascending order after compaction swap"
             );
 
@@ -763,7 +768,6 @@ impl CompactionEngine {
             }
         }
     }
-
 }
 
 #[cfg(test)]
@@ -1026,7 +1030,11 @@ mod tests {
 
         // Both versions (100 and 90) must be retained:
         // seq 100 >= 95 (kept), seq 90 < 95 (kept as floor version)
-        assert_eq!(entries.len(), 2, "Both seq 100 and floor version 90 must be retained");
+        assert_eq!(
+            entries.len(),
+            2,
+            "Both seq 100 and floor version 90 must be retained"
+        );
         assert_eq!(entries[0].0.as_ref(), b"k1");
         assert_eq!(entries[0].2, 100);
         assert_eq!(entries[1].0.as_ref(), b"k1");
@@ -1090,7 +1098,11 @@ mod tests {
 
         // Only versions 100 (>= 95) and 90 (floor version for < 95) must be retained.
         // Version 80 (< 95 and floor already emitted) must be discarded.
-        assert_eq!(entries.len(), 2, "Only seq 100 and floor version 90 must be retained, seq 80 discarded");
+        assert_eq!(
+            entries.len(),
+            2,
+            "Only seq 100 and floor version 90 must be retained, seq 80 discarded"
+        );
         assert_eq!(entries[0].0.as_ref(), b"k1");
         assert_eq!(entries[0].2, 100);
         assert_eq!(entries[1].0.as_ref(), b"k1");
@@ -1581,13 +1593,7 @@ mod tests {
         for _ in 0..100 {
             entries_c.push((b"padding_key", b"padding_value_large_file", 15u64));
         }
-        let sst_c = create_test_sstable(
-            tmp.path(),
-            "sst_c.sst",
-            &entries_c,
-            Arc::clone(&bc),
-        )
-        .await;
+        let sst_c = create_test_sstable(tmp.path(), "sst_c.sst", &entries_c, Arc::clone(&bc)).await;
 
         // SSTable B (newer candidate): key "k1" -> "v_new", seq 20
         let sst_b = create_test_sstable(
@@ -1610,7 +1616,10 @@ mod tests {
             .maybe_compact(&sstables, tmp.path())
             .await
             .expect("maybe_compact");
-        assert!(compacted, "Compaction should be triggered for tier {{A, B}}");
+        assert!(
+            compacted,
+            "Compaction should be triggered for tier {{A, B}}"
+        );
 
         // Read in reverse order (simulating get_at_seq / scan)
         let ssts_read = sstables.read().await;
@@ -1664,8 +1673,7 @@ mod tests {
         let unsorted_ssts = vec![sst_m, sst_c];
 
         let is_sorted = unsorted_ssts.windows(2).all(|w| {
-            (w[0].metadata().max_seq & !TOMBSTONE_BIT)
-                <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)
+            (w[0].metadata().max_seq & !TOMBSTONE_BIT) <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)
         });
 
         assert!(
@@ -1876,7 +1884,10 @@ mod tests {
         let sst_b = create_test_sstable(
             tmp.path(),
             "sst_b.sst",
-            &[(b"key_b", b"val_B", 20), (b"key_common", b"val_B_newest", 20)],
+            &[
+                (b"key_b", b"val_B", 20),
+                (b"key_common", b"val_B_newest", 20),
+            ],
             Arc::clone(&bc),
         )
         .await;
@@ -1893,7 +1904,12 @@ mod tests {
         let min_snapshot_seq = u64::MAX;
         let output_path = tmp.path().join("sst_merged_m.sst");
         engine
-            .merge_sstables(&[sst_a.clone(), sst_b.clone()], &output_path, min_snapshot_seq, false)
+            .merge_sstables(
+                &[sst_a.clone(), sst_b.clone()],
+                &output_path,
+                min_snapshot_seq,
+                false,
+            )
             .await
             .expect("merge A and B into M");
 
@@ -1921,8 +1937,9 @@ mod tests {
             ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
             debug_assert!(
-                ssts.windows(2).all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
-                    <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                ssts.windows(2)
+                    .all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                        <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
                 "SSTable list must be sorted by max_seq in ascending order after compaction swap"
             );
         }
@@ -2394,13 +2411,20 @@ mod tests {
         let merge_res = engine
             .merge_sstables(&candidates, &output, u64::MAX, true)
             .await;
-        assert!(merge_res.is_ok(), "Merge of Arc candidates must succeed regardless of list modifications");
+        assert!(
+            merge_res.is_ok(),
+            "Merge of Arc candidates must succeed regardless of list modifications"
+        );
 
         let reader = SstableReader::open(&output, Arc::clone(&bc))
             .await
             .expect("open merged sst");
         let entries = reader.iter().await.expect("iter entries");
-        assert_eq!(entries.len(), 3, "All 3 original Arc candidates must be merged safely");
+        assert_eq!(
+            entries.len(),
+            3,
+            "All 3 original Arc candidates must be merged safely"
+        );
     }
 
     #[tokio::test]

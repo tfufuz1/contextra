@@ -2708,6 +2708,8 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> memfuse_core::R
         other => panic!("Expected SnapshotUnsupportedForSignal, got: {:?}", other),
     }
 
+    let eid_1 = memfuse_core::EntityId::from_key("doc_1")?;
+    let anchors = vec![eid_1];
     let path_rag_strat = memfuse_core::GraphTraversalStrategy::PathRag {
         max_hops: 2,
         sufficiency_threshold: 0.5,
@@ -2717,14 +2719,17 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> memfuse_core::R
             "graph",
             &[1.0, 0.0, 0.0, 0.0],
             5,
-            None,
+            Some(&anchors),
             None,
             Some(&path_rag_strat),
             None,
         )
         .await;
 
-    assert!(path_res.is_err(), "PathRag under snapshot isolation must fail");
+    assert!(
+        path_res.is_err(),
+        "PathRag under snapshot isolation must fail"
+    );
     match path_res.unwrap_err() {
         memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(msg) => {
             assert!(msg.contains("PathRag"));

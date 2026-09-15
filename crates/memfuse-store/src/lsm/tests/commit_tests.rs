@@ -388,8 +388,7 @@ async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
 
     // Follower joins group commit queue
     let storage_follower = Arc::clone(&storage);
-    let follower_handle =
-        tokio::spawn(async move { storage_follower.commit(tx_follower).await });
+    let follower_handle = tokio::spawn(async move { storage_follower.commit(tx_follower).await });
 
     // Wait until the group commit leader starts executing wal.append_batch (with 500ms delay)
     tokio::time::sleep(Duration::from_millis(100)).await;
