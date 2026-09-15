@@ -33,7 +33,7 @@ impl CheckpointMeta {
     pub fn into_workflow_state(&self) -> WorkflowState {
         WorkflowState {
             tx: self.tx_id,
-            graph_hash: format!("seq-{}", self.seq_no),
+            graph_hash: *blake3::hash(format!("seq-{}", self.seq_no).as_bytes()).as_bytes(),
         }
     }
 }
@@ -121,6 +121,6 @@ mod tests {
 
         // Independent expected value assertions
         assert_eq!(state.tx, TxId::new(2026));
-        assert!(!state.graph_hash.is_empty());
+        assert_ne!(state.graph_hash, [0u8; 32]);
     }
 }

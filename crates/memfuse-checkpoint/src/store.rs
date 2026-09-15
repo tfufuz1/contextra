@@ -749,7 +749,7 @@ impl<S: memfuse_core::StorageEngine> memfuse_core::traits::Checkpoint
             let seq_no = self.storage.last_seq_no().await?;
             Ok(WorkflowState {
                 tx,
-                graph_hash: format!("seq-{}", seq_no),
+                graph_hash: *blake3::hash(format!("seq-{}", seq_no).as_bytes()).as_bytes(),
             })
         })
     }
