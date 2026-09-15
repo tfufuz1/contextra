@@ -54,9 +54,15 @@ pub async fn handle_cloud_query(
                 "Egress policy violation: query blocked by rule {rule_id}"
             )))
         }
-        EgressClassification::Block(reason) => Err(McpError::invalid_params(format!(
-            "Egress policy violation: query blocked: {reason:?}"
-        ))),
+        EgressClassification::Block(BlockReason::PolicyDenied(_)) => Err(McpError::invalid_params(
+            "Egress policy violation: query exceeds policy or size limits",
+        )),
+        EgressClassification::Block(BlockReason::ClassificationTimeout) => Err(
+            McpError::invalid_params("Egress policy violation: classification evaluation timeout"),
+        ),
+        EgressClassification::Block(BlockReason::InternalError(_)) => Err(
+            McpError::invalid_params("Egress policy violation: internal classification error"),
+        ),
         EgressClassification::Allow => Ok(CloudQueryResponse {
             status: "success".to_string(),
             query: request.query,
@@ -81,7 +87,7 @@ impl DefaultEgressClassifier {
             r"AKIA".to_string(),
             r"api_key".to_string(),
             r"password".to_string(),
-            r"@".to_string(),
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b".to_string(),
         ];
         let vault = EgressVault::new(default_patterns);
         Self { vault }
