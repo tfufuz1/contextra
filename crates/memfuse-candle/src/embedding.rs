@@ -405,4 +405,47 @@ mod tests {
         );
         assert!(res.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_embed_zero_concurrency_limit_clamped_to_one() {
+        let mock_model = Box::new(MockEmbedModel { dim: 8 });
+        let fingerprint = ModelFingerprint {
+            hash: [3u8; 32],
+            model_id: "embed_clamped.gguf".to_string(),
+            quantization: "Q8_0".to_string(),
+        };
+        let tokenizer_bytes = r#"{
+            "version": "1.0",
+            "truncation": null,
+            "padding": null,
+            "added_tokens": [],
+            "normalizer": null,
+            "pre_tokenizer": null,
+            "post_processor": null,
+            "decoder": null,
+            "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
+        }"#;
+        let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
+
+        let client = CandleEmbedClient::new(Device::Cpu, mock_model, fingerprint, tokenizer)
+            .with_max_concurrent_embeddings(0);
+
+        assert_eq!(client.max_concurrent_embeddings, 1);
+        assert_eq!(client.semaphore.available_permits(), 1);
+    }
+
+    #[test]
+    fn test_bert_embed_model_load_nonexistent_weights_returns_io_error() {
+        let path = Path::new("/nonexistent/model.safetensors");
+        let cfg_path = Path::new("/nonexistent/config.json");
+        let device = Device::Cpu;
+
+        let res = BertEmbedModel::load(path, cfg_path, &device);
+        assert!(res.is_err());
+        if let Err(MemFuseError::Io(e)) = res {
+            assert_eq!(e.kind(), std::io::ErrorKind::NotFound);
+        } else {
+            panic!("Expected MemFuseError::Io");
+        }
+    }
 }
