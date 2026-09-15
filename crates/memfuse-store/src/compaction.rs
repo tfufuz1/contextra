@@ -255,46 +255,11 @@ impl CompactionEngine {
         {
             let mut ssts = sstables.write().await;
 
-            // Verify input SSTables are still present
-            let still_present = input_ssts
-                .iter()
-                .all(|inp| ssts.iter().any(|sst| Arc::ptr_eq(inp, sst)));
-
-            if still_present {
-                let insert_idx = (insertion_point as usize).min(ssts.len());
-                ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
-                let final_idx = insert_idx.min(ssts.len());
-                ssts.insert(final_idx, new_reader.clone());
-            } else {
-                tracing::warn!(
-                    "Input SSTables removed during MANIFEST write (rare concurrent modification) — replacing state from MANIFEST"
-                );
-                ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
-                let final_idx = (insertion_point as usize).min(ssts.len());
-                ssts.insert(final_idx, new_reader.clone());
-            }
-
-            // Find insertion point: position of the earliest input SSTable in current list
-            let insertion_point = ssts
-                .iter()
-                .position(|sst| input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)))
-                .unwrap_or(ssts.len());
-
-            // Collect paths of input SSTables before removing them
-            let old_paths: Vec<PathBuf> = input_ssts
-                .iter()
-                .filter_map(|inp| {
-                    ssts.iter()
-                        .find(|sst| Arc::ptr_eq(inp, sst))
-                        .map(|sst| sst.file_path().to_path_buf())
-                })
-                .collect();
-
-            // Remove by identity, not by index
+            // Remove input SSTables by identity (Arc::ptr_eq), not by raw index
             ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
 
-            // Add new SSTable at the correct position to maintain shadowing order
-            let insert_idx = insertion_point.min(ssts.len());
+            // Add new SSTable at insertion point
+            let insert_idx = (insertion_point as usize).min(ssts.len());
             ssts.insert(insert_idx, new_reader);
 
             // Re-sort SSTable list by max_seq to guarantee shadowing/visibility order.
@@ -307,9 +272,7 @@ impl CompactionEngine {
                         <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
                 "SSTable list must be sorted by max_seq in ascending order after compaction swap"
             );
-
-            old_paths
-        };
+        }
 
         // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
@@ -377,18 +340,21 @@ impl CompactionEngine {
             let mut placed = false;
 
             for tier in &mut tiers {
-                let neighbor_idx = *tier.last().unwrap();
-                let neighbor_size = ssts[neighbor_idx].metadata().file_size;
-                let ratio = if size > neighbor_size {
-                    size as f64 / neighbor_size.max(1) as f64
-                } else {
-                    neighbor_size as f64 / size.max(1) as f64
-                };
+                if let Some(&neighbor_idx) = tier.last() {
+                    if let Some(neighbor_sst) = ssts.get(neighbor_idx) {
+                        let neighbor_size = neighbor_sst.metadata().file_size;
+                        let ratio = if size > neighbor_size {
+                            size as f64 / neighbor_size.max(1) as f64
+                        } else {
+                            neighbor_size as f64 / size.max(1) as f64
+                        };
 
-                if ratio <= self.config.size_ratio {
-                    tier.push(i);
-                    placed = true;
-                    break;
+                        if ratio <= self.config.size_ratio {
+                            tier.push(i);
+                            placed = true;
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -401,21 +367,32 @@ impl CompactionEngine {
         // Tie-breaker: prefer tiers with smaller files (likely closer to L0)
         tiers.sort_by(|a, b| {
             b.len().cmp(&a.len()).then_with(|| {
-                ssts[a[0]]
-                    .metadata()
-                    .file_size
-                    .cmp(&ssts[b[0]].metadata().file_size)
+                let a_size = a
+                    .first()
+                    .and_then(|&i| ssts.get(i))
+                    .map(|s| s.metadata().file_size)
+                    .unwrap_or(0);
+                let b_size = b
+                    .first()
+                    .and_then(|&i| ssts.get(i))
+                    .map(|s| s.metadata().file_size)
+                    .unwrap_or(0);
+                a_size.cmp(&b_size)
             })
         });
 
         for tier in tiers {
             if tier.len() >= self.config.min_sstables_per_tier {
                 let mut sorted_tier = tier;
-                sorted_tier.sort_by_key(|&i| ssts[i].metadata().max_seq & !TOMBSTONE_BIT);
+                sorted_tier.sort_by_key(|&i| {
+                    ssts.get(i)
+                        .map(|s| s.metadata().max_seq & !TOMBSTONE_BIT)
+                        .unwrap_or(0)
+                });
                 return Some(
                     sorted_tier
                         .into_iter()
-                        .map(|i| Arc::clone(&ssts[i]))
+                        .filter_map(|i| ssts.get(i).cloned())
                         .collect(),
                 );
             }
@@ -431,8 +408,17 @@ impl CompactionEngine {
             by_size.sort_by_key(|&(_, size)| size);
             let count = self.config.min_sstables_per_tier;
             let mut indices: Vec<usize> = by_size[..count].iter().map(|&(i, _)| i).collect();
-            indices.sort_by_key(|&i| ssts[i].metadata().max_seq & !TOMBSTONE_BIT);
-            return Some(indices.into_iter().map(|i| Arc::clone(&ssts[i])).collect());
+            indices.sort_by_key(|&i| {
+                ssts.get(i)
+                    .map(|s| s.metadata().max_seq & !TOMBSTONE_BIT)
+                    .unwrap_or(0)
+            });
+            return Some(
+                indices
+                    .into_iter()
+                    .filter_map(|i| ssts.get(i).cloned())
+                    .collect(),
+            );
         }
 
         None
@@ -2534,14 +2520,17 @@ mod tests {
             bc: Arc<BlockCache>,
         ) -> Arc<SstableReader> {
             let path = dir.join(name);
-            let mut builder = SstableBuilder::create(&path).await.unwrap();
+            let mut builder = SstableBuilder::create(&path).await.expect("create sst");
             let pad = vec![0u8; 1024];
             for i in 0..size_target_kb {
                 let k = format!("k-{:06}", i);
-                builder.add(k.as_bytes(), &pad, seq, seq).await.unwrap();
+                builder
+                    .add(k.as_bytes(), &pad, seq, seq)
+                    .await
+                    .expect("add entry");
             }
-            builder.finish().await.unwrap();
-            Arc::new(SstableReader::open(&path, bc).await.unwrap())
+            builder.finish().await.expect("finish sst");
+            Arc::new(SstableReader::open(&path, bc).await.expect("open sst"))
         }
 
         let sst1 = create_padded_sst(tmp.path(), "sst1.sst", 10, 1, Arc::clone(&bc)).await;
@@ -2557,5 +2546,93 @@ mod tests {
             3,
             "Chain linkage must group [10, 18, 32] into a tier with size_ratio = 2.0"
         );
+    }
+
+    #[tokio::test]
+    async fn test_compaction_concurrent_rollback_flush_no_panic() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let config = CompactionConfig {
+            min_sstables_per_tier: 2,
+            yield_threshold: 1, // force frequent yields during merge
+            ..CompactionConfig::default()
+        };
+        let engine = Arc::new(CompactionEngine::new(
+            config,
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        ));
+
+        let sstables = Arc::new(RwLock::new(Vec::new()));
+        // Populate initial SSTables
+        for i in 0..5u8 {
+            let sst = create_test_sstable(
+                tmp.path(),
+                &format!("sst-init-{}.sst", i),
+                &[(format!("key-{}", i).as_bytes(), b"val", i as u64 + 1)],
+                Arc::clone(&bc),
+            )
+            .await;
+            sstables.write().await.push(sst);
+        }
+
+        let engine_clone = Arc::clone(&engine);
+        let sstables_clone = Arc::clone(&sstables);
+        let tmp_path = tmp.path().to_path_buf();
+
+        // Spawn concurrent task simulating rollback (shortening list) and flush (appending list)
+        let mutator_cancel = tokio_util::sync::CancellationToken::new();
+        let ct = mutator_cancel.clone();
+        let sstables_mut = Arc::clone(&sstables);
+        let bc_mut = Arc::clone(&bc);
+        let tmp_path_mut = tmp.path().to_path_buf();
+
+        let mutator_handle = tokio::spawn(async move {
+            let mut counter = 100u8;
+            while !ct.is_cancelled() {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+                let mut guard = sstables_mut.write().await;
+                if !guard.is_empty() && counter % 2 == 0 {
+                    // Simulate rollback / compaction cleanup: remove an entry
+                    guard.pop();
+                } else {
+                    // Simulate concurrent flush: append a new SSTable
+                    counter += 1;
+                    let new_sst = create_test_sstable(
+                        &tmp_path_mut,
+                        &format!("sst-mut-{}.sst", counter),
+                        &[(
+                            format!("key-mut-{}", counter).as_bytes(),
+                            b"val",
+                            counter as u64,
+                        )],
+                        Arc::clone(&bc_mut),
+                    )
+                    .await;
+                    guard.push(new_sst);
+                }
+            }
+        });
+
+        // Run maybe_compact multiple times during concurrent list mutations
+        for _ in 0..10 {
+            let res = engine_clone.maybe_compact(&sstables_clone, &tmp_path).await;
+            // Compaction must return Ok(true) or Ok(false), never panic or error out bounds
+            assert!(
+                res.is_ok(),
+                "maybe_compact must complete cleanly without panic or unexpected error under concurrent list mutation"
+            );
+        }
+
+        mutator_cancel.cancel();
+        let _ = mutator_handle.await;
     }
 }
