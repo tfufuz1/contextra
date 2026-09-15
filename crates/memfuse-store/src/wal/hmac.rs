@@ -735,19 +735,11 @@ async fn test_hmac_chain_intact_after_append_failure() {
     );
     assert_eq!(prev_hmac, hmac_before);
 
-    // 3. Simulate append failure by replacing file with a read-only file handle
-    {
-        let ro_file = tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(false)
-            .open(&wal_path)
-            .await
-            .expect("open read-only");
-        let mut guard = wal.file.lock().await;
-        *guard = ro_file;
-    }
+    // 3. Simulate append failure via simulate_append_failure flag
+    wal.simulate_append_failure.store(true, std::sync::atomic::Ordering::SeqCst);
 
     let append_res = wal.append_batch(batch2).await;
+    wal.simulate_append_failure.store(false, std::sync::atomic::Ordering::SeqCst);
     assert!(
         append_res.is_err(),
         "append_batch must fail on read-only file handle"

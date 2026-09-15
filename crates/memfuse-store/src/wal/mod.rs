@@ -51,7 +51,6 @@ impl Default for WalConfig {
 
 pub struct Wal {
     pub(crate) path: PathBuf,
-    pub(crate) file: Arc<tokio::sync::Mutex<tokio::fs::File>>,
     pub(crate) size: Arc<std::sync::atomic::AtomicU64>,
     pub(crate) header_written: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) key_manager: Option<Arc<KeyManager>>,
@@ -59,8 +58,9 @@ pub struct Wal {
     pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,
     pub(crate) flusher_tx:
-        std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<FlusherMessage>>>,
+        std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<WalCommand>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) simulate_append_failure: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl std::fmt::Debug for Wal {
@@ -159,16 +159,16 @@ impl Wal {
             path: path.clone(),
             size: Arc::new(std::sync::atomic::AtomicU64::new(metadata.len())),
             header_written: Arc::new(std::sync::atomic::AtomicBool::new(metadata.len() > 0)),
-            file: Arc::new(tokio::sync::Mutex::new(file)),
             key_manager: derived_key_manager,
             fallback_integrity_key,
             allow_legacy_integrity_key_fallback: config.allow_legacy_integrity_key_fallback,
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
-        wal.enable_flusher_with_config(config.flusher_config);
+        wal.enable_flusher_with_config(file, config.flusher_config);
 
         // If file is not empty, find the last valid HMAC to continue the chain
         if metadata.len() > 0 {
@@ -227,8 +227,6 @@ impl Wal {
                 *guard = last_entry.checksum;
             }
         }
-
-        wal.enable_flusher_with_config(config.flusher_config);
 
         Ok(wal)
     }
