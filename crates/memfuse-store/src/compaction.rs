@@ -250,6 +250,15 @@ impl CompactionEngine {
             let insert_idx = insertion_point.min(ssts.len());
             ssts.insert(insert_idx, new_reader);
 
+            // Re-sort to guarantee max_seq shadowing invariant across all SSTables in the list
+            ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
+
+            debug_assert!(
+                ssts.windows(2).all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                    <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                "SSTable list must be sorted ascending by max_seq after compaction swap"
+            );
+
             old_paths
         };
 
@@ -1250,6 +1259,135 @@ mod tests {
                 uuid_path
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_compaction_swap_restores_shadowing_order_without_restart() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let config = CompactionConfig {
+            min_sstables_per_tier: 2,
+            ..CompactionConfig::default()
+        };
+        let engine = CompactionEngine::new(
+            config,
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            None,
+        );
+
+        // SSTable A (oldest candidate): key "k1" -> "v_old", seq 10
+        let sst_a = create_test_sstable(
+            tmp.path(),
+            "sst_a.sst",
+            &[(b"k1", b"v_old", 10)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        // SSTable C (non-input, intermediate seq, larger size so it is in a separate size tier): key "k1" -> "v_inter", seq 15
+        let mut entries_c = vec![(b"k1".as_ref(), b"v_inter".as_ref(), 15u64)];
+        for _ in 0..100 {
+            entries_c.push((b"padding_key", b"padding_value_large_file", 15u64));
+        }
+        let sst_c = create_test_sstable(
+            tmp.path(),
+            "sst_c.sst",
+            &entries_c,
+            Arc::clone(&bc),
+        )
+        .await;
+
+        // SSTable B (newer candidate): key "k1" -> "v_new", seq 20
+        let sst_b = create_test_sstable(
+            tmp.path(),
+            "sst_b.sst",
+            &[(b"k1", b"v_new", 20)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        // sstables list initially sorted by max_seq: [A (seq 10), C (seq 15), B (seq 20)]
+        let sstables = Arc::new(RwLock::new(vec![
+            Arc::clone(&sst_a),
+            Arc::clone(&sst_c),
+            Arc::clone(&sst_b),
+        ]));
+
+        // Run production maybe_compact directly to trigger candidate selection, merge, and atomic swap
+        let compacted = engine
+            .maybe_compact(&sstables, tmp.path())
+            .await
+            .expect("maybe_compact");
+        assert!(compacted, "Compaction should be triggered for tier {{A, B}}");
+
+        // Read in reverse order (simulating get_at_seq / scan)
+        let ssts_read = sstables.read().await;
+        let mut found_val = None;
+        for sst in ssts_read.iter().rev() {
+            if let Some((val, seq, tx)) = sst.get(b"k1").await.expect("get") {
+                if seq & !TOMBSTONE_BIT <= 20 && tx <= 20 {
+                    found_val = Some(val);
+                    break;
+                }
+            }
+        }
+
+        assert_eq!(
+            found_val.as_deref(),
+            Some(&b"v_new"[..]),
+            "Reader must see newer value from merged SSTable rather than stale value from non-input SSTable"
+        );
+
+        // Verify list is strictly sorted ascending by max_seq
+        assert!(
+            ssts_read
+                .windows(2)
+                .all(|w| w[0].metadata().max_seq <= w[1].metadata().max_seq),
+            "SSTable list must be strictly sorted by max_seq"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_compaction_swap_debug_assert_detects_unsorted_list() {
+        let tmp = TempDir::new().expect("temp dir");
+        let bc = create_block_cache(1);
+
+        let sst_c = create_test_sstable(
+            tmp.path(),
+            "sst_c.sst",
+            &[(b"k1", b"v_inter", 15)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let sst_m = create_test_sstable(
+            tmp.path(),
+            "sst_m.sst",
+            &[(b"k1", b"v_new", 20)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        // Intentionally create unsorted list: [M (seq 20), C (seq 15)]
+        let unsorted_ssts = vec![sst_m, sst_c];
+
+        let is_sorted = unsorted_ssts.windows(2).all(|w| {
+            (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)
+        });
+
+        assert!(
+            !is_sorted,
+            "Unsorted SSTable list must fail the max_seq order check"
+        );
     }
 
     #[test]

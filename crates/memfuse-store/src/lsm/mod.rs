@@ -1075,6 +1075,12 @@ impl StorageEngine for LsmStorage {
                 sstables.push(Arc::new(reader));
                 sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
+                debug_assert!(
+                    sstables.windows(2).all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
+                        <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                    "SSTable list must be sorted ascending by max_seq after flush"
+                );
+
                 drop(sstables);
                 drop(state);
 
