@@ -44,7 +44,7 @@ tokio = { version = "1", features = ["full"] }
 # Data structures
 bytes = "1"
 memmap2 = "0.9.11"
-ahash = "0.8"
+ahash = { version = "0.8", features = ["serde"] }
 itoa = "1"
 parking_lot = "0.12"
 roaring = "0.10"
