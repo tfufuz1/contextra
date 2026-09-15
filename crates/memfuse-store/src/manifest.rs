@@ -417,51 +417,54 @@ impl Manifest {
             }
 
             let len = u32::from_le_bytes(len_bytes) as usize;
-            if len > MAX_MANIFEST_ENTRY_SIZE as usize {
+            if len < 5 || len > MAX_MANIFEST_ENTRY_SIZE as usize {
                 return Err(MemFuseError::Storage(format!(
-                    "MANIFEST entry length ({}) exceeds max size ({}) at offset {}",
+                    "MANIFEST entry length ({}) invalid or exceeds max size ({}) at offset {}",
                     len, MAX_MANIFEST_ENTRY_SIZE, pos
                 )));
-            }
-
-            let is_tail = pos + 4 + len as u64 > file_size;
-
-            let mut entry_raw = vec![0u8; len];
-            match reader.read_exact(&mut entry_raw).await {
-                Ok(_) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof && is_tail => {
-                    // Tail-Truncation: letzter Eintrag wurde durch Power-Loss abgeschnitten — ok.
-                    tracing::warn!(
-                        "MANIFEST tail truncation detected (incomplete payload) at offset {}",
-                        pos
-                    );
-                    break;
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    // Mid-File-Korruption: UnexpectedEof in der Dateimitte = SSTable-Resurrection-Risiko.
-                    return Err(MemFuseError::Storage(format!(
-                        "MANIFEST mid-file corruption at offset {}: \
-                         incomplete payload read (not tail position — possible SSTable resurrection risk)",
-                        pos
-                    )));
-                }
-                Err(e) => {
-                    return Err(MemFuseError::Storage(format!(
-                        "MANIFEST read error at offset {}: {}",
-                        pos, e
-                    )));
-                }
             }
 
             let entry_pos = pos;
             pos += 4 + len as u64;
 
-            match ManifestEntry::from_bytes(&entry_raw) {
-                Ok(entry) => entries.push(entry),
-                Err(e) => {
+            if pos <= file_size {
+                let mut entry_raw = vec![0u8; len];
+                if let Err(e) = reader.read_exact(&mut entry_raw).await {
                     return Err(MemFuseError::Storage(format!(
-                        "MANIFEST entry corruption at offset {}: {}",
+                        "MANIFEST read error at offset {}: {}",
                         entry_pos, e
+                    )));
+                }
+
+                match ManifestEntry::from_bytes(&entry_raw) {
+                    Ok(entry) => entries.push(entry),
+                    Err(e) => {
+                        return Err(MemFuseError::Storage(format!(
+                            "MANIFEST entry corruption at offset {}: {}",
+                            entry_pos, e
+                        )));
+                    }
+                }
+            } else {
+                let avail = (file_size - (entry_pos + 4)) as usize;
+                let mut partial_raw = vec![0u8; avail];
+                if let Err(e) = reader.read_exact(&mut partial_raw).await {
+                    return Err(MemFuseError::Storage(format!(
+                        "MANIFEST read error for partial payload at offset {}: {}",
+                        entry_pos, e
+                    )));
+                }
+
+                if is_valid_tail_truncation_candidate(len, &partial_raw) {
+                    tracing::warn!(
+                        "MANIFEST tail truncation detected (incomplete payload) at offset {}",
+                        entry_pos
+                    );
+                    break;
+                } else {
+                    return Err(MemFuseError::Storage(format!(
+                        "MANIFEST mid-file corruption at offset {}: invalid frame length {} or corrupt frame structure (possible SSTable resurrection risk)",
+                        entry_pos, len
                     )));
                 }
             }
@@ -527,7 +530,100 @@ impl Manifest {
     pub fn path(&self) -> &Path {
         &self.path
     }
+}
 
+/// Evaluates whether a truncated tail frame is a plausible tail truncation resulting from power loss,
+/// rather than a corrupted length header in the middle of a file.
+///
+/// `claimed_len` is the 4-byte frame length stored in the header (`crc` + `payload`).
+/// `partial` is whatever payload bytes (including the initial 4-byte CRC) were read up to EOF.
+fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[u8]) -> bool {
+    // Minimum possible frame size for any ManifestEntry is 10 bytes (Remove with 1-char path)
+    if claimed_len < 10 || claimed_len > MAX_MANIFEST_ENTRY_SIZE as usize {
+        return false;
+    }
+
+    if partial.len() >= 5 {
+        let op_tag = partial[4];
+        let remaining = &partial[5..];
+
+        match op_tag {
+            0 => {
+                // Add: min size 18 bytes
+                if claimed_len < 18 {
+                    return false;
+                }
+                if remaining.len() >= 12 {
+                    let path_len = u32::from_le_bytes(remaining[8..12].try_into().unwrap()) as usize;
+                    let expected_total_len = 4 + 1 + 8 + 4 + path_len;
+                    if claimed_len != expected_total_len {
+                        return false;
+                    }
+                }
+            }
+            1 => {
+                // Remove: min size 10 bytes
+                if claimed_len < 10 {
+                    return false;
+                }
+                if remaining.len() >= 4 {
+                    let path_len = u32::from_le_bytes(remaining[0..4].try_into().unwrap()) as usize;
+                    let expected_total_len = 4 + 1 + 4 + path_len;
+                    if claimed_len != expected_total_len {
+                        return false;
+                    }
+                }
+            }
+            2 => {
+                // RollbackComplete: exact size 13 bytes
+                if claimed_len != 13 {
+                    return false;
+                }
+            }
+            3 => {
+                // Replace: min size 30 bytes
+                if claimed_len < 30 {
+                    return false;
+                }
+                if remaining.len() >= 20 {
+                    let added_path_len =
+                        u32::from_le_bytes(remaining[16..20].try_into().unwrap()) as usize;
+                    if remaining.len() >= 20 + added_path_len + 4 {
+                        let offset = 20 + added_path_len;
+                        let removed_count =
+                            u32::from_le_bytes(remaining[offset..offset + 4].try_into().unwrap())
+                                as usize;
+
+                        let mut rem_offset = offset + 4;
+                        let mut calculated_len = 4 + 1 + 8 + 8 + 4 + added_path_len + 4;
+                        for _ in 0..removed_count {
+                            if remaining.len() >= rem_offset + 4 {
+                                let r_len = u32::from_le_bytes(
+                                    remaining[rem_offset..rem_offset + 4].try_into().unwrap(),
+                                ) as usize;
+                                rem_offset += 4 + r_len;
+                                calculated_len += 4 + r_len;
+                            } else {
+                                break;
+                            }
+                        }
+                        if remaining.len() >= rem_offset && claimed_len != calculated_len {
+                            return false;
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Unknown op_tag is definitely corruption
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+impl Manifest {
     /// Evaluates whether the MANIFEST file size exceeds `threshold_bytes` and performs an atomic
     /// rollover if needed.
     ///
