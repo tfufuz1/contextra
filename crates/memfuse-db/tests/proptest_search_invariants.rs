@@ -87,12 +87,9 @@ proptest! {
                 let id = format!("doc_{i}");
                 let dummy_embedding = vec![0.1 * (i as f32 + 1.0), 0.2, 0.3, 0.4];
                 let doc_text = format!("sample document content {} {query_text}", i % 5);
-                col.insert_text_only(&id, &doc_text, None)
+                col.insert(&id, &dummy_embedding, Some(serde_json::json!({"text": doc_text})))
                     .await
-                    .expect("Failed to insert text document");
-                col.update(&id, &dummy_embedding, None)
-                    .await
-                    .expect("Failed to update embedding");
+                    .expect("Failed to insert document");
             }
 
             // Execute vector search

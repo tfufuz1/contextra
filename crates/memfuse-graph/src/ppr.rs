@@ -1453,5 +1453,16 @@ mod tests {
             !res_async.iter().any(|(id, _)| *id == id_b),
             "Deleted node B must not appear in personalized_page_rank_with_context_async result"
         );
+
+        // 3. Parity assertion: Both entry points MUST produce identical results
+        assert_eq!(res_trait.len(), res_async.len());
+        for (a, b) in res_trait.iter().zip(res_async.iter()) {
+            assert_eq!(a.0, b.0);
+            assert_eq!(
+                a.1.to_bits(),
+                b.1.to_bits(),
+                "PPR scores must be bit-identical between trait method and async context method"
+            );
+        }
     }
 }
