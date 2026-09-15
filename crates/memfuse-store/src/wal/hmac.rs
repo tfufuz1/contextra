@@ -83,7 +83,7 @@ impl Wal {
         };
 
         async fn read_key_file(path: &Path) -> Result<[u8; 32]> {
-            let bytes = tokio::fs::read(path).await.map_err(|e| {
+            let bytes = super::fs::read(path).await.map_err(|e| {
                 MemFuseError::Storage(format!("Failed to read WAL integrity key: {}", e))
             })?;
             if bytes.is_empty() {
@@ -117,10 +117,11 @@ impl Wal {
                 rand::thread_rng().next_u64()
             ));
 
-            let mut options = tokio::fs::OpenOptions::new();
+            let mut options = super::fs::OpenOptions::new();
             options.write(true).create_new(true);
             #[cfg(unix)]
             {
+                #[allow(unused_imports)]
                 use std::os::unix::fs::OpenOptionsExt;
                 options.mode(0o600);
             }
@@ -138,14 +139,14 @@ impl Wal {
             };
 
             if let Err(e) = file.write_all(&key).await {
-                let _ = tokio::fs::remove_file(&tmp_path).await;
+                let _ = super::fs::remove_file(&tmp_path).await;
                 return Err(MemFuseError::Storage(format!(
                     "Failed to write WAL integrity key: {}",
                     e
                 )));
             }
             if let Err(e) = file.sync_all().await {
-                let _ = tokio::fs::remove_file(&tmp_path).await;
+                let _ = super::fs::remove_file(&tmp_path).await;
                 return Err(MemFuseError::Storage(format!(
                     "Failed to sync WAL integrity key file: {}",
                     e
@@ -155,12 +156,12 @@ impl Wal {
 
             #[cfg(windows)]
             if let Err(e) = super::io::set_restrictive_file_acl(&tmp_path) {
-                let _ = tokio::fs::remove_file(&tmp_path).await;
+                let _ = super::fs::remove_file(&tmp_path).await;
                 return Err(e.into());
             }
 
-            let link_res = tokio::fs::hard_link(&tmp_path, &key_path).await;
-            let _ = tokio::fs::remove_file(&tmp_path).await;
+            let link_res = super::fs::hard_link(&tmp_path, &key_path).await;
+            let _ = super::fs::remove_file(&tmp_path).await;
 
             match link_res {
                 Ok(()) => {
@@ -180,7 +181,7 @@ impl Wal {
         };
 
         async fn read_uuid_file(path: &Path) -> Result<[u8; 16]> {
-            let bytes = tokio::fs::read(path).await.map_err(|e| {
+            let bytes = super::fs::read(path).await.map_err(|e| {
                 MemFuseError::Storage(format!("Failed to read WAL UUID sidecar: {}", e))
             })?;
             if bytes.len() != 16 {
@@ -221,7 +222,7 @@ impl Wal {
                 parent.join(tmp_filename)
             };
 
-            let mut options = tokio::fs::OpenOptions::new();
+            let mut options = super::fs::OpenOptions::new();
             options.write(true).create_new(true);
 
             let mut file = match options.open(&tmp_path).await {
@@ -239,7 +240,7 @@ impl Wal {
             };
 
             if let Err(e) = file.write_all(&bytes).await {
-                let _ = tokio::fs::remove_file(&tmp_path).await;
+                let _ = super::fs::remove_file(&tmp_path).await;
                 return Err(MemFuseError::Storage(format!(
                     "Failed to write WAL UUID sidecar: {}",
                     e
@@ -247,7 +248,7 @@ impl Wal {
             }
 
             if let Err(e) = file.sync_all().await {
-                let _ = tokio::fs::remove_file(&tmp_path).await;
+                let _ = super::fs::remove_file(&tmp_path).await;
                 return Err(MemFuseError::Storage(format!(
                     "Failed to sync WAL UUID sidecar file: {}",
                     e
@@ -255,8 +256,8 @@ impl Wal {
             }
             drop(file);
 
-            if let Err(e) = tokio::fs::rename(&tmp_path, &uuid_path).await {
-                let _ = tokio::fs::remove_file(&tmp_path).await;
+            if let Err(e) = super::fs::rename(&tmp_path, &uuid_path).await {
+                let _ = super::fs::remove_file(&tmp_path).await;
                 if uuid_path.exists() {
                     return read_uuid_file(&uuid_path).await;
                 }

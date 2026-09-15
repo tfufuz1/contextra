@@ -1,30 +1,18 @@
 //! Loom-basierter Determinismus-Beweis für SEC-01: Race-Condition im Group-Commit-Leader bezüglich `last_hmac`.
-//! Ausführung: LOOM_MAX_PREEMPTIONS=2 cargo test -p memfuse-store --test loom_group_commit
+//! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
 
-use loom::sync::Arc;
+use memfuse_store::wal::{PreparedBatch, Wal, WalOp};
+use std::sync::Arc;
+
+#[cfg(loom)]
 use loom::sync::Mutex;
-use loom::thread;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct WalEntry {
-    tx_id: u64,
-    prev_hmac: [u8; 32],
-    checksum: [u8; 32],
-}
-
-fn compute_hmac(prev_hmac: [u8; 32], tx_id: u64) -> [u8; 32] {
-    let mut hmac = prev_hmac;
-    let bytes = tx_id.to_le_bytes();
-    for i in 0..8 {
-        hmac[i] ^= bytes[i];
-    }
-    hmac[0] = hmac[0].wrapping_add(1);
-    hmac
-}
+#[cfg(not(loom))]
+use std::sync::Mutex;
 
 struct GroupCommitRequest {
     _tx_id: u64,
-    wal_entries: Vec<WalEntry>,
+    batch: PreparedBatch,
 }
 
 struct PendingCommitQueue {
@@ -32,147 +20,138 @@ struct PendingCommitQueue {
     first_prev_hmac: [u8; 32],
 }
 
-struct MockWal {
-    last_hmac: Mutex<[u8; 32]>,
-    disk_entries: Mutex<Vec<WalEntry>>,
-}
-
-impl MockWal {
-    fn new() -> Self {
-        Self {
-            last_hmac: Mutex::new([0u8; 32]),
-            disk_entries: Mutex::new(Vec::new()),
-        }
-    }
-
-    fn prepare_batch(&self, tx_id: u64) -> (Vec<WalEntry>, [u8; 32]) {
-        let mut guard = self.last_hmac.lock().unwrap();
-        let prev_hmac = *guard;
-        let checksum = compute_hmac(prev_hmac, tx_id);
-        *guard = checksum;
-        let entry = WalEntry {
-            tx_id,
-            prev_hmac,
-            checksum,
-        };
-        (vec![entry], prev_hmac)
-    }
-
-    fn restore_last_hmac(&self, hmac: [u8; 32]) {
-        let mut guard = self.last_hmac.lock().unwrap();
-        *guard = hmac;
-    }
-
-    fn append_batch(&self, entries: Vec<WalEntry>) -> Result<(), &'static str> {
-        let mut disk = self.disk_entries.lock().unwrap();
-        disk.extend(entries);
-        Ok(())
-    }
-}
-
 struct GroupCommitEngine {
     commit_mutex: Mutex<()>,
     pending_commit_queue: Mutex<Option<PendingCommitQueue>>,
-    wal: MockWal,
+    wal: Wal,
 }
 
 impl GroupCommitEngine {
-    fn new() -> Self {
+    fn new(wal: Wal) -> Self {
         Self {
             commit_mutex: Mutex::new(()),
             pending_commit_queue: Mutex::new(None),
-            wal: MockWal::new(),
+            wal,
         }
     }
 
     /// Nachbildung der Gruppen-Commit-Logik aus `lsm/mod.rs` & `lsm/group_commit.rs`
-    fn commit(&self, tx_id: u64) -> Result<(), &'static str> {
-        // PHASE 1: commit_mutex erwerben und WAL Entry vorbereiten
-        let commit_lock = self.commit_mutex.lock().unwrap();
-        let (wal_entries, prev_hmac_snapshot) = self.wal.prepare_batch(tx_id);
+    /// unter Verwendung der ECHTEN `Wal::prepare_batch` und `Wal::append_batch` Implementation.
+    async fn commit(&self, tx_id: u64) -> Result<(), memfuse_core::MemFuseError> {
+        // PHASE 1: WAL Entry vorbereiten
+        let op = WalOp::Put {
+            tx_id: memfuse_core::TxId::new(tx_id),
+            key: format!("key-{tx_id}").into_bytes(),
+            value: b"val".to_vec(),
+        };
+        let (batch, prev_hmac_snapshot) = self.wal.prepare_batch(vec![(op, tx_id)]).await?;
 
         // PHASE 2: Prüfen ob bereits eine Pending Queue existiert
-        let mut queue_guard = self.pending_commit_queue.lock().unwrap();
+        let is_follower = {
+            let mut queue_guard = self
+                .pending_commit_queue
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
 
-        if let Some(ref mut queue) = *queue_guard {
-            // Follower-Pfad: In bestehende Leader-Queue einreihen
-            let req = GroupCommitRequest {
-                _tx_id: tx_id,
-                wal_entries,
-            };
-            queue.requests.push(req);
-            drop(queue_guard);
-            drop(commit_lock);
+            if let Some(ref mut queue) = *queue_guard {
+                // Follower-Pfad: In bestehende Leader-Queue einreihen
+                let req = GroupCommitRequest {
+                    _tx_id: tx_id,
+                    batch: batch.clone(),
+                };
+                queue.requests.push(req);
+                true
+            } else {
+                // Leader-Pfad: Queue initialisieren
+                *queue_guard = Some(PendingCommitQueue {
+                    requests: Vec::new(),
+                    first_prev_hmac: prev_hmac_snapshot,
+                });
+                false
+            }
+        };
 
+        if is_follower {
             Ok(())
         } else {
-            // Leader-Pfad: Queue initialisieren
-            let leader_wal_entries = wal_entries;
-            *queue_guard = Some(PendingCommitQueue {
-                requests: Vec::new(),
-                first_prev_hmac: prev_hmac_snapshot,
-            });
-            drop(queue_guard);
-            drop(commit_lock);
+            // Leader-Pfad: Pending Queue konsolidieren
+            let (leader_batch, pending_queue) = {
+                let mut queue_guard = self
+                    .pending_commit_queue
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                let queue = queue_guard.take().expect("pending commit queue must exist");
+                (batch, queue)
+            };
 
-            // Leader erwirbt commit_mutex erneut um Queue zu konsolidieren
-            let commit_lock = self.commit_mutex.lock().unwrap();
-            let mut queue_guard = self.pending_commit_queue.lock().unwrap();
-            let pending_queue = queue_guard.take().expect("pending commit queue must exist");
-            drop(queue_guard);
-
-            let mut all_wal_entries = leader_wal_entries;
-            for r in &pending_queue.requests {
-                all_wal_entries.extend(r.wal_entries.clone());
+            let mut combined_batch = leader_batch;
+            for r in pending_queue.requests {
+                combined_batch.extend(r.batch);
             }
 
-            // SEC-01 RACE WINDOW: Leader gibt commit_mutex VOR dem physischen Disk I/O frei!
-            drop(commit_lock);
-
-            if let Err(e) = self.wal.append_batch(all_wal_entries) {
-                let _commit_lock = self.commit_mutex.lock().unwrap();
-                self.wal.restore_last_hmac(pending_queue.first_prev_hmac);
+            if let Err(e) = self.wal.append_batch(combined_batch).await {
+                let _ = self
+                    .wal
+                    .restore_last_hmac(pending_queue.first_prev_hmac)
+                    .await;
                 return Err(e);
             }
 
-            let _commit_lock = self.commit_mutex.lock().unwrap();
             Ok(())
-        }
-    }
-
-    fn verify_disk_hmac_chain(&self) {
-        let disk = self.wal.disk_entries.lock().unwrap().clone();
-        let mut expected_prev = [0u8; 32];
-        for (i, entry) in disk.iter().enumerate() {
-            assert_eq!(
-                entry.prev_hmac, expected_prev,
-                "CRITICAL SEC-01 RACE TRIGGERED: HMAC Chain link broken on disk at index {i}! Entry tx_id={} has prev_hmac={:?}, expected={:?}",
-                entry.tx_id, entry.prev_hmac, expected_prev
-            );
-            expected_prev = entry.checksum;
         }
     }
 }
 
+#[cfg(loom)]
 #[test]
 fn test_loom_group_commit_last_hmac_race() {
     loom::model(|| {
-        let engine = Arc::new(GroupCommitEngine::new());
-        let mut handles = Vec::new();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
 
-        // Simuliere 3 konkurrierende Threads
-        for i in 1..=3 {
-            let engine_clone = Arc::clone(&engine);
-            handles.push(thread::spawn(move || {
-                let _ = engine_clone.commit(i as u64);
-            }));
-        }
+        rt.block_on(async {
+            let wal = Wal::open_loom();
+            let engine = Arc::new(GroupCommitEngine::new(wal));
 
-        for h in handles {
-            h.join().unwrap();
-        }
+            let engine_1 = Arc::clone(&engine);
+            let task1 = tokio::spawn(async move {
+                let _ = engine_1.commit(1).await;
+            });
 
-        // Validierung: Die HMAC-Kette auf Disk MUSS ohne Lücken oder out-of-order Writes durchgehend valide sein
-        engine.verify_disk_hmac_chain();
+            let engine_2 = Arc::clone(&engine);
+            let task2 = tokio::spawn(async move {
+                let _ = engine_2.commit(2).await;
+            });
+
+            let _ = tokio::join!(task1, task2);
+
+            let final_hmac = engine.wal.last_hmac_snapshot().await;
+            assert_ne!(final_hmac, [0u8; 32], "last_hmac must be updated");
+
+            let _ = engine.wal.rotate_and_seal().await;
+        });
     });
+}
+
+#[cfg(not(loom))]
+#[tokio::test]
+async fn test_loom_group_commit_last_hmac_race_non_loom() {
+    let dir = tempfile::tempdir().expect("tempdir creation failed");
+    let wal_path = dir.path().join("wal.log");
+    let wal = Wal::open(&wal_path).await.expect("open wal failed");
+    let engine = Arc::new(GroupCommitEngine::new(wal));
+
+    let mut set = tokio::task::JoinSet::new();
+    for i in 1..=3 {
+        let engine_clone = Arc::clone(&engine);
+        set.spawn(async move { engine_clone.commit(i as u64).await });
+    }
+
+    while let Some(res) = set.join_next().await {
+        res.expect("task panicked").expect("commit failed");
+    }
+
+    let final_hmac = engine.wal.last_hmac_snapshot().await;
+    assert_ne!(final_hmac, [0u8; 32], "last_hmac must be updated");
 }

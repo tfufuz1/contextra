@@ -43,7 +43,7 @@ impl Wal {
 
     /// Replays the WAL using the stream reader (`BufReader`).
     pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
-        let metadata = tokio::fs::metadata(&self.path)
+        let metadata = crate::wal::fs::metadata(&self.path)
             .await
             .map_err(|e| MemFuseError::Storage(e.to_string()))?;
         let mut entries = Vec::new();
@@ -67,6 +67,7 @@ impl Wal {
             .collect())
     }
 
+    #[allow(clippy::type_complexity)]
     pub(crate) async fn replay_with_size_and_version(
         &self,
         file_size: u64,
@@ -74,6 +75,7 @@ impl Wal {
         self.replay_mmap_with_size_and_version(file_size).await
     }
 
+    #[allow(clippy::type_complexity)]
     async fn replay_mmap_with_size_and_version(
         &self,
         file_size: u64,
@@ -100,7 +102,7 @@ impl Wal {
 
     /// Replays the WAL using zero-copy memory mapping (`mmap`).
     /// Returns all valid entries with sequence numbers, entries, end offsets, and detected WAL version.
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, clippy::type_complexity)]
     pub async fn replay_mmap(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let std_file = std::fs::File::open(&self.path)
             .map_err(|e| MemFuseError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
@@ -126,6 +128,7 @@ impl Wal {
         self.parse_mmap_slice(&mmap, file_size)
     }
 
+    #[allow(clippy::type_complexity)]
     fn parse_mmap_slice(
         &self,
         mmap: &[u8],
@@ -497,6 +500,7 @@ impl Wal {
             return Ok(WalVersion::V1);
         }
 
+        #[allow(clippy::type_complexity)]
         let mmap_res = (|| -> Result<(WalVersion, Vec<(u64, WalEntry, u64)>)> {
             let std_file = std::fs::File::open(&self.path).map_err(|e| {
                 MemFuseError::Storage(format!("Failed to open WAL file for mmap: {e}"))
@@ -905,14 +909,14 @@ impl Wal {
 pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> Result<bool> {
     for suffix in &["v1.bak", "v2.bak"] {
         let bak_path = PathBuf::from(format!("{}.{}", wal_path.display(), suffix));
-        if !tokio::fs::try_exists(&bak_path).await.unwrap_or(false) {
+        if !crate::wal::fs::try_exists(&bak_path).await.unwrap_or(false) {
             continue;
         }
-        let wal_len = tokio::fs::metadata(wal_path)
+        let wal_len = crate::wal::fs::metadata(wal_path)
             .await
             .map(|m| m.len())
             .unwrap_or(0);
-        let bak_len = match tokio::fs::metadata(&bak_path).await {
+        let bak_len = match crate::wal::fs::metadata(&bak_path).await {
             Ok(m) => m.len(),
             Err(_) => continue,
         };
@@ -920,17 +924,19 @@ pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> R
             // Reguläre WAL ist leer, aber ein nicht-leeres Backup existiert:
             // sehr wahrscheinlich ein Crash zwischen set_len(0) und dem Schreiben
             // des neuen V3-Contents. Backup wiederherstellen.
-            match tokio::fs::rename(&bak_path, wal_path).await {
+            match crate::wal::fs::rename(&bak_path, wal_path).await {
                 Ok(()) => {}
                 Err(_) => {
                     // Cross-Device-Fallback: copy + remove statt rename.
-                    tokio::fs::copy(&bak_path, wal_path).await.map_err(|e| {
-                        MemFuseError::Storage(format!("WAL backup recovery copy failed: {e}"))
-                    })?;
-                    let _ = tokio::fs::remove_file(&bak_path).await;
+                    crate::wal::fs::copy(&bak_path, wal_path)
+                        .await
+                        .map_err(|e| {
+                            MemFuseError::Storage(format!("WAL backup recovery copy failed: {e}"))
+                        })?;
+                    let _ = crate::wal::fs::remove_file(&bak_path).await;
                 }
             }
-            if let Ok(f) = tokio::fs::OpenOptions::new()
+            if let Ok(f) = crate::wal::fs::OpenOptions::new()
                 .write(true)
                 .open(wal_path)
                 .await
