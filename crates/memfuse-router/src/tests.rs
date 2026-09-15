@@ -20,31 +20,58 @@ mod tests {
     struct MockStorageEngine;
 
     impl StorageEngine for MockStorageEngine {
-        fn get<'a>(&'a self, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
+        fn get<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
+        fn get_at_seq<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<Vec<u8>>>> {
             Box::pin(async move { Ok(None) })
         }
-        fn put<'a>(&'a self, _: memfuse_core::TxId, _: &'a [u8], _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn put<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+            _: &'a [u8],
+            _: &'a [u8],
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn delete<'a>(&'a self, _: memfuse_core::TxId, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn delete<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+            _: &'a [u8],
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn commit<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn commit<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn rollback<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn rollback<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn rollback_to_tx<'a>(&'a self, _: memfuse_core::TxId) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn rollback_to_tx<'a>(
+            &'a self,
+            _: memfuse_core::TxId,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
         fn flush<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn stats<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::StorageStats>> {
+        fn stats<'a>(
+            &'a self,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::StorageStats>> {
             Box::pin(async move {
                 Ok(memfuse_core::StorageStats {
                     num_segments: 0,
@@ -56,19 +83,35 @@ mod tests {
         fn last_seq_no<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<u64>> {
             Box::pin(async move { Ok(0) })
         }
-        fn last_tx_id<'a>(&'a self) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::TxId>> {
+        fn last_tx_id<'a>(
+            &'a self,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<memfuse_core::TxId>> {
             Box::pin(async move { Ok(memfuse_core::TxId(0)) })
         }
-        fn pin_checkpoint<'a>(&'a self, _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn pin_checkpoint<'a>(
+            &'a self,
+            _: u64,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn unpin_checkpoint<'a>(&'a self, _: u64) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
+        fn unpin_checkpoint<'a>(
+            &'a self,
+            _: u64,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn scan_prefix<'a>(&'a self, _: &'a [u8]) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn scan_prefix<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
             Box::pin(async move { Ok(vec![]) })
         }
-        fn scan<'a>(&'a self, _: std::ops::Bound<&'a [u8]>, _: std::ops::Bound<&'a [u8]>, _: Option<usize>) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
             Box::pin(async move { Ok(vec![]) })
         }
     }

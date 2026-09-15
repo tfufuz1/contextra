@@ -10,7 +10,10 @@ async fn proof_source_doc_ids_set_after_compact() {
     // Add 11 entities for 10 sequential edges
     for i in 0..=10 {
         graph
-            .add_entity(tx, Entity::new(EntityId::new(i), format!("Node{i}"), "Type"))
+            .add_entity(
+                tx,
+                Entity::new(EntityId::new(i), format!("Node{i}"), "Type"),
+            )
             .await
             .unwrap();
     }
@@ -93,7 +96,10 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
     let tx1 = TxId::new(1);
     for i in 0..=50 {
         graph
-            .add_entity(tx1, Entity::new(EntityId::new(i), format!("P1_Node{i}"), "Type"))
+            .add_entity(
+                tx1,
+                Entity::new(EntityId::new(i), format!("P1_Node{i}"), "Type"),
+            )
             .await
             .unwrap();
     }
@@ -119,7 +125,10 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
     let tx2 = TxId::new(2);
     for i in 50..=100 {
         graph
-            .add_entity(tx2, Entity::new(EntityId::new(i), format!("P2_Node{i}"), "Type"))
+            .add_entity(
+                tx2,
+                Entity::new(EntityId::new(i), format!("P2_Node{i}"), "Type"),
+            )
             .await
             .unwrap();
     }

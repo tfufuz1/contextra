@@ -1170,12 +1170,18 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(feature = "external-benchmarks")]
     {
-        if args.iter().any(|a| a == "--synthetic-only" || a == "synthetic-only" || a == "--ann") {
+        if args
+            .iter()
+            .any(|a| a == "--synthetic-only" || a == "synthetic-only" || a == "--ann")
+        {
             println!("=== Running ANN-Benchmark (Synthetic CI Version) ===");
             let res = memfuse_bench::ann_benchmarks::run_ann_benchmark_synthetic_ci().await?;
             println!("\nANN Synthetic CI Benchmark Summary:");
             println!("  Dataset          : {}", res.dataset_name);
-            println!("  Vectors          : {} ({}d)", res.n_vectors, res.dimension);
+            println!(
+                "  Vectors          : {} ({}d)",
+                res.n_vectors, res.dimension
+            );
             println!("  Max Recall@10    : {:.4}", res.max_recall_at_10);
             println!("  QPS @ Recall 0.90: {:.1}", res.qps_at_recall_90);
             println!("  QPS @ Recall 0.95: {:.1}", res.qps_at_recall_95);
@@ -1205,7 +1211,11 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
             let corpus = memfuse_bench::beir_eval::load_beir_corpus(&corpus_file)?;
             let queries = memfuse_bench::beir_eval::load_beir_queries(&queries_file, &qrels_file)?;
-            println!("Loaded BEIR dataset: {} docs, {} queries", corpus.len(), queries.len());
+            println!(
+                "Loaded BEIR dataset: {} docs, {} queries",
+                corpus.len(),
+                queries.len()
+            );
 
             let temp_dir = TempDir::new()?;
             let res = memfuse_bench::beir_eval::run_beir_eval(
@@ -1214,10 +1224,14 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 &queries,
                 "nfcorpus",
                 false,
-            ).await?;
+            )
+            .await?;
 
             println!("\nBEIR Evaluation Summary (nfcorpus):");
-            println!("  NDCG@10    : {:.4} (Baseline target: >= 0.25)", res.ndcg_at_10);
+            println!(
+                "  NDCG@10    : {:.4} (Baseline target: >= 0.25)",
+                res.ndcg_at_10
+            );
             println!("  Recall@10  : {:.4}", res.recall_at_10);
             println!("  MAP@100    : {:.4}", res.map_at_100);
             println!("  P50 Latency: {:.3} ms", res.latency_p50_ms);

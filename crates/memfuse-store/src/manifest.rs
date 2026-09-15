@@ -197,10 +197,11 @@ impl ManifestEntry {
                     u64::from_le_bytes(remaining[0..8].try_into().map_err(|_| {
                         MemFuseError::Serialization("Invalid added_max_tx format".into())
                     })?);
-                let rank =
-                    u64::from_le_bytes(remaining[8..16].try_into().map_err(|_| {
-                        MemFuseError::Serialization("Invalid rank format".into())
-                    })?);
+                let rank = u64::from_le_bytes(
+                    remaining[8..16]
+                        .try_into()
+                        .map_err(|_| MemFuseError::Serialization("Invalid rank format".into()))?,
+                );
                 let added_path_len =
                     u32::from_le_bytes(remaining[16..20].try_into().map_err(|_| {
                         MemFuseError::Serialization("Invalid added_path_len format".into())
@@ -236,11 +237,10 @@ impl ManifestEntry {
                             "Replace removed path length truncated".into(),
                         ));
                     }
-                    let r_len = u32::from_le_bytes(
-                        remaining[offset..offset + 4]
-                            .try_into()
-                            .map_err(|_| MemFuseError::Serialization("Invalid r_len format".into()))?,
-                    ) as usize;
+                    let r_len =
+                        u32::from_le_bytes(remaining[offset..offset + 4].try_into().map_err(
+                            |_| MemFuseError::Serialization("Invalid r_len format".into()),
+                        )?) as usize;
                     offset += 4;
                     if remaining.len() < offset + r_len {
                         return Err(MemFuseError::Serialization(
@@ -249,7 +249,10 @@ impl ManifestEntry {
                     }
                     let r_str =
                         std::str::from_utf8(&remaining[offset..offset + r_len]).map_err(|e| {
-                            MemFuseError::Serialization(format!("Invalid removed path UTF-8: {}", e))
+                            MemFuseError::Serialization(format!(
+                                "Invalid removed path UTF-8: {}",
+                                e
+                            ))
                         })?;
                     removed.push(PathBuf::from(r_str));
                     offset += r_len;
@@ -554,7 +557,8 @@ fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[u8]) -> boo
                     return false;
                 }
                 if remaining.len() >= 12 {
-                    let path_len = u32::from_le_bytes(remaining[8..12].try_into().unwrap()) as usize;
+                    let path_len =
+                        u32::from_le_bytes(remaining[8..12].try_into().unwrap()) as usize;
                     let expected_total_len = 4 + 1 + 8 + 4 + path_len;
                     if claimed_len != expected_total_len {
                         return false;
@@ -703,12 +707,14 @@ impl Manifest {
 
             drop(new_file);
 
-            tokio::fs::rename(&tmp_path, &self.path).await.map_err(|e| {
-                MemFuseError::Storage(format!(
-                    "Failed to rename temporary MANIFEST from {:?} to {:?}: {e}",
-                    tmp_path, self.path
-                ))
-            })?;
+            tokio::fs::rename(&tmp_path, &self.path)
+                .await
+                .map_err(|e| {
+                    MemFuseError::Storage(format!(
+                        "Failed to rename temporary MANIFEST from {:?} to {:?}: {e}",
+                        tmp_path, self.path
+                    ))
+                })?;
 
             crate::util::fsync_parent_dir(&self.path).await?;
 
@@ -971,14 +977,19 @@ mod tests {
             path: PathBuf::from("sst-0051.sst"),
             max_tx: 51,
         };
-        manifest.append(&new_entry).await.expect("append post-rollover");
+        manifest
+            .append(&new_entry)
+            .await
+            .expect("append post-rollover");
 
         let final_entries = Manifest::load(&manifest_path)
             .await
             .expect("load final entries");
         let final_live_set = Manifest::reconstruct_valid_sstables(&final_entries);
         assert_eq!(final_live_set.len(), 6);
-        assert!(final_live_set.iter().any(|(p, _)| p == Path::new("sst-0051.sst")));
+        assert!(final_live_set
+            .iter()
+            .any(|(p, _)| p == Path::new("sst-0051.sst")));
     }
 
     #[tokio::test]
@@ -1067,7 +1078,11 @@ mod tests {
         let valid_sstables = Manifest::reconstruct_valid_sstables(&reloaded_entries);
 
         assert_eq!(valid_sstables.len(), 2);
-        assert!(valid_sstables.iter().any(|(p, _)| p == Path::new("sst-10.sst")));
-        assert!(valid_sstables.iter().any(|(p, _)| p == Path::new("sst-20.sst")));
+        assert!(valid_sstables
+            .iter()
+            .any(|(p, _)| p == Path::new("sst-10.sst")));
+        assert!(valid_sstables
+            .iter()
+            .any(|(p, _)| p == Path::new("sst-20.sst")));
     }
 }
