@@ -1,34 +1,49 @@
 #!/usr/bin/env bash
+# MemFuse Pre-Commit Hook — Schnell-Gate vor jedem Commit
+# Installation: just bootstrap (setzt core.hooksPath auf .githooks)
 set -euo pipefail
 
-# ── STUFE 1: Formatierung (auto-fix) ──────────────────────────────────────────
-echo "→ [1/3] cargo fmt --all"
-cargo fmt --all
-if ! git diff --quiet; then
-    echo "  ℹ️  rustfmt hat Dateien reformatiert — werden zum Commit hinzugefügt."
-    git add -u
-fi
+echo "🔍 Pre-Commit Gate..."
 
-# ── STUFE 2: Compile-Gate (blockierend) ───────────────────────────────────────
-# TODO(opt-RC-2/A-4): Maintain local pre-commit compile gate to prevent uncompilable code commits.
-echo "→ [2/3] cargo check --workspace"
-if ! cargo check --workspace --quiet 2>/tmp/precommit_check_err.log; then
-    echo ""
-    echo "❌ COMMIT ABGEBROCHEN — Compile-Fehler:"
-    cat /tmp/precommit_check_err.log
-    echo ""
-    echo "Beheben mit: cargo check --workspace"
+# 1. Format-Check (schnell, < 2s)
+cargo fmt --all -- --check 2>/dev/null || {
+    echo "❌ Formatierung fehlerhaft. Führe 'cargo fmt --all' aus."
     exit 1
-fi
-echo "  ✅ Workspace kompiliert."
+}
 
-# ── STUFE 3: Schneller Governance-Check ───────────────────────────────────────
-echo "→ [3/3] Kritische AI-TAGs prüfen"
-CRITICAL_COUNT=$(grep -rE "AI-TAG\[[^]]+\]\[(CRITICAL|BLOCKER)\]" crates/ \
-    --include="*.rs" 2>/dev/null | grep -vc "RESOLVED" || true)
-if [ "$CRITICAL_COUNT" -gt 0 ]; then
-    echo "⚠️  $CRITICAL_COUNT ungelöste CRITICAL/BLOCKER-Tags gefunden."
-    echo "   Weiterarbeiten erlaubt, aber vor PR-Erstellung beheben."
-fi
+# 2. Clippy (schnell bei warmem Cache, < 10s)
+cargo clippy --all-targets -- -D warnings 2>/dev/null || {
+    echo "❌ Clippy-Fehler. Behebe alle Warnungen."
+    exit 1
+}
 
-echo "✅ Pre-Commit-Gate bestanden."
+# 3. Statische Audit-Lints (< 3s)
+cargo xtask check-max-results-unbound 2>/dev/null || {
+    echo "❌ Unbegrenzter max_results-Parameter gefunden. Füge 'UNBOUNDED-OK'-Kommentar oder begrenze."
+    exit 1
+}
+
+cargo xtask check-toctou-defaults 2>/dev/null || {
+    echo "❌ TOCTOU-Default in Trait gefunden. Default-Impl entfernen oder atomic implementieren."
+    exit 1
+}
+
+cargo xtask check-result-dropped-io 2>/dev/null || {
+    echo "❌ let _ = <IO-Operation> gefunden. Fehler propagieren oder explizit als INTENTIONAL-DROP markieren."
+    exit 1
+}
+
+# 4. Compilation Check (für geänderte Crates, < 20s)
+CHANGED_CRATES=$( (git diff --cached --name-only || true) | (grep "^crates/" || true) | cut -d/ -f1-2 | sort -u)
+for crate_path in $CHANGED_CRATES; do
+    if [ -n "$crate_path" ]; then
+        crate_name=$(basename "$crate_path")
+        cargo check -p "$crate_name" 2>/dev/null || {
+            echo "❌ Kompilierungsfehler in $crate_name."
+            exit 1
+        }
+    fi
+done
+
+echo "✅ Pre-Commit Gate bestanden"
+exit 0
