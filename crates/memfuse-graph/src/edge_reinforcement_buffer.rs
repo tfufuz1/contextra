@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-15T16:07:56Z (SESSION: 5d958ef0)
+// ZWECK: Akkumuliert Co-Occurrence- und Traversal-Update-Signale für asynchronen Flush in CSR-Graph (F-03)
+// INVARIANTEN: Lock-Scopes minimal halten, nie Mutex über .await halten.
+// NICHT-OFFENSICHTLICH: Partial-Flush wird nicht unterstützt; flush_to_graph leert den Buffer komplett.
+// SIEHE AUCH: crates/memfuse-graph/src/edge_reinforcement.rs
+
 //! F-03: EdgeReinforcementBuffer — Akkumuliert Co-Occurrence- und Traversal-
 //! Update-Signale für asynchronen, Scheduler-gesteuerten Flush in den CSR-Graphen.
 //!
@@ -150,5 +157,44 @@ mod tests {
         let config = EdgeReinforcementConfig::default();
         buf.flush_to_graph(&graph, &config); // kein Panic, keine Assertion
         assert_eq!(buf.cooccurrence_count(), 0); // Buffer geleert
+    }
+
+    #[tokio::test]
+    async fn test_flush_with_populated_graph_edges() {
+        use crate::csr::CsrGraph;
+        use crate::edge_reinforcement::EdgeReinforcementConfig;
+        use memfuse_core::{Edge, Entity, GraphIndex, TxId};
+
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+        let id1 = EntityId::new(1);
+        let id2 = EntityId::new(2);
+
+        graph
+            .add_entity(tx, Entity::new(id1, "N1", "Node"))
+            .await
+            .unwrap();
+        graph
+            .add_entity(tx, Entity::new(id2, "N2", "Node"))
+            .await
+            .unwrap();
+        graph
+            .add_edge(tx, Edge::new(id1, id2, "link").with_weight(1.0))
+            .await
+            .unwrap();
+        graph.commit(tx).await.unwrap();
+
+        let buf = EdgeReinforcementBuffer::new();
+        buf.push_cooccurrence(id1, id2, 0.8);
+        buf.push_traversal(id1, id2, 2);
+
+        assert_eq!(buf.cooccurrence_count(), 1);
+        assert_eq!(buf.traversal_count(), 1);
+
+        let config = EdgeReinforcementConfig::default();
+        buf.flush_to_graph(&graph, &config);
+
+        assert_eq!(buf.cooccurrence_count(), 0);
+        assert_eq!(buf.traversal_count(), 0);
     }
 }

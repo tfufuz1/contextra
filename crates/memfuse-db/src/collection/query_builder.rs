@@ -143,9 +143,6 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     filter_fn: Option<Box<dyn Fn(DocId) -> bool + Send + Sync>>,
     #[cfg(feature = "reranking")]
     reranker: Option<&'a memfuse_embed::CrossEncoderReranker>,
-    #[cfg(feature = "replicator-dynamics-weights")]
-    replicator_state:
-        Option<std::sync::Arc<parking_lot::RwLock<memfuse_calibration::ReplicatorState>>>,
     rerank_pool_multiplier: Option<usize>,
     rerank_pool_max: Option<usize>,
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
@@ -175,8 +172,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             filter_fn: None,
             #[cfg(feature = "reranking")]
             reranker: None,
-            #[cfg(feature = "replicator-dynamics-weights")]
-            replicator_state: None,
             rerank_pool_multiplier: None,
             rerank_pool_max: None,
             #[cfg(feature = "adaptive-candidate-pool-sizing")]
@@ -302,16 +297,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self
     }
 
-    /// Sets an online adaptive replicator state for dynamic signal fusion weights.
-    #[cfg(feature = "replicator-dynamics-weights")]
-    pub fn replicator_state(
-        mut self,
-        state: std::sync::Arc<parking_lot::RwLock<memfuse_calibration::ReplicatorState>>,
-    ) -> Self {
-        self.replicator_state = Some(state);
-        self
-    }
-
     /// Sets the candidate pool multiplier for pre-reranking candidate expansion.
     ///
     /// Default: 10 (`DEFAULT_RERANK_POOL_MULTIPLIER`), yielding ~100 candidates for `k=10`
@@ -401,20 +386,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         #[cfg(not(feature = "reranking"))]
         let _has_reranker = false;
 
-        let fusion_weights = {
-            #[cfg(feature = "replicator-dynamics-weights")]
-            {
-                if let Some(ref state) = self.replicator_state {
-                    state.read().fusion_weights()
-                } else {
-                    self.weights.unwrap_or_default()
-                }
-            }
-            #[cfg(not(feature = "replicator-dynamics-weights"))]
-            {
-                self.weights.unwrap_or_default()
-            }
-        };
+        let fusion_weights = self.weights.unwrap_or_default();
 
         let hybrid_query = memfuse_core::HybridQuery {
             text_query: self.text.clone(),

@@ -258,3 +258,128 @@ where
         total_eval_cases: n,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_locomo_question_category_enum_and_display() {
+        assert_eq!(
+            LocomoQuestionCategory::from_u8(1),
+            Some(LocomoQuestionCategory::MultiHop)
+        );
+        assert_eq!(
+            LocomoQuestionCategory::from_u8(2),
+            Some(LocomoQuestionCategory::Temporal)
+        );
+        assert_eq!(
+            LocomoQuestionCategory::from_u8(3),
+            Some(LocomoQuestionCategory::OpenDomain)
+        );
+        assert_eq!(
+            LocomoQuestionCategory::from_u8(4),
+            Some(LocomoQuestionCategory::SingleHop)
+        );
+        assert_eq!(
+            LocomoQuestionCategory::from_u8(5),
+            Some(LocomoQuestionCategory::Adversarial)
+        );
+        assert_eq!(LocomoQuestionCategory::from_u8(0), None);
+        assert_eq!(LocomoQuestionCategory::from_u8(6), None);
+
+        assert_eq!(format!("{}", LocomoQuestionCategory::MultiHop), "Multi-hop");
+        assert_eq!(format!("{}", LocomoQuestionCategory::Temporal), "Temporal");
+        assert_eq!(
+            format!("{}", LocomoQuestionCategory::OpenDomain),
+            "Open-domain"
+        );
+        assert_eq!(
+            format!("{}", LocomoQuestionCategory::SingleHop),
+            "Single-hop"
+        );
+        assert_eq!(
+            format!("{}", LocomoQuestionCategory::Adversarial),
+            "Adversarial"
+        );
+    }
+
+    #[test]
+    fn test_load_locomo_dataset_nonexistent_and_empty() {
+        let missing_path = Path::new("nonexistent_locomo_12345.json");
+        let err = load_locomo_dataset(missing_path);
+        assert!(err.is_err());
+        match err {
+            Err(MemFuseError::NotFound(msg)) => {
+                assert!(msg.contains("LoCoMo dataset file not found"));
+            }
+            other => panic!("Expected NotFound error, got {:?}", other),
+        }
+
+        let mut temp = NamedTempFile::new().unwrap();
+        write!(temp, "[]").unwrap();
+        let err_empty = load_locomo_dataset(temp.path());
+        assert!(err_empty.is_err());
+        match err_empty {
+            Err(MemFuseError::InvalidInput(msg)) => {
+                assert!(msg.contains("No valid LoCoMo cases extracted"));
+            }
+            other => panic!("Expected InvalidInput error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_load_locomo_dataset_various_answer_types() {
+        let json_data = r#"[
+            {
+                "sample_id": "conv_1",
+                "qa": [
+                    {
+                        "question": "What is the capital of France?",
+                        "answer": "Paris",
+                        "category": 1,
+                        "evidence": ["Paris is capital"]
+                    },
+                    {
+                        "question": "What is 2 + 2?",
+                        "answer": 4,
+                        "category": 4,
+                        "evidence": ["Math fact"]
+                    },
+                    {
+                        "question": "List fruits",
+                        "answer": ["apple", "banana"],
+                        "category": 3,
+                        "evidence": ["Fruit list"]
+                    },
+                    {
+                        "question": "Trick question?",
+                        "adversarial_answer": "None",
+                        "category": 5,
+                        "evidence": []
+                    }
+                ]
+            }
+        ]"#;
+
+        let mut temp = NamedTempFile::new().unwrap();
+        write!(temp, "{}", json_data).unwrap();
+
+        let cases = load_locomo_dataset(temp.path()).unwrap();
+        assert_eq!(cases.len(), 4);
+
+        assert_eq!(cases[0].expected_answer, "Paris");
+        assert_eq!(cases[0].category, LocomoQuestionCategory::MultiHop);
+
+        assert_eq!(cases[1].expected_answer, "4");
+        assert_eq!(cases[1].category, LocomoQuestionCategory::SingleHop);
+
+        assert_eq!(cases[2].expected_answer, "apple banana");
+        assert_eq!(cases[2].category, LocomoQuestionCategory::OpenDomain);
+
+        assert_eq!(cases[3].expected_answer, "None");
+        assert_eq!(cases[3].category, LocomoQuestionCategory::Adversarial);
+    }
+}
