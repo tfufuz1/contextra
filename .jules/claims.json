@@ -62,6 +62,25 @@
       "active": false,
       "expires_at": "2026-09-15T18:41:42.693675252+00:00",
       "released_at": "2026-09-15T14:50:31.257041469+00:00"
+    },
+    {
+<<<<<<< Updated upstream
+      "krate": "memfuse-checkpoint",
+      "issue": "JULES-20260915-MEMFUSECHE-TEST-UVNG",
+      "timestamp": "2026-09-15T15:54:43.274738223+00:00",
+      "session_id": "5973714571352502155",
+      "active": false,
+      "expires_at": "2026-09-15T19:54:43.274721930+00:00",
+      "released_at": "2026-09-15T16:09:10.966303390+00:00"
+=======
+      "krate": "memfuse-ollama",
+      "issue": "JULES-20260915-MEMFUSEOLL-TEST-VF9G",
+      "timestamp": "2026-09-15T16:00:25.034851728+00:00",
+      "session_id": "2432509696717743690",
+      "active": false,
+      "expires_at": "2026-09-15T20:00:25.034832481+00:00",
+      "released_at": "2026-09-15T16:23:49.556322973+00:00"
+>>>>>>> Stashed changes
     }
   ]
 }
