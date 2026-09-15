@@ -290,6 +290,27 @@ impl CompactionEngine {
             output_path
         );
 
+        if let Some(ref manifest) = self.manifest {
+            let current_live_entries: Vec<crate::manifest::ManifestEntry> = {
+                let ssts = sstables.read().await;
+                ssts.iter()
+                    .map(|sst| crate::manifest::ManifestEntry::Add {
+                        path: sst.file_path().to_path_buf(),
+                        max_tx: sst.metadata().max_tx_id,
+                    })
+                    .collect()
+            };
+            if let Err(e) = manifest
+                .maybe_rollover(
+                    &current_live_entries,
+                    crate::manifest::DEFAULT_ROLLOVER_THRESHOLD_BYTES,
+                )
+                .await
+            {
+                tracing::warn!("Periodic MANIFEST rollover failed after compaction: {e}");
+            }
+        }
+
         Ok(true)
     }
 
@@ -583,6 +604,26 @@ impl CompactionEngine {
                         }
                         Ok(false) => {
                             tracing::trace!("No compaction needed");
+                            if let Some(ref manifest) = self.manifest {
+                                let current_live_entries: Vec<crate::manifest::ManifestEntry> = {
+                                    let ssts = sstables.read().await;
+                                    ssts.iter()
+                                        .map(|sst| crate::manifest::ManifestEntry::Add {
+                                            path: sst.file_path().to_path_buf(),
+                                            max_tx: sst.metadata().max_tx_id,
+                                        })
+                                        .collect()
+                                };
+                                if let Err(e) = manifest
+                                    .maybe_rollover(
+                                        &current_live_entries,
+                                        crate::manifest::DEFAULT_ROLLOVER_THRESHOLD_BYTES,
+                                    )
+                                    .await
+                                {
+                                    tracing::warn!("Periodic MANIFEST rollover check failed: {e}");
+                                }
+                            }
                         }
                         Err(e) => {
                             tracing::error!("Background compaction failed: {}", e);

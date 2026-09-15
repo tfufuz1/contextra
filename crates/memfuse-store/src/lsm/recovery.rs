@@ -247,6 +247,7 @@ impl LsmStorage {
                 if file_name.ends_with(".tmp")
                     || path.extension().is_some_and(|ext| ext == "tmp")
                     || file_name.starts_with("SALT.tmp.")
+                    || file_name.starts_with("MANIFEST.new.")
                 {
                     tracing::warn!("Removing leftover un-renamed temp file: {:?}", path);
                     if let Err(e) = tokio::fs::remove_file(&path).await {
