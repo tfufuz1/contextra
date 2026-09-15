@@ -70,7 +70,7 @@ use memfuse_core::{
     BoxFuture, DocId, IndexOp, MemFuseError, ResourceTracker, Result, SnapshotRegistry,
     StorageEngine, TxBuffer, TxId, TOMBSTONE_BIT,
 };
-use memfuse_security::crypto::KeyManager;
+use memfuse_crypto::crypto::KeyManager;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

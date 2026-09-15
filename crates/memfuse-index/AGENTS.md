@@ -50,8 +50,9 @@ Beim Laden von Graph-Knoten (`load_node`) MUSS `neighbor_count` gegen `max_degre
 geprüft werden. Ein Out-of-Bounds bedeutet Datei-Korruption -> `Err` zurückgeben, nie stumm abschneiden.
 
 ### Quantisierungs-Drift
-`ScalarQuantizer` muss bei jedem Insert den Wertebereich prüfen (`expand_bounds_to_fit`).
-Ein Drift von >15% löst asynchronen Index-Rebuild aus.
+`ScalarQuantizer` klemmt Werte außerhalb der trainierten Min/Max-Grenzen auf den erlaubten Bereich `[min, max]`.
+Codebook-Grenzen bleiben für bestehende Codebook-Versionen unveränderlich, um gespeicherte `u8`-Codes nicht zu korrumpieren.
+Ein kumulativer Drift oberhalb von `quantizer_drift_threshold` (Standard 10%) löst einen asynchronen Index-Rebuild mit neu kalibriertem Codebook aus.
 
 ## 4. Public API Quick-Reference
 

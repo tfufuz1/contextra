@@ -104,9 +104,8 @@ impl<S: StorageEngine> MultiStepEngine<S> {
     ) -> Result<MultiStepResult> {
         use crate::fusion::reciprocal_rank_fusion;
 
-        let budget_guard = LatencyBudgetGuard::new(self.config.latency_budget_ms);
         let k = k.min(memfuse_core::MAX_SEARCH_K);
-        let mut current_k = k;
+        let current_k = k;
         let mut all_result_sets: Vec<Vec<SearchResult>> = Vec::new();
         let mut sub_queries: Vec<String> = Vec::new();
         let mut rounds_executed = 0;

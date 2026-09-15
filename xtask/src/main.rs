@@ -64,6 +64,7 @@ mod check_ffi_panic_boundary;
 mod check_jules_context_freshness;
 mod check_orphan_modules;
 mod check_phantom_files;
+mod check_reachable_modules;
 mod check_placeholder_refs;
 mod check_recall_stability;
 mod check_stale_tags;
@@ -3498,7 +3499,7 @@ description = "Core crate"
             ("memfuse-calibration", 2),
             ("memfuse-candle", 3),
             ("memfuse-checkpoint", 2),
-            ("memfuse-security", 2),
+            ("memfuse-crypto", 2),
             ("memfuse-graph", 2),
             ("memfuse-text", 2),
             ("memfuse-embed", 4),

@@ -1,5 +1,5 @@
 use memfuse_core::{MemFuseError, Result, TxId};
-use memfuse_security::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use memfuse_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
@@ -14,7 +14,8 @@ use super::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
 
 impl Wal {
     // AI-TAG[SMELL][ANALYZED-SAFE] audit-C-3: Exklusiver Mutex-Lock self.file.lock() in append_batch serialisiert Header-Check (write_header) und Dateischreibzugriffe vollständig. Die HMAC-Korrektheit wird NICHT durch die self.file-Mutex-Serialisierung, sondern durch den separaten last_hmac-Mutex in prepare_batch garantiert (siehe last_hmac.lock() in prepare_batch). (ID: AGT-STORE-d73203c0) (TS: 2026-09-10T19:14:58Z) (SESSION: 21a8d3e8)
-    pub(crate) async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
+    pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
+        let _truncate_guard = self.truncate_lock.lock().await;
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
                 "Cannot append to sealed WAL segment {}",
@@ -643,6 +644,7 @@ impl Wal {
     }
 
     pub async fn truncate(&self, offset: u64, new_last_hmac: [u8; 32]) -> Result<()> {
+        let _truncate_guard = self.truncate_lock.lock().await;
         // self.file.lock() Call Location 5
         let mut file = self.file.lock().await;
         if self.is_sealed() {
@@ -650,12 +652,6 @@ impl Wal {
                 "Cannot truncate sealed WAL segment {}",
                 self.path.display()
             )));
-        }
-
-        self.size.store(offset, std::sync::atomic::Ordering::SeqCst);
-        if offset < 4 {
-            self.header_written
-                .store(false, std::sync::atomic::Ordering::Release);
         }
 
         file.set_len(offset)
@@ -669,6 +665,12 @@ impl Wal {
         file.seek(std::io::SeekFrom::Start(offset))
             .await
             .map_err(|e| MemFuseError::Storage(format!("WAL seek after truncate failed: {e}")))?;
+
+        self.size.store(offset, std::sync::atomic::Ordering::SeqCst);
+        if offset < 4 {
+            self.header_written
+                .store(false, std::sync::atomic::Ordering::Release);
+        }
 
         {
             let mut last_hmac_guard = self.last_hmac.lock().await;
@@ -783,6 +785,11 @@ impl Wal {
     /// Returns a snapshot of the last HMAC written to the log.
     pub async fn last_hmac_snapshot(&self) -> [u8; 32] {
         *self.last_hmac.lock().await
+    }
+
+    pub async fn replace_file_handle_for_test(&self, file: tokio::fs::File) {
+        let mut guard = self.file.lock().await;
+        *guard = file;
     }
 }
 

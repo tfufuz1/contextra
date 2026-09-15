@@ -1,5 +1,5 @@
 use memfuse_core::{MemFuseError, Result};
-use memfuse_security::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use memfuse_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;
 
 use super::{
