@@ -735,8 +735,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
                 implicit_anchors = text_results
                     .iter()
-                    .map(|r| memfuse_core::EntityId::from_key(r.id.as_str()))
-                    .collect::<Result<Vec<_>>>()?;
+                    .filter_map(|r| memfuse_core::EntityId::from_key(r.id.as_str()).ok())
+                    .collect();
                 Some(&implicit_anchors)
             } else {
                 None
@@ -745,52 +745,23 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let graph_results = if let Some(anchors) = anchors_ref {
                 let tuples = match graph_strat {
                     memfuse_core::GraphTraversalStrategy::Hops { max_hops } => {
-                        self.graph_index
+                        let mut raw_tuples = self
+                            .graph_index
                             .multi_traverse_at(anchors, *max_hops, seq)
-                            .await?
+                            .await?;
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(k);
+                        raw_tuples
                     }
-                    memfuse_core::GraphTraversalStrategy::PersonalizedPageRank(ppr_config) => {
-                        tracing::warn!(
-                            hybrid_search_graph_snapshot_skew = true,
-                            seq = seq,
-                            strategy = "PersonalizedPageRank",
-                            "PPR strategy does not support explicit snapshot parameter; executing against global unversioned graph state."
-                        );
-                        self.graph_index
-                            .personalized_page_rank(anchors, ppr_config)
-                            .await?
+                    memfuse_core::GraphTraversalStrategy::PersonalizedPageRank(_) => {
+                        return Err(memfuse_core::MemFuseError::snapshot_unsupported_for_signal(
+                            "PersonalizedPageRank strategy does not support snapshot-isolated retrieval",
+                        ));
                     }
-                    memfuse_core::GraphTraversalStrategy::PathRag {
-                        max_hops,
-                        sufficiency_threshold,
-                    } => {
-                        tracing::warn!(
-                            hybrid_search_graph_snapshot_skew = true,
-                            seq = seq,
-                            strategy = "PathRag",
-                            "PathRag strategy does not support explicit snapshot parameter; executing against global unversioned graph state."
-                        );
-                        use memfuse_graph::path_rag::PathRAGEngine;
-                        let engine = PathRAGEngine::new(
-                            self.graph_index.as_ref(),
-                            *max_hops,
-                            *sufficiency_threshold,
-                        );
-                        let mut all_results: std::collections::HashMap<EntityId, f32> =
-                            std::collections::HashMap::new();
-                        for anchor in anchors.iter() {
-                            let paths = engine.find_all_paths(*anchor);
-                            for (doc_id, score) in engine.to_rrf_signal(&paths) {
-                                let eid = EntityId::new(doc_id.0);
-                                let entry = all_results.entry(eid).or_insert(0.0);
-                                if score > *entry {
-                                    *entry = score;
-                                }
-                            }
-                        }
-                        let mut res: Vec<(EntityId, f32)> = all_results.into_iter().collect();
-                        res.sort_by(|a, b| b.1.total_cmp(&a.1));
-                        res
+                    memfuse_core::GraphTraversalStrategy::PathRag { .. } => {
+                        return Err(memfuse_core::MemFuseError::snapshot_unsupported_for_signal(
+                            "PathRag strategy does not support snapshot-isolated retrieval",
+                        ));
                     }
                 };
                 let doc_tuples = tuples
@@ -816,7 +787,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let (vw, tw, gw) = crate::fusion::weights_to_signal_factors(weights);
 
             let target_community_id: Option<u64> = if let Some(same_comm_entity) = same_community_as {
-                self.get_community(same_comm_entity).await.ok().flatten()
+                self.get_community(same_comm_entity).await?
             } else {
                 None
             };
@@ -832,22 +803,22 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 signal_sets.push(("graph".to_string(), graph_results, gw));
             }
 
-            let fused = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
+            let mut fused = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
                 signal_sets,
                 k.saturating_mul(Self::OVERFETCH_FACTOR),
                 crate::fusion::MetadataMergePriority::default(),
                 true,
                 None,
             );
+            fused.truncate(k);
 
-            let mut boosted = self
+            let boosted = self
                 .apply_community_boost_post_rrf(
                     fused,
                     target_community_id,
                     Self::DEFAULT_COMMUNITY_BOOST,
                 )
                 .await?;
-            boosted.truncate(k);
             Ok(boosted)
         })
         .await
@@ -1113,8 +1084,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
                     implicit_anchors = text_results
                         .iter()
-                        .map(|r| memfuse_core::EntityId::from_key(r.id.as_str()))
-                        .collect::<Result<Vec<_>>>()?;
+                        .filter_map(|r| memfuse_core::EntityId::from_key(r.id.as_str()).ok())
+                        .collect();
                     Some(&implicit_anchors)
                 } else {
                     None
@@ -1125,52 +1096,23 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let graph_results = if let Some(anchors) = anchors_ref {
                 let tuples = match &query.graph_strategy {
                     memfuse_core::GraphTraversalStrategy::Hops { max_hops } => {
-                        self.graph_index
+                        let mut raw_tuples = self
+                            .graph_index
                             .multi_traverse_at(anchors, *max_hops, seq)
-                            .await?
+                            .await?;
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(candidate_k);
+                        raw_tuples
                     }
-                    memfuse_core::GraphTraversalStrategy::PersonalizedPageRank(ppr_config) => {
-                        tracing::warn!(
-                            hybrid_search_graph_snapshot_skew = true,
-                            seq = seq,
-                            strategy = "PersonalizedPageRank",
-                            "PPR strategy does not support explicit snapshot parameter; executing against global unversioned graph state."
-                        );
-                        self.graph_index
-                            .personalized_page_rank(anchors, ppr_config)
-                            .await?
+                    memfuse_core::GraphTraversalStrategy::PersonalizedPageRank(_) => {
+                        return Err(memfuse_core::MemFuseError::snapshot_unsupported_for_signal(
+                            "PersonalizedPageRank strategy does not support snapshot-isolated retrieval",
+                        ));
                     }
-                    memfuse_core::GraphTraversalStrategy::PathRag {
-                        max_hops,
-                        sufficiency_threshold,
-                    } => {
-                        tracing::warn!(
-                            hybrid_search_graph_snapshot_skew = true,
-                            seq = seq,
-                            strategy = "PathRag",
-                            "PathRag strategy does not support explicit snapshot parameter; executing against global unversioned graph state."
-                        );
-                        use memfuse_graph::path_rag::PathRAGEngine;
-                        let engine = PathRAGEngine::new(
-                            self.graph_index.as_ref(),
-                            *max_hops,
-                            *sufficiency_threshold,
-                        );
-                        let mut all_results: std::collections::HashMap<EntityId, f32> =
-                            std::collections::HashMap::new();
-                        for anchor in anchors.iter() {
-                            let paths = engine.find_all_paths(*anchor);
-                            for (doc_id, score) in engine.to_rrf_signal(&paths) {
-                                let eid = EntityId::new(doc_id.0);
-                                let entry = all_results.entry(eid).or_insert(0.0);
-                                if score > *entry {
-                                    *entry = score;
-                                }
-                            }
-                        }
-                        let mut res: Vec<(EntityId, f32)> = all_results.into_iter().collect();
-                        res.sort_by(|a, b| b.1.total_cmp(&a.1));
-                        res
+                    memfuse_core::GraphTraversalStrategy::PathRag { .. } => {
+                        return Err(memfuse_core::MemFuseError::snapshot_unsupported_for_signal(
+                            "PathRag strategy does not support snapshot-isolated retrieval",
+                        ));
                     }
                 };
                 let doc_tuples = tuples
@@ -1200,7 +1142,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             // Target community for boosting
             let target_community_id: Option<u64> =
                 if let Some(same_comm_entity) = query.same_community_as {
-                    self.get_community(same_comm_entity).await.ok().flatten()
+                    self.get_community(same_comm_entity).await?
                 } else {
                     None
                 };
@@ -1228,13 +1170,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 None,
             );
 
-            let mut fused_results = self
-                .apply_community_boost_post_rrf(
-                    fused,
-                    target_community_id,
-                    Self::DEFAULT_COMMUNITY_BOOST,
-                )
-                .await?;
             // Use oversized candidate pool (3×k) for Supersedes resolution to prevent
             // result shortfall when superseded docs are filtered out (P0 audit fix).
             // This also ensures superseding documents outside the initial k window
@@ -1270,6 +1205,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             // Final truncation to requested k after Supersedes filtering
             fused_results.truncate(k);
+
+            let fused_results = self
+                .apply_community_boost_post_rrf(
+                    fused_results,
+                    target_community_id,
+                    Self::DEFAULT_COMMUNITY_BOOST,
+                )
+                .await?;
 
             #[cfg(feature = "edge-reinforcement-learning")]
             if fused_results.len() >= 2 {
@@ -1318,17 +1261,22 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             return Ok(results);
         }
 
-        let mut candidate_eids = Vec::with_capacity(results.len());
-        for res in &results {
-            if let Ok(eid) = memfuse_core::EntityId::from_key(&res.id) {
-                candidate_eids.push(eid);
-            }
+        let parsed_eids: Vec<Option<memfuse_core::EntityId>> = results
+            .iter()
+            .map(|res| memfuse_core::EntityId::from_key(&res.id).ok())
+            .collect();
+
+        let candidate_eids: Vec<memfuse_core::EntityId> =
+            parsed_eids.iter().filter_map(|&eid| eid).collect();
+
+        if candidate_eids.is_empty() {
+            return Ok(results);
         }
 
         let community_map = self.get_communities_batch(&candidate_eids).await?;
 
-        for res in &mut results {
-            if let Ok(eid) = memfuse_core::EntityId::from_key(&res.id) {
+        for (res, &opt_eid) in results.iter_mut().zip(parsed_eids.iter()) {
+            if let Some(eid) = opt_eid {
                 if let Some(&comm) = community_map.get(&eid) {
                     if comm == target_comm {
                         res.score *= boost_factor;
