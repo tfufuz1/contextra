@@ -378,8 +378,8 @@ impl DiskAnnIndex {
     }
 
     fn check_quantizer_drift(&self, vector: &[f32]) {
-        let mut q_guard = self.inner.quantizer.write();
-        if let Some(ref mut q) = *q_guard {
+        let q_guard = self.inner.quantizer.read();
+        if let Some(ref q) = *q_guard {
             let drift = q.check_drift(vector);
             if drift > 0.10 {
                 use std::sync::atomic::Ordering;
@@ -389,14 +389,6 @@ impl DiskAnnIndex {
                     warn_count = count,
                     "Quantization drift > 10% detected — ScalarQuantizer recalibration recommended."
                 );
-                if count >= 100 {
-                    tracing::warn!(
-                        warn_count = count,
-                        "Quantization drift threshold (100) exceeded; auto-retraining quantizer via bound expansion."
-                    );
-                    q.expand_bounds_to_fit(vector);
-                    self.inner.drift_warn_count.store(0, Ordering::Relaxed);
-                }
             }
         }
     }

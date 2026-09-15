@@ -4,7 +4,7 @@
 //! must fulfill, enabling modularity and testability.
 
 // FILE-CONTEXT
-// STAND: 2026-09-14T00:00:00Z
+// STAND: 2026-09-15T00:00:00Z
 // ZWECK: Kern-Trait-Hierarchien (StorageEngine, VectorIndex, TextIndex, GraphIndex, Checkpoint, etc.) für Layer 0.
 // INVARIANTEN: Downward-only Trait interfaces; neue Trait-Methoden brauchen Default-Impls (Abwärtskompatibilität).
 // HOTSPOTS: mod declaration & re-exports
@@ -26,18 +26,27 @@ pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> +
 pub mod checkpoint;
 /// Embedding provider and LLM generation traits.
 pub mod embedding;
-/// Retrieval and index traits (Vector, Text, Graph).
-pub mod index;
-/// Memory lifecycle and observability traits.
+/// Graph index traits and CSR statistics.
+pub mod graph_index;
+/// Memory lifecycle, grounding validator, and distance calculator contracts.
+pub mod lifecycle;
+/// Observability and lifecycle re-exports.
 pub mod observability;
 /// Key-value storage engine traits.
 pub mod storage;
+/// Text retrieval and indexing traits (BM25 / Inverted Index).
+pub mod text_index;
+/// Vector retrieval and HNSW indexing traits.
+pub mod vector_index;
 
 pub use checkpoint::*;
 pub use embedding::*;
-pub use index::*;
+pub use graph_index::*;
+pub use lifecycle::*;
 pub use observability::*;
 pub use storage::*;
+pub use text_index::*;
+pub use vector_index::*;
 
 #[cfg(test)]
 mod dyn_safety {

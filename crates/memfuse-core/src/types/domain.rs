@@ -48,8 +48,8 @@ mod hex {
         }
         let mut bytes = [0u8; 32];
         for i in 0..32 {
-            bytes[i] = u8::from_str_radix(&s[i * 2..i * 2 + 2], 16)
-                .map_err(serde::de::Error::custom)?;
+            bytes[i] =
+                u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).map_err(serde::de::Error::custom)?;
         }
         Ok(bytes)
     }
@@ -1608,11 +1608,15 @@ mod tests {
         assert_eq!(entity.id.inner(), 1);
         assert_eq!(&*entity.name, "node1");
         assert_eq!(&*entity.entity_type, "typeA");
-        assert_eq!(entity.attributes.get("key1"), Some(&serde_json::json!("val1")));
+        assert_eq!(
+            entity.attributes.get("key1"),
+            Some(&serde_json::json!("val1"))
+        );
 
         // Test Entity Serde roundtrip with Arc<str> and AHashMap
         let entity_json = serde_json::to_string(&entity).expect("Entity serialization");
-        let deser_entity: Entity = serde_json::from_str(&entity_json).expect("Entity deserialization");
+        let deser_entity: Entity =
+            serde_json::from_str(&entity_json).expect("Entity deserialization");
         assert_eq!(entity, deser_entity);
 
         let edge = Edge::new(EntityId::new(1), EntityId::new(2), "rel")

@@ -11,6 +11,52 @@ use crate::csr::GraphInner;
 use memfuse_core::{EntityId, PprConfig};
 use std::collections::HashSet;
 
+/// Information view over graph tombstones/deleted node indices.
+///
+/// MUST NOT implement `Default`. Constructible only via explicit paths that load tombstone state
+/// (e.g. `CsrGraph::deleted_view(&self).await`).
+///
+/// ```compile_fail
+/// use memfuse_graph::DeletedView;
+/// let view = DeletedView::default(); // DeletedView does NOT implement Default
+/// ```
+#[derive(Debug, Clone)]
+pub struct DeletedView {
+    deleted_nodes: HashSet<usize>,
+}
+
+impl DeletedView {
+    /// Creates a `DeletedView` from a known set of deleted node indices.
+    pub(crate) fn from_nodes(deleted_nodes: HashSet<usize>) -> Self {
+        Self { deleted_nodes }
+    }
+
+    /// Creates an empty `DeletedView` when no nodes are deleted or for testing when explicitly intended.
+    pub(crate) fn empty() -> Self {
+        Self {
+            deleted_nodes: HashSet::new(),
+        }
+    }
+
+    /// Checks if internal node index `idx` is marked as deleted.
+    #[inline]
+    pub fn contains(&self, idx: usize) -> bool {
+        self.deleted_nodes.contains(&idx)
+    }
+
+    /// Returns the number of deleted node indices contained in this view.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.deleted_nodes.len()
+    }
+
+    /// Returns `true` if this view contains no deleted nodes.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.deleted_nodes.is_empty()
+    }
+}
+
 /// Reusable scratch buffers for Personalized PageRank (PPR) power iteration.
 ///
 /// Pre-allocating `PprContext` eliminates all intermediate heap allocations during repeated
@@ -49,7 +95,7 @@ pub(crate) fn compute_ppr(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
     config: &PprConfig,
-    deleted_nodes: &HashSet<usize>,
+    deleted_nodes: &DeletedView,
 ) -> Vec<(EntityId, f32)> {
     let mut ctx = PprContext::new();
     compute_ppr_with_context(inner, seed_nodes, config, deleted_nodes, &mut ctx)
@@ -66,7 +112,7 @@ pub(crate) fn compute_ppr_with_context(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
     config: &PprConfig,
-    deleted_nodes: &HashSet<usize>,
+    deleted_nodes: &DeletedView,
     ctx: &mut PprContext,
 ) -> Vec<(EntityId, f32)> {
     let n = inner.reverse_map.len();
@@ -82,7 +128,7 @@ pub(crate) fn compute_ppr_with_context(
     for &seed in seed_nodes {
         if let Some(&idx) = inner.id_map.get(&seed) {
             if idx < n
-                && !deleted_nodes.contains(&idx)
+                && !deleted_nodes.contains(idx)
                 && inner.entities.get(idx).is_some_and(|e| e.is_some())
                 && seen_seeds.insert(idx)
             {
@@ -108,7 +154,7 @@ pub(crate) fn compute_ppr_with_context(
     let weights = &inner.weights;
 
     for i in 0..n {
-        if deleted_nodes.contains(&i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
+        if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
             continue;
         }
 
@@ -124,7 +170,7 @@ pub(crate) fn compute_ppr_with_context(
             let target = targets[edge_idx];
             let weight = weights[edge_idx];
 
-            if !deleted_nodes.contains(&target)
+            if !deleted_nodes.contains(target)
                 && inner.entities.get(target).is_some_and(|e| e.is_some())
                 && weight > 0.0
             {
@@ -162,7 +208,7 @@ pub(crate) fn compute_ppr_with_context(
         // Rank mass accumulated at dead-end (dangling) nodes (excluding deleted nodes)
         let mut dangling_sum = 0.0f32;
         for i in 0..n {
-            if !deleted_nodes.contains(&i)
+            if !deleted_nodes.contains(i)
                 && inner.entities.get(i).is_some_and(|e| e.is_some())
                 && ctx.out_weight_sums[i] == 0.0
             {
@@ -178,7 +224,7 @@ pub(crate) fn compute_ppr_with_context(
 
         // Rank distribution across outgoing edges directly from CSR
         for i in 0..n {
-            if deleted_nodes.contains(&i) {
+            if deleted_nodes.contains(i) {
                 ctx.next_ranks[i] = 0.0; // Phantom-Node erhält keinen Rang
                 continue;
             }
@@ -197,7 +243,7 @@ pub(crate) fn compute_ppr_with_context(
                     let target = targets[edge_idx];
                     let weight = weights[edge_idx];
 
-                    if !deleted_nodes.contains(&target)
+                    if !deleted_nodes.contains(target)
                         && inner.entities.get(target).is_some_and(|e| e.is_some())
                         && weight > 0.0
                     {
@@ -236,13 +282,13 @@ pub(crate) fn compute_ppr_with_context(
     let sum: f32 = ctx.ranks[..n]
         .iter()
         .enumerate()
-        .filter(|(idx, _)| !deleted_nodes.contains(idx))
+        .filter(|(idx, _)| !deleted_nodes.contains(*idx))
         .map(|(_, &r)| r)
         .sum();
     if sum > 0.0 {
         let norm_denom = sum.max(f32::EPSILON);
         for (idx, r) in ctx.ranks[..n].iter_mut().enumerate() {
-            if !deleted_nodes.contains(&idx) {
+            if !deleted_nodes.contains(idx) {
                 *r /= norm_denom;
             } else {
                 *r = 0.0;
@@ -253,7 +299,7 @@ pub(crate) fn compute_ppr_with_context(
     // 6. Build and sort result vector (excluding deleted nodes)
     let mut results = Vec::new();
     for (idx, &rank) in ctx.ranks[..n].iter().enumerate() {
-        if !deleted_nodes.contains(&idx)
+        if !deleted_nodes.contains(idx)
             && rank > 0.0
             && inner.entities.get(idx).is_some_and(|e| e.is_some())
         {
@@ -302,8 +348,9 @@ mod tests {
         let config = PprConfig::default();
 
         // Call 1 on small graph (n=2)
-        let res1 =
-            graph.personalized_page_rank_with_context(&[EntityId::new(1)], &config, &mut ctx);
+        let res1 = graph
+            .personalized_page_rank_with_context_async(&[EntityId::new(1)], &config, &mut ctx)
+            .await;
         assert_eq!(res1.len(), 2);
 
         // Add 3 more nodes to expand graph to n=5
@@ -324,8 +371,9 @@ mod tests {
         graph.commit(tx2).await.unwrap(); // unwrap allowed
 
         // Call 2 reusing same ctx on grown graph (n=5)
-        let res2 =
-            graph.personalized_page_rank_with_context(&[EntityId::new(1)], &config, &mut ctx);
+        let res2 = graph
+            .personalized_page_rank_with_context_async(&[EntityId::new(1)], &config, &mut ctx)
+            .await;
         assert_eq!(res2.len(), 5);
 
         // Verify result matches fresh execution without context pollution
@@ -1323,6 +1371,68 @@ mod tests {
         assert!(
             (total_mass - 1.0).abs() < 1e-4,
             "Rank mass must conserve to 1.0 across remaining live nodes, got {total_mass}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deleted_view_tombstone_filtering_all_entry_points() {
+        use memfuse_core::StorageEngine;
+        use std::sync::Arc;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config = memfuse_store::LsmConfig {
+            path: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let storage = Arc::new(memfuse_store::LsmStorage::new(config).await.unwrap());
+        let graph = CsrGraph::with_storage(storage.clone());
+        let tx = TxId::new(1);
+
+        let id_a = EntityId::new(10);
+        let id_b = EntityId::new(20);
+
+        graph
+            .add_entity(tx, Entity::new(id_a, "Node A", "Type"))
+            .await
+            .unwrap();
+        graph
+            .add_entity(tx, Entity::new(id_b, "Node B", "Type"))
+            .await
+            .unwrap();
+        graph
+            .add_edge(tx, Edge::new(id_a, id_b, "link"))
+            .await
+            .unwrap();
+        graph.commit(tx).await.unwrap();
+
+        // Mark Node B as deleted in storage
+        let tx_del = TxId::new(2);
+        let tombstone_key = format!("graph:entity:deleted:{}", id_b.0);
+        storage
+            .put(tx_del, tombstone_key.as_bytes(), b"deleted")
+            .await
+            .unwrap();
+        storage.commit(tx_del).await.unwrap();
+
+        let config = PprConfig::default();
+
+        // 1. Check via personalized_page_rank (trait method)
+        let res_trait = graph
+            .personalized_page_rank(&[id_a], &config)
+            .await
+            .unwrap();
+        assert!(
+            !res_trait.iter().any(|(id, _)| *id == id_b),
+            "Deleted node B must not appear in personalized_page_rank result"
+        );
+
+        // 2. Check via personalized_page_rank_with_context_async
+        let mut ctx = PprContext::new();
+        let res_async = graph
+            .personalized_page_rank_with_context_async(&[id_a], &config, &mut ctx)
+            .await;
+        assert!(
+            !res_async.iter().any(|(id, _)| *id == id_b),
+            "Deleted node B must not appear in personalized_page_rank_with_context_async result"
         );
     }
 }
