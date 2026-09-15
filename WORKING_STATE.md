@@ -38,7 +38,7 @@ Ergebnis: **1 offene Tags**
 | `memfuse-text` | 2 | 6170 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-candle` | 3 | 4011 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-index` | 3 | 17474 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
-| `memfuse-ollama` | 3 | 4249 | 🟢 Clean |  |
+| `memfuse-ollama` | 3 | 4558 | 🟢 Clean |  |
 | `memfuse-store` | 3 | 25207 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-embed` | 4 | 2201 | 🧊 Optional |  |
 | `memfuse-db` | 5 | 35672 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
