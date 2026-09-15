@@ -1,5 +1,5 @@
 use memfuse_core::{DocId, Edge, Entity, EntityId, GraphIndex, TxId};
-use memfuse_graph::{CsrGraph, GraphIndexExt, PathGraph};
+use memfuse_graph::{CsrGraph, PathGraph};
 use proptest::prelude::*;
 use std::collections::HashSet;
 use std::sync::Arc;
