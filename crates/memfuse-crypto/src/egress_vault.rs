@@ -304,8 +304,8 @@ mod tests {
             .unwrap_or_else(|_| CompiledPattern::new("R-001", r"a{1000,}").unwrap())];
 
         let start = Instant::now();
-        // Setze extrem kurzes Timeout (1 Microsekunde / 10 Mikros), um Timeout-Pfad sicher zu triggern
-        let res = classify_layer1(&huge_payload, &patterns, Duration::from_micros(10)).await;
+        // Setze extrem kurzes Timeout (1 Nanosekunde), um Timeout-Pfad sicher zu triggern
+        let res = classify_layer1(&huge_payload, &patterns, Duration::from_nanos(1)).await;
         let elapsed = start.elapsed();
 
         assert_eq!(

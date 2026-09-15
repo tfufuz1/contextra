@@ -248,7 +248,8 @@ mod tests {
                     );
                     socket.write_all(response.as_bytes()).await.ok();
                 } else if req_str.starts_with("POST /api/embed ") {
-                    let body = serde_json::json!({ "embeddings": [[0.1, 0.2], [0.3, 0.4]] }).to_string();
+                    let body =
+                        serde_json::json!({ "embeddings": [[0.1, 0.2], [0.3, 0.4]] }).to_string();
                     let response = format!(
                         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                         body.len(),
@@ -297,13 +298,17 @@ mod tests {
             }
         });
 
-        let embedder_mismatch = OllamaEmbedder::new(server_url, "test-model").with_expected_dimension(4);
+        let embedder_mismatch =
+            OllamaEmbedder::new(server_url, "test-model").with_expected_dimension(4);
         let batch_dim_err = embedder_mismatch.embed_batch(&["hello"]).await.unwrap_err();
         match batch_dim_err {
             EmbeddingError::ComputationFailed(msg) => {
                 assert!(msg.contains("Ollama returned embedding of dimension 2 but expected 4"));
             }
-            _ => panic!("Expected EmbeddingError::ComputationFailed, got {:?}", batch_dim_err),
+            _ => panic!(
+                "Expected EmbeddingError::ComputationFailed, got {:?}",
+                batch_dim_err
+            ),
         }
     }
 }

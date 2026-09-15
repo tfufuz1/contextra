@@ -2525,7 +2525,8 @@ mod tests {
                 use tokio::io::{AsyncReadExt, AsyncWriteExt};
                 let mut buf = [0u8; 1024];
                 let _ = socket.read(&mut buf).await;
-                let response = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 13\r\n\r\nServer Error";
+                let response =
+                    "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 13\r\n\r\nServer Error";
                 socket.write_all(response.as_bytes()).await.ok();
             }
         });
@@ -2573,10 +2574,12 @@ mod tests {
                 let req_str = String::from_utf8_lossy(&buf[..n]);
 
                 if req_str.contains("bad-request-model") {
-                    let response = "HTTP/1.1 400 Bad Request\r\nContent-Length: 11\r\n\r\nBad Request";
+                    let response =
+                        "HTTP/1.1 400 Bad Request\r\nContent-Length: 11\r\n\r\nBad Request";
                     socket.write_all(response.as_bytes()).await.ok();
                 } else if req_str.contains("missing-gen-model") {
-                    let response = "HTTP/1.1 404 Not Found\r\nContent-Length: 15\r\n\r\nModel not found";
+                    let response =
+                        "HTTP/1.1 404 Not Found\r\nContent-Length: 15\r\n\r\nModel not found";
                     socket.write_all(response.as_bytes()).await.ok();
                 } else {
                     let body = serde_json::json!({ "response": "Generierter Text" }).to_string();
@@ -2594,10 +2597,16 @@ mod tests {
         let text = client.generate("test-model", "prompt").await.unwrap();
         assert_eq!(text, "Generierter Text");
 
-        let err_400 = client.try_generate("bad-request-model", "prompt").await.unwrap_err();
+        let err_400 = client
+            .try_generate("bad-request-model", "prompt")
+            .await
+            .unwrap_err();
         assert!(matches!(err_400, MemFuseError::InvalidInput(_)));
 
-        let err_404 = client.try_generate("missing-gen-model", "prompt").await.unwrap_err();
+        let err_404 = client
+            .try_generate("missing-gen-model", "prompt")
+            .await
+            .unwrap_err();
         assert!(matches!(err_404, MemFuseError::NotFound(_)));
     }
 
