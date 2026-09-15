@@ -1,0 +1,12 @@
+{
+  "dataset_name": "synthetic-1k-128d",
+  "n_vectors": 1000,
+  "dimension": 128,
+  "k": 10,
+  "qps_at_recall_90": 596.3101188531936,
+  "qps_at_recall_95": 596.3101188531936,
+  "qps_at_recall_99": 423.1653115686211,
+  "max_recall_at_10": 1.0,
+  "p50_latency_ms": 1.944,
+  "p99_latency_ms": 3.561
+}

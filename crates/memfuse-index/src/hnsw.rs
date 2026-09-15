@@ -1562,7 +1562,7 @@ impl HnswIndexCore {
         }
 
         // NOTE: deleted_snapshot is taken at search start. Concurrent deletes during this search are not reflected — this is intentional for search consistency.
-        let deleted_snapshot = self.hot.deleted_nodes.read();
+        let deleted_snapshot = self.cold.deleted_nodes.read();
 
         while let Some(Reverse(current)) = candidates.pop() {
             if let Some(worst_result) = results.peek() {
@@ -1892,10 +1892,6 @@ impl HnswIndexCore {
         } else {
             VectorData::F32(vector.to_vec())
         };
-
-        if trigger_rebuild {
-            // Rebuild threshold trigger check handled asynchronously
-        }
 
         let new_layer = self.random_layer();
         let entry_point_opt = *self.hot.entry_point.read();
