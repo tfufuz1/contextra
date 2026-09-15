@@ -176,7 +176,55 @@ impl CompactionEngine {
         )
         .await?;
 
-        // 4. Open the new SSTable
+        // Explicit fsync of output file and parent directory
+        crate::util::fsync_parent_dir(&output_path).await?;
+
+        // 4. Check consistency under read-lock before writing MANIFEST
+        let (all_present, insertion_point, old_paths) = {
+            let ssts = sstables.read().await;
+
+            let all_present = input_ssts
+                .iter()
+                .all(|inp| ssts.iter().any(|sst| Arc::ptr_eq(inp, sst)));
+
+            if !all_present {
+                (false, 0, Vec::new())
+            } else {
+                let insertion_point = ssts
+                    .iter()
+                    .position(|sst| input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)))
+                    .unwrap_or(ssts.len());
+
+                let old_paths: Vec<PathBuf> = input_ssts
+                    .iter()
+                    .filter_map(|inp| {
+                        ssts.iter()
+                            .find(|sst| Arc::ptr_eq(inp, sst))
+                            .map(|sst| sst.file_path().to_path_buf())
+                    })
+                    .collect();
+
+                (true, insertion_point as u64, old_paths)
+            }
+        };
+
+        if !all_present {
+            // Concurrent modification detected — abort compaction, clean up output file without writing MANIFEST entry
+            tracing::warn!(
+                "Compaction aborted: input SSTables modified during merge \
+                 (concurrent flush or rollback detected)"
+            );
+            if let Err(e) = tokio::fs::remove_file(&output_path).await {
+                tracing::warn!(
+                    "Failed to clean up aborted compaction output {:?}: {}",
+                    output_path,
+                    e
+                );
+            }
+            return Ok(false);
+        }
+
+        // Open the new SSTable reader
         let new_reader = Arc::new(
             SstableReader::open_with_key_manager(
                 &output_path,
@@ -186,89 +234,44 @@ impl CompactionEngine {
             .await?,
         );
 
-        // === SSTABLE MANIFEST INTEGRATION START ===
+        // 5. Write EXACTLY ONE atomic `Replace` entry to MANIFEST and fsync
         if let Some(ref manifest) = self.manifest {
             manifest
-                .append(&crate::manifest::ManifestEntry::Add {
-                    path: output_path.clone(),
-                    max_tx: new_reader.metadata().max_tx_id,
+                .append(&crate::manifest::ManifestEntry::Replace {
+                    removed: old_paths.clone(),
+                    added: output_path.clone(),
+                    added_max_tx: new_reader.metadata().max_tx_id,
+                    rank: insertion_point,
                 })
                 .await?;
         }
-        // === SSTABLE MANIFEST INTEGRATION END ===
 
-        // 5. Atomic swap under write-lock — identity-based (Arc::ptr_eq), not index-based.
-        // DECISION-REF: Replaces stale-index swap that was documented as
-        // AI-TAG[CONCURRENCY][CRITICAL] RESOLVED: AGT-STORE-002 — Indices computed before the lock was taken. (TS:2026-08-25T00:00:00Z)
-        // dropped could become invalid if a concurrent flush or rollback modifies the SSTable
-        // list. Arc::ptr_eq is immune to such reordering.
-        let old_paths: Vec<PathBuf> = {
+        // 6. In-memory SSTable swap under write-lock — mirroring already-persisted MANIFEST state
+        {
             let mut ssts = sstables.write().await;
 
-            // Verify all input SSTables are still present (concurrent flush/rollback safety)
-            let all_present = input_ssts
+            // Verify input SSTables are still present
+            let still_present = input_ssts
                 .iter()
                 .all(|inp| ssts.iter().any(|sst| Arc::ptr_eq(inp, sst)));
 
-            if !all_present {
-                // Concurrent modification detected — abort compaction, clean up output file
-                drop(ssts);
+            if still_present {
+                let insert_idx = (insertion_point as usize).min(ssts.len());
+                ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
+                let final_idx = insert_idx.min(ssts.len());
+                ssts.insert(final_idx, new_reader);
+            } else {
                 tracing::warn!(
-                    "Compaction aborted: input SSTables modified during merge \
-                     (concurrent flush or rollback detected)"
+                    "Input SSTables removed during MANIFEST write (rare concurrent modification) — replacing state from MANIFEST"
                 );
-                if let Err(e) = tokio::fs::remove_file(&output_path).await {
-                    tracing::warn!(
-                        "Failed to clean up aborted compaction output {:?}: {}",
-                        output_path,
-                        e
-                    );
-                }
-                return Ok(false);
+                ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
+                let final_idx = (insertion_point as usize).min(ssts.len());
+                ssts.insert(final_idx, new_reader);
             }
-
-            // Find insertion point: position of the earliest input SSTable in current list
-            let insertion_point = ssts
-                .iter()
-                .position(|sst| input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)))
-                .unwrap_or(ssts.len());
-
-            // Collect paths of input SSTables before removing them
-            let old_paths: Vec<PathBuf> = input_ssts
-                .iter()
-                .filter_map(|inp| {
-                    ssts.iter()
-                        .find(|sst| Arc::ptr_eq(inp, sst))
-                        .map(|sst| sst.file_path().to_path_buf())
-                })
-                .collect();
-
-            // Remove by identity, not by index
-            ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
-
-            // Add new SSTable at the correct position to maintain shadowing order
-            let insert_idx = insertion_point.min(ssts.len());
-            ssts.insert(insert_idx, new_reader);
-
-            old_paths
         };
 
-        // 6. Delete old SSTable files (best-effort, outside lock)
-        // RESOLVED: .uuid-Sidecar wird jetzt analog zum WAL-Cleanup-Pfad (lsm.rs) mitgelöscht.
+        // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
-            // === SSTABLE MANIFEST INTEGRATION START ===
-            if let Some(ref manifest) = self.manifest {
-                if let Err(e) = manifest
-                    .append(&crate::manifest::ManifestEntry::Remove { path: path.clone() })
-                    .await
-                {
-                    tracing::warn!(
-                        "Failed to write Manifest Remove entry during compaction: {}",
-                        e
-                    );
-                }
-            }
-            // === SSTABLE MANIFEST INTEGRATION END ===
             if let Err(e) = tokio::fs::remove_file(path).await {
                 tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
             }
@@ -1250,6 +1253,136 @@ mod tests {
                 uuid_path
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_compaction_crash_before_replace_entry_keeps_inputs() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let manifest_path = tmp.path().join("MANIFEST");
+        let manifest = Arc::new(crate::manifest::Manifest::open(&manifest_path).await.expect("open manifest"));
+
+        let sst1 = create_test_sstable(
+            tmp.path(),
+            "sst-1.sst",
+            &[(b"k1", b"v1", 10)],
+            Arc::clone(&bc),
+        )
+        .await;
+        let sst2 = create_test_sstable(
+            tmp.path(),
+            "sst-2.sst",
+            &[(b"k2", b"v2", 20)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        manifest.append(&crate::manifest::ManifestEntry::Add {
+            path: sst1.file_path().to_path_buf(),
+            max_tx: 10,
+        }).await.expect("add sst1");
+
+        manifest.append(&crate::manifest::ManifestEntry::Add {
+            path: sst2.file_path().to_path_buf(),
+            max_tx: 20,
+        }).await.expect("add sst2");
+
+        let engine = CompactionEngine::new(
+            CompactionConfig {
+                min_sstables_per_tier: 2,
+                ..Default::default()
+            },
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            Some(Arc::clone(&manifest)),
+        );
+
+        let output_path = tmp.path().join("sst-compact-output.sst");
+        engine
+            .merge_sstables(&[Arc::clone(&sst1), Arc::clone(&sst2)], &output_path, u64::MAX, true)
+            .await
+            .expect("merge sstables");
+
+        // Simulate crash right after merge finished but BEFORE writing Replace to MANIFEST
+        let entries = crate::manifest::Manifest::load(&manifest_path).await.expect("load manifest");
+        let valid_ssts = crate::manifest::Manifest::reconstruct_valid_sstables(&entries);
+
+        // Inputs must remain valid, output must be ignored/discarded
+        assert_eq!(valid_ssts.len(), 2);
+        assert!(valid_ssts.iter().any(|(p, _)| p.file_name().unwrap() == "sst-1.sst"));
+        assert!(valid_ssts.iter().any(|(p, _)| p.file_name().unwrap() == "sst-2.sst"));
+        assert!(!valid_ssts.iter().any(|(p, _)| p.file_name().unwrap() == "sst-compact-output.sst"));
+    }
+
+    #[tokio::test]
+    async fn test_compaction_crash_after_replace_entry_keeps_output() {
+        let tmp = TempDir::new().expect("temp dir");
+        let registry = Arc::new(SnapshotRegistry::new());
+        let bc = create_block_cache(1);
+        let manifest_path = tmp.path().join("MANIFEST");
+        let manifest = Arc::new(crate::manifest::Manifest::open(&manifest_path).await.expect("open manifest"));
+
+        let sst1 = create_test_sstable(
+            tmp.path(),
+            "sst-1.sst",
+            &[(b"k1", b"v1", 10)],
+            Arc::clone(&bc),
+        )
+        .await;
+        let sst2 = create_test_sstable(
+            tmp.path(),
+            "sst-2.sst",
+            &[(b"k2", b"v2", 20)],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        manifest.append(&crate::manifest::ManifestEntry::Add {
+            path: sst1.file_path().to_path_buf(),
+            max_tx: 10,
+        }).await.expect("add sst1");
+
+        manifest.append(&crate::manifest::ManifestEntry::Add {
+            path: sst2.file_path().to_path_buf(),
+            max_tx: 20,
+        }).await.expect("add sst2");
+
+        let engine = CompactionEngine::new(
+            CompactionConfig {
+                min_sstables_per_tier: 2,
+                ..Default::default()
+            },
+            registry,
+            Arc::clone(&bc),
+            None,
+            Arc::new(memfuse_core::ResourceTracker::new(
+                memfuse_core::ResourceBudget {
+                    memory_limit: 1024 * 1024,
+                },
+            )),
+            Some(Arc::clone(&manifest)),
+        );
+
+        let sstables = Arc::new(RwLock::new(vec![sst1, sst2]));
+        let compacted = engine.maybe_compact(&sstables, tmp.path()).await.expect("maybe compact");
+        assert!(compacted);
+
+        // Simulate crash AFTER Replace entry written to MANIFEST
+        let entries = crate::manifest::Manifest::load(&manifest_path).await.expect("load manifest");
+        let valid_ssts = crate::manifest::Manifest::reconstruct_valid_sstables(&entries);
+
+        // Output must be valid, inputs must be dropped
+        assert_eq!(valid_ssts.len(), 1);
+        assert!(!valid_ssts.iter().any(|(p, _)| p.file_name().unwrap() == "sst-1.sst"));
+        assert!(!valid_ssts.iter().any(|(p, _)| p.file_name().unwrap() == "sst-2.sst"));
+        assert!(valid_ssts.iter().any(|(p, _)| p.file_name().unwrap().to_string_lossy().starts_with("sst-compact-")));
     }
 
     #[test]
