@@ -186,24 +186,24 @@ pub fn scan_file_for_duplicate_symbols(path: &Path) -> Result<Vec<DuplicateSymbo
 }
 
 #[derive(Debug, Clone)]
-struct FnOccurrence {
+struct CrossSymbolOccurrence {
     file: String,
     line_number: usize,
     cfg_attr: Option<String>,
 }
 
 /// Scannt ein Crate-Verzeichnis dateiübergreifend auf doppelte öffentliche
-/// freistehende `fn`- und `async fn`-Top-Level-Deklarationen.
-/// Ignoriert bewusste `impl`-Blöcke, private Funktionen und ungleiche `#[cfg(...)]`.
-pub fn scan_crate_for_cross_module_duplicate_fns(
+/// Top-Level-Deklarationen (const, static, struct, enum, fn, trait, type).
+/// Ignoriert bewusste `impl`-Blöcke, private Elemente und ungleiche `#[cfg(...)]`.
+pub fn scan_crate_for_cross_module_duplicate_symbols(
     crate_root: &Path,
 ) -> Result<Vec<DuplicateSymbol>, String> {
-    let fn_decl_re = Regex::new(
-        r#"^(pub(\([^)]+\))?\s+)(?:const\s+|async\s+|unsafe\s+|extern\s*(?:#[^#]+#|"[^"]*")?\s+)*fn\s+([A-Za-z_][A-Za-z0-9_]*)"#,
+    let decl_re = Regex::new(
+        r#"^(pub(\([^)]+\))?\s+)(?:const\s+|async\s+|unsafe\s+|extern\s*(?:#[^#]+#|"[^"]*")?\s+)*(const|static|struct|enum|fn|trait|type)\s+([A-Za-z_][A-Za-z0-9_]*)"#,
     )
     .map_err(|e| format!("Invalid regex: {}", e))?;
 
-    let mut occurrences_by_fn: HashMap<String, Vec<FnOccurrence>> = HashMap::new();
+    let mut occurrences: HashMap<(String, String), Vec<CrossSymbolOccurrence>> = HashMap::new();
 
     for entry in WalkDir::new(crate_root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
@@ -236,15 +236,19 @@ pub fn scan_crate_for_cross_module_duplicate_fns(
                     && !line.is_empty()
                     && line.trim_start() == *line
                 {
-                    if let Some(caps) = fn_decl_re.captures(line) {
-                        let fn_name = caps[3].to_string();
-                        if fn_name != "_" {
-                            let occ = FnOccurrence {
+                    if let Some(caps) = decl_re.captures(line) {
+                        let symbol_kind = caps[3].to_string();
+                        let symbol_name = caps[4].to_string();
+                        if symbol_name != "_" {
+                            let occ = CrossSymbolOccurrence {
                                 file: file_str.clone(),
                                 line_number: line_num,
                                 cfg_attr: pending_cfg.clone(),
                             };
-                            occurrences_by_fn.entry(fn_name).or_default().push(occ);
+                            occurrences
+                                .entry((symbol_kind, symbol_name))
+                                .or_default()
+                                .push(occ);
                         }
                     }
                 }
@@ -318,9 +322,10 @@ pub fn scan_crate_for_cross_module_duplicate_fns(
 
     let mut duplicates = Vec::new();
 
-    for (fn_name, occ_list) in occurrences_by_fn {
+    for ((symbol_kind, symbol_name), occ_list) in occurrences {
         if occ_list.len() > 1 {
-            let mut cfg_groups: HashMap<Option<String>, Vec<FnOccurrence>> = HashMap::new();
+            let mut cfg_groups: HashMap<Option<String>, Vec<CrossSymbolOccurrence>> =
+                HashMap::new();
             for occ in occ_list {
                 cfg_groups
                     .entry(occ.cfg_attr.clone())
@@ -341,8 +346,8 @@ pub fn scan_crate_for_cross_module_duplicate_fns(
                         if duplicate.file != first.file {
                             duplicates.push(DuplicateSymbol {
                                 file: first.file.clone(),
-                                symbol_kind: "fn".to_string(),
-                                symbol_name: fn_name.clone(),
+                                symbol_kind: symbol_kind.clone(),
+                                symbol_name: symbol_name.clone(),
                                 first_line: first.line_number,
                                 duplicate_line: duplicate.line_number,
                                 duplicate_file: Some(duplicate.file.clone()),
@@ -358,10 +363,28 @@ pub fn scan_crate_for_cross_module_duplicate_fns(
         a.file
             .cmp(&b.file)
             .then_with(|| a.first_line.cmp(&b.first_line))
+            .then_with(|| {
+                a.duplicate_file
+                    .as_deref()
+                    .unwrap_or(&a.file)
+                    .cmp(b.duplicate_file.as_deref().unwrap_or(&b.file))
+            })
             .then_with(|| a.duplicate_line.cmp(&b.duplicate_line))
     });
 
     Ok(duplicates)
+}
+
+/// Scannt ein Crate-Verzeichnis dateiübergreifend auf doppelte öffentliche `fn`-Deklarationen.
+#[allow(dead_code)]
+pub fn scan_crate_for_cross_module_duplicate_fns(
+    crate_root: &Path,
+) -> Result<Vec<DuplicateSymbol>, String> {
+    let all_dups = scan_crate_for_cross_module_duplicate_symbols(crate_root)?;
+    Ok(all_dups
+        .into_iter()
+        .filter(|d| d.symbol_kind == "fn")
+        .collect())
 }
 
 fn find_crate_roots_to_scan(files: &[String]) -> Vec<std::path::PathBuf> {
@@ -448,7 +471,7 @@ pub fn check_duplicate_symbols_with_options(
     if cross_module {
         let crate_roots = find_crate_roots_to_scan(files);
         for crate_root in crate_roots {
-            if let Ok(cross_dups) = scan_crate_for_cross_module_duplicate_fns(&crate_root) {
+            if let Ok(cross_dups) = scan_crate_for_cross_module_duplicate_symbols(&crate_root) {
                 all_duplicates.extend(cross_dups);
             }
         }
@@ -702,5 +725,69 @@ impl Bar {
             "Expected no cross-module duplicates for private fns or impl methods, found: {:?}",
             cross_dups
         );
+    }
+
+    #[test]
+    fn test_detects_cross_module_duplicate_struct_and_const() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let crate_dir = temp_dir.path().join("my_crate");
+        let src_dir = crate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            r#"[package]
+name = "my_crate"
+version = "0.1.0"
+"#,
+        )
+        .unwrap();
+
+        let mod_a = src_dir.join("mod_a.rs");
+        let mod_b = src_dir.join("mod_b.rs");
+
+        fs::write(
+            &mod_a,
+            r#"
+pub struct DuplicateConfig {
+    pub field: u32,
+}
+
+pub const MAX_BUFFER_SIZE: usize = 1024;
+"#,
+        )
+        .unwrap();
+
+        fs::write(
+            &mod_b,
+            r#"
+pub struct DuplicateConfig {
+    pub name: String,
+}
+
+pub const MAX_BUFFER_SIZE: usize = 2048;
+"#,
+        )
+        .unwrap();
+
+        let files = vec![
+            mod_a.to_string_lossy().to_string(),
+            mod_b.to_string_lossy().to_string(),
+        ];
+
+        let cross_dups = check_duplicate_symbols_with_options(&files, true).unwrap();
+        assert_eq!(cross_dups.len(), 2);
+
+        let dup_struct = cross_dups
+            .iter()
+            .find(|d| d.symbol_kind == "struct")
+            .expect("struct duplicate should be found");
+        assert_eq!(dup_struct.symbol_name, "DuplicateConfig");
+
+        let dup_const = cross_dups
+            .iter()
+            .find(|d| d.symbol_kind == "const")
+            .expect("const duplicate should be found");
+        assert_eq!(dup_const.symbol_name, "MAX_BUFFER_SIZE");
     }
 }
