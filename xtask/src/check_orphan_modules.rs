@@ -134,7 +134,8 @@ pub fn check_crate_orphan_modules(crate_root: &Path) -> Vec<String> {
                 if decl.mod_name == mod_dir_name {
                     let decl_parent = decl.file_path.parent();
                     let is_grand_parent_file = decl_parent == Some(grand_parent);
-                    let is_parent_sibling_file = decl.file_path == grand_parent.join(format!("{}.rs", mod_dir_name));
+                    let is_parent_sibling_file =
+                        decl.file_path == grand_parent.join(format!("{}.rs", mod_dir_name));
                     if is_grand_parent_file || is_parent_sibling_file {
                         declaring_occurrences.push(decl.clone());
                     }
@@ -156,8 +157,10 @@ pub fn check_crate_orphan_modules(crate_root: &Path) -> Vec<String> {
 
             for decl in &all_declarations {
                 if decl.mod_name == mod_name {
-                    let is_sibling_in_parent_dir = decl.file_path.parent() == Some(parent_dir) && decl.file_path != *file;
-                    let is_parent_dir_sibling = parent_dir_sibling_file.as_ref() == Some(&decl.file_path);
+                    let is_sibling_in_parent_dir =
+                        decl.file_path.parent() == Some(parent_dir) && decl.file_path != *file;
+                    let is_parent_dir_sibling =
+                        parent_dir_sibling_file.as_ref() == Some(&decl.file_path);
                     if is_sibling_in_parent_dir || is_parent_dir_sibling {
                         declaring_occurrences.push(decl.clone());
                     }
@@ -249,11 +252,27 @@ mod tests {
 
         fs::write(src_dir.join("lib.rs"), "pub mod traits;\n").unwrap();
         // traits/mod.rs does NOT declare any of the 4 trait files
-        fs::write(traits_dir.join("mod.rs"), "// traits entry point without mod decls\n").unwrap();
-        fs::write(traits_dir.join("graph_index.rs"), "pub trait GraphIndex {}\n").unwrap();
+        fs::write(
+            traits_dir.join("mod.rs"),
+            "// traits entry point without mod decls\n",
+        )
+        .unwrap();
+        fs::write(
+            traits_dir.join("graph_index.rs"),
+            "pub trait GraphIndex {}\n",
+        )
+        .unwrap();
         fs::write(traits_dir.join("text_index.rs"), "pub trait TextIndex {}\n").unwrap();
-        fs::write(traits_dir.join("vector_index.rs"), "pub trait VectorIndex {}\n").unwrap();
-        fs::write(traits_dir.join("checkpoint.rs"), "pub trait Checkpoint {}\n").unwrap();
+        fs::write(
+            traits_dir.join("vector_index.rs"),
+            "pub trait VectorIndex {}\n",
+        )
+        .unwrap();
+        fs::write(
+            traits_dir.join("checkpoint.rs"),
+            "pub trait Checkpoint {}\n",
+        )
+        .unwrap();
 
         let violations = check_crate_orphan_modules(&crate_dir);
         assert_eq!(
