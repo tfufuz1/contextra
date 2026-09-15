@@ -84,7 +84,7 @@ pub mod recovery;
 pub mod scan;
 
 #[cfg(test)]
-mod concurrency_tests;
+mod tests;
 
 use group_commit::{GroupCommitRequest, PendingCommitQueue, WalQueueGuard};
 use scan::{check_in_range, SstableScanMode};
