@@ -42,7 +42,7 @@
 // HOTSPOTS:   greedy_search(), insert(), search_at(), trigger_rebuild_async()
 // SIEHE AUCH:  rules/simd_safety.md, ADR-017, ADR-034
 
-use crate::distance::compute_distance_trusted;
+use crate::distance::{compute_distance, compute_distance_trusted};
 use ahash::{AHashMap, AHashSet};
 use memfuse_core::{
     DistanceMetric, DocId, IndexOp, MemFuseError, Result, ScoredDocument, TxBuffer, TxId,

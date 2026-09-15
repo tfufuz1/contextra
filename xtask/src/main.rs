@@ -57,17 +57,22 @@ mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
 mod check_commit_messages;
 mod check_compile;
+mod check_coverage_gate;
 mod check_doc_references;
 mod check_duplicate_intent;
 mod check_duplicate_symbols;
 mod check_ffi_panic_boundary;
 mod check_jules_context_freshness;
+mod check_max_results_unbound;
+mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
-mod check_reachable_modules;
 mod check_placeholder_refs;
+mod check_reachable_modules;
 mod check_recall_stability;
+mod check_result_dropped_on_io;
 mod check_stale_tags;
+mod check_toctou_trait_defaults;
 mod check_type_registry;
 mod check_unwrap_baseline_trend;
 mod check_vetoes;
@@ -2457,9 +2462,137 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-max-results-unbound" => {
+            let root = find_root_dir();
+            match check_max_results_unbound::run_check_max_results_unbound(&root) {
+                Ok(violations) => {
+                    if !violations.is_empty() {
+                        eprintln!(
+                            "❌ check-max-results-unbound failed: {} violation(s) found:",
+                            violations.len()
+                        );
+                        for v in &violations {
+                            eprintln!("  {}:{} — {}", v.file_path, v.line_num, v.line_content);
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ check-max-results-unbound passed");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-max-results-unbound error: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-toctou-defaults" => {
+            let root = find_root_dir();
+            match check_toctou_trait_defaults::run_check_toctou_trait_defaults(&root) {
+                Ok(violations) => {
+                    if !violations.is_empty() {
+                        eprintln!(
+                            "❌ check-toctou-defaults failed: {} violation(s) found:",
+                            violations.len()
+                        );
+                        for v in &violations {
+                            eprintln!(
+                                "  {}:{} — trait '{}' has default get+put without lock",
+                                v.file_path, v.start_line, v.trait_name
+                            );
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ check-toctou-defaults passed");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-toctou-defaults error: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-nan-hot-loop" => {
+            let root = find_root_dir();
+            match check_nan_validation_in_hot_loop::run_check_nan_validation_in_hot_loop(&root) {
+                Ok(violations) => {
+                    if !violations.is_empty() {
+                        eprintln!(
+                            "❌ check-nan-hot-loop failed: {} violation(s) found:",
+                            violations.len()
+                        );
+                        for v in &violations {
+                            eprintln!("  {}:{} — {}", v.file_path, v.line_num, v.line_content);
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ check-nan-hot-loop passed");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-nan-hot-loop error: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-result-dropped-io" => {
+            let root = find_root_dir();
+            match check_result_dropped_on_io::run_check_result_dropped_on_io(&root) {
+                Ok(violations) => {
+                    if !violations.is_empty() {
+                        eprintln!(
+                            "❌ check-result-dropped-io failed: {} violation(s) found:",
+                            violations.len()
+                        );
+                        for v in &violations {
+                            eprintln!("  {}:{} — {}", v.file_path, v.line_num, v.line_content);
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ check-result-dropped-io passed");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-result-dropped-io error: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-coverage-gate" => {
+            let root = find_root_dir();
+            match check_coverage_gate::run_check_coverage_gate(&root) {
+                Ok(results) => {
+                    let mut failed = false;
+                    println!(
+                        "{:<20} | {:<15} | {:<12} | Status",
+                        "Crate", "Coverage (%)", "Threshold (%)"
+                    );
+                    println!("{:-<20}-|-{:-<15}-|-{:-<12}-|--------", "", "", "");
+
+                    for r in &results {
+                        let status = if r.passed { "✅ PASS" } else { "❌ FAIL" };
+                        if !r.passed {
+                            failed = true;
+                        }
+                        println!(
+                            "{:<20} | {:<15.2} | {:<12.2} | {}",
+                            r.crate_name, r.actual_coverage, r.threshold, status
+                        );
+                    }
+
+                    if failed {
+                        eprintln!(
+                            "❌ check-coverage-gate failed: one or more crates below threshold."
+                        );
+                        process::exit(1);
+                    } else {
+                        println!("✅ check-coverage-gate passed");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-coverage-gate error: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>]");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
             process::exit(1);
         }
     }
