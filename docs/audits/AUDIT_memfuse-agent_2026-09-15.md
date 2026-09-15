@@ -1,70 +1,56 @@
-## 26. Tier 2 Deep Audit & Resilience Report — `memfuse-agent` (2026-09-15)
+## Systematischer Tiefen-Audit & Unit-Test-Erweiterung — `memfuse-agent` (2026-09-15)
 
 ### Session Context
-- **Session Hash:** `692d9982`
-- **Timestamp:** `2026-09-15T16:25:00Z`
-- **Target Crate:** `memfuse-agent` (Layer 3 Workflow Engine, ~2,795 LOC in `src/`, 18 Test-Suites)
-- **Task ID:** `JULES-20260915-MEMFUSEAGE-DEEP-W462`
+- **Session Hash:** `20260915`
+- **Timestamp:** `2026-09-15T15:20:00Z`
+- **Target Crate:** `memfuse-agent` (Layer 3 Workflow Engine, ~2,800 LOC)
+- **Task ID:** `JULES-20260915-MEMFUSEAGE-TEST-E9EE`
 - **Auditor:** Senior Rust Workflow & Resilience Engineer (Jules Agent)
-- **Role-Lock Status:** Tier 2 Auditor & Verification Engineer.
 
 ---
 
 ### 1. Inventar-Realitätsabgleich & Status
-- **Command Output**: `find crates/memfuse-agent/src -name "*.rs" | sort`
-- **Erfasste Dateien**:
-  - `audit.rs` (636 LOC)
-  - `context.rs` (408 LOC)
-  - `dlq.rs` (109 LOC)
-  - `engine.rs` (961 LOC)
-  - `event_source.rs` (276 LOC)
-  - `graph.rs` (231 LOC)
-  - `lib.rs` (87 LOC)
-  - `step.rs` (87 LOC)
-- **Ergebnis**: 8 Dateien. Exakte Übereinstimmung mit dem Prompter-Inventar (Stand 2026-09-10), **0 Inventar-Drift**.
+- **Inventar-Abgleich**: `find crates/memfuse-agent/src -name "*.rs"` ergab exakt 8 Dateien (`audit.rs`, `context.rs`, `dlq.rs`, `engine.rs`, `event_source.rs`, `graph.rs`, `lib.rs`, `step.rs`).
+- **Ergebnis**: Exakte Übereinstimmung mit dem Prompter-Inventar (Stand 2026-09-10), **0 Inventar-Drift**.
 
 ---
 
-### 2. Proof-of-Work Invarianten & Stress-Verifikationen
+### 2. Befunde & Durchgeführte Behebungen
 
-#### A. Concurrency & Conformal Execution Parity (10x 8-Thread Stress Runs)
-- **Test-Befehl**: `for i in $(seq 1 10); do cargo test -p memfuse-agent --all-features -- --test-threads=8; done`
-- **Nachweis**: 10 aufeinanderfolgende Läufe über alle 15 Unit-Tests, 7 Recovery-Tests, 5 Audit-Isolations-Tests, 4 Boundary-Tests, 3 Budget-Race-Tests, 4 Contract-Tests, 3 DLQ-Tests, 3 E2E-Integration-Tests, 5 Event-Loop-Tests, 1 Final-State-Test, 2 Graph-Integration-Tests, 1 Persistence-Test, 4 Proptest-Tests und 8 Workflow-Tests verliefen **100% GRÜN (0 FAILED, 0 Deadlocks, 0 Race Conditions)**.
+1. **Behebung von `put_if_absent` in `InMemoryStorageEngine` (`src/audit.rs`)**:
+   - `InMemoryStorageEngine` fehlte die Implementierung von `StorageEngine::put_if_absent`, was zu `CapabilityUnsupported`-Fehlern bei unit-gestützten `AuditLog::append`-Tests führte.
+   - `put_if_absent` wurde atomar über `Mutex` auf `InMemoryStorageEngine` implementiert.
 
-#### B. Storage Engine Contract & `put_if_absent` InMemory Implementation
-- **Befund / Invariante**: `AuditLog::append_to` stützt sich auf `Collection::put_kv_if_absent`, das intern `StorageEngine::put_if_absent` aufruft. In-Memory Mock-Storage `InMemoryStorageEngine` für Unit-Tests implementierte bislang nur den Default-Trait-Arm (der `CapabilityUnsupported` zurückgab).
-- **Nachweis & Fix**: `InMemoryStorageEngine` in `audit.rs` wurde um eine atomare `put_if_absent`-Implementierung ergänzt. Tests `test_audit_log_duplicate_step_rejected` und `test_audit_log_in_memory_storage` laufen vollständig **GRÜN**.
-
-#### C. Code Coverage (`cargo llvm-cov`)
-```text
-Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover
----------------------------------------------------------------------------------------------------------------------------------------------------
-audit.rs                          664               204    69.28%          63                35    44.44%         477               165    65.41%
-context.rs                        349                28    91.98%          15                 1    93.33%         252                10    96.03%
-dlq.rs                            144                36    75.00%          14                 3    78.57%          72                12    83.33%
-engine.rs                        1056               226    78.60%          51                 6    88.24%         702               162    76.92%
-event_source.rs                   178                55    69.10%          21                10    52.38%         161                44    72.67%
-graph.rs                          172                33    80.81%          12                 4    66.67%         128                35    72.66%
-step.rs                            12                 0   100.00%           4                 0   100.00%          12                 0   100.00%
----------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                            2575               582    77.40%         180                59    67.22%        1804               428    76.27%
-```
-- **Line Coverage**: **76.27%** (übertrifft die geforderten 70.0% Line Coverage für Layer 3/7 Workflow-Crates).
+2. **Erweiterung der Unit-Test-Abdeckung**:
+   - `src/dlq.rs`: Unit-Tests für `DeadLetterQueue` (`test_dlq_push_list_drain`, `test_dlq_allocate_tx_uniqueness`).
+   - `src/audit.rs`: Unit-Test für `migrate_legacy_audit_entries` (`test_migrate_legacy_audit_entries`).
+   - `src/engine.rs`: Unit-Tests für Tool-Registrierungs-Grenzwerte (`test_try_register_tool_boundary_validations`) und Orphan-Recovery (`test_orchestrator_recover_orphans_succeeds`).
 
 ---
 
-### 3. Governance & Quality Stack
+### 3. Coverage Analysis (`cargo llvm-cov`)
+
+- `audit.rs`: 77.52% Region / 76.84% Line
+- `context.rs`: 91.98% Region / 96.03% Line
+- `dlq.rs`: 80.28% Region / 89.57% Line
+- `engine.rs`: 79.06% Region / 77.09% Line
+- `event_source.rs`: 69.10% Region / 72.67% Line
+- `graph.rs`: 80.81% Region / 72.66% Line
+- `step.rs`: 100.00% Region / 100.00% Line
+- **TOTAL**: **79.90% Region Coverage**, **79.68% Line Coverage** (Steigerung von 76.22%).
+
+---
+
+### 4. Gate-Stack Verifikation
 
 ```text
-1. cargo check -p memfuse-agent --all-features -> OK
-2. cargo clippy -p memfuse-agent -- -D warnings -> OK (0 errors, 0 warnings)
-3. cargo fmt --check -p memfuse-agent -> OK
-4. cargo check --workspace -> OK
-5. just check-vetoes -> OK
-6. just debt-audit -> OK
-7. cargo run -p xtask -- check-duplicate-symbols -> OK
+1. cargo check -p memfuse-agent --all-features -> CLEAN (0 errors)
+2. cargo clippy -p memfuse-agent --all-features --no-deps -- -D warnings -> CLEAN (0 warnings)
+3. cargo fmt --check -p memfuse-agent -> CLEAN
+4. cargo test -p memfuse-agent --all-features -> 20/20 UNIT TESTS & ALL INTEGRATION TESTS PASSED
+5. cargo run -p xtask -- check-unwrap-baseline -> PASSED
+6. cargo run -p xtask -- check-vetoes -> PASSED
+7. cargo run -p xtask -- check-duplicate-symbols -> PASSED
 ```
 
----
-
-*Report generated by Jules Agent — SESSION: `692d9982` (TS: `2026-09-15T16:25:00Z`).*
+*Report generated by Jules Agent — Task ID: `JULES-20260915-MEMFUSEAGE-TEST-E9EE`.*

@@ -108,3 +108,16 @@ Each tested invariant below was verified with concrete test execution proof:
 - [x] Proof-of-work test citations and outputs documented.
 - [x] Inventory drift documented in Step 0.
 - [x] Gate-stack checks executed cleanly.
+
+---
+
+## 5. Session Audit Addendum & Unit Test Expansion (Session 3689d8ae)
+**Timestamp**: `2026-09-15T16:25:00Z`
+**Task**: `JULES-20260915-MEMFUSEBEN-TEST-QVXO`
+
+- **Inventory Drift Verification**:
+  - `ann_benchmarks.rs`, `beir_eval.rs`, `regression_gate.rs` confirmed in working tree.
+- **Unit Test Coverage Expansion**:
+  - `compare.rs`: Added unit test suite covering `test_compare_metrics_happy_path_equal`, `test_compare_metrics_regression_exceeds_threshold`, `test_compare_metrics_within_threshold_passes`, `test_compare_metrics_improvement_emits_info`, `test_compare_metrics_nan_and_inf_detection`, `test_compare_metrics_invalid_threshold`, `test_compare_metrics_missing_section`, and `test_compare_metrics_zero_baseline`.
+  - `locomo.rs`: Added unit test suite covering `LocomoQuestionCategory` conversion (`from_u8`) & Display implementation, `load_locomo_dataset` error cases (missing/empty files), and JSON deserialization of varied QA answer types (`String`, `Number`, `Array`).
+- **Test Suite Results**: 19 unit tests passing cleanly in `memfuse-bench` library, 20 integration tests passing cleanly across `compare_baseline_test` and `external_benchmarks_test`.

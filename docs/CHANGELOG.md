@@ -81,8 +81,6 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/multistep.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/transaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
-| `2026-09-15T16:46:26Z` | `crates/memfuse-agent/src/lib.rs` | `REVIEW-PASS` | `AGT-AGENT-692d9982` | `692d9982` | `PASS` | `0` | // REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-AGENT-692d9982) (TS: 2026-09-15T16:46:26Z) (SESSION: 692d9982) (PRÜFER-KONTEXT: FRESH) |
-| `2026-09-15T16:15:00Z (SESSION: 1a43706f)` | `crates/memfuse-router/src/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit- und Integrationstest-Suite für memfuse-router. |
 | `2026-09-15T15:09:43Z (SESSION: 2e382e86)` | `crates/memfuse-checkpoint/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RAII CheckpointGuard + persistente Snapshot-Verwaltung (Re-Exports) |
 | `2026-09-15T15:09:43Z` | `crates/memfuse-checkpoint/src/lib.rs` | `REVIEW-PASS` | `-` | `2e382e86` | `-` | `-` | // REVIEW-PASS[1/2] (TS: 2026-09-15T15:09:43Z) (SESSION: 2e382e86) PRÜFER-KONTEXT: FRESH |
 | `2026-09-15T14:50:00Z` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `AGT-INDEX-f38b1a90` | `acf8fe72` | `OPEN` | `0` | // AI-TAG[TEST][MINOR] Global mutable atomic statics cause multi-threaded test harness races (ID: AGT-INDEX-f38b1a90) (TS: 2026-09-15T14:50:00Z) (SESSION: acf8fe72) |
@@ -119,8 +117,6 @@
 | `2026-09-11T10:21:34Z (SESSION: 31ada253)` | `crates/memfuse-store/src/compaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Size-Tiered Compaction Strategy (STCS) für SSTables |
 | `2026-09-11T10:21:34Z (SESSION: 31ada253)` | `crates/memfuse-store/src/sstable.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Immutables SSTable Format (Data Blocks + Index Block + Bloom Filter) |
 | `2026-09-11T10:21:34Z (SESSION: 31ada253)` | `crates/memfuse-store/src/tenant_codec.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Tenant Key Isolation & Encoding für LSM Storage Engine |
-| `2026-09-11T10:21:21Z (SESSION: fe92d654)` | `crates/memfuse-embed/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG). |
-| `2026-09-11T10:21:21Z (SESSION: fe92d654)` | `crates/memfuse-embed/src/reranker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cross-Encoder Reranking für Post-RRF Präzisionsverbesserung. |
 | `2026-09-11T00:00:00Z (SESSION: JULES-20260911-MUTATION-HARDENING)` | `crates/memfuse-calibration/tests/isotonic_mutation_hardening_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Mutation hardening test suite for IsotonicCalibrator (PAVA/ECE). |
 | `2026-09-11T00:00:00Z` | `crates/memfuse-calibration/src/pid.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Adaptive Reranking candidate pool-size regulation via PID latency control (F-08 & P11). |
 | `2026-09-11` | `crates/memfuse-candle/tests/real_inference_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integration tests for Candle real forward-pass GGUF LLM and Bert embedding inference. |

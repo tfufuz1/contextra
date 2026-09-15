@@ -238,10 +238,10 @@ impl Wal {
 
                             let written_len = (if write_header { WAL_V3_HEADER.len() } else { 0 })
                                 + batch_payload.len();
-                            size.fetch_add(written_len as u64, std::sync::atomic::Ordering::SeqCst);
 
                             let mut last_hmac_guard = last_hmac.lock().await;
                             *last_hmac_guard = final_last_hmac_val;
+                            size.fetch_add(written_len as u64, std::sync::atomic::Ordering::SeqCst);
 
                             Ok(())
                         }
@@ -278,10 +278,15 @@ impl Wal {
                                 ));
                             }
 
-                            file.set_len(offset).await.map_err(|e| {
-                                MemFuseError::Storage(format!("WAL truncate failed: {e}"))
-                            })?;
+                            let old_size = size.load(std::sync::atomic::Ordering::SeqCst);
                             size.store(offset, std::sync::atomic::Ordering::SeqCst);
+
+                            if let Err(e) = file.set_len(offset).await {
+                                size.store(old_size, std::sync::atomic::Ordering::SeqCst);
+                                return Err(MemFuseError::Storage(format!(
+                                    "WAL truncate failed: {e}"
+                                )));
+                            }
                             if offset < 4 {
                                 header_written.store(false, std::sync::atomic::Ordering::Release);
                             }
