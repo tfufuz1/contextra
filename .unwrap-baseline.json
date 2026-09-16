@@ -12969,6 +12969,10 @@
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "8aa7324a9af378cb"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
     "hash": "b0f3d18e6f678683"
   },
   {
@@ -12985,7 +12989,15 @@
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "bc56a701e94e51c3"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
     "hash": "beba03fe3b797a9e"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "c1d6960a03ae6461"
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
@@ -13010,6 +13022,10 @@
   {
     "file": "crates/memfuse-index/src/quantize.rs",
     "hash": "e4d4769d3779310a"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "e9a6cea8452632b8"
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
