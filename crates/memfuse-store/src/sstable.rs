@@ -2783,6 +2783,77 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_block_cache_shards_config_validation() {
+        use crate::lsm::{LsmConfig, LsmStorage};
+
+        let tmp = TempDir::new().expect("temp dir");
+
+        // 0 shards -> Err
+        let config_zero = LsmConfig {
+            path: tmp.path().join("zero"),
+            block_cache_shards: 0,
+            ..Default::default()
+        };
+        assert!(LsmStorage::new(config_zero).await.is_err());
+
+        // Non-power-of-two shards (e.g. 15) -> Err
+        let config_non_pow2 = LsmConfig {
+            path: tmp.path().join("non_pow2"),
+            block_cache_shards: 15,
+            ..Default::default()
+        };
+        assert!(LsmStorage::new(config_non_pow2).await.is_err());
+
+        // Power of two shards (e.g. 32) -> Ok
+        let config_valid = LsmConfig {
+            path: tmp.path().join("valid"),
+            block_cache_shards: 32,
+            ..Default::default()
+        };
+        let storage = LsmStorage::new(config_valid).await;
+        assert!(storage.is_ok());
+    }
+
+    #[test]
+    fn test_block_cache_sequential_scan_sharding_distribution() {
+        // Verification of sharding distribution during sequential scans with constant file_id.
+        // The hashing function `ahash::RandomState::hash_one((file_id, offset))` distributes
+        // sequential block offsets (4KB increments) evenly across all shards.
+        let num_shards = 64;
+        let cache = BlockCache::new_with_shards(16, num_shards);
+        let file_id = 100u64;
+        let num_blocks = 1000u64;
+
+        let mut shard_counts = vec![0usize; num_shards];
+        for i in 0..num_blocks {
+            let offset = i * 4096;
+            let shard = cache.shard_idx(file_id, offset);
+            shard_counts[shard] += 1;
+        }
+
+        // Ensure every shard received at least one block offset (no dead shards in sequential scan)
+        let empty_shards = shard_counts.iter().filter(|&&c| c == 0).count();
+        assert_eq!(
+            empty_shards, 0,
+            "Sequential scan produced empty shards: {:?}",
+            shard_counts
+        );
+
+        // Verify standard deviation or max load to ensure uniform distribution
+        let expected_avg = num_blocks as f64 / num_shards as f64;
+        for (idx, &count) in shard_counts.iter().enumerate() {
+            let diff = (count as f64 - expected_avg).abs();
+            assert!(
+                diff < expected_avg * 1.5,
+                "Shard {} has count {} which deviates significantly from expected average {:.1}",
+                idx,
+                count,
+                expected_avg
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn test_block_cache_32_concurrent_readers_hotset_latency() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::time::Instant;
