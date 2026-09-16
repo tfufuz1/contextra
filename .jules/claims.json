@@ -1,10 +1,10 @@
 {
   "claims": [
     {
-      "krate": "memfuse-core",
-      "issue": "JULES-20260915-MEMFUSECOR-PROCES-GLMN",
-      "timestamp": "2026-09-15T18:45:51.897397389+00:00",
-      "session_id": "13938544853952390441",
+      "krate": "memfuse-calibration",
+      "issue": "JULES-20260916-MEMFUSECAL-REVIEW-6EZC",
+      "timestamp": "2026-09-16T16:55:13.071281548+00:00",
+      "session_id": "599173594810567336",
       "active": false,
       "expires_at": "2026-09-15T22:45:51.897370635+00:00",
       "released_at": "2026-09-15T18:54:52.173782787+00:00"
