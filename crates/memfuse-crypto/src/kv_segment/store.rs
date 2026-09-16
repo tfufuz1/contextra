@@ -4,6 +4,7 @@
 
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use ahash::AHashMap;
 use lru::LruCache;
@@ -11,6 +12,9 @@ use memfuse_core::TenantId;
 use parking_lot::RwLock;
 
 use super::segment::KvSegment;
+
+/// Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache.
+pub type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>;
 
 /// Kapselt den LRU-Cache aller KV-Segmente eines einzelnen Tenants.
 /// Ersetzt `Vec<KvSegment>` als innere Datenstruktur.
@@ -111,6 +115,8 @@ pub struct TenantIsolatedKvStore {
     eviction_round_offsets: Box<[AtomicUsize]>,
     /// Maximale Segment-Kapazität pro Tenant (übergeben an TenantState::new).
     segment_capacity: NonZeroUsize,
+    /// Optionaler Spill-Handler für LSM Tier-2 Persistierung bei Eviction.
+    spill_handler: RwLock<Option<SpillHandler>>,
 }
 
 impl TenantIsolatedKvStore {
@@ -140,6 +146,7 @@ impl TenantIsolatedKvStore {
             global_shard_offset: AtomicUsize::new(0),
             eviction_round_offsets: offsets,
             segment_capacity: NonZeroUsize::new(Self::DEFAULT_SEGMENT_CAPACITY_PER_TENANT).unwrap(),
+            spill_handler: RwLock::new(None),
         }
     }
 
@@ -148,6 +155,11 @@ impl TenantIsolatedKvStore {
         let mut store = Self::new();
         store.segment_capacity = NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap();
         store
+    }
+
+    /// Registriert einen Spill-Handler für evictierte Segmente.
+    pub fn set_spill_handler(&self, handler: SpillHandler) {
+        *self.spill_handler.write() = Some(handler);
     }
 
     /// Deterministisches Shard-Mapping via Bitmask (Power-of-2).
@@ -160,13 +172,20 @@ impl TenantIsolatedKvStore {
     pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
         let idx = self.shard_idx(tenant);
         let capacity = self.segment_capacity;
-        let _evicted = {
+        let evicted = {
             let mut shard = self.shards[idx].lock.write();
             let state = shard
                 .entry(tenant)
                 .or_insert_with(|| TenantState::new(capacity));
             state.insert_returning_evicted(segment)
-        }; // ← Lock freigegeben HIER, _evicted wird ausserhalb des Locks gedroppt
+        }; // ← Lock freigegeben HIER, evicted wird ausserhalb des Locks gedroppt
+
+        if let Some(ev) = evicted {
+            let handler_opt = self.spill_handler.read().clone();
+            if let Some(handler) = handler_opt {
+                handler(tenant, ev.segment_id, ev.to_spill_bytes());
+            }
+        }
     }
 
     /// Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback.
@@ -446,6 +465,12 @@ impl TenantIsolatedKvStore {
                     } // ← Shard-Lock freigegeben HIER
 
                     // Phase 2: Zeroize AUSSERHALB des Locks (behebt D3)
+                    let handler_opt = self.spill_handler.read().clone();
+                    if let Some(ref handler) = handler_opt {
+                        for ev in &deferred_drop {
+                            handler(ev.tenant_id, ev.segment_id, ev.to_spill_bytes());
+                        }
+                    }
                     deferred_drop.clear(); // ZeroizeOnDrop für alle evicteten Segmente
 
                     // Test-Hook: signalisiert, dass Lock nach Eviction-Batch freigegeben wurde
