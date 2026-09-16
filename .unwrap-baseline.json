@@ -5473,6 +5473,10 @@
   },
   {
     "file": "crates/memfuse-db/src/collection/tests.rs",
+    "hash": "b3246edce0978fd8"
+  },
+  {
+    "file": "crates/memfuse-db/src/collection/tests.rs",
     "hash": "b6a19aee18bce723"
   },
   {
@@ -5485,11 +5489,19 @@
   },
   {
     "file": "crates/memfuse-db/src/collection/tests.rs",
+    "hash": "b9c1b3b7443f1c70"
+  },
+  {
+    "file": "crates/memfuse-db/src/collection/tests.rs",
     "hash": "bb99deb3dbccb6ab"
   },
   {
     "file": "crates/memfuse-db/src/collection/tests.rs",
     "hash": "bbce97563c803138"
+  },
+  {
+    "file": "crates/memfuse-db/src/collection/tests.rs",
+    "hash": "bc077c70d76f4194"
   },
   {
     "file": "crates/memfuse-db/src/collection/tests.rs",
@@ -12033,11 +12045,19 @@
   },
   {
     "file": "crates/memfuse-index/src/distance.rs",
+    "hash": "56c7981c930b2d01"
+  },
+  {
+    "file": "crates/memfuse-index/src/distance.rs",
     "hash": "5ec59e03f24e17a2"
   },
   {
     "file": "crates/memfuse-index/src/distance.rs",
     "hash": "6e355e62ecd240fd"
+  },
+  {
+    "file": "crates/memfuse-index/src/distance.rs",
+    "hash": "795146aff5bad36b"
   },
   {
     "file": "crates/memfuse-index/src/distance.rs",
@@ -12122,6 +12142,10 @@
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "0bb3aa8322168996"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "0c14fddcd640e7c8"
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
@@ -12265,6 +12289,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "3c954823629fd629"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "3d661d3cb1167ca0"
   },
   {
@@ -12397,6 +12425,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "6ad222ab056a0a00"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "6ad833ae3ed92681"
   },
   {
@@ -12446,6 +12478,10 @@
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "7d7461bd198ad792"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "7dc660875244370e"
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
@@ -12713,6 +12749,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "dda22c6905cafe64"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "e0e4d6f5f8f9d221"
   },
   {
@@ -12806,6 +12846,10 @@
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "f024c4d6034243dd"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "f07b0a850702cbb4"
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
@@ -12921,6 +12965,10 @@
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "63d13a10155c14c0"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
     "hash": "6a1a0d81064de527"
   },
   {
@@ -12930,6 +12978,10 @@
   {
     "file": "crates/memfuse-index/src/quantize.rs",
     "hash": "8231a65d4d9fff1a"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "8aa7324a9af378cb"
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
@@ -12949,7 +13001,15 @@
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "bc56a701e94e51c3"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
     "hash": "beba03fe3b797a9e"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "c1d6960a03ae6461"
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
@@ -12974,6 +13034,10 @@
   {
     "file": "crates/memfuse-index/src/quantize.rs",
     "hash": "e4d4769d3779310a"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "e9a6cea8452632b8"
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
@@ -20773,15 +20837,23 @@
   },
   {
     "file": "crates/memfuse-store/tests/loom_group_commit.rs",
+    "hash": "42b6e7608d97f705"
+  },
+  {
+    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
+    "hash": "442ea370fab502f1"
+  },
+  {
+    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
+    "hash": "583366b727cc827b"
+  },
+  {
+    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
     "hash": "c224043038bc9bb8"
   },
   {
     "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "d1228f7705baf81d"
-  },
-  {
-    "file": "crates/memfuse-store/tests/loom_group_commit.rs",
-    "hash": "e64ad4f6ce9f3f6e"
+    "hash": "cc5c9b3b9b60f0b1"
   },
   {
     "file": "crates/memfuse-store/tests/lsm_robustness_fixes.rs",

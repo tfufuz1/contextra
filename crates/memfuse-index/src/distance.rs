@@ -88,7 +88,166 @@ pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> memfuse
 ///
 /// # Invariant
 /// Input vectors `a` and `b` are assumed to be NaN/Inf-free (enforced at insert and query boundaries).
+/// Computes distance between an f32 query vector `a` and raw unaligned f32 bytes `b_bytes` (from mmap)
+/// without intermediate allocation or 4-byte alignment assumptions.
 #[inline]
+pub fn compute_distance_f32_bytes_trusted(
+    a: &[f32],
+    b_bytes: &[u8],
+    metric: DistanceMetric,
+) -> memfuse_core::Result<f32> {
+    if b_bytes.len() < a.len() * 4 {
+        return Err(MemFuseError::EmbeddingDimensionMismatch {
+            expected: a.len(),
+            got: b_bytes.len() / 4,
+        });
+    }
+
+    let dist = match metric {
+        DistanceMetric::Cosine => cosine_distance_f32_bytes(a, b_bytes)?,
+        DistanceMetric::Euclidean => euclidean_distance_f32_bytes(a, b_bytes)?,
+        DistanceMetric::DotProduct => dot_product_distance_f32_bytes(a, b_bytes)?,
+        other => {
+            return Err(MemFuseError::Index(format!(
+                "Unsupported DistanceMetric variant: {other:?}"
+            )));
+        }
+    };
+    Ok(dist)
+}
+
+#[inline]
+#[allow(unsafe_code)]
+pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, MemFuseError> {
+    if b_bytes.len() < a.len() * 4 {
+        return Err(MemFuseError::EmbeddingDimensionMismatch {
+            expected: a.len(),
+            got: b_bytes.len() / 4,
+        });
+    }
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("avx512f") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; AVX-512F feature detected.
+            return Ok(unsafe { cosine_distance_f32_bytes_avx512(a, b_bytes) });
+        }
+        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; AVX2+FMA features detected.
+            return Ok(unsafe { cosine_distance_f32_bytes_avx2(a, b_bytes) });
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; NEON feature detected.
+            return Ok(unsafe { cosine_distance_f32_bytes_neon(a, b_bytes) });
+        }
+    }
+    Ok(cosine_distance_f32_bytes_scalar(a, b_bytes))
+}
+
+#[inline]
+#[allow(unsafe_code)]
+pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, MemFuseError> {
+    if b_bytes.len() < a.len() * 4 {
+        return Err(MemFuseError::EmbeddingDimensionMismatch {
+            expected: a.len(),
+            got: b_bytes.len() / 4,
+        });
+    }
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("avx512f") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; AVX-512F feature detected.
+            return Ok(unsafe { euclidean_distance_f32_bytes_avx512(a, b_bytes) });
+        }
+        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; AVX2+FMA features detected.
+            return Ok(unsafe { euclidean_distance_f32_bytes_avx2(a, b_bytes) });
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; NEON feature detected.
+            return Ok(unsafe { euclidean_distance_f32_bytes_neon(a, b_bytes) });
+        }
+    }
+    Ok(euclidean_distance_f32_bytes_scalar(a, b_bytes))
+}
+
+#[inline]
+#[allow(unsafe_code)]
+pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, MemFuseError> {
+    if b_bytes.len() < a.len() * 4 {
+        return Err(MemFuseError::EmbeddingDimensionMismatch {
+            expected: a.len(),
+            got: b_bytes.len() / 4,
+        });
+    }
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("avx512f") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; AVX-512F feature detected.
+            return Ok(unsafe { -dot_product_f32_bytes_avx512(a, b_bytes) });
+        }
+        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; AVX2+FMA features detected.
+            return Ok(unsafe { -dot_product_f32_bytes_avx2(a, b_bytes) });
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: b_bytes.len() >= a.len() * 4 verified above; NEON feature detected.
+            return Ok(unsafe { -dot_product_f32_bytes_neon(a, b_bytes) });
+        }
+    }
+    Ok(-dot_product_f32_bytes_scalar(a, b_bytes))
+}
+
+pub fn cosine_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut dot = 0.0;
+    let mut norm_a = 0.0;
+    let mut norm_b = 0.0;
+
+    for (i, &x) in a.iter().enumerate() {
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+    }
+
+    if norm_a == 0.0 || norm_b == 0.0 {
+        1.0
+    } else {
+        let dist = 1.0 - (dot / (norm_a.sqrt() * norm_b.sqrt()));
+        dist.clamp(0.0, 2.0)
+    }
+}
+
+pub fn euclidean_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut sum = 0.0;
+    for (i, &x) in a.iter().enumerate() {
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        let diff = x - y;
+        sum += diff * diff;
+    }
+    sum.max(0.0).sqrt()
+}
+
+pub fn dot_product_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut sum = 0.0;
+    for (i, &x) in a.iter().enumerate() {
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        sum += x * y;
+    }
+    sum
+}
+
 pub fn compute_distance_trusted(
     a: &[f32],
     b: &[f32],
@@ -357,6 +516,137 @@ unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     sum.max(0.0).sqrt()
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx512f")]
+#[allow(unsafe_code)]
+/// # Safety
+/// Caller must ensure CPU supports AVX-512F, `a` is valid, and `b_bytes` has at least `a.len() * 4` bytes.
+unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
+        _mm512_setzero_ps(),
+        _mm512_setzero_ps(),
+        _mm512_setzero_ps(),
+    );
+
+    let n = a.len();
+    let mut i = 0;
+    let b_ptr = b_bytes.as_ptr();
+
+    while i + 16 <= n {
+        // SAFETY: 1. `i + 16 <= n` guarantees `a` has 16 valid f32s and `b_bytes` has 64 valid bytes.
+        // 2. `_mm512_loadu_ps` performs unaligned load from raw byte pointer `b_ptr.add(i * 4) as *const f32`.
+        // 3. AVX-512F target feature is enabled and verified by caller.
+        unsafe {
+            let va = _mm512_loadu_ps(a.as_ptr().add(i));
+            let vb = _mm512_loadu_ps(b_ptr.add(i * 4) as *const f32);
+
+            dot_v = _mm512_fmadd_ps(va, vb, dot_v);
+            norm_a_v = _mm512_fmadd_ps(va, va, norm_a_v);
+            norm_b_v = _mm512_fmadd_ps(vb, vb, norm_b_v);
+        }
+        i += 16;
+    }
+
+    let (mut dot, mut norm_a, mut norm_b) = unsafe {
+        (
+            hsum512_ps_avx(dot_v),
+            hsum512_ps_avx(norm_a_v),
+            hsum512_ps_avx(norm_b_v),
+        )
+    };
+
+    while i < n {
+        let x = a[i];
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+        i += 1;
+    }
+
+    if norm_a == 0.0 || norm_b == 0.0 {
+        1.0
+    } else {
+        let dist = 1.0 - (dot / (norm_a.sqrt() * norm_b.sqrt()));
+        dist.clamp(0.0, 2.0)
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx512f")]
+#[allow(unsafe_code)]
+/// # Safety
+/// Caller must ensure CPU supports AVX-512F, `a` is valid, and `b_bytes` has at least `a.len() * 4` bytes.
+unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut sum_v = _mm512_setzero_ps();
+    let n = a.len();
+    let mut i = 0;
+    let b_ptr = b_bytes.as_ptr();
+
+    while i + 16 <= n {
+        // SAFETY: 1. `i + 16 <= n` guarantees `a` has 16 valid f32s and `b_bytes` has 64 valid bytes.
+        // 2. `_mm512_loadu_ps` performs unaligned load from raw byte pointer `b_ptr.add(i * 4) as *const f32`.
+        // 3. AVX-512F target feature is enabled and verified by caller.
+        unsafe {
+            let va = _mm512_loadu_ps(a.as_ptr().add(i));
+            let vb = _mm512_loadu_ps(b_ptr.add(i * 4) as *const f32);
+            let diff = _mm512_sub_ps(va, vb);
+            sum_v = _mm512_fmadd_ps(diff, diff, sum_v);
+        }
+        i += 16;
+    }
+
+    let mut sum = unsafe { hsum512_ps_avx(sum_v) };
+
+    while i < n {
+        let x = a[i];
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        let diff = x - y;
+        sum += diff * diff;
+        i += 1;
+    }
+
+    sum.max(0.0).sqrt()
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx512f")]
+#[allow(unsafe_code)]
+/// # Safety
+/// Caller must ensure CPU supports AVX-512F, `a` is valid, and `b_bytes` has at least `a.len() * 4` bytes.
+unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut sum_v = _mm512_setzero_ps();
+    let n = a.len();
+    let mut i = 0;
+    let b_ptr = b_bytes.as_ptr();
+
+    while i + 16 <= n {
+        // SAFETY: 1. `i + 16 <= n` guarantees `a` has 16 valid f32s and `b_bytes` has 64 valid bytes.
+        // 2. `_mm512_loadu_ps` performs unaligned load from raw byte pointer `b_ptr.add(i * 4) as *const f32`.
+        // 3. AVX-512F target feature is enabled and verified by caller.
+        unsafe {
+            let va = _mm512_loadu_ps(a.as_ptr().add(i));
+            let vb = _mm512_loadu_ps(b_ptr.add(i * 4) as *const f32);
+            sum_v = _mm512_fmadd_ps(va, vb, sum_v);
+        }
+        i += 16;
+    }
+
+    let mut sum = unsafe { hsum512_ps_avx(sum_v) };
+
+    while i < n {
+        let x = a[i];
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        sum += x * y;
+        i += 1;
+    }
+
+    sum
+}
+
 #[cfg(target_arch = "aarch64")]
 #[target_feature(enable = "neon")]
 #[allow(unsafe_code)]
@@ -429,6 +719,140 @@ unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
         sum += a[i] * b[i];
         i += 1;
     }
+    sum
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2")]
+#[target_feature(enable = "fma")]
+#[allow(unsafe_code)]
+/// # Safety
+/// Caller must ensure CPU supports AVX2 and FMA, `a` is valid, and `b_bytes` has at least `a.len() * 4` bytes.
+unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+    );
+
+    let n = a.len();
+    let mut i = 0;
+    let b_ptr = b_bytes.as_ptr();
+
+    while i + 8 <= n {
+        // SAFETY: 1. `i + 8 <= n` guarantees `a` has 8 valid f32s and `b_bytes` has 32 valid bytes.
+        // 2. `_mm256_loadu_ps` performs unaligned load from raw byte pointer `b_ptr.add(i * 4) as *const f32`.
+        // 3. AVX2 and FMA target features are enabled and verified by caller.
+        unsafe {
+            let va = _mm256_loadu_ps(a.as_ptr().add(i));
+            let vb = _mm256_loadu_ps(b_ptr.add(i * 4) as *const f32);
+
+            dot_v = _mm256_fmadd_ps(va, vb, dot_v);
+            norm_a_v = _mm256_fmadd_ps(va, va, norm_a_v);
+            norm_b_v = _mm256_fmadd_ps(vb, vb, norm_b_v);
+        }
+        i += 8;
+    }
+
+    let (mut dot, mut norm_a, mut norm_b) = unsafe {
+        (
+            hsum256_ps_avx(dot_v),
+            hsum256_ps_avx(norm_a_v),
+            hsum256_ps_avx(norm_b_v),
+        )
+    };
+
+    while i < n {
+        let x = a[i];
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+        i += 1;
+    }
+
+    if norm_a == 0.0 || norm_b == 0.0 {
+        1.0
+    } else {
+        let dist = 1.0 - (dot / (norm_a.sqrt() * norm_b.sqrt()));
+        dist.clamp(0.0, 2.0)
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2")]
+#[target_feature(enable = "fma")]
+#[allow(unsafe_code)]
+/// # Safety
+/// Caller must ensure CPU supports AVX2 and FMA, `a` is valid, and `b_bytes` has at least `a.len() * 4` bytes.
+unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut sum_v = _mm256_setzero_ps();
+    let n = a.len();
+    let mut i = 0;
+    let b_ptr = b_bytes.as_ptr();
+
+    while i + 8 <= n {
+        // SAFETY: 1. `i + 8 <= n` guarantees `a` has 8 valid f32s and `b_bytes` has 32 valid bytes.
+        // 2. `_mm256_loadu_ps` performs unaligned load from raw byte pointer `b_ptr.add(i * 4) as *const f32`.
+        // 3. AVX2 and FMA target features are enabled and verified by caller.
+        unsafe {
+            let va = _mm256_loadu_ps(a.as_ptr().add(i));
+            let vb = _mm256_loadu_ps(b_ptr.add(i * 4) as *const f32);
+            let diff = _mm256_sub_ps(va, vb);
+            sum_v = _mm256_fmadd_ps(diff, diff, sum_v);
+        }
+        i += 8;
+    }
+
+    let mut sum = unsafe { hsum256_ps_avx(sum_v) };
+
+    while i < n {
+        let x = a[i];
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        let diff = x - y;
+        sum += diff * diff;
+        i += 1;
+    }
+
+    sum.max(0.0).sqrt()
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2")]
+#[target_feature(enable = "fma")]
+#[allow(unsafe_code)]
+/// # Safety
+/// Caller must ensure CPU supports AVX2 and FMA, `a` is valid, and `b_bytes` has at least `a.len() * 4` bytes.
+unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut sum_v = _mm256_setzero_ps();
+    let n = a.len();
+    let mut i = 0;
+    let b_ptr = b_bytes.as_ptr();
+
+    while i + 8 <= n {
+        // SAFETY: 1. `i + 8 <= n` guarantees `a` has 8 valid f32s and `b_bytes` has 32 valid bytes.
+        // 2. `_mm256_loadu_ps` performs unaligned load from raw byte pointer `b_ptr.add(i * 4) as *const f32`.
+        // 3. AVX2 and FMA target features are enabled and verified by caller.
+        unsafe {
+            let va = _mm256_loadu_ps(a.as_ptr().add(i));
+            let vb = _mm256_loadu_ps(b_ptr.add(i * 4) as *const f32);
+            sum_v = _mm256_fmadd_ps(va, vb, sum_v);
+        }
+        i += 8;
+    }
+
+    let mut sum = unsafe { hsum256_ps_avx(sum_v) };
+
+    while i < n {
+        let x = a[i];
+        let chunk = &b_bytes[i * 4..(i + 1) * 4];
+        let y = f32::from_le_bytes(chunk.try_into().unwrap_or([0; 4]));
+        sum += x * y;
+        i += 1;
+    }
+
     sum
 }
 
@@ -1289,6 +1713,40 @@ unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_compute_distance_f32_bytes_equivalence() {
+        let dims = [1, 7, 16, 32, 64, 128, 768];
+        let metrics = [
+            DistanceMetric::Cosine,
+            DistanceMetric::Euclidean,
+            DistanceMetric::DotProduct,
+        ];
+
+        for &dim in &dims {
+            let query: Vec<f32> = (0..dim).map(|i| (i as f32 * 0.17).sin()).collect();
+            let target: Vec<f32> = (0..dim).map(|i| ((i + 3) as f32 * 0.23).cos()).collect();
+
+            // Convert target to raw LE byte vector
+            let mut target_bytes = Vec::with_capacity(dim * 4);
+            for &val in &target {
+                target_bytes.extend_from_slice(&val.to_le_bytes());
+            }
+
+            for &metric in &metrics {
+                let dist_trusted = compute_distance_trusted(&query, &target, metric).unwrap();
+                let dist_bytes =
+                    compute_distance_f32_bytes_trusted(&query, &target_bytes, metric).unwrap();
+
+                let diff = (dist_trusted - dist_bytes).abs();
+                assert!(
+                    diff < 1e-5,
+                    "Unaligned byte kernel mismatch for {:?} at dim {dim}: trusted={dist_trusted}, bytes={dist_bytes}, diff={diff}",
+                    metric
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_public_compute_distance_api_sanity() {

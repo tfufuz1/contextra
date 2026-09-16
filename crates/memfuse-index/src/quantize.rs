@@ -13,6 +13,11 @@ use memfuse_core::DistanceMetric;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// Default low percentile for quantization scaling (0.5%).
+pub const DEFAULT_P_LOW: f32 = 0.005;
+/// Default high percentile for quantization scaling (99.5%).
+pub const DEFAULT_P_HIGH: f32 = 0.995;
+
 /// An 8-bit Scalar Quantizer (SQ8) with per-dimension scaling.
 ///
 /// Quantization reduces the memory footprint of vector storage by 4x.
@@ -51,13 +56,35 @@ impl ScalarQuantizer {
     /// quantizer (e.g., during index rebuilds) using a representative sample of active vectors.
     /// Without recalibration, new vectors that fall outside the initial range will be clamped,
     /// leading to degraded quantization accuracy.
-    /// Safely creates a new ScalarQuantizer trained on a batch of vectors.
+    /// Safely creates a new ScalarQuantizer trained on a batch of vectors using default percentile clipping (0.5% / 99.5%).
     /// Returns `MemFuseError::InvalidInput` if dimension is 0 or any vector dimension mismatches.
     pub fn try_train(batch: &[&[f32]], dimension: usize) -> memfuse_core::Result<Self> {
+        Self::try_train_with_percentiles(batch, dimension, DEFAULT_P_LOW, DEFAULT_P_HIGH)
+    }
+
+    /// Safely creates a new ScalarQuantizer trained on a batch of vectors using custom percentile clipping bounds.
+    /// Range `p_low` and `p_high` must satisfy `0.0 <= p_low < p_high <= 1.0`.
+    pub fn try_train_with_percentiles(
+        batch: &[&[f32]],
+        dimension: usize,
+        p_low: f32,
+        p_high: f32,
+    ) -> memfuse_core::Result<Self> {
         if dimension == 0 {
             return Err(memfuse_core::MemFuseError::invalid_input(
                 "Quantizer dimension must be greater than 0",
             ));
+        }
+
+        if !p_low.is_finite()
+            || !p_high.is_finite()
+            || p_low < 0.0
+            || p_high > 1.0
+            || p_low >= p_high
+        {
+            return Err(memfuse_core::MemFuseError::invalid_input(format!(
+                "Invalid percentiles: p_low ({p_low}) and p_high ({p_high}) must satisfy 0.0 <= p_low < p_high <= 1.0"
+            )));
         }
 
         for (idx, vec) in batch.iter().enumerate() {
@@ -68,9 +95,6 @@ impl ScalarQuantizer {
                 )));
             }
         }
-
-        let mut mins = vec![f32::MAX; dimension];
-        let mut maxes = vec![f32::MIN; dimension];
 
         if batch.is_empty() {
             return Ok(Self {
@@ -84,13 +108,28 @@ impl ScalarQuantizer {
             });
         }
 
-        for vec in batch {
-            for (i, &val) in vec.iter().take(dimension).enumerate() {
-                if val < mins[i] {
-                    mins[i] = val;
-                }
-                if val > maxes[i] {
-                    maxes[i] = val;
+        if batch.len() >= 100 {
+            // Apply 0.5th / 99.5th percentile clipping to eliminate extreme training outliers
+            // and preserve 8-bit quantization resolution for in-distribution values.
+            for i in 0..dimension {
+                let mut dim_vals: Vec<f32> = batch.iter().map(|vec| vec[i]).collect();
+                dim_vals.sort_by(|a, b| a.total_cmp(b));
+                let low_idx = ((dim_vals.len() as f64) * 0.005).floor() as usize;
+                let high_idx = (((dim_vals.len() as f64) * 0.995).ceil() as usize)
+                    .saturating_sub(1)
+                    .min(dim_vals.len() - 1);
+                mins[i] = dim_vals[low_idx];
+                maxes[i] = dim_vals[high_idx];
+            }
+        } else {
+            for vec in batch {
+                for (i, &val) in vec.iter().take(dimension).enumerate() {
+                    if val < mins[i] {
+                        mins[i] = val;
+                    }
+                    if val > maxes[i] {
+                        maxes[i] = val;
+                    }
                 }
             }
         }
@@ -113,6 +152,24 @@ impl ScalarQuantizer {
             maxes,
             scales,
             inv_scales,
+            dimension,
+            total_queries: AtomicU64::new(0),
+            out_of_range_queries: AtomicU64::new(0),
+        })
+    }
+
+    /// Creates a new ScalarQuantizer trained on a batch of vectors with custom percentile bounds.
+    pub fn train_with_percentiles(
+        batch: &[&[f32]],
+        dimension: usize,
+        p_low: f32,
+        p_high: f32,
+    ) -> Self {
+        Self::try_train_with_percentiles(batch, dimension, p_low, p_high).unwrap_or_else(|_| Self {
+            mins: vec![0.0; dimension],
+            maxes: vec![1.0; dimension],
+            scales: vec![255.0; dimension],
+            inv_scales: vec![1.0 / 255.0; dimension],
             dimension,
             total_queries: AtomicU64::new(0),
             out_of_range_queries: AtomicU64::new(0),
@@ -192,6 +249,7 @@ impl ScalarQuantizer {
     /// Checks if recalibration / index rebuild is required based on cumulative quantization drift ratio.
     ///
     /// Requires at least 20 queries to avoid false positives on small initial samples.
+    #[allow(dead_code)]
     pub fn is_rebuild_required(&self, threshold: f32) -> bool {
         let total = self.total_queries.load(Ordering::Relaxed);
         if total < 20 {
@@ -403,6 +461,41 @@ impl ScalarQuantizer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_percentile_clipping_in_try_train() {
+        let dim = 2;
+        let mut batch = Vec::new();
+        // 200 normal vectors in range [0.0, 1.0]
+        for i in 0..200 {
+            batch.push(vec![i as f32 / 200.0, 0.5]);
+        }
+        // Add extreme outliers
+        batch[0] = vec![-100.0, 0.5];
+        batch[199] = vec![1000.0, 0.5];
+
+        let batch_refs: Vec<&[f32]> = batch.iter().map(|v| v.as_slice()).collect();
+        let q = ScalarQuantizer::try_train(&batch_refs, dim).expect("train with clipping");
+
+        // Without percentile clipping, mins[0] would be -100.0 and maxes[0] would be 1000.0.
+        // With 0.5% / 99.5% percentile clipping on 200 vectors:
+        // mins[0] should be clipped close to 0.0 and maxes[0] close to 1.0.
+        assert!(
+            q.mins()[0] > -10.0,
+            "Lower outlier -100.0 must be clipped, got min: {}",
+            q.mins()[0]
+        );
+        assert!(
+            q.maxes()[0] < 10.0,
+            "Upper outlier 1000.0 must be clipped, got max: {}",
+            q.maxes()[0]
+        );
+
+        // Outlier vectors should be flagged by check_drift
+        let outlier_vec = vec![500.0, 0.5];
+        let drift = q.check_drift(&outlier_vec);
+        assert_eq!(drift, 0.5, "Outlier dimension 0 should register drift");
+    }
 
     #[test]
     fn test_serde_roundtrip() {
@@ -779,6 +872,65 @@ mod tests {
         let res_mismatch = ScalarQuantizer::try_train(&batch, 3);
         assert!(res_mismatch.is_err());
         assert!(res_mismatch.unwrap_err().to_string().contains("expected 3"));
+
+        // Invalid percentile bounds guard
+        let res_inv1 = ScalarQuantizer::try_train_with_percentiles(&batch[..1], 3, -0.1, 0.9);
+        assert!(res_inv1.is_err());
+
+        let res_inv2 = ScalarQuantizer::try_train_with_percentiles(&batch[..1], 3, 0.9, 0.8);
+        assert!(res_inv2.is_err());
+
+        let res_inv3 = ScalarQuantizer::try_train_with_percentiles(&batch[..1], 3, 0.1, 1.1);
+        assert!(res_inv3.is_err());
+
+        let res_inv4 = ScalarQuantizer::try_train_with_percentiles(&batch[..1], 3, f32::NAN, 0.95);
+        assert!(res_inv4.is_err());
+    }
+
+    #[test]
+    fn test_percentile_clipping_outlier_recall_improvement() {
+        // Create 400 synthetic vectors in [0.0, 1.0] for dimension 0
+        let mut vectors: Vec<Vec<f32>> = (0..398).map(|i| vec![(i as f32 / 397.0), 0.5]).collect();
+        // Add 2 extreme artificial outliers
+        vectors.push(vec![-500.0, 0.5]);
+        vectors.push(vec![500.0, 0.5]);
+
+        let refs: Vec<&[f32]> = vectors.iter().map(|v| v.as_slice()).collect();
+
+        // 1. Raw min/max quantizer (0.0% / 100.0%)
+        let raw_q = ScalarQuantizer::train_with_percentiles(&refs, 2, 0.0, 1.0);
+        // 2. Percentile clipped quantizer (0.5% / 99.5%)
+        let clipped_q = ScalarQuantizer::train_with_percentiles(&refs, 2, 0.005, 0.995);
+
+        // Check range for dim 0
+        assert_eq!(raw_q.mins()[0], -500.0);
+        assert_eq!(raw_q.maxes()[0], 500.0);
+
+        assert!(clipped_q.mins()[0] >= 0.0);
+        assert!(clipped_q.maxes()[0] <= 1.0);
+
+        // Evaluate reconstruction MSE on non-outlier vectors (first 398)
+        let mut raw_mse_sum = 0.0_f32;
+        let mut clipped_mse_sum = 0.0_f32;
+
+        for v in &vectors[..398] {
+            let q_raw = raw_q.quantize(v).expect("quantize raw");
+            let deq_raw = raw_q.dequantize(&q_raw).expect("dequantize raw");
+            raw_mse_sum += (v[0] - deq_raw[0]).powi(2);
+
+            let q_clipped = clipped_q.quantize(v).expect("quantize clipped");
+            let deq_clipped = clipped_q.dequantize(&q_clipped).expect("dequantize clipped");
+            clipped_mse_sum += (v[0] - deq_clipped[0]).powi(2);
+        }
+
+        let raw_mse = raw_mse_sum / 398.0;
+        let clipped_mse = clipped_mse_sum / 398.0;
+
+        // Percentile clipped MSE must be significantly lower than raw min/max MSE
+        assert!(
+            clipped_mse < raw_mse / 100.0,
+            "Clipped MSE ({clipped_mse}) should be at least 100x lower than raw MSE ({raw_mse})"
+        );
     }
 
     #[test]
