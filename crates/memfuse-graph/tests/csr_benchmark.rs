@@ -10,6 +10,7 @@ async fn test_csr_delta_buffer_incremental_benchmark() {
     // --- Benchmark 1: WITH Delta Buffer (high rebuild_threshold, e.g., 1000) ---
     let graph_delta = CsrGraph::with_config(CsrGraphConfig {
         rebuild_threshold: 1000,
+        ..Default::default()
     });
 
     // Populate initial 10,000 nodes and initial edges
@@ -59,6 +60,7 @@ async fn test_csr_delta_buffer_incremental_benchmark() {
     // --- Benchmark 2: WITHOUT Delta Buffer (rebuild_threshold = 0, full rebuild on every commit) ---
     let graph_rebuild = CsrGraph::with_config(CsrGraphConfig {
         rebuild_threshold: 0,
+        ..Default::default()
     });
 
     let setup_tx2 = TxId::new(1);
@@ -129,6 +131,7 @@ async fn test_add_edge_median_latency_10k_nodes_100k_edges() {
     // Use a rebuild threshold higher than num_edges so we measure add_edge latency without triggering compaction
     let graph = Arc::new(CsrGraph::with_config(CsrGraphConfig {
         rebuild_threshold: num_edges + 1000,
+        ..Default::default()
     }));
 
     for i in 1..=num_nodes {
