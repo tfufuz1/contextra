@@ -546,10 +546,7 @@ impl DiskAnnIndex {
     /// - Entry Layout:
     ///   - `id`: `u64` LE (8 bytes)
     ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes`)
-    async fn append_to_tombstone_wal(
-        path: &std::path::Path,
-        id: DocId,
-    ) -> Result<()> {
+    async fn append_to_tombstone_wal(path: &std::path::Path, id: DocId) -> Result<()> {
         use tokio::io::AsyncWriteExt;
 
         let is_new = match tokio::fs::metadata(path).await {
@@ -578,9 +575,7 @@ impl DiskAnnIndex {
         hmac.update(&id_bytes);
         let computed_hmac = hmac.finalize();
 
-        file.write_all(&id_bytes)
-            .await
-            .map_err(MemFuseError::Io)?;
+        file.write_all(&id_bytes).await.map_err(MemFuseError::Io)?;
         file.write_all(&computed_hmac)
             .await
             .map_err(MemFuseError::Io)?;
@@ -2222,7 +2217,12 @@ impl VectorIndex for DiskAnnIndex {
         let cache_usage = self.inner.cache.read().len() * node_size;
 
         let total_nodes = {
-            let disk_nodes = self.inner.header.read().map(|h| h.node_count as usize).unwrap_or(0);
+            let disk_nodes = self
+                .inner
+                .header
+                .read()
+                .map(|h| h.node_count as usize)
+                .unwrap_or(0);
             let pending_nodes = self.inner.pending_inserts.read().len();
             disk_nodes + pending_nodes
         };

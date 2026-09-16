@@ -75,11 +75,19 @@ pub fn run_migration(config: &MigrationConfig) -> Result<MigrationReport, String
         ));
     }
 
-    let input_content = fs::read_to_string(&config.input_path)
-        .map_err(|e| format!("Failed to read input file {}: {e}", config.input_path.display()))?;
+    let input_content = fs::read_to_string(&config.input_path).map_err(|e| {
+        format!(
+            "Failed to read input file {}: {e}",
+            config.input_path.display()
+        )
+    })?;
 
-    let mut records: Vec<DocumentRecord> = serde_json::from_str(&input_content)
-        .map_err(|e| format!("Failed to parse document JSON records from {}: {e}", config.input_path.display()))?;
+    let mut records: Vec<DocumentRecord> = serde_json::from_str(&input_content).map_err(|e| {
+        format!(
+            "Failed to parse document JSON records from {}: {e}",
+            config.input_path.display()
+        )
+    })?;
 
     let mut seen_ids = std::collections::HashSet::new();
     let mut collisions = 0;
@@ -98,7 +106,10 @@ pub fn run_migration(config: &MigrationConfig) -> Result<MigrationReport, String
         if let Some(parent) = config.output_path.parent() {
             if !parent.as_os_str().is_empty() && !parent.exists() {
                 fs::create_dir_all(parent).map_err(|e| {
-                    format!("Failed to create output parent dir {}: {e}", parent.display())
+                    format!(
+                        "Failed to create output parent dir {}: {e}",
+                        parent.display()
+                    )
                 })?;
             }
         }
@@ -107,7 +118,10 @@ pub fn run_migration(config: &MigrationConfig) -> Result<MigrationReport, String
             .map_err(|e| format!("Failed to serialize migrated records: {e}"))?;
 
         fs::write(&config.output_path, output_json).map_err(|e| {
-            format!("Failed to write migrated output to {}: {e}", config.output_path.display())
+            format!(
+                "Failed to write migrated output to {}: {e}",
+                config.output_path.display()
+            )
         })?;
     }
 

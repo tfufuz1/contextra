@@ -515,22 +515,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     };
                 let rank = (results.len() + 1) as u32;
                 let rrf_contrib = 1.0 / (60.0 + rank as f32);
-                let prov = crate::fusion::build_provenance(
-                    Some(sd.score),
-                    Some(rank),
-                    Some(1.0),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    60.0,
-                    Some(self.name.clone()),
-                    Some("hnsw".to_string()),
-                    Some(rrf_contrib),
-                );
+                let prov = crate::fusion::ProvenanceBuilder::new(60.0)
+                    .vector(sd.score, rank, 1.0)
+                    .source_collection(self.name.clone())
+                    .index_type("hnsw")
+                    .expected_total(rrf_contrib)
+                    .build();
                 results.push(crate::SearchResult {
                     id,
                     score: sd.score,
