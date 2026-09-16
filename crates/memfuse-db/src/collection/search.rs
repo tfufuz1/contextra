@@ -803,12 +803,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 signal_sets.push(("graph".to_string(), graph_results, gw));
             }
 
-            let mut fused = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
+            let mut fused = crate::fusion::fuse_search_results_with_strategy(
                 signal_sets,
                 k.saturating_mul(Self::OVERFETCH_FACTOR),
                 crate::fusion::MetadataMergePriority::default(),
                 true,
                 None,
+                memfuse_core::FusionStrategy::Rrf,
             );
             fused.truncate(k);
 
@@ -1162,12 +1163,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 .saturating_mul(Self::OVERFETCH_FACTOR)
                 .min(memfuse_core::MAX_SEARCH_K);
 
-            let mut fused_results = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
+            let mut fused_results = crate::fusion::fuse_search_results_with_strategy(
                 signal_sets,
                 max_fusion_results,
                 crate::fusion::MetadataMergePriority::default(),
                 query.include_provenance,
                 None,
+                query.fusion_strategy,
             );
 
             // Use oversized candidate pool (3×k) for Supersedes resolution to prevent
