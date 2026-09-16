@@ -2692,10 +2692,7 @@ mod tests {
             if let Ok((mut socket, _)) = listener.accept().await {
                 use tokio::io::{AsyncReadExt, AsyncWriteExt};
                 let mut buf = [0u8; 4096];
-                let n = match socket.read(&mut buf).await {
-                    Ok(n) => n,
-                    Err(_) => 0,
-                };
+                let n = socket.read(&mut buf).await.unwrap_or_default();
                 let req_str = String::from_utf8_lossy(&buf[..n]).to_string();
                 let _ = tx.send(req_str).await;
 

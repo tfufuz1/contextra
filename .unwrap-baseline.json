@@ -20384,6 +20384,46 @@
     "hash": "cc477ff09daf875d"
   },
   {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "07d4b2d620ecc958"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "0a5693f67739a651"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "101d372b059ea1c7"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "2085bd8db0d9e883"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "2d1a9f4e9cc159e7"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "4e13e5f0b8140271"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "9afaea19b2ca0da4"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "9e285f8f058f713a"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "b25b1c9f619687ae"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "ba05db4810b710a3"
+  },
+  {
     "file": "crates/memfuse-store/tests/encryption_test.rs",
     "hash": "050c48246d27fc93"
   },
@@ -21573,6 +21613,18 @@
   },
   {
     "file": "crates/memfuse-text/src/bm25.rs",
+    "hash": "6c7017f4d3540f99"
+  },
+  {
+    "file": "crates/memfuse-text/src/bm25.rs",
+    "hash": "8fc8e7a493a08ee7"
+  },
+  {
+    "file": "crates/memfuse-text/src/bm25.rs",
+    "hash": "b339b276a2d544a2"
+  },
+  {
+    "file": "crates/memfuse-text/src/bm25.rs",
     "hash": "f5fa32f17cf6601a"
   },
   {
@@ -21626,6 +21678,18 @@
   {
     "file": "crates/memfuse-text/tests/alloc_profiler.rs",
     "hash": "dbbde82f18f2c5bb"
+  },
+  {
+    "file": "crates/memfuse-text/tests/bm25f_field_weighting.rs",
+    "hash": "10f4fde75be66918"
+  },
+  {
+    "file": "crates/memfuse-text/tests/bm25f_field_weighting.rs",
+    "hash": "ccdc0bdf50cf6106"
+  },
+  {
+    "file": "crates/memfuse-text/tests/bm25f_field_weighting.rs",
+    "hash": "ceaa69a09e5c355a"
   },
   {
     "file": "crates/memfuse-text/tests/concurrent_metadata.rs",
