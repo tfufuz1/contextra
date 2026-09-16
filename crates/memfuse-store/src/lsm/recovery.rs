@@ -1,7 +1,7 @@
 use super::*;
 use crate::compaction::CompactionEngine;
 use crate::memtable::MemTable;
-use crate::sstable::{create_block_cache, SstableReader};
+use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::wal::{Wal, WalOp};
 use memfuse_core::{
     MemFuseError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId,
@@ -72,6 +72,13 @@ pub(super) async fn write_salt_atomically(
 
 impl LsmStorage {
     pub async fn new(config: LsmConfig) -> Result<Self> {
+        if config.block_cache_shards == 0 || !config.block_cache_shards.is_power_of_two() {
+            return Err(MemFuseError::InvalidInput(format!(
+                "block_cache_shards must be > 0 and a power of two, got {}",
+                config.block_cache_shards
+            )));
+        }
+
         tokio::fs::create_dir_all(&config.path)
             .await
             .map_err(|e| MemFuseError::Storage(format!("Failed to create dir: {}", e)))?;
@@ -270,7 +277,7 @@ impl LsmStorage {
         }
         sst_files.sort();
 
-        let block_cache = create_block_cache(64);
+        let block_cache = create_block_cache_with_shards(64, config.block_cache_shards);
 
         let mut sstables = Vec::new();
         for path in sst_files {

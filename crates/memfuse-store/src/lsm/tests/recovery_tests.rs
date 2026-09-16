@@ -530,6 +530,7 @@ async fn test_rollback_small_tx_inline_no_sstable() {
         compaction: CompactionConfig::default(),
         encryption_passphrase: None,
         group_commit_window_micros: 0,
+        ..Default::default()
     };
 
     let storage = LsmStorage::new(config.clone())
@@ -622,6 +623,7 @@ async fn test_rollback_crash_recovery_startup() {
         compaction: CompactionConfig::default(),
         encryption_passphrase: None,
         group_commit_window_micros: 0,
+        ..Default::default()
     };
 
     let tx1 = TxId::new(1);
