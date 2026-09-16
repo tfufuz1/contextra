@@ -332,3 +332,4 @@
 | `` | `crates/memfuse-store/tests/wal_hmac_chain_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Regressionstest — WAL HMAC-Kette enthält keine Gabelungen nach Group-Commit. |
 | `` | `crates/memfuse-store/tests/wal_hmac_rollback_race.rs` | `FILE-CONTEXT` | `-` | `b448084` | `-` | `-` |  |
 | `` | `crates/memfuse-store/tests/wal_truncate_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität. |
+| `` | `crates/memfuse-text/src/posting_list.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Stellt kompakte, resident gehaltene Postinglisten pro Term bereit. |

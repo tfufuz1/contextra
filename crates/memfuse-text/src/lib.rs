@@ -15,11 +15,13 @@
 pub mod bm25;
 pub mod inverted;
 pub mod morphology;
+pub mod posting_list;
 pub mod tokenizer;
 
 pub use bm25::BM25;
 pub use inverted::{BM25MorphIndex, InvertedIndex, Language};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
+pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
 pub use tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 
 use memfuse_core::{DocId, Result, ScoredDocument, TextIndex, TextIndexStats, TxId};
