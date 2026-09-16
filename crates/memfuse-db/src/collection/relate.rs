@@ -8,7 +8,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {
         validate_doc_id(from)?;
         validate_doc_id(to)?;
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for_keys(&[from, to]).await;
         let db_tx = self.begin_transaction()?;
 
         let from_id = memfuse_core::EntityId::from_key(from)?;

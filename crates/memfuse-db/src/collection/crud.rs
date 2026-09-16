@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: CRUD-Operationen (Insert, Upsert, Update, Delete, Get) für Collection.
 // INVARIANTEN: Atomare Multi-Index Commits via DbTransaction; Validierung aller Eingabegrenzen (ID-Länge, Batch-Größe).
-// NICHT-OFFENSICHTLICH: check_doc_id_collision wird strikt innerhalb des insert_lock ausgeführt.
+// NICHT-OFFENSICHTLICH: check_doc_id_collision wird strikt innerhalb des kv_locks ausgeführt.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 use super::{
@@ -245,7 +245,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             )));
         }
         self.apply_insert_backpressure().await;
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(id).await;
         self.insert_inner_unlocked(id, embedding, metadata).await
     }
 
@@ -304,7 +304,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Internal single document insert method without lock acquisition.
     ///
-    /// Assumes `self.insert_lock` is held by caller to ensure TOCTOU safety.
+    /// Assumes `self.kv_locks` is held by caller for `id` to ensure TOCTOU safety.
     async fn insert_inner_unlocked(
         &self,
         id: &str,
@@ -439,9 +439,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Inserts multiple documents in a single atomic transaction under a single lock scope.
     ///
     /// # Lock Granularity & Concurrency
-    /// `insert_lock` is acquired **once** for the entire batch rather than once per document.
+    /// `kv_locks` acquires key-granular shard locks in ascending order for all keys in the batch.
     /// The DocId collision check (`check_doc_id_collision`) is executed per document sequentially
-    /// inside `insert_op` within this held lock, guaranteeing TOCTOU safety (§18.4, ADR-016).
+    /// inside `insert_op` within these held locks, guaranteeing TOCTOU safety (§18.4, ADR-016).
     ///
     /// # Partial Failure & Atomicity (Option a)
     /// If an error occurs on any document in the batch (e.g., validation failure or DocId collision),
@@ -450,8 +450,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// batch behavior (Option a).
     ///
     /// # Performance
-    /// Holding `insert_lock` once per batch avoids N-1 lock acquisitions and N-1 separate
-    /// transaction commits, resulting in an expected 10-50x throughput improvement for bulk insertion workloads.
+    /// Holding key-granular locks once per batch in deterministic ascending shard order avoids N-1 lock
+    /// acquisitions and N-1 separate transaction commits while avoiding collection-wide contention.
     #[tracing::instrument(level = "trace", skip(self, docs))]
     pub async fn insert_many(
         &self,
@@ -480,7 +480,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self
+            .kv_locks
+            .lock_for_keys(docs.iter().map(|(id, _, _)| id.as_str()))
+            .await;
         let db_tx = self.begin_transaction()?;
 
         for (id, embedding, metadata) in docs {
@@ -552,7 +555,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(id).await;
         let db_tx = self.begin_transaction()?;
         let result = self.update_op(&db_tx, id, embedding, metadata).await;
 
@@ -600,7 +603,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self
+            .kv_locks
+            .lock_for_keys(docs.iter().map(|(id, _, _)| id.as_str()))
+            .await;
         let db_tx = self.begin_transaction()?;
         for (id, embedding, metadata) in docs {
             if embedding.len() != self.dimension {
@@ -693,7 +699,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             )));
         }
 
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(id).await;
         let db_tx = self.begin_transaction()?;
 
         match self.update_op(&db_tx, id, embedding, metadata).await {
@@ -809,7 +815,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Deletes a document from the collection by its ID.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn delete(&self, id: &str) -> Result<()> {
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(id).await;
         let mut db_tx = self.begin_transaction()?;
 
         match self.delete_op(&mut db_tx, id).await {
@@ -872,7 +878,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             ));
         }
 
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self
+            .kv_locks
+            .lock_for_keys(&[from.inner().to_string(), to.inner().to_string()])
+            .await;
 
         // Prevent cycles for ALL relation types: if `to` transitively reaches `from`
         // via the same relation, adding `from -> to` creates a cycle.
@@ -1575,14 +1584,14 @@ mod tests {
         .unwrap();
         let col = db.collection("dim_test").await.unwrap();
 
-        // Lock insert_lock manually in the test thread to prove col.insert does not block or acquire insert_lock
-        let _guard = col.insert_lock.lock().await;
+        // Lock kv_locks manually for "doc-1" in the test thread to prove col.insert fails before lock acquisition
+        let _guard = col.kv_locks.lock_for("doc-1").await;
 
         // Perform insert with mismatched vector (768 dims instead of 1536)
         let invalid_vector = vec![0.1f32; 768];
         let res = col.insert("doc-1", &invalid_vector, None).await;
 
-        // Must fail immediately without waiting for/acquiring insert_lock
+        // Must fail immediately without waiting for/acquiring lock
         assert!(res.is_err());
         let err_msg = match res {
             Err(memfuse_core::MemFuseError::InvalidInput(msg)) => msg,

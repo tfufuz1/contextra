@@ -2780,11 +2780,10 @@ async fn test_apm3_lock_contention_fallback() -> memfuse_core::Result<()> {
         memfuse_text::Language::English,
     ));
 
-    // Acquire write lock on insert_lock
-    let lock_guard = col.insert_lock.try_lock();
-    assert!(lock_guard.is_ok(), "Lock guard must be acquired");
+    // Acquire write lock on kv_locks for d_blocked
+    let lock_guard = col.kv_locks.lock_for("d_blocked").await;
 
-    // Concurrent insert_many attempt while write lock is held
+    // Concurrent insert attempt for d_blocked while lock is held
     let col_clone = col.clone();
     let handle = tokio::spawn(async move {
         col_clone
@@ -2799,6 +2798,131 @@ async fn test_apm3_lock_contention_fallback() -> memfuse_core::Result<()> {
         res.is_ok(),
         "Insert task must complete cleanly after lock release"
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_insert_does_not_block_on_collection_wide_lock() -> memfuse_core::Result<()> {
+    use memfuse_graph::CsrGraph;
+    use memfuse_index::HnswIndex;
+    use memfuse_store::LsmStorage;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(memfuse_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Arc::new(super::Collection::new(
+        "parallel_locks".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        memfuse_text::Language::English,
+    ));
+
+    // Find two keys that map to different shards
+    let key_a = "key_0".to_string();
+    let mut key_b = "key_1".to_string();
+    let mut i = 0;
+    while super::kv_lock::KvKeyLocks::shard_idx(&key_a)
+        == super::kv_lock::KvKeyLocks::shard_idx(&key_b)
+    {
+        i += 1;
+        key_b = format!("key_{i}");
+    }
+
+    // Acquire lock on key_a's shard
+    let guard_a = col.kv_locks.lock_for(&key_a).await;
+
+    // Concurrent insert for key_b (different shard) must NOT block
+    let col_clone = col.clone();
+    let key_b_clone = key_b.clone();
+    let handle = tokio::spawn(async move {
+        col_clone
+            .insert(&key_b_clone, &[1.0, 0.0, 0.0, 0.0], None)
+            .await
+    });
+
+    let res = tokio::time::timeout(std::time::Duration::from_millis(500), handle).await;
+    assert!(
+        res.is_ok(),
+        "Insert for key_b on different shard must not block when key_a is locked"
+    );
+    assert!(res.unwrap().unwrap().is_ok());
+
+    drop(guard_a);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> memfuse_core::Result<()> {
+    use memfuse_graph::CsrGraph;
+    use memfuse_index::HnswIndex;
+    use memfuse_store::LsmStorage;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(memfuse_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Arc::new(super::Collection::new(
+        "batch_order_no_deadlock".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        memfuse_text::Language::English,
+    ));
+
+    let k1 = "key_alpha".to_string();
+    let k2 = "key_beta".to_string();
+    let k3 = "key_gamma".to_string();
+
+    let batch_1 = vec![
+        (k3.clone(), vec![1.0, 0.0, 0.0, 0.0], None),
+        (k1.clone(), vec![0.0, 1.0, 0.0, 0.0], None),
+        (k2.clone(), vec![0.0, 0.0, 1.0, 0.0], None),
+    ];
+
+    let batch_2 = vec![
+        (k2.clone(), vec![0.5, 0.0, 0.0, 0.0], None),
+        (k3.clone(), vec![0.0, 0.5, 0.0, 0.0], None),
+        (k1.clone(), vec![0.0, 0.0, 0.5, 0.0], None),
+    ];
+
+    let col_1 = col.clone();
+    let h1 = tokio::spawn(async move { col_1.insert_many(&batch_1).await });
+
+    let col_2 = col.clone();
+    let h2 = tokio::spawn(async move { col_2.insert_many(&batch_2).await });
+
+    let (r1, r2) = tokio::join!(h1, h2);
+    assert!(r1.unwrap().is_ok());
+    assert!(r2.unwrap().is_ok());
 
     Ok(())
 }
