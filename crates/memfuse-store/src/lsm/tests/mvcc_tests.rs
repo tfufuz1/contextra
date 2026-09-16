@@ -508,7 +508,6 @@ async fn test_commit_mutex_released_before_flusher_await() {
         group_commit_window_micros: 10_000, // 10ms window to force group commit
         compaction: CompactionConfig::default(),
         encryption_passphrase: None,
-        ..Default::default()
     };
     let storage = Arc::new(LsmStorage::new(config).await.expect("create storage"));
 

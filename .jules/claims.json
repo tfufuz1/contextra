@@ -44,6 +44,22 @@
       "active": false,
       "expires_at": "2026-09-16T11:11:08.494678646+00:00",
       "released_at": "2026-09-16T15:23:04.742425106+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-store",
+<<<<<<< Updated upstream
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-16T15:52:33.065247306+00:00",
+      "session_id": "2575935384615743096",
+      "active": true,
+      "expires_at": "2026-09-16T19:52:33.065233447+00:00"
+=======
+      "issue": "JULES-20260916-MEMFUSESTO-REVIEW-RBQP",
+      "timestamp": "2026-09-16T16:15:59.630872453+00:00",
+      "session_id": "3045890966564247235",
+      "active": true,
+      "expires_at": "2026-09-16T20:15:59.630856429+00:00"
+>>>>>>> Stashed changes
     }
   ]
 }

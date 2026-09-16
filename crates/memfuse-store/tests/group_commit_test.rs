@@ -2,7 +2,7 @@
 
 #![cfg(feature = "fault-injection")]
 
-use memfuse_core::{MemFuseError, StorageEngine, TxId};
+use memfuse_core::{StorageEngine, TxId};
 use memfuse_store::lsm::{LsmConfig, LsmStorage};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -51,7 +51,7 @@ async fn test_group_commit_200_parallel_tasks_durability_and_replay_parity() {
         let val = storage.get(&key).await.expect("get succeeds");
         assert_eq!(
             val,
-            Some(expected_val),
+            Some(bytes::Bytes::from(expected_val)),
             "Key gk_{:04} missing or mismatch in active storage",
             i
         );
@@ -68,7 +68,7 @@ async fn test_group_commit_200_parallel_tasks_durability_and_replay_parity() {
         let val = reopened.get(&key).await.expect("get succeeds after reopen");
         assert_eq!(
             val,
-            Some(expected_val),
+            Some(bytes::Bytes::from(expected_val)),
             "Key gk_{:04} missing or mismatch after WAL/SSTable replay",
             i
         );

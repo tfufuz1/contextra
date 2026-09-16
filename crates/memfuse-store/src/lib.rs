@@ -13,8 +13,9 @@
 // INVARIANT: LSM-Tree Storage Engine (Triebwerk — Layer 1).
 // DATEN-PFAD: Client → TxBuffer → WAL → MemTable → SSTable → Compaction
 // INVARIANTE: tokio::fs für Metadaten/Lifecycle, std::fs::File ausschließlich innerhalb spawn_blocking für Block-Level Random-Access.
-// ANCHOR[INTEGRATION:STO-001] STATUS:RESOLVED (TS:2026-08-24T00:00:00Z)
+// ANCHOR[INTEGRATION:STO-001] STATUS:DONE (TS:2026-09-16T16:28:29Z)
 // REVIEW-PASS[1/2] Systematischer Tiefen-Audit von memfuse-store (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-13T01:33:57Z) (SESSION: 60ca322c)
+// REVIEW-PASS[2/2] Unabhängiges SDLC Phase 3 Review von memfuse-store (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-16T16:28:29Z) (SESSION: 1cd824d8)
 // MODUL-HIERARCHIE: lsm.rs orchestriert, memtable/wal/sstable sind Bausteine.
 
 // INTENT: deny unsafe_code except Windows Win32 API calls for file permissions
