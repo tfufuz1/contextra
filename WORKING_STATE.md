@@ -29,7 +29,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-core` | 1 | 10188 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
 | `memfuse-calibration` | 2 | 1980 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 2 | 6035 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
-| `memfuse-crypto` | 2 | 6844 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
+| `memfuse-crypto` | 2 | 6572 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
 | `memfuse-graph` | 2 | 13280 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-sandbox` | 2 | 858 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
 | `memfuse-text` | 2 | 7780 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
@@ -42,7 +42,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-bench` | 6 | 5709 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-router` | 6 | 6792 | 🟢 Clean |  |
 | `memfuse-agent` | 7 | 6531 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
-| `memfuse-mcp` | 8 | 5784 | 🟢 Clean |  |
+| `memfuse-mcp` | 8 | 6052 | 🟢 Clean |  |
 
 
 ## DAG-Topologie
