@@ -26,20 +26,12 @@
       "expires_at": "2026-09-17T01:38:47.429954857+00:00"
     },
     {
-      "krate": "memfuse-db",
-      "issue": "WELLE4-DOCID128-DB",
-      "timestamp": "2026-09-16T22:20:06.404560742+00:00",
-      "session_id": "717612856316517090",
+      "krate": "memfuse-candle",
+      "issue": "WELLE5-AUDIT-KVBRIDGE-SPILL",
+      "timestamp": "2026-09-16T22:29:03.410241302+00:00",
+      "session_id": "5745795697878023454",
       "active": true,
-      "expires_at": "2026-09-17T02:20:06.404537395+00:00"
-    },
-    {
-      "krate": "memfuse-mcp",
-      "issue": "WELLE4-DOCID128-MCP",
-      "timestamp": "2026-09-16T22:20:15.741317954+00:00",
-      "session_id": "717612856316517090",
-      "active": true,
-      "expires_at": "2026-09-17T02:20:15.741300037+00:00"
+      "expires_at": "2026-09-17T02:29:03.410221688+00:00"
     }
   ]
 }

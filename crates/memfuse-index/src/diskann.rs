@@ -2291,6 +2291,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unnecessary_literal_unwrap)]
     fn test_benchmark_override_respected() {
         // Wenn pending_flush_threshold im Config gesetzt ist, soll er den
         // adaptiven Wert überschreiben (Benchmark-Escape-Hatch bleibt intakt).

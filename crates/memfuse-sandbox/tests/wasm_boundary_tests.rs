@@ -21,8 +21,10 @@ async fn test_wasm_memory_isolation_property_variations() {
         );
 
         let wasm_bytes = wat::parse_str(&wat).expect("parse WAT");
-        let mut caps = WasmCapabilities::default();
-        caps.max_memory_pages = max_pages;
+        let caps = WasmCapabilities {
+            max_memory_pages: max_pages,
+            ..Default::default()
+        };
 
         let res = executor
             .execute(&wasm_bytes, b"", &caps, Duration::from_secs(2))
@@ -62,8 +64,10 @@ async fn test_wasm_fuel_exhaustion_returns_error_property() {
     let executor = WasmExecutor::new().expect("WasmExecutor init");
 
     for fuel_limit in [100u64, 1_000u64, 50_000u64] {
-        let mut caps = WasmCapabilities::default();
-        caps.max_fuel = fuel_limit;
+        let caps = WasmCapabilities {
+            max_fuel: fuel_limit,
+            ..Default::default()
+        };
 
         let res = executor
             .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
@@ -92,8 +96,10 @@ async fn test_cloud_egress_strict_capability_isolation() {
     let executor = WasmExecutor::new().expect("WasmExecutor init");
 
     // Disabled capability
-    let mut caps_denied = WasmCapabilities::default();
-    caps_denied.allow_cloud_egress = false;
+    let caps_denied = WasmCapabilities {
+        allow_cloud_egress: false,
+        ..Default::default()
+    };
     let res_denied = executor
         .execute(&wasm_bytes, b"", &caps_denied, Duration::from_secs(2))
         .await;
@@ -108,8 +114,10 @@ async fn test_cloud_egress_strict_capability_isolation() {
     );
 
     // Enabled capability
-    let mut caps_allowed = WasmCapabilities::default();
-    caps_allowed.allow_cloud_egress = true;
+    let caps_allowed = WasmCapabilities {
+        allow_cloud_egress: true,
+        ..Default::default()
+    };
     let res_allowed = executor
         .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(2))
         .await;

@@ -542,7 +542,7 @@ async fn test_wal_rotate_seal_crash_mid_rename() {
     }
 
     // 2. Simulate crash state between rename and parent fsync
-    let sealed_name = format!("crash_test.wal.sealed.1234567890");
+    let sealed_name = "crash_test.wal.sealed.1234567890".to_string();
     let sealed_path = dir.path().join(&sealed_name);
 
     tokio::fs::rename(&wal_path, &sealed_path)
