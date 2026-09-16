@@ -44,6 +44,15 @@
       "active": false,
       "expires_at": "2026-09-16T11:11:08.494678646+00:00",
       "released_at": "2026-09-16T15:23:04.742425106+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-index",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-16T15:53:10.842930978+00:00",
+      "session_id": "11171216018991660090",
+      "active": false,
+      "expires_at": "2026-09-16T19:53:10.842915261+00:00",
+      "released_at": "2026-09-16T16:21:13.925706957+00:00"
     }
   ]
 }

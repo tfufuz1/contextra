@@ -57,6 +57,9 @@ use std::collections::BinaryHeap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tokio::sync::Mutex;
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use std::arch::x86_64::*;
+
 /// Standard-Löschanteil (0.10 = 10 % gelöschte Knoten), ab dem ein Rebuild getriggert wird.
 ///
 /// Löschanteil, ab dem ein Rebuild ausgelöst wird (0.10 = 10 % gelöscht).
@@ -1386,20 +1389,522 @@ impl HnswIndexCore {
                 q.asymmetric_dist(query_exact, vector_bytes, self.cold.config.distance_metric)
             }
         } else {
-            // Safe unaligned F32 read
-            #[allow(unknown_lints)]
-            #[allow(clippy::chunks_exact_to_as_chunks)]
-            let v: Vec<f32> = vector_bytes
-                .chunks_exact(4)
-                .take(self.cold.config.dimension)
-                .map(|chunk| -> Result<f32> {
-                    Ok(f32::from_le_bytes(chunk.try_into().map_err(|_| {
-                        MemFuseError::Index("Corrupt f32 in mmap vector".into())
-                    })?))
-                })
-                .collect::<Result<Vec<f32>>>()?;
-            compute_distance_trusted(query_exact, &v, self.cold.config.distance_metric)
+            Self::compute_distance_raw_f32(
+                query_exact,
+                vector_bytes,
+                self.cold.config.distance_metric,
+            )
         }
+    }
+
+    pub(crate) fn compute_distance_raw_f32(
+        query: &[f32],
+        raw_bytes: &[u8],
+        metric: DistanceMetric,
+    ) -> Result<f32> {
+        if raw_bytes.len() < query.len() * 4 {
+            return Err(MemFuseError::Index(format!(
+            "Corrupt raw vector slice: length {} bytes is smaller than expected dimension {} * 4 = {} bytes",
+            raw_bytes.len(),
+            query.len(),
+            query.len() * 4
+        )));
+        }
+
+        let dist = match metric {
+            DistanceMetric::Cosine => Self::cosine_distance_raw_f32(query, raw_bytes),
+            DistanceMetric::Euclidean => Self::euclidean_distance_raw_f32(query, raw_bytes),
+            DistanceMetric::DotProduct => Self::dot_product_distance_raw_f32(query, raw_bytes),
+            other => {
+                return Err(MemFuseError::Index(format!(
+                    "Unsupported DistanceMetric variant in compute_distance_raw_f32: {other:?}"
+                )));
+            }
+        };
+        Ok(dist)
+    }
+
+    #[allow(unsafe_code)]
+    fn cosine_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("avx512f") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX-512F detected.
+                return unsafe { Self::cosine_distance_raw_avx512(query, raw) };
+            }
+            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX2+FMA detected.
+                return unsafe { Self::cosine_distance_raw_avx2(query, raw) };
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            if std::arch::is_aarch64_feature_detected!("neon") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). NEON detected.
+                return unsafe { Self::cosine_distance_raw_neon(query, raw) };
+            }
+        }
+        Self::cosine_distance_raw_scalar(query, raw)
+    }
+
+    #[allow(unsafe_code)]
+    fn euclidean_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("avx512f") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX-512F detected.
+                return unsafe { Self::euclidean_distance_raw_avx512(query, raw) };
+            }
+            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX2+FMA detected.
+                return unsafe { Self::euclidean_distance_raw_avx2(query, raw) };
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            if std::arch::is_aarch64_feature_detected!("neon") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). NEON detected.
+                return unsafe { Self::euclidean_distance_raw_neon(query, raw) };
+            }
+        }
+        Self::euclidean_distance_raw_scalar(query, raw)
+    }
+
+    #[allow(unsafe_code)]
+    fn dot_product_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        {
+            if is_x86_feature_detected!("avx512f") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX-512F detected.
+                return unsafe { -Self::dot_product_raw_avx512(query, raw) };
+            }
+            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX2+FMA detected.
+                return unsafe { -Self::dot_product_raw_avx2(query, raw) };
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            if std::arch::is_aarch64_feature_detected!("neon") {
+                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). NEON detected.
+                return unsafe { -Self::dot_product_raw_neon(query, raw) };
+            }
+        }
+        -Self::dot_product_raw_scalar(query, raw)
+    }
+
+    fn dot_product_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
+        let dim = query.len();
+        let mut sum = 0.0f32;
+        for i in 0..dim {
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            sum += query[i] * y;
+        }
+        sum
+    }
+
+    fn cosine_distance_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
+        let dim = query.len();
+        let mut dot = 0.0f32;
+        let mut norm_a = 0.0f32;
+        let mut norm_b = 0.0f32;
+        for i in 0..dim {
+            let x = query[i];
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            dot += x * y;
+            norm_a += x * x;
+            norm_b += y * y;
+        }
+        if norm_a == 0.0 || norm_b == 0.0 {
+            1.0
+        } else {
+            let norm_a_f32: f32 = norm_a;
+            let norm_b_f32: f32 = norm_b;
+            let dist = 1.0 - (dot / (norm_a_f32.sqrt() * norm_b_f32.sqrt()));
+            dist.clamp(0.0, 2.0)
+        }
+    }
+
+    fn euclidean_distance_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
+        let dim = query.len();
+        let mut sum = 0.0f32;
+        for i in 0..dim {
+            let x = query[i];
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            let diff = x - y;
+            sum += diff * diff;
+        }
+        sum.max(0.0).sqrt()
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx2")]
+    #[allow(unsafe_code)]
+    unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
+        // SAFETY: Standard AVX/AVX2 horizontal reduction sequence on target with AVX/AVX2 support.
+        let x128 = _mm_add_ps(_mm256_extractf128_ps(v, 1), _mm256_castps256_ps128(v));
+        let x64 = _mm_add_ps(x128, _mm_movehl_ps(x128, x128));
+        let x32 = _mm_add_ss(x64, _mm_shuffle_ps(x64, x64, 0x55));
+        _mm_cvtss_f32(x32)
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx512f")]
+    #[allow(unsafe_code)]
+    unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
+        // SAFETY: Extract top 256 bits and add to bottom 256 bits, then reduce via hsum256_ps_avx.
+        let x256 = _mm256_add_ps(_mm512_extractf32x8_ps(v, 1), _mm512_castps512_ps256(v));
+        Self::hsum256_ps_avx(x256)
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx2")]
+    #[target_feature(enable = "fma")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports AVX2 and FMA, and `raw.len() >= query.len() * 4`.
+    unsafe fn dot_product_raw_avx2(query: &[f32], raw: &[u8]) -> f32 {
+        let mut sum_v = _mm256_setzero_ps();
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 8 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds because `(i + 8) * 4 <= n * 4 <= raw.len()`
+            // and `i + 8 <= query.len()`. `_mm256_loadu_ps` handles unaligned reads safely.
+            let va = _mm256_loadu_ps(query_ptr.add(i));
+            let vb = _mm256_loadu_ps(raw_ptr.add(i));
+            sum_v = _mm256_fmadd_ps(va, vb, sum_v);
+            i += 8;
+        }
+
+        let mut sum = Self::hsum256_ps_avx(sum_v);
+        while i < n {
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            sum += query[i] * y;
+            i += 1;
+        }
+        sum
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx2")]
+    #[target_feature(enable = "fma")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports AVX2 and FMA, and `raw.len() >= query.len() * 4`.
+    unsafe fn cosine_distance_raw_avx2(query: &[f32], raw: &[u8]) -> f32 {
+        let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
+            _mm256_setzero_ps(),
+            _mm256_setzero_ps(),
+            _mm256_setzero_ps(),
+        );
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 8 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds because `(i + 8) * 4 <= n * 4 <= raw.len()`.
+            let va = _mm256_loadu_ps(query_ptr.add(i));
+            let vb = _mm256_loadu_ps(raw_ptr.add(i));
+
+            dot_v = _mm256_fmadd_ps(va, vb, dot_v);
+            norm_a_v = _mm256_fmadd_ps(va, va, norm_a_v);
+            norm_b_v = _mm256_fmadd_ps(vb, vb, norm_b_v);
+            i += 8;
+        }
+
+        let (mut dot, mut norm_a, mut norm_b) = (
+            Self::hsum256_ps_avx(dot_v),
+            Self::hsum256_ps_avx(norm_a_v),
+            Self::hsum256_ps_avx(norm_b_v),
+        );
+
+        while i < n {
+            let x = query[i];
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            dot += x * y;
+            norm_a += x * x;
+            norm_b += y * y;
+            i += 1;
+        }
+
+        if norm_a == 0.0 || norm_b == 0.0 {
+            1.0
+        } else {
+            let norm_a_f32: f32 = norm_a;
+            let norm_b_f32: f32 = norm_b;
+            let dist = 1.0 - (dot / (norm_a_f32.sqrt() * norm_b_f32.sqrt()));
+            dist.clamp(0.0, 2.0)
+        }
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx2")]
+    #[target_feature(enable = "fma")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports AVX2 and FMA, and `raw.len() >= query.len() * 4`.
+    unsafe fn euclidean_distance_raw_avx2(query: &[f32], raw: &[u8]) -> f32 {
+        let mut sum_v = _mm256_setzero_ps();
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 8 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds because `(i + 8) * 4 <= n * 4 <= raw.len()`.
+            let va = _mm256_loadu_ps(query_ptr.add(i));
+            let vb = _mm256_loadu_ps(raw_ptr.add(i));
+            let diff = _mm256_sub_ps(va, vb);
+            sum_v = _mm256_fmadd_ps(diff, diff, sum_v);
+            i += 8;
+        }
+
+        let mut sum = Self::hsum256_ps_avx(sum_v);
+        while i < n {
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            let diff = query[i] - y;
+            sum += diff * diff;
+            i += 1;
+        }
+
+        sum.max(0.0).sqrt()
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx512f")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports AVX-512F, and `raw.len() >= query.len() * 4`.
+    unsafe fn dot_product_raw_avx512(query: &[f32], raw: &[u8]) -> f32 {
+        let mut sum_v = _mm512_setzero_ps();
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 16 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds because `(i + 16) * 4 <= n * 4 <= raw.len()`.
+            let va = _mm512_loadu_ps(query_ptr.add(i));
+            let vb = _mm512_loadu_ps(raw_ptr.add(i));
+            sum_v = _mm512_fmadd_ps(va, vb, sum_v);
+            i += 16;
+        }
+
+        let mut sum = Self::hsum512_ps_avx(sum_v);
+        while i < n {
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            sum += query[i] * y;
+            i += 1;
+        }
+        sum
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx512f")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports AVX-512F, and `raw.len() >= query.len() * 4`.
+    unsafe fn cosine_distance_raw_avx512(query: &[f32], raw: &[u8]) -> f32 {
+        let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
+            _mm512_setzero_ps(),
+            _mm512_setzero_ps(),
+            _mm512_setzero_ps(),
+        );
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 16 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds because `(i + 16) * 4 <= n * 4 <= raw.len()`.
+            let va = _mm512_loadu_ps(query_ptr.add(i));
+            let vb = _mm512_loadu_ps(raw_ptr.add(i));
+
+            dot_v = _mm512_fmadd_ps(va, vb, dot_v);
+            norm_a_v = _mm512_fmadd_ps(va, va, norm_a_v);
+            norm_b_v = _mm512_fmadd_ps(vb, vb, norm_b_v);
+            i += 16;
+        }
+
+        let (mut dot, mut norm_a, mut norm_b) = (
+            Self::hsum512_ps_avx(dot_v),
+            Self::hsum512_ps_avx(norm_a_v),
+            Self::hsum512_ps_avx(norm_b_v),
+        );
+
+        while i < n {
+            let x = query[i];
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            dot += x * y;
+            norm_a += x * x;
+            norm_b += y * y;
+            i += 1;
+        }
+
+        if norm_a == 0.0 || norm_b == 0.0 {
+            1.0
+        } else {
+            let norm_a_f32: f32 = norm_a;
+            let norm_b_f32: f32 = norm_b;
+            let dist = 1.0 - (dot / (norm_a_f32.sqrt() * norm_b_f32.sqrt()));
+            dist.clamp(0.0, 2.0)
+        }
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[target_feature(enable = "avx512f")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports AVX-512F, and `raw.len() >= query.len() * 4`.
+    unsafe fn euclidean_distance_raw_avx512(query: &[f32], raw: &[u8]) -> f32 {
+        let mut sum_v = _mm512_setzero_ps();
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 16 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds because `(i + 16) * 4 <= n * 4 <= raw.len()`.
+            let va = _mm512_loadu_ps(query_ptr.add(i));
+            let vb = _mm512_loadu_ps(raw_ptr.add(i));
+            let diff = _mm512_sub_ps(va, vb);
+            sum_v = _mm512_fmadd_ps(diff, diff, sum_v);
+            i += 16;
+        }
+
+        let mut sum = Self::hsum512_ps_avx(sum_v);
+        while i < n {
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            let diff = query[i] - y;
+            sum += diff * diff;
+            i += 1;
+        }
+
+        sum.max(0.0).sqrt()
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[target_feature(enable = "neon")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports NEON, and `raw.len() >= query.len() * 4`.
+    unsafe fn dot_product_raw_neon(query: &[f32], raw: &[u8]) -> f32 {
+        let mut sum_v = vdupq_n_f32(0.0);
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 4 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds `(i + 4) * 4 <= raw.len()`. `vld1q_f32` handles unaligned reads.
+            let va = vld1q_f32(query_ptr.add(i));
+            let vb = vld1q_f32(raw_ptr.add(i));
+            sum_v = vfmaq_f32(sum_v, va, vb);
+            i += 4;
+        }
+
+        let mut sum = vaddvq_f32(sum_v);
+        while i < n {
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            sum += query[i] * y;
+            i += 1;
+        }
+        sum
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[target_feature(enable = "neon")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports NEON, and `raw.len() >= query.len() * 4`.
+    unsafe fn cosine_distance_raw_neon(query: &[f32], raw: &[u8]) -> f32 {
+        let (mut dot_v, mut norm_a_v, mut norm_b_v) =
+            (vdupq_n_f32(0.0), vdupq_n_f32(0.0), vdupq_n_f32(0.0));
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 4 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds `(i + 4) * 4 <= raw.len()`.
+            let va = vld1q_f32(query_ptr.add(i));
+            let vb = vld1q_f32(raw_ptr.add(i));
+
+            dot_v = vfmaq_f32(dot_v, va, vb);
+            norm_a_v = vfmaq_f32(norm_a_v, va, va);
+            norm_b_v = vfmaq_f32(norm_b_v, vb, vb);
+            i += 4;
+        }
+
+        let (mut dot, mut norm_a, mut norm_b) = (
+            vaddvq_f32(dot_v),
+            vaddvq_f32(norm_a_v),
+            vaddvq_f32(norm_b_v),
+        );
+
+        while i < n {
+            let x = query[i];
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            dot += x * y;
+            norm_a += x * x;
+            norm_b += y * y;
+            i += 1;
+        }
+
+        if norm_a == 0.0 || norm_b == 0.0 {
+            1.0
+        } else {
+            let dist = 1.0 - (dot / (norm_a.sqrt() * norm_b.sqrt()));
+            dist.clamp(0.0, 2.0)
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[target_feature(enable = "neon")]
+    #[allow(unsafe_code)]
+    /// # Safety
+    /// Caller must ensure CPU supports NEON, and `raw.len() >= query.len() * 4`.
+    unsafe fn euclidean_distance_raw_neon(query: &[f32], raw: &[u8]) -> f32 {
+        let mut sum_v = vdupq_n_f32(0.0);
+        let n = query.len();
+        let mut i = 0;
+        let query_ptr = query.as_ptr();
+        let raw_ptr = raw.as_ptr() as *const f32;
+
+        while i + 4 <= n {
+            // SAFETY: Pointer arithmetic stays within bounds `(i + 4) * 4 <= raw.len()`.
+            let va = vld1q_f32(query_ptr.add(i));
+            let vb = vld1q_f32(raw_ptr.add(i));
+            let diff = vsubq_f32(va, vb);
+            sum_v = vfmaq_f32(sum_v, diff, diff);
+            i += 4;
+        }
+
+        let mut sum = vaddvq_f32(sum_v);
+        while i < n {
+            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
+            let y = f32::from_le_bytes(y_bytes);
+            let diff = query[i] - y;
+            sum += diff * diff;
+            i += 1;
+        }
+
+        sum.max(0.0).sqrt()
     }
 
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
@@ -1561,9 +2066,9 @@ impl HnswIndexCore {
             prior_prepared,
         };
 
-        let mut visited = AHashSet::new();
-        let mut candidates = BinaryHeap::new();
-        let mut results = BinaryHeap::new();
+        let mut visited = AHashSet::with_capacity(ef * 4);
+        let mut candidates = BinaryHeap::with_capacity(ef * 2);
+        let mut results = BinaryHeap::with_capacity(ef + 1);
 
         #[cfg(feature = "partial-index-rebuild")]
         let mut visited_node_ids = Vec::new();
@@ -1632,30 +2137,33 @@ impl HnswIndexCore {
             if has_dead_neighbors && current.index >= mmap_node_count {
                 let ram_idx = current.index - mmap_node_count;
                 if let Some(node) = nodes_guard.get(ram_idx) {
-                    let seq_log = self.cold.seq_log.read();
-                    let min_retention_seq = seq_log.min_retention_seq();
-                    let mut conns_guard = node.connections.write();
-                    if let Some(layer_conns) = conns_guard.get_mut(layer) {
-                        layer_conns.retain(|&neighbor_u32| {
-                            if !deleted_snapshot.contains(neighbor_u32 as u64) {
-                                true
-                            } else if let Some(min_ret_seq) = min_retention_seq {
-                                let neighbor_idx = neighbor_u32 as usize;
-                                if neighbor_idx >= mmap_node_count {
-                                    let neighbor_ram_idx = neighbor_idx - mmap_node_count;
-                                    if let Some(neighbor_node) = nodes_guard.get(neighbor_ram_idx) {
-                                        if let Some(del_seq) =
-                                            seq_log.deletion_seq(neighbor_node.doc_id)
+                    if let Some(mut conns_guard) = node.connections.try_write() {
+                        let seq_log = self.cold.seq_log.read();
+                        let min_retention_seq = seq_log.min_retention_seq();
+                        if let Some(layer_conns) = conns_guard.get_mut(layer) {
+                            layer_conns.retain(|&neighbor_u32| {
+                                if !deleted_snapshot.contains(neighbor_u32 as u64) {
+                                    true
+                                } else if let Some(min_ret_seq) = min_retention_seq {
+                                    let neighbor_idx = neighbor_u32 as usize;
+                                    if neighbor_idx >= mmap_node_count {
+                                        let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                                        if let Some(neighbor_node) =
+                                            nodes_guard.get(neighbor_ram_idx)
                                         {
-                                            return del_seq >= min_ret_seq;
+                                            if let Some(del_seq) =
+                                                seq_log.deletion_seq(neighbor_node.doc_id)
+                                            {
+                                                return del_seq >= min_ret_seq;
+                                            }
                                         }
                                     }
+                                    false
+                                } else {
+                                    false
                                 }
-                                false
-                            } else {
-                                false
-                            }
-                        });
+                            });
+                        }
                     }
                 }
             }
@@ -4848,5 +5356,37 @@ mod tests {
             "index_normal commit must succeed cleanly without fault injection spillover"
         );
         assert_eq!(index_normal.len().await, 5);
+    }
+
+    #[test]
+    fn test_compute_distance_raw_f32_equivalence_with_trusted() {
+        let v1: Vec<f32> = vec![0.5, -0.2, 0.8, 1.2, 0.0, -0.5, 0.3, 0.7];
+        let v2: Vec<f32> = vec![0.1, 0.9, -0.4, 0.6, 0.8, -0.1, 0.2, -0.3];
+
+        let mut v2_bytes = Vec::with_capacity(v2.len() * 4);
+        for &val in &v2 {
+            v2_bytes.extend_from_slice(&val.to_le_bytes());
+        }
+
+        for metric in [
+            DistanceMetric::Cosine,
+            DistanceMetric::Euclidean,
+            DistanceMetric::DotProduct,
+        ] {
+            let trusted_dist =
+                compute_distance_trusted(&v1, &v2, metric).expect("compute_distance_trusted");
+            let raw_dist = HnswIndexCore::compute_distance_raw_f32(&v1, &v2_bytes, metric)
+                .expect("compute_distance_raw_f32");
+
+            let diff = (trusted_dist - raw_dist).abs();
+            assert!(
+                diff < 1e-4,
+                "Distance mismatch for metric {:?}: trusted = {}, raw = {}, diff = {}",
+                metric,
+                trusted_dist,
+                raw_dist,
+                diff
+            );
+        }
     }
 }
