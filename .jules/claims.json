@@ -46,13 +46,12 @@
       "released_at": "2026-09-16T15:23:04.742425106+00:00 [TTL-EXPIRED]"
     },
     {
-      "krate": "memfuse-bench",
-      "issue": "JULES-20260916-MEMFUSEBEN-REVIEW-H9I5",
-      "timestamp": "2026-09-16T16:15:29.228380955+00:00",
-      "session_id": "11638515275805963653",
-      "active": false,
-      "expires_at": "2026-09-16T20:15:29.228368448+00:00",
-      "released_at": "2026-09-16T16:31:50.554680855+00:00"
+      "krate": "memfuse-store",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-16T15:52:33.065247306+00:00",
+      "session_id": "2575935384615743096",
+      "active": true,
+      "expires_at": "2026-09-16T19:52:33.065233447+00:00"
     }
   ]
 }
