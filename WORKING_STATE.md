@@ -40,9 +40,9 @@ Ergebnis: **0 offene Tags**
 | `memfuse-embed` | 4 | 2219 | 🧊 Optional |  |
 | `memfuse-db` | 5 | 36411 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 6 | 5709 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
-| `memfuse-router` | 6 | 6841 | 🟢 Clean |  |
+| `memfuse-router` | 6 | 6792 | 🟢 Clean |  |
 | `memfuse-agent` | 7 | 6531 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
-| `memfuse-mcp` | 8 | 5784 | 🟢 Clean |  |
+| `memfuse-mcp` | 8 | 6052 | 🟢 Clean |  |
 
 
 ## DAG-Topologie

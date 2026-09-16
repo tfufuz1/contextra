@@ -4,11 +4,110 @@
 // Bei Timeout, Regex-Fehlern oder Laufzeitfehlern gilt strikt Fail-Closed (EgressClassification::Block).
 // STAND: TS:2026-09-13 (SESSION: HEAD)
 
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use zeroize::Zeroize;
+
+/// Trait for recognizing entities (NER) in text without creating a direct dependency
+/// on heavy embedding or ML crates (DAG-neutral interface).
+pub trait EntityRecognizer: Send + Sync {
+    /// Recognizes entities in the text and returns byte ranges and category labels.
+    fn recognize(&self, text: &str) -> Vec<(std::ops::Range<usize>, String)>;
+}
+
+/// A default no-op entity recognizer that detects no entities.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoOpRecognizer;
+
+impl EntityRecognizer for NoOpRecognizer {
+    fn recognize(&self, _text: &str) -> Vec<(std::ops::Range<usize>, String)> {
+        Vec::new()
+    }
+}
+
+/// Session-bound vault storing bidirectional mappings between original PII/entities and generated surrogates.
+///
+/// Material and mappings are zeroized upon drop.
+pub struct SurrogateVault {
+    session_salt: [u8; 16],
+    map: Mutex<HashMap<String, String>>,
+}
+
+impl std::fmt::Debug for SurrogateVault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let entry_count = self.map.lock().map(|m| m.len()).unwrap_or(0);
+        f.debug_struct("SurrogateVault")
+            .field("entry_count", &entry_count)
+            .finish_non_exhaustive()
+    }
+}
+
+impl SurrogateVault {
+    /// Creates a new `SurrogateVault` with the specified session salt.
+    pub fn new(session_salt: [u8; 16]) -> Self {
+        Self {
+            session_salt,
+            map: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Creates a new `SurrogateVault` with a cryptographically secure random session salt.
+    pub fn random_salt() -> Self {
+        let mut salt = [0u8; 16];
+        rand::rngs::OsRng.fill_bytes(&mut salt);
+        Self::new(salt)
+    }
+
+    /// Generates a session-stable surrogate identifier for `entity_text` and stores the surrogate -> entity mapping.
+    pub fn generate_surrogate(&self, entity_text: &str) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(entity_text.as_bytes());
+        hasher.update(&self.session_salt);
+        let hash_hex = hasher.finalize().to_hex();
+        let surrogate = format!("[USER_ENTITY_{}]", &hash_hex[..4]);
+
+        if let Ok(mut guard) = self.map.lock() {
+            guard.insert(surrogate.clone(), entity_text.to_string());
+        }
+
+        surrogate
+    }
+
+    /// Retrieves the original entity text for a given surrogate key if present.
+    pub fn get_entity(&self, surrogate: &str) -> Option<String> {
+        self.map
+            .lock()
+            .ok()
+            .and_then(|guard| guard.get(surrogate).cloned())
+    }
+
+    /// Returns the current count of stored surrogate mappings.
+    pub fn len(&self) -> usize {
+        self.map.lock().map(|m| m.len()).unwrap_or(0)
+    }
+
+    /// Returns true if the vault contains no surrogate mappings.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl Drop for SurrogateVault {
+    fn drop(&mut self) {
+        self.session_salt.zeroize();
+        if let Ok(mut guard) = self.map.lock() {
+            for (mut k, mut v) in guard.drain() {
+                k.zeroize();
+                v.zeroize();
+            }
+        }
+    }
+}
 
 /// Type alias for boxed dyn futures in `EgressClassifier` trait to ensure dyn compatibility.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -67,6 +166,8 @@ impl CompiledPattern {
 pub enum EgressVaultError {
     #[error("Invalid pattern '{pattern}': {reason}")]
     InvalidPattern { pattern: String, reason: String },
+    #[error("Payload size exceeds limit: {size} bytes > {limit} limit")]
+    PayloadTooLarge { size: usize, limit: usize },
 }
 
 /// Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation.
@@ -143,6 +244,7 @@ pub struct EgressVault {
     patterns: Arc<Vec<CompiledPattern>>,
     regex_set: Arc<regex::RegexSet>,
     timeout: Duration,
+    surrogate_vault: Arc<SurrogateVault>,
 }
 
 impl EgressVault {
@@ -185,12 +287,19 @@ impl EgressVault {
             patterns: Arc::new(compiled),
             regex_set: Arc::new(regex_set),
             timeout: Self::DEFAULT_TIMEOUT,
+            surrogate_vault: Arc::new(SurrogateVault::random_salt()),
         })
     }
 
     /// Setzt ein benutzerdefiniertes Timeout für Klassifikationsabfragen.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
+        self
+    }
+
+    /// Setzt einen benutzerdefinierten `SurrogateVault`.
+    pub fn with_surrogate_vault(mut self, surrogate_vault: Arc<SurrogateVault>) -> Self {
+        self.surrogate_vault = surrogate_vault;
         self
     }
 
@@ -202,6 +311,79 @@ impl EgressVault {
     /// Gibt das gesetzte Timeout zurück.
     pub fn timeout(&self) -> Duration {
         self.timeout
+    }
+
+    /// Gibt eine Referenz auf den verknüpften `SurrogateVault` zurück.
+    pub fn surrogate_vault(&self) -> &Arc<SurrogateVault> {
+        &self.surrogate_vault
+    }
+
+    /// Tokenisiert und ersetzt erkannte strukturierte Regex-Muster sowie unstrukturierte NER-Entitäten
+    /// durch sitzungsstabile Surrogate und speichert die Zuordnungen im `SurrogateVault`.
+    ///
+    /// Gibt den bereinigten Text sowie die Anzahl ersetzter Entitäten zurück.
+    pub fn sanitize_and_vault(
+        &self,
+        payload: &str,
+        recognizer: &dyn EntityRecognizer,
+    ) -> Result<(String, usize), EgressVaultError> {
+        if payload.len() > MAX_CLASSIFY_PAYLOAD_BYTES {
+            return Err(EgressVaultError::PayloadTooLarge {
+                size: payload.len(),
+                limit: MAX_CLASSIFY_PAYLOAD_BYTES,
+            });
+        }
+
+        let mut current_text = payload.to_string();
+        let mut replacement_count = 0;
+
+        // Phase 1: Regex-Muster im Ersetzungsmodus anwenden
+        for cp in self.patterns.iter() {
+            let mut new_text = String::with_capacity(current_text.len());
+            let mut last_end = 0;
+            for m in cp.regex.find_iter(&current_text) {
+                new_text.push_str(&current_text[last_end..m.start()]);
+                let entity_text = m.as_str();
+                let surrogate = self.surrogate_vault.generate_surrogate(entity_text);
+                new_text.push_str(&surrogate);
+                last_end = m.end();
+                replacement_count += 1;
+            }
+            if last_end > 0 {
+                new_text.push_str(&current_text[last_end..]);
+                current_text = new_text;
+            }
+        }
+
+        // Phase 2: Unstrukturierte NER-Entitäten des EntityRecognizers anwenden
+        let recognized_spans = recognizer.recognize(&current_text);
+        if !recognized_spans.is_empty() {
+            // Filtere und sortiere gültige Spans absteigend nach Start, um Indexverschiebungen zu vermeiden
+            let mut valid_spans: Vec<_> = recognized_spans
+                .into_iter()
+                .filter(|(range, _category)| {
+                    range.start <= range.end
+                        && range.end <= current_text.len()
+                        && current_text.is_char_boundary(range.start)
+                        && current_text.is_char_boundary(range.end)
+                })
+                .collect();
+
+            valid_spans.sort_by(|a, b| b.0.start.cmp(&a.0.start));
+
+            let mut last_processed_start = current_text.len();
+            for (range, _category) in valid_spans {
+                if range.end <= last_processed_start {
+                    let entity_text = &current_text[range.clone()];
+                    let surrogate = self.surrogate_vault.generate_surrogate(entity_text);
+                    current_text.replace_range(range.clone(), &surrogate);
+                    last_processed_start = range.start;
+                    replacement_count += 1;
+                }
+            }
+        }
+
+        Ok((current_text, replacement_count))
     }
 }
 
@@ -223,6 +405,7 @@ impl Default for EgressVault {
                 patterns: Arc::new(Vec::new()),
                 regex_set: Arc::new(empty_set),
                 timeout: Self::DEFAULT_TIMEOUT,
+                surrogate_vault: Arc::new(SurrogateVault::random_salt()),
             }
         })
     }
@@ -440,9 +623,98 @@ mod tests {
     #[tokio::test]
     async fn test_exact_payload_boundary_allowed() {
         let exact_payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES);
-        let patterns = vec![CompiledPattern::new("R-001", r"secret_pattern_xyz").unwrap()];
+        let patterns =
+            vec![CompiledPattern::new("R-001", r"secret_pattern_xyz").expect("valid pattern")];
 
         let res = classify_layer1(&exact_payload, &patterns, Duration::from_millis(200)).await;
         assert_eq!(res, EgressClassification::Allow);
+    }
+
+    #[test]
+    fn test_surrogate_determinism_same_session() {
+        let vault = SurrogateVault::new([42u8; 16]);
+        let s1 = vault.generate_surrogate("alice@example.com");
+        let s2 = vault.generate_surrogate("alice@example.com");
+
+        assert_eq!(s1, s2);
+        assert!(s1.starts_with("[USER_ENTITY_"));
+        assert_eq!(vault.get_entity(&s1), Some("alice@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_surrogate_divergence_different_session() {
+        let v1 = SurrogateVault::new([1u8; 16]);
+        let v2 = SurrogateVault::new([2u8; 16]);
+
+        let s1 = v1.generate_surrogate("alice@example.com");
+        let s2 = v2.generate_surrogate("alice@example.com");
+
+        assert_ne!(s1, s2);
+        assert_eq!(v1.get_entity(&s1), Some("alice@example.com".to_string()));
+        assert_eq!(v2.get_entity(&s2), Some("alice@example.com".to_string()));
+    }
+
+    struct MockRecognizer;
+
+    impl EntityRecognizer for MockRecognizer {
+        fn recognize(&self, text: &str) -> Vec<(std::ops::Range<usize>, String)> {
+            let mut result = Vec::new();
+            if let Some(pos) = text.find("Bob Smith") {
+                result.push((pos..pos + "Bob Smith".len(), "PERSON".to_string()));
+            }
+            result
+        }
+    }
+
+    #[test]
+    fn test_sanitize_and_vault_noop_and_mock_recognizer() {
+        let vault = EgressVault::try_default().expect("valid vault");
+        let payload = "Contact alice@example.com or Bob Smith for credentials";
+
+        // Test with NoOpRecognizer (only regex replaces email)
+        let (sanitized_noop, count_noop) = vault
+            .sanitize_and_vault(payload, &NoOpRecognizer)
+            .expect("sanitization succeeds");
+
+        assert_eq!(count_noop, 1);
+        assert!(!sanitized_noop.contains("alice@example.com"));
+        assert!(sanitized_noop.contains("Bob Smith"));
+
+        // Test with MockRecognizer (regex replaces email, NER replaces Bob Smith)
+        let (sanitized_mock, count_mock) = vault
+            .sanitize_and_vault(payload, &MockRecognizer)
+            .expect("sanitization succeeds");
+
+        assert_eq!(count_mock, 2);
+        assert!(!sanitized_mock.contains("alice@example.com"));
+        assert!(!sanitized_mock.contains("Bob Smith"));
+        assert_eq!(vault.surrogate_vault().len(), 2);
+    }
+
+    #[test]
+    fn test_sanitize_empty_payload() {
+        let vault = EgressVault::try_default().expect("valid vault");
+        let (sanitized, count) = vault
+            .sanitize_and_vault("", &NoOpRecognizer)
+            .expect("empty payload succeeds");
+
+        assert_eq!(sanitized, "");
+        assert_eq!(count, 0);
+        assert_eq!(vault.surrogate_vault().len(), 0);
+    }
+
+    #[test]
+    fn test_zeroize_on_drop_behavior() {
+        let surrogate_vault = Arc::new(SurrogateVault::new([7u8; 16]));
+        let s = surrogate_vault.generate_surrogate("secret_token");
+        assert_eq!(
+            surrogate_vault.get_entity(&s),
+            Some("secret_token".to_string())
+        );
+
+        let weak_vault = Arc::downgrade(&surrogate_vault);
+        drop(surrogate_vault);
+
+        assert!(weak_vault.upgrade().is_none());
     }
 }

@@ -1507,6 +1507,7 @@ name = "memfuse-graph"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "arc-swap",
  "bincode",
  "blake3",
  "memfuse-core",
@@ -1591,6 +1592,7 @@ dependencies = [
 name = "memfuse-store"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "blake3",
  "bytes",
  "crc32fast",
