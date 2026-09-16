@@ -289,6 +289,7 @@ fn validate_id_obj(id_obj: &pyo3::Bound<'_, pyo3::types::PyAny>) -> PyResult<Str
                 "Document ID cannot be a negative integer",
             ));
         }
+        #[cfg(not(feature = "docid-128"))]
         if id_int > (u64::MAX as i128) {
             return Err(MemFuseValueError::new_err(
                 "Document ID integer value exceeds maximum allowed bound (u64::MAX)",
@@ -1431,6 +1432,44 @@ mod tests {
         assert!(validate_id("\t\n").is_err());
         assert!(validate_id("doc\x00123").is_err());
         assert!(validate_id("doc123").is_ok());
+    }
+
+    #[test]
+    fn test_validate_id_obj_numeric_bounds() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            // Negative integer check
+            let neg_obj = (-1i64).into_pyobject(py)?;
+            assert!(validate_id_obj(&neg_obj).is_err());
+
+            // Value within u64::MAX bound
+            let valid_obj = 12345u64.into_pyobject(py)?;
+            let res = validate_id_obj(&valid_obj)?;
+            assert_eq!(res, "12345");
+
+            // Value > u64::MAX (e.g. 2^64 + 1 = 18446744073709551617)
+            let large_val: i128 = (u64::MAX as i128) + 2;
+            let large_obj = large_val.into_pyobject(py)?;
+            let large_res = validate_id_obj(&large_obj);
+
+            #[cfg(not(feature = "docid-128"))]
+            {
+                assert!(large_res.is_err());
+                if let Err(err) = large_res {
+                    let err_msg = err.value(py).to_string();
+                    assert!(err_msg.contains("exceeds maximum allowed bound"));
+                }
+            }
+
+            #[cfg(feature = "docid-128")]
+            {
+                assert!(large_res.is_ok());
+                if let Ok(id_str) = large_res {
+                    assert_eq!(id_str, large_val.to_string());
+                }
+            }
+            Ok(())
+        })
     }
 
     #[test]

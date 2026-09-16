@@ -1398,7 +1398,7 @@ impl HnswIndexCore {
         }
     }
 
-    #[allow(unsafe_code)]
+    #[allow(dead_code, unsafe_code)]
     fn euclidean_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
@@ -1421,7 +1421,7 @@ impl HnswIndexCore {
         Self::euclidean_distance_raw_scalar(query, raw)
     }
 
-    #[allow(unsafe_code)]
+    #[allow(dead_code, unsafe_code)]
     fn dot_product_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
