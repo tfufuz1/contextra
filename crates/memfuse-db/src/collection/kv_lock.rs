@@ -32,38 +32,18 @@ impl KvKeyLocks {
         }
     }
 
-    pub(crate) fn shard_idx(key: &str) -> usize {
+    pub fn shard_idx(&self, key: &str) -> usize {
         let mut hasher = DefaultHasher::new();
         key.hash(&mut hasher);
         (hasher.finish() as usize) % KV_LOCK_SHARDS
     }
 
-    pub async fn lock_for<'a>(&'a self, key: &str) -> MutexGuard<'a, ()> {
-        let idx = Self::shard_idx(key);
+    pub async fn lock_shard<'a>(&'a self, idx: usize) -> tokio::sync::MutexGuard<'a, ()> {
         self.shards[idx].lock().await
     }
 
-    pub async fn lock_for_keys<'a>(
-        &'a self,
-        keys: impl IntoIterator<Item = impl AsRef<str>>,
-    ) -> Vec<MutexGuard<'a, ()>> {
-        let mut shard_indices: Vec<usize> =
-            keys.into_iter().map(|k| Self::shard_idx(k.as_ref())).collect();
-        shard_indices.sort_unstable();
-        shard_indices.dedup();
-
-        let mut guards = Vec::with_capacity(shard_indices.len());
-        for idx in shard_indices {
-            guards.push(self.shards[idx].lock().await);
-        }
-        guards
-    }
-
-    pub async fn lock_all<'a>(&'a self) -> Vec<MutexGuard<'a, ()>> {
-        let mut guards = Vec::with_capacity(KV_LOCK_SHARDS);
-        for idx in 0..KV_LOCK_SHARDS {
-            guards.push(self.shards[idx].lock().await);
-        }
-        guards
+    pub async fn lock_for<'a>(&'a self, key: &str) -> tokio::sync::MutexGuard<'a, ()> {
+        let idx = self.shard_idx(key);
+        self.lock_shard(idx).await
     }
 }

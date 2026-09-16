@@ -535,12 +535,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         summary_content: &str,
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
-        let mut keys_to_lock: Vec<String> = Vec::with_capacity(1 + self.source_docs.len());
-        keys_to_lock.push(target_string_id.to_string());
-        for &(src_id, _) in &self.source_docs {
-            keys_to_lock.push(format!("doc_{}", src_id.inner()));
-        }
-        let _guard = self.collection.kv_locks.lock_for_keys(&keys_to_lock).await;
+        let _guard = self.collection.consolidation_guard.lock().await;
 
         // 1. Strict OCC validation under lock
         self.validate_occ().await?;

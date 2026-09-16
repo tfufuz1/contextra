@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: Sammlung/Collection-Namespace Verwaltung und gemeinsame Hilfsfunktionen.
 // INVARIANTEN: Strikte Isolation durch Präfixe; doc_keys (key_type=1) halten nur Metadaten (keine Vektoren).
-// NICHT-OFFENSICHTLICH: kv_locks schützt Mutationen zur Vermeidung von TOCTOU-Kollisionsrassen.
+// NICHT-OFFENSICHTLICH: kv_locks schützt Mutationen zur Vermeidung von TOCTOU-Kollisionsrassen auf Key-Ebene.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 //! Logically isolated Collections inside the MemFuse database.
@@ -231,9 +231,8 @@ pub(super) fn extract_text(metadata: &Option<serde_json::Value>) -> Option<Strin
 ///
 /// Lock acquisition within `Collection` follows strict ordering to prevent deadlocks:
 ///
-/// 1. `Collection::kv_locks` (`KvKeyLocks` sharded Mutexes):
-///    Protects key-granular mutations (`insert`, `update`, `delete`, `relate`, `repair`, `drop_collection`) and prevents
-///    TOCTOU races during `check_doc_id_collision`. Multi-key/collection-wide locks are acquired in strictly ascending shard order.
+/// 1. `Collection::kv_locks` (`KvKeyLocks`):
+///    Key-granular sharded locks protecting key-level mutations (`insert`, `update`, `delete`, `relate`).
 /// 2. `Collection::embedder` (`parking_lot::RwLock`):
 ///    Read/write lock for the configured `TextEmbeddingEngine`. Never acquired before `kv_locks` if both are needed.
 ///
