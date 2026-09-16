@@ -23,6 +23,14 @@
       "session_id": "3279970408593114847",
       "active": true,
       "expires_at": "2026-09-17T01:38:47.429954857+00:00"
+    },
+    {
+      "krate": "memfuse-store",
+      "issue": "WELLE4-DOCID128-STORE",
+      "timestamp": "2026-09-16T22:19:27.449145826+00:00",
+      "session_id": "3900247462185543652",
+      "active": true,
+      "expires_at": "2026-09-17T02:19:27.449125376+00:00"
     }
   ]
 }
