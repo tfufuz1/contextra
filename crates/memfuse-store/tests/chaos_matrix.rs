@@ -260,7 +260,11 @@ async fn test_chaos_matrix_full_combos() {
     let expected_stage1 = ground_truth.snapshot();
     for (k, v) in &expected_stage1 {
         let actual = storage.get(k).await.expect("get stage 1");
-        assert_eq!(actual, Some(bytes::Bytes::from(v.clone())), "Stage 1 ground truth match");
+        assert_eq!(
+            actual,
+            Some(bytes::Bytes::from(v.clone())),
+            "Stage 1 ground truth match"
+        );
     }
 
     // Concurrent writing with random aborts

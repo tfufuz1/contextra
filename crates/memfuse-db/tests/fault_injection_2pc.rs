@@ -49,7 +49,11 @@ impl StorageEngine for FaultyStorage {
         Box::pin(async move { self.inner.get(key).await })
     }
 
-    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.inner.get_at_seq(key, seq).await })
     }
 

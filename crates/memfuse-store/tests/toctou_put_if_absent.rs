@@ -12,7 +12,11 @@ impl StorageEngine for DummyStorageEngine {
     fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
-    fn get_at_seq<'a>(&'a self, _: &'a [u8], _: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    fn get_at_seq<'a>(
+        &'a self,
+        _: &'a [u8],
+        _: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
     fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {

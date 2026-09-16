@@ -230,7 +230,11 @@ impl StorageEngine for NamespaceStorageEngine {
         Box::pin(async move { self.inner.get(&self.prefixed_key(key)).await })
     }
 
-    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.inner.get_at_seq(&self.prefixed_key(key), seq).await })
     }
 
