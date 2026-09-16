@@ -2325,6 +2325,7 @@ dependencies = [
  "memfuse-calibration",
  "memfuse-core",
  "memfuse-crypto",
+ "memfuse-store",
  "proptest",
  "serde",
  "sha2",
