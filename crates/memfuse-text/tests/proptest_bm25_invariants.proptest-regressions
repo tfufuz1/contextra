@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 1d9349ab305e9ba53bd791482f9b771475b4836f2eb30787472bc47b1a083da0 # shrinks to q = "im", k = 1, doc_id_raw = 1
+cc f3127fc5adb1a9b97426b3b214480d05efe314cd251df249f826adb18179c93b # shrinks to q = "aa", k = 1, doc_id_raw = 1

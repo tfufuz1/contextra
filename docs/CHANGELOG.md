@@ -86,7 +86,7 @@
 | `2026-09-15T16:10:40Z (SESSION: ec33599e)` | `crates/memfuse-embed/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG). |
 | `2026-09-15T16:10:40Z (SESSION: ec33599e)` | `crates/memfuse-embed/src/reranker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cross-Encoder Reranking für Post-RRF Präzisionsverbesserung. |
 | `2026-09-15T16:07:56Z (SESSION: 5d958ef0)` | `crates/memfuse-graph/src/edge_reinforcement_buffer.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Akkumuliert Co-Occurrence- und Traversal-Update-Signale für asynchronen Flush in CSR-Graph (F-03) |
-| `2026-09-15T16:05:00Z` | `crates/memfuse-sandbox/src/executor.rs` | `AI-TAG` | `AGT-SANDBOX-12a4a39c` | `acf8fe72` | `OPEN` | `0` | // AI-TAG[SMELL][MINOR] WASI fd_write stub does not parse iovs buffer slices into stdout_buf/stderr_buf (ID: AGT-SANDBOX-12a4a39c) (TS: 2026-09-15T16:05:00Z) (SESSION: acf8fe72) |
+| `2026-09-15T16:05:00Z` | `crates/memfuse-sandbox/src/executor.rs` | `AI-TAG` | `AGT-SANDBOX-12a4a39c` | `acf8fe72` | `RESOLVED` | `0` | // AI-TAG[RESOLVED] WASI fd_write buffer parsing (ID: AGT-SANDBOX-12a4a39c) (TS: 2026-09-15T16:05:00Z) (SESSION: acf8fe72) |
 | `2026-09-15T16:00:00Z (SESSION: acf8fe72)` | `crates/memfuse-sandbox/src/capabilities.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Capability Whitelist & Configuration for WASM Execution Boundary |
 | `2026-09-15T16:00:00Z (SESSION: acf8fe72)` | `crates/memfuse-sandbox/src/executor.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | WASM execution engine with WASI and fuel enforcement |
 | `2026-09-15T16:00:00Z` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `AGT-INDEX-f38b1a90` | `-` | `RESOLVED` | `0` | // AI-TAG[TEST][MINOR] RESOLVED: AGT-INDEX-f38b1a90 — Global statics replaced with instance-bound AtomicU64 fields on HnswColdCore (TS: 2026-09-15T16:00:00Z) |
@@ -331,3 +331,4 @@
 | `` | `crates/memfuse-store/tests/wal_hmac_chain_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Regressionstest — WAL HMAC-Kette enthält keine Gabelungen nach Group-Commit. |
 | `` | `crates/memfuse-store/tests/wal_hmac_rollback_race.rs` | `FILE-CONTEXT` | `-` | `b448084` | `-` | `-` |  |
 | `` | `crates/memfuse-store/tests/wal_truncate_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität. |
+| `` | `crates/memfuse-text/src/posting_list.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Stellt kompakte, resident gehaltene Postinglisten pro Term bereit. |
