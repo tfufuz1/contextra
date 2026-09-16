@@ -274,7 +274,7 @@ pub struct Wal {
     pub(crate) flusher_tx:
         std::sync::RwLock<Option<tokio::sync::mpsc::UnboundedSender<WalCommand>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
-    pub(crate) truncate_lock: Arc<tokio::sync::Mutex<()>>,
+    pub truncate_lock: Arc<tokio::sync::Mutex<()>>,
     #[allow(dead_code)]
     pub(crate) simulate_append_failure: Arc<std::sync::atomic::AtomicBool>,
 }

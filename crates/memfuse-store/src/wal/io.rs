@@ -416,7 +416,15 @@ where
 
 impl Wal {
     pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
-        let _truncate_guard = self.truncate_lock.lock().await;
+        let truncate_guard = self.truncate_lock.lock().await;
+        self.append_batch_locked(batch, &truncate_guard).await
+    }
+
+    pub async fn append_batch_locked(
+        &self,
+        batch: PreparedBatch,
+        _guard: &tokio::sync::MutexGuard<'_, ()>,
+    ) -> Result<()> {
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
                 "Cannot append to sealed WAL segment {}",
@@ -524,7 +532,7 @@ impl Wal {
     ///
     /// Invokes `callback(seq_no, entry, end_offset)` for each valid entry.
     /// If `callback` returns `false`, scanning halts early.
-    pub(crate) async fn scan_entries_with_callback<F>(
+    pub async fn scan_entries_with_callback<F>(
         &self,
         file_size: u64,
         mut callback: F,
