@@ -3,6 +3,7 @@
 
 pub mod config;
 pub mod egress_gateway;
+pub mod egress_guard;
 pub mod prompt_injection;
 pub mod protocol;
 pub mod sandbox;

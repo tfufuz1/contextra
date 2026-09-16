@@ -380,6 +380,7 @@ impl EntityId {
     }
 
     /// Creates an `EntityId` directly from a `DocId`.
+    #[allow(clippy::unnecessary_cast)]
     pub fn from_doc_id(doc_id: DocId) -> Self {
         Self(doc_id.inner() as u64)
     }
@@ -392,6 +393,7 @@ impl EntityId {
     /// # Infallible Fallback
     /// If you need the old infallible behaviour (parse-as-u64 or hash), use `EntityId::from(key)` directly.
     /// Prefer this fallible variant for consistency with `DocId` at API boundaries.
+    #[allow(clippy::unnecessary_cast)]
     pub fn from_key(key: &str) -> Result<Self> {
         DocId::from_key(key).map(|d| Self(d.inner() as u64))
     }

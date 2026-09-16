@@ -3789,10 +3789,6 @@
   },
   {
     "file": "crates/memfuse-crypto/src/egress_vault.rs",
-    "hash": "32529a46cc0b6f63"
-  },
-  {
-    "file": "crates/memfuse-crypto/src/egress_vault.rs",
     "hash": "3bc2dcdc7f291ff6"
   },
   {
@@ -3801,7 +3797,19 @@
   },
   {
     "file": "crates/memfuse-crypto/src/egress_vault.rs",
+    "hash": "3c39c43cead27c11"
+  },
+  {
+    "file": "crates/memfuse-crypto/src/egress_vault.rs",
     "hash": "599cbc0787634cd9"
+  },
+  {
+    "file": "crates/memfuse-crypto/src/egress_vault.rs",
+    "hash": "672aa11d6f75e305"
+  },
+  {
+    "file": "crates/memfuse-crypto/src/egress_vault.rs",
+    "hash": "6cbfc7edd93b356d"
   },
   {
     "file": "crates/memfuse-crypto/src/egress_vault.rs",
@@ -3810,6 +3818,18 @@
   {
     "file": "crates/memfuse-crypto/src/egress_vault.rs",
     "hash": "9cb05f94ac621080"
+  },
+  {
+    "file": "crates/memfuse-crypto/src/egress_vault.rs",
+    "hash": "a68d220b32572c8b"
+  },
+  {
+    "file": "crates/memfuse-crypto/src/egress_vault.rs",
+    "hash": "a794e1194592e9a7"
+  },
+  {
+    "file": "crates/memfuse-crypto/src/egress_vault.rs",
+    "hash": "a923559b07cbba4f"
   },
   {
     "file": "crates/memfuse-crypto/src/egress_vault.rs",
