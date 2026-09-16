@@ -10,9 +10,9 @@
 
 use memfuse_core::traits::ContextSegment;
 use memfuse_core::{ModelFingerprint, TenantId};
-use memfuse_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
 #[cfg(test)]
 use memfuse_crypto::KvSegment;
+use memfuse_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -87,21 +87,22 @@ impl KvBridgeAdapter {
     /// NIEMALS wird ein Fehler propagiert — `None` bedeutet stets "voller Prefill".
     pub fn try_get_cached_segment(&self, tenant: TenantId, key: &KvCacheKey) -> Option<Vec<u8>> {
         // 1. Store-Lookup & Decrypt via rope-bewusste API
-        let decrypted_bytes = match self
-            .store
-            .get_decrypted_segment(&self.cipher, tenant, key.chunk_id)
-        {
-            Ok(Some(bytes)) => bytes,
-            Ok(None) => return None,
-            Err(e) => {
-                tracing::warn!(
-                    chunk_id = key.chunk_id,
-                    error = %e,
-                    "KvBridgeAdapter: Decrypt failed — cache miss"
-                );
-                return None;
-            }
-        };
+        let decrypted_bytes =
+            match self
+                .store
+                .get_decrypted_segment(&self.cipher, tenant, key.chunk_id)
+            {
+                Ok(Some(bytes)) => bytes,
+                Ok(None) => return None,
+                Err(e) => {
+                    tracing::warn!(
+                        chunk_id = key.chunk_id,
+                        error = %e,
+                        "KvBridgeAdapter: Decrypt failed — cache miss"
+                    );
+                    return None;
+                }
+            };
 
         // 2. Deserialisieren der gekapselten Payload
         let payload: CachedKvPayload = match bincode::deserialize(&decrypted_bytes) {

@@ -338,7 +338,10 @@ impl WasmExecutor {
         // `max_wall_clock_ms` is orthogonal to `max_fuel` (CPU limit vs. Wall-Clock limit, configured independently).
         // A value of 0 in `max_wall_clock_ms` indicates unlimited wall-clock capability limit, falling back to the caller's `timeout`.
         let effective_timeout = if capabilities.max_wall_clock_ms > 0 {
-            std::cmp::min(timeout, Duration::from_millis(capabilities.max_wall_clock_ms))
+            std::cmp::min(
+                timeout,
+                Duration::from_millis(capabilities.max_wall_clock_ms),
+            )
         } else {
             timeout
         };
@@ -347,9 +350,7 @@ impl WasmExecutor {
 
         tokio::time::timeout_at(deadline, execute_future)
             .await
-            .map_err(|_| SandboxError::Timeout {
-                timeout_ms,
-            })?
+            .map_err(|_| SandboxError::Timeout { timeout_ms })?
     }
 }
 
@@ -556,7 +557,10 @@ mod tests {
             .await;
 
         assert!(
-            matches!(result_timeout, Err(SandboxError::Timeout { timeout_ms: 50 })),
+            matches!(
+                result_timeout,
+                Err(SandboxError::Timeout { timeout_ms: 50 })
+            ),
             "Expected Timeout error with 50ms, got: {:?}",
             result_timeout
         );
