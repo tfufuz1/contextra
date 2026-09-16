@@ -129,7 +129,7 @@ fn test_tx_buffer_orphan_reaper_concurrency() {
                 let _ = b.stage(
                     tx,
                     IndexOp::Insert {
-                        doc_id: DocId::new(i as u64),
+                        doc_id: DocId::from(i as u64),
                         data: "test".to_string(),
                     },
                 );

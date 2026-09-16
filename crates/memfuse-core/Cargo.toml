@@ -11,6 +11,7 @@ description = "Core types, traits, and error handling for MemFuse"
 
 [features]
 test-utils = []
+docid-128 = []
 
 [dependencies]
 # Standard error derive macro for MemFuseError.
