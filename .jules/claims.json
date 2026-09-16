@@ -1,12 +1,12 @@
 {
   "claims": [
     {
-      "krate": "memfuse-store",
+      "krate": "memfuse-index",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-16T18:49:17.725407644+00:00",
-      "session_id": "15873729587359864986",
+      "timestamp": "2026-09-16T18:41:49.112937483+00:00",
+      "session_id": "17855158604236717290",
       "active": true,
-      "expires_at": "2026-09-16T22:49:17.725385501+00:00"
+      "expires_at": "2026-09-16T22:41:49.112921010+00:00"
     }
   ]
 }
