@@ -44,6 +44,15 @@
       "active": false,
       "expires_at": "2026-09-16T11:11:08.494678646+00:00",
       "released_at": "2026-09-16T15:23:04.742425106+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-py",
+      "issue": "JULES-20260916-MEMFUSEPY-REVIEW-26EN",
+      "timestamp": "2026-09-16T16:23:43.312580283+00:00",
+      "session_id": "11396811978485355897",
+      "active": false,
+      "expires_at": "2026-09-16T20:23:43.312560188+00:00",
+      "released_at": "2026-09-16T16:49:27.291788960+00:00"
     }
   ]
 }
