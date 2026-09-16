@@ -30,15 +30,15 @@ Ergebnis: **0 offene Tags**
 | `memfuse-calibration` | 2 | 1980 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 2 | 6035 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-crypto` | 2 | 6572 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
-| `memfuse-graph` | 2 | 12626 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `memfuse-graph` | 2 | 13204 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-sandbox` | 2 | 836 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
-| `memfuse-text` | 2 | 7379 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
+| `memfuse-text` | 2 | 7775 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-candle` | 3 | 4228 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-index` | 3 | 18961 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-ollama` | 3 | 4573 | 🟢 Clean |  |
 | `memfuse-store` | 3 | 26143 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-embed` | 4 | 2215 | 🧊 Optional |  |
-| `memfuse-db` | 5 | 36496 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 5 | 36376 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 6 | 5709 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-router` | 6 | 6789 | 🟢 Clean |  |
 | `memfuse-agent` | 7 | 6531 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |

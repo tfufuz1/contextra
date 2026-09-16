@@ -341,3 +341,4 @@
 | `` | `crates/memfuse-store/tests/wal_truncate_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität. |
 | `` | `crates/memfuse-text/src/posting_list.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Stellt kompakte, resident gehaltene Postinglisten pro Term bereit. |
 | `` | `crates/memfuse-text/src/wand.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Term Query-Traversierung mit Block-Maximalwert-Pruning und dynamic thresholding. |
+| `` | `crates/memfuse-text/tests/bm25f_field_weighting.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prüft Formel-Korrektheit, Degeneration zu einfeldigem BM25 und Zero-Panic Invarianten. |
