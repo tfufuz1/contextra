@@ -63,3 +63,7 @@ harness = false
 [[bench]]
 name = "lsm_concurrency_bench"
 harness = false
+
+[[bench]]
+name = "block_cache_bench"
+harness = false
