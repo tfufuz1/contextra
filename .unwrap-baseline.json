@@ -12133,6 +12133,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "0c14fddcd640e7c8"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "0d211e158c880732"
   },
   {
@@ -12830,6 +12834,10 @@
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "f024c4d6034243dd"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "f07b0a850702cbb4"
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
