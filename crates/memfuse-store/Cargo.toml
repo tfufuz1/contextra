@@ -17,9 +17,12 @@ windows-sys = { version = "0.61", features = [
 [features]
 default = []
 fault-injection = []
+block-cache-v2 = ["dep:quick_cache"]
 
 [dependencies]
 memfuse-core = { workspace = true }
+ahash = { workspace = true }
+quick_cache = { version = "0.6", optional = true }
 memfuse-crypto = { workspace = true }
 bytes = { workspace = true }
 blake3 = { workspace = true }

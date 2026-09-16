@@ -2598,6 +2598,7 @@ dependencies = [
 name = "memfuse-store"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "blake3",
  "bytes",
  "crc32fast",
@@ -2610,6 +2611,7 @@ dependencies = [
  "memmap2",
  "parking_lot",
  "proptest",
+ "quick_cache",
  "rand 0.8.8",
  "tempfile",
  "tokio",
@@ -3238,6 +3240,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "quick_cache"
+version = "0.6.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9c6658afe513a3b484e3abfdaa0d03ef3c0bbf017542c178dd55f94eb3051f9"
+dependencies = [
+ "ahash",
+ "equivalent",
+ "hashbrown 0.16.1",
+ "parking_lot",
 ]
 
 [[package]]
