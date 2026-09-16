@@ -2668,6 +2668,14 @@
     "hash": "69ec669e13e55ad9"
   },
   {
+    "file": "crates/memfuse-core/src/schema.rs",
+    "hash": "8f98a1fdfb9ec2ba"
+  },
+  {
+    "file": "crates/memfuse-core/src/schema.rs",
+    "hash": "a56d0d212a21c25c"
+  },
+  {
     "file": "crates/memfuse-core/src/seq_log.rs",
     "hash": "2831d77a3e3e54f5"
   },
@@ -2885,11 +2893,15 @@
   },
   {
     "file": "crates/memfuse-core/src/types/domain.rs",
-    "hash": "12bd1055ebe8a606"
+    "hash": "0b262029a4ef3b99"
   },
   {
     "file": "crates/memfuse-core/src/types/domain.rs",
-    "hash": "14bcee641d63ab18"
+    "hash": "115ab8c9a910bc96"
+  },
+  {
+    "file": "crates/memfuse-core/src/types/domain.rs",
+    "hash": "12bd1055ebe8a606"
   },
   {
     "file": "crates/memfuse-core/src/types/domain.rs",
@@ -3102,10 +3114,6 @@
   {
     "file": "crates/memfuse-core/src/types/domain.rs",
     "hash": "c650c4aa69136c55"
-  },
-  {
-    "file": "crates/memfuse-core/src/types/domain.rs",
-    "hash": "cbacb6f33979b589"
   },
   {
     "file": "crates/memfuse-core/src/types/domain.rs",
@@ -20382,6 +20390,46 @@
   {
     "file": "crates/memfuse-store/tests/disk_full_during_write.rs",
     "hash": "cc477ff09daf875d"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "07d4b2d620ecc958"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "0a5693f67739a651"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "101d372b059ea1c7"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "2085bd8db0d9e883"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "2d1a9f4e9cc159e7"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "4e13e5f0b8140271"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "9afaea19b2ca0da4"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "9e285f8f058f713a"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "b25b1c9f619687ae"
+  },
+  {
+    "file": "crates/memfuse-store/tests/docid_128_kv_engine.rs",
+    "hash": "ba05db4810b710a3"
   },
   {
     "file": "crates/memfuse-store/tests/encryption_test.rs",

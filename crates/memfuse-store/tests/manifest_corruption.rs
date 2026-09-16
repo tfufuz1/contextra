@@ -82,7 +82,7 @@ async fn scenario2_tail_truncation_is_recoverable() {
         .await
         .expect("load manifest with tail truncation should succeed");
     assert!(
-        loaded_entries.len() >= 1,
+        !loaded_entries.is_empty(),
         "Tail truncated entry should return valid entries read up to truncation"
     );
 

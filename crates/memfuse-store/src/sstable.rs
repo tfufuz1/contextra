@@ -40,11 +40,9 @@
 // SIEHE AUCH:  crates/memfuse-store/AGENTS.md
 
 use bytes::{BufMut, Bytes, BytesMut};
-#[cfg(not(feature = "block-cache-v2"))]
 use lru::LruCache;
 use memfuse_core::{MemFuseError, Result};
 use memfuse_crypto::crypto::KeyManager;
-#[cfg(not(feature = "block-cache-v2"))]
 use parking_lot::RwLock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -78,11 +76,121 @@ fn pread_exact(file: &std::fs::File, mut buf: &mut [u8], mut offset: u64) -> std
 /// Shard selection uses ahash tuple hashing on (file_id, offset).
 pub const BLOCK_CACHE_SHARDS: usize = 64;
 
-#[cfg(not(feature = "block-cache-v2"))]
-pub type BlockCacheShard = RwLock<LruCache<(u64, u64), Bytes>>;
+/// Trait abstraction for block cache backend implementations.
+///
+/// ## Approximative LRU & Lock-Optimized Read Path
+/// SSTable block caches store immutable 4KB data blocks. For point lookups and range scans,
+/// read hits occur with high frequency on hot-set blocks.
+///
+/// While standard `LruCache` maintains strict LRU ordering by updating a doubly-linked list
+/// on every access (requiring write lock acquisition even during `get()`), lock-optimized
+/// implementations like `quick_cache::sync::Cache` (S3-FIFO / Clock eviction) achieve
+/// lock-free read hit evaluation via atomic reference counting without mutating global eviction order on every hit.
+///
+/// Functionally, strict LRU order is NOT required for correctness in SSTable block caching.
+/// Approximative LRU / S3-FIFO eviction provides equivalent or superior hit ratios while
+/// eliminating lock contention across concurrent reader threads.
+pub trait BlockCacheBackend: Send + Sync {
+    /// Creates a new cache backend instance with the specified capacity.
+    fn new(capacity: usize) -> Self
+    where
+        Self: Sized;
+
+    /// Retrieves a cached block by `(file_id, offset)` key.
+    fn get(&self, key: &(u64, u64)) -> Option<Bytes>;
+
+    /// Inserts a block into the cache.
+    fn insert(&self, key: (u64, u64), value: Bytes);
+
+    /// Returns the number of cached blocks in this backend instance.
+    fn len(&self) -> usize;
+
+    /// Returns `true` if the backend contains no cached blocks.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Checks if a key is present in the cache.
+    fn contains(&self, key: &(u64, u64)) -> bool {
+        self.get(key).is_some()
+    }
+}
+
+/// Standard strict-LRU block cache backend using `parking_lot::RwLock<LruCache>`.
+pub struct LruBlockCacheBackend {
+    cache: RwLock<LruCache<(u64, u64), Bytes>>,
+}
+
+impl BlockCacheBackend for LruBlockCacheBackend {
+    fn new(capacity: usize) -> Self {
+        let cap = std::num::NonZeroUsize::new(capacity.max(1))
+            .unwrap_or(std::num::NonZeroUsize::MIN);
+        Self {
+            cache: RwLock::new(LruCache::new(cap)),
+        }
+    }
+
+    #[inline]
+    fn get(&self, key: &(u64, u64)) -> Option<Bytes> {
+        self.cache.write().get(key).cloned()
+    }
+
+    #[inline]
+    fn insert(&self, key: (u64, u64), value: Bytes) {
+        self.cache.write().put(key, value);
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.cache.read().len()
+    }
+
+    #[inline]
+    fn contains(&self, key: &(u64, u64)) -> bool {
+        self.cache.read().contains(key)
+    }
+}
+
+/// Lock-optimized block cache backend using `quick_cache::sync::Cache` (S3-FIFO / Clock-based eviction).
+#[cfg(feature = "block-cache-v2")]
+pub struct QuickCacheBlockCacheBackend {
+    cache: quick_cache::sync::Cache<(u64, u64), Bytes>,
+}
 
 #[cfg(feature = "block-cache-v2")]
-pub type BlockCacheShard = quick_cache::sync::Cache<(u64, u64), Bytes>;
+impl BlockCacheBackend for QuickCacheBlockCacheBackend {
+    fn new(capacity: usize) -> Self {
+        Self {
+            cache: quick_cache::sync::Cache::new(capacity.max(1)),
+        }
+    }
+
+    #[inline]
+    fn get(&self, key: &(u64, u64)) -> Option<Bytes> {
+        self.cache.get(key)
+    }
+
+    #[inline]
+    fn insert(&self, key: (u64, u64), value: Bytes) {
+        self.cache.insert(key, value);
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.cache.len()
+    }
+
+    #[inline]
+    fn contains(&self, key: &(u64, u64)) -> bool {
+        self.cache.get(key).is_some()
+    }
+}
+
+#[cfg(not(feature = "block-cache-v2"))]
+pub type BlockCacheShard = LruBlockCacheBackend;
+
+#[cfg(feature = "block-cache-v2")]
+pub type BlockCacheShard = QuickCacheBlockCacheBackend;
 
 pub struct BlockCache {
     shards: Vec<BlockCacheShard>,
@@ -98,17 +206,8 @@ impl BlockCache {
         let num_shards = num_shards.max(1);
         let cap_shard = capacity_per_shard.max(1);
 
-        #[cfg(not(feature = "block-cache-v2"))]
-        let shards = {
-            let cap = std::num::NonZeroUsize::new(cap_shard).unwrap();
-            (0..num_shards)
-                .map(|_| RwLock::new(LruCache::new(cap)))
-                .collect()
-        };
-
-        #[cfg(feature = "block-cache-v2")]
         let shards = (0..num_shards)
-            .map(|_| quick_cache::sync::Cache::new(cap_shard))
+            .map(|_| BlockCacheShard::new(cap_shard))
             .collect();
 
         Self {
@@ -129,57 +228,29 @@ impl BlockCache {
         &self.shards[idx]
     }
 
-    #[cfg(not(feature = "block-cache-v2"))]
-    pub fn get(&self, file_id: u64, offset: u64) -> Option<Bytes> {
-        self.shard(file_id, offset)
-            .write()
-            .get(&(file_id, offset))
-            .cloned()
-    }
-
-    #[cfg(feature = "block-cache-v2")]
+    #[inline]
     pub fn get(&self, file_id: u64, offset: u64) -> Option<Bytes> {
         self.shard(file_id, offset).get(&(file_id, offset))
     }
 
-    #[cfg(not(feature = "block-cache-v2"))]
-    pub fn insert(&self, file_id: u64, offset: u64, data: Bytes) {
-        self.shard(file_id, offset)
-            .write()
-            .put((file_id, offset), data);
-    }
-
-    #[cfg(feature = "block-cache-v2")]
+    #[inline]
     pub fn insert(&self, file_id: u64, offset: u64, data: Bytes) {
         self.shard(file_id, offset).insert((file_id, offset), data);
     }
 
-    #[cfg(not(feature = "block-cache-v2"))]
-    pub fn len(&self) -> usize {
-        self.shards.iter().map(|s| s.read().len()).sum()
-    }
-
-    #[cfg(feature = "block-cache-v2")]
+    #[inline]
     pub fn len(&self) -> usize {
         self.shards.iter().map(|s| s.len()).sum()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    #[cfg(not(feature = "block-cache-v2"))]
+    #[inline]
     pub fn contains(&self, file_id: u64, offset: u64) -> bool {
-        self.shard(file_id, offset)
-            .read()
-            .contains(&(file_id, offset))
-    }
-
-    #[cfg(feature = "block-cache-v2")]
-    pub fn contains(&self, file_id: u64, offset: u64) -> bool {
-        self.shard(file_id, offset)
-            .get(&(file_id, offset))
-            .is_some()
+        self.shard(file_id, offset).contains(&(file_id, offset))
     }
 }
 
