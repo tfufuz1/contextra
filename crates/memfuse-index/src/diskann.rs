@@ -6,6 +6,8 @@
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 
 //! DiskANN Out-of-Core Vector Search (WP-4.3).
+//!
+//! DiskANN unterstützt jetzt native Tombstone-Löschungen; physische Kompaktierung/Rebuild folgt als separater Task.
 
 #![doc(hidden)]
 
@@ -17,6 +19,7 @@ use memfuse_core::{
 };
 use memmap2::Mmap;
 use parking_lot::RwLock;
+use roaring::RoaringTreemap;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashSet};
 use std::path::PathBuf;
@@ -31,6 +34,10 @@ const DISKANN_INTEGRITY_KEY: &[u8; 32] = b"memfuse_diskann_integrity_key_32";
 const PENDING_WAL_MAGIC: &[u8; 4] = b"PWAL";
 const PENDING_WAL_VERSION: u8 = 1;
 const PENDING_WAL_HEADER_SIZE: usize = 5;
+
+const TOMBSTONE_WAL_MAGIC: &[u8; 4] = b"TWAL";
+const TOMBSTONE_WAL_VERSION: u8 = 1;
+const TOMBSTONE_WAL_HEADER_SIZE: usize = 5;
 const MAX_PENDING_WAL_DIM: usize = 65_536;
 /// Minimaler Pending-Flush-Threshold (untere Grenze der adaptiven Formel).
 /// Siehe ADR-068 für die vollständige Stufenregelung.
@@ -318,6 +325,7 @@ struct DiskAnnIndexInner {
     /// Flag um überlappende persist_delta-Hintergrundläufe zu verhindern.
     flushing_in_progress: AtomicBool,
     hnsw_fallback: RwLock<Option<Arc<crate::hnsw::HnswIndex>>>,
+    tombstones: RwLock<RoaringTreemap>,
 }
 
 impl DiskAnnIndex {
@@ -353,6 +361,7 @@ impl DiskAnnIndex {
                 pending_count: AtomicU64::new(0),
                 flushing_in_progress: AtomicBool::new(false),
                 hnsw_fallback: RwLock::new(None),
+                tombstones: RwLock::new(RoaringTreemap::new()),
             }),
         })
     }
@@ -528,6 +537,132 @@ impl DiskAnnIndex {
             }
         }
         Ok(pruned)
+    }
+
+    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 integrity protection.
+    ///
+    /// # Binary Format
+    /// - File Header (written on new/empty file creation): `[TWAL: 4 bytes] [version=1: 1 byte]`
+    /// - Entry Layout:
+    ///   - `id`: `u64` LE (8 bytes)
+    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes`)
+    async fn append_to_tombstone_wal(
+        path: &std::path::Path,
+        id: DocId,
+    ) -> Result<()> {
+        use tokio::io::AsyncWriteExt;
+
+        let is_new = match tokio::fs::metadata(path).await {
+            Ok(meta) => meta.len() == 0,
+            Err(_) => true,
+        };
+
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .await
+            .map_err(MemFuseError::Io)?;
+
+        if is_new {
+            file.write_all(TOMBSTONE_WAL_MAGIC)
+                .await
+                .map_err(MemFuseError::Io)?;
+            file.write_all(&[TOMBSTONE_WAL_VERSION])
+                .await
+                .map_err(MemFuseError::Io)?;
+        }
+
+        let id_bytes = id.inner().to_le_bytes();
+        let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        hmac.update(&id_bytes);
+        let computed_hmac = hmac.finalize();
+
+        file.write_all(&id_bytes)
+            .await
+            .map_err(MemFuseError::Io)?;
+        file.write_all(&computed_hmac)
+            .await
+            .map_err(MemFuseError::Io)?;
+        file.sync_all().await.map_err(MemFuseError::Io)?;
+        Ok(())
+    }
+
+    /// Reads and verifies uncommitted tombstone entries from `tombstone.wal`.
+    fn read_tombstone_wal(path: &std::path::Path) -> Result<RoaringTreemap> {
+        use std::io::Read;
+        use subtle::ConstantTimeEq;
+
+        let mut bitset = RoaringTreemap::new();
+
+        if !path.exists() {
+            return Ok(bitset);
+        }
+        let mut file = match std::fs::File::open(path) {
+            Ok(f) => f,
+            Err(_) => return Ok(bitset),
+        };
+
+        let file_len = match file.metadata() {
+            Ok(m) => m.len() as usize,
+            Err(_) => return Ok(bitset),
+        };
+
+        if file_len == 0 {
+            return Ok(bitset);
+        }
+
+        if file_len < TOMBSTONE_WAL_HEADER_SIZE {
+            return Err(MemFuseError::Storage(
+                "Unbekanntes oder veraltetes tombstone.wal-Format, bitte vor Upgrade leeren".into(),
+            ));
+        }
+
+        let mut magic_buf = [0u8; 4];
+        let mut version_buf = [0u8; 1];
+        if file.read_exact(&mut magic_buf).is_err() || file.read_exact(&mut version_buf).is_err() {
+            return Err(MemFuseError::Storage(
+                "Unbekanntes oder veraltetes tombstone.wal-Format, bitte vor Upgrade leeren".into(),
+            ));
+        }
+
+        if magic_buf != *TOMBSTONE_WAL_MAGIC || version_buf[0] != TOMBSTONE_WAL_VERSION {
+            return Err(MemFuseError::Storage(
+                "Unbekanntes oder veraltetes tombstone.wal-Format, bitte vor Upgrade leeren".into(),
+            ));
+        }
+
+        let mut offset = TOMBSTONE_WAL_HEADER_SIZE;
+        let mut buf_id = [0u8; 8];
+
+        while file.read_exact(&mut buf_id).is_ok() {
+            let entry_offset = offset;
+            offset += 8;
+
+            let doc_id = u64::from_le_bytes(buf_id);
+
+            let mut buf_hmac = [0u8; 32];
+            if file.read_exact(&mut buf_hmac).is_err() {
+                tracing::warn!("Truncated HMAC in tombstone.wal");
+                break;
+            }
+            offset += 32;
+
+            let mut hmac = memfuse_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            hmac.update(&buf_id);
+            let computed_hmac = hmac.finalize();
+
+            if computed_hmac.ct_eq(&buf_hmac).into() {
+                bitset.insert(doc_id);
+            } else {
+                tracing::error!(
+                    offset = entry_offset,
+                    doc_id = doc_id,
+                    "tombstone.wal: HMAC-Mismatch bei Eintrag, Eintrag verworfen"
+                );
+            }
+        }
+        Ok(bitset)
     }
 
     /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 integrity protection.
@@ -822,8 +957,13 @@ impl DiskAnnIndex {
         let mut all_vecs = Vec::with_capacity(disk_count);
         let mut all_ids = Vec::with_capacity(disk_count);
 
+        let tombstones = self.inner.tombstones.read();
+
         for i in 0..disk_count as u32 {
             let node = self.load_node(i)?;
+            if tombstones.contains(node.doc_id.inner()) {
+                continue;
+            }
             let vec_f32 = match node.vector {
                 VectorData::F32(v) => v,
                 VectorData::U8(v) => {
@@ -1222,6 +1362,12 @@ impl DiskAnnIndex {
             let _ = tokio::fs::remove_file(&pending_wal).await;
         }
 
+        let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
+        if tombstone_wal.exists() {
+            let _ = tokio::fs::remove_file(&tombstone_wal).await;
+        }
+        self.inner.tombstones.write().clear();
+
         self.load().await?;
         self.verify_graph_integrity_debug()?;
 
@@ -1582,6 +1728,21 @@ impl DiskAnnIndex {
             self.recover_pending_delta().await?;
         }
 
+        // Recover tombstones from tombstone.wal
+        let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
+        if tombstone_wal.exists() {
+            let path_clone = tombstone_wal.clone();
+            let recovered_tombstones =
+                tokio::task::spawn_blocking(move || Self::read_tombstone_wal(&path_clone))
+                    .await
+                    .map_err(|e| {
+                        MemFuseError::Storage(format!(
+                            "Join error during tombstone.wal recovery: {e}"
+                        ))
+                    })??;
+            *self.inner.tombstones.write() = recovered_tombstones;
+        }
+
         Ok(())
     }
 
@@ -1891,8 +2052,15 @@ impl DiskAnnIndex {
         let mut sorted_results: Vec<SearchCandidate> = results.into_vec();
         sorted_results.sort_by(|a, b| a.distance.total_cmp(&b.distance));
 
-        for c in sorted_results.into_iter().take(k) {
+        let tombstones = self.inner.tombstones.read();
+        for c in sorted_results.into_iter() {
+            if final_results.len() >= k {
+                break;
+            }
             let node = self.load_node(c.index)?;
+            if tombstones.contains(node.doc_id.inner()) {
+                continue;
+            }
             let score = match metric {
                 DistanceMetric::Cosine => 1.0 - c.distance,
                 DistanceMetric::Euclidean => 1.0 / (1.0 + c.distance),
@@ -1957,9 +2125,37 @@ impl VectorIndex for DiskAnnIndex {
         if let Some(hnsw) = fallback_opt {
             return hnsw.delete(tx, id).await;
         }
-        Err(MemFuseError::InvalidInput(
-            "DiskAnn is a read-only out-of-core index.".to_string(),
-        ))
+
+        let doc_id_u64 = id.inner();
+
+        if self.inner.tombstones.read().contains(doc_id_u64) {
+            return Err(MemFuseError::NotFound(format!(
+                "DocId {} not found in index or already deleted",
+                doc_id_u64
+            )));
+        }
+
+        let exists_in_doc_ids = self.inner.doc_ids.read().contains(&id);
+        let exists_in_pending = self
+            .inner
+            .pending_inserts
+            .read()
+            .iter()
+            .any(|(pid, _)| *pid == id);
+
+        if !exists_in_doc_ids && !exists_in_pending {
+            return Err(MemFuseError::NotFound(format!(
+                "DocId {} not found in DiskANN index",
+                doc_id_u64
+            )));
+        }
+
+        self.inner.tombstones.write().insert(doc_id_u64);
+
+        let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
+        Self::append_to_tombstone_wal(&tombstone_wal, id).await?;
+
+        Ok(())
     }
 
     async fn commit(&self, tx: TxId) -> Result<()> {
@@ -1991,7 +2187,20 @@ impl VectorIndex for DiskAnnIndex {
         if let Some(hnsw) = fallback_opt {
             return hnsw.all_doc_ids().await;
         }
-        Ok(self.inner.doc_ids.read().clone())
+        let tombstones = self.inner.tombstones.read();
+        let mut ids = Vec::new();
+
+        for &id in self.inner.doc_ids.read().iter() {
+            if !tombstones.contains(id.inner()) {
+                ids.push(id);
+            }
+        }
+        for (id, _) in self.inner.pending_inserts.read().iter() {
+            if !tombstones.contains(id.inner()) && !ids.contains(id) {
+                ids.push(*id);
+            }
+        }
+        Ok(ids)
     }
 
     async fn last_tx_id(&self) -> Result<TxId> {
@@ -2003,8 +2212,7 @@ impl VectorIndex for DiskAnnIndex {
         if let Some(hnsw) = fallback_opt {
             return hnsw.len().await;
         }
-        let guard = self.inner.header.read();
-        guard.as_ref().map(|h| h.node_count as usize).unwrap_or(0)
+        self.all_doc_ids().await.map(|ids| ids.len()).unwrap_or(0)
     }
 
     async fn stats(&self) -> Result<VectorIndexStats> {
@@ -2012,11 +2220,24 @@ impl VectorIndex for DiskAnnIndex {
         let count = self.len().await;
         let node_size = self.inner.node_size_bytes.load(Ordering::SeqCst) as usize;
         let cache_usage = self.inner.cache.read().len() * node_size;
+
+        let total_nodes = {
+            let disk_nodes = self.inner.header.read().map(|h| h.node_count as usize).unwrap_or(0);
+            let pending_nodes = self.inner.pending_inserts.read().len();
+            disk_nodes + pending_nodes
+        };
+        let deleted_count = self.inner.tombstones.read().len() as usize;
+        let deleted_ratio = if total_nodes > 0 {
+            deleted_count as f64 / total_nodes as f64
+        } else {
+            0.0
+        };
+
         Ok(VectorIndexStats {
             num_vectors: count,
             memory_usage_bytes: cache_usage,
             num_layers: 1,
-            deleted_ratio: 0.0,
+            deleted_ratio,
             rebuild_count: 0,
         })
     }
@@ -2092,13 +2313,74 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_diskann_read_only_mutations_return_error() {
-        let index = DiskAnnIndex::try_new(DiskAnnConfig::default()).expect("valid config"); // expect
+    async fn test_diskann_delete_non_existent_returns_not_found() {
+        let index = DiskAnnIndex::try_new(DiskAnnConfig::default()).expect("valid config");
         let tx = TxId::new(1);
         let doc_id = DocId::from(100);
 
         let delete_res = index.delete(tx, doc_id).await;
-        assert!(matches!(delete_res, Err(MemFuseError::InvalidInput(_))));
+        assert!(matches!(delete_res, Err(MemFuseError::NotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_diskann_tombstone_delete_search_filtering() -> Result<()> {
+        let dir = tempfile::tempdir().map_err(MemFuseError::Io)?;
+        let index_path = dir.path().join("tombstone_filtering.idx");
+        let config = DiskAnnConfig {
+            index_path: index_path.clone(),
+            dimension: 4,
+            max_degree: 4,
+            beam_width: 4,
+            distance_metric: DistanceMetric::Euclidean,
+            fallback_policy: DiskAnnFallbackPolicy::FailFast,
+            ..DiskAnnConfig::default()
+        };
+        let index = DiskAnnIndex::try_new(config.clone())?;
+
+        let vecs = vec![
+            vec![1.0, 0.0, 0.0, 0.0],
+            vec![2.0, 0.0, 0.0, 0.0],
+            vec![3.0, 0.0, 0.0, 0.0],
+        ];
+        let ids = vec![DocId::from(10), DocId::from(20), DocId::from(30)];
+        index.build(&vecs, &ids).await?;
+
+        // 1. Initial search finds doc 10 as top result
+        let query = vec![1.0, 0.0, 0.0, 0.0];
+        let res = index.search(&query, 1).await?;
+        assert_eq!(res[0].doc_id, DocId::from(10));
+        assert_eq!(index.len().await, 3);
+
+        // 2. Delete doc 10
+        index.delete(TxId(1), DocId::from(10)).await?;
+        assert_eq!(index.len().await, 2);
+
+        // Deleting doc 10 again returns NotFound
+        let del2 = index.delete(TxId(1), DocId::from(10)).await;
+        assert!(matches!(del2, Err(MemFuseError::NotFound(_))));
+
+        // 3. Search query no longer returns doc 10, instead returns doc 20
+        let res_after_del = index.search(&query, 1).await?;
+        assert_eq!(res_after_del[0].doc_id, DocId::from(20));
+
+        let all_ids = index.all_doc_ids().await?;
+        assert!(!all_ids.contains(&DocId::from(10)));
+        assert_eq!(all_ids.len(), 2);
+
+        let stats = index.stats().await?;
+        assert_eq!(stats.num_vectors, 2);
+        assert!((stats.deleted_ratio - (1.0 / 3.0)).abs() < 1e-4);
+
+        // 4. Persistence & WAL recovery after reload
+        drop(index);
+        let reloaded = DiskAnnIndex::try_new(config)?;
+        reloaded.load().await?;
+
+        assert_eq!(reloaded.len().await, 2);
+        let res_reloaded = reloaded.search(&query, 1).await?;
+        assert_eq!(res_reloaded[0].doc_id, DocId::from(20));
+
+        Ok(())
     }
 
     #[tokio::test]
