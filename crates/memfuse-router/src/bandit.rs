@@ -29,6 +29,14 @@ fn default_drift_decay_window() -> usize {
     50
 }
 
+fn default_alpha_base() -> f32 {
+    0.5
+}
+
+fn default_alpha_max_multiplier() -> f32 {
+    4.0
+}
+
 /// Laufzeitzustand eines LinUCB-Bandits pro Profil.
 ///
 /// # Formeln (§13.2)
@@ -57,6 +65,12 @@ pub struct BanditProfileState {
     pub work_buf: Vec<f32>,
     /// Exploration-Parameter α_p.
     pub alpha: f32,
+    /// Cold-Start Baseline Exploration Parameter α_base (Default: 0.5).
+    #[serde(default = "default_alpha_base")]
+    pub alpha_base: f32,
+    /// Maximale Eskalation von α als Multiplikator von α_base (Default: 4.0).
+    #[serde(default = "default_alpha_max_multiplier")]
+    pub alpha_max_multiplier: f32,
     /// Kostensensitivität λ (Default: 0.1).
     pub lambda: f32,
     /// Privacy-Malus für Cloud-Transport μ (Default: 0.2).
@@ -91,6 +105,8 @@ impl BanditProfileState {
             inv_a,
             work_buf: vec![0.0f32; d],
             alpha: alpha_base,
+            alpha_base,
+            alpha_max_multiplier: default_alpha_max_multiplier(),
             lambda: 0.1,
             mu: 0.2,
             gamma: default_gamma(),
@@ -249,10 +265,10 @@ impl BanditProfileState {
 
     /// Drift-Kopplung: Erhöhe α temporär und aktiviere beschleunigten Decay bei erkannter Drift (§13.2).
     ///
-    /// α_p ← α_p · k_drift (Default k_drift = 2.0)
+    /// α_p ← min(α_p · k_drift, α_base · alpha_max_multiplier)
     /// drift_steps_remaining ← drift_decay_window (Default: 50)
     pub fn on_drift_detected(&mut self, k_drift: f32) {
-        self.alpha *= k_drift;
+        self.alpha = (self.alpha * k_drift).min(self.alpha_base * self.alpha_max_multiplier);
         self.drift_steps_remaining = self.drift_decay_window;
     }
 }
@@ -329,6 +345,39 @@ mod tests {
         state.on_drift_detected(2.0);
         assert!((state.alpha - alpha_before * 2.0).abs() < 1e-6);
         assert_eq!(state.drift_steps_remaining, state.drift_decay_window);
+    }
+
+    #[test]
+    fn test_repeated_drift_caps_at_max_multiplier() {
+        let mut state = BanditProfileState::cold_start(2, 0.5);
+        let max_expected_alpha = state.alpha_base * state.alpha_max_multiplier; // 0.5 * 4.0 = 2.0
+        for _ in 0..10 {
+            state.on_drift_detected(2.0);
+        }
+        assert!((state.alpha - max_expected_alpha).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_serde_backward_compatibility_for_alpha_fields() {
+        // Simuliert einen alten JSON-Snapshot ohne alpha_base und alpha_max_multiplier
+        let legacy_json = r#"{
+            "theta": [0.0, 0.0],
+            "sigma_sq": [1.0, 1.0],
+            "inv_a": [],
+            "alpha": 0.5,
+            "lambda": 0.1,
+            "mu": 0.2,
+            "gamma": 0.999,
+            "drift_gamma": 0.95,
+            "drift_steps_remaining": 0,
+            "drift_decay_window": 50,
+            "implementation": "DiagonalApproximation"
+        }"#;
+
+        let state: BanditProfileState = serde_json::from_str(legacy_json)
+            .unwrap_or_else(|e| panic!("Deserialisierung alter Snapshots fehlgeschlagen: {e}"));
+        assert_eq!(state.alpha_base, 0.5);
+        assert_eq!(state.alpha_max_multiplier, 4.0);
     }
 
     #[test]

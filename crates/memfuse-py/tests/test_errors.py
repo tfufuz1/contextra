@@ -144,7 +144,18 @@ def test_numeric_id_validation(db):
         db.delete(-100)
     assert "cannot be a negative integer" in str(excinfo.value)
 
-    # Overflowing integer IDs (> u64::MAX) must raise MemFuseValueError
+    # Value > u64::MAX (e.g. 2**64 + 1 = 18446744073709551617)
+    # Under standard build, this raises MemFuseValueError; under docid-128, it is accepted.
+    u64_overflow_id = 2**64 + 1
+    try:
+        db.insert(u64_overflow_id, v)
+        doc = db.get(u64_overflow_id)
+        assert doc is not None
+        assert doc.id == str(u64_overflow_id)
+    except memfuse.MemFuseValueError as exc:
+        assert "exceeds maximum allowed bound" in str(exc)
+
+    # Overflowing integer IDs (> i128::MAX) must raise MemFuseValueError
     overflow_id = 2**128 + 1
     with pytest.raises(memfuse.MemFuseValueError) as excinfo:
         db.insert(overflow_id, v)
