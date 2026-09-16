@@ -53,6 +53,7 @@ async fn test_ppr_graph_1_single_dangling_node() {
         damping_factor: 0.85,
         max_iterations: 100,
         convergence_epsilon: 1e-6,
+        algorithm: memfuse_core::PprAlgorithm::Auto,
         warn_on_non_convergence: true,
     };
 
@@ -142,6 +143,7 @@ async fn test_ppr_graph_2_extreme_90_percent_dangling_nodes() {
         damping_factor: 0.85,
         max_iterations: 100,
         convergence_epsilon: 1e-6,
+        algorithm: memfuse_core::PprAlgorithm::Auto,
         warn_on_non_convergence: true,
     };
 
@@ -222,6 +224,7 @@ async fn test_ppr_graph_3_group_of_dangling_nodes() {
         damping_factor: 0.85,
         max_iterations: 100,
         convergence_epsilon: 1e-6,
+        algorithm: memfuse_core::PprAlgorithm::Auto,
         warn_on_non_convergence: true,
     };
 

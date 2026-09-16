@@ -158,39 +158,6 @@ impl<T: Ord> BoundedTopK<T> {
     }
 }
 
-#[cfg(test)]
-struct HeapEntry {
-    result: SearchResult,
-}
-
-#[cfg(test)]
-impl PartialEq for HeapEntry {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == std::cmp::Ordering::Equal
-    }
-}
-
-#[cfg(test)]
-impl Eq for HeapEntry {}
-
-#[cfg(test)]
-impl Ord for HeapEntry {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // We want BinaryHeap (a max-heap by default) to keep the worst item at the top (peek),
-        // so that peek() returns the candidate with the lowest score (or highest ID on tie).
-        // Therefore, lower score => Greater priority in max-heap.
-        cmp_scores(other.result.score, self.result.score)
-            .then_with(|| self.result.id.cmp(&other.result.id))
-    }
-}
-
-#[cfg(test)]
-impl PartialOrd for HeapEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum SignalKey<'a> {
     Known(SignalKind),
@@ -199,7 +166,7 @@ enum SignalKey<'a> {
 
 impl<'a> SignalKey<'a> {
     fn from_name(name: &'a str) -> Option<Self> {
-        if name.is_empty() || name == "unnamed" {
+        if name.is_empty() || name.eq_ignore_ascii_case("unnamed") {
             None
         } else if let Some(kind) = SignalKind::from_name(name) {
             Some(SignalKey::Known(kind))
@@ -249,18 +216,28 @@ pub enum SignalKind {
 impl SignalKind {
     /// Identifies `SignalKind` from a signal name string (e.g. "vector", "text", "graph", "edge-reinforcement").
     pub fn from_name(name: &str) -> Option<Self> {
-        match name.to_lowercase().as_str() {
-            "vector" | "vec" => Some(SignalKind::Vector),
-            "text" | "bm25" | "keyword" => Some(SignalKind::Text),
-            "graph" => Some(SignalKind::Graph),
-            #[cfg(feature = "edge-reinforcement-learning")]
-            "edge-reinforcement"
-            | "cooccurrence"
-            | "traversal-reinforcement"
-            | "synaptic"
-            | "hebbian" => Some(SignalKind::EdgeReinforcement),
-            _ => None,
+        if name.eq_ignore_ascii_case("vector") || name.eq_ignore_ascii_case("vec") {
+            return Some(SignalKind::Vector);
         }
+        if name.eq_ignore_ascii_case("text")
+            || name.eq_ignore_ascii_case("bm25")
+            || name.eq_ignore_ascii_case("keyword")
+        {
+            return Some(SignalKind::Text);
+        }
+        if name.eq_ignore_ascii_case("graph") {
+            return Some(SignalKind::Graph);
+        }
+        #[cfg(feature = "edge-reinforcement-learning")]
+        if name.eq_ignore_ascii_case("edge-reinforcement")
+            || name.eq_ignore_ascii_case("cooccurrence")
+            || name.eq_ignore_ascii_case("traversal-reinforcement")
+            || name.eq_ignore_ascii_case("synaptic")
+            || name.eq_ignore_ascii_case("hebbian")
+        {
+            return Some(SignalKind::EdgeReinforcement);
+        }
+        None
     }
 
     /// Converts `SignalKind` to its canonical string representation.
@@ -320,11 +297,116 @@ impl MetadataMergePriority {
     }
 }
 
+/// Fluent builder for constructing `ProvenanceRecord` instances.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProvenanceBuilder {
+    vector_distance: Option<f32>,
+    vector_rank: Option<u32>,
+    vector_weight: Option<f32>,
+    bm25_score: Option<f32>,
+    bm25_rank: Option<u32>,
+    text_weight: Option<f32>,
+    graph_score: Option<f32>,
+    graph_rank: Option<u32>,
+    graph_weight: Option<f32>,
+    rerank_score: Option<f32>,
+    rrf_k: f32,
+    source_collection: Option<String>,
+    index_type: Option<String>,
+    expected_total: Option<f32>,
+}
+
+impl ProvenanceBuilder {
+    /// Creates a new `ProvenanceBuilder` with the specified RRF parameter `k`.
+    ///
+    /// Note: `rrf_k` is intentionally required and has no `Default` implementation
+    /// to eliminate division-by-zero risks in RRF calculations.
+    pub fn new(rrf_k: f32) -> Self {
+        Self {
+            vector_distance: None,
+            vector_rank: None,
+            vector_weight: None,
+            bm25_score: None,
+            bm25_rank: None,
+            text_weight: None,
+            graph_score: None,
+            graph_rank: None,
+            graph_weight: None,
+            rerank_score: None,
+            rrf_k,
+            source_collection: None,
+            index_type: None,
+            expected_total: None,
+        }
+    }
+
+    pub fn vector(mut self, dist: f32, rank: u32, weight: impl Into<Option<f32>>) -> Self {
+        self.vector_distance = Some(dist);
+        self.vector_rank = Some(rank);
+        self.vector_weight = weight.into();
+        self
+    }
+
+    pub fn bm25(mut self, score: f32, rank: u32, weight: impl Into<Option<f32>>) -> Self {
+        self.bm25_score = Some(score);
+        self.bm25_rank = Some(rank);
+        self.text_weight = weight.into();
+        self
+    }
+
+    pub fn graph(mut self, score: f32, rank: u32, weight: impl Into<Option<f32>>) -> Self {
+        self.graph_score = Some(score);
+        self.graph_rank = Some(rank);
+        self.graph_weight = weight.into();
+        self
+    }
+
+    pub fn rerank_score(mut self, score: f32) -> Self {
+        self.rerank_score = Some(score);
+        self
+    }
+
+    pub fn source_collection(mut self, collection: impl Into<String>) -> Self {
+        self.source_collection = Some(collection.into());
+        self
+    }
+
+    pub fn index_type(mut self, index_type: impl Into<String>) -> Self {
+        self.index_type = Some(index_type.into());
+        self
+    }
+
+    pub fn expected_total(mut self, total: f32) -> Self {
+        self.expected_total = Some(total);
+        self
+    }
+
+    pub fn build(self) -> ProvenanceRecord {
+        build_provenance(
+            // intern
+            self.vector_distance,
+            self.vector_rank,
+            self.vector_weight,
+            self.bm25_score,
+            self.bm25_rank,
+            self.text_weight,
+            self.graph_score,
+            self.graph_rank,
+            self.graph_weight,
+            self.rerank_score,
+            self.rrf_k,
+            self.source_collection,
+            self.index_type,
+            self.expected_total,
+        )
+    }
+}
+
 /// Baut einen ProvenanceRecord aus den verfügbaren Signal-Scores und optionalen Signal-Gewichten.
 /// Erfüllt INV-PROV-1: sum(contributions.rrf_contribution) ≈ unboosted RRF score (|Δ| < 1e-6).
 /// Die Invariante wird in Debug-Builds per `debug_assert!` überprüft, wenn `expected_total` (Ground-Truth RRF score) angegeben ist.
 #[allow(clippy::too_many_arguments)]
-pub fn build_provenance(
+pub(super) fn build_provenance(
     vector_distance: Option<f32>,
     vector_rank: Option<u32>,
     vector_weight: Option<f32>,
@@ -873,25 +955,37 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
                 || prov.index_type.is_some())
         {
             let final_prov = if prov.signal_contributions.is_empty() {
-                build_provenance(
+                let mut builder = ProvenanceBuilder::new(k as f32);
+                if let (Some(dist), Some(rank)) = (
                     prov.vector_distance,
                     prov.signal_ranks.get("vector").copied(),
-                    None,
+                ) {
+                    builder = builder.vector(dist, rank, None);
+                }
+                if let (Some(score), Some(rank)) = (
                     prov.bm25_score,
                     prov.signal_ranks
                         .get("text")
                         .copied()
                         .or_else(|| prov.signal_ranks.get("bm25").copied()),
-                    None,
-                    prov.graph_score,
-                    prov.signal_ranks.get("graph").copied(),
-                    None,
-                    prov.rerank_score,
-                    k as f32,
-                    prov.source_collection,
-                    prov.index_type,
-                    None,
-                )
+                ) {
+                    builder = builder.bm25(score, rank, None);
+                }
+                if let (Some(score), Some(rank)) =
+                    (prov.graph_score, prov.signal_ranks.get("graph").copied())
+                {
+                    builder = builder.graph(score, rank, None);
+                }
+                if let Some(score) = prov.rerank_score {
+                    builder = builder.rerank_score(score);
+                }
+                if let Some(col) = prov.source_collection {
+                    builder = builder.source_collection(col);
+                }
+                if let Some(idx) = prov.index_type {
+                    builder = builder.index_type(idx);
+                }
+                builder.build()
             } else {
                 prov
             };
@@ -1287,22 +1381,12 @@ mod tests {
             },
         ];
 
-        let prov = build_provenance(
-            Some(0.9),
-            Some(1),
-            Some(1.0),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            0.0,
-            Some("col".to_string()),
-            Some("hnsw".to_string()),
-            Some(1.0),
-        );
+        let prov = ProvenanceBuilder::new(0.0)
+            .vector(0.9, 1, 1.0)
+            .source_collection("col")
+            .index_type("hnsw")
+            .expected_total(1.0)
+            .build();
         let contrib = prov
             .signal_contributions
             .get("vector")
@@ -1794,22 +1878,12 @@ mod tests {
         let k = 60.0f32;
         let expected_contrib = weight / (k + rank as f32);
 
-        let prov = build_provenance(
-            Some(0.95),
-            Some(rank),
-            Some(weight),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            k,
-            Some("test_collection".to_string()),
-            Some("hnsw".to_string()),
-            Some(expected_contrib),
-        );
+        let prov = ProvenanceBuilder::new(k)
+            .vector(0.95, rank, weight)
+            .source_collection("test_collection")
+            .index_type("hnsw")
+            .expected_total(expected_contrib)
+            .build();
 
         let sum: f32 = prov
             .signal_contributions
@@ -1827,107 +1901,13 @@ mod tests {
         let k = 60.0f32;
         let wrong_expected = 0.999f32; // Discrepancy > 1e-6
 
-        let prov = build_provenance(
-            Some(0.95),
-            Some(rank),
-            Some(weight),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            k,
-            Some("test_collection".to_string()),
-            Some("hnsw".to_string()),
-            Some(wrong_expected),
-        );
+        let prov = ProvenanceBuilder::new(k)
+            .vector(0.95, rank, weight)
+            .source_collection("test_collection")
+            .index_type("hnsw")
+            .expected_total(wrong_expected)
+            .build();
         assert!(!prov.signal_contributions.is_empty());
-    }
-
-    #[test]
-    fn test_heap_entry_nan_score_sorts_to_worst_position() {
-        use std::collections::BinaryHeap;
-
-        let mut heap = BinaryHeap::new();
-        heap.push(HeapEntry {
-            result: SearchResult {
-                id: "doc1".to_string(),
-                score: 0.9,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        });
-        heap.push(HeapEntry {
-            result: SearchResult {
-                id: "doc2".to_string(),
-                score: 0.5,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        });
-        heap.push(HeapEntry {
-            result: SearchResult {
-                id: "doc_nan".to_string(),
-                score: f32::NAN,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        });
-
-        let sorted: Vec<_> = heap
-            .into_sorted_vec()
-            .into_iter()
-            .map(|e| e.result.id)
-            .collect();
-
-        assert_eq!(
-            sorted.last().map(|s| s.as_str()),
-            Some("doc_nan"),
-            "NaN score entry must be at the end (worst position) in sorted results\nSorted order: {:?}",
-            sorted
-        );
-    }
-
-    #[test]
-    fn test_heap_entry_tie_breaking_deterministic() {
-        use std::collections::BinaryHeap;
-
-        let mut heap = BinaryHeap::new();
-        heap.push(HeapEntry {
-            result: SearchResult {
-                id: "doc_B".to_string(),
-                score: 0.5,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        });
-        heap.push(HeapEntry {
-            result: SearchResult {
-                id: "doc_A".to_string(),
-                score: 0.5,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        });
-
-        let sorted: Vec<_> = heap
-            .into_sorted_vec()
-            .into_iter()
-            .map(|e| e.result.id)
-            .collect();
-
-        assert_eq!(
-            sorted,
-            vec!["doc_A", "doc_B"],
-            "Identical scores must break ties lexicographically by ID (A before B)"
-        );
     }
 
     #[test]
@@ -3029,35 +3009,6 @@ mod tests {
                 "All RRF final scores must be finite despite non-finite raw inputs"
             );
         }
-
-        // 3. HeapEntry total_cmp behavior with NaN scores
-        let mut heap = std::collections::BinaryHeap::new();
-        heap.push(HeapEntry {
-            result: SearchResult {
-                id: "b_nan".to_string(),
-                score: f32::NAN,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        });
-        heap.push(HeapEntry {
-            result: SearchResult {
-                id: "a_nan".to_string(),
-                score: f32::NAN,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        });
-
-        // BinaryHeap pop returns maximum element according to Ord (worst item at top)
-        let first_pop = heap.pop().expect("heap entry");
-        let second_pop = heap.pop().expect("heap entry");
-        // For equal NaN scores, other.result.id.cmp(&self.result.id) tie breaks.
-        // peek/pop priority = lower score or higher ID => "b_nan" has higher ID than "a_nan", so "b_nan" > "a_nan"
-        assert_eq!(first_pop.result.id, "b_nan");
-        assert_eq!(second_pop.result.id, "a_nan");
     }
 
     #[cfg(test)]
@@ -3183,22 +3134,10 @@ mod tests {
     #[test]
     fn test_weighted_rrf_k_zero_boundary() {
         // At k=0, for rank 1 (1-indexed): score = 1.0 / (0.0 + 1.0) = 1.0
-        let prov = build_provenance(
-            Some(0.9),
-            Some(1),
-            Some(1.0),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            0.0,
-            None,
-            None,
-            Some(1.0),
-        );
+        let prov = ProvenanceBuilder::new(0.0)
+            .vector(0.9, 1, 1.0)
+            .expected_total(1.0)
+            .build();
         assert_eq!(
             prov.signal_contributions
                 .get("vector")
