@@ -912,6 +912,15 @@ mod tests {
             Box::pin(async move { self.inner.put(tx_id, key, value).await })
         }
 
+        fn put_if_absent<'a>(
+            &'a self,
+            tx_id: TxId,
+            key: &'a [u8],
+            value: &'a [u8],
+        ) -> BoxFuture<'a, Result<bool>> {
+            Box::pin(async move { self.inner.put_if_absent(tx_id, key, value).await })
+        }
+
         fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
                 if self.fail_delete.load(Ordering::SeqCst) {

@@ -515,22 +515,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     };
                 let rank = (results.len() + 1) as u32;
                 let rrf_contrib = 1.0 / (60.0 + rank as f32);
-                let prov = crate::fusion::build_provenance(
-                    Some(sd.score),
-                    Some(rank),
-                    Some(1.0),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    60.0,
-                    Some(self.name.clone()),
-                    Some("hnsw".to_string()),
-                    Some(rrf_contrib),
-                );
+                let prov = crate::fusion::ProvenanceBuilder::new(60.0)
+                    .vector(sd.score, rank, 1.0)
+                    .source_collection(self.name.clone())
+                    .index_type("hnsw")
+                    .expected_total(rrf_contrib)
+                    .build();
                 results.push(crate::SearchResult {
                     id,
                     score: sd.score,
@@ -803,12 +793,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 signal_sets.push(("graph".to_string(), graph_results, gw));
             }
 
-            let mut fused = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
+            let mut fused = crate::fusion::fuse_search_results_with_strategy(
                 signal_sets,
                 k.saturating_mul(Self::OVERFETCH_FACTOR),
                 crate::fusion::MetadataMergePriority::default(),
                 true,
                 None,
+                memfuse_core::FusionStrategy::Rrf,
             );
             fused.truncate(k);
 
@@ -1162,12 +1153,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 .saturating_mul(Self::OVERFETCH_FACTOR)
                 .min(memfuse_core::MAX_SEARCH_K);
 
-            let mut fused_results = crate::fusion::weighted_reciprocal_rank_fusion_with_options(
+            let mut fused_results = crate::fusion::fuse_search_results_with_strategy(
                 signal_sets,
                 max_fusion_results,
                 crate::fusion::MetadataMergePriority::default(),
                 query.include_provenance,
                 None,
+                query.fusion_strategy,
             );
 
             // Use oversized candidate pool (3×k) for Supersedes resolution to prevent
