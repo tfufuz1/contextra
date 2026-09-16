@@ -19,6 +19,8 @@ use crate::{capabilities::WasmCapabilities, error::SandboxError, output::WasmOut
 struct SandboxState {
     max_pages: u32,
     allow_cloud_egress: bool,
+    allow_stdout: bool,
+    allow_stderr: bool,
 }
 
 impl wasmtime::ResourceLimiter for SandboxState {
@@ -97,6 +99,8 @@ impl WasmExecutor {
             SandboxState {
                 max_pages: capabilities.max_memory_pages,
                 allow_cloud_egress: capabilities.allow_cloud_egress,
+                allow_stdout: capabilities.allow_stdout,
+                allow_stderr: capabilities.allow_stderr,
             },
         );
 
@@ -131,24 +135,124 @@ impl WasmExecutor {
         let stdout_clone = stdout_buf.clone();
         let stderr_clone = stderr_buf.clone();
 
-        // AI-TAG[SMELL][MINOR] WASI fd_write stub does not parse iovs buffer slices into stdout_buf/stderr_buf (ID: AGT-SANDBOX-12a4a39c) (TS: 2026-09-15T16:05:00Z) (SESSION: acf8fe72)
+        // AI-TAG[RESOLVED] WASI fd_write buffer parsing (ID: AGT-SANDBOX-12a4a39c) (TS: 2026-09-15T16:05:00Z) (SESSION: acf8fe72)
         // BEFUND: Linker stub for WASI fd_write discards iovs memory buffers and returns 0 without writing to stdout_buf or stderr_buf.
-        // RISIKO: WASM modules using WASI fd_write will execute without error but produce empty WasmOutput stdout/stderr buffers.
-        // EMPFEHLUNG: Parse guest memory iovs structures via WASI preview1 buffer reader when allow_stdout / allow_stderr is enabled.
-        // Minimalste WASI-fd_write Implementierung für stdout
+        // RESOLVED: Implemented WASI preview1 buffer parser reading guest memory ciovec structures into stdout_buf/stderr_buf with defensive bounds checking.
         linker
             .func_wrap(
                 "wasi_snapshot_preview1",
                 "fd_write",
-                move |_caller: wasmtime::Caller<'_, SandboxState>,
+                move |mut caller: wasmtime::Caller<'_, SandboxState>,
                       fd: i32,
-                      iovs: i32,
+                      iovs_ptr: i32,
                       iovs_len: i32,
-                      nwritten: i32|
+                      nwritten_ptr: i32|
                       -> i32 {
-                    // Minimal stub — verhindert Trap bei fd_write-Calls
-                    let _ = (fd, iovs, iovs_len, nwritten, &stdout_clone, &stderr_clone);
-                    0i32
+                    const ERRNO_SUCCESS: i32 = 0;
+                    const ERRNO_BADF: i32 = 8;
+                    const ERRNO_INVAL: i32 = 28;
+
+                    if fd != 1 && fd != 2 {
+                        return ERRNO_BADF;
+                    }
+
+                    if iovs_ptr < 0 || iovs_len < 0 || nwritten_ptr < 0 {
+                        return ERRNO_INVAL;
+                    }
+
+                    let memory = match caller.get_export("memory") {
+                        Some(wasmtime::Extern::Memory(mem)) => mem,
+                        _ => return ERRNO_INVAL,
+                    };
+
+                    let mem_slice = memory.data(&caller);
+                    let iovs_start = iovs_ptr as usize;
+                    let iovs_count = iovs_len as usize;
+
+                    let iovs_bytes = match iovs_count.checked_mul(8) {
+                        Some(bytes) => bytes,
+                        None => return ERRNO_INVAL,
+                    };
+
+                    let iovs_end = match iovs_start.checked_add(iovs_bytes) {
+                        Some(end) => end,
+                        None => return ERRNO_INVAL,
+                    };
+
+                    if iovs_end > mem_slice.len() {
+                        return ERRNO_INVAL;
+                    }
+
+                    let mut total_written: u32 = 0;
+                    let allow_write = if fd == 1 {
+                        caller.data().allow_stdout
+                    } else {
+                        caller.data().allow_stderr
+                    };
+
+                    for i in 0..iovs_count {
+                        let offset = iovs_start + i * 8;
+                        let iov_buf = match mem_slice.get(offset..offset + 8) {
+                            Some(slice) => slice,
+                            None => return ERRNO_INVAL,
+                        };
+
+                        let buf_ptr = u32::from_le_bytes(match iov_buf[0..4].try_into() {
+                            Ok(arr) => arr,
+                            Err(_) => return ERRNO_INVAL,
+                        }) as usize;
+                        let buf_len = u32::from_le_bytes(match iov_buf[4..8].try_into() {
+                            Ok(arr) => arr,
+                            Err(_) => return ERRNO_INVAL,
+                        }) as usize;
+
+                        let buf_end = match buf_ptr.checked_add(buf_len) {
+                            Some(end) => end,
+                            None => return ERRNO_INVAL,
+                        };
+
+                        if buf_end > mem_slice.len() {
+                            return ERRNO_INVAL;
+                        }
+
+                        if allow_write && buf_len > 0 {
+                            if let Some(slice) = mem_slice.get(buf_ptr..buf_end) {
+                                if fd == 1 {
+                                    if let Ok(mut guard) = stdout_clone.lock() {
+                                        guard.extend_from_slice(slice);
+                                    }
+                                } else if fd == 2 {
+                                    if let Ok(mut guard) = stderr_clone.lock() {
+                                        guard.extend_from_slice(slice);
+                                    }
+                                }
+                            }
+                        }
+
+                        total_written = match total_written.checked_add(buf_len as u32) {
+                            Some(sum) => sum,
+                            None => return ERRNO_INVAL,
+                        };
+                    }
+
+                    let nwritten_offset = nwritten_ptr as usize;
+                    let nwritten_end = match nwritten_offset.checked_add(4) {
+                        Some(end) => end,
+                        None => return ERRNO_INVAL,
+                    };
+
+                    let mem_slice_mut = memory.data_mut(&mut caller);
+                    if nwritten_end > mem_slice_mut.len() {
+                        return ERRNO_INVAL;
+                    }
+
+                    if let Some(dest) = mem_slice_mut.get_mut(nwritten_offset..nwritten_end) {
+                        dest.copy_from_slice(&total_written.to_le_bytes());
+                    } else {
+                        return ERRNO_INVAL;
+                    }
+
+                    ERRNO_SUCCESS
                 },
             )
             .map_err(|e| SandboxError::Runtime(format!("Linker setup failed: {}", e)))?;
@@ -178,6 +282,20 @@ impl WasmExecutor {
                 },
             )
             .map_err(|e| SandboxError::Runtime(format!("Linker host_cloud_query failed: {}", e)))?;
+
+        // Host async sleep/delay helper function for testing wall-clock timeouts
+        linker
+            .func_wrap_async(
+                "memfuse",
+                "host_sleep",
+                move |_caller: wasmtime::Caller<'_, SandboxState>, (millis,): (u32,)| {
+                    Box::new(async move {
+                        tokio::time::sleep(Duration::from_millis(millis as u64)).await;
+                        Ok(())
+                    })
+                },
+            )
+            .map_err(|e| SandboxError::Runtime(format!("Linker host_sleep failed: {}", e)))?;
 
         // Wall-Clock-Timeout wrapping der Instanziierung + Ausführung
         let execute_future = async {
@@ -216,10 +334,21 @@ impl WasmExecutor {
             ))
         };
 
-        tokio::time::timeout(timeout, execute_future)
+        // Wall-Clock-Timeout Enforcement (§4.18, IP-15 / B5)
+        // `max_wall_clock_ms` is orthogonal to `max_fuel` (CPU limit vs. Wall-Clock limit, configured independently).
+        // A value of 0 in `max_wall_clock_ms` indicates unlimited wall-clock capability limit, falling back to the caller's `timeout`.
+        let effective_timeout = if capabilities.max_wall_clock_ms > 0 {
+            std::cmp::min(timeout, Duration::from_millis(capabilities.max_wall_clock_ms))
+        } else {
+            timeout
+        };
+        let timeout_ms = effective_timeout.as_millis() as u64;
+        let deadline = tokio::time::Instant::now() + effective_timeout;
+
+        tokio::time::timeout_at(deadline, execute_future)
             .await
             .map_err(|_| SandboxError::Timeout {
-                timeout_ms: timeout.as_millis() as u64,
+                timeout_ms,
             })?
     }
 }
@@ -332,6 +461,104 @@ mod tests {
             ),
             "Expected MemoryExceeded or Runtime error, got: {:?}",
             result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_wasm_stdout_capture_via_fd_write() {
+        // WAT module that defines linear memory with "hello" at offset 16,
+        // populates a ciovec structure at offset 0 (buf_ptr=16, buf_len=5),
+        // calls wasi_snapshot_preview1::fd_write(1, 0, 1, 32),
+        // and exports _start.
+        let wat = r#"
+            (module
+                (import "wasi_snapshot_preview1" "fd_write"
+                    (func $fd_write (param i32 i32 i32 i32) (result i32)))
+                (memory (export "memory") 1)
+                (data (i32.const 16) "hello")
+                (func (export "_start")
+                    ;; ciovec at offset 0: buf_ptr = 16, buf_len = 5
+                    (i32.store (i32.const 0) (i32.const 16))
+                    (i32.store (i32.const 4) (i32.const 5))
+                    ;; call fd_write(fd=1, iovs_ptr=0, iovs_len=1, nwritten_ptr=32)
+                    (drop (call $fd_write (i32.const 1) (i32.const 0) (i32.const 1) (i32.const 32)))
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+        let executor = WasmExecutor::new().expect("WasmExecutor");
+
+        // Test 1: allow_stdout = true (default)
+        let caps = WasmCapabilities::default();
+        let output = executor
+            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+            .await
+            .expect("execution succeeds");
+        assert_eq!(&output.stdout[..], b"hello");
+
+        // Test 2: allow_stdout = false -> stdout buffer remains empty
+        let mut caps_no_stdout = WasmCapabilities::default();
+        caps_no_stdout.allow_stdout = false;
+        let output_no_stdout = executor
+            .execute(&wasm_bytes, b"", &caps_no_stdout, Duration::from_secs(1))
+            .await
+            .expect("execution succeeds");
+        assert!(output_no_stdout.stdout.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_wasm_stderr_capture_via_fd_write() {
+        let wat = r#"
+            (module
+                (import "wasi_snapshot_preview1" "fd_write"
+                    (func $fd_write (param i32 i32 i32 i32) (result i32)))
+                (memory (export "memory") 1)
+                (data (i32.const 16) "error msg")
+                (func (export "_start")
+                    ;; ciovec at offset 0: buf_ptr = 16, buf_len = 9
+                    (i32.store (i32.const 0) (i32.const 16))
+                    (i32.store (i32.const 4) (i32.const 9))
+                    ;; call fd_write(fd=2, iovs_ptr=0, iovs_len=1, nwritten_ptr=32)
+                    (drop (call $fd_write (i32.const 2) (i32.const 0) (i32.const 1) (i32.const 32)))
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+        let executor = WasmExecutor::new().expect("WasmExecutor");
+
+        let mut caps = WasmCapabilities::default();
+        caps.allow_stderr = true;
+        let output = executor
+            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+            .await
+            .expect("execution succeeds");
+        assert_eq!(&output.stderr[..], b"error msg");
+    }
+
+    #[tokio::test]
+    async fn test_wasm_wall_clock_timeout_enforced() {
+        let wat = r#"
+            (module
+                (import "memfuse" "host_sleep" (func $host_sleep (param i32)))
+                (func (export "_start")
+                    (call $host_sleep (i32.const 200))
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+        let executor = WasmExecutor::new().expect("WasmExecutor");
+
+        let mut caps = WasmCapabilities::default();
+        caps.max_wall_clock_ms = 50;
+
+        let result_timeout = executor
+            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
+            .await;
+
+        assert!(
+            matches!(result_timeout, Err(SandboxError::Timeout { timeout_ms: 50 })),
+            "Expected Timeout error with 50ms, got: {:?}",
+            result_timeout
         );
     }
 }
