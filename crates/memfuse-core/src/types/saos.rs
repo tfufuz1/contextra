@@ -13,6 +13,18 @@ use super::filter::FilterExpr;
 use crate::error::{MemFuseError, Result};
 use serde::{Deserialize, Serialize};
 
+/// Strategy used for search result signal fusion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum FusionStrategy {
+    /// Reciprocal Rank Fusion (default strategy per ADR-003).
+    /// Robust against score scale mismatch and partial signal degradation.
+    #[default]
+    Rrf,
+    /// Score-normalized fusion (CombSUM / Z-Score).
+    /// Explizit Opt-in strategy. Falls back to RRF if signal degradation is detected.
+    ScoreNormalized,
+}
+
 /// Strategy used for graph retrieval in hybrid search queries.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GraphTraversalStrategy {
@@ -217,6 +229,9 @@ pub struct HybridQuery {
     pub graph_strategy: GraphTraversalStrategy,
     /// Fusion weights across vector, text, and graph signals.
     pub fusion_weights: FusionWeights,
+    /// Fusion strategy used to combine search signals (default: Rrf).
+    #[serde(default)]
+    pub fusion_strategy: FusionStrategy,
     /// Optional metadata expression filter.
     pub filter: Option<FilterExpr>,
     /// Optional entity ID to filter/boost results in the same community.
@@ -263,6 +278,7 @@ pub struct HybridQueryBuilder {
     graph_start_node: Option<String>,
     graph_strategy: Option<GraphTraversalStrategy>,
     fusion_weights: Option<FusionWeights>,
+    fusion_strategy: Option<FusionStrategy>,
     filter: Option<FilterExpr>,
     same_community_as: Option<EntityId>,
     memory_type_filter: Option<Vec<MemoryType>>,
@@ -306,6 +322,12 @@ impl HybridQueryBuilder {
     /// Sets custom signal fusion weights.
     pub fn with_fusion_weights(mut self, weights: FusionWeights) -> Self {
         self.fusion_weights = Some(weights);
+        self
+    }
+
+    /// Sets search fusion strategy (`FusionStrategy::Rrf` or `FusionStrategy::ScoreNormalized`).
+    pub fn with_fusion_strategy(mut self, strategy: FusionStrategy) -> Self {
+        self.fusion_strategy = Some(strategy);
         self
     }
 
@@ -368,6 +390,7 @@ impl HybridQueryBuilder {
             graph_start_node: self.graph_start_node,
             graph_strategy: self.graph_strategy.unwrap_or_default(),
             fusion_weights: self.fusion_weights.unwrap_or_default(),
+            fusion_strategy: self.fusion_strategy.unwrap_or_default(),
             filter: self.filter,
             same_community_as: self.same_community_as,
             memory_type_filter: self.memory_type_filter,

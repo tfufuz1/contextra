@@ -84,7 +84,7 @@ Layer 8:  memfuse-mcp —  (deps: memfuse-agent, memfuse-calibration, memfuse-ca
 
 ## Workspace Crates Übersicht (19 Active Crates)
 
-- **Layer 0**: `memfuse-core` (Typen, Traits, Error + ContextChunk mit Contextual Prefix)
+- **Layer 0**: `memfuse-core` (Typen, Traits, Error, DocId [64-bit Default v0.x max 100M docs / 128-bit ADR-082 via docid-128])
 - **Layer 1**: `memfuse-store` (LSM-Tree), `memfuse-index` (HNSW), `memfuse-text` (BM25), `memfuse-security` (crates/memfuse-crypto) (AES-GCM & KV-Segment Security), `memfuse-graph` (CSR Graph, + SessionBranchTree DAG), `memfuse-checkpoint` (Snapshotting)
 - **Layer 2**: `memfuse-db` (Collections & 4-Signal Fusion, + MultiStepEngine, ContextCompactor)
 - **Layer 3**: `memfuse-ollama` (Ollama Client & Embeddings, + ContextPrefixEngine, generate_text()), `memfuse-agent` (Persistent Agent Workflow Engine), `memfuse-router` (Conformal Profile Router), `memfuse-embed` (ONNX-Embeddings, **optional**, Feature-gated, `default=[]`, + CrossEncoderReranker), `memfuse-py` (Python PyO3 FFI Bindings)

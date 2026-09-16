@@ -95,13 +95,13 @@ MemFuse ist reine Infrastruktur. Es wird über drei Schnittstellen verteilt:
 
 #### Mikrospezifikationen & Volltext-Dokumentation für `memfuse-core`:
 
-##### `pub struct DocId(pub u64)`
-- **Repräsentation:** `#[repr(transparent)]` Wrapper um `u64` (v0.x Kapazitätsgrenze: 100 Mio. Dokumente pro Kollektion; geplante Major-Release-Zielarchitektur: 128-Bit BLAKE3-Truncation `[u8; 16]`, UUIDv7 explizit abgelehnt zur Wahrung der deterministischen Hash-Derivierung).
-- **Konstanten:** `MAX = DocId(u64::MAX)`, `MIN = DocId(0)`.
+##### `pub struct DocId(pub u64)` / `DocId(pub u128)` (ADR-082)
+- **Repräsentation:** `#[repr(transparent)]` Wrapper um `u64` (Standard v0.x Kapazitätsgrenze: 100 Mio. Dokumente pro Kollektion) bzw. `#[repr(C, align(16))]` Wrapper um `u128` (Cargo Feature `docid-128`, ADR-082). UUIDv7 ist explizit ausgeschlossen zur Wahrung der deterministischen Hash-Derivierung.
+- **Konstanten:** `MAX = DocId(MAX)`, `MIN = DocId(0)`.
 - **Methoden:**
-  - `pub const fn new(id: u64) -> Self`: Erstellt `DocId`.
-  - `pub const fn inner(self) -> u64`: Gibt die innere primitive `u64` zurück.
-  - `pub fn from_key(key: &str) -> Result<Self>`: Deriviert deterministisch einen `DocId` aus den ersten 8 Bytes (Little-Endian) des BLAKE3-Hashes von `key` (ADR-016). Gibt `MemFuseError::InvalidInput` bei leerem `key` zurück.
+  - `pub const fn new(id: u64 / u128) -> Self`: Erstellt `DocId`.
+  - `pub const fn inner(self) -> u64 / u128`: Gibt die innere primitive ID zurück.
+  - `pub fn from_key(key: &str) -> Result<Self>`: Deriviert deterministisch einen `DocId` aus den ersten 8 Bytes (64-Bit) bzw. 16 Bytes (128-Bit, `docid-128`) des BLAKE3-Hashes von `key` (ADR-016, ADR-082). Gibt `MemFuseError::InvalidInput` bei leerem `key` zurück.
 
 ##### `pub struct EntityId(pub u64)`
 - **Beschreibung:** Interner Entitäts-Knoten-Identifikator im Wissensgraphen.
