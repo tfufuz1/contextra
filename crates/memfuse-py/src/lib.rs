@@ -1,4 +1,5 @@
 // FILE-CONTEXT
+// REVIEW-PASS[1/2] Systematischer Review der memfuse-py PyO3 FFI Bindings (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-16T16:47:30Z) (SESSION: 29edb6a4)
 // STAND: 2026-09-10T19:22:55Z (SESSION: 0b2ff57d)
 // ZWECK: PyO3 FFI bindings bridging MemFuse embedded vector DB functionality to Python.
 // INVARIANTEN: Zero Rust panics cross FFI boundary; GIL released during block_on async calls; Tokio Runtime bound per interpreter module state.
