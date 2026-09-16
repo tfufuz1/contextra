@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-09-09T15:45:22Z (SESSION: 6cae458a)
+// STAND: 2026-09-16T16:13:00Z (SESSION: afafdd44)
 // ZWECK: Crate root for memfuse-candle native GGUF inference backend.
 // INVARIANTEN: Zero unsafe code in crate; re-exports core inference types and gasp validator.
 
@@ -17,6 +17,8 @@
 //! Cache-Projektionen) ist ein separates, zukünftiges Vorhaben und NICHT Gegenstand dieser Erstfassung.
 
 #![forbid(unsafe_code)]
+
+// REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH
 
 pub mod embedding;
 pub mod embedding_provider;

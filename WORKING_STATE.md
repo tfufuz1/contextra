@@ -39,13 +39,13 @@ Ergebnis: **3 offene Tags**
 | `memfuse-sandbox` | 2 | 836 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
 | `memfuse-text` | 2 | 6414 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-candle` | 3 | 4226 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
-| `memfuse-index` | 3 | 17527 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
+| `memfuse-index` | 3 | 18077 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-ollama` | 3 | 4572 | 🟢 Clean |  |
 | `memfuse-store` | 3 | 25646 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-embed` | 4 | 2214 | 🧊 Optional |  |
 | `memfuse-db` | 5 | 36000 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 6 | 5708 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
-| `memfuse-router` | 6 | 6593 | 🟢 Clean |  |
+| `memfuse-router` | 6 | 6595 | 🟢 Clean |  |
 | `memfuse-agent` | 7 | 6531 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
 | `memfuse-mcp` | 8 | 5683 | 🟢 Clean |  |
 
