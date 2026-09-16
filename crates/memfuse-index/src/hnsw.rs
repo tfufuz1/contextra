@@ -1398,7 +1398,8 @@ impl HnswIndexCore {
         }
     }
 
-    #[allow(dead_code, unsafe_code)]
+    #[allow(dead_code)]
+    #[allow(unsafe_code)]
     fn euclidean_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
@@ -1421,7 +1422,8 @@ impl HnswIndexCore {
         Self::euclidean_distance_raw_scalar(query, raw)
     }
 
-    #[allow(dead_code, unsafe_code)]
+    #[allow(dead_code)]
+    #[allow(unsafe_code)]
     fn dot_product_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
@@ -1444,6 +1446,7 @@ impl HnswIndexCore {
         -Self::dot_product_raw_scalar(query, raw)
     }
 
+    #[allow(dead_code)]
     fn dot_product_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
         let dim = query.len();
         let mut sum = 0.0f32;
@@ -1455,6 +1458,7 @@ impl HnswIndexCore {
         sum
     }
 
+    #[allow(dead_code)]
     fn cosine_distance_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
         let dim = query.len();
         let mut dot = 0.0f32;
@@ -1478,6 +1482,7 @@ impl HnswIndexCore {
         }
     }
 
+    #[allow(dead_code)]
     fn euclidean_distance_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
         let dim = query.len();
         let mut sum = 0.0f32;
@@ -1494,6 +1499,7 @@ impl HnswIndexCore {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     #[target_feature(enable = "avx2")]
     #[allow(unsafe_code)]
+    #[allow(dead_code)]
     unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
         // SAFETY: Standard AVX/AVX2 horizontal reduction sequence on target with AVX/AVX2 support.
         let x128 = _mm_add_ps(_mm256_extractf128_ps(v, 1), _mm256_castps256_ps128(v));
@@ -1504,6 +1510,7 @@ impl HnswIndexCore {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     #[target_feature(enable = "avx512f")]
+    #[allow(dead_code)]
     #[allow(unsafe_code)]
     unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
         // SAFETY: Extract top 256 bits and add to bottom 256 bits, then reduce via hsum256_ps_avx.
@@ -1514,6 +1521,7 @@ impl HnswIndexCore {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     #[target_feature(enable = "avx2")]
     #[target_feature(enable = "fma")]
+    #[allow(dead_code)]
     #[allow(unsafe_code)]
     /// # Safety
     /// Caller must ensure CPU supports AVX2 and FMA, and `raw.len() >= query.len() * 4`.
@@ -1549,6 +1557,7 @@ impl HnswIndexCore {
     #[allow(unsafe_code)]
     /// # Safety
     /// Caller must ensure CPU supports AVX2 and FMA, and `raw.len() >= query.len() * 4`.
+    #[allow(dead_code)]
     unsafe fn cosine_distance_raw_avx2(query: &[f32], raw: &[u8]) -> f32 {
         let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
             _mm256_setzero_ps(),
@@ -1633,6 +1642,7 @@ impl HnswIndexCore {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     #[target_feature(enable = "avx512f")]
+    #[allow(dead_code)]
     #[allow(unsafe_code)]
     /// # Safety
     /// Caller must ensure CPU supports AVX-512F, and `raw.len() >= query.len() * 4`.
@@ -1666,6 +1676,7 @@ impl HnswIndexCore {
     #[allow(unsafe_code)]
     /// # Safety
     /// Caller must ensure CPU supports AVX-512F, and `raw.len() >= query.len() * 4`.
+    #[allow(dead_code)]
     unsafe fn cosine_distance_raw_avx512(query: &[f32], raw: &[u8]) -> f32 {
         let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
             _mm512_setzero_ps(),
@@ -3821,6 +3832,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn test_search_non_blocking_when_connection_write_lock_held() {
         let index = std::sync::Arc::new(HnswIndex::try_new(test_config(4)).unwrap());
         let tx1 = TxId::new(1);

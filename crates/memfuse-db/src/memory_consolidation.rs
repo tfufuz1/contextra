@@ -385,7 +385,7 @@ pub struct SynthesisPhaseResult {
 
 /// Berechnet einen deterministischen 64-Bit-Hash für eine Liste von Member-DocIds.
 pub fn compute_community_hash(member_doc_ids: &[DocId]) -> u64 {
-    let mut sorted_ids: Vec<u64> = member_doc_ids.iter().map(|d| d.inner()).collect();
+    let mut sorted_ids: Vec<u64> = member_doc_ids.iter().map(|d| d.as_u64()).collect();
     sorted_ids.sort_unstable();
     let mut bytes = Vec::with_capacity(sorted_ids.len() * 8);
     for id in sorted_ids {

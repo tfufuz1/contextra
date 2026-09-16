@@ -2,6 +2,7 @@
 //! Feature `bandit-routing` (Default: off). Kein Default-Wechsel ohne P7-Nachweis.
 
 #![cfg(feature = "bandit-routing")]
+#![allow(clippy::needless_range_loop)]
 
 use serde::{Deserialize, Serialize};
 
@@ -120,6 +121,7 @@ impl BanditProfileState {
     /// Berechnet UCB-Score für Kontext-Embedding `x` und Profilkosten `cost`.
     ///
     /// r̂_p(x) = θᵀx + α√(Σ(x)) - λ·cost - μ·is_cloud
+    #[allow(clippy::needless_range_loop)]
     pub fn score(&self, x: &[f32], cost: f32, is_cloud_transport: bool) -> f32 {
         debug_assert_eq!(
             x.len(),
@@ -138,6 +140,7 @@ impl BanditProfileState {
                 .sum::<f32>()
                 .sqrt(),
             #[cfg(feature = "egress-sherman-morrison")]
+            #[allow(clippy::needless_range_loop)]
             BanditImplementation::ShermanMorrison => {
                 let d = self.theta.len();
                 if self.inv_a.len() == d * d {

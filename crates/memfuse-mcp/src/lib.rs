@@ -688,7 +688,7 @@ impl McpServer {
                 #[cfg(feature = "kv-bridge")]
                 if let Some(ref bridge) = self.kv_bridge {
                     for res in &results {
-                        let chunk_id = DocId::from_key(&res.id).map(|d| d.inner()).unwrap_or(0);
+                        let chunk_id = DocId::from_key(&res.id).map(|d| d.as_u64()).unwrap_or(0);
                         let text = res
                             .metadata
                             .as_ref()

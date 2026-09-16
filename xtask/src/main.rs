@@ -63,6 +63,7 @@ mod check_doc_references;
 mod check_duplicate_intent;
 mod check_duplicate_symbols;
 mod check_ffi_panic_boundary;
+mod check_flatbuffers_drift;
 mod check_jules_context_freshness;
 mod check_max_results_unbound;
 mod check_nan_validation_in_hot_loop;
@@ -2316,6 +2317,18 @@ fn main() {
         "check-bandit-latency-budget" => {
             if let Err(e) = check_bandit_latency_budget::check_bandit_latency_budget() {
                 eprintln!("❌ check-bandit-latency-budget failed: {}", e);
+                process::exit(1);
+            }
+        }
+        "check-flatbuffers-drift" => {
+            if let Err(e) = check_flatbuffers_drift::check_flatbuffers_drift() {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+        }
+        "regenerate-flatbuffers" => {
+            if let Err(e) = check_flatbuffers_drift::regenerate_flatbuffers() {
+                eprintln!("{}", e);
                 process::exit(1);
             }
         }
