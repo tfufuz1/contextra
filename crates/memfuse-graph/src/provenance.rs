@@ -37,7 +37,7 @@ impl EdgeProvenance {
 /// Wird bei jedem neuen EdgeProvenance-Eintrag aktualisiert.
 #[derive(Debug, Default)]
 pub struct DocEdgeIndex {
-    index: RwLock<AHashMap<u64, AHashSet<EdgeId>>>,
+    index: RwLock<AHashMap<DocId, AHashSet<EdgeId>>>,
 }
 
 impl DocEdgeIndex {
@@ -50,17 +50,14 @@ impl DocEdgeIndex {
     /// Registriert die Abhängigkeit einer Kante von einem Dokument.
     pub fn record(&self, doc_id: DocId, edge_id: EdgeId) {
         let mut guard = self.index.write();
-        guard.entry(doc_id.inner()).or_default().insert(edge_id);
+        guard.entry(doc_id).or_default().insert(edge_id);
     }
 
     /// Registriert einen EdgeProvenance-Eintrag und indiziert alle darin enthaltenen source_doc_ids.
     pub fn record_provenance(&self, provenance: &EdgeProvenance) {
         let mut guard = self.index.write();
         for &doc_id in &provenance.source_doc_ids {
-            guard
-                .entry(doc_id.inner())
-                .or_default()
-                .insert(provenance.edge_id);
+            guard.entry(doc_id).or_default().insert(provenance.edge_id);
         }
     }
 
@@ -68,7 +65,7 @@ impl DocEdgeIndex {
     pub fn edges_for_doc(&self, doc_id: DocId) -> Vec<EdgeId> {
         let guard = self.index.read();
         guard
-            .get(&doc_id.inner())
+            .get(&doc_id)
             .map(|set| set.iter().copied().collect())
             .unwrap_or_default()
     }
@@ -76,7 +73,7 @@ impl DocEdgeIndex {
     /// Entfernt alle Kanten-Registrierungen für ein Dokument.
     pub fn remove_doc(&self, doc_id: DocId) {
         let mut guard = self.index.write();
-        guard.remove(&doc_id.inner());
+        guard.remove(&doc_id);
     }
 }
 
