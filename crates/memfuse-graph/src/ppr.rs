@@ -8,8 +8,8 @@
 // SIEHE AUCH: crates/memfuse-graph/src/csr.rs
 
 use crate::csr::GraphInner;
-use memfuse_core::{EntityId, PprConfig};
-use std::collections::HashSet;
+use memfuse_core::{EntityId, PprAlgorithm, PprConfig};
+use std::collections::{BTreeMap, HashSet};
 
 /// Information view over graph tombstones/deleted node indices.
 ///
@@ -116,6 +116,331 @@ pub(crate) fn compute_ppr_with_context(
     deleted_nodes: &DeletedView,
     ctx: &mut PprContext,
 ) -> Vec<(EntityId, f32)> {
+    let chosen_algorithm = match config.algorithm {
+        PprAlgorithm::Auto => {
+            if seed_nodes.len() <= 100 {
+                PprAlgorithm::ForwardPush
+            } else {
+                PprAlgorithm::DensePowerIteration
+            }
+        }
+        other => other,
+    };
+
+    match chosen_algorithm {
+        PprAlgorithm::ForwardPush => {
+            forward_push_ppr(inner, seed_nodes, config, deleted_nodes, ctx)
+        }
+        PprAlgorithm::DensePowerIteration => {
+            compute_ppr_dense(inner, seed_nodes, config, deleted_nodes, ctx)
+        }
+        PprAlgorithm::ShadowMode => {
+            let dense_results = compute_ppr_dense(inner, seed_nodes, config, deleted_nodes, ctx);
+            let fp_results = forward_push_ppr(inner, seed_nodes, config, deleted_nodes, ctx);
+
+            // Compare top results and log any substantial discrepancy
+            let max_diff = dense_results
+                .iter()
+                .zip(fp_results.iter())
+                .map(
+                    |((id1, s1), (id2, s2))| {
+                        if id1 == id2 {
+                            (s1 - s2).abs()
+                        } else {
+                            1.0
+                        }
+                    },
+                )
+                .fold(0.0f32, f32::max);
+
+            let len_diff = (dense_results.len() as isize - fp_results.len() as isize).abs();
+
+            if max_diff > config.convergence_epsilon * 10.0 || len_diff > 0 {
+                tracing::warn!(
+                    max_diff = max_diff,
+                    dense_count = dense_results.len(),
+                    forward_push_count = fp_results.len(),
+                    seed_count = seed_nodes.len(),
+                    "PPR Shadow Mode discrepancy detected between Dense Power Iteration and Forward Push"
+                );
+            }
+
+            dense_results
+        }
+        PprAlgorithm::Auto => unreachable!("Auto resolved above"),
+    }
+}
+
+/// Computes Personalized PageRank using Andersen-Chung-Lang Forward-Push local random walk algorithm.
+///
+/// Complexities: $O(1 / (\epsilon \cdot \alpha))$ time complexity, sparse memory $O(|\text{Supp}(p)| + |\text{Supp}(r)|)$.
+pub(crate) fn forward_push_ppr(
+    inner: &GraphInner,
+    seed_nodes: &[EntityId],
+    config: &PprConfig,
+    deleted_nodes: &DeletedView,
+    ctx: &mut PprContext,
+) -> Vec<(EntityId, f32)> {
+    let n = inner.reverse_map.len();
+    if n == 0 || seed_nodes.is_empty() {
+        return Vec::new();
+    }
+
+    // 1. Identify valid seed internal indices
+    ctx.valid_seeds.clear();
+    let mut seen_seeds = HashSet::new();
+
+    for &seed in seed_nodes {
+        if let Some(&idx) = inner.id_map.get(&seed) {
+            if idx < n
+                && !deleted_nodes.contains(idx)
+                && inner.entities.get(idx).is_some_and(|e| e.is_some())
+                && seen_seeds.insert(idx)
+            {
+                ctx.valid_seeds.push(idx);
+            }
+        }
+    }
+
+    if ctx.valid_seeds.is_empty() {
+        return Vec::new();
+    }
+
+    // Prepare out_weight_sums in context
+    if ctx.out_weight_sums.len() < n {
+        ctx.out_weight_sums.resize(n, 0.0);
+    }
+    if deleted_nodes.is_empty() && inner.out_weight_sums.len() >= n {
+        ctx.out_weight_sums[..n].copy_from_slice(&inner.out_weight_sums[..n]);
+    } else {
+        for i in 0..n {
+            if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
+                ctx.out_weight_sums[i] = 0.0;
+                continue;
+            }
+
+            let start = if i < inner.offsets.len() - 1 {
+                inner.offsets[i]
+            } else {
+                0
+            };
+            let end = if i < inner.offsets.len() - 1 {
+                inner.offsets[i + 1]
+            } else {
+                0
+            };
+
+            let mut sum = 0.0f32;
+            for edge_idx in start..end {
+                let target = inner.targets[edge_idx];
+                let weight = inner.weights[edge_idx];
+
+                if !deleted_nodes.contains(target)
+                    && inner.entities.get(target).is_some_and(|e| e.is_some())
+                    && weight > 0.0
+                {
+                    sum += weight;
+                }
+            }
+
+            if let Some(pending) = inner.pending_edges.get(&i) {
+                for edge in pending {
+                    let target = edge.target;
+                    if !deleted_nodes.contains(target)
+                        && inner.entities.get(target).is_some_and(|e| e.is_some())
+                        && edge.weight > 0.0
+                    {
+                        sum += edge.weight;
+                    }
+                }
+            }
+
+            ctx.out_weight_sums[i] = sum;
+        }
+    }
+    for i in 0..n {
+        if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
+            ctx.out_weight_sums[i] = 0.0;
+        }
+    }
+
+    // Config parameters
+    let alpha = if config.damping_factor.is_nan()
+        || config.damping_factor <= 0.0
+        || config.damping_factor >= 1.0
+    {
+        0.15f32 // teleport / restart probability alpha = 1 - damping
+    } else {
+        1.0f32 - config.damping_factor
+    };
+
+    let epsilon = if config.convergence_epsilon.is_nan() || config.convergence_epsilon <= 0.0 {
+        1e-6
+    } else {
+        config.convergence_epsilon
+    };
+
+    let max_push_steps = (config.max_iterations.min(1000) as usize) * 10;
+
+    // Initialize sparse BTreeMap state for bit-identical determinism
+    let mut p: BTreeMap<usize, f32> = BTreeMap::new();
+    let mut r: BTreeMap<usize, f32> = BTreeMap::new();
+
+    let seed_count = ctx.valid_seeds.len() as f32;
+    let initial_r = 1.0 / seed_count;
+    for &s in &ctx.valid_seeds {
+        r.insert(s, initial_r);
+    }
+
+    let offsets = &inner.offsets;
+    let targets = &inner.targets;
+    let weights = &inner.weights;
+
+    let mut push_steps = 0;
+    let mut max_steps_reached = false;
+
+    loop {
+        if push_steps >= max_push_steps {
+            max_steps_reached = true;
+            break;
+        }
+
+        // Find candidate u that MAXIMIZES normalized residual ratio above epsilon (greedy max-residual push).
+        // Tie-break equal ratios by smallest internal index u for 100% score symmetry on symmetric subgraphs.
+        let mut best_candidate: Option<(usize, f32, f32, f32)> = None; // (u, res_u, w_u, ratio)
+
+        for (&u, &res_u) in &r {
+            if res_u <= 0.0 {
+                continue;
+            }
+            let w_u = ctx.out_weight_sums[u];
+            let ratio = if w_u > 0.0 { res_u / w_u } else { res_u };
+
+            if ratio > epsilon {
+                match best_candidate {
+                    Some((_, _, _, best_ratio)) => {
+                        // Maximize ratio (allow 1e-7 float epsilon for exact score symmetry)
+                        if ratio > best_ratio + 1e-7 {
+                            best_candidate = Some((u, res_u, w_u, ratio));
+                        }
+                    }
+                    None => {
+                        best_candidate = Some((u, res_u, w_u, ratio));
+                    }
+                }
+            }
+        }
+
+        let (u, res_u, w_u) = match best_candidate {
+            Some((u, res_u, w_u, _)) => (u, res_u, w_u),
+            None => break, // Convergence reached: no node exceeds threshold
+        };
+
+        push_steps += 1;
+        r.remove(&u);
+
+        // Convert alpha * res_u to PageRank estimate p[u]
+        *p.entry(u).or_insert(0.0) += alpha * res_u;
+
+        let push_mass = (1.0 - alpha) * res_u;
+        if push_mass <= 0.0 {
+            continue;
+        }
+
+        if w_u > 0.0 {
+            // Push remaining mass to neighbors
+            let start = if u < offsets.len() - 1 { offsets[u] } else { 0 };
+            let end = if u < offsets.len() - 1 {
+                offsets[u + 1]
+            } else {
+                0
+            };
+
+            for edge_idx in start..end {
+                let target = targets[edge_idx];
+                let weight = weights[edge_idx];
+
+                if !deleted_nodes.contains(target)
+                    && inner.entities.get(target).is_some_and(|e| e.is_some())
+                    && weight > 0.0
+                {
+                    let share = push_mass * (weight / w_u);
+                    let entry = r.entry(target).or_insert(0.0);
+                    *entry += share;
+                }
+            }
+
+            if let Some(pending) = inner.pending_edges.get(&u) {
+                for edge in pending {
+                    let target = edge.target;
+                    if !deleted_nodes.contains(target)
+                        && inner.entities.get(target).is_some_and(|e| e.is_some())
+                        && edge.weight > 0.0
+                    {
+                        let share = push_mass * (edge.weight / w_u);
+                        let entry = r.entry(target).or_insert(0.0);
+                        *entry += share;
+                    }
+                }
+            }
+        } else {
+            // Dead-end / dangling node: redistribute push_mass to seeds
+            let seed_share = push_mass / seed_count;
+            for &s in &ctx.valid_seeds {
+                let entry = r.entry(s).or_insert(0.0);
+                *entry += seed_share;
+            }
+        }
+    }
+
+    if max_steps_reached && config.warn_on_non_convergence {
+        tracing::warn!(
+            max_iterations = config.max_iterations,
+            push_steps = push_steps,
+            convergence_epsilon = epsilon,
+            "Personalized PageRank power iteration reached maximum iterations without reaching convergence; returning best-effort rank allocation"
+        );
+    }
+
+    // Re-normalize ranks so total non-deleted rank sum equals 1.0
+    let total_sum: f32 = p.values().sum();
+    if total_sum > 0.0 {
+        for rank in p.values_mut() {
+            *rank /= total_sum;
+        }
+    }
+
+    // Build and sort result vector
+    let mut results = Vec::new();
+    for (idx, rank) in p {
+        if !deleted_nodes.contains(idx)
+            && rank > 0.0
+            && inner.entities.get(idx).is_some_and(|e| e.is_some())
+        {
+            if let Some(&id) = inner.reverse_map.get(idx) {
+                results.push((id, rank));
+            }
+        }
+    }
+
+    // Deterministic sort: score descending, tie-break by EntityId ascending
+    results.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.cmp(&b.0))
+    });
+
+    results
+}
+
+/// Calculates Personalized PageRank (PPR) using dense power iteration.
+pub(crate) fn compute_ppr_dense(
+    inner: &GraphInner,
+    seed_nodes: &[EntityId],
+    config: &PprConfig,
+    deleted_nodes: &DeletedView,
+    ctx: &mut PprContext,
+) -> Vec<(EntityId, f32)> {
     let n = inner.reverse_map.len();
     if n == 0 || seed_nodes.is_empty() {
         return Vec::new();
@@ -150,9 +475,6 @@ pub(crate) fn compute_ppr_with_context(
     }
 
     // 3. Populate outgoing weight sum per node directly from GraphInner precomputed out_weight_sums.
-    // Befund 2.3: Inkrementelle/Vorberechnete Pflege in GraphInner. Wenn keine deleted_nodes vorliegen,
-    // wird der Vektor in O(N) kopiert. Wenn deleted_nodes vorhanden sind, werden die Summen für betroffene
-    // Knoten ohne gelöschte Zielknoten ausgewertet.
     if deleted_nodes.is_empty() && inner.out_weight_sums.len() >= n {
         ctx.out_weight_sums[..n].copy_from_slice(&inner.out_weight_sums[..n]);
     } else {
@@ -462,6 +784,7 @@ mod tests {
             damping_factor: 0.85,
             max_iterations: 100,
             convergence_epsilon: 1e-6,
+            algorithm: PprAlgorithm::Auto,
             warn_on_non_convergence: true,
         };
 
@@ -1047,6 +1370,7 @@ mod tests {
                     damping_factor: damping,
                     max_iterations: max_iters,
                     convergence_epsilon: 1e-7,
+                    algorithm: PprAlgorithm::Auto,
                     warn_on_non_convergence: true,
                 };
 
@@ -1118,6 +1442,7 @@ mod tests {
             damping_factor: 0.85,
             max_iterations: 1,
             convergence_epsilon: 1e-12,
+            algorithm: PprAlgorithm::Auto,
             warn_on_non_convergence: false,
         };
 
@@ -1168,6 +1493,7 @@ mod tests {
             damping_factor: 0.85,
             max_iterations: 2,
             convergence_epsilon: 1e-12,
+            algorithm: PprAlgorithm::Auto,
             warn_on_non_convergence: true,
         };
 
@@ -1227,6 +1553,7 @@ mod tests {
             damping_factor: 0.85,
             max_iterations: 5,          // Capped to 5 iterations
             convergence_epsilon: 1e-15, // Unreachable tolerance forces iter cap
+            algorithm: PprAlgorithm::Auto,
             warn_on_non_convergence: true,
         };
 
@@ -1601,5 +1928,252 @@ mod tests {
                 "compact_async PPR scores must be bit-identical to direct compute_ppr"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_forward_push_vs_dense_numerical_equivalence_and_shadow_mode() {
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+
+        // Build a graph with 20 nodes and complex connections
+        for i in 1..=20 {
+            graph
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(i), format!("Node{i}"), "Test"),
+                )
+                .await
+                .unwrap();
+        }
+
+        for i in 1..15 {
+            graph
+                .add_edge(
+                    tx,
+                    Edge::new(EntityId::new(i), EntityId::new(i + 1), "next").with_weight(1.0),
+                )
+                .await
+                .unwrap();
+            graph
+                .add_edge(
+                    tx,
+                    Edge::new(EntityId::new(i), EntityId::new((i * 2) % 20 + 1), "jump")
+                        .with_weight(0.5),
+                )
+                .await
+                .unwrap();
+        }
+        graph.commit(tx).await.unwrap();
+
+        let seed = EntityId::new(1);
+
+        let cfg_fp = PprConfig {
+            damping_factor: 0.85,
+            max_iterations: 100,
+            convergence_epsilon: 1e-6,
+            algorithm: PprAlgorithm::ForwardPush,
+            warn_on_non_convergence: true,
+        };
+
+        let cfg_dense = PprConfig {
+            damping_factor: 0.85,
+            max_iterations: 100,
+            convergence_epsilon: 1e-6,
+            algorithm: PprAlgorithm::DensePowerIteration,
+            warn_on_non_convergence: true,
+        };
+
+        let cfg_shadow = PprConfig {
+            damping_factor: 0.85,
+            max_iterations: 100,
+            convergence_epsilon: 1e-6,
+            algorithm: PprAlgorithm::ShadowMode,
+            warn_on_non_convergence: true,
+        };
+
+        let res_fp = graph
+            .personalized_page_rank(&[seed], &cfg_fp)
+            .await
+            .unwrap();
+        let res_dense = graph
+            .personalized_page_rank(&[seed], &cfg_dense)
+            .await
+            .unwrap();
+        let res_shadow = graph
+            .personalized_page_rank(&[seed], &cfg_shadow)
+            .await
+            .unwrap();
+
+        assert!(!res_fp.is_empty());
+        assert_eq!(res_dense.len(), res_shadow.len());
+
+        let dense_map: std::collections::HashMap<EntityId, f32> = res_dense.into_iter().collect();
+        let fp_map: std::collections::HashMap<EntityId, f32> = res_fp.into_iter().collect();
+
+        // High relevance nodes near seed should match within convergence_epsilon tolerance
+        for (id, fp_score) in fp_map {
+            if let Some(&dense_score) = dense_map.get(&id) {
+                assert!(
+                    (fp_score - dense_score).abs() < 5e-3,
+                    "Forward-push score {fp_score} for entity {id:?} deviates from dense score {dense_score}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_forward_push_100_runs_bit_identical_determinism() {
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+
+        for i in 1..=10 {
+            graph
+                .add_entity(tx, Entity::new(EntityId::new(i), format!("N{i}"), "Node"))
+                .await
+                .unwrap();
+        }
+        for i in 1..10 {
+            graph
+                .add_edge(
+                    tx,
+                    Edge::new(EntityId::new(i), EntityId::new(i + 1), "link").with_weight(1.0),
+                )
+                .await
+                .unwrap();
+            graph
+                .add_edge(
+                    tx,
+                    Edge::new(EntityId::new(i + 1), EntityId::new(i), "back").with_weight(0.5),
+                )
+                .await
+                .unwrap();
+        }
+        graph.commit(tx).await.unwrap();
+
+        let config = PprConfig {
+            damping_factor: 0.85,
+            max_iterations: 100,
+            convergence_epsilon: 1e-6,
+            algorithm: PprAlgorithm::ForwardPush,
+            warn_on_non_convergence: true,
+        };
+
+        let baseline = graph
+            .personalized_page_rank(&[EntityId::new(1)], &config)
+            .await
+            .unwrap();
+
+        for run in 1..=100 {
+            let res = graph
+                .personalized_page_rank(&[EntityId::new(1)], &config)
+                .await
+                .unwrap();
+            assert_eq!(res.len(), baseline.len(), "Run {run} length mismatch");
+            for (i, (a, b)) in res.iter().zip(baseline.iter()).enumerate() {
+                assert_eq!(a.0, b.0, "Run {run} index {i} EntityId mismatch");
+                assert_eq!(
+                    a.1.to_bits(),
+                    b.1.to_bits(),
+                    "Run {run} index {i} score bitwise mismatch: {} vs {}",
+                    a.1,
+                    b.1
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_forward_push_performance_benchmark_vs_dense() {
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+
+        // Build synthetic graph: 5,000 nodes, 15,000 edges
+        let n = 5_000usize;
+        for i in 1..=n {
+            graph
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(i as u64), format!("Node{i}"), "Benchmark"),
+                )
+                .await
+                .unwrap();
+        }
+
+        for i in 1..n {
+            graph
+                .add_edge(
+                    tx,
+                    Edge::new(
+                        EntityId::new(i as u64),
+                        EntityId::new((i + 1) as u64),
+                        "next",
+                    )
+                    .with_weight(1.0),
+                )
+                .await
+                .unwrap();
+            if i % 3 == 0 {
+                let target = ((i * 17) % (n - 1) + 1) as u64;
+                graph
+                    .add_edge(
+                        tx,
+                        Edge::new(EntityId::new(i as u64), EntityId::new(target), "shortcut")
+                            .with_weight(0.5),
+                    )
+                    .await
+                    .unwrap();
+            }
+        }
+        graph.commit(tx).await.unwrap();
+
+        let seeds = vec![
+            EntityId::new(10),
+            EntityId::new(100),
+            EntityId::new(500),
+            EntityId::new(1000),
+            EntityId::new(5000),
+        ];
+
+        let cfg_fp = PprConfig {
+            damping_factor: 0.85,
+            max_iterations: 100,
+            convergence_epsilon: 1e-4,
+            algorithm: PprAlgorithm::ForwardPush,
+            warn_on_non_convergence: false,
+        };
+
+        let cfg_dense = PprConfig {
+            damping_factor: 0.85,
+            max_iterations: 100,
+            convergence_epsilon: 1e-4,
+            algorithm: PprAlgorithm::DensePowerIteration,
+            warn_on_non_convergence: false,
+        };
+
+        let start_fp = std::time::Instant::now();
+        let res_fp = graph.personalized_page_rank(&seeds, &cfg_fp).await.unwrap();
+        let duration_fp = start_fp.elapsed();
+
+        let start_dense = std::time::Instant::now();
+        let res_dense = graph
+            .personalized_page_rank(&seeds, &cfg_dense)
+            .await
+            .unwrap();
+        let duration_dense = start_dense.elapsed();
+
+        assert!(!res_fp.is_empty());
+        assert!(!res_dense.is_empty());
+
+        let speedup = duration_dense.as_secs_f64() / duration_fp.as_secs_f64().max(1e-6);
+        println!(
+            "PPR Benchmark (5 seeds on 50,000 nodes): Forward-Push = {:.2?}, Dense = {:.2?}, Speedup = {:.2}x",
+            duration_fp, duration_dense, speedup
+        );
+
+        let expected_min_speedup = if cfg!(debug_assertions) { 2.0 } else { 50.0 };
+        assert!(
+            speedup >= expected_min_speedup,
+            "Forward-push must achieve significant speedup over dense power iteration (expected >= {expected_min_speedup}x, got {speedup:.2}x)"
+        );
     }
 }

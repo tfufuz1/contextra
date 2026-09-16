@@ -130,14 +130,13 @@ impl BanditProfileState {
         let dot: f32 = self.theta.iter().zip(x.iter()).map(|(t, xi)| t * xi).sum();
 
         let variance_term = match self.implementation {
-            BanditImplementation::DiagonalApproximation => {
-                self.sigma_sq
-                    .iter()
-                    .zip(x.iter())
-                    .map(|(s, xi)| xi * xi / s.max(1e-8))
-                    .sum::<f32>()
-                    .sqrt()
-            }
+            BanditImplementation::DiagonalApproximation => self
+                .sigma_sq
+                .iter()
+                .zip(x.iter())
+                .map(|(s, xi)| xi * xi / s.max(1e-8))
+                .sum::<f32>()
+                .sqrt(),
             #[cfg(feature = "egress-sherman-morrison")]
             BanditImplementation::ShermanMorrison => {
                 let d = self.theta.len();

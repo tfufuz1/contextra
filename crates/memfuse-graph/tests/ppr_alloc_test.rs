@@ -83,6 +83,7 @@ async fn test_ppr_alloc_reduction_100k_nodes() {
         damping_factor: 0.85,
         max_iterations: 10,
         convergence_epsilon: 1e-6,
+        algorithm: memfuse_core::PprAlgorithm::Auto,
         warn_on_non_convergence: true,
     };
 
