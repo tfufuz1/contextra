@@ -919,7 +919,9 @@ mod tests {
             raw_mse_sum += (v[0] - deq_raw[0]).powi(2);
 
             let q_clipped = clipped_q.quantize(v).expect("quantize clipped");
-            let deq_clipped = clipped_q.dequantize(&q_clipped).expect("dequantize clipped");
+            let deq_clipped = clipped_q
+                .dequantize(&q_clipped)
+                .expect("dequantize clipped");
             clipped_mse_sum += (v[0] - deq_clipped[0]).powi(2);
         }
 

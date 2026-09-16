@@ -17,6 +17,7 @@ pub mod inverted;
 pub mod morphology;
 pub mod posting_list;
 pub mod tokenizer;
+pub mod wand;
 
 pub use bm25::BM25;
 pub use inverted::{BM25MorphIndex, InvertedIndex, Language};

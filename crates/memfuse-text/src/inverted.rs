@@ -13,7 +13,7 @@
 // BOTTLENECK: Heap-Allokationen (format!, Vec::new)
 // OPTIMIERUNG: itoa::Buffer + Vec::with_capacity + doc_len_cache
 
-use crate::posting_list::{Posting, PostingList, ResidentPostingIndex};
+use crate::posting_list::{Posting, ResidentPostingIndex};
 use crate::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 use memfuse_core::{
     DocId, MemFuseError, Result, ScoredDocument, StorageEngine, TextIndex, TextIndexStats, TxId,
@@ -23,70 +23,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-
-struct Bm25Candidate {
-    doc_id: DocId,
-    score: f32,
-}
-
-impl PartialEq for Bm25Candidate {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == std::cmp::Ordering::Equal
-    }
-}
-
-impl Eq for Bm25Candidate {}
-
-impl Ord for Bm25Candidate {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // BinaryHeap is max-heap by default. We want peek() to return the worst candidate
-        // (lowest score, or highest DocId on score tie) so that it gets evicted when heap size > k.
-        other
-            .score
-            .partial_cmp(&self.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| self.doc_id.cmp(&other.doc_id))
-    }
-}
-
-impl PartialOrd for Bm25Candidate {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-struct BoundedTopK<T> {
-    heap: std::collections::BinaryHeap<T>,
-    capacity: usize,
-}
-
-impl<T: Ord> BoundedTopK<T> {
-    fn new(capacity: usize) -> Self {
-        let capacity = capacity.min(MAX_SEARCH_K);
-        Self {
-            heap: std::collections::BinaryHeap::with_capacity(capacity.saturating_add(1)),
-            capacity,
-        }
-    }
-
-    fn push(&mut self, item: T) {
-        if self.capacity == 0 {
-            return;
-        }
-        if self.heap.len() < self.capacity {
-            self.heap.push(item);
-        } else if let Some(worst) = self.heap.peek() {
-            if item < *worst {
-                self.heap.pop();
-                self.heap.push(item);
-            }
-        }
-    }
-
-    fn into_sorted_vec(self) -> Vec<T> {
-        self.heap.into_sorted_vec()
-    }
-}
 
 /// Supported tokenizer languages for BM25 text indexing.
 ///
@@ -153,7 +89,7 @@ pub struct InvertedIndex<S: StorageEngine> {
     pub(crate) staged_stats: Arc<parking_lot::Mutex<HashMap<TxId, StagedStatsChange>>>,
     pub(crate) staged_terms: Arc<parking_lot::Mutex<HashMap<TxId, Vec<String>>>>,
     commit_lock: Arc<tokio::sync::Mutex<()>>,
-    resident_index: Arc<ResidentPostingIndex>,
+    pub(crate) resident_index: Arc<ResidentPostingIndex>,
 }
 
 impl<S: StorageEngine> Clone for InvertedIndex<S> {
@@ -245,7 +181,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k
     }
 
-    fn key_with_id(&self, type_prefix: &str, id: u64) -> Vec<u8> {
+    pub(crate) fn key_with_id(&self, type_prefix: &str, id: u64) -> Vec<u8> {
         let mut itoa_buf = itoa::Buffer::new();
         let id_str = itoa_buf.format(id);
         let mut k = Vec::with_capacity(self.prefix.len() + type_prefix.len() + id_str.len());
@@ -267,7 +203,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k
     }
 
-    fn key_term_prefix(&self, term: &str) -> Vec<u8> {
+    pub(crate) fn key_term_prefix(&self, term: &str) -> Vec<u8> {
         let mut k = Vec::with_capacity(self.prefix.len() + 3 + term.len() + 1);
         k.extend_from_slice(&self.prefix);
         k.extend_from_slice(b"pl:");
@@ -287,7 +223,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
     ///   If a tombstone key exists at or before `seq`, the posting entry for `(term, doc_id)` is masked out.
     /// - **Compaction Strategy**: Tombstone keys persist in storage until resolved via `resolve_tombstones()`
     ///   or removed during background compaction when all snapshots prior to tombstone creation are no longer active.
-    fn key_tombstone(&self, doc_id: DocId, term: &str) -> Vec<u8> {
+    pub(crate) fn key_tombstone(&self, doc_id: DocId, term: &str) -> Vec<u8> {
         let mut itoa_buf = itoa::Buffer::new();
         let id_str = itoa_buf.format(doc_id.inner());
         let mut k = Vec::with_capacity(self.prefix.len() + 4 + id_str.len() + 1 + term.len());
@@ -596,16 +532,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
             return Ok(Vec::new());
         }
 
-        // 🛡️ SICHERUNG: Snapshot-Isolation (FIND-TXT-001)
-        // Wir pinnen die Sequence-Number zu Beginn der Anfrage, damit alle Reads
-        // (Stats, PL, DL) auf demselben konsistenten Stand basieren.
-        let seq = if let Some(s) = max_seq {
-            s
-        } else {
-            self.storage.last_seq_no().await?
-        };
-
-        // FIND-TXT-004: Use cached stats instead of storage reads
         let n = self.total_docs.load(Ordering::Acquire);
         let cached_avg_len_x1000 = self.avg_doc_len_x1000.load(Ordering::Acquire);
 
@@ -615,122 +541,21 @@ impl<S: StorageEngine> InvertedIndex<S> {
             0.0
         };
 
-        let mut scores: HashMap<DocId, f32> = HashMap::new();
-        let mut doc_len_cache: HashMap<DocId, u32> = HashMap::new();
-        let mut tbs_cache: HashMap<Vec<u8>, bool> = HashMap::new();
+        let wand_res = crate::wand::block_max_wand_search(
+            self.storage.as_ref(),
+            &tokens,
+            &self.resident_index,
+            |term| self.key_term_prefix(term),
+            |doc_id, term| self.key_tombstone(doc_id, term),
+            |doc_id_inner| self.key_with_id("dl:", doc_id_inner),
+            k,
+            max_seq,
+            n,
+            avg_doc_len,
+        )
+        .await?;
 
-        for term in &tokens {
-            let list = match self.resident_index.get(term) {
-                Some(l) => l,
-                None => {
-                    let prefix = self.key_term_prefix(term);
-                    let raw_entries = self.storage.scan_prefix_at(&prefix, u64::MAX).await?;
-                    let mut postings = Vec::with_capacity(raw_entries.len());
-                    for (key, val_bytes) in raw_entries {
-                        let suffix_bytes = &key[prefix.len()..];
-                        if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
-                            if let Ok(doc_id_raw) = suffix.parse::<u64>() {
-                                if val_bytes.len() == 4 {
-                                    let doc_id = DocId::new(doc_id_raw);
-                                    let tf = u32::from_le_bytes(
-                                        (&val_bytes[..4]).try_into().map_err(|_| {
-                                            MemFuseError::Storage(
-                                                "Invalid posting tf length".into(),
-                                            )
-                                        })?,
-                                    );
-                                    let dl_key = self.key_with_id("dl:", doc_id.inner());
-                                    let doc_len = match self.storage.get(&dl_key).await? {
-                                        Some(dl_bytes) if dl_bytes.len() == 4 => {
-                                            u32::from_le_bytes((&dl_bytes[..]).try_into().map_err(
-                                                |_| {
-                                                    MemFuseError::Storage(
-                                                        "Invalid doc_len length".into(),
-                                                    )
-                                                },
-                                            )?)
-                                        }
-                                        _ => 0,
-                                    };
-                                    postings.push(Posting::new(doc_id, tf, doc_len));
-                                }
-                            }
-                        }
-                    }
-                    let plist = PostingList::new(postings);
-                    self.resident_index.insert_list(term.clone(), plist);
-                    match self.resident_index.get(term) {
-                        Some(l) => l,
-                        None => Arc::new(PostingList::empty()),
-                    }
-                }
-            };
-
-            let is_latest = max_seq.is_none() || max_seq == Some(u64::MAX);
-
-            let mut valid_postings = Vec::with_capacity(list.len());
-            for posting in list.as_slice() {
-                let doc_id = posting.doc_id();
-
-                // For historical snapshot queries, verify document existence at snapshot seq
-                if !is_latest {
-                    let doc_len = if let Some(&len) = doc_len_cache.get(&doc_id) {
-                        len
-                    } else {
-                        let dl_key = self.key_with_id("dl:", doc_id.inner());
-                        match self.storage.get_at_seq(&dl_key, seq).await? {
-                            Some(_) => {
-                                let len = posting.doc_len;
-                                doc_len_cache.insert(doc_id, len);
-                                len
-                            }
-                            None => continue, // Document deleted or not yet created at seq
-                        }
-                    };
-                    _ = doc_len;
-                }
-
-                // Check tombstone marker tbs:{doc_id}:{term} at snapshot seq (cached per query run)
-                let tbs_key = self.key_tombstone(doc_id, term);
-                let is_tombstone = match tbs_cache.get(&tbs_key) {
-                    Some(&exists) => exists,
-                    None => {
-                        let exists = self.storage.get_at_seq(&tbs_key, seq).await?.is_some();
-                        tbs_cache.insert(tbs_key.clone(), exists);
-                        exists
-                    }
-                };
-                if is_tombstone {
-                    continue; // Stale posting masked by tombstone at seq
-                }
-
-                valid_postings.push((doc_id, posting.tf, posting.doc_len));
-            }
-
-            let df = valid_postings.len() as u32;
-            if df == 0 {
-                continue;
-            }
-
-            for (doc_id, tf, doc_len) in valid_postings {
-                let score = crate::bm25::score_term(tf, doc_len, avg_doc_len, df, n as u32);
-
-                *scores.entry(doc_id).or_insert(0.0) += score;
-            }
-        }
-
-        let mut top_k = BoundedTopK::new(k);
-        for (doc_id, score) in scores {
-            top_k.push(Bm25Candidate { doc_id, score });
-        }
-
-        let results = top_k
-            .into_sorted_vec()
-            .into_iter()
-            .map(|c| (c.doc_id, c.score))
-            .collect();
-
-        Ok(results)
+        Ok(wand_res.results)
     }
 }
 

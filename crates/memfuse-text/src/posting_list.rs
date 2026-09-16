@@ -13,6 +13,21 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Block size for Block-Max WAND decomposition.
+pub const BLOCK_SIZE: usize = 64;
+
+/// Block-Max metadata for a chunk of postings (typically 64 postings).
+#[repr(C, align(8))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PostingBlockInfo {
+    /// Upper bound doc_id in this block (for fast skip).
+    pub max_doc_id: u64,
+    /// Maximum term frequency in this block.
+    pub max_tf: u32,
+    /// Minimum document length in this block (maximizing BM25 score upper bound).
+    pub min_doc_len: u32,
+}
+
 /// Compact representation of a single posting in a posting list.
 /// Packed with 8-byte alignment (16 bytes total) for optimal CPU cache alignment.
 #[repr(C, align(8))]
@@ -39,10 +54,41 @@ impl Posting {
     }
 }
 
+/// Computes Block-Max metadata for a sequence of postings.
+fn compute_blocks(postings: &[Posting]) -> Vec<PostingBlockInfo> {
+    if postings.is_empty() {
+        return Vec::new();
+    }
+    let mut blocks = Vec::with_capacity((postings.len() + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    for chunk in postings.chunks(BLOCK_SIZE) {
+        let max_doc_id = chunk.last().map(|p| p.doc_id).unwrap_or(0);
+        let mut max_tf = 0u32;
+        let mut min_doc_len = u32::MAX;
+        for p in chunk {
+            if p.tf > max_tf {
+                max_tf = p.tf;
+            }
+            if p.doc_len < min_doc_len {
+                min_doc_len = p.doc_len;
+            }
+        }
+        if min_doc_len == u32::MAX {
+            min_doc_len = 0;
+        }
+        blocks.push(PostingBlockInfo {
+            max_doc_id,
+            max_tf,
+            min_doc_len,
+        });
+    }
+    blocks
+}
+
 /// A contiguous, sorted sequence of postings for a specific term.
 #[derive(Debug, Clone, Default)]
 pub struct PostingList {
     postings: Vec<Posting>,
+    blocks: Vec<PostingBlockInfo>,
 }
 
 impl PostingList {
@@ -50,13 +96,15 @@ impl PostingList {
     pub fn new(mut postings: Vec<Posting>) -> Self {
         postings.sort_unstable_by_key(|p| p.doc_id);
         postings.dedup_by_key(|p| p.doc_id);
-        Self { postings }
+        let blocks = compute_blocks(&postings);
+        Self { postings, blocks }
     }
 
     /// Creates an empty `PostingList`.
     pub fn empty() -> Self {
         Self {
             postings: Vec::new(),
+            blocks: Vec::new(),
         }
     }
 
@@ -64,6 +112,12 @@ impl PostingList {
     #[inline]
     pub fn as_slice(&self) -> &[Posting] {
         &self.postings
+    }
+
+    /// Returns the block-max metadata blocks.
+    #[inline]
+    pub fn blocks(&self) -> &[PostingBlockInfo] {
+        &self.blocks
     }
 
     /// Returns the number of postings.
@@ -89,8 +143,10 @@ impl PostingList {
                 new_postings.insert(idx, posting);
             }
         }
+        let blocks = compute_blocks(&new_postings);
         Self {
             postings: new_postings,
+            blocks,
         }
     }
 
@@ -100,8 +156,10 @@ impl PostingList {
         if let Ok(idx) = new_postings.binary_search_by_key(&doc_id.inner(), |p| p.doc_id) {
             new_postings.remove(idx);
         }
+        let blocks = compute_blocks(&new_postings);
         Self {
             postings: new_postings,
+            blocks,
         }
     }
 }
