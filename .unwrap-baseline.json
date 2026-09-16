@@ -12017,11 +12017,19 @@
   },
   {
     "file": "crates/memfuse-index/src/distance.rs",
+    "hash": "56c7981c930b2d01"
+  },
+  {
+    "file": "crates/memfuse-index/src/distance.rs",
     "hash": "5ec59e03f24e17a2"
   },
   {
     "file": "crates/memfuse-index/src/distance.rs",
     "hash": "6e355e62ecd240fd"
+  },
+  {
+    "file": "crates/memfuse-index/src/distance.rs",
+    "hash": "795146aff5bad36b"
   },
   {
     "file": "crates/memfuse-index/src/distance.rs",
@@ -12249,6 +12257,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "3c954823629fd629"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "3d661d3cb1167ca0"
   },
   {
@@ -12381,6 +12393,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "6ad222ab056a0a00"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "6ad833ae3ed92681"
   },
   {
@@ -12430,6 +12446,10 @@
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "7d7461bd198ad792"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "7dc660875244370e"
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
@@ -12697,6 +12717,10 @@
   },
   {
     "file": "crates/memfuse-index/src/hnsw.rs",
+    "hash": "dda22c6905cafe64"
+  },
+  {
+    "file": "crates/memfuse-index/src/hnsw.rs",
     "hash": "e0e4d6f5f8f9d221"
   },
   {
@@ -12902,6 +12926,10 @@
   {
     "file": "crates/memfuse-index/src/quantize.rs",
     "hash": "56613e84308f8f20"
+  },
+  {
+    "file": "crates/memfuse-index/src/quantize.rs",
+    "hash": "63d13a10155c14c0"
   },
   {
     "file": "crates/memfuse-index/src/quantize.rs",
@@ -15709,6 +15737,18 @@
   },
   {
     "file": "crates/memfuse-sandbox/src/executor.rs",
+    "hash": "45c87002aaaafccb"
+  },
+  {
+    "file": "crates/memfuse-sandbox/src/executor.rs",
+    "hash": "4b7093014201e7e1"
+  },
+  {
+    "file": "crates/memfuse-sandbox/src/executor.rs",
+    "hash": "80fe33a80503e147"
+  },
+  {
+    "file": "crates/memfuse-sandbox/src/executor.rs",
     "hash": "904a5ba9eeb6c39a"
   },
   {
@@ -15718,6 +15758,14 @@
   {
     "file": "crates/memfuse-sandbox/src/executor.rs",
     "hash": "a1a65407a5ddb641"
+  },
+  {
+    "file": "crates/memfuse-sandbox/src/executor.rs",
+    "hash": "d3b685317ff2a65d"
+  },
+  {
+    "file": "crates/memfuse-sandbox/src/executor.rs",
+    "hash": "e0c5f9927948f81f"
   },
   {
     "file": "crates/memfuse-sandbox/tests/wasm_boundary_tests.rs",
