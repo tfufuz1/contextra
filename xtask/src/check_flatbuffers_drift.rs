@@ -69,8 +69,13 @@ pub fn check_flatbuffers_drift() -> Result<(), String> {
 
     let new_content = fs::read_to_string(&newly_generated_path)
         .map_err(|e| format!("Failed to read generated output file: {}", e))?;
-    let existing_content = fs::read_to_string(&existing_generated_path)
-        .map_err(|e| format!("Failed to read existing file '{}': {}", existing_generated_path.display(), e))?;
+    let existing_content = fs::read_to_string(&existing_generated_path).map_err(|e| {
+        format!(
+            "Failed to read existing file '{}': {}",
+            existing_generated_path.display(),
+            e
+        )
+    })?;
 
     let norm_new = normalize_code(&new_content);
     let norm_existing = normalize_code(&existing_content);
@@ -120,7 +125,10 @@ pub fn regenerate_flatbuffers() -> Result<(), String> {
         ));
     }
 
-    println!("✅ FlatBuffers Rust code successfully regenerated at '{}'.", out_dir.join("memfuse_generated.rs").display());
+    println!(
+        "✅ FlatBuffers Rust code successfully regenerated at '{}'.",
+        out_dir.join("memfuse_generated.rs").display()
+    );
     Ok(())
 }
 

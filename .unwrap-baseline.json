@@ -15841,11 +15841,11 @@
   },
   {
     "file": "crates/memfuse-sandbox/src/executor.rs",
-    "hash": "3666d3e5def555fa"
+    "hash": "45c87002aaaafccb"
   },
   {
     "file": "crates/memfuse-sandbox/src/executor.rs",
-    "hash": "45c87002aaaafccb"
+    "hash": "4a78299ac300bb6e"
   },
   {
     "file": "crates/memfuse-sandbox/src/executor.rs",
@@ -15889,7 +15889,7 @@
   },
   {
     "file": "crates/memfuse-sandbox/tests/wasm_boundary_tests.rs",
-    "hash": "779e90f53f1d5227"
+    "hash": "bd5cb7d3e4c86e0b"
   },
   {
     "file": "crates/memfuse-store/benches/lsm_concurrency_bench.rs",
@@ -18286,10 +18286,6 @@
   {
     "file": "crates/memfuse-store/src/sstable.rs",
     "hash": "1e5c9dd14e8ce67d"
-  },
-  {
-    "file": "crates/memfuse-store/src/sstable.rs",
-    "hash": "2372fcc6610157bf"
   },
   {
     "file": "crates/memfuse-store/src/sstable.rs",
