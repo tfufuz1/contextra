@@ -44,7 +44,7 @@ um Dokumente anhand von Headings (`#`, `##`) in sinnvolle semantische Chunks
 ### Lock-Hierarchie (Deadlock Prevention)
 Wenn mehrere Komponenten gelockt werden müssen, gilt zwingend folgende Reihenfolge:
 1. **`collections` (RwLock)**: Die Registry aller aktiven Collections (äußerster Lock).
-2. **`insert_lock` (Mutex)**: Pro Collection, schützt Batch-Updates.
+2. **`kv_locks` (KvKeyLocks)**: Pro Collection, Key-granulares Sharded-Locking.
 3. **`embedder` (RwLock)**: Lazy-Initialization des TextEmbeddingEngines.
 *Jede Abweichung erzeugt Deadlocks unter Last.*
 
@@ -96,7 +96,7 @@ for chunk in chunks { collection.insert_chunk(...).await?; }
 
 (Siehe Sektion 3)
 Zusätzlich: LLM-gestützte Operationen (`consolidate_via_llm`, `MultiStepEngine::search`)
-dauern Sekunden! Sie DÜRFEN NIEMALS unter einem aktiven `insert_lock` oder `RwLockReadGuard`
+dauern Sekunden! Sie DÜRFEN NIEMALS unter einem aktiven Key-Lock oder `RwLockReadGuard`
 ausgeführt werden (Fehlerklasse 11).
 
 ## 7. Cross-Crate-Schnittstellen & DAG-Grenzen

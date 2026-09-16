@@ -3,17 +3,32 @@
 //! Verifikation der physischen WAL-Schreibreihenfolge.
 //!
 //! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
-
-#![allow(unexpected_cfgs)]
+//!
+//! MANUELLER MUTATIONSTEST (Dokumentation / Verifikation):
+//! Falls im Leader-Pfad von `GroupCommitEngine::commit()` die Zeilen für Lock-Handoff
+//!   `let truncate_guard = self.wal.truncate_lock.lock().await;`
+//!   `drop(_commit_lock);`
+//! vertauscht werden zu:
+//!   `drop(_commit_lock);`
+//!   `let truncate_guard = self.wal.truncate_lock.lock().await;`
+//! dann entsteht eine Race-Condition: Parallele Tasks können `commit_mutex` vor der physischen
+//! WAL-Write-Phase übernehmen und ihre Batch-HMACs auf Basis des alten `last_hmac` berechnen.
+//! Bei der anschließenden HMAC-Ketten-Rekonstruktion in `verify_wal_hmac_chain` schlägt die
+//! Assertion `entry.prev_hmac == expected_prev_hmac` fehl.
+//!
+//! Die Lock-Handoff-Sequenz (`truncate_lock.lock()` ERWERBEN bevor `_commit_lock` FREIGEGEBEN wird)
+//! garantiert deterministische WAL-Schreibreihenfolge analog zu `lsm/mod.rs:788–792`.
 
 use memfuse_core::{MemFuseError, TxId};
 use memfuse_store::wal::{PreparedBatch, Wal, WalOp};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 struct GroupCommitRequest {
     _tx_id: u64,
     batch: PreparedBatch,
+    sender: tokio::sync::oneshot::Sender<Result<(), MemFuseError>>,
 }
 
 struct PendingCommitQueue {
@@ -40,65 +55,66 @@ impl GroupCommitEngine {
         }
     }
 
-    /// Nachbildung der echten Gruppen-Commit-Logik aus `lsm/mod.rs`
-    /// unter Verwendung der ECHTEN `commit_mutex` + `truncate_lock` Lock-Handoff-Reihenfolge.
+    /// Nachbildung der Gruppen-Commit-Logik aus `lsm/mod.rs` & `lsm/group_commit.rs`
+    /// unter Verwendung der ECHTEN `Wal::prepare_batch` und `Wal::append_batch_locked` Implementation.
     async fn commit(&self, tx_id: u64) -> Result<(), MemFuseError> {
-        // PHASE 1: commit_mutex erwerben für Sequenz-Allokierung & Batch-Vorbereitung
-        let commit_lock = self.commit_mutex.lock().await;
-
-        let seq_no = self.next_seq_no.fetch_add(1, Ordering::SeqCst);
-        {
-            let mut order = self
-                .prep_order
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
-            order.push(tx_id);
-        }
+        // PHASE 1: commit_mutex erwerben und WAL Entry vorbereiten
+        let _commit_lock = self.commit_mutex.lock().await;
 
         let op = WalOp::Put {
             tx_id: TxId::new(tx_id),
             key: format!("key-{tx_id}").into_bytes(),
             value: b"val".to_vec(),
         };
-        let (batch, prev_hmac_snapshot) = self.wal.prepare_batch(vec![(op, seq_no)]).await?;
+        let (batch, prev_hmac_snapshot) = self.wal.prepare_batch(vec![(op, tx_id)]).await?;
 
-        // PHASE 2: Group Commit Einreihung / Leader-Auswahl
+        // PHASE 2: Prüfen ob bereits eine Pending Queue existiert
         let mut queue_guard = self.pending_commit_queue.lock().await;
 
         if let Some(ref mut queue) = *queue_guard {
-            // Follower-Pfad: In bestehende Leader-Queue einreihen
+            // Follower-Pfad: In bestehende Leader-Queue einreihen und auf Leader warten
+            let (tx, rx) = tokio::sync::oneshot::channel();
             let req = GroupCommitRequest {
                 _tx_id: tx_id,
-                batch: batch.clone(),
+                batch,
+                sender: tx,
             };
             queue.requests.push(req);
             drop(queue_guard);
-            drop(commit_lock);
-            Ok(())
+            drop(_commit_lock);
+
+            rx.await
+                .map_err(|_| MemFuseError::Internal("Leader dropped commit channel".into()))?
         } else {
-            // Leader-Pfad: Queue initialisieren und Leader-Rolle übernehmen
+            // Leader-Pfad: Queue initialisieren
+            let leader_batch = batch;
             *queue_guard = Some(PendingCommitQueue {
                 requests: Vec::new(),
                 first_prev_hmac: prev_hmac_snapshot,
             });
             drop(queue_guard);
+            drop(_commit_lock);
 
-            // Leader-Pfad: Pending Queue übernehmen
+            // Zero-Wait / Latency window: Yield um Follower-Tasks Zeit zum Einreihen zu geben
+            tokio::task::yield_now().await;
+
+            // Leader übernimmt Queue zur physischen WAL-I/O Phase
+            let _commit_lock = self.commit_mutex.lock().await;
             let mut queue_guard = self.pending_commit_queue.lock().await;
             let pending_queue = queue_guard
                 .take()
                 .expect("pending commit queue must exist for leader");
             drop(queue_guard);
 
-            let mut combined_batch = batch;
-            for r in pending_queue.requests {
-                combined_batch.extend(r.batch);
+            let mut combined_batch = leader_batch;
+            for r in &pending_queue.requests {
+                combined_batch.extend(r.batch.clone());
             }
 
-            // LOCK-HANDOFF (P0-A / Commit 694fa8c2):
-            // Acquire truncate_lock BEFORE dropping commit_mutex!
+            // LOCK-HANDOFF (P0-A Fix analog zu lsm/mod.rs:788–792):
+            // Acquire truncate_lock BEFORE dropping commit_mutex.
             let truncate_guard = self.wal.truncate_lock.lock().await;
-            drop(commit_lock);
+            drop(_commit_lock);
 
             let append_res = self
                 .wal
@@ -112,14 +128,50 @@ impl GroupCommitEngine {
                     .wal
                     .restore_last_hmac(pending_queue.first_prev_hmac)
                     .await;
+                let err_msg = e.to_string();
+                for r in pending_queue.requests {
+                    let _ = r.sender.send(Err(MemFuseError::Storage(err_msg.clone())));
+                }
                 return Err(e);
             }
 
-            // Re-acquire commit_mutex für Post-Commit Status-Updates / Visibility Advancement
+            // Re-acquire commit_mutex for MemTable / visibility updates & follower notification (lsm/mod.rs:810)
             let _commit_lock = self.commit_mutex.lock().await;
+
+            for r in pending_queue.requests {
+                let _ = r.sender.send(Ok(()));
+            }
+
             Ok(())
         }
     }
+}
+
+/// Rekonstruiert und verifiziert die physische HMAC-Kette im WAL.
+async fn verify_wal_hmac_chain(wal: &Wal) -> Result<usize, MemFuseError> {
+    let size = wal.size();
+    let mut expected_prev_hmac = [0u8; 32];
+    let mut entry_count = 0usize;
+
+    wal.scan_entries_with_callback(size, |_seq, entry, _pos| {
+        assert_eq!(
+            entry.prev_hmac, expected_prev_hmac,
+            "WAL entry prev_hmac mismatch at entry {entry_count}! HMAC chain broken."
+        );
+        expected_prev_hmac = entry.checksum;
+        entry_count += 1;
+        true
+    })
+    .await?;
+
+    let final_hmac = wal.last_hmac_snapshot().await;
+    assert_ne!(final_hmac, [0u8; 32], "last_hmac must not be zero");
+    assert_eq!(
+        expected_prev_hmac, final_hmac,
+        "Final entry checksum must match wal.last_hmac_snapshot()"
+    );
+
+    Ok(entry_count)
 }
 
 #[cfg(loom)]
@@ -128,7 +180,7 @@ fn test_loom_group_commit_last_hmac_race() {
     loom::model(|| {
         let rt = tokio::runtime::Builder::new_current_thread()
             .build()
-            .expect("tokio runtime build failed");
+            .expect("failed to build tokio runtime");
 
         rt.block_on(async {
             let wal = Wal::open_loom();
@@ -144,10 +196,17 @@ fn test_loom_group_commit_last_hmac_race() {
                 let _ = engine_2.commit(2).await;
             });
 
-            let _ = tokio::join!(task1, task2);
+            let engine_3 = Arc::clone(&engine);
+            let task3 = tokio::spawn(async move {
+                let _ = engine_3.commit(3).await;
+            });
 
-            let final_hmac = engine.wal.last_hmac_snapshot().await;
-            assert_ne!(final_hmac, [0u8; 32], "last_hmac must be updated");
+            let _ = tokio::join!(task1, task2, task3);
+
+            let entry_count = verify_wal_hmac_chain(&engine.wal)
+                .await
+                .expect("HMAC chain verification failed");
+            assert_eq!(entry_count, 3, "Expected 3 committed entries in WAL");
 
             let file_size = engine.wal.size();
             let physical_seqs = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -206,57 +265,8 @@ async fn test_loom_group_commit_last_hmac_race_non_loom() {
         res.expect("task panicked").expect("commit failed");
     }
 
-    // 1. Endzustand HMAC Prüfen
-    let final_hmac = engine.wal.last_hmac_snapshot().await;
-    assert_ne!(
-        final_hmac, [0u8; 32],
-        "last_hmac must be updated after group commit"
-    );
-
-    // 2. Physische Schreibreihenfolge per Wal::scan_entries_with_callback verifizieren
-    let file_size = engine.wal.size();
-    let physical_seqs = Arc::new(std::sync::Mutex::new(Vec::new()));
-    let physical_seqs_clone = Arc::clone(&physical_seqs);
-
-    engine
-        .wal
-        .scan_entries_with_callback(file_size, move |seq, entry, _pos| {
-            if let Ok(mut guard) = physical_seqs_clone.lock() {
-                guard.push((seq, entry.tx_id().inner()));
-            }
-            true
-        })
+    let entry_count = verify_wal_hmac_chain(&engine.wal)
         .await
-        .expect("scan entries succeeds");
-
-    let written = physical_seqs
-        .lock()
-        .map(|g| g.clone())
-        .unwrap_or_default();
-    assert_eq!(
-        written.len(),
-        3,
-        "Exactly 3 physical entries must be written to WAL"
-    );
-
-    // Verifiziere monokausal aufsteigende seq_no-Folge
-    for window in written.windows(2) {
-        assert!(
-            window[0].0 < window[1].0,
-            "Physical WAL seq_no must strictly increase: {} vs {}",
-            window[0].0,
-            window[1].0
-        );
-    }
-
-    let prep_order = engine
-        .prep_order
-        .lock()
-        .map(|g| g.clone())
-        .unwrap_or_default();
-    assert_eq!(
-        prep_order.len(),
-        3,
-        "All 3 transactions must record preparation order"
-    );
+        .expect("HMAC chain verification failed");
+    assert_eq!(entry_count, 3, "Expected 3 committed entries in WAL");
 }

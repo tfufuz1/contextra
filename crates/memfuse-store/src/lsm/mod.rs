@@ -791,7 +791,9 @@ impl StorageEngine for LsmStorage {
                 let truncate_guard = wal.truncate_lock.lock().await;
                 drop(_commit_lock);
 
-                let append_res = wal.append_batch_locked(all_wal_entries, &truncate_guard).await;
+                let append_res = wal
+                    .append_batch_locked(all_wal_entries, &truncate_guard)
+                    .await;
                 drop(truncate_guard);
 
                 if let Err(e) = append_res {

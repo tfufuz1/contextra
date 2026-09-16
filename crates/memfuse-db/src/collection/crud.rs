@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: CRUD-Operationen (Insert, Upsert, Update, Delete, Get) für Collection.
 // INVARIANTEN: Atomare Multi-Index Commits via DbTransaction; Validierung aller Eingabegrenzen (ID-Länge, Batch-Größe).
-// NICHT-OFFENSICHTLICH: check_doc_id_collision wird strikt innerhalb des insert_lock ausgeführt.
+// NICHT-OFFENSICHTLICH: check_doc_id_collision wird via atomic put_if_absent und Key-granulares Locking ausgeführt.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 use super::{
@@ -229,6 +229,25 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.insert(id, embedding, Some(meta)).await
     }
 
+    /// Locks keys in deterministic sorted order to prevent deadlocks across batch operations.
+    /// Deduplicates by lock shard index to prevent self-deadlock when multiple keys map to the same shard.
+    pub(super) async fn lock_keys_sorted<'a>(
+        &'a self,
+        keys: impl IntoIterator<Item = &'a str>,
+    ) -> Vec<tokio::sync::MutexGuard<'a, ()>> {
+        let mut shard_indices: Vec<usize> = keys
+            .into_iter()
+            .map(|k| self.kv_locks.shard_idx(k))
+            .collect();
+        shard_indices.sort_unstable();
+        shard_indices.dedup();
+        let mut guards = Vec::with_capacity(shard_indices.len());
+        for idx in shard_indices {
+            guards.push(self.kv_locks.lock_shard(idx).await);
+        }
+        guards
+    }
+
     /// Inserts a document with an embedding and optional metadata.
     #[tracing::instrument(level = "trace", skip(self, embedding, metadata))]
     pub async fn insert(
@@ -245,7 +264,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             )));
         }
         self.apply_insert_backpressure().await;
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(id).await;
         self.insert_inner_unlocked(id, embedding, metadata).await
     }
 
@@ -304,7 +323,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Internal single document insert method without lock acquisition.
     ///
-    /// Assumes `self.insert_lock` is held by caller to ensure TOCTOU safety.
+    /// Assumes key lock is held by caller to ensure TOCTOU safety.
     async fn insert_inner_unlocked(
         &self,
         id: &str,
@@ -415,7 +434,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.storage.put(tx, &user_key, &data).await?;
 
         let meta_data = serde_json::to_vec(&meta_only)?;
-        self.storage.put(tx, &doc_key, &meta_data).await?;
+        let written = self.storage.put_if_absent(tx, &doc_key, &meta_data).await?;
+        if !written {
+            self.check_doc_id_collision(doc_id, id).await?;
+        }
 
         // Record for compensating transaction with pre-write values
         db_tx.record_keys_with_old_values(user_key, old_user_val, doc_key, old_doc_val, doc_id);
@@ -436,22 +458,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 
-    /// Inserts multiple documents in a single atomic transaction under a single lock scope.
+    /// Inserts multiple documents in a single atomic transaction under key-granular locks.
     ///
     /// # Lock Granularity & Concurrency
-    /// `insert_lock` is acquired **once** for the entire batch rather than once per document.
+    /// Key locks are acquired in sorted order for all keys in the batch.
     /// The DocId collision check (`check_doc_id_collision`) is executed per document sequentially
-    /// inside `insert_op` within this held lock, guaranteeing TOCTOU safety (§18.4, ADR-016).
+    /// inside `insert_op` within held locks, guaranteeing TOCTOU safety (§18.4, ADR-016).
     ///
     /// # Partial Failure & Atomicity (Option a)
     /// If an error occurs on any document in the batch (e.g., validation failure or DocId collision),
     /// the batch iteration is aborted immediately and `db_tx.rollback()` is invoked. All staged writes
     /// for previous documents in this transaction are discarded, ensuring atomic all-or-nothing
     /// batch behavior (Option a).
-    ///
-    /// # Performance
-    /// Holding `insert_lock` once per batch avoids N-1 lock acquisitions and N-1 separate
-    /// transaction commits, resulting in an expected 10-50x throughput improvement for bulk insertion workloads.
     #[tracing::instrument(level = "trace", skip(self, docs))]
     pub async fn insert_many(
         &self,
@@ -480,7 +498,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
-        let _guard = self.insert_lock.lock().await;
+        let _guards = self
+            .lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str()))
+            .await;
         let db_tx = self.begin_transaction()?;
 
         for (id, embedding, metadata) in docs {
@@ -552,7 +572,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(id).await;
         let db_tx = self.begin_transaction()?;
         let result = self.update_op(&db_tx, id, embedding, metadata).await;
 
@@ -600,7 +620,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
-        let _guard = self.insert_lock.lock().await;
+        let _guards = self
+            .lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str()))
+            .await;
         let db_tx = self.begin_transaction()?;
         for (id, embedding, metadata) in docs {
             if embedding.len() != self.dimension {
@@ -693,7 +715,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             )));
         }
 
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(id).await;
         let db_tx = self.begin_transaction()?;
 
         match self.update_op(&db_tx, id, embedding, metadata).await {
@@ -809,7 +831,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Deletes a document from the collection by its ID.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn delete(&self, id: &str) -> Result<()> {
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(id).await;
         let mut db_tx = self.begin_transaction()?;
 
         match self.delete_op(&mut db_tx, id).await {
@@ -872,7 +894,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             ));
         }
 
-        let _guard = self.insert_lock.lock().await;
+        let from_str = from.inner().to_string();
+        let to_str = to.inner().to_string();
+        let _guards = self
+            .lock_keys_sorted([from_str.as_str(), to_str.as_str()])
+            .await;
 
         // Prevent cycles for ALL relation types: if `to` transitively reaches `from`
         // via the same relation, adding `from -> to` creates a cycle.
@@ -1575,14 +1601,11 @@ mod tests {
         .unwrap();
         let col = db.collection("dim_test").await.unwrap();
 
-        // Lock insert_lock manually in the test thread to prove col.insert does not block or acquire insert_lock
-        let _guard = col.insert_lock.lock().await;
-
         // Perform insert with mismatched vector (768 dims instead of 1536)
         let invalid_vector = vec![0.1f32; 768];
         let res = col.insert("doc-1", &invalid_vector, None).await;
 
-        // Must fail immediately without waiting for/acquiring insert_lock
+        // Must fail immediately
         assert!(res.is_err());
         let err_msg = match res {
             Err(memfuse_core::MemFuseError::InvalidInput(msg)) => msg,
@@ -1595,5 +1618,39 @@ mod tests {
             "Error message must mention both expected (1536) and actual (768) dimensions, got: {}",
             err_msg
         );
+    }
+
+    #[tokio::test]
+    async fn test_insert_does_not_block_on_collection_wide_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = crate::MemFuse::open_with_config(
+            dir.path(),
+            crate::MemFuseConfig {
+                dimension: 4,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let col = Arc::new(db.collection("concurrency_test").await.unwrap());
+
+        // Hold a key lock on "key_1"
+        let guard_key_1 = col.kv_locks.lock_for("key_1").await;
+
+        // Perform insert on "key_2" concurrently.
+        // Since key-granular locking is used, inserting key_2 must not block on key_1.
+        let col_clone = col.clone();
+        let handle =
+            tokio::spawn(
+                async move { col_clone.insert("key_2", &[1.0, 0.0, 0.0, 0.0], None).await },
+            );
+
+        let res = tokio::time::timeout(std::time::Duration::from_millis(500), handle).await;
+        assert!(
+            res.is_ok(),
+            "Insert of key_2 timed out/blocked due to lock on key_1"
+        );
+        assert!(res.unwrap().unwrap().is_ok());
+        drop(guard_key_1);
     }
 }
