@@ -57,6 +57,7 @@ mod check_audit_tool_evidence;
 mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
 mod check_commit_messages;
+mod check_flatbuffers_drift;
 mod check_compile;
 mod check_coverage_gate;
 mod check_doc_references;
@@ -2316,6 +2317,18 @@ fn main() {
         "check-bandit-latency-budget" => {
             if let Err(e) = check_bandit_latency_budget::check_bandit_latency_budget() {
                 eprintln!("❌ check-bandit-latency-budget failed: {}", e);
+                process::exit(1);
+            }
+        }
+        "check-flatbuffers-drift" => {
+            if let Err(e) = check_flatbuffers_drift::check_flatbuffers_drift() {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+        }
+        "regenerate-flatbuffers" => {
+            if let Err(e) = check_flatbuffers_drift::regenerate_flatbuffers() {
+                eprintln!("{}", e);
                 process::exit(1);
             }
         }

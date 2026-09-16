@@ -191,6 +191,7 @@ async fn test_hybrid_search_with_ppr_strategy() {
         damping_factor: 0.85,
         max_iterations: 100,
         convergence_epsilon: 1e-6,
+        algorithm: memfuse_core::PprAlgorithm::Auto,
         warn_on_non_convergence: true,
     });
 

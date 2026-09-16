@@ -7,7 +7,7 @@
       "session_id": "17855158604236717290",
       "active": false,
       "expires_at": "2026-09-16T22:41:49.112921010+00:00",
-      "released_at": "2026-09-16T22:45:01.175618353+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-16T22:43:26.467800040+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-core",
@@ -22,16 +22,25 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-16T21:38:47.429973770+00:00",
       "session_id": "3279970408593114847",
+      "active": false,
+      "expires_at": "2026-09-17T01:38:47.429954857+00:00",
+      "released_at": "2026-09-16T22:31:10.004432927+00:00"
+    },
+    {
+      "krate": "memfuse-text",
+      "issue": "WELLE5-BM25F",
+      "timestamp": "2026-09-16T22:31:19.093982017+00:00",
+      "session_id": "9595033855427390629",
       "active": true,
       "expires_at": "2026-09-17T01:38:47.429954857+00:00"
     },
     {
-      "krate": "memfuse-graph",
-      "issue": "WELLE4-DOCID128-GRAPH",
-      "timestamp": "2026-09-16T22:19:58.508567505+00:00",
-      "session_id": "16525687467372238479",
+      "krate": "memfuse-candle",
+      "issue": "WELLE5-AUDIT-KVBRIDGE-SPILL",
+      "timestamp": "2026-09-16T22:29:03.410241302+00:00",
+      "session_id": "5745795697878023454",
       "active": true,
-      "expires_at": "2026-09-17T02:19:58.508544841+00:00"
+      "expires_at": "2026-09-17T02:29:03.410221688+00:00"
     }
   ]
 }

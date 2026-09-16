@@ -11,6 +11,7 @@ default = []
 docid-128 = ["memfuse-core/docid-128"]
 graph-connectivity-health = []
 edge-reinforcement-learning = []
+ppr-forward-push = []
 
 # Deprecated alias features for backward compatibility with memfuse-db
 physio-percolation = ["graph-connectivity-health"]
