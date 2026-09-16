@@ -81,7 +81,7 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/multistep.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/transaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
-| `2026-09-16T16:47:30Z` | `crates/memfuse-py/src/lib.rs` | `REVIEW-PASS` | `-` | `29edb6a4` | `-` | `-` | // REVIEW-PASS[1/2] Systematischer Review der memfuse-py PyO3 FFI Bindings (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-16T16:47:30Z) (SESSION: 29edb6a4) |
+| `2026-09-16T16:17:21Z` | `crates/memfuse-router/src/lib.rs` | `REVIEW-PASS` | `-` | `cec8b8e9` | `-` | `-` | // REVIEW-PASS[1/2] (TS: 2026-09-16T16:17:21Z) (SESSION: cec8b8e9) (PRÜFER-KONTEXT: FRESH) |
 | `2026-09-15T16:46:26Z` | `crates/memfuse-agent/src/lib.rs` | `REVIEW-PASS` | `AGT-AGENT-692d9982` | `692d9982` | `PASS` | `0` | // REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-AGENT-692d9982) (TS: 2026-09-15T16:46:26Z) (SESSION: 692d9982) (PRÜFER-KONTEXT: FRESH) |
 | `2026-09-15T16:15:00Z (SESSION: 1a43706f)` | `crates/memfuse-router/src/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit- und Integrationstest-Suite für memfuse-router. |
 | `2026-09-15T16:10:40Z (SESSION: ec33599e)` | `crates/memfuse-embed/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG). |
@@ -332,3 +332,4 @@
 | `` | `crates/memfuse-store/tests/wal_hmac_chain_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Regressionstest — WAL HMAC-Kette enthält keine Gabelungen nach Group-Commit. |
 | `` | `crates/memfuse-store/tests/wal_hmac_rollback_race.rs` | `FILE-CONTEXT` | `-` | `b448084` | `-` | `-` |  |
 | `` | `crates/memfuse-store/tests/wal_truncate_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität. |
+| `` | `crates/memfuse-text/src/posting_list.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Stellt kompakte, resident gehaltene Postinglisten pro Term bereit. |
