@@ -611,7 +611,9 @@ mod tests {
 
         impl StorageEngine for MockStorage {
             fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
-                Box::pin(async move { Ok(self.data.lock().unwrap().get(key).cloned().map(Bytes::from)) })
+                Box::pin(
+                    async move { Ok(self.data.lock().unwrap().get(key).cloned().map(Bytes::from)) },
+                )
             }
             fn get_at_seq<'a>(
                 &'a self,
