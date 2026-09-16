@@ -77,7 +77,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | Crate | Layer | LOC | Status | Beschreibung / Hauptaufgabe |
 | :--- | :---: | :---: | :--- | :--- |
 | `memfuse-core-ipc-gen` | 0 | 1174 | 🟢 Clean | Auto-generated FlatBuffers IPC code for MemFuse Core |
-| `memfuse-core` | 1 | 10006 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
+| `memfuse-core` | 1 | 10029 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
 | `memfuse-calibration` | 2 | 1980 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 2 | 6035 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-crypto` | 2 | 6572 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
@@ -89,7 +89,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-ollama` | 3 | 4573 | 🟢 Clean |  |
 | `memfuse-store` | 3 | 26071 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-embed` | 4 | 2215 | 🧊 Optional |  |
-| `memfuse-db` | 5 | 36000 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 5 | 36496 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 6 | 5709 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-router` | 6 | 6790 | 🟢 Clean |  |
 | `memfuse-agent` | 7 | 6531 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
