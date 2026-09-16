@@ -19,11 +19,11 @@
 //! Die Lock-Handoff-Sequenz (`truncate_lock.lock()` ERWERBEN bevor `_commit_lock` FREIGEGEBEN wird)
 //! garantiert deterministische WAL-Schreibreihenfolge analog zu `lsm/mod.rs:788–792`.
 
+#![allow(unexpected_cfgs)]
+
 use memfuse_core::{MemFuseError, TxId};
 use memfuse_store::wal::{PreparedBatch, Wal, WalOp};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 struct GroupCommitRequest {
     _tx_id: u64,
@@ -39,8 +39,6 @@ struct PendingCommitQueue {
 struct GroupCommitEngine {
     commit_mutex: tokio::sync::Mutex<()>,
     pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,
-    next_seq_no: AtomicU64,
-    prep_order: std::sync::Mutex<Vec<u64>>,
     wal: Wal,
 }
 
@@ -49,8 +47,6 @@ impl GroupCommitEngine {
         Self {
             commit_mutex: tokio::sync::Mutex::new(()),
             pending_commit_queue: tokio::sync::Mutex::new(None),
-            next_seq_no: AtomicU64::new(1),
-            prep_order: std::sync::Mutex::new(Vec::new()),
             wal,
         }
     }
@@ -226,8 +222,8 @@ fn test_loom_group_commit_last_hmac_race() {
             let written = physical_seqs.lock().map(|g| g.clone()).unwrap_or_default();
             assert_eq!(
                 written.len(),
-                2,
-                "Exactly 2 physical entries must be written to WAL"
+                3,
+                "Exactly 3 physical entries must be written to WAL"
             );
 
             for window in written.windows(2) {

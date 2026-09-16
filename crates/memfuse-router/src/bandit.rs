@@ -48,6 +48,12 @@ pub struct BanditProfileState {
     pub theta: Vec<f32>,
     /// Diagonale Kovarianz-Terme σ²_p (Diagonal-Approximation).
     pub sigma_sq: Vec<f32>,
+    /// Inverser Kovarianzmatrix-Speicher A⁻¹ (d x d, Row-Major) für Sherman-Morrison O(d²).
+    #[serde(default)]
+    pub inv_a: Vec<f32>,
+    /// Pre-allocated Buffer für Matrix-Vektor Produkte (d Elemente) zur Vermeidung von Hot-Path Allokationen.
+    #[serde(skip, default)]
+    pub work_buf: Vec<f32>,
     /// Exploration-Parameter α_p.
     pub alpha: f32,
     /// Kostensensitivität λ (Default: 0.1).
@@ -74,9 +80,15 @@ pub struct BanditProfileState {
 impl BanditProfileState {
     /// Erstellt einen neuen Cold-Start-Zustand für Dimension `d`.
     pub fn cold_start(d: usize, alpha_base: f32) -> Self {
+        let mut inv_a = vec![0.0f32; d * d];
+        for i in 0..d {
+            inv_a[i * d + i] = 1.0;
+        }
         Self {
             theta: vec![0.0f32; d],
             sigma_sq: vec![1.0f32; d], // Uninformative Prior
+            inv_a,
+            work_buf: vec![0.0f32; d],
             alpha: alpha_base,
             lambda: 0.1,
             mu: 0.2,
@@ -85,6 +97,23 @@ impl BanditProfileState {
             drift_steps_remaining: 0,
             drift_decay_window: default_drift_decay_window(),
             implementation: BanditImplementation::default(),
+        }
+    }
+
+    fn ensure_inv_a(&mut self) {
+        let d = self.theta.len();
+        if self.inv_a.len() != d * d {
+            self.inv_a = vec![0.0f32; d * d];
+            for i in 0..d {
+                self.inv_a[i * d + i] = 1.0;
+            }
+        }
+    }
+
+    fn ensure_work_buf(&mut self) {
+        let d = self.theta.len();
+        if self.work_buf.len() != d {
+            self.work_buf.resize(d, 0.0);
         }
     }
 
@@ -100,26 +129,48 @@ impl BanditProfileState {
 
         let dot: f32 = self.theta.iter().zip(x.iter()).map(|(t, xi)| t * xi).sum();
 
-        // Diagonal-Approximation: Σ(x) = Σ_i x_i² / σ²_i
-        let variance_term: f32 = self
-            .sigma_sq
-            .iter()
-            .zip(x.iter())
-            .map(|(s, xi)| xi * xi / s.max(1e-8))
-            .sum::<f32>()
-            .sqrt();
+        let variance_term = match self.implementation {
+            BanditImplementation::DiagonalApproximation => {
+                self.sigma_sq
+                    .iter()
+                    .zip(x.iter())
+                    .map(|(s, xi)| xi * xi / s.max(1e-8))
+                    .sum::<f32>()
+                    .sqrt()
+            }
+            #[cfg(feature = "egress-sherman-morrison")]
+            BanditImplementation::ShermanMorrison => {
+                let d = self.theta.len();
+                if self.inv_a.len() == d * d {
+                    let mut var_sum = 0.0f32;
+                    for i in 0..d {
+                        let row_offset = i * d;
+                        let mut row_dot = 0.0f32;
+                        for j in 0..d {
+                            row_dot += self.inv_a[row_offset + j] * x[j];
+                        }
+                        var_sum += x[i] * row_dot;
+                    }
+                    var_sum.max(0.0).sqrt()
+                } else {
+                    self.sigma_sq
+                        .iter()
+                        .zip(x.iter())
+                        .map(|(s, xi)| xi * xi / s.max(1e-8))
+                        .sum::<f32>()
+                        .sqrt()
+                }
+            }
+        };
 
         let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
 
         dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty
     }
 
-    /// Aktualisiert θ und σ² nach beobachtetem Outcome unter Berücksichtigung von Discounting.
+    /// Aktualisiert θ und σ² (sowie A⁻¹ bei Sherman-Morrison) nach beobachtetem Outcome unter Berücksichtigung von Discounting.
     ///
     /// r_adj = r_outcome - λ·cost - μ·is_cloud
-    /// σ²[i] ← max(γ_eff · σ²[i], 1.0)
-    /// θ[i] += r_adj · x[i] / σ²[i]
-    /// σ²[i] += x[i]²
     pub fn update(&mut self, x: &[f32], r_outcome: f32, cost: f32, is_cloud_transport: bool) {
         debug_assert_eq!(x.len(), self.theta.len());
 
@@ -134,11 +185,63 @@ impl BanditProfileState {
             self.gamma
         };
 
-        for (i, &xi) in x.iter().enumerate().take(self.theta.len()) {
-            // Discounted-Update: Ältere Beobachtungen dämpfen, floored bei Cold-Start Prior 1.0
-            self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0);
-            self.theta[i] += r_adj * xi / self.sigma_sq[i].max(1e-8);
-            self.sigma_sq[i] += xi * xi;
+        match self.implementation {
+            BanditImplementation::DiagonalApproximation => {
+                for (i, &xi) in x.iter().enumerate().take(self.theta.len()) {
+                    self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0);
+                    self.theta[i] += r_adj * xi / self.sigma_sq[i].max(1e-8);
+                    self.sigma_sq[i] += xi * xi;
+                }
+            }
+            #[cfg(feature = "egress-sherman-morrison")]
+            BanditImplementation::ShermanMorrison => {
+                let d = self.theta.len();
+                self.ensure_inv_a();
+                self.ensure_work_buf();
+
+                let gamma_inv = 1.0 / effective_gamma.max(1e-5);
+
+                // 1. Berechne v_x = A⁻¹ x in work_buf
+                let mut xt_vx = 0.0f32;
+                for i in 0..d {
+                    let row_offset = i * d;
+                    let mut sum = 0.0f32;
+                    for j in 0..d {
+                        sum += self.inv_a[row_offset + j] * x[j];
+                    }
+                    self.work_buf[i] = sum;
+                    xt_vx += x[i] * sum;
+                }
+
+                // 2. Diskonterte Zwischenwerte
+                let denominator = 1.0 + gamma_inv * xt_vx;
+                let denom_safe = denominator.max(1e-8);
+
+                // 3. Gain Vector k = (γ⁻¹ A⁻¹ x) / (1 + γ⁻¹ xᵀ A⁻¹ x)
+                // Matrix-Update: A_new⁻¹ = γ⁻¹ A_old⁻¹ - k (γ⁻¹ A_old⁻¹ x)ᵀ
+                // Parameter-Update: θ_new = θ_old + (r_adj - θ_oldᵀ x) * k
+                let mut pred_theta_x = 0.0f32;
+                for i in 0..d {
+                    pred_theta_x += self.theta[i] * x[i];
+                }
+                let residual = r_adj - pred_theta_x;
+
+                // Aktualisiere inv_a und theta
+                for i in 0..d {
+                    let v_disc_i = gamma_inv * self.work_buf[i];
+                    let k_i = v_disc_i / denom_safe;
+
+                    let row_offset = i * d;
+                    for j in 0..d {
+                        let v_disc_j = gamma_inv * self.work_buf[j];
+                        self.inv_a[row_offset + j] =
+                            gamma_inv * self.inv_a[row_offset + j] - k_i * v_disc_j;
+                    }
+
+                    self.theta[i] += residual * k_i;
+                    self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0) + x[i] * x[i];
+                }
+            }
         }
     }
 
@@ -155,6 +258,23 @@ impl BanditProfileState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(feature = "egress-sherman-morrison")]
+    fn test_sherman_morrison_score_and_update() {
+        let mut state = BanditProfileState::cold_start(4, 0.5);
+        state.implementation = BanditImplementation::ShermanMorrison;
+        let x = vec![1.0f32, 0.0, 0.0, 0.0];
+
+        let score_before = state.score(&x, 0.0, false);
+        assert!(score_before > 0.0);
+
+        state.update(&x, 1.0, 0.0, false);
+        assert!(state.theta[0] > 0.0);
+
+        let score_after = state.score(&x, 0.0, false);
+        assert_ne!(score_after, score_before);
+    }
 
     #[test]
     fn test_cold_start_zero_theta_unit_sigma() {

@@ -27,10 +27,10 @@
 # ADR-002: HNSW für Vektor-Indexierung
 
 *   **Datum**: 2026-05-15
-*   **Status**: ✅ Final
-*   **Entscheidung**: Verwendung des Hierarchical Navigable Small World (HNSW) Graphen für die Vektorsuche.
-*   **Alternativen**: IVF-PQ (Quantisierung), Flat Index.
-*   **Begründung**: HNSW bietet exzellente Suchpräzision (Recall) und sehr geringe Suchlatenz auf CPU, kombiniert mit SIMD-Befehlssatz-Erkennung.
+*   **Status**: ✅ Final (Erweitert durch Gestufte Vektorindex-Architektur)
+*   **Entscheidung**: Verwendung des Hierarchical Navigable Small World (HNSW) Graphen als Default- und Primärindex für aktive, mutable Kollektionen.
+*   **Alternativen**: IVF-PQ (Quantisierung), Flat Index, DiskANN.
+*   **Begründung**: HNSW bietet exzellente Suchpräzision (Recall) und sehr geringe Suchlatenz auf CPU. Für großvolumige, leselastige Kollektionen wird DiskANN als gestufter Tier nach Behebung des SQ8-Codebook-Drifts (IP-17) und nativer Delete-Semantik bereitgestellt.
 
 ---
 
@@ -39,10 +39,10 @@
 # ADR-003: RRF (Reciprocal Rank Fusion) für Hybridisierung
 
 *   **Datum**: 2026-05-20
-*   **Status**: ✅ Final
-*   **Entscheidung**: Kombination von HNSW- und BM25-Suche mittels Reciprocal Rank Fusion (RRF).
-*   **Alternativen**: Lineare Gewichtung der Scores.
-*   **Begründung**: RRF fusioniert Ränge statt roher, nicht normierter Scores (Kosinus-Distanz vs. BM25-Score) und benötigt kein manuelles Parameter-Tuning.
+*   **Status**: ✅ Final (Bestätigt & Präzisiert)
+*   **Entscheidung**: RRF bleibt der verbindliche Default für die Multi-Signal-Fusion, da es score-blind und hochgradig robust gegenüber Signalausfällen ist.
+*   **Alternativen**: Score-normalisierte Fusion (CombSUM / Z-Score).
+*   **Begründung**: RRF verhindert Fehler durch nicht-vergleichbare Score-Skalen und Ausfall einzelner Signale (z. B. Graph ohne Kandidaten). Score-Normalisierung wird ausschließlich als opt-in Erweiterung mit dynamischem Fallback auf RRF bereitgestellt.
 
 ---
 
@@ -180,11 +180,11 @@
 
 ---
 
-# ADR-013: DiskANN als experimentelles Feature (memfuse-index)
+# ADR-013: Gestuftes Vektorindex-Modell — HNSW Default + DiskANN Tier (memfuse-index)
 
-*   **Datum**: 2026-08-23
-*   **Status**: ✅ Final
-*   **Entscheidung**: Die Out-of-Core-Vektorsuche (DiskANN) im `memfuse-index` Crate wird als experimentell markiert und hinter dem Cargo-Feature `experimental-diskann` sowie `#[doc(hidden)]` verborgen. Sie wird (vorerst) nicht in die abstrahierte `VectorIndexBackend`-Schnittstelle des `memfuse-db`-Crates integriert.
+*   **Datum**: 2026-08-23 (Aktualisiert 2026-09-16)
+*   **Status**: ✅ Final (Revidiert & Gestuft)
+*   **Entscheidung**: HNSW bleibt Default-Index für mutable Kollektionen. DiskANN wird als offizieller Tier für große, leselastige Kollektionen befördert. Die volle Freigabe erfolgt nach Abschluss von IP-17 (SQ8-Perzentil-Clipping) und Implementierung nativer Tombstone-Löschsemantik in DiskANN.
 *   **Alternativen**:
     - **Option A**: Volle Integration durch Refactoring der `VectorIndex`-Abstraktion und Anpassung der `memfuse-db::Collection`, um dynamisch zwischen HNSW und DiskANN zu wechseln.
 *   **Begründung**: `memfuse-db::Collection` und `HnswIndex` sind aktuell extrem eng verzahnt (z.B. direkte Nutzung von `all_doc_ids_from_map()` in der Collection). Eine überhastete Integration würde die Architektur-Integrität und Snapshot-Isolation gefährden, da DiskANN derzeit `insert()` und `delete()` nicht vollständig (oder nur mit `Err`) implementiert. Option A hätte gravierende Umbauten am Kern-Datenfluss der Collection zur Folge gehabt. Das Verbergen von DiskANN schützt die Produktionspfade, lässt aber den Code für zukünftige Entwicklungen im Baum.
@@ -492,17 +492,16 @@
 
 ---
 
-# ADR-027: Leiden-Algorithmus für Community Detection & GraphRAG
+# ADR-027: Leiden-Algorithmus für Community Detection & GraphRAG (Revidiert)
 
 
-*   **Datum**: 2026-08-27
-*   **Datum der Revision**: 2026-08-30
-*   **Status**: ✅ Revidiert (Ablösung von Label Propagation durch Leiden)
-*   **Kontext**: Für Phase 3 ("Community Detection & GraphRAG") wird eine Methode zur semantischen Clusterbildung von Wissensgraph-Knoten benötigt. Das Ergebnis (Community-Zuordnung pro EntityId) wird asynchron als Batch-Prozess berechnet, im Storage unter `__graph:community:<entity_id>` abgelegt und beim Retrieval gelesen.
+*   **Datum**: 2026-08-27 (Revidiert 2026-09-16)
+*   **Status**: ✅ Final (Revidiert)
+*   **Kontext**: Für Phase 3 ("Community Detection & GraphRAG") wird eine Methode zur semantischen Clusterbildung von Wissensgraph-Knoten benötigt. Das Ergebnis (Community-Zuordnung pro EntityId) soll asynchron als Batch-Prozess berechnet, im Storage unter `__graph:community:<entity_id>` abgelegt und beim Retrieval gelesen werden.
 *   **Entscheidung**:
-    - Wahl des **Leiden-Algorithmus (Traag et al., 2019)** anstelle von Label Propagation (LPA).
-    - Vollständig deterministische Ausführung durch fixierten RNG-Seed (`config.seed`) für Knoten-Shuffling und striktes Tie-Breaking: Bei relativer oder absoluter Gleichheit von Modularity-Gewinnen gewinnt die kleinste `EntityId` (numerischer `u64`-Wert).
-    - Implementierung direkt auf der bestehenden `CsrGraph`-Struktur in `memfuse-graph::community` ohne externe Abhängigkeiten.
+    - Wahl des **Leiden-Algorithmus** anstelle von LPA/Louvain für deterministische, wohlverbundene Community-Erstellung.
+    - Vollständig deterministische Ausführung durch fixierten RNG-Seed für Knoten-Shuffling und ein striktes Tie-Breaking: Bei relativer oder absoluter Gleichheit von Label-Gewichten gewinnt das kleinstmögliche `EntityId` (numerischer `u64`-Wert).
+    - Implementierung direkt auf der bestehenden `CsrGraph`-Struktur in `memfuse-graph::community` ohne zusätzliche externe Abhängigkeiten.
     - Persolidierung im LSM-Storage über `Collection::run_community_detection()` mit strenger TxId-Allokation (`self.allocate_tx()`).
     - Anbindung an das Retrieval über `HybridQuery::same_community_as`, welches Kandidaten derselben Community vor der RRF-Fusion filtert bzw. verstärkt.
 *   **Alternativen**:
@@ -1591,3 +1590,28 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
 ## Konsequenzen
 - `Collection` hält ein neues Feld `consolidation_guard: Arc<tokio::sync::Mutex<()>>`.
 - `execute_consolidation_pass` erwirbt das Lock per `try_lock()`. Falls bereits gesperrt, liefert es `Ok(ConsolidationPhaseResult::default())` zurück und beendet den Pass ohne Fehler.
+
+# ADR-082: Gestufte Architekturentscheidungen Endprodukt v9
+
+* **Status:** ✅ Final
+* **Datum:** 2026-09-16
+* **Kontext / Auslöser:** Architektur-Review der finalen Produktentscheidungen auf Basis des Repo-Stands und der Principal-Analysen.
+
+## Entscheidung
+1. **Gestufte Vektorindex-Architektur:** HNSW bleibt Default & Primärindex für aktive mutable Kollektionen; DiskANN ist der offiziell unterstützte Tier für großvolumige, leselastige Kollektionen (Freigabe nach nativer Tombstone-Delete-Semantik & IP-17 SQ8-Fix).
+2. **Contextual Bandit Routing:** LinUCB Sherman-Morrison $O(d^2)$ Rang-1-Updates als Zielarchitektur, abgesichert durch CI-Benchmark-Gate (`check-bandit-latency-budget`).
+3. **DocId Breiten- & Skalierungsziel:** 128-Bit BLAKE3-Truncation ($16$ Bytes) als Zielarchitektur für Major-Releases / Enterprise-Skalierung; 100 Mio. Dokumente Kapazitätsgrenze für 64-Bit v0.x. UUIDv7 wird explizit abgelehnt zur Wahrung der deterministischen Hash-Derivierung.
+4. **GraphRAG Community Detection:** Leiden-Algorithmus als verbindliche Zielarchitektur (ersetzt LPA / ADR-027).
+5. **Multi-Signal Hybrid Fusion:** Reciprocal Rank Fusion (RRF) bleibt Default wegen Score-Blindheit und Ausfallsicherheit; score-normalisierte Fusion (CombSUM/Z-Score) wird als opt-in Erweiterung mit RRF-Fallback bereitgestellt.
+6. **Quantisierung & Block-Cache:** IP-17 (SQ8-Perzentil-Clipping) hat Vorrang vor RaBitQ/PQ-Evaluierung; CLOCK / S3-FIFO als Eviction-Strategie für BlockCache (IP-18).
+
+## Begründung
+Wahrt die Zero-Panic-, Predictable-Performance- und Determinismus-Garantien von MemFuse, während Skalierung und Retrieval-Präzision gezielt verbessert werden.
+
+## Alternativen
+Pauschale Umstellung auf DiskANN oder UUIDv7 wurden wegen Mutabilitäts- bzw. Determinisierungsbrüchen explizit zurückgewiesen.
+
+## Konsequenzen
+Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Pläne auf diese Zielarchitektur.
+
+---

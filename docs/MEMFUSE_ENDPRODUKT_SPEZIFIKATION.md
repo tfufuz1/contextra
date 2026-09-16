@@ -35,7 +35,7 @@ Eine grafische Desktop-Anwendung ist kein Bestandteil des Produkts (siehe §2.4)
 
 ### §2.3 Alleinstellungsmerkmale
 
-1. **4-Signal-Retrieval-Fusion inkl. PathRAG:** HNSW (Vektor) + BM25 (Volltext, deutsche Komposita-Dekomposition) + CSR-Graph (PageRank) + Metadaten-Filter, fusioniert via Reciprocal Rank Fusion (RRF) mit optionalem Resonanz-Kohärenz-Bonus. PathRAG (bidirektionaler Dijkstra) liefert ein viertes, multi-hop-fähiges Signal.
+1. **4-Signal-Retrieval-Fusion inkl. PathRAG & Gestufte Indexarchitektur:** HNSW (Vektor, Default für aktive mutable Kollektionen) + BM25 (Volltext) + CSR-Graph (PageRank / Leiden-Community-Clustering) + Metadaten-Filter, fusioniert via Reciprocal Rank Fusion (RRF) mit optionaler Z-Score/CombSUM-Score-Normalisierung (opt-in mit RRF-Fallback bei Signalausfall). DiskANN dient als offizieller Tier für großvolumige, leselastige Kollektionen nach SQ8-Codebook-Drift-Fix und nativer Delete-Semantik. PathRAG (bidirektionaler Dijkstra) liefert ein viertes, multi-hop-fähiges Signal.
 2. **Kalibriertes Retrieval mit proaktiver Drift-Erkennung:** Isotonic-Kalibrierung (PAVA) + Lyapunov-Drift-Watcher erkennen Qualitätsverschlechterung, bevor sie beim Nutzer sichtbar wird. Live-Observability-Daten (Drift-Status, Kalibrierungsfehler, PID-Pool-Größe) sind bis in die Python- und MCP-Grenzschicht durchgehend verdrahtet — keine Platzhalterwerte an der API-Oberfläche.
 3. **MCP-native mit technisch erzwungener Zero-Trust-Sandbox:** Prompt Injection Guard, volatile Tool-Output-Verschlüsselung **und** — für die `CodeExecution`-Permission — eine echte WASM-Ausführungsgrenze (`memfuse-sandbox`, §4.18) sind in `memfuse-mcp` first-class. Die Zero-Trust-Eigenschaft ist für Code-Ausführung technisch erzwungen, nicht nur behauptet: Agenten-Tool-Code läuft in einer speicher-isolierten WASM-Instanz mit expliziten Capability-Grenzen, nicht im selben Prozessraum wie MemFuse.
 4. **Kryptographische Integrität & Löschung:** WAL-HMAC-Kette und `DeletionProof` (kryptographischer Löschnachweis, DSGVO Art. 17) auf Storage-Ebene.
@@ -392,7 +392,7 @@ MCP-Client sendet `ToolCategory::CodeExecution` + `wasm_bytes` → `McpSandbox::
 - `cloud-egress-guard` (**neu**, Default: **off**) — Cloud-Egress Privacy Gateway (§12). Verstößt nicht gegen P5; adressiert Nutzer, die Cloud-LLMs ohnehin extern einsetzen.
 - `wasm-sandbox` (**neu**, Default: **off**) — WASM-Ausführungsgrenze für `CodeExecution` via `memfuse-sandbox` (§4.18). Bewirbt erst nach erfolgreicher Integration `CodeExecution` als unterstützt.
 - `egress-sherman-morrison` (opt-in, nur wenn `bandit-routing`) — Volles Sherman-Morrison-O(d²) statt Diagonal-O(d) für LinUCB.
-- `experimental-diskann` — DiskANN-Basisimplementierung.
+- `experimental-diskann` — DiskANN-Speicher-Tier für großvolumige, überwiegend statische/leselastige Kollektionen (mit gestuftem HNSW-Default-Modell).
 
 **Permanent verworfen (kein Zukunftsvorhaben):** Desktop-App, Replicator-Dynamics-Gewichtung, Voice-Assistant-Interface, Cross-Tenant-Wissensaustausch, dateisystembasiertes Claim-Locking, verteilte ADR-Dateien, `memfuse-cluster` (Raft/`openraft`).
 
