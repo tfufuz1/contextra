@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: MemFuse Database Orchestrator & Facade (Layer 2).
 // INVARIANTEN: Monoton steigende TxId-Allokation; Reparaturgarantie beim Öffnen (repair_on_open); Strikte Isolation von Namespaces.
-// NICHT-OFFENSICHTLICH: Lock-Hierarchie: collections (RwLock) -> insert_lock (Mutex) -> embedder (RwLock).
+// NICHT-OFFENSICHTLICH: Lock-Hierarchie: collections (RwLock) -> kv_locks -> embedder (RwLock).
 // STAND: TS:2026-09-11T22:58:30Z (SESSION: e6ab3646)
 
 // INVARIANT: Orchestrator Facade (Getriebe — Layer 2).
@@ -11,7 +11,7 @@
 //! When acquiring multiple locks in `MemFuse`, the following order must be respected to avoid deadlocks:
 //! 1. `MemFuse::collections` (`tokio::sync::RwLock`)
 //! 2. `MemFuse::embedder` (`parking_lot::RwLock`)
-//! 3. `Collection::insert_lock` (`tokio::sync::Mutex`) / `Collection::embedder` (`parking_lot::RwLock`)
+//! 3. `Collection::kv_locks` / `Collection::embedder` (`parking_lot::RwLock`)
 //!
 //!
 //! MemFuse is a zero-boilerplate embedded database for AI agent memory.
@@ -437,13 +437,13 @@ impl Default for MemFuseConfig {
 ///
 /// 1. `MemFuse::collections` (`tokio::sync::RwLock`):
 ///    Registry for active collection instances.
-/// 2. `Collection::insert_lock` (`tokio::sync::Mutex`):
-///    Mutex serializing mutation paths (`insert`, `update`, `delete`, `relate`, `repair`, `drop_collection`) per collection.
+/// 2. `Collection::kv_locks` (`KvKeyLocks`):
+///    Key-granular sharded locks protecting mutation paths (`insert`, `update`, `delete`, `relate`) per collection.
 /// 3. `Collection::embedder` / `MemFuse::embedder` (`parking_lot::RwLock`):
 ///    Synchronous lock guarding configured text embedding engines.
 ///
 /// **Rule**: Higher-level locks MUST always be acquired BEFORE lower-level locks. Never acquire `collections`
-/// while holding `insert_lock` or `embedder`.
+/// while holding `kv_locks` or `embedder`.
 ///
 /// MemFuse — Embedded hybrid-search database for AI agents.
 ///
