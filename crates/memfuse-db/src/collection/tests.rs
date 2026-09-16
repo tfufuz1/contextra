@@ -2780,11 +2780,10 @@ async fn test_apm3_lock_contention_fallback() -> memfuse_core::Result<()> {
         memfuse_text::Language::English,
     ));
 
-    // Acquire write lock on insert_lock
-    let lock_guard = col.insert_lock.try_lock();
-    assert!(lock_guard.is_ok(), "Lock guard must be acquired");
+    // Acquire key lock on "d_blocked"
+    let lock_guard = col.kv_locks.lock_for("d_blocked").await;
 
-    // Concurrent insert_many attempt while write lock is held
+    // Concurrent insert attempt while key lock is held
     let col_clone = col.clone();
     let handle = tokio::spawn(async move {
         col_clone
@@ -2792,7 +2791,7 @@ async fn test_apm3_lock_contention_fallback() -> memfuse_core::Result<()> {
             .await
     });
 
-    // Release write lock and verify task completes cleanly
+    // Release key lock and verify task completes cleanly
     drop(lock_guard);
     let res = handle.await.unwrap();
     assert!(
