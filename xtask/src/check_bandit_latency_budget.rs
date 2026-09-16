@@ -11,8 +11,8 @@ pub const BANDIT_LATENCY_BUDGET_P95_US: u64 = 1000;
 /// Anzahl an Benchmark-Iterationen für die Perzentil-Berechnung.
 const BENCHMARK_ITERATIONS: usize = 1000;
 
-/// Vektor-Dimension für Kontext-Embeddings im Benchmark.
-const FEATURE_DIM: usize = 16;
+/// Vektor-Dimension für Kontext-Embeddings im Benchmark (Standard: nomic-embed-text d=768).
+const FEATURE_DIM: usize = 768;
 
 pub fn check_bandit_latency_budget() -> Result<(), String> {
     println!("=== Gate: Check Bandit Latency Budget ===");
