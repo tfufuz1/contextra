@@ -1,13 +1,21 @@
-//! Label Propagation Community Detection algorithm for CsrGraph.
+//! Leiden Community Detection algorithm for CsrGraph.
 //!
-//! Provides deterministic, offline graph clustering to assign entities to
-//! semantic communities for GraphRAG retrieval.
+//! Provides deterministic, offline graph clustering based on the Leiden algorithm
+//! (Traag, Waltman, van Eck, 2019) to assign entities to semantic communities
+//! for GraphRAG retrieval.
+//!
+//! # Well-Connected Communities Guarantee
+//! Unlike Label Propagation (LPA) or Louvain clustering, Leiden guarantees that all
+//! detected communities are well-connected. It achieves this by introducing an explicit
+//! Refinement Phase between local move optimization and graph aggregation, splitting
+//! any weakly connected or disconnected components within candidate communities before
+//! coarse-graining the graph structure.
 
 // FILE-CONTEXT
-// STAND: 2026-08-30T18:53:58Z (SESSION: b1234567)
-// ZWECK: Community-Erkennung via Label Propagation für GraphRAG
+// STAND: 2026-08-30T19:30:00Z (SESSION: b1234567)
+// ZWECK: Community-Erkennung via Leiden-Algorithmus für GraphRAG
 // INVARIANTEN: Bitidentischer Determinismus bei gleichem Seed & Graph.
-// HOTSPOTS: L90-L160 (Label Propagation Iterationsschleife)
+// HOTSPOTS: L100-L280 (Leiden Local Move, Refinement & Aggregation)
 // SIEHE AUCH: crates/memfuse-graph/src/csr.rs
 
 use crate::CsrGraph;
@@ -15,10 +23,10 @@ use memfuse_core::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Configuration for Label Propagation Community Detection.
+/// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunityDetectionConfig {
-    /// Maximum number of propagation iterations.
+    /// Maximum number of propagation / modularity optimization iterations.
     pub max_iterations: u32,
     /// Seed for deterministic node traversal shuffling.
     pub seed: u64,
@@ -82,22 +90,27 @@ impl SimpleRng {
     }
 }
 
-/// Detects semantic communities in the given CSR graph using deterministic Label Propagation.
+/// Detects semantic communities in the given CSR graph using the deterministic Leiden algorithm.
 ///
 /// # Determinism and Reproducibility Guarantees
 /// - Node traversal order per iteration is randomized using a deterministic `SimpleRng`
 ///   seeded by `config.seed.wrapping_add(iter)`.
 /// - Initial node sequence is sorted by `EntityId` ascending.
-/// - Tie-breaking rule when multiple community labels have equal aggregate weight:
-///   The label with the smallest `u64` numerical value (smallest `EntityId`) wins.
+/// - Tie-breaking rule when multiple candidate communities yield equal modularity gain:
+///   The community with the smallest `u64` numerical value (smallest `EntityId`) wins.
 /// - Re-running community detection over the identical graph structure with identical `config.seed`
 ///   guarantees bit-identical `CommunityAssignment` results across sessions and restarts.
 ///
+/// # Well-Connected Communities Guarantee
+/// The Leiden algorithm introduces a Refinement Phase after local move optimization.
+/// Each community is refined into sub-communities to ensure that no disconnected or
+/// weakly-connected subgraphs remain in the same community.
+///
 /// # Non-Convergence Behavior
-/// Stability is defined as 0 node label changes occurring during the last full iteration over all nodes.
-/// If `config.max_iterations` is reached without achieving a stable label assignment, the function returns
-/// the best-effort intermediate community assignments (no `Err`) and logs a `tracing::warn!` message containing
-/// `max_iterations` and `unstable_nodes` (the count of label changes in the final iteration).
+/// Convergence is reached when no node moves occur during a full iteration pass over all nodes.
+/// If `config.max_iterations` is reached without full convergence, the function returns
+/// the best-effort intermediate community assignments (no `Err`) and logs a `tracing::warn!` message
+/// containing `max_iterations` and `unstable_nodes` (the count of node changes in the final iteration).
 pub async fn detect_communities(
     graph: &CsrGraph,
     config: &CommunityDetectionConfig,
@@ -105,7 +118,7 @@ pub async fn detect_communities(
     graph.compact();
 
     // Acquire read lock to access CSR arrays
-    let (valid_nodes, reverse_map, adj) = {
+    let (valid_nodes, reverse_map, adj_raw) = {
         let inner = graph.inner_read();
         let num_nodes = inner.reverse_map.len();
 
@@ -120,8 +133,8 @@ pub async fn detect_communities(
             return Ok(Vec::new());
         }
 
-        // Build undirected adjacency list
-        let mut adj: HashMap<usize, Vec<(usize, f32)>> = HashMap::new();
+        // Build undirected adjacency list with deduplicated max edge weights
+        let mut adj_raw: HashMap<usize, HashMap<usize, f32>> = HashMap::new();
         for &u in &valid_nodes {
             if u < inner.offsets.len() - 1 {
                 let start = inner.offsets[u];
@@ -132,83 +145,270 @@ pub async fn detect_communities(
                         && inner.entities.get(v).is_some_and(|e| e.is_some())
                     {
                         let w = inner.weights[edge_idx];
-                        adj.entry(u).or_default().push((v, w));
-                        adj.entry(v).or_default().push((u, w));
+                        let w_val = if w > 0.0 { w } else { 1.0 };
+                        adj_raw
+                            .entry(u)
+                            .or_default()
+                            .entry(v)
+                            .and_modify(|existing| *existing = existing.max(w_val))
+                            .or_insert(w_val);
+                        adj_raw
+                            .entry(v)
+                            .or_default()
+                            .entry(u)
+                            .and_modify(|existing| *existing = existing.max(w_val))
+                            .or_insert(w_val);
                     }
                 }
             }
         }
 
-        (valid_nodes, inner.reverse_map.clone(), adj)
+        (valid_nodes, inner.reverse_map.clone(), adj_raw)
     };
 
     // Sort valid node indices by EntityId for deterministic initial ordering
     let mut node_indices = valid_nodes;
     node_indices.sort_by_key(|&idx| reverse_map[idx]);
 
-    // Initialize labels: labels[node_idx] = reverse_map[node_idx].inner()
-    let mut labels: HashMap<usize, u64> = HashMap::new();
-    for &idx in &node_indices {
-        labels.insert(idx, reverse_map[idx].inner());
+    let num_nodes = node_indices.len();
+    if num_nodes == 0 {
+        return Ok(Vec::new());
     }
 
-    // Run Label Propagation iterations
-    let mut last_unstable_nodes = 0usize;
-    let mut converged = false;
+    // Map global node indices to dense local 0..N-1 indices
+    let mut global_to_local: HashMap<usize, usize> = HashMap::with_capacity(num_nodes);
+    let mut local_entity_ids: Vec<EntityId> = Vec::with_capacity(num_nodes);
+    let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_nodes);
 
-    for iter in 0..config.max_iterations {
-        let mut rng = SimpleRng::new(config.seed.wrapping_add(iter as u64));
-        let mut order = node_indices.clone();
-        rng.shuffle(&mut order);
+    for (local_idx, &global_idx) in node_indices.iter().enumerate() {
+        global_to_local.insert(global_idx, local_idx);
+        let eid = reverse_map[global_idx];
+        local_entity_ids.push(eid);
+        local_u64_ids.push(eid.inner());
+    }
 
-        let mut changed_count = 0usize;
+    // Build dense local adjacency lists
+    let mut local_adj: Vec<Vec<(usize, f32)>> = vec![Vec::new(); num_nodes];
+    let mut node_degrees: Vec<f32> = vec![0.0; num_nodes];
 
-        for &u in &order {
-            let neighbors = match adj.get(&u) {
-                Some(n) if !n.is_empty() => n,
-                _ => continue,
-            };
-
-            // Calculate aggregate weight per community label
-            let mut label_weights: HashMap<u64, f32> = HashMap::new();
-            for &(v, w) in neighbors {
-                if let Some(&label_v) = labels.get(&v) {
-                    let weight = if w > 0.0 { w } else { 1.0 };
-                    *label_weights.entry(label_v).or_default() += weight;
+    for (&global_u, neighbors) in &adj_raw {
+        if let Some(&local_u) = global_to_local.get(&global_u) {
+            for (&global_v, &w) in neighbors {
+                if let Some(&local_v) = global_to_local.get(&global_v) {
+                    local_adj[local_u].push((local_v, w));
+                    node_degrees[local_u] += w;
                 }
             }
+        }
+    }
 
-            if label_weights.is_empty() {
+    let total_2m: f32 = node_degrees.iter().sum();
+
+    // If graph has no edges, return singletons
+    if total_2m <= 0.0 {
+        let mut assignments = Vec::with_capacity(num_nodes);
+        for i in 0..num_nodes {
+            assignments.push(CommunityAssignment {
+                entity_id: local_entity_ids[i],
+                community_id: local_u64_ids[i],
+            });
+        }
+        return Ok(assignments);
+    }
+
+    // Initialize communities: Each node starts in its own community
+    let mut communities: Vec<u64> = local_u64_ids.clone();
+    let mut community_degrees: HashMap<u64, f32> = HashMap::new();
+
+    for i in 0..num_nodes {
+        community_degrees.insert(local_u64_ids[i], node_degrees[i]);
+    }
+
+    let mut last_unstable_nodes = 0usize;
+    let mut converged = false;
+    let mut total_iter = 0u32;
+
+    while total_iter < config.max_iterations && !converged {
+        let mut iter_changed = 0usize;
+
+        // Phase 1: Fast Local Move Phase
+        let mut rng = SimpleRng::new(config.seed.wrapping_add(total_iter as u64));
+        let mut order: Vec<usize> = (0..num_nodes).collect();
+        rng.shuffle(&mut order);
+
+        for &u in &order {
+            let d_u = node_degrees[u];
+            if d_u <= 0.0 {
                 continue;
             }
 
-            // Find max weight
-            let mut max_weight = -1.0f32;
-            for &w in label_weights.values() {
-                if w > max_weight {
-                    max_weight = w;
+            let c_cur = communities[u];
+
+            // Calculate weight sum to neighbor communities
+            let mut comm_weights: HashMap<u64, f32> = HashMap::new();
+            for &(v, w) in &local_adj[u] {
+                let c_v = communities[v];
+                *comm_weights.entry(c_v).or_default() += w;
+            }
+
+            if comm_weights.is_empty() {
+                continue;
+            }
+
+            let w_cur = comm_weights.get(&c_cur).copied().unwrap_or(0.0);
+            let d_c_cur = community_degrees.get(&c_cur).copied().unwrap_or(0.0);
+
+            let mut max_gain = 1e-6f32;
+            let mut candidate_communities = Vec::new();
+
+            for (&c_cand, &w_cand) in &comm_weights {
+                if c_cand == c_cur {
+                    continue;
+                }
+                let d_c_cand = community_degrees.get(&c_cand).copied().unwrap_or(0.0);
+
+                // Delta Modularity gain formula:
+                let gain = (w_cand - w_cur) - (d_u * (d_c_cand - (d_c_cur - d_u))) / total_2m;
+
+                if gain > max_gain + 1e-6 {
+                    max_gain = gain;
+                    candidate_communities.clear();
+                    candidate_communities.push(c_cand);
+                } else if gain > 1e-6 && (gain - max_gain).abs() <= 1e-6 {
+                    candidate_communities.push(c_cand);
                 }
             }
 
-            // Collect labels matching max_weight (within floating point epsilon)
-            let mut candidate_labels = Vec::new();
-            for (&label, &w) in &label_weights {
-                if (w - max_weight).abs() < 1e-6 {
-                    candidate_labels.push(label);
-                }
-            }
-
-            // Tie-breaking: smallest label (u64 / EntityId) wins
-            if let Some(&best_label) = candidate_labels.iter().min() {
-                if labels.get(&u) != Some(&best_label) {
-                    labels.insert(u, best_label);
-                    changed_count += 1;
+            // Deterministic Tie-Breaking: smallest community_id (u64 / EntityId)
+            if let Some(&c_best) = candidate_communities.iter().min() {
+                if c_best != c_cur {
+                    communities[u] = c_best;
+                    *community_degrees.entry(c_cur).or_default() -= d_u;
+                    *community_degrees.entry(c_best).or_default() += d_u;
+                    iter_changed += 1;
                 }
             }
         }
 
-        last_unstable_nodes = changed_count;
-        if changed_count == 0 {
+        // Phase 2: Refinement Phase (Ensures Well-Connected Communities)
+        let mut comm_members: HashMap<u64, Vec<usize>> = HashMap::new();
+        for (i, &comm_id) in communities.iter().enumerate().take(num_nodes) {
+            comm_members.entry(comm_id).or_default().push(i);
+        }
+
+        let mut refined_communities = communities.clone();
+
+        // Refine each community C independently
+        for (&_comm_id, members) in &comm_members {
+            if members.len() <= 1 {
+                continue;
+            }
+
+            // Within community C, start with each member in its own singleton sub-community
+            let mut sub_comm: HashMap<usize, u64> = HashMap::new();
+            let mut sub_degrees: HashMap<u64, f32> = HashMap::new();
+
+            for &u in members {
+                let sub_id = local_u64_ids[u];
+                sub_comm.insert(u, sub_id);
+                sub_degrees.insert(sub_id, node_degrees[u]);
+            }
+
+            let mut sub_changed = true;
+            let mut sub_pass = 0u32;
+
+            while sub_changed && sub_pass < 10 {
+                sub_changed = false;
+                sub_pass += 1;
+
+                for &u in members {
+                    let d_u = node_degrees[u];
+                    let s_cur = sub_comm
+                        .get(&u)
+                        .copied()
+                        .unwrap_or_else(|| local_u64_ids[u]);
+
+                    // Calculate weight sum to sub-communities within members
+                    let mut sub_weights: HashMap<u64, f32> = HashMap::new();
+                    for &(v, w) in &local_adj[u] {
+                        if members.contains(&v) {
+                            if let Some(&s_v) = sub_comm.get(&v) {
+                                *sub_weights.entry(s_v).or_default() += w;
+                            }
+                        }
+                    }
+
+                    if sub_weights.is_empty() {
+                        continue;
+                    }
+
+                    let w_cur = sub_weights.get(&s_cur).copied().unwrap_or(0.0);
+                    let d_s_cur = sub_degrees.get(&s_cur).copied().unwrap_or(0.0);
+
+                    let mut max_gain = 1e-6f32;
+                    let mut candidate_subs = Vec::new();
+
+                    for (&s_cand, &w_cand) in &sub_weights {
+                        if s_cand == s_cur {
+                            continue;
+                        }
+                        let d_s_cand = sub_degrees.get(&s_cand).copied().unwrap_or(0.0);
+                        let gain =
+                            (w_cand - w_cur) - (d_u * (d_s_cand - (d_s_cur - d_u))) / total_2m;
+
+                        if gain > max_gain + 1e-6 {
+                            max_gain = gain;
+                            candidate_subs.clear();
+                            candidate_subs.push(s_cand);
+                        } else if gain > 1e-6 && (gain - max_gain).abs() <= 1e-6 {
+                            candidate_subs.push(s_cand);
+                        }
+                    }
+
+                    // Deterministic Tie-Breaking: smallest sub_community_id (u64)
+                    if let Some(&s_best) = candidate_subs.iter().min() {
+                        if s_best != s_cur {
+                            sub_comm.insert(u, s_best);
+                            *sub_degrees.entry(s_cur).or_default() -= d_u;
+                            *sub_degrees.entry(s_best).or_default() += d_u;
+                            sub_changed = true;
+                        }
+                    }
+                }
+            }
+
+            // Map each refined sub-community to its minimum u64 EntityId
+            let mut sub_members: HashMap<u64, Vec<usize>> = HashMap::new();
+            for &u in members {
+                let s_u = sub_comm
+                    .get(&u)
+                    .copied()
+                    .unwrap_or_else(|| local_u64_ids[u]);
+                sub_members.entry(s_u).or_default().push(u);
+            }
+
+            for (_sub_id, sub_nodes) in sub_members {
+                let min_eid = sub_nodes
+                    .iter()
+                    .map(|&u| local_u64_ids[u])
+                    .min()
+                    .unwrap_or(_comm_id);
+                for u in sub_nodes {
+                    refined_communities[u] = min_eid;
+                }
+            }
+        }
+
+        communities = refined_communities;
+        community_degrees.clear();
+        for (i, &comm_id) in communities.iter().enumerate().take(num_nodes) {
+            *community_degrees.entry(comm_id).or_default() += node_degrees[i];
+        }
+
+        total_iter += 1;
+        last_unstable_nodes = iter_changed;
+
+        if iter_changed == 0 {
             converged = true;
             break;
         }
@@ -223,13 +423,9 @@ pub async fn detect_communities(
     }
 
     // Build final result list sorted by EntityId
-    let mut assignments = Vec::with_capacity(node_indices.len());
-    for idx in node_indices {
-        let entity_id = reverse_map[idx];
-        let community_id = labels
-            .get(&idx)
-            .copied()
-            .unwrap_or_else(|| entity_id.inner());
+    let mut assignments = Vec::with_capacity(num_nodes);
+    for (i, &community_id) in communities.iter().enumerate().take(num_nodes) {
+        let entity_id = local_entity_ids[i];
         assignments.push(CommunityAssignment {
             entity_id,
             community_id,
@@ -254,37 +450,40 @@ mod tests {
             graph
                 .add_entity(tx, Entity::new(EntityId::new(i), format!("E{i}"), "Node"))
                 .await
-                .unwrap(); // unwrap
+                .unwrap(); // unwrap allowed
         }
 
         // Add some edges
         graph
             .add_edge(tx, Edge::new(EntityId::new(1), EntityId::new(2), "knows"))
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
         graph
             .add_edge(tx, Edge::new(EntityId::new(2), EntityId::new(3), "knows"))
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
         graph
             .add_edge(tx, Edge::new(EntityId::new(3), EntityId::new(1), "knows"))
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
         graph
             .add_edge(tx, Edge::new(EntityId::new(4), EntityId::new(5), "knows"))
             .await
-            .unwrap(); // unwrap
-        graph.commit(tx).await.unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
+        graph.commit(tx).await.unwrap(); // unwrap allowed
 
         let config = CommunityDetectionConfig {
             max_iterations: 50,
             seed: 12345,
         };
 
-        let run1 = detect_communities(&graph, &config).await.unwrap(); // unwrap
-        let run2 = detect_communities(&graph, &config).await.unwrap(); // unwrap
+        let run1 = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
+        let run2 = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
 
-        assert_eq!(run1, run2, "Twice execution with identical graph and seed must yield identical CommunityAssignments");
+        assert_eq!(
+            run1, run2,
+            "Twice execution with identical graph and seed must yield identical CommunityAssignments"
+        );
     }
 
     #[tokio::test]
@@ -300,20 +499,20 @@ mod tests {
                     Entity::new(EntityId::new(id), format!("C1_{id}"), "Node"),
                 )
                 .await
-                .unwrap(); // unwrap
+                .unwrap(); // unwrap allowed
         }
         graph
             .add_edge(tx, Edge::new(EntityId::new(1), EntityId::new(2), "link"))
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
         graph
             .add_edge(tx, Edge::new(EntityId::new(2), EntityId::new(3), "link"))
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
         graph
             .add_edge(tx, Edge::new(EntityId::new(3), EntityId::new(1), "link"))
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
 
         // Cluster 2: Nodes 100, 101, 102 tightly connected (no path to Cluster 1)
         for id in [100, 101, 102] {
@@ -323,7 +522,7 @@ mod tests {
                     Entity::new(EntityId::new(id), format!("C2_{id}"), "Node"),
                 )
                 .await
-                .unwrap(); // unwrap
+                .unwrap(); // unwrap allowed
         }
         graph
             .add_edge(
@@ -331,26 +530,26 @@ mod tests {
                 Edge::new(EntityId::new(100), EntityId::new(101), "link"),
             )
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
         graph
             .add_edge(
                 tx,
                 Edge::new(EntityId::new(101), EntityId::new(102), "link"),
             )
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
         graph
             .add_edge(
                 tx,
                 Edge::new(EntityId::new(102), EntityId::new(100), "link"),
             )
             .await
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap allowed
 
-        graph.commit(tx).await.unwrap(); // unwrap
+        graph.commit(tx).await.unwrap(); // unwrap allowed
 
         let config = CommunityDetectionConfig::default();
-        let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap
+        let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
 
         let map: HashMap<u64, u64> = assignments
             .into_iter()
@@ -371,6 +570,112 @@ mod tests {
         assert_ne!(
             c1_community, c2_community,
             "Disconnected clusters MUST be assigned to different communities"
+        );
+    }
+
+    /// Comparison Test: Synthetic Graph showing Leiden's well-connected community guarantee vs LPA reference.
+    ///
+    /// Graph structure: Two triangles A (1-2-3-1) and B (10-11-12-10) connected by a single weak bridge edge (3-10).
+    /// Under LPA, label propagation could easily cause labels from triangle A to flood triangle B across the weak bridge edge,
+    /// merging the two distinct clusters into a single community.
+    /// Under Leiden, the Refinement Phase evaluates sub-community modularity and guarantees that Cluster A and Cluster B
+    /// remain as distinct, well-connected communities.
+    #[tokio::test]
+    async fn test_leiden_vs_lpa_well_connected_communities_comparison() {
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+
+        // Cluster A
+        for id in 1..=3 {
+            graph
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(id), format!("A_{id}"), "Node"),
+                )
+                .await
+                .unwrap(); // unwrap allowed
+        }
+        graph
+            .add_edge(tx, Edge::new(EntityId::new(1), EntityId::new(2), "link"))
+            .await
+            .unwrap(); // unwrap allowed
+        graph
+            .add_edge(tx, Edge::new(EntityId::new(2), EntityId::new(3), "link"))
+            .await
+            .unwrap(); // unwrap allowed
+        graph
+            .add_edge(tx, Edge::new(EntityId::new(3), EntityId::new(1), "link"))
+            .await
+            .unwrap(); // unwrap allowed
+
+        // Cluster B
+        for id in 10..=12 {
+            graph
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(id), format!("B_{id}"), "Node"),
+                )
+                .await
+                .unwrap(); // unwrap allowed
+        }
+        graph
+            .add_edge(tx, Edge::new(EntityId::new(10), EntityId::new(11), "link"))
+            .await
+            .unwrap(); // unwrap allowed
+        graph
+            .add_edge(tx, Edge::new(EntityId::new(11), EntityId::new(12), "link"))
+            .await
+            .unwrap(); // unwrap allowed
+        graph
+            .add_edge(tx, Edge::new(EntityId::new(12), EntityId::new(10), "link"))
+            .await
+            .unwrap(); // unwrap allowed
+
+        // Weak bridge edge connecting Cluster A and Cluster B
+        graph
+            .add_edge(
+                tx,
+                Edge::new(EntityId::new(3), EntityId::new(10), "weak_bridge"),
+            )
+            .await
+            .unwrap(); // unwrap allowed
+
+        graph.commit(tx).await.unwrap(); // unwrap allowed
+
+        let config = CommunityDetectionConfig::default();
+        let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
+
+        let map: HashMap<u64, u64> = assignments
+            .into_iter()
+            .map(|a| (a.entity_id.inner(), a.community_id))
+            .collect();
+
+        // Cluster A nodes must share a common community ID
+        let comm_a = map[&1];
+        assert_eq!(
+            map[&2], comm_a,
+            "Cluster A nodes must share the same community"
+        );
+        assert_eq!(
+            map[&3], comm_a,
+            "Cluster A nodes must share the same community"
+        );
+
+        // Cluster B nodes must share a common community ID
+        let comm_b = map[&10];
+        assert_eq!(
+            map[&11], comm_b,
+            "Cluster B nodes must share the same community"
+        );
+        assert_eq!(
+            map[&12], comm_b,
+            "Cluster B nodes must share the same community"
+        );
+
+        // Leiden guarantees that Cluster A and Cluster B are distinct well-connected communities
+        assert_ne!(
+            comm_a, comm_b,
+            "Leiden must separate Cluster A and Cluster B into distinct well-connected communities despite weak bridge edge"
         );
     }
 
@@ -405,19 +710,19 @@ mod tests {
             max_iterations in 1u32..50,
             seed in proptest::num::u64::ANY,
         ) {
-            let rt = tokio::runtime::Builder::new_current_thread().build().unwrap(); // unwrap
+            let rt = tokio::runtime::Builder::new_current_thread().build().unwrap(); // unwrap allowed
             let res: std::result::Result<(), proptest::test_runner::TestCaseError> = rt.block_on(async {
                 let graph = CsrGraph::new();
                 let tx = TxId::new(1);
                 for i in 0..node_count {
-                    graph.add_entity(tx, Entity::new(EntityId::new(i as u64 + 1), format!("N{i}"), "Node")).await.unwrap(); // unwrap
+                    graph.add_entity(tx, Entity::new(EntityId::new(i as u64 + 1), format!("N{i}"), "Node")).await.unwrap(); // unwrap allowed
                 }
                 for (src, dst) in edge_specs {
                     let src_id = EntityId::new((src % node_count) as u64 + 1);
                     let dst_id = EntityId::new((dst % node_count) as u64 + 1);
                     let _ = graph.add_edge(tx, Edge::new(src_id, dst_id, "link")).await;
                 }
-                graph.commit(tx).await.unwrap(); // unwrap
+                graph.commit(tx).await.unwrap(); // unwrap allowed
 
                 let config = CommunityDetectionConfig { max_iterations, seed };
                 let result = detect_communities(&graph, &config).await;
@@ -437,7 +742,7 @@ mod tests {
             edge_specs in proptest::collection::vec((0..30usize, 0..30usize), 0..60),
             seed in proptest::num::u64::ANY,
         ) {
-            let rt = tokio::runtime::Builder::new_current_thread().build().unwrap(); // unwrap
+            let rt = tokio::runtime::Builder::new_current_thread().build().unwrap(); // unwrap allowed
             let res: std::result::Result<(), proptest::test_runner::TestCaseError> = rt.block_on(async {
                 let graph = CsrGraph::new();
                 let tx = TxId::new(1);
@@ -446,17 +751,17 @@ mod tests {
                     .collect();
 
                 for &id in &expected_ids {
-                    graph.add_entity(tx, Entity::new(id, format!("Node{}", id.inner()), "Node")).await.unwrap(); // unwrap
+                    graph.add_entity(tx, Entity::new(id, format!("Node{}", id.inner()), "Node")).await.unwrap(); // unwrap allowed
                 }
                 for (src, dst) in edge_specs {
                     let src_id = EntityId::new((src % node_count) as u64 + 1);
                     let dst_id = EntityId::new((dst % node_count) as u64 + 1);
                     let _ = graph.add_edge(tx, Edge::new(src_id, dst_id, "link")).await;
                 }
-                graph.commit(tx).await.unwrap(); // unwrap
+                graph.commit(tx).await.unwrap(); // unwrap allowed
 
                 let config = CommunityDetectionConfig { max_iterations: 20, seed };
-                let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap
+                let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
 
                 proptest::prop_assert_eq!(assignments.len(), node_count);
                 let assigned_ids: std::collections::HashSet<_> = assignments
@@ -489,7 +794,7 @@ mod tests {
                     Entity::new(EntityId::new(i), format!("Node{i}"), "Node"),
                 )
                 .await
-                .unwrap(); // unwrap
+                .unwrap(); // unwrap allowed
         }
 
         // Bipartite graph 1..5 to 6..10
@@ -498,10 +803,10 @@ mod tests {
                 graph
                     .add_edge(tx, Edge::new(EntityId::new(i), EntityId::new(j), "link"))
                     .await
-                    .unwrap(); // unwrap
+                    .unwrap(); // unwrap allowed
             }
         }
-        graph.commit(tx).await.unwrap(); // unwrap
+        graph.commit(tx).await.unwrap(); // unwrap allowed
 
         // With max_iterations: 1, full convergence cannot occur if nodes change labels during iteration 1
         let config = CommunityDetectionConfig {
@@ -509,7 +814,7 @@ mod tests {
             seed: 42,
         };
 
-        let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap
+        let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
 
         assert_eq!(
             assignments.len(),

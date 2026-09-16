@@ -81,7 +81,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-calibration` | 2 | 1980 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 2 | 6035 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-crypto` | 2 | 6572 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
-| `memfuse-graph` | 2 | 12056 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `memfuse-graph` | 2 | 12361 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-sandbox` | 2 | 836 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
 | `memfuse-text` | 2 | 7376 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-candle` | 3 | 4228 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
@@ -150,7 +150,7 @@ Noch offen:
 ### Phase 3 — Selbstorganisierung (🔄 Teilweise implementiert, Q1 2027)
 Bereits implementiert:
 - ✅ Personalized PageRank (PPR) — Power-Iteration mit L1-Norm-Abbruch (ADR-026)
-- ✅ Community Detection — Label Propagation, deterministisch (ADR-027)
+- ✅ Community Detection — Leiden-Algorithmus, deterministisch (ADR-027)
 
 Noch offen:
 - 🔲 Memory Consolidation & Reflection (Sleep-Cycle-Konsolidierung)

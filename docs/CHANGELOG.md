@@ -227,6 +227,7 @@
 | `2026-08-30T21:51:46Z (SESSION: a43b7682)` | `crates/memfuse-core/src/error_dto.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Serialisierbares Error-DTO für IPC/FFI-Schichten ohne Typverlust (ADR-028). |
 | `2026-08-30T21:49:55Z (SESSION: 283abf0f)` | `crates/memfuse-store/src/compaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | STCS-Compaction-Engine (Size-Tiered Compaction Strategy) |
 | `2026-08-30T21:49:55Z (SESSION: 283abf0f)` | `crates/memfuse-store/src/lsm/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | LSM-Tree-Implementierung (MemTable + SSTable + Compaction) |
+| `2026-08-30T19:30:00Z (SESSION: b1234567)` | `crates/memfuse-graph/src/community.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Community-Erkennung via Leiden-Algorithmus für GraphRAG |
 | `2026-08-30T19:05:00Z` | `crates/memfuse-core/src/lib.rs` | `REVIEW-PASS` | `AGT-CORE-a3f29c1d` | `c9f5e2b3` | `PASS` | `3` | // REVIEW-PASS[2/2] STATUS:PASS (ID: AGT-CORE-a3f29c1d) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3) |
 | `2026-08-30T19:05:00Z` | `crates/memfuse-crypto/src/crypto.rs` | `REVIEW-PASS` | `TEST:CRY-001` | `c9f5e2b3` | `PASS` | `6` | // REVIEW-PASS[2/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3) |
 | `2026-08-30T19:05:00Z` | `crates/memfuse-ollama/src/client.rs` | `REVIEW-PASS` | `TEST:OLL-001` | `c9f5e2b3` | `PASS` | `1` | // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:OLL-001) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3) |
@@ -239,7 +240,6 @@
 | `2026-08-30T18:54:39Z (SESSION: ed7b7b38)` | `crates/memfuse-ollama/src/importance.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | LLM-basierte Wichtigkeits-Bewertung (ImportanceScore 0.0-1.0) für Memory Chunks |
 | `2026-08-30T18:54:39Z (SESSION: ed7b7b38)` | `crates/memfuse-ollama/src/model_info.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Modell-Inspektion (/api/show) und Statisches Mapping bekannter Embedding-Dimensionen |
 | `2026-08-30T18:54:39Z` | `crates/memfuse-ollama/src/client.rs` | `ANCHOR` | `TEST:OLL-001` | `ed7b7b38` | `DONE` | `2` | // ANCHOR[TEST:OLL-001] STATUS:DONE (TS:2026-08-30T18:54:39Z) (SESSION:ed7b7b38) |
-| `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/memfuse-graph/src/community.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Community-Erkennung via Label Propagation für GraphRAG |
 | `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/memfuse-graph/src/csr.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | CSR-Graph für Entity-Relation-Traversal (Signal 3 in 4-Signal-Fusion) |
 | `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/memfuse-graph/src/ppr.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Personalized PageRank Power Iteration über CSR Graph |
 | `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/memfuse-graph/src/session_dag.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Session-DAG für persistente, azyklische Agent-State-Verzweigung (MemFuse Session-DAG Pattern) |

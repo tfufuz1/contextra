@@ -678,7 +678,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(importance_score)
     }
 
-    /// Runs Label Propagation Community Detection on the collection's graph index
+    /// Runs Leiden Community Detection on the collection's graph index
     /// and persists the resulting assignments in storage using TxId allocation.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn run_community_detection(&self) -> Result<Vec<CommunityAssignment>> {
@@ -686,7 +686,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .await
     }
 
-    /// Runs Label Propagation Community Detection with custom configuration
+    /// Runs Leiden Community Detection with custom configuration
     /// and persists the resulting assignments in storage using TxId allocation.
     #[tracing::instrument(level = "trace", skip(self, config))]
     pub async fn run_community_detection_with_config(
