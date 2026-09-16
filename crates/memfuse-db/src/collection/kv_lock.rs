@@ -1,6 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::Mutex;
 
 const KV_LOCK_SHARDS: usize = 16;
 
