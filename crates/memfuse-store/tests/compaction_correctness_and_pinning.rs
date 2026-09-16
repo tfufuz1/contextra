@@ -39,7 +39,10 @@ async fn test_multigenerational_overwrites_and_tombstones() -> Result<()> {
     storage.commit(tx3).await?;
     storage.force_flush().await?;
 
-    assert_eq!(storage.get(b"key1").await?, Some(bytes::Bytes::from_static(b"v3")));
+    assert_eq!(
+        storage.get(b"key1").await?,
+        Some(bytes::Bytes::from_static(b"v3"))
+    );
 
     Ok(())
 }
@@ -73,7 +76,10 @@ async fn test_compaction_gc_unpinned_vs_pinned() -> Result<()> {
     storage.maybe_compact().await?;
 
     assert_eq!(storage.get(b"keyA").await?, None);
-    assert_eq!(storage.get(b"keyB").await?, Some(bytes::Bytes::from_static(b"valB")));
+    assert_eq!(
+        storage.get(b"keyB").await?,
+        Some(bytes::Bytes::from_static(b"valB"))
+    );
 
     let key_a_at_tx2 = storage.get_at_seq(b"keyA", 2).await?;
     assert_eq!(

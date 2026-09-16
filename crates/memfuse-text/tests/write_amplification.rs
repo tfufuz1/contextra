@@ -68,11 +68,7 @@ impl StorageEngine for InstrumentedStorage {
     fn rollback_to_tx<'a>(&'a self, _tx: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn get_at_seq<'a>(
-        &'a self,
-        key: &'a [u8],
-        _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+    fn get_at_seq<'a>(&'a self, key: &'a [u8], _seq: u64) -> BoxFuture<'a, Result<Option<Bytes>>> {
         Box::pin(async move { self.get(key).await })
     }
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {

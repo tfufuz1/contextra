@@ -23,6 +23,70 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+struct Bm25Candidate {
+    doc_id: DocId,
+    score: f32,
+}
+
+impl PartialEq for Bm25Candidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl Eq for Bm25Candidate {}
+
+impl Ord for Bm25Candidate {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // BinaryHeap is max-heap by default. We want peek() to return the worst candidate
+        // (lowest score, or highest DocId on score tie) so that it gets evicted when heap size > k.
+        other
+            .score
+            .partial_cmp(&self.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| self.doc_id.cmp(&other.doc_id))
+    }
+}
+
+impl PartialOrd for Bm25Candidate {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+struct BoundedTopK<T> {
+    heap: std::collections::BinaryHeap<T>,
+    capacity: usize,
+}
+
+impl<T: Ord> BoundedTopK<T> {
+    fn new(capacity: usize) -> Self {
+        let capacity = capacity.min(MAX_SEARCH_K);
+        Self {
+            heap: std::collections::BinaryHeap::with_capacity(capacity.saturating_add(1)),
+            capacity,
+        }
+    }
+
+    fn push(&mut self, item: T) {
+        if self.capacity == 0 {
+            return;
+        }
+        if self.heap.len() < self.capacity {
+            self.heap.push(item);
+        } else if let Some(worst) = self.heap.peek() {
+            if item < *worst {
+                self.heap.pop();
+                self.heap.push(item);
+            }
+        }
+    }
+
+    fn into_sorted_vec(self) -> Vec<T> {
+        self.heap.into_sorted_vec()
+    }
+}
+
 /// Supported tokenizer languages for BM25 text indexing.
 ///
 /// Controls which tokenizer is used for document indexing and query processing.
@@ -541,6 +605,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
         let mut scores: HashMap<DocId, f32> = HashMap::new();
         let mut doc_len_cache: HashMap<DocId, u32> = HashMap::new();
+        let mut tbs_cache: HashMap<Vec<u8>, bool> = HashMap::new();
 
         for term in &tokens {
             let prefix = self.key_term_prefix(term);
@@ -575,9 +640,18 @@ impl<S: StorageEngine> InvertedIndex<S> {
                                 }
                             };
 
-                            // Check tombstone marker tbs:{doc_id}:{term} at snapshot seq
+                            // Check tombstone marker tbs:{doc_id}:{term} at snapshot seq (cached per query run)
                             let tbs_key = self.key_tombstone(doc_id, term);
-                            if self.storage.get_at_seq(&tbs_key, seq).await?.is_some() {
+                            let is_tombstone = match tbs_cache.get(&tbs_key) {
+                                Some(&exists) => exists,
+                                None => {
+                                    let exists =
+                                        self.storage.get_at_seq(&tbs_key, seq).await?.is_some();
+                                    tbs_cache.insert(tbs_key.clone(), exists);
+                                    exists
+                                }
+                            };
+                            if is_tombstone {
                                 continue; // Stale posting masked by tombstone at seq
                             }
 
@@ -603,14 +677,16 @@ impl<S: StorageEngine> InvertedIndex<S> {
             }
         }
 
-        let mut results: Vec<(DocId, f32)> = scores.into_iter().collect();
-        // Sort descending by score, then ascending by DocId for determinism
-        results.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.0.cmp(&b.0))
-        });
-        results.truncate(k);
+        let mut top_k = BoundedTopK::new(k);
+        for (doc_id, score) in scores {
+            top_k.push(Bm25Candidate { doc_id, score });
+        }
+
+        let results = top_k
+            .into_sorted_vec()
+            .into_iter()
+            .map(|c| (c.doc_id, c.score))
+            .collect();
 
         Ok(results)
     }
@@ -868,7 +944,7 @@ mod tests {
                             if (v_seq & memfuse_core::TOMBSTONE_BIT) != 0 {
                                 return Ok(None);
                             }
-                        return Ok(Some(bytes::Bytes::from(val.clone())));
+                            return Ok(Some(bytes::Bytes::from(val.clone())));
                         }
                     }
                 }
@@ -1867,6 +1943,162 @@ mod tests {
         let results = index.search("user", 10).await?;
         assert!(!results.is_empty());
         assert_eq!(results[0].doc_id, DocId::new(1));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_bm25_bounded_top_k_ordering_equivalence() -> Result<()> {
+        let storage = Arc::new(MockStorage::new());
+        let index = InvertedIndex::new(storage.clone(), "bounded_top_k_test");
+
+        let tx = TxId::new(1);
+        // Insert 20 documents with varying TF for search term "performance"
+        for i in 1..=20 {
+            let text = std::iter::repeat("performance ")
+                .take(i)
+                .collect::<String>();
+            index
+                .upsert_document(tx, DocId::new(i as u64), &text)
+                .await?;
+        }
+        index.commit_stats(tx).await?;
+        storage.commit(tx).await?;
+
+        // Query top 5 documents
+        let k = 5;
+        let results = index.search_bm25("performance", k, None).await?;
+        assert_eq!(results.len(), k);
+
+        // Expected order: Doc 20 down to Doc 16 due to highest TF / score
+        for (idx, (doc_id, score)) in results.iter().enumerate() {
+            let expected_doc_id = DocId::new((20 - idx) as u64);
+            assert_eq!(*doc_id, expected_doc_id, "Rank {} mismatch", idx);
+            assert!(*score > 0.0);
+        }
+
+        Ok(())
+    }
+
+    struct CountingStorage {
+        inner: MockStorage,
+        get_at_seq_calls: AtomicU64,
+    }
+
+    impl CountingStorage {
+        fn new() -> Self {
+            Self {
+                inner: MockStorage::new(),
+                get_at_seq_calls: AtomicU64::new(0),
+            }
+        }
+    }
+
+    impl StorageEngine for CountingStorage {
+        fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            self.inner.get(key)
+        }
+        fn put<'a>(
+            &'a self,
+            tx_id: TxId,
+            key: &'a [u8],
+            value: &'a [u8],
+        ) -> BoxFuture<'a, Result<()>> {
+            self.inner.put(tx_id, key, value)
+        }
+        fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            self.inner.delete(tx_id, key)
+        }
+        fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
+            self.inner.commit(tx_id)
+        }
+        fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
+            self.inner.rollback(tx_id)
+        }
+        fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
+            self.inner.rollback_to_tx(tx_id)
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            key: &'a [u8],
+            seq: u64,
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            self.get_at_seq_calls.fetch_add(1, Ordering::SeqCst);
+            self.inner.get_at_seq(key, seq)
+        }
+        fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+            self.inner.last_seq_no()
+        }
+        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+            self.inner.last_tx_id()
+        }
+        fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+            self.inner.flush()
+        }
+        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<memfuse_core::StorageStats>> {
+            self.inner.stats()
+        }
+        fn pin_checkpoint<'a>(&'a self, id: u64) -> BoxFuture<'a, Result<()>> {
+            self.inner.pin_checkpoint(id)
+        }
+        fn unpin_checkpoint<'a>(&'a self, id: u64) -> BoxFuture<'a, Result<()>> {
+            self.inner.unpin_checkpoint(id)
+        }
+        fn scan<'a>(
+            &'a self,
+            start: std::ops::Bound<&'a [u8]>,
+            end: std::ops::Bound<&'a [u8]>,
+            limit: Option<usize>,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            self.inner.scan(start, end, limit)
+        }
+        fn scan_prefix<'a>(
+            &'a self,
+            prefix: &'a [u8],
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            self.inner.scan_prefix(prefix)
+        }
+        fn scan_prefix_at<'a>(
+            &'a self,
+            prefix: &'a [u8],
+            seq_no: u64,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            self.inner.scan_prefix_at(prefix, seq_no)
+        }
+    }
+
+    #[tokio::test]
+    async fn test_tombstone_lookup_caching_per_query_run() -> Result<()> {
+        let storage = Arc::new(CountingStorage::new());
+        let index = InvertedIndex::new(storage.clone(), "tbs_cache_test");
+
+        let tx1 = TxId::new(1);
+        let d1 = DocId::new(1);
+        index
+            .upsert_document(tx1, d1, "repeat repeat repeat")
+            .await?;
+        index.commit_stats(tx1).await?;
+        storage.inner.commit(tx1).await?;
+
+        // Query with duplicated term in string: "repeat repeat"
+        // Tokenizer yields ["repeat", "repeat"].
+        let calls_before = storage.get_at_seq_calls.load(Ordering::SeqCst);
+        let results = index.search_bm25("repeat repeat", 10, None).await?;
+        let calls_after = storage.get_at_seq_calls.load(Ordering::SeqCst);
+
+        assert_eq!(results.len(), 1);
+
+        // Reads issued during search_bm25_at:
+        // 1. dl_key get_at_seq for doc 1 (first term "repeat")
+        // 2. tbs_key get_at_seq for (doc 1, "repeat") (first term "repeat")
+        // Second term "repeat" hits doc_len_cache and tbs_cache!
+        // So exactly 2 get_at_seq calls total.
+        let total_get_at_seq = calls_after - calls_before;
+        assert_eq!(
+            total_get_at_seq, 2,
+            "Expected exactly 2 get_at_seq calls (1 doc_len + 1 tbs_key), got {}",
+            total_get_at_seq
+        );
 
         Ok(())
     }
