@@ -23,6 +23,14 @@
       "session_id": "3279970408593114847",
       "active": true,
       "expires_at": "2026-09-17T01:38:47.429954857+00:00"
+    },
+    {
+      "krate": "memfuse-candle",
+      "issue": "WELLE5-AUDIT-KVBRIDGE-SPILL",
+      "timestamp": "2026-09-16T22:29:03.410241302+00:00",
+      "session_id": "5745795697878023454",
+      "active": true,
+      "expires_at": "2026-09-17T02:29:03.410221688+00:00"
     }
   ]
 }
