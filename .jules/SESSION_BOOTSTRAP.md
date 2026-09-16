@@ -7,7 +7,7 @@
   Eintrag existiert. `just check-vetoes` läuft automatisch, ist aber kein Ersatz
   für manuelles Lesen vor Arbeitsbeginn an physio-*/Nucleation-artigen Features.
 
-## Phase 0 — Session-Identität etablieren (30 Sekunden)
+## Phase 0 — Session-Identität etablieren & Task-Claiming (30 Sekunden)
 
 **Primärquelle:** Das Environment-Setup-Skript liefert SESSION_HASH und TS bereits
 unter `[10/10] Session Identity`. Nutze diese Werte direkt.
@@ -24,10 +24,22 @@ TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "TS: $TS"
 ```
 
+**Pflichtschritt — Task-Claiming vor Arbeitsbeginn:**
+```bash
+# Task-Claiming & TTL-Bereinigung vor jeder Crate-Bearbeitung
+bash .jules/verify/claim_precheck.sh --prune-expired --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>"
+```
+
 **Konsistenzregel:** Ein Session-Hash MUSS für die gesamte Sitzung konsistent bleiben.
 Niemals mid-session neu generieren — außer nach explizitem Neustart des Environments.
 
-## Phase 1 — Offene Kritische Issues prüfen (60 Sekunden)
+## Phase 1 — Context Pack laden & Offene Kritische Issues prüfen (30 Sekunden)
+
+```bash
+# Dichte Kontext-Erzeugung in EINER Datei
+bash .jules/context/gen_context_pack.sh
+```
+Lade danach nur `.jules/context/CONTEXT_PACK.md` via `read_file` (1 Tool-Call statt 8-12 Explorations-Aufrufen).
 
 ```bash
 # BLOCKER und CRITICAL Tags — bei Fund: STOP, zuerst beheben

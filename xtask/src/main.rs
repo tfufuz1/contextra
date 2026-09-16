@@ -53,6 +53,7 @@ mod bench_gate;
 mod check_adr_deadlines;
 mod check_agents_integrity;
 mod check_audit_duplication;
+mod check_audit_tool_evidence;
 mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
 mod check_commit_messages;
@@ -2161,6 +2162,28 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("❌ check-orphan-modules failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-audit-tool-evidence" => {
+            let root = find_root_dir();
+            match check_audit_tool_evidence::run_check_audit_tool_evidence(&root) {
+                Ok(violations) => {
+                    if !violations.is_empty() {
+                        eprintln!(
+                            "❌ check-audit-tool-evidence failed: {} violation(s) found:",
+                            violations.len()
+                        );
+                        for v in &violations {
+                            eprintln!("  {}:{}: [{}] {}", v.file_path, v.line_num, v.verdict_text, v.reason);
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ check-audit-tool-evidence: all audit verdicts verified with evidence");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-audit-tool-evidence failed: {}", e);
                     process::exit(1);
                 }
             }
