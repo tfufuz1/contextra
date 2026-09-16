@@ -22,7 +22,7 @@ MemFuse ist reine Infrastruktur. Es wird über drei Schnittstellen verteilt:
 - `memfuse` (Rust Crate): Direkte Einbindung der Workspace-Crates (allen voran `memfuse-db`).
 
 ### §1.3 Alleinstellungsmerkmale
-1. **5-Signal Retrieval Fusion inkl. PathRAG & Synaptischer Co-Aktivierung:** HNSW (Vektor) + BM25 (Volltext mit deutscher Komposita-Dekomposition) + CSR-Graph (Personalized PageRank) + Metadaten-Filter + Synaptische Edge-Co-Aktivierung, fusioniert via Reciprocal Rank Fusion (RRF) mit Resonanz-Kohärenz-Bonus ($\gamma \cdot (S/T)^\beta$). PathRAG (bidirektionaler Dijkstra) ermöglicht Multi-Hop-Traversierung.
+1. **5-Signal Retrieval Fusion inkl. PathRAG & Gestufte Indexarchitektur:** HNSW (Vektor, Default für aktive mutable Kollektionen) + BM25 (Volltext) + CSR-Graph (Personalized PageRank / Leiden-Community-Clustering) + Metadaten-Filter + Synaptische Edge-Co-Aktivierung, fusioniert via Reciprocal Rank Fusion (RRF) mit optionaler Score-Normalisierung (CombSUM/Z-Score opt-in mit RRF-Fallback bei Signalausfall). DiskANN dient als offizieller Tier für großvolumige, leselastige Kollektionen nach nativer Delete-Semantik und SQ8-Codebook-Drift-Fix. PathRAG (bidirektionaler Dijkstra) ermöglicht Multi-Hop-Traversierung.
 2. **Kalibriertes Retrieval mit proaktiver Drift-Erkennung:** Isotonic-Kalibrierung (PAVA) und Lyapunov-Drift-Watcher erkennen Trajektorien-Qualitätsverschlechterungen proaktiv.
 3. **Kryptographische Integrität & DSGVO Art. 17 Löschung:** WAL-HMAC-Kette mit Snapshots (`restore_last_hmac`) sowie fälschungssicherer `DeletionProof` für kryptographische Löschnachweise.
 4. **Pure Rust Air-Gap Inferenz & Encrypted KV-Cache-Bridge:** Native Candle GGUF-Inferenz ohne externe Abhängigkeiten, gepaart mit mandantenisolierter LRU-verschlüsselter `KvSegmentStore` Bridge für LLM-Prefill-Bypass.
@@ -96,7 +96,7 @@ MemFuse ist reine Infrastruktur. Es wird über drei Schnittstellen verteilt:
 #### Mikrospezifikationen & Volltext-Dokumentation für `memfuse-core`:
 
 ##### `pub struct DocId(pub u64)`
-- **Beschreibung:** Interner Dokument-Identifikator wrapped als `#[repr(transparent)] u64`.
+- **Repräsentation:** `#[repr(transparent)]` Wrapper um `u64` (v0.x Kapazitätsgrenze: 100 Mio. Dokumente pro Kollektion; geplante Major-Release-Zielarchitektur: 128-Bit BLAKE3-Truncation `[u8; 16]`, UUIDv7 explizit abgelehnt zur Wahrung der deterministischen Hash-Derivierung).
 - **Konstanten:** `MAX = DocId(u64::MAX)`, `MIN = DocId(0)`.
 - **Methoden:**
   - `pub const fn new(id: u64) -> Self`: Erstellt `DocId`.
