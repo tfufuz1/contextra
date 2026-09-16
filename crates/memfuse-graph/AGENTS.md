@@ -16,7 +16,7 @@ Implementiert den `GraphIndex` Trait aus `memfuse-core`.
 | `lib.rs` | Modul-Deklaration, `#![deny(unsafe_code)]` |
 | `csr.rs` | `CsrGraph` — Hauptstruktur, persistiert Entitäten & Kanten, GraphIndex-Impl |
 | `ppr.rs` | `PprContext` — Personalized PageRank mit L1-Norm-Abbruch (ADR-026) |
-| `community.rs` | `detect_communities` — Label Propagation Algorithmus (ADR-027) |
+| `community.rs` | `detect_communities` — Leiden-Algorithmus (ADR-027) |
 | `session_dag.rs` | `SessionBranchTree` — Agenten-Workflow-DAG, `AgentStateNode`, `DagEdge` |
 
 ## 3. Kritische Invarianten

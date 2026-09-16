@@ -81,7 +81,14 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/multistep.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/transaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
+| `2026-09-16T16:47:30Z` | `crates/memfuse-py/src/lib.rs` | `REVIEW-PASS` | `-` | `29edb6a4` | `-` | `-` | // REVIEW-PASS[1/2] Systematischer Review der memfuse-py PyO3 FFI Bindings (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-16T16:47:30Z) (SESSION: 29edb6a4) |
+| `2026-09-16T16:24:19Z` | `crates/memfuse-ollama/src/lib.rs` | `REVIEW-PASS` | `-` | `4b816c9a` | `PASS` | `-` | // REVIEW-PASS[2/2] STATUS:PASS (TS: 2026-09-16T16:24:19Z) (SESSION: 4b816c9a) PRÜFER-KONTEXT: FRESH - Independent diff review verified: prompt injection XML-escaping, retry & backoff error classification, forbid(unsafe_code) invariant, and 91 tests green. |
+| `2026-09-16T16:24:18Z` | `crates/memfuse-embed/src/lib.rs` | `REVIEW-PASS` | `-` | `d3856baa` | `PASS` | `-` | // REVIEW-PASS[3/3] STATUS:PASS (TS: 2026-09-16T16:24:18Z) (SESSION: d3856baa) PRÜFER-KONTEXT: FRESH - Independent review verified feature gate isolation, zero unsafe in production, spawn_blocking non-starvation model, and domain scoring invariants (APM-22, APM-23, APM-24). |
+| `2026-09-16T16:23:23Z` | `crates/memfuse-checkpoint/src/lib.rs` | `REVIEW-PASS` | `-` | `8d62c439` | `-` | `-` | // REVIEW-PASS[2/2] (TS: 2026-09-16T16:23:23Z) (SESSION: 8d62c439) PRÜFER-KONTEXT: FRESH |
 | `2026-09-16T16:17:21Z` | `crates/memfuse-router/src/lib.rs` | `REVIEW-PASS` | `-` | `cec8b8e9` | `-` | `-` | // REVIEW-PASS[1/2] (TS: 2026-09-16T16:17:21Z) (SESSION: cec8b8e9) (PRÜFER-KONTEXT: FRESH) |
+| `2026-09-16T16:15:00Z` | `crates/memfuse-calibration/src/lib.rs` | `REVIEW-PASS` | `-` | `e72e11a3` | `PASS` | `-` | // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-16T16:15:00Z) (SESSION: e72e11a3) |
+| `2026-09-16T16:13:00Z (SESSION: afafdd44)` | `crates/memfuse-candle/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Crate root for memfuse-candle native GGUF inference backend. |
+| `2026-09-16T16:13:00Z` | `crates/memfuse-candle/src/lib.rs` | `REVIEW-PASS` | `AGT-CANDLE-d495a019` | `afafdd44` | `-` | `0` | // REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH |
 | `2026-09-15T16:46:26Z` | `crates/memfuse-agent/src/lib.rs` | `REVIEW-PASS` | `AGT-AGENT-692d9982` | `692d9982` | `PASS` | `0` | // REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-AGENT-692d9982) (TS: 2026-09-15T16:46:26Z) (SESSION: 692d9982) (PRÜFER-KONTEXT: FRESH) |
 | `2026-09-15T16:15:00Z (SESSION: 1a43706f)` | `crates/memfuse-router/src/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit- und Integrationstest-Suite für memfuse-router. |
 | `2026-09-15T16:10:40Z (SESSION: ec33599e)` | `crates/memfuse-embed/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG). |
@@ -220,6 +227,7 @@
 | `2026-08-30T21:51:46Z (SESSION: a43b7682)` | `crates/memfuse-core/src/error_dto.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Serialisierbares Error-DTO für IPC/FFI-Schichten ohne Typverlust (ADR-028). |
 | `2026-08-30T21:49:55Z (SESSION: 283abf0f)` | `crates/memfuse-store/src/compaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | STCS-Compaction-Engine (Size-Tiered Compaction Strategy) |
 | `2026-08-30T21:49:55Z (SESSION: 283abf0f)` | `crates/memfuse-store/src/lsm/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | LSM-Tree-Implementierung (MemTable + SSTable + Compaction) |
+| `2026-08-30T19:30:00Z (SESSION: b1234567)` | `crates/memfuse-graph/src/community.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Community-Erkennung via Leiden-Algorithmus für GraphRAG |
 | `2026-08-30T19:05:00Z` | `crates/memfuse-core/src/lib.rs` | `REVIEW-PASS` | `AGT-CORE-a3f29c1d` | `c9f5e2b3` | `PASS` | `3` | // REVIEW-PASS[2/2] STATUS:PASS (ID: AGT-CORE-a3f29c1d) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3) |
 | `2026-08-30T19:05:00Z` | `crates/memfuse-crypto/src/crypto.rs` | `REVIEW-PASS` | `TEST:CRY-001` | `c9f5e2b3` | `PASS` | `6` | // REVIEW-PASS[2/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3) |
 | `2026-08-30T19:05:00Z` | `crates/memfuse-ollama/src/client.rs` | `REVIEW-PASS` | `TEST:OLL-001` | `c9f5e2b3` | `PASS` | `1` | // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:OLL-001) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3) |
@@ -232,7 +240,6 @@
 | `2026-08-30T18:54:39Z (SESSION: ed7b7b38)` | `crates/memfuse-ollama/src/importance.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | LLM-basierte Wichtigkeits-Bewertung (ImportanceScore 0.0-1.0) für Memory Chunks |
 | `2026-08-30T18:54:39Z (SESSION: ed7b7b38)` | `crates/memfuse-ollama/src/model_info.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Modell-Inspektion (/api/show) und Statisches Mapping bekannter Embedding-Dimensionen |
 | `2026-08-30T18:54:39Z` | `crates/memfuse-ollama/src/client.rs` | `ANCHOR` | `TEST:OLL-001` | `ed7b7b38` | `DONE` | `2` | // ANCHOR[TEST:OLL-001] STATUS:DONE (TS:2026-08-30T18:54:39Z) (SESSION:ed7b7b38) |
-| `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/memfuse-graph/src/community.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Community-Erkennung via Label Propagation für GraphRAG |
 | `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/memfuse-graph/src/csr.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | CSR-Graph für Entity-Relation-Traversal (Signal 3 in 4-Signal-Fusion) |
 | `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/memfuse-graph/src/ppr.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Personalized PageRank Power Iteration über CSR Graph |
 | `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/memfuse-graph/src/session_dag.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Session-DAG für persistente, azyklische Agent-State-Verzweigung (MemFuse Session-DAG Pattern) |
@@ -332,3 +339,4 @@
 | `` | `crates/memfuse-store/tests/wal_hmac_rollback_race.rs` | `FILE-CONTEXT` | `-` | `b448084` | `-` | `-` |  |
 | `` | `crates/memfuse-store/tests/wal_truncate_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität. |
 | `` | `crates/memfuse-text/src/posting_list.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Stellt kompakte, resident gehaltene Postinglisten pro Term bereit. |
+| `` | `crates/memfuse-text/src/wand.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Term Query-Traversierung mit Block-Maximalwert-Pruning und dynamic thresholding. |

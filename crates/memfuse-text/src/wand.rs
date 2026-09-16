@@ -291,7 +291,10 @@ pub async fn block_max_wand_search<S: StorageEngine>(
             // Count active tombstones for `term` at snapshot `seq` using a fast prefix scan
             // Notice tombstone key format in inverted.rs is `__txt:{ns}:tbs:{doc_id}:{term}`.
             // To scan tombstones for term, we scan prefix `__txt:{ns}:tbs:` and filter by `:{term}` suffix.
-            let tbs_global_prefix = tombstone_key_helper(DocId::new(0), "").into_iter().take_while(|&b| b != b'0').collect::<Vec<u8>>();
+            let tbs_global_prefix = tombstone_key_helper(DocId::new(0), "")
+                .into_iter()
+                .take_while(|&b| b != b'0')
+                .collect::<Vec<u8>>();
             let active_tbs_entries = storage.scan_prefix_at(&tbs_global_prefix, seq).await?;
             let mut term_tbs_count = 0u32;
             let term_suffix = format!(":{}", term);
