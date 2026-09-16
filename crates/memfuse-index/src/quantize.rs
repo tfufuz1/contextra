@@ -108,6 +108,9 @@ impl ScalarQuantizer {
             });
         }
 
+        let mut mins = vec![f32::MAX; dimension];
+        let mut maxes = vec![f32::MIN; dimension];
+
         if batch.len() >= 100 {
             // Apply 0.5th / 99.5th percentile clipping to eliminate extreme training outliers
             // and preserve 8-bit quantization resolution for in-distribution values.
