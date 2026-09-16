@@ -35,3 +35,5 @@ pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 pub use routing_strategy::RoutingStrategy;
 #[cfg(feature = "cloud-egress-guard")]
 pub use transport::Transport;
+
+// REVIEW-PASS[1/2] (TS: 2026-09-16T16:17:21Z) (SESSION: cec8b8e9) (PRÜFER-KONTEXT: FRESH)
