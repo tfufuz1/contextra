@@ -223,10 +223,7 @@ fn test_loom_group_commit_last_hmac_race() {
                 .await
                 .expect("scan entries succeeds");
 
-            let written = physical_seqs
-                .lock()
-                .map(|g| g.clone())
-                .unwrap_or_default();
+            let written = physical_seqs.lock().map(|g| g.clone()).unwrap_or_default();
             assert_eq!(
                 written.len(),
                 2,
