@@ -1386,19 +1386,12 @@ impl HnswIndexCore {
                 q.asymmetric_dist(query_exact, vector_bytes, self.cold.config.distance_metric)
             }
         } else {
-            // Safe unaligned F32 read
-            #[allow(unknown_lints)]
-            #[allow(clippy::chunks_exact_to_as_chunks)]
-            let v: Vec<f32> = vector_bytes
-                .chunks_exact(4)
-                .take(self.cold.config.dimension)
-                .map(|chunk| -> Result<f32> {
-                    Ok(f32::from_le_bytes(chunk.try_into().map_err(|_| {
-                        MemFuseError::Index("Corrupt f32 in mmap vector".into())
-                    })?))
-                })
-                .collect::<Result<Vec<f32>>>()?;
-            compute_distance_trusted(query_exact, &v, self.cold.config.distance_metric)
+            // Safe unaligned SIMD F32 read directly from mmap byte slice (zero allocation)
+            crate::distance::compute_distance_f32_bytes_trusted(
+                query_exact,
+                vector_bytes,
+                self.cold.config.distance_metric,
+            )
         }
     }
 
@@ -1561,7 +1554,10 @@ impl HnswIndexCore {
             prior_prepared,
         };
 
-        let mut visited = AHashSet::new();
+        // Pre-allocate capacity derived from search parameter `ef` and graph degree `M`.
+        // During graph traversal, up to `ef` candidates are expanded, each having up to `M` neighbors.
+        // Allocating `ef * 4` prevents repeated reallocations during hot-path candidate visitation.
+        let mut visited = AHashSet::with_capacity(ef.saturating_mul(4));
         let mut candidates = BinaryHeap::new();
         let mut results = BinaryHeap::new();
 
@@ -1634,28 +1630,33 @@ impl HnswIndexCore {
                 if let Some(node) = nodes_guard.get(ram_idx) {
                     let seq_log = self.cold.seq_log.read();
                     let min_retention_seq = seq_log.min_retention_seq();
-                    let mut conns_guard = node.connections.write();
-                    if let Some(layer_conns) = conns_guard.get_mut(layer) {
-                        layer_conns.retain(|&neighbor_u32| {
-                            if !deleted_snapshot.contains(neighbor_u32 as u64) {
-                                true
-                            } else if let Some(min_ret_seq) = min_retention_seq {
-                                let neighbor_idx = neighbor_u32 as usize;
-                                if neighbor_idx >= mmap_node_count {
-                                    let neighbor_ram_idx = neighbor_idx - mmap_node_count;
-                                    if let Some(neighbor_node) = nodes_guard.get(neighbor_ram_idx) {
-                                        if let Some(del_seq) =
-                                            seq_log.deletion_seq(neighbor_node.doc_id)
+                    // Use try_write() to avoid blocking search traversal under contention.
+                    // If write lock acquisition fails, pruning is skipped for this visit and attempted again on next visit.
+                    if let Some(mut conns_guard) = node.connections.try_write() {
+                        if let Some(layer_conns) = conns_guard.get_mut(layer) {
+                            layer_conns.retain(|&neighbor_u32| {
+                                if !deleted_snapshot.contains(neighbor_u32 as u64) {
+                                    true
+                                } else if let Some(min_ret_seq) = min_retention_seq {
+                                    let neighbor_idx = neighbor_u32 as usize;
+                                    if neighbor_idx >= mmap_node_count {
+                                        let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                                        if let Some(neighbor_node) =
+                                            nodes_guard.get(neighbor_ram_idx)
                                         {
-                                            return del_seq >= min_ret_seq;
+                                            if let Some(del_seq) =
+                                                seq_log.deletion_seq(neighbor_node.doc_id)
+                                            {
+                                                return del_seq >= min_ret_seq;
+                                            }
                                         }
                                     }
+                                    false
+                                } else {
+                                    false
                                 }
-                                false
-                            } else {
-                                false
-                            }
-                        });
+                            });
+                        }
                     }
                 }
             }
@@ -3354,6 +3355,47 @@ mod tests {
             res_builder_err,
             Err(MemFuseError::InvalidInput(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn test_search_non_blocking_when_connection_write_lock_held() {
+        let index = std::sync::Arc::new(HnswIndex::try_new(test_config(4)).unwrap());
+        let tx1 = TxId::new(1);
+
+        for i in 1..=20u64 {
+            let v = vec![i as f32, 0.0, 0.0, 0.0];
+            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+        }
+        index.commit(tx1).await.unwrap();
+
+        // Soft-delete a document to trigger has_dead_neighbors during search
+        let tx2 = TxId::new(2);
+        index.delete(tx2, DocId::new(5)).await.unwrap();
+        index.commit(tx2).await.unwrap();
+
+        // Hold write lock on first node's connections
+        let nodes = index.inner.hot.nodes.read();
+        let first_node_conns = &nodes[0].connections;
+        let lock_guard = first_node_conns.write();
+
+        // Perform search while write lock is held.
+        // Because search lazy pruning uses try_write(), search must complete without blocking!
+        let start = std::time::Instant::now();
+        let search_res = tokio::time::timeout(
+            std::time::Duration::from_millis(500),
+            index.search(&[1.0, 0.0, 0.0, 0.0], 5),
+        )
+        .await;
+
+        drop(lock_guard);
+
+        assert!(
+            search_res.is_ok(),
+            "Search must complete non-blockingly within 500ms even when connection write lock is held"
+        );
+        let results = search_res.unwrap().unwrap();
+        assert!(!results.is_empty());
+        assert!(start.elapsed() < std::time::Duration::from_millis(200));
     }
 
     #[tokio::test]
