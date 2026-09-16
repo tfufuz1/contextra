@@ -1656,7 +1656,7 @@ mod tests {
         .await;
 
         // Intentionally create unsorted list: [M (seq 20), C (seq 15)]
-        let unsorted_ssts = vec![sst_m, sst_c];
+        let unsorted_ssts = [sst_m, sst_c];
 
         let is_sorted = unsorted_ssts.windows(2).all(|w| {
             (w[0].metadata().max_seq & !TOMBSTONE_BIT) <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)
@@ -1906,7 +1906,7 @@ mod tests {
         );
 
         // Perform the swap manually inside a write guard (replicating swap logic in maybe_compact)
-        let input_ssts = vec![sst_a, sst_b];
+        let input_ssts = [sst_a, sst_b];
         {
             let mut ssts = sstables.write().await;
             let insertion_point = ssts
@@ -2600,7 +2600,7 @@ mod tests {
             while !ct.is_cancelled() {
                 tokio::time::sleep(Duration::from_millis(1)).await;
                 let mut guard = sstables_mut.write().await;
-                if !guard.is_empty() && counter % 2 == 0 {
+                if !guard.is_empty() && counter.is_multiple_of(2) {
                     // Simulate rollback / compaction cleanup: remove an entry
                     guard.pop();
                 } else {

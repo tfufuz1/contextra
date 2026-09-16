@@ -59,7 +59,7 @@ fn compute_blocks(postings: &[Posting]) -> Vec<PostingBlockInfo> {
     if postings.is_empty() {
         return Vec::new();
     }
-    let mut blocks = Vec::with_capacity((postings.len() + BLOCK_SIZE - 1) / BLOCK_SIZE);
+    let mut blocks = Vec::with_capacity(postings.len().div_ceil(BLOCK_SIZE));
     for chunk in postings.chunks(BLOCK_SIZE) {
         let max_doc_id = chunk.last().map(|p| p.doc_id).unwrap_or(0);
         let mut max_tf = 0u32;

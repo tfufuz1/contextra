@@ -123,6 +123,22 @@ fn validate_key(key: &[u8]) -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(feature = "docid-128"))]
+fn derive_doc_id(key: &[u8]) -> DocId {
+    let hash = blake3::hash(key);
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(&hash.as_bytes()[..8]);
+    DocId::new(u64::from_le_bytes(bytes))
+}
+
+#[cfg(feature = "docid-128")]
+fn derive_doc_id(key: &[u8]) -> DocId {
+    let hash = blake3::hash(key);
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&hash.as_bytes()[..16]);
+    DocId::new(u128::from_le_bytes(bytes))
+}
+
 fn validate_value(value: &[u8]) -> Result<()> {
     if value.len() > MAX_VALUE_SIZE {
         return Err(MemFuseError::InvalidInput(format!(
@@ -387,12 +403,7 @@ impl StorageEngine for LsmStorage {
             if !self.budget.has_memory_capacity() {
                 return Err(MemFuseError::Storage("Memory budget exceeded (95%)".into()));
             }
-            let doc_id = {
-                let hash = blake3::hash(key);
-                let mut bytes = [0u8; 8];
-                bytes.copy_from_slice(&hash.as_bytes()[..8]);
-                DocId::new(u64::from_le_bytes(bytes))
-            };
+            let doc_id = derive_doc_id(key);
 
             self.tx_buffer.stage_kv(
                 tx_id,
@@ -458,12 +469,7 @@ impl StorageEngine for LsmStorage {
             }
 
             // 4. Stage operation in tx_buffer
-            let doc_id = {
-                let hash = blake3::hash(key);
-                let mut bytes = [0u8; 8];
-                bytes.copy_from_slice(&hash.as_bytes()[..8]);
-                DocId::new(u64::from_le_bytes(bytes))
-            };
+            let doc_id = derive_doc_id(key);
 
             if let Err(e) = self.tx_buffer.stage_kv(
                 tx_id,
@@ -503,10 +509,7 @@ impl StorageEngine for LsmStorage {
             let ops: Vec<IndexOp<(Vec<u8>, Vec<u8>)>> = keys
                 .into_iter()
                 .map(|key| {
-                    let hash = blake3::hash(&key);
-                    let mut bytes = [0u8; 8];
-                    bytes.copy_from_slice(&hash.as_bytes()[..8]);
-                    let doc_id = DocId::new(u64::from_le_bytes(bytes));
+                    let doc_id = derive_doc_id(&key);
                     IndexOp::Delete {
                         doc_id,
                         data: Some((key, Vec::new())),
@@ -542,12 +545,7 @@ impl StorageEngine for LsmStorage {
     fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             validate_key(key)?;
-            let doc_id = {
-                let hash = blake3::hash(key);
-                let mut bytes = [0u8; 8];
-                bytes.copy_from_slice(&hash.as_bytes()[..8]);
-                DocId::new(u64::from_le_bytes(bytes))
-            };
+            let doc_id = derive_doc_id(key);
 
             self.tx_buffer.stage_kv(
                 tx_id,

@@ -215,6 +215,7 @@ pub struct WandSearchResult {
 }
 
 /// Executes Block-Max WAND traversal over resident posting lists.
+#[allow(clippy::too_many_arguments)]
 pub async fn block_max_wand_search<S: StorageEngine>(
     storage: &S,
     terms: &[String],
