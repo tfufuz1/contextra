@@ -1,4 +1,7 @@
-//! Loom-basierter Determinismus-Beweis für SEC-01: Race-Condition im Group-Commit-Leader bezüglich `last_hmac`.
+//! Loom-basierter Determinismus-Beweis für Lock-Handoff & Group-Commit-Reihenfolge.
+//! Nacharbeit zu Commit 694fa8c2: Richtige Lock-Reihenfolge (Lock-Handoff) und
+//! Verifikation der physischen WAL-Schreibreihenfolge.
+//!
 //! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
 //!
 //! MANUELLER MUTATIONSTEST (Dokumentation / Verifikation):
@@ -18,6 +21,7 @@
 
 use memfuse_core::{MemFuseError, TxId};
 use memfuse_store::wal::{PreparedBatch, Wal, WalOp};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -33,16 +37,20 @@ struct PendingCommitQueue {
 }
 
 struct GroupCommitEngine {
-    commit_mutex: Mutex<()>,
-    pending_commit_queue: Mutex<Option<PendingCommitQueue>>,
+    commit_mutex: tokio::sync::Mutex<()>,
+    pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,
+    next_seq_no: AtomicU64,
+    prep_order: std::sync::Mutex<Vec<u64>>,
     wal: Wal,
 }
 
 impl GroupCommitEngine {
     fn new(wal: Wal) -> Self {
         Self {
-            commit_mutex: Mutex::new(()),
-            pending_commit_queue: Mutex::new(None),
+            commit_mutex: tokio::sync::Mutex::new(()),
+            pending_commit_queue: tokio::sync::Mutex::new(None),
+            next_seq_no: AtomicU64::new(1),
+            prep_order: std::sync::Mutex::new(Vec::new()),
             wal,
         }
     }
@@ -199,6 +207,40 @@ fn test_loom_group_commit_last_hmac_race() {
                 .await
                 .expect("HMAC chain verification failed");
             assert_eq!(entry_count, 3, "Expected 3 committed entries in WAL");
+
+            let file_size = engine.wal.size();
+            let physical_seqs = Arc::new(std::sync::Mutex::new(Vec::new()));
+            let physical_seqs_clone = Arc::clone(&physical_seqs);
+
+            engine
+                .wal
+                .scan_entries_with_callback(file_size, move |seq, entry, _pos| {
+                    if let Ok(mut guard) = physical_seqs_clone.lock() {
+                        guard.push((seq, entry.tx_id().inner()));
+                    }
+                    true
+                })
+                .await
+                .expect("scan entries succeeds");
+
+            let written = physical_seqs
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or_default();
+            assert_eq!(
+                written.len(),
+                2,
+                "Exactly 2 physical entries must be written to WAL"
+            );
+
+            for window in written.windows(2) {
+                assert!(
+                    window[0].0 < window[1].0,
+                    "Physical WAL seq_no must strictly increase: {} vs {}",
+                    window[0].0,
+                    window[1].0
+                );
+            }
 
             let _ = engine.wal.rotate_and_seal().await;
         });
