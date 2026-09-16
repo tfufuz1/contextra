@@ -5372,8 +5372,9 @@ mod tests {
         ] {
             let trusted_dist =
                 compute_distance_trusted(&v1, &v2, metric).expect("compute_distance_trusted");
-            let raw_dist = crate::distance::compute_distance_f32_bytes_trusted(&v1, &v2_bytes, metric)
-                .expect("compute_distance_f32_bytes_trusted");
+            let raw_dist =
+                crate::distance::compute_distance_f32_bytes_trusted(&v1, &v2_bytes, metric)
+                    .expect("compute_distance_f32_bytes_trusted");
 
             let diff = (trusted_dist - raw_dist).abs();
             assert!(

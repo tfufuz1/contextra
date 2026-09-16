@@ -33,7 +33,9 @@ impl DocIdWidth {
 }
 
 /// SSTable and WAL Manifest schema version identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[repr(u8)]
 pub enum ManifestSchemaVersion {
     /// Schema Version 1 (v0.x legacy 64-bit DocId layout).
@@ -80,8 +82,14 @@ mod tests {
 
     #[test]
     fn test_manifest_schema_version_roundtrip() {
-        assert_eq!(ManifestSchemaVersion::from_u8(1).unwrap(), ManifestSchemaVersion::V1);
-        assert_eq!(ManifestSchemaVersion::from_u8(2).unwrap(), ManifestSchemaVersion::V2);
+        assert_eq!(
+            ManifestSchemaVersion::from_u8(1).unwrap(),
+            ManifestSchemaVersion::V1
+        );
+        assert_eq!(
+            ManifestSchemaVersion::from_u8(2).unwrap(),
+            ManifestSchemaVersion::V2
+        );
         assert!(ManifestSchemaVersion::from_u8(3).is_err());
     }
 
