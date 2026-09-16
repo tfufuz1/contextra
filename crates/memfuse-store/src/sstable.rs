@@ -40,9 +40,11 @@
 // SIEHE AUCH:  crates/memfuse-store/AGENTS.md
 
 use bytes::{BufMut, Bytes, BytesMut};
+#[cfg(not(feature = "block-cache-v2"))]
 use lru::LruCache;
 use memfuse_core::{MemFuseError, Result};
 use memfuse_crypto::crypto::KeyManager;
+#[cfg(not(feature = "block-cache-v2"))]
 use parking_lot::RwLock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -72,29 +74,62 @@ fn pread_exact(file: &std::fs::File, mut buf: &mut [u8], mut offset: u64) -> std
     Ok(())
 }
 
-/// Sharded block cache: 16 independent LRU shards to reduce write-lock contention.
-/// Shard = (file_id XOR block_offset) % 16.
-pub const BLOCK_CACHE_SHARDS: usize = 16;
+/// Sharded block cache: 64 independent shards to reduce contention.
+/// Shard selection uses ahash tuple hashing on (file_id, offset).
+pub const BLOCK_CACHE_SHARDS: usize = 64;
+
+#[cfg(not(feature = "block-cache-v2"))]
 pub type BlockCacheShard = RwLock<LruCache<(u64, u64), Bytes>>;
 
+#[cfg(feature = "block-cache-v2")]
+pub type BlockCacheShard = quick_cache::sync::Cache<(u64, u64), Bytes>;
+
 pub struct BlockCache {
-    shards: [BlockCacheShard; BLOCK_CACHE_SHARDS],
+    shards: Vec<BlockCacheShard>,
+    hash_builder: ahash::RandomState,
 }
 
 impl BlockCache {
     pub fn new(capacity_per_shard: usize) -> Self {
-        let cap = std::num::NonZeroUsize::new(capacity_per_shard.max(1)).unwrap();
+        Self::new_with_shards(capacity_per_shard, BLOCK_CACHE_SHARDS)
+    }
+
+    pub fn new_with_shards(capacity_per_shard: usize, num_shards: usize) -> Self {
+        let num_shards = num_shards.max(1);
+        let cap_shard = capacity_per_shard.max(1);
+
+        #[cfg(not(feature = "block-cache-v2"))]
+        let shards = {
+            let cap = std::num::NonZeroUsize::new(cap_shard).unwrap();
+            (0..num_shards)
+                .map(|_| RwLock::new(LruCache::new(cap)))
+                .collect()
+        };
+
+        #[cfg(feature = "block-cache-v2")]
+        let shards = (0..num_shards)
+            .map(|_| quick_cache::sync::Cache::new(cap_shard))
+            .collect();
+
         Self {
-            shards: std::array::from_fn(|_| RwLock::new(LruCache::new(cap))),
+            shards,
+            hash_builder: ahash::RandomState::new(),
         }
     }
 
     #[inline]
+    pub fn shard_idx(&self, file_id: u64, offset: u64) -> usize {
+        let hash = self.hash_builder.hash_one((file_id, offset));
+        (hash as usize) % self.shards.len()
+    }
+
+    #[inline]
     fn shard(&self, file_id: u64, offset: u64) -> &BlockCacheShard {
-        let idx = ((file_id ^ offset) as usize) % BLOCK_CACHE_SHARDS;
+        let idx = self.shard_idx(file_id, offset);
         &self.shards[idx]
     }
 
+    #[cfg(not(feature = "block-cache-v2"))]
     pub fn get(&self, file_id: u64, offset: u64) -> Option<Bytes> {
         self.shard(file_id, offset)
             .write()
@@ -102,24 +137,49 @@ impl BlockCache {
             .cloned()
     }
 
+    #[cfg(feature = "block-cache-v2")]
+    pub fn get(&self, file_id: u64, offset: u64) -> Option<Bytes> {
+        self.shard(file_id, offset).get(&(file_id, offset))
+    }
+
+    #[cfg(not(feature = "block-cache-v2"))]
     pub fn insert(&self, file_id: u64, offset: u64, data: Bytes) {
         self.shard(file_id, offset)
             .write()
             .put((file_id, offset), data);
     }
 
+    #[cfg(feature = "block-cache-v2")]
+    pub fn insert(&self, file_id: u64, offset: u64, data: Bytes) {
+        self.shard(file_id, offset).insert((file_id, offset), data);
+    }
+
+    #[cfg(not(feature = "block-cache-v2"))]
     pub fn len(&self) -> usize {
         self.shards.iter().map(|s| s.read().len()).sum()
+    }
+
+    #[cfg(feature = "block-cache-v2")]
+    pub fn len(&self) -> usize {
+        self.shards.iter().map(|s| s.len()).sum()
     }
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[cfg(not(feature = "block-cache-v2"))]
     pub fn contains(&self, file_id: u64, offset: u64) -> bool {
         self.shard(file_id, offset)
             .read()
             .contains(&(file_id, offset))
+    }
+
+    #[cfg(feature = "block-cache-v2")]
+    pub fn contains(&self, file_id: u64, offset: u64) -> bool {
+        self.shard(file_id, offset)
+            .get(&(file_id, offset))
+            .is_some()
     }
 }
 
@@ -292,11 +352,17 @@ pub fn block_binary_search(
 pub const SSTABLE_MAGIC_MFSX: u32 = 0x5853_464D; // "MFSX" in hex
 pub const SSTABLE_MAGIC_LEGACY: u32 = 0x4D46_5354; // "MFST" in hex
 
-/// Creates a new block cache instance. Capacity is in MB (assuming 4KB blocks).
+/// Creates a new block cache instance with default shard count. Capacity is in MB (assuming 4KB blocks).
 pub fn create_block_cache(capacity_mb: usize) -> Arc<BlockCache> {
+    create_block_cache_with_shards(capacity_mb, BLOCK_CACHE_SHARDS)
+}
+
+/// Creates a new block cache instance with configurable shard count. Capacity is in MB (assuming 4KB blocks).
+pub fn create_block_cache_with_shards(capacity_mb: usize, num_shards: usize) -> Arc<BlockCache> {
+    let num_shards = num_shards.max(1);
     let total_blocks = capacity_mb.saturating_mul(256).clamp(256, 8 * 1024 * 256);
-    let per_shard = (total_blocks / BLOCK_CACHE_SHARDS).max(16);
-    Arc::new(BlockCache::new(per_shard))
+    let per_shard = (total_blocks / num_shards).max(16);
+    Arc::new(BlockCache::new_with_shards(per_shard, num_shards))
 }
 
 /// Block size for SSTable data blocks (4KB).
@@ -2448,10 +2514,20 @@ mod tests {
         let cache = Arc::new(BlockCache::new(1));
 
         let file_id = 1u64;
-        // Offsets that map to the exact same shard index ((file_id ^ offset) % 16)
-        let offset1 = 0u64;
-        let offset2 = 16u64;
-        let offset3 = 32u64;
+        // Find 3 offsets that map to the exact same shard index using ahash
+        let target_shard = cache.shard_idx(file_id, 0);
+        let mut offsets = vec![0u64];
+        let mut candidate = 1u64;
+        while offsets.len() < 3 {
+            if cache.shard_idx(file_id, candidate) == target_shard {
+                offsets.push(candidate);
+            }
+            candidate += 1;
+        }
+
+        let offset1 = offsets[0];
+        let offset2 = offsets[1];
+        let offset3 = offsets[2];
 
         // 1. Insert block 1 -> populates shard
         cache.insert(file_id, offset1, Bytes::from_static(b"block1"));
@@ -2704,5 +2780,59 @@ mod tests {
 
         assert_eq!(completed.load(Ordering::SeqCst), num_tasks);
         assert!(!cache.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_block_cache_32_concurrent_readers_hotset_latency() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Instant;
+
+        let cache = Arc::new(BlockCache::new(64));
+        let file_id = 42u64;
+        let offset = 4096u64;
+        let val = Bytes::from_static(b"hotset_block_payload");
+
+        cache.insert(file_id, offset, val.clone());
+
+        let num_readers = 32;
+        let reads_per_reader = 10_000;
+        let total_hits = Arc::new(AtomicUsize::new(0));
+
+        let start = Instant::now();
+        let mut handles = Vec::with_capacity(num_readers);
+
+        for _ in 0..num_readers {
+            let cache_ref = Arc::clone(&cache);
+            let hits_ref = Arc::clone(&total_hits);
+            let expected_val = val.clone();
+            handles.push(tokio::spawn(async move {
+                let mut hits = 0;
+                for _ in 0..reads_per_reader {
+                    if let Some(res) = cache_ref.get(file_id, offset) {
+                        if res == expected_val {
+                            hits += 1;
+                        }
+                    }
+                }
+                hits_ref.fetch_add(hits, Ordering::Relaxed);
+            }));
+        }
+
+        for h in handles {
+            h.await.expect("reader task completed");
+        }
+
+        let elapsed = start.elapsed();
+        let total_reads = num_readers * reads_per_reader;
+        assert_eq!(total_hits.load(Ordering::SeqCst), total_reads);
+
+        let ns_per_op = elapsed.as_nanos() as f64 / total_reads as f64;
+        println!(
+            "[BlockCache Benchmark] 32 concurrent readers hot-set: {} total ops in {:?}, avg {:.2} ns/op (feature block-cache-v2={})",
+            total_reads,
+            elapsed,
+            ns_per_op,
+            cfg!(feature = "block-cache-v2")
+        );
     }
 }
