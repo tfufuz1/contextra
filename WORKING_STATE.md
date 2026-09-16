@@ -33,7 +33,7 @@ Ergebnis: **3 offene Tags**
 | `memfuse-core-ipc-gen` | 0 | 1174 | 🟢 Clean | Auto-generated FlatBuffers IPC code for MemFuse Core |
 | `memfuse-core` | 1 | 9842 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
 | `memfuse-calibration` | 2 | 1976 | 🟢 Clean |  |
-| `memfuse-checkpoint` | 2 | 6034 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
+| `memfuse-checkpoint` | 2 | 6035 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-crypto` | 2 | 6572 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
 | `memfuse-graph` | 2 | 12056 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-sandbox` | 2 | 836 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
