@@ -44,6 +44,24 @@
       "active": false,
       "expires_at": "2026-09-16T11:11:08.494678646+00:00",
       "released_at": "2026-09-16T15:23:04.742425106+00:00 [TTL-EXPIRED]"
+    },
+    {
+<<<<<<< Updated upstream
+      "krate": "memfuse-store",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-16T15:52:33.065247306+00:00",
+      "session_id": "2575935384615743096",
+      "active": true,
+      "expires_at": "2026-09-16T19:52:33.065233447+00:00"
+=======
+      "krate": "memfuse-crypto",
+      "issue": "JULES-20260916-MEMFUSECRY-REVIEW-0987",
+      "timestamp": "2026-09-16T16:14:50.806048405+00:00",
+      "session_id": "1320460701347053899",
+      "active": false,
+      "expires_at": "2026-09-16T20:14:50.806032771+00:00",
+      "released_at": "2026-09-16T16:29:23.699155243+00:00"
+>>>>>>> Stashed changes
     }
   ]
 }
