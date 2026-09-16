@@ -162,7 +162,7 @@ fn test_extreme_and_special_values() {
     // 4. Infinity input sanity check
     let normal_vec = vec![1.0f32, 2.0, 3.0];
     let inf_vec = vec![1.0f32, f32::INFINITY, 3.0];
-    assert!(compute_distance(&inf_vec, &normal_vec, DistanceMetric::Cosine).is_ok());
+    assert!(compute_distance(&inf_vec, &normal_vec, DistanceMetric::Cosine).is_err());
 }
 
 proptest::proptest! {
