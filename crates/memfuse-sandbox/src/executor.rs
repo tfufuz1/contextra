@@ -384,8 +384,10 @@ mod tests {
         let executor = WasmExecutor::new().expect("WasmExecutor");
 
         // Test case 1: allow_cloud_egress = false (default) -> CapabilityViolation
-        let mut caps_denied = WasmCapabilities::default();
-        caps_denied.allow_cloud_egress = false;
+        let caps_denied = WasmCapabilities {
+            allow_cloud_egress: false,
+            ..Default::default()
+        };
         let res_denied = executor
             .execute(&wasm_bytes, b"", &caps_denied, Duration::from_secs(1))
             .await;
@@ -399,8 +401,10 @@ mod tests {
         );
 
         // Test case 2: allow_cloud_egress = true -> Execution succeeds
-        let mut caps_allowed = WasmCapabilities::default();
-        caps_allowed.allow_cloud_egress = true;
+        let caps_allowed = WasmCapabilities {
+            allow_cloud_egress: true,
+            ..Default::default()
+        };
         let res_allowed = executor
             .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(1))
             .await;
@@ -423,8 +427,10 @@ mod tests {
         let wasm_bytes = wat::parse_str(wat).expect("valid wat");
 
         let executor = WasmExecutor::new().expect("WasmExecutor");
-        let mut caps = WasmCapabilities::default();
-        caps.max_fuel = 1_000;
+        let caps = WasmCapabilities {
+            max_fuel: 1_000,
+            ..Default::default()
+        };
 
         let result = executor
             .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
@@ -448,8 +454,10 @@ mod tests {
         let wasm_bytes = wat::parse_str(wat).expect("valid wat");
 
         let executor = WasmExecutor::new().expect("WasmExecutor");
-        let mut caps = WasmCapabilities::default();
-        caps.max_memory_pages = 2;
+        let caps = WasmCapabilities {
+            max_memory_pages: 2,
+            ..Default::default()
+        };
 
         let result = executor
             .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))
@@ -498,8 +506,10 @@ mod tests {
         assert_eq!(&output.stdout[..], b"hello");
 
         // Test 2: allow_stdout = false -> stdout buffer remains empty
-        let mut caps_no_stdout = WasmCapabilities::default();
-        caps_no_stdout.allow_stdout = false;
+        let caps_no_stdout = WasmCapabilities {
+            allow_stdout: false,
+            ..Default::default()
+        };
         let output_no_stdout = executor
             .execute(&wasm_bytes, b"", &caps_no_stdout, Duration::from_secs(1))
             .await
@@ -527,8 +537,10 @@ mod tests {
         let wasm_bytes = wat::parse_str(wat).expect("valid wat");
         let executor = WasmExecutor::new().expect("WasmExecutor");
 
-        let mut caps = WasmCapabilities::default();
-        caps.allow_stderr = true;
+        let caps = WasmCapabilities {
+            allow_stderr: true,
+            ..Default::default()
+        };
         let output = executor
             .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
             .await
@@ -549,8 +561,10 @@ mod tests {
         let wasm_bytes = wat::parse_str(wat).expect("valid wat");
         let executor = WasmExecutor::new().expect("WasmExecutor");
 
-        let mut caps = WasmCapabilities::default();
-        caps.max_wall_clock_ms = 50;
+        let caps = WasmCapabilities {
+            max_wall_clock_ms: 50,
+            ..Default::default()
+        };
 
         let result_timeout = executor
             .execute(&wasm_bytes, b"", &caps, Duration::from_secs(5))

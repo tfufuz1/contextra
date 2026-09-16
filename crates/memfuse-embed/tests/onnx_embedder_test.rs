@@ -17,6 +17,7 @@ fn fixture_path() -> PathBuf {
 static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_onnx_embedder_fixture_inference() {
     let _guard = TEST_MUTEX.lock().unwrap();
     let model_file = fixture_path();
@@ -45,6 +46,7 @@ async fn test_onnx_embedder_fixture_inference() {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_onnx_embedder_input_too_long() {
     let _guard = TEST_MUTEX.lock().unwrap();
     let model_file = fixture_path();
@@ -76,6 +78,7 @@ async fn test_onnx_embedder_input_too_long() {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_single_session_load_across_multiple_embed_calls() {
     let _guard = TEST_MUTEX.lock().unwrap();
     let model_file = fixture_path();
@@ -111,6 +114,7 @@ async fn test_single_session_load_across_multiple_embed_calls() {
 }
 
 #[tokio::test]
+#[allow(clippy::await_holding_lock)]
 async fn test_concurrent_embed_async_mutex_contention() {
     let _guard = TEST_MUTEX.lock().unwrap();
     let model_file = fixture_path();

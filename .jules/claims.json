@@ -7,6 +7,14 @@
       "session_id": "17855158604236717290",
       "active": true,
       "expires_at": "2026-09-16T22:41:49.112921010+00:00"
+    },
+    {
+      "krate": "memfuse-store",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-16T20:47:30.937313513+00:00",
+      "session_id": "17548987235771960954",
+      "active": true,
+      "expires_at": "2026-09-17T00:47:30.937293277+00:00"
     }
   ]
 }

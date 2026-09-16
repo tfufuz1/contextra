@@ -2834,12 +2834,11 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> memfuse_core::R
     ));
 
     // Find two keys that map to different shards
+    let locks = super::kv_lock::KvKeyLocks::new(64);
     let key_a = "key_0".to_string();
     let mut key_b = "key_1".to_string();
     let mut i = 0;
-    while super::kv_lock::KvKeyLocks::shard_idx(&key_a)
-        == super::kv_lock::KvKeyLocks::shard_idx(&key_b)
-    {
+    while locks.shard_idx(&key_a) == locks.shard_idx(&key_b) {
         i += 1;
         key_b = format!("key_{i}");
     }
