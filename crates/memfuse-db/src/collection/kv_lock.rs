@@ -1,6 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard};
 
 const KV_LOCK_SHARDS: usize = 16;
 
@@ -32,10 +32,18 @@ impl KvKeyLocks {
         }
     }
 
-    pub async fn lock_for<'a>(&'a self, key: &str) -> tokio::sync::MutexGuard<'a, ()> {
+    pub fn shard_idx(&self, key: &str) -> usize {
         let mut hasher = DefaultHasher::new();
         key.hash(&mut hasher);
-        let idx = (hasher.finish() as usize) % KV_LOCK_SHARDS;
+        (hasher.finish() as usize) % KV_LOCK_SHARDS
+    }
+
+    pub async fn lock_shard<'a>(&'a self, idx: usize) -> tokio::sync::MutexGuard<'a, ()> {
         self.shards[idx].lock().await
+    }
+
+    pub async fn lock_for<'a>(&'a self, key: &str) -> tokio::sync::MutexGuard<'a, ()> {
+        let idx = self.shard_idx(key);
+        self.lock_shard(idx).await
     }
 }

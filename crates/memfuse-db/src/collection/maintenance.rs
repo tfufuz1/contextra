@@ -155,7 +155,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// and reconciles them. This is critical for crash recovery.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn repair(&self) -> Result<()> {
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.consolidation_guard.lock().await;
         let mut repair_count = 0;
         let docs = self.storage.scan_prefix(&self.prefix).await?;
         // FIND-DB-004: Use doc_to_node map directly for O(1) lookup per DocId,
@@ -670,7 +670,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let user_bytes = serde_json::to_vec(&stored)?;
         let doc_bytes = serde_json::to_vec(&meta_only)?;
 
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.kv_locks.lock_for(doc_id).await;
         self.storage.put(tx, &user_key, &user_bytes).await?;
         self.storage.put(tx, &doc_key, &doc_bytes).await?;
         self.storage.commit(tx).await?;
@@ -773,7 +773,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Removes all data belonging to this collection from storage.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn drop_collection(&self) -> Result<()> {
-        let _guard = self.insert_lock.lock().await;
+        let _guard = self.consolidation_guard.lock().await;
         let prefix = if self.name == "default" {
             return Err(memfuse_core::MemFuseError::invalid_input(
                 "Cannot drop default collection",

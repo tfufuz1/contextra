@@ -535,7 +535,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         summary_content: &str,
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
-        let _guard = self.collection.insert_lock.lock().await;
+        let _guard = self.collection.consolidation_guard.lock().await;
 
         // 1. Strict OCC validation under lock
         self.validate_occ().await?;

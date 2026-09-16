@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: Sammlung/Collection-Namespace Verwaltung und gemeinsame Hilfsfunktionen.
 // INVARIANTEN: Strikte Isolation durch Präfixe; doc_keys (key_type=1) halten nur Metadaten (keine Vektoren).
-// NICHT-OFFENSICHTLICH: insert_lock schützt Mutationen zur Vermeidung von TOCTOU-Kollisionsrassen.
+// NICHT-OFFENSICHTLICH: kv_locks schützt Mutationen zur Vermeidung von TOCTOU-Kollisionsrassen auf Key-Ebene.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 //! Logically isolated Collections inside the MemFuse database.
@@ -231,11 +231,10 @@ pub(super) fn extract_text(metadata: &Option<serde_json::Value>) -> Option<Strin
 ///
 /// Lock acquisition within `Collection` follows strict ordering to prevent deadlocks:
 ///
-/// 1. `Collection::insert_lock` (`tokio::sync::Mutex`):
-///    Serializes mutations (`insert`, `update`, `delete`, `relate`, `repair`, `drop_collection`) and prevents
-///    TOCTOU races during `check_doc_id_collision`.
+/// 1. `Collection::kv_locks` (`KvKeyLocks`):
+///    Key-granular sharded locks protecting key-level mutations (`insert`, `update`, `delete`, `relate`).
 /// 2. `Collection::embedder` (`parking_lot::RwLock`):
-///    Read/write lock for the configured `TextEmbeddingEngine`. Never acquired before `insert_lock` if both are needed.
+///    Read/write lock for the configured `TextEmbeddingEngine`. Never acquired before `kv_locks` if both are needed.
 ///
 /// A logically isolated collection of documents (namespace).
 ///
@@ -251,7 +250,6 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) next_tx: Arc<AtomicU64>,
     pub(super) dimension: usize,
     pub(super) embedder: parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>,
-    pub(super) insert_lock: Arc<tokio::sync::Mutex<()>>,
     pub(super) consolidation_guard: Arc<tokio::sync::Mutex<()>>,
     pub(super) kv_locks: Arc<kv_lock::KvKeyLocks>,
     /// Optionaler tenant-isolierter KV-Cache-Store zur automatischen KV-Cache-Bereinigung bei Rollbacks.
@@ -281,7 +279,6 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             next_tx: self.next_tx.clone(),
             dimension: self.dimension,
             embedder: parking_lot::RwLock::new(self.embedder.read().as_ref().map(Arc::clone)),
-            insert_lock: self.insert_lock.clone(),
             consolidation_guard: self.consolidation_guard.clone(),
             kv_locks: self.kv_locks.clone(),
             kv_store: self.kv_store.clone(),
@@ -359,7 +356,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             next_tx,
             dimension,
             embedder: parking_lot::RwLock::new(None),
-            insert_lock: Arc::new(tokio::sync::Mutex::new(())),
             consolidation_guard: Arc::new(tokio::sync::Mutex::new(())),
             kv_locks: Arc::new(kv_lock::KvKeyLocks::new()),
             kv_store: None,
