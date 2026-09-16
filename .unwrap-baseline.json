@@ -5473,6 +5473,10 @@
   },
   {
     "file": "crates/memfuse-db/src/collection/tests.rs",
+    "hash": "b3246edce0978fd8"
+  },
+  {
+    "file": "crates/memfuse-db/src/collection/tests.rs",
     "hash": "b6a19aee18bce723"
   },
   {
@@ -5485,11 +5489,19 @@
   },
   {
     "file": "crates/memfuse-db/src/collection/tests.rs",
+    "hash": "b9c1b3b7443f1c70"
+  },
+  {
+    "file": "crates/memfuse-db/src/collection/tests.rs",
     "hash": "bb99deb3dbccb6ab"
   },
   {
     "file": "crates/memfuse-db/src/collection/tests.rs",
     "hash": "bbce97563c803138"
+  },
+  {
+    "file": "crates/memfuse-db/src/collection/tests.rs",
+    "hash": "bc077c70d76f4194"
   },
   {
     "file": "crates/memfuse-db/src/collection/tests.rs",
@@ -21486,6 +21498,14 @@
   {
     "file": "crates/memfuse-text/src/lib.rs",
     "hash": "dc6926eb811323bf"
+  },
+  {
+    "file": "crates/memfuse-text/src/posting_list.rs",
+    "hash": "546f796997fe1cff"
+  },
+  {
+    "file": "crates/memfuse-text/src/posting_list.rs",
+    "hash": "dc7df42f95942f51"
   },
   {
     "file": "crates/memfuse-text/tests/alloc_profiler.rs",

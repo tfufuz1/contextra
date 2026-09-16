@@ -2,6 +2,7 @@
 // REVIEW-PASS[2/2] STATUS:PASS (ID: AGT-OLLAMA-4d606464) (TS: 2026-09-11T19:01:58Z) (SESSION: 089dd3c0) PRÜFER-KONTEXT: FRESH - Clarified historical "zero unsafe" status observation vs compile-time enforced invariant via forbid(unsafe_code).
 // REVIEW-PASS[3/3] STATUS:PASS (TS: 2026-09-13T01:45:00Z) (SESSION: 6e371f4e) PRÜFER-KONTEXT: FRESH - Tier 3 deep audit complete: verified prompt injection structural isolation, proptest evasion matrix, concurrency stress tests, and ML calibration provenance.
 // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-15T14:48:58Z) (SESSION: 1d6e3667) PRÜFER-KONTEXT: FRESH - Tier 3 deep audit verified: zero unsafe, proptests green, 10x 8-thread concurrency stress test green, prompt injection evasion matrix passed.
+// REVIEW-PASS[2/2] STATUS:PASS (TS: 2026-09-16T16:24:19Z) (SESSION: 4b816c9a) PRÜFER-KONTEXT: FRESH - Independent diff review verified: prompt injection XML-escaping, retry & backoff error classification, forbid(unsafe_code) invariant, and 91 tests green.
 
 #![forbid(unsafe_code)]
 

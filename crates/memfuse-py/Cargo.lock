@@ -1413,6 +1413,7 @@ name = "memfuse-checkpoint"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "bytes",
  "dirs",
  "futures-executor",
  "memfuse-core",
@@ -1430,6 +1431,7 @@ dependencies = [
  "ahash",
  "bincode",
  "blake3",
+ "bytes",
  "flatbuffers",
  "futures-util",
  "memfuse-core-ipc-gen",
@@ -1478,6 +1480,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
+ "bytes",
  "libc",
  "memfuse-calibration",
  "memfuse-candle",
@@ -1609,6 +1612,7 @@ name = "memfuse-text"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "bytes",
  "itoa",
  "memfuse-core",
  "parking_lot",
