@@ -1,64 +1,12 @@
 {
   "claims": [
     {
-      "krate": "memfuse-calibration",
-      "issue": "JULES-20260916-MEMFUSECAL-REVIEW-6EZC",
-      "timestamp": "2026-09-16T16:55:13.071281548+00:00",
-      "session_id": "599173594810567336",
-      "active": false,
-      "expires_at": "2026-09-15T22:45:51.897370635+00:00",
-      "released_at": "2026-09-15T18:54:52.173782787+00:00"
-    },
-    {
-      "krate": "memfuse-mcp",
+      "krate": "memfuse-index",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-15T21:15:17.650922493+00:00",
-      "session_id": "5172984810570330285",
-      "active": false,
-      "expires_at": "2026-09-16T01:15:17.650904558+00:00",
-      "released_at": "2026-09-16T07:43:02.483773321+00:00 [TTL-EXPIRED]"
-    },
-    {
-      "krate": "memfuse-store",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-15T21:53:18.619398313+00:00",
-      "session_id": "6856992937740306897",
-      "active": false,
-      "expires_at": "2026-09-16T01:53:18.619382482+00:00",
-      "released_at": "2026-09-16T07:43:02.483773321+00:00 [TTL-EXPIRED]"
-    },
-    {
-      "krate": "memfuse-text",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-16T07:32:30.425072412+00:00",
-      "session_id": "11452926505971722802",
-      "active": false,
-      "expires_at": "2026-09-16T01:53:18.619382482+00:00",
-      "released_at": "2026-09-16T15:23:04.742425106+00:00 [TTL-EXPIRED]"
-    },
-    {
-      "krate": "memfuse-sandbox",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-16T07:11:08.494697740+00:00",
-      "session_id": "12782674859531231362",
-      "active": false,
-      "expires_at": "2026-09-16T11:11:08.494678646+00:00",
-      "released_at": "2026-09-16T15:23:04.742425106+00:00 [TTL-EXPIRED]"
-    },
-    {
-      "krate": "memfuse-store",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-16T15:52:33.065247306+00:00",
-      "session_id": "2575935384615743096",
+      "timestamp": "2026-09-16T18:42:19.273471421+00:00",
+      "session_id": "2728735376080494928",
       "active": true,
-      "expires_at": "2026-09-16T19:52:33.065233447+00:00"
-      "krate": "memfuse-crypto",
-      "issue": "JULES-20260916-MEMFUSECRY-REVIEW-0987",
-      "timestamp": "2026-09-16T16:14:50.806048405+00:00",
-      "session_id": "1320460701347053899",
-      "active": false,
-      "expires_at": "2026-09-16T20:14:50.806032771+00:00",
-      "released_at": "2026-09-16T16:29:23.699155243+00:00"
+      "expires_at": "2026-09-16T22:42:19.273458812+00:00"
     }
   ]
 }

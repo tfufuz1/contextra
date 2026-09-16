@@ -112,15 +112,14 @@ impl ScalarQuantizer {
         let mut maxes = vec![f32::MIN; dimension];
 
         if batch.len() >= 100 {
-            // Apply 0.5th / 99.5th percentile clipping to eliminate extreme training outliers
+            // Apply p_low / p_high percentile clipping to eliminate extreme training outliers
             // and preserve 8-bit quantization resolution for in-distribution values.
             for i in 0..dimension {
                 let mut dim_vals: Vec<f32> = batch.iter().map(|vec| vec[i]).collect();
                 dim_vals.sort_by(|a, b| a.total_cmp(b));
-                let low_idx = ((dim_vals.len() as f64) * 0.005).floor() as usize;
-                let high_idx = (((dim_vals.len() as f64) * 0.995).ceil() as usize)
-                    .saturating_sub(1)
-                    .min(dim_vals.len() - 1);
+                let max_idx = (dim_vals.len() - 1) as f64;
+                let low_idx = ((max_idx * p_low as f64).round() as usize).min(dim_vals.len() - 1);
+                let high_idx = ((max_idx * p_high as f64).round() as usize).min(dim_vals.len() - 1);
                 mins[i] = dim_vals[low_idx];
                 maxes[i] = dim_vals[high_idx];
             }
