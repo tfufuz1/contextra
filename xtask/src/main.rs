@@ -84,6 +84,7 @@ mod init_audit_fix;
 mod jules_preflight;
 mod jules_submit_gate;
 mod lint_unsafe_slice_bounds;
+mod migrate_docid_128;
 mod record_mutation_score;
 mod validate_pr_checklist;
 
@@ -2630,6 +2631,12 @@ fn main() {
                     eprintln!("❌ check-coverage-gate error: {}", e);
                     process::exit(1);
                 }
+            }
+        }
+        "migrate-docid-128" => {
+            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+            if !migrate_docid_128::run_cli(extra_args) {
+                process::exit(1);
             }
         }
         other => {

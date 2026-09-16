@@ -11,8 +11,8 @@
 #[cfg(feature = "coherence-bonus-fusion")]
 use memfuse_db::fusion::{apply_resonance_bonus, ResonanceConfig};
 use memfuse_db::fusion::{
-    build_provenance, reciprocal_rank_fusion, weighted_reciprocal_rank_fusion,
-    weighted_reciprocal_rank_fusion_with_options, MetadataMergePriority,
+    reciprocal_rank_fusion, weighted_reciprocal_rank_fusion,
+    weighted_reciprocal_rank_fusion_with_options, MetadataMergePriority, ProvenanceBuilder,
 };
 use memfuse_db::SearchResult;
 use proptest::prelude::*;
@@ -415,22 +415,12 @@ fn test_k_parameter_zero_boundary_permitted() {
     let k_zero = 0.0f32;
     let rank = 1u32;
     let weight = 1.0f32;
-    let prov = build_provenance(
-        Some(0.95),
-        Some(rank),
-        Some(weight),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        k_zero,
-        Some("test_col".to_string()),
-        Some("hnsw".to_string()),
-        Some(1.0),
-    );
+    let prov = ProvenanceBuilder::new(k_zero)
+        .vector(0.95, rank, weight)
+        .source_collection("test_col")
+        .index_type("hnsw")
+        .expected_total(1.0)
+        .build();
     let contrib = prov
         .signal_contributions
         .get("vector")
@@ -447,22 +437,12 @@ fn test_k_parameter_minimal_positive_boundary() {
     // Hand calculation: 1.0 / (0.001 + 1.0) ≈ 0.999000999
     let expected_contrib = weight / (k_min + rank as f32);
 
-    let prov = build_provenance(
-        Some(0.95),
-        Some(rank),
-        Some(weight),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        k_min,
-        Some("test_col".to_string()),
-        Some("hnsw".to_string()),
-        Some(expected_contrib),
-    );
+    let prov = ProvenanceBuilder::new(k_min)
+        .vector(0.95, rank, weight)
+        .source_collection("test_col")
+        .index_type("hnsw")
+        .expected_total(expected_contrib)
+        .build();
 
     let contrib = prov
         .signal_contributions
@@ -489,39 +469,9 @@ fn test_k_parameter_minimal_positive_boundary() {
 fn test_k_parameter_very_large_score_convergence() {
     let k_large = 1_000_000.0f32;
 
-    let prov1 = build_provenance(
-        Some(0.9),
-        Some(1),
-        Some(1.0),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        k_large,
-        None,
-        None,
-        None,
-    );
+    let prov1 = ProvenanceBuilder::new(k_large).vector(0.9, 1, 1.0).build();
 
-    let prov2 = build_provenance(
-        Some(0.8),
-        Some(2),
-        Some(1.0),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        k_large,
-        None,
-        None,
-        None,
-    );
+    let prov2 = ProvenanceBuilder::new(k_large).vector(0.8, 2, 1.0).build();
 
     let score1 = prov1
         .signal_contributions

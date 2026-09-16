@@ -514,7 +514,7 @@ mod tests {
             let res = buffer.stage_bounded(
                 tx,
                 IndexOp::Insert {
-                    doc_id: DocId::new(i),
+                    doc_id: DocId::from(i as u64),
                     data: format!("data_{i}"),
                 },
             );
@@ -524,7 +524,7 @@ mod tests {
         let result = buffer.stage_bounded(
             tx,
             IndexOp::Insert {
-                doc_id: DocId::new(99),
+                doc_id: DocId::from(99u64),
                 data: "overflow".to_string(),
             },
         );
@@ -540,7 +540,7 @@ mod tests {
             let res = buffer.stage(
                 tx,
                 IndexOp::Insert {
-                    doc_id: DocId::new(i),
+                    doc_id: DocId::from(i as u64),
                     data: format!("data_{i}"),
                 },
             );
@@ -557,11 +557,11 @@ mod tests {
 
         let ops = vec![
             IndexOp::Insert {
-                doc_id: DocId::new(1),
+                doc_id: DocId::from(1u64),
                 data: "op1".to_string(),
             },
             IndexOp::Insert {
-                doc_id: DocId::new(2),
+                doc_id: DocId::from(2u64),
                 data: "op2".to_string(),
             },
         ];
@@ -584,15 +584,15 @@ mod tests {
 
         let ops = vec![
             IndexOp::Insert {
-                doc_id: DocId::new(1),
+                doc_id: DocId::from(1u64),
                 data: "op1".to_string(),
             },
             IndexOp::Insert {
-                doc_id: DocId::new(2),
+                doc_id: DocId::from(2u64),
                 data: "op2".to_string(),
             },
             IndexOp::Insert {
-                doc_id: DocId::new(3),
+                doc_id: DocId::from(3u64),
                 data: "op3".to_string(),
             },
         ];
@@ -624,7 +624,7 @@ mod tests {
         let _ = buffer.stage(
             tx,
             IndexOp::Insert {
-                doc_id: DocId::new(1),
+                doc_id: DocId::from(1u64),
                 data: "data1".to_string(),
             },
         );
@@ -651,7 +651,7 @@ mod tests {
                     let _ = buffer.stage(
                         tx,
                         IndexOp::Insert {
-                            doc_id: DocId::new(i as u64),
+                            doc_id: DocId::from(i as u64),
                             data: i,
                         },
                     );
@@ -701,7 +701,7 @@ mod tests {
                 let _ = buffer.stage(
                     tx,
                     IndexOp::Insert {
-                        doc_id: DocId::new(i as u64),
+                        doc_id: DocId::from(i as u64),
                         data: format!("data_{i}"),
                     },
                 );
@@ -746,7 +746,7 @@ mod tests {
         let _ = buffer.stage(
             tx,
             IndexOp::Insert {
-                doc_id: DocId::new(1),
+                doc_id: DocId::from(1u64),
                 data: "s".to_string(),
             },
         );
@@ -769,7 +769,7 @@ mod tests {
             .stage_kv(
                 tx1,
                 IndexOp::Insert {
-                    doc_id: DocId::new(100),
+                    doc_id: DocId::from(100u64),
                     data: (key_a.clone(), val_a.clone()),
                 },
             )
@@ -784,16 +784,16 @@ mod tests {
     #[test]
     fn test_index_op_helpers() {
         let op = IndexOp::Insert {
-            doc_id: DocId::new(1),
+            doc_id: DocId::from(1u64),
             data: "d",
         };
-        assert_eq!(op.doc_id(), DocId::new(1));
+        assert_eq!(op.doc_id(), DocId::from(1u64));
 
         let op2 = IndexOp::Delete::<String> {
-            doc_id: DocId::new(2),
+            doc_id: DocId::from(2u64),
             data: None,
         };
-        assert_eq!(op2.doc_id(), DocId::new(2));
+        assert_eq!(op2.doc_id(), DocId::from(2u64));
     }
 
     #[test]
@@ -816,7 +816,7 @@ mod tests {
         let _ = buffer.stage(
             tx,
             IndexOp::Insert {
-                doc_id: DocId::new(1),
+                doc_id: DocId::from(1u64),
                 data: 0,
             },
         );
@@ -836,7 +836,7 @@ mod tests {
             // 1. Stage values for all unique TXs
             for &id in &tx_ids {
                 let tx = TxId::new(id);
-                let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::new(id), data: id });
+                let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(id), data: id });
             }
 
             // 2. Verify each TX only has its own data
@@ -846,7 +846,7 @@ mod tests {
                 for op in ops {
                     match op {
                         IndexOp::Insert { doc_id, data } => {
-                            prop_assert_eq!(doc_id.inner(), id);
+                            prop_assert_eq!(doc_id.inner() as u64, id);
                             prop_assert_eq!(data, id);
                         },
                         _ => panic!("Unexpected op"),
@@ -892,7 +892,7 @@ mod tests {
 
             // 1. Stage first batch
             for &val in &first_ops {
-                let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::new(val), data: val });
+                let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(val), data: val });
             }
 
             // 2. Drain and verify matching first batch
@@ -901,7 +901,7 @@ mod tests {
             for (idx, op) in drained1.into_iter().enumerate() {
                 match op {
                     IndexOp::Insert { doc_id, data } => {
-                        prop_assert_eq!(doc_id.inner(), first_ops[idx]);
+                        prop_assert_eq!(doc_id.inner() as u64, first_ops[idx]);
                         prop_assert_eq!(data, first_ops[idx]);
                     }
                     _ => panic!("Expected Insert"),
@@ -914,7 +914,7 @@ mod tests {
 
             // 4. Stage second batch
             for &val in &second_ops {
-                let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::new(val), data: val });
+                let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(val), data: val });
             }
 
             // 5. Drain and verify matching second batch exactly (no ghost leakage)
@@ -923,7 +923,7 @@ mod tests {
             for (idx, op) in drained2.into_iter().enumerate() {
                 match op {
                     IndexOp::Insert { doc_id, data } => {
-                        prop_assert_eq!(doc_id.inner(), second_ops[idx]);
+                        prop_assert_eq!(doc_id.inner() as u64, second_ops[idx]);
                         prop_assert_eq!(data, second_ops[idx]);
                     }
                     _ => panic!("Expected Insert"),
@@ -949,7 +949,7 @@ mod tests {
 
             for &id in &unique_txs {
                 let tx = TxId::new(id);
-                let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::new(id), data: id });
+                let _ = buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(id), data: id });
             }
 
             // Determine which to discard
@@ -976,7 +976,7 @@ mod tests {
                     prop_assert_eq!(ops.len(), 1);
                     match &ops[0] {
                         IndexOp::Insert { doc_id, data } => {
-                            prop_assert_eq!(doc_id.inner(), id);
+                            prop_assert_eq!(doc_id.inner() as u64, id);
                             prop_assert_eq!(*data, id);
                         }
                         _ => panic!("Expected Insert"),

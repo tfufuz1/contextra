@@ -221,10 +221,22 @@ impl std::fmt::Display for CollectionId {
 }
 
 /// Internal document identifier.
+///
+/// Under the default configuration, `DocId` wraps a 64-bit primitive (`u64`).
+/// When feature `docid-128` is enabled (ADR-082), `DocId` wraps a 128-bit primitive (`u128`),
+/// using 16-byte BLAKE3 truncation for deterministic, stateless key hashing.
+#[cfg(not(feature = "docid-128"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct DocId(pub u64);
 
+#[cfg(feature = "docid-128")]
+/// Internal document identifier (128-bit variant).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[repr(C, align(16))]
+pub struct DocId(pub u128);
+
+#[cfg(not(feature = "docid-128"))]
 impl DocId {
     /// Maximum possible `DocId` value (`u64::MAX`).
     pub const MAX: Self = Self(u64::MAX);
@@ -277,8 +289,56 @@ impl DocId {
     }
 }
 
+#[cfg(feature = "docid-128")]
+impl DocId {
+    /// Maximum possible `DocId` value (`u128::MAX`).
+    pub const MAX: Self = Self(u128::MAX);
+    /// Minimum possible `DocId` value (`0`).
+    pub const MIN: Self = Self(0);
+
+    /// Creates a new `DocId` wrapping the provided `u128` identifier.
+    #[inline]
+    pub const fn new(id: u128) -> Self {
+        Self(id)
+    }
+
+    /// Returns the inner raw `u128` identifier.
+    #[inline]
+    pub const fn inner(self) -> u128 {
+        self.0
+    }
+
+    /// Returns the lower 64 bits of the identifier for backwards compatibility.
+    #[inline]
+    pub const fn as_u64(self) -> u64 {
+        self.0 as u64
+    }
+
+    /// Derives a 128-bit `DocId` from a string key using the first 16 bytes (128 bits) of its BLAKE3 hash.
+    ///
+    /// # ADR-082 128-Bit BLAKE3 Truncation
+    /// BLAKE3-128 is a deterministic, stateless function of the original key.
+    /// Unlike UUIDv7, it requires no stateful key-to-ID mapping table and preserves
+    /// collision probability p(k) ≈ 10^-15 at 1 trillion documents.
+    pub fn from_key(key: &str) -> Result<Self> {
+        if key.is_empty() {
+            return Err(MemFuseError::InvalidInput(
+                "Key cannot be empty".to_string(),
+            ));
+        }
+        Ok(Self(hash_key_u128(key)))
+    }
+}
+
 impl From<u64> for DocId {
     fn from(id: u64) -> Self {
+        Self(id as _)
+    }
+}
+
+#[cfg(feature = "docid-128")]
+impl From<u128> for DocId {
+    fn from(id: u128) -> Self {
         Self(id)
     }
 }
@@ -321,7 +381,7 @@ impl EntityId {
 
     /// Creates an `EntityId` directly from a `DocId`.
     pub fn from_doc_id(doc_id: DocId) -> Self {
-        Self(doc_id.inner())
+        Self(doc_id.inner() as u64)
     }
 
     /// Derives an `EntityId` from a string key using the first 8 bytes of its BLAKE3 hash.
@@ -333,7 +393,7 @@ impl EntityId {
     /// If you need the old infallible behaviour (parse-as-u64 or hash), use `EntityId::from(key)` directly.
     /// Prefer this fallible variant for consistency with `DocId` at API boundaries.
     pub fn from_key(key: &str) -> Result<Self> {
-        DocId::from_key(key).map(|d| Self(d.inner()))
+        DocId::from_key(key).map(|d| Self(d.inner() as u64))
     }
 }
 
@@ -349,6 +409,15 @@ fn hash_key_u64(s: &str) -> u64 {
     let mut buf = [0u8; 8];
     buf.copy_from_slice(&hash.as_bytes()[..8]);
     u64::from_le_bytes(buf)
+}
+
+#[inline]
+#[allow(dead_code)]
+fn hash_key_u128(s: &str) -> u128 {
+    let hash = blake3::hash(s.as_bytes());
+    let mut buf = [0u8; 16];
+    buf.copy_from_slice(&hash.as_bytes()[..16]);
+    u128::from_le_bytes(buf)
 }
 
 impl From<&str> for EntityId {
@@ -959,6 +1028,21 @@ impl MemoryType {
     }
 }
 
+/// Selection of algorithm strategy for Personalized PageRank (PPR).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PprAlgorithm {
+    /// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise).
+    #[default]
+    Auto,
+    /// Dense power-iteration algorithm (matrix-vector multiplication over full graph vector).
+    DensePowerIteration,
+    /// Andersen-Chung-Lang Forward-Push local random walk algorithm.
+    ForwardPush,
+    /// Shadow mode: executes both algorithms, returns DensePowerIteration result, and logs discrepancies.
+    ShadowMode,
+}
+
 /// Configuration parameters for Personalized PageRank (PPR).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PprConfig {
@@ -968,6 +1052,9 @@ pub struct PprConfig {
     pub max_iterations: u32,
     /// L1 norm threshold for early termination convergence check. Default: 1e-6.
     pub convergence_epsilon: f32,
+    /// Algorithm strategy variant (Auto, DensePowerIteration, ForwardPush, ShadowMode). Default: Auto.
+    #[serde(default)]
+    pub algorithm: PprAlgorithm,
     /// Gibt eine nicht-konvergierte Warnung (tracing::warn!) aus, wenn
     /// max_iterations erreicht wird, bevor convergence_epsilon
     /// unterschritten wurde. Kein Fehler — die Berechnung liefert das
@@ -986,6 +1073,7 @@ impl Default for PprConfig {
             damping_factor: 0.85,
             max_iterations: 100,
             convergence_epsilon: 1e-6,
+            algorithm: PprAlgorithm::Auto,
             warn_on_non_convergence: true,
         }
     }
@@ -1408,7 +1496,7 @@ mod tests {
             assert!(doc_id.inner() > 0);
             let entity_id =
                 EntityId::from_key(key).expect("multibyte unicode key should derive entity_id"); // expect #[cfg(test)]
-            assert_eq!(entity_id.inner(), doc_id.inner());
+            assert_eq!(entity_id.inner(), doc_id.inner() as u64);
         }
     }
 
@@ -1725,7 +1813,7 @@ mod tests {
 
     proptest::proptest! {
         fn prop_docid_serialization(id in proptest::num::u64::ANY) {
-            let doc = DocId::new(id);
+            let doc = DocId::new(id.into());
             let ser = serde_json::to_string(&doc).unwrap(); // unwrap
             let deser: DocId = serde_json::from_str(&ser).unwrap(); // unwrap
             prop_assert_eq!(doc, deser);

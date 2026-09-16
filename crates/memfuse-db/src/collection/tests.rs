@@ -2838,7 +2838,7 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> memfuse_core::R
     let key_a = "key_0".to_string();
     let mut key_b = "key_1".to_string();
     let mut i = 0;
-    while locks.shard_idx(&key_a) == locks.shard_idx(&key_b) {
+    while col.kv_locks.shard_idx(&key_a) == col.kv_locks.shard_idx(&key_b) {
         i += 1;
         key_b = format!("key_{i}");
     }
