@@ -2176,11 +2176,16 @@ fn main() {
                             violations.len()
                         );
                         for v in &violations {
-                            eprintln!("  {}:{}: [{}] {}", v.file_path, v.line_num, v.verdict_text, v.reason);
+                            eprintln!(
+                                "  {}:{}: [{}] {}",
+                                v.file_path, v.line_num, v.verdict_text, v.reason
+                            );
                         }
                         process::exit(1);
                     }
-                    println!("✅ check-audit-tool-evidence: all audit verdicts verified with evidence");
+                    println!(
+                        "✅ check-audit-tool-evidence: all audit verdicts verified with evidence"
+                    );
                 }
                 Err(e) => {
                     eprintln!("❌ check-audit-tool-evidence failed: {}", e);

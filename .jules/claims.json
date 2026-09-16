@@ -1,13 +1,12 @@
 {
   "claims": [
     {
-      "krate": "memfuse-core",
-      "issue": "JULES-20260916-MEMFUSECOR-PROCES-WBGW",
-      "timestamp": "2026-09-16T19:06:40.206284381+00:00",
-      "session_id": "17675307778573335437",
-      "active": false,
-      "expires_at": "2026-09-16T23:06:40.206251676+00:00",
-      "released_at": "2026-09-16T19:20:45.257660395+00:00"
+      "krate": "memfuse-index",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-16T18:41:49.112937483+00:00",
+      "session_id": "17855158604236717290",
+      "active": true,
+      "expires_at": "2026-09-16T22:41:49.112921010+00:00"
     }
   ]
 }

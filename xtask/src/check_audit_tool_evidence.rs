@@ -54,7 +54,11 @@ pub fn extract_audit_timestamp(content: &str) -> Option<DateTime<Utc>> {
     for line in content.lines() {
         if let Some(pos) = line.find("TS:") {
             let rest = line[pos + 3..].trim();
-            let ts_part = rest.split_whitespace().next().unwrap_or("").trim_matches(&['(', ')', ',', ';'][..]);
+            let ts_part = rest
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim_matches(&['(', ')', ',', ';'][..]);
             if let Ok(dt) = DateTime::parse_from_rfc3339(ts_part) {
                 return Some(dt.with_timezone(&Utc));
             }
@@ -101,7 +105,8 @@ pub fn run_check_audit_tool_evidence(root: &Path) -> Result<Vec<AuditEvidenceVio
             let line_num = line_idx + 1;
             let upper = line.to_uppercase();
 
-            let is_approved_verdict = (upper.contains("VERDICT:") && (upper.contains("GO") || upper.contains("APPROVED")))
+            let is_approved_verdict = (upper.contains("VERDICT:")
+                && (upper.contains("GO") || upper.contains("APPROVED")))
                 || upper.contains("VERDICT: GO")
                 || upper.contains("VERDICT: APPROVED")
                 || upper.contains("VERDICT: GO/APPROVED");
@@ -145,7 +150,10 @@ pub fn run_check_audit_tool_evidence(root: &Path) -> Result<Vec<AuditEvidenceVio
                         file_path: relative_path.clone(),
                         line_num,
                         verdict_text: line.trim().to_string(),
-                        reason: format!("Referenced evidence log '{}' does not exist", marker.log_path),
+                        reason: format!(
+                            "Referenced evidence log '{}' does not exist",
+                            marker.log_path
+                        ),
                     });
                 } else {
                     let log_content = fs::read_to_string(&log_full_path).unwrap_or_default();
