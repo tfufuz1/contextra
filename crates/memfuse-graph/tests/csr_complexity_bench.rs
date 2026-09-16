@@ -13,6 +13,7 @@ async fn bench_single_compaction_scaling() {
         // Create graph with very large rebuild_threshold so auto-compaction is not triggered during prep
         let graph = Arc::new(CsrGraph::with_config(CsrGraphConfig {
             rebuild_threshold: usize::MAX,
+            ..Default::default()
         }));
 
         // Populate committed entities and edges
@@ -76,7 +77,10 @@ async fn bench_amortized_1m_edge_inserts() {
     let total_inserts: usize = 1_000_000;
     let rebuild_threshold = 1000;
 
-    let graph = Arc::new(CsrGraph::with_config(CsrGraphConfig { rebuild_threshold }));
+    let graph = Arc::new(CsrGraph::with_config(CsrGraphConfig {
+        rebuild_threshold,
+        ..Default::default()
+    }));
 
     let num_nodes: u64 = 100_000; // 100k distinct nodes
     for i in 1..=num_nodes {

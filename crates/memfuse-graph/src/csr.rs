@@ -17,11 +17,12 @@
 
 use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
 use crate::GraphIndexExt;
+use arc_swap::ArcSwap;
 use memfuse_core::{
     BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
     StorageEngine, TxId,
 };
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 
 /// Edge type representation for CSR edges.
@@ -178,12 +179,15 @@ pub(crate) fn is_edge_visible_bitemporal(
 pub struct CsrGraphConfig {
     /// Rebuild threshold: max number of uncompacted pending edges in delta buffer before triggering an automatic full CSR rebuild.
     pub rebuild_threshold: usize,
+    /// Max compaction peak memory limit in MB (IP-08). Compaction will be deferred if current graph memory + rebuild allocation exceeds this threshold.
+    pub max_compaction_peak_memory_mb: Option<usize>,
 }
 
 impl Default for CsrGraphConfig {
     fn default() -> Self {
         Self {
             rebuild_threshold: 1000,
+            max_compaction_peak_memory_mb: Some(1024),
         }
     }
 }
@@ -216,6 +220,7 @@ struct StagedEdgePayload {
 }
 
 /// Inner state of the CsrGraph to manage contiguous storage.
+#[derive(Clone)]
 pub(crate) struct GraphInner {
     /// Mapping from public EntityId to internal contiguous index.
     pub(crate) id_map: HashMap<EntityId, InternalIndex>,
@@ -300,6 +305,21 @@ impl GraphInner {
             #[cfg(feature = "edge-reinforcement-learning")]
             edge_store: HashMap::new(),
         }
+    }
+
+    pub(crate) fn estimate_memory_bytes(&self) -> usize {
+        (self.reverse_map.len() * std::mem::size_of::<EntityId>())
+            + (self.entities.len() * std::mem::size_of::<Option<Entity>>())
+            + (self.offsets.len() * std::mem::size_of::<usize>())
+            + (self.targets.len() * std::mem::size_of::<usize>())
+            + (self.weights.len() * std::mem::size_of::<f32>())
+            + (self.tx_valid_froms.len() * std::mem::size_of::<Option<TxId>>())
+            + (self.tx_valid_tos.len() * std::mem::size_of::<Option<TxId>>())
+            + (self.business_valid_froms.len() * std::mem::size_of::<Option<i64>>())
+            + (self.business_valid_tos.len() * std::mem::size_of::<Option<i64>>())
+            + (self.source_doc_ids.len() * std::mem::size_of::<Option<DocId>>())
+            + (self.out_weight_sums.len() * std::mem::size_of::<f32>())
+            + (self.pending_edge_count * std::mem::size_of::<EdgePayload>())
     }
 
     fn get_or_create_index(&mut self, id: EntityId) -> InternalIndex {
@@ -648,12 +668,38 @@ impl GraphInner {
     }
 }
 
+/// RAII guard wrapping the writer mutex guard, automatically publishing updated `Arc<GraphInner>` snapshots to `ArcSwap` on drop.
+pub(crate) struct InnerWriteGuard<'a> {
+    guard: parking_lot::MutexGuard<'a, GraphInner>,
+    arc_swap: &'a ArcSwap<GraphInner>,
+}
+
+impl<'a> std::ops::Deref for InnerWriteGuard<'a> {
+    type Target = GraphInner;
+    fn deref(&self) -> &Self::Target {
+        &self.guard
+    }
+}
+
+impl<'a> std::ops::DerefMut for InnerWriteGuard<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.guard
+    }
+}
+
+impl<'a> Drop for InnerWriteGuard<'a> {
+    fn drop(&mut self) {
+        self.arc_swap.store(Arc::new((*self.guard).clone()));
+    }
+}
+
 /// Compressed Sparse Row graph for entity-relation traversal.
 ///
 /// Implements `GraphIndex` trait as Signal 3 in the 4-Signal Fusion architecture.
 pub struct CsrGraph {
     config: CsrGraphConfig,
-    inner: Arc<RwLock<GraphInner>>,
+    inner: Arc<ArcSwap<GraphInner>>,
+    write_state: Arc<Mutex<GraphInner>>,
     /// Optionaler Persistenz-Handle. None = reiner In-Memory-Modus (z.B. Tests).
     storage: Option<Arc<dyn StorageEngine>>,
     last_tx_id: AtomicU64,
@@ -672,9 +718,11 @@ impl CsrGraph {
 
     /// Creates a new, empty CSR graph with specified configuration.
     pub fn with_config(config: CsrGraphConfig) -> Self {
+        let initial = Arc::new(GraphInner::new());
         Self {
             config,
-            inner: Arc::new(RwLock::new(GraphInner::new())),
+            inner: Arc::new(ArcSwap::from(initial.clone())),
+            write_state: Arc::new(Mutex::new((*initial).clone())),
             storage: None,
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: None,
@@ -692,9 +740,11 @@ impl CsrGraph {
         config: CsrGraphConfig,
         storage: Arc<dyn StorageEngine>,
     ) -> Self {
+        let initial = Arc::new(GraphInner::new());
         Self {
             config,
-            inner: Arc::new(RwLock::new(GraphInner::new())),
+            inner: Arc::new(ArcSwap::from(initial.clone())),
+            write_state: Arc::new(Mutex::new((*initial).clone())),
             storage: Some(storage),
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: None,
@@ -704,9 +754,11 @@ impl CsrGraph {
 
     /// Erstellt CsrGraph mit aktiviertem ConsistencyEnforcer für Widerspruchsprävention (F-04/ADR-073).
     pub fn with_consistency_enforcer(suppression_threshold: u32) -> Self {
+        let initial = Arc::new(GraphInner::new());
         Self {
             config: CsrGraphConfig::default(),
-            inner: Arc::new(RwLock::new(GraphInner::new())),
+            inner: Arc::new(ArcSwap::from(initial.clone())),
+            write_state: Arc::new(Mutex::new((*initial).clone())),
             storage: None,
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: Some(RwLock::new(ConsistencyEnforcer::new(
@@ -728,13 +780,22 @@ impl CsrGraph {
         Ok(())
     }
 
-    pub(crate) fn inner_read(&self) -> parking_lot::RwLockReadGuard<'_, GraphInner> {
-        self.inner.read()
+    /// Read path contract for RCU snapshot isolation (IP-08):
+    /// Returns a lock-free reference `arc_swap::Guard<Arc<GraphInner>>` to the current `GraphInner` snapshot.
+    /// Readers never block on compaction or writer locks.
+    ///
+    /// # PPR Integration Contract
+    /// Downstream PPR algorithms (e.g. `ppr.rs`) consume this snapshot directly via `inner_read()`.
+    /// The returned `Arc<GraphInner>` snapshot is point-in-time immutable and guaranteed not to be mutated in-place.
+    pub(crate) fn inner_read(&self) -> arc_swap::Guard<Arc<GraphInner>> {
+        self.inner.load()
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn inner_write(&self) -> parking_lot::RwLockWriteGuard<'_, GraphInner> {
-        self.inner.write()
+    pub(crate) fn inner_write(&self) -> InnerWriteGuard<'_> {
+        InnerWriteGuard {
+            guard: self.write_state.lock(),
+            arc_swap: &self.inner,
+        }
     }
 
     /// Sets or replaces the persistent storage handle.
@@ -749,13 +810,13 @@ impl CsrGraph {
 
     /// Returns the optional source document ID stored at the given edge index in `source_doc_ids`.
     pub fn get_source_doc_id(&self, index: usize) -> Option<DocId> {
-        let inner = self.inner.read();
+        let inner = self.inner_read();
         inner.source_doc_ids.get(index).copied().flatten()
     }
 
     /// Returns the optional source document ID from which the edge (from, to) was derived.
     pub fn source_doc_id_at(&self, from: EntityId, to: EntityId) -> Option<DocId> {
-        let inner = self.inner.read();
+        let inner = self.inner_read();
 
         for ((_, staged_from), staged_vec) in inner.staged_edges.iter() {
             if *staged_from == from {
@@ -797,7 +858,7 @@ impl CsrGraph {
         edges: &[(EntityId, EntityId)],
         wal_tx: TxId,
     ) -> Result<(usize, Vec<(EntityId, EntityId)>, Vec<EntityId>)> {
-        let mut inner = self.inner.write();
+        let mut inner = self.inner_write();
         let mut newly_tombstoned = Vec::new();
         let mut affected_nodes_set = HashSet::new();
 
@@ -843,7 +904,7 @@ impl CsrGraph {
 
     /// Returns all edge IDs derived from the given source `DocId`.
     pub fn edges_for_doc(&self, doc_id: DocId) -> Vec<(EntityId, EntityId)> {
-        let inner = self.inner.read();
+        let inner = self.inner_read();
         let mut edges: HashSet<(EntityId, EntityId)> =
             inner.doc_to_edges.get(&doc_id).cloned().unwrap_or_default();
         for edge in self.doc_edge_index.edges_for_doc(doc_id) {
@@ -854,7 +915,7 @@ impl CsrGraph {
 
     /// Directly inserts an entity into the CSR graph without staging.
     pub fn insert_entity_direct(&self, entity: Entity) -> Result<()> {
-        let mut inner = self.inner.write();
+        let mut inner = self.inner_write();
         let idx = inner.get_or_create_index(entity.id);
         if idx >= inner.entities.len() {
             inner.entities.resize(idx + 1, None);
@@ -914,7 +975,7 @@ impl CsrGraph {
 
         // Phase 1: Edge einfügen (Write-Lock kurz halten, kein I/O)
         let needs_compact = {
-            let mut inner = self.inner.write();
+            let mut inner = self.inner_write();
             let from_idx = inner.get_or_create_index(from);
             let to_idx = inner.get_or_create_index(to);
             if let Some(doc_id) = source_doc_id {
@@ -1026,7 +1087,7 @@ impl CsrGraph {
 
     /// Fügt eine Entity direkt ein (für load_from_storage).
     fn load_entity_direct(&self, entity: Entity) -> Result<()> {
-        let mut inner = self.inner.write();
+        let mut inner = self.inner_write();
         let idx = inner.get_or_create_index(entity.id);
         while inner.entities.len() <= idx {
             inner.entities.push(None);
@@ -1054,7 +1115,7 @@ impl CsrGraph {
                 "Invalid edge weight {weight}: weight must be finite and non-negative"
             )));
         }
-        let mut inner = self.inner.write();
+        let mut inner = self.inner_write();
         let from_idx = inner.get_or_create_index(from);
         let to_idx = inner.get_or_create_index(to);
         if let Some(doc_id) = source_doc_id {
@@ -1308,7 +1369,7 @@ impl CsrGraph {
         let community_entries = storage.scan_prefix(GRAPH_COMMUNITY_PREFIX).await?;
         let mut community_count = 0usize;
         {
-            let mut inner = graph.inner.write();
+            let mut inner = graph.inner_write();
             inner.communities_loaded = true;
             for (raw_key, raw_value) in community_entries {
                 if let Some(key_payload) = raw_key.get(GRAPH_COMMUNITY_PREFIX.len()..) {
@@ -1336,18 +1397,18 @@ impl CsrGraph {
     /// Force compacts the graph delta buffer into the main CSR arrays to optimize traversal layout.
     pub fn compact(&self) {
         // Double-checked locking to avoid unnecessary write locks (FIND-GRA-002)
-        let inner_read = self.inner.read();
-        let num_nodes = inner_read.reverse_map.len();
-        if !inner_read.is_dirty
-            && inner_read.pending_edges.is_empty()
-            && inner_read.tombstoned_edges.is_empty()
-            && inner_read.offsets.len() == num_nodes + 1
+        let snapshot = self.inner.load();
+        let num_nodes = snapshot.reverse_map.len();
+        if !snapshot.is_dirty
+            && snapshot.pending_edges.is_empty()
+            && snapshot.tombstoned_edges.is_empty()
+            && snapshot.offsets.len() == num_nodes + 1
         {
             return;
         }
-        drop(inner_read);
+        drop(snapshot);
 
-        let mut inner = self.inner.write();
+        let mut inner = self.inner_write();
         let num_nodes = inner.reverse_map.len();
         if inner.is_dirty
             || !inner.pending_edges.is_empty()
@@ -1360,21 +1421,37 @@ impl CsrGraph {
 
     /// Asynchronously compacts the graph delta buffer, offloading heavy CPU rebuild work to `spawn_blocking` if necessary.
     pub async fn compact_async(&self) -> Result<()> {
-        let is_needed = {
-            let inner_read = self.inner.read();
-            let num_nodes = inner_read.reverse_map.len();
-            inner_read.is_dirty
-                || !inner_read.pending_edges.is_empty()
-                || !inner_read.tombstoned_edges.is_empty()
-                || inner_read.offsets.len() != num_nodes + 1
-        };
+        let snapshot = self.inner.load();
+        let num_nodes = snapshot.reverse_map.len();
+        let is_needed = snapshot.is_dirty
+            || !snapshot.pending_edges.is_empty()
+            || !snapshot.tombstoned_edges.is_empty()
+            || snapshot.offsets.len() != num_nodes + 1;
+
         if !is_needed {
             return Ok(());
         }
 
-        let inner = self.inner.clone();
+        if let Some(max_mb) = self.config.max_compaction_peak_memory_mb {
+            let estimated_bytes = snapshot.estimate_memory_bytes();
+            let estimated_peak_bytes = estimated_bytes * 2;
+            let max_bytes = max_mb * 1024 * 1024;
+            if estimated_peak_bytes > max_bytes {
+                tracing::warn!(
+                    estimated_peak_mb = estimated_peak_bytes / (1024 * 1024),
+                    max_compaction_peak_memory_mb = max_mb,
+                    "compact_async deferred due to compaction memory budget constraint"
+                );
+                // TODO(IP-08-BUDGET-COUPLING): Connect to global ResourceTracker when cross-crate tracker handle is integrated.
+                return Ok(());
+            }
+        }
+
+        let write_state = self.write_state.clone();
+        let arc_swap = self.inner.clone();
+
         tokio::task::spawn_blocking(move || {
-            let mut inner_writer = inner.write();
+            let mut inner_writer = write_state.lock();
             let num_nodes = inner_writer.reverse_map.len();
             if inner_writer.is_dirty
                 || !inner_writer.pending_edges.is_empty()
@@ -1382,6 +1459,7 @@ impl CsrGraph {
                 || inner_writer.offsets.len() != num_nodes + 1
             {
                 inner_writer.compact();
+                arc_swap.store(Arc::new(inner_writer.clone()));
             }
         })
         .await
@@ -1392,7 +1470,7 @@ impl CsrGraph {
 
     /// Sets community assignments in batch for in-memory graph index lookups.
     pub fn set_communities_batch(&self, assignments: &[crate::CommunityAssignment]) {
-        let mut inner = self.inner.write();
+        let mut inner = self.inner_write();
         for a in assignments {
             inner.communities.insert(a.entity_id, a.community_id);
         }
@@ -1405,7 +1483,7 @@ impl CsrGraph {
         entity_ids: &[EntityId],
     ) -> Result<HashMap<EntityId, u64>> {
         let (map, done) = {
-            let inner = self.inner.read();
+            let inner = self.inner_read();
             let mut map = HashMap::with_capacity(entity_ids.len());
             for &eid in entity_ids {
                 if let Some(&comm_id) = inner.communities.get(&eid) {
@@ -1422,7 +1500,7 @@ impl CsrGraph {
 
         if let Some(ref storage) = self.storage {
             let entries = storage.scan_prefix(GRAPH_COMMUNITY_PREFIX).await?;
-            let mut inner = self.inner.write();
+            let mut inner = self.inner_write();
             inner.communities_loaded = true;
             for (raw_key, raw_val) in entries {
                 if let Some(key_payload) = raw_key.get(GRAPH_COMMUNITY_PREFIX.len()..) {
@@ -1448,7 +1526,7 @@ impl CsrGraph {
 
     /// Returns direct 1-hop outgoing neighbors of `start`.
     pub async fn neighbors(&self, start: EntityId) -> Result<Vec<EntityId>> {
-        let inner = self.inner.read();
+        let inner = self.inner_read();
         let start_idx = match inner.id_map.get(&start) {
             Some(&idx) => idx,
             None => return Ok(Vec::new()),
@@ -1516,7 +1594,7 @@ impl CsrGraph {
         if let Err(err) = self.compact_async().await {
             tracing::warn!(error = %err, "compact_async failed during pagerank compaction");
         }
-        let inner = self.inner.read();
+        let inner = self.inner_read();
         let n = inner.reverse_map.len();
         if n == 0 {
             return HashMap::new();
@@ -1591,7 +1669,7 @@ impl CsrGraph {
             return HashSet::new();
         }
         let entity_ids: Vec<(usize, EntityId)> = {
-            let inner = self.inner.read();
+            let inner = self.inner_read();
             inner.reverse_map.iter().copied().enumerate().collect()
         };
         let mut deleted_indices = HashSet::new();
@@ -1625,18 +1703,18 @@ impl CsrGraph {
                 "compact_async failed during personalized_page_rank_with_context_async compaction"
             );
         }
-        let inner = self.inner.read();
+        let inner = self.inner_read();
         crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_view, ctx)
     }
 
     /// Returns the number of committed entities in the graph.
     pub fn entity_count(&self) -> usize {
-        self.inner.read().entities.iter().flatten().count()
+        self.inner_read().entities.iter().flatten().count()
     }
 
     /// Checks if a committed entity exists in the graph.
     pub fn entity_exists(&self, id: EntityId) -> bool {
-        let inner = self.inner.read();
+        let inner = self.inner_read();
         if let Some(&idx) = inner.id_map.get(&id) {
             inner.entities.get(idx).is_some_and(|e| e.is_some())
         } else {
@@ -1656,7 +1734,7 @@ impl CsrGraph {
 
     /// Returns the number of edges in the graph.
     pub fn edge_count(&self) -> usize {
-        let inner = self.inner.read();
+        let inner = self.inner_read();
         inner.targets.len()
             + inner.pending_edge_count
             + inner.staged_edges.values().map(|v| v.len()).sum::<usize>()
@@ -1672,7 +1750,7 @@ impl GraphIndexExt for CsrGraph {
     fn remove_entity<'a>(&'a self, tx: TxId, entity: EntityId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let (target_idx, outgoing_targets, incoming_sources) = {
-                let inner = self.inner.read();
+                let inner = self.inner_read();
                 let idx = match inner.id_map.get(&entity) {
                     Some(&i) => i,
                     None => return Ok(()),
@@ -1745,7 +1823,7 @@ impl GraphIndexExt for CsrGraph {
 
             // c. Den Knoten selbst aus inner.id_map entfernen
             {
-                let mut inner = self.inner.write();
+                let mut inner = self.inner_write();
                 inner.id_map.remove(&entity);
                 if target_idx < inner.entities.len() {
                     inner.entities[target_idx] = None;
@@ -1801,7 +1879,7 @@ impl GraphIndex for CsrGraph {
             // Lazy index allocation: Entity indices are assigned in commit(),
             // avoiding premature mutation of id_map/reverse_map on rollback.
             {
-                let mut inner = self.inner.write();
+                let mut inner = self.inner_write();
                 inner
                     .staged_entities
                     .insert((tx, entity.id), entity.clone());
@@ -1874,7 +1952,7 @@ impl GraphIndex for CsrGraph {
             // Internal indices via get_or_create_index are allocated only during commit(),
             // ensuring rollback does not leak entity indices into id_map/reverse_map.
             {
-                let mut inner = self.inner.write();
+                let mut inner = self.inner_write();
                 inner
                     .staged_edges
                     .entry((tx, edge.from))
@@ -1921,7 +1999,7 @@ impl GraphIndex for CsrGraph {
                     "compact_async failed during personalized_page_rank compaction"
                 );
             }
-            let inner = self.inner.read();
+            let inner = self.inner_read();
             Ok(crate::ppr::compute_ppr(
                 &inner,
                 seed_nodes,
@@ -1975,7 +2053,7 @@ impl GraphIndex for CsrGraph {
                 "traverse_at_bitemporal requested max_hops ({max_hops}) exceeds internal cap MAX_TRAVERSAL_HOPS ({MAX_TRAVERSAL_HOPS}); capping traversal depth"
             );
             }
-            let inner = self.inner.read();
+            let inner = self.inner_read();
             let start_idx = match inner.id_map.get(&start) {
                 Some(&idx) => idx,
                 None => return Ok(Vec::new()),
@@ -2142,7 +2220,7 @@ impl GraphIndex for CsrGraph {
 
             // Merge-read: read directly from both compacted CSR arrays AND uncompacted pending_edges delta buffer.
             // No full compact() call is required before traversal.
-            let inner = self.inner.read();
+            let inner = self.inner_read();
             let start_idx = match inner.id_map.get(&start) {
                 Some(&idx) => idx,
                 None => return Ok(Vec::new()), // Start node not in graph
@@ -2286,7 +2364,7 @@ impl GraphIndex for CsrGraph {
             );
             }
 
-            let mut inner = self.inner.write();
+            let mut inner = self.inner_write();
 
             // 1. Commit entities
             let mut tx_entities = Vec::new();
@@ -2406,7 +2484,7 @@ impl GraphIndex for CsrGraph {
             );
             }
             {
-                let mut inner = self.inner.write();
+                let mut inner = self.inner_write();
                 inner
                     .staged_removals
                     .entry(tx)
@@ -2443,7 +2521,7 @@ impl GraphIndex for CsrGraph {
 
     fn rollback<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            let mut inner = self.inner.write();
+            let mut inner = self.inner_write();
             inner.staged_entities.retain(|&(t, _), _| t != tx);
             inner.staged_edges.retain(|&(t, _), _| t != tx);
             inner.staged_removals.remove(&tx);
@@ -2469,7 +2547,7 @@ impl GraphIndex for CsrGraph {
 
     fn stats<'a>(&'a self) -> BoxFuture<'a, Result<GraphIndexStats>> {
         Box::pin(async move {
-            let inner = self.inner.read();
+            let inner = self.inner_read();
             let num_entities = inner.entities.iter().flatten().count();
             let num_edges = inner.targets.len()
                 + inner.pending_edge_count
@@ -2735,7 +2813,7 @@ mod tests {
 
         // Before compact(), reverse_map has 5 entities
         {
-            let inner = graph.inner.read();
+            let inner = graph.inner_read();
             assert_eq!(inner.reverse_map.len(), 5);
         }
 
@@ -2743,7 +2821,7 @@ mod tests {
 
         // After compact(), offsets length MUST equal reverse_map.len() + 1 = 6
         {
-            let inner = graph.inner.read();
+            let inner = graph.inner_read();
             assert_eq!(inner.reverse_map.len(), 5);
             assert_eq!(inner.offsets.len(), 6);
             assert_eq!(inner.offsets, vec![0, 0, 0, 0, 0, 0]);
@@ -2771,7 +2849,7 @@ mod tests {
         graph.commit(tx).await.unwrap(); // unwrap
 
         {
-            let inner = graph.inner.read();
+            let inner = graph.inner_read();
             assert!(inner.is_dirty);
             assert_eq!(inner.staged_edges.len(), 0);
             assert_eq!(inner.targets.len(), 0);
@@ -2780,7 +2858,7 @@ mod tests {
         graph.compact();
 
         {
-            let inner = graph.inner.read();
+            let inner = graph.inner_read();
             assert!(!inner.is_dirty);
             assert_eq!(inner.staged_edges.len(), 0);
             assert_eq!(inner.targets.len(), 1);
@@ -2796,6 +2874,7 @@ mod tests {
         // are correctly traversed without needing compact() call.
         let graph = CsrGraph::with_config(CsrGraphConfig {
             rebuild_threshold: 1000,
+            ..Default::default()
         });
         let tx = TxId::new(1);
 
@@ -2823,7 +2902,7 @@ mod tests {
 
         // Edge 1->2 is committed in pending_edges (uncompacted)
         {
-            let inner = graph.inner.read();
+            let inner = graph.inner_read();
             assert!(inner.is_dirty);
             assert_eq!(inner.pending_edge_count, 1);
             assert_eq!(inner.targets.len(), 0); // Not in CSR targets yet
@@ -3025,7 +3104,7 @@ mod tests {
         assert_eq!(stats.num_edges, 5);
 
         // Calculate expected memory based on implementation
-        let inner = graph.inner.read();
+        let inner = graph.inner_read();
         let expected_mem = (inner.reverse_map.len() * std::mem::size_of::<EntityId>())
             + (inner.entities.len() * std::mem::size_of::<Option<Entity>>())
             + (inner.offsets.len() * std::mem::size_of::<usize>())
@@ -3040,7 +3119,7 @@ mod tests {
         let graph = CsrGraph::new();
 
         {
-            let inner = graph.inner.read();
+            let inner = graph.inner_read();
             assert_eq!(inner.id_map.len(), 0);
             assert_eq!(inner.reverse_map.len(), 0);
         }
@@ -3057,7 +3136,7 @@ mod tests {
 
             graph.rollback(tx).await.unwrap(); // unwrap
 
-            let inner = graph.inner.read();
+            let inner = graph.inner_read();
             assert_eq!(
                 inner.id_map.len(),
                 0,
@@ -3130,7 +3209,7 @@ mod tests {
         graph.commit(tx_source_a).await.unwrap(); // unwrap
 
         // Nach Commit ist der Zustand deterministisch (letzte staged Entity gewinnt)
-        let inner = graph.inner.read();
+        let inner = graph.inner_read();
         let idx = inner.id_map.get(&EntityId::new(10)).unwrap(); // unwrap
         let entity = inner.entities[*idx].as_ref().unwrap(); // unwrap
         assert_eq!(&*entity.name, "EntityFromB");
@@ -3854,8 +3933,8 @@ mod tests {
             let rt = tokio::runtime::Builder::new_current_thread().build().unwrap(); // unwrap
             let res: std::result::Result<(), proptest::test_runner::TestCaseError> = rt.block_on(async {
                 let graph = CsrGraph::new();
-                let initial_id_len = graph.inner.read().id_map.len();
-                let initial_rev_len = graph.inner.read().reverse_map.len();
+                let initial_id_len = graph.inner_read().id_map.len();
+                let initial_rev_len = graph.inner_read().reverse_map.len();
 
                 for (i, (from_val, to_val)) in edge_specs.into_iter().enumerate() {
                     let tx = TxId::new(i as u64 + 1);
@@ -3863,7 +3942,7 @@ mod tests {
                     let _ = graph.add_edge(tx, edge).await;
                     let _ = graph.rollback(tx).await;
 
-                    let inner = graph.inner.read();
+                    let inner = graph.inner_read();
                     proptest::prop_assert_eq!(inner.id_map.len(), initial_id_len);
                     proptest::prop_assert_eq!(inner.reverse_map.len(), initial_rev_len);
                 }
@@ -3980,7 +4059,7 @@ mod tests {
                         let mut entities = std::collections::HashSet::new();
                         let mut active_edges = std::collections::HashSet::new();
 
-                        let inner = graph.inner.read();
+                        let inner = graph.inner_read();
                         let num_nodes = inner.reverse_map.len();
                         for i in 0..num_nodes {
                             if let Some(&id) = inner.reverse_map.get(i) {
@@ -4065,17 +4144,17 @@ mod tests {
         .unwrap(); // unwrap allowed
         graph.commit(tx).await.unwrap(); // unwrap allowed
 
-        assert!(graph.inner.read().is_dirty);
+        assert!(graph.inner_read().is_dirty);
 
         // compact_async on dirty graph
         graph.compact_async().await.unwrap(); // unwrap allowed
 
-        assert!(!graph.inner.read().is_dirty);
-        assert_eq!(graph.inner.read().targets.len(), 1);
+        assert!(!graph.inner_read().is_dirty);
+        assert_eq!(graph.inner_read().targets.len(), 1);
 
         // compact_async no-op on clean graph
         graph.compact_async().await.unwrap(); // unwrap allowed
-        assert!(!graph.inner.read().is_dirty);
+        assert!(!graph.inner_read().is_dirty);
     }
 
     #[tokio::test]
@@ -4095,6 +4174,7 @@ mod tests {
 
         let config = CsrGraphConfig {
             rebuild_threshold: 50,
+            ..Default::default()
         };
         let mut graph = CsrGraph::with_config_and_storage(config, storage.clone());
         assert!(graph.storage.is_some());
@@ -4374,7 +4454,7 @@ mod tests {
 
                 graph.compact();
 
-                let inner = graph.inner.read();
+                let inner = graph.inner_read();
 
                 // Invariant 1: offsets length must equal reverse_map length + 1 after compaction
                 proptest::prop_assert_eq!(inner.offsets.len(), inner.reverse_map.len() + 1);
@@ -4559,6 +4639,7 @@ mod tests {
         // Use a high rebuild_threshold to avoid repeated O(N) CSR compactions during setup
         let graph = Arc::new(CsrGraph::with_config(CsrGraphConfig {
             rebuild_threshold: 2_000_000,
+            ..Default::default()
         }));
         let start = EntityId::new(1);
         let hub = EntityId::new(2);
@@ -4780,6 +4861,183 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_rcu_snapshot_isolation_no_torn_reads() {
+        let graph = Arc::new(CsrGraph::new());
+        let tx = TxId::new(1);
+
+        for i in 1..=500 {
+            graph
+                .add_entity(tx, Entity::new(EntityId::new(i), format!("N{i}"), "Type"))
+                .await
+                .unwrap();
+        }
+        for i in 1..500 {
+            GraphIndex::add_edge(
+                graph.as_ref(),
+                tx,
+                Edge::new(EntityId::new(i), EntityId::new(i + 1), "rel").with_weight(1.0),
+            )
+            .await
+            .unwrap();
+        }
+        graph.commit(tx).await.unwrap();
+
+        // Reader acquires point-in-time RCU snapshot BEFORE compaction
+        let snapshot_v1 = graph.inner_read();
+        assert_eq!(snapshot_v1.entities.iter().flatten().count(), 500);
+
+        // Mutate graph with additional transaction
+        let tx2 = TxId::new(2);
+        for i in 501..=1000 {
+            graph
+                .add_entity(tx2, Entity::new(EntityId::new(i), format!("N{i}"), "Type"))
+                .await
+                .unwrap();
+        }
+        for i in 500..1000 {
+            GraphIndex::add_edge(
+                graph.as_ref(),
+                tx2,
+                Edge::new(EntityId::new(i), EntityId::new(i + 1), "rel").with_weight(1.0),
+            )
+            .await
+            .unwrap();
+        }
+        graph.commit(tx2).await.unwrap();
+        graph.compact(); // Trigger full CSR compaction
+
+        // Snapshot held by v1 MUST remain isolated on v1 state without torn reads
+        assert_eq!(snapshot_v1.entities.iter().flatten().count(), 500);
+
+        // New reader loads published post-compaction v2 snapshot
+        let snapshot_v2 = graph.inner_read();
+        assert_eq!(snapshot_v2.entities.iter().flatten().count(), 1000);
+    }
+
+    #[tokio::test]
+    async fn test_rcu_concurrent_readers_never_block_during_compaction() {
+        let graph = Arc::new(CsrGraph::with_config(CsrGraphConfig {
+            rebuild_threshold: 10,
+            ..Default::default()
+        }));
+
+        let setup_tx = TxId::new(1);
+        for i in 1..=200 {
+            graph
+                .add_entity(
+                    setup_tx,
+                    Entity::new(EntityId::new(i), format!("N{i}"), "Node"),
+                )
+                .await
+                .unwrap();
+        }
+        graph.commit(setup_tx).await.unwrap();
+
+        let stop_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let max_reader_load_nanos = Arc::new(AtomicU64::new(0));
+
+        // Spawn 8 parallel reader tasks
+        let mut reader_handles = Vec::new();
+        for _ in 0..8 {
+            let g = graph.clone();
+            let stop = stop_flag.clone();
+            let max_load = max_reader_load_nanos.clone();
+            reader_handles.push(tokio::spawn(async move {
+                while !stop.load(Ordering::Relaxed) {
+                    let start = std::time::Instant::now();
+                    let snapshot = g.inner_read();
+                    let load_duration_nanos = start.elapsed().as_nanos() as u64;
+                    max_load.fetch_max(load_duration_nanos, Ordering::Relaxed);
+
+                    // Traversal runs lock-free on snapshot
+                    let _ = g.traverse(EntityId::new(1), 2).await;
+                    drop(snapshot);
+                    tokio::task::yield_now().await;
+                }
+            }));
+        }
+
+        // Writer task continuously adds edges and triggers compact_async()
+        let g_writer = graph.clone();
+        let stop_writer = stop_flag.clone();
+        let writer_handle = tokio::spawn(async move {
+            let mut iter = 0u64;
+            while !stop_writer.load(Ordering::Relaxed) {
+                iter += 1;
+                let tx = TxId::new(10 + iter);
+                let src = EntityId::new((iter % 150) + 1);
+                let dst = EntityId::new(((iter * 3) % 150) + 1);
+                let _ = GraphIndex::add_edge(
+                    g_writer.as_ref(),
+                    tx,
+                    Edge::new(src, dst, "link").with_weight(0.9),
+                )
+                .await;
+                let _ = g_writer.commit(tx).await;
+                let _ = g_writer.compact_async().await;
+                tokio::task::yield_now().await;
+            }
+        });
+
+        // Run concurrent test loop for 2 seconds
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        stop_flag.store(true, Ordering::Relaxed);
+
+        for h in reader_handles {
+            h.await.unwrap();
+        }
+        writer_handle.await.unwrap();
+
+        let max_ns = max_reader_load_nanos.load(Ordering::Relaxed);
+        let max_ms = max_ns as f64 / 1_000_000.0;
+        println!(
+            "RCU ArcSwap::load max reader latency: {:.4} ms ({} ns)",
+            max_ms, max_ns
+        );
+
+        assert!(
+            max_ms < 5.0,
+            "RCU ArcSwap::load must remain lock-free (< 5.0 ms), got {:.4} ms",
+            max_ms
+        );
+    }
+
+    /// CONTRACT STUB: Demonstrates downstream PPR / Graph search access contract.
+    /// Follow-up agents updating `ppr.rs` or `search.rs` consume `graph.inner_read()`.
+    /// Read-your-own-write consistency requires inspecting both snapshot and uncompacted pending buffers.
+    #[tokio::test]
+    async fn test_ppr_read_contract_stub() {
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+        let id1 = EntityId::new(1);
+        let id2 = EntityId::new(2);
+
+        graph
+            .add_entity(tx, Entity::new(id1, "P1", "Person"))
+            .await
+            .unwrap();
+        graph
+            .add_entity(tx, Entity::new(id2, "P2", "Person"))
+            .await
+            .unwrap();
+        GraphIndex::add_edge(&graph, tx, Edge::new(id1, id2, "knows"))
+            .await
+            .unwrap();
+        graph.commit(tx).await.unwrap();
+
+        // PPR contract: inner_read() returns point-in-time immutable Guard<Arc<GraphInner>>
+        let snapshot = graph.inner_read();
+        assert_eq!(snapshot.entities.iter().flatten().count(), 2);
+        assert!(!snapshot.reverse_map.is_empty());
+
+        // Snapshot coerces to &GraphInner for PPR
+        fn consume_ppr_inner(inner: &GraphInner) -> usize {
+            inner.reverse_map.len()
+        }
+        assert_eq!(consume_ppr_inner(&snapshot), 2);
+    }
+
+    #[tokio::test]
     async fn test_source_doc_id_provenance_and_compact_isolation() {
         let graph = Arc::new(CsrGraph::new());
         let tx = TxId::new(1);
@@ -4863,7 +5121,7 @@ mod tests {
         assert!(!edges_doc200_post.contains(&(id1, id2)));
 
         // Verify parallel arrays source_doc_ids in GraphInner
-        let inner = graph.inner.read();
+        let inner = graph.inner_read();
         assert_eq!(inner.targets.len(), inner.source_doc_ids.len());
         for (idx, target_idx) in inner.targets.iter().enumerate() {
             let target_id = inner.reverse_map[*target_idx];
