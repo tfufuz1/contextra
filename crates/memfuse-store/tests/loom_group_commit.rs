@@ -1,14 +1,15 @@
-//! Loom-basierter Determinismus-Beweis für SEC-01: Race-Condition im Group-Commit-Leader bezüglich `last_hmac`.
+//! Loom-basierter Determinismus-Beweis für Lock-Handoff & Group-Commit-Reihenfolge.
+//! Nacharbeit zu Commit 694fa8c2: Richtige Lock-Reihenfolge (Lock-Handoff) und
+//! Verifikation der physischen WAL-Schreibreihenfolge.
+//!
 //! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
 
+#![allow(unexpected_cfgs)]
+
+use memfuse_core::{MemFuseError, TxId};
 use memfuse_store::wal::{PreparedBatch, Wal, WalOp};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-
-#[cfg(loom)]
-use loom::sync::Mutex;
-
-#[cfg(not(loom))]
-use std::sync::Mutex;
 
 struct GroupCommitRequest {
     _tx_id: u64,
@@ -21,75 +22,92 @@ struct PendingCommitQueue {
 }
 
 struct GroupCommitEngine {
-    commit_mutex: Mutex<()>,
-    pending_commit_queue: Mutex<Option<PendingCommitQueue>>,
+    commit_mutex: tokio::sync::Mutex<()>,
+    pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,
+    next_seq_no: AtomicU64,
+    prep_order: std::sync::Mutex<Vec<u64>>,
     wal: Wal,
 }
 
 impl GroupCommitEngine {
     fn new(wal: Wal) -> Self {
         Self {
-            commit_mutex: Mutex::new(()),
-            pending_commit_queue: Mutex::new(None),
+            commit_mutex: tokio::sync::Mutex::new(()),
+            pending_commit_queue: tokio::sync::Mutex::new(None),
+            next_seq_no: AtomicU64::new(1),
+            prep_order: std::sync::Mutex::new(Vec::new()),
             wal,
         }
     }
 
-    /// Nachbildung der Gruppen-Commit-Logik aus `lsm/mod.rs` & `lsm/group_commit.rs`
-    /// unter Verwendung der ECHTEN `Wal::prepare_batch` und `Wal::append_batch` Implementation.
-    async fn commit(&self, tx_id: u64) -> Result<(), memfuse_core::MemFuseError> {
-        // PHASE 1: WAL Entry vorbereiten
+    /// Nachbildung der echten Gruppen-Commit-Logik aus `lsm/mod.rs`
+    /// unter Verwendung der ECHTEN `commit_mutex` + `truncate_lock` Lock-Handoff-Reihenfolge.
+    async fn commit(&self, tx_id: u64) -> Result<(), MemFuseError> {
+        // PHASE 1: commit_mutex erwerben für Sequenz-Allokierung & Batch-Vorbereitung
+        let commit_lock = self.commit_mutex.lock().await;
+
+        let seq_no = self.next_seq_no.fetch_add(1, Ordering::SeqCst);
+        {
+            let mut order = self
+                .prep_order
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            order.push(tx_id);
+        }
+
         let op = WalOp::Put {
-            tx_id: memfuse_core::TxId::new(tx_id),
+            tx_id: TxId::new(tx_id),
             key: format!("key-{tx_id}").into_bytes(),
             value: b"val".to_vec(),
         };
-        let (batch, prev_hmac_snapshot) = self.wal.prepare_batch(vec![(op, tx_id)]).await?;
+        let (batch, prev_hmac_snapshot) = self.wal.prepare_batch(vec![(op, seq_no)]).await?;
 
-        // PHASE 2: Prüfen ob bereits eine Pending Queue existiert
-        let is_follower = {
-            let mut queue_guard = self
-                .pending_commit_queue
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
+        // PHASE 2: Group Commit Einreihung / Leader-Auswahl
+        let mut queue_guard = self.pending_commit_queue.lock().await;
 
-            if let Some(ref mut queue) = *queue_guard {
-                // Follower-Pfad: In bestehende Leader-Queue einreihen
-                let req = GroupCommitRequest {
-                    _tx_id: tx_id,
-                    batch: batch.clone(),
-                };
-                queue.requests.push(req);
-                true
-            } else {
-                // Leader-Pfad: Queue initialisieren
-                *queue_guard = Some(PendingCommitQueue {
-                    requests: Vec::new(),
-                    first_prev_hmac: prev_hmac_snapshot,
-                });
-                false
-            }
-        };
-
-        if is_follower {
+        if let Some(ref mut queue) = *queue_guard {
+            // Follower-Pfad: In bestehende Leader-Queue einreihen
+            let req = GroupCommitRequest {
+                _tx_id: tx_id,
+                batch: batch.clone(),
+            };
+            queue.requests.push(req);
+            drop(queue_guard);
+            drop(commit_lock);
             Ok(())
         } else {
-            // Leader-Pfad: Pending Queue konsolidieren
-            let (leader_batch, pending_queue) = {
-                let mut queue_guard = self
-                    .pending_commit_queue
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner());
-                let queue = queue_guard.take().expect("pending commit queue must exist");
-                (batch, queue)
-            };
+            // Leader-Pfad: Queue initialisieren und Leader-Rolle übernehmen
+            *queue_guard = Some(PendingCommitQueue {
+                requests: Vec::new(),
+                first_prev_hmac: prev_hmac_snapshot,
+            });
+            drop(queue_guard);
 
-            let mut combined_batch = leader_batch;
+            // Leader-Pfad: Pending Queue übernehmen
+            let mut queue_guard = self.pending_commit_queue.lock().await;
+            let pending_queue = queue_guard
+                .take()
+                .expect("pending commit queue must exist for leader");
+            drop(queue_guard);
+
+            let mut combined_batch = batch;
             for r in pending_queue.requests {
                 combined_batch.extend(r.batch);
             }
 
-            if let Err(e) = self.wal.append_batch(combined_batch).await {
+            // LOCK-HANDOFF (P0-A / Commit 694fa8c2):
+            // Acquire truncate_lock BEFORE dropping commit_mutex!
+            let truncate_guard = self.wal.truncate_lock.lock().await;
+            drop(commit_lock);
+
+            let append_res = self
+                .wal
+                .append_batch_locked(combined_batch, &truncate_guard)
+                .await;
+            drop(truncate_guard);
+
+            if let Err(e) = append_res {
+                let _commit_lock = self.commit_mutex.lock().await;
                 let _ = self
                     .wal
                     .restore_last_hmac(pending_queue.first_prev_hmac)
@@ -97,6 +115,8 @@ impl GroupCommitEngine {
                 return Err(e);
             }
 
+            // Re-acquire commit_mutex für Post-Commit Status-Updates / Visibility Advancement
+            let _commit_lock = self.commit_mutex.lock().await;
             Ok(())
         }
     }
@@ -108,7 +128,7 @@ fn test_loom_group_commit_last_hmac_race() {
     loom::model(|| {
         let rt = tokio::runtime::Builder::new_current_thread()
             .build()
-            .unwrap();
+            .expect("tokio runtime build failed");
 
         rt.block_on(async {
             let wal = Wal::open_loom();
@@ -128,6 +148,40 @@ fn test_loom_group_commit_last_hmac_race() {
 
             let final_hmac = engine.wal.last_hmac_snapshot().await;
             assert_ne!(final_hmac, [0u8; 32], "last_hmac must be updated");
+
+            let file_size = engine.wal.size();
+            let physical_seqs = Arc::new(std::sync::Mutex::new(Vec::new()));
+            let physical_seqs_clone = Arc::clone(&physical_seqs);
+
+            engine
+                .wal
+                .scan_entries_with_callback(file_size, move |seq, entry, _pos| {
+                    if let Ok(mut guard) = physical_seqs_clone.lock() {
+                        guard.push((seq, entry.tx_id().inner()));
+                    }
+                    true
+                })
+                .await
+                .expect("scan entries succeeds");
+
+            let written = physical_seqs
+                .lock()
+                .map(|g| g.clone())
+                .unwrap_or_default();
+            assert_eq!(
+                written.len(),
+                2,
+                "Exactly 2 physical entries must be written to WAL"
+            );
+
+            for window in written.windows(2) {
+                assert!(
+                    window[0].0 < window[1].0,
+                    "Physical WAL seq_no must strictly increase: {} vs {}",
+                    window[0].0,
+                    window[1].0
+                );
+            }
 
             let _ = engine.wal.rotate_and_seal().await;
         });
@@ -152,6 +206,57 @@ async fn test_loom_group_commit_last_hmac_race_non_loom() {
         res.expect("task panicked").expect("commit failed");
     }
 
+    // 1. Endzustand HMAC Prüfen
     let final_hmac = engine.wal.last_hmac_snapshot().await;
-    assert_ne!(final_hmac, [0u8; 32], "last_hmac must be updated");
+    assert_ne!(
+        final_hmac, [0u8; 32],
+        "last_hmac must be updated after group commit"
+    );
+
+    // 2. Physische Schreibreihenfolge per Wal::scan_entries_with_callback verifizieren
+    let file_size = engine.wal.size();
+    let physical_seqs = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let physical_seqs_clone = Arc::clone(&physical_seqs);
+
+    engine
+        .wal
+        .scan_entries_with_callback(file_size, move |seq, entry, _pos| {
+            if let Ok(mut guard) = physical_seqs_clone.lock() {
+                guard.push((seq, entry.tx_id().inner()));
+            }
+            true
+        })
+        .await
+        .expect("scan entries succeeds");
+
+    let written = physical_seqs
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default();
+    assert_eq!(
+        written.len(),
+        3,
+        "Exactly 3 physical entries must be written to WAL"
+    );
+
+    // Verifiziere monokausal aufsteigende seq_no-Folge
+    for window in written.windows(2) {
+        assert!(
+            window[0].0 < window[1].0,
+            "Physical WAL seq_no must strictly increase: {} vs {}",
+            window[0].0,
+            window[1].0
+        );
+    }
+
+    let prep_order = engine
+        .prep_order
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default();
+    assert_eq!(
+        prep_order.len(),
+        3,
+        "All 3 transactions must record preparation order"
+    );
 }

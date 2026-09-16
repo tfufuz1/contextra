@@ -32,16 +32,26 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-16T07:32:30.425072412+00:00",
       "session_id": "11452926505971722802",
-      "active": true,
-      "expires_at": "2026-09-16T01:53:18.619382482+00:00"
+      "active": false,
+      "expires_at": "2026-09-16T01:53:18.619382482+00:00",
+      "released_at": "2026-09-16T16:09:01.788030436+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-sandbox",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-16T07:11:08.494697740+00:00",
       "session_id": "12782674859531231362",
+      "active": false,
+      "expires_at": "2026-09-16T11:11:08.494678646+00:00",
+      "released_at": "2026-09-16T16:09:01.788030436+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-store",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-16T15:09:25.199837251+00:00",
+      "session_id": "10254216655117341336",
       "active": true,
-      "expires_at": "2026-09-16T11:11:08.494678646+00:00"
+      "expires_at": "2026-09-16T19:09:25.199815052+00:00"
     }
   ]
 }
