@@ -8,8 +8,8 @@ use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
 use memfuse_core::{
-    DocId, EntityId, FilterExpr, FusionWeights, GraphTraversalStrategy, MemoryType, Result,
-    StorageEngine, VectorIndex,
+    DocId, EntityId, FilterExpr, FusionStrategy, FusionWeights, GraphTraversalStrategy, MemoryType,
+    Result, StorageEngine, VectorIndex,
 };
 
 #[cfg(feature = "adaptive-candidate-pool-sizing")]
@@ -57,8 +57,10 @@ impl From<FusionWeights> for SignalWeights {
 /// Strategy for hybrid search and graph signal traversal.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SearchStrategy {
-    /// Reciprocal Rank Fusion (default fusion strategy).
+    /// Reciprocal Rank Fusion (default fusion strategy per ADR-003).
     Rrf,
+    /// Score-normalized fusion (CombSUM / Z-Score).
+    ScoreNormalized,
     /// Multi-hop BFS graph traversal strategy.
     Hops {
         /// Maximum traversal hop depth.
@@ -79,7 +81,9 @@ impl SearchStrategy {
     /// Converts `SearchStrategy` into core `GraphTraversalStrategy`.
     pub fn to_graph_strategy(&self) -> GraphTraversalStrategy {
         match self {
-            SearchStrategy::Rrf => GraphTraversalStrategy::Hops { max_hops: 3 },
+            SearchStrategy::Rrf | SearchStrategy::ScoreNormalized => {
+                GraphTraversalStrategy::Hops { max_hops: 3 }
+            }
             SearchStrategy::Hops { max_hops } => GraphTraversalStrategy::Hops {
                 max_hops: *max_hops,
             },
@@ -93,6 +97,15 @@ impl SearchStrategy {
                 max_hops: *max_hops,
                 sufficiency_threshold: *sufficiency_threshold,
             },
+        }
+    }
+
+    /// Converts `SearchStrategy` into core `FusionStrategy`.
+    pub fn to_fusion_strategy(&self) -> FusionStrategy {
+        match self {
+            SearchStrategy::Rrf => FusionStrategy::Rrf,
+            SearchStrategy::ScoreNormalized => FusionStrategy::ScoreNormalized,
+            _ => FusionStrategy::Rrf,
         }
     }
 }
@@ -133,6 +146,7 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     vector: Option<Vec<f32>>,
     k: Option<usize>,
     weights: Option<FusionWeights>,
+    fusion_strategy: Option<FusionStrategy>,
     strategy: Option<SearchStrategy>,
     filter: Option<FilterExpr>,
     anchor_entities: Option<Vec<EntityId>>,
@@ -162,6 +176,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             vector: None,
             k: None,
             weights: None,
+            fusion_strategy: None,
             strategy: None,
             filter: None,
             anchor_entities: None,
@@ -220,6 +235,12 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     /// Sets custom signal fusion weights directly using `FusionWeights`.
     pub fn fusion_weights(mut self, weights: FusionWeights) -> Self {
         self.weights = Some(weights);
+        self
+    }
+
+    /// Sets search fusion strategy (`FusionStrategy::Rrf` or `FusionStrategy::ScoreNormalized`).
+    pub fn fusion_strategy(mut self, strategy: FusionStrategy) -> Self {
+        self.fusion_strategy = Some(strategy);
         self
     }
 
@@ -363,6 +384,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         }
         self.strategy = Some(query.graph_strategy.clone().into());
         self.weights = Some(query.fusion_weights.clone());
+        self.fusion_strategy = Some(query.fusion_strategy);
         self.filter = query.filter.clone();
         self.same_community_as = query.same_community_as;
         self.memory_type_filter = query.memory_type_filter.clone();
@@ -387,6 +409,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         let _has_reranker = false;
 
         let fusion_weights = self.weights.unwrap_or_default();
+        let fusion_strategy = self
+            .fusion_strategy
+            .or_else(|| self.strategy.as_ref().map(|s| s.to_fusion_strategy()))
+            .unwrap_or_default();
 
         let hybrid_query = memfuse_core::HybridQuery {
             text_query: self.text.clone(),
@@ -402,6 +428,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                 .map(|s| s.to_graph_strategy())
                 .unwrap_or_default(),
             fusion_weights,
+            fusion_strategy,
             filter: self.filter.clone(),
             memory_type_filter: self.memory_type_filter.clone(),
             same_community_as: self.same_community_as,

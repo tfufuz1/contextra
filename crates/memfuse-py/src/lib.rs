@@ -49,7 +49,7 @@ const MIN_WORKER_THREADS: usize = 1;
 /// Prevents thread exhaustion attacks while accommodating high core-count systems.
 const MAX_WORKER_THREADS: usize = 256;
 
-// AI-TAG[FIX][PY-1] Clamp MEMFUSE_WORKER_THREADS to valid range [MIN_WORKER_THREADS, MAX_WORKER_THREADS] (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d)
+// AI-TAG[FIX][PY-1][RESOLVED] Clamp MEMFUSE_WORKER_THREADS to valid range [MIN_WORKER_THREADS, MAX_WORKER_THREADS] (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d)
 // Prevents Tokio Builder panic on worker_threads == 0 when MEMFUSE_WORKER_THREADS=0 is set in environment.
 /// Parses and clamps `MEMFUSE_WORKER_THREADS` environment variable to `[MIN_WORKER_THREADS, MAX_WORKER_THREADS]`.
 ///
@@ -77,7 +77,7 @@ pub struct PyRuntimeState {
     pub worker_threads: usize,
 }
 
-// AI-TAG[FIX][PY-2] Evaluate Result of module.setattr("_runtime_state", py_state) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d)
+// AI-TAG[FIX][PY-2][RESOLVED] Evaluate Result of module.setattr("_runtime_state", py_state) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d)
 // Propagates PyRuntimeError on failure instead of silently falling back or building duplicate runtimes.
 /// Retrieves or initializes the per-interpreter Tokio runtime attached to the `_memfuse` module state.
 ///
@@ -340,7 +340,7 @@ fn check_subinterpreter_guard(py: Python<'_>) -> PyResult<()> {
 // BEHOBEN: `std::panic::catch_unwind` in `run_blocking_ffi` intercepts panics in release builds, converting them into catchable PyRuntimeError exceptions without aborting CPython via SIGABRT.
 // Siehe docs/decisions/ADR-064-memfuse-py-separater-workspace-panic-strategie.md
 // für die vollständige Begründung dieser Workspace-Trennung.
-// AI-TAG[FIX][PY-3] Poison engine instance on caught panic (APM-PY-A) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d)
+// AI-TAG[FIX][PY-3][RESOLVED] Poison engine instance on caught panic (APM-PY-A) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d)
 // Checks poisoned AtomicBool prior to execution and sets poisoned = true when catch_unwind catches a panic.
 /// Safely executes a blocking closure across FFI boundaries with thread state release
 /// and panic containment to guarantee no Rust panic propagates across FFI boundaries into Python.
