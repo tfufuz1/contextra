@@ -169,8 +169,14 @@ async fn test_compaction_roundtrip() {
     let compact_res = storage.maybe_compact().await.expect("compact");
     assert!(compact_res, "Compaction should occur");
 
-    assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
-    assert_eq!(storage.get(b"key2").await.unwrap(), Some(bytes::Bytes::from_static(b"val2")));
+    assert_eq!(
+        storage.get(b"key1").await.unwrap(),
+        Some(bytes::Bytes::from_static(b"val1"))
+    );
+    assert_eq!(
+        storage.get(b"key2").await.unwrap(),
+        Some(bytes::Bytes::from_static(b"val2"))
+    );
 }
 
 #[tokio::test]

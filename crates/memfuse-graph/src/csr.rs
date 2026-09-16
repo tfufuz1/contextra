@@ -193,14 +193,14 @@ type InternalIndex = usize;
 
 /// Internal representation of an edge payload.
 #[derive(Debug, Clone, PartialEq)]
-struct EdgePayload {
-    target: InternalIndex,
-    weight: f32,
-    tx_valid_from: Option<TxId>,
-    tx_valid_to: Option<TxId>,
-    business_valid_from: Option<i64>,
-    business_valid_to: Option<i64>,
-    source_doc_id: Option<DocId>,
+pub(crate) struct EdgePayload {
+    pub(crate) target: InternalIndex,
+    pub(crate) weight: f32,
+    pub(crate) tx_valid_from: Option<TxId>,
+    pub(crate) tx_valid_to: Option<TxId>,
+    pub(crate) business_valid_from: Option<i64>,
+    pub(crate) business_valid_to: Option<i64>,
+    pub(crate) source_doc_id: Option<DocId>,
 }
 
 /// Staging representation of an edge before index allocation at commit time.
@@ -245,6 +245,8 @@ pub(crate) struct GraphInner {
     pub(crate) business_valid_tos: Vec<Option<i64>>,
     /// CSR source_doc_id array: contiguous list of optional source document IDs.
     pub(crate) source_doc_ids: Vec<Option<DocId>>,
+    /// Precomputed outgoing weight sums per internal node index.
+    pub(crate) out_weight_sums: Vec<f32>,
 
     /// Reverse lookup index mapping DocId to Set of EdgeId (EntityId, EntityId)
     pub(crate) doc_to_edges: ahash::AHashMap<DocId, HashSet<(EntityId, EntityId)>>,
@@ -256,7 +258,7 @@ pub(crate) struct GraphInner {
     /// Staging for edge removals not yet committed, grouped by TxId.
     staged_removals: ahash::AHashMap<TxId, Vec<(EntityId, EntityId)>>,
     /// Edges that have been committed but not yet compacted into CSR arrays (delta buffer).
-    pending_edges: HashMap<InternalIndex, Vec<EdgePayload>>,
+    pub(crate) pending_edges: HashMap<InternalIndex, Vec<EdgePayload>>,
     /// Tombstoned edges that have been removed and should be excluded during compaction and traversal.
     pub(crate) tombstoned_edges: HashSet<(InternalIndex, InternalIndex)>,
     /// Total number of uncompacted edges currently in `pending_edges`.
@@ -286,6 +288,7 @@ impl GraphInner {
             business_valid_froms: Vec::new(),
             business_valid_tos: Vec::new(),
             source_doc_ids: Vec::new(),
+            out_weight_sums: Vec::new(),
             doc_to_edges: ahash::AHashMap::new(),
             staged_entities: ahash::AHashMap::default(),
             staged_edges: ahash::AHashMap::default(),
@@ -306,11 +309,70 @@ impl GraphInner {
             let idx = self.reverse_map.len();
             self.id_map.insert(id, idx);
             self.reverse_map.push(id);
+            self.out_weight_sums.push(0.0);
             // entities vector should be kept in sync by add_entity,
             // but we might add an edge to an entity not yet added via add_entity.
             // In that case, we'll have a "shadow" entity.
             idx
         }
+    }
+
+    #[inline]
+    pub(crate) fn add_to_out_weight_sum(&mut self, node_idx: usize, weight: f32) {
+        if weight > 0.0 {
+            let num_nodes = self.reverse_map.len();
+            if self.out_weight_sums.len() < num_nodes {
+                self.out_weight_sums.resize(num_nodes, 0.0);
+            }
+            if node_idx < self.out_weight_sums.len() {
+                self.out_weight_sums[node_idx] += weight;
+            }
+        }
+    }
+
+    pub(crate) fn recompute_node_out_weight_sum(&mut self, node_idx: usize) {
+        let num_nodes = self.reverse_map.len();
+        if node_idx >= num_nodes {
+            return;
+        }
+        if self.out_weight_sums.len() < num_nodes {
+            self.out_weight_sums.resize(num_nodes, 0.0);
+        }
+        if !self.entities.get(node_idx).is_some_and(|e| e.is_some()) {
+            self.out_weight_sums[node_idx] = 0.0;
+            return;
+        }
+
+        let mut sum = 0.0f32;
+
+        if node_idx < self.offsets.len() - 1 {
+            let start = self.offsets[node_idx];
+            let end = self.offsets[node_idx + 1];
+            for j in start..end {
+                let target = self.targets[j];
+                let w = self.weights[j];
+                if !self.tombstoned_edges.contains(&(node_idx, target))
+                    && self.entities.get(target).is_some_and(|e| e.is_some())
+                    && w > 0.0
+                {
+                    sum += w;
+                }
+            }
+        }
+
+        if let Some(pending) = self.pending_edges.get(&node_idx) {
+            for edge in pending {
+                let target = edge.target;
+                if !self.tombstoned_edges.contains(&(node_idx, target))
+                    && self.entities.get(target).is_some_and(|e| e.is_some())
+                    && edge.weight > 0.0
+                {
+                    sum += edge.weight;
+                }
+            }
+        }
+
+        self.out_weight_sums[node_idx] = sum;
     }
 
     /// Compacts pending edges in the delta buffer into the main CSR arrays.
@@ -421,6 +483,26 @@ impl GraphInner {
         self.is_dirty = false;
         #[cfg(feature = "edge-reinforcement-learning")]
         self.edge_store.clear();
+
+        // Recompute out_weight_sums for all nodes during compaction
+        self.out_weight_sums.resize(num_nodes, 0.0);
+        for i in 0..num_nodes {
+            if !self.entities.get(i).is_some_and(|e| e.is_some()) {
+                self.out_weight_sums[i] = 0.0;
+                continue;
+            }
+            let start = self.offsets[i];
+            let end = self.offsets[i + 1];
+            let mut sum = 0.0f32;
+            for j in start..end {
+                let target = self.targets[j];
+                let w = self.weights[j];
+                if self.entities.get(target).is_some_and(|e| e.is_some()) && w > 0.0 {
+                    sum += w;
+                }
+            }
+            self.out_weight_sums[i] = sum;
+        }
     }
 }
 
@@ -571,7 +653,7 @@ impl GraphInner {
 /// Implements `GraphIndex` trait as Signal 3 in the 4-Signal Fusion architecture.
 pub struct CsrGraph {
     config: CsrGraphConfig,
-    inner: RwLock<GraphInner>,
+    inner: Arc<RwLock<GraphInner>>,
     /// Optionaler Persistenz-Handle. None = reiner In-Memory-Modus (z.B. Tests).
     storage: Option<Arc<dyn StorageEngine>>,
     last_tx_id: AtomicU64,
@@ -592,7 +674,7 @@ impl CsrGraph {
     pub fn with_config(config: CsrGraphConfig) -> Self {
         Self {
             config,
-            inner: RwLock::new(GraphInner::new()),
+            inner: Arc::new(RwLock::new(GraphInner::new())),
             storage: None,
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: None,
@@ -612,7 +694,7 @@ impl CsrGraph {
     ) -> Self {
         Self {
             config,
-            inner: RwLock::new(GraphInner::new()),
+            inner: Arc::new(RwLock::new(GraphInner::new())),
             storage: Some(storage),
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: None,
@@ -624,7 +706,7 @@ impl CsrGraph {
     pub fn with_consistency_enforcer(suppression_threshold: u32) -> Self {
         Self {
             config: CsrGraphConfig::default(),
-            inner: RwLock::new(GraphInner::new()),
+            inner: Arc::new(RwLock::new(GraphInner::new())),
             storage: None,
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: Some(RwLock::new(ConsistencyEnforcer::new(
@@ -857,6 +939,7 @@ impl CsrGraph {
                 });
             inner.pending_edge_count += 1;
             inner.is_dirty = true;
+            inner.add_to_out_weight_sum(from_idx, weight);
             inner.pending_edge_count >= self.config.rebuild_threshold
         }; // Write-Lock freigegeben
 
@@ -996,6 +1079,7 @@ impl CsrGraph {
             });
         inner.pending_edge_count += 1;
         inner.is_dirty = true;
+        inner.add_to_out_weight_sum(from_idx, weight);
         Ok(())
     }
 
@@ -1275,7 +1359,7 @@ impl CsrGraph {
     }
 
     /// Asynchronously compacts the graph delta buffer, offloading heavy CPU rebuild work to `spawn_blocking` if necessary.
-    pub async fn compact_async(self: &Arc<Self>) -> Result<()> {
+    pub async fn compact_async(&self) -> Result<()> {
         let is_needed = {
             let inner_read = self.inner.read();
             let num_nodes = inner_read.reverse_map.len();
@@ -1288,20 +1372,20 @@ impl CsrGraph {
             return Ok(());
         }
 
-        let self_clone = self.clone();
+        let inner = self.inner.clone();
         tokio::task::spawn_blocking(move || {
-            let mut inner = self_clone.inner.write();
-            let num_nodes = inner.reverse_map.len();
-            if inner.is_dirty
-                || !inner.pending_edges.is_empty()
-                || !inner.tombstoned_edges.is_empty()
-                || inner.offsets.len() != num_nodes + 1
+            let mut inner_writer = inner.write();
+            let num_nodes = inner_writer.reverse_map.len();
+            if inner_writer.is_dirty
+                || !inner_writer.pending_edges.is_empty()
+                || !inner_writer.tombstoned_edges.is_empty()
+                || inner_writer.offsets.len() != num_nodes + 1
             {
-                inner.compact();
+                inner_writer.compact();
             }
         })
         .await
-        .map_err(|e| MemFuseError::Internal(format!("Graph compact panicked: {e}")))?;
+        .map_err(|e| MemFuseError::Internal(format!("compact_async spawn_blocking error: {e}")))?;
 
         Ok(())
     }
@@ -1420,13 +1504,18 @@ impl CsrGraph {
     }
 
     /// Calculates PageRank for all entities in the graph using the CSR layout.
-    pub fn pagerank(
+    pub async fn pagerank(
         &self,
         damping_factor: f32,
         max_iterations: usize,
         tolerance: f32,
     ) -> HashMap<EntityId, f32> {
-        self.compact();
+        // Befund 2.1: compact_async() offloads CPU work if compaction is needed.
+        // NOTE: This is an intermediate mitigation preventing Tokio runtime stalls during O(V+E) rebuilds;
+        // exclusive write-lock scoping remains open for IP-08.
+        if let Err(err) = self.compact_async().await {
+            tracing::warn!(error = %err, "compact_async failed during pagerank compaction");
+        }
         let inner = self.inner.read();
         let n = inner.reverse_map.len();
         if n == 0 {
@@ -1527,7 +1616,15 @@ impl CsrGraph {
         ctx: &mut crate::PprContext,
     ) -> Vec<(EntityId, f32)> {
         let deleted_view = self.deleted_view().await;
-        self.compact();
+        // Befund 2.1: compact_async() offloads CPU work if compaction is needed.
+        // NOTE: This is an intermediate mitigation preventing Tokio runtime stalls during O(V+E) rebuilds;
+        // exclusive write-lock scoping remains open for IP-08.
+        if let Err(err) = self.compact_async().await {
+            tracing::warn!(
+                error = %err,
+                "compact_async failed during personalized_page_rank_with_context_async compaction"
+            );
+        }
         let inner = self.inner.read();
         crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_view, ctx)
     }
@@ -1816,7 +1913,14 @@ impl GraphIndex for CsrGraph {
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
             let deleted_view = self.deleted_view().await;
-            self.compact();
+            // Befund 2.1: Call compact_async() to prevent Tokio runtime stalls during O(V+E) rebuilds.
+            // NOTE: Intermediate mitigation; exclusive write-lock scoping remains open for IP-08.
+            if let Err(err) = self.compact_async().await {
+                tracing::warn!(
+                    error = %err,
+                    "compact_async failed during personalized_page_rank compaction"
+                );
+            }
             let inner = self.inner.read();
             Ok(crate::ppr::compute_ppr(
                 &inner,
@@ -2240,6 +2344,9 @@ impl GraphIndex for CsrGraph {
                             source_doc_id: edge.source_doc_id,
                         });
                     }
+                    for edge in &converted_edges {
+                        inner.add_to_out_weight_sum(from_idx, edge.weight);
+                    }
                     let count = converted_edges.len();
                     inner
                         .pending_edges
@@ -2262,6 +2369,7 @@ impl GraphIndex for CsrGraph {
                         }
                         inner.tombstoned_edges.insert((f_idx, t_idx));
                         inner.is_dirty = true;
+                        inner.recompute_node_out_weight_sum(f_idx);
                     }
                 }
             }
@@ -3312,7 +3420,7 @@ mod tests {
             .unwrap(); // unwrap
         graph.commit(tx).await.unwrap(); // unwrap
 
-        let ranks = graph.pagerank(0.85, 100, 1e-6);
+        let ranks = graph.pagerank(0.85, 100, 1e-6).await;
         assert_eq!(ranks.len(), 3);
 
         let r1 = ranks[&EntityId::new(1)];
@@ -4202,11 +4310,11 @@ mod tests {
         assert!(matches!(err_time, MemFuseError::InvalidInput(_)));
     }
 
-    #[test]
+    #[tokio::test]
     #[allow(non_snake_case)]
-    fn pagerank_CASE_empty_graph_and_isolated_node() {
+    async fn pagerank_CASE_empty_graph_and_isolated_node() {
         let empty_graph = CsrGraph::new();
-        let ranks_empty = empty_graph.pagerank(0.85, 100, 1e-6);
+        let ranks_empty = empty_graph.pagerank(0.85, 100, 1e-6).await;
         assert!(ranks_empty.is_empty());
 
         let iso_graph = CsrGraph::new();
@@ -4214,7 +4322,7 @@ mod tests {
             .insert_entity_direct(Entity::new(EntityId::new(1), "Iso", "Type"))
             .unwrap(); // unwrap allowed
 
-        let ranks_iso = iso_graph.pagerank(0.85, 100, 1e-6);
+        let ranks_iso = iso_graph.pagerank(0.85, 100, 1e-6).await;
         assert_eq!(ranks_iso.len(), 1);
         let rank = ranks_iso[&EntityId::new(1)];
         assert!((rank - 1.0).abs() < 1e-4);

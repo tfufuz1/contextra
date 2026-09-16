@@ -78,7 +78,10 @@ async fn test_commit_failure_no_deadlock() {
         storage.rollback_to_tx(tx1).await.expect("rollback to tx1");
 
         // Verify key2 is gone and key1 remains
-        assert_eq!(storage.get(b"key1").await.unwrap(), Some(bytes::Bytes::from_static(b"val1")));
+        assert_eq!(
+            storage.get(b"key1").await.unwrap(),
+            Some(bytes::Bytes::from_static(b"val1"))
+        );
         assert_eq!(storage.get(b"key2").await.unwrap(), None);
     })
     .await;

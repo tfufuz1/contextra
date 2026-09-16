@@ -98,7 +98,13 @@ mod tests {
     impl StorageEngine for MockStorage {
         fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
             Box::pin(async move {
-                Ok(self.data.lock().unwrap().get(key).cloned().map(bytes::Bytes::from)) // unwrap allowed
+                Ok(self
+                    .data
+                    .lock()
+                    .unwrap()
+                    .get(key)
+                    .cloned()
+                    .map(bytes::Bytes::from)) // unwrap allowed
             })
         }
 

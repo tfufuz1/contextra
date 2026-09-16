@@ -29,7 +29,11 @@ impl StorageEngine for MVCCMockStorage {
         Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
     }
 
-    fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move {
             let store = self.store.read();
             if let Some(versions) = store.get(key) {

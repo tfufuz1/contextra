@@ -868,7 +868,7 @@ mod tests {
                             if (v_seq & memfuse_core::TOMBSTONE_BIT) != 0 {
                                 return Ok(None);
                             }
-                        return Ok(Some(bytes::Bytes::from(val.clone())));
+                            return Ok(Some(bytes::Bytes::from(val.clone())));
                         }
                     }
                 }
