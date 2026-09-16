@@ -36,7 +36,7 @@ Ergebnis: **4 offene Tags**
 | `memfuse-calibration` | 2 | 1976 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 2 | 6034 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-crypto` | 2 | 6572 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
-| `memfuse-graph` | 2 | 11811 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `memfuse-graph` | 2 | 12056 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-sandbox` | 2 | 599 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
 | `memfuse-text` | 2 | 6182 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-candle` | 3 | 4166 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |

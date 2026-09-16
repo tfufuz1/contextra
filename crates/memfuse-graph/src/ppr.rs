@@ -149,37 +149,64 @@ pub(crate) fn compute_ppr_with_context(
         ctx.ranks[seed_idx] = restart_prob;
     }
 
-    // 3. Precompute total outgoing weight sum per node directly from CSR offsets
-    let offsets = &inner.offsets;
-    let targets = &inner.targets;
-    let weights = &inner.weights;
+    // 3. Populate outgoing weight sum per node directly from GraphInner precomputed out_weight_sums.
+    // Befund 2.3: Inkrementelle/Vorberechnete Pflege in GraphInner. Wenn keine deleted_nodes vorliegen,
+    // wird der Vektor in O(N) kopiert. Wenn deleted_nodes vorhanden sind, werden die Summen für betroffene
+    // Knoten ohne gelöschte Zielknoten ausgewertet.
+    if deleted_nodes.is_empty() && inner.out_weight_sums.len() >= n {
+        ctx.out_weight_sums[..n].copy_from_slice(&inner.out_weight_sums[..n]);
+    } else {
+        for i in 0..n {
+            if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
+                ctx.out_weight_sums[i] = 0.0;
+                continue;
+            }
 
+            let start = if i < inner.offsets.len() - 1 {
+                inner.offsets[i]
+            } else {
+                0
+            };
+            let end = if i < inner.offsets.len() - 1 {
+                inner.offsets[i + 1]
+            } else {
+                0
+            };
+
+            let mut sum = 0.0f32;
+            for edge_idx in start..end {
+                let target = inner.targets[edge_idx];
+                let weight = inner.weights[edge_idx];
+
+                if !deleted_nodes.contains(target)
+                    && inner.entities.get(target).is_some_and(|e| e.is_some())
+                    && weight > 0.0
+                {
+                    sum += weight;
+                }
+            }
+
+            if let Some(pending) = inner.pending_edges.get(&i) {
+                for edge in pending {
+                    let target = edge.target;
+                    if !deleted_nodes.contains(target)
+                        && inner.entities.get(target).is_some_and(|e| e.is_some())
+                        && edge.weight > 0.0
+                    {
+                        sum += edge.weight;
+                    }
+                }
+            }
+
+            ctx.out_weight_sums[i] = sum;
+        }
+    }
+
+    // Zero-out out_weight_sums for deleted or non-entity nodes
     for i in 0..n {
         if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
-            continue;
+            ctx.out_weight_sums[i] = 0.0;
         }
-
-        let start = if i < offsets.len() - 1 { offsets[i] } else { 0 };
-        let end = if i < offsets.len() - 1 {
-            offsets[i + 1]
-        } else {
-            0
-        };
-
-        let mut sum = 0.0f32;
-        for edge_idx in start..end {
-            let target = targets[edge_idx];
-            let weight = weights[edge_idx];
-
-            if !deleted_nodes.contains(target)
-                && inner.entities.get(target).is_some_and(|e| e.is_some())
-                && weight > 0.0
-            {
-                sum += weight;
-            }
-        }
-
-        ctx.out_weight_sums[i] = sum;
     }
 
     // Validate config parameters defensively
@@ -198,6 +225,11 @@ pub(crate) fn compute_ppr_with_context(
     } else {
         config.convergence_epsilon
     };
+
+    // Bind CSR slices for power iteration
+    let offsets = &inner.offsets;
+    let targets = &inner.targets;
+    let weights = &inner.weights;
 
     // 4. Power Iteration operating directly on CSR slices
     let mut last_diff = 0.0f32;
@@ -325,6 +357,7 @@ mod tests {
     use super::*;
     use crate::csr::CsrGraph;
     use memfuse_core::{Edge, Entity, EntityId, GraphIndex, TxId};
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_ppr_context_reuse_when_graph_grows() {
@@ -1462,6 +1495,110 @@ mod tests {
                 a.1.to_bits(),
                 b.1.to_bits(),
                 "PPR scores must be bit-identical between trait method and async context method"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_out_weight_sums_incremental_equivalence() {
+        let graph = Arc::new(CsrGraph::new());
+        let tx = TxId::new(1);
+
+        for i in 1..=10 {
+            graph
+                .add_entity(tx, Entity::new(EntityId::new(i), format!("N{i}"), "Type"))
+                .await
+                .unwrap();
+        }
+
+        for i in 1..=9 {
+            GraphIndex::add_edge(
+                graph.as_ref(),
+                tx,
+                Edge::new(EntityId::new(i), EntityId::new(i + 1), "edge")
+                    .with_weight(i as f32 * 0.5),
+            )
+            .await
+            .unwrap();
+        }
+        graph.commit(tx).await.unwrap();
+
+        // Check out_weight_sums precomputed vs recomputed before compact
+        {
+            let mut inner = graph.inner_write();
+            let precomputed = inner.out_weight_sums.clone();
+            let num_nodes = inner.reverse_map.len();
+            for i in 0..num_nodes {
+                inner.recompute_node_out_weight_sum(i);
+            }
+            let recomputed = inner.out_weight_sums.clone();
+            assert_eq!(
+                precomputed, recomputed,
+                "Incremental out_weight_sums must equal recomputed sums before compact()"
+            );
+        }
+
+        // Compact and re-verify
+        graph.compact();
+
+        {
+            let mut inner = graph.inner_write();
+            let precomputed = inner.out_weight_sums.clone();
+            let num_nodes = inner.reverse_map.len();
+            for i in 0..num_nodes {
+                inner.recompute_node_out_weight_sum(i);
+            }
+            let recomputed = inner.out_weight_sums.clone();
+            assert_eq!(
+                precomputed, recomputed,
+                "Incremental out_weight_sums must equal recomputed sums after compact()"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compact_async_numerical_equivalence() {
+        let graph = Arc::new(CsrGraph::new());
+        let tx = TxId::new(1);
+
+        for i in 1..=5 {
+            graph
+                .add_entity(tx, Entity::new(EntityId::new(i), format!("N{i}"), "Node"))
+                .await
+                .unwrap();
+        }
+        for i in 1..=4 {
+            GraphIndex::add_edge(
+                graph.as_ref(),
+                tx,
+                Edge::new(EntityId::new(i), EntityId::new(i + 1), "link").with_weight(0.8),
+            )
+            .await
+            .unwrap();
+        }
+        graph.commit(tx).await.unwrap();
+
+        let config = PprConfig::default();
+        let seed = EntityId::new(1);
+
+        // Result via compact_async
+        let res_async = graph
+            .personalized_page_rank(&[seed], &config)
+            .await
+            .unwrap();
+
+        // Direct computation without compact_async (compact already performed by res_async)
+        let deleted_view = graph.deleted_view().await;
+        let inner = graph.inner_read();
+        let res_direct = crate::ppr::compute_ppr(&inner, &[seed], &config, &deleted_view);
+
+        assert_eq!(res_async.len(), res_direct.len());
+        for (a, b) in res_async.iter().zip(res_direct.iter()) {
+            assert_eq!(a.0, b.0);
+            assert_eq!(
+                a.1.to_bits(),
+                b.1.to_bits(),
+                "compact_async PPR scores must be bit-identical to direct compute_ppr"
             );
         }
     }
