@@ -84,13 +84,28 @@ impl ScalarQuantizer {
             });
         }
 
-        for vec in batch {
-            for (i, &val) in vec.iter().take(dimension).enumerate() {
-                if val < mins[i] {
-                    mins[i] = val;
-                }
-                if val > maxes[i] {
-                    maxes[i] = val;
+        if batch.len() >= 100 {
+            // Apply 0.5th / 99.5th percentile clipping to eliminate extreme training outliers
+            // and preserve 8-bit quantization resolution for in-distribution values.
+            for i in 0..dimension {
+                let mut dim_vals: Vec<f32> = batch.iter().map(|vec| vec[i]).collect();
+                dim_vals.sort_by(|a, b| a.total_cmp(b));
+                let low_idx = ((dim_vals.len() as f64) * 0.005).floor() as usize;
+                let high_idx = (((dim_vals.len() as f64) * 0.995).ceil() as usize)
+                    .saturating_sub(1)
+                    .min(dim_vals.len() - 1);
+                mins[i] = dim_vals[low_idx];
+                maxes[i] = dim_vals[high_idx];
+            }
+        } else {
+            for vec in batch {
+                for (i, &val) in vec.iter().take(dimension).enumerate() {
+                    if val < mins[i] {
+                        mins[i] = val;
+                    }
+                    if val > maxes[i] {
+                        maxes[i] = val;
+                    }
                 }
             }
         }
@@ -403,6 +418,41 @@ impl ScalarQuantizer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_percentile_clipping_in_try_train() {
+        let dim = 2;
+        let mut batch = Vec::new();
+        // 200 normal vectors in range [0.0, 1.0]
+        for i in 0..200 {
+            batch.push(vec![i as f32 / 200.0, 0.5]);
+        }
+        // Add extreme outliers
+        batch[0] = vec![-100.0, 0.5];
+        batch[199] = vec![1000.0, 0.5];
+
+        let batch_refs: Vec<&[f32]> = batch.iter().map(|v| v.as_slice()).collect();
+        let q = ScalarQuantizer::try_train(&batch_refs, dim).expect("train with clipping");
+
+        // Without percentile clipping, mins[0] would be -100.0 and maxes[0] would be 1000.0.
+        // With 0.5% / 99.5% percentile clipping on 200 vectors:
+        // mins[0] should be clipped close to 0.0 and maxes[0] close to 1.0.
+        assert!(
+            q.mins()[0] > -10.0,
+            "Lower outlier -100.0 must be clipped, got min: {}",
+            q.mins()[0]
+        );
+        assert!(
+            q.maxes()[0] < 10.0,
+            "Upper outlier 1000.0 must be clipped, got max: {}",
+            q.maxes()[0]
+        );
+
+        // Outlier vectors should be flagged by check_drift
+        let outlier_vec = vec![500.0, 0.5];
+        let drift = q.check_drift(&outlier_vec);
+        assert_eq!(drift, 0.5, "Outlier dimension 0 should register drift");
+    }
 
     #[test]
     fn test_serde_roundtrip() {

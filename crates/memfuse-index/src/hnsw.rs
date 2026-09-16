@@ -1389,60 +1389,12 @@ impl HnswIndexCore {
                 q.asymmetric_dist(query_exact, vector_bytes, self.cold.config.distance_metric)
             }
         } else {
-            Self::compute_distance_raw_f32(
+            // Safe unaligned SIMD F32 read directly from mmap byte slice (zero allocation)
+            crate::distance::compute_distance_f32_bytes_trusted(
                 query_exact,
                 vector_bytes,
                 self.cold.config.distance_metric,
             )
-        }
-    }
-
-    pub(crate) fn compute_distance_raw_f32(
-        query: &[f32],
-        raw_bytes: &[u8],
-        metric: DistanceMetric,
-    ) -> Result<f32> {
-        if raw_bytes.len() < query.len() * 4 {
-            return Err(MemFuseError::Index(format!(
-            "Corrupt raw vector slice: length {} bytes is smaller than expected dimension {} * 4 = {} bytes",
-            raw_bytes.len(),
-            query.len(),
-            query.len() * 4
-        )));
-        }
-
-        let dist = match metric {
-            DistanceMetric::Cosine => Self::cosine_distance_raw_f32(query, raw_bytes),
-            DistanceMetric::Euclidean => Self::euclidean_distance_raw_f32(query, raw_bytes),
-            DistanceMetric::DotProduct => Self::dot_product_distance_raw_f32(query, raw_bytes),
-            other => {
-                return Err(MemFuseError::Index(format!(
-                    "Unsupported DistanceMetric variant in compute_distance_raw_f32: {other:?}"
-                )));
-            }
-        };
-        Ok(dist)
-    }
-
-    #[allow(unsafe_code)]
-    fn cosine_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        {
-            if is_x86_feature_detected!("avx512f") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX-512F detected.
-                return unsafe { Self::cosine_distance_raw_avx512(query, raw) };
-            }
-            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX2+FMA detected.
-                return unsafe { Self::cosine_distance_raw_avx2(query, raw) };
-            }
-        }
-        #[cfg(target_arch = "aarch64")]
-        {
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). NEON detected.
-                return unsafe { Self::cosine_distance_raw_neon(query, raw) };
-            }
         }
         Self::cosine_distance_raw_scalar(query, raw)
     }
@@ -2066,9 +2018,12 @@ impl HnswIndexCore {
             prior_prepared,
         };
 
-        let mut visited = AHashSet::with_capacity(ef * 4);
-        let mut candidates = BinaryHeap::with_capacity(ef * 2);
-        let mut results = BinaryHeap::with_capacity(ef + 1);
+        // Pre-allocate capacity derived from search parameter `ef` and graph degree `M`.
+        // During graph traversal, up to `ef` candidates are expanded, each having up to `M` neighbors.
+        // Allocating `ef * 4` prevents repeated reallocations during hot-path candidate visitation.
+        let mut visited = AHashSet::with_capacity(ef.saturating_mul(4));
+        let mut candidates = BinaryHeap::new();
+        let mut results = BinaryHeap::new();
 
         #[cfg(feature = "partial-index-rebuild")]
         let mut visited_node_ids = Vec::new();
@@ -2137,9 +2092,11 @@ impl HnswIndexCore {
             if has_dead_neighbors && current.index >= mmap_node_count {
                 let ram_idx = current.index - mmap_node_count;
                 if let Some(node) = nodes_guard.get(ram_idx) {
+                    let seq_log = self.cold.seq_log.read();
+                    let min_retention_seq = seq_log.min_retention_seq();
+                    // Use try_write() to avoid blocking search traversal under contention.
+                    // If write lock acquisition fails, pruning is skipped for this visit and attempted again on next visit.
                     if let Some(mut conns_guard) = node.connections.try_write() {
-                        let seq_log = self.cold.seq_log.read();
-                        let min_retention_seq = seq_log.min_retention_seq();
                         if let Some(layer_conns) = conns_guard.get_mut(layer) {
                             layer_conns.retain(|&neighbor_u32| {
                                 if !deleted_snapshot.contains(neighbor_u32 as u64) {
@@ -3862,6 +3819,47 @@ mod tests {
             res_builder_err,
             Err(MemFuseError::InvalidInput(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn test_search_non_blocking_when_connection_write_lock_held() {
+        let index = std::sync::Arc::new(HnswIndex::try_new(test_config(4)).unwrap());
+        let tx1 = TxId::new(1);
+
+        for i in 1..=20u64 {
+            let v = vec![i as f32, 0.0, 0.0, 0.0];
+            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+        }
+        index.commit(tx1).await.unwrap();
+
+        // Soft-delete a document to trigger has_dead_neighbors during search
+        let tx2 = TxId::new(2);
+        index.delete(tx2, DocId::new(5)).await.unwrap();
+        index.commit(tx2).await.unwrap();
+
+        // Hold write lock on first node's connections
+        let nodes = index.inner.hot.nodes.read();
+        let first_node_conns = &nodes[0].connections;
+        let lock_guard = first_node_conns.write();
+
+        // Perform search while write lock is held.
+        // Because search lazy pruning uses try_write(), search must complete without blocking!
+        let start = std::time::Instant::now();
+        let search_res = tokio::time::timeout(
+            std::time::Duration::from_millis(500),
+            index.search(&[1.0, 0.0, 0.0, 0.0], 5),
+        )
+        .await;
+
+        drop(lock_guard);
+
+        assert!(
+            search_res.is_ok(),
+            "Search must complete non-blockingly within 500ms even when connection write lock is held"
+        );
+        let results = search_res.unwrap().unwrap();
+        assert!(!results.is_empty());
+        assert!(start.elapsed() < std::time::Duration::from_millis(200));
     }
 
     #[tokio::test]
