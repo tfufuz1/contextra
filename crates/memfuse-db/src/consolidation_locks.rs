@@ -63,7 +63,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
             return (Vec::new(), Vec::new());
         }
 
-        // Kanonische Sortierung nach DocId inner u64 zur Vermeidung von Lock-Order-Inversion
+        // Kanonische Sortierung nach DocId zur Vermeidung von Lock-Order-Inversion
         let mut sorted_doc_ids = superseded_doc_ids.to_vec();
         sorted_doc_ids.sort_by_key(|id| id.inner());
         sorted_doc_ids.dedup();
