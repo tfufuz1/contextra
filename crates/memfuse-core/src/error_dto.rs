@@ -297,6 +297,13 @@ impl From<&MemFuseError> for MemFuseErrorDto {
                 message: msg.clone(),
                 details: None,
             },
+            MemFuseError::CommitTimeout { tx_id } => Self {
+                kind: "CommitTimeout".to_string(),
+                message: err.to_string(),
+                details: Some(serde_json::json!({
+                    "tx_id": tx_id,
+                })),
+            },
         }
     }
 }

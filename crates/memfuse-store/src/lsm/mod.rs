@@ -703,11 +703,19 @@ impl StorageEngine for LsmStorage {
                     notify.notify_one();
                 }
 
-                let res = match rx.await {
-                    Ok(res) => res,
-                    Err(_) => Err(MemFuseError::Internal(
+                let res = match tokio::time::timeout(self.config.tx_timeout, rx).await {
+                    Ok(Ok(res)) => res,
+                    Ok(Err(_)) => Err(MemFuseError::Internal(
                         "Group commit leader dropped without sending result".to_string(),
                     )),
+                    Err(_) => {
+                        let mut queue_guard = self.pending_commit_queue.lock().await;
+                        *queue_guard = None;
+                        drop(queue_guard);
+                        Err(MemFuseError::CommitTimeout {
+                            tx_id: tx_id.inner(),
+                        })
+                    }
                 };
                 self.cleanup_intent_locks_for_tx(tx_id);
                 res
@@ -755,10 +763,6 @@ impl StorageEngine for LsmStorage {
                             "Group commit leader: pending_commit_queue unexpectedly missing. \
                              This is a bug — notifying all followers."
                         );
-                        debug_assert!(
-                            false,
-                            "Group commit queue invariant violated — queue was Some at leader init and must remain Some until leader re-acquisition"
-                        );
                         return Err(MemFuseError::Internal(
                             "Group commit queue invariant violated".into(),
                         ));
@@ -781,11 +785,16 @@ impl StorageEngine for LsmStorage {
                     all_wal_entries.extend(r.wal_entries.clone());
                 }
 
-                // PERF-FIX: Release commit_mutex before disk I/O (fsync)
-                // This allows the next batch/commit to start sequence allocation and WAL preparation while fsync runs.
+                // LOCK-HANDOFF (P0-A Fix): Acquire truncate_lock BEFORE releasing commit_mutex.
+                // This guarantees physical WAL write order matches HMAC sequence allocation order,
+                // while dropping commit_mutex during disk I/O to avoid serializing WAL preparation.
+                let truncate_guard = wal.truncate_lock.lock().await;
                 drop(_commit_lock);
 
-                if let Err(e) = wal.append_batch(all_wal_entries).await {
+                let append_res = wal.append_batch_locked(all_wal_entries, &truncate_guard).await;
+                drop(truncate_guard);
+
+                if let Err(e) = append_res {
                     // Re-acquire commit_mutex on error path to restore HMAC chain and execute rollback_to_tx_locked
                     let _commit_lock = self.commit_mutex.lock().await;
 

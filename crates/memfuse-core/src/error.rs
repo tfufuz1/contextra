@@ -229,6 +229,13 @@ pub enum MemFuseError {
         /// Identifier of vector in index.
         index_id: String,
     },
+
+    /// Group commit execution timeout exceeded for a follower transaction.
+    #[error("Group commit timed out for transaction {tx_id}")]
+    CommitTimeout {
+        /// Identifier of timed out transaction.
+        tx_id: u64,
+    },
 }
 
 impl MemFuseError {
