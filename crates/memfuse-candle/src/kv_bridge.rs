@@ -10,8 +10,19 @@
 
 use memfuse_core::traits::ContextSegment;
 use memfuse_core::{ModelFingerprint, TenantId};
-use memfuse_crypto::{KvSegment, KvSegmentCipher, TenantIsolatedKvStore};
+#[cfg(test)]
+use memfuse_crypto::KvSegment;
+use memfuse_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+/// Gekapselter KV-Payload zur Persistierung im verschlüsselten Store mit Metadaten.
+#[derive(Debug, Serialize, Deserialize)]
+struct CachedKvPayload {
+    fingerprint: ModelFingerprint,
+    rope_offset: Option<usize>,
+    data: Vec<u8>,
+}
 
 /// Cache-Lookup-Schlüssel: eindeutige Kombination aus Chunk-ID, Modell und optionalem RoPE-Offset.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,25 +86,39 @@ impl KvBridgeAdapter {
     /// Gibt `None` zurück bei Cache-Miss, Decrypt-Fehler, Fingerprint-Mismatch oder jedem anderen Fehler.
     /// NIEMALS wird ein Fehler propagiert — `None` bedeutet stets "voller Prefill".
     pub fn try_get_cached_segment(&self, tenant: TenantId, key: &KvCacheKey) -> Option<Vec<u8>> {
-        // 1. Store-Lookup (synchron, Lock wird vor Rückgabe freigegeben)
-        let encrypted_bytes = self.store.get_segment_bytes(tenant, key.chunk_id)?;
-
-        // 2. Deserialisieren (außerhalb des Store-Locks)
-        let encrypted_layer: memfuse_crypto::EncryptedKvLayer =
-            match bincode::deserialize(&encrypted_bytes) {
-                Ok(l) => l,
+        // 1. Store-Lookup & Decrypt via rope-bewusste API
+        let decrypted_bytes =
+            match self
+                .store
+                .get_decrypted_segment(&self.cipher, tenant, key.chunk_id)
+            {
+                Ok(Some(bytes)) => bytes,
+                Ok(None) => return None,
                 Err(e) => {
                     tracing::warn!(
                         chunk_id = key.chunk_id,
                         error = %e,
-                        "KvBridgeAdapter: Deserialization failed — cache miss"
+                        "KvBridgeAdapter: Decrypt failed — cache miss"
                     );
                     return None;
                 }
             };
 
+        // 2. Deserialisieren der gekapselten Payload
+        let payload: CachedKvPayload = match bincode::deserialize(&decrypted_bytes) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    chunk_id = key.chunk_id,
+                    error = %e,
+                    "KvBridgeAdapter: Deserialization failed — cache miss"
+                );
+                return None;
+            }
+        };
+
         // 3. Fingerprint-Validierung
-        if encrypted_layer.model_fingerprint != key.fingerprint {
+        if payload.fingerprint != key.fingerprint {
             tracing::warn!(
                 chunk_id = key.chunk_id,
                 "KvBridgeAdapter: Model fingerprint mismatch — cache miss"
@@ -101,39 +126,29 @@ impl KvBridgeAdapter {
             return None;
         }
 
-        // 4. Entschlüsseln (außerhalb des Store-Locks)
-        match self.cipher.decrypt(&encrypted_layer) {
-            Ok(plaintext) => Some(plaintext),
-            Err(e) => {
-                tracing::warn!(
-                    chunk_id = key.chunk_id,
-                    error = %e,
-                    "KvBridgeAdapter: Decrypt failed — cache miss (possible format version mismatch)"
-                );
-                None
-            }
+        // 4. RoPE-Offset-Validierung
+        if payload.rope_offset != key.rope_offset {
+            tracing::warn!(
+                chunk_id = key.chunk_id,
+                expected_rope = ?key.rope_offset,
+                cached_rope = ?payload.rope_offset,
+                "KvBridgeAdapter: RoPE offset mismatch — cache miss"
+            );
+            return None;
         }
+
+        Some(payload.data)
     }
 
     /// Speichert ein KV-Segment im Cache. Fehler werden geloggt, nie propagiert.
     pub fn store_segment(&self, tenant: TenantId, key: KvCacheKey, plaintext_kv_bytes: Vec<u8>) {
-        let encrypted_layer =
-            match self
-                .cipher
-                .encrypt(tenant, key.fingerprint, &plaintext_kv_bytes)
-            {
-                Ok(l) => l,
-                Err(e) => {
-                    tracing::warn!(
-                        chunk_id = key.chunk_id,
-                        error = %e,
-                        "KvBridgeAdapter: Encrypt failed — segment not cached"
-                    );
-                    return;
-                }
-            };
+        let payload = CachedKvPayload {
+            fingerprint: key.fingerprint.clone(),
+            rope_offset: key.rope_offset,
+            data: plaintext_kv_bytes,
+        };
 
-        let bytes = match bincode::serialize(&encrypted_layer) {
+        let serialized_bytes = match bincode::serialize(&payload) {
             Ok(b) => b,
             Err(e) => {
                 tracing::warn!(
@@ -145,8 +160,20 @@ impl KvBridgeAdapter {
             }
         };
 
-        let segment = KvSegment::new(tenant, key.chunk_id, bytes);
-        self.store.insert_segment(tenant, segment);
+        if let Err(e) = self.store.insert_encrypted_segment(
+            &self.cipher,
+            tenant,
+            key.chunk_id,
+            key.fingerprint,
+            key.rope_offset,
+            &serialized_bytes,
+        ) {
+            tracing::warn!(
+                chunk_id = key.chunk_id,
+                error = %e,
+                "KvBridgeAdapter: Insert encrypted segment failed — segment not cached"
+            );
+        }
     }
 }
 
@@ -227,6 +254,39 @@ mod tests {
         assert!(
             retrieved_b.is_none(),
             "Tenant B MUST NOT access Tenant A's cached segment"
+        );
+    }
+
+    #[test]
+    fn test_rope_offset_mismatch_returns_cache_miss() {
+        let adapter = create_test_adapter();
+        let tenant = TenantId::try_new(10).unwrap();
+        let fp = dummy_fp();
+        let chunk_id = 123;
+        let payload = b"KV tensor keys and values plaintext cache payload".to_vec();
+
+        // Key stored with rope_offset = Some(128)
+        let key_stored = KvCacheKey::new(chunk_id, fp.clone(), Some(128));
+        adapter.store_segment(tenant, key_stored.clone(), payload.clone());
+
+        // Exact match succeeds
+        let retrieved = adapter.try_get_cached_segment(tenant, &key_stored);
+        assert_eq!(retrieved, Some(payload.clone()));
+
+        // Different rope_offset (e.g. 256) returns None (cache miss)
+        let key_diff_rope = KvCacheKey::new(chunk_id, fp.clone(), Some(256));
+        let res_diff = adapter.try_get_cached_segment(tenant, &key_diff_rope);
+        assert!(
+            res_diff.is_none(),
+            "Lookup with different rope_offset MUST return None"
+        );
+
+        // Missing rope_offset (None) returns None (cache miss)
+        let key_no_rope = KvCacheKey::new(chunk_id, fp, None);
+        let res_none = adapter.try_get_cached_segment(tenant, &key_no_rope);
+        assert!(
+            res_none.is_none(),
+            "Lookup with None rope_offset MUST return None when stored with Some(128)"
         );
     }
 

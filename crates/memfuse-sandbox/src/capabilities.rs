@@ -30,6 +30,10 @@ pub struct WasmCapabilities {
     pub allow_clock: bool,
     /// Cloud-Egress-Zugriff (dedizierte Cloud-Query-Calls). Default: false.
     pub allow_cloud_egress: bool,
+    /// Max. Wall-Clock-Timeout in Millisekunden. Default: 5_000 (5s).
+    /// `0` bedeutet unbegrenztes Wall-Clock-Time-Limit (gefördert durch max_fuel / caller timeout).
+    /// Orthogonal zu `max_fuel` (CPU-Limit vs. Wall-Clock-Limit, beide unabhängig zu setzen).
+    pub max_wall_clock_ms: u64,
 }
 
 impl Default for WasmCapabilities {
@@ -43,6 +47,7 @@ impl Default for WasmCapabilities {
             allow_network: false,
             allow_clock: true,
             allow_cloud_egress: false,
+            max_wall_clock_ms: 5_000,
         }
     }
 }
@@ -58,5 +63,6 @@ mod tests {
             !caps.allow_cloud_egress,
             "allow_cloud_egress MUST default to false (Least Privilege)"
         );
+        assert_eq!(caps.max_wall_clock_ms, 5_000);
     }
 }
