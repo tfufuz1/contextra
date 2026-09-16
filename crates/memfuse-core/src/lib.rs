@@ -40,12 +40,14 @@ pub mod error_dto;
 pub mod ipc;
 pub mod model_fingerprint;
 pub mod seq_log;
+pub mod schema;
 pub mod snapshot;
 pub mod traits;
 pub mod tx_buffer;
 pub mod types;
 
 pub use error::{MemFuseError, Result};
+pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use error_dto::MemFuseErrorDto;
 pub use model_fingerprint::ModelFingerprint;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
