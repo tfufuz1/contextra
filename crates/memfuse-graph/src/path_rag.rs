@@ -229,6 +229,9 @@ impl<G: PathGraph> PathRAGEngine<G> {
 
     /// Konvertiert gefilterte Pfade in RRF-kompatibles Signal.
     /// Nur Knoten aus Pfaden die sufficiency_check() passiert haben.
+    ///
+    /// NOTE (Type-Punning Assumption): Re-uses `EntityId` numerical value as `DocId`.
+    /// See explicit confirmation in `csr.rs:5104` ("querying DocId(10) (which equals EntityId 10)").
     pub fn to_rrf_signal(&self, paths: &[GraphPath]) -> Vec<(DocId, f32)> {
         let mut scored: HashMap<u64, f32> = HashMap::new();
 
@@ -240,10 +243,18 @@ impl<G: PathGraph> PathRAGEngine<G> {
             }
         }
 
+        #[cfg(not(feature = "docid-128"))]
         let mut result: Vec<(DocId, f32)> = scored
             .into_iter()
             .map(|(id, score)| (DocId(id), score))
             .collect();
+
+        #[cfg(feature = "docid-128")]
+        let mut result: Vec<(DocId, f32)> = scored
+            .into_iter()
+            .map(|(id, score)| (DocId(id as u128), score))
+            .collect();
+
         result.sort_by(|a, b| b.1.total_cmp(&a.1));
         result
     }
