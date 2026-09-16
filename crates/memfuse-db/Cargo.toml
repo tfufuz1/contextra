@@ -52,6 +52,7 @@ graph-connectivity-health = ["memfuse-graph/physio-percolation"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = []
 volatile-vault = []
+docid-128 = ["memfuse-core/docid-128"]
 # RESOLVED: AGT-DB-897f3a5c — Forward edge-reinforcement-learning feature to memfuse-graph/edge-reinforcement-learning (TS: 2026-09-09T15:48:51Z) (SESSION: 2c31404a)
 edge-reinforcement-learning = ["memfuse-graph/edge-reinforcement-learning"]
 

@@ -38,7 +38,7 @@ pub enum SignalModality {
 #[derive(ZeroizeOnDrop)]
 pub struct VaultChunk {
     #[zeroize(skip)]
-    pub id: u64, // DocId-Wert, ohne komplexe Drop-Interaktion
+    pub id: DocId, // DocId-Wert, ohne komplexe Drop-Interaktion
     /// Sensitiver Inhalt — wird bei Drop gezeroized.
     pub content: Vec<u8>,
     #[zeroize(skip)]
@@ -52,7 +52,7 @@ pub struct VaultChunk {
 impl VaultChunk {
     pub fn new(id: DocId, content: Vec<u8>, modality: SignalModality, captured_tx: TxId) -> Self {
         Self {
-            id: id.0,
+            id,
             content,
             modality,
             captured_tx: captured_tx.0,
@@ -284,7 +284,7 @@ impl VolatileContextVault {
         self.chunks
             .iter()
             .map(|c| VaultChunkMetadata {
-                id: DocId(c.id),
+                id: c.id,
                 modality: c.modality.clone(),
                 size_bytes: c.content.len(),
                 label: c.label.clone(),
@@ -417,7 +417,7 @@ mod tests {
             .unwrap();
         let meta = vault.preview_metadata();
         assert_eq!(meta.len(), 1);
-        assert_eq!(meta[0].id.0, 42);
+        assert_eq!(meta[0].id, DocId::new(42));
         assert_eq!(meta[0].size_bytes, b"very secret".len());
         assert_eq!(meta[0].label.as_deref(), Some("test"));
         // Kein Feld, das den Inhalt `b"very secret"` exponiert.

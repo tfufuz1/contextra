@@ -19,7 +19,7 @@ pub mod posting_list;
 pub mod tokenizer;
 pub mod wand;
 
-pub use bm25::BM25;
+pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
 pub use inverted::{BM25MorphIndex, InvertedIndex, Language};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};

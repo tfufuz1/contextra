@@ -5889,10 +5889,6 @@
   },
   {
     "file": "crates/memfuse-db/src/fusion.rs",
-    "hash": "0612222a6e7bb4d3"
-  },
-  {
-    "file": "crates/memfuse-db/src/fusion.rs",
     "hash": "1a07ecd7744b573d"
   },
   {
@@ -5914,10 +5910,6 @@
   {
     "file": "crates/memfuse-db/src/fusion.rs",
     "hash": "63bdc0ab4ed5b54f"
-  },
-  {
-    "file": "crates/memfuse-db/src/fusion.rs",
-    "hash": "c452b21817a09441"
   },
   {
     "file": "crates/memfuse-db/src/fusion.rs",
@@ -21621,6 +21613,18 @@
   },
   {
     "file": "crates/memfuse-text/src/bm25.rs",
+    "hash": "6c7017f4d3540f99"
+  },
+  {
+    "file": "crates/memfuse-text/src/bm25.rs",
+    "hash": "8fc8e7a493a08ee7"
+  },
+  {
+    "file": "crates/memfuse-text/src/bm25.rs",
+    "hash": "b339b276a2d544a2"
+  },
+  {
+    "file": "crates/memfuse-text/src/bm25.rs",
     "hash": "f5fa32f17cf6601a"
   },
   {
@@ -21674,6 +21678,18 @@
   {
     "file": "crates/memfuse-text/tests/alloc_profiler.rs",
     "hash": "dbbde82f18f2c5bb"
+  },
+  {
+    "file": "crates/memfuse-text/tests/bm25f_field_weighting.rs",
+    "hash": "10f4fde75be66918"
+  },
+  {
+    "file": "crates/memfuse-text/tests/bm25f_field_weighting.rs",
+    "hash": "ccdc0bdf50cf6106"
+  },
+  {
+    "file": "crates/memfuse-text/tests/bm25f_field_weighting.rs",
+    "hash": "ceaa69a09e5c355a"
   },
   {
     "file": "crates/memfuse-text/tests/concurrent_metadata.rs",
