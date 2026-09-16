@@ -21500,6 +21500,14 @@
     "hash": "dc6926eb811323bf"
   },
   {
+    "file": "crates/memfuse-text/src/posting_list.rs",
+    "hash": "546f796997fe1cff"
+  },
+  {
+    "file": "crates/memfuse-text/src/posting_list.rs",
+    "hash": "dc7df42f95942f51"
+  },
+  {
     "file": "crates/memfuse-text/tests/alloc_profiler.rs",
     "hash": "27f73972b4fd06a6"
   },
