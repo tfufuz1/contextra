@@ -123,8 +123,8 @@ pub struct LruBlockCacheBackend {
 
 impl BlockCacheBackend for LruBlockCacheBackend {
     fn new(capacity: usize) -> Self {
-        let cap = std::num::NonZeroUsize::new(capacity.max(1))
-            .unwrap_or(std::num::NonZeroUsize::MIN);
+        let cap =
+            std::num::NonZeroUsize::new(capacity.max(1)).unwrap_or(std::num::NonZeroUsize::MIN);
         Self {
             cache: RwLock::new(LruCache::new(cap)),
         }
