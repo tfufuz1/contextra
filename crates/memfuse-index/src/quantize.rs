@@ -96,9 +96,6 @@ impl ScalarQuantizer {
             }
         }
 
-        let mut mins = vec![f32::MAX; dimension];
-        let mut maxes = vec![f32::MIN; dimension];
-
         if batch.is_empty() {
             return Ok(Self {
                 mins: vec![0.0; dimension],
