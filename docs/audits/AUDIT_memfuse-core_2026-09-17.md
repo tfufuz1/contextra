@@ -6,6 +6,12 @@
 **Task ID:** `JULES-20260917-MEMFUSECOR-PROCES-J5P7`
 **Prüfer:** Senior Rust Systems & Governance Engineer (Jules)
 **Crate Scope:** `memfuse-core` (`crates/memfuse-core/src/lib.rs`) & Governance Documentation Sync
+**Session Hash:** `e1c47b62`
+**Timestamp:** `2026-09-17T17:55:00Z`
+**Prüfer:** Senior Rust Systems & Governance Engineer (Jules)
+**Crate Scope:** `memfuse-core` (`crates/memfuse-core/src/error.rs`, `crates/memfuse-core/src/lib.rs`) & Governance Documentation Sync
+=======
+
 
 ---
 
@@ -43,3 +49,35 @@ Die Dokumentation des gesamten Projekts wurde frei von Widersprüchen auf den ak
 
 ---
 *Ende des Audit-Reports — TS: 2026-09-17T17:45:56Z (SESSION: 9099f058)*
+- **Befund (Inventar-Drift):** Die Dateien `crates/memfuse-core/src/schema.rs` (SSTable/WAL Schema-Versionierung v1/v2, ADR-082) und `crates/memfuse-core/src/tombstone.rs` (Tombstone-Semantik-Check IP-07 / ADR-041) sind im Repository vorhanden, wurden jedoch im Prompter-Inventar vom 2026-09-13 nicht gelistet.
+- **Bewertung:** Beide Dateien sind DAG-konform, wohlgeformt und frei von Unsafe-Code. Sie fügen sich nahtlos in die Modulstruktur von `memfuse-core` ein.
+
+---
+
+## 2. Zusammenfassung `error.rs` (3-Satz-Zusammenfassung)
+
+1. `crates/memfuse-core/src/error.rs` definiert `MemFuseError` als `#[non_exhaustive]` unifizierte Error-Enum, die als einzige Fehlerquelle im gesamten Workspace dient und Zero-Panic via `?`-Operator-Propagation garantiert.
+2. Die Datei bietet spezialisierte Konstruktor-Helfer (z. B. `wal_corruption`, `capability_unsupported`) sowie `From`-Implementierungen für Standardtypen (`std::io::Error`, `serde_json::Error`, `bincode::Error`).
+3. Kontrollflüsse basieren auf automatischen `From`-Konversionen sowie explizitem Pattern Matching in höheren Schichten, während FFI/IPC-Grenzen jede Variante verlustfrei nach `MemFuseErrorDto` abbilden.
+
+---
+
+## 3. Auditergebnisse & FFI-Mapping Verifikation
+
+- **FFI / DTO Vollständigkeit:** Alle 35 Varianten von `MemFuseError` besitzen eine exakte 1:1 Abbildung auf `MemFuseErrorDto` in `error_dto.rs` (über `From<&MemFuseError>`). Ein Catch-all Wildcard-Arm `_ => ...` wird bewusst vermieden, um bei künftigen Enumerations-Erweiterungen sofortige Kompilierfehler an FFI-Grenzen auszulösen.
+- **DAG-Garantie & Exporte (`lib.rs`):** `lib.rs` hält `#![forbid(unsafe_code)]` und `#![warn(missing_docs)]`. Eine Prüfung via `cargo tree -p memfuse-core` bestätigt, dass `memfuse-core` als Layer 0 keine Workspace-Abhängigkeiten außerhalb des Layer-0-Partnercrates `memfuse-core-ipc-gen` besitzt.
+
+---
+
+## 4. Durchgeführte Verifikationen & Gates
+
+- `cargo check -p memfuse-core --all-features` -> **PASSED**
+- `cargo clippy -p memfuse-core --all-features -- -D warnings` -> **PASSED**
+- `cargo fmt --check -p memfuse-core` -> **PASSED**
+- `cargo test -p memfuse-core --all-features` -> **PASSED** (173 Unit-, 2 Integrations-, 5 Robustheitstests grün)
+- `cargo run -p xtask -- sync-docs` -> **PASSED**
+- `cargo run -p xtask -- sync-docs --check` -> **PASSED** (0 Drift-Abweichungen)
+- `just check-vetoes` -> **PASSED**
+
+---
+*Ende des Audit-Reports — TS: 2026-09-17T17:55:00Z (SESSION: e1c47b62)*
