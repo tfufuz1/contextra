@@ -1,0 +1,327 @@
+### memfuse-core-ipc-gen (crates/memfuse-core-ipc-gen/src)
+  DUP fn: run_verifier x4
+  DUP fn: new x4
+  DUP fn: fmt x4
+  DUP fn: finish x4
+  DUP fn: default x4
+  DUP fn: create x4
+  DUP fn: metadata x2
+  DUP fn: id x2
+  DUP fn: embedding x2
+  DUP fn: add_metadata x2
+  DUP fn: add_id x2
+  DUP fn: add_embedding x2
+
+### memfuse-core (crates/memfuse-core/src)
+  DUP fn: new x20
+  DUP fn: default x12
+  DUP fn: from x11
+  DUP fn: stats x10
+  DUP fn: rollback_to_tx x10
+  DUP fn: rollback x10
+  DUP fn: last_tx_id x10
+  DUP fn: commit x10
+  DUP fn: len x7
+  DUP fn: fmt x7
+  DUP fn: delete x7
+  DUP fn: unpin_checkpoint x5
+  DUP fn: scan_prefix x5
+  DUP fn: scan x5
+  DUP fn: put x5
+  DUP fn: pin_checkpoint x5
+  DUP fn: last_seq_no x5
+  DUP fn: is_empty x5
+  DUP fn: get_at_seq x5
+  DUP fn: get x5
+  DUP fn: flush x5
+  DUP fn: try_new x4
+  DUP fn: embed x4
+  DUP fn: traverse x3
+  DUP fn: from_key x3
+  DUP fn: embed_batch x3
+  DUP fn: compute_u8 x3
+  DUP fn: add_entity x3
+  DUP fn: add_edge x3
+  DUP fn: traverse_at_time x2
+  DUP fn: traverse_at_bitemporal x2
+  DUP fn: traverse_at x2
+  DUP fn: test_token_budget_edge_cases x2
+  DUP fn: seq_no x2
+  DUP fn: search_at x2
+  DUP fn: search x2
+  DUP fn: provider_name x2
+  DUP fn: make_tombstone x2
+  DUP fn: is_tombstone x2
+  DUP fn: insert x2
+  DUP fn: generate x2
+  DUP fn: embedding_dim x2
+  DUP fn: doc_id x2
+  DUP fn: compute_f32 x2
+  DUP struct: MockStorage x2
+  DUP struct: DocId x2
+
+### memfuse-calibration (crates/memfuse-calibration/src)
+  DUP fn: new x3
+  DUP fn: invalidate_on_config_change x2
+  DUP fn: default x2
+
+### memfuse-checkpoint (crates/memfuse-checkpoint/src)
+  DUP fn: new x7
+  DUP fn: orphan_registry x3
+  DUP fn: get_orphaned_checkpoints x3
+  DUP fn: commit x3
+  DUP fn: clear_orphaned_checkpoint x3
+  DUP fn: unpin_checkpoint x2
+  DUP fn: stats x2
+  DUP fn: scan_prefix x2
+  DUP fn: scan x2
+  DUP fn: save_checkpoint x2
+  DUP fn: rollback_to_tx x2
+  DUP fn: rollback x2
+  DUP fn: register_pinned_seq_no_orphan x2
+  DUP fn: register_orphaned_checkpoint x2
+  DUP fn: recover_orphaned_pins x2
+  DUP fn: recover_orphaned_checkpoints x2
+  DUP fn: put x2
+  DUP fn: pin_checkpoint x2
+  DUP fn: persist_sync x2
+  DUP fn: monotonic_timestamp_ms x2
+  DUP fn: load_sync x2
+  DUP fn: load_checkpoint x2
+  DUP fn: list_checkpoints x2
+  DUP fn: last_tx_id x2
+  DUP fn: last_seq_no x2
+  DUP fn: get_at_seq x2
+  DUP fn: get x2
+  DUP fn: flush_orphan_registry x2
+  DUP fn: flush x2
+  DUP fn: drop x2
+  DUP fn: delete x2
+  DUP fn: default x2
+  DUP fn: clear_all_orphaned_checkpoints x2
+  DUP fn: clear_all x2
+  DUP struct: MockStorage x2
+
+### memfuse-crypto (crates/memfuse-crypto/src)
+  DUP fn: new x12
+  DUP fn: fmt x4
+  DUP fn: recognize x3
+  DUP fn: len x3
+  DUP fn: is_empty x3
+  DUP fn: emergency_wipe x3
+  DUP fn: inspect_key_bytes_for_test x2
+  DUP fn: drop x2
+  DUP fn: default x2
+  DUP fn: classify x2
+  DUP fn: as_bytes x2
+
+### memfuse-graph (crates/memfuse-graph/src)
+  DUP fn: new x15
+  DUP fn: hyperedges_for_entity x7
+  DUP fn: default x7
+  DUP fn: predecessors_with_weights x6
+  DUP fn: neighbors_with_weights x6
+  DUP fn: get_hyperedge x6
+  DUP fn: record_debug x3
+  DUP fn: on_event x3
+  DUP fn: active_head x3
+  DUP fn: with_config x2
+  DUP fn: remove_entity x2
+  DUP fn: nodes x2
+  DUP fn: len x2
+  DUP fn: insert_hyperedge x2
+  DUP fn: from x2
+  DUP fn: fmt x2
+  DUP fn: edges_write x2
+  DUP fn: edges_for_doc x2
+  DUP fn: edges x2
+  DUP fn: conflicts x2
+  DUP fn: compact x2
+  DUP fn: active_head_write x2
+  DUP struct: StringVisitor x3
+  DUP struct: LogCaptureLayer x3
+
+### memfuse-sandbox (crates/memfuse-sandbox/src)
+  DUP fn: new x2
+
+### memfuse-text (crates/memfuse-text/src)
+  DUP fn: new x19
+  DUP fn: get x5
+  DUP fn: unpin_checkpoint x4
+  DUP fn: tokenize x4
+  DUP fn: stats x4
+  DUP fn: scan_prefix_at x4
+  DUP fn: scan_prefix x4
+  DUP fn: scan x4
+  DUP fn: rollback_to_tx x4
+  DUP fn: rollback x4
+  DUP fn: put x4
+  DUP fn: pin_checkpoint x4
+  DUP fn: last_tx_id x4
+  DUP fn: last_seq_no x4
+  DUP fn: get_at_seq x4
+  DUP fn: flush x4
+  DUP fn: delete x4
+  DUP fn: commit x4
+  DUP fn: score_term x3
+  DUP fn: language x3
+  DUP fn: default x3
+  DUP fn: decompose x3
+  DUP struct: MockStorage x3
+
+### memfuse-index (crates/memfuse-index/src)
+  DUP fn: new x6
+  DUP fn: to_bytes x4
+  DUP fn: is_rebuild_required x4
+  DUP fn: try_from_bytes x3
+  DUP fn: drop x3
+  DUP fn: default x3
+  DUP fn: visited_dead_nodes x2
+  DUP fn: validate_vector x2
+  DUP fn: try_new x2
+  DUP fn: trigger_rebuild_async x2
+  DUP fn: rebuild_status x2
+  DUP fn: rebuild_count x2
+  DUP fn: quantize x2
+  DUP fn: partial_cmp x2
+  DUP fn: m x2
+  DUP fn: eq x2
+  DUP fn: dimension x2
+  DUP fn: deleted_ratio x2
+  DUP fn: connectivity_score x2
+  DUP fn: cmp x2
+  DUP fn: clone x2
+  DUP fn: check_connectivity x2
+
+### memfuse-ollama (crates/memfuse-ollama/src)
+  DUP fn: new x4
+  DUP fn: with_defaults x2
+  DUP fn: with_config x2
+  DUP fn: default x2
+  DUP fn: config x2
+
+### memfuse-store (crates/memfuse-store/src)
+  DUP fn: new x13
+  DUP fn: len x6
+  DUP fn: get x6
+  DUP fn: is_empty x5
+  DUP fn: insert x5
+  DUP fn: default x5
+  DUP fn: drop x4
+  DUP fn: contains x4
+  DUP fn: to_bytes x3
+  DUP fn: from_bytes x3
+  DUP fn: fmt x3
+  DUP fn: tx_id x2
+  DUP fn: size x2
+  DUP fn: set_restrictive_file_acl x2
+  DUP fn: scan_prefix x2
+  DUP fn: rollback x2
+  DUP fn: put x2
+  DUP fn: pread_exact x2
+  DUP fn: path x2
+  DUP fn: get_at_seq x2
+  DUP fn: derive_doc_id x2
+
+### memfuse-candle (crates/memfuse-candle/src)
+  DUP fn: generate x6
+  DUP fn: new x5
+  DUP fn: embed x5
+  DUP fn: generate_stream x4
+  DUP fn: dim x4
+  DUP fn: load x2
+  DUP fn: generate_with_context x2
+  DUP fn: from_dir x2
+  DUP fn: fmt x2
+  DUP fn: fingerprint x2
+  DUP fn: default x2
+
+### memfuse-embed (crates/memfuse-embed/src)
+  DUP fn: new x3
+  DUP fn: embed x3
+  DUP fn: with_calibration x2
+  DUP fn: default x2
+
+### memfuse-db (crates/memfuse-db/src)
+  DUP fn: new x25
+  DUP fn: default x18
+  DUP fn: unpin_checkpoint x6
+  DUP fn: stats x6
+  DUP fn: scan_prefix x6
+  DUP fn: scan x6
+  DUP fn: rollback_to_tx x6
+  DUP fn: rollback x6
+  DUP fn: put x6
+  DUP fn: pin_checkpoint x6
+  DUP fn: last_tx_id x6
+  DUP fn: last_seq_no x6
+  DUP fn: get_at_seq x6
+  DUP fn: get x6
+  DUP fn: flush x6
+  DUP fn: delete x6
+  DUP fn: commit x6
+  DUP fn: execute x5
+  DUP fn: rewrite x4
+  DUP fn: generate x4
+  DUP fn: from x4
+  DUP fn: drop x4
+  DUP fn: with_defaults x3
+  DUP fn: rebuild x3
+  DUP fn: is_empty x3
+  DUP fn: check_connectivity x3
+  DUP fn: vector x2
+  DUP fn: try_from x2
+  DUP fn: try_acquire x2
+  DUP fn: start x2
+  DUP fn: seq x2
+  DUP fn: scan_prefix_bounded x2
+  DUP fn: scan_prefix_at x2
+  DUP fn: put_if_absent x2
+  DUP fn: push x2
+  DUP fn: overall_drift_status x2
+  DUP fn: matches x2
+  DUP fn: make_chunk x2
+  DUP fn: len x2
+  DUP fn: from_name x2
+  DUP fn: db_search x2
+  DUP fn: db_insert x2
+  DUP fn: db_get x2
+  DUP fn: as_str x2
+  DUP fn: allocate_tx x2
+  DUP struct: SynthesisPhaseResult x2
+  DUP struct: MockLlmGenerator x2
+
+### memfuse-bench (benchmarks/memfuse-bench/src)
+  DUP fn: pad_vector x3
+  DUP fn: recall_at_k x2
+  DUP fn: fmt x2
+
+### memfuse-router (crates/memfuse-router/src)
+  DUP fn: new x8
+  DUP fn: default x5
+  DUP fn: update x3
+  DUP fn: try_new x2
+  DUP fn: serialize x2
+  DUP fn: overall_drift_status x2
+  DUP fn: deserialize x2
+
+### memfuse-agent (crates/memfuse-agent/src)
+  DUP fn: new x7
+  DUP fn: try_new x4
+  DUP fn: next_event x3
+  DUP fn: wait_for_event x2
+  DUP fn: name x2
+  DUP fn: is_exhausted x2
+  DUP fn: execute x2
+
+### memfuse-mcp (crates/memfuse-mcp/src)
+  DUP fn: new x6
+  DUP fn: from_env x5
+  DUP fn: default x4
+  DUP fn: provider_name x3
+  DUP fn: from x3
+  DUP fn: embedding_dim x3
+  DUP fn: embed x3
+  DUP fn: policy x2
+  DUP fn: check x2
+
