@@ -369,7 +369,7 @@ impl EgressVault {
                 })
                 .collect();
 
-            valid_spans.sort_by(|a, b| b.0.start.cmp(&a.0.start));
+            valid_spans.sort_by_key(|span| std::cmp::Reverse(span.0.start));
 
             let mut last_processed_start = current_text.len();
             for (range, _category) in valid_spans {
@@ -520,8 +520,8 @@ mod tests {
             .unwrap_or_else(|_| CompiledPattern::new("R-001", r"a{1000,}").unwrap())];
 
         let start = Instant::now();
-        // Setze extrem kurzes Timeout (1 Nanosekunde), um Timeout-Pfad sicher zu triggern
-        let res = classify_layer1(&huge_payload, &patterns, Duration::from_nanos(1)).await;
+        // Setze extrem kurzes Timeout (Duration::ZERO), um Timeout-Pfad sicher zu triggern
+        let res = classify_layer1(&huge_payload, &patterns, Duration::ZERO).await;
         let elapsed = start.elapsed();
 
         assert_eq!(
