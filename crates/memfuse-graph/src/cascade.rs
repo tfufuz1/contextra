@@ -75,10 +75,15 @@ pub struct HyperedgeCascadeReport {
 /// Any excess hyperedges are returned in `deferred` for the caller (e.g., in `memfuse-db`)
 /// to schedule for deferred background processing, preserving DAG layering without
 /// cross-layer imports.
+///
+/// INVARIANTE: Jede hier tombstonierte Hyperkante erhält einen Provenienz-Eintrag
+/// mit der WAL-Sequenznummer dieses Aufrufs (INV-GRAPH-PROV-1).
 pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     graph: &CsrGraph,
     superseded_doc_id: DocId,
+    wal_seq: u64,
 ) -> Result<HyperedgeCascadeReport> {
+    let wal_tx = TxId::new(wal_seq);
     let candidate_ids = graph.hyperedges_for_doc(superseded_doc_id);
     if candidate_ids.is_empty() {
         return Ok(HyperedgeCascadeReport {
@@ -92,7 +97,7 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
 
     for (idx, hyperedge_id) in candidate_ids.into_iter().enumerate() {
         if idx < MAX_HYPEREDGE_CASCADE_FANOUT {
-            if graph.tombstone_hyperedge(hyperedge_id) {
+            if graph.tombstone_hyperedge(hyperedge_id, wal_tx) {
                 invalidated.push(hyperedge_id);
             }
         } else {
@@ -109,7 +114,8 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding};
+    use crate::csr::EdgeType;
+    use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
     use crate::path_rag::PathRAGEngine;
     use memfuse_core::{Edge, GraphIndex};
 
@@ -361,17 +367,21 @@ mod tests {
         let graph = CsrGraph::new();
         let doc_a = DocId::from_key("doc-a").unwrap();
 
+        const ROLE_SUBJECT: RoleId = RoleId::new(1);
+        const ROLE_OBJECT: RoleId = RoleId::new(2);
+
         for i in 1..=5 {
             let id = HyperEdgeId::new(i);
             let bindings = vec![
-                RoleBinding::new("subject", EntityId::new(100 + i)),
-                RoleBinding::new("object", EntityId::new(200 + i)),
+                RoleBinding::new(ROLE_SUBJECT, EntityId::new(100 + i)),
+                RoleBinding::new(ROLE_OBJECT, EntityId::new(200 + i)),
             ];
-            let he = HyperEdge::new(id, "relation", bindings, Some(doc_a));
+            let he = HyperEdge::new(id, EdgeType::Default, bindings, 1.0)
+                .with_source_doc_id(Some(doc_a));
             graph.insert_hyperedge_direct(he);
         }
 
-        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a)
+        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a, 2)
             .await
             .unwrap();
 
@@ -388,19 +398,23 @@ mod tests {
         let graph = CsrGraph::new();
         let doc_a = DocId::from_key("doc-a").unwrap();
 
+        const ROLE_1: RoleId = RoleId::new(1);
+        const ROLE_2: RoleId = RoleId::new(2);
+
         let total_count = 1_200;
         for i in 1..=total_count {
             let id = HyperEdgeId::new(i as u64);
             let bindings = vec![
-                RoleBinding::new("role1", EntityId::new(1)),
-                RoleBinding::new("role2", EntityId::new(2)),
+                RoleBinding::new(ROLE_1, EntityId::new(1)),
+                RoleBinding::new(ROLE_2, EntityId::new(2)),
             ];
-            let he = HyperEdge::new(id, "high_fanout_rel", bindings, Some(doc_a));
+            let he = HyperEdge::new(id, EdgeType::Default, bindings, 1.0)
+                .with_source_doc_id(Some(doc_a));
             graph.insert_hyperedge_direct(he);
         }
 
         let start = std::time::Instant::now();
-        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a)
+        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a, 2)
             .await
             .unwrap();
         let elapsed = start.elapsed();
@@ -424,22 +438,25 @@ mod tests {
         let graph = CsrGraph::new();
         let doc_a = DocId::from_key("doc-a").unwrap();
 
+        const ROLE_1: RoleId = RoleId::new(1);
+
         for i in 1..=3 {
             let id = HyperEdgeId::new(i);
-            let bindings = vec![RoleBinding::new("role", EntityId::new(i))];
-            let he = HyperEdge::new(id, "rel", bindings, Some(doc_a));
+            let bindings = vec![RoleBinding::new(ROLE_1, EntityId::new(i))];
+            let he = HyperEdge::new(id, EdgeType::Default, bindings, 1.0)
+                .with_source_doc_id(Some(doc_a));
             graph.insert_hyperedge_direct(he);
         }
 
         // First call
-        let report1 = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a)
+        let report1 = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a, 2)
             .await
             .unwrap();
         assert_eq!(report1.invalidated.len(), 3);
         assert!(report1.deferred.is_empty());
 
         // Repeat call (idempotent)
-        let report2 = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a)
+        let report2 = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a, 3)
             .await
             .unwrap();
         assert!(report2.invalidated.is_empty());
@@ -456,15 +473,21 @@ mod tests {
         let e3 = EntityId::new(30);
         let e4 = EntityId::new(40);
 
+        const ROLE_BUYER: RoleId = RoleId::new(1);
+        const ROLE_SELLER: RoleId = RoleId::new(2);
+        const ROLE_ASSET: RoleId = RoleId::new(3);
+        const ROLE_ESCROW: RoleId = RoleId::new(4);
+
         let he_id = HyperEdgeId::new(99);
         let bindings = vec![
-            RoleBinding::new("buyer", e1),
-            RoleBinding::new("seller", e2),
-            RoleBinding::new("asset", e3),
-            RoleBinding::new("escrow", e4),
+            RoleBinding::new(ROLE_BUYER, e1),
+            RoleBinding::new(ROLE_SELLER, e2),
+            RoleBinding::new(ROLE_ASSET, e3),
+            RoleBinding::new(ROLE_ESCROW, e4),
         ];
 
-        let he = HyperEdge::new(he_id, "transaction", bindings, Some(doc_a));
+        let he = HyperEdge::new(he_id, EdgeType::Default, bindings, 1.0)
+            .with_source_doc_id(Some(doc_a));
         graph.insert_hyperedge_direct(he);
 
         // Before invalidation, all 4 entities link to the hyperedge
@@ -472,7 +495,7 @@ mod tests {
             assert_eq!(graph.hyperedges_for_entity(e), vec![he_id]);
         }
 
-        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a)
+        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a, 2)
             .await
             .unwrap();
 
@@ -489,7 +512,7 @@ mod tests {
         let graph = CsrGraph::new();
         let doc_unknown = DocId::from_key("doc-unknown").unwrap();
 
-        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_unknown)
+        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_unknown, 10)
             .await
             .unwrap();
 
@@ -507,30 +530,35 @@ mod tests {
         let id_a2 = HyperEdgeId::new(2);
         let id_b1 = HyperEdgeId::new(3);
 
+        const ROLE_R: RoleId = RoleId::new(1);
+
         let he_a1 = HyperEdge::new(
             id_a1,
-            "rel_a",
-            vec![RoleBinding::new("r", EntityId::new(1))],
-            Some(doc_a),
-        );
+            EdgeType::Default,
+            vec![RoleBinding::new(ROLE_R, EntityId::new(1))],
+            1.0,
+        )
+        .with_source_doc_id(Some(doc_a));
         let he_a2 = HyperEdge::new(
             id_a2,
-            "rel_a",
-            vec![RoleBinding::new("r", EntityId::new(2))],
-            Some(doc_a),
-        );
+            EdgeType::Default,
+            vec![RoleBinding::new(ROLE_R, EntityId::new(2))],
+            1.0,
+        )
+        .with_source_doc_id(Some(doc_a));
         let he_b1 = HyperEdge::new(
             id_b1,
-            "rel_b",
-            vec![RoleBinding::new("r", EntityId::new(3))],
-            Some(doc_b),
-        );
+            EdgeType::Default,
+            vec![RoleBinding::new(ROLE_R, EntityId::new(3))],
+            1.0,
+        )
+        .with_source_doc_id(Some(doc_b));
 
         graph.insert_hyperedge_direct(he_a1);
         graph.insert_hyperedge_direct(he_a2);
         graph.insert_hyperedge_direct(he_b1);
 
-        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a)
+        let report = cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_a, 2)
             .await
             .unwrap();
 
