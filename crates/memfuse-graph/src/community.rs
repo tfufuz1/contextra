@@ -23,69 +23,6 @@ use memfuse_core::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Represents a synthetic bipartite hyperedge node generated during star expansion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct VirtualHyperedgeNode {
-    /// Numerical ID of the hyperedge.
-    pub hyperedge_id: u64,
-}
-
-impl VirtualHyperedgeNode {
-    /// Creates a new `VirtualHyperedgeNode`.
-    pub fn new(hyperedge_id: u64) -> Self {
-        Self { hyperedge_id }
-    }
-}
-
-/// Zero-allocation iterator for star expansion projection of hyperedges.
-///
-/// Yields binary incidence pairs `(EntityId, VirtualHyperedgeNode)` representing the incidence matrix H
-/// without physical graph materialization or heap allocations per `next()` call.
-pub struct StarExpansionIterator<'a> {
-    graph: &'a CsrGraph,
-    hyperedge_ids: Vec<crate::hyperedge::HyperEdgeId>,
-    current_he_idx: usize,
-    current_participant_idx: usize,
-}
-
-impl<'a> StarExpansionIterator<'a> {
-    /// Creates a new `StarExpansionIterator` over all hyperedges currently present in `graph`.
-    pub fn new(graph: &'a CsrGraph) -> Self {
-        let hyperedge_ids = {
-            let inner = graph.inner_read();
-            inner.hyperedges.keys().copied().collect()
-        };
-        Self {
-            graph,
-            hyperedge_ids,
-            current_he_idx: 0,
-            current_participant_idx: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for StarExpansionIterator<'a> {
-    type Item = (EntityId, VirtualHyperedgeNode);
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let inner = self.graph.inner_read();
-        while self.current_he_idx < self.hyperedge_ids.len() {
-            let he_id = self.hyperedge_ids[self.current_he_idx];
-            if let Some(he) = inner.hyperedges.get(&he_id) {
-                if self.current_participant_idx < he.participants.len() {
-                    let participant = &he.participants[self.current_participant_idx];
-                    self.current_participant_idx += 1;
-                    return Some((participant.entity, VirtualHyperedgeNode::new(he_id.inner())));
-                }
-            }
-            self.current_he_idx += 1;
-            self.current_participant_idx = 0;
-        }
-        None
-    }
-}
-
 /// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunityDetectionConfig {
@@ -103,6 +40,15 @@ pub struct CommunityDetectionConfig {
 pub struct VirtualHyperedgeNode {
     /// ID der zugrundeliegenden Hyperkante.
     pub hyperedge_id: crate::hyperedge::HyperEdgeId,
+}
+
+impl VirtualHyperedgeNode {
+    /// Creates a new `VirtualHyperedgeNode`.
+    pub fn new(hyperedge_id: u64) -> Self {
+        Self {
+            hyperedge_id: crate::hyperedge::HyperEdgeId::new(hyperedge_id),
+        }
+    }
 }
 
 /// Stern-Expansion: Jede Hyperkante wird als künstlicher bipartiter Knoten
@@ -253,7 +199,7 @@ pub async fn detect_communities(
     graph.compact();
 
     // Acquire read lock to access CSR arrays
-    let (valid_nodes, num_real_nodes, reverse_map, adj_raw) = {
+    let (valid_nodes, _num_real_nodes, reverse_map, adj_raw) = {
         let inner = graph.inner_read();
         let num_nodes = inner.reverse_map.len();
 
@@ -310,7 +256,7 @@ pub async fn detect_communities(
                     if inner.entities.get(u).is_some_and(|e| e.is_some()) {
                         let v_idx =
                             *virtual_map
-                                .entry(virtual_node.hyperedge_id)
+                                .entry(virtual_node.hyperedge_id.inner())
                                 .or_insert_with(|| {
                                     let idx = next_virtual_idx;
                                     next_virtual_idx += 1;
@@ -318,7 +264,7 @@ pub async fn detect_communities(
                                     idx
                                 });
 
-                        let he_id = crate::hyperedge::HyperEdgeId::new(virtual_node.hyperedge_id);
+                        let he_id = virtual_node.hyperedge_id;
                         let w_val = inner
                             .hyperedges
                             .get(&he_id)
@@ -371,7 +317,7 @@ pub async fn detect_communities(
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
-        let (eid, u64_id) = if global_idx < reverse_map.len() {
+        let (eid, _u64_id) = if global_idx < reverse_map.len() {
             let eid = reverse_map[global_idx];
             (eid, eid.inner())
         } else {
