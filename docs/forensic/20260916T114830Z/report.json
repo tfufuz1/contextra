@@ -1,0 +1,27 @@
+{
+  "generated_at": "20260916T114830Z",
+  "head": "7c282c7d",
+  "mode": "full",
+  "test_backend": "cargo test",
+  "all_passed": false,
+  "crates": [
+    {"name":"memfuse-core-ipc-gen","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"memfuse-core","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-store","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-index","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-db","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-text","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-checkpoint","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"memfuse-crypto","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"memfuse-graph","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"memfuse-embed","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"memfuse-mcp","mode":"full","check":"pass","clippy":"pass","test":"pass","test_runs":1,"result":"pass"},
+    {"name":"memfuse-agent","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-ollama","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-router","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-calibration","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-bench","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-candle","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"},
+    {"name":"memfuse-sandbox","mode":"full","check":"pass","clippy":"fail","test":"fail","test_runs":1,"result":"fail"}
+  ]
+}

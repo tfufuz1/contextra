@@ -1,0 +1,7 @@
+--- GIT-ZUSTAND ZUM ZEITPUNKT DIESES LAUFS ---
+HEAD: 6d6ae16a4e6839c0e96cf9661ad2675e02f6b19f
+Branch: main
+Dirty-Diff (uncommitted):
+ M crates/memfuse-candle/src/kv_bridge.rs
+ M crates/memfuse-sandbox/src/executor.rs
+A  scripts/forensic_test.sh
