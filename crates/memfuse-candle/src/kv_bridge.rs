@@ -9,7 +9,13 @@
 #![cfg(feature = "kv-bridge")]
 
 use memfuse_core::traits::ContextSegment;
+#[cfg(feature = "memfuse-store")]
+use memfuse_core::traits::StorageEngine;
+#[cfg(feature = "memfuse-store")]
+use memfuse_core::TxId;
 use memfuse_core::{ModelFingerprint, TenantId};
+#[cfg(feature = "memfuse-store")]
+use memfuse_crypto::EncryptedKvLayer;
 #[cfg(test)]
 use memfuse_crypto::KvSegment;
 use memfuse_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
@@ -50,6 +56,8 @@ impl KvCacheKey {
 #[derive(Clone)]
 pub struct KvBridgeAdapter {
     pub store: Arc<TenantIsolatedKvStore>,
+    #[cfg(feature = "memfuse-store")]
+    pub lsm_store: Option<Arc<memfuse_store::LsmStorage>>,
     pub cipher: Arc<KvSegmentCipher>,
     pub consultations: Arc<std::sync::atomic::AtomicU64>,
 }
@@ -59,6 +67,54 @@ impl KvBridgeAdapter {
     pub fn new(store: Arc<TenantIsolatedKvStore>, cipher: Arc<KvSegmentCipher>) -> Self {
         Self {
             store,
+            #[cfg(feature = "memfuse-store")]
+            lsm_store: None,
+            cipher,
+            consultations: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        }
+    }
+
+    /// Erstellt einen neuen Adapter mit Zwei-Tier-Hierarchie (RAM Fast-Path + LSM-Spill Slow-Path).
+    #[cfg(feature = "memfuse-store")]
+    pub fn with_lsm_fallback(
+        store: Arc<TenantIsolatedKvStore>,
+        lsm_store: Arc<memfuse_store::LsmStorage>,
+        cipher: Arc<KvSegmentCipher>,
+    ) -> Self {
+        let lsm = Arc::clone(&lsm_store);
+        let handler = Arc::new(
+            move |tenant: TenantId, segment_id: u64, ciphertext: Vec<u8>| {
+                let lsm_inner = Arc::clone(&lsm);
+                tokio::spawn(async move {
+                    let spill_key =
+                        format!("__kv_spill:{}:{:#x}", tenant.inner(), segment_id).into_bytes();
+                    let tx_id = TxId(segment_id);
+                    if let Err(e) = lsm_inner.put(tx_id, &spill_key, &ciphertext).await {
+                        tracing::warn!(
+                            tenant_id = tenant.inner(),
+                            segment_id,
+                            error = %e,
+                            "KvBridgeAdapter: Failed to put spilled segment into LSM"
+                        );
+                        return;
+                    }
+                    if let Err(e) = lsm_inner.commit(tx_id).await {
+                        tracing::warn!(
+                            tenant_id = tenant.inner(),
+                            segment_id,
+                            error = %e,
+                            "KvBridgeAdapter: Failed to commit spilled segment into LSM"
+                        );
+                    }
+                });
+            },
+        );
+
+        store.set_spill_handler(handler);
+
+        Self {
+            store,
+            lsm_store: Some(lsm_store),
             cipher,
             consultations: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
@@ -79,6 +135,41 @@ impl KvBridgeAdapter {
     /// Returns the number of segment consultations recorded.
     pub fn consultation_count(&self) -> u64 {
         self.consultations.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Deserialisiert und validiert entschlüsselte Payload-Bytes gegen den angegebenen Key.
+    fn validate_payload(decrypted_bytes: &[u8], key: &KvCacheKey) -> Option<Vec<u8>> {
+        let payload: CachedKvPayload = match bincode::deserialize(decrypted_bytes) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    chunk_id = key.chunk_id,
+                    error = %e,
+                    "KvBridgeAdapter: Deserialization failed — cache miss"
+                );
+                return None;
+            }
+        };
+
+        if payload.fingerprint != key.fingerprint {
+            tracing::warn!(
+                chunk_id = key.chunk_id,
+                "KvBridgeAdapter: Model fingerprint mismatch — cache miss"
+            );
+            return None;
+        }
+
+        if payload.rope_offset != key.rope_offset {
+            tracing::warn!(
+                chunk_id = key.chunk_id,
+                expected_rope = ?key.rope_offset,
+                cached_rope = ?payload.rope_offset,
+                "KvBridgeAdapter: RoPE offset mismatch — cache miss"
+            );
+            return None;
+        }
+
+        Some(payload.data)
     }
 
     /// Versucht, ein gecachetes KV-Segment zu laden.
@@ -104,40 +195,56 @@ impl KvBridgeAdapter {
                 }
             };
 
-        // 2. Deserialisieren der gekapselten Payload
-        let payload: CachedKvPayload = match bincode::deserialize(&decrypted_bytes) {
-            Ok(p) => p,
+        Self::validate_payload(&decrypted_bytes, key)
+    }
+
+    /// Versucht asynchron, ein gecachetes KV-Segment erst im RAM (Tier 1) und bei Miss im LSM-Store (Tier 2) zu laden.
+    #[cfg(feature = "memfuse-store")]
+    pub async fn try_get_cached_segment_async(
+        &self,
+        tenant: TenantId,
+        key: &KvCacheKey,
+    ) -> Option<Vec<u8>> {
+        // 1. Try RAM cache first
+        if let Some(bytes) = self.try_get_cached_segment(tenant, key) {
+            return Some(bytes);
+        }
+
+        // 2. Try LSM store fallback if lsm_store is configured
+        let lsm = self.lsm_store.as_ref()?;
+        let spill_key = format!("__kv_spill:{}:{:#x}", tenant.inner(), key.chunk_id).into_bytes();
+
+        let doc_bytes = match lsm.get(&spill_key).await {
+            Ok(Some(bytes)) => bytes,
+            _ => return None,
+        };
+
+        // 3. Decrypt and validate payload identically
+        let layer: EncryptedKvLayer = match bincode::deserialize(&doc_bytes) {
+            Ok(l) => l,
             Err(e) => {
                 tracing::warn!(
                     chunk_id = key.chunk_id,
                     error = %e,
-                    "KvBridgeAdapter: Deserialization failed — cache miss"
+                    "KvBridgeAdapter: Failed to deserialize EncryptedKvLayer from LSM spill"
                 );
                 return None;
             }
         };
 
-        // 3. Fingerprint-Validierung
-        if payload.fingerprint != key.fingerprint {
-            tracing::warn!(
-                chunk_id = key.chunk_id,
-                "KvBridgeAdapter: Model fingerprint mismatch — cache miss"
-            );
-            return None;
-        }
+        let decrypted_bytes = match self.cipher.decrypt_with_version(&layer, key.chunk_id, 1) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                tracing::warn!(
+                    chunk_id = key.chunk_id,
+                    error = %e,
+                    "KvBridgeAdapter: Decrypt LSM spill failed — cache miss"
+                );
+                return None;
+            }
+        };
 
-        // 4. RoPE-Offset-Validierung
-        if payload.rope_offset != key.rope_offset {
-            tracing::warn!(
-                chunk_id = key.chunk_id,
-                expected_rope = ?key.rope_offset,
-                cached_rope = ?payload.rope_offset,
-                "KvBridgeAdapter: RoPE offset mismatch — cache miss"
-            );
-            return None;
-        }
-
-        Some(payload.data)
+        Self::validate_payload(&decrypted_bytes, key)
     }
 
     /// Speichert ein KV-Segment im Cache. Fehler werden geloggt, nie propagiert.
@@ -305,6 +412,198 @@ mod tests {
             result.is_none(),
             "Corrupt payload MUST return None without panic"
         );
+    }
+
+    #[test]
+    #[cfg(feature = "memfuse-store")]
+    fn test_with_lsm_fallback_without_lsm_store() {
+        let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
+        let store = Arc::new(TenantIsolatedKvStore::new());
+        let adapter = KvBridgeAdapter::new(store, cipher);
+
+        assert!(adapter.lsm_store.is_none());
+        let tenant = TenantId::try_new(1).unwrap();
+        let key = KvCacheKey::new(999, dummy_fp(), None);
+        assert!(adapter.try_get_cached_segment(tenant, &key).is_none());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "memfuse-store")]
+    async fn test_lsm_fallback_ram_hit() {
+        let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
+        let store = Arc::new(TenantIsolatedKvStore::new());
+        let temp_dir = tempfile::tempdir().unwrap();
+        let lsm_config = memfuse_store::LsmConfig {
+            path: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let lsm_store = Arc::new(memfuse_store::LsmStorage::new(lsm_config).await.unwrap());
+
+        let adapter = KvBridgeAdapter::with_lsm_fallback(store, lsm_store, cipher);
+        let tenant = TenantId::try_new(10).unwrap();
+        let fp = dummy_fp();
+        let chunk_id = 42;
+        let payload = b"RAM hit payload".to_vec();
+        let key = KvCacheKey::new(chunk_id, fp, None);
+
+        adapter.store_segment(tenant, key.clone(), payload.clone());
+
+        let retrieved = adapter.try_get_cached_segment_async(tenant, &key).await;
+        assert_eq!(retrieved, Some(payload));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "memfuse-store")]
+    async fn test_lsm_fallback_ram_miss_lsm_hit() {
+        let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
+        let store = Arc::new(TenantIsolatedKvStore::new());
+        let temp_dir = tempfile::tempdir().unwrap();
+        let lsm_config = memfuse_store::LsmConfig {
+            path: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let lsm_store = Arc::new(memfuse_store::LsmStorage::new(lsm_config).await.unwrap());
+
+        let adapter =
+            KvBridgeAdapter::with_lsm_fallback(store, Arc::clone(&lsm_store), cipher.clone());
+        let tenant = TenantId::try_new(10).unwrap();
+        let fp = dummy_fp();
+        let chunk_id = 100;
+        let payload = b"LSM hit payload".to_vec();
+        let key = KvCacheKey::new(chunk_id, fp.clone(), None);
+
+        // Manually serialize payload and encrypt layer, then store directly in LSM
+        let inner_payload = CachedKvPayload {
+            fingerprint: fp.clone(),
+            rope_offset: None,
+            data: payload.clone(),
+        };
+        let serialized_bytes = bincode::serialize(&inner_payload).unwrap();
+        let layer = cipher
+            .encrypt_with_version(tenant, chunk_id, 1, fp, &serialized_bytes)
+            .unwrap();
+        let doc_bytes = bincode::serialize(&layer).unwrap();
+
+        let spill_key = format!("__kv_spill:{}:{:#x}", tenant.inner(), chunk_id).into_bytes();
+        let tx_id = TxId(chunk_id);
+        lsm_store.put(tx_id, &spill_key, &doc_bytes).await.unwrap();
+        lsm_store.commit(tx_id).await.unwrap();
+
+        // Ensure RAM store is empty for key
+        assert!(adapter.try_get_cached_segment(tenant, &key).is_none());
+
+        // async lookup should hit LSM store and return decrypted payload
+        let retrieved = adapter.try_get_cached_segment_async(tenant, &key).await;
+        assert_eq!(retrieved, Some(payload));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "memfuse-store")]
+    async fn test_lsm_fallback_ram_miss_lsm_miss() {
+        let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
+        let store = Arc::new(TenantIsolatedKvStore::new());
+        let temp_dir = tempfile::tempdir().unwrap();
+        let lsm_config = memfuse_store::LsmConfig {
+            path: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let lsm_store = Arc::new(memfuse_store::LsmStorage::new(lsm_config).await.unwrap());
+
+        let adapter = KvBridgeAdapter::with_lsm_fallback(store, lsm_store, cipher);
+        let tenant = TenantId::try_new(10).unwrap();
+        let key = KvCacheKey::new(999, dummy_fp(), None);
+
+        let retrieved = adapter.try_get_cached_segment_async(tenant, &key).await;
+        assert!(retrieved.is_none());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "memfuse-store")]
+    async fn test_lsm_fallback_fingerprint_mismatch() {
+        let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
+        let store = Arc::new(TenantIsolatedKvStore::new());
+        let temp_dir = tempfile::tempdir().unwrap();
+        let lsm_config = memfuse_store::LsmConfig {
+            path: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let lsm_store = Arc::new(memfuse_store::LsmStorage::new(lsm_config).await.unwrap());
+
+        let adapter =
+            KvBridgeAdapter::with_lsm_fallback(store, Arc::clone(&lsm_store), cipher.clone());
+        let tenant = TenantId::try_new(10).unwrap();
+        let fp_stored = dummy_fp();
+        let fp_lookup = ModelFingerprint::new([0x88u8; 32], "other-model.gguf", "Q8_0");
+        let chunk_id = 200;
+        let payload = b"LSM payload with mismatched fingerprint".to_vec();
+
+        let inner_payload = CachedKvPayload {
+            fingerprint: fp_stored.clone(),
+            rope_offset: None,
+            data: payload,
+        };
+        let serialized_bytes = bincode::serialize(&inner_payload).unwrap();
+        let layer = cipher
+            .encrypt_with_version(tenant, chunk_id, 1, fp_stored, &serialized_bytes)
+            .unwrap();
+        let doc_bytes = bincode::serialize(&layer).unwrap();
+
+        let spill_key = format!("__kv_spill:{}:{:#x}", tenant.inner(), chunk_id).into_bytes();
+        let tx_id = TxId(chunk_id);
+        lsm_store.put(tx_id, &spill_key, &doc_bytes).await.unwrap();
+        lsm_store.commit(tx_id).await.unwrap();
+
+        let key_mismatch = KvCacheKey::new(chunk_id, fp_lookup, None);
+        let retrieved = adapter
+            .try_get_cached_segment_async(tenant, &key_mismatch)
+            .await;
+        assert!(
+            retrieved.is_none(),
+            "Fingerprint mismatch MUST return None without panic"
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "memfuse-store")]
+    async fn test_lsm_fallback_eviction_triggers_spill() {
+        let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
+        // Create store with capacity of 1 segment per tenant
+        let store = Arc::new(TenantIsolatedKvStore::with_capacity(1));
+        let temp_dir = tempfile::tempdir().unwrap();
+        let lsm_config = memfuse_store::LsmConfig {
+            path: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let lsm_store = Arc::new(memfuse_store::LsmStorage::new(lsm_config).await.unwrap());
+
+        let adapter = KvBridgeAdapter::with_lsm_fallback(store, Arc::clone(&lsm_store), cipher);
+        let tenant = TenantId::try_new(100).unwrap();
+        let fp = dummy_fp();
+
+        let key1 = KvCacheKey::new(1, fp.clone(), None);
+        let payload1 = b"Payload segment 1".to_vec();
+        adapter.store_segment(tenant, key1.clone(), payload1.clone());
+
+        let key2 = KvCacheKey::new(2, fp.clone(), None);
+        let payload2 = b"Payload segment 2".to_vec();
+        // Storing second segment forces eviction of segment 1 from RAM
+        adapter.store_segment(tenant, key2.clone(), payload2.clone());
+
+        // Wait brief moment for tokio::spawn spill handler task to complete
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // RAM store should now miss key1
+        assert!(adapter.try_get_cached_segment(tenant, &key1).is_none());
+
+        // But async lookup should successfully fetch key1 from Tier-2 LSM spill
+        let retrieved1 = adapter.try_get_cached_segment_async(tenant, &key1).await;
+        assert_eq!(retrieved1, Some(payload1));
     }
 
     #[test]

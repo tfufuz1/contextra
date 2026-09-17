@@ -380,6 +380,7 @@ impl EntityId {
     }
 
     /// Creates an `EntityId` directly from a `DocId`.
+    #[allow(clippy::unnecessary_cast)]
     pub fn from_doc_id(doc_id: DocId) -> Self {
         Self(doc_id.inner() as u64)
     }
@@ -392,6 +393,7 @@ impl EntityId {
     /// # Infallible Fallback
     /// If you need the old infallible behaviour (parse-as-u64 or hash), use `EntityId::from(key)` directly.
     /// Prefer this fallible variant for consistency with `DocId` at API boundaries.
+    #[allow(clippy::unnecessary_cast)]
     pub fn from_key(key: &str) -> Result<Self> {
         DocId::from_key(key).map(|d| Self(d.inner() as u64))
     }
@@ -1028,6 +1030,21 @@ impl MemoryType {
     }
 }
 
+/// Selection of algorithm strategy for Personalized PageRank (PPR).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PprAlgorithm {
+    /// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise).
+    #[default]
+    Auto,
+    /// Dense power-iteration algorithm (matrix-vector multiplication over full graph vector).
+    DensePowerIteration,
+    /// Andersen-Chung-Lang Forward-Push local random walk algorithm.
+    ForwardPush,
+    /// Shadow mode: executes both algorithms, returns DensePowerIteration result, and logs discrepancies.
+    ShadowMode,
+}
+
 /// Configuration parameters for Personalized PageRank (PPR).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PprConfig {
@@ -1037,6 +1054,9 @@ pub struct PprConfig {
     pub max_iterations: u32,
     /// L1 norm threshold for early termination convergence check. Default: 1e-6.
     pub convergence_epsilon: f32,
+    /// Algorithm strategy variant (Auto, DensePowerIteration, ForwardPush, ShadowMode). Default: Auto.
+    #[serde(default)]
+    pub algorithm: PprAlgorithm,
     /// Gibt eine nicht-konvergierte Warnung (tracing::warn!) aus, wenn
     /// max_iterations erreicht wird, bevor convergence_epsilon
     /// unterschritten wurde. Kein Fehler — die Berechnung liefert das
@@ -1055,6 +1075,7 @@ impl Default for PprConfig {
             damping_factor: 0.85,
             max_iterations: 100,
             convergence_epsilon: 1e-6,
+            algorithm: PprAlgorithm::Auto,
             warn_on_non_convergence: true,
         }
     }

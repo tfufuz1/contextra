@@ -23,6 +23,7 @@ bincode = { workspace = true, optional = true }
 memfuse-core = { workspace = true }
 memfuse-calibration = { workspace = true }
 memfuse-crypto = { workspace = true, optional = true }
+memfuse-store = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
@@ -39,6 +40,7 @@ required-features = ["kv-bridge"]
 [features]
 default = []
 candle = []
-kv-bridge = ["dep:memfuse-crypto", "memfuse-crypto/kv-encryption", "dep:bincode"]
+kv-bridge = ["dep:memfuse-crypto", "memfuse-crypto/kv-encryption", "dep:bincode", "dep:memfuse-store", "memfuse-store"]
+memfuse-store = ["dep:memfuse-store"]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]

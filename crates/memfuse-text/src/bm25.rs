@@ -105,6 +105,176 @@ pub fn score_term_with_params(
     idf * (tf_numerator / tf_denominator)
 }
 
+/// Field identifier for field-weighted BM25F scoring.
+pub type FieldId = u32;
+
+/// Field weighting configuration for BM25F scoring.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FieldWeight {
+    pub field_id: FieldId,
+    pub weight: f32,
+    pub b: f32,
+}
+
+impl FieldWeight {
+    /// Creates a new `FieldWeight` validation configuration.
+    ///
+    /// # Errors
+    /// Returns `MemFuseError::InvalidInput` if `weight < 0.0` or `weight` is NaN,
+    /// or if `b` is outside `[0.0, 1.0]` or is NaN.
+    pub fn new(field_id: FieldId, weight: f32, b: f32) -> Result<Self> {
+        if weight < 0.0 || weight.is_nan() {
+            return Err(MemFuseError::InvalidInput(
+                "field weight must be >= 0.0".into(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&b) || b.is_nan() {
+            return Err(MemFuseError::InvalidInput("b must be in [0.0, 1.0]".into()));
+        }
+        Ok(Self {
+            field_id,
+            weight,
+            b,
+        })
+    }
+}
+
+/// BM25F field-weighted scoring model configuration (§11.3).
+#[derive(Debug, Clone, PartialEq)]
+pub struct BM25F {
+    pub k1: f32,
+    pub field_weights: Vec<FieldWeight>,
+    cached_weights: Vec<(FieldId, f32, f32)>,
+}
+
+impl BM25F {
+    /// Creates a new `BM25F` scoring configuration.
+    ///
+    /// # Errors
+    /// Returns `MemFuseError::InvalidInput` if `k1 < 0.0` or `k1` is NaN.
+    pub fn new(k1: f32, field_weights: Vec<FieldWeight>) -> Result<Self> {
+        if k1 < 0.0 || k1.is_nan() {
+            return Err(MemFuseError::InvalidInput("k1 must be >= 0.0".into()));
+        }
+        let cached_weights = field_weights
+            .iter()
+            .map(|fw| (fw.field_id, fw.weight, fw.b))
+            .collect();
+        Ok(Self {
+            k1,
+            field_weights,
+            cached_weights,
+        })
+    }
+
+    /// Calculates the BM25F score for a single term across multiple fields.
+    pub fn score_term(
+        &self,
+        field_term_frequencies: &[(FieldId, u32, u32, f32)],
+        df: u32,
+        n: u32,
+    ) -> f32 {
+        score_term_bm25f(field_term_frequencies, &self.cached_weights, self.k1, df, n)
+    }
+}
+
+/// Calculates the field-weighted BM25F score for a single term across document fields.
+///
+/// Implements the Robertson & Zaragoza (2004) field-weighted BM25 formula:
+/// - Computes pseudo-term frequency $\tilde{tf} = \sum_f w_f \cdot \frac{tf_f}{1 - b_f + b_f \cdot \frac{len_f}{avglen_f}}$
+/// - Evaluates single-saturation BM25 score with global parameter `k1`.
+///
+/// # Arguments
+/// * `field_term_frequencies` - Slice of tuples `(field_id, tf_f, len_f, avg_len_f)` per field
+/// * `field_weights` - Slice of tuples `(field_id, weight_f, b_f)` per field configuration
+/// * `k1` - Term frequency saturation control parameter
+/// * `df` - Document frequency across corpus
+/// * `n` - Total document count in corpus
+pub fn score_term_bm25f(
+    field_term_frequencies: &[(FieldId, u32, u32, f32)],
+    field_weights: &[(FieldId, f32, f32)],
+    k1: f32,
+    df: u32,
+    n: u32,
+) -> f32 {
+    if n == 0 || df == 0 || field_term_frequencies.is_empty() {
+        return 0.0;
+    }
+
+    let df_f = df.min(n) as f32;
+    let n_f = n as f32;
+
+    let idf = {
+        let arg = 1.0 + (n_f - df_f + 0.5) / (df_f + 0.5);
+        let val = arg.ln();
+        if val < 0.0 || val.is_nan() {
+            0.0
+        } else {
+            val
+        }
+    };
+
+    if idf <= 0.0 {
+        return 0.0;
+    }
+
+    let mut tilde_tf = 0.0f32;
+
+    for &(field_id, tf_f, len_f, avg_len_f) in field_term_frequencies {
+        if tf_f == 0 {
+            continue;
+        }
+
+        let (w_f, b_f) = field_weights
+            .iter()
+            .find(|(fid, _, _)| *fid == field_id)
+            .map(|(_, w, b)| (*w, *b))
+            .unwrap_or((1.0, BM25_B));
+
+        if w_f <= 0.0 || w_f.is_nan() {
+            continue;
+        }
+
+        let tf_val = tf_f as f32;
+        let len_val = len_f as f32;
+        let avg_len_val = avg_len_f.max(1.0);
+        let b_val = b_f.clamp(0.0, 1.0);
+
+        let norm_len = len_val / avg_len_val;
+        let denom = 1.0 - b_val + b_val * norm_len;
+        let denom_clamped = if denom <= 1e-6 || denom.is_nan() {
+            1e-6
+        } else {
+            denom
+        };
+
+        let contrib = w_f * (tf_val / denom_clamped);
+        if !contrib.is_nan() && contrib > 0.0 {
+            tilde_tf += contrib;
+        }
+    }
+
+    if tilde_tf <= 0.0 || tilde_tf.is_nan() {
+        return 0.0;
+    }
+
+    let k1_val = if k1 < 0.0 || k1.is_nan() { BM25_K1 } else { k1 };
+
+    let tf_numerator = tilde_tf * (k1_val + 1.0);
+    let tf_denominator = tilde_tf + k1_val;
+
+    if tf_denominator <= 0.0 || tf_denominator.is_nan() {
+        return 0.0;
+    }
+
+    let score = idf * (tf_numerator / tf_denominator);
+    if score.is_nan() || score.is_infinite() || score < 0.0 {
+        0.0
+    } else {
+        score
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,6 +572,84 @@ mod tests {
             "Mehr Term-Matches müssen höheren Score geben (score_2: {}, score_1: {})",
             score_2,
             score_1
+        );
+    }
+
+    #[test]
+    fn test_bm25f_degeneration_to_bm25() {
+        // Degeneration test: Single field document with w_0 = 1.0, b_0 = b
+        // Must yield numerically identical result to score_term_with_params
+        let tf = 2u32;
+        let doc_len = 100u32;
+        let avg_doc_len = 150.0f32;
+        let df = 10u32;
+        let n = 1000u32;
+        let k1 = 1.5f32;
+        let b = 0.75f32;
+
+        let bm25_score = score_term_with_params(tf, doc_len, avg_doc_len, df, n, k1, b);
+
+        let field_id: FieldId = 0;
+        let field_tf = vec![(field_id, tf, doc_len, avg_doc_len)];
+        let field_weights = vec![(field_id, 1.0f32, b)];
+
+        let bm25f_score = score_term_bm25f(&field_tf, &field_weights, k1, df, n);
+
+        assert!(
+            (bm25_score - bm25f_score).abs() < 1e-6,
+            "BM25F score ({}) must match standard BM25 score ({}) for single field",
+            bm25f_score,
+            bm25_score
+        );
+    }
+
+    #[test]
+    fn test_bm25f_field_weight_validation() {
+        assert!(FieldWeight::new(0, 1.0, 0.75).is_ok());
+
+        // Negative weight
+        assert!(FieldWeight::new(0, -0.1, 0.75).is_err());
+        // NaN weight
+        assert!(FieldWeight::new(0, f32::NAN, 0.75).is_err());
+        // Out of bound b
+        assert!(FieldWeight::new(0, 1.0, -0.1).is_err());
+        assert!(FieldWeight::new(0, 1.0, 1.1).is_err());
+        assert!(FieldWeight::new(0, 1.0, f32::NAN).is_err());
+    }
+
+    #[test]
+    fn test_bm25f_struct_methods() {
+        let fw0 = FieldWeight::new(0, 2.0, 0.75).expect("valid fw0");
+        let fw1 = FieldWeight::new(1, 0.5, 0.50).expect("valid fw1");
+        let model = BM25F::new(1.2, vec![fw0, fw1]).expect("valid model");
+
+        let field_tfs = vec![(0, 1, 10, 20.0), (1, 3, 50, 100.0)];
+
+        let score = model.score_term(&field_tfs, 5, 100);
+        assert!(score > 0.0);
+        assert!(!score.is_nan());
+        assert!(score.is_finite());
+    }
+
+    #[test]
+    fn test_bm25f_title_higher_weight_than_body() {
+        // Field 0 = Title (weight = 3.0)
+        // Field 1 = Body (weight = 1.0)
+        let weights = vec![(0, 3.0f32, 0.75f32), (1, 1.0f32, 0.75f32)];
+
+        // Doc A: Term occurs 1 time in title (Field 0)
+        let doc_a_tfs = vec![(0, 1u32, 5u32, 10.0f32), (1, 0u32, 100u32, 200.0f32)];
+        // Doc B: Term occurs 1 time in body (Field 1)
+        let doc_b_tfs = vec![(0, 0u32, 5u32, 10.0f32), (1, 1u32, 100u32, 200.0f32)];
+
+        let score_a = score_term_bm25f(&doc_a_tfs, &weights, 1.5, 10, 1000);
+        let score_b = score_term_bm25f(&doc_b_tfs, &weights, 1.5, 10, 1000);
+
+        assert!(
+            score_a > score_b,
+            "Title match (score_a: {}) must score higher than Body match (score_b: {}) when title has higher weight",
+            score_a,
+            score_b
         );
     }
 }

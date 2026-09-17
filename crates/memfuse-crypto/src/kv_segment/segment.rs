@@ -160,6 +160,17 @@ impl KvSegment {
         }
     }
 
+    /// Serialisiert das Segment bzw. dessen verschlüsselte Layer für Tier-2-LSM-Spill.
+    pub fn to_spill_bytes(&self) -> Vec<u8> {
+        #[cfg(feature = "kv-encryption")]
+        if let Some(payload) = &self.encrypted_payload {
+            if let Ok(bytes) = bincode::serialize(&payload.layer) {
+                return bytes;
+            }
+        }
+        self.data.clone()
+    }
+
     /// Read-Only-Zugriff. Kein Klartext-Export nach außen ohne expliziten Call.
     pub fn as_bytes(&self) -> &[u8] {
         &self.data

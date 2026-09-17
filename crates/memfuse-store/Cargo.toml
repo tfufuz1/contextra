@@ -18,6 +18,7 @@ windows-sys = { version = "0.61", features = [
 default = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
+docid-128 = ["memfuse-core/docid-128"]
 
 [dependencies]
 memfuse-core = { workspace = true }
@@ -62,4 +63,8 @@ harness = false
 
 [[bench]]
 name = "lsm_concurrency_bench"
+harness = false
+
+[[bench]]
+name = "block_cache_bench"
 harness = false
