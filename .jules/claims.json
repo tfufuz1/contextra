@@ -1,7 +1,7 @@
 {
   "claims": [
     {
-      "krate": "memfuse-index",
+      "krate": "memfuse-calibration",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-16T18:41:49.112937483+00:00",
       "session_id": "17855158604236717290",
