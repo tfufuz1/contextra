@@ -9,6 +9,7 @@
 
 use memfuse_core::DocId;
 pub use memfuse_core::EntityId;
+pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
@@ -23,54 +24,6 @@ pub struct GraphPath {
     pub confidence: f64,
     /// Invertierte Gesamtdistanz als Flow-Proxy.
     pub total_flow: f32,
-}
-
-/// Identifier for a hyperedge connecting multiple entities.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct HyperEdgeId(pub u64);
-
-impl HyperEdgeId {
-    pub fn new(id: u64) -> Self {
-        Self(id)
-    }
-
-    pub fn inner(self) -> u64 {
-        self.0
-    }
-}
-
-/// Role binding connecting an entity to a hyperedge with a role designation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RoleBinding {
-    pub role: String,
-    pub entity: EntityId,
-}
-
-impl RoleBinding {
-    pub fn new(role: impl Into<String>, entity: EntityId) -> Self {
-        Self {
-            role: role.into(),
-            entity,
-        }
-    }
-}
-
-/// Representation of a multi-way hyperedge connecting two or more entities.
-#[derive(Debug, Clone, PartialEq)]
-pub struct HyperEdge {
-    pub id: HyperEdgeId,
-    pub weight: f32,
-    pub participants: Vec<RoleBinding>,
-}
-
-impl HyperEdge {
-    pub fn new(id: HyperEdgeId, weight: f32, participants: Vec<RoleBinding>) -> Self {
-        Self {
-            id,
-            weight,
-            participants,
-        }
-    }
 }
 
 /// Trait für Graphen die PathRAG konsumieren kann.
@@ -639,8 +592,9 @@ mod tests {
         let b = EntityId::new(2);
         let he = HyperEdge::new(
             HyperEdgeId::new(100),
+            crate::csr::EdgeType::Default,
+            vec![RoleBinding::new(RoleId::new(1), a), RoleBinding::new(RoleId::new(2), b)],
             1.0,
-            vec![RoleBinding::new("subj", a), RoleBinding::new("obj", b)],
         );
         let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
         // Default engine has hyperedge_expansion_enabled: false
@@ -660,12 +614,13 @@ mod tests {
         let c = EntityId::new(3);
         let he = HyperEdge::new(
             HyperEdgeId::new(101),
-            1.0,
+            crate::csr::EdgeType::Default,
             vec![
-                RoleBinding::new("member", a),
-                RoleBinding::new("member", b),
-                RoleBinding::new("member", c),
+                RoleBinding::new(RoleId::new(1), a),
+                RoleBinding::new(RoleId::new(1), b),
+                RoleBinding::new(RoleId::new(1), c),
             ],
+            1.0,
         );
         let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
         let config = PathRAGConfig {
@@ -693,8 +648,9 @@ mod tests {
         let b = EntityId::new(2);
         let he = HyperEdge::new(
             HyperEdgeId::new(102),
+            crate::csr::EdgeType::Default,
+            vec![RoleBinding::new(RoleId::new(1), a), RoleBinding::new(RoleId::new(2), b)],
             1.0,
-            vec![RoleBinding::new("src", a), RoleBinding::new("dst", b)],
         );
 
         // Test discount = 0.85
@@ -731,8 +687,9 @@ mod tests {
         // Weight 0.10 * discount 0.85 = 0.085 < sufficiency_threshold 0.10
         let he = HyperEdge::new(
             HyperEdgeId::new(103),
+            crate::csr::EdgeType::Default,
+            vec![RoleBinding::new(RoleId::new(1), a), RoleBinding::new(RoleId::new(2), b)],
             0.10,
-            vec![RoleBinding::new("src", a), RoleBinding::new("dst", b)],
         );
         let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
         let engine = PathRAGEngine::with_config(
@@ -758,8 +715,9 @@ mod tests {
         // Hyperedge pointing to itself twice
         let he = HyperEdge::new(
             HyperEdgeId::new(104),
+            crate::csr::EdgeType::Default,
+            vec![RoleBinding::new(RoleId::new(1), a), RoleBinding::new(RoleId::new(2), a)],
             1.0,
-            vec![RoleBinding::new("self1", a), RoleBinding::new("self2", a)],
         );
         let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
         let engine = PathRAGEngine::with_config(
@@ -792,5 +750,40 @@ mod tests {
         let rrf = engine.to_rrf_signal(&[path]);
         assert_eq!(rrf.len(), 1);
         assert_eq!(rrf[0].0, DocId(42));
+    }
+
+    #[test]
+    fn test_path_rag_engine_with_real_csr_graph_hyperedges() {
+        use crate::csr::CsrGraph;
+
+        let graph = CsrGraph::new();
+        let a = EntityId::new(10);
+        let b = EntityId::new(20);
+
+        let he = HyperEdge::new(
+            HyperEdgeId::new(999),
+            crate::csr::EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), a),
+                RoleBinding::new(RoleId::new(2), b),
+            ],
+            1.0,
+        );
+
+        graph.insert_hyperedge(he);
+
+        let config = PathRAGConfig {
+            hyperedge_expansion_enabled: true,
+            hyperedge_weight_discount: 0.85,
+            ..Default::default()
+        };
+        let engine = PathRAGEngine::with_config(graph, config);
+
+        let path = engine
+            .find_path(a, b)
+            .expect("PathRAG must find path over real CsrGraph hyperedge");
+
+        assert_eq!(path.nodes, vec![a, b]);
+        assert!((path.confidence - 0.85).abs() < 1e-5);
     }
 }
