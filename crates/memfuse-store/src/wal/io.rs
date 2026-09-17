@@ -236,6 +236,9 @@ where
                 let (op_type, key, value) = match &entry.op {
                     WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                     WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+                    WalOp::TxEnd { committed, .. } => {
+                        (2u8, vec![if *committed { 1u8 } else { 0u8 }], Vec::new())
+                    }
                 };
 
                 let snapshot = WalEntrySnapshot {
@@ -352,6 +355,9 @@ where
             let (op_type, key, value) = match &entry.op {
                 WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                 WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+                WalOp::TxEnd { committed, .. } => {
+                    (2u8, vec![if *committed { 1u8 } else { 0u8 }], Vec::new())
+                }
             };
 
             let snapshot = WalEntrySnapshot {

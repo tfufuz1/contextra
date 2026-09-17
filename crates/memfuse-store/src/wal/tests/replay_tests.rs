@@ -1552,6 +1552,48 @@ async fn test_single_entry_no_commit_marker_replay() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_mmap_replay_truncated_file_size_bounds() -> Result<()> {
+    let dir = tempdir()?;
+    let wal_path = dir.path().join("mmap_truncated_bounds.wal");
+
+    {
+        let wal = Wal::open(&wal_path).await?;
+        let op1 = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"k1".to_vec(),
+            value: b"v1".to_vec(),
+        };
+        let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await?;
+        wal.append_batch(batch1).await?;
+    }
+
+    let wal = Wal::open(&wal_path).await?;
+    let (entries, _version) = wal.replay_mmap().await?;
+    assert_eq!(entries.len(), 1);
+
+    // Call parse_mmap_slice directly with a file_size parameter larger than the mmap buffer length
+    // to verify bounds capping and safe error/fallback without panicking.
+    let full_data = tokio::fs::read(&wal_path).await?;
+    let short_slice = &full_data[..full_data.len() / 2];
+    let inflated_file_size = (full_data.len() * 2) as u64;
+
+    // Truncating in the middle of an entry payload causes a tail corruption warning/halt or WalCorruption error
+    let parsed_res = wal.parse_mmap_slice(short_slice, inflated_file_size);
+    assert!(
+        parsed_res.is_ok() || matches!(parsed_res, Err(MemFuseError::WalCorruption { .. })),
+        "parse_mmap_slice must complete safely or return WalCorruption without panicking"
+    );
+    if let Ok((short_entries, _ver)) = parsed_res {
+        assert!(
+            short_entries.is_empty(),
+            "Truncated slice should produce zero complete entries"
+        );
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_wal_replay_stream_vs_mmap_parity() -> Result<()> {
     let dir = tempdir()?;
     let wal_path = dir.path().join("parity_test.wal");

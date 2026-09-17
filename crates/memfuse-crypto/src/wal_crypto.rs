@@ -162,7 +162,7 @@ impl WalHmac {
 pub struct WalEntrySnapshot {
     pub tx_id: u64,
     pub seq_no: u64,
-    pub op_type: u8, // 0: Put, 1: Delete
+    pub op_type: u8, // 0: Put, 1: Delete, 2: TxEnd
     pub key: Vec<u8>,
     pub value: Vec<u8>,
     pub checksum: [u8; 32],
@@ -231,9 +231,14 @@ impl IntegrityVerifier {
             mac.update(&entry.key);
             mac.update(&(entry.value.len() as u32).to_le_bytes());
             mac.update(&entry.value);
-        } else {
+        } else if entry.op_type == 1 {
             // Delete
             mac.update(&[1u8]);
+            mac.update(&(entry.key.len() as u32).to_le_bytes());
+            mac.update(&entry.key);
+        } else {
+            // TxEnd (op_type == 2)
+            mac.update(&[2u8]);
             mac.update(&(entry.key.len() as u32).to_le_bytes());
             mac.update(&entry.key);
         }

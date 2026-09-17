@@ -32,6 +32,12 @@ fn compute_v3_hmac_reference_independent(
             mac.update(&(key.len() as u32).to_le_bytes());
             mac.update(key);
         }
+        WalOp::TxEnd { committed, .. } => {
+            mac.update(&[2u8]);
+            let flag = [if *committed { 1u8 } else { 0u8 }];
+            mac.update(&(flag.len() as u32).to_le_bytes());
+            mac.update(&flag);
+        }
     }
 
     Ok(mac.finalize())

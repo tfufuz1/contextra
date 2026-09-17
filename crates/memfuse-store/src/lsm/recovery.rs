@@ -2,7 +2,7 @@ use super::*;
 use crate::compaction::CompactionEngine;
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
-use crate::wal::{Wal, WalOp};
+use crate::wal::{Wal, WalEntry, WalOp};
 use memfuse_core::{
     MemFuseError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId,
     TOMBSTONE_BIT,
@@ -153,35 +153,73 @@ impl LsmStorage {
             let wal = Wal::open_with_key_manager(wal_path, key_manager.clone()).await?;
             let wal_entries = wal.replay().await?;
 
+            // Buffer staged entries by transaction ID until a committed TxEnd marker is observed
+            let mut pending_tx_ops: std::collections::HashMap<
+                u64,
+                Vec<(u64, &WalEntry)>,
+            > = std::collections::HashMap::new();
+
             for (lsn, entry, _offset) in &wal_entries {
                 let raw_lsn = *lsn & !TOMBSTONE_BIT;
                 if raw_lsn > max_seq {
                     max_seq = raw_lsn;
                 }
-                if entry.tx_id().inner() > max_tx && entry.tx_id().inner() < TxId::INTERNAL_BASE {
-                    max_tx = entry.tx_id().inner();
-                }
+
+                let tx_raw = entry.tx_id().inner();
                 match &entry.op {
-                    WalOp::Put { key, value, tx_id } => {
-                        replayed_size += (key.len() + value.len()) as u64;
-                        memtable.put(
-                            Bytes::from(key.clone()),
-                            Bytes::from(value.clone()),
-                            *lsn,
-                            tx_id.inner(),
-                        );
+                    WalOp::Put { .. } | WalOp::Delete { .. } => {
+                        pending_tx_ops.entry(tx_raw).or_default().push((*lsn, entry));
                     }
-                    WalOp::Delete { key, tx_id } => {
-                        replayed_size += key.len() as u64;
-                        memtable.put(
-                            Bytes::from(key.clone()),
-                            Bytes::new(),
-                            *lsn | TOMBSTONE_BIT,
-                            tx_id.inner(),
-                        );
+                    WalOp::TxEnd { tx_id, committed } => {
+                        let tx_end_id = tx_id.inner();
+                        if let Some(ops) = pending_tx_ops.remove(&tx_end_id) {
+                            if *committed {
+                                if tx_end_id > max_tx && tx_end_id < TxId::INTERNAL_BASE {
+                                    max_tx = tx_end_id;
+                                }
+                                for (op_lsn, op_entry) in ops {
+                                    match &op_entry.op {
+                                        WalOp::Put { key, value, tx_id } => {
+                                            replayed_size += (key.len() + value.len()) as u64;
+                                            memtable.put(
+                                                Bytes::from(key.clone()),
+                                                Bytes::from(value.clone()),
+                                                op_lsn,
+                                                tx_id.inner(),
+                                            );
+                                        }
+                                        WalOp::Delete { key, tx_id } => {
+                                            replayed_size += key.len() as u64;
+                                            memtable.put(
+                                                Bytes::from(key.clone()),
+                                                Bytes::new(),
+                                                op_lsn | TOMBSTONE_BIT,
+                                                tx_id.inner(),
+                                            );
+                                        }
+                                        WalOp::TxEnd { .. } => {}
+                                    }
+                                }
+                            } else {
+                                tracing::info!(
+                                    tx_id = tx_end_id,
+                                    "Discarding uncommitted/aborted transaction during WAL replay"
+                                );
+                            }
+                        }
                     }
                 }
             }
+
+            // Discard any remaining uncommitted transactions lacking a TxEnd marker
+            for (uncommitted_tx, ops) in pending_tx_ops {
+                tracing::warn!(
+                    tx_id = uncommitted_tx,
+                    op_count = ops.len() as u64,
+                    "Discarding uncommitted transaction missing TxEnd marker during WAL repair-on-open recovery"
+                );
+            }
+
             last_wal = Some(wal);
         }
 
@@ -623,26 +661,44 @@ impl LsmStorage {
         }
 
         let entries = wal.replay().await?;
+        let mut pending_tx_ops: std::collections::HashMap<u64, Vec<(u64, WalEntry)>> =
+            std::collections::HashMap::new();
+
         for (seq, entry, _offset) in entries {
             if (seq & !TOMBSTONE_BIT) > max_seq {
                 max_seq = seq & !TOMBSTONE_BIT;
             }
-            match entry.op {
-                WalOp::Put { key, value, tx_id } => {
-                    state.memtable.put(
-                        bytes::Bytes::from(key),
-                        bytes::Bytes::from(value),
-                        seq,
-                        tx_id.inner(),
-                    );
+            let tx_raw = entry.tx_id().inner();
+            match &entry.op {
+                WalOp::Put { .. } | WalOp::Delete { .. } => {
+                    pending_tx_ops.entry(tx_raw).or_default().push((seq, entry));
                 }
-                WalOp::Delete { key, tx_id } => {
-                    state.memtable.put(
-                        bytes::Bytes::from(key),
-                        bytes::Bytes::new(),
-                        seq | TOMBSTONE_BIT,
-                        tx_id.inner(),
-                    );
+                WalOp::TxEnd { tx_id: _, committed } => {
+                    if let Some(ops) = pending_tx_ops.remove(&tx_raw) {
+                        if *committed {
+                            for (op_seq, op_entry) in ops {
+                                match op_entry.op {
+                                    WalOp::Put { key, value, tx_id } => {
+                                        state.memtable.put(
+                                            bytes::Bytes::from(key),
+                                            bytes::Bytes::from(value),
+                                            op_seq,
+                                            tx_id.inner(),
+                                        );
+                                    }
+                                    WalOp::Delete { key, tx_id } => {
+                                        state.memtable.put(
+                                            bytes::Bytes::from(key),
+                                            bytes::Bytes::new(),
+                                            op_seq | TOMBSTONE_BIT,
+                                            tx_id.inner(),
+                                        );
+                                    }
+                                    WalOp::TxEnd { .. } => {}
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

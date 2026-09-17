@@ -13,6 +13,8 @@ pub enum WalOp {
     },
     /// Deletes a key.
     Delete { tx_id: TxId, key: Vec<u8> },
+    /// Marks transaction outcome (committed/aborted) for repair-on-open recovery.
+    TxEnd { tx_id: TxId, committed: bool },
 }
 
 impl WalOp {
@@ -20,6 +22,7 @@ impl WalOp {
         match self {
             WalOp::Put { tx_id, .. } => *tx_id,
             WalOp::Delete { tx_id, .. } => *tx_id,
+            WalOp::TxEnd { tx_id, .. } => *tx_id,
         }
     }
 }
@@ -137,6 +140,12 @@ impl WalEntry {
                 mac.update(&(key.len() as u32).to_le_bytes());
                 mac.update(key);
             }
+            WalOp::TxEnd { committed, .. } => {
+                mac.update(&[2u8]); // op type
+                let flag = [if *committed { 1u8 } else { 0u8 }];
+                mac.update(&(flag.len() as u32).to_le_bytes());
+                mac.update(&flag);
+            }
         }
         Ok(mac.finalize())
     }
@@ -162,6 +171,10 @@ impl WalEntry {
                 mac.update(&[1u8]);
                 mac.update(key);
             }
+            WalOp::TxEnd { committed, .. } => {
+                mac.update(&[2u8]);
+                mac.update(&[if *committed { 1u8 } else { 0u8 }]);
+            }
         }
         Ok(mac.finalize())
     }
@@ -180,6 +193,7 @@ impl WalEntry {
         let op_size = match &self.op {
             WalOp::Put { key, value, .. } => 1 + 8 + 4 + key.len() + 4 + value.len(),
             WalOp::Delete { key, .. } => 1 + 8 + 4 + key.len(),
+            WalOp::TxEnd { .. } => 1 + 8 + 1,
         };
 
         // payload = seq_no(8) + checksum(32) + prev_hmac(32) + op
@@ -224,6 +238,11 @@ impl WalEntry {
                 buf.extend_from_slice(&tx_id.inner().to_le_bytes());
                 buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
                 buf.extend_from_slice(key);
+            }
+            WalOp::TxEnd { tx_id, committed } => {
+                buf.push(2u8);
+                buf.extend_from_slice(&tx_id.inner().to_le_bytes());
+                buf.push(if *committed { 1u8 } else { 0u8 });
             }
         }
 
@@ -343,6 +362,17 @@ impl WalEntry {
                     }
                     let key = remaining[12..12 + key_len].to_vec();
                     WalOp::Delete { tx_id, key }
+                }
+                2 => {
+                    // TxEnd
+                    if remaining.len() < 9 {
+                        return Err(MemFuseError::Serialization("TxEnd op too short".into()));
+                    }
+                    let tx_id = TxId::new(u64::from_le_bytes(remaining[0..8].try_into().map_err(
+                        |_| MemFuseError::Serialization("Invalid tx_id format".into()),
+                    )?));
+                    let committed = remaining[8] != 0;
+                    WalOp::TxEnd { tx_id, committed }
                 }
                 _ => {
                     return Err(MemFuseError::Serialization(format!(
