@@ -5,8 +5,9 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-16T18:41:49.112937483+00:00",
       "session_id": "17855158604236717290",
-      "active": true,
-      "expires_at": "2026-09-16T22:41:49.112921010+00:00"
+      "active": false,
+      "expires_at": "2026-09-16T22:41:49.112921010+00:00",
+      "released_at": "2026-09-16T23:41:37.357137594+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-core",

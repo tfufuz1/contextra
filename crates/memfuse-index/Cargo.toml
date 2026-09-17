@@ -24,6 +24,7 @@ serde = { workspace = true, features = ["derive"] }
 
 [features]
 default = []
+docid-128 = ["memfuse-core/docid-128"]
 experimental-diskann = []
 graph = []
 # ACHTUNG: partial-index-rebuild aktiviert F-02 (Partial HNSW Rebuild), das gegen ein
