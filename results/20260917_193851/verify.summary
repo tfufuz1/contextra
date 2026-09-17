@@ -1,0 +1,28 @@
+# MemFuse Bottom-Up Verification — 2026-09-17T19:38:51+02:00
+# Modus: full | stop_on_fail=true | clippy=true
+CRATE                  CHECK    CLIPPY   TEST     ERRORS   DAUER(s)
+memfuse-core-ipc-gen   PASS     PASS     PASS     0        77
+memfuse-core           PASS     FAIL     PASS     0        61
+memfuse-calibration    PASS     FAIL     PASS     0        5
+memfuse-checkpoint     PASS     PASS     PASS     0        3
+memfuse-crypto         PASS     FAIL     FAIL     0        154
+memfuse-graph          PASS     FAIL     FAIL     0        14
+memfuse-sandbox        PASS     PASS     PASS     0        6
+memfuse-text           PASS     PASS     PASS     0        249
+memfuse-index          PASS     FAIL     FAIL     0        62
+memfuse-ollama         PASS     FAIL     PASS     0        3
+memfuse-store          PASS     FAIL     FAIL     0        59
+memfuse-candle         PASS     FAIL     FAIL     0        17
+memfuse-embed          PASS     FAIL     PASS     0        3
+memfuse-db             FAIL     SKIP     SKIP     1        2
+
+!!! memfuse-db kompiliert nicht (1 Fehler).
+!!! Granularer Report: results/20260917_193851/memfuse-db/report.md
+!!! Rohlog-Abschnitt: results/20260917_193851/verify.log (Abschnitt '=== memfuse-db ===')
+!!! STOP (bottom-up): Downstream-Crates werden übersprungen.
+!!! Fortsetzen nach Fix mit: ./verify_workspace.sh --resume memfuse-db
+
+Ergebnisverzeichnis: results/20260917_193851
+  - Kompletter Fehlerbericht (Basis für Jules-Prompts): results/20260917_193851/FEHLERBERICHT.md
+  - Rohes JSONL aller Diagnosen: results/20260917_193851/diagnostics.jsonl
+  - Duplicate-Symbol-Scan: results/20260917_193851/duplicate_symbols.txt

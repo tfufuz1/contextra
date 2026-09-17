@@ -62,6 +62,30 @@
       "active": false,
       "expires_at": "2026-09-17T11:06:26.852839738+00:00",
       "released_at": "2026-09-17T17:25:52.454754311+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-core",
+<<<<<<< HEAD
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-J5P7",
+      "timestamp": "2026-09-17T17:45:26.664696110+00:00",
+      "session_id": "6790409367255378698",
+      "active": false,
+      "expires_at": "2026-09-17T21:45:26.664674585+00:00",
+      "released_at": "2026-09-17T17:51:52.318265577+00:00"
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-12DH",
+      "timestamp": "2026-09-17T17:45:56.295397689+00:00",
+      "session_id": "8230640030215165648",
+      "active": false,
+      "expires_at": "2026-09-17T21:45:56.295370234+00:00",
+      "released_at": "2026-09-17T17:56:52.999540956+00:00"
+=======
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-GRQP",
+      "timestamp": "2026-09-17T18:01:28.002657472+00:00",
+      "session_id": "7854104221436399471",
+      "active": false,
+      "expires_at": "2026-09-17T22:01:28.002631527+00:00",
+      "released_at": "2026-09-17T18:09:42.365558207+00:00"
+>>>>>>> 0dca876 (docs(memfuse-core): sync governance docs and record inventory audit (#3015))
     }
   ]
 }
