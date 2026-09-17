@@ -5,6 +5,15 @@
 #![allow(clippy::needless_range_loop)]
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Fehlerzustände des Contextual Bandits.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum BanditError {
+    /// Dimension des Eingabevektors stimmt nicht mit dem Bandit-Zustand überein.
+    #[error("Embedding dimension mismatch: expected {expected}, actual {actual}")]
+    DimensionMismatch { expected: usize, actual: usize },
+}
 
 /// LinUCB-Implementierungsvariante (§13.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -134,16 +143,22 @@ impl BanditProfileState {
         }
     }
 
+    /// Gibt die erwartete Dimension der Feature-Vektoren zurück.
+    pub fn expected_dim(&self) -> usize {
+        self.theta.len()
+    }
+
     /// Berechnet UCB-Score für Kontext-Embedding `x` und Profilkosten `cost`.
     ///
     /// r̂_p(x) = θᵀx + α√(Σ(x)) - λ·cost - μ·is_cloud
     #[allow(clippy::needless_range_loop)]
-    pub fn score(&self, x: &[f32], cost: f32, is_cloud_transport: bool) -> f32 {
-        debug_assert_eq!(
-            x.len(),
-            self.theta.len(),
-            "Embedding-Dimension muss übereinstimmen"
-        );
+    pub fn score(&self, x: &[f32], cost: f32, is_cloud_transport: bool) -> Result<f32, BanditError> {
+        if x.len() != self.theta.len() {
+            return Err(BanditError::DimensionMismatch {
+                expected: self.theta.len(),
+                actual: x.len(),
+            });
+        }
 
         let dot: f32 = self.theta.iter().zip(x.iter()).map(|(t, xi)| t * xi).sum();
 
@@ -183,14 +198,25 @@ impl BanditProfileState {
 
         let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
 
-        dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty
+        Ok(dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty)
     }
 
     /// Aktualisiert θ und σ² (sowie A⁻¹ bei Sherman-Morrison) nach beobachtetem Outcome unter Berücksichtigung von Discounting.
     ///
     /// r_adj = r_outcome - λ·cost - μ·is_cloud
-    pub fn update(&mut self, x: &[f32], r_outcome: f32, cost: f32, is_cloud_transport: bool) {
-        debug_assert_eq!(x.len(), self.theta.len());
+    pub fn update(
+        &mut self,
+        x: &[f32],
+        r_outcome: f32,
+        cost: f32,
+        is_cloud_transport: bool,
+    ) -> Result<(), BanditError> {
+        if x.len() != self.theta.len() {
+            return Err(BanditError::DimensionMismatch {
+                expected: self.theta.len(),
+                actual: x.len(),
+            });
+        }
 
         let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
         let r_adj = r_outcome - self.lambda * cost - privacy_penalty;
@@ -261,6 +287,8 @@ impl BanditProfileState {
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Drift-Kopplung: Erhöhe α temporär und aktiviere beschleunigten Decay bei erkannter Drift (§13.2).
@@ -284,13 +312,13 @@ mod tests {
         state.implementation = BanditImplementation::ShermanMorrison;
         let x = vec![1.0f32, 0.0, 0.0, 0.0];
 
-        let score_before = state.score(&x, 0.0, false);
+        let score_before = state.score(&x, 0.0, false).expect("valid score");
         assert!(score_before > 0.0);
 
-        state.update(&x, 1.0, 0.0, false);
+        state.update(&x, 1.0, 0.0, false).expect("valid update");
         assert!(state.theta[0] > 0.0);
 
-        let score_after = state.score(&x, 0.0, false);
+        let score_after = state.score(&x, 0.0, false).expect("valid score");
         assert_ne!(score_after, score_before);
     }
 
@@ -307,7 +335,7 @@ mod tests {
         let state = BanditProfileState::cold_start(4, 0.5);
         let x = vec![1.0f32; 4];
         // Cold-Start: θᵀx = 0, Varianzterm > 0 → Score > 0
-        let score = state.score(&x, 0.0, false);
+        let score = state.score(&x, 0.0, false).expect("valid score");
         assert!(
             score > 0.0,
             "Cold-Start Score muss durch Exploration > 0 sein"
@@ -318,7 +346,7 @@ mod tests {
     fn test_update_increases_theta_on_positive_reward() {
         let mut state = BanditProfileState::cold_start(2, 0.5);
         let x = vec![1.0f32, 0.0f32];
-        state.update(&x, 1.0, 0.0, false); // Success = 1.0
+        state.update(&x, 1.0, 0.0, false).expect("valid update"); // Success = 1.0
         assert!(
             state.theta[0] > 0.0,
             "θ[0] muss nach positivem Reward steigen"
@@ -330,8 +358,8 @@ mod tests {
     fn test_cloud_transport_penalty_reduces_score() {
         let state = BanditProfileState::cold_start(2, 0.5);
         let x = vec![1.0f32, 1.0f32];
-        let score_local = state.score(&x, 0.0, false);
-        let score_cloud = state.score(&x, 0.0, true);
+        let score_local = state.score(&x, 0.0, false).expect("valid score");
+        let score_cloud = state.score(&x, 0.0, true).expect("valid score");
         assert!(
             score_local > score_cloud,
             "Cloud-Transport-Penalty muss Score reduzieren"
@@ -394,8 +422,8 @@ mod tests {
 
         // Phase 1: 500 stationäre Schritte mit hohem Reward (1.0)
         for _ in 0..500 {
-            state_discounted.update(&x, 1.0, 0.0, false);
-            state_stiff.update(&x, 1.0, 0.0, false);
+            state_discounted.update(&x, 1.0, 0.0, false).expect("valid update");
+            state_stiff.update(&x, 1.0, 0.0, false).expect("valid update");
         }
 
         let theta_disc_peak = state_discounted.theta[0];
@@ -411,8 +439,8 @@ mod tests {
 
         // Phase 3: 100 Schritte nach Drift mit neuem negativem Reward / Misserfolg (-1.0)
         for _ in 0..100 {
-            state_discounted.update(&x, -1.0, 0.0, false);
-            state_stiff.update(&x, -1.0, 0.0, false);
+            state_discounted.update(&x, -1.0, 0.0, false).expect("valid update");
+            state_stiff.update(&x, -1.0, 0.0, false).expect("valid update");
         }
 
         let drop_discounted = theta_disc_peak - state_discounted.theta[0];
