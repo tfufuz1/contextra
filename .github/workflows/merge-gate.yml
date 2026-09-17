@@ -69,16 +69,18 @@ jobs:
         run: cargo run -p xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
         # Feature-Flag nötig da check_bandit_latency_budget memfuse_router::BanditProfileState nutzt.
 
-      - name: Unwrap Baseline Ratchet Gate (IP-12)
-        # Erfüllt IP-12: Verhindert jegliche Erhöhung der .unwrap() / .expect() Vorkommen in Produktionscode.
+      - name: Unwrap Baseline Ratchet Gate
         run: cargo run -p xtask -- check-unwrap-ratchet
 
-      - name: Loom Concurrency Gate
-        # Pfad-getriggertes CI-Gate für Loom-Gedächtnis-Systemtests bei Änderungen an lsm/mod.rs oder wal/*.rs.
-        run: |
-          if git diff --name-only origin/main...HEAD 2>/dev/null | grep -E '^crates/memfuse-store/src/(lsm/|wal/)'; then
-            echo "⚡ LSM/WAL Änderungen erkannt — Loom-Konkurrenztest wird ausgeführt..."
-            RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
-          else
-            echo "ℹ️ Keine LSM/WAL-Änderungen in PR erkannt — Loom Concurrency Gate übersprungen."
-          fi
+      - name: Check for LSM / WAL changes
+        uses: dorny/paths-filter@v3
+        id: lsm_wal_changes
+        with:
+          filters: |
+            store_lsm_wal:
+              - 'crates/memfuse-store/src/lsm/**'
+              - 'crates/memfuse-store/src/wal/**'
+
+      - name: Loom Concurrency Tests (LSM / WAL)
+        if: steps.lsm_wal_changes.outputs.store_lsm_wal == 'true'
+        run: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release

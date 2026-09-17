@@ -88,6 +88,7 @@ mod jules_submit_gate;
 mod lint_unsafe_slice_bounds;
 mod migrate_docid_128;
 mod record_mutation_score;
+mod unwrap_ratchet;
 mod validate_pr_checklist;
 
 pub use check_jules_context_freshness::run_check_jules_context_freshness;
@@ -1874,37 +1875,7 @@ pub fn scan_unwrap_expect_occurrences_at(root: &Path) -> Vec<UnwrapOccurrence> {
 }
 
 pub fn run_update_unwrap_baseline_at(root: &Path) -> bool {
-    let occurrences = scan_unwrap_expect_occurrences_at(root);
-    let mut entries: Vec<UnwrapBaselineEntry> = occurrences
-        .into_iter()
-        .map(|occ| UnwrapBaselineEntry {
-            file: occ.file,
-            hash: occ.hash,
-        })
-        .collect();
-
-    entries.sort();
-    entries.dedup();
-
-    let json_path = root.join(".unwrap-baseline.json");
-    let json_content = match serde_json::to_string_pretty(&entries) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Failed to serialize baseline entries: {}", e);
-            return false;
-        }
-    };
-
-    if let Err(e) = fs::write(&json_path, json_content) {
-        eprintln!("Failed to write {}: {}", json_path.display(), e);
-        return false;
-    }
-
-    println!(
-        "Baseline updated: {} unwrap/expect calls recorded.",
-        entries.len()
-    );
-    true
+    unwrap_ratchet::run_check_unwrap_ratchet(root, true)
 }
 
 pub fn run_update_unwrap_baseline() -> bool {
@@ -1913,57 +1884,7 @@ pub fn run_update_unwrap_baseline() -> bool {
 }
 
 pub fn run_check_unwrap_baseline_at(root: &Path) -> bool {
-    println!("=== Running xtask check-unwrap-baseline ===");
-    let json_path = root.join(".unwrap-baseline.json");
-    if !json_path.exists() {
-        eprintln!("❌ [GATE-2]: .unwrap-baseline.json missing!");
-        eprintln!("💡 AUTOMATISCHE BEHEBUNG: cargo xtask update-unwrap-baseline");
-        return false;
-    }
-
-    let json_content = match fs::read_to_string(&json_path) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("❌ Failed to read .unwrap-baseline.json: {}", e);
-            return false;
-        }
-    };
-
-    let baseline_entries: Vec<UnwrapBaselineEntry> = match serde_json::from_str(&json_content) {
-        Ok(entries) => entries,
-        Err(e) => {
-            eprintln!("❌ Failed to parse .unwrap-baseline.json: {}", e);
-            return false;
-        }
-    };
-
-    let baseline_set: std::collections::HashSet<(&str, &str)> = baseline_entries
-        .iter()
-        .map(|e| (e.file.as_str(), e.hash.as_str()))
-        .collect();
-
-    let occurrences = scan_unwrap_expect_occurrences_at(root);
-    let mut violations = Vec::new();
-
-    for occ in &occurrences {
-        if !baseline_set.contains(&(occ.file.as_str(), occ.hash.as_str())) {
-            violations.push(occ);
-        }
-    }
-
-    if !violations.is_empty() {
-        for v in &violations {
-            eprintln!(
-                "❌ [GATE-2]: {}:{} — new .unwrap() not in baseline",
-                v.file, v.line_num
-            );
-        }
-        eprintln!("💡 AUTOMATISCHE BEHEBUNG: cargo xtask update-unwrap-baseline");
-        return false;
-    }
-
-    println!("✅ Baseline check passed: no new unwrap/expect occurrences found.");
-    true
+    unwrap_ratchet::run_check_unwrap_ratchet(root, false)
 }
 
 pub fn run_check_unwrap_baseline() -> bool {
@@ -2150,7 +2071,7 @@ fn main() {
         "check-unwrap-ratchet" => {
             let root = find_root_dir();
             let update_mode = args.iter().any(|arg| arg == "--update");
-            let success = check_unwrap_ratchet::run_check_unwrap_ratchet(&root, update_mode);
+            let success = unwrap_ratchet::run_check_unwrap_ratchet(&root, update_mode);
             if !success {
                 process::exit(1);
             }
@@ -2663,7 +2584,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-ratchet, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
             process::exit(1);
         }
     }

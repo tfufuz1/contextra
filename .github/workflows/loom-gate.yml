@@ -1,0 +1,55 @@
+name: Loom Concurrency Gate
+on:
+  schedule:
+    # Täglich um 04:00 UTC
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/memfuse-store/src/**"
+      - "crates/memfuse-store/tests/loom_group_commit.rs"
+      - "crates/memfuse-crypto/src/**"
+      - "crates/memfuse-crypto/tests/loom_kv_deferred_zeroize.rs"
+      - "crates/memfuse-index/src/**"
+      - "crates/memfuse-index/tests/loom_quantizer_race_test.rs"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  loom-store:
+    name: Loom Concurrency Check — memfuse-store
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run Loom Test — memfuse-store (loom_group_commit)
+        run: |
+          RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
+
+  loom-crypto:
+    name: Loom Concurrency Check — memfuse-crypto
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run Loom Test — memfuse-crypto (loom_kv_deferred_zeroize)
+        run: |
+          RUSTFLAGS="--cfg loom" cargo test -p memfuse-crypto --test loom_kv_deferred_zeroize --release
+
+  loom-index:
+    name: Loom Concurrency Check — memfuse-index
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run Loom Test — memfuse-index (loom_quantizer_race_test)
+        run: |
+          RUSTFLAGS="--cfg loom" cargo test -p memfuse-index --test loom_quantizer_race_test --release

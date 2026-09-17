@@ -38,6 +38,7 @@ pub mod csr;
 pub mod edge_reinforcement;
 #[cfg(feature = "edge-reinforcement-learning")]
 pub mod edge_reinforcement_buffer;
+pub mod hyperedge;
 pub mod path_rag;
 #[cfg(feature = "graph-connectivity-health")]
 pub mod percolation;
@@ -45,7 +46,10 @@ pub mod ppr;
 pub mod provenance;
 pub mod session_dag;
 
-pub use cascade::{cascade_invalidate_edges_for_superseded_doc, CascadeInvalidationReport};
+pub use cascade::{
+    cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
+    CascadeInvalidationReport, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
+};
 pub use community::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
 pub use consistency_enforcement::{
     ConflictPattern, ConsistencyEnforcer, ContradictionDetector, EdgeAssertion, EdgeId,
@@ -61,7 +65,10 @@ pub use edge_reinforcement::{
 pub use edge_reinforcement_buffer::edge_reinforcement_buffer::{
     CooccurrenceSignal, EdgeReinforcementBuffer, TraversalSignal,
 };
-pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGEngine};
+pub use path_rag::{
+    EntityId, GraphPath, HyperEdge, HyperEdgeId, PathGraph, PathRAGConfig, PathRAGEngine,
+    RoleBinding,
+};
 #[cfg(feature = "graph-connectivity-health")]
 pub use percolation::{
     compute_percolation_health, find_rebonding_candidates, should_trigger_rebonding,

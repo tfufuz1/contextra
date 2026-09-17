@@ -1172,4 +1172,147 @@ mod tests {
             _ => panic!("Unexpected CommitIntent variant"),
         }
     }
+
+    #[tokio::test]
+    async fn test_repair_on_open_targeted_only_repairs_affected_collection() {
+        let dir = tempdir().expect("tempdir");
+        let config = crate::MemFuseConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = crate::MemFuse::open_with_config(dir.path(), config)
+            .await
+            .expect("open db");
+
+        let col_a = db.collection("col_a").await.expect("col_a");
+        let col_b = db.collection("col_b").await.expect("col_b");
+
+        let tx1 = col_a.allocate_tx().expect("tx");
+        let doc_id = DocId::new(101);
+        let stored_doc = crate::collection::StoredDocument {
+            id: "doc_101".to_string(),
+            metadata: None,
+            embedding: vec![0.1, 0.2, 0.3, 0.4],
+        };
+        let doc_bytes = serde_json::to_vec(&stored_doc).expect("serde");
+        let doc_key = col_a.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+        col_a
+            .storage
+            .put(tx1, &doc_key, &doc_bytes)
+            .await
+            .expect("put doc");
+
+        let intent = CommitIntent::Pending {
+            doc_ids: Arc::new(vec![doc_id]),
+            has_text: false,
+            has_graph: false,
+            stages_completed: 0,
+        };
+        let intent_bytes = serde_json::to_vec(&intent).expect("serde intent");
+        let intent_key = col_a.namespaced_key(&tx1.inner().to_le_bytes(), 3);
+        col_a
+            .storage
+            .put(tx1, &intent_key, &intent_bytes)
+            .await
+            .expect("put intent");
+        col_a.storage.commit(tx1).await.expect("commit tx1");
+
+        let repair_res = db.repair_on_open().await;
+        assert!(repair_res.is_ok());
+
+        let indexed_a = col_a.index.all_doc_ids().await.expect("all_doc_ids");
+        assert!(indexed_a.contains(&doc_id));
+
+        let indexed_b = col_b.index.all_doc_ids().await.expect("all_doc_ids col_b");
+        assert!(indexed_b.is_empty());
+
+        let final_intent_val = col_a.storage.get(&intent_key).await.expect("get intent");
+        assert!(final_intent_val.is_some());
+        let final_intent: CommitIntent =
+            serde_json::from_slice(&final_intent_val.unwrap()).expect("parse intent");
+        assert!(matches!(final_intent, CommitIntent::Committed));
+    }
+
+    #[tokio::test]
+    async fn test_repair_on_open_legacy_intent_fallback_repair() {
+        let dir = tempdir().expect("tempdir");
+        let config = crate::MemFuseConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = crate::MemFuse::open_with_config(dir.path(), config)
+            .await
+            .expect("open db");
+
+        let col = db.collection("col_legacy").await.expect("col_legacy");
+
+        let tx1 = col.allocate_tx().expect("tx");
+        let intent_key = col.namespaced_key(&tx1.inner().to_le_bytes(), 3);
+        col.storage
+            .put(tx1, &intent_key, b"pending")
+            .await
+            .expect("put legacy intent");
+        col.storage.commit(tx1).await.expect("commit tx1");
+
+        let repair_res = db.repair_on_open().await;
+        assert!(repair_res.is_ok());
+
+        let final_intent_val = col.storage.get(&intent_key).await.expect("get intent");
+        assert!(final_intent_val.is_some());
+        let final_intent: CommitIntent =
+            serde_json::from_slice(&final_intent_val.unwrap()).expect("parse intent");
+        assert!(matches!(final_intent, CommitIntent::Committed));
+    }
+
+    #[tokio::test]
+    async fn test_repair_on_open_failed_collection_repair_marks_intent_as_failed() {
+        let dir = tempdir().expect("tempdir");
+        let config = crate::MemFuseConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = crate::MemFuse::open_with_config(dir.path(), config)
+            .await
+            .expect("open db");
+
+        let invalid_col_name = "invalid/col/name!";
+        let col_idx_key = [b"__col_idx:\x00", invalid_col_name.as_bytes()].concat();
+
+        let invalid_prefix = format!("__col:{}:\x00", invalid_col_name);
+        let mut intent_key = invalid_prefix.into_bytes();
+        intent_key.push(3);
+        intent_key.extend_from_slice(&999u64.to_le_bytes());
+
+        let intent = CommitIntent::Pending {
+            doc_ids: Arc::new(vec![DocId::new(303)]),
+            has_text: false,
+            has_graph: false,
+            stages_completed: 0,
+        };
+        let intent_bytes = serde_json::to_vec(&intent).expect("serde intent");
+
+        let tx1 = db.allocate_tx().expect("tx");
+        db.inner_storage()
+            .put(tx1, &col_idx_key, b"{}")
+            .await
+            .expect("put col idx");
+        db.inner_storage()
+            .put(tx1, &intent_key, &intent_bytes)
+            .await
+            .expect("put intent");
+        db.inner_storage().commit(tx1).await.expect("commit tx");
+
+        let repair_res = db.repair_on_open().await;
+        assert!(repair_res.is_err());
+
+        let final_intent_val = db
+            .inner_storage()
+            .get(&intent_key)
+            .await
+            .expect("get intent");
+        assert!(final_intent_val.is_some());
+        let final_intent: CommitIntent =
+            serde_json::from_slice(&final_intent_val.unwrap()).expect("parse intent");
+        assert!(matches!(final_intent, CommitIntent::Failed { .. }));
+    }
 }
