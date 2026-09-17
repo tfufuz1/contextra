@@ -10,6 +10,9 @@ use memfuse_core::{DocId, EntityId, Result, TxId};
 /// to bound latency spikes. Any remaining hyperedges are returned in `deferred`.
 pub const MAX_HYPEREDGE_CASCADE_FANOUT: usize = 1_000;
 
+/// Default fan-out limit for hyperedge cascade invalidation per document (§6.8).
+pub const DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT: usize = MAX_HYPEREDGE_CASCADE_FANOUT;
+
 /// Report summarizing the cascade invalidation of graph edges derived from a superseded document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CascadeInvalidationReport {
@@ -68,6 +71,9 @@ pub struct HyperedgeCascadeReport {
     /// Hyperedges deferred for background processing due to fan-out limit.
     pub deferred: Vec<crate::hyperedge::HyperEdgeId>,
 }
+
+/// Alias for [`HyperedgeCascadeReport`] (§6.8 specification alignment).
+pub type CascadeReport = HyperedgeCascadeReport;
 
 /// Cascade invalidates hyperedges derived from `superseded_doc_id` with fan-out protection.
 ///
