@@ -76,6 +76,11 @@ name = "competitive_bench"
 path = "../../benches/competitive_bench.rs"
 harness = false
 
+[[bench]]
+name = "relate_bench"
+path = "../../benches/relate_bench.rs"
+harness = false
+
 [[example]]
 name = "quickstart"
 
