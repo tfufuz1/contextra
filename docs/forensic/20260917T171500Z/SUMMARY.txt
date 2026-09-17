@@ -1,0 +1,23 @@
+=== FORENSIC BENCHMARK AUDIT REPORT — 20260917T171500Z ===
+Task: AK-8 Benchmark-Vergleich — Hyperkanten-Regressionsnachweis für relate()
+Auditor: Google-Jules (Principal Rust Systems Engineer — AUDIT Role)
+Base Commit: 6d5025d ("fix(graph): eliminate CSR inline hyperedge duplicate and align model (#3002)")
+Target: Abnahmekriterium AK-8 (MEMFUSE_ENDPRODUKT_SPEZIFIKATION_v11_2_HYPEREDGES_KRITISCH.md)
+
+VERDICT: KEINE REGRESSION (AK-8 PASSED FOR BINARY RELATE / EDGE TRAVERSAL)
+
+1. BENCHMARK COMPARISON SUMMARY (HEAD vs Pre-IP-20 Baseline):
+  - bfs_2hop (n=1k, e=3k):             239.16 ns  (Baseline: 4500 ns   => 18.8x faster)
+  - get_neighbors (n=1k, e=3k):         71.55 ns  (Baseline: 350 ns    => 4.9x faster)
+  - bfs_2hop_with_pending (n=1k, e=3k): 1815.10 ns  (Baseline: 52000 ns  => 28.6x faster)
+  - bfs_2hop (n=10k, e=30k):           217.69 ns  (Baseline: 48000 ns  => 220.5x faster)
+  - get_neighbors (n=10k, e=30k):       69.46 ns  (Baseline: 350 ns    => 5.0x faster)
+  - bfs_2hop_with_pending (n=10k, e=30k):236.82 ns (Baseline: 52000 ns  => 219.6x faster)
+
+2. COMPILATION & INTEGRATION FINDINGS:
+  - memfuse-graph (Tier 1): ✅ Check OK, ✅ Clippy OK, ✅ Benchmarks OK.
+  - memfuse-db (Tier 1): ❌ Compilation Error (E0061 in background_workers.rs:272, E0308 in homeostat.rs:90).
+    Root cause: In commit 6d5025d, `CsrGraph::tombstone_hyperedge` was updated to accept `wal_tx: TxId`, but `background_workers.rs` caller was not updated. `PidController::update` signature was modified in memfuse-calibration but `homeostat.rs` caller was not updated.
+    Per AUDIT role-lock, no production code fixes were applied in memfuse-db. Escalated as P0 finding.
+
+Report JSON: docs/forensic/20260917T171500Z/report.json
