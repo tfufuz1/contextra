@@ -12,12 +12,16 @@ die Modellauswahl basierend auf empirischen Fehler-Raten adaptiv zu steuern.
 
 | Datei | Verantwortung |
 |---|---|
-| `lib.rs` | `#![deny(unsafe_code)]`, Modul-Deklarationen & Re-Exports |
+| `lib.rs` | `#![forbid(unsafe_code)]`, Modul-Deklarationen & Re-Exports |
 | `router.rs` | `RouterEngine` — Die Haupt-Logik, `RoutingDecision`, `ConfidenceMetrics` |
 | `profile.rs` | `SlmProfile` — Konfiguration eines Modells, `ConformalCalibrator`, `ProfileCalibrationState` |
 | `dispatch.rs` | `dispatch_to_slm` — Execution-Layer für den ausgewählten Pfad |
-| `lyapunov.rs` | `LyapunovDriftWatcher` — Drift-Erkennung & Adaptions-Steuerung für Conformal Calibration |
+| `lyapunov.rs` | `LyapunovDriftWatcher` — Drift-Erkennung & Adaptions-Steuerung für Conformal Calibration (event-driven) |
 | `outcome.rs` | `DecisionId`, `RoutingOutcome` — Aufzeichnung und Feedback von Routing-Entscheidungen |
+| `bandit.rs` | Contextual Bandit Routing (LinUCB Sherman-Morrison Rang-1-Updates vs. Diagonal-Default) |
+| `routing_strategy.rs` | `RoutingStrategy` & `BanditPolicy` Traits und Strategie-Auswahl |
+| `guarded_payload.rs` | Typsichere Egress-Payload-Kapselung (`GuardedPayload<Sanitized/Unsanitized>`) |
+| `transport.rs` | Transport-Abstraktion für sichere Modell-Übertragung |
 | `serde_helpers.rs` | Serde-Hilfsfunktionen für Deserialisierung |
 | `tests.rs` | Integrations- und Einheitentests für Router- und Dispatch-Logik (kein Produktionscode) |
 

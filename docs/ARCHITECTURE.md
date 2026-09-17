@@ -82,14 +82,17 @@ Layer 9:  memfuse-mcp —  (deps: memfuse-agent, memfuse-calibration, memfuse-ca
 | memfuse-calibration | G0-Sprint: IsotonicCalibrator + PlattScaler |
 | memfuse-candle | H2-Sprint: Native GGUF-Inferenz (Datenhoheit) |
 
-## Workspace Crates Übersicht (19 Active Crates)
+## Workspace Crates Übersicht
 
-- **Layer 0**: `memfuse-core` (Typen, Traits, Error, DocId [64-bit Default v0.x max 100M docs / 128-bit ADR-082 via docid-128])
-- **Layer 1**: `memfuse-store` (LSM-Tree), `memfuse-index` (HNSW), `memfuse-text` (BM25), `memfuse-security` (crates/memfuse-crypto) (AES-GCM & KV-Segment Security), `memfuse-graph` (CSR Graph, + SessionBranchTree DAG), `memfuse-checkpoint` (Snapshotting)
-- **Layer 2**: `memfuse-db` (Collections & 4-Signal Fusion, + MultiStepEngine, ContextCompactor)
-- **Layer 3**: `memfuse-ollama` (Ollama Client & Embeddings, + ContextPrefixEngine, generate_text()), `memfuse-agent` (Persistent Agent Workflow Engine), `memfuse-router` (Conformal Profile Router), `memfuse-embed` (ONNX-Embeddings, **optional**, Feature-gated, `default=[]`, + CrossEncoderReranker), `memfuse-py` (Python PyO3 FFI Bindings)
-- **Layer 4**: `memfuse-mcp` (MCP Server, + McpSandbox, VolatileToolResult), `memfuse-tauri` (Desktop App Shell — deprecated, Entfernung 2026-11-07)
-- **Layer 5**: `memfuse-bench` (Reproduzierbarer Benchmark-Harness für Retrieval-Genauigkeit)
+- **Layer 0**: `memfuse-core-ipc-gen`, `memfuse-core` (Typen, Traits, Error, DocId [64-bit Default / 128-bit via docid-128])
+- **Layer 1**: `memfuse-store` (LSM-Tree, WAL, Block-Cache), `memfuse-index` (HNSW/DiskANN), `memfuse-text` (BM25), `memfuse-security` (crates/memfuse-crypto), `memfuse-graph` (CSR Graph, Hyperkanten), `memfuse-checkpoint` (Snapshotting), `memfuse-calibration`
+- **Layer 2**: `memfuse-db` (Collections & 4-Signal Fusion)
+- **Layer 3**: `memfuse-ollama` (Ollama Client), `memfuse-candle` (Inferenz, KV-Cache), `memfuse-embed` (ONNX-Embeddings, optional), `memfuse-agent` (Agent Workflow Engine), `memfuse-router` (Contextual Bandit Routing), `memfuse-py` (Python FFI)
+- **Layer 4**: `memfuse-mcp` (MCP Server, Sandbox, Egress Gateway)
+- **Layer 5**: `memfuse-bench` (Benchmark-Harness)
+- **Layer 6.5**: `memfuse-sandbox` (WASM Execution Boundary)
+
+*(Hinweis: `memfuse-tauri` wurde gemäß Produktfokus auf PyPI & MCP Server vollständig als deprecated markiert und entfernt, siehe ADR-077).*
 
 ## Kern-Philosophie
 MemFuse ist das **Cognitive Operating System für LLM-Agenten — 4-Signal-RAG-Engine mit Contextual Retrieval, Cross-Encoder Reranking, Multi-Step Query, Session DAG und MCP Sandbox** — air-gapped, zero-panic (angestrebt), 100% Pure-Rust Sovereign Core (mit Ollama als lokalem LLM/Embedding Backend).
@@ -145,3 +148,15 @@ Standard-Korrekturen für Architektur- und Planungs-Blueprints:
 2. **Keine `petgraph`-Abhängigkeit**: `memfuse-graph` nutzt eine native Pure-Rust CSR-Graph-Implementierung (`SessionBranchTree`, `CsrGraph`) ohne `petgraph`-Workspace-Abhängigkeit gemäß ADR-004 (Pure Rust Sovereign Core Policy).
 3. **`CheckpointGuard` RAII & Snapshot-Referenzen**: `CheckpointGuard` besitzt RAII-Semantik (Auto-Rollback bei Drop) und ist bewusst nicht klonbar. Zustands-Referenzen werden als `snapshot_tx_id: Option<TxId>` gespeichert.
 4. **RRF-Nutzung**: `memfuse-db::fusion` stellt `reciprocal_rank_fusion()` und `weighted_reciprocal_rank_fusion()` bereit. Spezifikationen und Blueprints nutzen bestehende Funktionen anstelle redundanter `execute_rrf()` Neuimplementierungen.
+
+## Neue Architekturkonzepte (Zielbild)
+
+Das Endprodukt-Zielbild definiert zusätzliche Architekturkonzepte, die sukzessive eingeführt werden (orientiert an den **Opus-Optimierungen** Stufe 0-3):
+
+- **N-äre Hyperkanten (§6)**: Erweiterung des Wissensgraphen um die Struktur `HyperEdge`, um n-äre Relationen (Fakten mit mehr als zwei Beteiligten) verlustfrei darzustellen, anstatt sie in binäre Kanten zu zerlegen.
+- **SIEVE Block-Cache (§5.2)**: Ein lock-freies, epochenbasiertes Cache-Backend (via `block-cache-v2`), das den Overhead eines schreibenden Mutex bei Cache-Hits eliminiert.
+- **Sherman-Morrison-Bandit (§8)**: Mathematisch korrekte inkrementelle Ridge-Regression zur Bandit-Gewichtung (`egress-sherman-morrison` Opt-in).
+- **Architekturprinzipien P23-P25**:
+  - **P23**: Orthogonale Zeitbudgets (Fuel und Wall-Clock getrennt konfigurierbar in der WASM-Sandbox).
+  - **P24**: Lokalitätsprinzip (Globale Neuberechnungen wie bei dichten Power-Iterationen sind unzulässig; stattdessen Forward-Push PPR).
+  - **P25**: Lock-freie Cache-Treffer (Motivation für SIEVE).

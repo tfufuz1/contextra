@@ -10,10 +10,14 @@ und den Anti-Tamper-Schutz der WAL-Einträge.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Datei / Modul | Verantwortung |
 |---|---|
-| `lib.rs` | `#![deny(unsafe_code)]` (mit Ausnahme im Test-Modul für Memory-Inspektion) |
+| `lib.rs` | `#![forbid(unsafe_code)]` im Produktionscode (Test-Only Unsafe für Zeroize-Verifikation) |
 | `crypto.rs` | `KeyManager` — HKDF Subkey Derivation, AES-256-GCM-SIV Ver-/Entschlüsselung |
+| `deletion_proof.rs` | Kryptographischer Löschnachweis (`DeletionProof`, `LayerCleanupProof`) |
+| `egress_vault.rs` | Egress Shield & Exfiltration Protection (`EgressVault`, `EgressClassifier`) |
+| `kv_cipher.rs` | KV-Segment-Verschlüsselung & Modell-Fingerprinting |
+| `kv_segment/` | Mandanten-isolierte KV-Cache-Security (`TenantIsolatedKvStore`, `KvSegment`, `EvictionWorker`) |
 | `wal_crypto.rs` | `WalHmac`, `IntegrityVerifier`, `EncryptedWal` — HMAC-Chaining Protokoll |
 | `anti_tamper.rs` | `VolatileEncryptionKey`, Speicherschutz (Zeroize) |
 

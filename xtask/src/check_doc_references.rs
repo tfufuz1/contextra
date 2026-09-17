@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 pub const DEFAULT_CHECK_DOCS: &[&str] = &[
-    "docs/GESAMTSPEZIFIKATION_v10.md",
+    "docs/GESAMTSPEZIFIKATION.md",
     "AGENTS.md",
     "DECISIONS.md",
 ];

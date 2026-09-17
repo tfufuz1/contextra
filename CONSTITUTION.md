@@ -12,7 +12,7 @@
 ### 1. Safety First (Sovereign Core Doctrine)
 -   **Memory Safety**: We prefer Safe Rust. `unsafe` code is strictly prohibited by default. It is only permitted for documented, hardware-/OS-level or FFI integrations in specific files, accompanied by rigorous `// SAFETY:` proof comments:
     -   `memfuse-index`: SIMD hardware optimizations in `distance.rs` (AVX2, AVX-512, NEON) and read-only memory-mapped index I/O in `diskann.rs` and `persistence.rs` (`Mmap::map`, ADR-017).
-    -   `memfuse-store`: Win32 DACL/ACL file permission enforcement in `wal.rs` (`OpenProcessToken`, `InitializeAcl`, `SetFileSecurityW`, `#[cfg(windows)]`).
+    -   `memfuse-store`: Win32 DACL/ACL file permission enforcement in `wal/io.rs` (`OpenProcessToken`, `InitializeAcl`, `SetFileSecurityW`, `#[cfg(windows)]`).
     -   `memfuse-db`: RAM buffer memory locking against OS swapping in `volatile_vault.rs` (`mlock`/`munlock`, feature-gated via `volatile-vault`).
     -   `memfuse-embed`: C-FFI interactions with ONNX Runtime backend (feature-gated via `onnx`).
     -   `memfuse-core-ipc-gen`: Auto-generated FlatBuffers IPC bindings in `memfuse_generated.rs`.

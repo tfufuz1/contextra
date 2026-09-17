@@ -13,10 +13,15 @@ Implementiert den `GraphIndex` Trait aus `memfuse-core`.
 
 | Datei | Verantwortung |
 |---|---|
-| `lib.rs` | Modul-Deklaration, `#![deny(unsafe_code)]` |
+| `lib.rs` | Modul-Deklaration, `#![forbid(unsafe_code)]`, Re-Exports |
 | `csr.rs` | `CsrGraph` — Hauptstruktur, persistiert Entitäten & Kanten, GraphIndex-Impl |
+| `hyperedge.rs` | N-äre Hyperkanten-Definition (`HyperEdge`, `HyperEdgeId`, `RoleId`, `RoleBinding`) |
+| `path_rag.rs` | `PathRAGEngine` — Bidirektionaler Path-Retrieval-Graph (Dijkstra) |
 | `ppr.rs` | `PprContext` — Personalized PageRank mit L1-Norm-Abbruch (ADR-026) |
-| `community.rs` | `detect_communities` — Leiden-Algorithmus (ADR-027) |
+| `community.rs` | `detect_communities` — Leiden-Algorithmus inkl. StarExpansion für Hyperkanten |
+| `provenance.rs` | Herkunftsnachweis (`EdgeProvenance`, `DocEdgeIndex`) |
+| `cascade.rs` | Kaskadierende Kanten- und Hyperkanten-Invalidierung bei Dokument-Superseding |
+| `consistency_enforcement.rs` | Widerspruchserkennung und Edge-Suppression (`ConsistencyEnforcer`) |
 | `session_dag.rs` | `SessionBranchTree` — Agenten-Workflow-DAG, `AgentStateNode`, `DagEdge` |
 
 ## 3. Kritische Invarianten

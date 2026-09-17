@@ -1,757 +1,1174 @@
-# MemFuse — Gesamtspezifikation des Endprodukts v5
+# MemFuse — Gesamtspezifikation des Endprodukts (v6)
 
-> **Status:** Verbindlich · Einzige normative Quelle für Produkt, Architektur und Prozess
-> **Version:** 5.0 · **Erstellt:** 2026-09-13 · **Basis:** v4 + Strategiebericht (d56289b) + Spezifikationserweiterung §12–§14 + Architektur-Audit §12–§14
-> **Geltungsbereich:** Diese Spezifikation beschreibt den **Zielzustand** von MemFuse — wie das System als fertiges Produkt aussieht, sich verhält und verteilt wird. Sie ist keine Fortschritts-, Audit- oder Änderungshistorie und enthält bewusst keine Commit-Referenzen, Revisionsvergleiche oder Statusabzeichen. Alle Aussagen sind normative Festlegungen dessen, was das System leisten MUSS bzw. wie es strukturiert ist.
-> **Codeumfang (Größenordnung):** ca. 160.000 Zeilen Rust über 17 Workspace-Crates (16 Kern + `memfuse-sandbox`) plus `memfuse-py` als isoliertes FFI-Workspace, plus `xtask`- und `memfuse-bench`-Werkzeug-Crates.
-> **Vorgängerdokument:** `MEMFUSE_ENDPRODUKT_SPEZIFIKATION_FINAL_4.md` (v4). Änderungen gegenüber v4 sind: neue §§ 12–14, neues Crate §4.18 `memfuse-sandbox`, erweiterte §§ 4.14/4.16 (Router-Bandit/Transport-Erweiterung), gehärtete §§ 9.1/10, neue Glossareinträge §11.
-
----
-
-## §1 — Kernthese
-
-**MemFuse ist die technisch fortschrittlichste, vollständig lokal betriebene Gedächtnisschicht für KI-Agenten.**
-
-Die Kombination aus 4-Signal-Retrieval-Fusion (Vektor, Volltext, Graph, Metadaten) mit PathRAG-Multi-Hop-Traversierung, proaktiver Kalibrierungs-Drift-Erkennung, kryptographisch integritätsgesicherter Storage-Engine, echter WASM-Ausführungs-Isolation und einer echten Air-Gap-Inferenzoption ist im Feld lokal betriebener AI-Memory-Systeme ohne direktes Äquivalent. Der oberste Produktgrundsatz:
-
-> **Release schlägt Feature.** Solange kein erstes stabiles Release existiert, hat jede Aufgabe, die direkt zu einem `uvx`- oder `pip install`-fähigen Artefakt führt, Vorrang vor neuer Retrieval- oder Konsolidierungsarbeit — mit der einzigen Ausnahme von Fehlern mit Silent-Data-Corruption-Risiko.
-
----
-
-## §2 — Produktvision
-
-### §2.1 Was MemFuse ist
-
-MemFuse ist eine souveräne, lokal betriebene Gedächtnisschicht für KI-Agenten. Sie wird primär als **MCP-Server** (`memfuse-mcp`, Installation via `uvx`) und sekundär als **Python-Library** (`pip install memfuse`) sowie als **Rust-Crate** (`crates.io`) verteilt. MemFuse ist reine Infrastruktur — kein menschlicher Endnutzer interagiert je direkt mit MemFuse ohne einen dazwischenliegenden Agenten, Assistenten oder ein Framework.
-
-### §2.2 Primärer Eingang: MCP-Server zuerst
-
-1. **`memfuse-mcp`** (`uvx`-paketiert) — MCP-Server für Claude Desktop, Cursor, Windsurf, Cline. Installationsfluss: `uvx memfuse-mcp --db-path ~/.memfuse`.
-2. **`memfuse` (Python-Library)** — `pip install memfuse` für Python-Entwickler, die LangChain/LlamaIndex/eigene Agentenloops mit lokalem Gedächtnis versorgen.
-3. **`memfuse` (Rust-Crate)** — `crates.io`-Distribution für Rust-native Agentenframeworks.
-4. **`memfuse` Enterprise** (Fernziel) — DSGVO-konforme, auditierbare Deployments, relevant sobald 1. und 2. echte Nutzer haben.
-
-Eine grafische Desktop-Anwendung ist kein Bestandteil des Produkts (siehe §2.4).
-
-### §2.3 Alleinstellungsmerkmale
-
-1. **4-Signal-Retrieval-Fusion inkl. PathRAG & Gestufte Indexarchitektur:** HNSW (Vektor, Default für aktive mutable Kollektionen) + BM25 (Volltext) + CSR-Graph (PageRank / Leiden-Community-Clustering) + Metadaten-Filter, fusioniert via Reciprocal Rank Fusion (RRF) mit optionaler Z-Score/CombSUM-Score-Normalisierung (opt-in mit RRF-Fallback bei Signalausfall). DiskANN dient als offizieller Tier für großvolumige, leselastige Kollektionen nach SQ8-Codebook-Drift-Fix und nativer Delete-Semantik. PathRAG (bidirektionaler Dijkstra) liefert ein viertes, multi-hop-fähiges Signal.
-2. **Kalibriertes Retrieval mit proaktiver Drift-Erkennung:** Isotonic-Kalibrierung (PAVA) + Lyapunov-Drift-Watcher erkennen Qualitätsverschlechterung, bevor sie beim Nutzer sichtbar wird. Live-Observability-Daten (Drift-Status, Kalibrierungsfehler, PID-Pool-Größe) sind bis in die Python- und MCP-Grenzschicht durchgehend verdrahtet — keine Platzhalterwerte an der API-Oberfläche.
-3. **MCP-native mit technisch erzwungener Zero-Trust-Sandbox:** Prompt Injection Guard, volatile Tool-Output-Verschlüsselung **und** — für die `CodeExecution`-Permission — eine echte WASM-Ausführungsgrenze (`memfuse-sandbox`, §4.18) sind in `memfuse-mcp` first-class. Die Zero-Trust-Eigenschaft ist für Code-Ausführung technisch erzwungen, nicht nur behauptet: Agenten-Tool-Code läuft in einer speicher-isolierten WASM-Instanz mit expliziten Capability-Grenzen, nicht im selben Prozessraum wie MemFuse.
-4. **Kryptographische Integrität & Löschung:** WAL-HMAC-Kette und `DeletionProof` (kryptographischer Löschnachweis, DSGVO Art. 17) auf Storage-Ebene.
-5. **Typsichere Lock-Infrastruktur:** Session-DAG mit `NodesGuard`-Typ erzwingt Lock-Reihenfolge zur Compile-Zeit. Die Deadlock-Freiheitsgarantie erstreckt sich über den Konsolidierungspfad via `ConsolidationNodesGuard::try_acquire()`.
-6. **Echter Air-Gap-Modus mit KV-Cache-Bridge:** Native Candle-GGUF-Inferenz (Pure Rust) ist als vollwertiger Inferenz- und Embedding-Backend-Pfad verdrahtet — kein Ollama-Prozess und kein Netzwerkzugriff nötig. Eine mandantenisolierte, verschlüsselte KV-Cache-Bridge verbindet Retrieval-Treffer direkt mit dem Inferenz-Backend.
-7. **Portables, versioniertes Memory-Export-/Import-Format:** Vollständiger Export **und** idempotenter Re-Import einer Collection als JSON, tool- und plattformunabhängig lesbar — Grundlage für Backup, Migration und Interoperabilität. Macht MemFuse zum System ohne Vendor-Lock-in: Nutzer können jederzeit wechseln, was Vertrauen und Adoption erhöht.
-8. **Cloud-Egress Privacy Gateway** (optional, `cloud-egress-guard`): Für Nutzer, die Cloud-LLMs bewusst und selbst einsetzen, schützt ein fünfschichtiges Privacy-Gateway (deterministisches Token-Vaulting, lokale Abstraktion, Graph-Generalisierung, Bulk-Exfiltrations-Erkennung via `EgressGuard`, bidirektionaler Zero-Trust) vor ungewollter Datenexfiltration — ohne das Air-Gap-Standardverhalten zu berühren (P5).
-
-### §2.4 Nicht-Ziele (verbindlich)
-
-- Kein Cloud-SaaS, auch nicht optional gehostet.
-- Kein Multi-Tenant-Enterprise-Produkt für gleichzeitige Fremdkunden auf einer Instanz.
-- Kein eigenes LLM-Training/Fine-Tuning-Feature.
-- Keine grafische Desktop-Oberfläche.
-- Kein eigenes Agentenframework — reine Gedächtnisschicht für externe Frameworks.
-- Keine Cloud-Vektordatenbank-Alternative — embedded/lokal-only.
-- Kein Voice-Assistant-Interface.
-- Kein verteilter Konsenscluster (`memfuse-cluster`, Raft/`openraft`) — weder als Kern- noch als optionales Feature (§14 begründet dies erschöpfend; das Veto gilt zeit-invariant unabhängig von verfügbarer Implementierungsgeschwindigkeit).
+> **Status:** Normativ · Einzige maßgebliche, eigenständige Quelle für Produkt, Architektur, Datenmodell, Algorithmen,
+> Sicherheitsmodell und Implementierungsreihenfolge von MemFuse.
+> **Geltung:** Dieses Dokument ersetzt vollständig alle vorherigen Spezifikationsfassungen und -deltas
+> (u. a. die `FINAL_9`–`FINAL_12`-Reihe, die `v11.1`/`v11.2`-Hyperkanten-Deltas sowie die
+> „Mikrofeingranulare Schnittstellenspezifikation"). Es enthält keine Verweise auf diese Vorgängerdokumente mehr,
+> sondern führt deren normativen Inhalt zu einem einzigen, in sich geschlossenen Zielbild zusammen.
+> **Charakter:** Dies ist eine **Zielarchitektur- und Produktspezifikation**, keine Commit-für-Commit-Verifikation
+> eines bestimmten Repository-Standes. Wo zwischen spezifiziertem Zielzustand und (zum Zeitpunkt der letzten
+> bekannten Code-Prüfung) tatsächlich implementiertem Zustand ein Unterschied besteht, ist dies explizit als
+> **Reifegrad** gekennzeichnet, nicht stillschweigend vermischt.
+>
+> **Reifegrad-Kennzeichnung, durchgängig verwendet:**
+> - 🟢 **Produktiv** — im Code vorhanden, korrekt und als Produktions-Default aktiv.
+> - 🟡 **Hinter Feature-Flag** — im Code vollständig und korrekt vorhanden, aber nicht der Produktions-Default;
+>   Aktivierung erfordert ein explizites Cargo-Feature oder eine Konfigurationsoption.
+> - 🔴 **Spezifiziert, zu bauen** — normativer Zielzustand dieses Dokuments, im Code (Stand der letzten Prüfung)
+>   nicht vorhanden.
+> - ⚖️ **Produktentscheidung ausstehend** — die technische Umsetzung ist möglich oder bereits vorhanden, der
+>   Wechsel des Produktions-Defaults ist jedoch eine bewusste, an ein Kriterium (Benchmark, Major-Release)
+>   gebundene Entscheidung, kein Implementierungsrückstand.
 
 ---
 
-## §3 — Architekturprinzipien P1–P20
+## Inhaltsverzeichnis
 
-- **P1 — DAG-Integrität:** `cargo xtask check-dag` ist zwingendes CI-Gate. Kein Code in Layer N darf Abhängigkeiten auf Layer >N besitzen. Wo eine höherschichtige Information (z. B. Router-Drift-Status) in einer niedrigeren Schicht sichtbar sein muss, erfolgt dies ausschließlich über eine optionale, schwache Referenz (`Weak<T>`-Injection zur Konstruktionszeit), niemals über eine harte Abhängigkeitsumkehr. `memfuse-sandbox` (Layer 6.5) ist bewusst zwischen Router (Layer 6) und MCP (Layer 8) positioniert und von Layer 8 (`memfuse-mcp`) stark abhängig — keine DAG-Verletzung, da Layer 8 nur nach Layer 6.5 geordnet ist.
-- **P2 — Zero-Panic-Doctrine:** Production-Code ist panic-frei. `unsafe` ist beschränkt auf drei funktionale Kategorien: (a) SIMD-Distanzberechnung, (b) Mmap-Persistenz mit dokumentiertem `// SAFETY:`-Proof, (c) plattformspezifische Systemaufrufe mit dokumentiertem `// SAFETY:`-Proof. `memfuse-py` nutzt `panic = "unwind"` mit `catch_unwind`-Isolation. `memfuse-sandbox` hält `#![forbid(unsafe_code)]` — der WASM-Host-Aufruf läuft über `wasmtime`s sicheres API ohne unsafe.
-- **P3 — WAL-First:** Kein Datenschreibvorgang ohne vorherigen WAL-Commit. `fsync` auf Datei- und Directory-Ebene.
-- **P4 — Inferenz-Backend-Agnostizismus:** `LlmTextGenerator`/`LlmTextGeneratorStreaming` und `TextEmbeddingEngine` in `memfuse-core` sichern die Abstraktion. Backend-spezifische Fähigkeiten werden ausschließlich additiv über Default-Trait-Methoden angeboten.
-- **P5 — Kein Cloud-Zwang:** Inferenz und Retrieval laufen vollständig lokal. Das optionale `cloud-egress-guard`-Feature berührt diesen Grundsatz nicht — es ist standardmäßig deaktiviert und adressiert Nutzer, die Cloud-LLMs *ohnehin* und *selbst* einsetzen, außerhalb von MemFuse.
-- **P6 — Eine Quelle für Architekturentscheidungen:** `DECISIONS.md` ist die einzige Quelle für ADRs.
-- **P7 — Code-Nachweis-Pflicht für Marketing-Aussagen:** Quantitative Leistungsversprechen benötigen reproduzierbare Benchmark-Nachweise in `memfuse-bench` — null Ausnahmen. Dies gilt explizit für: (a) KV-Cache-Bridge-Prefill-Einsparung (benötigter Benchmark: `bench_kv_bridge_prefill_savings`), (b) Session-DAG-Deadlock-Freiheit (benötigter Stress-Test: `stress_session_dag_deadlock_freedom`), (c) LinUCB-Bandit-Regret vs. Kaskaden-Baseline (`test_bandit_vs_cascade_regret_comparison`, §13.3). Ohne diese Benchmarks bleiben die entsprechenden USP-Aussagen in README/PyPI-Beschreibung als `[BENCHMARK_PENDING]` markiert.
-- **P8 — Kalibrierungs-Integrität:** Jede Änderung an `prompt_template_hash`, `temperature_bits` oder `quantization` invalidiert automatisch alle Kalibrierungsstatistiken. Eine analoge `ModelFingerprint`-Bindung (HKDF-gebunden) gilt für alle persistierten KV-Cache-Segmente.
-- **P9 — Kein Klartext-Sensitivspeicher:** Sensitiver Tensor-Speicher (Volatile Vault, KV-Cache-Segmente, WASM-Sandbox-Outputs) wird nach Nutzung via `ZeroizeOnDrop` überschrieben.
-- **P10 — Reuse vor Neubau:** Prüfung gegen `TYPE_REGISTRY.md` und CI-Gate `check-duplicate-symbols` vor Neuanlage. Für §12: Aho-Corasick-Erkennung nutzt die vorhandene ONNX-Runtime aus `memfuse-embed`; Layer-3-Abstraktion nutzt den vorhandenen `SegmentSynthesizer`-Trait; `EgressGuard` nutzt den vorhandenen HNSW-Index als k-NN-Backend. Für §13: Der Bandit-Router nutzt den bereits für Retrieval berechneten Query-Embedding-Vektor ohne zweite Inferenz; `ndarray 0.15` wird via re-export aus `memfuse-embed/onnx` bezogen, nicht neu eingeführt.
-- **P11 — Latenzbudget-Pflicht für Hot-Path:** `RerankPidController` und `PidLatencyController` (beide produktiv) begrenzen P95-Latenzen. Für das Cloud-Egress-Gateway (§12.2.2) gilt: Layer 2 (lokale Abstraktion via `SegmentSynthesizer`) wird durch denselben `PidLatencyController`-Mechanismus begrenzt; bei Latenzbudget-Überschreitung wird Layer 2 übersprungen (Fail-Open zu Layer 3), niemals blockiert.
-- **P12 — Physio-Feature-Default-Unsichtbarkeit:** Alle `physio-*`-Feature-Aliase sind per Feature-Flag deaktivierbar, Defaults bleiben transparent.
-- **P13 — Modulgrenzen nach Verantwortung:** Klare Trennung Layer 0 (Fundament) bis Layer 8 (Agenten/Interfaces). `memfuse-sandbox` belegt Sublayer 6.5 — abhängig von Layer 2/3 (`memfuse-core`, `memfuse-security`), Abhängigkeit von Layer 8 (`memfuse-mcp`) in umgekehrter Richtung (MCP hängt von sandbox ab, nicht umgekehrt).
-- **P14 — Klare Verantwortungstrennung für Hintergrundtasks:** `MaintenanceScheduler` und `ConsolidationEngine` sind zwei sich ergänzende, aber gegenseitig exklusive Mechanismen pro Collection: gesichert durch `consolidation_guard: Arc<tokio::sync::Mutex<()>>` per `try_lock` (ADR-081). Neue Hintergrund-Task-Kategorien dürfen nur mit explizitem ADR eingeführt werden.
-- **P15 — Eine Vision pro Release:** MCP-Server zuerst, Python-Library parallel.
-- **P16 — Dokumente als Zieldefinitionen:** Dokumente beschreiben Soll-Zustände und maschinenlesbare Invarianten, keine ephemeren Code-Zeilen.
-- **P17 — Ambient-Kontext ist keine Garantie:** `AGENTS.md` wird nicht automatisch geladen; jeder Trigger-Prompt erzwingt das Einlesen von `AGENTS.md` und `.jules/SESSION_BOOTSTRAP.md`.
-- **P18 — Parallele Sessions brauchen Claims:** `cargo xtask claim --crate X --issue Y` sperrt Ziel-Crates vor paralleler Bearbeitung. Der Check MUSS zusätzlich alle offenen Remote-Branches und Pull-Requests über die GitHub-API auf normalisierte Subject-Ähnlichkeit prüfen, bevor ein PR als merge-fähig gilt; ist die API nicht erreichbar, MUSS dies als expliziter Fehler gemeldet werden, niemals als stiller Fallback auf ein falsches „OK".
-- **P19 — Beschlossener, nicht umgesetzter Governance-Beschluss ist gefährlicher als keiner:** Beschlüsse werden per CI-Gate durchgesetzt oder formal widerrufen. Dies gilt symmetrisch: Ein stillschweigend revidierter, aber nicht neu dokumentierter Beschluss (z. B. die Cluster-Veto-Reaffirmation §14) ist ebenso gefährlich wie ein nicht umgesetzter.
-- **P20 — Release schlägt Feature:** Höchste Priorität bei Konflikt (siehe §1). `bandit-routing` (§13) und `cloud-egress-guard` (§12) und `memfuse-sandbox` (§4.18) werden per Feature-Flag (Default: off) gegen den Release-Pfad abgeschirmt.
+1. [Kernthese & Leitprinzip](#kernthese)
+2. [Produktvision, Alleinstellungsmerkmale & Nicht-Ziele](#vision)
+3. [Architekturprinzipien P1–P25](#prinzipien)
+4. [Systemarchitektur: der Crate-DAG](#architektur)
+5. [Speicherschicht: LSM-Tree, WAL und lock-freies Cache-Management](#speicher)
+6. [Wissensgraph-Datenmodell: binäre Kanten und n-äre Hyperkanten](#graph)
+7. [Retrieval-Pipeline: 4-Signal-Fusion und ihre Algorithmen](#retrieval)
+8. [Contextual-Bandit-Routing](#bandit)
+9. [Inferenz, KV-Cache-Bridge und Zero-Copy-IPC](#inferenz)
+10. [Sicherheits- und Datenschutzmodell](#sicherheit)
+11. [Betriebsmodi](#betrieb)
+12. [Feature-Flag-Politik: Produktions-Default vs. Opt-in](#features)
+13. [Governance & Entwicklungsprozess](#governance)
+14. [Abnahmekriterien des Endprodukts](#abnahme)
+15. [Rückverfolgbarkeitsmatrix](#matrix)
+16. [Roadmap](#roadmap)
 
 ---
 
-## §4 — Crate-Spezifikation (mikrofein)
-
-### §4.1 `memfuse-core-ipc-gen` — Layer 0
-
-Auto-generierter FlatBuffers-IPC-Code für die MemFuse-Kernprotokolle. Keine internen Abhängigkeiten (Wurzel des DAG). Enthält die generierten FlatBuffers-Typen für Query-/Response-Strukturen, die über die Python- und MCP-Grenzschicht transportiert werden. Wird nicht manuell editiert; Regeneration via Build-Skript aus `.fbs`-Quellschemata.
-
-### §4.2 `memfuse-core` — Layer 1 (Fundament, Dependency-Root)
-
-Stellt alle domänenweiten Typen, Trait-Abstraktionen und die einheitliche Fehlerbehandlung bereit. Jedes andere Crate hängt transitiv davon ab. Abhängigkeit: `memfuse-core-ipc-gen`.
-
-**Module:**
-- `error.rs`/`error_dto.rs` — `MemFuseError`-Enum, DTO-Serialisierung für Grenzschichten.
-- `ipc/` — JSON-RPC-Hilfstypen.
-- `seq_log.rs` — Sequenz-Logging-Primitive für MVCC-Ordering.
-- `snapshot.rs` — `SnapshotRegistry` für MVCC-Lese-Isolation.
-- `traits/mod.rs` — Kern-Traits: `StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`, `CheckpointCoordinator`, `Checkpoint`, `Snapshot`, `TextEmbeddingEngine`, `LlmTextGenerator`, `SegmentSynthesizer` (inkl. additiver Modus `SynthesisMode::PrivacyAbstraction` für §12.2.2), `DistanceCalculator`, `MemoryLifecycleManager`, `GroundingValidator`, Stats-Typen, `ConsolidationAction`-Enum, `GroundingAssessment`.
-- `traits/embedding.rs` — `EmbeddingProvider`, `TextGenerator`, `EmbeddingError`, `MockEmbedder`, **`LlmTextGeneratorStreaming`**, `generate_with_context()`.
-- `model_fingerprint.rs` — kanonischer `ModelFingerprint`-Typ.
-- `types.rs` + Untermodule — Domänentypen inkl. `SynthesisMode`-Enum (`SleepCycle` | `PrivacyAbstraction`) als neuer Typ für die duale Nutzung des `SegmentSynthesizer`-Traits.
-
-**Feature-Flags:** `test-utils`.
-
-### §4.3 `memfuse-calibration` — Layer 2
-
-Score- und Wahrscheinlichkeits-Kalibrierung. Abhängigkeit: `memfuse-core`.
-
-- `isotonic.rs` — `IsotonicCalibrator` via PAVA.
-- `platt.rs` — `PlattScaler`.
-- `pid.rs` — `RerankPidController` und `PidLatencyController` (beide produktiv).
-
-### §4.4 `memfuse-checkpoint` — Layer 2
-
-Öffentlich sichtbarer Checkpoint-Subsystem-Einstiegspunkt. Abhängigkeit: `memfuse-core`.
-
-**Kernschnittstellen:** `CheckpointCoordinator`-Trait-Implementierung; `PersistentCheckpointStore`; `CheckpointGuard`.
-
-### §4.5 `memfuse-graph` — Layer 2
-
-CSR-Graph für Entity-Relation-Traversal sowie Session-DAG. Abhängigkeiten: `memfuse-core`, `memfuse-store`.
-
-- `csr.rs`, `ppr.rs`, `community.rs`, `path_rag.rs`, `session_dag.rs`, `cascade.rs`, `consistency_enforcement.rs`, `edge_reinforcement.rs`/`edge_reinforcement_buffer.rs`, `percolation.rs`, `provenance.rs`.
-
-**`NodesGuard`-Garantie (erweitert):** Die Compile-Zeit-Deadlock-Freiheit gilt jetzt nachweislich über den gesamten Konsolidierungspfad: `consolidation_executor.rs` bezieht Tx-Sperren via `ConsolidationNodesGuard::try_acquire()` — eine eigenständige, vom `NodesGuard`-Typ abgeleitete Hülle, die dieselbe Lock-Reihenfolge erzwingt und durch `test_consolidation_deadlock_freedom` (Regression) permanent abgesichert ist.
-
-**Feature-Flags:** `default = []`, `graph-connectivity-health`, `edge-reinforcement-learning`, `physio-percolation` → `graph-connectivity-health`, `physio-synaptic-edges` → `edge-reinforcement-learning`.
-
-### §4.6 `memfuse-crypto` (Package-Name `memfuse-security`) — Layer 2
-
-Verschlüsselung, Integritätsschutz und mandantenisolierte KV-Cache-Sicherheit. Abhängigkeit: `memfuse-core`. Namenskonvention: Verzeichnisname `memfuse-crypto`, Cargo-Package-Name `memfuse-security`.
-
-- `crypto.rs` — `KeyManager`: AES-256-GCM-SIV, HKDF-SHA256, `derive_file_key()`, `derive_kv_key()`. Alle variablen HKDF-Info-Felder sind längenpräfixiert. Nonces: instanzweites Zufallspräfix plus OsRng-Suffix.
-- `wal_crypto.rs` — WAL-HMAC-Kette mit `subtle::ConstantTimeEq`.
-- `anti_tamper.rs`, `deletion_proof.rs` — `DeletionProof` (DSGVO Art. 17).
-- `kv_cipher.rs` — `KvSegmentCipher`/`EncryptedKvLayer` mit Format-Versionsfeld.
-- `kv_segment/` — `TenantIsolatedKvStore`: `DEFAULT_SHARD_COUNT = 32`, `#[repr(align(64))]`-Shards, O(1)-LRU, Deferred Zeroization, `EvictionWorker` auf separatem OS-Thread, `evict_lru_fair()`, `clear_all()` (synchroner Emergency-Wipe).
-- `egress_vault.rs` (neu, hinter Feature `cloud-egress-guard`) — Wiederverwendung des `volatile_vault`-Paradigmas für die Surrogat-Mappings des Egress-Gateways (§12.2.1): `EgressVault` hält die `Surrogat → Klartext`-Map AES-256-GCM-SIV-verschlüsselt in einer `TenantIsolatedKvStore`-Instanz mit `ZeroizeOnDrop`; pro Session initialisiert, beim Session-Ende vollständig gewipet.
-- `error.rs` — crate-lokale Fehlertypen.
-
-**Feature-Flags:** `test-utils`, `kv-encryption`, `cloud-egress-guard` (neu, aktiviert `egress_vault.rs`).
-
-### §4.7 `memfuse-text` — Layer 2
-
-BM25-Volltextsuche mit deutscher Kompositum-Dekomposition. Abhängigkeit: `memfuse-core`.
-
-- `bm25.rs`, `inverted.rs`, `morphology.rs`, `tokenizer.rs`.
-
-### §4.8 `memfuse-candle` — Layer 3
-
-Native Candle-GGUF-ML-Inferenz-Engine (Pure-Rust). Abhängigkeiten: `memfuse-core`, `memfuse-calibration`, optional `memfuse-crypto` (Feature `kv-bridge`).
-
-- `gguf_loader.rs`, `inference.rs` (`CandleLlmClient`, implementiert `LlmTextGenerator`/`LlmTextGeneratorStreaming`), `embedding.rs`/`embedding_provider.rs`, `model_registry.rs` (`compute_fingerprint()`), `gasp.rs`, `kv_bridge.rs` (Feature `kv-bridge`).
-
-**Feature-Flags:** `default = []`, `candle`, `cuda`, `metal`, `kv-bridge`.
-
-### §4.9 `memfuse-index` — Layer 3
-
-HNSW-Vektorindex mit SIMD-beschleunigter Distanzberechnung. Abhängigkeiten: `memfuse-core`, `memfuse-security`.
-
-- `hnsw.rs`, `distance.rs` (SIMD, unsafe), `diskann.rs` (unsafe), `persistence.rs` (unsafe), `quantize.rs`, `partial_rebuild.rs` (VETO-F02, Feature `partial-index-rebuild`, gesperrt bis `test_partial_rebuild_recall_regression()` 30 Tage stabil, ADR-070).
-
-**Adaptiver DiskANN-Flush-Threshold** (ADR-076): `PENDING_FLUSH_THRESHOLD(N) = max(50, min(1000, ⌊N × 0.05⌋))` — implementiert als dynamisch berechnete Funktion statt statischer Konstante.
-
-**Feature-Flags:** `default = []`, `experimental-diskann`, `partial-index-rebuild`.
-
-### §4.10 `memfuse-ollama` — Layer 3
-
-HTTP-Client für Ollama. Abhängigkeiten: `memfuse-core`, `memfuse-calibration`, `memfuse-embed`.
-
-- `client.rs`, `embedding.rs`, `context_prefixer.rs`, `importance.rs`, `model_info.rs`.
-
-### §4.11 `memfuse-embed` — Layer 4
-
-In-Process-Text-Embeddings über ONNX Runtime. Abhängigkeiten: `memfuse-core`, `memfuse-calibration`, `memfuse-candle` (optional).
-
-- `lib.rs` — ONNX-Runtime, `max_concurrent_embeddings` Backpressure-Vertrag.
-- `reranker.rs` — Cross-Encoder-Reranking.
-
-**`ndarray 0.15` Re-Export:** Das unter Feature `onnx` bereits als transitive Abhängigkeit vorhandene `ndarray 0.15` wird für den LinUCB-Sherman-Morrison-Pfad in `memfuse-router` (§4.14) via `memfuse-embed/onnx` re-exportiert — kein neuer Crate-Import, P10-konform.
-
-**Feature-Flags:** `default = []`, `onnx`, `candle-backend`.
-
-### §4.12 `memfuse-store` — Layer 3
-
-LSM-Tree-basierte Storage-Engine. Abhängigkeiten: `memfuse-core`, `memfuse-security`.
-
-- `wal.rs` — WAL v3 mit HMAC-Kette, WAL-Flusher-Actor (standardmäßig aktiv: `Wal::new()` sowie `open_with_key_manager()` rufen `enable_flusher()` ohne gesonderten Aufrufer-Opt-in auf), Zero-Copy-mmap-Replay (`replay_mmap()`; `replay()` delegiert direkt dorthin. Fallback auf den sequenziellen Stream-Reader bei mmap-Fehlern ist implementiert. Bit-Identität beider Pfade ist über `test_wal_replay_stream_vs_mmap_parity` abgesichert).
-  - **WAL-Rotation für passives Shipping** (§14.3): Abgeschlossene WAL-Segmente werden durch `Wal::rotate_and_seal()` atomar versiegelt (via `rename()` + `fsync()` auf Directory) und danach `O_RDONLY`-reflaggt. Nur versiegelte, read-only-geflaggite Segmente werden für das passive WAL-Shipping (Syncthing, iCloud Drive, One-Shot-HTTP-Push) freigegeben. Der Flusher-Actor schreibt ausschließlich in das aktive, nicht-versiegelte Segment; damit sind TOCTOU-Konflikte zwischen Flusher und externem Sync-Daemon strukturell ausgeschlossen.
-- `memtable.rs` — 16-Shard-MemTable, Avalanche-64-Bit-Mixer, `scan_prefix_into`/`scan_prefix_into_matching`.
-- `sstable.rs` — SSTable mit Block-Binärsuche (`binary_search_in_block()`, `binary_search_in_block_index()`, `binary_search_index_in_block()`), `BlockCacheShard` (`BLOCK_CACHE_SHARDS = 16` Shards, cache-line-ausgerichtet).
-- `compaction.rs`, `lsm.rs` (Group-Commit, Zero-Wait-Heuristik: Bei fehlender Commit-Warteschlange verzichtet der Leader über eine `has_followers`-Prüfung auf das künstliche Warteintervall), `manifest.rs`, `mmap.rs`, `checkpoint.rs` (`pub(crate)`), `system_pressure.rs`, `tenant_codec.rs`, `util.rs`.
-
-**Feature-Flags:** `default = []`, `fault-injection`.
-
-### §4.13 `memfuse-db` — Layer 5 (Orchestrierungs-Kern)
-
-Eingebettete Hybrid-Search-Engine für KI-Agenten. Abhängigkeiten: alle Layer-2–4-Crates.
-
-**Lock-Hierarchie:** 1. `MemFuse::collections` → 2. `MemFuse::embedder` → 3. `Collection::insert_lock` / `Collection::embedder`.
-
-**Module:** `collection/`, `fusion.rs` (Late Hydration, NaN-Guards, `AHashMap`), `multistep.rs` (mit `PidLatencyController`), `chunker.rs` (`MarkdownChunker`), `context.rs`/`context_compaction.rs`, `temporal_filter.rs`, `filter.rs`, `decay_controller.rs`, `homeostat.rs`, `memory_consolidation.rs`, `synthesis_phase.rs`, `consolidation_executor.rs` (mit `ConsolidationNodesGuard`), `maintenance_scheduler.rs`, `consolidation_engine.rs`, `maintenance_config.rs`, `background_workers.rs`, `transaction.rs`, `volatile_vault.rs`, `export.rs`, `import.rs`, `pid_latency_controller.rs`.
-
-**`router`-Anbindung:** `MemFuse` hält `router: Option<Weak<RouterEngine>>` (ADR-080). `MemFuseDb::stats()` befüllt `drift_status`, `calibration_ece`, `last_calibration_at`, `pid_pool_size` mit Live-Daten via `Weak::upgrade()`.
-
-**`EmbeddingBackend`-Enum:** `Onnx { model_name, cache_dir }` (Default), `Ollama { base_url, model }`, `Candle { model_dir, quantization }`, `None`.
-
-**Feature-Flags:** `default = []`, `bench`, `sandbox`, `experimental-diskann`, `reranking`, `background-maintenance`, `graph-connectivity-health`, `coherence-bonus-fusion`, `adaptive-candidate-pool-sizing`, `volatile-vault`, `edge-reinforcement-learning`, `cloud-egress-guard` (neu).
-
-### §4.14 `memfuse-router` — Layer 6
-
-Conformal Router mit outcome-kalibriertem Routing, proaktiver Drift-Überwachung und optionalem Contextual-Bandit-Gate (§13). Abhängigkeiten: `memfuse-core`, `memfuse-store`, `memfuse-db`, `memfuse-ollama`.
-
-**Module:**
-- `router.rs` — `RouterEngine`. Kernmethoden: `route()` (async), `profiles()`, `update_profiles()`/`try_update_profiles()`, `calibration_stats()`, `reset_calibration()`, `drift_status()`, `set_lyapunov_baseline()`, `record_outcome()`, `pending_decision_count()`, `reset_all_calibration()`. Zustandstypen: `ConfidenceMetrics`, `RoutingDecision`, `RouterState`.
-- `lyapunov.rs` — Lyapunov-Drift-Watcher (ADR-079: event-driven, nicht periodisch).
-- `dispatch.rs` — Dispatch-Logik. **Hardening (§12.3, unabhängig von cloud-egress-guard):** `dispatch_to_slm()` MUSS den Subprozess via `Command::new(program).args(&[...])` ohne Shell-Zwischenschicht starten (kein `sh -c`); der `endpoint`-String aus `SlmProfile.mcp_endpoint` MUSS zuvor geparst und in Programmpfad + Argumente aufgeteilt werden. Beim `HttpCloud`-Transport (Feature `cloud-egress-guard`, §12.3) wird der `HttpCloud`-Zweig ausschließlich aufgerufen, wenn `GuardedPayload<Sanitized>` als Typ-State vorliegt.
-- `outcome.rs` — `RoutingOutcome`: `Success`, `Escalated { .. }`, `Rejected`.
-- `profile.rs` — `SlmProfile` mit neuem Feld `transport: Transport` (Default: `Transport::StdioMcp`, additive Erweiterung, kein Breaking Change). Neu: `bandit_state: Option<BanditProfileState>` (Feature `bandit-routing`).
-- `transport.rs` (neu, Feature `cloud-egress-guard`) — `Transport`-Enum:
-  ```rust
-  pub enum Transport {
-      StdioMcp,                    // bestehend, unverändert
-      HttpCloud { url: String },   // neu, nur mit cloud-egress-guard + GuardedPayload<Sanitized>
-  }
-  ```
-- `bandit.rs` (neu, Feature `bandit-routing`) — Contextual-Bandit-Implementierung (§13.2):
-  - **`BanditProfileState`:** Hält pro Profil $p$ den Gewichtsvektor $\theta_p$ und — je nach `BanditImplementation`-Variante — entweder die diagonale Varianzschätzung (Default) oder die via Sherman-Morrison aktualisierte volle Inverse $A_p^{-1}$.
-  - **`BanditImplementation`-Enum (Feature-interne Konfiguration):**
-    ```rust
-    pub enum BanditImplementation {
-        /// Default: O(d) pro Update und Score. Keine BLAS-Abhängigkeit.
-        /// A_p^{-1} wird als diag(σ₁², ..., σ_d²) approxmiert.
-        DiagonalApproximation,
-        /// O(d²) pro Update und Score. Nutzt ndarray re-exportiert aus memfuse-embed/onnx.
-        /// A_p^{-1} wird vollständig via Sherman-Morrison-Rang-1-Update geführt.
-        ShermanMorrison,
-    }
-    ```
-  - **Diagonale Default-Implementierung (O(d), kein Latenzproblem):**
-    - $\hat{r}_p(x) = \theta_p^\top x + \alpha \sqrt{\sum_i \sigma_{p,i}^2 \cdot x_i^2}$
-    - Update bei Reward $r$: $\theta_p \leftarrow \theta_p + \eta \cdot (r - \theta_p^\top x) \cdot x$; $\sigma_{p,i}^2 \leftarrow \sigma_{p,i}^2 + x_i^2$ (kumulierte Varianz je Dimension).
-    - Speicherbedarf: 2 `Vec<f32>` der Länge $d$ pro Profil. Kein `ndarray`, kein BLAS.
-  - **Sherman-Morrison-Implementierung (O(d²), opt-in):**
-    - $A_p^{-1}$ wird als $d \times d$ `ndarray::Array2<f32>` (re-exportiert aus `memfuse-embed/onnx`) direkt geführt.
-    - Rang-1-Update nach Beobachtung $(x, r)$: $A_p^{-1} \leftarrow A_p^{-1} - \frac{A_p^{-1} x x^\top A_p^{-1}}{1 + x^\top A_p^{-1} x}$ — strikt O(d²) ohne Matrix-Inversion.
-    - Score-Berechnung: $\hat{r}_p(x) = \theta_p^\top x + \alpha \sqrt{x^\top A_p^{-1} x}$ — zwei Matrix-Vektor-Produkte O(d²).
-    - **Latenz-Garantie:** Beide Implementierungen sind durch den `PidLatencyController`-Mechanismus (P11) budgetiert. Überschreitet der Bandit-Scoring-Schritt das konfigurierte Budget, fällt `RouterEngine` transparent auf `select_profile_cascade()` zurück. Die Diagonal-Approximation ist der sichere Default, der das Latenzbudget strukturell einhält.
-  - **Belohnungssignal:** `Success = 1.0`, `Rejected = 0.0`, `Escalated { .. } = 0.3` (konfigurierbar) − $\lambda \cdot \text{resource\_cost\_estimate}$ (Feld in `SlmProfile` bereits vorhanden) − $\mu \cdot \mathbb{1}[\text{profile.transport} = \text{HttpCloud}]$ (Privacy-Malus für Cloud-Profile, konfigurierbar, Default $\mu = 0.2$).
-  - **Drift-gekoppelte Exploration:** Bei Drift-Erkennung durch `LyapunovDriftWatcher` für Profil $p$ wird $\alpha_p$ temporär erhöht (konfigurierbar, Default: Faktor 2.0).
-  - **Kapazitätsbeschränkung:** Profil-Auslastung > Budget → temporärer Strafterm auf $\hat{r}_p(x)$ via `PidLatencyController`-Rückkopplung.
-- `routing_strategy.rs` (neu, Feature `bandit-routing`):
-  ```rust
-  pub enum RoutingStrategy {
-      Cascade,           // Default, bestehend, kalibriert, produktiv
-      ContextualBandit,  // Feature bandit-routing, Default: off
-  }
-  ```
-  `RouterEngine::route()` dispatcht je nach `RoutingStrategy`-Feld auf `select_profile_cascade()` (bestehend) oder `select_profile_bandit()` (neu). Der Kaskaden-Pfad wird **nicht** entfernt — er bleibt der Produktions-Default.
-- `serde_helpers.rs` — Serialisierungs-Hilfsfunktionen.
-- `guarded_payload.rs` (neu, Feature `cloud-egress-guard`) — Typ-State `GuardedPayload<Sanitized>`: nur durch erfolgreichen Durchlauf aller fünf Egress-Guard-Layer konstruierbar. Ein `GuardedPayload<Unsanitized>` an `dispatch_to_slm()` zu übergeben ist ein Compile-Fehler.
-
-**Architektur:** `RouterEngine` hält Profile, Kalibrierung und Drift-Watcher in `ArcSwap<RouterState>` (atomar Hot-Reload), `pending_decisions` in `RwLock<HashMap<...>>` (bewusst getrennt, Contention-Vermeidung).
-
-**Feature-Flags:** `default = []`, `bandit-routing` (Default: off, kein Breaking Change), `cloud-egress-guard` (Default: off), `egress-sherman-morrison` (opt-in für O(d²)-Bandit, Default: diagonal O(d)).
-
-### §4.15 `memfuse-agent` — Layer 7
-
-Persistenter Agenten-Workflow-Loop nach dem Muster `checkpoint → execute → commit → audit`. Abhängigkeiten: `memfuse-core`, `memfuse-db`, `memfuse-graph`, `memfuse-checkpoint`, `memfuse-store`, `memfuse-router`, `memfuse-index`, `memfuse-text`.
-
-- `engine.rs`, `graph.rs`, `step.rs`, `context.rs`, `dlq.rs`, `audit.rs`, `event_source.rs`.
-
-### §4.16 `memfuse-mcp` — Layer 8 (primäre Grenzschicht)
-
-Model-Context-Protocol-Server — stdio-basiertes JSON-RPC-2.0-Interface. Layer-8-Rand-Crate ohne `unsafe`-Toleranz. Abhängigkeiten: `memfuse-db`, `memfuse-core`, `memfuse-security`, `memfuse-ollama`, `memfuse-embed` (optional), `memfuse-agent` (optional), `memfuse-candle` (optional), `memfuse-sandbox` (Feature `wasm-sandbox`).
-
-- `bin/memfuse-mcp-server.rs` — Binary-Entry-Point. CLI-Flags: `--db-path`, `--provider`, `--ollama-url`, `--embed-model`, `--onnx-model-path`, `--read-only`, `--allow-write`. Stderr-only-Logging.
-- `lib.rs` — `McpServer`. stdio-Leseschleife gehärtet: (a) Idle-Timeout (`MEMFUSE_MCP_IDLE_TIMEOUT_SECS`, Default 300s), (b) `read_line_bounded()` begrenzt Zeilenlänge (`MAX_RPC_BYTES`) mit JSON-RPC-Parse-Error `-32700` bei Überschreitung.
-  - **Sechs MCP-Tools** (fünf bestehend + ein neues):
-    1. `memfuse_search` — Hybrid Semantic Search (Vektor + BM25 + Graph).
-    2. `memfuse_insert` — Dokument einspeichern.
-    3. `memfuse_get` — Dokument per ID abrufen.
-    4. `memfuse_collections` — Collections auflisten.
-    5. `memfuse_consolidate` — manueller Konsolidierungstrigger.
-    6. `memfuse_cloud_query` (neu, Feature `cloud-egress-guard`) — Sendet eine Query über das fünfschichtige Egress-Gateway (§12) an einen konfigurierten Cloud-Endpunkt. Nur aufrufbar wenn `cloud-egress-guard`-Feature aktiviert und `SandboxPolicy::allow_cloud_egress = true` (Default: false). Rückgabe enthält re-hydrierten Klartext nach Layer-5-Rücksubstitution und Prompt-Injection-Guard-Prüfung.
-- `config.rs` — `EmbeddingConfig`, `is_write_allowed_by_env()`.
-- `prompt_injection.rs` — Prompt Injection Guard: NFKC-Unicode-Normalisierung, Zero-Width-Character-Entfernung, rekursive Base64-Payload-Dekodierung (Tiefe 2), Homoglyphen-Normalisierung via `skeletonize_char()`-Mapping (kyrillische/griechische Homoglyphen). Quarantäne-Modi: Strict (redact), Escalate (log + redact), Passthrough.
-- `sandbox.rs` — MCP-Sandbox: `execute_with_timeout()`, volatile Tool-Outputs AES-256-GCM-SIV-verschlüsselt im RAM, `SandboxPolicy` (Read/Write/CodeExecution/CloudEgress als separate Permissions, Default: nur Read). Für `CodeExecution`: Wenn Feature `wasm-sandbox` aktiv, delegiert `execute_with_timeout()` an `memfuse-sandbox::WasmExecutor`; ohne Feature ist `CodeExecution` auf Policy-Ebene blockiert (keine stille Prozess-Ausführung). Neu: `allow_cloud_egress: bool` (Default: false) in `SandboxPolicy`.
-- `protocol.rs` — `McpError`-Enum.
-- `egress_gateway.rs` (neu, Feature `cloud-egress-guard`) — Orchestriert die fünf Layer des Cloud-Egress-Privacy-Gateways (§12.2) für den `memfuse_cloud_query`-Tool-Aufruf. Gibt `GuardedPayload<Sanitized>` zurück, das von `dispatch.rs::dispatch_to_cloud()` konsumiert wird.
-
-**Feature-Flags:** `default = []`, `agent-workflows`, `onnx`, `candle`, `kv-bridge`, `wasm-sandbox` (neu, aktiviert `memfuse-sandbox`-Abhängigkeit), `cloud-egress-guard` (neu), `test-utils`.
-
-### §4.17 `memfuse-py` — Grenzschicht (isoliertes FFI-Workspace)
-
-Python-Bindings via PyO3. Eigenes Cargo-Workspace mit `panic = "unwind"`. Abhängigkeiten: `memfuse-core`, `memfuse-db`.
-
-**Öffentliche Python-API:** `open()` → `PyMemFuse`; `PyMemFuse` (Haupt-Facade); `PyCollection`; `memfuse_crud_methods!`-Makro; Statistik-Typen `PyDbStats` (inkl. Live-Observability-Felder `drift_status`, `calibration_ece`, `last_calibration_at`, `pid_pool_size`), `PyVectorIndexStats`, `PyStorageStats`.
-
-**Zero-Copy-Strategie:** Eingabe-Vektordaten zero-copy aus NumPy-Arrays; FlatBuffer-Antworten als `PyBytes`.
-
-### §4.18 `memfuse-sandbox` — Layer 6.5 (NEU)
-
-WASM-Ausführungsgrenze für die `CodeExecution`-Permission. Reaktivierung der ursprünglichen `memfuse-sandbox`-Crate (archiviert in Commit `55a34647`) unter formalisiertem ADR (§9.2: dediziertes ADR vor Merge). Abhängigkeiten: `memfuse-core`, `memfuse-security`.
-
-**Designgrundsatz:** `#![forbid(unsafe_code)]`. Alle Interaktionen mit `wasmtime` erfolgen über dessen safe Rust-API. Kein direkter `mmap`/`mlock`-Aufruf.
-
-**Module:**
-- `executor.rs` — `WasmExecutor`: zentrale WASM-Ausführungseinheit.
-  - `fn execute(wasm_bytes: &[u8], input: &[u8], capabilities: &WasmCapabilities, timeout: Duration) -> Result<WasmOutput, SandboxError>`
-  - Jeder `execute()`-Aufruf startet eine frische `wasmtime::Store` und `wasmtime::Instance` — kein Zustandsüberlauf zwischen Aufrufen.
-  - `wasmtime::Config` mit aktiviertem `fuel`-Mechanismus (CPU-Limit) und `max_wasm_stack`-Konfiguration (Speicher-Limit).
-  - Timeout: `wasmtime`s asynchrones `call_async()` kombiniert mit `tokio::time::timeout`.
-- `capabilities.rs` — `WasmCapabilities`: strikte Whitelist für den WASM-Gast.
-  ```rust
-  pub struct WasmCapabilities {
-      pub allow_stdout: bool,            // WASM darf auf stdout schreiben
-      pub allow_stderr: bool,            // WASM darf auf stderr schreiben
-      pub max_memory_pages: u32,         // Default: 16 (= 1 MB)
-      pub max_fuel: u64,                 // CPU-Ticks, Default: 10_000_000
-      pub allow_filesystem: bool,        // Default: false — kein Dateisystemzugriff
-      pub allow_network: bool,           // Default: false — kein Netzwerkzugriff
-      pub allow_clock: bool,             // Default: true — monotone Uhr erlaubt
-  }
-  impl Default for WasmCapabilities {
-      fn default() -> Self { /* alle allow_*: false, max_memory_pages: 16 */ }
-  }
-  ```
-  Das WASM-Guest-Modul hat keinen Zugriff auf MemFuse-interne Datenstrukturen, den Storage-Layer oder die Krypto-Primitiven — der WASM-Adressraum ist vollständig vom Host-Prozessraum isoliert.
-- `output.rs` — `WasmOutput { stdout: zeroize::Zeroizing<Vec<u8>>, stderr: Vec<u8>, fuel_consumed: u64 }`. `stdout` ist `ZeroizeOnDrop`, damit keine Tool-Outputs im RAM verbleiben.
-- `error.rs` — `SandboxError`-Enum: `Timeout`, `MemoryExceeded`, `FuelExhausted`, `CapabilityViolation`, `WasmTrap(String)`, `InvalidModule`.
-
-**Integration mit `memfuse-mcp::sandbox.rs`:** Wenn Feature `wasm-sandbox` aktiv ist, erhält `McpSandbox` ein `Arc<WasmExecutor>`-Feld. `execute_with_timeout()` für `ToolCategory::CodeExecution` delegiert an `WasmExecutor::execute()`. Das WASM-Modul wird vom Aufrufer als `&[u8]` übergeben (vorab kompilierte `.wasm`-Datei); MemFuse selbst übersetzt keinen Quellcode.
-
-**Wichtiger Scope-Hinweis:** `memfuse-sandbox` ist KEIN WASM-Compiler und kein WASM-Laufzeit-Ökosystem für Endnutzer. Es ist eine eng begrenzte, sicherheitsfokussierte Ausführungsgrenze für Agenten-Tools, die ein MCP-Client als vorab kompilierte WASM-Binaries bereitstellt. Der `CodeExecution`-Use-Case betrifft ausschließlich Tool-Implementierungen, die der MCP-Client-Entwickler selbst als WASM kompiliert und vertrauenswürdig bereitstellt — nicht Endnutzer-Code.
-
-**Feature-Flags:** `default = []`, `wasm-sandbox` (schaltet `wasmtime`-Abhängigkeit ein; ohne dieses Feature existiert das Crate zwar im Workspace, aber `memfuse-mcp` bindet es nicht ein und `CodeExecution` bleibt auf Policy-Ebene blockiert).
+<a id="kernthese"></a>
+## 1. Kernthese & Leitprinzip
+
+**MemFuse ist eine souveräne, vollständig lokal betriebene Gedächtnisschicht für KI-Agenten** — eine eingebettete,
+kryptographisch isolierte AI-Memory-Bibliothek in Rust mit Python- und MCP-Bindings, die ohne Cloud-Abhängigkeit,
+ohne Telemetrie und ohne API-Key betrieben werden kann.
+
+Ihr Alleinstellungsmerkmal ist die Kombination aus:
+
+- einer **4-Signal-Retrieval-Fusion** (Vektor, Volltext, Graph, Metadaten) statt reiner Vektorsuche,
+- einer **kryptographisch integritätsgesicherten Storage-Engine** (LSM-Tree, WAL mit HMAC-Kette, AES-256-GCM-SIV at rest),
+- **WASM-/Sandbox-Ausführungsisolation** für Agent-Tool-Aufrufe,
+- echter **Air-Gap-Inferenz** (lokales GGUF-Backend, kein Netzwerkzwang) mit verschlüsseltem, LSM-rückfallfähigem KV-Cache,
+- einem **Contextual-Bandit-Router**, der Anfragen adaptiv auf Retrieval-Strategien verteilt,
+- und — als jüngste, noch zu bauende Erweiterung des Datenmodells — **n-ären Hyperkanten** für Fakten, die sich
+  nicht auf ein Subjekt-Prädikat-Objekt-Tripel reduzieren lassen (§6).
+
+**Leitprinzip: Korrektheit schlägt Performance schlägt Feature.** Jede Optimierung, die eine Korrektheitsgarantie
+(Datenintegrität, Nebenläufigkeitssicherheit, Wiederherstellbarkeit, Deadlockfreiheit) aufweicht, ist unzulässig —
+unabhängig vom Performancegewinn. Jede Performance-Optimierung, die eine noch nicht spezifizierte Fähigkeit
+vorwegnimmt, ist nachrangig gegenüber der Fertigstellung bereits spezifizierter Fähigkeiten. Jede Erweiterung eines
+bestehenden Subsystems muss geprüft werden gegen die Invarianten, die dieses Subsystem bereits trägt — nicht nur
+dagegen, *dass* eine Erweiterung grundsätzlich möglich ist, sondern *welches bestehende Invariant dadurch unter
+Druck gerät* und wie es gewahrt bleibt. Dieses Prinzip prägt insbesondere die Hyperkanten-Spezifikation (§6.5).
 
 ---
 
-## §5 — Systemweite Datenflüsse
+<a id="vision"></a>
+## 2. Produktvision, Alleinstellungsmerkmale & Nicht-Ziele
 
-### §5.1 Schreibpfad (`insert`/`upsert`)
+### 2.1 Was MemFuse ist
 
-`memfuse-mcp::memfuse_insert` oder `memfuse-py::insert()` → `memfuse-db::collection::crud` → Chunking → Embedding-Erzeugung → `memfuse-core::TxBuffer`-Staging → `memfuse-store::wal.rs` (WAL-First) → `memfuse-store::memtable.rs` → asynchron `memfuse-index::hnsw.rs` + `memfuse-text::bm25.rs`/`inverted.rs` + `memfuse-graph::csr.rs`.
+Eine eingebettete (embedded) Gedächtnisschicht, kein Cloud-Service. MemFuse läuft im Prozess des aufrufenden
+Agenten oder als lokaler MCP-Server — es gibt keine serverseitige Multi-Tenant-Instanz und keine Datenübertragung
+an Dritte, sofern nicht explizit über das Cloud-Egress-Gateway (§10.4) angefordert.
 
-### §5.2 Lesepfad (`search`/`hybrid_search`)
+### 2.2 Distributionswege
 
-Anfrage → parallele Ausführung der vier Signale (HNSW, BM25, CSR/PathRAG, Metadaten-Filter) → `memfuse-db::fusion.rs` (RRF, Late Hydration, optionaler Kohärenz-Bonus) → optionales Cross-Encoder-Reranking → optionale Isotonic-Kalibrierung → Rückgabe. Bei Routing zusätzlich: Konfidenzbewertung, Drift-Check, `RoutingStrategy`-Dispatch (`Cascade` oder `ContextualBandit`).
+| Kanal | Paket | Zielgruppe |
+|---|---|---|
+| MCP-Server (primär) | `uvx memfuse-mcp --db-path ... --allow-write` | Claude Desktop, Cursor, beliebige MCP-Clients |
+| Python-Bibliothek | `pip install memfuse` | In-Process-Einbettung in Python-Agenten |
+| Rust-Crate | `cargo add memfuse-db` | Native Rust-Anwendungen |
 
-### §5.3 Generierungspfad mit KV-Cache-Bridge
+Eine Desktop-Shell (`memfuse-tauri`) existierte als Prototyp, ist aber zugunsten der PyPI-Bibliothek und des
+MCP-Servers als primäre Vertriebswege eingestellt (deprecated).
 
-Retrieval-Ergebnisse → `LlmTextGenerator::generate_with_context()` → bei Candle + `kv-bridge`: `KvBridgeAdapter` konsultiert `TenantIsolatedKvStore` (Cache-Hit: entschlüsseltes KV-Segment injiziert, Prefill entfällt; Cache-Miss: voller Prefill, danach gecacht). Für Backends ohne Bridge: textuelle Segmentkoncatenation.
+### 2.3 Alleinstellungsmerkmale und ihr Reifegrad
 
-### §5.4 Konsolidierungspfad ("Sleep Cycle")
+1. **4-Signal-Hybridsuche** (🟢) — Vektorsuche (HNSW), Volltextsuche (BM25/BM25F), Wissensgraph-Traversierung
+   (CSR + Forward-Push-Personalized-PageRank), Metadaten-Filter; fusioniert über Reciprocal Rank Fusion
+   (RRF, Default 🟢) oder score-normalisierte Fusion (Opt-in 🟡, mit hartem RRF-Fallback bei Signaldegradation).
+2. **Kalibriertes Retrieval mit Lyapunov-Drift-Erkennung** (🟢) — Score-Schwellenwerte werden nicht statisch,
+   sondern über ein laufend kalibriertes Modell mit gedeckelter Drift-Eskalation bestimmt.
+3. **MCP-native Zero-Trust-Sandbox** (🟢) — Tool-Ausführung mit getrennt konfigurierbarem Fuel- (Rechenschritt-)
+   und Wall-Clock-Budget (Default 5 s), orthogonal zueinander konfigurierbar.
+4. **Kryptographische DSGVO-Art.-17-Löschung** (🟢) — Löschvorgänge erzeugen einen verifizierbaren `DeletionProof`
+   über eine race-freie HMAC-Kette.
+5. **Session-DAG** (🟢) — Konversationsverzweigung als persistenter, azyklischer Graph.
+6. **Air-Gap-KV-Cache-Bridge mit LSM-Fallback-Spill** (🟢) — der KV-Cache liegt primär verschlüsselt im RAM; bei
+   Speicherdruck greift kontrolliertes Auslagern auf die SSD statt verlustbehafteten Verwerfens.
+7. **Cloud-Egress Privacy Gateway** (🟢, weitgehend auditiert) — mehrschichtiger DLP-Pfad mit Surrogat-Tokenisierung,
+   Bulk-Exfiltration-Erkennung und Rehydration der Cloud-Antwort (§10.4).
+8. **Contextual-Bandit-Routing** (🟢 Grundfunktion / 🟡 mathematisch korrekte Variante) — LinUCB-basiertes Routing;
+   siehe §8 für die Unterscheidung zwischen Produktions-Default und Ridge-korrekter Opt-in-Variante.
+9. **Gestufte Vektorindex-Architektur** (🟢 HNSW / 🟢 DiskANN als Tier) — HNSW als Standard, DiskANN für
+   RAM-sprengende Korpora.
+10. **Deutsche Morphologie inkl. BM25F** (🟢) — Kompositazerlegung im Volltextindex plus feldgewichtete Bewertung.
+11. **Zero-Copy-Storage-Pfad** (🟢) — seit der Grundarchitektur produktiv.
+12. **Key-granulare Schreibnebenläufigkeit** (🟢) — `kv_locks` statt collection-weitem Mutex.
+13. **N-äre Hyperkanten** (🔴, vollständig spezifiziert, siehe §6) — Fakten mit mehr als zwei Beteiligten als
+    erstklassige, atomar invalidierbare Struktur statt Zerlegung in mehrere, im Zusammenhang verlorene Binärkanten.
+    Dies ist die einzige der hier geführten Fähigkeiten, die noch **nicht** implementiert ist; sie wird deshalb in
+    §6 mit besonderer Tiefe spezifiziert.
 
-Zwei gegenseitig exklusive Mechanismen (P14, ADR-081): (a) `MaintenanceScheduler` (schwellenwertbasiert) und (b) `ConsolidationEngine` (periodisch, vollständiger Sleep-Cycle inkl. Generative Synthesis). Beide Pfade wenden anschließend via `consolidation_executor.rs` Tombstones und Graph-Cascade-Invalidierung an.
+### 2.4 Nicht-Ziele
 
-### §5.5 Export-/Importpfad
-
-Export: `memfuse-db::export.rs` → `memfuse-export-v1.json` (Dokumente, Embeddings, `embedding_model`, `importance_score`, `relations`).
-Import: `Collection::import_memories()` → schemaversionsgeprüfte, idempotente Upsert-Wiedereinspielung → `ImportSummary`.
-
-### §5.6 Cloud-Egress-Pfad (optional, Feature `cloud-egress-guard`)
-
-`memfuse_cloud_query` (MCP-Tool) → `McpServer` prüft `allow_cloud_egress`-Permission → `egress_gateway.rs` orchestriert Layer 1–4 → `GuardedPayload<Sanitized>` (Typ-State) → `dispatch.rs::dispatch_to_cloud()` → Cloud-API via `Transport::HttpCloud { url }` → Antwort → Layer 5 Re-Hydration + Prompt-Injection-Guard → re-hydrierter Klartext → Aufrufer.
-
-### §5.7 WASM-Sandbox-Ausführungspfad (optional, Feature `wasm-sandbox`)
-
-MCP-Client sendet `ToolCategory::CodeExecution` + `wasm_bytes` → `McpSandbox::execute_with_timeout()` → `WasmExecutor::execute()` (frische `wasmtime::Store`, `WasmCapabilities`-Check, `fuel`-Budget) → `WasmOutput { stdout: ZeroizeOnDrop, ... }` → Tool-Ergebnis AES-256-GCM-SIV-verschlüsselt in Volatile Vault → Antwort an MCP-Client.
-
-### §5.8 Passives WAL-Shipping-Pfad (optional, Betriebskonzept, kein Code-Feature)
-
-`memfuse-store::wal.rs::rotate_and_seal()` versiegelt abgeschlossene WAL-Segmente (atomar via `rename()`, danach `O_RDONLY`-Flag). Externer Sync-Daemon (Syncthing, iCloud Drive, oder optionaler `memfuse wal-push`-CLI-Befehl als One-Shot-HTTP-Push ohne dauerhaften Listener) repliziert nur versiegelte, read-only-Segmente auf eine passive Kopie. Die passive Kopie bleibt rein lesend, bis der Nutzer explizit ein manuelles Failover auslöst (`memfuse wal-restore`). Kein Konsens, kein Leader-Election, kein Split-Brain-Szenario möglich (exakt ein Schreiber zu jedem Zeitpunkt).
-
----
-
-## §6 — Feature-Klassifikation (verbindlich)
-
-**Kernfeatures (dauerhaft, produktdefinierend):** 4-Signal-RRF-Fusion inkl. PathRAG, Structural Consolidation Pass, Generative Synthesis Pass, DecayController, Immunologische Widerspruchsabwehr, Session-DAG mit `NodesGuard`/`ConsolidationNodesGuard`, WAL-HMAC-Kette, `DeletionProof`, MCP-Sandbox mit Prompt Injection Guard, Memory-Export-/Import-Format v1, KV-Cache-Bridge.
-
-**Optionale Features (hinter Feature-Flag, dauerhaft unterstützt):**
-- `graph-connectivity-health` — Graph-Connectivity/Perkolation.
-- `edge-reinforcement-learning` — Hebbianisches Kanten-Reinforcement.
-- `coherence-bonus-fusion` — Kohärenz-Bonus in RRF.
-- `adaptive-candidate-pool-sizing` — Adaptive Kandidatenpool-Größe.
-- `reranking` — Cross-Encoder-Reranking.
-- `kv-bridge` — KV-Cache-Bridge für Candle-Inferenzpfad.
-- `bandit-routing` (**neu**, Default: **off**) — Contextual-Bandit-Gate (`RoutingStrategy::ContextualBandit`, §13). Darf erst zum Default werden, wenn `test_bandit_vs_cascade_regret_comparison` offline auf historischen `RoutingOutcome`-Daten einen nachweisbaren Regret-Vorteil zeigt (P7).
-- `cloud-egress-guard` (**neu**, Default: **off**) — Cloud-Egress Privacy Gateway (§12). Verstößt nicht gegen P5; adressiert Nutzer, die Cloud-LLMs ohnehin extern einsetzen.
-- `wasm-sandbox` (**neu**, Default: **off**) — WASM-Ausführungsgrenze für `CodeExecution` via `memfuse-sandbox` (§4.18). Bewirbt erst nach erfolgreicher Integration `CodeExecution` als unterstützt.
-- `egress-sherman-morrison` (opt-in, nur wenn `bandit-routing`) — Volles Sherman-Morrison-O(d²) statt Diagonal-O(d) für LinUCB.
-- `experimental-diskann` — DiskANN-Speicher-Tier für großvolumige, überwiegend statische/leselastige Kollektionen (mit gestuftem HNSW-Default-Modell).
-
-**Permanent verworfen (kein Zukunftsvorhaben):** Desktop-App, Replicator-Dynamics-Gewichtung, Voice-Assistant-Interface, Cross-Tenant-Wissensaustausch, dateisystembasiertes Claim-Locking, verteilte ADR-Dateien, `memfuse-cluster` (Raft/`openraft`).
-
-**Dauerhaft gesperrt bis Architektur-Revision (VETO):** `partial-index-rebuild` (VETO-F02, conditionally_accepted bis 2026-10-07, täglich via `nucleation-recall-history.yml` überwacht); Cross-Tenant-Wissensaustausch (VETO-F10, permanent_rejected); Voice-Assistant (VETO-OP3, conditionally_accepted bis 2027-03-08).
+MemFuse ist explizit **kein** Cloud-SaaS-Produkt, **kein** Multi-Tenant-Enterprise-System, **kein** Framework für
+LLM-Training, **keine** primär GUI-getriebene Desktop-Anwendung und **kein** Cluster-/Replikations-System. Ein
+`memfuse-cluster`-Veto besteht bewusst: verteilter Konsensbetrieb ist kein Ziel der aktuellen Produktphase.
+Passives WAL-Shipping für Backup-Zwecke ist als Fernziel vorgesehen (Roadmap-Stufe 4, §16), aber nicht Bestandteil
+des Kernprodukts.
 
 ---
 
-## §7 — Sicherheits- und Datenschutzmodell
+<a id="prinzipien"></a>
+## 3. Architekturprinzipien P1–P25
 
-1. **Zero-Trust gegenüber Tool-Output:** Jeder zurückgegebene Inhalt gilt als untrusted.
-2. **Prompt Injection Guard:** NFKC-Normalisierung, Zero-Width-Character-Entfernung, rekursive Base64-Dekodierung (Tiefe 2), Homoglyphen-Normalisierung (kyrillisch/griechisch). Modi: Strict/Escalate/Passthrough.
-3. **Volatile-Vault-Verschlüsselung:** Tool-Outputs AES-256-GCM-SIV im RAM, `ZeroizeOnDrop`.
-4. **KV-Cache-Bridge-Isolation:** Kryptographische Mandantenisolation via `(TenantId, ModelFingerprint)`-gebundenem HKDF-Sub-Schlüssel; faire LRU-Eviction; Emergency-Wipe.
-5. **Integritätskette:** WAL-HMAC-Kette.
-6. **Kryptographischer Löschnachweis:** `DeletionProof` (DSGVO Art. 17) mit `ExcludedScope`-Deklaration.
-7. **Whitelist-Berechtigungsmodell:** Read/Write/CodeExecution/CloudEgress als getrennte Permissions; Default: ausschließlich Read.
-8. **WASM-Ausführungs-Isolation** (Feature `wasm-sandbox`): `CodeExecution`-Permission-Tool-Code läuft in einer speicher-isolierten WASM-Instanz mit `WasmCapabilities`-Whitelist. Kein Dateisystem- und Netzwerkzugriff per Default. `WasmOutput.stdout` ist `ZeroizeOnDrop`. Ein WASM-Trap oder Timeout führt zu `SandboxError`; niemals zu stiller Prozess-Ausführung im Host-Kontext.
-9. **Cloud-Egress Privacy Gateway** (Feature `cloud-egress-guard`, §12):
-   - **Layer 1 — Deterministisches Token-Vaulting:** Aho-Corasick (O(n)) + Regex-Nachvalidierung für strukturierte PII; ONNX-NER (Reuse `memfuse-embed`) für unstrukturierte Entitäten. Surrogate: `[USER_ENTITY_<blake3(entity_text ‖ session_salt)[..4]>]`; `session_salt` = frischer `OsRng`-Wert. Speicher: `EgressVault` (§4.6, `ZeroizeOnDrop`).
-   - **Layer 2 — Lokale Vorabstraktion:** `SegmentSynthesizer`-Trait im Modus `SynthesisMode::PrivacyAbstraction` (P10: Reuse). Bei Latenzbudget-Überschreitung: Fail-Open (übersprungen), nie Fail-Closed.
-   - **Layer 3 — Graph-Generalisierung:** Kanten-Labels auf Community-Zugehörigkeit abstrahiert (`memfuse-graph::community.rs`). Fernziel: Echter $(\varepsilon,\delta)$-DP-Mechanismus mit Privacy-Budget-Ledger — explizit **kein Kernfeature**, eigenes ADR erforderlich, um keine Falsch-Compliance-Aussage zu erzeugen (P7).
-   - **Layer 4 — `EgressGuard`:** Bulk-Exfiltrations-Erkennung via HNSW-k-NN (Reuse bestehender Index). Bei Ähnlichkeit ≥ Schwellenwert **und** Payload-Länge ≥ Mindestwert: Egress geblockt. **Fail-Closed** bei Guard-Fehler (Umkehrung der normalen Fail-Open-Philosophie — Datenexfiltrations-Risiko dominiert über Verfügbarkeit; bewusste, dokumentierte Asymmetrie).
-   - **Layer 5 — Inbound Re-Hydration mit bidirektionalem Zero-Trust:** Rücksubstitution nur bei exaktem Format-Match (`[USER_ENTITY_[0-9a-f]{8}]`). Cloud-Antwort MUSS denselben Prompt-Injection-Guard durchlaufen wie `memfuse_search`/`memfuse_get`-Ergebnisse — Cloud ist eine untrusted Quelle.
-10. **`dispatch.rs`-Hardening:** Subprozess-Aufruf via `Command::new(program).args(&[...])` ohne Shell-Zwischenschicht (kein `sh -c`), unabhängig von §12.
-11. **Kein Multi-Tenant-Fremdkundenbetrieb:** `TenantId` dient ausschließlich Prozess-/Test-Isolation sowie kryptographischer KV-Cache-Trennung.
+Diese Prinzipien sind normativ für jede gegenwärtige und künftige Erweiterung des Systems.
+
+**P1 — Korrektheit schlägt Performance schlägt Feature.** Siehe §1.
+
+**P2–P22 — Sovereign-Core-Grundsätze** (u. a. WAL-First-Persistenz, deterministische Recovery, keine
+stillschweigende I/O-Fehlerunterdrückung, strikte DAG-Modularität des Crate-Graphen, feingranulare
+`Result<T, E>`-Fehlerkategorisierung statt generischer `panic!`-Pfade, Verbot von `unwrap()`/`expect()` auf
+potenziell toxischen Ein-/Ausgaben). Diese Grundsätze sind seit der Kernarchitektur unverändert gültig und werden
+in §5–§10 an den jeweils betroffenen Subsystemen konkretisiert.
+
+**P23 — Zeitbudgets sind orthogonal konfigurierbar.** Rechenschritt-Budget (Fuel) und Wall-Clock-Budget für
+Sandbox-Ausführungen sind zwei unabhängige Achsen. Ein Tool kann rechnerisch günstig, aber durch blockierendes I/O
+langsam sein, oder umgekehrt — beide Fälle müssen unabhängig begrenzbar sein. **Produktiv erfüllt** (§10.2).
+
+**P24 — Lokalität vor globaler Neuberechnung.** Jeder Algorithmus, dessen Eingabe eine anfragebestimmte Teilmenge
+des Gesamtzustands ist (PPR mit wenigen Seed-Knoten, Cascade-Invalidierung ausgehend von einem Dokument), MUSS
+eine zur Anfragegröße proportionale Laufzeit haben — niemals zur Größe des Gesamtzustands ($O(V+E)$ ist für
+solche Anfragen unzulässig). Dieses Prinzip ist der normative Grund für den Forward-Push-PPR-Algorithmus (§7.2)
+und für das harte Fan-out-Limit der Hyperkanten-Cascade-Invalidierung (§6.5, H5). Es gilt uneingeschränkt für jeden
+künftigen Graph- oder Retrieval-Algorithmus.
+
+**P25 — Cache-Treffer sind lock-frei bzw. lock-günstig zu gestalten.** Ein Lesetreffer im Block-Cache soll nach
+Möglichkeit keinen exklusiv sperrenden, mutierenden Zugriff erfordern, da Cache-Treffer der mit Abstand häufigste
+Zugriffspfad sind und jede darin verborgene Schreibsperre unter Last zur Kontention wird (§5.2).
+
+**Ergänzende, aus der jüngsten Architekturüberarbeitung übernommene Grundsätze:**
+
+- **Nebenläufigkeitssicherheit vor Nebenläufigkeitsperformance:** Sperrenhierarchien werden explizit dokumentiert
+  und dürfen nicht durch bloßen Analogieschluss auf neue Mutationspfade übertragen werden, ohne die
+  Deadlockfreiheit für den neuen Fall erneut zu beweisen (konkretes Beispiel: §6.5, H2).
+- **Geschlossene Enums bleiben geschlossen:** Wo ein Enum bewusst **nicht** `#[non_exhaustive]` deklariert ist
+  (z. B. das Signal-Typ-Enum der Fusionsschicht), ist das eine architektonische Entscheidung. Eine neue Kategorie
+  von Information wird in ein bestehendes offenes Signal integriert, statt das Enum breaking zu erweitern
+  (konkretes Beispiel: §6.5, H3).
+- **Kein Sicherungsnetz, keine Schema-Änderung:** Persistenzformat-Änderungen (insbesondere am
+  FlatBuffers-IPC-Schema) werden nur vorgenommen, wenn ein automatisiertes CI-Drift-Gate zwischen Schema und
+  generiertem Code aktiv läuft (konkretes Beispiel: §6.5, H4).
+- **Explizite Unvollständigkeit statt stiller Lücken:** Wo ein Subsystem eine neue Datenklasse strukturell nicht
+  berücksichtigt, wird dies über ein sichtbares Konfigurations-/Report-Flag markiert, statt die Lücke
+  stillschweigend zu tolerieren (konkretes Beispiel: §6.5, H6).
 
 ---
 
-## §8 — Betriebsmodi
+<a id="architektur"></a>
+## 4. Systemarchitektur: der Crate-DAG
 
-| Modus | Air-Gap-fähig | Ext. Prozess | KV-Cache-Bridge | WASM-Sandbox | Cloud-Egress |
-|---|:---:|:---:|:---:|:---:|:---:|
-| ONNX-Embedding (Default) | ✅ | ❌ | — | optional | — |
-| Candle-Embedding/-Inferenz | ✅ | ❌ | ✅ (opt-in) | optional | — |
-| Ollama-Embedding/-Inferenz | ❌ | ✅ (Ollama) | ❌ | optional | — |
-| MCP stdio + Zero-Trust-Sandbox | ✅ | ❌ | — | optional (`wasm-sandbox`) | optional (`cloud-egress-guard`) |
-| Cloud-Egress-Gateway | ❌ (bewusst) | ❌ (kein Listener) | — | optional | ✅ (opt-in) |
+MemFuse gliedert sich in einen mehrschichtigen Rust-Workspace. Abhängigkeiten verlaufen strikt abwärts; eine
+Abhängigkeit, die gegen die Schichtrichtung verstößt, gilt als Architekturdefekt, nicht als Stilfrage.
 
-**Benchmark-Strategie:** Vergleichsrahmen gegen Mem0, Zep/Graphiti, VelesDB über LongMemEval- und LoCoMo-Datensätze. Benötigte, noch nicht erstellte Benchmarks (P7): `bench_kv_bridge_prefill_savings`, `stress_session_dag_deadlock_freedom`, `test_bandit_vs_cascade_regret_comparison`.
+| Layer | Crates | Verantwortung |
+|---|---|---|
+| **0** | `memfuse-core-ipc-gen`, `memfuse-core` | FlatBuffers-generierter IPC-Code; Kerntypen, Traits, Fehlerbehandlung, `DocId`/`EntityId` (Default 64-Bit, 128-Bit-Variante feature-gated, §6.1). |
+| **1** | `memfuse-store` (LSM-Tree-Storage, WAL, Block-Cache), `memfuse-index` (HNSW/DiskANN-Vektorindex, SIMD-Distanz), `memfuse-text` (BM25/BM25F-Volltextindex, deutsche Morphologie), `memfuse-crypto` (AES-256-GCM-SIV, KV-Segment-Security, Deletion-Proof-Kette), `memfuse-graph` (CSR-Graph, PathRAG, Forward-Push-PPR, Leiden-Community-Detection, Hyperkanten), `memfuse-checkpoint` (Snapshotting), `memfuse-calibration` (Score-Kalibrierung, Drift-Erkennung) | Persistenz- und Indexierungs-Primitive. Keine Kenntnis voneinander außerhalb dieser Schicht. |
+| **2** | `memfuse-db` | Öffentliche `Collection`-API, 4-Signal-Fusion, Multi-Step-Query-Engine, Kontext-Kompaktierung, Provenance-Tracking. Konsumiert alle Layer-1-Crates. |
+| **3** | `memfuse-ollama` (Ollama-Client, Contextual-Chunk-Prefixing), `memfuse-candle` (natives GGUF-Inferenz-Backend, KV-Cache-Bridge), `memfuse-embed` (ONNX-Embeddings, Cross-Encoder-Reranking, feature-gated), `memfuse-agent` (persistente Agent-Workflow-Engine), `memfuse-router` (Contextual-Bandit-Routing), `memfuse-py` (Python-FFI via PyO3, eigener Cargo-Workspace zur Panic-Strategie-Isolation) | Inferenz-Backends und Anwendungslogik oberhalb der Datenschicht. |
+| **4** | `memfuse-mcp` (MCP-Server, Sandbox, Cloud-Egress-Gateway) | Externe Schnittstelle für Agenten (stdio-JSON-RPC). |
+| **5** | `memfuse-bench` | Reproduzierbarer Benchmark-Harness für Retrieval-Genauigkeit und Latenz. |
+
+### 4.1 Safety-First-Doktrin
+
+Safe Rust ist der Standard; `#![forbid(unsafe_code)]` gilt per Default und wird nur in einer geschlossenen,
+dokumentierten Ausnahmeliste durchbrochen — jeweils mit einem `// SAFETY:`-Beweiskommentar direkt am Code, der die
+Invarianten (insbesondere Pointer-Alignment) beweist:
+
+- `memfuse-index`: SIMD-Distanzberechnung (AVX2/AVX-512/NEON) und read-only Memory-Mapping des Indexformats.
+- `memfuse-store`: plattformspezifische ACL-Durchsetzung für WAL-Dateien unter Windows.
+- `memfuse-db`: `mlock`/`munlock` gegen OS-Swapping sensibler RAM-Puffer (feature-gated).
+- `memfuse-embed`: C-FFI zum ONNX-Runtime-Backend (feature-gated).
+- `memfuse-core-ipc-gen`: automatisch generierter FlatBuffers-IPC-Code.
+- `memfuse-router`: SIMD-Intrinsics für die Sherman-Morrison-Matrixarithmetik (§8.2) — die einzige Ausnahme des
+  `#![forbid(unsafe_code)]`-Paradigmas außerhalb der oben genannten Crates.
+
+Jeder Crate außerhalb dieser Liste erzwingt `#![forbid(unsafe_code)]` kompilierzeitlich. Bibliothekscode darf
+seinen Host-Prozess niemals durch einen Panic zum Absturz bringen — Fehlerbehandlung erfolgt konsequent über
+domänenspezifische `Result<T, E>`-Enums, nicht über `unwrap()`/`expect()` auf potenziell toxischen Daten.
 
 ---
 
-## §9 — Governance & Entwicklungsprozess
+<a id="speicher"></a>
+## 5. Speicherschicht: LSM-Tree, WAL und lock-freies Cache-Management
 
-### §9.1 Säulen des Entwicklungssystems
+### 5.1 Grundprinzip
 
-1. **Preflight Gate:** zentraler Aggregator aller lokalen und CI-Gates vor jedem Commit/PR.
-2. **Anti-Collision Claim System:** `cargo xtask claim --crate X --issue Y` mit TTL-Expiry und Cross-Branch-/Open-PR-Abgleich via GitHub-API (P18).
-3. **Single Source of Truth:** `DECISIONS.md` (ADRs); `WORKING_STATE.md` autogeneriert. Code-Kommentare verweisen auf `DECISIONS.md`-ADR-Nummern.
-4. **Automatisierte CI-Guardrails — vollständige, mergeblockierende Gate-Katalog:**
-   - **Architektur-Integrität:** `check-dag`, `check-duplicate-symbols`, `check-type-registry`.
-   - **Prozess-/Kollisions-Prävention:** `check-duplicate-intent` (inkl. Cross-Branch-/Open-PR-Abgleich, P18).
-   - **Qualitäts-Trend-Tracking:** `check-unwrap-baseline-trend`, `check-recall-stability`, Mutation-Testing, Benchmark-Regressions-Gates.
-   - **Audit-Integrität:** `check-audit-verdict-independence` — **MUSS** in `merge-gate.yml` als mergeblockierender Required-Check verankert sein (aktuell nur in `scheduled-audit.yml`; dies ist eine offene Lücke die vor dem nächsten Release zu schließen ist). `check-audit-duplication`.
-   - **Governance-Frische:** `check-vetoes` (gegen `VETOES.md`), `check-adr-deadlines`, `check-stale-tags`, `check-jules-context-freshness`, `check-agents-integrity`.
-   - **Grenzschicht-Sicherheit:** `check-ffi-panic-boundary` (aktuell `continue-on-error: true`, MUSS auf `continue-on-error: false` hochgestuft werden per TODO in `merge-gate.yml`).
-   - **Formale Konsistenz:** `check-commit-messages` (Shell-Commit-Unterbindung für `lsm.rs`, `wal.rs`, `fusion.rs`, `prompt_injection.rs`, `dispatch.rs`), `check-workflow-commands`, `check-doc-references`, `check-placeholder-refs`, `check-phantom-files`.
-   - **NEU — Dispatch-Shell-Hardening:** `check-dispatch-no-sh-c` — prüft via `grep -rn 'Command::new("sh")' crates/memfuse-router/src/dispatch.rs`, dass kein `sh -c`-Muster in `dispatch.rs` vorkommt. Mergeblockierend.
-   - **NEU — Bandit-Latenz-Safety:** `check-bandit-latency-budget` — stellt sicher, dass `BanditImplementation::ShermanMorrison` ausschließlich als opt-in via `egress-sherman-morrison`-Feature-Flag aktivierbar ist und nicht als Default-Pfad. Prüft dass `routing_strategy.rs` das Diagonal-Approximation-Default korrekt wählt.
-   - Jedes neu eingeführte Gate MUSS zwingend auch in der CI-Workflow-Konfiguration als mergeblockierender Schritt verankert werden — ein implementiertes, aber nicht eingebundenes Gate erfüllt seinen Zweck nicht.
-5. **Prompter & Bootstrap Protocol:** `AGENTS.md`, `.jules/SESSION_BOOTSTRAP.md` unüberspringbar. `CONSTITUTION.md` on-demand.
-6. **Governance-Dokumentenkatalog:** `AGENTS.md`, `DECISIONS.md`, `WORKING_STATE.md`, `VETOES.md`, `CONSTITUTION.md`, `SECURITY.md`, `TESTING.md`.
-
-### §9.2 Zwei-Stufen-Entwicklungsprozess
-
-- **Stufe 1 (Orchestrator):** liest Repository-Zustand, prüft Architektur/ADRs, trifft Entscheidungen, verfasst Task-Spezifikationen — schreibt keinen Produktionscode.
-- **Stufe 2 (Ausführender Agent):** Mandatory Bootstrap, Crate-Claim, Preflight-Gate, exakte Umsetzung. Keine eigenständigen ADRs; bei Bedarf `ADR-VORSCHLAG:` im PR-Body.
-
-**ADR-Pflicht für neue Komponenten aus §4–§5 dieser Spezifikation:**
-- `memfuse-sandbox`-Reaktivierung: eigenes ADR (ADR-082 oder folgendes) mit Scope-Abgrenzung und `wasmtime`-Begründung, vor Merge.
-- `bandit-routing`-Feature: ADR nach Verifikation via `test_bandit_vs_cascade_regret_comparison`.
-- `cloud-egress-guard`-Feature: ADR mit Privacy-Threat-Model-Verweis auf `SECURITY.md`.
-- WAL-Rotation-und-Shipping-API: ADR mit expliziter TOCTOU-Risikobewertung für externe Sync-Daemons.
-
-### §9.3 Sprache
-
-Deutsch für interne Governance-Dokumentation; Englisch für Code-Kommentare und öffentliche API-Dokumentation.
-
-### §9.4 Lizenz & Contributions
-
-MIT OR Apache-2.0. Vollständig Open Source.
-
-### §9.5 Crate-Zielstruktur
+Keine Zustandsänderung wird im Speicher sichtbar gemacht, bevor sie physisch in das Write-Ahead-Log geschrieben
+und mit dem Datenträger synchronisiert wurde (WAL-First). Der Systemzustand muss sich allein aus dem Log
+rekonstruieren lassen (deterministische Recovery). Schreibzugriffe sperren nicht die gesamte Collection, sondern
+nur die betroffenen Schlüssel über eine key-granulare Lock-Hierarchie:
 
 ```
-KERN (6 Module, Fusionsziel):
-  memfuse-core         [Fundament, Traits, Domain-Typen]
-  memfuse-security     [Fusion: memfuse-crypto]
-  memfuse-persistence  [Fusion: memfuse-store + memfuse-checkpoint]
-  memfuse-retrieval    [Fusion: memfuse-index + memfuse-graph + memfuse-text]
-  memfuse-orchestrator [memfuse-db, Scheduler-Konsolidierung]
-  memfuse-inference    [Fusion: memfuse-calibration + memfuse-ollama + memfuse-candle + memfuse-router + memfuse-embed]
-
-GRENZSCHICHT:
-  memfuse-mcp          [unverändert]
-  memfuse-py           [unverändert]
-  memfuse-agentic      [memfuse-agent]
-  memfuse-sandbox      [WASM-Ausführungsgrenze, separater Layer 6.5]
-
-WERKZEUG:
-  xtask, memfuse-bench [unverändert]
+collections (RwLock) → kv_locks (schlüssel-granular, KvKeyLocks) → embedder (RwLock)
 ```
 
-Migrationsreihenfolge: Security → Persistence → Inference → Scheduler → Retrieval → Bereinigung. Diese Konsolidierung ist nachgelagert und darf Release-Kriterien (§10) nicht verzögern.
+Diese Hierarchie ist für **Einzelschlüssel**-Mutationen ausgelegt und deadlockfrei bewiesen. Jede künftige
+Mutation, die mehrere Schlüssel gleichzeitig unter `kv_locks` hält, muss diesen Beweis für den Mehrschlüsselfall
+gesondert führen — sie darf sich nicht per Analogieschluss auf den Einzelschlüsselfall berufen (P24-Ergänzung,
+§3; konkret angewendet in §6.5, H2).
 
----
+### 5.2 Block-Cache: von sperrendem LRU zu lock-freiem SIEVE/S3-FIFO
 
-## §10 — Abnahmekriterien des Endprodukts
+**Befund:** Ein klassisches `RwLock<LruCache>`-Backend zwingt bei **jedem** Cache-Lesetreffer zur Akquise eines
+exklusiven Schreib-Locks, um das Element in der doppelt verketteten LRU-Liste an den Kopf zu bewegen. Unter der
+hochgradig parallelen Last eines Multi-Agenten-Systems degeneriert dies zu einem massiven Flaschenhals (Verstoß
+gegen P25).
 
-Das System gilt als abnahmefertig (Release-reif), wenn **sämtliche** der folgenden Kriterien erfüllt sind:
+**Zielarchitektur:** Der Block-Cache wird als austauschbares `BlockCacheBackend`-Trait geführt. Neben dem
+klassischen LRU-Backend (Produktions-Default) spezifiziert diese Architektur ein lock-freies Backend nach dem
+**SIEVE**-Prinzip (ergänzbar um **S3-FIFO** für differenzierte Eviction-Strategien):
 
-1. `cargo test --workspace` besteht fehlerfrei mit 0 Regressionen.
-2. `uvx memfuse-mcp` startet fehlerfrei gegen einen frischen `~/.memfuse`-Pfad und beantwortet eine `memfuse_search`-Anfrage ohne laufende Ollama-Instanz (ONNX-Default).
-3. `pip install memfuse` installiert fehlerfrei auf Linux x86_64, macOS arm64 und Windows x86_64; `memfuse.open()` → `insert()` → `search()` funktioniert ohne externe Abhängigkeiten.
-4. Dimension- und Versionsnummer sind zwischen `memfuse-py`, `memfuse-db` und `Cargo.toml` durchgängig konsistent (`dimension=768`).
-5. `DeletionProof` (`memfuse-crypto`) erbringt den negativen Rekonstruktionstest.
-6. `cargo xtask check-dag` bestätigt 0 Layer-Verletzungen (inkl. `memfuse-sandbox` auf Layer 6.5).
-7. Ein Git-Tag markiert das Release; alle für `memfuse-tauri` spezifischen CI-Workflows sind entfernt oder deaktiviert.
-8. `MemFuseDb::stats()` liefert durchgängig Live-Daten aus dem Router-/Kalibrierungszustand (`drift_status`, `calibration_ece`, `last_calibration_at`, `pid_pool_size`) via `Weak<RouterEngine>::upgrade()` (ADR-080) statt Platzhalterwerten.
-9. `MaintenanceScheduler` und `ConsolidationEngine` sind für jede Collection nachweislich gegenseitig exklusiv aktiv: `consolidation_guard: Arc<tokio::sync::Mutex<()>>` mit `try_lock`-Semantik produktiv verdrahtet (ADR-081).
-10. Die KV-Cache-Bridge ist über Feature `kv-bridge` durchgängig von `memfuse-crypto` bis `memfuse-mcp` verdrahtet, mit textidentischem Verhalten bei deaktiviertem Feature und nachgewiesener Tenant-Isolation unter Nebenläufigkeit.
-11. `AGENTS.md`/`WORKING_STATE.md` sind tagesaktuell zum letzten Code-Stand.
-12. **NEU:** `dispatch_to_slm()` in `memfuse-router::dispatch.rs` verwendet ausschließlich `Command::new(program).args(&[...])` ohne `sh -c` (verifiziert durch `check-dispatch-no-sh-c`-Gate).
-13. **NEU:** `check-audit-verdict-independence` ist als mergeblockierender Required-Check in `merge-gate.yml` verankert (nicht nur in `scheduled-audit.yml`); `check-ffi-panic-boundary` läuft mit `continue-on-error: false`.
-14. **NEU (Feature-Gates):** Wenn Feature `wasm-sandbox` aktiviert, besteht `memfuse-sandbox::executor::tests::test_wasm_memory_isolation` und `test_wasm_fuel_exhaustion_returns_error` fehlerfrei. Wenn Feature `cloud-egress-guard` aktiviert, besteht `test_egress_guard_fail_closed_on_index_unavailable` fehlerfrei (Fail-Closed-Verifikation). Wenn Feature `bandit-routing` aktiviert, besteht `test_bandit_diagonal_vs_linucb_latency_budget` fehlerfrei (Latenz-Budget-Verifikation).
-15. **NEU (P7-Benchmarks):** `bench_kv_bridge_prefill_savings` und `stress_session_dag_deadlock_freedom` sind in `memfuse-bench` vorhanden und zeigen messbare Ergebnisse; entsprechende USP-Aussagen in README/PyPI sind nicht mehr `[BENCHMARK_PENDING]`.
-16. WAL-Rotation-API (`Wal::rotate_and_seal()`) ist implementiert, read-only-Flagging ist durch `test_wal_rotate_and_seal_readonly_guarantee` verifiziert.
+- **S3-FIFO** evaluiert die Lebensdauer von Objekten über drei FIFO-Warteschlangen (Small ≈ 10 % der Kapazität,
+  Main, Ghost). Neue Objekte betreten die Small-Queue; werden sie dort nicht erneut referenziert, scheiden sie
+  schnell aus („Quick Demotion"), was verhindert, dass „One-Hit-Wonders" die Main-Queue blockieren.
+- **SIEVE** verzichtet vollständig auf Listen-Neuordnung bei einem Lesetreffer: Ein Cache-Hit reduziert sich auf
+  das Setzen eines einzigen atomaren `visited`-Bits (`Ordering::Relaxed`), ohne jede Mutation der Listenstruktur.
+  Eviction erfolgt über einen umlaufenden Zeiger („Hand"): Ein Objekt mit gesetztem `visited`-Bit wird begnadigt
+  (Bit gelöscht, verbleibt im Cache), ein Objekt mit gelöschtem Bit wird verdrängt. Diese „Lazy Promotion"
+  eliminiert den CPU-Overhead für Cache-Hits nahezu vollständig und liefert auf verzerrten (skewed) Workloads eine
+  höhere Trefferquote als LRU.
 
----
+**Schnittstellenspezifikation (Rust, Zielzustand):**
 
-## §11 — Glossar
-
-- **RRF (Reciprocal Rank Fusion):** Fusion mehrerer Ranglisten unterschiedlicher Retrieval-Signale (`memfuse-db::fusion.rs`).
-- **PathRAG:** Graph-basierte Retrieval-Methode mit bidirektionalem Dijkstra für Multi-Hop-Fragen (`memfuse-graph::path_rag.rs`).
-- **SAOS (Synthesized Agent Operating System):** Sammelbegriff für die typsichere Multi-Signal-Query- und Kontextfenster-Repräsentationsschicht in `memfuse-core`.
-- **ConfigFingerprint:** Hash-Fingerabdruck über Modell-/Kalibrierungsparameter zur automatischen Invalidierung veralteter Statistiken.
-- **ModelFingerprint:** SHA-256-basierter Fingerabdruck über Modellgewichte und Quantisierungsstufe; Grundlage der KV-Cache-Schlüsselableitung.
-- **KV-Cache-Bridge:** Mandantenisolierte, verschlüsselte Wiederverwendung berechneter LLM-KV-Tensoren über Retrieval-Treffer hinweg (`memfuse-crypto::kv_segment`, `memfuse-candle::kv_bridge`).
-- **DeletionProof:** Kryptographischer Nachweis, dass gelöschte Daten auf Storage-Ebene nicht mehr rekonstruierbar sind (`memfuse-crypto::deletion_proof.rs`, DSGVO Art. 17).
-- **Lyapunov-Drift-Watcher:** Statistisches Verfahren zur proaktiven Erkennung von Verteilungsverschiebungen in Kalibrierungs-Scores (`memfuse-router::lyapunov.rs`). Wird event-driven direkt nach jeder Routing-Entscheidung aufgerufen (ADR-079).
-- **Session-DAG/`NodesGuard`:** Typsichere Datenstruktur zur Abbildung verzweigter Konversationen mit Compile-Time-Deadlock-Prävention (`memfuse-graph::session_dag.rs`).
-- **`ConsolidationNodesGuard`:** Vom `NodesGuard`-Typ abgeleitete Hülle für den Konsolidierungspfad; schließt die zuvor offene Deadlock-Freiheitslücke zwischen Session-DAG und `consolidation_executor.rs`.
-- **Structural Consolidation Pass:** Deterministischer, LLM-freier Teil des Sleep-Cycle (`memfuse-db::memory_consolidation.rs`).
-- **Generative Synthesis Pass:** LLM-basierter Teil des Sleep-Cycle, erzeugt `SynthesizedChunk`s (`memfuse-db::synthesis_phase.rs`).
-- **Memory-Export-/Import-Format v1:** Versioniertes, portables JSON-Format je Collection mit idempotentem Re-Import (`memfuse-db::export.rs`/`import.rs`). Macht MemFuse zum System ohne Vendor-Lock-in.
-- **EmbeddingBackend:** Konfigurations-Enum mit Varianten Onnx (Default), Ollama, Candle, None.
-- **Late Hydration:** Architekturmuster in `memfuse-db::fusion.rs`, das Metadaten-Deserialisierung auf Top-K-Treffer beschränkt.
-- **WAL-Flusher-Actor:** Dedizierte Hintergrund-Task, die WAL-Batches koaleziert.
-- **Lock-Sharding:** Partitionierung in cache-line-ausgerichtete Shards zur Contention-Vermeidung.
-- **PidLatencyController:** Latenzbudget-Regler für Multi-Step-Retrieval (implementiert in `memfuse-db::pid_latency_controller.rs` und in `multistep.rs` via `MultiStepEngine` verdrahtet) und Cloud-Egress-Layer-2 (§12.2.2).
-- **`RoutingStrategy`:** Enum (`Cascade` [Default] | `ContextualBandit`) in `memfuse-router`, Feature `bandit-routing`. Wählt zwischen deterministischem Schwellenwert-Kaskaden-Klassifikator und lernfähigem LinUCB-Bandit.
-- **LinUCB:** Linear Upper Confidence Bound — kontextueller Bandit-Algorithmus (Li et al., 2010) für adaptives Profil-Routing. Implementiert in zwei Varianten: diagonal O(d) (Default, kein BLAS) und Sherman-Morrison O(d²) (opt-in via `egress-sherman-morrison`-Feature).
-- **Sherman-Morrison-Formel:** Rang-1-Update für Matrix-Inverse: $A^{-1} \leftarrow A^{-1} - \frac{A^{-1}xx^\top A^{-1}}{1 + x^\top A^{-1}x}$, O(d²) — vermeidet O(d³)-Inversion im Hot-Path.
-- **`GuardedPayload<Sanitized>`:** Typ-State in `memfuse-router::guarded_payload`, der nur durch erfolgreichen Durchlauf aller fünf Egress-Guard-Layer konstruierbar ist. Macht einen vergessenen Guard-Durchlauf zum Compile-Fehler.
-- **`EgressGuard`:** Bulk-Exfiltrations-Erkennungskomponente (Layer 4 des Cloud-Egress-Gateways, §12.2.4). Bewusst anders benannt als `NodesGuard` (der Lock-Ordnungs-Typ), da beide komplett verschiedene Semantik haben (Symbolkollision wäre P10-Verstoß).
-- **Graph-Generalisierung:** Deterministisches $k$-Anonymitäts-Verfahren auf Graphkanten (Community-Abstrahierung), eingesetzt in Layer 3 des Cloud-Egress-Gateways. Kein Differential-Privacy-Mechanismus.
-- **`Transport`-Enum:** `StdioMcp` (Default, bestehend) | `HttpCloud { url }` (neu, nur mit `cloud-egress-guard` + `GuardedPayload<Sanitized>`). Feld in `SlmProfile`.
-- **Passives WAL-Shipping:** Replikation versiegelter, read-only-geflaggter WAL-Segmente auf eine passive Kopie ohne Konsensprotokoll, Leader-Election oder Split-Brain-Risiko. Exakt ein Schreiber; passive Kopie rein lesend bis zu explizitem manuellem Failover (`memfuse wal-restore`).
-- **`memfuse-sandbox`:** WASM-Ausführungsgrenze für `CodeExecution`-Permission. Layer-6.5-Crate. Nutzt `wasmtime` mit `fuel`-Limit und `WasmCapabilities`-Whitelist. `#![forbid(unsafe_code)]`. Kein Dateisystem-/Netzwerkzugriff per Default.
-- **`WasmCapabilities`:** Capability-Whitelist für WASM-Guest-Module in `memfuse-sandbox`. Definiert erlaubte I/O-Kanäle, Speicherlimit, CPU-Ticks und Netzwerk-/Dateisystemzugriff.
-- **`SynthesisMode`:** Enum (`SleepCycle` | `PrivacyAbstraction`) für den `SegmentSynthesizer`-Trait, das die Wiederverwendung desselben Traits für Sleep-Cycle-Konsolidierung und Cloud-Egress-Layer-2 ermöglicht.
-
----
-
-## §12 — Cloud-Egress Privacy Gateway (optional, Feature `cloud-egress-guard`)
-
-### §12.1 Designprinzipien und Vorbedingungen
-
-Dieses Feature ist **standardmäßig deaktiviert** und verletzt P5 (Kein Cloud-Zwang) **nicht**: Es adressiert Nutzer, die Cloud-LLMs (z. B. Gemini, Claude via API, GPT) *ohnehin* einsetzen, und bietet technische Schadensbegrenzung für eine Realität, die außerhalb von MemFuse bereits existiert. Air-Gap bleibt der Standardzustand.
-
-**Namenskorrektur (zwingend vor Implementierung):** Die Bulk-Exfiltrations-Erkennungskomponente heißt `EgressGuard`, **nicht** `NodesGuard` (dieser Name ist für den Session-DAG-Lock-Ordnungs-Typ kanonisch reserviert, §4.5). Eine Verwechslung würde `cargo xtask check-duplicate-symbols` sofort scheitern lassen.
-
-**DAG-Position:** `memfuse-router::egress_guard` (Layer 6) — benötigt `memfuse-db` (Layer 5), `memfuse-security` (Layer 2) und optional `memfuse-candle` (Layer 3). Rein additiv: bei deaktiviertem Feature identisches Verhalten zum bestehenden System.
-
-### §12.2 Fünfschichtige Spezifikation
-
-#### §12.2.1 Layer 1 — Deterministisches Token-Vaulting
-
-**Zwei parallele Erkennungspfade (kein ReDoS-Risiko durch klare Aufgabentrennung):**
-
-1. **Strukturierte PII** (E-Mail, IP, API-Key-Muster, Kreditkarten-Luhn-Check):
-   - Aho-Corasick-Multi-Pattern-Automat, worst-case O(n) über den Payload unabhängig von Musterzahl.
-   - Reguläre-Ausdruck-Nachvalidierung **nur** auf den Aho-Corasick-Treffern (nicht auf dem Gesamttext — verhindert ReDoS).
-2. **Unstrukturierte Entitäten** (Personen, Organisationen):
-   - Wiederverwendung der ONNX-Runtime aus `memfuse-embed` (P10) für ein quantisiertes Token-Classification-NER-Modell.
-   - Kein zweiter Inferenzpfad, keine neue Abhängigkeit.
-
-**Sitzungsstabiles Surrogat:** Jede erkannte Entität → `[USER_ENTITY_<blake3(entity_text ‖ session_salt)[..4 Byte, hex]>]`.
-- `session_salt` = frischer `OsRng`-Wert pro Session. Gleiche Entität → gleiches Surrogat innerhalb einer Session (Cloud-LLM kann kohärent referenzieren); verschiedene Sessions nicht korrelierbar.
-- **Speicherung:** `EgressVault` in `memfuse-security::egress_vault` (AES-256-GCM-SIV, `ZeroizeOnDrop`).
-
-#### §12.2.2 Layer 2 — Lokale Vorabstraktion
-
-- **P10-konform:** `SegmentSynthesizer`-Trait (produktiv für Sleep-Cycle) im Modus `SynthesisMode::PrivacyAbstraction` — keine Parallelstruktur.
-- **Latenzbudget-Kopplung:** Derselbe `PidLatencyController` wie für Multi-Step-Retrieval (§4.13/P11). Bei Überschreitung: **Fail-Open** (Layer 2 übersprungen, Payload fließt zu Layer 3) — niemals Fail-Closed, da Verfügbarkeit hier nicht hinter Sicherheit zurücksteht; PII wurde bereits in Layer 1 deterministisch tokenisiert.
-
-#### §12.2.3 Layer 3 — Graph-Generalisierung
-
-**Standard-Mechanismus (Default):** Deterministische $k$-Anonymitäts-Generalisierung:
-- Kantenlabels → Community-Zugehörigkeit (`memfuse-graph::community.rs`, produktiv).
-- Spezifische Entity-Namen → Layer-1-Surrogate.
-- Kein Rauschmechanismus, keine Budget-Buchführung.
-
-**Fernziel — Echter $(\varepsilon,\delta)$-DP (explizit kein Kernfeature dieser Version):**
-Ein echter DP-Mechanismus (Laplace-Mechanismus auf PageRank-/Zentralitäts-Scores mit kalibrierter Sensitivität) benötigt einen **Privacy-Budget-Ledger** (stateful, pro Tenant/Session, mit Kompositions-Tracking über wiederholte Anfragen). Diese Komponente ist **nicht** in v5 enthalten — eigenes ADR und eigenes Release erforderlich, um keine falsche Compliance-Aussage zu erzeugen (P7: DSGVO-Auditoren, die "Differential Privacy" hören, erwarten beweisbares $\varepsilon$).
-
-#### §12.2.4 Layer 4 — `EgressGuard`
-
-**Aufgabe:** Bulk-Chunk-Exfiltrations-Erkennung (nahezu wörtliche Wiedergabe eines gespeicherten Memory-Chunks im ausgehenden Payload). **Nicht** PII-Erkennung — das ist deterministisch Layer 1 überlassen.
-
-**Algorithmus:**
-- Ausgehender Payload → Embedding via bestehender `memfuse-embed`/HNSW-Infrastruktur (P10: kein Zweitmodell).
-- k-NN-Anfrage gegen lokalen HNSW-Index (kein Vollscan — das ist genau der Anwendungsfall des Index).
-- Blockierung wenn: `max(cosine_similarity) ≥ threshold` **und** `payload_length ≥ min_payload_bytes` (verhindert False Positives bei kurzen, generischen Fragmenten).
-- **Fail-Closed** bei Guard-Fehler (Index nicht verfügbar, Timeout): Egress wird blockiert, nicht durchgelassen. Bewusste Asymmetrie zum KV-Bridge-Fail-Open-Muster (§4.8) — hier dominiert Exfiltrationsrisiko über Verfügbarkeit.
-
-#### §12.2.5 Layer 5 — Inbound Re-Hydration mit bidirektionalem Zero-Trust
-
-- **Reverse-Mapping:** Rücksubstitution aus `EgressVault` **nur** bei exaktem Format-Match (`[USER_ENTITY_[0-9a-f]{8}]`) — kein unscharfes Pattern-Matching, um Prompt-Injection durch manipulierte Cloud-Antworten zu verhindern.
-- **Bidirektionaler Zero-Trust:** Cloud-Antwort MUSS denselben Prompt-Injection-Guard-Pfad durchlaufen wie `memfuse_search`/`memfuse_get`-Ergebnisse (§7.2). Cloud ist eine externe, untrusted Quelle — dies gilt für beide Richtungen der Kommunikation.
-
-### §12.3 Transport-Erweiterung (`Transport`-Enum)
-
-`SlmProfile` erhält additives `transport: Transport`-Feld (Default: `StdioMcp`):
 ```rust
-pub enum Transport {
-    StdioMcp,                   // bestehend, unverändert
-    HttpCloud { url: String },  // neu, nur mit cloud-egress-guard-Feature
+use crossbeam_epoch::{Atomic, Guard, Shared};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+pub struct SieveNode<K, V> {
+    pub key: K,
+    pub value: V,
+    pub visited: AtomicBool,
+    pub next: Atomic<SieveNode<K, V>>,
+}
+
+pub struct SieveCacheBackend<K, V> {
+    head: Atomic<SieveNode<K, V>>,
+    tail: Atomic<SieveNode<K, V>>,
+    hand: Atomic<SieveNode<K, V>>,
+    capacity: usize,
+    size: AtomicUsize,
+    index: scc::HashMap<K, Shared<'static, SieveNode<K, V>>>,
 }
 ```
-`dispatch_to_cloud()` darf den `HttpCloud`-Zweig **ausschließlich** aufrufen, wenn `GuardedPayload<Sanitized>` als Typ-State vorliegt. Dies ist ein **Compile-Fehler**, wenn der Guard-Durchlauf fehlt — keine Laufzeitprüfung, kein Flag-Check.
 
-**Unabhängiges Hardening (§7.10, kein cloud-egress-guard nötig):** `dispatch_to_slm()` MUSS `Command::new(program)` ohne Shell-Zwischenschicht verwenden. Dies ist ein separates, sofort umzusetzendes Hardening, unabhängig vom Cloud-Egress-Feature-Gate.
+Ein Lesetreffer über `get` erstellt zunächst einen Epochen-Guard (`crossbeam_epoch`), der garantiert, dass der
+referenzierte Speicher während der Guard-Lebensdauer nicht freigegeben wird. Der Lookup erfolgt über eine
+concurrent Hash-Map; bei Fund reduziert sich der Hit auf `node.visited.store(true, Ordering::Relaxed)` — keine
+Mutexe, keine Spin-Locks, keine Cache-Line-Invalidierung durch Pointer-Updates. Epochenbasierte Speicherfreigabe
+(Epoch-Based Reclamation, EBR) verhindert dabei ABA-Probleme und Use-After-Free, wenn Objekte entfernt werden,
+während andere Threads sie noch lesen.
 
-### §12.4 Nicht-Ziel-Klarstellung
+### 5.3 Write-Ahead-Log: SPSC-Ring-Puffer statt File-Handle-Mutex
 
-Dieses Feature macht aus einer privatsphäreschützenden Sicht das Senden von Daten an Cloud-LLMs sicherer — es macht es nicht *empfohlen*. Die MemFuse-Default-Empfehlung bleibt Air-Gap (P5). Nutzer, die dieses Feature aktivieren, tun dies in vollem Bewusstsein, dass sie MemFuse-Daten an externe Dienste senden.
+Die klassische Implementierung leidet unter geteilter Eigentümerschaft am File-Handle, was zu HMAC-Ketten-Forks
+und stillen Datenverlusten führen kann. Die Zielarchitektur sieht eine lock-freie WAL-Pipe auf Basis eines
+Single-Producer-Single-Consumer-(SPSC-)Ring-Puffers vor. Die Puffergröße ist zwingend eine Zweierpotenz, um teure
+Modulo-Operationen durch bitweise UND-Maskierung (`& (capacity - 1)`) zu ersetzen. Synchronisation erfolgt über
+atomare Lese-/Schreibzeiger mit `Ordering::Acquire`/`Ordering::Release`. Ein dedizierter Flusher-Task übernimmt
+exklusiv den `fsync`, wodurch die Transaktionslatenz vom tatsächlichen I/O-Durchsatz entkoppelt wird.
 
----
-
-## §13 — Router-Neuausrichtung: Contextual-Bandit-Gate (Feature `bandit-routing`)
-
-### §13.1 Ist-Zustand (normativ dokumentiert)
-
-`RouterEngine::select_profile_cascade()` ist ein deterministischer **Kaskaden-Klassifikator** (Profile nach `min_relevance_score` sortiert, Schwellenwert-Check pro Profil, erster Treffer gewinnt). Er ist gut kalibriert (Isotonic/Platt, konformale Quantile), produktiv und getestet. Er bleibt der **unveränderliche Default** — `RoutingStrategy::Cascade` ist und bleibt die einzig aktivierte Strategie bis `bandit-routing` explizit per ADR und Benchmark freigegeben wird (P7, P20).
-
-**Bekannte Einschränkungen des Kaskaden-Klassifikators:** keine gelernte, kontinuierliche Gating-Funktion über Query-Kontext; kein Mechanismus gegen Profil-Verhungern (ein Profil mit niedrigem Schwellenwert kann systematisch unterbeschäftigt sein); kein explizites Exploration/Exploitation-Gleichgewicht; `RoutingOutcome` wird ausschließlich für Kalibrierungs-Statistik, nicht als Belohnungssignal genutzt.
-
-### §13.2 Zielarchitektur: LinUCB Contextual Bandit
-
-**Designprinzipien:**
-1. **Kein zweiter Embedding-Aufruf (P10):** Gating-Kontext = bereits berechneter Query-Embedding-Vektor aus `memfuse-embed`/`memfuse-candle`. Kein Performance-Overhead für die Embedding-Berechnung selbst.
-2. **Latenz-sicherer Algorithmus:** Die Spezifikation mandatiert **zwingend** eine O(d²)-oder-besser-Implementierung. Die naive O(d³)-Inversion von $A_p$ im Hot-Path ist **verboten** — dies würde das `PidLatencyController`-Budget bei d=768 unweigerlich sprengen.
-3. **Bestehendes Belohnungssignal:** `RoutingOutcome::Success = 1.0`, `Rejected = 0.0`, `Escalated { .. } = 0.3` (konfigurierbar).
-4. **Bestehende Kapazitätskontrolle:** `PidLatencyController`-Muster (§4.13).
-5. **Bestehende Drift-Kopplung:** `LyapunovDriftWatcher` (ADR-079).
-
-**Score-Formel:**
-$$\hat{r}_p(x) = \theta_p^\top x + \alpha_p \sqrt{\Sigma_p(x)} - \lambda \cdot c_p - \mu \cdot \mathbb{1}[\text{transport} = \text{HttpCloud}]$$
-
-Dabei ist $\Sigma_p(x)$ je nach `BanditImplementation`:
-- **Diagonal (Default):** $\Sigma_p(x) = \sum_i \sigma_{p,i}^2 \cdot x_i^2$ — O(d), kein BLAS.
-- **Sherman-Morrison (opt-in):** $\Sigma_p(x) = x^\top A_p^{-1} x$ via Matrixvektor-Produkt — O(d²), `ndarray`.
-
-**Updates (beide Varianten) bei Beobachtung $(x, r_{\text{adjusted}})$:**
-- $\theta_p \leftarrow \theta_p + \eta \cdot (r_{\text{adjusted}} - \theta_p^\top x) \cdot x$ — O(d).
-- Diagonal: $\sigma_{p,i}^2 \leftarrow \sigma_{p,i}^2 + x_i^2$ — O(d).
-- Sherman-Morrison: $A_p^{-1} \leftarrow A_p^{-1} - \frac{A_p^{-1} x x^\top A_p^{-1}}{1 + x^\top A_p^{-1} x}$ — O(d²), keine Inversion.
-
-**Belohnungsanpassung:**
-$$r_{\text{adjusted}} = r_{\text{outcome}} - \lambda \cdot c_p - \mu \cdot \mathbb{1}[\text{transport} = \text{HttpCloud}]$$
-- $c_p$ = `resource_cost_estimate` (Feld in `SlmProfile`, bereits vorhanden).
-- $\mu$ = Privacy-Malus für Cloud-Profile (Default: 0.2, konfigurierbar). Cloud-Profile gewinnen nur, wenn ihr Qualitätsvorteil den Privacy-Malus überkompensiert — lokal-bevorzugendes Verhalten ist direkt im Reward kodiert.
-- $\lambda$ = Kostensensitivitäts-Parameter (Default: 0.1, konfigurierbar).
-
-**Drift-gekoppelte Exploration:** Bei `LyapunovDriftWatcher` → Drift für Profil $p$: $\alpha_p \leftarrow \alpha_p \cdot k_{\text{drift}}$ temporär erhöht (Default: $k_{\text{drift}} = 2.0$, konfigurierbar; Rückfall auf Basis-$\alpha$ nach Drift-Auflösung).
-
-**Kapazitätsbeschränkung via PID:** Profil $p$ überschreitet Auslastungsbudget → temporärer Strafterm auf $\hat{r}_p(x)$ bis Fensterverschiebt (Wiederverwendung des `PidLatencyController`-Feedbacks auf die Zustandsgröße Profil-Auslastung).
-
-**`ndarray`-Abhängigkeit:** Nur für `ShermanMorrison`-Variante und nur wenn Feature `egress-sherman-morrison` aktiv. Bezogen via re-export aus `memfuse-embed/onnx` (`ndarray 0.15`, bereits im Workspace vorhanden). Die Diagonal-Variante benötigt ausschließlich `Vec<f32>` — keine zusätzliche Abhängigkeit, kein BLAS.
-
-### §13.3 Migrationsstrategie (P20-konform)
-
-- Feature-Flag `bandit-routing` (Default: **off**). Kaskaden-Pfad bleibt **unverändert bestehend**.
-- `RoutingStrategy`-Enum: `Cascade` (Default) | `ContextualBandit`.
-- **Verifikationspflicht vor Default-Aktivierung:** `test_bandit_vs_cascade_regret_comparison` — Offline-Replay-Benchmark auf historischen `RoutingOutcome`-Daten in `memfuse-bench`. Dieser Benchmark MUSS einen messbaren Regret-Vorteil des Bandits gegenüber der Kaskade zeigen, bevor `ContextualBandit` je zum Default wird (P7). Kein Wechsel ohne Benchmark-Nachweis.
-- **Latenz-Sicherheits-Test:** `test_bandit_diagonal_vs_linucb_latency_budget` verifiziert, dass der Diagonal-Default das `PidLatencyController`-Budget unter d=768 nicht überschreitet.
+| Komponente | Bisheriges Modell | Zielarchitektur | Laufzeit (Hit/Append) |
+|---|---|---|---|
+| Block-Cache-Lesepfad | `RwLock<LruCache>` (Produktions-Default) | `SieveCacheBackend` mit `crossbeam_epoch` (Opt-in) | $O(1)$ lock-frei |
+| WAL-Synchronisation | Mutex pro File-Handle | SPSC-Atomic-Ring-Puffer + Flusher-Actor | lock-freies Append |
+| Schreib-Lock-Handoff | Collection-weiter Mutex | Key-granulares Lock-Striping (`kv_locks`) | lock-freie Hash-Auflösung |
 
 ---
 
-## §14 — Reaffirmation: `memfuse-cluster`-Veto & Passives WAL-Shipping
+<a id="graph"></a>
+## 6. Wissensgraph-Datenmodell: binäre Kanten und n-äre Hyperkanten
 
-### §14.1 Das Veto bleibt bestehen (zeit-invariant)
+### 6.1 Binäre Kanten als Grundmodell
 
-Das Veto gegen `memfuse-cluster` (Raft/`openraft`) ist **permanent und gilt unverändert**. Kein Umfang an verfügbarer Implementierungsgeschwindigkeit (Commit-Tempo, Agenten-Schwarm) ändert die zugrunde liegende Risikoklasse:
+Der Wissensgraph wird primär als gerichteter, gewichteter Graph in einer CSR-Struktur (Compressed Sparse Row)
+gehalten: `Edge { target: EntityId, weight: f32, edge_type: EdgeType, tx_valid_from/to, business_valid_from/to,
+source_doc_id }`. `EdgeType` ist als `#[non_exhaustive] enum { Default }` deklariert — strukturell auf einen
+impliziten Prädikat-Typ reduziert; es gibt keine typsystemische Unterscheidung nach Relationsart. Kanten tragen
+sowohl **transaktionale** Gültigkeit (MVCC-Systemzeit, `tx_valid_from/to`) als auch **fachliche** Gültigkeit
+(Business-Zeit, `business_valid_from/to`) — der Graph ist damit bi-temporal.
 
-1. **Verifikationsschulden sind qualitativ anders:** Split-Brain-Szenarien, Leader-Election-Liveness und verteilte Lock-Semantik sind in der Verifikations-Literatur (Jepsen-Framework) die Fehlerklasse, die spezialisierte Teams (etcd, Consul, CockroachDB) noch Jahre nach Produktivsetzung als Incident-Ursache finden. Mehr Code-Durchsatz bei gleicher oder überlasteter Audit-Kapazität **erhöht** dieses Risiko.
-2. **P2 (Zero-Panic-Doctrine):** Ein fehlerhaftes verteiltes Konsensprotokoll ist der Prototyp eines Silent-Data-Corruption-Risikos — im Unterschied zu einem lokalen LSM-Bug betrifft ein Split-Brain-Fehler per Definition mehrere Knoten gleichzeitig und ist oft nicht mehr rekonstruierbar.
-3. **Markenkern-Begründung ist zeit-invariant:** Das Air-Gap-/Zero-Trust-Versprechen, die Nicht-Ziel-Liste (§2.4) und die Behauptung "kein Netzwerk-Angriffsvektor, weil kein Netzwerk-Listener existiert" sind keine Funktion der Entwicklungsgeschwindigkeit.
-4. **P19:** Revision eines dokumentierten Beschlusses erfordert explizites ADR — kein Ad-hoc-Umkehr.
+`DocId` (Default `u64`, feature-gated `u128` via BLAKE3-Truncation, `#[repr(C, align(16))]`) und `EntityId`
+(`u64`) bilden die gemeinsame Identitätsgrundlage für alle Kantentypen, binär wie n-är — keine neue ID-Klasse ist
+für Hyperkanten nötig. Der `docid-128`-Rollout ist technisch über praktisch den gesamten Crate-DAG vollzogen,
+bleibt aber bewusst 🟡 hinter Feature-Flag: Der Wechsel des Produktions-Defaults ist an einen Major-Version-Cutover
+gebunden, gebündelt mit der DiskANN-Tier-Vollfreigabe (⚖️, kein Zieltermin normativ festgelegt).
 
-### §14.2 Tatsächlicher Nutzungsbedarf: Passives WAL-Shipping
+Cascade-Invalidierung (`cascade_invalidate_edges_for_superseded_doc`) markiert Kanten, deren Quelldokument durch
+eine neue Version ersetzt wurde, als tombstoniert; sie arbeitet auf `edges_for_doc(doc_id) -> Vec<(EntityId,
+EntityId)>` — strikt auf Kantenpaare festgelegt.
 
-**Kurzfristig (bereits vorhanden):** Memory-Export-/Import-Format v1 (§2.3 Punkt 7) deckt Batch-Snapshots für Migration/Restore vollständig ab.
+Dieses Modell ist performant und ausreichend für die überwiegende Mehrheit von Fakten, die sich als
+Subjekt-Prädikat-Objekt-Aussage darstellen lassen. Es stößt jedoch strukturell an eine Grenze, sobald ein Faktum
+per Definition mehr als zwei Beteiligte hat: Ein Ereignis wie *„Anthropic (Subjekt) hat Claude Sonnet 5 (Objekt)
+am Datum X (Zeit) für den Enterprise-Tier (Qualifier) veröffentlicht (Prädikat)"* lässt sich im binären Modell nur
+als mehrere unabhängige Kanten zerlegen (Subjekt→Objekt, Subjekt→Zeit, Subjekt→Qualifier …), wodurch der
+Zusammenhang zwischen den Kanten — dass sie *ein und dasselbe* Ereignis beschreiben — verloren geht.
 
-**Mittelfristig — Passives WAL-Shipping (neues, risikoarmes Feature):**
+### 6.2 Hyperkanten: Kernidee und Designentscheidung
 
-Das durch HMAC-Kette integritätsgesicherte WAL (§4.12) wird periodisch auf eine passive Kopie repliziert — **kein Konsens, kein Leader-Election, kein Split-Brain** möglich, da zu jedem Zeitpunkt exakt ein Schreiber existiert und die Kopie rein lesend bleibt bis zu explizitem manuellem Failover.
+**Reifegrad: 🔴 spezifiziert, zu bauen.** MemFuse führt eine zweite, orthogonale Kantenklasse ein: **`HyperEdge`**
+— eine n-stellige Relation, die mehrere `EntityId`s in klar benannten Rollen (nicht nur „Quelle"/„Ziel") zu einem
+einzigen, gemeinsam versionierten und atomar invalidierbaren Faktum verbindet. Binäre `Edge`s bleiben der
+Default-Pfad für einfache Subjekt-Prädikat-Objekt-Fakten (Kompatibilität, unangetasteter Hotpath);
+`HyperEdge` ist die Erweiterung für Fakten, die per Definition mehr als zwei Beteiligte haben (Ereignisse,
+Transaktionen, n-äre Beziehungen, Zitate mit Quelle+Kontext+Zeitpunkt).
 
-**Implementierung** (`memfuse-store::wal.rs`):
-- `Wal::rotate_and_seal()`: Atomares Versiegeln eines WAL-Segments (rename + fsync auf Directory, danach `O_RDONLY`-Flag). Nur versiegelte Segmente sind für externen Sync freigegeben.
-- **TOCTOU-Schutz gegen externe Sync-Daemons (Syncthing, iCloud Drive):** Der Flusher-Actor schreibt ausschließlich in das aktive, nicht-versiegelte Segment. Externe Sync-Daemons lesen ausschließlich versiegelte, read-only-geflaggite Segmente. Datei-Locking-Konflikte zwischen Flusher und Sync-Daemon sind strukturell ausgeschlossen — nicht durch Locking-Protokolle, sondern durch die Invariante "Flusher und Sync-Daemon schreiben/lesen nie dasselbe Segment gleichzeitig". `test_wal_rotate_and_seal_readonly_guarantee` verifiziert diese Invariante.
-- Optionaler `memfuse wal-push`-CLI-Befehl: One-Shot-HTTP-Push eines versiegelten Segment-Batches ohne dauerhaften Listener — der Server läuft nur während des Push-Vorgangs.
-- `memfuse wal-restore`: Manuelles, explizites Failover einer passiven Kopie zum Primär-Gerät.
+**Designentscheidung (verbindlich):** Es wird **kein** generisches RDF-Reifikations-Pattern verwendet (Hyperkante
+als eigener Blank-Node mit N binären Kanten zu den Beteiligten). Begründung: Reifikation würde exakt das zu
+lösende Problem reproduzieren — der Zusammenhang der Teil-Kanten ginge im CSR-Traversal erneut verloren, und
+Cascade-Invalidierung müsste N synthetische Kanten einzeln statt eine Hyperkante atomar treffen. Stattdessen wird
+eine kohärente, erstklassige, im Speicher flach liegende Rust-Struktur mit Zero-Copy-Deserialisierung via
+FlatBuffers/Mmap spezifiziert.
 
-**Langfristig (Fernziel, eigenes ADR):** CRDT-artige, versionsvektor-basierte Delta-Merges für asynchrone Zusammenführung zweier unabhängig geschriebener Instanzen. Geeigneter für das tatsächliche Nutzungsmuster (Handy + Laptop, beide offline geschrieben, Merge wenn online). Wird **nicht** in v5 aufgenommen (P20).
+### 6.3 Datenstruktur
 
-### §14.3 Invarianten des Passiven WAL-Shippings
+```rust
+/// Eindeutige ID einer Hyperkante — eigener Namensraum, kollidiert nicht mit EntityId/DocId.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct HyperEdgeId(pub u64);
 
-- Exactly-one-writer: Zu jedem Zeitpunkt existiert genau eine schreibende Instanz.
-- Passive Kopie: Rein lesend bis zu explizitem `memfuse wal-restore`.
-- HMAC-Integrität: Jedes geshippte Segment trägt die vollständige HMAC-Kette; die passive Instanz verifiziert die Kette beim Replay.
-- Kein Automatismus: Failover ist ein manueller, bewusster Entschluss des Nutzers — kein automatischer Failover-Mechanismus, der Split-Brain provozieren könnte.
-- Keine neue Netzwerkfläche im Steady-State: MemFuse öffnet keinen dauerhaften Netzwerk-Listener für Shipping-Zwecke.
+/// Rollenbezeichner innerhalb einer Hyperkante (z. B. "subject", "object", "time", "location").
+/// Interniert über denselben String-Interner wie EdgeType/Prädikate, um Allokationen im Hotpath
+/// zu vermeiden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RoleId(pub u32);
+
+/// Ein Teilnehmer-Tupel: welche Entität füllt welche Rolle.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RoleBinding {
+    pub role: RoleId,
+    pub entity: EntityId,
+}
+
+/// N-äre Hyperkante — verbindet 2..N Entitäten zu einem gemeinsam gültigen Faktum.
+/// Zero-Copy-Variante für den Lesepfad: `ArcSlice` hält lediglich Pointer + Referenzzähler auf
+/// den Mmap-Bereich, statt den Puffer beim Einlesen aus dem LSM-Storage zu kopieren.
+pub struct HyperEdge<'a> {
+    pub id: HyperEdgeId,
+    pub predicate: EdgeType,                    // Wiederverwendung des bestehenden Prädikat-Typs
+    pub participants: ArcSlice<'a, RoleBinding>, // min. 2 Bindings (sonst degeneriert zur binären Edge)
+    pub weight: f32,
+    pub tx_valid_from: Option<TxId>,
+    pub tx_valid_to: Option<TxId>,
+    pub business_valid_from: Option<i64>,
+    pub business_valid_to: Option<i64>,
+    pub source_doc_id: Option<DocId>,
+}
+```
+
+**Persistenz:** Neues LSM-Präfix `__graph:hyperedge:` (analog zu `__graph:edge:`), Value =
+FlatBuffers-serialisiertes `HyperEdge` (Wiederverwendung der bestehenden FlatBuffers-Toolchain,
+`memfuse-core-ipc-gen`, keine neue Serialisierungsschicht). Zusätzlicher Sekundärindex
+`__graph:hyperedge_by_entity:{EntityId} -> Vec<HyperEdgeId>` für den Zugriffspfad „gib mir alle Hyperkanten, an
+denen Entität X in irgendeiner Rolle beteiligt ist". Einführung als **additives** Schema-Feld — kein Breaking
+Change für bestehende `Edge`/`PersistedEdgePayload`-Daten.
+
+**API-Oberfläche:** Neue öffentliche Methode
+`Collection::relate_n_ary(predicate, participants: &[(RoleId, EntityId)], doc_id) -> Result<HyperEdgeId>`, analog
+zur bestehenden `relate()`-Invariante: **muss** sowohl LSM-Write (Primär- und Sekundärindex) als auch
+`graph_index`-Registrierung atomar durchführen. `relate()` (binär) bleibt unverändert bestehen und wird **nicht**
+intern auf `relate_n_ary` mit 2 Teilnehmern umgestellt — der binäre Pfad bleibt der unangetastete Hotpath.
+
+**Nicht im Scope:** Automatische NLP-seitige Extraktion n-ärer Fakten aus Freitext (separates, vorgelagertes
+Thema der Extraction-Pipeline).
+
+### 6.4 Traversal-Semantik
+
+`CsrGraph` erhält eine neue Methode `hyperedges_for_entity(id: EntityId) -> Vec<HyperEdgeId>`, die intern den
+Sekundärindex nutzt — **kein** Eingriff in die bestehende CSR-Adjazenzstruktur für binäre Kanten (additive
+Erweiterung, keine Migration des Hotpfads). PathRAG wird um einen optionalen Hyperkanten-Expansionsschritt
+ergänzt: Beim Erreichen eines Knotens während der Forward-Push-Traversierung (§7.2) werden zusätzlich alle
+`RoleBinding`-Partner der an diesem Knoten anliegenden `HyperEdge`s als „virtuelle" Nachbarn mit
+rollenspezifischem Gewichtsabschlag eingespeist (Startwert `0.85`, analog zum bestehenden Hop-Abschlagsfaktor).
+Diese Einspeisung erfolgt gegen die Forward-Push-Queue-Logik (nicht gegen eine dichte Power-Iteration), da
+Forward-Push die produktive PPR-Zielarchitektur ist (§7.2).
+
+### 6.5 Integrationshindernisse H1–H6 und ihre verbindliche Lösung
+
+Diese sechs Hindernisse sind der eigentliche Kern der Spezifikation: Sie benennen nicht nur, *dass* eine
+Integration möglich ist, sondern *welches bestehende Invariant unter Druck gerät* und wie es gewahrt bleibt.
+
+#### H1 — RCU-Snapshot-Inkonsistenz zwischen CSR und Hyperkanten-Sekundärindex
+
+**Problem:** `CsrGraph::compact()`/`compact_async()` tauscht den gesamten Graphzustand atomar über einen
+`ArcSwap<GraphInner>`-Pointer aus — Leser sehen nie einen gemischten Alt-/Neu-Zustand. Würde der
+Hyperkanten-Sekundärindex als **separate** Struktur außerhalb von `GraphInner` geführt, entstünde ein
+Zeitfenster, in dem CSR- und Hyperkanten-Zustand auseinanderlaufen: Ein Leser könnte einen `HyperEdgeId` erhalten,
+dessen Teilnehmer-Entität im gerade getauschten Snapshot bereits tombstoniert ist.
+
+**Lösung (verbindlich):** Der Hyperkanten-Sekundärindex wird **Teil von `GraphInner` selbst**
+(`hyperedge_index: AHashMap<EntityId, Vec<HyperEdgeId>>` plus `hyperedges: AHashMap<HyperEdgeId, HyperEdge>`) —
+automatisch vom bestehenden `ArcSwap`-Swap miterfasst, keine neue Synchronisationsprimitive nötig. Die Freigabe
+obsoleter Snapshots wird über `crossbeam_epoch` orchestriert: Eine Epoche wird erst inkrementiert und der
+Speicher der alten Graphenstruktur erst dann freigegeben, wenn kein aktiver `Guard` mehr Lesezugriff anfordert.
+**Konsequenz:** `GraphInner::estimate_memory_bytes()` muss um die Hyperkanten-Anteile erweitert werden, damit der
+`compact_async`-Speicherbudget-Check (`max_compaction_peak_memory_mb`) das tatsächliche Peak-Memory bei großen
+Hyperkantenmengen nicht unterschätzt. Dies ist **Voraussetzung**, nicht Nachbarthema der Implementierung.
+
+#### H2 — Kanonisches Multi-Key-Locking zur Deadlock-Prävention
+
+**Problem:** Die Lock-Hierarchie `collections → kv_locks (key-granular) → embedder` (§5.1) ist für Mutationspfade
+auf **ein** Schlüsselpaar ausgelegt. `relate()` mutiert eine Kante, typischerweise ein Schlüsselpaar.
+`relate_n_ary()` mit N Teilnehmern muss dagegen **N Entitäten gleichzeitig** unter `kv_locks` konsistent halten
+(Sekundärindex-Einträge für alle N Teilnehmer müssen atomar mit der Hyperkante selbst geschrieben werden). Werden
+diese N Locks naiv nacheinander erworben, entsteht ein klassisches Lock-Ordering-Problem: Zwei gleichzeitige
+`relate_n_ary`-Aufrufe mit überlappenden, aber unterschiedlich sortierten Teilnehmermengen (`{A,B,C}` vs.
+`{C,B,A}`) können sich gegenseitig blockieren.
+
+**Lösung (verbindlich):** `relate_n_ary()` sortiert die Teilnehmer-`EntityId`s vor dem Locking **kanonisch**
+(aufsteigend nach `u64`-Wert) und erwirbt die zugehörigen `kv_locks`-Shards strikt in dieser Reihenfolge:
+
+```rust
+pub fn relate_n_ary(
+    &self,
+    predicate: EdgeType,
+    participants: &[RoleBinding],
+    doc_id: DocId,
+) -> Result<HyperEdgeId, GraphMutationError> {
+    let mut entities: Vec<EntityId> = participants.iter().map(|p| p.entity).collect();
+    // Kanonische Sortierung erzwingt deterministisches Lock-Ordering
+    entities.sort_unstable_by_key(|e| e.0);
+    entities.dedup();
+
+    let _guards = self.kv_locks.acquire_multi_sorted(&entities)?;
+    // Atomare Insertion in den LSM-Tree und Registrierung im RCU-Snapshot (H1)
+}
+```
+
+Durch aufsteigendes Sortieren greifen alle Threads in exakt derselben Reihenfolge auf die Ressourcen zu — das
+eliminiert zyklische Abhängigkeiten im Wait-for-Graph des Schedulers und garantiert Deadlock-Freiheit. Dies ist
+ein **neuer Testfall** (mehr als zwei Schlüssel gleichzeitig unter `kv_locks`), kein Wiederverwendungsfall des
+Einzelschlüssel-Beweises — eigenes Abnahmekriterium (§14, AK-3).
+
+#### H3 — `SignalKind` ist ein geschlossenes Enum
+
+**Problem:** Im Unterschied zu `EdgeType` (`#[non_exhaustive]`) ist das Signal-Typ-Enum der Fusionsschicht
+(`SignalKind`) **nicht** `non_exhaustive` und hat vier feste Varianten (`Vector`, `Text`, `Graph`,
+`EdgeReinforcement`) mit `eq_ignore_ascii_case`-basiertem, allokationsfreiem Matching in `from_name()`/`as_str()`.
+Ein fünftes `SignalKind::Hyperedge` würde jeden `match`-Arm im Fusionspfad (Gewichtung, Metadata-Merge-Priorität)
+zum Anpassen zwingen — ein Breaking Change am geschlossenen Enum mit hohem Regressionsrisiko für den produktiven
+binären Fusionspfad (RRF ist Default).
+
+**Lösung (verbindlich):** Hyperkanten-Treffer werden **nicht** als eigenes Signal geführt, sondern fließen als
+zusätzliche Kandidaten **in das bestehende `SignalKind::Graph`-Signal** ein — PathRAG liefert ohnehin bereits ein
+Graph-RRF-Signal; Hyperkanten-Expansion ist dort ein interner Erweiterungsschritt der Pfadsuche (§6.4:
+„virtuelle Nachbarn mit Gewichtsabschlag"), kein separater Signalkanal. `SignalKind` bleibt strukturell
+unverändert — dies ist der **einzig zulässige** Integrationspunkt, nicht eine von mehreren Optionen
+(Diff-Test-Pflicht: keine neue Variante, siehe §14, AK-4).
+
+#### H4 — FlatBuffers-Schemaerweiterung erfordert ein aktives CI-Drift-Gate
+
+**Problem:** Ein FlatBuffers-Schema und der davon abgeleitete generierte Code (`memfuse-core-ipc-gen`) können
+stillschweigend auseinanderlaufen, wenn kein automatisiertes Gate dies verhindert. Hyperkanten fügen zwangsläufig
+neue FlatBuffers-Typen (`HyperEdge`, `RoleBinding`) hinzu — der riskanteste denkbare Zeitpunkt für eine
+Schemaänderung ist ausgerechnet einer, an dem ein solches Gate fehlt.
+
+**Lösung (verbindlich, harte Vorbedingung):** Ein FlatBuffers-CI-Drift-Gate (Schema-Datei gegen generierten Code
+per CI-Job abgesichert) MUSS produktiv und grün sein, **bevor** das `HyperEdge`-FlatBuffers-Schema gemerged wird.
+Diese Reihenfolge ist per CI-Job-Abhängigkeit zu erzwingen, nicht nur organisatorisch zu vereinbaren (§14, AK-5).
+Ist dieses Gate bereits vorhanden und produktiv, reduziert sich das Kriterium auf den reinen
+Ausführungsnachweis zum Zeitpunkt des Hyperkanten-Merges — andernfalls ist es Blocker Nummer eins vor Beginn der
+Hyperkanten-Implementierung.
+
+#### H5 — Cascade-Invalidierung: hartes Fan-out-Limit gegen Kostenexplosion
+
+**Problem:** Die bestehende Cascade-Invalidierung für binäre Kanten arbeitet auf klar begrenzter Kardinalität
+(ein Dokument erzeugt typischerweise wenige Kanten). Eine Hyperkante mit z. B. sechs Teilnehmern, die selbst
+wieder Teil weiterer Hyperkanten sind (Ereignisketten), kann bei naiver Übertragung des Cascade-Musters zu einem
+Fan-out führen, der mit der Teilnehmerzahl **nicht linear**, sondern potenziell **quadratisch** wächst (jede
+Invalidierung muss den Sekundärindex für alle ihre Teilnehmer aktualisieren) — ein Verstoß gegen P24.
+
+**Lösung (verbindlich, Pflichtbestandteil, keine optionale Härtung):**
+`cascade_invalidate_hyperedges_for_superseded_doc()` erhält von Beginn an ein **hartes Fan-out-Limit**
+(Default-Vorschlag: 1.000 betroffene Hyperkanten pro Cascade-Lauf), analog zum bestehenden
+`MAX_TRAVERSAL_HOPS`/Visited-Node-Limit-Prinzip im CSR-Graphen — Verhinderung von Hub-Node-bedingter
+Ressourcenexplosion. Wird das Limit erreicht, wird der Rest asynchron über die bestehende
+Hintergrund-Worker-Infrastruktur nachgezogen statt synchron im Schreibpfad abgearbeitet. Dies garantiert
+deterministische Antwortzeiten im synchronen Hotpath (§14, AK-6).
+
+| Kriterium | Fehlerbehandlung (`Result<T, E>`) |
+|---|---|
+| Lock-Timeout | `GraphMutationError::LockAcquisitionTimeout` |
+| Fan-out überschritten | `GraphMutationError::PartialCascadeQueued(DeletionProof)` |
+| Ungültige Rolle | `GraphMutationError::RoleBindingInvalid` |
+| RCU-Snapshot veraltet | `GraphMutationError::EpochReclamationPending` |
+
+#### H6 — Community-Detection/Leiden sieht Hyperkanten nicht
+
+**Problem:** Der Leiden-Algorithmus für GraphRAG-Community-Erkennung operiert ausschließlich auf binären
+Kantengewichten und ist strukturell „blind" gegenüber n-ären Fakten. Ohne Erzwingungsmechanismus würde
+`detect_communities()` Hyperkanten-Fakten stillschweigend ignorieren, ohne dass dies für Aufrufer sichtbar wird —
+ein Nutzer, der annimmt, Community-Detection berücksichtige „den ganzen Graphen", erhielte ein leises,
+undokumentiertes Unvollständigkeitsrisiko.
+
+**Lösung (verbindlich für Sichtbarkeit; Projektion selbst ist Folgethema):** `CommunityDetectionConfig` erhält ein
+Feld `hyperedges_included: bool` (Default `false`), das im Ergebnistyp `CommunityAssignment`/Report sichtbar
+mitgeführt wird — Unvollständigkeit wird explizit statt implizit. Eine echte Hyperkanten-Projektion bleibt
+separates Folgethema (§6.6), aber das Fehlen ist ab der Hyperkanten-Einführung messbar/sichtbar, nicht nur bekannt
+(§14, AK-7).
+
+### 6.6 Hyperkanten-Projektion für Leiden: Stern-Expansion als Zielarchitektur
+
+Die Standard-Modularitätsfunktion, auf der Leiden basiert,
+
+$$Q = \frac{1}{2m} \sum_{i,j} \left( A_{ij} - \gamma \frac{k_i k_j}{2m} \right) \delta(c_i, c_j)$$
+
+(mit $m$ = Gesamtgewichtsmasse, $k_i$ = Grad von Knoten $i$, $\gamma$ = Resolution-Parameter, $c_i$ = Community
+von Knoten $i$) ist ausschließlich für binäre Adjazenzmatrizen $A$ definiert. Um Hyperkanten nicht stillschweigend
+zu ignorieren (H6), aber auch ohne den asynchronen C-FFI-Code des Leiden-Solvers zu modifizieren, muss der
+Hypergraph $G_H = (V, E_H)$ auf einen binären Graphen projiziert werden. Zwei Projektionen stehen mathematisch zur
+Wahl:
+
+1. **Cliquen-Expansion:** Jede Hyperkante $e$ wird in eine Clique transformiert, bei der alle Knoten in $e$
+   paarweise verbunden werden, mit Kantengewicht $\frac{w(e)}{|e| - 1}$ (Erhaltung der Gesamtgewichtsmasse). Führt
+   bei großen Hyperkanten zu einer $O(|e|^2)$-Kantenexplosion — für hochvernetzte Hyperkanten inakzeptabel.
+2. **Stern-Expansion (verbindlich gewählt):** Der Hypergraph wird in einen bipartiten Graphen überführt. Jede
+   Hyperkante $e \in E_H$ wird als eigenständiger, künstlicher „Knoten" repräsentiert; es entstehen nur binäre
+   Kanten zwischen Entitätsknoten und dem neuen Hyperkanten-Knoten. Die Kantenanzahl skaliert linear mit
+   $O(|e|)$.
+
+Um Kopiervorgänge zu vermeiden, wird die bipartite Inzidenzmatrix $H$ **nicht** physisch materialisiert, sondern
+über einen typsicheren Iterator dem Leiden-Algorithmus on-the-fly vorgegaukelt (Zero-Allocation
+Arena-CSR-Speicherstruktur, analog zu §5.2/§7.2).
+
+### 6.7 Abnahmekriterien für die Hyperkanten-Erweiterung
+
+Siehe §14 für die vollständige, konsolidierte Liste (AK-1 bis AK-8) inklusive Regressionsfreiheit gegenüber dem
+bestehenden binären Pfad.
 
 ---
 
-*Diese Spezifikation ist die einzige normative Produktquelle für MemFuse v5. Sie beschreibt den vollständigen Zielzustand des Systems und wird bei jeder architektonisch relevanten Änderung aktualisiert. Sie ersetzt `MEMFUSE_ENDPRODUKT_SPEZIFIKATION_FINAL_4.md` als maßgebliches Referenzdokument.*
+<a id="retrieval"></a>
+## 7. Retrieval-Pipeline: 4-Signal-Fusion und ihre Algorithmen
+
+### 7.1 4-Signal-Fusion
+
+Jede Hybridsuche kombiniert bis zu vier unabhängige Signale — Vektor (HNSW-k-NN), Text (BM25/BM25F), Graph
+(PPR-Traversierung inkl. Hyperkanten-Erweiterung, §6.4/§6.5-H3) und optional Kanten-Reinforcement
+(feature-gated) — über das geschlossene `SignalKind`-Enum (§6.5, H3). Die Fusion selbst erfolgt standardmäßig
+über **Reciprocal Rank Fusion (RRF)**, score-blind und robust bei Signalausfall. Eine score-normalisierte Fusion
+steht als Opt-in mit hartem RRF-Fallback bei Signaldegradation zur Verfügung — RRF bleibt in jedem Fall Default,
+kein Ersatz.
+
+### 7.2 Graph-Signal: Gestreamtes Personalized PageRank via Forward-Push
+
+**Problem der dichten Power-Iteration:** Eine PPR-Berechnung über dichte Power-Iteration berechnet die
+stationäre Wahrscheinlichkeitsverteilung über den **gesamten** Graphen — $O(V+E)$ pro Anfrage, unabhängig von der
+tatsächlichen Seed-Menge. Das verstößt gegen P24 und führt zu enormen Heap-Allokationen bei großen Graphen.
+
+**Zielarchitektur (🟢 produktiv):** Der lokale **Andersen-Chung-Lang-Forward-Push-Algorithmus** exploriert nur
+Knoten, die signifikant zur PageRank-Masse des Seed-Knotens beitragen. Die mathematische Spezifikation stützt
+sich auf einen Wahrscheinlichkeitsvektor $p$ und einen Restvektor $r$. Initialisierung für Seed-Knoten $s$:
+$r(s) = 1$, $p(s) = 0$. Für jeden Knoten $u$, bei dem $\frac{r(u)}{d(u)}$ einen Fehlertoleranz-Schwellenwert
+$\epsilon$ überschreitet, wird eine Push-Operation ausgeführt:
+
+1. $p(u) \leftarrow p(u) + \alpha \cdot r(u)$
+2. $r(u) \leftarrow (1 - \alpha) \frac{r(u)}{2}$ (Rückhaltung eines Teils der Restmasse)
+3. $r(v) \leftarrow r(v) + (1 - \alpha) \frac{r(u)}{2\, d(u)}$ für alle Nachbarn $v$ (gleichmäßige Verteilung der
+   verbleibenden Masse)
+
+Die Laufzeit ist strikt durch $O\!\left(\frac{1}{\alpha \epsilon}\right)$ begrenzt — unabhängig von der
+Gesamtgröße des Graphen. Der Graph-Lesepfad ist zusätzlich nebenläufigkeitssicher über RCU-Snapshot-Verfahren:
+`CsrGraph::compact()` tauscht den gesamten Graphzustand atomar über `ArcSwap<GraphInner>` aus, sodass Leser
+niemals einen gemischten Alt-/Neu-Zustand sehen (Grundlage von H1, §6.5).
+
+### 7.3 Volltextsuche: BM25 mit Block-Max WAND und Feldgewichtung (BM25F)
+
+**🟢 produktiv.** Der Volltextindex hält einen residenten In-Memory-Postinglisten-Index mit
+Block-Max-WAND-Traversierung für effiziente Top-k-Suche (kein Live-LSM-Range-Scan pro Query-Term) und
+unterstützt feldgewichtete Bewertung (BM25F), sodass z. B. Titel- und Fließtext-Treffer unterschiedlich gewichtet
+werden. Deutsche Komposita werden morphologisch zerlegt, sodass z. B. „Urlaubsantragsprozess" auch über „Urlaub",
+„Antrag", „Prozess" auffindbar ist.
+
+### 7.4 Vektorindex: gestuftes HNSW + DiskANN
+
+**🟢 produktiv (Stufe 0), 🔴 Stufe 1 spezifiziert.** HNSW ist der Standard-Vektorindex (SIMD-beschleunigte
+Distanzberechnung, SQ8-Quantisierung mit konfigurierbarem Perzentil-Clipping gegen Codebook-Drift, native
+Tombstone-Löschung). Für Korpora, die den verfügbaren RAM übersteigen, steht DiskANN als zweite Indexstufe zur
+Verfügung (mmap-basiertes, read-only Zugriffsmuster, ebenfalls native Tombstones).
+
+**Zielarchitektur „HNSW-Dateiformat v2" (🔴, Arena-Allocator):** Der aktuelle Traversierungs-Hotpath erzeugt pro
+abgerufenem Nachbarknoten eine Heap-Allokation (`Vec<u32>`) und verwendet redundante `RwLock`-Sperren pro Knoten.
+Ein Arena-Allocator reserviert beim Start einen zusammenhängenden Speicherblock; Knoten-Offsets ersetzen rohe
+Pointer, was den Hardware-Prefetcher der CPU maximal ausnutzt:
+
+```rust
+pub struct HnswArena<const D: usize> {
+    /// Lock-freie Arena, von Mmap oder großem Vektor gestützt
+    storage: Arc<MmapArena>,
+    /// Epochen-basierte Referenzen zur lock-freien Traversierung
+    head: crossbeam_epoch::Atomic<NodeRecord<D>>,
+    capacity: usize,
+}
+```
+
+Bei Updates (Neuverlinkung von Knoten) wird die Adjazenzliste nicht via Mutex gesperrt: Eine neue, verlängerte
+Liste wird erstellt, und der Zeiger im Knoten wird über ein atomares `compare_exchange` (CAS) ausgetauscht.
+Leser-Threads nutzen `crossbeam_epoch`, damit die alte Liste im Speicher verbleibt, bis der letzte Lesevorgang
+abgeschlossen ist (Zero-Allocation Traversal).
+
+**NaN-sichere Distanzberechnung:** Innerhalb der HNSW-Distanzschleife ist das Einfügen von Branches
+(`if val.is_nan()`) toxisch für die CPU-Pipeline. Stattdessen werden bitweise SIMD-Maskierungen genutzt: Ein
+Vektor-Register wird parallel auf `NaN` evaluiert, eine Bit-Maske erzeugt und ungültige Werte über bitweises
+UND/ODER auf `0.0` (bzw. auf Distanz $\infty$) gesetzt, ohne dass der Instruction Pointer verzweigen muss —
+garantiert Determinismus und Laufzeitstabilität.
+
+### 7.5 Community-Detection: Leiden
+
+**🟢 produktiv (binärer Pfad).** Graph-Clustering für GraphRAG erfolgt über den Leiden-Algorithmus
+(deterministisch, garantiert wohlverbundene Communities — im Unterschied zu Label-Propagation oder Louvain).
+Die Hyperkanten-Projektion (Stern-Expansion, §6.6) und das Sichtbarkeits-Flag `hyperedges_included` (§6.5, H6)
+sind Teil der Hyperkanten-Erweiterung und entsprechend 🔴 spezifiziert, solange Hyperkanten selbst nicht gebaut
+sind.
 
 ---
 
-## Anhang A — Delta zu v4 (Kurzübersicht)
+<a id="bandit"></a>
+## 8. Contextual-Bandit-Routing
 
-Folgende normative Änderungen wurden gegenüber v4 vorgenommen:
+MemFuse integriert einen Multi-Armed-Bandit-Router (LinUCB, Li et al. 2010) zur adaptiven Aussteuerung der
+Retrieval-Strategien zwischen Volltext, Vektor und Graph.
 
-| Abschnitt | Änderungstyp | Inhalt |
+### 8.1 Zwei Implementierungsvarianten unterschiedlicher mathematischer Korrektheit
+
+- **`DiagonalApproximation` (🟢 Produktions-Default):** `theta[i] += r_adj * xi / sigma_sq[i].max(1e-8);
+  sigma_sq[i] += xi * xi;` — eine laufende Summe ohne Renormierung gegen die Ridge-Regression-Matrix. Dies ist
+  strukturell ein SGD-artiges Verfahren mit **keiner** exakten Ridge-Regression im Sinne von $\theta = A^{-1}b$.
+- **`ShermanMorrison` (🟡 Opt-in, Feature-Flag):** vollständige inkrementelle Matrixinversion über die
+  **Sherman-Morrison-Formel**, die eine Rang-1-Aktualisierung der Inversen in $O(d^2)$ statt $O(d^3)$ ermöglicht:
+
+$$(A + xx^\top)^{-1} = A^{-1} - \frac{A^{-1}xx^\top A^{-1}}{1 + x^\top A^{-1} x}$$
+
+wobei $A = \sum x_t x_t^\top + \lambda I$ und $b = \sum r_t x_t$, $\theta = A^{-1}b$. Nur die exakte Inversion von
+$A$ generiert die korrekten Konfidenzintervalle, die das Exploration-Exploitation-Dilemma deterministisch lösen —
+diese Variante **ist** eine mathematisch korrekte, inkrementelle Ridge-Regression und die einzige, die die
+LinUCB-Regret-Garantie tatsächlich erfüllt.
+
+### 8.2 SIMD-optimiertes Update ohne Heap-Allokation
+
+Um strikte Latenzbudgets im Hotpath einzuhalten, wird die Sherman-Morrison-Aktualisierung über SIMD-Intrinsics
+(AVX-512/NEON) parallelisiert. Datenstrukturen sind an 64-Byte-Cache-Lines ausgerichtet, um „False Sharing"
+zwischen Threads zu verhindern:
+
+```rust
+#[repr(C, align(64))]
+pub struct AlignedVector<const D: usize> {
+    pub data: [f32; D],
+}
+
+pub struct ShermanMorrisonBandit<const D: usize> {
+    pub inv_a: AlignedVector<{ D * D }>,   // Inverse Kovarianzmatrix, flach im Speicher
+    pub b: AlignedVector<D>,
+    pub theta: AlignedVector<D>,
+}
+
+impl<const D: usize> ShermanMorrisonBandit<D> {
+    /// O(d^2) Lock-free Update der Parameter ohne Heap-Allokationen
+    pub fn update_rank_1(&mut self, x: &AlignedVector<D>, reward: f32) -> Result<(), BanditError> {
+        // 1. v = A^{-1} x via AVX-512-Intrinsics
+        // 2. s = 1.0 + x^T * v
+        // 3. inv_a -= (v * v^T) / s via FMA-Instruktionen
+        // 4. Update b und theta
+        Ok(())
+    }
+}
+```
+
+Jeder `unsafe`-Block für `core::arch`-Intrinsics ist zwingend mit einem `// SAFETY:`-Kommentar zu annotieren, der
+die Pointer-Alignment-Invarianten beweist (§4.1).
+
+### 8.3 Gedeckelter Lyapunov-Drift-Regelkreis
+
+Das Routing nutzt dynamisches Budgeting über einen PID-Controller. Unter Traffic-Spikes kann der
+$\alpha$-Explorationsparameter unbegrenzt nach oben driften (Exploration-Exploitation-Kollaps). **🟢 produktiv:**
+Ein zeitfensterbasiertes `drift_decay_window` (Default 50 Zeitschritte, `drift_gamma = 0.95`) deckelt die
+Eskalation. Fällt der PID-Regler in die Ausgangssättigung (CPU-Limit-Saturierung), stoppt der Integrator sofort
+(Anti-Windup), statt den Fehler unbegrenzt aufzuaddieren. Die Berechnung berücksichtigt das Delta $dt$ zwischen
+Abfragen für abtastratenunabhängige Regelung. Dieser Deckel gilt für **beide** Bandit-Implementierungsvarianten
+gleichermaßen.
+
+### 8.4 Normative Bewertung
+
+Der Wechsel des Produktions-Defaults von `DiagonalApproximation` zu `ShermanMorrison` ist an ein
+CI-Latenzbudget-Gate gebunden (Kriterium: Sherman-Morrison-Latenz < 5 % der medianen LLM/SLM-Inferenzlatenz) —
+⚖️ Produktentscheidung, kein Implementierungsrückstand. Diagonal-Approximation bleibt in jedem Fall als
+Low-Memory-Opt-out erhalten.
+
+---
+
+<a id="inferenz"></a>
+## 9. Inferenz, KV-Cache-Bridge und Zero-Copy-IPC
+
+### 9.1 Zero-Copy-Eviction-Bridge
+
+**🟢 produktiv.** Die Interprozesskommunikation und die Verwaltung des LLM-Kontexts erfordern durchgehende
+Zero-Copy-Datenpipelines auf Basis von `Bytes` und Mmap. FlatBuffers erlaubt das direkte Auslesen von Strukturen
+aus einem Byte-Slice (`&[u8]`), ohne Puffer im Heap neu anzulegen; der generierte IPC-Code
+(`memfuse-core-ipc-gen`) gibt alle Strings und Vektoren als Slice-Referenzen zurück.
+
+### 9.2 LSM-Fallback-Spill bei Speicherdruck
+
+**🟢 produktiv.** Der KV-Cache wird primär verschlüsselt im RAM gehalten (Paged-Encrypted). Bei Speicherdruck
+implementiert das System einen kontrollierten LSM-Fallback-Spill auf die SSD, statt den Cache verlustbehaftet zu
+verwerfen oder den Prozess außer Speicher laufen zu lassen. Die Sicherheitsschicht (AES-256-GCM-SIV) instanziiert
+die Verschlüsselungsinstanz (`Aes256GcmSiv`) einmalig in einem `OnceLock` und übergibt sie an einen dedizierten
+Worker-Thread, der Nachrichten über asynchrone Channels (`mpsc`) entgegennimmt — dies vermeidet den vormaligen
+Engpass, den erneuten Aufbau des Key-Schedules bei jeder kryptografischen Operation.
+
+### 9.3 Kryptographisch verifizierbare Löschung
+
+Der Zero-Trust-WASM-Sandbox-Ansatz erfordert kryptografisch verifizierbare Deletion Proofs. Löschungen
+(Art. 17 DSGVO) sind deterministisch über HMAC-Ketten abgesichert: Ein gelöschter Schlüssel hinterlässt einen
+Tombstone, der integraler Bestandteil des Hash-Trees des LSM-Stores bleibt, wodurch die Löschung gegenüber der
+Cloud-Egress-Schicht kryptografisch beweisbar ist.
+
+---
+
+<a id="sicherheit"></a>
+## 10. Sicherheits- und Datenschutzmodell
+
+### 10.1 Kryptographische Grundlagen
+
+AES-256-GCM-SIV für Daten at rest, WAL mit race-freier HMAC-Kette, `DeletionProof` für DSGVO-Art.-17-Nachweise
+(§9.3). Key-granulare Schreibisolation (`kv_locks`) reduziert zusätzlich die Angriffsfläche für lock-basierte
+Denial-of-Service-Muster gegenüber einem collection-weiten Mutex.
+
+### 10.2 WASM-Sandbox
+
+**🟢 produktiv.** Zero-Trust-Ausführungsisolation für Agent-Tool-Aufrufe über `wasmtime`. Fuel-Budget (Rechenschritte)
+und Wall-Clock-Limit (`max_wall_clock_ms`, Default 5 s) sind orthogonal konfigurierbar (P23) — ein Tool kann
+rechnerisch günstig, aber durch blockierendes I/O langsam sein, oder umgekehrt; beide Fälle müssen unabhängig
+begrenzbar sein. `#![forbid(unsafe_code)]` gilt für den Sandbox-Crate uneingeschränkt.
+
+### 10.3 Prompt-Injection-Schutz und Zero-Copy-Lesepfad
+
+Bestandteil des Sicherheitsmodells seit der Kernarchitektur, unverändert gültig: Eingaben aus dem Kontext eines
+Agenten werden nicht ungeprüft als Steuerbefehle interpretiert; der Lesepfad ist durchgehend Zero-Copy, um
+unnötige Pufferkopien sensibler Daten zu vermeiden.
+
+### 10.4 Cloud-Egress Privacy Gateway (Fünf-Schichten-Architektur)
+
+**🟢 produktiv, weitgehend auditiert.** Für den Fall, dass eine Anfrage dennoch an ein Cloud-LLM weitergereicht
+werden soll, besteht ein mehrschichtiger DLP-Pfad:
+
+1. **Token-Vaulting/Pattern-Matching (`EgressVault`):** `RegexSet`-Klassifikation sensibler Entitäten, Payload-Deckel.
+2. **Vorabstraktion.**
+3. **Graph-Generalisierung.**
+4. **Bulk-Exfiltration-Detektor:** erkennt großvolumige, potenziell exfiltrierende Anfragemuster.
+5. **Re-Hydration:** `CloudResponseRehydrator::rehydrate` übersetzt Surrogate in der Cloud-Antwort zurück in die
+   Originalentität — Round-Trip, unbekannte Surrogat-Token (No-Op) und Multibyte-UTF-8-Grenzfälle
+   (Panic-Sicherheit) sind Testpflicht.
+
+**Surrogat-Tokenisierung:** `generate_surrogate`/`get_entity` erzeugen eine session-gebundene, bidirektionale
+Zuordnung zwischen Originalentität und Platzhalter (`[USER_ENTITY_xxxx]`-Format, Hash-basiert). Ein formaler
+Fünf-Schichten-Vollständigkeitsaudit dokumentiert den Reifegrad dieser Kette.
+
+---
+
+<a id="betrieb"></a>
+## 11. Betriebsmodi
+
+MemFuse wird ausschließlich eingebettet betrieben: im Prozess des aufrufenden Agenten (Rust- oder Python-Bindung)
+oder als lokaler MCP-Server über stdio-JSON-RPC. Es gibt keinen Server-Modus mit Netzwerk-Listener für
+Multi-Tenant-Zugriff. Der Cloud-Egress-Pfad (§10.4) ist der einzige Punkt, an dem Daten das lokale System
+verlassen — ausschließlich auf explizite Anforderung, nie als Hintergrundtelemetrie.
+
+---
+
+<a id="features"></a>
+## 12. Feature-Flag-Politik: Produktions-Default vs. Opt-in
+
+Ein Breaking-Change- oder Performance-Trade-off-Feature wird hinter einem Cargo-Feature isoliert, bis eine
+explizite Produktentscheidung (Major-Version-Cutover bzw. CI-Benchmark-Gate-Erfolg) den Wechsel des Defaults
+auslöst. Dies ist **kein Mangel**, sondern verbindliche Politik — die Unterscheidung zwischen „im Code korrekt
+gelöst" und „im Produktionsbetrieb tatsächlich wirksam" ist für Abnahme- und Sicherheitszwecke wesentlich.
+
+| Feature-Flag | Reifegrad | Beschreibung |
 |---|---|---|
-| §2.3 | Erweiterung | WASM-Sandbox als USP #3 (ersetzt Verschlüsselungs-Sandbox); Cloud-Egress-Gateway als neues USP #8 |
-| §2.4 | Ergänzung | Explizites Cluster-Veto in Nicht-Ziele aufgenommen |
-| §3 P2 | Präzisierung | `memfuse-sandbox`-unsafe-Freiheitsgarantie |
-| §3 P7 | Ergänzung | Explizite Benchmark-Pflicht für KV-Bridge, Session-DAG, LinUCB (§13) |
-| §3 P10 | Ergänzung | Konkrete Reuse-Mandate für §12 (Aho-Corasick, ONNX, HNSW) und §13 (ndarray) |
-| §4.6 | Erweiterung | `egress_vault.rs` (Feature `cloud-egress-guard`); Feature `cloud-egress-guard` |
-| §4.9 | Ergänzung | Adaptiver DiskANN-Flush-Threshold (ADR-076) |
-| §4.11 | Ergänzung | `ndarray 0.15` Re-Export für §13 |
-| §4.12 | Ergänzung | `Wal::rotate_and_seal()` für passives WAL-Shipping (§14) |
-| §4.13 | Ergänzung | `cloud-egress-guard`-Feature-Flag |
-| §4.14 | Erweiterung (neu) | `RoutingStrategy`-Enum, `bandit.rs`, `transport.rs`, `guarded_payload.rs`, `routing_strategy.rs`; `dispatch.rs`-Hardening (kein `sh -c`) |
-| §4.16 | Erweiterung | 6. MCP-Tool `memfuse_cloud_query`; `allow_cloud_egress`-Permission; `egress_gateway.rs`; `wasm-sandbox`-Feature |
-| §4.18 | **NEU** | `memfuse-sandbox`-Crate (WASM-Ausführungsgrenze, Layer 6.5) |
-| §5.6 | **NEU** | Cloud-Egress-Pfad |
-| §5.7 | **NEU** | WASM-Sandbox-Ausführungspfad |
-| §5.8 | **NEU** | Passives WAL-Shipping-Pfad |
-| §6 | Erweiterung | Features `bandit-routing`, `cloud-egress-guard`, `wasm-sandbox`, `egress-sherman-morrison` |
-| §7 | Erweiterung | Punkte 8 (WASM), 9 (Cloud-Egress-Layers 1–5), 10 (dispatch-Hardening), 11 (Cloud-Egress-Nicht-Ziel) |
-| §8 | Erweiterung | Neue Tabellenspalten für WASM-Sandbox und Cloud-Egress |
-| §9.1 | **Korrektur/Ergänzung** | `check-audit-verdict-independence` als Merge-Gate (war nur scheduled); `check-ffi-panic-boundary` auf `continue-on-error: false`; neue Gates `check-dispatch-no-sh-c`, `check-bandit-latency-budget` |
-| §10 | Ergänzung | Abnahmekriterien 12–16 (neu) |
-| §11 | Ergänzung | Glossar-Einträge: `ConsolidationNodesGuard`, `EgressGuard`, `GuardedPayload`, `RoutingStrategy`, `LinUCB`, `Sherman-Morrison`, `Transport`, passives WAL-Shipping, `memfuse-sandbox`, `WasmCapabilities`, `SynthesisMode` |
-| §12 | **NEU** | Cloud-Egress Privacy Gateway (vollständige normative Spezifikation) |
-| §13 | **NEU** | Contextual Bandit Router mit latenz-sicherem LinUCB (Diagonal-Default O(d), Sherman-Morrison opt-in O(d²)) |
-| §14 | **NEU** | Cluster-Veto-Reaffirmation & Passives WAL-Shipping mit TOCTOU-Schutz |
+| `cloud-egress-guard` | 🟢 | DLP/Egress-Kontrolle, Surrogat-Tokenisierung, Bulk-Exfiltration-Detektor, Rehydration (§10.4) |
+| `bandit-routing` | 🟢 | LinUCB-Grundfunktion, Lyapunov-Kopplung, gedeckelte Drift-Alpha-Eskalation (§8) |
+| `egress-sherman-morrison` | 🟡 | Mathematisch korrekte Ridge-Regression-Form (§8.1); einziger Pfad mit LinUCB-Regret-Garantie |
+| `kv-bridge` | 🟢 | KV-Cache-Bridge inkl. LSM-Fallback-Spill, Bincode + AES-256-GCM-SIV (§9) |
+| `wasm-sandbox` | 🟢 | Fuel- und Wall-Clock-Budget orthogonal (§10.2) |
+| `experimental-diskann` | 🟢 (offizieller Tier) | Native Tombstones, SQ8-Perzentil-Clipping (§7.4) |
+| `docid-128` | 🟡 | 128-Bit-BLAKE3-Truncation-DocId, Rollout über praktisch alle Crates vollzogen, Default bleibt `u64` (§6.1) |
+| `block-cache-v2` | 🟡 | SIEVE-/S3-FIFO-artiges Backend, Default bleibt klassisches `RwLock`-LRU (§5.2) |
+| `bm25f` | 🟢 | Feldgewichtete BM25-Bewertung (§7.3) |
+| `flatbuffers-drift-gate` (xtask) | 🟢 | CI-Gate gegen Schema-Drift — Vorbedingung für jede künftige Schemaerweiterung, insbesondere Hyperkanten (§6.5, H4) |
+| `fault-injection` | 🟢 | Test-only |
+| `loom` | Dev-Dependency | Nebenläufigkeits-Modelltests für Group-Commit und (künftig) Multi-Key-Locking (§6.5, H2) |
+| `adaptive-decay` / `-control` | 🟢 | Kalibrierungs-Feintuning |
+| `partial-index-rebuild` | 🟢 | Inkrementeller Indexaufbau |
+| `edge-reinforcement-learning` | 🟢 (Feature-Gate) | Kantenverstärkung als optionales fünftes Fusionsverhalten |
+| **Hyperkanten (`relate_n_ary`, `HyperEdge`)** | **🔴 kein Flag — nicht implementiert** | Siehe §6 |
+
+---
+
+<a id="governance"></a>
+## 13. Governance & Entwicklungsprozess
+
+- **Keine Statusaussage ohne Code-Gegenprobe:** Jede Aussage über den Reifegrad einer Fähigkeit beruht auf einer
+  Prüfung des tatsächlichen Codes (Dateilektüre, Tests, CI-Konfiguration) zum Zeitpunkt der Aussage — nicht auf
+  der Übernahme einer früheren, möglicherweise überholten Statuszeile.
+- **Persistenzformat-Änderungen sind an ein aktives CI-Drift-Gate gebunden** (§3, §6.5 H4) — keine Ausnahme,
+  auch nicht unter Zeitdruck.
+- **ADR-Disziplin:** Architekturentscheidungen mit Breaking-Change-Charakter (Bandit-Default, BlockCache-Default,
+  DocId-128-Cutover, HNSW/DiskANN-Stufenmodell, Fusionsstrategie) werden als eigenständige ADRs geführt, an ein
+  messbares Kriterium (Benchmark-Gate, Major-Release) gebunden und bei Code-Umsetzung formal revidiert — Code, der
+  seiner ADR-Dokumentation vorauseilt, ist ein zu schließender Governance-Befund, kein Dauerzustand.
+- **Explizite Nicht-Verifikationen werden benannt, nicht verschwiegen:** Wo eine Aussage (z. B. Approximationsgüte
+  eines Algorithmus, Inhalt eines Audit-Reports, tatsächliches CI-Laufergebnis) nicht bis auf Ausführungsebene
+  geprüft wurde, wird dies als solches gekennzeichnet, statt stillschweigend als „erledigt" geführt.
+- **Kein Merge risikoreicher Schemaänderungen ohne Sicherungsnetz** (§6.5, H4) — dies ist die zentrale, aus der
+  Hyperkanten-Analyse gewonnene und auf jede künftige Schemaerweiterung übertragbare Lehre.
+
+---
+
+<a id="abnahme"></a>
+## 14. Abnahmekriterien des Endprodukts
+
+### 14.1 Kernsystem (Auszug, normativ)
+
+1. `insert_lock` vollständig durch key-granulare `kv_locks` ersetzt — kein collection-weiter Schreib-Mutex im Pfad.
+2. HNSW-Hotpath nutzt unaligned-SIMD-Distanzkernel statt Heap-Allokation pro Distanzberechnung.
+3. BM25-Suche nutzt residenten Postinglisten-Index mit Block-Max WAND, kein Live-LSM-Scan pro Query-Term.
+4. Block-Cache erzwingt bei reinem Lesetreffer im Opt-in-Backend (`block-cache-v2`) keinen exklusiven Write-Lock.
+5. DiskANN kann ohne HNSW-Fallback löschen (native Tombstones).
+6. Bandit-Router-Latenzbudget ist CI-gated, nicht nur literaturbasiert behauptet.
+7. Graph-`compact()` blockiert keine nebenläufigen Leser während des Rebuilds (RCU-Snapshot-Swap).
+8. PPR-Retrieval-Anfrage hat eine zur Seed-Menge, nicht zur Graphgröße proportionale Laufzeit (P24).
+9. `build_provenance` nutzt eine `ProvenanceBuilder`-Struktur statt vieler Positionsargumente.
+10. FlatBuffers-generierter Code hat ein CI-Drift-Gate gegen die Schema-Definition.
+11. `SignalKind::from_name`/`SignalKey::from_name` sind allokationsfrei (`eq_ignore_ascii_case`).
+12. BM25F ist produktiv nutzbar.
+13. KV-Cache-Bridge verfügt über LSM-Fallback-Spill mit Testabdeckung für RAM/LSM-Hit/Miss-Kombinationen.
+14. Bandit-Drift-Alpha-Eskalation ist zeitlich und wertmäßig gedeckelt.
+15. Cloud-Egress-Gateway: Layer-4-Bulk-Exfiltration-Detektor produktiv, Rehydration inkl. Multibyte-UTF-8-Sicherheit verifiziert.
+16. Der Produktions-Default des Bandit-Routers implementiert (⚖️, sobald Gate besteht) eine mathematisch korrekte
+    Ridge-Regression ($\theta = A^{-1}b$).
+17. Der Produktions-Default des Block-Caches zeigt (⚖️, sobald entschieden) S3-FIFO-/SIEVE-Verhalten.
+18. DocId-128 ist (⚖️, gebündelt mit Major-Release) Produktions-Default.
+19. Group-Commit-Loom-Test läuft sichtbar grün in CI.
+
+### 14.2 Abnahmekriterien für Hyperkanten (AK-1 bis AK-8, normativ und abschließend)
+
+1. `HyperEdge` mit ≥3 `RoleBinding`s persistiert, überlebt Prozess-Neustart, korrekt über `hyperedges_for_entity`
+   für jede beteiligte Entität auffindbar — **und** bleibt nach einem `compact()`-Lauf, der gleichzeitig mit einer
+   laufenden Leseoperation ausgeführt wird, konsistent (Regressionstest gegen H1: kein Leser darf je einen
+   `HyperEdgeId` sehen, dessen Teilnehmer im selben Snapshot bereits tombstoniert ist).
+2. `GraphInner::estimate_memory_bytes()` schließt Hyperkanten-Strukturen ein; der `compact_async`-Budget-Check
+   (`max_compaction_peak_memory_mb`) greift nachweislich auch bei Hyperkanten-dominiertem Speicherwachstum.
+3. Zwei gleichzeitige `relate_n_ary`-Aufrufe mit überlappenden, unterschiedlich geordneten Teilnehmermengen
+   terminieren beide ohne Deadlock (Loom- oder Stress-Test).
+4. PathRAG-Hyperkanten-Expansion fließt ausschließlich über das bestehende `SignalKind::Graph`-Signal;
+   `SignalKind`-Enum bleibt strukturell unverändert (Diff-Test: keine neue Variante).
+5. Das FlatBuffers-CI-Drift-Gate ist grün in CI, **bevor** das `HyperEdge`-FlatBuffers-Schema gemerged wird
+   (Reihenfolge-Constraint, per CI-Job-Abhängigkeit erzwungen, nicht nur organisatorisch vereinbart).
+6. `cascade_invalidate_hyperedges_for_superseded_doc` bricht bei >1.000 betroffenen Hyperkanten kontrolliert auf
+   Hintergrundverarbeitung um; ein Test mit synthetischem High-Fan-out-Graphen belegt, dass der synchrone
+   Schreibpfad dabei keine unbeschränkte Latenzspitze erzeugt.
+7. `CommunityDetectionConfig::hyperedges_included` ist im Report sichtbar `false`, solange keine
+   Hyperkanten-Projektion existiert — ein Test prüft das Flag selbst, nicht nur die zugrundeliegende Funktionalität.
+8. Kein Regressions-Impact auf bestehende binäre `relate()`/`Edge`-Benchmarks (Hotpath bleibt unangetastet).
+
+---
+
+<a id="matrix"></a>
+## 15. Rückverfolgbarkeitsmatrix
+
+| Bereich | Reifegrad | Verweis |
+|---|---|---|
+| Key-granulare `kv_locks` statt collection-weitem Mutex | 🟢 | §5.1 |
+| HNSW-SIMD-Hotpath (unaligned Distanzkernel, `AHashSet`-Vorallokation, `try_write()`-Pruning) | 🟢 | §7.4 |
+| SQ8-Perzentil-Clipping | 🟢 | §7.4 |
+| BM25 residenter Index + Block-Max WAND | 🟢 | §7.3 |
+| BM25F feldgewichtete Bewertung | 🟢 | §7.3 |
+| Block-Cache: klassisches LRU | 🟢 (Default) | §5.2 |
+| Block-Cache: SIEVE/S3-FIFO | 🟡 | §5.2 |
+| Sherman-Morrison-Bandit + CI-Latency-Gate | 🟡 (Opt-in) / Gate 🟢 | §8 |
+| Leiden statt Label-Propagation (binärer Pfad) | 🟢 | §7.5 |
+| RCU-Snapshot-Swap für `CsrGraph::compact()` | 🟢 | §7.2 |
+| Native DiskANN-Tombstones | 🟢 | §7.4 |
+| DocId-128-Bit-Migration (Rollout) | 🟡 | §6.1 |
+| Score-normalisierte Fusion mit RRF-Fallback | 🟡 (Opt-in) | §7.1 |
+| Forward-Push-PPR | 🟢 | §7.2 |
+| `ProvenanceBuilder`-Struktur | 🟢 | §14 |
+| FlatBuffers-CI-Drift-Gate | 🟢 | §6.5 (H4), §13 |
+| Cloud-Egress Fünf-Schichten (Surrogat-Tokenisierung, Bulk-Exfiltration, Rehydration) | 🟢 | §10.4 |
+| KV-Cache-Bridge LSM-Fallback-Spill | 🟢 | §9.2 |
+| Bandit-Drift-Alpha-Eskalation gedeckelt | 🟢 | §8.3 |
+| Loom-Test sichtbar grün in CI | 🔴 | §14 |
+| HNSW-Dateiformat v2 (Arena) | 🔴 | §7.4 |
+| RaBitQ/PQ-Quantisierung jenseits SQ8 | 🔴 | §7.4 |
+| ADR-Formalrevision (Leiden statt LPA) | 🔴 (Dokumentationsnacharbeit) | §13 |
+| **N-äre Hyperkanten (gesamt: Datenmodell, H1–H6, `relate_n_ary`)** | **🔴 vollständig spezifiziert, nicht implementiert** | §6 |
+
+---
+
+<a id="roadmap"></a>
+## 16. Roadmap
+
+### Stufe 0 — Unmittelbar
+
+1. Loom-Test für Group-Commit sichtbar grün in CI (reine Verifikationslücke, Test existiert bereits).
+2. Benchmark-Ausführung des Bandit-Latency-Gates mit produktivem $d$, um die Sherman-Morrison-Umstellung von
+   „Gate existiert" zu „Gate bestanden, Default umgestellt" zu überführen.
+
+### Stufe 1 — Strukturell
+
+3. **N-äre Hyperkanten** (§6), vollständig spezifiziert, unmittelbar startbereit — kein externer Blocker mehr,
+   sofern das FlatBuffers-CI-Drift-Gate (H4) produktiv ist. Reihenfolge innerhalb der Implementierung: H4-Nachweis
+   → Datenmodell (§6.3) → kanonisches Locking (§6.5 H2) → RCU-Integration (§6.5 H1) → PathRAG-Anschluss (§6.4,
+   §6.5 H3) → Cascade-Fan-out-Limit (§6.5 H5) → Leiden-Sichtbarkeitsflag (§6.5 H6) → Stern-Expansion-Projektion
+   (§6.6, separates Folgethema).
+4. HNSW-Dateiformat v2 (Arena + CSR + allokationsfreie Traversierung).
+
+### Stufe 2 — Produktions-Default-Entscheidungen
+
+5. Bandit-Default `DiagonalApproximation` → `ShermanMorrison`, sobald CI-Gate besteht.
+6. Block-Cache-Default `RwLock`-LRU → SIEVE-/S3-FIFO-Backend.
+7. RaBitQ- oder PQ-Evaluierung (nach HNSW v2).
+
+### Stufe 3 — Governance & Produktentscheidungen
+
+8. Formale ADR-Revision der Leiden-Umstellung (Code ist der Dokumentation voraus).
+9. Major-Release-Planung: 128-Bit-DocId-Cutover mit DiskANN-Tier-Vollfreigabe bündeln — technische Vorbedingung
+   ist bereits vollständig erfüllt.
+
+### Stufe 4 — Fernziele
+
+Memory Consolidation (`consolidate_via_llm()`), CausalEdge, passives WAL-Shipping, vollständige
+`ProvenanceRecord`-API-Exposition, `edge-reinforcement-learning`-Vollspezifikation, automatische NLP-Extraktion
+n-ärer Fakten aus Freitext (explizit außerhalb des Scopes der Hyperkanten-Spezifikation, §6.3).
+
+---
+
+*Diese Spezifikation ist die einzige normative Produktquelle für MemFuse. Sie ist in sich geschlossen: Jede
+frühere Fassung, jedes Delta-Dokument und jede Zwischen-Review-Notiz zu den hier behandelten Themen — insbesondere
+zur Hyperkanten-Erweiterung (§6) — ist durch dieses Dokument vollständig ersetzt und wird nicht mehr referenziert.
+Künftige Änderungen erfolgen als direkte Überarbeitung dieses Dokuments, nicht als weiteres Delta-Dokument.*
+
+
+## 17. Opus Optimierungen (Roadmap Ergänzung)
+
+
+Dieser Plan enthält ausschließlich Maßnahmen, die aus den Opus-Architektur-Reviews stammen, im aktuellen Code verifiziert noch **nicht behoben** sind und sich als konkrete, abgrenzbare Implementierungsschritte umsetzen lassen. Bereits erledigte Punkte (WAL-Actor-Exklusivität, PID-Regler mit `dt`, Sherman-Morrison-Bandit, Hyperkanten-Grundgerüst, Block-Cache-v2, `to_lowercase`-Fix, HMAC-Lock-Handoff u. a.) sind nicht enthalten.
+
+Die Reihenfolge der Stufen ist bindend zu verstehen: Stufe 0 blockiert bzw. gefährdet den Betrieb, Stufe 1 ist der größte Hebel für Latenz/Durchsatz, Stufe 2 betrifft Speicherverbrauch und Struktur, Stufe 3 ist Prozess/Governance.
+
+---
+
+## Stufe 0 — Korrektheit & Betriebssicherheit (zuerst)
+
+### 0.1 WAL-Replay: Panic-Pfad bei korrupter oder sich ändernder Datei entschärfen
+**Problem:** Die Replay-Routine liest die Dateigröße einmalig vor dem `mmap`, prüft alle Zugriffsgrenzen aber gegen diesen separat gehaltenen Wert statt gegen die tatsächliche Länge der gemappten Region. Verkürzt sich die Datei zwischen beiden Schritten (abgebrochener Schreibvorgang, konkurrierender Prozess, Netzwerk-Dateisystem), führt die anschließende direkte Byte-Indizierung zu einem Index-Panic statt zu einem behandelten Fehler. Mit `panic = "abort"` im Release-Profil beendet das den Prozess beim Öffnen der Datenbank — im schlimmsten Fall bei jedem Neustart erneut (Crash-Loop).
+**Maßnahme:**
+- Dateigröße ausschließlich aus `mmap.len()` ableiten, keinen separat gelesenen `file_size`-Parameter mehr durchreichen.
+- Alle Slice-Zugriffe auf `mmap.get(a..b)` mit `.ok_or(WalCorruption)` statt direkter Indizierung umstellen.
+- Die zweite, parallele Scan-Implementierung auf denselben Hilfsfunktions-Pfad reduzieren, damit nicht zwei Implementierungen mit potenziell unterschiedlichen Schranken existieren.
+**Nutzen:** Eliminiert den mit Abstand risikoreichsten verbleibenden Panic-Pfad im Storage-Layer; sehr geringer Aufwand bei hoher Risikoreduktion.
+
+### 0.2 Bandit: Dimensionsprüfung von `debug_assert` auf harte Fehlerbehandlung umstellen
+**Problem:** `score()` und `update()` des Contextual-Bandit-Routings prüfen die Übereinstimmung von Kontext- und Gewichtsvektor-Dimension nur über `debug_assert_eq!`. Im Release-Build greift diese Prüfung nicht; ein interner `zip` kürzt beide Vektoren stillschweigend auf die kürzere Länge. Ein Dimensionswechsel des Embedding-Modells (z. B. nach einem Modell-Upgrade) würde damit zu einem stillen Teil-Skalarprodukt in der Routing-Entscheidung führen, statt einen Fehler auszulösen. Zusätzlich wird der persistierte Bandit-Zustand ohne Dimensions-Versionierung serialisiert.
+**Maßnahme:**
+- Dimensionsprüfung in `score()`/`update()` als `Result`-Rückgabe mit eigenem Fehlervariant (`DimensionMismatch { expected, actual }`) statt `debug_assert`.
+- Ein Versionsfeld (oder die erwartete Dimension) in `BanditProfileState` mit persistieren und beim Laden gegen die aktuell konfigurierte Embedding-Dimension prüfen.
+**Nutzen:** Verhindert eine stillschweigend falsche Routing-Entscheidung nach Modellwechsel — geringer Aufwand, hohe Korrektheitswirkung.
+
+### 0.3 Lyapunov-Drift-Erkennung mit dem Bandit verdrahten
+**Problem:** Der Drift-Wächter erkennt Verteilungsverschiebungen der Non-Conformity-Scores zuverlässig und protokolliert sie, ruft aber an keiner Stelle die dafür vorgesehene Reaktionsmethode des Bandits auf. Die Eskalation der Exploration bei erkanntem Drift existiert im Code, ist aber vollständig unverdrahtet und wird derzeit nur aus dem eigenen Unit-Test heraus aufgerufen.
+**Maßnahme:** An der Stelle, an der `DriftDetected` erkannt und aktuell nur geloggt wird, zusätzlich die Drift-Reaktionsmethode auf dem zum jeweiligen Profil gehörenden Bandit-Zustand aufrufen (mit einem konfigurierbaren `k_drift`-Faktor).
+**Nutzen:** Schließt die einzige fehlende Verbindung zwischen zwei bereits fertigen Komponenten; erschließt eine bereits gebaute, aber bislang wirkungslose Funktion. Sehr geringer Aufwand.
+
+### 0.4 Cloud-Egress-Klassifizierung korrigieren
+**Problem:** Die einzige Werkzeugmethode, die eine Anfrage tatsächlich das lokale System verlassen lässt, ist derselben, permissiven Policy-Kategorie zugeordnet wie reine lokale Lesezugriffe. Sie wird dadurch von einem Flag gesteuert, das für harmlose Leseoperationen gedacht ist, nicht für Daten, die den Rechner verlassen.
+**Maßnahme:** Eine eigene Kategorie für Cloud-Egress-Methoden einführen, mit eigenem, restriktiverem Default-Policy-Feld, das unabhängig vom allgemeinen Lesezugriffs-Flag konfiguriert wird.
+**Nutzen:** Schließt eine sicherheitsrelevante Fehlkategorisierung; geringer Aufwand.
+
+### 0.5 Recovery-Pfad für offene Transaktions-Intents differenzieren
+**Problem:** Der Wiederherstellungspfad beim Öffnen der Datenbank behandelt jeden gefundenen offenen Transaktions-Intent unbedingt als „vorwärts committen und Indizes nachziehen“ — unabhängig davon, ob die Transaktion ursprünglich erfolgreich war oder mit einem Fehler abgebrochen wurde. Erfolg und Fehlschlag können dadurch denselben On-Disk-Endzustand erzeugen.
+**Maßnahme:** Den Intent-Datensatz um einen expliziten Ergebnisstatus (committed/aborted) erweitern, der beim Schreiben des Intents festgelegt und bei Repair-on-Open ausgewertet wird, statt pauschal vorwärts zu committen.
+**Nutzen:** Verhindert, dass abgebrochene Transaktionen nach einem Neustart fälschlich als abgeschlossen behandelt werden. Mittlerer Aufwand, da der Intent-Schreibpfad und alle Aufrufer angepasst werden müssen.
+
+---
+
+## Stufe 1 — Hot-Path-Performance (größter Hebel)
+
+### 1.1 HNSW: Nachbarlisten-Auflösung ohne Allokation
+**Problem:** Die zentrale Funktion, die für jeden besuchten Knoten während einer Suche die Nachbarliste auflöst, gibt in jedem ihrer Rückgabepfade eine eigens allokierte Kopie zurück, obwohl die Signatur eine Referenz-oder-Kopie-Abstraktion vorsieht. Eine Suche, die mehrere hundert bis tausend Knoten besucht, erzeugt dadurch ebenso viele Heap-Allokationen allein für Adjazenzlisten — der mit Abstand größte Einzelfaktor im Suchpfad.
+**Maßnahme:**
+- Kurzfristig (ohne Formatwechsel): Wo die Nachbarn bereits als Referenz vorliegen (In-RAM-Knoten ohne konkurrierenden Schreibzugriff), tatsächlich den Referenz-Zweig statt der Kopie zurückgeben.
+- Mittelfristig: Umstellung des On-Disk-/Mmap-Knotenformats auf einen festen, ausgerichteten Datensatz-Stride mit pro Layer zusammenhängend abgelegten Nachbar-Indizes, sodass Nachbarlisten direkt als Byte-Slice referenziert statt dekodiert und kopiert werden können.
+**Nutzen:** Größter einzelner Effizienzgewinn im gesamten Suchpfad; die kurzfristige Teilmaßnahme ist mit geringem Aufwand umsetzbar, die vollständige Formatumstellung ist aufwendiger, aber Voraussetzung für alle weiteren HNSW-Optimierungen.
+
+### 1.2 HNSW: Backlink-Auflösung von O(P×B) auf O(1) pro Schritt
+**Problem:** Während eines Batch-Inserts wird für jeden im aktuellen Suchschritt expandierten Nachbarn eine lineare Suche über die gesamte Liste bereits vorbereiteter Einfüge-Operationen und deren Backlinks durchgeführt. Bei größeren Batches multipliziert sich das zu einer quadratischen Gesamtkomplexität über die Suche.
+**Maßnahme:** Einmal pro Suche eine Hash-Map von `(Nachbar-Index, Layer)` auf die zugehörige aktualisierte Nachbarliste aus den vorbereiteten Einfüge-Operationen aufbauen und im Suchkontext mitführen; Nachschlagen wird dadurch O(1) statt einer linearen Suche pro Schritt.
+**Nutzen:** Direkter algorithmischer Gewinn bei Batch-Inserts, insbesondere bei hoher Schreiblast; geringer Umsetzungsaufwand.
+
+### 1.3 HNSW: Lock- und Allokationsvermeidung im Distanzpfad
+**Problem:** Innerhalb der Distanzberechnung für quantisierte Vektoren wird bei jedem einzelnen Kandidaten ein Lese-Lock auf den gemeinsam genutzten Quantisierer erneut angefordert. Zusätzlich wird beim mmap-gestützten Distanzpfad der Vektor bei jeder Berechnung Element für Element dekodiert und in einen neu allokierten Puffer geschrieben, statt direkt aus dem gemappten Speicher zu lesen — der eigentliche Zweck der Mmap-Nutzung wird dadurch im heißesten Pfad wieder aufgehoben.
+**Maßnahme:**
+- Lock auf den Quantisierer einmalig pro Suchaufruf (nicht pro Kandidat) erwerben und als Referenz durch die Distanzschleife reichen.
+- Distanzfunktion so umbauen, dass sie direkt auf dem gemappten Byte-Slice operiert (z. B. über SIMD-Kernel, die auf `&[u8]`/`&[f32]`-Slices arbeiten), statt vorab in einen Heap-Vektor zu dekodieren.
+**Nutzen:** Reduziert Lock-Kontention und Allokationsrate im am häufigsten durchlaufenen Codepfad des Systems messbar; mittlerer Aufwand, hoher Ertrag.
+
+### 1.4 SSTable: Unnötige Kopie beim Block-Lesen entfernen
+**Problem:** Beim Lesen eines Datenblocks wird nach erfolgreicher CRC-Prüfung eine vollständige Kopie des Nutzdaten-Anteils angelegt, nur um die vorangestellten Prüfsummen-Bytes abzuschneiden — obwohl der zugrunde liegende Puffertyp Zero-Copy-Slicing mit geteiltem Referenzzähler unterstützt.
+**Maßnahme:** Die Kopieroperation durch ein referenzzählendes Slicing des bestehenden Puffers ersetzen, sodass keine zusätzliche Allokation und kein Memcopy der vollen Blockgröße mehr anfällt.
+**Nutzen:** Spart bei jedem Cache-Miss eine vollständige Blockkopie; trivialer Aufwand, sofort messbar.
+
+### 1.5 Kryptografie: AES-Schlüsselplan wiederverwenden statt pro Operation neu aufzubauen
+**Problem:** Bei jeder Verschlüsselungs-/Entschlüsselungsoperation wird die AES-256-GCM-SIV-Instanz aus dem Schlüsselmaterial neu aufgebaut. Der Aufbau des Schlüsselplans ist der teuerste Teil der Operation und wird dadurch bei jedem einzelnen Aufruf unnötig wiederholt — betrifft sowohl den WAL-Verschlüsselungspfad als auch Sandbox-/Vault-Operationen.
+**Maßnahme:** Die Cipher-Instanz einmalig pro Schlüssel (bzw. Schlüsselgeneration) aufbauen und danach wiederverwenden — etwa über eine einmalig initialisierte, threadsicher geteilte Referenz, die bei Schlüsselrotation gezielt ausgetauscht wird, statt bei jeder Operation neu konstruiert zu werden.
+**Nutzen:** Reduziert CPU-Kosten auf allen kryptografisch gesicherten Pfaden spürbar; mittlerer Aufwand wegen der Schlüsselrotations-Semantik, die erhalten bleiben muss.
+
+### 1.6 MemTable: Von Hash-Sharding auf Range-/Präfix-Sharding umstellen
+**Problem:** Die MemTable verteilt Schlüssel über eine feste Anzahl unabhängiger, hash-basiert ausgewählter Partitionen. Das beschleunigt einzelne Punktschreibungen, zerstört aber die beiden dominanten Zugriffsmuster des Systems: Beim Flush müssen alle Partitionen zusammengeführt und global neu sortiert werden (statt einer reinen Konkatenation), und ein Präfix-Scan über einen Namensraum muss grundsätzlich alle Partitionen durchsuchen, statt nur die eine, die den Präfix tatsächlich enthält.
+**Maßnahme:** Sharding-Grenzen aus dem Namensraum-Präfix ableiten (Range-Sharding), sodass jede Partition intern zusammenhängend bleibt. Alternativ, falls die Präfixverteilung zu ungleichmäßig ist: eine einzelne nebenläufige, geordnete Datenstruktur ohne Sharding-Kompromiss einsetzen.
+**Nutzen:** Macht den Flush-Pfad sortierfrei und reduziert Präfix-Scans von „alle Partitionen“ auf „eine Partition“; hoher Aufwand, aber hoher struktureller Ertrag für den am häufigsten durchlaufenen Schreibpfad.
+
+### 1.7 Block-Cache: Byte-basierte Kapazität statt Eintragsanzahl
+**Problem:** Die konfigurierte Cache-Kapazität wird in Anzahl Einträgen angegeben und implizit auf eine feste Blockgröße hochgerechnet. Blöcke können jedoch bis zu einer deutlich größeren Maximalgröße anwachsen, sodass ein nominell klein konfigurierter Cache tatsächlich ein Vielfaches an Speicher belegen kann, ohne dass dies vom zentralen Ressourcen-Budget erfasst wird.
+**Maßnahme:** Kapazität byte-basiert statt eintragsbasiert führen (Eviction anhand der tatsächlichen Bytegröße der zwischengespeicherten Werte); Anbindung an das zentrale Ressourcen-Tracking, damit der Cache im Gesamtspeicherbudget sichtbar ist.
+**Nutzen:** Verhindert unvorhersehbaren Speicherverbrauch unter variabler Blockgröße; mittlerer Aufwand.
+
+### 1.8 RRF-Fusion: `build_provenance`-Signatur entschärfen
+**Problem:** Die Funktion zum Aufbau des Provenance-Datensatzes nimmt vierzehn positionelle Parameter entgegen, davon acht vom identischen Typ (`Option<f32>`/`Option<u32>`). Eine Vertauschung zweier Argumente an der Aufrufstelle (z. B. Text- und Graph-Score) kompiliert fehlerfrei und erzeugt eine stillschweigend falsche Provenienz-Zuordnung.
+**Maßnahme:** Umstellung auf eine benannte Struct mit einem Feld pro Signal (oder ein `[SignalInput; N]`-Array), sodass Vertauschungen durch das Typsystem ausgeschlossen werden; zusätzlich `&str` statt `String` für Textfelder, um eine Allokation pro Ergebnis einzusparen.
+**Nutzen:** Beseitigt eine stille Fehlerquelle in der Ergebnis-Provenienz und eine unnötige Allokation pro Treffer; geringer bis mittlerer Aufwand (Signaturänderung mit mehreren Aufrufstellen).
+
+### 1.9 Text-Suche: Posting-Format von Einzelschlüssel- auf Listenspeicherung umstellen
+**Problem:** Jedes einzelne Posting (Term–Dokument-Paar) wird als eigenständiges Schlüssel-Wert-Paar abgelegt, mit dem Term und der Dokument-ID als Teil des Schlüssels. Das führt zu erheblicher Schreibverstärkung (ein Dokument mit vielen Termen erzeugt ebenso viele einzelne Schreiboperationen), zu erheblicher Leseverstärkung (ein häufiger Suchbegriff löst einen unbegrenzten Präfix-Scan über potenziell hunderttausende Einzelschlüssel aus) und zu einem Speicher-Overhead, bei dem der Schlüssel ein Vielfaches des eigentlichen Werts ausmacht.
+**Maßnahme:** Umstellung auf ein Format, bei dem die vollständige Postingliste eines Terms als ein einziger Wert abgelegt wird (z. B. Delta-kodierte Dokument-IDs mit Term-Frequenz und Dokumentlänge je Eintrag), ergänzt um einen separat gepflegten Dokumentfrequenz-Zähler pro Term. Das ermöglicht einen einzelnen Lesezugriff pro Suchbegriff statt eines unbegrenzten Scans und entfernt gleichzeitig das separate Nachladen der Dokumentlänge pro Treffer.
+**Nutzen:** Größter struktureller Einzelbefund im Textsuche-Pfad; hoher Aufwand (Formatwechsel inkl. Migration bestehender Indizes), aber Voraussetzung für jede weitere Optimierung der Volltextsuche (u. a. echte Top-k-Abbruchbedingungen).
+
+### 1.10 RRF/Textsuche: Volle Sortierung durch begrenzte Selektion ersetzen
+**Problem:** Sowohl in der Signal-Fusion als auch in der Textsuche werden sämtliche Kandidaten vollständig sortiert und danach auf die gewünschte Trefferzahl gekürzt, obwohl nur die besten k Einträge benötigt werden.
+**Maßnahme:** Auf eine Selektionsmethode umstellen, die die besten k Elemente in linearer Zeit bestimmt und erst diese Teilmenge sortiert, statt die Gesamtmenge vollständig zu sortieren.
+**Nutzen:** Reduziert die Komplexität von „M·log M“ auf „M“ bei großer Kandidatenzahl; geringer Umsetzungsaufwand, sobald 1.9 (Textsuche) bzw. die bestehende Fusion-Struktur dies zulässt.
+
+---
+
+## Stufe 2 — Speicher & Struktur
+
+### 2.1 Graph: Inkrementelle Kompaktierung statt vollständigem Rebuild pro Anfrage
+**Problem:** Der Personalized-PageRank-Pfad löst bei jeder Anfrage mit Graph-Signal einen vollständigen Rebuild sämtlicher CSR-Spalten-Arrays aus, unabhängig davon, wie viele Änderungen seit dem letzten Rebuild tatsächlich aufgelaufen sind. Der Aufwand pro Anfrage skaliert damit mit der Gesamtgröße des Graphen statt mit der Menge der tatsächlichen Änderungen.
+**Maßnahme:** Kompaktierung auf ein inkrementelles Schema umstellen (append-only Delta-Segmente plus periodischer Merge im Hintergrund), sodass Traversierungen den stabilen CSR-Bestand plus ein kleines Delta lesen, statt bei jeder Anfrage neu aufzubauen.
+**Nutzen:** Entfernt einen Faktor „Gesamtgraphgröße“ aus dem Anfragepfad; hoher Aufwand, aber der wirkungsvollste strukturelle Eingriff im Graph-Layer.
+
+### 2.2 CSR-Kantenspalten: Speicherverbrauch durch Sentinel-Werte statt `Option`-Tags halbieren
+**Problem:** Mehrere Kantenspalten des Graphen sind als `Vec<Option<T>>` geführt, obwohl der zugrunde liegende Typ keine ungenutzten Bitmuster besitzt, die eine Nischenoptimierung erlauben würden. Jedes dieser Felder benötigt dadurch deutlich mehr Speicher, als für den Wertebereich nötig wäre — in Summe rund doppelt so viel Speicher pro Kante wie nötig.
+**Maßnahme:** Interne Indextypen auf einen kompakteren Ganzzahltyp umstellen, `Option`-Felder durch dedizierte Sentinel-Werte (z. B. Minimalwert des Zahlbereichs) oder Nischentypen ersetzen, bei identischer fachlicher Semantik.
+**Nutzen:** Etwa Halbierung des Speicherbedarfs pro Kante bei großen Graphen; mittlerer Aufwand, da alle Lese-/Schreibstellen der betroffenen Spalten angepasst werden müssen.
+
+### 2.3 Checkpoint-Store: Zwei Indizes unter einem gemeinsamen Lock zusammenführen
+**Problem:** Checkpoint-Metadaten werden in zwei separaten Strukturen (Sequenznummer-Index und Namens-Index) mit jeweils eigenem Lock geführt. Aktualisierungen erfolgen über mehrere unabhängige Lock-Erwerbe hintereinander; ein Leser, der über den Namen nachschlägt, kann zwischen den beiden Lookups einen inkonsistenten Zwischenzustand sehen (veraltete oder fehlende Zuordnung).
+**Maßnahme:** Beide Indizes in eine gemeinsame, unter einem einzigen Lock geführte Struktur zusammenfassen (z. B. eine Map von Namen auf Metadaten mit abgeleitetem Sequenz-Index), sodass Aktualisierung und Lookup atomar bezüglich beider Zugriffspfade sind.
+**Nutzen:** Beseitigt ein Zeitfenster für inkonsistente Checkpoint-Lookups; geringer bis mittlerer Aufwand.
+
+### 2.4 Manifest: Fsync pro Zustandsübergang statt pro Einzeleintrag
+**Problem:** Das Manifest führt aktuell für jeden einzelnen Eintrag einen eigenen `fsync` durch, auch wenn mehrere Einträge fachlich zu einem einzigen atomaren Zustandsübergang gehören (z. B. Kompaktierung mit mehreren neuen und mehreren entfernten Dateien). Das erzeugt unnötig viele synchrone Festplattenzugriffe für einen fachlich einzigen Vorgang.
+**Maßnahme:** Zusammengehörige Manifest-Änderungen in einem Batch sammeln und mit einem einzigen `fsync` pro Zustandsübergang statt pro Einzeleintrag persistieren.
+**Nutzen:** Reduziert die Anzahl synchroner I/O-Operationen bei Kompaktierung und Flush spürbar; mittlerer Aufwand, da die Aufrufstellen entsprechend gebündelt werden müssen.
+
+### 2.5 `memfuse-py` in den Cargo-Workspace aufnehmen
+**Problem:** Das Python-FFI-Crate deklariert einen eigenen, separaten Workspace und ist nicht Teil des Root-Workspace. Dadurch wird die PyO3-FFI-Grenze von `cargo build/clippy/test --workspace` nie mitgeprüft, und das Crate nutzt Pfad-Abhängigkeiten statt der geteilten Workspace-Versionen, was einen Versions-Drift bei gemeinsam genutzten Abhängigkeiten strukturell möglich macht.
+**Maßnahme:** Crate in die `members`-Liste des Root-`Cargo.toml` aufnehmen; abweichende Profileinstellungen (z. B. Panic-Verhalten für die `cdylib`) gezielt per paketspezifischem Profil erhalten.
+**Nutzen:** Stellt sicher, dass die FFI-Grenze denselben CI-Prüfungen unterliegt wie der restliche Workspace; geringer Aufwand.
+
+---
+
+## Stufe 3 — Governance / Prozess
+
+### 3.1 Feature-Kombinationen in CI absichern
+**Problem:** Optionale Features (z. B. Edge-Reinforcement-Learning-Pfade und weitere Opt-in-Ausbaustufen) werden im Standard-CI-Lauf nie in Kombination gebaut, sodass nicht sichergestellt ist, dass sie überhaupt kompilieren, geschweige denn korrekt funktionieren.
+**Maßnahme:** Einen CI-Schritt ergänzen, der das Powerset der relevanten Feature-Flags baut und mindestens kompiliert (idealerweise inklusive Tests je Kombination).
+**Nutzen:** Verhindert stille Bit-Rot in selten aktivierten Codepfaden; geringer Einrichtungsaufwand, laufende CI-Zeitkosten.
+
+### 3.2 Panic-Inventar kontinuierlich pflegen
+**Problem:** Auch nach der bereits erfolgten deutlichen Reduzierung der bekannten Panic-Stellen im Produktivcode besteht das Risiko, dass neue `unwrap()`/`expect()`/`panic!()`-Aufrufe unbemerkt in produktiven Code-Pfaden landen, sofern das Gate nicht zwischen Test- und Produktivcode unterscheidet.
+**Maßnahme:** Sicherstellen, dass das bestehende Gate ausschließlich Produktivcode unter `src/` (ohne Benchmarks und Tests) zählt und eine harte Obergrenze durchsetzt, die nur sinken, nie steigen darf.
+**Nutzen:** Verhindert ein erneutes Anwachsen der bereits reduzierten Panic-Schuld; geringer Aufwand, sofern das Gate bereits die richtige Grundlage hat.
+
+---
+
+## Kurzübersicht nach Aufwand/Nutzen
+
+| Sofort umsetzbar (geringer Aufwand, hoher Nutzen) | Mittelfristig (mittlerer Aufwand) | Struktureller Umbau (hoher Aufwand) |
+|---|---|---|
+| 0.1 WAL-Replay-Bounds | 1.3 Distanzpfad-Lock/Allokation | 1.1 HNSW-Nachbarformat |
+| 0.2 Bandit-Dimensionsprüfung | 1.5 AES-Schlüsselplan wiederverwenden | 1.6 MemTable Range-Sharding |
+| 0.3 Drift-Bandit-Kopplung | 1.7 Byte-basierte Cache-Kapazität | 1.9 Text-Posting-Format |
+| 0.4 Egress-Kategorisierung | 1.8 build_provenance-Struct | 2.1 Inkrementelle Graph-Kompaktierung |
+| 1.2 Backlink-Lookup | 2.2 CSR-Sentinel statt Option | |
+| 1.4 SSTable-Zero-Copy-Slice | 2.3 Checkpoint-Index-Merge | |
+| 2.5 memfuse-py in Workspace | 2.4 Manifest-Batch-Fsync | |
+| 3.1 / 3.2 Governance-Gates | 0.5 Transaktions-Intent-Status | |
+
+
+## 18. Feature-Flag-Katalog (aus Implementierungsspezifikation)
+
+### 0.3 Cargo-Feature-Katalog (crateübergreifend normativ)
+
+| Feature | Definierender Crate | Default | Wirkung |
+|---|---|---|---|
+| `docid-128` | `memfuse-core` | aus | `DocId` wird `u128` statt `u64` (§1.3) |
+| `block-cache-v2` | `memfuse-store` | aus | `SieveCacheBackend` statt `LruBlockCacheBackend` als aktives Backend (§2.4) |
+| `egress-sherman-morrison` | `memfuse-router` | aus | `ShermanMorrisonBandit` statt `DiagonalApproximation` (§10.2) |
+| `experimental-diskann` | `memfuse-index` | aus | `DiskAnnIndex` kompiliert und ist über `VectorIndexTier::DiskAnn` wählbar (§5.4) |
+| `bandit-routing` | `memfuse-router` | an | Aktiviert den Bandit-Router überhaupt |
+| `cloud-egress-guard` | `memfuse-mcp` | an | Aktiviert `egress_gateway`-Modul |
+| `wasm-sandbox` | `memfuse-mcp` | an | Aktiviert `sandbox`-Modul |
+| `kv-bridge` | `memfuse-candle` | an | Aktiviert `kv_cache_bridge`-Modul |
+| `edge-reinforcement-learning` | `memfuse-graph` | aus | Aktiviert `SignalKind::EdgeReinforcement`-Pfad |
+| `fault-injection` | `memfuse-store` | nur `dev-dependencies` | Deterministische I/O-Fehlerinjektion für Tests |
+| `loom` | `memfuse-store`, `memfuse-graph` | nur `dev-dependencies` | Aktiviert `loom::sync::*` statt `std::sync::*` hinter `#[cfg(loom)]` |
+
+
+
+## 19. Fehlertaxonomie
+
+### 19.1 Fehlertaxonomie (crateübergreifend)
+
+| Crate | Fehler-Enum | Einbettet |
+|---|---|---|
+| `memfuse-core` | `CoreError` | — |
+| `memfuse-store` | `StoreError` | `WalError`, `LockError`, `CoreError` |
+| `memfuse-crypto` | `CryptoError` | — |
+| `memfuse-index` | `IndexError` | `CoreError` |
+| `memfuse-graph` | `GraphMutationError`, `GraphError` | `LockError` |
+| `memfuse-router` | `BanditError` | — |
+| `memfuse-candle` | `KvBridgeError` | `CryptoError` |
+| `memfuse-mcp` | `SandboxError`, `EgressError` | `wasmtime::Error` |
+| `memfuse-db` | `DbError` | alle Layer-1-Fehler per `#[from]` |
+
+**Regel (verbindlich):** Kein öffentlicher Funktionsrückgabetyp ist `Box<dyn std::error::Error>`. Jeder Crate
+exportiert genau einen (oder wenige, klar abgegrenzte) `thiserror`-Fehlertyp(en); `memfuse-db` als oberste
+Konsumentenschicht bündelt alle Unterfehler verlustfrei per `#[from]`/`#[error(transparent)]`.
+
+---
+
+<a id="tests"></a>

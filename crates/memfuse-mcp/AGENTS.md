@@ -12,9 +12,12 @@ und Volatile-Result-Speicherung.
 
 | Datei | Verantwortung |
 |---|---|
-| `lib.rs` | `#![deny(unsafe_code)]`, `McpServer`, Stdio-Event-Loop (`memfuse_consolidate` Tool H-13 geschlossen, `uvx`-Distribution) |
+| `lib.rs` | `#![forbid(unsafe_code)]`, `McpServer`, Stdio-Event-Loop (`memfuse_consolidate`, `memfuse_cloud_query`, `uvx`-Distribution) |
+| `config.rs` | CLI- und Server-Konfiguration (`McpConfig`) |
 | `protocol.rs` | `McpError`, JSON-RPC 2.0 Message-Parser und Typen |
 | `sandbox.rs` | `McpSandbox`, `SandboxPolicy`, `VolatileToolResult` (verschlüsselter RAM) |
+| `egress_gateway.rs` | Egress Shield Gateway für Cloud Queries (`CloudQueryRequest`, `DefaultEgressClassifier`) |
+| `egress_guard.rs` | Schutz und Validierung ausgehender Anfragen gegen Exfiltration |
 | `prompt_injection.rs` | `PromptInjectionGuard`, `SecurityAuditLogger`, Pattern-Matching |
 
 ## 3. Kritische Invarianten
