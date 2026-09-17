@@ -471,7 +471,7 @@ mod tests {
         let res = validator.compute_raw_grounding_score("Valid response text.", &chunks);
         assert!(res.is_ok());
         let score = res.unwrap();
-        assert!(score >= 0.0 && score <= 1.0);
+        assert!((0.0..=1.0).contains(&score));
         assert!(!score.is_nan());
 
         // Verify that non-finite/NaN float inputs do not panic clamp(0.0, 1.0)
