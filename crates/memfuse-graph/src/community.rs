@@ -30,6 +30,9 @@ pub struct CommunityDetectionConfig {
     pub max_iterations: u32,
     /// Seed for deterministic node traversal shuffling.
     pub seed: u64,
+    /// Community-Detection (Leiden-Algorithmus) berücksichtigt ausschließlich binäre Kantengewichte; Hyperkanten-Fakten fließen NICHT in die Cluster-Zuordnung ein, auch wenn sie im Graphen vorhanden sind. Dieses Flag macht diese Unvollständigkeit explizit sichtbar statt sie stillschweigend zu tolerieren (siehe IP-20/H6).
+    #[serde(default)]
+    pub hyperedges_included: bool,
 }
 
 impl Default for CommunityDetectionConfig {
@@ -37,6 +40,7 @@ impl Default for CommunityDetectionConfig {
         Self {
             max_iterations: 100,
             seed: 42,
+            hyperedges_included: false,
         }
     }
 }
@@ -48,6 +52,9 @@ pub struct CommunityAssignment {
     pub entity_id: EntityId,
     /// Community ID (represented as a 64-bit integer, initialized from the seed EntityId).
     pub community_id: u64,
+    /// Community-Detection (Leiden-Algorithmus) berücksichtigt ausschließlich binäre Kantengewichte; Hyperkanten-Fakten fließen NICHT in die Cluster-Zuordnung ein, auch wenn sie im Graphen vorhanden sind. Dieses Flag macht diese Unvollständigkeit explizit sichtbar statt sie stillschweigend zu tolerieren (siehe IP-20/H6).
+    #[serde(default)]
+    pub hyperedges_included: bool,
 }
 
 /// Minimal deterministic PRNG for shuffling node order.
@@ -211,6 +218,7 @@ pub async fn detect_communities(
             assignments.push(CommunityAssignment {
                 entity_id: local_entity_ids[i],
                 community_id: local_u64_ids[i],
+                hyperedges_included: config.hyperedges_included,
             });
         }
         return Ok(assignments);
@@ -429,6 +437,7 @@ pub async fn detect_communities(
         assignments.push(CommunityAssignment {
             entity_id,
             community_id,
+            hyperedges_included: config.hyperedges_included,
         });
     }
 
@@ -475,6 +484,7 @@ mod tests {
         let config = CommunityDetectionConfig {
             max_iterations: 50,
             seed: 12345,
+            hyperedges_included: false,
         };
 
         let run1 = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
@@ -724,7 +734,7 @@ mod tests {
                 }
                 graph.commit(tx).await.unwrap(); // unwrap allowed
 
-                let config = CommunityDetectionConfig { max_iterations, seed };
+                let config = CommunityDetectionConfig { max_iterations, seed, hyperedges_included: false };
                 let result = detect_communities(&graph, &config).await;
 
                 proptest::prop_assert!(result.is_ok() || result.is_err());
@@ -760,7 +770,7 @@ mod tests {
                 }
                 graph.commit(tx).await.unwrap(); // unwrap allowed
 
-                let config = CommunityDetectionConfig { max_iterations: 20, seed };
+                let config = CommunityDetectionConfig { max_iterations: 20, seed, hyperedges_included: false };
                 let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
 
                 proptest::prop_assert_eq!(assignments.len(), node_count);
@@ -812,6 +822,7 @@ mod tests {
         let config = CommunityDetectionConfig {
             max_iterations: 1,
             seed: 42,
+            hyperedges_included: false,
         };
 
         let assignments = detect_communities(&graph, &config).await.unwrap(); // unwrap allowed
@@ -876,6 +887,7 @@ mod tests {
         let config = CommunityDetectionConfig {
             max_iterations: 150,
             seed: 987654321,
+            hyperedges_included: false,
         };
 
         let serialized_config = bincode::serialize(&config).unwrap(); // unwrap allowed
@@ -883,15 +895,132 @@ mod tests {
             bincode::deserialize(&serialized_config).unwrap(); // unwrap allowed
         assert_eq!(config.max_iterations, deserialized_config.max_iterations);
         assert_eq!(config.seed, deserialized_config.seed);
+        assert_eq!(
+            config.hyperedges_included,
+            deserialized_config.hyperedges_included
+        );
 
         let assignment = CommunityAssignment {
             entity_id: EntityId::new(100),
             community_id: 100,
+            hyperedges_included: false,
         };
 
         let serialized_assignment = bincode::serialize(&assignment).unwrap(); // unwrap allowed
         let deserialized_assignment: CommunityAssignment =
             bincode::deserialize(&serialized_assignment).unwrap(); // unwrap allowed
         assert_eq!(assignment, deserialized_assignment);
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_hyperedges_included_flag_default_is_false() {
+        let config = CommunityDetectionConfig::default();
+        assert!(
+            !config.hyperedges_included,
+            "Default for CommunityDetectionConfig.hyperedges_included must be false"
+        );
+
+        let assignment = CommunityAssignment {
+            entity_id: EntityId::new(1),
+            community_id: 1,
+            hyperedges_included: false,
+        };
+        assert!(!assignment.hyperedges_included);
+    }
+
+    #[tokio::test]
+    #[allow(non_snake_case)]
+    async fn test_hyperedges_included_flag_passthrough_from_config_to_assignment() {
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+        graph
+            .add_entity(tx, Entity::new(EntityId::new(1), "Node1", "Type"))
+            .await
+            .unwrap(); // unwrap allowed
+        graph
+            .add_entity(tx, Entity::new(EntityId::new(2), "Node2", "Type"))
+            .await
+            .unwrap(); // unwrap allowed
+        graph
+            .add_edge(tx, Edge::new(EntityId::new(1), EntityId::new(2), "link"))
+            .await
+            .unwrap(); // unwrap allowed
+        graph.commit(tx).await.unwrap(); // unwrap allowed
+
+        // Test with hyperedges_included = true
+        let config_true = CommunityDetectionConfig {
+            max_iterations: 10,
+            seed: 42,
+            hyperedges_included: true,
+        };
+        let assignments_true = detect_communities(&graph, &config_true).await.unwrap(); // unwrap allowed
+        assert!(!assignments_true.is_empty());
+        for assignment in &assignments_true {
+            assert!(
+                assignment.hyperedges_included,
+                "CommunityAssignment must reflect config.hyperedges_included = true"
+            );
+        }
+
+        // Test with hyperedges_included = false
+        let config_false = CommunityDetectionConfig {
+            max_iterations: 10,
+            seed: 42,
+            hyperedges_included: false,
+        };
+        let assignments_false = detect_communities(&graph, &config_false).await.unwrap(); // unwrap allowed
+        assert!(!assignments_false.is_empty());
+        for assignment in &assignments_false {
+            assert!(
+                !assignment.hyperedges_included,
+                "CommunityAssignment must reflect config.hyperedges_included = false"
+            );
+        }
+    }
+
+    #[test]
+    #[allow(non_snake_case)]
+    fn test_hyperedges_included_serde_backwards_compatibility() {
+        // Old JSON config snapshot without hyperedges_included field
+        let old_config_json = r#"{"max_iterations":100,"seed":42}"#;
+        let config: CommunityDetectionConfig = serde_json::from_str(old_config_json).unwrap(); // unwrap allowed
+        assert_eq!(config.max_iterations, 100);
+        assert_eq!(config.seed, 42);
+        assert!(
+            !config.hyperedges_included,
+            "Deserializing old config without hyperedges_included must default to false"
+        );
+
+        // Old JSON assignment snapshot without hyperedges_included field
+        let old_assignment_json = r#"{"entity_id":100,"community_id":42}"#;
+        let assignment: CommunityAssignment = serde_json::from_str(old_assignment_json).unwrap(); // unwrap allowed
+        assert_eq!(assignment.entity_id, EntityId::new(100));
+        assert_eq!(assignment.community_id, 42);
+        assert!(
+            !assignment.hyperedges_included,
+            "Deserializing old assignment without hyperedges_included must default to false"
+        );
+
+        // Serialization roundtrip with hyperedges_included = true
+        let config_true = CommunityDetectionConfig {
+            max_iterations: 50,
+            seed: 123,
+            hyperedges_included: true,
+        };
+        let serialized = serde_json::to_string(&config_true).unwrap(); // unwrap allowed
+        assert!(serialized.contains(r#""hyperedges_included":true"#));
+        let deserialized: CommunityDetectionConfig = serde_json::from_str(&serialized).unwrap(); // unwrap allowed
+        assert!(deserialized.hyperedges_included);
+
+        let assignment_true = CommunityAssignment {
+            entity_id: EntityId::new(100),
+            community_id: 42,
+            hyperedges_included: true,
+        };
+        let serialized_a = serde_json::to_string(&assignment_true).unwrap(); // unwrap allowed
+        assert!(serialized_a.contains(r#""hyperedges_included":true"#));
+        let deserialized_a: CommunityAssignment = serde_json::from_str(&serialized_a).unwrap(); // unwrap allowed
+        assert!(deserialized_a.hyperedges_included);
     }
 }
