@@ -62,6 +62,30 @@
       "active": false,
       "expires_at": "2026-09-17T11:06:26.852839738+00:00",
       "released_at": "2026-09-17T17:25:52.454754311+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-core",
+<<<<<<< Updated upstream
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-J5P7",
+      "timestamp": "2026-09-17T17:45:26.664696110+00:00",
+      "session_id": "6790409367255378698",
+      "active": false,
+      "expires_at": "2026-09-17T21:45:26.664674585+00:00",
+      "released_at": "2026-09-17T17:51:52.318265577+00:00"
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-12DH",
+      "timestamp": "2026-09-17T17:45:56.295397689+00:00",
+      "session_id": "8230640030215165648",
+      "active": false,
+      "expires_at": "2026-09-17T21:45:56.295370234+00:00",
+      "released_at": "2026-09-17T17:56:52.999540956+00:00"
+=======
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-MT02",
+      "timestamp": "2026-09-17T17:56:43.083405948+00:00",
+      "session_id": "3759607312961736615",
+      "active": false,
+      "expires_at": "2026-09-17T21:56:43.083391934+00:00",
+      "released_at": "2026-09-17T18:10:47.767667082+00:00"
+>>>>>>> Stashed changes
     }
   ]
 }
