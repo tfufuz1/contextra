@@ -13,3 +13,4 @@ Fehler: **0**  |  Warnungen: **8**
 - **WARNING [deprecated]** @ `crates/memfuse-core/src/types/domain.rs:1198:28`: use of deprecated associated function `types::domain::TenantId::new`: Nutze TenantId::try_new() oder TenantId::SYSTEM — new() umgeht INV-TENANT-1 und wird in einer künftigen Version entfernt.
 - **WARNING [deprecated]** @ `crates/memfuse-core/src/types/domain.rs:1220:32`: use of deprecated associated function `types::domain::TenantId::new`: Nutze TenantId::try_new() oder TenantId::SYSTEM — new() umgeht INV-TENANT-1 und wird in einer künftigen Version entfernt.
 - **WARNING [deprecated]** @ `crates/memfuse-core/src/types/domain.rs:1280:27`: use of deprecated associated function `types::domain::TenantId::new`: Nutze TenantId::try_new() oder TenantId::SYSTEM — new() umgeht INV-TENANT-1 und wird in einer künftigen Version entfernt.
+

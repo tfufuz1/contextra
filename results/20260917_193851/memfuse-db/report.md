@@ -36,3 +36,4 @@ Fehler: **1**  |  Warnungen: **9**
 
 - **WARNING [dead_code]** @ `crates/memfuse-graph/src/csr.rs:352:19`: methods `hyperedges_for_entity` and `insert_hyperedge` are never used
   - _Hinweis:_ `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+

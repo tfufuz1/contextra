@@ -65,21 +65,25 @@
     },
     {
       "krate": "memfuse-core",
-<<<<<<< HEAD
       "issue": "JULES-20260917-MEMFUSECOR-PROCES-J5P7",
       "timestamp": "2026-09-17T17:45:26.664696110+00:00",
       "session_id": "6790409367255378698",
       "active": false,
       "expires_at": "2026-09-17T21:45:26.664674585+00:00",
       "released_at": "2026-09-17T17:51:52.318265577+00:00"
-=======
       "issue": "JULES-20260917-MEMFUSECOR-PROCES-PUS7",
       "timestamp": "2026-09-17T17:48:20.827794955+00:00",
       "session_id": "15025248594747795545",
       "active": false,
       "expires_at": "2026-09-17T21:48:20.827774201+00:00",
       "released_at": "2026-09-17T17:55:33.505008030+00:00"
->>>>>>> 979ba81 (docs(memfuse-core): sync governance documentation and audit report)
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-12DH",
+      "timestamp": "2026-09-17T17:45:56.295397689+00:00",
+      "session_id": "8230640030215165648",
+      "active": false,
+      "expires_at": "2026-09-17T21:45:56.295370234+00:00",
+      "released_at": "2026-09-17T17:56:52.999540956+00:00"
+
     }
   ]
 }
