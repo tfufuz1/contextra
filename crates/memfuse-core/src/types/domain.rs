@@ -1183,9 +1183,12 @@ mod tests {
         assert_eq!(default_tenant, TenantId::SYSTEM);
         assert_eq!(default_tenant.inner(), 0);
         assert_eq!(default_tenant.as_u64(), 0);
-        assert_eq!(TenantId::new(42).inner(), 42);
-        assert_eq!(TenantId::new(42).as_u64(), 42);
-        assert_eq!(TenantId::try_from(100u64).unwrap(), TenantId::new(100));
+        assert_eq!(TenantId::try_new(42).unwrap().inner(), 42);
+        assert_eq!(TenantId::try_new(42).unwrap().as_u64(), 42);
+        assert_eq!(
+            TenantId::try_from(100u64).unwrap(),
+            TenantId::try_new(100).unwrap()
+        );
         assert_eq!(format!("{default_tenant}"), "TenantId(0)");
     }
 
@@ -1193,9 +1196,9 @@ mod tests {
     fn test_tenant_id_collections_hashmap_btreemap() {
         use std::collections::{BTreeMap, HashMap};
 
-        let t0 = TenantId::DEFAULT;
-        let t1 = TenantId::new(1);
-        let t2 = TenantId::new(2);
+        let t0 = TenantId::SYSTEM;
+        let t1 = TenantId::try_new(1).unwrap();
+        let t2 = TenantId::try_new(2).unwrap();
 
         // HashMap key test
         let mut map = HashMap::new();
@@ -1217,7 +1220,7 @@ mod tests {
 
     #[test]
     fn test_tenant_id_serde_roundtrip() {
-        let tenant = TenantId::new(987654321);
+        let tenant = TenantId::try_new(987654321).unwrap();
         let serialized = serde_json::to_string(&tenant).expect("TenantId serialization failed");
         assert_eq!(serialized, "987654321");
 
@@ -1277,7 +1280,7 @@ mod tests {
     #[test]
     fn test_serialization_roundtrips() {
         // TenantId & CollectionId
-        let t = TenantId::new(10);
+        let t = TenantId::try_new(10).unwrap();
         let ser = serde_json::to_string(&t).unwrap();
         let deser: TenantId = serde_json::from_str(&ser).unwrap();
         assert_eq!(t, deser);
@@ -1498,7 +1501,7 @@ mod tests {
             assert!(doc_id.inner() > 0);
             let entity_id =
                 EntityId::from_key(key).expect("multibyte unicode key should derive entity_id"); // expect #[cfg(test)]
-            assert_eq!(entity_id.inner(), doc_id.inner() as u64);
+            assert_eq!(entity_id.inner(), doc_id.inner());
         }
     }
 
@@ -1815,7 +1818,7 @@ mod tests {
 
     proptest::proptest! {
         fn prop_docid_serialization(id in proptest::num::u64::ANY) {
-            let doc = DocId::new(id.into());
+            let doc = DocId::new(id);
             let ser = serde_json::to_string(&doc).unwrap(); // unwrap
             let deser: DocId = serde_json::from_str(&ser).unwrap(); // unwrap
             prop_assert_eq!(doc, deser);
