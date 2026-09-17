@@ -35,6 +35,71 @@ pub struct CommunityDetectionConfig {
     pub hyperedges_included: bool,
 }
 
+/// Künstlicher bipartiter Knoten für eine Hyperkante in der Stern-Expansion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct VirtualHyperedgeNode {
+    /// ID der zugrundeliegenden Hyperkante.
+    pub hyperedge_id: crate::hyperedge::HyperEdgeId,
+}
+
+/// Stern-Expansion: Jede Hyperkante wird als künstlicher bipartiter Knoten
+/// (`VirtualHyperedgeNode`) repräsentiert. Der Iterator gaukelt dem Leiden-Solver die
+/// Inzidenzmatrix H vor, ohne zusätzlichen Speicher für die volle Expansion zu allozieren.
+pub struct StarExpansionIterator<'a> {
+    _graph: &'a CsrGraph,
+    active_hyperedges: Vec<crate::hyperedge::HyperEdge>,
+    current_hyperedge_idx: usize,
+    current_participant_idx: usize,
+}
+
+impl<'a> StarExpansionIterator<'a> {
+    /// Erstellt einen neuen `StarExpansionIterator` für den gegebenen CsrGraph.
+    pub fn new(graph: &'a CsrGraph) -> Self {
+        let inner = graph.inner_read();
+        let active_hyperedges = inner
+            .hyperedges
+            .values()
+            .filter(|h| h.tx_valid_to.is_none() && h.participants.len() >= 2)
+            .cloned()
+            .collect();
+
+        Self {
+            _graph: graph,
+            active_hyperedges,
+            current_hyperedge_idx: 0,
+            current_participant_idx: 0,
+        }
+    }
+
+    /// Liest das nächste Element inkl. Kantengewicht.
+    pub fn next_with_weight(&mut self) -> Option<(EntityId, VirtualHyperedgeNode, f32)> {
+        while self.current_hyperedge_idx < self.active_hyperedges.len() {
+            let hedge = &self.active_hyperedges[self.current_hyperedge_idx];
+            if self.current_participant_idx < hedge.participants.len() {
+                let entity_id = hedge.participants[self.current_participant_idx].entity;
+                let vnode = VirtualHyperedgeNode {
+                    hyperedge_id: hedge.id,
+                };
+                let weight = if hedge.weight > 0.0 { hedge.weight } else { 1.0 };
+                self.current_participant_idx += 1;
+                return Some((entity_id, vnode, weight));
+            } else {
+                self.current_hyperedge_idx += 1;
+                self.current_participant_idx = 0;
+            }
+        }
+        None
+    }
+}
+
+impl<'a> Iterator for StarExpansionIterator<'a> {
+    type Item = (EntityId, VirtualHyperedgeNode);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_with_weight().map(|(entity, vnode, _w)| (entity, vnode))
+    }
+}
+
 impl Default for CommunityDetectionConfig {
     fn default() -> Self {
         Self {
@@ -177,26 +242,65 @@ pub async fn detect_communities(
     let mut node_indices = valid_nodes;
     node_indices.sort_by_key(|&idx| reverse_map[idx]);
 
-    let num_nodes = node_indices.len();
-    if num_nodes == 0 {
+    let num_entity_nodes = node_indices.len();
+    if num_entity_nodes == 0 {
         return Ok(Vec::new());
     }
 
     // Map global node indices to dense local 0..N-1 indices
-    let mut global_to_local: HashMap<usize, usize> = HashMap::with_capacity(num_nodes);
-    let mut local_entity_ids: Vec<EntityId> = Vec::with_capacity(num_nodes);
-    let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_nodes);
+    let mut global_to_local: HashMap<usize, usize> = HashMap::with_capacity(num_entity_nodes);
+    let mut local_entity_ids: Vec<EntityId> = Vec::with_capacity(num_entity_nodes);
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
         let eid = reverse_map[global_idx];
         local_entity_ids.push(eid);
-        local_u64_ids.push(eid.inner());
     }
 
-    // Build dense local adjacency lists
-    let mut local_adj: Vec<Vec<(usize, f32)>> = vec![Vec::new(); num_nodes];
-    let mut node_degrees: Vec<f32> = vec![0.0; num_nodes];
+    // Entity lookup map from EntityId -> local index
+    let entity_to_local: HashMap<EntityId, usize> = local_entity_ids
+        .iter()
+        .enumerate()
+        .map(|(idx, &eid)| (eid, idx))
+        .collect();
+
+    // Virtual hyperedge nodes for star expansion (if enabled)
+    let mut vnode_u64_ids: Vec<u64> = Vec::new();
+    let mut vnode_local_adj: Vec<Vec<(usize, f32)>> = Vec::new();
+
+    if config.hyperedges_included {
+        let mut star_iter = StarExpansionIterator::new(graph);
+        // Map VirtualHyperedgeNode (hyperedge_id) to virtual local index starting at num_entity_nodes
+        let mut vnode_to_local: HashMap<crate::hyperedge::HyperEdgeId, usize> = HashMap::new();
+
+        while let Some((entity_id, vnode, weight)) = star_iter.next_with_weight() {
+            if let Some(&local_entity_idx) = entity_to_local.get(&entity_id) {
+                let v_idx = *vnode_to_local
+                    .entry(vnode.hyperedge_id)
+                    .or_insert_with(|| {
+                        let idx = num_entity_nodes + vnode_u64_ids.len();
+                        vnode_u64_ids.push(vnode.hyperedge_id.inner());
+                        vnode_local_adj.push(Vec::new());
+                        idx
+                    });
+
+                vnode_local_adj[v_idx - num_entity_nodes].push((local_entity_idx, weight));
+            }
+        }
+    }
+
+    let num_total_nodes = num_entity_nodes + vnode_u64_ids.len();
+    let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_total_nodes);
+    for &eid in &local_entity_ids {
+        local_u64_ids.push(eid.inner());
+    }
+    for &v_u64 in &vnode_u64_ids {
+        local_u64_ids.push(v_u64);
+    }
+
+    // Build dense local adjacency lists for all nodes (entities + virtual hyperedge nodes)
+    let mut local_adj: Vec<Vec<(usize, f32)>> = vec![Vec::new(); num_total_nodes];
+    let mut node_degrees: Vec<f32> = vec![0.0; num_total_nodes];
 
     for (&global_u, neighbors) in &adj_raw {
         if let Some(&local_u) = global_to_local.get(&global_u) {
@@ -209,12 +313,25 @@ pub async fn detect_communities(
         }
     }
 
+    if config.hyperedges_included {
+        for (v_sub_idx, neighbors) in vnode_local_adj.into_iter().enumerate() {
+            let v_local_idx = num_entity_nodes + v_sub_idx;
+            for (entity_local_idx, weight) in neighbors {
+                local_adj[v_local_idx].push((entity_local_idx, weight));
+                node_degrees[v_local_idx] += weight;
+
+                local_adj[entity_local_idx].push((v_local_idx, weight));
+                node_degrees[entity_local_idx] += weight;
+            }
+        }
+    }
+
     let total_2m: f32 = node_degrees.iter().sum();
 
     // If graph has no edges, return singletons
     if total_2m <= 0.0 {
-        let mut assignments = Vec::with_capacity(num_nodes);
-        for i in 0..num_nodes {
+        let mut assignments = Vec::with_capacity(num_entity_nodes);
+        for i in 0..num_entity_nodes {
             assignments.push(CommunityAssignment {
                 entity_id: local_entity_ids[i],
                 community_id: local_u64_ids[i],
@@ -228,7 +345,7 @@ pub async fn detect_communities(
     let mut communities: Vec<u64> = local_u64_ids.clone();
     let mut community_degrees: HashMap<u64, f32> = HashMap::new();
 
-    for i in 0..num_nodes {
+    for i in 0..num_total_nodes {
         community_degrees.insert(local_u64_ids[i], node_degrees[i]);
     }
 
@@ -241,7 +358,7 @@ pub async fn detect_communities(
 
         // Phase 1: Fast Local Move Phase
         let mut rng = SimpleRng::new(config.seed.wrapping_add(total_iter as u64));
-        let mut order: Vec<usize> = (0..num_nodes).collect();
+        let mut order: Vec<usize> = (0..num_total_nodes).collect();
         rng.shuffle(&mut order);
 
         for &u in &order {
@@ -300,7 +417,7 @@ pub async fn detect_communities(
 
         // Phase 2: Refinement Phase (Ensures Well-Connected Communities)
         let mut comm_members: HashMap<u64, Vec<usize>> = HashMap::new();
-        for (i, &comm_id) in communities.iter().enumerate().take(num_nodes) {
+        for (i, &comm_id) in communities.iter().enumerate().take(num_total_nodes) {
             comm_members.entry(comm_id).or_default().push(i);
         }
 
@@ -409,7 +526,7 @@ pub async fn detect_communities(
 
         communities = refined_communities;
         community_degrees.clear();
-        for (i, &comm_id) in communities.iter().enumerate().take(num_nodes) {
+        for (i, &comm_id) in communities.iter().enumerate().take(num_total_nodes) {
             *community_degrees.entry(comm_id).or_default() += node_degrees[i];
         }
 
@@ -430,9 +547,9 @@ pub async fn detect_communities(
         );
     }
 
-    // Build final result list sorted by EntityId
-    let mut assignments = Vec::with_capacity(num_nodes);
-    for (i, &community_id) in communities.iter().enumerate().take(num_nodes) {
+    // Build final result list sorted by EntityId (only for actual Entity nodes, not virtual hyperedge nodes)
+    let mut assignments = Vec::with_capacity(num_entity_nodes);
+    for (i, &community_id) in communities.iter().enumerate().take(num_entity_nodes) {
         let entity_id = local_entity_ids[i];
         assignments.push(CommunityAssignment {
             entity_id,
@@ -1022,5 +1139,136 @@ mod tests {
         assert!(serialized_a.contains(r#""hyperedges_included":true"#));
         let deserialized_a: CommunityAssignment = serde_json::from_str(&serialized_a).unwrap(); // unwrap allowed
         assert!(deserialized_a.hyperedges_included);
+    }
+
+    #[tokio::test]
+    #[allow(non_snake_case)]
+    async fn test_star_expansion_iterator_iteration() {
+        use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+
+        for id in 1..=3 {
+            graph
+                .add_entity(tx, Entity::new(EntityId::new(id), format!("E{id}"), "Node"))
+                .await
+                .unwrap(); // unwrap allowed
+        }
+        graph.commit(tx).await.unwrap(); // unwrap allowed
+
+        let he_id = HyperEdgeId::new(500);
+        let hedge = HyperEdge::new(
+            he_id,
+            crate::csr::EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), EntityId::new(1)),
+                RoleBinding::new(RoleId::new(2), EntityId::new(2)),
+                RoleBinding::new(RoleId::new(3), EntityId::new(3)),
+            ],
+            2.5,
+        );
+        graph.insert_hyperedge_direct(hedge);
+
+        let mut iter = StarExpansionIterator::new(&graph);
+        let mut items = Vec::new();
+        while let Some((eid, vnode, weight)) = iter.next_with_weight() {
+            items.push((eid, vnode.hyperedge_id, weight));
+        }
+
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0], (EntityId::new(1), he_id, 2.5));
+        assert_eq!(items[1], (EntityId::new(2), he_id, 2.5));
+        assert_eq!(items[2], (EntityId::new(3), he_id, 2.5));
+    }
+
+    #[tokio::test]
+    #[allow(non_snake_case)]
+    async fn test_community_detection_with_star_expansion_hyperedges() {
+        use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+
+        // Cluster 1: Nodes 1, 2, 3 (no binary edges)
+        for id in 1..=3 {
+            graph
+                .add_entity(tx, Entity::new(EntityId::new(id), format!("C1_{id}"), "Node"))
+                .await
+                .unwrap(); // unwrap allowed
+        }
+        // Cluster 2: Nodes 10, 11, 12 (no binary edges)
+        for id in 10..=12 {
+            graph
+                .add_entity(tx, Entity::new(EntityId::new(id), format!("C2_{id}"), "Node"))
+                .await
+                .unwrap(); // unwrap allowed
+        }
+        graph.commit(tx).await.unwrap(); // unwrap allowed
+
+        // Add Hyperedge H1 grouping Nodes 1, 2, 3
+        let he1 = HyperEdge::new(
+            HyperEdgeId::new(101),
+            crate::csr::EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), EntityId::new(1)),
+                RoleBinding::new(RoleId::new(2), EntityId::new(2)),
+                RoleBinding::new(RoleId::new(3), EntityId::new(3)),
+            ],
+            1.0,
+        );
+        graph.insert_hyperedge_direct(he1);
+
+        // Add Hyperedge H2 grouping Nodes 10, 11, 12
+        let he2 = HyperEdge::new(
+            HyperEdgeId::new(102),
+            crate::csr::EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), EntityId::new(10)),
+                RoleBinding::new(RoleId::new(2), EntityId::new(11)),
+                RoleBinding::new(RoleId::new(3), EntityId::new(12)),
+            ],
+            1.0,
+        );
+        graph.insert_hyperedge_direct(he2);
+
+        // Without hyperedges (hyperedges_included = false), no binary edges exist -> singletons
+        let config_false = CommunityDetectionConfig {
+            max_iterations: 50,
+            seed: 42,
+            hyperedges_included: false,
+        };
+        let assignments_false = detect_communities(&graph, &config_false).await.unwrap(); // unwrap allowed
+        let map_false: HashMap<u64, u64> = assignments_false
+            .into_iter()
+            .map(|a| (a.entity_id.inner(), a.community_id))
+            .collect();
+        assert_ne!(map_false[&1], map_false[&2]);
+        assert_ne!(map_false[&10], map_false[&11]);
+
+        // With hyperedges (hyperedges_included = true), star expansion connects nodes via virtual hyperedge nodes
+        let config_true = CommunityDetectionConfig {
+            max_iterations: 50,
+            seed: 42,
+            hyperedges_included: true,
+        };
+        let assignments_true = detect_communities(&graph, &config_true).await.unwrap(); // unwrap allowed
+        let map_true: HashMap<u64, u64> = assignments_true
+            .into_iter()
+            .map(|a| (a.entity_id.inner(), a.community_id))
+            .collect();
+
+        // Cluster 1 nodes must be grouped into the same community
+        let c1_comm = map_true[&1];
+        assert_eq!(map_true[&2], c1_comm);
+        assert_eq!(map_true[&3], c1_comm);
+
+        // Cluster 2 nodes must be grouped into the same community
+        let c2_comm = map_true[&10];
+        assert_eq!(map_true[&11], c2_comm);
+        assert_eq!(map_true[&12], c2_comm);
+
+        // Cluster 1 and Cluster 2 must be in distinct communities
+        assert_ne!(c1_comm, c2_comm);
     }
 }
