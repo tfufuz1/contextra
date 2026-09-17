@@ -1,9 +1,9 @@
 [package]
 name = "memfuse-py"
-version = "0.1.0"
-edition = "2021"
-license = "MIT OR Apache-2.0"
-rust-version = "1.89"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
 description = "Python bindings for MemFuse using PyO3"
 
 [lib]
@@ -15,7 +15,7 @@ doctest = false
 [dependencies]
 pyo3 = { version = "0.24.1", features = ["extension-module", "abi3-py38", "multiple-pymethods"] }
 numpy = "0.24"
-tokio = { version = "1", features = ["full"] }
+tokio = { workspace = true }
 # ANCHOR:ARCH:DAG-003 — Architektur-Layer durchbrochen (Ausnahme für Bindings)
 # WP:NONE PRIO:2 NEEDS:NONE
 # AGENT:06 DATE:2026-05-09 STATUS:DONE
@@ -23,26 +23,15 @@ tokio = { version = "1", features = ["full"] }
 # RECHTFERTIGUNG: Als High-Level Python-Bridge (Layer 3) benötigt memfuse-py Zugriff
 # auf die orchestrating Facade in memfuse-db sowie Routing- und Kalibrierungskomponenten. Dies ist eine beabsichtigte Ausnahme
 # vom Sovereign Core DAG, da Bindings per Definition an der Grenze zum Nutzer stehen.
-memfuse-router = { path = "../memfuse-router" }
-memfuse-calibration = { path = "../memfuse-calibration" }
-parking_lot = "0.12"
-memfuse-core = { path = "../memfuse-core" }
-memfuse-db = { path = "../memfuse-db" }
-flatbuffers = "24.3"
-serde_json = "1"
+memfuse-router = { workspace = true }
+memfuse-calibration = { workspace = true }
+parking_lot = { workspace = true }
+memfuse-core = { workspace = true }
+memfuse-db = { workspace = true }
+flatbuffers = { workspace = true }
+serde_json = { workspace = true }
 pythonize = "0.24"
 
 [features]
 default = []
 docid-128 = ["memfuse-core/docid-128"]
-
-[workspace]
-resolver = "2"
-
-[profile.release]
-opt-level = 3
-lto = "fat"
-codegen-units = 1
-panic = "unwind"
-strip = true
-overflow-checks = true

@@ -1,28 +1,13 @@
 {
   "claims": [
     {
-      "krate": "memfuse-store",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-17T19:35:52.513702308+00:00",
-      "session_id": "4020660578212732193",
-      "active": true,
-      "expires_at": "2026-09-17T23:35:52.513683065+00:00"
-    },
-    {
-      "krate": "memfuse-candle",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-17T20:07:28.513569686+00:00",
-      "session_id": "563933830810746016",
-      "active": true,
-      "expires_at": "2026-09-18T00:07:28.513546193+00:00"
-    },
-    {
-      "krate": "memfuse-graph",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-17T21:21:24.123057658+00:00",
-      "session_id": "604547472940316711",
-      "active": true,
-      "expires_at": "2026-09-18T01:21:24.123038562+00:00"
+      "krate": "memfuse-mcp",
+      "issue": "OPUS-0.4-EGRESS-CLASSIFICATION",
+      "timestamp": "2026-09-17T23:09:49.852031567+00:00",
+      "session_id": "11644130354361076418",
+      "active": false,
+      "expires_at": "2026-09-18T03:09:49.851999841+00:00",
+      "released_at": "2026-09-17T23:20:12.934993278+00:00"
     }
   ]
 }

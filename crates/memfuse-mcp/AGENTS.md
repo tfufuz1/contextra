@@ -32,7 +32,8 @@ Die `SandboxPolicy` definiert harte Grenzen:
 - `allow_db_reads`: true
 - `allow_db_writes`: false (muss explizit opt-in via Env-Var `MEMFUSE_MCP_WRITE_ALLOW`)
 - `allow_code_execution`: false (strikt verboten by default)
-Schreibende Operationen (Write-Authorization, ADR-044) werden vor Ausführung blockiert, wenn deaktiviert.
+- `allow_cloud_egress`: false (Cloud-Egress strikt verboten by default; erfordert explizites Opt-in)
+Schreibende Operationen (Write-Authorization, ADR-044) sowie Cloud-Egress-Aufrufe werden vor Ausführung blockiert, wenn deaktiviert.
 
 ### Prompt-Injection Guard (Quarantäne)
 Eingehende Texte (für Embeddings/Graph) passieren den `PromptInjectionGuard`.
@@ -63,6 +64,7 @@ pub struct SandboxPolicy {
     pub allow_db_reads: bool,
     pub allow_db_writes: bool,
     pub allow_code_execution: bool,
+    pub allow_cloud_egress: bool,
     pub max_execution_ms: u64,
 }
 pub struct McpSandbox { ... }

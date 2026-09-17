@@ -338,9 +338,21 @@ impl Manifest {
 
     /// Appends a new entry to the manifest and performs flush + fsync.
     pub async fn append(&self, entry: &ManifestEntry) -> Result<()> {
-        let bytes = entry.to_bytes()?;
+        self.append_batch(std::slice::from_ref(entry)).await
+    }
+
+    /// Appends multiple entries to the manifest in a single atomic batch with flush + fsync.
+    pub async fn append_batch(&self, entries: &[ManifestEntry]) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let mut batch_bytes = Vec::new();
+        for entry in entries {
+            batch_bytes.extend(entry.to_bytes()?);
+        }
+
         let mut file = self.file.lock().await;
-        file.write_all(&bytes).await.map_err(|e| {
+        file.write_all(&batch_bytes).await.map_err(|e| {
             MemFuseError::Storage(format!(
                 "MANIFEST write failed for {}: {}",
                 self.path.display(),

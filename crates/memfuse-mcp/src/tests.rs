@@ -37,19 +37,32 @@ impl memfuse_core::EmbeddingProvider for MockEmbedder {
 }
 
 async fn create_mock_server() -> (Arc<McpServer>, TempDir) {
-    create_mock_server_with_write(true).await
+    create_mock_server_with_write_and_egress(true, true).await
 }
 
 async fn create_mock_server_with_write(allow_db_writes: bool) -> (Arc<McpServer>, TempDir) {
+    create_mock_server_with_write_and_egress(allow_db_writes, false).await
+}
+
+async fn create_mock_server_with_write_and_egress(
+    allow_db_writes: bool,
+    allow_cloud_egress: bool,
+) -> (Arc<McpServer>, TempDir) {
+    use crate::sandbox::{McpSandbox, SandboxPolicy};
     let tmp = TempDir::new().expect("temp dir"); // expect
     let db = MemFuse::open(tmp.path()).await.expect("open db"); // expect
     let collection = db.collection("default").await.expect("collection"); // expect
     let dim = collection.dimension();
     let embedder = Arc::new(MockEmbedder { dimension: dim });
-    let server = Arc::new(
-        McpServer::with_write_permission(Arc::new(db), embedder, allow_db_writes)
-            .expect("server new"), // expect
-    );
+    let policy = SandboxPolicy {
+        allow_db_reads: true,
+        allow_db_writes,
+        allow_code_execution: false,
+        allow_cloud_egress,
+        max_execution_ms: 5_000,
+    };
+    let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
+    let server = Arc::new(McpServer::with_sandbox(Arc::new(db), embedder, sandbox));
     (server, tmp)
 }
 
