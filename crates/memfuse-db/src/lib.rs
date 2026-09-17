@@ -689,106 +689,154 @@ impl MemFuse {
     async fn repair_on_open_internal(&self) -> Result<()> {
         let start_time = std::time::Instant::now();
 
+        // Helper: Parse target collection name from intent key namespace
+        let collection_name_from_key = |key: &[u8]| -> String {
+            if key.starts_with(b"__tx_intent:") {
+                "default".to_string()
+            } else if key.starts_with(b"__col:") {
+                let rest = &key[6..];
+                if let Some(pos) = rest.windows(3).position(|w| w == b":\x00\x03") {
+                    if let Ok(name) = std::str::from_utf8(&rest[..pos]) {
+                        return name.to_string();
+                    }
+                }
+                "default".to_string()
+            } else {
+                "default".to_string()
+            }
+        };
+
         // 1. Scan for pending transaction intents across all namespaces
-        //    Default collection uses `__tx_intent:` prefix, named collections use
-        //    their own namespaced prefix with key_type=3.
         let pending_intents = self.scan_pending_intents().await?;
 
-        if !pending_intents.is_empty() {
-            tracing::warn!(
-                "repair_on_open: found {} pending transaction intent(s), initiating recovery",
-                pending_intents.len()
-            );
+        if pending_intents.is_empty() {
+            return Ok(());
         }
 
-        // 2. Forward-commit: repair all loaded collections by re-syncing HNSW, BM25, and CSR graph from LSM.
-        //    This deterministically replays any missing index entries that were lost
-        //    due to the crash (LSM committed but downstream indices didn't).
-        let collections = self.collections.read().await;
+        tracing::warn!(
+            "repair_on_open: found {} pending transaction intent(s), initiating recovery",
+            pending_intents.len()
+        );
+
+        type PendingIntentItem = (Vec<u8>, Option<crate::transaction::CommitIntent>);
+        type PendingIntentMap = ahash::AHashMap<String, Vec<PendingIntentItem>>;
+
+        // Group pending intent keys and deserialized CommitIntent states by target collection
+        let mut intents_by_col: PendingIntentMap = ahash::AHashMap::new();
+
+        for intent_key in pending_intents {
+            let col_name = collection_name_from_key(&intent_key);
+            let value_opt = self.storage.get(&intent_key).await?;
+            let intent_opt = value_opt.and_then(|val| {
+                serde_json::from_slice::<crate::transaction::CommitIntent>(&val).ok()
+            });
+            intents_by_col
+                .entry(col_name)
+                .or_default()
+                .push((intent_key, intent_opt));
+        }
+
         let mut total_repairs = 0u64;
         let mut repair_errors: Vec<String> = Vec::new();
-        for (name, col) in collections.iter() {
+
+        // 2. Targeted Forward-commit: repair ONLY the specific collection(s) with pending transaction intents.
+        for (col_name, col_intents) in intents_by_col {
+            let col = match self.collection(&col_name).await {
+                Ok(c) => c,
+                Err(e) => {
+                    let err_msg = format!("Collection '{}' could not be loaded: {}", col_name, e);
+                    tracing::error!("repair_on_open: {}", err_msg);
+                    repair_errors.push(err_msg.clone());
+
+                    let failed_intent =
+                        crate::transaction::CommitIntent::Failed { reason: err_msg };
+                    let failed_bytes = serde_json::to_vec(&failed_intent).unwrap_or_default();
+                    for (intent_key, _) in col_intents {
+                        if let Ok(tx) = self.allocate_tx() {
+                            let _ = self.storage.put(tx, &intent_key, &failed_bytes).await;
+                            let _ = self.storage.commit(tx).await;
+                        }
+                    }
+                    continue;
+                }
+            };
+
             if let Err(e) = col.repair().await {
+                let err_msg = format!("'{}': {}", col_name, e);
                 tracing::error!(
-                    "repair_on_open: Collection '{}' konnte nicht repariert werden: {}",
-                    name,
+                    "repair_on_open: Collection '{}' repair failed: {}",
+                    col_name,
                     e
                 );
-                repair_errors.push(format!("'{}': {}", name, e));
-            } else {
-                total_repairs += 1;
-            }
-        }
+                repair_errors.push(err_msg.clone());
 
-        // 3. Mark pending intents as Committed or Failed based on recovery outcome.
-        if !pending_intents.is_empty() {
-            if repair_errors.is_empty() {
-                let committed_intent = crate::transaction::CommitIntent::Committed;
-                let committed_bytes = serde_json::to_vec(&committed_intent).unwrap_or_default();
-                for intent_key in &pending_intents {
-                    let tx = match self.allocate_tx() {
-                        Ok(t) => t,
-                        Err(e) => {
-                            tracing::error!("repair_on_open: failed to allocate tx: {}", e);
-                            continue;
-                        }
-                    };
-                    if let Err(e) = self.storage.put(tx, intent_key, &committed_bytes).await {
-                        tracing::error!(
-                            "repair_on_open: failed to mark intent as committed: {}",
-                            e
-                        );
-                        continue;
-                    }
-                    if let Err(e) = self.storage.commit(tx).await {
-                        tracing::error!(
-                            "repair_on_open: failed to commit committed intent marker: {}",
-                            e
-                        );
+                let failed_intent = crate::transaction::CommitIntent::Failed { reason: err_msg };
+                let failed_bytes = serde_json::to_vec(&failed_intent).unwrap_or_default();
+                for (intent_key, _) in col_intents {
+                    if let Ok(tx) = self.allocate_tx() {
+                        let _ = self.storage.put(tx, &intent_key, &failed_bytes).await;
+                        let _ = self.storage.commit(tx).await;
                     }
                 }
             } else {
-                let reason = repair_errors.join("; ");
-                let failed_intent = crate::transaction::CommitIntent::Failed {
-                    reason: reason.clone(),
-                };
-                let failed_bytes = serde_json::to_vec(&failed_intent).unwrap_or_default();
-                for intent_key in &pending_intents {
-                    tracing::error!(
-                        intent_key = ?intent_key,
-                        reason = %reason,
-                        "repair_on_open: marking transaction intent as Failed"
-                    );
-                    let tx = match self.allocate_tx() {
-                        Ok(t) => t,
-                        Err(e) => {
-                            tracing::error!("repair_on_open: failed to allocate tx: {}", e);
-                            continue;
+                total_repairs += 1;
+
+                // 3. Finalize each intent for this collection
+                let committed_intent = crate::transaction::CommitIntent::Committed;
+                let committed_bytes = serde_json::to_vec(&committed_intent).unwrap_or_default();
+
+                for (intent_key, intent_opt) in col_intents {
+                    let mut should_abort = false;
+
+                    if let Some(crate::transaction::CommitIntent::Pending { ref doc_ids, .. }) =
+                        intent_opt
+                    {
+                        if !doc_ids.is_empty() {
+                            let mut any_doc_exists = false;
+                            for &doc_id in doc_ids.iter() {
+                                let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+                                if col.storage.get(&doc_key).await.unwrap_or(None).is_some() {
+                                    any_doc_exists = true;
+                                    break;
+                                }
+                            }
+                            if !any_doc_exists {
+                                // All documents were compensated/rolled back from storage before crash
+                                should_abort = true;
+                            }
                         }
-                    };
-                    if let Err(e) = self.storage.put(tx, intent_key, &failed_bytes).await {
-                        tracing::error!("repair_on_open: failed to mark intent as failed: {}", e);
-                        continue;
                     }
-                    if let Err(e) = self.storage.commit(tx).await {
-                        tracing::error!(
-                            "repair_on_open: failed to commit failed intent marker: {}",
-                            e
-                        );
+
+                    let final_bytes = if should_abort {
+                        let abort_intent = crate::transaction::CommitIntent::Aborted;
+                        serde_json::to_vec(&abort_intent).unwrap_or_default()
+                    } else {
+                        committed_bytes.clone()
+                    };
+
+                    if let Ok(tx) = self.allocate_tx() {
+                        if let Err(e) = self.storage.put(tx, &intent_key, &final_bytes).await {
+                            tracing::error!(
+                                "repair_on_open: failed to write final intent state: {}",
+                                e
+                            );
+                        } else if let Err(e) = self.storage.commit(tx).await {
+                            tracing::error!(
+                                "repair_on_open: failed to commit final intent state: {}",
+                                e
+                            );
+                        }
                     }
                 }
             }
         }
 
         let elapsed = start_time.elapsed();
-        if !pending_intents.is_empty() || total_repairs > 0 {
-            tracing::info!(
-                "repair_on_open: completed in {:?} — {} intents resolved, {} collections verified",
-                elapsed,
-                pending_intents.len(),
-                total_repairs
-            );
-        }
+        tracing::info!(
+            "repair_on_open: completed in {:?} — collections verified: {}",
+            elapsed,
+            total_repairs
+        );
 
         if !repair_errors.is_empty() {
             return Err(memfuse_core::MemFuseError::Storage(format!(
