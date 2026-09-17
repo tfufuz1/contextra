@@ -38,6 +38,7 @@ pub mod csr;
 pub mod edge_reinforcement;
 #[cfg(feature = "edge-reinforcement-learning")]
 pub mod edge_reinforcement_buffer;
+pub mod hyperedge;
 pub mod path_rag;
 #[cfg(feature = "graph-connectivity-health")]
 pub mod percolation;
