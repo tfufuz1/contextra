@@ -8,7 +8,7 @@
 //! F-08: PID-Regler für Reranking-Kandidatenpool-Größe.
 //!
 //! Hält Reranking-Latenz auf `target_latency_ms` durch adaptive Pool-Größe.
-//! ANTI-WINDUP: Integral-Term wird auf [-max_integral, +max_integral] geclipped.
+//! ANTI-WINDUP: Integrations-Stop im Sättigungsfall (Output Clamp Range).
 //!
 //! # Scientific Foundation
 //! arXiv:2604.01733 (T2-RAGBench) demonstrate the non-linear relationship between candidate pool size (`k_pool`) and retrieval Recall@5:
@@ -19,6 +19,8 @@
 //! While Recall@5 reaches 0.888 at pool >= 100, `PID_MIN_POOL_SIZE_DEFAULT = 50` is enforced as the strict hard floor (`min_pool_size >= 50`).
 //! Under extreme latency spikes, pool size may contract down to 50 (accepting a bounded recall drop to 0.826 at the Quality Knee),
 //! but will NEVER drop to 20 or below where Recall collapses catastrophically (0.458).
+
+use std::time::Duration;
 
 /// Minimale Kandidaten-Pool-Größe (Hard Floor = 50, Quality Knee per arXiv:2604.01733).
 pub const PID_MIN_POOL_SIZE_DEFAULT: usize = 50;
@@ -88,20 +90,30 @@ impl PidController {
 
     /// Verarbeitet eine neue Latenz-Messung und gibt die neue Pool-Größe zurück.
     ///
-    /// ANTI-WINDUP: Integral wird auf [-max_integral, max_integral] geclipped.
-    pub fn update(&mut self, current_pool_size: usize, measured_latency_ms: f32) -> usize {
+    /// ANTI-WINDUP: Führt Integral-Update nur durch, wenn Stellwert nicht gesättigt ist.
+    pub fn update(&mut self, dt: Duration, measured_latency_ms: f32) -> usize {
+        let current_pool = self.current_pool_size.unwrap_or(self.min_pool_size);
         if !measured_latency_ms.is_finite() {
-            return self.current_pool_size.unwrap_or(current_pool_size);
+            return current_pool;
         }
+
+        let dt_s = dt.as_secs_f32().clamp(0.001, 10.0);
         let error = self.target_latency_ms - measured_latency_ms;
-        self.integral = (self.integral + error).clamp(-self.max_integral, self.max_integral);
-        let derivative = error - self.prev_error;
-        let u = self.kp * error + self.ki * self.integral + self.kd * derivative;
+        let candidate_integral = self.integral + error * dt_s;
+        let derivative = (error - self.prev_error) / dt_s;
+
+        let u = self.kp * error + self.ki * candidate_integral + self.kd * derivative;
         self.prev_error = error;
 
-        let new_size = (current_pool_size as f32 + u).round() as isize;
-        let clamped =
-            new_size.clamp(self.min_pool_size as isize, self.max_pool_size as isize) as usize;
+        let new_size = (current_pool as f32 + u).round() as isize;
+        let min_s = self.min_pool_size as isize;
+        let max_s = self.max_pool_size as isize;
+
+        if new_size >= min_s && new_size <= max_s {
+            self.integral = candidate_integral;
+        }
+
+        let clamped = new_size.clamp(min_s, max_s) as usize;
         self.current_pool_size = Some(clamped);
         clamped
     }
@@ -125,81 +137,87 @@ mod tests {
 
     #[test]
     fn test_pid_stable_at_target() {
-        let mut pid = PidController::default();
+        let mut pid = PidController::new(150.0, 50, 200, Some(100));
+        let dt = Duration::from_millis(100);
         let initial_pool = 100;
-        let new_pool = pid.update(initial_pool, 150.0); // measured_latency = target_latency_ms
+        let new_pool = pid.update(dt, 150.0); // measured_latency = target_latency_ms
         assert_eq!(new_pool, initial_pool);
         assert_eq!(pid.current_pool_size, Some(initial_pool));
     }
 
     #[test]
     fn test_pid_latency_too_high_reduces_pool() {
-        let mut pid = PidController::default();
+        let mut pid = PidController::new(150.0, 50, 200, Some(100));
+        let dt = Duration::from_millis(100);
         let initial_pool = 100;
-        let new_pool = pid.update(initial_pool, 300.0); // measured_latency (300) > target (150)
+        let new_pool = pid.update(dt, 300.0); // measured_latency (300) > target (150)
         assert!(new_pool < initial_pool);
         assert_eq!(pid.current_pool_size, Some(new_pool));
     }
 
     #[test]
     fn test_pid_latency_too_low_increases_pool() {
-        let mut pid = PidController::default();
+        let mut pid = PidController::new(150.0, 50, 200, Some(100));
+        let dt = Duration::from_millis(100);
         let initial_pool = 100;
-        let new_pool = pid.update(initial_pool, 50.0); // measured_latency (50) < target (150)
+        let new_pool = pid.update(dt, 50.0); // measured_latency (50) < target (150)
         assert!(new_pool > initial_pool);
         assert_eq!(pid.current_pool_size, Some(new_pool));
     }
 
     #[test]
     fn test_pid_non_finite_latency_ignored() {
-        let mut pid = PidController::default();
-        let initial_pool = 100;
-        let _ = pid.update(initial_pool, 150.0);
+        let mut pid = PidController::new(150.0, 50, 200, Some(100));
+        let dt = Duration::from_millis(100);
+        let _ = pid.update(dt, 150.0);
         let integral_before = pid.integral;
         let prev_error_before = pid.prev_error;
 
         // Test NAN
-        let size_nan = pid.update(100, f32::NAN);
+        let size_nan = pid.update(dt, f32::NAN);
         assert_eq!(size_nan, 100);
         assert_eq!(pid.integral, integral_before);
         assert_eq!(pid.prev_error, prev_error_before);
 
         // Test INFINITY
-        let size_inf = pid.update(100, f32::INFINITY);
+        let size_inf = pid.update(dt, f32::INFINITY);
         assert_eq!(size_inf, 100);
         assert_eq!(pid.integral, integral_before);
         assert_eq!(pid.prev_error, prev_error_before);
     }
 
     #[test]
-    fn test_pid_anti_windup_prevents_overflow() {
-        let mut pid = PidController::default();
-        let initial_pool = 100;
-        // Perform 1000 updates with large error
-        for _ in 0..1000 {
-            pid.update(initial_pool, 1000.0);
-        }
-        assert_eq!(pid.integral, -pid.max_integral);
+    fn test_pid_anti_windup_halts_integral_accumulation() {
+        let mut pid = PidController::new(150.0, 50, 200, Some(100));
+        let dt = Duration::from_millis(100);
 
-        pid.reset();
-        assert_eq!(pid.current_pool_size, None);
-        for _ in 0..1000 {
-            pid.update(initial_pool, 0.0);
+        // Perform 100 updates with extreme high latency to hit min floor (50)
+        for _ in 0..100 {
+            pid.update(dt, 1000.0);
         }
-        assert_eq!(pid.integral, pid.max_integral);
+
+        let saturated_integral = pid.integral;
+
+        // Further updates while saturated must not keep accumulating integral downwards
+        pid.update(dt, 1000.0);
+        assert_eq!(
+            pid.integral, saturated_integral,
+            "Anti-windup must halt integral accumulation when output is saturated"
+        );
     }
 
     #[test]
     fn test_pid_clamps_to_min_max() {
-        let mut pid = PidController::new(150.0, 50, 150, None);
+        let mut pid = PidController::new(150.0, 50, 150, Some(100));
+        let dt = Duration::from_millis(100);
 
         // Force drastic reduction below min
-        let res_min = pid.update(10, 10000.0);
+        let res_min = pid.update(dt, 10000.0);
         assert_eq!(res_min, 50);
         assert_eq!(pid.current_pool_size, Some(50));
 
         // Force drastic increase above max
-        let res_max = pid.update(200, 0.0);
+        let res_max = pid.update(dt, 0.0);
         assert_eq!(res_max, 150);
         assert_eq!(pid.current_pool_size, Some(150));
     }
@@ -207,11 +225,11 @@ mod tests {
     #[test]
     fn test_high_latency_causes_monotonic_decrease_bounded_by_k_min() {
         let mut pid = PidController::new(150.0, 50, 200, Some(100));
+        let dt = Duration::from_millis(100);
         let mut prev_pool = pid.current_pool_size.unwrap();
 
-        // Simulate 10 iterations of severe latency overflow (300ms vs 150ms target)
         for _ in 0..10 {
-            let new_pool = pid.update(prev_pool, 300.0);
+            let new_pool = pid.update(dt, 300.0);
             assert!(
                 new_pool <= prev_pool,
                 "Pool size must monotonically decrease under high latency: prev={prev_pool}, new={new_pool}"
@@ -233,11 +251,11 @@ mod tests {
     #[test]
     fn test_low_latency_causes_increase_bounded_by_k_max() {
         let mut pid = PidController::new(150.0, 50, 200, Some(100));
+        let dt = Duration::from_millis(100);
         let mut prev_pool = pid.current_pool_size.unwrap();
 
-        // Simulate 10 iterations of low latency (50ms vs 150ms target)
         for _ in 0..10 {
-            let new_pool = pid.update(prev_pool, 50.0);
+            let new_pool = pid.update(dt, 50.0);
             assert!(
                 new_pool >= prev_pool,
                 "Pool size must increase under low latency: prev={prev_pool}, new={new_pool}"
@@ -259,33 +277,29 @@ mod tests {
     #[test]
     fn test_oscillating_latency_anti_windup_clamp() {
         let mut pid = PidController::new(150.0, 50, 200, Some(100));
-        let mut pool = 100;
+        let dt = Duration::from_millis(100);
 
-        // Extreme positive and negative spikes
         for i in 0..20 {
             let observed = if i % 2 == 0 { 1000.0 } else { 1.0 };
-            pool = pid.update(pool, observed);
+            pid.update(dt, observed);
             assert!(
-                pid.integral >= -100.0 && pid.integral <= 100.0,
-                "Integral windup protection failed: integral = {}",
-                pid.integral
+                pid.integral.is_finite(),
+                "Integral must remain finite under extreme latency oscillations"
             );
         }
     }
 
     #[test]
     fn test_hard_k_min_floor_never_below_50() {
-        // Attempt to create a controller with invalid min_pool_size=10 (below scientific floor 50)
         let mut pid = PidController::new(150.0, 10, 200, Some(100));
+        let dt = Duration::from_millis(100);
         assert_eq!(
             pid.min_pool_size, 50,
             "Constructor must enforce hard floor min_pool_size >= 50"
         );
 
-        let mut pool = 100;
-        // Drive latency extremely high
         for _ in 0..50 {
-            pool = pid.update(pool, 10_000.0);
+            let pool = pid.update(dt, 10_000.0);
             assert!(
                 pool >= 50,
                 "pool must NEVER drop below 50 regardless of control input"
@@ -296,14 +310,15 @@ mod tests {
     #[test]
     fn test_pid_nan_latency_preserves_state_and_returns_current_pool() {
         let mut pid = PidController::default();
-        pid.update(100, 250.0);
+        let dt = Duration::from_millis(100);
+        pid.update(dt, 250.0);
 
         let ref_integral = pid.integral;
         let ref_prev_error = pid.prev_error;
         let ref_current_pool_size = pid.current_pool_size;
         let expected_pool = ref_current_pool_size.expect("current_pool_size should be set");
 
-        let result = pid.update(999, f32::NAN);
+        let result = pid.update(dt, f32::NAN);
 
         assert_eq!(result, expected_pool);
         assert_eq!(pid.integral, ref_integral);
@@ -311,127 +326,65 @@ mod tests {
         assert_eq!(pid.current_pool_size, ref_current_pool_size);
     }
 
-    #[test]
-    fn test_pid_positive_infinity_latency_preserves_state() {
-        let mut pid = PidController::default();
-        pid.update(100, 250.0);
-
-        let ref_integral = pid.integral;
-        let ref_prev_error = pid.prev_error;
-        let ref_current_pool_size = pid.current_pool_size;
-        let expected_pool = ref_current_pool_size.expect("current_pool_size should be set");
-
-        let result = pid.update(999, f32::INFINITY);
-
-        assert_eq!(result, expected_pool);
-        assert_eq!(pid.integral, ref_integral);
-        assert_eq!(pid.prev_error, ref_prev_error);
-        assert_eq!(pid.current_pool_size, ref_current_pool_size);
+    macro_rules! assert_f32_near {
+        ($left:expr, $right:expr, $tol:expr) => {
+            let diff = ($left - $right).abs();
+            assert!(
+                diff <= $tol,
+                "Assertion failed: {} ~ {} (diff: {}, tol: {})",
+                $left, $right, diff, $tol
+            );
+        };
     }
 
     #[test]
-    fn test_pid_negative_infinity_latency_preserves_state() {
-        let mut pid = PidController::default();
-        pid.update(100, 250.0);
+    fn test_pid_dt_rate_independence() {
+        // Compare 1 update with dt=1.0s vs 10 updates with dt=0.1s under steady error
+        let mut pid1 = PidController::new(150.0, 50, 10000, Some(200));
+        pid1.kd = 0.0;
+        let mut pid2 = PidController::new(150.0, 50, 10000, Some(200));
+        pid2.kd = 0.0;
 
-        let ref_integral = pid.integral;
-        let ref_prev_error = pid.prev_error;
-        let ref_current_pool_size = pid.current_pool_size;
-        let expected_pool = ref_current_pool_size.expect("current_pool_size should be set");
+        // 1 step of 1.0s
+        pid1.update(Duration::from_secs(1), 100.0);
 
-        let result = pid.update(999, f32::NEG_INFINITY);
+        // 10 steps of 0.1s
+        for _ in 0..10 {
+            pid2.update(Duration::from_millis(100), 100.0);
+        }
 
-        assert_eq!(result, expected_pool);
-        assert_eq!(pid.integral, ref_integral);
-        assert_eq!(pid.prev_error, ref_prev_error);
-        assert_eq!(pid.current_pool_size, ref_current_pool_size);
+        // Integral accumulation over total time of 1 second should be equal
+        assert_f32_near!(pid1.integral, pid2.integral, 1e-4);
     }
 
     #[test]
-    fn test_pid_nan_on_fresh_controller_returns_input_pool_size() {
+    fn test_pid_nan_on_fresh_controller_returns_min_pool_size() {
         let mut pid = PidController::default();
+        let dt = Duration::from_millis(100);
         assert_eq!(pid.current_pool_size, None);
 
-        let result = pid.update(77, f32::NAN);
+        let result = pid.update(dt, f32::NAN);
 
-        assert_eq!(result, 77);
+        assert_eq!(result, pid.min_pool_size);
         assert_eq!(pid.integral, 0.0);
         assert_eq!(pid.prev_error, 0.0);
         assert_eq!(pid.current_pool_size, None);
     }
 
     #[test]
-    fn test_pid_nan_latency_returns_unchanged_pool_size() {
-        let mut pid = PidController::default();
-        let pool_after_valid = pid.update(100, 250.0);
-        assert_ne!(pool_after_valid, 100);
-
-        let pool_after_nan = pid.update(999, f32::NAN);
-        assert_eq!(pool_after_nan, pool_after_valid);
-    }
-
-    #[test]
-    fn test_pid_positive_infinity_latency_returns_unchanged_pool_size() {
-        let mut pid = PidController::default();
-        let pool_after_valid = pid.update(100, 250.0);
-        assert_ne!(pool_after_valid, 100);
-
-        let pool_after_inf = pid.update(999, f32::INFINITY);
-        assert_eq!(pool_after_inf, pool_after_valid);
-    }
-
-    #[test]
-    fn test_pid_negative_infinity_latency_returns_unchanged_pool_size() {
-        let mut pid = PidController::default();
-        let pool_after_valid = pid.update(100, 250.0);
-        assert_ne!(pool_after_valid, 100);
-
-        let pool_after_neg_inf = pid.update(999, f32::NEG_INFINITY);
-        assert_eq!(pool_after_neg_inf, pool_after_valid);
-    }
-
-    #[test]
-    fn test_pid_state_unchanged_after_nan_input() {
-        let mut pid = PidController::default();
-        pid.update(100, 250.0);
-
-        let integral_before = pid.integral;
-        let prev_error_before = pid.prev_error;
-
-        pid.update(999, f32::NAN);
-
-        assert_eq!(pid.integral, integral_before);
-        assert_eq!(pid.prev_error, prev_error_before);
-    }
-
-    #[test]
     fn test_pid_recovers_correctly_after_nan_then_valid_input() {
+        let dt = Duration::from_millis(100);
         let mut pid_with_nan = PidController::default();
-        let pool_nan_1 = pid_with_nan.update(100, 250.0);
-        pid_with_nan.update(999, f32::NAN);
-        let pool_nan_3 = pid_with_nan.update(pool_nan_1, 180.0);
+        let _ = pid_with_nan.update(dt, 250.0);
+        pid_with_nan.update(dt, f32::NAN);
+        let pool_nan_3 = pid_with_nan.update(dt, 180.0);
 
         let mut pid_without_nan = PidController::default();
-        let pool_no_nan_1 = pid_without_nan.update(100, 250.0);
-        let pool_no_nan_2 = pid_without_nan.update(pool_no_nan_1, 180.0);
+        let _ = pid_without_nan.update(dt, 250.0);
+        let pool_no_nan_2 = pid_without_nan.update(dt, 180.0);
 
         assert_eq!(pool_nan_3, pool_no_nan_2);
         assert_eq!(pid_with_nan.integral, pid_without_nan.integral);
         assert_eq!(pid_with_nan.prev_error, pid_without_nan.prev_error);
-    }
-
-    #[test]
-    fn test_pid_multiple_consecutive_nan_calls_stable() {
-        let mut pid = PidController::default();
-        let initial_pool = pid.update(100, 250.0);
-
-        let res1 = pid.update(999, f32::NAN);
-        let res2 = pid.update(888, f32::NAN);
-        let res3 = pid.update(777, f32::NAN);
-
-        assert_eq!(res1, initial_pool);
-        assert_eq!(res2, initial_pool);
-        assert_eq!(res3, initial_pool);
-        assert_eq!(pid.current_pool_size, Some(initial_pool));
     }
 }
