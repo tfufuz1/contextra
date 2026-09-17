@@ -3301,10 +3301,12 @@ mod tests {
             crate::CommunityAssignment {
                 entity_id: EntityId::new(1),
                 community_id: 100,
+                hyperedges_included: false,
             },
             crate::CommunityAssignment {
                 entity_id: EntityId::new(2),
                 community_id: 200,
+                hyperedges_included: false,
             },
         ];
 

@@ -16,8 +16,23 @@ use wasmtime::{Config, Engine, Module, Store};
 
 use crate::{capabilities::WasmCapabilities, error::SandboxError, output::WasmOutput};
 
+/// Custom error type returned by host functions on capability violation (INV-SBX-3).
+#[derive(Debug, Clone)]
+pub struct CapabilityViolationError {
+    pub capability: &'static str,
+}
+
+impl std::fmt::Display for CapabilityViolationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WASM capability violation: {}", self.capability)
+    }
+}
+
+impl std::error::Error for CapabilityViolationError {}
+
 struct SandboxState {
     max_pages: u32,
+    max_table_entries: u32,
     allow_cloud_egress: bool,
     allow_stdout: bool,
     allow_stderr: bool,
@@ -30,17 +45,19 @@ impl wasmtime::ResourceLimiter for SandboxState {
         desired: usize,
         _max: Option<usize>,
     ) -> anyhow::Result<bool> {
-        let desired_pages = (desired / 65536) as u32;
+        // INV-SBX-2: Rounding up with div_ceil ensures exact page limits without page under-counting
+        let desired_pages = desired.div_ceil(65536) as u32;
         Ok(desired_pages <= self.max_pages)
     }
 
     fn table_growing(
         &mut self,
         _current: u32,
-        _desired: u32,
+        desired: u32,
         _max: Option<u32>,
     ) -> anyhow::Result<bool> {
-        Ok(true)
+        // INV-SBX-2: Enforce strict ceiling on table elements
+        Ok(desired <= self.max_table_entries)
     }
 }
 
@@ -89,15 +106,49 @@ impl WasmExecutor {
         capabilities: &WasmCapabilities,
         timeout: Duration,
     ) -> Result<WasmOutput, SandboxError> {
-        // Modul kompilieren (Validierung inbegriffen)
-        let module = Module::from_binary(&self.engine, wasm_bytes)
-            .map_err(|e| SandboxError::InvalidModule(e.to_string()))?;
+        // Wall-Clock-Timeout Enforcement (§4.18, IP-15 / B5)
+        // `max_wall_clock_ms` is orthogonal to `max_fuel` (CPU limit vs. Wall-Clock limit, configured independently).
+        // A value of 0 in `max_wall_clock_ms` indicates unlimited wall-clock capability limit, falling back to the caller's `timeout`.
+        let effective_timeout = if capabilities.max_wall_clock_ms > 0 {
+            std::cmp::min(
+                timeout,
+                Duration::from_millis(capabilities.max_wall_clock_ms),
+            )
+        } else {
+            timeout
+        };
+        let timeout_ms = effective_timeout.as_millis() as u64;
+        let deadline = tokio::time::Instant::now() + effective_timeout;
+
+        // INV-SBX-1: WASM module binary size limit check prior to compilation
+        if wasm_bytes.len() > capabilities.max_module_size_bytes {
+            return Err(SandboxError::InvalidModule(format!(
+                "WASM module binary size ({} bytes) exceeds maximum allowed size ({} bytes)",
+                wasm_bytes.len(),
+                capabilities.max_module_size_bytes
+            )));
+        }
+
+        // INV-SBX-1: Offload synchronous Module compilation to spawn_blocking with wall-clock timeout to prevent compilation DoS
+        let engine_clone = self.engine.clone();
+        let wasm_bytes_vec = wasm_bytes.to_vec();
+        let compile_task = tokio::task::spawn_blocking(move || {
+            Module::from_binary(&engine_clone, &wasm_bytes_vec)
+        });
+
+        let module = match tokio::time::timeout_at(deadline, compile_task).await {
+            Ok(Ok(Ok(m))) => m,
+            Ok(Ok(Err(e))) => return Err(SandboxError::InvalidModule(e.to_string())),
+            Ok(Err(join_err)) => return Err(SandboxError::Runtime(format!("Compilation task failed: {}", join_err))),
+            Err(_) => return Err(SandboxError::Timeout { timeout_ms }),
+        };
 
         // Frische Store für diese Execution (kein Zustandsüberlauf)
         let mut store = Store::new(
             &self.engine,
             SandboxState {
                 max_pages: capabilities.max_memory_pages,
+                max_table_entries: capabilities.max_table_entries,
                 allow_cloud_egress: capabilities.allow_cloud_egress,
                 allow_stdout: capabilities.allow_stdout,
                 allow_stderr: capabilities.allow_stderr,
@@ -117,11 +168,13 @@ impl WasmExecutor {
         let stderr_buf = std::sync::Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
 
         // Capability-Checks
+        // INV-SBX-5: Capability fields (allow_filesystem, allow_network) are strictly enforced by non-registration
+        // of WASI filesystem/network socket host functions in the Linker below.
         if capabilities.allow_filesystem {
-            warn!("WasmExecutor: allow_filesystem=true — erhöhtes Risiko");
+            warn!("WasmExecutor: allow_filesystem=true — erhöhtes Risiko (keine FS-Imports registriert)");
         }
         if capabilities.allow_network {
-            warn!("WasmExecutor: allow_network=true — erhöhtes Risiko");
+            warn!("WasmExecutor: allow_network=true — erhöhtes Risiko (keine Network-Imports registriert)");
         }
         if capabilities.allow_cloud_egress {
             warn!("WasmExecutor: allow_cloud_egress=true — erhöhtes Risiko");
@@ -273,9 +326,9 @@ impl WasmExecutor {
                 "host_cloud_query",
                 move |caller: wasmtime::Caller<'_, SandboxState>| -> Result<i32, wasmtime::Error> {
                     if !caller.data().allow_cloud_egress {
-                        Err(wasmtime::Error::msg(
-                            "WASM capability violation: allow_cloud_egress is disabled",
-                        ))
+                        Err(wasmtime::Error::from(CapabilityViolationError {
+                            capability: "allow_cloud_egress",
+                        }))
                     } else {
                         Ok(0)
                     }
@@ -307,18 +360,21 @@ impl WasmExecutor {
             // _start / main aufrufen
             if let Ok(start_fn) = instance.get_typed_func::<(), ()>(&mut store, "_start") {
                 start_fn.call_async(&mut store, ()).await.map_err(|e| {
-                    let err_msg = format!("{:#}", e);
-                    if err_msg.contains("fuel") {
-                        let consumed = capabilities.max_fuel;
-                        SandboxError::FuelExhausted { consumed }
-                    } else if err_msg.contains("allow_cloud_egress")
-                        || err_msg.contains("capability violation")
-                    {
+                    // INV-SBX-3: Precise error classification using downcast_ref without string matching
+                    if let Some(cap_err) = e.downcast_ref::<CapabilityViolationError>() {
                         SandboxError::CapabilityViolation {
-                            capability: "allow_cloud_egress".to_string(),
+                            capability: cap_err.capability.to_string(),
+                        }
+                    } else if let Some(trap) = e.downcast_ref::<wasmtime::Trap>() {
+                        match trap {
+                            wasmtime::Trap::OutOfFuel => {
+                                let consumed = capabilities.max_fuel;
+                                SandboxError::FuelExhausted { consumed }
+                            }
+                            _ => SandboxError::WasmTrap(format!("{:#}", e)),
                         }
                     } else {
-                        SandboxError::WasmTrap(err_msg)
+                        SandboxError::WasmTrap(format!("{:#}", e))
                     }
                 })?;
             }
@@ -334,20 +390,6 @@ impl WasmExecutor {
             ))
         };
 
-        // Wall-Clock-Timeout Enforcement (§4.18, IP-15 / B5)
-        // `max_wall_clock_ms` is orthogonal to `max_fuel` (CPU limit vs. Wall-Clock limit, configured independently).
-        // A value of 0 in `max_wall_clock_ms` indicates unlimited wall-clock capability limit, falling back to the caller's `timeout`.
-        let effective_timeout = if capabilities.max_wall_clock_ms > 0 {
-            std::cmp::min(
-                timeout,
-                Duration::from_millis(capabilities.max_wall_clock_ms),
-            )
-        } else {
-            timeout
-        };
-        let timeout_ms = effective_timeout.as_millis() as u64;
-        let deadline = tokio::time::Instant::now() + effective_timeout;
-
         tokio::time::timeout_at(deadline, execute_future)
             .await
             .map_err(|_| SandboxError::Timeout { timeout_ms })?
@@ -359,18 +401,21 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
     #[tokio::test]
-    async fn test_invalid_wasm_module_returns_error() {
-        let executor = WasmExecutor::new().expect("WasmExecutor");
+    async fn test_invalid_wasm_module_returns_error() -> TestResult {
+        let executor = WasmExecutor::new()?;
         let caps = WasmCapabilities::default();
         let result = executor
             .execute(b"not a wasm binary", b"", &caps, Duration::from_secs(1))
             .await;
         assert!(matches!(result, Err(SandboxError::InvalidModule(_))));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_cloud_egress_enforcement() {
+    async fn test_cloud_egress_enforcement() -> TestResult {
         let wat = r#"
             (module
                 (import "memfuse" "host_cloud_query" (func $host_cloud_query (result i32)))
@@ -379,9 +424,9 @@ mod tests {
                 )
             )
         "#;
-        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+        let wasm_bytes = wat::parse_str(wat)?;
 
-        let executor = WasmExecutor::new().expect("WasmExecutor");
+        let executor = WasmExecutor::new()?;
 
         // Test case 1: allow_cloud_egress = false (default) -> CapabilityViolation
         let caps_denied = WasmCapabilities {
@@ -413,10 +458,11 @@ mod tests {
             "Expected execution to succeed when allow_cloud_egress is true, got: {:?}",
             res_allowed
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wasm_fuel_exhaustion_returns_error() {
+    async fn test_wasm_fuel_exhaustion_returns_error() -> TestResult {
         let wat = r#"
             (module
                 (func (export "_start")
@@ -424,9 +470,9 @@ mod tests {
                 )
             )
         "#;
-        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+        let wasm_bytes = wat::parse_str(wat)?;
 
-        let executor = WasmExecutor::new().expect("WasmExecutor");
+        let executor = WasmExecutor::new()?;
         let caps = WasmCapabilities {
             max_fuel: 1_000,
             ..Default::default()
@@ -441,19 +487,20 @@ mod tests {
             "Expected FuelExhausted error with consumed > 0, got: {:?}",
             result
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wasm_memory_isolation() {
+    async fn test_wasm_memory_isolation() -> TestResult {
         let wat = r#"
             (module
                 (memory 32)
                 (func (export "_start"))
             )
         "#;
-        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
+        let wasm_bytes = wat::parse_str(wat)?;
 
-        let executor = WasmExecutor::new().expect("WasmExecutor");
+        let executor = WasmExecutor::new()?;
         let caps = WasmCapabilities {
             max_memory_pages: 2,
             ..Default::default()
@@ -471,14 +518,11 @@ mod tests {
             "Expected MemoryExceeded or Runtime error, got: {:?}",
             result
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wasm_stdout_capture_via_fd_write() {
-        // WAT module that defines linear memory with "hello" at offset 16,
-        // populates a ciovec structure at offset 0 (buf_ptr=16, buf_len=5),
-        // calls wasi_snapshot_preview1::fd_write(1, 0, 1, 32),
-        // and exports _start.
+    async fn test_wasm_stdout_capture_via_fd_write() -> TestResult {
         let wat = r#"
             (module
                 (import "wasi_snapshot_preview1" "fd_write"
@@ -486,39 +530,34 @@ mod tests {
                 (memory (export "memory") 1)
                 (data (i32.const 16) "hello")
                 (func (export "_start")
-                    ;; ciovec at offset 0: buf_ptr = 16, buf_len = 5
                     (i32.store (i32.const 0) (i32.const 16))
                     (i32.store (i32.const 4) (i32.const 5))
-                    ;; call fd_write(fd=1, iovs_ptr=0, iovs_len=1, nwritten_ptr=32)
                     (drop (call $fd_write (i32.const 1) (i32.const 0) (i32.const 1) (i32.const 32)))
                 )
             )
         "#;
-        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
-        let executor = WasmExecutor::new().expect("WasmExecutor");
+        let wasm_bytes = wat::parse_str(wat)?;
+        let executor = WasmExecutor::new()?;
 
-        // Test 1: allow_stdout = true (default)
         let caps = WasmCapabilities::default();
         let output = executor
             .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
-            .await
-            .expect("execution succeeds");
+            .await?;
         assert_eq!(&output.stdout[..], b"hello");
 
-        // Test 2: allow_stdout = false -> stdout buffer remains empty
         let caps_no_stdout = WasmCapabilities {
             allow_stdout: false,
             ..Default::default()
         };
         let output_no_stdout = executor
             .execute(&wasm_bytes, b"", &caps_no_stdout, Duration::from_secs(1))
-            .await
-            .expect("execution succeeds");
+            .await?;
         assert!(output_no_stdout.stdout.is_empty());
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wasm_stderr_capture_via_fd_write() {
+    async fn test_wasm_stderr_capture_via_fd_write() -> TestResult {
         let wat = r#"
             (module
                 (import "wasi_snapshot_preview1" "fd_write"
@@ -526,16 +565,14 @@ mod tests {
                 (memory (export "memory") 1)
                 (data (i32.const 16) "error msg")
                 (func (export "_start")
-                    ;; ciovec at offset 0: buf_ptr = 16, buf_len = 9
                     (i32.store (i32.const 0) (i32.const 16))
                     (i32.store (i32.const 4) (i32.const 9))
-                    ;; call fd_write(fd=2, iovs_ptr=0, iovs_len=1, nwritten_ptr=32)
                     (drop (call $fd_write (i32.const 2) (i32.const 0) (i32.const 1) (i32.const 32)))
                 )
             )
         "#;
-        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
-        let executor = WasmExecutor::new().expect("WasmExecutor");
+        let wasm_bytes = wat::parse_str(wat)?;
+        let executor = WasmExecutor::new()?;
 
         let caps = WasmCapabilities {
             allow_stderr: true,
@@ -543,13 +580,13 @@ mod tests {
         };
         let output = executor
             .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
-            .await
-            .expect("execution succeeds");
+            .await?;
         assert_eq!(&output.stderr[..], b"error msg");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_wasm_wall_clock_timeout_enforced() {
+    async fn test_wasm_wall_clock_timeout_enforced() -> TestResult {
         let wat = r#"
             (module
                 (import "memfuse" "host_sleep" (func $host_sleep (param i32)))
@@ -558,8 +595,8 @@ mod tests {
                 )
             )
         "#;
-        let wasm_bytes = wat::parse_str(wat).expect("valid wat");
-        let executor = WasmExecutor::new().expect("WasmExecutor");
+        let wasm_bytes = wat::parse_str(wat)?;
+        let executor = WasmExecutor::new()?;
 
         let caps = WasmCapabilities {
             max_wall_clock_ms: 50,
@@ -578,5 +615,91 @@ mod tests {
             "Expected Timeout error with 50ms, got: {:?}",
             result_timeout
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wasm_module_size_limit_exceeded() -> TestResult {
+        let wat = r#"
+            (module
+                (func (export "_start"))
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat)?;
+        let executor = WasmExecutor::new()?;
+        let caps = WasmCapabilities {
+            max_module_size_bytes: 5, // Exceeded by any valid WASM binary
+            ..Default::default()
+        };
+
+        let result = executor
+            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+            .await;
+
+        assert!(
+            matches!(result, Err(SandboxError::InvalidModule(ref msg)) if msg.contains("exceeds maximum allowed size")),
+            "Expected InvalidModule error due to binary size limit, got: {:?}",
+            result
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_memory_growing_div_ceil_boundary() -> TestResult {
+        let mut state = SandboxState {
+            max_pages: 2,
+            max_table_entries: 10,
+            allow_cloud_egress: false,
+            allow_stdout: true,
+            allow_stderr: false,
+        };
+        use wasmtime::ResourceLimiter;
+        // 65536 bytes = 1 page
+        assert!(state.memory_growing(0, 65536, None)?);
+        // 65537 bytes = 2 pages (div_ceil)
+        assert!(state.memory_growing(0, 65537, None)?);
+        // 131073 bytes = 3 pages (div_ceil) -> exceeds max_pages (2)
+        assert!(!state.memory_growing(0, 131073, None)?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_table_growing_limit() -> TestResult {
+        let mut state = SandboxState {
+            max_pages: 2,
+            max_table_entries: 10,
+            allow_cloud_egress: false,
+            allow_stdout: true,
+            allow_stderr: false,
+        };
+        use wasmtime::ResourceLimiter;
+        assert!(state.table_growing(0, 10, None)?);
+        assert!(!state.table_growing(0, 11, None)?);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wasm_trap_unreachable_classified_as_wasm_trap() -> TestResult {
+        let wat = r#"
+            (module
+                (func (export "_start")
+                    unreachable
+                )
+            )
+        "#;
+        let wasm_bytes = wat::parse_str(wat)?;
+        let executor = WasmExecutor::new()?;
+        let caps = WasmCapabilities::default();
+
+        let result = executor
+            .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
+            .await;
+
+        assert!(
+            matches!(result, Err(SandboxError::WasmTrap(_))),
+            "Expected WasmTrap error for unreachable instruction, got: {:?}",
+            result
+        );
+        Ok(())
     }
 }

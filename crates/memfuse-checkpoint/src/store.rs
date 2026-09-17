@@ -32,6 +32,57 @@ pub trait CheckpointRegistry: memfuse_core::traits::Checkpoint + Send + Sync {
     }
 }
 
+#[derive(Debug, Default)]
+struct CheckpointIndex {
+    by_seq: HashMap<u64, CheckpointMeta>,
+    by_name: HashMap<String, u64>,
+}
+
+impl CheckpointIndex {
+    fn insert(&mut self, meta: CheckpointMeta) {
+        if let Some(old_seq) = self.by_name.insert(meta.name.clone(), meta.seq_no) {
+            if old_seq != meta.seq_no {
+                self.by_seq.remove(&old_seq);
+            }
+        }
+        self.by_seq.insert(meta.seq_no, meta);
+    }
+
+    fn remove_by_name(&mut self, name: &str) -> Option<CheckpointMeta> {
+        if let Some(seq_no) = self.by_name.remove(name) {
+            self.by_seq.remove(&seq_no)
+        } else {
+            None
+        }
+    }
+
+    fn remove_by_seq(&mut self, seq_no: u64) -> Option<CheckpointMeta> {
+        if let Some(meta) = self.by_seq.remove(&seq_no) {
+            if self.by_name.get(&meta.name) == Some(&seq_no) {
+                self.by_name.remove(&meta.name);
+            }
+            Some(meta)
+        } else {
+            None
+        }
+    }
+
+    fn get_by_name(&self, name: &str) -> Option<&CheckpointMeta> {
+        self.by_name
+            .get(name)
+            .and_then(|seq_no| self.by_seq.get(seq_no))
+    }
+
+    fn get_by_seq(&self, seq_no: u64) -> Option<&CheckpointMeta> {
+        self.by_seq.get(&seq_no)
+    }
+
+    fn clear(&mut self) {
+        self.by_seq.clear();
+        self.by_name.clear();
+    }
+}
+
 /// Counter metadata persisted to guarantee TxId monotonicity across restarts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TxCounterMeta {
@@ -66,10 +117,8 @@ async fn persist_hwm_internal<S: memfuse_core::StorageEngine>(
 /// - Keine Panics (Zero-Panic Doctrine)
 pub struct PersistentCheckpointStore<S: memfuse_core::StorageEngine> {
     storage: Arc<S>,
-    /// Registrierte Checkpoints im Arbeitsspeicher — geschützt durch RwLock (seq_no -> meta)
-    checkpoints: RwLock<HashMap<u64, CheckpointMeta>>,
-    /// O(1) Index für Name -> seq_no Lookup
-    name_index: RwLock<HashMap<String, u64>>,
+    /// Registrierter Checkpoint-Index im Arbeitsspeicher — geschützt durch ein konsolidiertes RwLock
+    index: RwLock<CheckpointIndex>,
     /// Namespace-Präfix für Storage-Keys
     namespace: String,
     /// Lock für sequentielle Schreiboperationen auf den Storage (HIGH-002)
@@ -178,8 +227,7 @@ impl<S: memfuse_core::StorageEngine> PersistentCheckpointStore<S> {
 
         Ok(Self {
             storage,
-            checkpoints: RwLock::new(HashMap::new()),
-            name_index: RwLock::new(HashMap::new()),
+            index: RwLock::new(CheckpointIndex::default()),
             namespace,
             write_lock: tokio::sync::Mutex::new(()),
             tx_counter: AtomicU64::new(start_raw),
@@ -392,14 +440,12 @@ impl<S: memfuse_core::StorageEngine> PersistentCheckpointStore<S> {
                     );
                 }
                 // Alten Checkpoint aus Cache entfernen
-                self.checkpoints.write().remove(&old.seq_no);
-                self.name_index.write().remove(&old.name);
+                self.index.write().remove_by_seq(old.seq_no);
             }
         }
 
         // 5. Update the stored checkpoint reference
-        self.checkpoints.write().insert(seq_no, meta.clone());
-        self.name_index.write().insert(name.to_string(), seq_no);
+        self.index.write().insert(meta.clone());
 
         Ok(meta)
     }
@@ -438,8 +484,7 @@ impl<S: memfuse_core::StorageEngine> PersistentCheckpointStore<S> {
             }
 
             // 3. Cache bereinigen
-            self.checkpoints.write().remove(&checkpoint.seq_no);
-            self.name_index.write().remove(&checkpoint.name);
+            self.index.write().remove_by_name(&checkpoint.name);
         }
         Ok(())
     }
@@ -466,24 +511,15 @@ impl<S: memfuse_core::StorageEngine> PersistentCheckpointStore<S> {
         }
 
         // In-Memory Cache aktualisieren
-        self.name_index
-            .write()
-            .insert(meta.name.clone(), meta.seq_no);
-        self.checkpoints.write().insert(meta.seq_no, meta);
+        self.index.write().insert(meta);
         Ok(())
     }
 
     /// Internal helper to get checkpoint by name without extra locking.
     async fn get_checkpoint_internal(&self, name: &str) -> Result<Option<CheckpointMeta>> {
-        // Erst O(1) In-Memory Name-Index prüfen
-        {
-            let name_idx = self.name_index.read();
-            if let Some(&seq_no) = name_idx.get(name) {
-                let cache = self.checkpoints.read();
-                if let Some(cp) = cache.get(&seq_no) {
-                    return Ok(Some(cp.clone()));
-                }
-            }
+        // Erst O(1) In-Memory Name-Index prüfen (unter EINEM Read-Lock)
+        if let Some(cp) = self.index.read().get_by_name(name) {
+            return Ok(Some(cp.clone()));
         }
 
         // Storage direkt fragen
@@ -498,10 +534,7 @@ impl<S: memfuse_core::StorageEngine> PersistentCheckpointStore<S> {
                         serde_json::from_slice::<CheckpointMeta>(&bytes)
                             .map_err(|e| MemFuseError::Serialization(e.to_string()))?
                     };
-                self.name_index
-                    .write()
-                    .insert(meta.name.clone(), meta.seq_no);
-                self.checkpoints.write().insert(meta.seq_no, meta.clone());
+                self.index.write().insert(meta.clone());
                 Ok(Some(meta))
             }
             None => Ok(None),
@@ -531,13 +564,10 @@ impl<S: memfuse_core::StorageEngine> PersistentCheckpointStore<S> {
 
         // Cache synchronisieren
         {
-            let mut cache = self.checkpoints.write();
-            let mut name_idx = self.name_index.write();
-            cache.clear();
-            name_idx.clear();
+            let mut idx = self.index.write();
+            idx.clear();
             for meta in &result {
-                cache.insert(meta.seq_no, meta.clone());
-                name_idx.insert(meta.name.clone(), meta.seq_no);
+                idx.insert(meta.clone());
             }
         }
 
@@ -681,7 +711,7 @@ impl<S: memfuse_core::StorageEngine> CheckpointRegistry for PersistentCheckpoint
 
     fn load_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<Option<CheckpointMeta>>> {
         Box::pin(async move {
-            if let Some(meta) = self.checkpoints.read().get(&seq_no) {
+            if let Some(meta) = self.index.read().get_by_seq(seq_no) {
                 return Ok(Some(meta.clone()));
             }
 
@@ -1560,5 +1590,66 @@ mod tests {
 
         assert_eq!(store.skipped_rollback_count(), 1);
         assert_eq!(store.checkpoint_guard_skipped_rollback_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_checkpoint_index_atomicity() {
+        use std::sync::atomic::AtomicBool;
+
+        let storage = Arc::new(MockStorage::new());
+        let store = Arc::new(PersistentCheckpointStore::new(storage, "test_atomicity").unwrap());
+        let stop_flag = Arc::new(AtomicBool::new(false));
+
+        let cp_name = "atomic_cp";
+
+        // Spawn writer task continuously creating and dropping checkpoints under the same name
+        let writer_store = Arc::clone(&store);
+        let writer_stop = Arc::clone(&stop_flag);
+        let writer_handle = tokio::spawn(async move {
+            let mut seq = 1u64;
+            while !writer_stop.load(Ordering::Relaxed) {
+                let _create_res = writer_store
+                    .create_checkpoint(
+                        cp_name,
+                        "col_atomic",
+                        seq,
+                        TxId::new(seq),
+                        serde_json::json!({"seq": seq}),
+                    )
+                    .await;
+                tokio::task::yield_now().await;
+                let _drop_res = writer_store.drop_checkpoint(cp_name).await;
+                tokio::task::yield_now().await;
+                seq += 1;
+            }
+        });
+
+        // Spawn 4 reader tasks continuously reading the checkpoint by name
+        let mut reader_handles = Vec::new();
+        for _ in 0..4 {
+            let reader_store = Arc::clone(&store);
+            let reader_stop = Arc::clone(&stop_flag);
+            reader_handles.push(tokio::spawn(async move {
+                while !reader_stop.load(Ordering::Relaxed) {
+                    if let Ok(Some(cp)) = reader_store.get_checkpoint(cp_name).await {
+                        // Verify that if a checkpoint is returned, its internal name match and seq_no are consistent
+                        assert_eq!(cp.name, cp_name);
+                        assert!(cp.seq_no > 0);
+                        let meta_seq = cp.metadata.get("seq").and_then(|v| v.as_u64());
+                        assert_eq!(meta_seq, Some(cp.seq_no));
+                    }
+                    tokio::task::yield_now().await;
+                }
+            }));
+        }
+
+        // Run concurrent readers & writers for 200 ms
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        stop_flag.store(true, Ordering::Relaxed);
+
+        let _ = writer_handle.await;
+        for handle in reader_handles {
+            let _ = handle.await;
+        }
     }
 }
