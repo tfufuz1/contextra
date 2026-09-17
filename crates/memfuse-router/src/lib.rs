@@ -28,7 +28,7 @@ pub use profile::SlmProfile;
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 
 #[cfg(feature = "bandit-routing")]
-pub use bandit::{BanditImplementation, BanditProfileState};
+pub use bandit::{BanditError, BanditImplementation, BanditProfileState};
 #[cfg(feature = "cloud-egress-guard")]
 pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 #[cfg(feature = "bandit-routing")]
