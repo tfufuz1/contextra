@@ -326,6 +326,7 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = memfuse_index::HnswI
     staged_graph_edges: Mutex<Vec<Edge>>,
     staged_graph_entity_deletes: Mutex<Vec<EntityId>>,
     staged_graph_edge_deletes: Mutex<Vec<(EntityId, EntityId)>>,
+    staged_hyperedges: Mutex<Vec<memfuse_graph::hyperedge::HyperEdge>>,
     committed: AtomicBool,
 }
 
@@ -343,6 +344,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             staged_graph_edges: Mutex::new(Vec::with_capacity(16)),
             staged_graph_entity_deletes: Mutex::new(Vec::with_capacity(16)),
             staged_graph_edge_deletes: Mutex::new(Vec::with_capacity(16)),
+            staged_hyperedges: Mutex::new(Vec::with_capacity(16)),
             committed: AtomicBool::new(false),
         }
     }
@@ -428,6 +430,14 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push((from, to));
     }
 
+    pub fn stage_hyperedge(&self, hyperedge: memfuse_graph::hyperedge::HyperEdge) {
+        let mut guard = match self.staged_hyperedges.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        guard.push(hyperedge);
+    }
+
     async fn commit_text_staged(&self) -> Result<()> {
         let text_deletes = {
             let mut guard = match self.staged_text_deletes.lock() {
@@ -486,6 +496,18 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         for edge in edges {
             GraphIndex::add_edge(&*self.collection.graph_index, self.tx_id, edge).await?;
+        }
+
+        let hyperedges = {
+            let mut guard = match self.staged_hyperedges.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            std::mem::take(&mut *guard)
+        };
+
+        for hyperedge in hyperedges {
+            self.collection.graph_index.insert_hyperedge(hyperedge);
         }
 
         let edge_deletes = {
@@ -577,7 +599,15 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
-            !ents.is_empty() || !edgs.is_empty() || !e_dels.is_empty() || !ent_dels.is_empty()
+            let hyperedgs = match self.staged_hyperedges.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            !ents.is_empty()
+                || !edgs.is_empty()
+                || !e_dels.is_empty()
+                || !ent_dels.is_empty()
+                || !hyperedgs.is_empty()
         };
 
         // Execute staged text and graph staging before prepare/commit

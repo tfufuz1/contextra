@@ -197,7 +197,11 @@ fn save_baseline(path: &Path, entries: &[UnwrapBaselineEntry]) -> bool {
         return false;
     }
 
-    println!("Saved baseline to {} with {} entries.", path.display(), entries.len());
+    println!(
+        "Saved baseline to {} with {} entries.",
+        path.display(),
+        entries.len()
+    );
     true
 }
 
@@ -219,7 +223,12 @@ mod tests {
         }
 
         let file1 = crates_dir.join("lib.rs");
-        if fs::write(&file1, "pub fn a() { let x: Option<i32> = None; x.unwrap(); }\n").is_err() {
+        if fs::write(
+            &file1,
+            "pub fn a() { let x: Option<i32> = None; x.unwrap(); }\n",
+        )
+        .is_err()
+        {
             return;
         }
 
@@ -227,7 +236,12 @@ mod tests {
         assert!(run_check_unwrap_ratchet(root, true));
 
         // Remove unwrap
-        if fs::write(&file1, "pub fn a() { let x: Option<i32> = None; if let Some(_) = x {} }\n").is_err() {
+        if fs::write(
+            &file1,
+            "pub fn a() { let x: Option<i32> = None; if let Some(_) = x {} }\n",
+        )
+        .is_err()
+        {
             return;
         }
 
@@ -256,7 +270,12 @@ mod tests {
         assert!(run_check_unwrap_ratchet(root, true));
 
         // Add new unwrap
-        if fs::write(&file1, "pub fn a() { let x: Option<i32> = None; x.unwrap(); }\n").is_err() {
+        if fs::write(
+            &file1,
+            "pub fn a() { let x: Option<i32> = None; x.unwrap(); }\n",
+        )
+        .is_err()
+        {
             return;
         }
 
@@ -273,8 +292,14 @@ mod tests {
             if trimmed.starts_with("//") || trimmed.starts_with("/*") {
                 continue;
             }
-            assert!(!trimmed.contains(".unwrap()"), "check_unwrap_ratchet.rs must not contain .unwrap()");
-            assert!(!trimmed.contains(".expect("), "check_unwrap_ratchet.rs must not contain .expect()");
+            assert!(
+                !trimmed.contains(".unwrap()"),
+                "check_unwrap_ratchet.rs must not contain .unwrap()"
+            );
+            assert!(
+                !trimmed.contains(".expect("),
+                "check_unwrap_ratchet.rs must not contain .expect()"
+            );
         }
     }
 }

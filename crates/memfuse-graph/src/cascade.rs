@@ -486,8 +486,8 @@ mod tests {
             RoleBinding::new(ROLE_ESCROW, e4),
         ];
 
-        let he = HyperEdge::new(he_id, EdgeType::Default, bindings, 1.0)
-            .with_source_doc_id(Some(doc_a));
+        let he =
+            HyperEdge::new(he_id, EdgeType::Default, bindings, 1.0).with_source_doc_id(Some(doc_a));
         graph.insert_hyperedge_direct(he);
 
         // Before invalidation, all 4 entities link to the hyperedge

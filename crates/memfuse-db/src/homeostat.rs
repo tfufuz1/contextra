@@ -86,8 +86,8 @@ impl RerankPidController {
 
     /// Updates the controller state with observed latency and returns new pool size.
     pub fn update(&mut self, observed_p95_latency_ms: f32) -> usize {
-        let current = self.k_pool();
-        self.inner.update(current, observed_p95_latency_ms)
+        let dt = Duration::from_millis(100);
+        self.inner.update(dt, observed_p95_latency_ms)
     }
 }
 
