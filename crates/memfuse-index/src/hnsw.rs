@@ -854,7 +854,7 @@ impl HnswIndex {
         let deleted = self.inner.cold.deleted_nodes.read();
         map.iter()
             .filter(|(&_doc_id_raw, &node_idx)| !deleted.contains(node_idx as u64))
-            .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw.into()))
+            .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw))
             .collect()
     }
 
@@ -1989,7 +1989,7 @@ impl HnswIndexCore {
         if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
                 let record = mmap.get_node_record(idx)?;
-                return Ok(DocId::new(record.doc_id.into()));
+                return Ok(DocId::new(record.doc_id));
             }
             let ram_idx = idx - ctx.mmap_node_count;
             return Ok(ctx.nodes[ram_idx].doc_id);
