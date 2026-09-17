@@ -10,7 +10,6 @@
 **Timestamp:** `2026-09-17T17:55:00Z`
 **Prüfer:** Senior Rust Systems & Governance Engineer (Jules)
 **Crate Scope:** `memfuse-core` (`crates/memfuse-core/src/error.rs`, `crates/memfuse-core/src/lib.rs`) & Governance Documentation Sync
-=======
 
 
 ---
