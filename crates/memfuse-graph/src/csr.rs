@@ -2841,6 +2841,17 @@ impl crate::path_rag::PathGraph for CsrGraph {
 
         result
     }
+
+    fn hyperedges_for_entity(&self, node: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        self.hyperedges_for_entity(node)
+    }
+
+    fn get_hyperedge(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+    ) -> Option<crate::hyperedge::HyperEdge> {
+        self.get_hyperedge(id)
+    }
 }
 
 impl crate::path_rag::PathGraph for &CsrGraph {
@@ -2850,6 +2861,15 @@ impl crate::path_rag::PathGraph for &CsrGraph {
     fn predecessors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)> {
         (*self).predecessors_with_weights(node)
     }
+    fn hyperedges_for_entity(&self, node: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        (*self).hyperedges_for_entity(node)
+    }
+    fn get_hyperedge(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+    ) -> Option<crate::hyperedge::HyperEdge> {
+        (*self).get_hyperedge(id)
+    }
 }
 
 impl crate::path_rag::PathGraph for Arc<CsrGraph> {
@@ -2858,6 +2878,15 @@ impl crate::path_rag::PathGraph for Arc<CsrGraph> {
     }
     fn predecessors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)> {
         self.as_ref().predecessors_with_weights(node)
+    }
+    fn hyperedges_for_entity(&self, node: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        self.as_ref().hyperedges_for_entity(node)
+    }
+    fn get_hyperedge(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+    ) -> Option<crate::hyperedge::HyperEdge> {
+        self.as_ref().get_hyperedge(id)
     }
 }
 
