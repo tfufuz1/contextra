@@ -195,9 +195,9 @@ fn test_pava_empty_calibrator_returns_none_not_panic() {
     // Case B: Warmup required = 0 (edge configuration).
     let mut cal_zero = IsotonicCalibrator::new(0, 100);
     assert!(cal_zero.is_calibrated());
-    // Must return Some(0.5) default without panic when binary searching empty cached model.
+    // Must return None without panic when binary searching empty cached model.
     let prob = cal_zero.calibrated_probability(0.5);
-    assert_eq!(prob, Some(0.5));
+    assert_eq!(prob, None);
 
     let ece = cal_zero.expected_calibration_error();
     assert_eq!(ece, Some(0.0));
