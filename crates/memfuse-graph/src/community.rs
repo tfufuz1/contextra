@@ -37,6 +37,7 @@ pub struct CommunityDetectionConfig {
 
 /// Künstlicher bipartiter Knoten für eine Hyperkante in der Stern-Expansion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+
 pub struct VirtualHyperedgeNode {
     /// ID der zugrundeliegenden Hyperkante.
     pub hyperedge_id: crate::hyperedge::HyperEdgeId,
@@ -89,7 +90,11 @@ impl<'a> StarExpansionIterator<'a> {
                 let vnode = VirtualHyperedgeNode {
                     hyperedge_id: hedge.id,
                 };
-                let weight = if hedge.weight > 0.0 { hedge.weight } else { 1.0 };
+                let weight = if hedge.weight > 0.0 {
+                    hedge.weight
+                } else {
+                    1.0
+                };
                 self.current_participant_idx += 1;
                 return Some((entity_id, vnode, weight));
             } else {
@@ -105,7 +110,8 @@ impl<'a> Iterator for StarExpansionIterator<'a> {
     type Item = (EntityId, VirtualHyperedgeNode);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_with_weight().map(|(entity, vnode, _w)| (entity, vnode))
+        self.next_with_weight()
+            .map(|(entity, vnode, _w)| (entity, vnode))
     }
 }
 
@@ -345,14 +351,12 @@ pub async fn detect_communities(
 
         while let Some((entity_id, vnode, weight)) = star_iter.next_with_weight() {
             if let Some(&local_entity_idx) = entity_to_local.get(&entity_id) {
-                let v_idx = *vnode_to_local
-                    .entry(vnode.hyperedge_id)
-                    .or_insert_with(|| {
-                        let idx = num_entity_nodes + vnode_u64_ids.len();
-                        vnode_u64_ids.push(vnode.hyperedge_id.inner());
-                        vnode_local_adj.push(Vec::new());
-                        idx
-                    });
+                let v_idx = *vnode_to_local.entry(vnode.hyperedge_id).or_insert_with(|| {
+                    let idx = num_entity_nodes + vnode_u64_ids.len();
+                    vnode_u64_ids.push(vnode.hyperedge_id.inner());
+                    vnode_local_adj.push(Vec::new());
+                    idx
+                });
 
                 vnode_local_adj[v_idx - num_entity_nodes].push((local_entity_idx, weight));
             }
@@ -1358,14 +1362,20 @@ mod tests {
         // Cluster 1: Nodes 1, 2, 3 (no binary edges)
         for id in 1..=3 {
             graph
-                .add_entity(tx, Entity::new(EntityId::new(id), format!("C1_{id}"), "Node"))
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(id), format!("C1_{id}"), "Node"),
+                )
                 .await
                 .unwrap(); // unwrap allowed
         }
         // Cluster 2: Nodes 10, 11, 12 (no binary edges)
         for id in 10..=12 {
             graph
-                .add_entity(tx, Entity::new(EntityId::new(id), format!("C2_{id}"), "Node"))
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(id), format!("C2_{id}"), "Node"),
+                )
                 .await
                 .unwrap(); // unwrap allowed
         }

@@ -130,7 +130,8 @@ impl StorageEngine for InstrumentedStorage {
 ///   - 1 put for forward index (fw:)
 ///   - 1 put for metadata (meta:stats)
 ///   - N puts for posting lists (pl:{term}:{doc_id})
-///   Total: N + 3 puts, 0 deletes
+///   - N puts for batch posting lists (plb:{term})
+///   Total: 2*N + 3 puts, 0 deletes
 #[tokio::test]
 async fn test_first_insert_io_count() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(InstrumentedStorage::new());
@@ -144,11 +145,11 @@ async fn test_first_insert_io_count() -> std::result::Result<(), Box<dyn std::er
         .await?;
     index.commit(tx).await?;
 
-    // Expected: 4 terms + dl + fw + meta = 7 puts
+    // Expected: 2 * 4 terms + dl + fw + meta = 11 puts
     assert_eq!(
         storage.puts(),
-        7,
-        "First insert: 4 terms + 3 overhead = 7 puts"
+        11,
+        "First insert: 4 terms * 2 (single + batch) + 3 overhead = 11 puts"
     );
     assert_eq!(
         storage.deletes(),
@@ -161,21 +162,21 @@ async fn test_first_insert_io_count() -> std::result::Result<(), Box<dyn std::er
 
 /// Update of a document with the tombstone path should:
 ///   - NOT call delete for old terms (tombstone path)
-///   - Put: 1 dl + 1 fw + 1 meta + 1 tombstone + N_new posting lists
-///   Total: N_new + 4 puts, 0 deletes (before resolve_tombstones)
+///   - Put: 1 dl + 1 fw + 1 meta + 3 tombstones + N_new * 2 (single + batch) posting lists
+///   Total: 2 * N_new + 6 puts, 0 deletes (before resolve_tombstones)
 #[tokio::test]
 async fn test_tombstone_update_io_count() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(InstrumentedStorage::new());
     let index = InvertedIndex::new(storage.clone(), "io_update");
 
-    // First insert: 3 terms → 6 puts
+    // First insert: 3 terms → 2 * 3 + 3 = 9 puts
     let tx1 = TxId::new(1);
     let doc_id = DocId::new(1);
     index
         .upsert_document(tx1, doc_id, "alpha beta gamma")
         .await?;
     index.commit(tx1).await?;
-    assert_eq!(storage.puts(), 6, "First insert: 3 + 3 = 6");
+    assert_eq!(storage.puts(), 9, "First insert: 3 * 2 + 3 = 9");
 
     // Reset for update measurement
     storage.reset_counters();
@@ -185,11 +186,11 @@ async fn test_tombstone_update_io_count() -> std::result::Result<(), Box<dyn std
     index.upsert_document(tx2, doc_id, "delta epsilon").await?;
     index.commit(tx2).await?;
 
-    // Tombstone path: 3 tbs + 1 dl + 1 fw + 1 meta + 2 terms = 8 puts
+    // Tombstone path: 3 tbs + 1 dl + 1 fw + 1 meta + 2 terms * 2 = 10 puts
     assert_eq!(
         storage.puts(),
-        8,
-        "Tombstone update: 2 terms + 3 tombstones + 3 overhead = 8 puts"
+        10,
+        "Tombstone update: 2 terms * 2 + 3 tombstones + 3 overhead = 10 puts"
     );
     assert_eq!(
         storage.deletes(),
@@ -201,7 +202,7 @@ async fn test_tombstone_update_io_count() -> std::result::Result<(), Box<dyn std
 }
 
 /// After resolve_tombstones, stale entries are cleaned up via deletes.
-/// This must only delete the removed terms, not the overlapping ones.
+/// This must delete the removed terms (pl & plb) and tombstones.
 #[tokio::test]
 async fn test_resolve_tombstones_cleanup_count(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -223,17 +224,17 @@ async fn test_resolve_tombstones_cleanup_count(
 
     storage.reset_counters();
 
-    // Resolve tombstones: should delete "beta" and "gamma" entries + tombstone itself
+    // Resolve tombstones: should delete "beta" and "gamma" entries (pl & plb) + tombstones
     let tx3 = TxId::new(3);
     let resolved = index.resolve_tombstones(tx3).await?;
     index.commit(tx3).await?;
 
     assert_eq!(resolved, 3, "Three tombstones resolved");
-    // Deletes: 2 stale terms (beta, gamma) + 3 tombstones = 5
+    // Deletes: 2 stale terms * 2 (pl + plb) + 3 tombstones = 7
     assert_eq!(
         storage.deletes(),
-        5,
-        "Resolve must delete 2 stale terms + 3 tombstone markers"
+        7,
+        "Resolve must delete 2 stale terms * 2 (pl & plb) + 3 tombstone markers"
     );
 
     Ok(())
