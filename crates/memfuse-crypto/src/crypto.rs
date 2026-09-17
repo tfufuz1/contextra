@@ -44,6 +44,7 @@ use sha2::Sha256;
 /// Manager for encryption keys and block encryption.
 pub struct KeyManager {
     key: VolatileEncryptionKey,
+    cipher: Aes256GcmSiv,
     nonce_prefix: [u8; 4],
 }
 
@@ -80,11 +81,15 @@ impl KeyManager {
         hk.expand(b"memfuse-aes-256-gcm-key", &mut key_raw)
             .map_err(|e| CryptoError::Crypto(format!("HKDF expansion failed: {}", e)))?;
 
+        let cipher = Aes256GcmSiv::new_from_slice(&key_raw)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+
         let mut nonce_prefix = [0u8; 4];
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(key_raw),
+            cipher,
             nonce_prefix,
         })
     }
@@ -128,11 +133,15 @@ impl KeyManager {
         hk.expand(&info, &mut sub_key)
             .map_err(|e| CryptoError::Crypto(format!("HKDF sub-key expansion failed: {}", e)))?;
 
+        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+
         let mut nonce_prefix = [0u8; 4];
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
+            cipher,
             nonce_prefix,
         })
     }
@@ -147,11 +156,15 @@ impl KeyManager {
             CryptoError::Crypto(format!("HKDF segment key expansion failed: {}", e))
         })?;
 
+        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+
         let mut nonce_prefix = [0u8; 4];
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
+            cipher,
             nonce_prefix,
         })
     }
@@ -198,11 +211,15 @@ impl KeyManager {
         hk.expand(&info, &mut sub_key)
             .map_err(|e| CryptoError::Crypto(format!("HKDF KV sub-key expansion failed: {}", e)))?;
 
+        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+
         let mut nonce_prefix = [0u8; 4];
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
+            cipher,
             nonce_prefix,
         })
     }
@@ -247,10 +264,9 @@ impl KeyManager {
         // schlüssel, sondern lediglich Wiederholungs-Metadaten (Repeat-Detection).
         rand::rngs::OsRng.fill_bytes(&mut nonce_bytes[4..12]);
 
-        let cipher = Aes256GcmSiv::new_from_slice(self.key.as_bytes())
-            .map_err(|e| CryptoError::Crypto(format!("Crypto error: {}", e)))?;
         let nonce = Nonce::from_slice(&nonce_bytes);
-        let ciphertext = cipher
+        let ciphertext = self
+            .cipher
             .encrypt(nonce, data)
             .map_err(|e| CryptoError::Crypto(format!("Encryption failed: {}", e)))?;
 
@@ -259,10 +275,8 @@ impl KeyManager {
 
     /// Decrypts a block of data using a full 12-byte nonce.
     pub fn decrypt_auto_nonce(&self, ciphertext: &[u8], nonce_bytes: &[u8; 12]) -> Result<Vec<u8>> {
-        let cipher = Aes256GcmSiv::new_from_slice(self.key.as_bytes())
-            .map_err(|e| CryptoError::Crypto(format!("Crypto error: {}", e)))?;
         let nonce = Nonce::from_slice(nonce_bytes);
-        cipher
+        self.cipher
             .decrypt(nonce, ciphertext)
             .map_err(|e| CryptoError::Crypto(format!("Decryption failed: {}", e)))
     }
@@ -270,6 +284,9 @@ impl KeyManager {
     /// Emergency Trigger: Explicitly wipes the key from memory.
     pub fn emergency_wipe(&mut self) {
         self.key.emergency_wipe();
+        if let Ok(zero_cipher) = Aes256GcmSiv::new_from_slice(&[0u8; 32]) {
+            self.cipher = zero_cipher;
+        }
     }
 
     /// Provides access to the key bytes ONLY during testing.
