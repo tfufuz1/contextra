@@ -65,12 +65,12 @@
     },
     {
       "krate": "memfuse-core",
-      "issue": "JULES-20260917-MEMFUSECOR-PROCES-V29W",
-      "timestamp": "2026-09-17T17:45:21.108951591+00:00",
-      "session_id": "8750457601070921547",
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-J5P7",
+      "timestamp": "2026-09-17T17:45:26.664696110+00:00",
+      "session_id": "6790409367255378698",
       "active": false,
-      "expires_at": "2026-09-17T21:45:21.108929582+00:00",
-      "released_at": "2026-09-17T17:51:47.424636531+00:00"
+      "expires_at": "2026-09-17T21:45:26.664674585+00:00",
+      "released_at": "2026-09-17T17:51:52.318265577+00:00"
     }
   ]
 }
