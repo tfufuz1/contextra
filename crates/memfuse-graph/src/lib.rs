@@ -38,6 +38,7 @@ pub mod csr;
 pub mod edge_reinforcement;
 #[cfg(feature = "edge-reinforcement-learning")]
 pub mod edge_reinforcement_buffer;
+pub mod hyperedge;
 pub mod path_rag;
 #[cfg(feature = "graph-connectivity-health")]
 pub mod percolation;
@@ -60,6 +61,9 @@ pub use edge_reinforcement::{
 #[cfg(feature = "edge-reinforcement-learning")]
 pub use edge_reinforcement_buffer::edge_reinforcement_buffer::{
     CooccurrenceSignal, EdgeReinforcementBuffer, TraversalSignal,
+};
+pub use hyperedge::{
+    HyperEdge, HyperEdgeId, RoleBinding, RoleId, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
 };
 pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGEngine};
 #[cfg(feature = "graph-connectivity-health")]
