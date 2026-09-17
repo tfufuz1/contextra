@@ -9,8 +9,9 @@ Implements probability calibration primitives (`IsotonicCalibrator` and `PlattSc
 | Datei | Verantwortung |
 |---|---|
 | `lib.rs` | Re-Exports und Modul-Deklarationen |
-| `isotonic.rs` | `IsotonicCalibrator` Implementierung |
-| `platt.rs` | `PlattScaler` Implementierung |
+| `isotonic.rs` | `IsotonicCalibrator` Implementierung (PAVA) |
+| `platt.rs` | `PlattScaler` Implementierung (Logistische Regression) |
+| `pid.rs` | `PidController` Implementierung (Adaptive PID Pool-Size Control) |
 
 ## 3. Kritische Invarianten
 

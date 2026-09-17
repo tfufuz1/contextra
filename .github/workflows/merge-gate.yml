@@ -69,6 +69,9 @@ jobs:
         run: cargo run -p xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
         # Feature-Flag nötig da check_bandit_latency_budget memfuse_router::BanditProfileState nutzt.
 
+      - name: FlatBuffers Schema Drift Gate
+        run: cargo run -p xtask -- check-fbs-drift
+
       - name: Unwrap Baseline Ratchet Gate
         run: cargo run -p xtask -- check-unwrap-ratchet
 

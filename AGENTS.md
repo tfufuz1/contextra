@@ -78,7 +78,7 @@ MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspa
 | `MarkdownChunker` | `crates/memfuse-db/src/chunker.rs` | Strukturiertes Dokumentsplitting vor Vektor-Embedding |
 | `MultiStepEngine` & `total_cmp` (H) | `crates/memfuse-db/src/multistep.rs` & `fusion.rs` | Iterative Search Engine mit RRF-Signal-Fusion & robuster HeapEntry-Sortierung (PR #1925) |
 | `scan_bounded` (F) | `crates/memfuse-core`, `memfuse-store`, `memfuse-db` | Speicherbeschränkter Range-Scan zur OOM-Vermeidung (PR #1927) |
-| `WAL Header State Atomicity` | `crates/memfuse-store/src/wal.rs` | Atomare Schreibzustandsverfolgung im WAL Header (PR #1924) |
+| `WAL Header State Atomicity` | `crates/memfuse-store/src/wal/mod.rs` | Atomare Schreibzustandsverfolgung im WAL Header (PR #1924) |
 | `DiskANN HMAC Hardening` | `crates/memfuse-index/src/diskann.rs` | HMAC-Integritätsschutz für DiskANN-Indizes (PR #1919) |
 | `CheckpointGuard` | `crates/memfuse-checkpoint/src/lib.rs` | RAII-Checkpoint & Persistent Store Management |
 | `CrossEncoderReranker` | `crates/memfuse-embed/src/reranker.rs` | Cross-Encoder Reranking für High-Precision Retrieval (ONNX ist Default-Embedding-Backend) |
@@ -93,8 +93,8 @@ MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspa
 | `ExportDocumentV1` & `ExportCollectionV1` | `crates/memfuse-db/src/export.rs:17` | Memory-Export-Format v1 mit Schema Version "1.0" und Idempotenz |
 | `LlmTextGeneratorStreaming` | `crates/memfuse-core/src/traits/embedding.rs:63` | Streaming Trait-Abstraktion für LLM-Textgenerierung |
 | `PyDbStats` Metriken | `crates/memfuse-py/src/lib.rs:518` | FFI Export von `drift_status`, `calibration_ece` und `last_calibration_at` in Python API |
-| `Wal::rotate_and_seal()` | `crates/memfuse-store/src/wal.rs:554` | Atomares Versiegeln und Read-Only-Flagging für passives WAL-Shipping (PR #2419) |
-| `WalFlusherConfig` `batch_window_micros` | `crates/memfuse-store/src/wal.rs:172` | Konfigurierbares Batch-Window für WAL-Flusher-Actor (PR #2436) |
+| `Wal::rotate_and_seal()` | `crates/memfuse-store/src/wal/io.rs:637` | Atomares Versiegeln und Read-Only-Flagging für passives WAL-Shipping (PR #2419) |
+| `WalFlusherConfig` `batch_window_micros` | `crates/memfuse-store/src/wal/flusher.rs:81` | Konfigurierbares Batch-Window für WAL-Flusher-Actor (PR #2436) |
 | `memfuse_cloud_query` MCP-Tool & `egress_gateway.rs` | `crates/memfuse-mcp/src/egress_gateway.rs` | Scaffolded MCP-Tool & Gateway für Egress-Shield (AI-TAG[SMELL][MAJOR] behoben, verwendet offiziellen `memfuse-security`-Contract `EgressVault`) |
 | `BanditRouter` Module | `crates/memfuse-router/src/` | `bandit.rs`, `routing_strategy.rs`, `transport.rs`, `guarded_payload.rs` scaffolded (PR #2422, #2433) |
 | `check-bandit-latency-budget` xtask | `xtask/src/check_bandit_latency_budget.rs` | Latenz-Budget-Prüfung für LinUCB-Bandit implementiert (PR #2433, noch nicht in merge-gate.yml) |
@@ -182,9 +182,9 @@ Bei Claim-Konflikt: STOP — warten oder koordinieren, nicht überschreiben.
   - `memfuse-index/src/distance.rs` (SIMD hardware optimizations: AVX2, AVX-512, NEON; ADR-017/ADR-034)
   - `memfuse-index/src/diskann.rs` (Read-only memory-mapped index I/O: Mmap; ADR-017)
   - `memfuse-index/src/persistence.rs` (Read-only memory-mapped index persistence: Mmap; ADR-017)
-  - `memfuse-store/src/wal.rs` (Win32 DACL/ACL file permission enforcement; `#[cfg(windows)]`)
+  - `memfuse-store/src/wal/io.rs` (Win32 DACL/ACL file permission enforcement; `#[cfg(windows)]`)
   - `memfuse-db/src/volatile_vault.rs` (RAM buffer memory locking against OS swapping: `mlock`/`munlock`; feature-gated `volatile-vault`)
-  - Exception: Test-only unsafe in `memfuse-crypto/src/anti_tamper.rs` (and `kv_segment/segment.rs` unit tests) exclusively for Zeroize drop-semantics verification via raw pointer inspection.
+  - Exception: Test-only unsafe in `memfuse-crypto/src/anti_tamper.rs` (and `crates/memfuse-crypto/src/kv_segment/segment.rs` unit tests) exclusively for Zeroize drop-semantics verification via raw pointer inspection.
   All other crates strictly enforce `#![forbid(unsafe_code)]` or `#![deny(unsafe_code)]` with inline rationale.
 - **AI-TAG[SMELL][CRITICAL]**: ALWAYS fix immediately — never just comment
 - **Document chunking**: ALWAYS use `MarkdownChunker` — NEVER embed entire text as 1 vector

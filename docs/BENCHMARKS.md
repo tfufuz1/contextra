@@ -55,3 +55,21 @@ Verifizierte Messung gegen synthetische Ground Truth (20 Themen-Cluster × 50 Do
 | Hybrid search p99 (ms) | 30.45 ms | not publicly available | not publicly available | not publicly available |
 
 Sources for any competitor numbers must be cited with URL and access date.
+
+---
+
+## 5. Zielmetriken & Neue Benchmark-Kategorien (Opus-Optimierungen)
+
+Mit der Umsetzung der Opus-Optimierungen (Stufe 0–3) werden folgende neue Benchmark-Kategorien und architektonische Zielwerte eingeführt. Diese sind normativ für die Abnahme der jeweiligen Optimierungen:
+
+### 5.1 Neue Benchmark-Kategorien
+
+- **Bandit-Latenz-Budget (`check-bandit-latency-budget`)**: Messung der LinUCB-Bandit-Updates (Diagonal vs. Sherman-Morrison) auf Cache-Line-aligned SIMD-Vektoren. **Latenzziel**: Update-Overhead < 50 µs pro Query.
+- **Block-Cache Hit-Latenz (`SieveCacheBackend`)**: Vergleich der Leselatenz (Hit-Pfad) zwischen dem sperrenden `LruBlockCacheBackend` und dem lock-freien `SieveCacheBackend` unter hochgradig paralleler Thread-Last.
+- **WAL-Ring-Puffer-Durchsatz (`wal_ring_buffer`)**: Messung der Transaktionslatenz bei asynchronem Flusher-Task im Vergleich zum Mutex-geschützten synchronen `fsync`.
+
+### 5.2 Architektonische Zielwerte (Allokations- & Zero-Copy-Ziele)
+
+- **HNSW-Allokationsreduktion**: Der Distanz- und Traversierungspfad im Vektorindex muss durch den Arena-Allocator (HNSW v2) so optimiert werden, dass die Anzahl der Heap-Allokationen pro `search_knn`-Query signifikant sinkt (Ziel: Zero-Allocation Traversal).
+- **SSTable-Zero-Copy**: Vermeidung des Kopierens kompletter SSTables in den Speicher (Nutzung von Mmap/Zero-Copy-Deserialisierung).
+- **AES-Key-Schedule-Wiederverwendung**: Der Key-Schedule (`Aes256GcmSiv`) wird als `OnceLock` initialisiert, was die Overhead-Zeiten pro Verschlüsselungsoperation drastisch reduziert, da der Schedule nicht pro Operation neu berechnet wird.

@@ -2,24 +2,81 @@
 //! Validates whether `schemas/memfuse.fbs` matches `crates/memfuse-core-ipc-gen/src/memfuse_generated.rs`.
 
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 use tempfile::tempdir;
 
 use crate::find_root_dir;
 
-/// Checks if `flatc` is available in PATH.
-fn check_flatc_available() -> Result<(), String> {
-    match Command::new("flatc").arg("--version").output() {
-        Ok(output) if output.status.success() => Ok(()),
-        _ => Err("❌ Gate failed: 'flatc' binary not found in PATH. Please install FlatBuffers compiler (flatc) to run the flatbuffers drift gate.".to_string()),
+/// Finds or fetches `flatc` binary.
+fn find_or_fetch_flatc() -> Result<PathBuf, String> {
+    // 1. Check if 'flatc' is in PATH
+    if let Ok(output) = Command::new("flatc").arg("--version").output() {
+        if output.status.success() {
+            return Ok(PathBuf::from("flatc"));
+        }
     }
+
+    // 2. Check ~/.local/bin/flatc or /tmp/flatc
+    if let Ok(home) = std::env::var("HOME") {
+        let local_flatc = PathBuf::from(home).join(".local/bin/flatc");
+        if local_flatc.exists() {
+            if let Ok(out) = Command::new(&local_flatc).arg("--version").output() {
+                if out.status.success() {
+                    return Ok(local_flatc);
+                }
+            }
+        }
+    }
+
+    let tmp_flatc = PathBuf::from("/tmp/flatc");
+    if tmp_flatc.exists() {
+        if let Ok(out) = Command::new(&tmp_flatc).arg("--version").output() {
+            if out.status.success() {
+                return Ok(tmp_flatc);
+            }
+        }
+    }
+
+    // 3. Try downloading flatc binary from GitHub release
+    let download_url = "https://github.com/google/flatbuffers/releases/download/v24.12.23/Linux.flatc.binary.g%2B%2B-13.zip";
+    let zip_path = PathBuf::from("/tmp/flatc_dl.zip");
+    let curl_status = Command::new("curl")
+        .args([
+            "-sL",
+            download_url,
+            "-o",
+            zip_path.to_str().unwrap_or("/tmp/flatc_dl.zip"),
+        ])
+        .status();
+
+    if let Ok(st) = curl_status {
+        if st.success() {
+            let unzip_status = Command::new("unzip")
+                .args([
+                    "-o",
+                    zip_path.to_str().unwrap_or("/tmp/flatc_dl.zip"),
+                    "-d",
+                    "/tmp/",
+                ])
+                .status();
+            if let Ok(ust) = unzip_status {
+                if ust.success() {
+                    let _ = Command::new("chmod").args(["+x", "/tmp/flatc"]).status();
+                    if tmp_flatc.exists() {
+                        return Ok(tmp_flatc);
+                    }
+                }
+            }
+        }
+    }
+
+    Err("❌ Gate failed: 'flatc' binary not found in PATH and auto-download failed. Please install FlatBuffers compiler (flatc) to run the flatbuffers drift gate.".to_string())
 }
 
 /// Checks if the generated FlatBuffers code matches the schema in `schemas/memfuse.fbs`.
 pub fn check_flatbuffers_drift() -> Result<(), String> {
     println!("=== Gate: Check FlatBuffers Schema Drift ===");
-
-    check_flatc_available()?;
 
     let root = find_root_dir();
     let schema_path = root.join("schemas/memfuse.fbs");
@@ -39,10 +96,12 @@ pub fn check_flatbuffers_drift() -> Result<(), String> {
         ));
     }
 
+    let flatc_bin = find_or_fetch_flatc()?;
+
     let temp_dir = tempdir().map_err(|e| format!("Failed to create temporary directory: {}", e))?;
     let temp_out_dir = temp_dir.path();
 
-    let output = Command::new("flatc")
+    let output = Command::new(&flatc_bin)
         .args([
             "--rust",
             "-o",
@@ -94,7 +153,7 @@ pub fn check_flatbuffers_drift() -> Result<(), String> {
 pub fn regenerate_flatbuffers() -> Result<(), String> {
     println!("=== XTask: Regenerate FlatBuffers Rust Code ===");
 
-    check_flatc_available()?;
+    let flatc_bin = find_or_fetch_flatc()?;
 
     let root = find_root_dir();
     let schema_path = root.join("schemas/memfuse.fbs");
@@ -107,7 +166,7 @@ pub fn regenerate_flatbuffers() -> Result<(), String> {
         ));
     }
 
-    let output = Command::new("flatc")
+    let output = Command::new(&flatc_bin)
         .args([
             "--rust",
             "-o",

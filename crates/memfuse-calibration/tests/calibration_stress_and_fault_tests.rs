@@ -104,6 +104,6 @@ proptest! {
         let ece = cal.expected_calibration_error();
         prop_assert!(ece.is_some());
         let val = ece.unwrap();
-        prop_assert!(val >= 0.0 && val <= 1.0, "ECE must be bounded in [0, 1], got {}", val);
+        prop_assert!((0.0..=1.0).contains(&val), "ECE must be bounded in [0, 1], got {}", val);
     }
 }

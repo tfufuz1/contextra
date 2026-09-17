@@ -12,16 +12,18 @@ Einziger Implementor des `StorageEngine` Traits aus `memfuse-core`.
 
 ## 2. Modul-Karte
 
-| Datei | Verantwortung |
+| Datei / Verzeichnis | Verantwortung |
 |---|---|
 | `lib.rs` | Modul-Deklaration, `#![deny(unsafe_code)]`, Datenpfad-Invariante |
 | `lsm.rs` | `LsmStorage` — Orchestrator: öffnet DB, koordiniert WAL/MemTable/SSTable/Compaction, implementiert `StorageEngine` Trait |
-| `wal.rs` | Write-Ahead-Log: Append-Only, HMAC-Chaining, CRC32 pro Entry, fsync-Pflicht |
-| `memtable.rs` | In-Memory Skip-List mit Sequenznummern, Tombstone-Unterstützung |
-| `sstable.rs` | On-Disk sortierte Segmente: Block-Kompression, Bloom-Filter, Index, CRC32 |
+| `wal/` | Write-Ahead-Log: Modul mit `encode.rs`, `flusher.rs`, `hmac.rs`, `io.rs`, `replay.rs`. Append-Only, HMAC-Chaining, CRC32, Flusher-Actor, Passives WAL-Shipping (`rotate_and_seal`), Bounds-Prüfung |
+| `memtable.rs` | In-Memory Skip-List mit Sequenznummern, Tombstone-Unterstützung (Ziel: Range-Sharded MemTable) |
+| `sstable.rs` | On-Disk sortierte Segmente: Block-Kompression, Bloom-Filter, Index, CRC32, Block-Cache-Integration (LRU Default / SIEVE Opt-in) |
 | `compaction.rs` | `CompactionEngine` — Hintergrund-Merge von SSTables (Tiered/Leveled) |
 | `checkpoint.rs` | `pub(crate)` — Internes MVCC-Snapshot-Pinning, **NICHT** die öffentliche Checkpoint-API (die ist in `memfuse-checkpoint`) |
-| `mmap.rs` | Memory-Mapped File Utilities für SSTable-Lesezugriff |
+| `manifest.rs` | Transaktionale Manifest-Verwaltung für SSTable-Generationen |
+| `tenant_codec.rs` | Tenant-spezifische Key-Präfix-Codierung und Scopes |
+| `system_pressure.rs` | Überwachung von Memory- und Disk-Pressure für Flush/Throttling |
 | `util.rs` | `pub(crate)` Hilfsfunktionen (Atomic Rename, load_or_create_integrity_key) |
 
 ## 3. Kritische Invarianten
