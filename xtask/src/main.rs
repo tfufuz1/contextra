@@ -76,6 +76,7 @@ mod check_stale_tags;
 mod check_toctou_trait_defaults;
 mod check_type_registry;
 mod check_unwrap_baseline_trend;
+mod check_unwrap_ratchet;
 mod check_vetoes;
 mod check_workflow_commands;
 mod claim;
@@ -2142,6 +2143,14 @@ fn main() {
         "sync-docs" => {
             let check_only = args.iter().any(|arg| arg == "--check");
             let success = run_sync_docs(check_only);
+            if !success {
+                process::exit(1);
+            }
+        }
+        "check-unwrap-ratchet" => {
+            let root = find_root_dir();
+            let update_mode = args.iter().any(|arg| arg == "--update");
+            let success = check_unwrap_ratchet::run_check_unwrap_ratchet(&root, update_mode);
             if !success {
                 process::exit(1);
             }
