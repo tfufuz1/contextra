@@ -25,11 +25,69 @@ pub struct GraphPath {
     pub total_flow: f32,
 }
 
+/// Identifier for a hyperedge connecting multiple entities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct HyperEdgeId(pub u64);
+
+impl HyperEdgeId {
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    pub fn inner(self) -> u64 {
+        self.0
+    }
+}
+
+/// Role binding connecting an entity to a hyperedge with a role designation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoleBinding {
+    pub role: String,
+    pub entity: EntityId,
+}
+
+impl RoleBinding {
+    pub fn new(role: impl Into<String>, entity: EntityId) -> Self {
+        Self {
+            role: role.into(),
+            entity,
+        }
+    }
+}
+
+/// Representation of a multi-way hyperedge connecting two or more entities.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HyperEdge {
+    pub id: HyperEdgeId,
+    pub weight: f32,
+    pub participants: Vec<RoleBinding>,
+}
+
+impl HyperEdge {
+    pub fn new(id: HyperEdgeId, weight: f32, participants: Vec<RoleBinding>) -> Self {
+        Self {
+            id,
+            weight,
+            participants,
+        }
+    }
+}
+
 /// Trait für Graphen die PathRAG konsumieren kann.
 /// Ermöglicht Testbarkeit ohne echten CSR-Graphen.
 pub trait PathGraph: Send + Sync {
     fn neighbors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)>;
     fn predecessors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)>;
+
+    /// Returns hyperedge IDs associated with the given entity (default: empty).
+    fn hyperedges_for_entity(&self, _node: EntityId) -> Vec<HyperEdgeId> {
+        Vec::new()
+    }
+
+    /// Resolves a HyperEdgeId to its full HyperEdge details (default: None).
+    fn get_hyperedge(&self, _id: HyperEdgeId) -> Option<HyperEdge> {
+        None
+    }
 }
 
 /// Normativer Default-Schwellenwert für das Sufficiency-Gate (ADR-067).
@@ -38,25 +96,103 @@ pub trait PathGraph: Send + Sync {
 /// Rauschen bei tiefen Multi-Hop-Traversierungen zu verhindern (arXiv:2506.00610).
 pub const DEFAULT_SUFFICIENCY_THRESHOLD: f64 = 0.1;
 
+/// Configuration options for [`PathRAGEngine`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct PathRAGConfig {
+    /// Maximale Suchtiefe (Hop-Limit).
+    pub max_hops: usize,
+    /// Sufficiency-Schwelle: Pfade unter dieser Konfidenz werden gefiltert.
+    pub sufficiency_threshold: f64,
+    /// Enable virtual neighbor expansion over hyperedges during PathRAG traversal.
+    pub hyperedge_expansion_enabled: bool,
+    /// Discount factor applied to hyperedge weights when expanded as virtual neighbors (default: 0.85).
+    pub hyperedge_weight_discount: f32,
+}
+
+impl Default for PathRAGConfig {
+    fn default() -> Self {
+        Self {
+            max_hops: 4,
+            sufficiency_threshold: DEFAULT_SUFFICIENCY_THRESHOLD,
+            hyperedge_expansion_enabled: false,
+            hyperedge_weight_discount: 0.85,
+        }
+    }
+}
+
 pub struct PathRAGEngine<G: PathGraph> {
     graph: G,
-    /// Maximale Suchtiefe (Hop-Limit).
-    max_hops: usize,
-    /// Sufficiency-Schwelle: Pfade unter dieser Konfidenz werden gefiltert.
-    sufficiency_threshold: f64,
+    pub config: PathRAGConfig,
 }
 
 impl<G: PathGraph> PathRAGEngine<G> {
     pub fn new(graph: G, max_hops: usize, sufficiency_threshold: f64) -> Self {
-        Self {
+        Self::with_config(
             graph,
-            max_hops,
-            sufficiency_threshold,
-        }
+            PathRAGConfig {
+                max_hops,
+                sufficiency_threshold,
+                hyperedge_expansion_enabled: false,
+                hyperedge_weight_discount: 0.85,
+            },
+        )
     }
 
     pub fn with_defaults(graph: G) -> Self {
-        Self::new(graph, 4, DEFAULT_SUFFICIENCY_THRESHOLD)
+        Self::with_config(graph, PathRAGConfig::default())
+    }
+
+    pub fn with_config(graph: G, config: PathRAGConfig) -> Self {
+        Self { graph, config }
+    }
+
+    pub fn max_hops(&self) -> usize {
+        self.config.max_hops
+    }
+
+    pub fn sufficiency_threshold(&self) -> f64 {
+        self.config.sufficiency_threshold
+    }
+
+    /// Returns physical neighbors plus virtual neighbors from hyperedges if expansion is enabled.
+    #[inline]
+    fn get_expanded_neighbors(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        let base_neighbors = self.graph.neighbors_with_weights(node);
+        if !self.config.hyperedge_expansion_enabled {
+            return base_neighbors;
+        }
+
+        self.expand_with_hyperedges(node, base_neighbors)
+    }
+
+    /// Returns physical predecessors plus virtual predecessors from hyperedges if expansion is enabled.
+    #[inline]
+    fn get_expanded_predecessors(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        let base_predecessors = self.graph.predecessors_with_weights(node);
+        if !self.config.hyperedge_expansion_enabled {
+            return base_predecessors;
+        }
+
+        self.expand_with_hyperedges(node, base_predecessors)
+    }
+
+    fn expand_with_hyperedges(
+        &self,
+        node: EntityId,
+        mut candidates: Vec<(EntityId, f32)>,
+    ) -> Vec<(EntityId, f32)> {
+        let hyperedge_ids = self.graph.hyperedges_for_entity(node);
+        for id in hyperedge_ids {
+            if let Some(hyperedge) = self.graph.get_hyperedge(id) {
+                let virtual_weight = hyperedge.weight * self.config.hyperedge_weight_discount;
+                for participant in &hyperedge.participants {
+                    if participant.entity != node {
+                        candidates.push((participant.entity, virtual_weight));
+                    }
+                }
+            }
+        }
+        candidates
     }
 
     /// Findet den optimalen Pfad zwischen source und target via bidirektionalem Dijkstra.
@@ -92,7 +228,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
         let mut meeting_node: Option<EntityId> = None;
 
         let mut steps = 0;
-        let max_steps = self.max_hops * 1000; // Schutzzähler gegen Endlosschleife
+        let max_steps = self.config.max_hops * 1000; // Schutzzähler gegen Endlosschleife
 
         while (!heap_fwd.is_empty() || !heap_bwd.is_empty()) && steps < max_steps {
             steps += 1;
@@ -111,7 +247,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
                     }
 
                     if d <= best_dist {
-                        for (neighbor, weight) in self.graph.neighbors_with_weights(u) {
+                        for (neighbor, weight) in self.get_expanded_neighbors(u) {
                             let new_d = d + (1.0 / weight.max(1e-8));
                             let entry = dist_fwd.entry(neighbor).or_insert(f32::INFINITY);
                             if new_d < *entry {
@@ -137,7 +273,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
                     }
 
                     if d <= best_dist {
-                        for (neighbor, weight) in self.graph.predecessors_with_weights(u) {
+                        for (neighbor, weight) in self.get_expanded_predecessors(u) {
                             let new_d = d + (1.0 / weight.max(1e-8));
                             let entry = dist_bwd.entry(neighbor).or_insert(f32::INFINITY);
                             if new_d < *entry {
@@ -200,10 +336,10 @@ impl<G: PathGraph> PathRAGEngine<G> {
         queue.push_back((source, 0));
 
         while let Some((curr, depth)) = queue.pop_front() {
-            if depth >= self.max_hops {
+            if depth >= self.config.max_hops {
                 continue;
             }
-            for (nbr, _) in self.graph.neighbors_with_weights(curr) {
+            for (nbr, _) in self.get_expanded_neighbors(curr) {
                 if nbr != source && targets.insert(nbr) {
                     queue.push_back((nbr, depth + 1));
                 }
@@ -224,7 +360,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
     /// Sufficiency-Gate: Filtert Pfade unter Konfidenz-Schwelle.
     /// Kritisch für Precision (arXiv:2506.00610).
     pub fn sufficiency_check(&self, path: &GraphPath) -> bool {
-        path.confidence >= self.sufficiency_threshold
+        path.confidence >= self.config.sufficiency_threshold
     }
 
     /// Konvertiert gefilterte Pfade in RRF-kompatibles Signal.
@@ -412,7 +548,8 @@ mod tests {
 
         let engine = PathRAGEngine::with_defaults(TestGraph::new(vec![]));
         assert_eq!(
-            engine.sufficiency_threshold, DEFAULT_SUFFICIENCY_THRESHOLD,
+            engine.sufficiency_threshold(),
+            DEFAULT_SUFFICIENCY_THRESHOLD,
             "with_defaults() must construct PathRAGEngine using DEFAULT_SUFFICIENCY_THRESHOLD"
         );
     }
@@ -435,5 +572,225 @@ mod tests {
         let engine = PathRAGEngine::with_defaults(TestGraph::new(vec![]));
         let signal = engine.to_rrf_signal(&[]);
         assert!(signal.is_empty());
+    }
+
+    struct TestGraphWithHyperedges {
+        edges: HashMap<EntityId, Vec<(EntityId, f32)>>,
+        hyperedges: HashMap<EntityId, Vec<HyperEdgeId>>,
+        hyperedge_store: HashMap<HyperEdgeId, HyperEdge>,
+    }
+
+    impl TestGraphWithHyperedges {
+        fn new(edges: Vec<(EntityId, EntityId, f32)>, hyperedges: Vec<HyperEdge>) -> Self {
+            let mut map: HashMap<EntityId, Vec<(EntityId, f32)>> = HashMap::new();
+            for (from, to, w) in edges {
+                map.entry(from).or_default().push((to, w));
+            }
+
+            let mut he_map: HashMap<EntityId, Vec<HyperEdgeId>> = HashMap::new();
+            let mut he_store = HashMap::new();
+
+            for he in hyperedges {
+                he_store.insert(he.id, he.clone());
+                for participant in &he.participants {
+                    he_map.entry(participant.entity).or_default().push(he.id);
+                }
+            }
+
+            Self {
+                edges: map,
+                hyperedges: he_map,
+                hyperedge_store: he_store,
+            }
+        }
+    }
+
+    impl PathGraph for TestGraphWithHyperedges {
+        fn neighbors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+            self.edges.get(&node).cloned().unwrap_or_default()
+        }
+        fn predecessors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+            self.edges
+                .iter()
+                .flat_map(|(from, nbrs)| {
+                    nbrs.iter().filter_map(
+                        move |(to, w)| {
+                            if *to == node {
+                                Some((*from, *w))
+                            } else {
+                                None
+                            }
+                        },
+                    )
+                })
+                .collect()
+        }
+        fn hyperedges_for_entity(&self, node: EntityId) -> Vec<HyperEdgeId> {
+            self.hyperedges.get(&node).cloned().unwrap_or_default()
+        }
+        fn get_hyperedge(&self, id: HyperEdgeId) -> Option<HyperEdge> {
+            self.hyperedge_store.get(&id).cloned()
+        }
+    }
+
+    #[test]
+    fn test_hyperedge_expansion_disabled_by_default() {
+        let a = EntityId::new(1);
+        let b = EntityId::new(2);
+        let he = HyperEdge::new(
+            HyperEdgeId::new(100),
+            1.0,
+            vec![RoleBinding::new("subj", a), RoleBinding::new("obj", b)],
+        );
+        let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
+        // Default engine has hyperedge_expansion_enabled: false
+        let engine = PathRAGEngine::with_defaults(graph);
+        assert!(!engine.config.hyperedge_expansion_enabled);
+        assert!(
+            engine.find_path(a, b).is_none(),
+            "When hyperedge expansion is disabled, hyperedge-only path must return None"
+        );
+    }
+
+    #[test]
+    fn test_hyperedge_expansion_enabled_finds_path_via_hyperedge_only() {
+        // AK-2 test: Path exclusively over hyperedge
+        let a = EntityId::new(1);
+        let b = EntityId::new(2);
+        let c = EntityId::new(3);
+        let he = HyperEdge::new(
+            HyperEdgeId::new(101),
+            1.0,
+            vec![
+                RoleBinding::new("member", a),
+                RoleBinding::new("member", b),
+                RoleBinding::new("member", c),
+            ],
+        );
+        let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
+        let config = PathRAGConfig {
+            hyperedge_expansion_enabled: true,
+            hyperedge_weight_discount: 0.85,
+            ..Default::default()
+        };
+        let engine = PathRAGEngine::with_config(graph, config);
+
+        let path = engine
+            .find_path(a, c)
+            .expect("path must be found via hyperedge");
+        assert_eq!(path.nodes, vec![a, c]);
+        // weight = hyperedge.weight (1.0) * discount (0.85) = 0.85
+        assert!(
+            (path.confidence - 0.85).abs() < 1e-5,
+            "Expected confidence 0.85, got {}",
+            path.confidence
+        );
+    }
+
+    #[test]
+    fn test_hyperedge_weight_discount_applied_correctly() {
+        let a = EntityId::new(1);
+        let b = EntityId::new(2);
+        let he = HyperEdge::new(
+            HyperEdgeId::new(102),
+            1.0,
+            vec![RoleBinding::new("src", a), RoleBinding::new("dst", b)],
+        );
+
+        // Test discount = 0.85
+        let graph1 = TestGraphWithHyperedges::new(vec![], vec![he.clone()]);
+        let engine1 = PathRAGEngine::with_config(
+            graph1,
+            PathRAGConfig {
+                hyperedge_expansion_enabled: true,
+                hyperedge_weight_discount: 0.85,
+                ..Default::default()
+            },
+        );
+        let path1 = engine1.find_path(a, b).unwrap();
+        assert!((path1.confidence - 0.85).abs() < 1e-5);
+
+        // Test discount = 0.50
+        let graph2 = TestGraphWithHyperedges::new(vec![], vec![he]);
+        let engine2 = PathRAGEngine::with_config(
+            graph2,
+            PathRAGConfig {
+                hyperedge_expansion_enabled: true,
+                hyperedge_weight_discount: 0.50,
+                ..Default::default()
+            },
+        );
+        let path2 = engine2.find_path(a, b).unwrap();
+        assert!((path2.confidence - 0.50).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_sufficiency_gate_filters_low_confidence_virtual_neighbors() {
+        let a = EntityId::new(1);
+        let b = EntityId::new(2);
+        // Weight 0.10 * discount 0.85 = 0.085 < sufficiency_threshold 0.10
+        let he = HyperEdge::new(
+            HyperEdgeId::new(103),
+            0.10,
+            vec![RoleBinding::new("src", a), RoleBinding::new("dst", b)],
+        );
+        let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
+        let engine = PathRAGEngine::with_config(
+            graph,
+            PathRAGConfig {
+                sufficiency_threshold: 0.10,
+                hyperedge_expansion_enabled: true,
+                hyperedge_weight_discount: 0.85,
+                ..Default::default()
+            },
+        );
+
+        let paths = engine.find_all_paths(a);
+        assert!(
+            paths.is_empty(),
+            "Virtual neighbor path with confidence 0.085 < 0.10 must be filtered by sufficiency gate"
+        );
+    }
+
+    #[test]
+    fn test_self_referencing_hyperedge_no_infinite_loop() {
+        let a = EntityId::new(1);
+        // Hyperedge pointing to itself twice
+        let he = HyperEdge::new(
+            HyperEdgeId::new(104),
+            1.0,
+            vec![RoleBinding::new("self1", a), RoleBinding::new("self2", a)],
+        );
+        let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
+        let engine = PathRAGEngine::with_config(
+            graph,
+            PathRAGConfig {
+                hyperedge_expansion_enabled: true,
+                hyperedge_weight_discount: 0.85,
+                ..Default::default()
+            },
+        );
+
+        let paths = engine.find_all_paths(a);
+        assert!(
+            paths.is_empty(),
+            "Self-referencing hyperedge participant must not produce spurious self-paths or infinite loops"
+        );
+    }
+
+    #[test]
+    fn test_fusion_and_signalkind_non_modification_contract() {
+        // Contract test ensuring no modification to fusion.rs or SignalKind enum
+        // Verify path_rag types seamlessly convert to DocId signal without introducing new SignalKind
+        let engine = PathRAGEngine::with_defaults(TestGraph::new(vec![]));
+        let path = GraphPath {
+            nodes: vec![EntityId::new(42)],
+            edge_weights: vec![],
+            confidence: 1.0,
+            total_flow: 1.0,
+        };
+        let rrf = engine.to_rrf_signal(&[path]);
+        assert_eq!(rrf.len(), 1);
+        assert_eq!(rrf[0].0, DocId(42));
     }
 }

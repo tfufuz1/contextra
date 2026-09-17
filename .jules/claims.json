@@ -14,8 +14,9 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-16T20:40:20.305351005+00:00",
       "session_id": "4363914930122359458",
-      "active": true,
-      "expires_at": "2026-09-17T00:40:20.305334755+00:00"
+      "active": false,
+      "expires_at": "2026-09-17T00:40:20.305334755+00:00",
+      "released_at": "2026-09-17T07:09:12.662843789+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-text",
@@ -31,32 +32,35 @@
       "issue": "WELLE5-BM25F",
       "timestamp": "2026-09-16T22:31:19.093982017+00:00",
       "session_id": "9595033855427390629",
-      "active": true,
-      "expires_at": "2026-09-17T01:38:47.429954857+00:00"
+      "active": false,
+      "expires_at": "2026-09-17T01:38:47.429954857+00:00",
+      "released_at": "2026-09-17T07:09:12.662843789+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-candle",
       "issue": "WELLE5-AUDIT-KVBRIDGE-SPILL",
       "timestamp": "2026-09-16T22:29:03.410241302+00:00",
       "session_id": "5745795697878023454",
-      "active": true,
-      "expires_at": "2026-09-17T02:29:03.410221688+00:00"
+      "active": false,
+      "expires_at": "2026-09-17T02:29:03.410221688+00:00",
+      "released_at": "2026-09-17T07:09:12.662843789+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "workspace-audit",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-16T23:29:35.369726080+00:00",
       "session_id": "4865021195704609027",
-      "active": true,
-      "expires_at": "2026-09-17T03:29:35.369705749+00:00"
+      "active": false,
+      "expires_at": "2026-09-17T03:29:35.369705749+00:00",
+      "released_at": "2026-09-17T07:09:12.662843789+00:00 [TTL-EXPIRED]"
     },
     {
-      "krate": "memfuse-db",
+      "krate": "workspace-ci",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-17T07:12:54.316020021+00:00",
-      "session_id": "7990025414909543452",
+      "timestamp": "2026-09-17T07:06:26.852855781+00:00",
+      "session_id": "8576944047840288262",
       "active": true,
-      "expires_at": "2026-09-17T11:12:54.316008872+00:00"
+      "expires_at": "2026-09-17T11:06:26.852839738+00:00"
     }
   ]
 }

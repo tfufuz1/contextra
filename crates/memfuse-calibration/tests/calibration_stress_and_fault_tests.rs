@@ -7,6 +7,7 @@ use memfuse_calibration::{IsotonicCalibrator, PidController, PlattScaler};
 use proptest::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 #[test]
 fn test_isotonic_fifo_eviction_and_force_rebuild() {
@@ -62,13 +63,13 @@ fn test_platt_scaler_extreme_finite_logits_monotonicity() {
 
 #[test]
 fn test_pid_controller_multithreaded_stress() {
-    let pid = Arc::new(Mutex::new(PidController::default()));
+    let pid = Arc::new(Mutex::new(PidController::new(150.0, 50, 200, Some(100))));
     let mut handles = vec![];
 
     for thread_idx in 0..8 {
         let pid_clone = Arc::clone(&pid);
         let handle = thread::spawn(move || {
-            let mut local_pool = 100;
+            let dt = Duration::from_millis(100);
             for i in 0..100 {
                 let measured_lat = if (thread_idx + i) % 2 == 0 {
                     300.0
@@ -76,7 +77,7 @@ fn test_pid_controller_multithreaded_stress() {
                     50.0
                 };
                 let mut guard = pid_clone.lock().unwrap();
-                local_pool = guard.update(local_pool, measured_lat);
+                let local_pool = guard.update(dt, measured_lat);
                 assert!(local_pool >= 50, "Pool size must stay >= 50 floor");
                 assert!(local_pool <= 200, "Pool size must stay <= 200 max");
             }
