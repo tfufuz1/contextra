@@ -11,6 +11,10 @@
 **Prüfer:** Senior Rust Systems & Governance Engineer (Jules)
 **Crate Scope:** `memfuse-core` (`crates/memfuse-core/src/error.rs`, `crates/memfuse-core/src/lib.rs`) & Governance Documentation Sync
 
+**Session Hash:** `c9c5f937`
+**Timestamp:** `2026-09-17T17:59:57Z`
+**Prüfer:** Senior Rust Systems & Governance Engineer (Jules)
+**Crate Scope:** `memfuse-core` (`crates/memfuse-core/src/lib.rs`) & Governance Documentation Sync
 
 ---
 
@@ -135,6 +139,37 @@ The following checks were executed and passed cleanly:
 
 - **FFI / DTO Vollständigkeit:** Alle 35 Varianten von `MemFuseError` besitzen eine exakte 1:1 Abbildung auf `MemFuseErrorDto` in `error_dto.rs` (über `From<&MemFuseError>`). Ein Catch-all Wildcard-Arm `_ => ...` wird bewusst vermieden, um bei künftigen Enumerations-Erweiterungen sofortige Kompilierfehler an FFI-Grenzen auszulösen.
 - **DAG-Garantie & Exporte (`lib.rs`):** `lib.rs` hält `#![forbid(unsafe_code)]` und `#![warn(missing_docs)]`. Eine Prüfung via `cargo tree -p memfuse-core` bestätigt, dass `memfuse-core` als Layer 0 keine Workspace-Abhängigkeiten außerhalb des Layer-0-Partnercrates `memfuse-core-ipc-gen` besitzt.
+- **Befund (Inventar-Drift):**
+  - `ipc/memfuse_generated.rs`: Im Prompter-Inventar gelistet, liegt aber physisch unter `crates/memfuse-core-ipc-gen/src/memfuse_generated.rs` (Layer 0 IPC-Gen Crate).
+  - Im Prompter-Inventar unberücksichtigte Quelldateien unter `crates/memfuse-core/src/`:
+    - `schema.rs` (`DocIdWidth`, `ManifestSchemaVersion`)
+    - `tombstone.rs` (`SeqBitTombstone`, `TombstoneSemanticsCheck`)
+    - `traits/checkpoint.rs`
+    - `traits/graph_index.rs`
+    - `traits/lifecycle.rs`
+    - `traits/observability.rs`
+    - `traits/storage.rs`
+    - `traits/text_index.rs`
+    - `traits/vector_index.rs`
+- **Bewertung:** Modulstruktur ist DAG-konform und hält `#![forbid(unsafe_code)]`. `lib.rs` re-exportiert alle Trait-Module und Core-Typen ohne Layer-Verletzung (Layer 0 hat 0 Workspace-Abhängigkeiten).
+
+---
+
+## 2. FILE-CONTEXT Header & Invarianten
+
+- `crates/memfuse-core/src/lib.rs` wurde mit aktuellem `STAND:`-Zeitstempel (`2026-09-17T17:59:57Z`) und `SESSION:`-Token (`c9c5f937`) im `FILE-CONTEXT`-Header versehen.
+- `#![forbid(unsafe_code)]` und `#![warn(missing_docs)]` bleiben ausnahmslos in `lib.rs` erzwungen.
+- Unified Error Model (`MemFuseError`, `Result<T>`) und Zero-Panic-Doktrin sind unverändert aktiv.
+
+---
+
+## 3. Governance & Architektur-Dokumentations-Synchronisation
+
+Die Dokumentation des gesamten Projekts wurde frei von Widersprüchen auf die Architektur- und Governance-Standards ausgerichtet:
+
+1. `cargo run -p xtask -- sync-docs` regenerierte `WORKING_STATE.md`, `docs/CHANGELOG.md`, `docs/ARCHITECTURE.md` (DAG_TOPOLOGY & INVARIANTS_TABLE) und `docs/SOURCE_OF_TRUTH.md`.
+2. `cargo run -p xtask -- sync-docs --check` bestätigte 0 Abweichungen (PASSED).
+
 
 ---
 
@@ -150,3 +185,15 @@ The following checks were executed and passed cleanly:
 
 ---
 *Ende des Audit-Reports — TS: 2026-09-17T17:55:00Z (SESSION: e1c47b62)*
+- `cargo check -p memfuse-core --all-features` -> **PASSED** (0 Fehler, 0 Warnungen)
+- `cargo clippy -p memfuse-core -- -D warnings` -> **PASSED** (0 Diffs/Warnings)
+- `cargo fmt --check -p memfuse-core` -> **PASSED**
+- `cargo test -p memfuse-core --all-features` -> **PASSED**
+- `cargo check --workspace` -> **PASSED**
+- `just check-vetoes` -> **PASSED**
+- `just debt-audit` -> **PASSED**
+- `cargo run -p xtask -- check-jules-context-freshness` -> **PASSED**
+- `cargo run -p xtask -- jules-preflight --fast` -> **PASSED**
+
+---
+*Ende des Audit-Reports — TS: 2026-09-17T17:59:57Z (SESSION: c9c5f937)*
