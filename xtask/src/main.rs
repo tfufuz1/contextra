@@ -76,6 +76,7 @@ mod check_stale_tags;
 mod check_toctou_trait_defaults;
 mod check_type_registry;
 mod check_unwrap_baseline_trend;
+mod check_unwrap_ratchet;
 mod check_vetoes;
 mod check_workflow_commands;
 mod claim;
