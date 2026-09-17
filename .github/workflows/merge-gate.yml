@@ -68,3 +68,19 @@ jobs:
         # Verhindert versehentliche O(d³)-Implementierungen im Hot-Path (§9.1, §13.2).
         run: cargo run -p xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
         # Feature-Flag nötig da check_bandit_latency_budget memfuse_router::BanditProfileState nutzt.
+
+      - name: Unwrap Baseline Ratchet Gate
+        run: cargo run -p xtask -- check-unwrap-ratchet
+
+      - name: Check for LSM / WAL changes
+        uses: dorny/paths-filter@v3
+        id: lsm_wal_changes
+        with:
+          filters: |
+            store_lsm_wal:
+              - 'crates/memfuse-store/src/lsm/**'
+              - 'crates/memfuse-store/src/wal/**'
+
+      - name: Loom Concurrency Tests (LSM / WAL)
+        if: steps.lsm_wal_changes.outputs.store_lsm_wal == 'true'
+        run: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
