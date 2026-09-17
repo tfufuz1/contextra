@@ -10,6 +10,7 @@
 
 use memfuse_core::DocId;
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -18,7 +19,7 @@ pub const BLOCK_SIZE: usize = 64;
 
 /// Block-Max metadata for a chunk of postings (typically 64 postings).
 #[repr(C, align(8))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct PostingBlockInfo {
     /// Upper bound doc_id in this block (for fast skip).
     pub max_doc_id: u64,
@@ -31,7 +32,7 @@ pub struct PostingBlockInfo {
 /// Compact representation of a single posting in a posting list.
 /// Packed with 8-byte alignment (16 bytes total) for optimal CPU cache alignment.
 #[repr(C, align(8))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Posting {
     pub doc_id: u64,
     pub tf: u32,
@@ -85,7 +86,7 @@ fn compute_blocks(postings: &[Posting]) -> Vec<PostingBlockInfo> {
 }
 
 /// A contiguous, sorted sequence of postings for a specific term.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PostingList {
     postings: Vec<Posting>,
     blocks: Vec<PostingBlockInfo>,
