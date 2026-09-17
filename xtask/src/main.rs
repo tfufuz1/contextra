@@ -2250,7 +2250,7 @@ fn main() {
                 process::exit(1);
             }
         }
-        "check-flatbuffers-drift" => {
+        "check-flatbuffers-drift" | "check-fbs-drift" => {
             if let Err(e) = check_flatbuffers_drift::check_flatbuffers_drift() {
                 eprintln!("{}", e);
                 process::exit(1);
