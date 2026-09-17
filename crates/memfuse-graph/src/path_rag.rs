@@ -7,9 +7,9 @@
 //! INTEGRATION: PathRAG liefert ein RRF-Signal neben Vektor- und BM25-Signal.
 //! Resultat von to_rrf_signal() wird in FusionEngine als drittes Signal eingespeist.
 
+pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use memfuse_core::DocId;
 pub use memfuse_core::EntityId;
-pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
@@ -593,7 +593,10 @@ mod tests {
         let he = HyperEdge::new(
             HyperEdgeId::new(100),
             crate::csr::EdgeType::Default,
-            vec![RoleBinding::new(RoleId::new(1), a), RoleBinding::new(RoleId::new(2), b)],
+            vec![
+                RoleBinding::new(RoleId::new(1), a),
+                RoleBinding::new(RoleId::new(2), b),
+            ],
             1.0,
         );
         let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
@@ -649,7 +652,10 @@ mod tests {
         let he = HyperEdge::new(
             HyperEdgeId::new(102),
             crate::csr::EdgeType::Default,
-            vec![RoleBinding::new(RoleId::new(1), a), RoleBinding::new(RoleId::new(2), b)],
+            vec![
+                RoleBinding::new(RoleId::new(1), a),
+                RoleBinding::new(RoleId::new(2), b),
+            ],
             1.0,
         );
 
@@ -688,7 +694,10 @@ mod tests {
         let he = HyperEdge::new(
             HyperEdgeId::new(103),
             crate::csr::EdgeType::Default,
-            vec![RoleBinding::new(RoleId::new(1), a), RoleBinding::new(RoleId::new(2), b)],
+            vec![
+                RoleBinding::new(RoleId::new(1), a),
+                RoleBinding::new(RoleId::new(2), b),
+            ],
             0.10,
         );
         let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
@@ -716,7 +725,10 @@ mod tests {
         let he = HyperEdge::new(
             HyperEdgeId::new(104),
             crate::csr::EdgeType::Default,
-            vec![RoleBinding::new(RoleId::new(1), a), RoleBinding::new(RoleId::new(2), a)],
+            vec![
+                RoleBinding::new(RoleId::new(1), a),
+                RoleBinding::new(RoleId::new(2), a),
+            ],
             1.0,
         );
         let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
