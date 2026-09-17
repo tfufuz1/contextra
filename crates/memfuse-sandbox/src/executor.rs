@@ -139,7 +139,12 @@ impl WasmExecutor {
         let module = match tokio::time::timeout_at(deadline, compile_task).await {
             Ok(Ok(Ok(m))) => m,
             Ok(Ok(Err(e))) => return Err(SandboxError::InvalidModule(e.to_string())),
-            Ok(Err(join_err)) => return Err(SandboxError::Runtime(format!("Compilation task failed: {}", join_err))),
+            Ok(Err(join_err)) => {
+                return Err(SandboxError::Runtime(format!(
+                    "Compilation task failed: {}",
+                    join_err
+                )))
+            }
             Err(_) => return Err(SandboxError::Timeout { timeout_ms }),
         };
 

@@ -244,9 +244,7 @@ impl IsotonicCalibrator {
         let probs_and_outcomes: Vec<(f32, bool)> = self
             .observations
             .iter()
-            .filter_map(|&(score, outcome)| {
-                self.lookup_isotonic(score).map(|prob| (prob, outcome))
-            })
+            .filter_map(|&(score, outcome)| self.lookup_isotonic(score).map(|prob| (prob, outcome)))
             .collect();
 
         let bin_width = 1.0 / ECE_BINS as f32;

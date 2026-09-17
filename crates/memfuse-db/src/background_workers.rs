@@ -5,9 +5,6 @@
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 use crate::collection::{Collection, StoredDocument};
-use memfuse_graph::hyperedge::HyperEdgeId;
-use std::collections::VecDeque;
-use tokio::sync::Mutex;
 use crate::consolidation_executor::{execute_consolidation_pass, ConsolidationLockGuard};
 use crate::memory_consolidation::ConsolidationConfig;
 use memfuse_core::traits::StorageEngine;
@@ -15,9 +12,12 @@ use memfuse_core::tx_buffer::TxBuffer;
 use memfuse_core::DocId;
 #[cfg(feature = "background-maintenance")]
 use memfuse_core::VectorIndex;
+use memfuse_graph::hyperedge::HyperEdgeId;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 
 /// Configuration parameters for HNSW index rebuild backoff and failure escalation.
 #[derive(Debug, Clone, Copy)]
@@ -267,9 +267,20 @@ pub fn start_hyperedge_cascade_deferred_worker<S: StorageEngine>(
                     let batch = queue.drain_up_to(MAX_DEFERRED_HYPEREDGES_PER_TICK).await;
                     if !batch.is_empty() {
                         let graph = collection.graph_index();
+                        let tx = match collection.allocate_tx() {
+                            Ok(t) => t,
+                            Err(err) => {
+                                tracing::error!(
+                                    collection = %collection.name(),
+                                    error = %err,
+                                    "Deferred hyperedge worker failed to allocate TxId"
+                                );
+                                continue;
+                            }
+                        };
                         let mut tombstoned_count = 0usize;
                         for id in batch {
-                            if graph.tombstone_hyperedge(id) {
+                            if graph.tombstone_hyperedge(id, tx) {
                                 tombstoned_count += 1;
                             }
                         }

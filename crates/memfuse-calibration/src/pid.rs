@@ -332,7 +332,10 @@ mod tests {
             assert!(
                 diff <= $tol,
                 "Assertion failed: {} ~ {} (diff: {}, tol: {})",
-                $left, $right, diff, $tol
+                $left,
+                $right,
+                diff,
+                $tol
             );
         };
     }

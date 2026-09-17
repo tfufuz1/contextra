@@ -3151,7 +3151,7 @@ async fn test_single_pid_controller_instantiation_in_query_builder() {
     assert_eq!(pid.min_pool_size, 50);
     assert_eq!(pid.max_pool_size, 200);
 
-    let updated = pid.update(100, 300.0);
+    let updated = pid.update(std::time::Duration::from_millis(100), 300.0);
     assert!(updated < 100);
     assert!(updated >= 50);
 }
