@@ -41,3 +41,7 @@ tracing-subscriber = { workspace = true }
 [[bench]]
 name = "router_bench"
 harness = false
+
+[[bench]]
+name = "bandit_latency_gate"
+harness = false
