@@ -198,10 +198,7 @@ impl IsotonicCalibrator {
     }
 
     fn lookup_isotonic(&self, raw_score: f32) -> Option<f32> {
-        let model = match &self.cached_model {
-            Some(m) => m,
-            None => return None,
-        };
+        let model = self.cached_model.as_ref()?;
         if model.is_empty() {
             return None;
         }
