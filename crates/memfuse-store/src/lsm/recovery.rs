@@ -307,14 +307,14 @@ impl LsmStorage {
         let manifest = Arc::new(crate::manifest::Manifest::open(&manifest_path).await?);
         if !manifest_exists {
             let ssts_read = sstables.read().await;
+            let mut add_entries = Vec::with_capacity(ssts_read.len());
             for sst in ssts_read.iter() {
-                manifest
-                    .append(&crate::manifest::ManifestEntry::Add {
-                        path: sst.file_path().to_path_buf(),
-                        max_tx: sst.metadata().max_tx_id,
-                    })
-                    .await?;
+                add_entries.push(crate::manifest::ManifestEntry::Add {
+                    path: sst.file_path().to_path_buf(),
+                    max_tx: sst.metadata().max_tx_id,
+                });
             }
+            manifest.append_batch(&add_entries).await?;
         }
 
         let snapshot_registry = Arc::new(SnapshotRegistry::new());
@@ -583,18 +583,10 @@ impl LsmStorage {
         }
         drop(sstables_lock);
 
+        let mut manifest_batch = Vec::new();
         for path in sst_to_remove {
             tracing::info!("Removing SSTable during rollback: {:?}", path);
-            if let Err(e) = self
-                .manifest
-                .append(&crate::manifest::ManifestEntry::Remove { path: path.clone() })
-                .await
-            {
-                tracing::warn!(
-                    "Failed to write Manifest Remove entry during rollback: {}",
-                    e
-                );
-            }
+            manifest_batch.push(crate::manifest::ManifestEntry::Remove { path: path.clone() });
             if let Err(e) = tokio::fs::remove_file(&path).await {
                 if e.kind() != std::io::ErrorKind::NotFound {
                     tracing::error!(
@@ -605,11 +597,13 @@ impl LsmStorage {
             }
         }
 
-        self.manifest
-            .append(&crate::manifest::ManifestEntry::RollbackComplete {
-                target_tx: target_tx.inner(),
-            })
-            .await?;
+        manifest_batch.push(crate::manifest::ManifestEntry::RollbackComplete {
+            target_tx: target_tx.inner(),
+        });
+
+        if let Err(e) = self.manifest.append_batch(&manifest_batch).await {
+            tracing::warn!("Failed to write Manifest batch during rollback: {}", e);
+        }
 
         if let Err(e) = tokio::fs::remove_file(&intent_path).await {
             if e.kind() != std::io::ErrorKind::NotFound {
