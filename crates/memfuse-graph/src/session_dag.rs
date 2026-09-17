@@ -176,37 +176,10 @@ impl SessionBranchTree {
         }
     }
 
-    /// Appends a step to the current active head node.
-    pub fn append_step(
+    /// Internal helper method to branch from a parent node while holding a `NodesWriteGuard`.
+    fn branch_from_internal(
         &self,
-        prompt: String,
-        response: String,
-        snapshot_tx_id: Option<TxId>,
-        tool_outputs: Vec<String>,
-        label: &str,
-    ) -> Result<NodeIdx> {
-        let parent = self.active_head();
-        let new_id = self.branch_from(
-            parent,
-            prompt,
-            response,
-            snapshot_tx_id,
-            tool_outputs,
-            label,
-        )?;
-        // Update head for linear append (intended sequential behavior)
-        let nodes = self.lock_nodes_write();
-        let mut head_guard = nodes.active_head_write();
-        *head_guard = new_id;
-        Ok(new_id)
-    }
-
-    /// Branches from an arbitrary prior node (Branch-Erstellung ab beliebigem Vorgänger-Knoten).
-    ///
-    /// # Errors
-    /// Returns `Err(MemFuseError::InvalidInput)` if `parent_node` does not exist in the DAG.
-    pub fn branch_from(
-        &self,
+        nodes: &mut NodesWriteGuard<'_>,
         parent_node: NodeIdx,
         prompt: String,
         response: String,
@@ -219,8 +192,6 @@ impl SessionBranchTree {
                 "SessionDAG: prompt or response size exceeds limit of {MAX_DAG_STRING_BYTES} bytes"
             )));
         }
-
-        let mut nodes = self.lock_nodes_write();
 
         if !nodes.nodes().contains_key(&parent_node) {
             return Err(MemFuseError::InvalidInput(format!(
@@ -248,11 +219,58 @@ impl SessionBranchTree {
             child: new_id,
             label: label.to_string(),
         });
-        // active_head is updated ONLY via set_active_head() or append_step().
-        // branch_from() creates the new node but leaves head management to the caller.
-        // This allows parallel branch exploration without fighting over active_head.
 
         Ok(new_id)
+    }
+
+    /// Appends a step to the current active head node atomically under a single write lock.
+    pub fn append_step(
+        &self,
+        prompt: String,
+        response: String,
+        snapshot_tx_id: Option<TxId>,
+        tool_outputs: Vec<String>,
+        label: &str,
+    ) -> Result<NodeIdx> {
+        let mut nodes = self.lock_nodes_write();
+        let parent = *nodes.active_head();
+        let new_id = self.branch_from_internal(
+            &mut nodes,
+            parent,
+            prompt,
+            response,
+            snapshot_tx_id,
+            tool_outputs,
+            label,
+        )?;
+        let mut head_guard = nodes.active_head_write();
+        *head_guard = new_id;
+        Ok(new_id)
+    }
+
+    /// Branches from an arbitrary prior node (Branch-Erstellung ab beliebigem Vorgänger-Knoten).
+    ///
+    /// # Errors
+    /// Returns `Err(MemFuseError::InvalidInput)` if `parent_node` does not exist in the DAG.
+    pub fn branch_from(
+        &self,
+        parent_node: NodeIdx,
+        prompt: String,
+        response: String,
+        snapshot_tx_id: Option<TxId>,
+        tool_outputs: Vec<String>,
+        label: &str,
+    ) -> Result<NodeIdx> {
+        let mut nodes = self.lock_nodes_write();
+        self.branch_from_internal(
+            &mut nodes,
+            parent_node,
+            prompt,
+            response,
+            snapshot_tx_id,
+            tool_outputs,
+            label,
+        )
     }
 
     /// Sets the active head to an existing node.
@@ -866,5 +884,76 @@ mod tests {
         let res = dag.set_active_head(99999);
         assert!(res.is_err());
         assert!(matches!(res.unwrap_err(), MemFuseError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn test_append_step_sequential() {
+        let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
+        let n1 = dag
+            .append_step("P1".into(), "R1".into(), None, vec![], "main")
+            .unwrap();
+        let n2 = dag
+            .append_step("P2".into(), "R2".into(), None, vec![], "main")
+            .unwrap();
+        let n3 = dag
+            .append_step("P3".into(), "R3".into(), None, vec![], "main")
+            .unwrap();
+
+        assert_eq!(n1, 1);
+        assert_eq!(n2, 2);
+        assert_eq!(n3, 3);
+        assert_eq!(dag.active_head(), 3);
+        assert_eq!(dag.node_count(), 4);
+
+        let path = dag.path_to_head();
+        assert_eq!(path.len(), 4);
+        assert_eq!(
+            path.iter().map(|node| node.step_id).collect::<Vec<_>>(),
+            vec![0, 1, 2, 3]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_append_step_concurrent_atomicity() {
+        let dag = Arc::new(SessionBranchTree::new(
+            "Root Prompt".into(),
+            "Root Resp".into(),
+        ));
+        let num_tasks = 10;
+        let barrier = Arc::new(tokio::sync::Barrier::new(num_tasks));
+        let mut handles = Vec::new();
+
+        for i in 0..num_tasks {
+            let dag_clone = Arc::clone(&dag);
+            let barrier_clone = Arc::clone(&barrier);
+            let handle = tokio::spawn(async move {
+                barrier_clone.wait().await;
+                dag_clone.append_step(
+                    format!("Concurrent Prompt {i}"),
+                    format!("Concurrent Resp {i}"),
+                    None,
+                    vec![],
+                    "concurrent",
+                )
+            });
+            handles.push(handle);
+        }
+
+        let mut created_nodes = Vec::new();
+        for handle in handles {
+            let node_id = handle.await.unwrap().unwrap();
+            created_nodes.push(node_id);
+        }
+
+        assert_eq!(created_nodes.len(), num_tasks);
+        assert_eq!(dag.node_count(), num_tasks + 1);
+
+        let active_head = dag.active_head();
+        assert!(created_nodes.contains(&active_head));
+        assert!(dag.get_node(active_head).is_some());
+
+        let path = dag.path_to_head();
+        assert!(!path.is_empty());
+        assert_eq!(path.last().map(|node| node.step_id), Some(active_head));
     }
 }
