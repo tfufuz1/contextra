@@ -1389,7 +1389,7 @@ pub mod mem_fuse {
         /// `root_as_search_response_unchecked`.
         pub fn root_as_search_response(
             buf: &[u8],
-        ) -> Result<SearchResponse, flatbuffers::InvalidFlatbuffer> {
+        ) -> Result<SearchResponse<'_>, flatbuffers::InvalidFlatbuffer> {
             flatbuffers::root::<SearchResponse>(buf)
         }
         #[inline]
@@ -1401,7 +1401,7 @@ pub mod mem_fuse {
         /// `size_prefixed_root_as_search_response_unchecked`.
         pub fn size_prefixed_root_as_search_response(
             buf: &[u8],
-        ) -> Result<SearchResponse, flatbuffers::InvalidFlatbuffer> {
+        ) -> Result<SearchResponse<'_>, flatbuffers::InvalidFlatbuffer> {
             flatbuffers::size_prefixed_root::<SearchResponse>(buf)
         }
         #[inline]
@@ -1434,7 +1434,7 @@ pub mod mem_fuse {
         /// Assumes, without verification, that a buffer of bytes contains a SearchResponse and returns it.
         /// # Safety
         /// Callers must trust the given bytes do indeed contain a valid `SearchResponse`.
-        pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse {
+        pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse<'_> {
             flatbuffers::root_unchecked::<SearchResponse>(buf)
         }
         #[inline]
@@ -1443,7 +1443,7 @@ pub mod mem_fuse {
         /// Callers must trust the given bytes do indeed contain a valid size prefixed `SearchResponse`.
         pub unsafe fn size_prefixed_root_as_search_response_unchecked(
             buf: &[u8],
-        ) -> SearchResponse {
+        ) -> SearchResponse<'_> {
             flatbuffers::size_prefixed_root_unchecked::<SearchResponse>(buf)
         }
         #[inline]
