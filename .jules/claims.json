@@ -62,6 +62,15 @@
       "active": false,
       "expires_at": "2026-09-17T11:06:26.852839738+00:00",
       "released_at": "2026-09-17T17:25:52.454754311+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-core",
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-R3H6",
+      "timestamp": "2026-09-17T17:57:47.858772458+00:00",
+      "session_id": "3824641710948591486",
+      "active": false,
+      "expires_at": "2026-09-17T21:57:47.858754922+00:00",
+      "released_at": "2026-09-17T18:04:07.165924852+00:00"
     }
   ]
 }
