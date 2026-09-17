@@ -593,11 +593,13 @@ impl StorageEngine for LsmStorage {
                 return Ok(());
             }
 
-            let mut wal_ops = Vec::with_capacity(ops.len());
+            let mut wal_ops = Vec::with_capacity(ops.len() + 1);
             let mut mem_updates = Vec::with_capacity(ops.len());
+            let mut last_seq = 0u64;
 
             for op in &ops {
                 let seq_no = self.next_seq_no.fetch_add(1, Ordering::SeqCst);
+                last_seq = seq_no;
                 match op {
                     IndexOp::Insert { doc_id: _, data } => {
                         let (key, value) = data;
@@ -631,6 +633,14 @@ impl StorageEngine for LsmStorage {
                     }
                 }
             }
+
+            wal_ops.push((
+                WalOp::TxEnd {
+                    tx_id,
+                    committed: true,
+                },
+                last_seq,
+            ));
 
             // --- PHASE 2: Prepare WAL entries under commit_mutex ---
             // commit_mutex ist gehalten; WAL I/O erfolgt außerhalb des state-Locks.

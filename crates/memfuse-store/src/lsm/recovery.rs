@@ -70,6 +70,11 @@ pub(super) async fn write_salt_atomically(
     write_res
 }
 
+struct PendingTxOp {
+    lsn: u64,
+    op: WalOp,
+}
+
 impl LsmStorage {
     pub async fn new(config: LsmConfig) -> Result<Self> {
         if config.block_cache_shards == 0 || !config.block_cache_shards.is_power_of_two() {
@@ -149,6 +154,9 @@ impl LsmStorage {
         let mut replayed_size = 0u64;
         let mut last_wal = None;
 
+        let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
+            std::collections::HashMap::new();
+
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_with_key_manager(wal_path, key_manager.clone()).await?;
             let wal_entries = wal.replay().await?;
@@ -158,27 +166,52 @@ impl LsmStorage {
                 if raw_lsn > max_seq {
                     max_seq = raw_lsn;
                 }
-                if entry.tx_id().inner() > max_tx && entry.tx_id().inner() < TxId::INTERNAL_BASE {
-                    max_tx = entry.tx_id().inner();
-                }
+
                 match &entry.op {
-                    WalOp::Put { key, value, tx_id } => {
-                        replayed_size += (key.len() + value.len()) as u64;
-                        memtable.put(
-                            Bytes::from(key.clone()),
-                            Bytes::from(value.clone()),
-                            *lsn,
-                            tx_id.inner(),
-                        );
+                    WalOp::Put { .. } | WalOp::Delete { .. } => {
+                        let tx_id = entry.tx_id().inner();
+                        pending_tx_map
+                            .entry(tx_id)
+                            .or_default()
+                            .push(PendingTxOp {
+                                lsn: *lsn,
+                                op: entry.op.clone(),
+                            });
                     }
-                    WalOp::Delete { key, tx_id } => {
-                        replayed_size += key.len() as u64;
-                        memtable.put(
-                            Bytes::from(key.clone()),
-                            Bytes::new(),
-                            *lsn | TOMBSTONE_BIT,
-                            tx_id.inner(),
-                        );
+                    WalOp::TxEnd { tx_id, committed } => {
+                        let tx_raw = tx_id.inner();
+                        if *committed {
+                            if tx_raw > max_tx && tx_raw < TxId::INTERNAL_BASE {
+                                max_tx = tx_raw;
+                            }
+                            if let Some(ops) = pending_tx_map.remove(&tx_raw) {
+                                for op in ops {
+                                    match op.op {
+                                        WalOp::Put { key, value, tx_id } => {
+                                            replayed_size += (key.len() + value.len()) as u64;
+                                            memtable.put(
+                                                Bytes::from(key),
+                                                Bytes::from(value),
+                                                op.lsn,
+                                                tx_id.inner(),
+                                            );
+                                        }
+                                        WalOp::Delete { key, tx_id } => {
+                                            replayed_size += key.len() as u64;
+                                            memtable.put(
+                                                Bytes::from(key),
+                                                Bytes::new(),
+                                                op.lsn | TOMBSTONE_BIT,
+                                                tx_id.inner(),
+                                            );
+                                        }
+                                        WalOp::TxEnd { .. } => {}
+                                    }
+                                }
+                            }
+                        } else {
+                            pending_tx_map.remove(&tx_raw);
+                        }
                     }
                 }
             }
@@ -623,26 +656,50 @@ impl LsmStorage {
         }
 
         let entries = wal.replay().await?;
+        let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
+            std::collections::HashMap::new();
+
         for (seq, entry, _offset) in entries {
             if (seq & !TOMBSTONE_BIT) > max_seq {
                 max_seq = seq & !TOMBSTONE_BIT;
             }
             match entry.op {
-                WalOp::Put { key, value, tx_id } => {
-                    state.memtable.put(
-                        bytes::Bytes::from(key),
-                        bytes::Bytes::from(value),
-                        seq,
-                        tx_id.inner(),
-                    );
+                WalOp::Put { .. } | WalOp::Delete { .. } => {
+                    let tx_id = entry.tx_id().inner();
+                    pending_tx_map.entry(tx_id).or_default().push(PendingTxOp {
+                        lsn: seq,
+                        op: entry.op,
+                    });
                 }
-                WalOp::Delete { key, tx_id } => {
-                    state.memtable.put(
-                        bytes::Bytes::from(key),
-                        bytes::Bytes::new(),
-                        seq | TOMBSTONE_BIT,
-                        tx_id.inner(),
-                    );
+                WalOp::TxEnd { tx_id, committed } => {
+                    let tx_raw = tx_id.inner();
+                    if committed {
+                        if let Some(ops) = pending_tx_map.remove(&tx_raw) {
+                            for op in ops {
+                                match op.op {
+                                    WalOp::Put { key, value, tx_id } => {
+                                        state.memtable.put(
+                                            bytes::Bytes::from(key),
+                                            bytes::Bytes::from(value),
+                                            op.lsn,
+                                            tx_id.inner(),
+                                        );
+                                    }
+                                    WalOp::Delete { key, tx_id } => {
+                                        state.memtable.put(
+                                            bytes::Bytes::from(key),
+                                            bytes::Bytes::new(),
+                                            op.lsn | TOMBSTONE_BIT,
+                                            tx_id.inner(),
+                                        );
+                                    }
+                                    WalOp::TxEnd { .. } => {}
+                                }
+                            }
+                        }
+                    } else {
+                        pending_tx_map.remove(&tx_raw);
+                    }
                 }
             }
         }
