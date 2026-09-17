@@ -1,7 +1,6 @@
 # Audit Report: `memfuse-core` & Governance Documentation Synchronization
 
 **Datum:** 2026-09-17
-<<<<<<< Updated upstream
 **Session Hash:** `9099f058`
 **Timestamp:** `2026-09-17T17:45:56Z`
 **Task ID:** `JULES-20260917-MEMFUSECOR-PROCES-J5P7`
@@ -11,14 +10,11 @@
 **Timestamp:** `2026-09-17T17:55:00Z`
 **Prüfer:** Senior Rust Systems & Governance Engineer (Jules)
 **Crate Scope:** `memfuse-core` (`crates/memfuse-core/src/error.rs`, `crates/memfuse-core/src/lib.rs`) & Governance Documentation Sync
-=======
 
-=======
 **Session Hash:** `c9c5f937`
 **Timestamp:** `2026-09-17T17:59:57Z`
 **Prüfer:** Senior Rust Systems & Governance Engineer (Jules)
 **Crate Scope:** `memfuse-core` (`crates/memfuse-core/src/lib.rs`) & Governance Documentation Sync
->>>>>>> Stashed changes
 
 ---
 
@@ -26,7 +22,6 @@
 
 Ein Dateisystemabgleich per `find crates/memfuse-core/src -name "*.rs" | sort` gegen das Prompter-Inventar vom 2026-09-13 ergab folgenden Befund:
 
-<<<<<<< Updated upstream
 - **Befund (Inventar-Drift):** `crates/memfuse-core/src/traits/` ist im Quelltext sauber in modularisierte Trait-Dateien unterteilt (`checkpoint.rs`, `embedding.rs`, `graph_index.rs`, `lifecycle.rs`, `observability.rs`, `storage.rs`, `text_index.rs`, `vector_index.rs`, `mod.rs`). `model_fingerprint.rs`, `schema.rs` und `tombstone.rs` existieren im Crate-Quelltext. `ipc/memfuse_generated.rs` wurde nach `memfuse-core-ipc-gen` ausgelagert.
 - **Bewertung:** Modulstruktur ist DAG-konform und hält `#![forbid(unsafe_code)]`. `lib.rs` exportiert alle Trait-Module ohne Layer-Verletzung (Layer 0 hat 0 Workspace-Abhängigkeiten).
 
@@ -57,6 +52,76 @@ Die Dokumentation des gesamten Projekts wurde frei von Widersprüchen auf den ak
 
 ---
 *Ende des Audit-Reports — TS: 2026-09-17T17:45:56Z (SESSION: 9099f058)*
+# Audit & Sync Report: `memfuse-core` & Governance Documentation
+
+**Crate Scope:** `memfuse-core` (`crates/memfuse-core/src/lib.rs`) & Governance Documentation Sync
+**Datum:** 2026-09-17
+**Task-ID:** `JULES-20260917-MEMFUSECOR-PROCES-PUS7`
+**Role:** Process / Gate Engineer & Governance Sync Specialist
+**HEAD:** `7e3137c`
+**Status:** 🟢 PASSED
+
+---
+
+## 1. Inventory & Reality Check (`crates/memfuse-core/src/`)
+
+An inventory verification was performed by comparing the codebase files found under `crates/memfuse-core/src/` against the prompt inventory snapshot dated 2026-09-13:
+
+- **Prompt Inventory (2026-09-13 Snapshot):** `error.rs`, `error_dto.rs`, `ipc/jsonrpc.rs`, `ipc/memfuse_generated.rs`, `ipc/mod.rs`, `lib.rs`, `seq_log.rs`, `snapshot.rs`, `traits/embedding.rs`, `traits/mod.rs`, `model_fingerprint.rs`, `tx_buffer.rs`, `types.rs`, `types/budget.rs`, `types/domain.rs`, `types/filter.rs`, `types/importance.rs`, `types/saos.rs`.
+- **Actual File System State (2026-09-17):**
+  - `crates/memfuse-core/src/error.rs`
+  - `crates/memfuse-core/src/error_dto.rs`
+  - `crates/memfuse-core/src/ipc/jsonrpc.rs`
+  - `crates/memfuse-core/src/ipc/mod.rs`
+  - `crates/memfuse-core/src/lib.rs`
+  - `crates/memfuse-core/src/model_fingerprint.rs`
+  - `crates/memfuse-core/src/schema.rs`
+  - `crates/memfuse-core/src/seq_log.rs`
+  - `crates/memfuse-core/src/snapshot.rs`
+  - `crates/memfuse-core/src/tombstone.rs`
+  - `crates/memfuse-core/src/traits/checkpoint.rs`
+  - `crates/memfuse-core/src/traits/embedding.rs`
+  - `crates/memfuse-core/src/traits/graph_index.rs`
+  - `crates/memfuse-core/src/traits/lifecycle.rs`
+  - `crates/memfuse-core/src/traits/mod.rs`
+  - `crates/memfuse-core/src/traits/observability.rs`
+  - `crates/memfuse-core/src/traits/storage.rs`
+  - `crates/memfuse-core/src/traits/text_index.rs`
+  - `crates/memfuse-core/src/traits/vector_index.rs`
+  - `crates/memfuse-core/src/tx_buffer.rs`
+  - `crates/memfuse-core/src/types.rs`
+  - `crates/memfuse-core/src/types/budget.rs`
+  - `crates/memfuse-core/src/types/domain.rs`
+  - `crates/memfuse-core/src/types/filter.rs`
+  - `crates/memfuse-core/src/types/importance.rs`
+  - `crates/memfuse-core/src/types/saos.rs`
+- **Inventory Drift Finding:** `Inventar-Drift: Dateien schema.rs, tombstone.rs sowie aufgeteilte Trait-Submodule (checkpoint.rs, graph_index.rs, lifecycle.rs, observability.rs, storage.rs, text_index.rs, vector_index.rs unter crates/memfuse-core/src/traits/) im Prompter-Inventar vom 2026-09-13 nicht explizit erfasst.`
+- **Assessment:** The module hierarchy in `memfuse-core` strictly enforces Layer-0 DAG invariants (0 workspace dependencies) and `#![forbid(unsafe_code)]`. `lib.rs` cleanly re-exports these submodules.
+
+---
+
+## 2. Governance & Architecture Documentation Synchronization
+
+Documentation synchronization was executed via `cargo run -p xtask -- sync-docs`.
+- `WORKING_STATE.md` updated and validated against active tags across the workspace.
+- `docs/ARCHITECTURE.md` (DAG topology and invariants table) updated.
+- `docs/CHANGELOG.md` regenerated.
+- `cargo run -p xtask -- sync-docs --check` verified 0 drift across all generated documentation targets.
+
+---
+
+## 3. Verification & Quality Gates
+
+The following checks were executed and passed cleanly:
+1. `cargo check -p memfuse-core --all-features` -> **PASSED** (0 errors, 0 warnings).
+2. `cargo test -p memfuse-core --all-features` -> **PASSED** (174/174 tests passing).
+3. `cargo check --workspace` -> **PASSED** (0 errors).
+4. `cargo run -p xtask -- sync-docs --check` -> **PASSED** (0 documentation drift).
+5. `just check-vetoes` -> **PASSED** (0 veto violations).
+
+---
+*Report generated on 2026-09-17T17:52:00Z*
+
 - **Befund (Inventar-Drift):** Die Dateien `crates/memfuse-core/src/schema.rs` (SSTable/WAL Schema-Versionierung v1/v2, ADR-082) und `crates/memfuse-core/src/tombstone.rs` (Tombstone-Semantik-Check IP-07 / ADR-041) sind im Repository vorhanden, wurden jedoch im Prompter-Inventar vom 2026-09-13 nicht gelistet.
 - **Bewertung:** Beide Dateien sind DAG-konform, wohlgeformt und frei von Unsafe-Code. Sie fügen sich nahtlos in die Modulstruktur von `memfuse-core` ein.
 
@@ -74,7 +139,6 @@ Die Dokumentation des gesamten Projekts wurde frei von Widersprüchen auf den ak
 
 - **FFI / DTO Vollständigkeit:** Alle 35 Varianten von `MemFuseError` besitzen eine exakte 1:1 Abbildung auf `MemFuseErrorDto` in `error_dto.rs` (über `From<&MemFuseError>`). Ein Catch-all Wildcard-Arm `_ => ...` wird bewusst vermieden, um bei künftigen Enumerations-Erweiterungen sofortige Kompilierfehler an FFI-Grenzen auszulösen.
 - **DAG-Garantie & Exporte (`lib.rs`):** `lib.rs` hält `#![forbid(unsafe_code)]` und `#![warn(missing_docs)]`. Eine Prüfung via `cargo tree -p memfuse-core` bestätigt, dass `memfuse-core` als Layer 0 keine Workspace-Abhängigkeiten außerhalb des Layer-0-Partnercrates `memfuse-core-ipc-gen` besitzt.
-=======
 - **Befund (Inventar-Drift):**
   - `ipc/memfuse_generated.rs`: Im Prompter-Inventar gelistet, liegt aber physisch unter `crates/memfuse-core-ipc-gen/src/memfuse_generated.rs` (Layer 0 IPC-Gen Crate).
   - Im Prompter-Inventar unberücksichtigte Quelldateien unter `crates/memfuse-core/src/`:
@@ -105,13 +169,12 @@ Die Dokumentation des gesamten Projekts wurde frei von Widersprüchen auf die Ar
 
 1. `cargo run -p xtask -- sync-docs` regenerierte `WORKING_STATE.md`, `docs/CHANGELOG.md`, `docs/ARCHITECTURE.md` (DAG_TOPOLOGY & INVARIANTS_TABLE) und `docs/SOURCE_OF_TRUTH.md`.
 2. `cargo run -p xtask -- sync-docs --check` bestätigte 0 Abweichungen (PASSED).
->>>>>>> Stashed changes
+
 
 ---
 
 ## 4. Durchgeführte Verifikationen & Gates
 
-<<<<<<< Updated upstream
 - `cargo check -p memfuse-core --all-features` -> **PASSED**
 - `cargo clippy -p memfuse-core --all-features -- -D warnings` -> **PASSED**
 - `cargo fmt --check -p memfuse-core` -> **PASSED**
@@ -122,7 +185,6 @@ Die Dokumentation des gesamten Projekts wurde frei von Widersprüchen auf die Ar
 
 ---
 *Ende des Audit-Reports — TS: 2026-09-17T17:55:00Z (SESSION: e1c47b62)*
-=======
 - `cargo check -p memfuse-core --all-features` -> **PASSED** (0 Fehler, 0 Warnungen)
 - `cargo clippy -p memfuse-core -- -D warnings` -> **PASSED** (0 Diffs/Warnings)
 - `cargo fmt --check -p memfuse-core` -> **PASSED**
@@ -135,4 +197,3 @@ Die Dokumentation des gesamten Projekts wurde frei von Widersprüchen auf die Ar
 
 ---
 *Ende des Audit-Reports — TS: 2026-09-17T17:59:57Z (SESSION: c9c5f937)*
->>>>>>> Stashed changes

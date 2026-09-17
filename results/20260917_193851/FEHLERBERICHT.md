@@ -206,3 +206,4 @@ Fehlercodes: `clippy::unnecessary_sort_by`×1
   - Hinweis: `-D clippy::unnecessary-sort-by` implied by `-D warnings`
   - Hinweis: to override `-D warnings` add `#[allow(clippy::unnecessary_sort_by)]`
   - Hinweis: try
+
