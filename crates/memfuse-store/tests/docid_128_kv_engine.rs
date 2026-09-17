@@ -5,8 +5,10 @@ use tempfile::tempdir;
 #[tokio::test]
 async fn test_kv_engine_put_get_default_docid() {
     let dir = tempdir().expect("tempdir");
-    let mut config = LsmConfig::default();
-    config.path = dir.path().to_path_buf();
+    let config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
 
     let storage = LsmStorage::new(config).await.expect("open storage");
     let tx1 = TxId::new(1);
@@ -45,8 +47,10 @@ async fn test_kv_engine_put_get_default_docid() {
 #[tokio::test]
 async fn test_kv_engine_docid_128_uniqueness() {
     let dir = tempdir().expect("tempdir");
-    let mut config = LsmConfig::default();
-    config.path = dir.path().to_path_buf();
+    let config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
 
     let storage = LsmStorage::new(config).await.expect("open storage");
     let tx = TxId::new(10);
