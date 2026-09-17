@@ -6,3 +6,16 @@ memfuse-core           PASS     FAIL     PASS     50
 memfuse-calibration    PASS     FAIL     PASS     14        
 memfuse-checkpoint     PASS     PASS     PASS     37        
 memfuse-crypto         PASS     FAIL     FAIL     154       
+memfuse-graph          PASS     FAIL     FAIL     31        
+memfuse-sandbox        PASS     PASS     PASS     96        
+memfuse-text           PASS     PASS     PASS     261       
+memfuse-index          PASS     FAIL     FAIL     26        
+memfuse-ollama         PASS     FAIL     PASS     60        
+memfuse-store          PASS     FAIL     FAIL     63        
+memfuse-candle         PASS     FAIL     FAIL     11        
+memfuse-embed          PASS     FAIL     PASS     111       
+memfuse-db             FAIL     SKIP     SKIP     22        
+
+!!! STOP: memfuse-db kompiliert nicht. Downstream-Crates werden übersprungen.
+!!! Fehlerdetails: siehe results/verify_20260917_193340.log (Abschnitt '=== memfuse-db ===')
+!!! Fortsetzen nach Fix mit: ./verify_workspace.sh --resume memfuse-db
