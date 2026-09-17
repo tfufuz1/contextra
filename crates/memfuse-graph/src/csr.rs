@@ -25,6 +25,69 @@ use memfuse_core::{
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 
+/// HyperEdge definitions for multi-entity relationships in MemFuse Graph.
+pub mod hyperedge {
+    use memfuse_core::EntityId;
+    use serde::{Deserialize, Serialize};
+
+    /// Unique identifier for a hyperedge.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    pub struct HyperEdgeId(pub u64);
+
+    impl From<u64> for HyperEdgeId {
+        fn from(id: u64) -> Self {
+            Self(id)
+        }
+    }
+
+    impl HyperEdgeId {
+        pub fn inner(self) -> u64 {
+            self.0
+        }
+    }
+
+    /// Role binding connecting an entity to a hyperedge with an explicit semantic role.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct RoleBinding {
+        pub entity: EntityId,
+        pub role: String,
+    }
+
+    impl RoleBinding {
+        pub fn new(entity: impl Into<EntityId>, role: impl Into<String>) -> Self {
+            Self {
+                entity: entity.into(),
+                role: role.into(),
+            }
+        }
+    }
+
+    /// A hyperedge connecting two or more entities with typed role bindings.
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    pub struct HyperEdge {
+        pub id: HyperEdgeId,
+        pub label: String,
+        pub participants: Vec<RoleBinding>,
+        pub weight: f32,
+    }
+
+    impl HyperEdge {
+        pub fn new(
+            id: impl Into<HyperEdgeId>,
+            label: impl Into<String>,
+            participants: Vec<RoleBinding>,
+            weight: f32,
+        ) -> Self {
+            Self {
+                id: id.into(),
+                label: label.into(),
+                participants,
+                weight,
+            }
+        }
+    }
+}
+
 /// Edge type representation for CSR edges.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -330,6 +393,36 @@ impl GraphInner {
             + (self.source_doc_ids.len() * std::mem::size_of::<Option<DocId>>())
             + (self.out_weight_sums.len() * std::mem::size_of::<f32>())
             + (self.pending_edge_count * std::mem::size_of::<EdgePayload>())
+            + (self.hyperedges.len() * std::mem::size_of::<hyperedge::HyperEdge>())
+            + self
+                .hyperedges
+                .values()
+                .map(|e| e.participants.len() * std::mem::size_of::<hyperedge::RoleBinding>())
+                .sum::<usize>()
+            + (self.hyperedge_index.len()
+                * (std::mem::size_of::<EntityId>()
+                    + std::mem::size_of::<Vec<hyperedge::HyperEdgeId>>()))
+            + (self
+                .hyperedge_index
+                .values()
+                .map(|v| v.len())
+                .sum::<usize>()
+                * std::mem::size_of::<hyperedge::HyperEdgeId>())
+    }
+
+    pub(crate) fn hyperedges_for_entity(&self, id: EntityId) -> Vec<hyperedge::HyperEdgeId> {
+        self.hyperedge_index.get(&id).cloned().unwrap_or_default()
+    }
+
+    pub(crate) fn insert_hyperedge(&mut self, edge: hyperedge::HyperEdge) {
+        let edge_id = edge.id;
+        for participant in &edge.participants {
+            let list = self.hyperedge_index.entry(participant.entity).or_default();
+            if !list.contains(&edge_id) {
+                list.push(edge_id);
+            }
+        }
+        self.hyperedges.insert(edge_id, edge);
     }
 
     fn get_or_create_index(&mut self, id: EntityId) -> InternalIndex {
@@ -1037,6 +1130,21 @@ impl CsrGraph {
         edges.into_iter().collect()
     }
 
+    /// Returns all hyperedge IDs connected to the specified entity ID.
+    pub fn hyperedges_for_entity(&self, id: EntityId) -> Vec<hyperedge::HyperEdgeId> {
+        self.inner_read().hyperedges_for_entity(id)
+    }
+
+    /// Looks up a hyperedge by its HyperEdgeId.
+    pub fn get_hyperedge(&self, id: hyperedge::HyperEdgeId) -> Option<hyperedge::HyperEdge> {
+        self.inner_read().hyperedges.get(&id).cloned()
+    }
+
+    /// Atomically inserts a hyperedge into the graph and updates the entity secondary index.
+    pub fn insert_hyperedge(&self, edge: hyperedge::HyperEdge) {
+        self.inner_write().insert_hyperedge(edge);
+    }
+
     /// Directly inserts an entity into the CSR graph without staging.
     pub fn insert_entity_direct(&self, entity: Entity) -> Result<()> {
         let mut inner = self.inner_write();
@@ -1567,6 +1675,7 @@ impl CsrGraph {
                     "compact_async deferred due to compaction memory budget constraint"
                 );
                 // TODO(IP-08-BUDGET-COUPLING): Connect to global ResourceTracker when cross-crate tracker handle is integrated.
+                // NOTE(IP-20): Hyperedge memory contributions are included in estimate_memory_bytes() for accurate local budget checks.
                 return Ok(());
             }
         }
@@ -5258,5 +5367,174 @@ mod tests {
                 assert_eq!(source_doc, Some(doc200));
             }
         }
+    }
+
+    #[test]
+    fn test_hyperedge_insertion_and_lookup() {
+        let graph = CsrGraph::new();
+        let e1 = EntityId::from("entity_a");
+        let e2 = EntityId::from("entity_b");
+
+        let rb1 = hyperedge::RoleBinding::new(e1.clone(), "agent");
+        let rb2 = hyperedge::RoleBinding::new(e2.clone(), "target");
+        let he_id = hyperedge::HyperEdgeId(101);
+        let edge = hyperedge::HyperEdge::new(he_id, "COLLABORATES", vec![rb1, rb2], 0.85);
+
+        graph.insert_hyperedge(edge.clone());
+
+        let retrieved = graph.get_hyperedge(he_id);
+        assert_eq!(retrieved, Some(edge));
+
+        let e1_hes = graph.hyperedges_for_entity(e1);
+        assert_eq!(e1_hes, vec![he_id]);
+
+        let e2_hes = graph.hyperedges_for_entity(e2);
+        assert_eq!(e2_hes, vec![he_id]);
+    }
+
+    #[test]
+    fn test_hyperedge_multiple_participants() {
+        let graph = CsrGraph::new();
+        let e1 = EntityId::from("p1");
+        let e2 = EntityId::from("p2");
+        let e3 = EntityId::from("p3");
+
+        let edge = hyperedge::HyperEdge::new(
+            hyperedge::HyperEdgeId(202),
+            "TRIAD_RELATION",
+            vec![
+                hyperedge::RoleBinding::new(e1.clone(), "source"),
+                hyperedge::RoleBinding::new(e2.clone(), "mediator"),
+                hyperedge::RoleBinding::new(e3.clone(), "destination"),
+            ],
+            1.0,
+        );
+
+        graph.insert_hyperedge(edge);
+
+        for entity in &[e1, e2, e3] {
+            let hes = graph.hyperedges_for_entity(entity.clone());
+            assert_eq!(hes, vec![hyperedge::HyperEdgeId(202)]);
+        }
+    }
+
+    #[test]
+    fn test_entity_multiple_hyperedges() {
+        let graph = CsrGraph::new();
+        let e1 = EntityId::from("shared_entity");
+
+        let he1 = hyperedge::HyperEdge::new(
+            hyperedge::HyperEdgeId(1),
+            "ROLE_A",
+            vec![hyperedge::RoleBinding::new(e1.clone(), "role_1")],
+            0.5,
+        );
+        let he2 = hyperedge::HyperEdge::new(
+            hyperedge::HyperEdgeId(2),
+            "ROLE_B",
+            vec![hyperedge::RoleBinding::new(e1.clone(), "role_2")],
+            0.7,
+        );
+
+        graph.insert_hyperedge(he1);
+        graph.insert_hyperedge(he2);
+
+        let hes = graph.hyperedges_for_entity(e1);
+        assert_eq!(hes.len(), 2);
+        assert!(hes.contains(&hyperedge::HyperEdgeId(1)));
+        assert!(hes.contains(&hyperedge::HyperEdgeId(2)));
+    }
+
+    #[test]
+    fn test_hyperedge_nonexistent_entity() {
+        let graph = CsrGraph::new();
+        let nonexistent = EntityId::from("missing_entity");
+
+        let hes = graph.hyperedges_for_entity(nonexistent);
+        assert!(hes.is_empty());
+
+        let he = graph.get_hyperedge(hyperedge::HyperEdgeId(9999));
+        assert!(he.is_none());
+    }
+
+    #[test]
+    fn test_hyperedge_memory_estimation() {
+        let graph = CsrGraph::new();
+        let initial_bytes = graph.inner_read().estimate_memory_bytes();
+
+        let e1 = EntityId::from("m1");
+        let e2 = EntityId::from("m2");
+
+        let edge = hyperedge::HyperEdge::new(
+            hyperedge::HyperEdgeId(500),
+            "HEAVY_HYPEREDGE",
+            vec![
+                hyperedge::RoleBinding::new(e1, "role_x"),
+                hyperedge::RoleBinding::new(e2, "role_y"),
+            ],
+            0.9,
+        );
+
+        graph.insert_hyperedge(edge);
+
+        let new_bytes = graph.inner_read().estimate_memory_bytes();
+        assert!(
+            new_bytes > initial_bytes,
+            "Expected memory estimation to increase from {initial_bytes} but got {new_bytes}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_hyperedge_rcu_concurrent_compaction_consistency() {
+        let graph = std::sync::Arc::new(CsrGraph::new());
+        let iterations = 50;
+
+        let g_writer = graph.clone();
+        let writer_handle = tokio::spawn(async move {
+            for i in 0..iterations {
+                let e1 = EntityId::from(format!("entity_{i}"));
+                let e2 = EntityId::from(format!("entity_{}", i + 1));
+                let he_id = hyperedge::HyperEdgeId(i as u64);
+
+                let edge = hyperedge::HyperEdge::new(
+                    he_id,
+                    "CONCURRENT_EDGE",
+                    vec![
+                        hyperedge::RoleBinding::new(e1.clone(), "source"),
+                        hyperedge::RoleBinding::new(e2.clone(), "target"),
+                    ],
+                    1.0,
+                );
+
+                g_writer.insert_hyperedge(edge);
+                let _ = g_writer.insert_edge_direct(e1, e2, 1.0).await;
+
+                if i % 5 == 0 {
+                    let _ = g_writer.compact_async().await;
+                }
+            }
+        });
+
+        let g_reader = graph.clone();
+        let reader_handle = tokio::spawn(async move {
+            for i in 0..iterations {
+                let e1 = EntityId::from(format!("entity_{i}"));
+                let hes = g_reader.hyperedges_for_entity(e1);
+                for he_id in hes {
+                    let he = g_reader.get_hyperedge(he_id);
+                    assert!(
+                        he.is_some(),
+                        "RCU inconsistency: hyperedge {he_id:?} found in index but missing in snapshot"
+                    );
+                    let found_he = he.expect("checked above");
+                    assert_eq!(found_he.id, he_id);
+                }
+                tokio::task::yield_now().await;
+            }
+        });
+
+        let (r1, r2) = tokio::join!(writer_handle, reader_handle);
+        assert!(r1.is_ok());
+        assert!(r2.is_ok());
     }
 }
