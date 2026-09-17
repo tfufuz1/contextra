@@ -86,5 +86,9 @@ name = "hybrid_search"
 name = "diskann_collection_fallback"
 required-features = ["experimental-diskann"]
 
+[[test]]
+name = "docid_128_consolidation"
+required-features = ["volatile-vault"]
+
 [[example]]
 name = "collections"
