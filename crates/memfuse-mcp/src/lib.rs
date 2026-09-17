@@ -231,6 +231,7 @@ impl McpServer {
             allow_db_reads: true,
             allow_db_writes,
             allow_code_execution: false,
+            allow_cloud_egress: false,
             max_execution_ms: 5_000,
         };
         let sandbox = McpSandbox::new(policy)

@@ -73,6 +73,7 @@ async fn test_sandbox_policy_enforcement() {
         allow_db_reads: true,
         allow_db_writes: false,
         allow_code_execution: false,
+        allow_cloud_egress: false,
         max_execution_ms: 5000,
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
