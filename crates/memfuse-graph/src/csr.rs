@@ -275,6 +275,13 @@ pub(crate) struct GraphInner {
     /// from being served after pending/tombstone edge compaction.
     #[cfg(feature = "edge-reinforcement-learning")]
     pub(crate) edge_store: HashMap<EntityId, Vec<Edge>>,
+
+    /// Hyperedge storage mapping HyperEdgeId -> HyperEdge.
+    pub(crate) hyperedges: HashMap<crate::hyperedge::HyperEdgeId, crate::hyperedge::HyperEdge>,
+    /// Index mapping DocId -> Set of HyperEdgeIds.
+    pub(crate) doc_to_hyperedges: ahash::AHashMap<DocId, HashSet<crate::hyperedge::HyperEdgeId>>,
+    /// Index mapping EntityId -> Set of HyperEdgeIds.
+    pub(crate) hyperedge_index: ahash::AHashMap<EntityId, HashSet<crate::hyperedge::HyperEdgeId>>,
 }
 
 impl GraphInner {
@@ -304,6 +311,9 @@ impl GraphInner {
             is_dirty: false,
             #[cfg(feature = "edge-reinforcement-learning")]
             edge_store: HashMap::new(),
+            hyperedges: HashMap::new(),
+            doc_to_hyperedges: ahash::AHashMap::new(),
+            hyperedge_index: ahash::AHashMap::new(),
         }
     }
 
@@ -900,6 +910,120 @@ impl CsrGraph {
         affected_node_ids.sort();
 
         Ok((newly_tombstoned.len(), newly_tombstoned, affected_node_ids))
+    }
+
+    /// Directly inserts a hyperedge into memory.
+    pub fn insert_hyperedge_direct(&self, hyperedge: crate::hyperedge::HyperEdge) {
+        let mut inner = self.inner_write();
+        let hyperedge_id = hyperedge.id;
+        if let Some(doc_id) = hyperedge.source_doc_id {
+            inner
+                .doc_to_hyperedges
+                .entry(doc_id)
+                .or_default()
+                .insert(hyperedge_id);
+        }
+        for binding in &hyperedge.bindings {
+            inner
+                .hyperedge_index
+                .entry(binding.entity_id)
+                .or_default()
+                .insert(hyperedge_id);
+        }
+        inner.hyperedges.insert(hyperedge_id, hyperedge);
+    }
+
+    /// Returns all non-tombstoned hyperedge IDs derived from `doc_id`.
+    pub fn hyperedges_for_doc(&self, doc_id: DocId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        let inner = self.inner_read();
+        inner
+            .doc_to_hyperedges
+            .get(&doc_id)
+            .map(|set| {
+                set.iter()
+                    .copied()
+                    .filter(|id| {
+                        inner
+                            .hyperedges
+                            .get(id)
+                            .is_some_and(|edge| !edge.is_tombstoned)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Retrieves a non-tombstoned hyperedge by its ID if present.
+    pub fn get_hyperedge(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+    ) -> Option<crate::hyperedge::HyperEdge> {
+        let inner = self.inner_read();
+        inner
+            .hyperedges
+            .get(&id)
+            .filter(|edge| !edge.is_tombstoned)
+            .cloned()
+    }
+
+    /// Returns all non-tombstoned hyperedge IDs associated with `entity_id`.
+    pub fn hyperedges_for_entity(&self, entity_id: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        let inner = self.inner_read();
+        inner
+            .hyperedge_index
+            .get(&entity_id)
+            .map(|set| {
+                set.iter()
+                    .copied()
+                    .filter(|id| {
+                        inner
+                            .hyperedges
+                            .get(id)
+                            .is_some_and(|edge| !edge.is_tombstoned)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Atomically tombstones a hyperedge by setting `is_tombstoned = true` and removing
+    /// it from `hyperedge_index` and `doc_to_hyperedges` in a single write lock.
+    ///
+    /// Returns `true` if the hyperedge was found and newly tombstoned, or `false` if
+    /// it was already tombstoned or does not exist.
+    pub fn tombstone_hyperedge(&self, id: crate::hyperedge::HyperEdgeId) -> bool {
+        let mut inner = self.inner_write();
+        let inner_ptr = &mut *inner;
+        let edge = match inner_ptr.hyperedges.get_mut(&id) {
+            Some(edge) => {
+                if edge.is_tombstoned {
+                    return false;
+                }
+                edge.is_tombstoned = true;
+                edge
+            }
+            None => return false,
+        };
+
+        if let Some(doc_id) = edge.source_doc_id {
+            if let Some(set) = inner_ptr.doc_to_hyperedges.get_mut(&doc_id) {
+                set.remove(&id);
+                if set.is_empty() {
+                    inner_ptr.doc_to_hyperedges.remove(&doc_id);
+                }
+            }
+        }
+
+        for binding in &edge.bindings {
+            if let Some(set) = inner_ptr.hyperedge_index.get_mut(&binding.entity_id) {
+                set.remove(&id);
+                if set.is_empty() {
+                    inner_ptr.hyperedge_index.remove(&binding.entity_id);
+                }
+            }
+        }
+
+        true
     }
 
     /// Returns all edge IDs derived from the given source `DocId`.

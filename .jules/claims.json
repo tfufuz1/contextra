@@ -49,6 +49,14 @@
       "session_id": "4865021195704609027",
       "active": true,
       "expires_at": "2026-09-17T03:29:35.369705749+00:00"
+    },
+    {
+      "krate": "memfuse-graph",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-17T07:06:58.542822457+00:00",
+      "session_id": "12506487923417325739",
+      "active": true,
+      "expires_at": "2026-09-17T11:06:58.542797411+00:00"
     }
   ]
 }
