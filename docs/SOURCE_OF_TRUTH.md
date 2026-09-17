@@ -77,11 +77,11 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | Crate | Layer | LOC | Status | Beschreibung / Hauptaufgabe |
 | :--- | :---: | :---: | :--- | :--- |
 | `memfuse-core-ipc-gen` | 0 | 1174 | 🟢 Clean | Auto-generated FlatBuffers IPC code for MemFuse Core |
-| `memfuse-core` | 1 | 10190 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
+| `memfuse-core` | 1 | 10193 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
 | `memfuse-calibration` | 2 | 1934 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 2 | 6126 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-crypto` | 2 | 6880 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
-| `memfuse-graph` | 2 | 14873 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `memfuse-graph` | 2 | 14912 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-sandbox` | 2 | 992 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
 | `memfuse-text` | 2 | 7780 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-index` | 3 | 19134 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
