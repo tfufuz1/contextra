@@ -87,7 +87,7 @@ mod tests {
             (1u64, 0u8),
             (42u64, 0u8),
             (1_000_000u64, 0u8),
-            (u64::MAX & !TOMBSTONE_BIT, 0u8),
+            (!TOMBSTONE_BIT, 0u8),
             (42u64, 0x02u8),
             (42u64, 0xFEu8),
         ];

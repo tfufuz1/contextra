@@ -14,7 +14,7 @@
 //! - **Snapshots**: MVCC read isolation via [`SnapshotRegistry`]
 
 // FILE-CONTEXT
-// STAND: 2026-09-09T15:39:55Z (SESSION: 96e5c38b)
+// STAND: 2026-09-17T17:59:57Z (SESSION: c9c5f937)
 // ZWECK: Core types, traits, and error handling for MemFuse.
 // INVARIANTEN: Triebwerk-Fundament: Alle anderen Crates hängen von memfuse-core ab. Kein I/O, kein async, kein Netzwerk in types.
 // HOTSPOTS: 1-45
