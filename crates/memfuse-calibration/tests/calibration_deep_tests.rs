@@ -78,7 +78,7 @@ fn test_isotonic_pava_monotonicity_and_bounds() {
     for &score in &test_scores {
         let prob = cal.calibrated_probability(score).unwrap();
         assert!(
-            prob >= 0.0 && prob <= 1.0,
+            (0.0..=1.0).contains(&prob),
             "Probability out of [0,1]: {prob}"
         );
         assert!(
@@ -355,7 +355,7 @@ proptest! {
     fn prop_platt_scaler_bounded_output(logit in -100.0f32..100.0f32, a in -5.0f32..5.0f32, b in -5.0f32..5.0f32) {
         let scaler = PlattScaler::new(a, b);
         let prob = scaler.transform(logit);
-        prop_assert!(prob >= 0.0 && prob <= 1.0, "Probability out of bounds: {}", prob);
+        prop_assert!((0.0..=1.0).contains(&prob), "Probability out of bounds: {}", prob);
     }
 
     #[test]
