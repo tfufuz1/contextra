@@ -34,6 +34,10 @@ pub struct WasmCapabilities {
     /// `0` bedeutet unbegrenztes Wall-Clock-Time-Limit (gefördert durch max_fuel / caller timeout).
     /// Orthogonal zu `max_fuel` (CPU-Limit vs. Wall-Clock-Limit, beide unabhängig zu setzen).
     pub max_wall_clock_ms: u64,
+    /// Max. WASM-Modul-Größe in Bytes (INV-SBX-1). Default: 10 MB (10_485_760).
+    pub max_module_size_bytes: usize,
+    /// Max. WASM-Tabellen-Einträge (INV-SBX-2). Default: 10_000.
+    pub max_table_entries: u32,
 }
 
 impl Default for WasmCapabilities {
@@ -48,6 +52,8 @@ impl Default for WasmCapabilities {
             allow_clock: true,
             allow_cloud_egress: false,
             max_wall_clock_ms: 5_000,
+            max_module_size_bytes: 10 * 1024 * 1024, // 10 MB
+            max_table_entries: 10_000,
         }
     }
 }
