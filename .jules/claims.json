@@ -62,6 +62,33 @@
       "active": false,
       "expires_at": "2026-09-17T11:06:26.852839738+00:00",
       "released_at": "2026-09-17T17:25:52.454754311+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-core",
+<<<<<<< HEAD
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-J5P7",
+      "timestamp": "2026-09-17T17:45:26.664696110+00:00",
+      "session_id": "6790409367255378698",
+      "active": false,
+      "expires_at": "2026-09-17T21:45:26.664674585+00:00",
+      "released_at": "2026-09-17T17:51:52.318265577+00:00"
+<<<<<<< HEAD
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-12DH",
+      "timestamp": "2026-09-17T17:45:56.295397689+00:00",
+      "session_id": "8230640030215165648",
+      "active": false,
+      "expires_at": "2026-09-17T21:45:56.295370234+00:00",
+      "released_at": "2026-09-17T17:56:52.999540956+00:00"
+=======
+=======
+      "issue": "JULES-20260917-MEMFUSECOR-PROCES-EZIM",
+      "timestamp": "2026-09-17T17:55:23.431964841+00:00",
+      "session_id": "599949739796691223",
+      "active": false,
+      "expires_at": "2026-09-17T21:55:23.431943855+00:00",
+      "released_at": "2026-09-17T18:02:36.965809274+00:00"
+>>>>>>> f3300de7 (docs(core): sync governance documentation and audit report)
+>>>>>>> 5b0aa13c (docs(core): sync governance documentation and audit report)
     }
   ]
 }
