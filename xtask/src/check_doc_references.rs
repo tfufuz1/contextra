@@ -9,11 +9,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-pub const DEFAULT_CHECK_DOCS: &[&str] = &[
-    "docs/GESAMTSPEZIFIKATION.md",
-    "AGENTS.md",
-    "DECISIONS.md",
-];
+pub const DEFAULT_CHECK_DOCS: &[&str] =
+    &["docs/GESAMTSPEZIFIKATION.md", "AGENTS.md", "DECISIONS.md"];
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DocRefViolation {

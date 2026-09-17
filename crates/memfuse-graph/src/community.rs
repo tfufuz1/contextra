@@ -23,6 +23,69 @@ use memfuse_core::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Represents a synthetic bipartite hyperedge node generated during star expansion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct VirtualHyperedgeNode {
+    /// Numerical ID of the hyperedge.
+    pub hyperedge_id: u64,
+}
+
+impl VirtualHyperedgeNode {
+    /// Creates a new `VirtualHyperedgeNode`.
+    pub fn new(hyperedge_id: u64) -> Self {
+        Self { hyperedge_id }
+    }
+}
+
+/// Zero-allocation iterator for star expansion projection of hyperedges.
+///
+/// Yields binary incidence pairs `(EntityId, VirtualHyperedgeNode)` representing the incidence matrix H
+/// without physical graph materialization or heap allocations per `next()` call.
+pub struct StarExpansionIterator<'a> {
+    graph: &'a CsrGraph,
+    hyperedge_ids: Vec<crate::hyperedge::HyperEdgeId>,
+    current_he_idx: usize,
+    current_participant_idx: usize,
+}
+
+impl<'a> StarExpansionIterator<'a> {
+    /// Creates a new `StarExpansionIterator` over all hyperedges currently present in `graph`.
+    pub fn new(graph: &'a CsrGraph) -> Self {
+        let hyperedge_ids = {
+            let inner = graph.inner_read();
+            inner.hyperedges.keys().copied().collect()
+        };
+        Self {
+            graph,
+            hyperedge_ids,
+            current_he_idx: 0,
+            current_participant_idx: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for StarExpansionIterator<'a> {
+    type Item = (EntityId, VirtualHyperedgeNode);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let inner = self.graph.inner_read();
+        while self.current_he_idx < self.hyperedge_ids.len() {
+            let he_id = self.hyperedge_ids[self.current_he_idx];
+            if let Some(he) = inner.hyperedges.get(&he_id) {
+                if self.current_participant_idx < he.participants.len() {
+                    let participant = &he.participants[self.current_participant_idx];
+                    self.current_participant_idx += 1;
+                    return Some((participant.entity, VirtualHyperedgeNode::new(he_id.inner())));
+                }
+            }
+            self.current_he_idx += 1;
+            self.current_participant_idx = 0;
+        }
+        None
+    }
+}
+
 /// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunityDetectionConfig {
@@ -190,7 +253,7 @@ pub async fn detect_communities(
     graph.compact();
 
     // Acquire read lock to access CSR arrays
-    let (valid_nodes, reverse_map, adj_raw) = {
+    let (valid_nodes, num_real_nodes, reverse_map, adj_raw) = {
         let inner = graph.inner_read();
         let num_nodes = inner.reverse_map.len();
 
@@ -204,6 +267,8 @@ pub async fn detect_communities(
         if valid_nodes.is_empty() {
             return Ok(Vec::new());
         }
+
+        let num_real_nodes = valid_nodes.len();
 
         // Build undirected adjacency list with deduplicated max edge weights
         let mut adj_raw: HashMap<usize, HashMap<usize, f32>> = HashMap::new();
@@ -235,12 +300,65 @@ pub async fn detect_communities(
             }
         }
 
-        (valid_nodes, inner.reverse_map.clone(), adj_raw)
+        if config.hyperedges_included {
+            let mut virtual_map: HashMap<u64, usize> = HashMap::new();
+            let mut next_virtual_idx = inner.reverse_map.len();
+            let star_iter = StarExpansionIterator::new(graph);
+
+            for (entity_id, virtual_node) in star_iter {
+                if let Some(&u) = inner.id_map.get(&entity_id) {
+                    if inner.entities.get(u).is_some_and(|e| e.is_some()) {
+                        let v_idx =
+                            *virtual_map
+                                .entry(virtual_node.hyperedge_id)
+                                .or_insert_with(|| {
+                                    let idx = next_virtual_idx;
+                                    next_virtual_idx += 1;
+                                    valid_nodes.push(idx);
+                                    idx
+                                });
+
+                        let he_id = crate::hyperedge::HyperEdgeId::new(virtual_node.hyperedge_id);
+                        let w_val = inner
+                            .hyperedges
+                            .get(&he_id)
+                            .map(|he| if he.weight > 0.0 { he.weight } else { 1.0 })
+                            .unwrap_or(1.0);
+
+                        adj_raw
+                            .entry(u)
+                            .or_default()
+                            .entry(v_idx)
+                            .and_modify(|existing| *existing = existing.max(w_val))
+                            .or_insert(w_val);
+                        adj_raw
+                            .entry(v_idx)
+                            .or_default()
+                            .entry(u)
+                            .and_modify(|existing| *existing = existing.max(w_val))
+                            .or_insert(w_val);
+                    }
+                }
+            }
+        }
+
+        (
+            valid_nodes,
+            num_real_nodes,
+            inner.reverse_map.clone(),
+            adj_raw,
+        )
     };
 
-    // Sort valid node indices by EntityId for deterministic initial ordering
+    // Sort valid node indices: real entity nodes by EntityId ascending, then virtual nodes by index
     let mut node_indices = valid_nodes;
-    node_indices.sort_by_key(|&idx| reverse_map[idx]);
+    node_indices.sort_by_key(|&idx| {
+        if idx < reverse_map.len() {
+            (0u8, reverse_map[idx].inner())
+        } else {
+            (1u8, idx as u64)
+        }
+    });
 
     let num_entity_nodes = node_indices.len();
     if num_entity_nodes == 0 {
@@ -253,7 +371,13 @@ pub async fn detect_communities(
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
-        let eid = reverse_map[global_idx];
+        let (eid, u64_id) = if global_idx < reverse_map.len() {
+            let eid = reverse_map[global_idx];
+            (eid, eid.inner())
+        } else {
+            let u64_id = u64::MAX - (global_idx - reverse_map.len()) as u64;
+            (EntityId::new(0), u64_id)
+        };
         local_entity_ids.push(eid);
     }
 
@@ -1094,6 +1218,101 @@ mod tests {
                 "CommunityAssignment must reflect config.hyperedges_included = false"
             );
         }
+    }
+
+    #[tokio::test]
+    #[allow(non_snake_case)]
+    async fn test_star_expansion_iterator_and_community_detection() {
+        use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+
+        // Add 3 entities: 1, 2, 3
+        for i in 1..=3 {
+            graph
+                .add_entity(tx, Entity::new(EntityId::new(i), format!("E{i}"), "Type"))
+                .await
+                .unwrap();
+        }
+
+        // Add hyperedge linking E1, E2, E3 (no binary edges present!)
+        let he = HyperEdge::new(
+            HyperEdgeId::new(50),
+            crate::csr::EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), EntityId::new(1)),
+                RoleBinding::new(RoleId::new(2), EntityId::new(2)),
+                RoleBinding::new(RoleId::new(3), EntityId::new(3)),
+            ],
+            1.0,
+        );
+        graph.insert_hyperedge(he);
+        graph.commit(tx).await.unwrap();
+
+        // 1. Verify StarExpansionIterator
+        let star_items: Vec<_> = StarExpansionIterator::new(&graph).collect();
+        assert_eq!(star_items.len(), 3);
+        assert_eq!(
+            star_items,
+            vec![
+                (EntityId::new(1), VirtualHyperedgeNode::new(50)),
+                (EntityId::new(2), VirtualHyperedgeNode::new(50)),
+                (EntityId::new(3), VirtualHyperedgeNode::new(50)),
+            ]
+        );
+
+        // 2. When hyperedges_included = false, E1, E2, E3 are disconnected singletons (no binary edges)
+        let config_false = CommunityDetectionConfig {
+            max_iterations: 10,
+            seed: 42,
+            hyperedges_included: false,
+        };
+        let assignments_false = detect_communities(&graph, &config_false).await.unwrap();
+        assert_eq!(assignments_false.len(), 3);
+        let comm_1 = assignments_false
+            .iter()
+            .find(|a| a.entity_id == EntityId::new(1))
+            .unwrap()
+            .community_id;
+        let comm_2 = assignments_false
+            .iter()
+            .find(|a| a.entity_id == EntityId::new(2))
+            .unwrap()
+            .community_id;
+        let comm_3 = assignments_false
+            .iter()
+            .find(|a| a.entity_id == EntityId::new(3))
+            .unwrap()
+            .community_id;
+        assert_ne!(comm_1, comm_2);
+        assert_ne!(comm_2, comm_3);
+
+        // 3. When hyperedges_included = true, star expansion connects E1, E2, E3 via virtual hyperedge node
+        let config_true = CommunityDetectionConfig {
+            max_iterations: 10,
+            seed: 42,
+            hyperedges_included: true,
+        };
+        let assignments_true = detect_communities(&graph, &config_true).await.unwrap();
+        assert_eq!(assignments_true.len(), 3);
+        let comm_1_h = assignments_true
+            .iter()
+            .find(|a| a.entity_id == EntityId::new(1))
+            .unwrap()
+            .community_id;
+        let comm_2_h = assignments_true
+            .iter()
+            .find(|a| a.entity_id == EntityId::new(2))
+            .unwrap()
+            .community_id;
+        let comm_3_h = assignments_true
+            .iter()
+            .find(|a| a.entity_id == EntityId::new(3))
+            .unwrap()
+            .community_id;
+        assert_eq!(comm_1_h, comm_2_h);
+        assert_eq!(comm_2_h, comm_3_h);
     }
 
     #[test]
