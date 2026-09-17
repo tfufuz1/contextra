@@ -1,0 +1,8 @@
+# MemFuse Bottom-Up Verification — 2026-09-17T19:33:40+02:00
+# Modus: full
+CRATE                  CHECK    CLIPPY   TEST     DAUER(s)  
+memfuse-core-ipc-gen   PASS     PASS     PASS     2         
+memfuse-core           PASS     FAIL     PASS     50        
+memfuse-calibration    PASS     FAIL     PASS     14        
+memfuse-checkpoint     PASS     PASS     PASS     37        
+memfuse-crypto         PASS     FAIL     FAIL     154       

@@ -1,0 +1,21 @@
+# MemFuse Bottom-Up Verification — 2026-09-17T19:12:57+02:00
+# Modus: fast
+CRATE                  CHECK    CLIPPY   TEST     DAUER(s)  
+memfuse-core-ipc-gen   PASS     SKIP     SKIP     1         
+memfuse-core           PASS     SKIP     SKIP     7         
+memfuse-calibration    PASS     SKIP     SKIP     6         
+memfuse-checkpoint     PASS     SKIP     SKIP     7         
+memfuse-crypto         PASS     SKIP     SKIP     14        
+memfuse-graph          PASS     SKIP     SKIP     17        
+memfuse-sandbox        PASS     SKIP     SKIP     45        
+memfuse-text           PASS     SKIP     SKIP     6         
+memfuse-index          PASS     SKIP     SKIP     10        
+memfuse-ollama         PASS     SKIP     SKIP     20        
+memfuse-store          PASS     SKIP     SKIP     15        
+memfuse-candle         PASS     SKIP     SKIP     39        
+memfuse-embed          PASS     SKIP     SKIP     1         
+memfuse-db             FAIL     SKIP     SKIP     55        
+
+!!! STOP: memfuse-db kompiliert nicht. Downstream-Crates werden übersprungen.
+!!! Fehlerdetails: siehe results/verify_20260917_191257.log (Abschnitt '=== memfuse-db ===')
+!!! Fortsetzen nach Fix mit: ./verify_workspace.sh --resume memfuse-db
