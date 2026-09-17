@@ -24,7 +24,7 @@ fn bench_bandit_latency_gate(c: &mut Criterion) {
 
         b.iter(|| {
             let score = state.score(black_box(&x), black_box(cost), black_box(is_cloud));
-            state.update(
+            let _ = state.update(
                 black_box(&x),
                 black_box(reward),
                 black_box(cost),
@@ -43,7 +43,7 @@ fn bench_bandit_latency_gate(c: &mut Criterion) {
 
             b.iter(|| {
                 let score = state.score(black_box(&x), black_box(cost), black_box(is_cloud));
-                state.update(
+                let _ = state.update(
                     black_box(&x),
                     black_box(reward),
                     black_box(cost),

@@ -51,7 +51,10 @@ pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
     CascadeInvalidationReport, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
-pub use community::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
+pub use community::{
+    detect_communities, CommunityAssignment, CommunityDetectionConfig, StarExpansionIterator,
+    VirtualHyperedgeNode,
+};
 pub use consistency_enforcement::{
     ConflictPattern, ConsistencyEnforcer, ContradictionDetector, EdgeAssertion, EdgeId,
     ExactPredicateConflictDetector,

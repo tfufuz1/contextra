@@ -19,10 +19,18 @@
     {
       "krate": "memfuse-graph",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-17T21:33:17.186574834+00:00",
-      "session_id": "4563856472918898450",
+      "timestamp": "2026-09-17T21:21:24.123057658+00:00",
+      "session_id": "604547472940316711",
       "active": true,
-      "expires_at": "2026-09-18T01:33:17.186546659+00:00"
+      "expires_at": "2026-09-18T01:21:24.123038562+00:00"
+    },
+    {
+      "krate": "memfuse-py",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-17T22:52:36.409854645+00:00",
+      "session_id": "15341767735733559964",
+      "active": true,
+      "expires_at": "2026-09-18T02:52:36.409832401+00:00"
     }
   ]
 }

@@ -21,14 +21,14 @@ fn test_bandit_diagonal_vs_linucb_latency_budget() {
     // Warmup
     for _ in 0..10 {
         let _ = diag_state.score(&x, cost, is_cloud);
-        diag_state.update(&x, reward, cost, is_cloud);
+        let _ = diag_state.update(&x, reward, cost, is_cloud);
     }
 
     let mut diag_latencies: Vec<u64> = Vec::with_capacity(BENCHMARK_ITERATIONS);
     for _ in 0..BENCHMARK_ITERATIONS {
         let start = Instant::now();
         let _s = diag_state.score(&x, cost, is_cloud);
-        diag_state.update(&x, reward, cost, is_cloud);
+        let _ = diag_state.update(&x, reward, cost, is_cloud);
         diag_latencies.push(start.elapsed().as_micros() as u64);
     }
     diag_latencies.sort_unstable();
@@ -54,14 +54,14 @@ fn test_bandit_diagonal_vs_linucb_latency_budget() {
         // Warmup
         for _ in 0..10 {
             let _ = sm_state.score(&x, cost, is_cloud);
-            sm_state.update(&x, reward, cost, is_cloud);
+            let _ = sm_state.update(&x, reward, cost, is_cloud);
         }
 
         let mut sm_latencies: Vec<u64> = Vec::with_capacity(BENCHMARK_ITERATIONS);
         for _ in 0..BENCHMARK_ITERATIONS {
             let start = Instant::now();
             let _s = sm_state.score(&x, cost, is_cloud);
-            sm_state.update(&x, reward, cost, is_cloud);
+            let _ = sm_state.update(&x, reward, cost, is_cloud);
             sm_latencies.push(start.elapsed().as_micros() as u64);
         }
         sm_latencies.sort_unstable();
