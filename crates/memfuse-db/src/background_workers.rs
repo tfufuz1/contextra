@@ -5,6 +5,9 @@
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 use crate::collection::{Collection, StoredDocument};
+use memfuse_graph::hyperedge::HyperEdgeId;
+use std::collections::VecDeque;
+use tokio::sync::Mutex;
 use crate::consolidation_executor::{execute_consolidation_pass, ConsolidationLockGuard};
 use crate::memory_consolidation::ConsolidationConfig;
 use memfuse_core::traits::StorageEngine;
@@ -83,6 +86,38 @@ pub const MAX_ORPHANS_PER_TICK: usize = 100;
 
 /// Maximum number of expired documents processed in a single expiry cleanup tick.
 pub const MAX_EXPIRED_PER_TICK: usize = 100;
+
+/// Maximum number of deferred hyperedges processed in a single worker tick.
+pub const MAX_DEFERRED_HYPEREDGES_PER_TICK: usize = 1_000;
+
+/// Thread-safe FIFO queue for storing hyperedges whose cascade invalidation was
+/// deferred to the background worker due to fan-out limits (H5 / AK-6).
+#[derive(Debug, Default)]
+pub struct DeferredHyperedgeQueue {
+    inner: Mutex<VecDeque<HyperEdgeId>>,
+}
+
+impl DeferredHyperedgeQueue {
+    /// Creates a new empty `DeferredHyperedgeQueue`.
+    pub fn new() -> Self {
+        Self {
+            inner: Mutex::new(VecDeque::new()),
+        }
+    }
+
+    /// Enqueues hyperedge IDs for deferred background tombstoning.
+    pub async fn enqueue(&self, ids: impl IntoIterator<Item = HyperEdgeId>) {
+        let mut guard = self.inner.lock().await;
+        guard.extend(ids);
+    }
+
+    /// Drains up to `max` hyperedge IDs from the front of the queue (FIFO).
+    pub async fn drain_up_to(&self, max: usize) -> Vec<HyperEdgeId> {
+        let mut guard = self.inner.lock().await;
+        let drain_count = max.min(guard.len());
+        guard.drain(..drain_count).collect()
+    }
+}
 
 /// Starts a background task for periodic consolidation.
 #[deprecated(
@@ -193,6 +228,68 @@ pub fn start_consolidation_reaper<S: StorageEngine>(
     cancel_token: tokio_util::sync::CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
     start_consolidation_worker(collection, consolidation_config, interval, cancel_token)
+}
+
+/// Starts a background task to process deferred hyperedge tombstones.
+///
+/// ARCHITEKTUR-HINTERGRUND (H5 / AK-6 & Welle 8 Prompt 7):
+/// Wenn beim Ersetzen/Invalidieren eines Dokuments in `consolidation_locks.rs` das
+/// Kaskadier-Limit für Hyperkanten erreicht wird, werden verbleibende Hyperkanten nicht
+/// synchron im Schreibpfad entwertet, sondern als `deferred: Vec<HyperEdgeId>` zurückgegeben.
+/// Die DAG-Hierarchie `memfuse-db -> memfuse-graph` verbietet einen direkten Aufruf von
+/// `memfuse-graph` in `background_workers.rs` zurück nach `memfuse-db` — stattdessen reiht der
+/// Aufrufer in `memfuse-db` die IDs in die `DeferredHyperedgeQueue` ein.
+///
+/// Dieser Worker nimmt pro Tick bis zu `MAX_DEFERRED_HYPEREDGES_PER_TICK` HyperEdgeIDs aus der Queue
+/// und ruft `collection.graph_index().tombstone_hyperedge(id)` auf.
+/// Die tatsächliche Befüllung der Queue via `.enqueue(...)` mit dem `deferred`-Feld aus
+/// `HyperedgeCascadeReport` ist ein Folge-Schritt in `consolidation_locks.rs::cascade_invalidate_edges_ordered`,
+/// sobald diese Datei freigegeben ist.
+pub fn start_hyperedge_cascade_deferred_worker<S: StorageEngine>(
+    collection: Arc<Collection<S>>,
+    queue: Arc<DeferredHyperedgeQueue>,
+    interval: Duration,
+    cancel_token: tokio_util::sync::CancellationToken,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        tracing::info!(
+            collection = %collection.name(),
+            interval = ?interval,
+            "Deferred hyperedge cascade worker task started"
+        );
+
+        loop {
+            tokio::select! {
+                _ = ticker.tick() => {
+                    let batch = queue.drain_up_to(MAX_DEFERRED_HYPEREDGES_PER_TICK).await;
+                    if !batch.is_empty() {
+                        let graph = collection.graph_index();
+                        let mut tombstoned_count = 0usize;
+                        for id in batch {
+                            if graph.tombstone_hyperedge(id) {
+                                tombstoned_count += 1;
+                            }
+                        }
+                        tracing::info!(
+                            collection = %collection.name(),
+                            processed = tombstoned_count,
+                            "Deferred hyperedge worker tombstoned hyperedges"
+                        );
+                    }
+                }
+                _ = cancel_token.cancelled() => {
+                    tracing::info!(
+                        collection = %collection.name(),
+                        "Deferred hyperedge worker task shutting down via token"
+                    );
+                    break;
+                }
+            }
+        }
+    })
 }
 
 /// Starts a background task to periodically clean up expired documents with TTL.
@@ -521,6 +618,238 @@ mod tests {
                 Ok(())
             })
         }
+    }
+
+    #[tokio::test]
+    async fn test_deferred_hyperedge_queue_fifo_and_limits() {
+        let queue = DeferredHyperedgeQueue::new();
+
+        // (c) drain_up_to on empty queue returns empty Vec without panic
+        let empty = queue.drain_up_to(100).await;
+        assert!(empty.is_empty());
+
+        // (a) FIFO ordering test
+        queue
+            .enqueue(vec![
+                HyperEdgeId::new(10),
+                HyperEdgeId::new(20),
+                HyperEdgeId::new(30),
+            ])
+            .await;
+
+        let drained_part = queue.drain_up_to(2).await;
+        assert_eq!(
+            drained_part,
+            vec![HyperEdgeId::new(10), HyperEdgeId::new(20)]
+        );
+
+        // (b) drain_up_to with max larger than queue content returns all remaining elements without panic
+        let drained_all = queue.drain_up_to(100).await;
+        assert_eq!(drained_all, vec![HyperEdgeId::new(30)]);
+
+        let empty_again = queue.drain_up_to(10).await;
+        assert!(empty_again.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_deferred_hyperedge_worker_single_tick_processing() {
+        use memfuse_graph::CsrGraph;
+        use memfuse_index::HnswIndex;
+        use memfuse_store::LsmStorage;
+        use std::sync::atomic::AtomicU64;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let storage = Arc::new(
+            LsmStorage::new(memfuse_store::LsmConfig {
+                path: dir.path().to_path_buf(),
+                ..Default::default()
+            })
+            .await
+            .unwrap(),
+        );
+        let index = Arc::new(
+            HnswIndex::try_new(memfuse_index::HnswConfig {
+                dimension: 4,
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+        let col = Arc::new(crate::Collection::new(
+            "default".to_string(),
+            storage,
+            index,
+            Arc::new(CsrGraph::new()),
+            Arc::new(AtomicU64::new(1)),
+            4,
+            memfuse_text::Language::English,
+        ));
+
+        let queue = Arc::new(DeferredHyperedgeQueue::new());
+        queue
+            .enqueue(vec![HyperEdgeId::new(1), HyperEdgeId::new(2)])
+            .await;
+
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+        let handle = start_hyperedge_cascade_deferred_worker(
+            col.clone(),
+            queue.clone(),
+            Duration::from_millis(10),
+            cancel_token.clone(),
+        );
+
+        // (d) Worker processes a tick with fewer than MAX_DEFERRED_HYPEREDGES_PER_TICK completely
+        let mut processed = false;
+        for _ in 0..50 {
+            sleep(Duration::from_millis(10)).await;
+            if queue.drain_up_to(1).await.is_empty() {
+                processed = true;
+                break;
+            }
+        }
+
+        cancel_token.cancel();
+        let _ = handle.await;
+
+        assert!(processed, "Worker should process queued items in tick");
+    }
+
+    #[tokio::test]
+    async fn test_deferred_hyperedge_worker_fanout_multitick_processing() {
+        use memfuse_graph::CsrGraph;
+        use memfuse_index::HnswIndex;
+        use memfuse_store::LsmStorage;
+        use std::sync::atomic::AtomicU64;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let storage = Arc::new(
+            LsmStorage::new(memfuse_store::LsmConfig {
+                path: dir.path().to_path_buf(),
+                ..Default::default()
+            })
+            .await
+            .unwrap(),
+        );
+        let index = Arc::new(
+            HnswIndex::try_new(memfuse_index::HnswConfig {
+                dimension: 4,
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+        let col = Arc::new(crate::Collection::new(
+            "default".to_string(),
+            storage,
+            index,
+            Arc::new(CsrGraph::new()),
+            Arc::new(AtomicU64::new(1)),
+            4,
+            memfuse_text::Language::English,
+        ));
+
+        let queue = Arc::new(DeferredHyperedgeQueue::new());
+
+        // (e) Enqueue 2,500 items (> MAX_DEFERRED_HYPEREDGES_PER_TICK = 1,000)
+        let total_items = 2_500;
+        let items: Vec<HyperEdgeId> = (1..=total_items).map(HyperEdgeId::new).collect();
+        queue.enqueue(items).await;
+
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+        let handle = start_hyperedge_cascade_deferred_worker(
+            col.clone(),
+            queue.clone(),
+            Duration::from_millis(10),
+            cancel_token.clone(),
+        );
+
+        // Wait for multiple ticks to drain all 2,500 items
+        let mut fully_drained = false;
+        for _ in 0..100 {
+            sleep(Duration::from_millis(15)).await;
+            if queue.drain_up_to(1).await.is_empty() {
+                fully_drained = true;
+                break;
+            }
+        }
+
+        cancel_token.cancel();
+        let _ = handle.await;
+
+        assert!(
+            fully_drained,
+            "Worker should drain all items across multiple ticks without item loss"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deferred_hyperedge_worker_graceful_shutdown_preserves_queue() {
+        use memfuse_graph::CsrGraph;
+        use memfuse_index::HnswIndex;
+        use memfuse_store::LsmStorage;
+        use std::sync::atomic::AtomicU64;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let storage = Arc::new(
+            LsmStorage::new(memfuse_store::LsmConfig {
+                path: dir.path().to_path_buf(),
+                ..Default::default()
+            })
+            .await
+            .unwrap(),
+        );
+        let index = Arc::new(
+            HnswIndex::try_new(memfuse_index::HnswConfig {
+                dimension: 4,
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+        let col = Arc::new(crate::Collection::new(
+            "default".to_string(),
+            storage,
+            index,
+            Arc::new(CsrGraph::new()),
+            Arc::new(AtomicU64::new(1)),
+            4,
+            memfuse_text::Language::English,
+        ));
+
+        let queue = Arc::new(DeferredHyperedgeQueue::new());
+        queue
+            .enqueue(vec![
+                HyperEdgeId::new(100),
+                HyperEdgeId::new(200),
+                HyperEdgeId::new(300),
+            ])
+            .await;
+
+        let cancel_token = tokio_util::sync::CancellationToken::new();
+        // Cancel token before worker even runs
+        cancel_token.cancel();
+
+        let handle = start_hyperedge_cascade_deferred_worker(
+            col.clone(),
+            queue.clone(),
+            Duration::from_secs(60),
+            cancel_token.clone(),
+        );
+
+        let res = handle.await;
+        assert!(res.is_ok(), "Task should exit cleanly upon cancellation");
+
+        // (f) Shutdown preserves unhandled items in queue
+        let remaining = queue.drain_up_to(100).await;
+        assert_eq!(
+            remaining,
+            vec![
+                HyperEdgeId::new(100),
+                HyperEdgeId::new(200),
+                HyperEdgeId::new(300)
+            ],
+            "Cancelled worker must not lose unhandled elements in queue"
+        );
     }
 
     #[tokio::test]
