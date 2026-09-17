@@ -122,6 +122,16 @@ pub const MAX_DAG_STRING_BYTES: usize = 10 * 1024 * 1024;
 /// Maximale Pfadtiefe in einem SessionDag (Schutz vor Zyklen und Tiefenexplosion).
 pub const MAX_DAG_TRAVERSAL_DEPTH: usize = 10_000;
 
+/// Options for creating or branching a new step in the Session-DAG.
+#[derive(Debug, Clone)]
+pub struct SessionDagStepOptions<'a> {
+    pub prompt: String,
+    pub response: String,
+    pub snapshot_tx_id: Option<TxId>,
+    pub tool_outputs: Vec<String>,
+    pub label: &'a str,
+}
+
 /// Session-DAG for a single agent conversation tree.
 ///
 /// # Invariants
@@ -181,12 +191,16 @@ impl SessionBranchTree {
         &self,
         nodes: &mut NodesWriteGuard<'_>,
         parent_node: NodeIdx,
-        prompt: String,
-        response: String,
-        snapshot_tx_id: Option<TxId>,
-        tool_outputs: Vec<String>,
-        label: &str,
+        options: SessionDagStepOptions<'_>,
     ) -> Result<NodeIdx> {
+        let SessionDagStepOptions {
+            prompt,
+            response,
+            snapshot_tx_id,
+            tool_outputs,
+            label,
+        } = options;
+
         if prompt.len() > MAX_DAG_STRING_BYTES || response.len() > MAX_DAG_STRING_BYTES {
             return Err(MemFuseError::InvalidInput(format!(
                 "SessionDAG: prompt or response size exceeds limit of {MAX_DAG_STRING_BYTES} bytes"
@@ -237,11 +251,13 @@ impl SessionBranchTree {
         let new_id = self.branch_from_internal(
             &mut nodes,
             parent,
-            prompt,
-            response,
-            snapshot_tx_id,
-            tool_outputs,
-            label,
+            SessionDagStepOptions {
+                prompt,
+                response,
+                snapshot_tx_id,
+                tool_outputs,
+                label,
+            },
         )?;
         let mut head_guard = nodes.active_head_write();
         *head_guard = new_id;
@@ -265,11 +281,13 @@ impl SessionBranchTree {
         self.branch_from_internal(
             &mut nodes,
             parent_node,
-            prompt,
-            response,
-            snapshot_tx_id,
-            tool_outputs,
-            label,
+            SessionDagStepOptions {
+                prompt,
+                response,
+                snapshot_tx_id,
+                tool_outputs,
+                label,
+            },
         )
     }
 
