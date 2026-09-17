@@ -62,10 +62,10 @@ pub use edge_reinforcement::{
 pub use edge_reinforcement_buffer::edge_reinforcement_buffer::{
     CooccurrenceSignal, EdgeReinforcementBuffer, TraversalSignal,
 };
-pub use hyperedge::{
-    HyperEdge, HyperEdgeId, RoleBinding, RoleId, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
+pub use path_rag::{
+    EntityId, GraphPath, HyperEdge, HyperEdgeId, PathGraph, PathRAGConfig, PathRAGEngine,
+    RoleBinding,
 };
-pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGEngine};
 #[cfg(feature = "graph-connectivity-health")]
 pub use percolation::{
     compute_percolation_health, find_rebonding_candidates, should_trigger_rebonding,
