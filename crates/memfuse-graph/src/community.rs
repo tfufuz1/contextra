@@ -23,69 +23,6 @@ use memfuse_core::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Represents a synthetic bipartite hyperedge node generated during star expansion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct VirtualHyperedgeNode {
-    /// Numerical ID of the hyperedge.
-    pub hyperedge_id: u64,
-}
-
-impl VirtualHyperedgeNode {
-    /// Creates a new `VirtualHyperedgeNode`.
-    pub fn new(hyperedge_id: u64) -> Self {
-        Self { hyperedge_id }
-    }
-}
-
-/// Zero-allocation iterator for star expansion projection of hyperedges.
-///
-/// Yields binary incidence pairs `(EntityId, VirtualHyperedgeNode)` representing the incidence matrix H
-/// without physical graph materialization or heap allocations per `next()` call.
-pub struct StarExpansionIterator<'a> {
-    graph: &'a CsrGraph,
-    hyperedge_ids: Vec<crate::hyperedge::HyperEdgeId>,
-    current_he_idx: usize,
-    current_participant_idx: usize,
-}
-
-impl<'a> StarExpansionIterator<'a> {
-    /// Creates a new `StarExpansionIterator` over all hyperedges currently present in `graph`.
-    pub fn new(graph: &'a CsrGraph) -> Self {
-        let hyperedge_ids = {
-            let inner = graph.inner_read();
-            inner.hyperedges.keys().copied().collect()
-        };
-        Self {
-            graph,
-            hyperedge_ids,
-            current_he_idx: 0,
-            current_participant_idx: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for StarExpansionIterator<'a> {
-    type Item = (EntityId, VirtualHyperedgeNode);
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let inner = self.graph.inner_read();
-        while self.current_he_idx < self.hyperedge_ids.len() {
-            let he_id = self.hyperedge_ids[self.current_he_idx];
-            if let Some(he) = inner.hyperedges.get(&he_id) {
-                if self.current_participant_idx < he.participants.len() {
-                    let participant = &he.participants[self.current_participant_idx];
-                    self.current_participant_idx += 1;
-                    return Some((participant.entity, VirtualHyperedgeNode::new(he_id.inner())));
-                }
-            }
-            self.current_he_idx += 1;
-            self.current_participant_idx = 0;
-        }
-        None
-    }
-}
-
 /// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunityDetectionConfig {
@@ -100,9 +37,18 @@ pub struct CommunityDetectionConfig {
 
 /// Künstlicher bipartiter Knoten für eine Hyperkante in der Stern-Expansion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+
 pub struct VirtualHyperedgeNode {
     /// ID der zugrundeliegenden Hyperkante.
     pub hyperedge_id: crate::hyperedge::HyperEdgeId,
+}
+
+impl VirtualHyperedgeNode {
+    pub fn new(hyperedge_id: u64) -> Self {
+        Self {
+            hyperedge_id: crate::hyperedge::HyperEdgeId::new(hyperedge_id),
+        }
+    }
 }
 
 /// Stern-Expansion: Jede Hyperkante wird als künstlicher bipartiter Knoten
@@ -143,7 +89,11 @@ impl<'a> StarExpansionIterator<'a> {
                 let vnode = VirtualHyperedgeNode {
                     hyperedge_id: hedge.id,
                 };
-                let weight = if hedge.weight > 0.0 { hedge.weight } else { 1.0 };
+                let weight = if hedge.weight > 0.0 {
+                    hedge.weight
+                } else {
+                    1.0
+                };
                 self.current_participant_idx += 1;
                 return Some((entity_id, vnode, weight));
             } else {
@@ -159,7 +109,8 @@ impl<'a> Iterator for StarExpansionIterator<'a> {
     type Item = (EntityId, VirtualHyperedgeNode);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_with_weight().map(|(entity, vnode, _w)| (entity, vnode))
+        self.next_with_weight()
+            .map(|(entity, vnode, _w)| (entity, vnode))
     }
 }
 
@@ -253,7 +204,7 @@ pub async fn detect_communities(
     graph.compact();
 
     // Acquire read lock to access CSR arrays
-    let (valid_nodes, num_real_nodes, reverse_map, adj_raw) = {
+    let (valid_nodes, _num_real_nodes, reverse_map, adj_raw) = {
         let inner = graph.inner_read();
         let num_nodes = inner.reverse_map.len();
 
@@ -308,17 +259,16 @@ pub async fn detect_communities(
             for (entity_id, virtual_node) in star_iter {
                 if let Some(&u) = inner.id_map.get(&entity_id) {
                     if inner.entities.get(u).is_some_and(|e| e.is_some()) {
-                        let v_idx =
-                            *virtual_map
-                                .entry(virtual_node.hyperedge_id)
-                                .or_insert_with(|| {
-                                    let idx = next_virtual_idx;
-                                    next_virtual_idx += 1;
-                                    valid_nodes.push(idx);
-                                    idx
-                                });
+                        let v_idx = *virtual_map
+                            .entry(virtual_node.hyperedge_id.inner())
+                            .or_insert_with(|| {
+                                let idx = next_virtual_idx;
+                                next_virtual_idx += 1;
+                                valid_nodes.push(idx);
+                                idx
+                            });
 
-                        let he_id = crate::hyperedge::HyperEdgeId::new(virtual_node.hyperedge_id);
+                        let he_id = virtual_node.hyperedge_id;
                         let w_val = inner
                             .hyperedges
                             .get(&he_id)
@@ -371,7 +321,7 @@ pub async fn detect_communities(
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
-        let (eid, u64_id) = if global_idx < reverse_map.len() {
+        let (eid, _u64_id) = if global_idx < reverse_map.len() {
             let eid = reverse_map[global_idx];
             (eid, eid.inner())
         } else {
@@ -399,14 +349,12 @@ pub async fn detect_communities(
 
         while let Some((entity_id, vnode, weight)) = star_iter.next_with_weight() {
             if let Some(&local_entity_idx) = entity_to_local.get(&entity_id) {
-                let v_idx = *vnode_to_local
-                    .entry(vnode.hyperedge_id)
-                    .or_insert_with(|| {
-                        let idx = num_entity_nodes + vnode_u64_ids.len();
-                        vnode_u64_ids.push(vnode.hyperedge_id.inner());
-                        vnode_local_adj.push(Vec::new());
-                        idx
-                    });
+                let v_idx = *vnode_to_local.entry(vnode.hyperedge_id).or_insert_with(|| {
+                    let idx = num_entity_nodes + vnode_u64_ids.len();
+                    vnode_u64_ids.push(vnode.hyperedge_id.inner());
+                    vnode_local_adj.push(Vec::new());
+                    idx
+                });
 
                 vnode_local_adj[v_idx - num_entity_nodes].push((local_entity_idx, weight));
             }
@@ -1412,14 +1360,20 @@ mod tests {
         // Cluster 1: Nodes 1, 2, 3 (no binary edges)
         for id in 1..=3 {
             graph
-                .add_entity(tx, Entity::new(EntityId::new(id), format!("C1_{id}"), "Node"))
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(id), format!("C1_{id}"), "Node"),
+                )
                 .await
                 .unwrap(); // unwrap allowed
         }
         // Cluster 2: Nodes 10, 11, 12 (no binary edges)
         for id in 10..=12 {
             graph
-                .add_entity(tx, Entity::new(EntityId::new(id), format!("C2_{id}"), "Node"))
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(id), format!("C2_{id}"), "Node"),
+                )
                 .await
                 .unwrap(); // unwrap allowed
         }
