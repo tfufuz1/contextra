@@ -44,6 +44,7 @@ pub struct VirtualHyperedgeNode {
 }
 
 impl VirtualHyperedgeNode {
+    /// Creates a new `VirtualHyperedgeNode`.
     pub fn new(hyperedge_id: u64) -> Self {
         Self {
             hyperedge_id: crate::hyperedge::HyperEdgeId::new(hyperedge_id),
@@ -259,14 +260,15 @@ pub async fn detect_communities(
             for (entity_id, virtual_node) in star_iter {
                 if let Some(&u) = inner.id_map.get(&entity_id) {
                     if inner.entities.get(u).is_some_and(|e| e.is_some()) {
-                        let v_idx = *virtual_map
-                            .entry(virtual_node.hyperedge_id.inner())
-                            .or_insert_with(|| {
-                                let idx = next_virtual_idx;
-                                next_virtual_idx += 1;
-                                valid_nodes.push(idx);
-                                idx
-                            });
+                        let v_idx =
+                            *virtual_map
+                                .entry(virtual_node.hyperedge_id.inner())
+                                .or_insert_with(|| {
+                                    let idx = next_virtual_idx;
+                                    next_virtual_idx += 1;
+                                    valid_nodes.push(idx);
+                                    idx
+                                });
 
                         let he_id = virtual_node.hyperedge_id;
                         let w_val = inner

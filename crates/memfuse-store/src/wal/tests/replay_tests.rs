@@ -1497,6 +1497,40 @@ async fn test_seq_no_near_u64_max_boundary() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_mmap_slice_bounds_mismatch_no_panic() {
+    let dir = tempdir().expect("tempdir");
+    let wal_path = dir.path().join("mmap_bounds.wal");
+
+    {
+        let wal = Wal::open(&wal_path).await.expect("open wal");
+        for i in 1..=3 {
+            let op = WalOp::Put {
+                tx_id: TxId::new(i),
+                key: format!("key_{i}").into_bytes(),
+                value: format!("val_{i}").into_bytes(),
+            };
+            let (batch, _) = wal.prepare_batch(vec![(op, i)]).await.expect("batch");
+            wal.append_batch(batch).await.expect("append");
+        }
+    }
+
+    let real_data = tokio::fs::read(&wal_path).await.expect("read wal");
+    let real_file_size = real_data.len() as u64;
+
+    let wal = Wal::open(&wal_path).await.expect("reopen wal");
+
+    // Pass a slice that is deliberately shorter than reported file_size
+    let truncated_slice = &real_data[..real_data.len() / 2];
+    let res = wal.parse_mmap_slice(truncated_slice, real_file_size);
+
+    // Verify it handles the truncated slice gracefully without panic
+    assert!(
+        res.is_ok() || matches!(res, Err(MemFuseError::WalCorruption { .. })),
+        "parse_mmap_slice with slice shorter than file_size must not panic"
+    );
+}
+
+#[tokio::test]
 async fn test_empty_wal_file_zero_bytes_replay() -> Result<()> {
     let dir = tempdir()?;
     let wal_path = dir.path().join("empty_zero_byte.wal");

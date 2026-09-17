@@ -212,6 +212,67 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k
     }
 
+    pub(crate) fn key_batch_posting_list(&self, term: &str) -> Vec<u8> {
+        let mut k = Vec::with_capacity(self.prefix.len() + 4 + term.len());
+        k.extend_from_slice(&self.prefix);
+        k.extend_from_slice(b"plb:");
+        k.extend_from_slice(term.as_bytes());
+        k
+    }
+
+    /// Ensures that the posting list for a term is loaded into the resident index from storage.
+    pub(crate) async fn ensure_term_loaded(
+        &self,
+        term: &str,
+    ) -> Result<Arc<crate::posting_list::PostingList>> {
+        if let Some(list) = self.resident_index.get(term) {
+            return Ok(list);
+        }
+
+        let plb_key = self.key_batch_posting_list(term);
+        if let Some(bytes) = self.storage.get(&plb_key).await? {
+            if let Ok(plist) = bincode::deserialize::<crate::posting_list::PostingList>(&bytes) {
+                self.resident_index.insert_list(term.to_string(), plist);
+                if let Some(l) = self.resident_index.get(term) {
+                    return Ok(l);
+                }
+            }
+        }
+
+        // Fallback to legacy single-key prefix scan
+        let prefix = self.key_term_prefix(term);
+        let raw_entries = self.storage.scan_prefix(&prefix).await?;
+        let mut postings = Vec::with_capacity(raw_entries.len());
+        for (key, val_bytes) in raw_entries {
+            let suffix_bytes = &key[prefix.len()..];
+            if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
+                if let Ok(doc_id_raw) = suffix.parse::<u64>() {
+                    if val_bytes.len() == 4 {
+                        let doc_id = DocId::new(doc_id_raw);
+                        let tf =
+                            u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(|_| {
+                                MemFuseError::Storage("Invalid posting tf length".into())
+                            })?);
+                        let dl_key = self.key_with_id("dl:", doc_id.inner());
+                        let doc_len = match self.storage.get(&dl_key).await? {
+                            Some(dl_bytes) if dl_bytes.len() == 4 => {
+                                u32::from_le_bytes((&dl_bytes[..]).try_into().map_err(|_| {
+                                    MemFuseError::Storage("Invalid doc_len length".into())
+                                })?)
+                            }
+                            _ => 0,
+                        };
+                        postings.push(Posting::new(doc_id, tf, doc_len));
+                    }
+                }
+            }
+        }
+        let plist = crate::posting_list::PostingList::new(postings);
+        self.resident_index
+            .insert_list(term.to_string(), plist.clone());
+        Ok(Arc::new(plist))
+    }
+
     /// Generates a tombstone storage key for document updating or deletion.
     ///
     /// # Tombstone Key & Value Schema
@@ -301,10 +362,18 @@ impl<S: StorageEngine> InvertedIndex<S> {
         self.stage_stats_change(tx, change)?;
 
         for (term, tf) in &tfs_vec {
+            self.ensure_term_loaded(term).await?;
             let pl_doc_key = self.key_with_term_doc(term, doc_id);
             self.storage.put(tx, &pl_doc_key, &tf.to_le_bytes()).await?;
             self.resident_index
                 .upsert_posting(term, Posting::new(doc_id, *tf, new_len));
+
+            if let Some(plist) = self.resident_index.get(term) {
+                let batch_bytes = bincode::serialize(plist.as_ref())
+                    .map_err(|e| MemFuseError::Storage(format!("bincode: {}", e)))?;
+                let plb_key = self.key_batch_posting_list(term);
+                self.storage.put(tx, &plb_key, &batch_bytes).await?;
+            }
         }
 
         Ok(())
@@ -366,10 +435,20 @@ impl<S: StorageEngine> InvertedIndex<S> {
             };
 
             if !is_live {
+                self.ensure_term_loaded(&term).await?;
                 let pl_key = self.key_with_term_doc(&term, doc_id);
                 self.storage.delete(tx, &pl_key).await?;
                 self.resident_index
                     .remove_posting_from_terms(std::slice::from_ref(&term), doc_id);
+
+                let plb_key = self.key_batch_posting_list(&term);
+                if let Some(plist) = self.resident_index.get(&term) {
+                    let batch_bytes = bincode::serialize(plist.as_ref())
+                        .map_err(|e| MemFuseError::Storage(format!("bincode: {}", e)))?;
+                    self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                } else {
+                    self.storage.delete(tx, &plb_key).await?;
+                }
             }
             self.storage.delete(tx, &tbs_key).await?;
             resolved += 1;
@@ -401,11 +480,24 @@ impl<S: StorageEngine> InvertedIndex<S> {
         // Remove from posting lists using forward index and write tombstone markers
         if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
             if let Ok(old_terms) = bincode::deserialize::<Vec<String>>(&fw_bytes) {
-                for term in old_terms {
-                    let pl_doc_key = self.key_with_term_doc(&term, doc_id);
+                for term in &old_terms {
+                    self.ensure_term_loaded(term).await?;
+                    let pl_doc_key = self.key_with_term_doc(term, doc_id);
                     self.storage.delete(tx, &pl_doc_key).await?;
-                    let tbs_key = self.key_tombstone(doc_id, &term);
+                    let tbs_key = self.key_tombstone(doc_id, term);
                     self.storage.put(tx, &tbs_key, &[]).await?;
+
+                    self.resident_index
+                        .remove_posting_from_terms(std::slice::from_ref(term), doc_id);
+
+                    let plb_key = self.key_batch_posting_list(term);
+                    if let Some(plist) = self.resident_index.get(term) {
+                        let batch_bytes = bincode::serialize(plist.as_ref())
+                            .map_err(|e| MemFuseError::Storage(format!("bincode: {}", e)))?;
+                        self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                    } else {
+                        self.storage.delete(tx, &plb_key).await?;
+                    }
                 }
             }
         }
@@ -2023,6 +2115,57 @@ mod tests {
             cold_duration,
             speedup_factor
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_batch_posting_list_persistence_and_fallback() -> Result<()> {
+        let storage = Arc::new(MockStorage::new());
+        let index = InvertedIndex::new(storage.clone(), "batch_test");
+
+        let tx = TxId::new(1);
+        let d1 = DocId::new(10);
+        let d2 = DocId::new(20);
+
+        // Upsert documents using batch persistence
+        index.upsert_document(tx, d1, "rust batch search").await?;
+        index.upsert_document(tx, d2, "rust stream search").await?;
+        index.commit(tx).await?;
+
+        // Verify batch key plb:rust exists in storage
+        let plb_key = index.key_batch_posting_list("rust");
+        let batch_bytes = storage.get(&plb_key).await?.expect("plb:rust must exist");
+        let plist: crate::posting_list::PostingList =
+            bincode::deserialize(&batch_bytes).expect("deserialization");
+        assert_eq!(plist.len(), 2);
+        assert_eq!(plist.as_slice()[0].doc_id(), d1);
+        assert_eq!(plist.as_slice()[1].doc_id(), d2);
+
+        // Clear resident index to test cold batch loading from storage
+        index.resident_index.clear();
+        let search_res = index.search_bm25("rust", 10, None).await?;
+        assert_eq!(search_res.len(), 2);
+
+        // Verify backward compatibility fallback reading for single-key legacy postings:
+        let legacy_term = "legacyterm";
+        let legacy_pl_key = index.key_with_term_doc(legacy_term, d1);
+        let dl_key = index.key_with_id("dl:", d1.inner());
+        let tx_legacy = TxId::new(2);
+        storage
+            .put(tx_legacy, &dl_key, &10u32.to_le_bytes())
+            .await?;
+        storage
+            .put(tx_legacy, &legacy_pl_key, &2u32.to_le_bytes())
+            .await?;
+        storage.commit(tx_legacy).await?;
+
+        // Cold load for legacy term without plb: record
+        index.resident_index.clear();
+        let loaded = index.ensure_term_loaded(legacy_term).await?;
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded.as_slice()[0].doc_id(), d1);
+        assert_eq!(loaded.as_slice()[0].tf, 2);
 
         Ok(())
     }

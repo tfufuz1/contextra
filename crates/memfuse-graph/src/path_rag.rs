@@ -8,6 +8,7 @@
 //! Resultat von to_rrf_signal() wird in FusionEngine als drittes Signal eingespeist.
 
 pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use ahash::AHashMap;
 use memfuse_core::DocId;
 pub use memfuse_core::EntityId;
 use std::cmp::Reverse;
@@ -41,6 +42,102 @@ pub trait PathGraph: Send + Sync {
     fn get_hyperedge(&self, _id: HyperEdgeId) -> Option<HyperEdge> {
         None
     }
+
+    /// Returns participant role bindings for a given hyperedge ID (default: resolves via get_hyperedge).
+    fn hyperedge_participants(&self, id: HyperEdgeId) -> Vec<RoleBinding> {
+        self.get_hyperedge(id)
+            .map(|he| he.participants)
+            .unwrap_or_default()
+    }
+}
+
+/// Configuration parameters for Forward-Push Personalized PageRank (PPR).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PprParams {
+    /// Teleport probability ($\alpha$, default: 0.15).
+    pub alpha: f32,
+    /// Convergence error tolerance threshold ($\epsilon$, default: 1e-4).
+    pub epsilon: f32,
+    /// Discount factor applied to virtual hyperedge neighbor push shares (default: 0.85).
+    pub hyperedge_decay: f32,
+}
+
+impl Default for PprParams {
+    fn default() -> Self {
+        Self {
+            alpha: 0.15,
+            epsilon: 1e-4,
+            hyperedge_decay: 0.85,
+        }
+    }
+}
+
+/// Andersen-Chung-Lang Forward-Push PPR implementation with Hyperedge Expansion (§6.6, H3).
+///
+/// Runtime is $O(1/(\alpha \cdot \epsilon))$, independent of $|V| + |E|$ (P24).
+pub fn forward_push_ppr<G: PathGraph>(
+    graph: &G,
+    seeds: &[EntityId],
+    params: &PprParams,
+) -> AHashMap<EntityId, f32> {
+    let mut p: AHashMap<EntityId, f32> = AHashMap::default();
+    if seeds.is_empty() {
+        return p;
+    }
+
+    let mut r: AHashMap<EntityId, f32> = seeds
+        .iter()
+        .map(|&s| (s, 1.0 / seeds.len() as f32))
+        .collect();
+    let mut queue: std::collections::VecDeque<EntityId> = seeds.iter().copied().collect();
+    let mut in_queue: ahash::AHashSet<EntityId> = seeds.iter().copied().collect();
+
+    while let Some(u) = queue.pop_front() {
+        in_queue.remove(&u);
+
+        let binary_neighbors = graph.neighbors_with_weights(u);
+        let mut hyper_participants = Vec::new();
+        for hedge_id in graph.hyperedges_for_entity(u) {
+            for role_binding in graph.hyperedge_participants(hedge_id) {
+                if role_binding.entity != u {
+                    hyper_participants.push(role_binding.entity);
+                }
+            }
+        }
+
+        let total_neighbors_count = binary_neighbors.len() + hyper_participants.len();
+        let degree = (total_neighbors_count as f32).max(1.0);
+
+        let r_u = *r.get(&u).unwrap_or(&0.0);
+        if r_u / degree <= params.epsilon {
+            continue;
+        }
+
+        *p.entry(u).or_insert(0.0) += params.alpha * r_u;
+        r.insert(u, 0.0);
+
+        let push_share = (1.0 - params.alpha) * r_u / degree;
+
+        // Binary neighbors (unmodified hotpath invariant).
+        for (v, _w) in binary_neighbors {
+            let entry = r.entry(v).or_insert(0.0);
+            *entry += push_share;
+            if in_queue.insert(v) {
+                queue.push_back(v);
+            }
+        }
+
+        // Virtual neighbors from hyperedges (§6.6, H3) with hyperedge_decay discount.
+        for v in hyper_participants {
+            let entry = r.entry(v).or_insert(0.0);
+            *entry += push_share * params.hyperedge_decay;
+            if in_queue.insert(v) {
+                queue.push_back(v);
+            }
+        }
+    }
+
+    p
 }
 
 /// Normativer Default-Schwellenwert für das Sufficiency-Gate (ADR-067).
@@ -797,5 +894,107 @@ mod tests {
 
         assert_eq!(path.nodes, vec![a, b]);
         assert!((path.confidence - 0.85).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_ppr_params_defaults() {
+        let params = PprParams::default();
+        assert_eq!(params.alpha, 0.15);
+        assert_eq!(params.epsilon, 1e-4);
+        assert_eq!(params.hyperedge_decay, 0.85);
+    }
+
+    #[test]
+    fn test_forward_push_ppr_empty_seeds() {
+        let graph = TestGraph::new(vec![]);
+        let params = PprParams::default();
+        let res = forward_push_ppr(&graph, &[], &params);
+        assert!(res.is_empty());
+    }
+
+    #[test]
+    fn test_forward_push_ppr_binary_graph() {
+        let a = EntityId::new(1);
+        let b = EntityId::new(2);
+        let graph = TestGraph::new(vec![(a, b, 1.0)]);
+        let params = PprParams::default();
+
+        let scores = forward_push_ppr(&graph, &[a], &params);
+        assert!(scores.get(&a).is_some());
+        assert!(*scores.get(&a).unwrap() > 0.0);
+    }
+
+    #[test]
+    fn test_forward_push_ppr_hyperedge_expansion_and_decay() {
+        let a = EntityId::new(1);
+        let b = EntityId::new(2);
+        let c = EntityId::new(3);
+
+        // Hyperedge connecting a, b, c
+        let he = HyperEdge::new(
+            HyperEdgeId::new(500),
+            crate::csr::EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), a),
+                RoleBinding::new(RoleId::new(2), b),
+                RoleBinding::new(RoleId::new(3), c),
+            ],
+            1.0,
+        );
+
+        let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
+
+        let params_full = PprParams {
+            alpha: 0.15,
+            epsilon: 1e-4,
+            hyperedge_decay: 1.0,
+        };
+        let scores_full = forward_push_ppr(&graph, &[a], &params_full);
+
+        let params_decay = PprParams {
+            alpha: 0.15,
+            epsilon: 1e-4,
+            hyperedge_decay: 0.5,
+        };
+        let scores_decay = forward_push_ppr(&graph, &[a], &params_decay);
+
+        let score_b_full = *scores_full.get(&b).unwrap_or(&0.0);
+        let score_b_decay = *scores_decay.get(&b).unwrap_or(&0.0);
+
+        assert!(
+            score_b_full > 0.0,
+            "b must receive PPR score via hyperedge expansion"
+        );
+        assert!(
+            score_b_decay > 0.0,
+            "b must receive PPR score with decay applied"
+        );
+        assert!(
+            score_b_decay < score_b_full,
+            "Lower hyperedge_decay must yield lower virtual score (full={}, decay={})",
+            score_b_full,
+            score_b_decay
+        );
+    }
+
+    #[test]
+    fn test_forward_push_ppr_self_participant_filtered() {
+        let a = EntityId::new(1);
+        // Hyperedge where 'a' is repeated twice
+        let he = HyperEdge::new(
+            HyperEdgeId::new(501),
+            crate::csr::EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), a),
+                RoleBinding::new(RoleId::new(2), a),
+            ],
+            1.0,
+        );
+        let graph = TestGraphWithHyperedges::new(vec![], vec![he]);
+        let params = PprParams::default();
+
+        let scores = forward_push_ppr(&graph, &[a], &params);
+        // Only 'a' should be in scores (no panic or spurious nodes)
+        assert!(scores.get(&a).is_some());
     }
 }

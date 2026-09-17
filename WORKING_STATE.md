@@ -38,7 +38,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-store` | 3 | 26277 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-candle` | 4 | 4527 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-embed` | 5 | 2219 | 🧊 Optional |  |
-| `memfuse-db` | 6 | 37256 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 6 | 37325 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 7 | 5709 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-router` | 7 | 6909 | 🟢 Clean |  |
 | `memfuse-agent` | 8 | 6531 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
