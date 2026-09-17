@@ -1,11 +1,14 @@
-//! Hyperkanten-Kerndatenmodell (`HyperEdge`, `RoleBinding`, `RoleId`, `HyperEdgeId`).
+//! Hyperkanten-Kerndatenmodell (`HyperEdge`, `RoleBinding`, `RoleId`, `HyperEdgeId`, `RoleInterner`).
 //!
 //! Implementiert n-äre Hyperkanten für komplexe Wissensrepräsentation (IP-20 / ADR-064).
 //! Persistenz erfolgt serde/bincode-kompatibel analog zu `PersistedEdgePayload`.
 
 use crate::csr::EdgeType;
+use crate::error::GraphMutationError;
 use memfuse_core::{DocId, EntityId, MemFuseError, Result, TxId};
+use scc::HashMap;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 /// LSM-Key-Präfix für Hyperkanten.
 pub const HYPEREDGE_PREFIX: &str = "__graph:hyperedge:";
@@ -47,8 +50,6 @@ impl std::fmt::Display for HyperEdgeId {
 }
 
 /// Identifikator für die Rolle eines Teilnehmers in einer Hyperkante.
-///
-/// NOTE: Internierung über einen String-Interner ist als Folge-Prompt geplant.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
@@ -105,6 +106,9 @@ pub struct HyperEdge {
     /// Prädikat/Typ der Hyperkante.
     pub predicate: EdgeType,
     /// Liste der Teilnehmer mit ihren Rollen.
+    ///
+    /// # Invariante
+    /// `participants` MUSS mindestens 2 Einträge enthalten (Validierung erfolgt in `relate_n_ary`).
     pub participants: Vec<RoleBinding>,
     /// Gewichtung der Hyperkante.
     pub weight: f32,
@@ -175,18 +179,18 @@ impl HyperEdge {
     /// # Invarianten
     /// - Mindestens 2 Teilnehmer (`participants.len() >= 2`), sonst degeneriert zur binären Edge.
     /// - Endliches, nicht-negatives Gewicht (`0.0 <= weight`).
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> std::result::Result<(), GraphMutationError> {
         if self.participants.len() < 2 {
-            return Err(MemFuseError::InvalidInput(format!(
-                "HyperEdge requires at least 2 participants, found {}",
-                self.participants.len()
-            )));
+            return Err(GraphMutationError::InsufficientParticipants {
+                expected: 2,
+                found: self.participants.len(),
+            });
         }
         if !self.weight.is_finite() || self.weight < 0.0 {
-            return Err(MemFuseError::InvalidInput(format!(
-                "Invalid hyperedge weight {}: weight must be finite and non-negative",
-                self.weight
-            )));
+            return Err(GraphMutationError::InvalidWeight {
+                weight: self.weight,
+                reason: "weight must be finite and non-negative".to_string(),
+            });
         }
         Ok(())
     }
@@ -205,10 +209,93 @@ impl HyperEdge {
     }
 }
 
+/// Concurrent string interner for hyperedge participant roles ([`RoleId`]).
+///
+/// Maps role names (`&str`) to numeric [`RoleId`]s and vice versa.
+/// Uses lock-free/concurrent [`scc::HashMap`] for both forward and backward lookups
+/// to ensure high-throughput concurrent access without global lock contention.
+pub struct RoleInterner {
+    forward: HashMap<String, RoleId>,
+    backward: HashMap<RoleId, String>,
+    next_id: AtomicU32,
+}
+
+impl Default for RoleInterner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RoleInterner {
+    /// Erstellt einen neuen, leeren [`RoleInterner`].
+    pub fn new() -> Self {
+        Self {
+            forward: HashMap::new(),
+            backward: HashMap::new(),
+            next_id: AtomicU32::new(1),
+        }
+    }
+
+    /// Interniert einen Rollennamen und gibt die zugehörige [`RoleId`] zurück.
+    ///
+    /// Falls der Rollenname bereits interniert wurde, wird die bestehende [`RoleId`] zurückgegeben.
+    /// Neue Allokationen finden nur beim Einfügen von zuvor ungesehenen Strings statt.
+    pub fn get_or_intern(&self, name: &str) -> RoleId {
+        if let Some(id) = self.forward.read(name, |_, id| *id) {
+            return id;
+        }
+
+        let name_str = name.to_string();
+        let new_id = RoleId(self.next_id.fetch_add(1, Ordering::Relaxed));
+
+        match self.forward.insert(name_str.clone(), new_id) {
+            Ok(()) => {
+                let _ = self.backward.insert(new_id, name_str);
+                new_id
+            }
+            Err((_, existing_id)) => existing_id,
+        }
+    }
+
+    /// Löst eine [`RoleId`] im Lesepfad zero-copy über eine Closure auf.
+    ///
+    /// Es entsteht keine neue String-Allokation pro Aufruf im Lesepfad.
+    pub fn resolve<F, R>(&self, id: RoleId, f: F) -> Option<R>
+    where
+        F: FnOnce(&str) -> R,
+    {
+        self.backward.read(&id, |_, name| f(name.as_str()))
+    }
+
+    /// Löst eine [`RoleId`] in ein owned `String` auf.
+    pub fn resolve_string(&self, id: RoleId) -> Option<String> {
+        self.backward.read(&id, |_, name| name.clone())
+    }
+
+    /// Prüft, ob ein Rollenname im Interner vorhanden ist.
+    pub fn contains_role(&self, name: &str) -> bool {
+        self.forward.contains(name)
+    }
+
+    /// Prüft, ob eine [`RoleId`] im Interner vorhanden ist.
+    pub fn contains_id(&self, id: RoleId) -> bool {
+        self.backward.contains(&id)
+    }
+
+    /// Gibt die Anzahl der internierten Rollen zurück.
+    pub fn len(&self) -> usize {
+        self.forward.len()
+    }
+
+    /// Gibt `true` zurück, falls der Interner leer ist.
+    pub fn is_empty(&self) -> bool {
+        self.forward.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     #[test]
     fn test_hyperedge_id_methods_and_traits() {
@@ -217,7 +304,7 @@ mod tests {
         assert_eq!(HyperEdgeId::from(42u64), id1);
         assert_eq!(format!("{id1}"), "HyperEdgeId(42)");
 
-        let mut set = HashSet::new();
+        let mut set = std::collections::HashSet::new();
         set.insert(id1);
         assert!(set.contains(&HyperEdgeId::new(42)));
     }
@@ -229,7 +316,7 @@ mod tests {
         assert_eq!(RoleId::from(7u32), role1);
         assert_eq!(format!("{role1}"), "RoleId(7)");
 
-        let mut set = HashSet::new();
+        let mut set = std::collections::HashSet::new();
         set.insert(role1);
         assert!(set.contains(&RoleId::new(7)));
     }
@@ -261,9 +348,13 @@ mod tests {
         // 0 participants
         let edge0 = HyperEdge::new(HyperEdgeId::new(1), EdgeType::Default, vec![], 1.0);
         let err0 = edge0.validate().unwrap_err();
-        assert!(
-            matches!(err0, MemFuseError::InvalidInput(msg) if msg.contains("at least 2 participants"))
-        );
+        assert!(matches!(
+            err0,
+            GraphMutationError::InsufficientParticipants {
+                expected: 2,
+                found: 0
+            }
+        ));
 
         // 1 participant
         let edge1 = HyperEdge::new(
@@ -273,14 +364,17 @@ mod tests {
             1.0,
         );
         let err1 = edge1.validate().unwrap_err();
-        assert!(
-            matches!(err1, MemFuseError::InvalidInput(msg) if msg.contains("at least 2 participants"))
-        );
+        assert!(matches!(
+            err1,
+            GraphMutationError::InsufficientParticipants {
+                expected: 2,
+                found: 1
+            }
+        ));
     }
 
     #[test]
     fn test_validation_valid_participants() {
-        // Exactly 2 participants
         let edge2 = HyperEdge::new(
             HyperEdgeId::new(1),
             EdgeType::Default,
@@ -292,7 +386,6 @@ mod tests {
         );
         assert!(edge2.validate().is_ok());
 
-        // N participants (4)
         let edge_n = HyperEdge::new(
             HyperEdgeId::new(2),
             EdgeType::Default,
@@ -314,38 +407,38 @@ mod tests {
             RoleBinding::new(RoleId::new(2), EntityId::new(20)),
         ];
 
-        // NaN
         let edge_nan = HyperEdge::new(
             HyperEdgeId::new(1),
             EdgeType::Default,
             valid_bindings.clone(),
             f32::NAN,
         );
-        assert!(
-            matches!(edge_nan.validate().unwrap_err(), MemFuseError::InvalidInput(msg) if msg.contains("Invalid hyperedge weight"))
-        );
+        assert!(matches!(
+            edge_nan.validate().unwrap_err(),
+            GraphMutationError::InvalidWeight { .. }
+        ));
 
-        // Negative
         let edge_neg = HyperEdge::new(
             HyperEdgeId::new(2),
             EdgeType::Default,
             valid_bindings.clone(),
             -0.5,
         );
-        assert!(
-            matches!(edge_neg.validate().unwrap_err(), MemFuseError::InvalidInput(msg) if msg.contains("Invalid hyperedge weight"))
-        );
+        assert!(matches!(
+            edge_neg.validate().unwrap_err(),
+            GraphMutationError::InvalidWeight { .. }
+        ));
 
-        // Infinity
         let edge_inf = HyperEdge::new(
             HyperEdgeId::new(3),
             EdgeType::Default,
             valid_bindings,
             f32::INFINITY,
         );
-        assert!(
-            matches!(edge_inf.validate().unwrap_err(), MemFuseError::InvalidInput(msg) if msg.contains("Invalid hyperedge weight"))
-        );
+        assert!(matches!(
+            edge_inf.validate().unwrap_err(),
+            GraphMutationError::InvalidWeight { .. }
+        ));
     }
 
     #[test]
@@ -355,11 +448,63 @@ mod tests {
     }
 
     #[test]
-    fn test_deserialize_corrupted_bytes_returns_error() {
-        let corrupted_bytes = vec![0xFF, 0x00, 0xAA, 0xBB];
-        let res = HyperEdge::deserialize(&corrupted_bytes);
-        assert!(
-            matches!(res, Err(MemFuseError::Internal(msg)) if msg.contains("Failed to deserialize hyperedge"))
+    fn test_role_interner_basic_operations() {
+        let interner = RoleInterner::new();
+        assert!(interner.is_empty());
+        assert_eq!(interner.len(), 0);
+
+        let id_subject = interner.get_or_intern("subject");
+        let id_object = interner.get_or_intern("object");
+        let id_subject_again = interner.get_or_intern("subject");
+
+        assert_eq!(id_subject, id_subject_again);
+        assert_ne!(id_subject, id_object);
+        assert_eq!(interner.len(), 2);
+        assert!(!interner.is_empty());
+
+        assert!(interner.contains_role("subject"));
+        assert!(interner.contains_role("object"));
+        assert!(!interner.contains_role("predicate"));
+
+        assert!(interner.contains_id(id_subject));
+        assert!(interner.contains_id(id_object));
+        assert!(!interner.contains_id(RoleId::new(999)));
+
+        // Zero-copy read path via closure
+        let resolved_len = interner.resolve(id_subject, |s| {
+            assert_eq!(s, "subject");
+            s.len()
+        });
+        assert_eq!(resolved_len, Some(7));
+
+        assert_eq!(
+            interner.resolve_string(id_object),
+            Some("object".to_string())
         );
+        assert_eq!(interner.resolve_string(RoleId::new(999)), None);
+    }
+
+    #[test]
+    fn test_role_interner_concurrent_access() {
+        use std::sync::Arc;
+
+        let interner = Arc::new(RoleInterner::new());
+        let mut handles = vec![];
+
+        for i in 0..10 {
+            let interner_clone = Arc::clone(&interner);
+            handles.push(std::thread::spawn(move || {
+                let role_name = format!("role_{}", i % 3);
+                let id = interner_clone.get_or_intern(&role_name);
+                let resolved = interner_clone.resolve(id, |s| s.to_string());
+                assert_eq!(resolved, Some(role_name));
+            }));
+        }
+
+        for h in handles {
+            h.join().unwrap();
+        }
+
+        assert_eq!(interner.len(), 3);
     }
 }

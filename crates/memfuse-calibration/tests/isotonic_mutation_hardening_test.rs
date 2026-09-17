@@ -231,7 +231,7 @@ proptest! {
         let mut prev_prob = -1.0f32;
         for &q in &query_scores {
             let prob = cal.calibrated_probability(q).unwrap();
-            prop_assert!(prob >= 0.0 && prob <= 1.0, "Probability {} out of [0,1]", prob);
+            prop_assert!((0.0..=1.0).contains(&prob), "Probability {} out of [0,1]", prob);
             prop_assert!(
                 prob >= prev_prob - 1e-6,
                 "PAVA monotonicity violated at query {}: prob {} < prev_prob {}",

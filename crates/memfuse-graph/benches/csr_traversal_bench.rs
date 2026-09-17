@@ -138,7 +138,12 @@ fn bench_csr_traversal(c: &mut Criterion) {
             &n,
             |b, _| {
                 b.to_async(&rt).iter(|| async {
-                    black_box(graph.bfs(black_box(DocId::new(0)), 2).await.unwrap_or_default())
+                    black_box(
+                        graph
+                            .bfs(black_box(DocId::new(0)), 2)
+                            .await
+                            .unwrap_or_default(),
+                    )
                 });
             },
         );
@@ -149,7 +154,12 @@ fn bench_csr_traversal(c: &mut Criterion) {
             &n,
             |b, _| {
                 b.to_async(&rt).iter(|| async {
-                    black_box(graph.get_neighbors(black_box(DocId::new(0))).await.unwrap_or_default())
+                    black_box(
+                        graph
+                            .get_neighbors(black_box(DocId::new(0)))
+                            .await
+                            .unwrap_or_default(),
+                    )
                 });
             },
         );
@@ -161,7 +171,12 @@ fn bench_csr_traversal(c: &mut Criterion) {
             &n,
             |b, _| {
                 b.to_async(&rt).iter(|| async {
-                    black_box(graph_dirty.bfs(black_box(DocId::new(0)), 2).await.unwrap_or_default())
+                    black_box(
+                        graph_dirty
+                            .bfs(black_box(DocId::new(0)), 2)
+                            .await
+                            .unwrap_or_default(),
+                    )
                 });
             },
         );

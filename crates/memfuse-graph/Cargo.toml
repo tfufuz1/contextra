@@ -28,6 +28,8 @@ serde_json = { workspace = true }
 bincode = { workspace = true }
 blake3 = { workspace = true }
 arc-swap = "1.7"
+scc = "2"
+thiserror = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

@@ -25,4 +25,29 @@ table VectorIndexUpdate {
   metadata: string;
 }
 
+table RoleId {
+  id: uint;
+}
+
+table HyperEdgeId {
+  id: ulong;
+}
+
+table RoleBinding {
+  role: uint;
+  entity: ulong;
+}
+
+table HyperEdge {
+  id: ulong;
+  predicate: ubyte;
+  participants: [RoleBinding];
+  weight: float;
+  tx_valid_from: ulong;
+  tx_valid_to: ulong;
+  business_valid_from: long;
+  business_valid_to: long;
+  source_doc_id: ulong;
+}
+
 root_type SearchResponse;
