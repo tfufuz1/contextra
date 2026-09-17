@@ -366,19 +366,26 @@ impl HnswHeader {
 /// Represents a node's metadata in the flat file.
 #[derive(Debug, Clone, Copy)]
 pub struct NodeRecord {
+    #[cfg(not(feature = "docid-128"))]
     pub doc_id: u64,
+    #[cfg(feature = "docid-128")]
+    pub doc_id: u128,
     pub max_layer: u8,
     pub vector_offset: u64,
     pub connections_offset: u64,
 }
 
 impl NodeRecord {
+    #[cfg(not(feature = "docid-128"))]
     pub const SIZE: usize = 8 + 1 + 8 + 8; // 25 bytes
+    #[cfg(feature = "docid-128")]
+    pub const SIZE: usize = 16 + 1 + 8 + 8; // 33 bytes
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < Self::SIZE {
             return Err(MemFuseError::Storage("NodeRecord bytes too small".into()));
         }
+        #[cfg(not(feature = "docid-128"))]
         let doc_id = u64::from_le_bytes(
             bytes
                 .get(0..8)
@@ -386,19 +393,29 @@ impl NodeRecord {
                 .try_into()
                 .map_err(|_| MemFuseError::Storage("Invalid doc_id bytes".into()))?,
         );
+        #[cfg(feature = "docid-128")]
+        let doc_id = u128::from_le_bytes(
+            bytes
+                .get(0..16)
+                .ok_or_else(|| MemFuseError::Storage("Invalid doc_id offset".into()))?
+                .try_into()
+                .map_err(|_| MemFuseError::Storage("Invalid doc_id bytes".into()))?,
+        );
+
+        let doc_id_bytes = std::mem::size_of_val(&doc_id);
         let max_layer = *bytes
-            .get(8)
+            .get(doc_id_bytes)
             .ok_or_else(|| MemFuseError::Storage("Invalid max_layer offset".into()))?;
         let vector_offset = u64::from_le_bytes(
             bytes
-                .get(9..17)
+                .get(doc_id_bytes + 1..doc_id_bytes + 9)
                 .ok_or_else(|| MemFuseError::Storage("Invalid vector_offset offset".into()))?
                 .try_into()
                 .map_err(|_| MemFuseError::Storage("Invalid vector_offset bytes".into()))?,
         );
         let connections_offset = u64::from_le_bytes(
             bytes
-                .get(17..25)
+                .get(doc_id_bytes + 9..doc_id_bytes + 17)
                 .ok_or_else(|| MemFuseError::Storage("Invalid connections_offset offset".into()))?
                 .try_into()
                 .map_err(|_| MemFuseError::Storage("Invalid connections_offset bytes".into()))?,
@@ -411,12 +428,14 @@ impl NodeRecord {
         })
     }
 
-    pub fn to_bytes(&self) -> [u8; 25] {
-        let mut buf = [0u8; 25];
-        buf[0..8].copy_from_slice(&self.doc_id.to_le_bytes());
-        buf[8] = self.max_layer;
-        buf[9..17].copy_from_slice(&self.vector_offset.to_le_bytes());
-        buf[17..25].copy_from_slice(&self.connections_offset.to_le_bytes());
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = vec![0u8; Self::SIZE];
+        let doc_id_bytes = std::mem::size_of_val(&self.doc_id);
+        buf[0..doc_id_bytes].copy_from_slice(&self.doc_id.to_le_bytes());
+        buf[doc_id_bytes] = self.max_layer;
+        buf[doc_id_bytes + 1..doc_id_bytes + 9].copy_from_slice(&self.vector_offset.to_le_bytes());
+        buf[doc_id_bytes + 9..doc_id_bytes + 17]
+            .copy_from_slice(&self.connections_offset.to_le_bytes());
         buf
     }
 }
@@ -447,10 +466,58 @@ impl MmapIndex {
             .get(0..HnswHeader::SIZE)
             .ok_or_else(|| MemFuseError::Storage("HNSW file too small for header".into()))?;
         let header = HnswHeader::try_from_bytes(header_slice)?;
-        Ok(Self {
+
+        let index_obj = Self {
             mmap: std::sync::Arc::new(mmap),
             header,
-        })
+        };
+
+        if index_obj.header.node_count() > 0 {
+            let expected_nodes_bytes = (index_obj.header.node_count() as usize)
+                .checked_mul(NodeRecord::SIZE)
+                .ok_or_else(|| MemFuseError::Storage("Node records total size overflow".into()))?;
+            let actual_nodes_bytes = (index_obj.header.connections_offset() as usize)
+                .checked_sub(index_obj.header.nodes_offset() as usize)
+                .ok_or_else(|| {
+                    MemFuseError::Storage(
+                        "Invalid nodes_offset / connections_offset relative position".into(),
+                    )
+                })?;
+            if actual_nodes_bytes < expected_nodes_bytes {
+                return Err(MemFuseError::Storage(format!(
+                    "NodeRecord size mismatch / DocId bit-width mismatch: expected at least {} bytes for {} nodes ({} bytes per record), found {} bytes between nodes_offset and connections_offset",
+                    expected_nodes_bytes,
+                    index_obj.header.node_count(),
+                    NodeRecord::SIZE,
+                    actual_nodes_bytes
+                )));
+            }
+
+            if index_obj.header.version() == 2 {
+                let rec0 = index_obj.get_node_record(0)?;
+                let expected_vector_offset = index_obj
+                    .header
+                    .nodes_offset()
+                    .checked_add(
+                        index_obj
+                            .header
+                            .node_count()
+                            .checked_mul(NodeRecord::SIZE as u64)
+                            .ok_or_else(|| {
+                                MemFuseError::Storage("Node records total size overflow".into())
+                            })?,
+                    )
+                    .ok_or_else(|| MemFuseError::Storage("Vector offset overflow".into()))?;
+                if rec0.vector_offset != expected_vector_offset {
+                    return Err(MemFuseError::Storage(format!(
+                        "NodeRecord layout mismatch or DocId bit-width mismatch: record 0 vector_offset is {}, expected {}",
+                        rec0.vector_offset, expected_vector_offset
+                    )));
+                }
+            }
+        }
+
+        Ok(index_obj)
     }
 
     /// Asynchronously opens an HNSW file using `spawn_blocking`.
@@ -703,8 +770,8 @@ mod tests {
         let mut vectors = Vec::with_capacity(100);
         for i in 1..=100u64 {
             let vec = vec![i as f32, (i * 2) as f32, (i * 3) as f32, (i * 4) as f32];
-            index.insert(tx, DocId::new(i), &vec).await?;
-            vectors.push((DocId::new(i), vec));
+            index.insert(tx, DocId::from(i), &vec).await?;
+            vectors.push((DocId::from(i), vec));
         }
         index.commit(tx).await?;
 
@@ -886,7 +953,7 @@ mod tests {
         for i in 0..60u64 {
             let v0 = (i as f32) / 59.0;
             let v1 = (i as f32) * 1000.0 / 59.0;
-            index.insert(tx, DocId::new(i + 1), &[v0, v1]).await?;
+            index.insert(tx, DocId::from(i + 1), &[v0, v1]).await?;
         }
         index.commit(tx).await?;
 
@@ -1003,21 +1070,23 @@ mod tests {
             1,
             0,
             HnswHeader::SIZE as u64,
-            (HnswHeader::SIZE + 25) as u64,
+            (HnswHeader::SIZE + NodeRecord::SIZE) as u64,
             1,
         );
         let mut file_bytes = header.to_bytes().to_vec();
         let record = NodeRecord {
             doc_id: 1,
             max_layer: 1,
-            vector_offset: 9999,
-            connections_offset: (HnswHeader::SIZE + 25) as u64,
+            vector_offset: (HnswHeader::SIZE + NodeRecord::SIZE) as u64,
+            connections_offset: (HnswHeader::SIZE + NodeRecord::SIZE) as u64,
         };
         file_bytes.extend_from_slice(&record.to_bytes());
         std::fs::write(&path, &file_bytes).map_err(|e| MemFuseError::Storage(e.to_string()))?;
 
         let mmap_index = MmapIndex::open(&path)?;
-        let res = mmap_index.get_vector(&record);
+        let mut bad_record = record;
+        bad_record.vector_offset = 9999;
+        let res = mmap_index.get_vector(&bad_record);
         assert!(
             res.is_err(),
             "Expected error for out-of-bounds vector_offset"
@@ -1038,7 +1107,7 @@ mod tests {
     fn test_get_connections_rejects_absurd_length_field() -> Result<()> {
         let temp_dir = tempfile::tempdir().map_err(|e| MemFuseError::Storage(e.to_string()))?;
         let path = temp_dir.path().join("absurd_length.hnsw");
-        let conn_offset = HnswHeader::SIZE + 25;
+        let conn_offset = HnswHeader::SIZE + NodeRecord::SIZE;
         let header = HnswHeader::new(
             4,
             16,
@@ -1056,7 +1125,7 @@ mod tests {
         let record = NodeRecord {
             doc_id: 1,
             max_layer: 1,
-            vector_offset: (conn_offset + 100) as u64,
+            vector_offset: conn_offset as u64,
             connections_offset: conn_offset as u64,
         };
         file_bytes.extend_from_slice(&record.to_bytes());

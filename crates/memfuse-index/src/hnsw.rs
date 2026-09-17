@@ -355,7 +355,10 @@ pub struct HnswIndex {
 #[repr(align(64))]
 pub struct HnswHotCore {
     pub nodes: RwLock<Vec<HnswNode>>,
+    #[cfg(not(feature = "docid-128"))]
     pub doc_to_node: RwLock<AHashMap<u64, usize>>,
+    #[cfg(feature = "docid-128")]
+    pub doc_to_node: RwLock<AHashMap<u128, usize>>,
     pub entry_point: RwLock<Option<usize>>,
     pub ram_entry_point: RwLock<Option<usize>>,
     pub max_layer: AtomicU64,
@@ -599,7 +602,7 @@ impl HnswIndex {
 
             let total_nodes = mmap_node_count + nodes.len();
             for i in (0..total_nodes).rev() {
-                if !ep.contains(&i) {
+                if !ep.contains(&(i as _)) {
                     if snapshot_seq.is_none() && deleted.contains(i as u64) {
                         continue;
                     }
@@ -851,7 +854,7 @@ impl HnswIndex {
         let deleted = self.inner.cold.deleted_nodes.read();
         map.iter()
             .filter(|(&_doc_id_raw, &node_idx)| !deleted.contains(node_idx as u64))
-            .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw))
+            .map(|(&doc_id_raw, _)| DocId::new(doc_id_raw.into()))
             .collect()
     }
 
@@ -1986,7 +1989,7 @@ impl HnswIndexCore {
         if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
                 let record = mmap.get_node_record(idx)?;
-                return Ok(DocId::new(record.doc_id));
+                return Ok(DocId::new(record.doc_id.into()));
             }
             let ram_idx = idx - ctx.mmap_node_count;
             return Ok(ctx.nodes[ram_idx].doc_id);
@@ -3839,13 +3842,13 @@ mod tests {
 
         for i in 1..=20u64 {
             let v = vec![i as f32, 0.0, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+            index.insert(tx1, DocId::from(i), &v).await.unwrap();
         }
         index.commit(tx1).await.unwrap();
 
         // Soft-delete a document to trigger has_dead_neighbors during search
         let tx2 = TxId::new(2);
-        index.delete(tx2, DocId::new(5)).await.unwrap();
+        index.delete(tx2, DocId::from(5u64)).await.unwrap();
         index.commit(tx2).await.unwrap();
 
         // Hold write lock on first node's connections
@@ -3881,7 +3884,7 @@ mod tests {
         };
         let index = HnswIndex::try_new(config).expect("valid config"); // expect
         let tx = TxId::new(1);
-        let doc_id = DocId::from(1);
+        let doc_id = DocId::from(1u64);
         let vec = vec![1.0, 2.0, 3.0, 4.0];
 
         index.insert(tx, doc_id, &vec).await.expect("insert"); // expect
@@ -3902,7 +3905,9 @@ mod tests {
         #[allow(deprecated)]
         let index = HnswIndex::new(config);
         let tx = TxId::new(1);
-        let result = index.insert(tx, DocId::new(1), &[1.0, 0.0, 0.0, 0.0]).await;
+        let result = index
+            .insert(tx, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
+            .await;
         assert!(result.is_err());
         let err_msg = format!("{}", result.unwrap_err());
         assert!(err_msg.contains("Invalid index configuration"));
@@ -3916,15 +3921,15 @@ mod tests {
 
         // Insert 3 vectors
         index
-            .insert(tx, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
+            .insert(tx, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
             .await
             .expect("insert 1"); // expect
         index
-            .insert(tx, DocId::new(2), &[0.0, 1.0, 0.0, 0.0])
+            .insert(tx, DocId::from(2u64), &[0.0, 1.0, 0.0, 0.0])
             .await
             .expect("insert 2"); // expect
         index
-            .insert(tx, DocId::new(3), &[0.9, 0.1, 0.0, 0.0])
+            .insert(tx, DocId::from(3u64), &[0.9, 0.1, 0.0, 0.0])
             .await
             .expect("insert 3"); // expect
         index.commit(tx).await.expect("commit"); // expect
@@ -3935,7 +3940,7 @@ mod tests {
             .await
             .expect("search"); // expect
         assert!(!results.is_empty());
-        assert_eq!(results[0].doc_id, DocId::new(1));
+        assert_eq!(results[0].doc_id, DocId::from(1u64));
     }
 
     #[tokio::test]
@@ -3944,7 +3949,7 @@ mod tests {
 
         let tx1 = TxId::new(1);
         index
-            .insert(tx1, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
+            .insert(tx1, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
             .await
             .expect("insert"); // expect
         index.commit(tx1).await.expect("commit"); // expect
@@ -3952,7 +3957,7 @@ mod tests {
         assert_eq!(index.len().await, 1);
 
         let tx2 = TxId::new(2);
-        index.delete(tx2, DocId::new(1)).await.expect("delete"); // expect
+        index.delete(tx2, DocId::from(1u64)).await.expect("delete"); // expect
         index.commit(tx2).await.expect("commit"); // expect
 
         assert_eq!(index.len().await, 0);
@@ -3966,13 +3971,13 @@ mod tests {
         // Insert 5 nodes. First node (DocId(0)) will be the initial entry point.
         for i in 0u64..5 {
             let v = vec![i as f32, 0.0, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.expect("insert"); // expect
+            index.insert(tx1, DocId::from(i), &v).await.expect("insert"); // expect
         }
         index.commit(tx1).await.expect("commit"); // expect
 
         // Delete node 0 (the entry point)
         let tx2 = TxId::new(2);
-        index.delete(tx2, DocId::new(0)).await.expect("delete"); // expect
+        index.delete(tx2, DocId::from(0u64)).await.expect("delete"); // expect
         index.commit(tx2).await.expect("commit"); // expect
 
         // Search must successfully return results from remaining nodes without panicking
@@ -3985,7 +3990,7 @@ mod tests {
         for res in &results {
             assert_ne!(
                 res.doc_id,
-                DocId::new(0),
+                DocId::from(0u64),
                 "Deleted entry point node 0 must not be returned"
             );
         }
@@ -3997,7 +4002,7 @@ mod tests {
 
         // 1. Insert vector and commit
         let tx1 = TxId::new(1);
-        let doc_id = DocId::new(42);
+        let doc_id = DocId::from(42u64);
         index
             .insert(tx1, doc_id, &[1.0, 0.0, 0.0, 0.0])
             .await
@@ -4029,7 +4034,7 @@ mod tests {
 
         let tx = TxId::new(1);
         index
-            .insert(tx, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
+            .insert(tx, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
             .await
             .expect("insert"); // expect
         index.rollback(tx).await.expect("rollback"); // expect
@@ -4051,7 +4056,7 @@ mod tests {
     async fn test_dimension_mismatch() {
         let index = HnswIndex::try_new(test_config(4)).unwrap(); // unwrap
         let tx = TxId::new(1);
-        let result = index.insert(tx, DocId::new(1), &[1.0, 0.0]).await;
+        let result = index.insert(tx, DocId::from(1u64), &[1.0, 0.0]).await;
         assert!(result.is_err());
     }
 
@@ -4061,15 +4066,15 @@ mod tests {
         let tx = TxId::new(1);
 
         index
-            .insert(tx, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
+            .insert(tx, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
             .await
             .expect("test"); // expect
         index
-            .insert(tx, DocId::new(2), &[0.9, 0.1, 0.0, 0.0])
+            .insert(tx, DocId::from(2u64), &[0.9, 0.1, 0.0, 0.0])
             .await
             .expect("test"); // expect
         index
-            .insert(tx, DocId::new(3), &[0.8, 0.2, 0.0, 0.0])
+            .insert(tx, DocId::from(3u64), &[0.8, 0.2, 0.0, 0.0])
             .await
             .expect("test"); // expect
         index.commit(tx).await.expect("test"); // expect
@@ -4082,7 +4087,7 @@ mod tests {
             .await
             .expect("test"); // expect
         assert_eq!(filtered.len(), 2);
-        assert!(filtered.iter().all(|r| r.doc_id != DocId::new(1)));
+        assert!(filtered.iter().all(|r| r.doc_id != DocId::from(1u64)));
     }
 
     #[tokio::test]
@@ -4098,7 +4103,7 @@ mod tests {
 
         for i in 1..=5u64 {
             index
-                .insert(tx, DocId::new(i), &[i as f32, 0.0])
+                .insert(tx, DocId::from(i), &[i as f32, 0.0])
                 .await
                 .expect("test"); // expect
         }
@@ -4110,8 +4115,8 @@ mod tests {
 
         // Delete 2 nodes → 40% deleted, connectivity = 0.6
         let tx2 = TxId::new(2);
-        index.delete(tx2, DocId::new(2)).await.expect("test"); // expect
-        index.delete(tx2, DocId::new(4)).await.expect("test"); // expect
+        index.delete(tx2, DocId::from(2u64)).await.expect("test"); // expect
+        index.delete(tx2, DocId::from(4u64)).await.expect("test"); // expect
         index.commit(tx2).await.expect("test"); // expect
 
         assert_eq!(index.len().await, 3);
@@ -4133,7 +4138,7 @@ mod tests {
 
         // Ensure rebuilt index still works
         let results = index.search(&[1.0, 0.0], 1).await.expect("test"); // expect
-        assert_eq!(results[0].doc_id, DocId::new(1));
+        assert_eq!(results[0].doc_id, DocId::from(1u64));
     }
 
     #[tokio::test]
@@ -4151,7 +4156,7 @@ mod tests {
         // Insert enough vectors to train quantizer (>= 50)
         for i in 1..=60u64 {
             let v = [i as f32, i as f32 * 0.1, 0.0, 0.0];
-            index.insert(tx, DocId::new(i), &v).await.expect("test"); // expect
+            index.insert(tx, DocId::from(i), &v).await.expect("test"); // expect
         }
         index.commit(tx).await.expect("test"); // expect
 
@@ -4162,7 +4167,7 @@ mod tests {
         // Delete some to lower connectivity and allow rebuild
         let tx2 = TxId::new(2);
         for i in 1..=10u64 {
-            index.delete(tx2, DocId::new(i)).await.expect("test"); // expect
+            index.delete(tx2, DocId::from(i)).await.expect("test"); // expect
         }
         index.commit(tx2).await.expect("test"); // expect
 
@@ -4180,7 +4185,7 @@ mod tests {
             .search(&[60.0, 6.0, 0.0, 0.0], 1)
             .await
             .expect("search"); // expect
-        assert_eq!(results[0].doc_id, DocId::new(60));
+        assert_eq!(results[0].doc_id, DocId::from(60u64));
     }
 
     proptest::proptest! {
@@ -4195,7 +4200,7 @@ mod tests {
 
             let config = test_config(v.len());
             let index = HnswIndex::try_new(config).unwrap(); // unwrap
-            let result = index.inner.do_insert(DocId::new(1), &v);
+            let result = index.inner.do_insert(DocId::from(1u64), &v);
 
             proptest::prop_assert!(result.is_err(), "Inserting vector containing NaN must return error");
         }
@@ -4219,7 +4224,7 @@ mod tests {
         // 1. Initial Insert (RAM)
         for i in 1..=50u64 {
             let v = [i as f32, i as f32 * 0.1, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.expect("test"); // expect
+            index.insert(tx1, DocId::from(i), &v).await.expect("test"); // expect
         }
         index.commit(tx1).await.expect("test"); // expect
 
@@ -4237,14 +4242,14 @@ mod tests {
             .search(&[25.0, 2.5, 0.0, 0.0], 1)
             .await
             .expect("search"); // expect
-        assert_eq!(results[0].doc_id, DocId::new(25));
+        assert_eq!(results[0].doc_id, DocId::from(25u64));
 
         // 5. Insert new nodes on top of Mmap (Hybrid)
         let tx2 = TxId::new(2);
         for i in 51..=60u64 {
             let v = [i as f32, i as f32 * 0.1, 0.0, 0.0];
             index_mmap
-                .insert(tx2, DocId::new(i), &v)
+                .insert(tx2, DocId::from(i), &v)
                 .await
                 .expect("test"); // expect
         }
@@ -4257,14 +4262,14 @@ mod tests {
             .search(&[58.0, 5.8, 0.0, 0.0], 1)
             .await
             .expect("search"); // expect
-        assert_eq!(results_hybrid[0].doc_id, DocId::new(58));
+        assert_eq!(results_hybrid[0].doc_id, DocId::from(58u64));
 
         // 7. Verify Hybrid Search (finding an Mmap node)
         let results_mmap = index_mmap
             .search(&[5.0, 0.5, 0.0, 0.0], 1)
             .await
             .expect("search"); // expect
-        assert_eq!(results_mmap[0].doc_id, DocId::new(5));
+        assert_eq!(results_mmap[0].doc_id, DocId::from(5u64));
     }
 
     #[test]
@@ -4299,7 +4304,7 @@ mod tests {
 
         for (i, v) in data.iter().enumerate() {
             index
-                .insert(tx, DocId::new(i as u64), v)
+                .insert(tx, DocId::from(i as u64), v)
                 .await
                 .expect("insert"); // expect
         }
@@ -4328,7 +4333,7 @@ mod tests {
 
         for i in 1..=10u64 {
             index
-                .insert(tx, DocId::new(i), &[i as f32, 0.0, 0.0, 0.0])
+                .insert(tx, DocId::from(i), &[i as f32, 0.0, 0.0, 0.0])
                 .await
                 .unwrap(); // unwrap
         }
@@ -4337,19 +4342,19 @@ mod tests {
         let ids = index.all_doc_ids().await.unwrap(); // unwrap
         assert_eq!(ids.len(), 10);
         for i in 1..=10u64 {
-            assert!(ids.contains(&DocId::new(i)));
+            assert!(ids.contains(&DocId::from(i)));
         }
 
         // Delete some
         let tx2 = TxId::new(2);
-        index.delete(tx2, DocId::new(5)).await.unwrap(); // unwrap
-        index.delete(tx2, DocId::new(8)).await.unwrap(); // unwrap
+        index.delete(tx2, DocId::from(5u64)).await.unwrap(); // unwrap
+        index.delete(tx2, DocId::from(8u64)).await.unwrap(); // unwrap
         index.commit(tx2).await.unwrap(); // unwrap
 
         let ids2 = index.all_doc_ids().await.unwrap(); // unwrap
         assert_eq!(ids2.len(), 8);
-        assert!(!ids2.contains(&DocId::new(5)));
-        assert!(!ids2.contains(&DocId::new(8)));
+        assert!(!ids2.contains(&DocId::from(5u64)));
+        assert!(!ids2.contains(&DocId::from(8u64)));
     }
 
     #[tokio::test]
@@ -4364,14 +4369,14 @@ mod tests {
 
         for i in 0u64..5 {
             let v = vec![i as f32, 0.0, 0.0, 0.0];
-            index.insert(tx, DocId::new(i), &v).await.unwrap(); // unwrap
+            index.insert(tx, DocId::from(i), &v).await.unwrap(); // unwrap
         }
         index.commit(tx).await.unwrap(); // unwrap
 
         // Delete 2 out of 5 → 40% deleted → score = 0.6 < threshold 0.8
         let tx2 = TxId::new(2);
-        index.delete(tx2, DocId::new(0)).await.unwrap(); // #[test] // unwrap
-        index.delete(tx2, DocId::new(1)).await.unwrap(); // unwrap
+        index.delete(tx2, DocId::from(0u64)).await.unwrap(); // #[test] // unwrap
+        index.delete(tx2, DocId::from(1u64)).await.unwrap(); // unwrap
         index.commit(tx2).await.unwrap(); // unwrap
 
         let result = index.check_connectivity();
@@ -4415,14 +4420,14 @@ mod tests {
         // Insert 100 vectors
         for i in 0u64..100 {
             let v = vec![i as f32, 1.0, 0.0, 0.0];
-            idx.insert(tx, DocId::new(i), &v).await.unwrap(); // unwrap
+            idx.insert(tx, DocId::from(i), &v).await.unwrap(); // unwrap
         }
         idx.commit(tx).await.unwrap(); // unwrap
 
         // Delete 51 vectors -> >50% deleted, crossing 0.5 threshold
         let tx2 = TxId::new(2);
         for i in 0u64..51 {
-            idx.delete(tx2, DocId::new(i)).await.unwrap(); // unwrap
+            idx.delete(tx2, DocId::from(i)).await.unwrap(); // unwrap
         }
         idx.commit(tx2).await.unwrap(); // unwrap
 
@@ -4464,7 +4469,7 @@ mod tests {
         let tx = TxId::new(1);
         for i in 0u64..10 {
             index
-                .insert(tx, DocId::new(i), &[i as f32, 0.0, 0.0, 0.0])
+                .insert(tx, DocId::from(i), &[i as f32, 0.0, 0.0, 0.0])
                 .await
                 .unwrap(); // unwrap
         }
@@ -4472,7 +4477,7 @@ mod tests {
 
         let tx2 = TxId::new(2);
         for i in 0u64..6 {
-            index.delete(tx2, DocId::new(i)).await.unwrap(); // unwrap
+            index.delete(tx2, DocId::from(i)).await.unwrap(); // unwrap
         }
 
         // Commit triggers trigger_rebuild_async
@@ -4492,20 +4497,20 @@ mod tests {
         // seq 1: Insert doc 1 & 2
         let tx1 = TxId::new(1);
         index
-            .insert(tx1, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
+            .insert(tx1, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
             .await
             .unwrap(); // unwrap
         index
-            .insert(tx1, DocId::new(2), &[0.0, 1.0, 0.0, 0.0])
+            .insert(tx1, DocId::from(2u64), &[0.0, 1.0, 0.0, 0.0])
             .await
             .unwrap(); // unwrap
         index.commit(tx1).await.unwrap(); // unwrap
 
         // seq 2: Delete doc 1, insert doc 3
         let tx2 = TxId::new(2);
-        index.delete(tx2, DocId::new(1)).await.unwrap(); // unwrap
+        index.delete(tx2, DocId::from(1u64)).await.unwrap(); // unwrap
         index
-            .insert(tx2, DocId::new(3), &[0.5, 0.5, 0.0, 0.0])
+            .insert(tx2, DocId::from(3u64), &[0.5, 0.5, 0.0, 0.0])
             .await
             .unwrap(); // unwrap
         index.commit(tx2).await.unwrap(); // unwrap
@@ -4539,7 +4544,7 @@ mod tests {
         let tx = TxId::new(1);
         for i in 0u64..10 {
             index
-                .insert(tx, DocId::new(i), &[i as f32, 0.0, 0.0, 0.0])
+                .insert(tx, DocId::from(i), &[i as f32, 0.0, 0.0, 0.0])
                 .await
                 .unwrap(); // unwrap
         }
@@ -4549,7 +4554,7 @@ mod tests {
 
         let tx2 = TxId::new(2);
         for i in 0u64..6 {
-            index.delete(tx2, DocId::new(i)).await.unwrap(); // unwrap
+            index.delete(tx2, DocId::from(i)).await.unwrap(); // unwrap
         }
         index.commit(tx2).await.unwrap(); // unwrap
 
@@ -4604,10 +4609,10 @@ mod tests {
                     match op {
                         Op::Insert(id) => {
                             let vec = [id as f32, 0.0, 0.0, 0.0];
-                            let _ = index.insert(tx, DocId::new(id), &vec).await;
+                            let _ = index.insert(tx, DocId::from(id), &vec).await;
                         }
                         Op::Delete(id) => {
-                            let _ = index.delete(tx, DocId::new(id)).await;
+                            let _ = index.delete(tx, DocId::from(id)).await;
                         }
                     }
                     if index.commit(tx).await.is_ok() {
@@ -4718,7 +4723,7 @@ mod tests {
         let index = HnswIndex::try_new(test_config(4)).unwrap(); // unwrap
         let tx = TxId::new(1);
         index
-            .insert(tx, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
+            .insert(tx, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
             .await
             .unwrap(); // unwrap
         index.commit(tx).await.unwrap(); // unwrap
@@ -4732,7 +4737,7 @@ mod tests {
         let index = HnswIndex::try_new(test_config(4)).unwrap(); // unwrap
         let tx = TxId::new(1);
         // Deleting non-existent doc should succeed without altering index state
-        index.delete(tx, DocId::new(999)).await.unwrap(); // unwrap
+        index.delete(tx, DocId::from(999u64)).await.unwrap(); // unwrap
         index.commit(tx).await.unwrap(); // unwrap
         assert!(index.all_doc_ids().await.unwrap().is_empty()); // unwrap
     }
@@ -4745,7 +4750,7 @@ mod tests {
         let tx1 = TxId::new(1);
         for i in 1..=5u64 {
             let v = [i as f32, 0.0, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap(); // unwrap
+            index.insert(tx1, DocId::from(i), &v).await.unwrap(); // unwrap
         }
         index.commit(tx1).await.unwrap(); // unwrap
 
@@ -4753,7 +4758,7 @@ mod tests {
         let tx2 = TxId::new(2);
         for i in 6..=10u64 {
             let v = [i as f32, 0.0, 0.0, 0.0];
-            index.insert(tx2, DocId::new(i), &v).await.unwrap(); // unwrap
+            index.insert(tx2, DocId::from(i), &v).await.unwrap(); // unwrap
         }
         index.commit(tx2).await.unwrap(); // unwrap
 
@@ -4774,7 +4779,7 @@ mod tests {
 
         for i in 6..=10u64 {
             assert!(
-                !result_doc_ids.contains(&i),
+                !result_doc_ids.contains(&(i as _)),
                 "Rolled back DocId {} must not appear in filtered search results",
                 i
             );
@@ -4782,7 +4787,7 @@ mod tests {
 
         for i in 1..=5u64 {
             assert!(
-                result_doc_ids.contains(&i),
+                result_doc_ids.contains(&(i as _)),
                 "Active DocId {} must appear in filtered search results",
                 i
             );
@@ -4803,7 +4808,7 @@ mod tests {
         let tx1 = TxId::new(1);
         for i in 1..=60u64 {
             let v = [1.0, 2.0, 3.0, 4.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap(); // unwrap
+            index.insert(tx1, DocId::from(i), &v).await.unwrap(); // unwrap
         }
         index.commit(tx1).await.unwrap(); // unwrap
 
@@ -4826,7 +4831,7 @@ mod tests {
         let out_of_bounds_vector = [1000.0, -1000.0, 500.0, -500.0];
         let tx2 = TxId::new(2);
         index
-            .insert(tx2, DocId::new(100), &out_of_bounds_vector)
+            .insert(tx2, DocId::from(100u64), &out_of_bounds_vector)
             .await
             .unwrap(); // unwrap
         index.commit(tx2).await.unwrap(); // unwrap
@@ -4869,7 +4874,7 @@ mod tests {
         let tx1 = TxId::new(1);
         for i in 0..=60u64 {
             let v = [i as f32 / 60.0, 0.5];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+            index.insert(tx1, DocId::from(i), &v).await.unwrap();
         }
         index.commit(tx1).await.unwrap();
 
@@ -4882,7 +4887,7 @@ mod tests {
         // 2. Insert outlier vector [10.0, 0.5]
         let tx2 = TxId::new(2);
         index
-            .insert(tx2, DocId::new(100), &[10.0, 0.5])
+            .insert(tx2, DocId::from(100u64), &[10.0, 0.5])
             .await
             .unwrap();
         index.commit(tx2).await.unwrap();
@@ -4914,7 +4919,7 @@ mod tests {
         let tx1 = TxId::new(1);
         for i in 1..=60u64 {
             let v = [i as f32 / 60.0, 0.5];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+            index.insert(tx1, DocId::from(i), &v).await.unwrap();
         }
         index.commit(tx1).await.unwrap();
         assert_eq!(index.rebuild_count(), 0);
@@ -4927,7 +4932,7 @@ mod tests {
         let tx2 = TxId::new(2);
         for i in 61..=80u64 {
             let v = [10.0 + (i as f32), 10.0];
-            index.insert(tx2, DocId::new(i), &v).await.unwrap();
+            index.insert(tx2, DocId::from(i), &v).await.unwrap();
         }
         index.commit(tx2).await.unwrap(); // commit triggers trigger_rebuild_async()
 
@@ -4961,7 +4966,7 @@ mod tests {
         // Initial commit to train quantizer
         let tx0 = TxId::new(0);
         index
-            .insert(tx0, DocId::new(0), &[1.0, 2.0, 3.0, 4.0])
+            .insert(tx0, DocId::from(0u64), &[1.0, 2.0, 3.0, 4.0])
             .await
             .unwrap();
         index.commit(tx0).await.unwrap();
@@ -4975,7 +4980,7 @@ mod tests {
                     let doc_val = thread_id * 100 + i;
                     let tx = TxId::new(doc_val);
                     let v = [i as f32, (i * 2) as f32, 1.0, 2.0];
-                    idx.insert(tx, DocId::new(doc_val), &v).await.unwrap();
+                    idx.insert(tx, DocId::from(doc_val), &v).await.unwrap();
                     idx.commit(tx).await.unwrap();
                 }
             }));
@@ -5005,14 +5010,14 @@ mod tests {
         let total_vectors = 100u64;
         for i in 0..total_vectors {
             let v = vec![i as f32, (i % 10) as f32, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap(); // unwrap
+            index.insert(tx1, DocId::from(i), &v).await.unwrap(); // unwrap
         }
         index.commit(tx1).await.unwrap(); // unwrap
 
         // Delete 30% of vectors (30 vectors)
         let tx2 = TxId::new(2);
         for i in (0..total_vectors).step_by(3) {
-            index.delete(tx2, DocId::new(i)).await.unwrap(); // unwrap
+            index.delete(tx2, DocId::from(i)).await.unwrap(); // unwrap
         }
         index.commit(tx2).await.unwrap(); // unwrap
 
@@ -5053,7 +5058,7 @@ mod tests {
 
         for i in 0u64..100 {
             let v = vec![i as f32, 0.0, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap(); // unwrap
+            index.insert(tx1, DocId::from(i), &v).await.unwrap(); // unwrap
         }
         index.commit(tx1).await.unwrap(); // unwrap
 
@@ -5062,7 +5067,7 @@ mod tests {
         // Delete 10 vectors -> 10% deleted -> score = 0.90 >= 0.85 (no rebuild required)
         let tx2 = TxId::new(2);
         for i in 0u64..10 {
-            index.delete(tx2, DocId::new(i)).await.unwrap(); // unwrap
+            index.delete(tx2, DocId::from(i)).await.unwrap(); // unwrap
         }
         index.commit(tx2).await.unwrap(); // unwrap
 
@@ -5072,7 +5077,7 @@ mod tests {
         // Delete 10 more vectors -> 20% deleted -> score = 0.80 < 0.85 (rebuild required!)
         let tx3 = TxId::new(3);
         for i in 10u64..20 {
-            index.delete(tx3, DocId::new(i)).await.unwrap(); // unwrap
+            index.delete(tx3, DocId::from(i)).await.unwrap(); // unwrap
         }
         index.commit(tx3).await.unwrap(); // unwrap
 
@@ -5098,14 +5103,14 @@ mod tests {
 
         for i in 0u64..200 {
             let v = vec![i as f32, (i % 5) as f32, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap(); // unwrap
+            index.insert(tx1, DocId::from(i), &v).await.unwrap(); // unwrap
         }
         index.commit(tx1).await.unwrap(); // unwrap
 
         // Delete 50 vectors (25% deleted, < 90% threshold so auto-rebuild is not triggered)
         let tx2 = TxId::new(2);
         for i in 0u64..50 {
-            index.delete(tx2, DocId::new(i)).await.unwrap(); // unwrap
+            index.delete(tx2, DocId::from(i)).await.unwrap(); // unwrap
         }
         index.commit(tx2).await.unwrap(); // unwrap
 
@@ -5149,7 +5154,7 @@ mod tests {
         let tx1 = TxId::new(1);
         for i in 1u64..=100 {
             let v = vec![i as f32, 0.0, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap(); // unwrap #[cfg(test)]
+            index.insert(tx1, DocId::from(i), &v).await.unwrap(); // unwrap #[cfg(test)]
         }
         index.commit(tx1).await.unwrap(); // unwrap #[cfg(test)]
 
@@ -5162,12 +5167,12 @@ mod tests {
             let tx2 = TxId::new(2);
             for i in 101u64..=150 {
                 let v = vec![i as f32, 0.0, 0.0, 0.0];
-                index_write.insert(tx2, DocId::new(i), &v).await.unwrap(); // unwrap #[cfg(test)]
+                index_write.insert(tx2, DocId::from(i), &v).await.unwrap(); // unwrap #[cfg(test)]
             }
             index_write.commit(tx2).await.unwrap(); // unwrap #[cfg(test)]
 
             let tx3 = TxId::new(3);
-            index_write.delete(tx3, DocId::new(1)).await.unwrap(); // unwrap #[cfg(test)]
+            index_write.delete(tx3, DocId::from(1u64)).await.unwrap(); // unwrap #[cfg(test)]
             index_write.commit(tx3).await.unwrap(); // unwrap #[cfg(test)]
         });
 
@@ -5181,12 +5186,12 @@ mod tests {
         // Doc 1 was deleted during concurrent write
         let query_doc1 = vec![1.0, 0.0, 0.0, 0.0];
         let res_doc1 = index.search(&query_doc1, 10).await.unwrap(); // unwrap #[cfg(test)]
-        assert!(!res_doc1.iter().any(|d| d.doc_id == DocId::new(1)));
+        assert!(!res_doc1.iter().any(|d| d.doc_id == DocId::from(1u64)));
 
         // Doc 105 was inserted during rebuild Phase 1 & committed
         let query_doc105 = vec![105.0, 0.0, 0.0, 0.0];
         let res_doc105 = index.search(&query_doc105, 10).await.unwrap(); // unwrap #[cfg(test)]
-        assert!(res_doc105.iter().any(|d| d.doc_id == DocId::new(105)));
+        assert!(res_doc105.iter().any(|d| d.doc_id == DocId::from(105u64)));
 
         // Total active docs in index should be 149 (100 - 1 deleted + 50 newly inserted)
         assert_eq!(index.len().await, 149);
@@ -5213,7 +5218,7 @@ mod tests {
         // 1. Insert 100 vectors
         for i in 0u64..100 {
             let v = vec![i as f32, 0.0, 0.0, 0.0];
-            index.insert(tx1, DocId::new(i), &v).await.unwrap();
+            index.insert(tx1, DocId::from(i), &v).await.unwrap();
         }
         index.commit(tx1).await.unwrap();
 
@@ -5226,10 +5231,10 @@ mod tests {
         // 3. Soft-delete nodes in hot path (0, 1, 2) plus 1 node elsewhere (99)
         // Local tombstones in hot path ~ 30%, global tombstones ~ 4%
         let tx2 = TxId::new(2);
-        index.delete(tx2, DocId::new(0)).await.unwrap();
-        index.delete(tx2, DocId::new(1)).await.unwrap();
-        index.delete(tx2, DocId::new(2)).await.unwrap();
-        index.delete(tx2, DocId::new(99)).await.unwrap();
+        index.delete(tx2, DocId::from(0u64)).await.unwrap();
+        index.delete(tx2, DocId::from(1u64)).await.unwrap();
+        index.delete(tx2, DocId::from(2u64)).await.unwrap();
+        index.delete(tx2, DocId::from(99u64)).await.unwrap();
 
         // Commit triggers check_and_trigger_partial_rebuild
         index.commit(tx2).await.unwrap();
@@ -5239,10 +5244,10 @@ mod tests {
 
         // Verify remaining docs in index
         let active_docs = index.all_doc_ids().await.unwrap();
-        assert!(!active_docs.contains(&DocId::new(0)));
-        assert!(!active_docs.contains(&DocId::new(1)));
-        assert!(!active_docs.contains(&DocId::new(2)));
-        assert!(!active_docs.contains(&DocId::new(99)));
+        assert!(!active_docs.contains(&DocId::from(0u64)));
+        assert!(!active_docs.contains(&DocId::from(1u64)));
+        assert!(!active_docs.contains(&DocId::from(2u64)));
+        assert!(!active_docs.contains(&DocId::from(99u64)));
     }
 
     #[tokio::test]
@@ -5252,11 +5257,11 @@ mod tests {
         // 1. Insert baseline vectors in Tx 1
         let tx1 = TxId::new(1);
         index
-            .insert(tx1, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
+            .insert(tx1, DocId::from(1u64), &[1.0, 0.0, 0.0, 0.0])
             .await
             .unwrap();
         index
-            .insert(tx1, DocId::new(2), &[0.0, 1.0, 0.0, 0.0])
+            .insert(tx1, DocId::from(2u64), &[0.0, 1.0, 0.0, 0.0])
             .await
             .unwrap();
         index.commit(tx1).await.unwrap();
@@ -5271,7 +5276,7 @@ mod tests {
         let tx2 = TxId::new(2);
         for i in 100..105u64 {
             let vec = [i as f32, 0.5, 0.0, 0.0];
-            index.insert(tx2, DocId::new(i), &vec).await.unwrap();
+            index.insert(tx2, DocId::from(i), &vec).await.unwrap();
         }
 
         // 3. Configure fault injection to fail on the 3rd element during Phase 1 compute
@@ -5312,7 +5317,7 @@ mod tests {
         let doc_map = index.inner.hot.doc_to_node.read();
         for i in 100..105u64 {
             assert!(
-                !doc_map.contains_key(&i),
+                !doc_map.contains_key(&DocId::from(i).inner()),
                 "DocId {} from failed transaction must not exist in doc_to_node",
                 i
             );
@@ -5334,7 +5339,7 @@ mod tests {
             let tx = TxId::new(10);
             for i in 1..=5u64 {
                 let vec = [i as f32, 0.0, 0.0, 0.0];
-                idx_f.insert(tx, DocId::new(i), &vec).await.unwrap();
+                idx_f.insert(tx, DocId::from(i), &vec).await.unwrap();
             }
             idx_f.commit(tx).await
         });
@@ -5344,7 +5349,7 @@ mod tests {
             let tx = TxId::new(20);
             for i in 1..=5u64 {
                 let vec = [i as f32, 0.0, 0.0, 0.0];
-                idx_n.insert(tx, DocId::new(i), &vec).await.unwrap();
+                idx_n.insert(tx, DocId::from(i), &vec).await.unwrap();
             }
             idx_n.commit(tx).await
         });
