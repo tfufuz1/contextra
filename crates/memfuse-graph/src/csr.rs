@@ -349,6 +349,10 @@ impl GraphInner {
                 * std::mem::size_of::<crate::hyperedge::HyperEdgeId>())
     }
 
+    #[expect(
+        dead_code,
+        reason = "Internal GraphInner hyperedge helper method retained for planned GraphInner API symmetry"
+    )]
     pub(crate) fn hyperedges_for_entity(&self, id: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
         self.hyperedge_index
             .get(&id)
@@ -356,6 +360,10 @@ impl GraphInner {
             .unwrap_or_default()
     }
 
+    #[expect(
+        dead_code,
+        reason = "Internal GraphInner hyperedge helper method retained for planned GraphInner API symmetry"
+    )]
     pub(crate) fn insert_hyperedge(&mut self, edge: crate::hyperedge::HyperEdge) {
         let edge_id = edge.id;
         for participant in &edge.participants {
@@ -5341,8 +5349,8 @@ mod tests {
         let e1 = EntityId::from("entity_a");
         let e2 = EntityId::from("entity_b");
 
-        let rb1 = RoleBinding::new(RoleId::new(1), e1.clone());
-        let rb2 = RoleBinding::new(RoleId::new(2), e2.clone());
+        let rb1 = RoleBinding::new(RoleId::new(1), e1);
+        let rb2 = RoleBinding::new(RoleId::new(2), e2);
         let he_id = HyperEdgeId(101);
         let edge = HyperEdge::new(he_id, EdgeType::Default, vec![rb1, rb2], 0.85);
 
@@ -5371,9 +5379,9 @@ mod tests {
             HyperEdgeId(202),
             EdgeType::Default,
             vec![
-                RoleBinding::new(RoleId::new(1), e1.clone()),
-                RoleBinding::new(RoleId::new(2), e2.clone()),
-                RoleBinding::new(RoleId::new(3), e3.clone()),
+                RoleBinding::new(RoleId::new(1), e1),
+                RoleBinding::new(RoleId::new(2), e2),
+                RoleBinding::new(RoleId::new(3), e3),
             ],
             1.0,
         );
@@ -5381,7 +5389,7 @@ mod tests {
         graph.insert_hyperedge(edge);
 
         for entity in &[e1, e2, e3] {
-            let hes = graph.hyperedges_for_entity(entity.clone());
+            let hes = graph.hyperedges_for_entity(*entity);
             assert_eq!(hes, vec![HyperEdgeId(202)]);
         }
     }
@@ -5398,8 +5406,8 @@ mod tests {
             HyperEdgeId(1),
             EdgeType::Default,
             vec![
-                RoleBinding::new(RoleId::new(1), e1.clone()),
-                RoleBinding::new(RoleId::new(2), e2.clone()),
+                RoleBinding::new(RoleId::new(1), e1),
+                RoleBinding::new(RoleId::new(2), e2),
             ],
             0.5,
         );
@@ -5407,8 +5415,8 @@ mod tests {
             HyperEdgeId(2),
             EdgeType::Default,
             vec![
-                RoleBinding::new(RoleId::new(2), e1.clone()),
-                RoleBinding::new(RoleId::new(1), e2.clone()),
+                RoleBinding::new(RoleId::new(2), e1),
+                RoleBinding::new(RoleId::new(1), e2),
             ],
             0.7,
         );
@@ -5483,8 +5491,8 @@ mod tests {
                     he_id,
                     EdgeType::Default,
                     vec![
-                        RoleBinding::new(RoleId::new(1), e1.clone()),
-                        RoleBinding::new(RoleId::new(2), e2.clone()),
+                        RoleBinding::new(RoleId::new(1), e1),
+                        RoleBinding::new(RoleId::new(2), e2),
                     ],
                     1.0,
                 );
