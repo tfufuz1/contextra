@@ -1,0 +1,23 @@
+# MemFuse Bottom-Up Verification — 2026-09-17T21:16:19+02:00
+# Modus: full | stop_on_fail=true | clippy=true
+CRATE                  CHECK    CLIPPY   TEST     ERRORS   DAUER(s)  
+memfuse-core-ipc-gen   PASS     PASS     PASS     0        2         
+memfuse-core           PASS     PASS     FAIL     0        9         
+memfuse-calibration    PASS     FAIL     PASS     0        14        
+memfuse-checkpoint     PASS     PASS     PASS     0        25        
+memfuse-crypto         PASS     PASS     FAIL     0        132       
+memfuse-graph          PASS     PASS     FAIL     0        30        
+memfuse-sandbox        PASS     PASS     PASS     0        12        
+memfuse-text           PASS     PASS     PASS     0        178       
+memfuse-index          PASS     FAIL     FAIL     0        26        
+memfuse-ollama         PASS     PASS     PASS     0        23        
+memfuse-store          PASS     FAIL     FAIL     0        97        
+memfuse-candle         PASS     FAIL     FAIL     0        14        
+memfuse-embed          PASS     PASS     PASS     0        31        
+memfuse-db             PASS     FAIL     FAIL     0        62        
+memfuse-bench          PASS     FAIL     FAIL     0        254       
+memfuse-router         PASS     FAIL     PASS     0        256       
+memfuse-agent          PASS     FAIL     FAIL     0        332       
+memfuse-mcp            PASS     FAIL     FAIL     0        41        
+
+Alle geprüften Crates grün. Ergebnisverzeichnis: results/20260917_211619

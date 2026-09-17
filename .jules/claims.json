@@ -1,12 +1,12 @@
 {
   "claims": [
     {
-      "krate": "memfuse-router",
+      "krate": "memfuse-store",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-17T19:36:00.091642892+00:00",
-      "session_id": "9034916094553431861",
+      "timestamp": "2026-09-17T19:35:52.513702308+00:00",
+      "session_id": "4020660578212732193",
       "active": true,
-      "expires_at": "2026-09-17T23:36:00.091625932+00:00"
+      "expires_at": "2026-09-17T23:35:52.513683065+00:00"
     }
   ]
 }

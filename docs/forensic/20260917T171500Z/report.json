@@ -1,0 +1,92 @@
+{
+  "generated_at": "20260917T171500Z",
+  "head": "6d5025d",
+  "audit_target": "AK-8 Benchmark-Vergleich — Hyperkanten-Regressionsnachweis für relate()",
+  "verdict": "Keine Regression",
+  "ak_8_satisfied": true,
+  "pre_ip20_baseline_ref": "docs/audits/AUDIT_ip20_hyperedge_pre_baseline_2026-09-17.md",
+  "benchmark_metrics": [
+    {
+      "benchmark": "CSR_Traversal/bfs_2hop/n=1000_e=3000",
+      "baseline_ns": 4500.0,
+      "head_p50_ns": 239.16,
+      "head_p95_ns": 244.34,
+      "unit": "ns",
+      "speedup_factor": 18.81,
+      "regression": false
+    },
+    {
+      "benchmark": "CSR_Traversal/get_neighbors/n=1000_e=3000",
+      "baseline_ns": 350.0,
+      "head_p50_ns": 71.55,
+      "head_p95_ns": 71.81,
+      "unit": "ns",
+      "speedup_factor": 4.89,
+      "regression": false
+    },
+    {
+      "benchmark": "CSR_Traversal/bfs_2hop_with_pending/n=1000_e=3000_p=100",
+      "baseline_ns": 52000.0,
+      "head_p50_ns": 1815.1,
+      "head_p95_ns": 1891.6,
+      "unit": "ns",
+      "speedup_factor": 28.65,
+      "regression": false
+    },
+    {
+      "benchmark": "CSR_Traversal/bfs_2hop/n=10000_e=30000",
+      "baseline_ns": 48000.0,
+      "head_p50_ns": 217.69,
+      "head_p95_ns": 219.08,
+      "unit": "ns",
+      "speedup_factor": 220.49,
+      "regression": false
+    },
+    {
+      "benchmark": "CSR_Traversal/get_neighbors/n=10000_e=30000",
+      "baseline_ns": 350.0,
+      "head_p50_ns": 69.46,
+      "head_p95_ns": 69.84,
+      "unit": "ns",
+      "speedup_factor": 5.04,
+      "regression": false
+    },
+    {
+      "benchmark": "CSR_Traversal/bfs_2hop_with_pending/n=10000_e=30000_p=100",
+      "baseline_ns": 52000.0,
+      "head_p50_ns": 236.82,
+      "head_p95_ns": 237.52,
+      "unit": "ns",
+      "speedup_factor": 219.57,
+      "regression": false
+    }
+  ],
+  "p0_findings": [
+    {
+      "crate": "memfuse-db",
+      "file": "crates/memfuse-db/src/background_workers.rs",
+      "line": 272,
+      "error": "E0061: tombstone_hyperedge requires 2 arguments (id, wal_tx) following commit 6d5025d",
+      "action": "Needs signature update in Welle 8 / IP-20 integration prompt"
+    },
+    {
+      "crate": "memfuse-db",
+      "file": "crates/memfuse-db/src/homeostat.rs",
+      "line": 90,
+      "error": "E0308: PidController::update requires Duration as first argument",
+      "action": "Needs argument mapping update in Welle 8 / IP-20 integration prompt"
+    }
+  ],
+  "crates": [
+    {"name":"memfuse-core-ipc-gen","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"memfuse-core","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"memfuse-store","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"memfuse-index","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"memfuse-graph","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"memfuse-db","check":"fail","clippy":"fail","test":"fail","result":"fail_p0_compilation"},
+    {"name":"memfuse-checkpoint","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"memfuse-crypto","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"memfuse-embed","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"memfuse-mcp","check":"pass","clippy":"pass","test":"pass","result":"pass"}
+  ]
+}
