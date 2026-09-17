@@ -16,7 +16,7 @@
       "session_id": "4363914930122359458",
       "active": false,
       "expires_at": "2026-09-17T00:40:20.305334755+00:00",
-      "released_at": "2026-09-17T07:21:08.956008016+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-17T07:09:12.662843789+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-text",
@@ -34,7 +34,7 @@
       "session_id": "9595033855427390629",
       "active": false,
       "expires_at": "2026-09-17T01:38:47.429954857+00:00",
-      "released_at": "2026-09-17T07:21:08.956008016+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-17T07:09:12.662843789+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-candle",
@@ -43,7 +43,7 @@
       "session_id": "5745795697878023454",
       "active": false,
       "expires_at": "2026-09-17T02:29:03.410221688+00:00",
-      "released_at": "2026-09-17T07:21:08.956008016+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-17T07:09:12.662843789+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "workspace-audit",
@@ -52,15 +52,15 @@
       "session_id": "4865021195704609027",
       "active": false,
       "expires_at": "2026-09-17T03:29:35.369705749+00:00",
-      "released_at": "2026-09-17T07:21:08.956008016+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-17T07:09:12.662843789+00:00 [TTL-EXPIRED]"
     },
     {
-      "krate": "memfuse-sandbox",
+      "krate": "workspace-ci",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-17T07:11:33.912270130+00:00",
-      "session_id": "9861440444929711671",
+      "timestamp": "2026-09-17T07:06:26.852855781+00:00",
+      "session_id": "8576944047840288262",
       "active": true,
-      "expires_at": "2026-09-17T11:11:33.912226896+00:00"
+      "expires_at": "2026-09-17T11:06:26.852839738+00:00"
     }
   ]
 }

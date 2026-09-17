@@ -102,7 +102,7 @@ impl IsotonicCalibrator {
         {
             self.rebuild_model();
         }
-        Some(self.lookup_isotonic(raw_score))
+        self.lookup_isotonic(raw_score)
     }
 
     /// Erzwingt ein sofortiges Rebuild des PAVA-Modells, unabhängig vom Threshold für neue Beobachtungen.
@@ -197,22 +197,22 @@ impl IsotonicCalibrator {
         self.cached_ece = self.calculate_ece();
     }
 
-    fn lookup_isotonic(&self, raw_score: f32) -> f32 {
+    fn lookup_isotonic(&self, raw_score: f32) -> Option<f32> {
         let model = match &self.cached_model {
             Some(m) => m,
-            None => return 0.5,
+            None => return None,
         };
         if model.is_empty() {
-            return 0.5;
+            return None;
         }
 
         match model.binary_search_by(|(threshold, _)| threshold.total_cmp(&raw_score)) {
-            Ok(idx) => model[idx].1,
+            Ok(idx) => Some(model[idx].1),
             Err(idx) => {
                 if idx >= model.len() {
-                    model.last().map(|(_, p)| *p).unwrap_or(0.5)
+                    model.last().map(|(_, p)| *p)
                 } else {
-                    model[idx].1
+                    Some(model[idx].1)
                 }
             }
         }
@@ -244,7 +244,9 @@ impl IsotonicCalibrator {
         let probs_and_outcomes: Vec<(f32, bool)> = self
             .observations
             .iter()
-            .map(|&(score, outcome)| (self.lookup_isotonic(score), outcome))
+            .filter_map(|&(score, outcome)| {
+                self.lookup_isotonic(score).map(|prob| (prob, outcome))
+            })
             .collect();
 
         let bin_width = 1.0 / ECE_BINS as f32;
