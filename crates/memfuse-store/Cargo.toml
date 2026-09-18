@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "memfuse-store"
 version.workspace = true
