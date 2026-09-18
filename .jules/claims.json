@@ -23,24 +23,35 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-17T21:21:24.123057658+00:00",
       "session_id": "604547472940316711",
-      "active": true,
-      "expires_at": "2026-09-18T01:21:24.123038562+00:00"
+      "active": false,
+      "expires_at": "2026-09-18T01:21:24.123038562+00:00",
+      "released_at": "2026-09-18T12:22:24.820316114+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-py",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-17T22:52:36.409854645+00:00",
       "session_id": "15341767735733559964",
-      "active": true,
-      "expires_at": "2026-09-18T02:52:36.409832401+00:00"
+      "active": false,
+      "expires_at": "2026-09-18T02:52:36.409832401+00:00",
+      "released_at": "2026-09-18T12:22:24.820316114+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-candle",
       "issue": "WELLE5-DOCID128-CANDLE",
       "timestamp": "2026-09-18T00:09:55.182910158+00:00",
       "session_id": "7475709940801589732",
+      "active": false,
+      "expires_at": "2026-09-18T04:09:55.182899883+00:00",
+      "released_at": "2026-09-18T12:22:24.820316114+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-mcp",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-18T12:17:54.714603784+00:00",
+      "session_id": "9397694294964393647",
       "active": true,
-      "expires_at": "2026-09-18T04:09:55.182899883+00:00"
+      "expires_at": "2026-09-18T16:17:54.714586146+00:00"
     }
   ]
 }
