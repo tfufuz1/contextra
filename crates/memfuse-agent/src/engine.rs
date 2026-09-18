@@ -228,6 +228,8 @@ impl OrchestratorEngine {
                                 let letter = StepDeadLetter {
                                     session_id: ctx.task_id.clone(),
                                     node_id: node.id.clone(),
+                                    step_index: ctx.step_count,
+                                    tx_id: Some(tx_id),
                                     failure_reason: DeadLetterReason::BudgetExhausted {
                                         available: ctx.budget.available(),
                                         required: estimated_cost,
@@ -275,6 +277,8 @@ impl OrchestratorEngine {
                                             let letter = StepDeadLetter {
                                                 session_id: ctx.task_id.clone(),
                                                 node_id: node.id.clone(),
+                                                step_index: ctx.step_count,
+                                                tx_id: Some(tx_id),
                                                 failure_reason: DeadLetterReason::BudgetExhausted {
                                                     available: 0,
                                                     required: estimated_cost,
@@ -316,6 +320,8 @@ impl OrchestratorEngine {
                                                 let letter = StepDeadLetter {
                                                     session_id: ctx.task_id.clone(),
                                                     node_id: node.id.clone(),
+                                                    step_index: ctx.step_count,
+                                                    tx_id: Some(tx_id),
                                                     failure_reason: DeadLetterReason::ToolError {
                                                         message: err_msg,
                                                     },
@@ -336,6 +342,8 @@ impl OrchestratorEngine {
                                                 let letter = StepDeadLetter {
                                                     session_id: ctx.task_id.clone(),
                                                     node_id: node.id.clone(),
+                                                    step_index: ctx.step_count,
+                                                    tx_id: Some(tx_id),
                                                     failure_reason:
                                                         DeadLetterReason::MaxRetriesExceeded {
                                                             attempts: max_attempts,
@@ -364,6 +372,8 @@ impl OrchestratorEngine {
                                             let letter = StepDeadLetter {
                                                 session_id: ctx.task_id.clone(),
                                                 node_id: node.id.clone(),
+                                                step_index: ctx.step_count,
+                                                tx_id: Some(tx_id),
                                                 failure_reason: DeadLetterReason::Timeout {
                                                     timeout_ms: tool.timeout_ms(),
                                                 },
@@ -664,13 +674,15 @@ impl OrchestratorEngine {
 
     async fn commit_step(&self, ctx: &AgentContext, result: &StepResult) -> Result<()> {
         let state_doc_id = format!("task:{}:step:{}", ctx.task_id, ctx.step_count);
+        let tx_id = ctx.db.inner_storage().last_tx_id().await?;
         let metadata = serde_json::json!({
             "stage": "commit",
             "node": ctx.current_node,
             "memory": ctx.memory,
             "output": result.output,
             "tokens_consumed": result.tokens_consumed,
-            "status": ctx.status
+            "status": ctx.status,
+            "tx_id": tx_id.0
         });
 
         // Use direct KV storage pattern for workflow history without vector index participation
@@ -684,6 +696,7 @@ impl OrchestratorEngine {
     /// In such recovery scenarios, the caller must advance to a new `step_count` (e.g., via
     /// `ctx.next_retry_step_count()`), and NOT attempt to overwrite the existing entry.
     async fn audit_log(&self, ctx: &AgentContext, result: &StepResult) -> Result<()> {
+        let tx_id = ctx.db.inner_storage().last_tx_id().await?;
         // Generate immutable audit trace and store it
         let entry = crate::audit::AuditEntry {
             task_id: ctx.task_id.clone(),
@@ -692,12 +705,14 @@ impl OrchestratorEngine {
             tokens_consumed: result.tokens_consumed,
             payload: result.output.clone(),
             error: None,
+            tx_id: Some(tx_id),
         };
 
         crate::audit::AuditLog::append_to(&ctx.state_collection, &entry).await
     }
 
     async fn audit_log_failure(&self, ctx: &AgentContext, error_message: &str) -> Result<()> {
+        let tx_id = ctx.db.inner_storage().last_tx_id().await.ok();
         let entry = crate::audit::AuditEntry {
             task_id: ctx.task_id.clone(),
             step_count: ctx.step_count,
@@ -705,6 +720,7 @@ impl OrchestratorEngine {
             tokens_consumed: 0,
             payload: serde_json::Value::Null,
             error: Some(error_message.to_string()),
+            tx_id,
         };
 
         crate::audit::AuditLog::append_to(&ctx.state_collection, &entry).await

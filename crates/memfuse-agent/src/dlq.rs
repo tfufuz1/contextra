@@ -35,8 +35,8 @@ impl DeadLetterQueue {
 
     pub async fn push(&self, letter: &StepDeadLetter) -> Result<()> {
         let key = format!(
-            "dlq:{}:{}:{}:{}",
-            letter.session_id, letter.failed_at_secs, letter.node_id, letter.attempt
+            "dlq:{}:{}:{}",
+            letter.session_id, letter.node_id, letter.step_index
         );
         let value =
             serde_json::to_vec(letter).map_err(|e| MemFuseError::Serialization(e.to_string()))?;
@@ -93,6 +93,74 @@ impl DeadLetterQueue {
         Ok(letters)
     }
 
+    /// Prüft vor dem Replay eines DLQ-Eintrags, ob die im Eintrag assoziierte `TxId`
+    /// bereits im WAL/Storage für denselben `(Session, Node, Step)`-Schlüssel committet ist.
+    ///
+    /// Gibt `Ok(true)` zurück, falls das Event bereits erfolgreich committet wurde (Replay = No-Op).
+    /// Gibt `Ok(false)` zurück, falls das Event noch nicht committet wurde und neu ausgeführt werden muss.
+    pub async fn is_already_committed(&self, letter: &StepDeadLetter) -> Result<bool> {
+        let letter_tx_id = match letter.tx_id {
+            Some(tx) => tx,
+            None => return Ok(false),
+        };
+
+        let state_doc_id = format!("task:{}:step:{}", letter.session_id, letter.step_index);
+        let audit_id = format!("audit:{}:step:{}", letter.session_id, letter.step_index);
+
+        for doc_id in [&state_doc_id, &audit_id] {
+            if let Ok(Some(val_bytes)) = self.storage.get(doc_id.as_bytes()).await {
+                if let Ok(meta) = serde_json::from_slice::<serde_json::Value>(&val_bytes) {
+                    let tx_val = meta.get("tx_id").and_then(|v| v.as_u64()).or_else(|| {
+                        meta.get("metadata")
+                            .and_then(|m| m.get("tx_id"))
+                            .and_then(|v| v.as_u64())
+                    });
+                    if let Some(tx_u64) = tx_val {
+                        if tx_u64 == letter_tx_id.0 {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+            let namespaced_doc_key = format!("__col:agent:\x000{}", doc_id);
+            if let Ok(Some(val_bytes)) = self.storage.get(namespaced_doc_key.as_bytes()).await {
+                if let Ok(meta) = serde_json::from_slice::<serde_json::Value>(&val_bytes) {
+                    let tx_val = meta.get("tx_id").and_then(|v| v.as_u64()).or_else(|| {
+                        meta.get("metadata")
+                            .and_then(|m| m.get("tx_id"))
+                            .and_then(|v| v.as_u64())
+                    });
+                    if let Some(tx_u64) = tx_val {
+                        if tx_u64 == letter_tx_id.0 {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+
+        let entries = self.storage.scan_prefix(b"").await?;
+        for (k, val_bytes) in entries {
+            let key_str = String::from_utf8_lossy(&k);
+            if key_str.contains(&state_doc_id) || key_str.contains(&audit_id) {
+                if let Ok(meta) = serde_json::from_slice::<serde_json::Value>(&val_bytes) {
+                    let tx_val = meta.get("tx_id").and_then(|v| v.as_u64()).or_else(|| {
+                        meta.get("metadata")
+                            .and_then(|m| m.get("tx_id"))
+                            .and_then(|v| v.as_u64())
+                    });
+                    if let Some(tx_u64) = tx_val {
+                        if tx_u64 == letter_tx_id.0 {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
     pub async fn allocate_tx(&self) -> Result<TxId> {
         let counter = self
             .next_tx
@@ -122,6 +190,8 @@ mod tests {
         let letter1 = StepDeadLetter {
             session_id: "sess-1".to_string(),
             node_id: "node-a".to_string(),
+            step_index: 0,
+            tx_id: None,
             failure_reason: DeadLetterReason::Timeout { timeout_ms: 5000 },
             input: serde_json::json!({"query": "test"}),
             attempt: 0,
@@ -131,6 +201,8 @@ mod tests {
         let letter2 = StepDeadLetter {
             session_id: "sess-1".to_string(),
             node_id: "node-b".to_string(),
+            step_index: 1,
+            tx_id: None,
             failure_reason: DeadLetterReason::ToolError {
                 message: "Tool failed".to_string(),
             },
