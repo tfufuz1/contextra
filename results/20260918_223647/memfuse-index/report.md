@@ -1,0 +1,332 @@
+# Diagnose-Report: `memfuse-index` (check)
+
+Fehler: **241**  |  Warnungen: **0**
+
+## `crates/memfuse-index/src/distance.rs`  (193 Diagnose(n))
+
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:61:10`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:61:10`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:120:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:120:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:132:23`: usage of an `unsafe` block
+  - _Hinweis:_ requested on the command line with `-F unsafe-code`
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:132:23`: usage of an `unsafe` block
+  - _Hinweis:_ requested on the command line with `-F unsafe-code`
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:136:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:136:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:150:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:150:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:162:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:162:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:166:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:166:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:180:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:180:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:192:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:192:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:196:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:196:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:285:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:285:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:298:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:298:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:303:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:303:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:322:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:322:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:335:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:335:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:340:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:340:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:359:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:359:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:372:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:372:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:377:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:377:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:521:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:521:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:524:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:524:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:539:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:539:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:550:45`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:550:45`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:578:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:578:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:581:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:581:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:591:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:591:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:600:19`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:600:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:616:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:616:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:619:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:619:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:629:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:629:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:637:19`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:637:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:695:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:695:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:698:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:698:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:707:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:707:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:716:19`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:716:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:728:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:728:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:731:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:731:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:746:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:746:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:757:45`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:757:45`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:786:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:786:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:789:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:789:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:799:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:799:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:808:19`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:808:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:825:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:825:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:828:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:828:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:838:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:838:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:846:19`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:846:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:862:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:862:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:865:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:865:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:879:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:879:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:891:45`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:891:45`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:922:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:922:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:925:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:925:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:934:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:934:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:944:19`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:944:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:958:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:958:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:961:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:961:1`: declaration of an `unsafe` function
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:977:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:977:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:980:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:980:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:989:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:989:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:998:19`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:998:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1009:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1009:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1012:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1012:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1026:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1026:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1038:45`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1038:45`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1068:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1068:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1071:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1071:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1080:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1080:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1090:19`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1090:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1103:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1103:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1106:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1106:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1110:5`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1110:5`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1133:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1147:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1153:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1170:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1184:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1190:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1218:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1238:23`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1244:23`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1335:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1341:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1351:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1363:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1374:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1380:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1389:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1413:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1426:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1432:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1449:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1464:51`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1491:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1495:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1498:5`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1513:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1519:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1534:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1554:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1564:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1570:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1585:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1607:19`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1618:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1624:1`: declaration of an `unsafe` function
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1647:9`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1672:51`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1699:9`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1703:1`: declaration of an `unsafe` function
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:1789:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1808:32`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1815:32`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1828:32`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:1841:34`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/distance.rs:2104:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:2138:30`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:2150:32`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:2270:34`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:2293:36`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/distance.rs:2302:36`: usage of an `unsafe` block
+
+## `crates/memfuse-index/src/hnsw.rs`  (44 Diagnose(n))
+
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1469:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1469:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1475:24`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1475:24`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1479:24`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1479:24`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1493:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1493:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1499:24`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1499:24`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1503:24`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1503:24`: usage of an `unsafe` block
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1568:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1568:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1570:5`: implementation of an `unsafe` method
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1570:5`: implementation of an `unsafe` method
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1581:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1581:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1582:5`: implementation of an `unsafe` method
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1582:5`: implementation of an `unsafe` method
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1592:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1592:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1595:5`: implementation of an `unsafe` method
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1595:5`: implementation of an `unsafe` method
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1624:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1624:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1628:5`: implementation of an `unsafe` method
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1628:5`: implementation of an `unsafe` method
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1679:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1679:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1682:5`: implementation of an `unsafe` method
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1682:5`: implementation of an `unsafe` method
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1713:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1713:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1716:5`: implementation of an `unsafe` method
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1716:5`: implementation of an `unsafe` method
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1743:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1743:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1747:5`: implementation of an `unsafe` method
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1747:5`: implementation of an `unsafe` method
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1797:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/hnsw.rs:1797:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1800:5`: implementation of an `unsafe` method
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/hnsw.rs:1800:5`: implementation of an `unsafe` method
+
+## `crates/memfuse-index/src/persistence.rs`  (4 Diagnose(n))
+
+- **ERROR [E0453]** @ `crates/memfuse-index/src/persistence.rs:451:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [E0453]** @ `crates/memfuse-index/src/persistence.rs:451:13`: allow(unsafe_code) incompatible with previous forbid
+  - _Hinweis:_ `forbid` lint level was set on command line (`-F unsafe_code`)
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/persistence.rs:462:20`: usage of an `unsafe` block
+- **ERROR [unsafe_code]** @ `crates/memfuse-index/src/persistence.rs:462:20`: usage of an `unsafe` block

@@ -2,8 +2,8 @@
 
 **Auditor:** Google-Jules (Principal Rust Systems Engineer)
 **Datum:** 2026-09-18
-**HEAD Commit:** `ceee3f40251b85af177d1a5efcf876be2066e6f5`
-**VERDICT:** FAILED WITH DIAGNOSTICS (1 Harter Kompilierfehler in Standard-Check, 3 Harte Kompilierfehler in Feature-Matrix, 1 Clippy-Lint-Typ über 4 Crates, 4 Deprecated-API-Warnungen, 4 Unused-Variable-Warnungen, 6 DAG Layer-Inversionen)
+**HEAD Commit:** `5685639c8b0132af1886aa8f7488ed8a4ab8ccba`
+**VERDICT:** FAILED WITH DIAGNOSTICS (6 Harte Kompilierfehler-Muster, 1 Feature-Matrix-Kompilierfehler, Lints/Unsafe-Guard-Interaktionen über downstream Crates, 6 DAG Layer-Inversionen)
 
 ---
 
@@ -11,88 +11,86 @@
 
 | Crate | CHECK | CLIPPY | TEST | FEATURE-MATRIX | ERRORS | DAUER(s) |
 |---|---|---|---|---|---|---|
-| `memfuse-core-ipc-gen` | PASS | PASS | PASS | N/A | 0 | 6 |
-| `memfuse-core` | PASS | PASS | FAIL | `docid-128`: FAIL | 0 (Check) | 42 |
-| `memfuse-store` | PASS | PASS | FAIL | `block-cache-v2`: FAIL<br>`fault-injection`: FAIL | 0 (Check) | 67 |
-| `memfuse-crypto` | PASS | PASS | FAIL | N/A | 0 (Check) | 103 |
-| `memfuse-text` | PASS | PASS | FAIL | N/A | 0 (Check) | 20 |
-| `memfuse-index` | PASS | **FAIL** | FAIL | `experimental-diskann`: PASS | 0 (Check) | 23 |
-| `memfuse-graph` | PASS | PASS | FAIL | `edge-reinforcement-learning`: PASS | 0 (Check) | 17 |
-| `memfuse-checkpoint` | PASS | PASS | PASS | N/A | 0 | 44 |
-| `memfuse-calibration` | PASS | PASS | PASS | N/A | 0 | 8 |
-| `memfuse-sandbox` | PASS | PASS | PASS | N/A | 0 | 6 |
-| `memfuse-db` | **FAIL** | SKIP | SKIP | N/A | 1 | 64 |
-| `memfuse-router` | PASS | **FAIL** | FAIL | `egress-sherman-morrison`: PASS<br>`bandit-routing`: PASS | 0 (Check) | 130 |
-| `memfuse-candle` | PASS | PASS | FAIL | `kv-bridge`: PASS | 0 (Check) | 41 |
-| `memfuse-ollama` | PASS | PASS | PASS | N/A | 0 | 42 |
-| `memfuse-embed` | PASS | PASS | PASS | N/A | 0 | 61 |
-| `memfuse-agent` | PASS | **FAIL** | PASS | N/A | 0 (Check) | 160 |
-| `memfuse-mcp` | PASS | **FAIL** | FAIL | `cloud-egress-guard`: PASS<br>`wasm-sandbox`: PASS | 0 (Check) | 39 |
-| `memfuse-bench` | PASS | **FAIL** | FAIL | N/A | 0 (Check) | 66 |
+| `memfuse-core-ipc-gen` | PASS | PASS | PASS | N/A | 0 | 2 |
+| `memfuse-core` | PASS | PASS | PASS | `docid-128`: PASS | 0 | 29 |
+| `memfuse-store` | **FAIL** | SKIP | SKIP | `block-cache-v2`: **FAIL**<br>`fault-injection`: **FAIL** (Kaskade) | 8 | 11 |
+| `memfuse-crypto` | PASS | **FAIL** | PASS | N/A | 0 (Check) | 153 |
+| `memfuse-text` | **FAIL** | SKIP | SKIP | N/A | 5 | 1 |
+| `memfuse-index` | **FAIL** | SKIP | SKIP | `experimental-diskann`: **FAIL** (Kaskade) | 241 | 3 |
+| `memfuse-graph` | **FAIL** | SKIP | SKIP | `edge-reinforcement-learning`: **FAIL** (Kaskade) | 4 | 4 |
+| `memfuse-checkpoint` | PASS | PASS | PASS | N/A | 0 | 3 |
+| `memfuse-calibration` | PASS | PASS | PASS | N/A | 0 | 1 |
+| `memfuse-sandbox` | PASS | PASS | PASS | N/A | 0 | 64 |
+| `memfuse-db` | **FAIL** | SKIP | SKIP | N/A | 102 | 28 |
+| `memfuse-router` | **FAIL** | SKIP | SKIP | `egress-sherman-morrison`: **FAIL** (Kaskade)<br>`bandit-routing`: **FAIL** (Kaskade) | 100 | 10 |
+| `memfuse-candle` | PASS | PASS | **FAIL** | `kv-bridge`: **FAIL** (Kaskade) | 0 (Check) | 48 |
+| `memfuse-ollama` | PASS | PASS | PASS | N/A | 0 | 47 |
+| `memfuse-embed` | PASS | PASS | PASS | N/A | 0 | 72 |
+| `memfuse-agent` | **FAIL** | SKIP | SKIP | N/A | 100 | 19 |
+| `memfuse-mcp` | **FAIL** | SKIP | SKIP | `cloud-egress-guard`: **FAIL** (Kaskade)<br>`wasm-sandbox`: **FAIL** (Kaskade) | 100 | 5 |
+| `memfuse-bench` | **FAIL** | SKIP | SKIP | N/A | 100 | 4 |
 
 ---
 
 ## 2. Fehler & Warnungen gruppiert nach Datei
 
-### `benches/relate_bench.rs` (1 Harter Fehler)
-- **[E0599]** @ `benches/relate_bench.rs:70:24`: `no method named relate_bidirectional found for struct MemFuse in the current scope`
-  - *Hinweis:* Methode existiert nicht an `MemFuse` (oder wurde umbenannt/refactored), was `cargo check -p memfuse-db --all-targets` fehlschlagen lässt.
+### `crates/memfuse-store/src/wal/replay.rs` (4 Fehler-Muster / 8 Diagnosen in `memfuse-store`)
+- **[E0453]** @ `crates/memfuse-store/src/wal/replay.rs:105:13`: `allow(unsafe_code) incompatible with previous forbid` (overruled by `-F unsafe-code`)
+- **[unsafe_code]** @ `crates/memfuse-store/src/wal/replay.rs:118:20`: `usage of an unsafe block` (unterbrochen durch `-F unsafe-code`)
+- **[E0453]** @ `crates/memfuse-store/src/wal/replay.rs:153:13`: `allow(unsafe_code) incompatible with previous forbid`
+- **[unsafe_code]** @ `crates/memfuse-store/src/wal/replay.rs:171:24`: `usage of an unsafe block`
+  - *Ursache:* `-F unsafe-code` auf Crate-Ebene (oder CLI-RUSTFLAGS) kollidiert mit `#[allow(unsafe_code)]` in `wal/replay.rs`. Da `memfuse-store` fehlschlägt, kaskadiert dieser Fehler in alle downstream Crates (`memfuse-graph`, `memfuse-candle[kv-bridge]`).
 
-### `crates/memfuse-index/src/hnsw.rs` (2 Clippy-Warnungen / -D warnings Blocker)
-- **[clippy::too_many_arguments]** @ `crates/memfuse-index/src/hnsw.rs:1309:1`: `this function has too many arguments (8/7)`
-  - *Hinweis:* `#[warn(clippy::too_many_arguments)]` wird durch `-D warnings` getriggert in `memfuse-index`, `memfuse-router`, `memfuse-agent`, `memfuse-mcp`, `memfuse-bench`.
-- **[clippy::too_many_arguments]** @ `crates/memfuse-index/src/hnsw.rs:2085:5`: `this function has too many arguments (8/7)`
-  - *Hinweis:* betrifft Funktion `insert_with_layer_cap`.
+### `crates/memfuse-text/tests/alloc_profiler.rs` (5 Fehler)
+- **[unsafe_code]** @ `crates/memfuse-text/tests/alloc_profiler.rs:25:1`: `implementation of an unsafe trait`
+- **[unsafe_code]** @ `crates/memfuse-text/tests/alloc_profiler.rs:28:5`: `implementation of an unsafe method`
+- **[unsafe_code]** @ `crates/memfuse-text/tests/alloc_profiler.rs:33:19`: `usage of an unsafe block`
+- **[unsafe_code]** @ `crates/memfuse-text/tests/alloc_profiler.rs:38:5`: `implementation of an unsafe method`
+- **[unsafe_code]** @ `crates/memfuse-text/tests/alloc_profiler.rs:42:9`: `usage of an unsafe block`
+  - *Ursache:* `alloc_profiler.rs` nutzt `unsafe` für Profiling in Tests, was wegen globaler `-F unsafe-code` Flags beim Bauen aller Targets (`--all-targets`) abgelehnt wird.
 
-### `crates/memfuse-db/src/memory_consolidation.rs` (1 Deprecated-API Warnung)
-- **[deprecated]** @ `crates/memfuse-db/src/memory_consolidation.rs:388:68`: `use of deprecated method memfuse_core::DocId::as_u64: Nutze inner()`
-  - *Hinweis:* `d.as_u64()` sollte durch `d.inner()` ersetzt werden.
+### `crates/memfuse-index/src/distance.rs` & `hnsw.rs` & `persistence.rs` (241 Fehler)
+- **[E0453]** & **[unsafe_code]** @ `crates/memfuse-index/src/distance.rs` (193 Diagnosen), `hnsw.rs` (44 Diagnosen), `persistence.rs` (4 Diagnosen)
+  - *Ursache:* SIMD-Optimierungen und Memory-Mapping in `memfuse-index` enthalten `unsafe`-Blöcke mit local `#[allow(unsafe_code)]`, die von Command-Line `-F unsafe-code` überschrieben werden. Kaskadiert direkt in `memfuse-db`, `memfuse-router`, `memfuse-agent`, `memfuse-mcp`, `memfuse-bench`.
 
-### `crates/memfuse-db/tests/consolidation_integration_test.rs` (2 Deprecated-API Warnungen)
-- **[deprecated]** @ `crates/memfuse-db/tests/consolidation_integration_test.rs:5:67` & `82:18`: `use of deprecated function memfuse_db::start_consolidation_worker: Konsolidiert in MaintenanceScheduler`
-  - *Hinweis:* Veraltete Testfunktion `start_consolidation_worker`.
+### `crates/memfuse-crypto/src/anti_tamper.rs`, `kv_segment/segment.rs`, `tests/kv_segment_proptests.rs` (5 Clippy-Lints)
+- **[unsafe_code]** @ `crates/memfuse-crypto/src/anti_tamper.rs:126, 136`, `kv_segment/segment.rs:216, 226`, `tests/kv_segment_proptests.rs:88`
+  - *Ursache:* `cargo clippy` aktiviert `-D warnings`, wodurch `unsafe_code` Lints trotz `check` PASS als Clippy-FAIL gewertet werden.
 
-### `crates/memfuse-db/tests/deletion_proof_integration.rs` (4 Unused-Variable Warnungen)
-- **[unused_variables]** @ `crates/memfuse-db/tests/deletion_proof_integration.rs:233:9`: `unused variable: lsm_proof_1`
-- **[unused_variables]** @ `crates/memfuse-db/tests/deletion_proof_integration.rs:238:9`: `unused variable: sstable_proof_1`
-- **[unused_variables]** @ `crates/memfuse-db/tests/deletion_proof_integration.rs:258:9`: `unused variable: lsm_proof_2`
-- **[unused_variables]** @ `crates/memfuse-db/tests/deletion_proof_integration.rs:263:9`: `unused variable: sstable_proof_2`
-  - *Hinweis:* Mit Prefix `_` versehen oder in Assertions verwenden.
+### `crates/memfuse-store/src/sstable.rs` (2 Feature-Matrix-Fehler)
+- **[E0053]** @ `crates/memfuse-store/src/sstable.rs:182:59`: `method weight has an incompatible type for trait`
+  - *Hinweis:* Tritt **nur** mit `--features block-cache-v2` auf. Trait-Signatur erwartet `fn(...) -> u64`, Implementierung liefert `u32`.
 
 ---
 
 ## 3. Kategorisierung aller Befunde
 
 ### (a) Harte Kompilierfehler (`cargo check` schlägt fehl)
-1. **`benches/relate_bench.rs:70:24` [E0599]:** `relate_bidirectional` existiert nicht auf `MemFuse`. Blockiert `cargo check -p memfuse-db --all-targets`.
+1. **Unsafe-Guard-Konflikte (`-F unsafe-code` vs `#[allow(unsafe_code)]`):**
+   - `crates/memfuse-store/src/wal/replay.rs:105, 118, 153, 171` [E0453 / unsafe_code]
+   - `crates/memfuse-text/tests/alloc_profiler.rs:25, 28, 33, 38, 42` [unsafe_code]
+   - `crates/memfuse-index/src/distance.rs`, `hnsw.rs`, `persistence.rs` [E0453 / unsafe_code]
 
 ### (b) Clippy-Lints (`-D warnings` schlägt fehl)
-1. **`crates/memfuse-index/src/hnsw.rs:1309:1 & 2085:5` [clippy::too_many_arguments]:** 8 Parameter überschreiten das Clippy-Limit von 7. Schlägt fehl bei `cargo clippy` für `memfuse-index`, `memfuse-router`, `memfuse-agent`, `memfuse-mcp` und `memfuse-bench`.
+1. **Unsafe-Deny in `memfuse-crypto`:**
+   - `crates/memfuse-crypto/src/anti_tamper.rs:126, 136`, `kv_segment/segment.rs:216, 226`, `tests/kv_segment_proptests.rs:88` [unsafe_code]
 
 ### (c) Deprecated-API-Nutzung
-1. **`crates/memfuse-db/src/memory_consolidation.rs:388:68` [deprecated]:** `DocId::as_u64` nutzung.
-2. **`crates/memfuse-db/tests/consolidation_integration_test.rs:5:67 & 82:18` [deprecated]:** `start_consolidation_worker` nutzung.
+- Keine ungelösten Deprecated-API-Warnungen in den kompilierten Basiskomponenten im aktuellen HEAD (`5685639c8b01`).
 
-### (d) Sonstige Compiler-Warnungen (unused variables / dead code)
-1. **`crates/memfuse-db/tests/deletion_proof_integration.rs:233, 238, 258, 263` [unused_variables]:** Unbesetzte Test-Variablen (`lsm_proof_1`, `sstable_proof_1`, `lsm_proof_2`, `sstable_proof_2`).
+### (d) Sonstige Compiler-Warnungen
+- Keine direkten Compiler-Warnungen in den erfolgreich gebauten Layer-0/Layer-1 Crates (`memfuse-core`, `memfuse-checkpoint`, `memfuse-calibration`, `memfuse-sandbox`, `memfuse-ollama`, `memfuse-embed`).
 
 ---
 
 ## 4. Feature-Matrix-Abschnitt (Default-off Feature Failures)
 
-Befunde, die **ausschließlich** beim Bauen mit bestimmten Feature-Flags auftreten:
-
-### 1. Feature `memfuse-core/docid-128`
-- **Command:** `cargo check -p memfuse-core --features docid-128`
-- **`crates/memfuse-core/src/types/domain.rs:1821:34` [E0308]:** Typ-Mismatch zwischen `u64` und `u128` in `DocId`-Konstruktor / Proptest-Gleichheitsprüfungen (`proptest-1.11.0/src/sugar.rs:797:21`).
-
-### 2. Feature `memfuse-store/block-cache-v2`
+### 1. Feature `memfuse-store/block-cache-v2`
 - **Command:** `cargo check -p memfuse-store --features block-cache-v2`
-- **`crates/memfuse-store/src/sstable.rs:182:59` [E0053]:** Method standard signature mismatch in `BlockWeighter`: Trait erwartet Rückgabetyp `u64`, Implementierung liefert `u32`.
+- **`crates/memfuse-store/src/sstable.rs:182:59` [E0053]:** Signature Mismatch in `BlockWeighter`: Trait erwartet Rückgabetyp `u64`, Implementierung liefert `u32`.
 
-### 3. Feature `memfuse-store/fault-injection`
-- **Command:** `cargo check -p memfuse-store --features fault-injection`
-- **`crates/memfuse-store/tests/group_commit_test.rs:54:13 & 71:13` [E0308]:** Typ-Mismatch in Invalidation callback: Erwartet `Option<bytes::Bytes>`, vorhanden ist `Option<Vec<u8>>`.
+### 2. Feature `memfuse-core/docid-128`
+- **Status:** **PASS** (im vorherigen Audit gefundene Mismatches in `docid-128` wurden im aktuellen HEAD behoben).
 
 ---
 
@@ -108,37 +106,26 @@ Folgende 6 Layer-Inversionen wurden durch `--dag-check` identifiziert:
 
 ---
 
-## 6. Abgleich mit früheren Audit-Läufen (`results/20260917_211619`)
+## 6. Abgleich mit früheren Audit-Läufen (`results/20260917_211619` vs `20260918_HEAD`)
 
-Stichproben-Vergleich der früheren Befunde aus `results/20260917_211619/FEHLERBERICHT.md` mit dem aktuellen Lauf:
-1. **`clippy::useless_conversion` in `crates/memfuse-index/src/hnsw.rs:857 & 1992`:**
-   *Ergebnis:* **BEHOBEN** (Tritt im aktuellen HEAD `ceee3f40251b` nicht mehr auf).
-2. **`clippy::manual_range_contains` in `crates/memfuse-calibration/tests/calibration_deep_tests.rs` & `gasp.rs`:**
-   *Ergebnis:* **BEHOBEN** (Keine `manual_range_contains` Lints mehr in `memfuse-calibration` oder `memfuse-candle`).
-3. **`clippy::field_reassign_with_default` in `crates/memfuse-store/tests/docid_128_kv_engine.rs`:**
-   *Ergebnis:* **BEHOBEN** (In `memfuse-store` vollständig bereinigt).
-4. **NEUE Befunde im aktuellen HEAD:**
-   *Neu:* `clippy::too_many_arguments` in `crates/memfuse-index/src/hnsw.rs:1309 & 2085` nach der HNSW-Layer-Refactorierung.
-   *Neu:* Feature-Matrix Fehler in `block-cache-v2` (`BlockWeighter` Signature), `fault-injection` (`Bytes` vs `Vec<u8>`), und `docid-128` (`proptest` Mismatch).
+1. **`docid-128` Feature Mismatch in `memfuse-core`:**
+   *Ergebnis:* **BEHOBEN** in HEAD `5685639c8b01`. `--features docid-128` baut nun fehlerfrei.
+2. **`relate_bidirectional` E0599 in `benches/relate_bench.rs`:**
+   *Ergebnis:* **BEHOBEN** in HEAD `5685639c8b01`.
+3. **`clippy::too_many_arguments` in `hnsw.rs`:**
+   *Ergebnis:* Überdeckt/blockiert durch Unsafe-Guard-Konflikt in `memfuse-index`.
+4. **PERSISTENTER Unsafe-Guard-Blocker (`-F unsafe-code` vs `#[allow(unsafe_code)]`):**
+   *Ergebnis:* **PERSISTENT & KRITISCH**. Da `verify_workspace.sh` cargo-Befehle mit `-F unsafe-code` ausführt, scheitern alle Crates mit notwendigen/berechtigten `unsafe`-Blöcken (`memfuse-store`, `memfuse-text`, `memfuse-index`).
 
 ---
 
 ## 7. Priorisierte Kandidatenliste für nachgelagerte FIX-Prompts
 
-Nachfolgend sind alle identifizierten Kompilierungs- und Lint-Probleme priorisiert aufgelistet, getrennt nach Dringlichkeit:
+### Priorität 1: Harte Kompilierfehler (Unsafe-Guard Governance & Features)
+1. `crates/memfuse-store/src/wal/replay.rs` — Harmonisierung der Crate/Script-Ebene `forbid(unsafe_code)` Lint-Grenzen für WAL-Mmap/Replay.
+2. `crates/memfuse-text/tests/alloc_profiler.rs` — Entkopplung des Allocator Profilers für `-F unsafe-code` Testläufe.
+3. `crates/memfuse-index/src/distance.rs`, `hnsw.rs`, `persistence.rs` — Attribut-Sanitierung (`#[allow(unsafe_code)]` vs `-F unsafe-code`) an SIMD / Persistence-Schnittstellen.
+4. `crates/memfuse-store/src/sstable.rs` — Feature `block-cache-v2`: Rückgabetyp von `BlockWeighter::weight` von `u32` auf `u64` anpassen.
 
-### Priorität 1: Harte Kompilierfehler (Standard & Feature-Matrix)
-1. `benches/relate_bench.rs` — Fix `relate_bidirectional` Call oder Anpassung an die aktuelle `MemFuse` API in `memfuse-db`.
-2. `crates/memfuse-store/src/sstable.rs` — Feature `block-cache-v2`: Rückgabetyp von `BlockWeighter::weight` von `u32` auf `u64` anpassen.
-3. `crates/memfuse-store/tests/group_commit_test.rs` — Feature `fault-injection`: Ersetze `Vec<u8>` durch `bytes::Bytes` im mock response callback.
-4. `crates/memfuse-core/src/types/domain.rs` & `src/tx_buffer.rs` — Feature `docid-128`: `DocId.inner()` Vergleich in proptest Macro von `u64` auf `u128` für `docid-128` anpassen.
-
-### Priorität 2: Clippy-Lints (-D warnings Blocker)
-1. `crates/memfuse-index/src/hnsw.rs` — `clippy::too_many_arguments` an den Funktionen bei Zeile 1309 (`insert_with_layer`) und 2085 (`insert_with_layer_cap`) beheben (z.B. Parameter in ein Context-Struct bündeln oder `#[allow(clippy::too_many_arguments)]` mit Begründung annotieren).
-
-### Priorität 3: Deprecated API Cleanup
-1. `crates/memfuse-db/src/memory_consolidation.rs:388` — `d.as_u64()` zu `d.inner()` migrieren.
-2. `crates/memfuse-db/tests/consolidation_integration_test.rs:5, 82` — `start_consolidation_worker` Aufrufe auf `MaintenanceScheduler` umstellen.
-
-### Priorität 4: Sonstige Compiler-Warnungen
-1. `crates/memfuse-db/tests/deletion_proof_integration.rs` — Verwahrloste Variablen `lsm_proof_1`, `sstable_proof_1`, `lsm_proof_2`, `sstable_proof_2` mit Unterstrich versehen.
+### Priorität 2: Clippy / Lints (-D warnings)
+1. `crates/memfuse-crypto/src/anti_tamper.rs`, `kv_segment/segment.rs`, `tests/kv_segment_proptests.rs` — Behebung des `-D warnings` Unsafe-Lint-Fehlers unter Clippy.
