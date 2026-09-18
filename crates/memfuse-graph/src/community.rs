@@ -26,13 +26,13 @@ use std::collections::HashMap;
 /// Represents a synthetic bipartite hyperedge node generated during star expansion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VirtualHyperedgeNode {
-    /// Numerical ID of the hyperedge.
-    pub hyperedge_id: u64,
+    /// ID der zugrundeliegenden Hyperkante.
+    pub hyperedge_id: crate::hyperedge::HyperEdgeId,
 }
 
 impl VirtualHyperedgeNode {
     /// Creates a new `VirtualHyperedgeNode`.
-    pub fn new(hyperedge_id: u64) -> Self {
+    pub fn new(hyperedge_id: crate::hyperedge::HyperEdgeId) -> Self {
         Self { hyperedge_id }
     }
 }
@@ -43,24 +43,48 @@ impl VirtualHyperedgeNode {
 /// without physical graph materialization or heap allocations per `next()` call.
 pub struct StarExpansionIterator<'a> {
     graph: &'a CsrGraph,
-    hyperedge_ids: Vec<crate::hyperedge::HyperEdgeId>,
+    active_hyperedges: Vec<crate::hyperedge::HyperEdge>,
     current_he_idx: usize,
     current_participant_idx: usize,
 }
 
 impl<'a> StarExpansionIterator<'a> {
-    /// Creates a new `StarExpansionIterator` over all hyperedges currently present in `graph`.
+    /// Creates a new `StarExpansionIterator` over active hyperedges present in `graph`.
     pub fn new(graph: &'a CsrGraph) -> Self {
-        let hyperedge_ids = {
-            let inner = graph.inner_read();
-            inner.hyperedges.keys().copied().collect()
-        };
+        let inner = graph.inner_read();
+        let active_hyperedges = inner
+            .hyperedges
+            .values()
+            .filter(|h| h.tx_valid_to.is_none() && h.participants.len() >= 2)
+            .cloned()
+            .collect();
+
         Self {
             graph,
-            hyperedge_ids,
+            active_hyperedges,
             current_he_idx: 0,
             current_participant_idx: 0,
         }
+    }
+
+    /// Liest das nächste Element inkl. Kantengewicht.
+    pub fn next_with_weight(&mut self) -> Option<(EntityId, VirtualHyperedgeNode, f32)> {
+        while self.current_he_idx < self.active_hyperedges.len() {
+            let hedge = &self.active_hyperedges[self.current_he_idx];
+            if self.current_participant_idx < hedge.participants.len() {
+                let entity_id = hedge.participants[self.current_participant_idx].entity;
+                let vnode = VirtualHyperedgeNode {
+                    hyperedge_id: hedge.id,
+                };
+                let weight = if hedge.weight > 0.0 { hedge.weight } else { 1.0 };
+                self.current_participant_idx += 1;
+                return Some((entity_id, vnode, weight));
+            } else {
+                self.current_he_idx += 1;
+                self.current_participant_idx = 0;
+            }
+        }
+        None
     }
 }
 
@@ -69,20 +93,7 @@ impl<'a> Iterator for StarExpansionIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let inner = self.graph.inner_read();
-        while self.current_he_idx < self.hyperedge_ids.len() {
-            let he_id = self.hyperedge_ids[self.current_he_idx];
-            if let Some(he) = inner.hyperedges.get(&he_id) {
-                if self.current_participant_idx < he.participants.len() {
-                    let participant = &he.participants[self.current_participant_idx];
-                    self.current_participant_idx += 1;
-                    return Some((participant.entity, VirtualHyperedgeNode::new(he_id.inner())));
-                }
-            }
-            self.current_he_idx += 1;
-            self.current_participant_idx = 0;
-        }
-        None
+        self.next_with_weight().map(|(entity, vnode, _w)| (entity, vnode))
     }
 }
 
@@ -96,71 +107,6 @@ pub struct CommunityDetectionConfig {
     /// Community-Detection (Leiden-Algorithmus) berücksichtigt ausschließlich binäre Kantengewichte; Hyperkanten-Fakten fließen NICHT in die Cluster-Zuordnung ein, auch wenn sie im Graphen vorhanden sind. Dieses Flag macht diese Unvollständigkeit explizit sichtbar statt sie stillschweigend zu tolerieren (siehe IP-20/H6).
     #[serde(default)]
     pub hyperedges_included: bool,
-}
-
-/// Künstlicher bipartiter Knoten für eine Hyperkante in der Stern-Expansion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct VirtualHyperedgeNode {
-    /// ID der zugrundeliegenden Hyperkante.
-    pub hyperedge_id: crate::hyperedge::HyperEdgeId,
-}
-
-/// Stern-Expansion: Jede Hyperkante wird als künstlicher bipartiter Knoten
-/// (`VirtualHyperedgeNode`) repräsentiert. Der Iterator gaukelt dem Leiden-Solver die
-/// Inzidenzmatrix H vor, ohne zusätzlichen Speicher für die volle Expansion zu allozieren.
-pub struct StarExpansionIterator<'a> {
-    _graph: &'a CsrGraph,
-    active_hyperedges: Vec<crate::hyperedge::HyperEdge>,
-    current_hyperedge_idx: usize,
-    current_participant_idx: usize,
-}
-
-impl<'a> StarExpansionIterator<'a> {
-    /// Erstellt einen neuen `StarExpansionIterator` für den gegebenen CsrGraph.
-    pub fn new(graph: &'a CsrGraph) -> Self {
-        let inner = graph.inner_read();
-        let active_hyperedges = inner
-            .hyperedges
-            .values()
-            .filter(|h| h.tx_valid_to.is_none() && h.participants.len() >= 2)
-            .cloned()
-            .collect();
-
-        Self {
-            _graph: graph,
-            active_hyperedges,
-            current_hyperedge_idx: 0,
-            current_participant_idx: 0,
-        }
-    }
-
-    /// Liest das nächste Element inkl. Kantengewicht.
-    pub fn next_with_weight(&mut self) -> Option<(EntityId, VirtualHyperedgeNode, f32)> {
-        while self.current_hyperedge_idx < self.active_hyperedges.len() {
-            let hedge = &self.active_hyperedges[self.current_hyperedge_idx];
-            if self.current_participant_idx < hedge.participants.len() {
-                let entity_id = hedge.participants[self.current_participant_idx].entity;
-                let vnode = VirtualHyperedgeNode {
-                    hyperedge_id: hedge.id,
-                };
-                let weight = if hedge.weight > 0.0 { hedge.weight } else { 1.0 };
-                self.current_participant_idx += 1;
-                return Some((entity_id, vnode, weight));
-            } else {
-                self.current_hyperedge_idx += 1;
-                self.current_participant_idx = 0;
-            }
-        }
-        None
-    }
-}
-
-impl<'a> Iterator for StarExpansionIterator<'a> {
-    type Item = (EntityId, VirtualHyperedgeNode);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next_with_weight().map(|(entity, vnode, _w)| (entity, vnode))
-    }
 }
 
 impl Default for CommunityDetectionConfig {
@@ -253,7 +199,7 @@ pub async fn detect_communities(
     graph.compact();
 
     // Acquire read lock to access CSR arrays
-    let (valid_nodes, num_real_nodes, reverse_map, adj_raw) = {
+    let (valid_nodes, _num_real_nodes, reverse_map, adj_raw) = {
         let inner = graph.inner_read();
         let num_nodes = inner.reverse_map.len();
 
@@ -310,7 +256,7 @@ pub async fn detect_communities(
                     if inner.entities.get(u).is_some_and(|e| e.is_some()) {
                         let v_idx =
                             *virtual_map
-                                .entry(virtual_node.hyperedge_id)
+                                .entry(virtual_node.hyperedge_id.inner())
                                 .or_insert_with(|| {
                                     let idx = next_virtual_idx;
                                     next_virtual_idx += 1;
@@ -318,7 +264,7 @@ pub async fn detect_communities(
                                     idx
                                 });
 
-                        let he_id = crate::hyperedge::HyperEdgeId::new(virtual_node.hyperedge_id);
+                        let he_id = virtual_node.hyperedge_id;
                         let w_val = inner
                             .hyperedges
                             .get(&he_id)
@@ -371,7 +317,7 @@ pub async fn detect_communities(
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
-        let (eid, u64_id) = if global_idx < reverse_map.len() {
+        let (eid, _u64_id) = if global_idx < reverse_map.len() {
             let eid = reverse_map[global_idx];
             (eid, eid.inner())
         } else {
