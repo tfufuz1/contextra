@@ -435,6 +435,11 @@ impl StorageEngine for LsmStorage {
                 return Ok(false);
             }
 
+            // 1b. Check if staged in any uncommitted transaction scope.
+            if self.tx_buffer.staged_status(key).is_some() {
+                return Ok(false);
+            }
+
             // 2. Intent Lock check and registration
             {
                 let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
