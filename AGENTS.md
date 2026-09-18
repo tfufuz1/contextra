@@ -10,7 +10,7 @@
 <!-- §7 = Non-Obvious Decisions (would cause wrong code without this knowledge) -->
 
 <a id="1"></a>
-## Verifizierter Codestand · HEAD `6a7ca31d42841ffa80afc583c1a3389410a2e9e2` · Stand 2026-09-14
+## Verifizierter Codestand · HEAD `6a7ca31d42841ffa80afc583c1a3389410a2e9e2` · Stand 2026-09-18
 
 > **Für AI-Assistenten:** Diese Datei beschreibt was TATSÄCHLICH implementiert ist,
 > nicht was die Spec behauptet. Bei Widerspruch zwischen dieser Datei und Spec/README:
