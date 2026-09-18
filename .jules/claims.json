@@ -80,6 +80,23 @@
       "active": false,
       "expires_at": "2026-09-18T22:37:16.877731643+00:00",
       "released_at": "2026-09-18T18:54:30.559299639+00:00 [RELEASED]"
+    },
+    {
+      "krate": "workspace-root",
+      "issue": "PHASE0-T1",
+      "timestamp": "2026-09-18T19:00:47.312256023+00:00",
+      "session_id": "7969829840554621654",
+      "active": true,
+      "expires_at": "2026-09-18T23:00:47.312240447+00:00"
+    },
+    {
+      "krate": "memfuse-bench",
+      "issue": "PHASE0-T2",
+      "timestamp": "2026-09-18T19:01:10.667690312+00:00",
+      "session_id": "12814159345160565071",
+      "active": false,
+      "expires_at": "2026-09-18T23:01:10.667669495+00:00",
+      "released_at": "2026-09-18T19:17:10.499166783+00:00 [RELEASED]"
     }
   ]
 }
