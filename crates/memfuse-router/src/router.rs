@@ -543,8 +543,10 @@ impl<S: StorageEngine> RouterEngine<S> {
                     #[cfg(feature = "bandit-routing")]
                     {
                         let k_drift = (1.0 + lyapunov_exponent.max(0.0)).clamp(1.5, 4.0);
-                        if let Some(profile_state) =
-                            new_state.profiles.iter_mut().find(|p| p.name == selected_profile.name)
+                        if let Some(profile_state) = new_state
+                            .profiles
+                            .iter_mut()
+                            .find(|p| p.name == selected_profile.name)
                         {
                             if let Some(ref mut bstate) = profile_state.bandit_state {
                                 bstate.on_drift_detected(k_drift);
