@@ -72,16 +72,18 @@ async fn test_regression_zero_panic_doctrine_no_panics_on_invalid_inputs() {
     let (mut engine, _db, _ctx, _tmp) = setup_env().await;
 
     // 1. Deprecated/legacy constructors and helpers must not panic
-    let event = BackgroundEvent::new(json!({}), "", 1);
-    assert_eq!(event.source, "unknown");
+    let event = BackgroundEvent::try_new(json!({}), "", 1);
+    assert!(event.is_err());
 
     let mut graph = StateGraph::new();
-    // Invalid node addition via deprecated add_node should log a warning, not panic
-    graph.add_node("", "Invalid node", NodeType::Task, None);
+    // Invalid node addition via try_add_node should return an error, not panic
+    assert!(graph
+        .try_add_node("", "Invalid node", NodeType::Task, None)
+        .is_err());
     assert!(graph.get_node("").is_none());
 
-    // Invalid edge addition via deprecated add_edge should log a warning, not panic
-    graph.add_edge("", "end", None, 1);
+    // Invalid edge addition via try_add_edge should return an error, not panic
+    assert!(graph.try_add_edge("", "end", None, 1).is_err());
     assert!(graph.edges.is_empty());
 
     // Registered tool with invalid name

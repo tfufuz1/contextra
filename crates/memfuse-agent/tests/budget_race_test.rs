@@ -58,7 +58,7 @@ async fn setup_env(
     };
     let db = Arc::new(MemFuse::open_with_config(tmp_dir.path(), config).await?);
     let state_col = db.collection("agent_state").await?;
-    let engine = OrchestratorEngine::from_db(&db);
+    let engine = OrchestratorEngine::try_from_db(&db).expect("engine try_from_db");
     let ctx = AgentContext::try_new(
         "task-race-1",
         "start",
