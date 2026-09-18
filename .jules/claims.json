@@ -82,12 +82,12 @@
       "released_at": "2026-09-18T18:54:30.559299639+00:00 [RELEASED]"
     },
     {
-      "krate": "cargo-audit-policy",
-      "issue": "PHASE0-T6",
-      "timestamp": "2026-09-18T19:23:34.032875389+00:00",
-      "session_id": "16797740130146240637",
+      "krate": "workspace-root",
+      "issue": "PHASE0-T1",
+      "timestamp": "2026-09-18T19:00:47.312256023+00:00",
+      "session_id": "7969829840554621654",
       "active": true,
-      "expires_at": "2026-09-18T23:23:34.032857517+00:00"
+      "expires_at": "2026-09-18T23:00:47.312240447+00:00"
     }
   ]
 }

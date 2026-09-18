@@ -10,6 +10,7 @@ use memfuse_bench::long_mem_eval::{
 };
 use memfuse_core::Result;
 use memfuse_db::{MemFuse, MemFuseConfig};
+#[cfg(feature = "onnx-bench")]
 use memfuse_embed::{CrossEncoderReranker, RerankConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -690,6 +691,7 @@ async fn run_scenario_a(
     })
 }
 
+#[cfg(feature = "onnx-bench")]
 async fn run_scenario_b(
     docs: &[SyntheticDocument],
     queries: &[GroundTruthQuery],
@@ -781,6 +783,18 @@ async fn run_scenario_b(
         recall_at_1_delta_pct: recall_1_delta,
         recall_at_5_delta_pct: recall_5_delta,
         error_rate_reduction_pct: err_reduction,
+    })
+}
+
+#[cfg(not(feature = "onnx-bench"))]
+async fn run_scenario_b(
+    _docs: &[SyntheticDocument],
+    _queries: &[GroundTruthQuery],
+) -> Result<ScenarioComparison> {
+    eprintln!("[WARN] Scenario B (Cross-Encoder Reranking) requires the 'onnx-bench' feature.");
+    Err(memfuse_core::MemFuseError::CapabilityUnsupported {
+        capability: "onnx-bench".to_string(),
+        reason: "Cross-Encoder Reranking benchmark requires 'onnx-bench' feature. Recompile with --features onnx-bench.".to_string(),
     })
 }
 
@@ -1304,8 +1318,23 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let scenario_a = run_scenario_a(&docs, &queries_a).await?;
     println!("Scenario A completed.");
 
-    let scenario_b = run_scenario_b(&docs, &queries_b).await?;
-    println!("Scenario B completed.");
+    let scenario_b = match run_scenario_b(&docs, &queries_b).await {
+        Ok(sc) => {
+            println!("Scenario B completed.");
+            sc
+        }
+        Err(e) => {
+            eprintln!("[INFO] Scenario B skipped: {e}");
+            ScenarioComparison {
+                scenario_name: "Ohne vs. mit Cross-Encoder-Reranking (deaktiviert)".into(),
+                baseline_metrics: Default::default(),
+                feature_metrics: Default::default(),
+                recall_at_1_delta_pct: 0.0,
+                recall_at_5_delta_pct: 0.0,
+                error_rate_reduction_pct: 0.0,
+            }
+        }
+    };
 
     let report = BenchmarkReport {
         timestamp: "2026-09-03T10:00:00Z".into(),
@@ -1399,11 +1428,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_benchmark_scenarios_execution() {
-        let (docs, q_a, q_b) = create_synthetic_corpus();
+        let (docs, q_a, _q_b) = create_synthetic_corpus();
         let sc_a = run_scenario_a(&docs, &q_a).await.unwrap();
-        let sc_b = run_scenario_b(&docs, &q_b).await.unwrap();
-
         assert_eq!(sc_a.baseline_metrics.total_queries, q_a.len());
-        assert_eq!(sc_b.baseline_metrics.total_queries, q_b.len());
+
+        #[cfg(feature = "onnx-bench")]
+        {
+            let sc_b = run_scenario_b(&docs, &_q_b).await.unwrap();
+            assert_eq!(sc_b.baseline_metrics.total_queries, _q_b.len());
+        }
     }
 }
