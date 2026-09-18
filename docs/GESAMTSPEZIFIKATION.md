@@ -1,55 +1,202 @@
-# MemFuse — Gesamtspezifikation des Endprodukts
+# MemFuse Cognitive OS — Finale Konsolidierte Gesamtspezifikation
 
-> **Status:** Normativ · Einzige maßgebliche, eigenständige Quelle für Produkt, Architektur, Datenmodell, Algorithmen,
-> Sicherheitsmodell und Implementierungsreihenfolge von MemFuse.
-> **Geltung:** Dieses Dokument ersetzt vollständig alle vorherigen Spezifikationsfassungen und -deltas
-> (u. a. die `FINAL_9`–`FINAL_12`-Reihe, die `v11.1`/`v11.2`-Hyperkanten-Deltas sowie die
-> „Mikrofeingranulare Schnittstellenspezifikation"). Es enthält keine Verweise auf diese Vorgängerdokumente mehr,
-> sondern führt deren normativen Inhalt zu einem einzigen, in sich geschlossenen Zielbild zusammen.
-> **Charakter:** Dies ist eine **Zielarchitektur- und Produktspezifikation**, keine Commit-für-Commit-Verifikation
-> eines bestimmten Repository-Standes. Wo zwischen spezifiziertem Zielzustand und (zum Zeitpunkt der letzten
-> bekannten Code-Prüfung) tatsächlich implementiertem Zustand ein Unterschied besteht, ist dies explizit als
-> **Reifegrad** gekennzeichnet, nicht stillschweigend vermischt.
+> **Status:** Normativ · Einzige maßgebliche Quelle für Produkt, Architektur, Algorithmen,
+> Implementierungsvorgaben, Sicherheitsmodell, Schnittstellenspezifikation und Optimierungs-Roadmap
+> des MemFuse Cognitive OS.
+>
+> **Synthese aus:**
+> - `MEMFUSE_GESAMTSPEZIFIKATION.md` — Produktvision, Architekturprinzipien P1–P25, Reifegrad-Tracking
+> - `MEMFUSE_IMPLEMENTIERUNGSSPEZIFIKATION.md` — Normative Signaturen, Modulstrukturen, Fehler-Enums, Testkriterien
+> - `Mikrofeingranulare Schnittstellenspezifikation.md` — Lock-freie Algorithmen, mathematische Grundlagen, SIMD-Spezifikation
+> - `Implementierungsplan_Opus_Optimierungen.md` — Priorisierte Optimierungsmaßnahmen Stufe 0–3
+>
+> **Charakter:** Dieses Dokument führt Produktvision, Zielarchitektur, normative Signaturen,
+> algorithmische Spezifikationen, mikrofeingranulare Schnittstellendefinitionen und die priorisierte
+> Optimierungs-Roadmap in einem einzigen, in sich geschlossenen Dokument zusammen. Es ersetzt
+> vollständig alle vorherigen Spezifikationsfassungen und -deltas.
+>
+> **Sprache:** Rust 2021, Workspace-Layout, `#![forbid(unsafe_code)]` als Default in jedem Crate
+> ohne explizite Ausnahme (§0.4).
+>
+> **Lesart:** Jeder Abschnitt ist eigenständig implementierbar. Codeblöcke sind **normativ**, nicht
+> illustrativ — Feldnamen, Typnamen und Funktionssignaturen sind exakt zu übernehmen, sofern nicht
+> als „Beispiel" markiert. Wo `unimplemented!()` steht, ist die Signatur und das umgebende
+> Vertrags-/Fehlerverhalten normativ, der Funktionskörper ist gemäß der in Prosa/Formel gegebenen
+> Algorithmusbeschreibung des jeweiligen Abschnitts zu füllen.
 >
 > **Reifegrad-Kennzeichnung, durchgängig verwendet:**
 > - 🟢 **Produktiv** — im Code vorhanden, korrekt und als Produktions-Default aktiv.
-> - 🟡 **Hinter Feature-Flag** — im Code vollständig und korrekt vorhanden, aber nicht der Produktions-Default;
->   Aktivierung erfordert ein explizites Cargo-Feature oder eine Konfigurationsoption.
-> - 🔴 **Spezifiziert, zu bauen** — normativer Zielzustand dieses Dokuments, im Code (Stand der letzten Prüfung)
->   nicht vorhanden.
-> - ⚖️ **Produktentscheidung ausstehend** — die technische Umsetzung ist möglich oder bereits vorhanden, der
->   Wechsel des Produktions-Defaults ist jedoch eine bewusste, an ein Kriterium (Benchmark, Major-Release)
->   gebundene Entscheidung, kein Implementierungsrückstand.
+> - 🟡 **Hinter Feature-Flag** — im Code vollständig und korrekt vorhanden, aber nicht der
+>   Produktions-Default; Aktivierung erfordert ein explizites Cargo-Feature.
+> - 🔴 **Spezifiziert, zu bauen** — normativer Zielzustand dieses Dokuments, im Code noch nicht
+>   vorhanden.
+> - ⚖️ **Produktentscheidung ausstehend** — technisch möglich oder vorhanden, Default-Wechsel an
+>   messbares Kriterium gebunden.
+> - ⚠️ **Opus-Optimierung** — aus Architektur-Review identifiziert, priorisiert umzusetzen, mit
+>   Stufe (0–3) und Aufwandseinschätzung versehen.
 
 ---
 
 ## Inhaltsverzeichnis
 
-1. [Kernthese & Leitprinzip](#kernthese)
-2. [Produktvision, Alleinstellungsmerkmale & Nicht-Ziele](#vision)
-3. [Architekturprinzipien P1–P25](#prinzipien)
-4. [Systemarchitektur: der Crate-DAG](#architektur)
-5. [Speicherschicht: LSM-Tree, WAL und lock-freies Cache-Management](#speicher)
-6. [Wissensgraph-Datenmodell: binäre Kanten und n-äre Hyperkanten](#graph)
-7. [Retrieval-Pipeline: 4-Signal-Fusion und ihre Algorithmen](#retrieval)
-8. [Contextual-Bandit-Routing](#bandit)
-9. [Inferenz, KV-Cache-Bridge und Zero-Copy-IPC](#inferenz)
-10. [Sicherheits- und Datenschutzmodell](#sicherheit)
-11. [Betriebsmodi](#betrieb)
-12. [Feature-Flag-Politik: Produktions-Default vs. Opt-in](#features)
-13. [Governance & Entwicklungsprozess](#governance)
-14. [Abnahmekriterien des Endprodukts](#abnahme)
-15. [Rückverfolgbarkeitsmatrix](#matrix)
-16. [Roadmap](#roadmap)
+0. [Meta: Workspace-Layout und Build-Konfiguration](#0-meta)
+1. [Kernthese und Leitprinzip](#1-kernthese)
+2. [Produktvision, Alleinstellungsmerkmale und Nicht-Ziele](#2-vision)
+3. [Architekturprinzipien P1–P25](#3-prinzipien)
+4. [Systemarchitektur: der Crate-DAG](#4-architektur)
+5. [Speicherschicht: LSM-Tree, WAL und Block-Cache](#5-speicher)
+6. [Wissensgraph-Datenmodell: binäre Kanten und n-äre Hyperkanten](#6-graph)
+7. [Retrieval-Pipeline: 4-Signal-Fusion und ihre Algorithmen](#7-retrieval)
+8. [Contextual-Bandit-Routing](#8-bandit)
+9. [Inferenz, KV-Cache-Bridge und Zero-Copy-IPC](#9-inferenz)
+10. [Sicherheits- und Datenschutzmodell](#10-sicherheit)
+11. [Betriebsmodi](#11-betrieb)
+12. [FlatBuffers-Schema (vollständig)](#12-schema)
+13. [Fehlertaxonomie (crateübergreifend)](#13-fehler)
+14. [Feature-Flag-Politik: Produktions-Default vs. Opt-in](#14-features)
+15. [Test- und CI-Spezifikation](#15-tests)
+16. [Vollständige Abnahmekriterien](#16-abnahme)
+17. [Priorisierte Optimierungs-Roadmap (Opus-Analyse)](#17-optimierungen)
+18. [Gesamtroadmap](#18-roadmap)
+19. [Rückverfolgbarkeitsmatrix](#19-matrix)
 
 ---
 
-<a id="kernthese"></a>
-## 1. Kernthese & Leitprinzip
+<a id="0-meta"></a>
+## 0. Meta: Workspace-Layout und Build-Konfiguration
 
-**MemFuse ist eine souveräne, vollständig lokal betriebene Gedächtnisschicht für KI-Agenten** — eine eingebettete,
-kryptographisch isolierte AI-Memory-Bibliothek in Rust mit Python- und MCP-Bindings, die ohne Cloud-Abhängigkeit,
-ohne Telemetrie und ohne API-Key betrieben werden kann.
+### 0.1 Verzeichnisstruktur
+
+```
+memfuse/
+├── Cargo.toml                      # [workspace], resolver = "2"
+├── xtask/                          # CI-Tooling (Drift-Gates, Benchmarks)
+│   └── src/
+│       ├── main.rs
+│       ├── check_flatbuffers_drift.rs
+│       └── check_bandit_latency_budget.rs
+├── schemas/
+│   └── memfuse.fbs                 # §12
+├── crates/
+│   ├── memfuse-core-ipc-gen/       # Layer 0 — FlatBuffers-generierter Code
+│   ├── memfuse-core/               # Layer 0 — Kerntypen, Traits, Fehlerbehandlung
+│   ├── memfuse-store/              # Layer 1 — LSM-Tree, WAL, Block-Cache
+│   ├── memfuse-crypto/             # Layer 1 — AES-256-GCM-SIV, DeletionProof, KV-Segment-Security
+│   ├── memfuse-text/               # Layer 1 — BM25/BM25F-Volltextindex, deutsche Morphologie
+│   ├── memfuse-index/              # Layer 1 — HNSW/DiskANN-Vektorindex, SIMD-Distanz
+│   ├── memfuse-graph/              # Layer 1 — CSR-Graph, PPR, Leiden, Hyperkanten
+│   ├── memfuse-checkpoint/         # Layer 1 — Snapshotting
+│   ├── memfuse-calibration/        # Layer 1 — Score-Kalibrierung, Drift-Erkennung
+│   ├── memfuse-db/                 # Layer 2 — Collection-API, 4-Signal-Fusion, Provenance
+│   ├── memfuse-router/             # Layer 3 — Contextual-Bandit-Routing
+│   ├── memfuse-candle/             # Layer 3 — Natives GGUF-Inferenz-Backend, KV-Cache-Bridge
+│   ├── memfuse-ollama/             # Layer 3 — Ollama-Client, Contextual-Chunk-Prefixing
+│   ├── memfuse-embed/              # Layer 3 — ONNX-Embeddings, Cross-Encoder (optional)
+│   ├── memfuse-agent/              # Layer 3 — Persistente Agent-Workflow-Engine
+│   ├── memfuse-py/                 # Layer 3 — Python-FFI via PyO3 (eigener Workspace)
+│   ├── memfuse-sandbox/            # Layer 6.5 — WASM Execution Boundary
+│   ├── memfuse-mcp/                # Layer 4 — MCP-Server, Egress-Gateway
+│   └── memfuse-bench/              # Layer 5 — Benchmark-Harness
+├── benchmarks/
+│   └── memfuse-bench/
+├── .github/workflows/
+│   └── merge-gate.yml              # §15.4
+└── docs/decisions/                 # ADR-0NN-*.md <!-- doc-ref-ignore -->
+```
+
+### 0.2 Root-`Cargo.toml` (normativ)
+
+```toml
+[workspace]
+resolver = "2"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.79"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+flatbuffers = "23"
+crossbeam-epoch = "0.9"
+arc-swap = "1"
+ahash = "0.8"
+scc = "2"
+quick_cache = "0.5"
+zerocopy = "0.7"
+thiserror = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+aes-gcm-siv = "0.11"
+blake3 = "1"
+wasmtime = "23"
+```
+
+### 0.3 Cargo-Feature-Katalog (crateübergreifend normativ)
+
+| Feature | Definierender Crate | Default | Wirkung |
+|---|---|---|---|
+| `docid-128` | `memfuse-core` | aus | `DocId` wird `u128` statt `u64` (§6.1) |
+| `block-cache-v2` | `memfuse-store` | aus | `SieveCacheBackend` statt `LruBlockCacheBackend` als aktives Backend (§5.4) |
+| `egress-sherman-morrison` | `memfuse-router` | aus | `ShermanMorrisonBandit` statt `DiagonalApproximation` (§8.2) |
+| `experimental-diskann` | `memfuse-index` | aus | `DiskAnnIndex` kompiliert und ist über `VectorIndexTier::DiskAnn` wählbar (§7.5) |
+| `bandit-routing` | `memfuse-router` | an | Aktiviert den Bandit-Router überhaupt |
+| `cloud-egress-guard` | `memfuse-mcp` | an | Aktiviert `egress_gateway`-Modul |
+| `wasm-sandbox` | `memfuse-mcp` | an | Aktiviert `sandbox`-Modul |
+| `kv-bridge` | `memfuse-candle` | an | Aktiviert `kv_cache_bridge`-Modul |
+| `edge-reinforcement-learning` | `memfuse-graph` | aus | Aktiviert `SignalKind::EdgeReinforcement`-Pfad |
+| `fault-injection` | `memfuse-store` | nur `dev-dependencies` | Deterministische I/O-Fehlerinjektion für Tests |
+| `loom` | `memfuse-store`, `memfuse-graph` | nur `dev-dependencies` | Aktiviert `loom::sync::*` statt `std::sync::*` hinter `#[cfg(loom)]` |
+| `bm25f` | `memfuse-text` | an | Feldgewichtete BM25-Bewertung |
+| `adaptive-decay` / `-control` | `memfuse-db` | an | Kalibrierungs-Feintuning |
+| `partial-index-rebuild` | `memfuse-index` | an | Inkrementeller Indexaufbau |
+
+### 0.4 Globale Compile-Time-Regeln
+
+Jeder Crate erhält in `lib.rs` genau eine der beiden folgenden Kopfzeilen:
+
+```rust
+#![forbid(unsafe_code)]
+```
+
+oder, **ausschließlich** in den folgenden Crates, mit dokumentierter Begründung:
+
+| Crate | Begründung für `#![deny(unsafe_code)]` |
+|---|---|
+| `memfuse-index` | SIMD-Hardware-Optimierungen (AVX2, AVX-512, NEON) und Read-only Memory-Mapped Index I/O (ADR-017/ADR-034) |
+| `memfuse-store` | Win32-DACL/ACL-File-Permission-Enforcement (`#[cfg(windows)]`) |
+| `memfuse-db` | RAM-Buffer Memory-Locking gegen OS-Swapping (`mlock`/`munlock`, feature-gated `volatile-vault`) |
+| `memfuse-embed` | C-FFI zum ONNX-Runtime-Backend (feature-gated) |
+| `memfuse-core-ipc-gen` | Automatisch generierter FlatBuffers-IPC-Code |
+| `memfuse-router` | SIMD-Intrinsics für Sherman-Morrison-Matrixarithmetik (§8.2) |
+
+Jeder Crate erhält zusätzlich:
+
+```rust
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+```
+
+mit einer versionierten Ausnahmeliste `.unwrap-baseline.json` im Crate-Root, die in CI gegen Neuvorkommen
+geprüft wird (Ratchet: die Datei darf nur schrumpfen, nie wachsen — CI-Job `check-unwrap-baseline`).
+
+### 0.5 Non-Obvious Decisions (systemweit bindend)
+
+- **TxId-Generation:** IMMER `collection.allocate_tx()` — NIEMALS `SystemTime::as_nanos()`
+- **fsync-Fehler:** IMMER mit `?` propagieren — NIEMALS `let _ = dir.sync_all()`
+- **Dokument-Chunking:** IMMER `MarkdownChunker` — NIEMALS gesamten Text als 1 Vektor embedden
+- **MCP-Transport:** stdio JSON-RPC 2.0 ONLY — axum wurde entfernt (ADR-010)
+- **WAL-HMAC-Key:** IMMER via `load_or_create_integrity_key()` — NIEMALS hardcoded
+- **TOMBSTONE_BIT-Disziplin (ADR-041):** Bit 63 strikt maskieren (`seq & !TOMBSTONE_BIT`) vor `max_seq`-Vergleichen
+- **SSTable-Flush-Sichtbarkeit (ADR-043):** `last_committed_tx` vor `sstables.push()` aktualisieren
+
+---
+
+<a id="1-kernthese"></a>
+## 1. Kernthese und Leitprinzip
+
+**MemFuse ist eine souveräne, vollständig lokal betriebene Gedächtnisschicht für KI-Agenten** — eine
+eingebettete, kryptographisch isolierte AI-Memory-Bibliothek in Rust mit Python- und MCP-Bindings, die
+ohne Cloud-Abhängigkeit, ohne Telemetrie und ohne API-Key betrieben werden kann.
 
 Ihr Alleinstellungsmerkmal ist die Kombination aus:
 
@@ -61,24 +208,29 @@ Ihr Alleinstellungsmerkmal ist die Kombination aus:
 - und — als jüngste, noch zu bauende Erweiterung des Datenmodells — **n-ären Hyperkanten** für Fakten, die sich
   nicht auf ein Subjekt-Prädikat-Objekt-Tripel reduzieren lassen (§6).
 
-**Leitprinzip: Korrektheit schlägt Performance schlägt Feature.** Jede Optimierung, die eine Korrektheitsgarantie
-(Datenintegrität, Nebenläufigkeitssicherheit, Wiederherstellbarkeit, Deadlockfreiheit) aufweicht, ist unzulässig —
-unabhängig vom Performancegewinn. Jede Performance-Optimierung, die eine noch nicht spezifizierte Fähigkeit
-vorwegnimmt, ist nachrangig gegenüber der Fertigstellung bereits spezifizierter Fähigkeiten. Jede Erweiterung eines
-bestehenden Subsystems muss geprüft werden gegen die Invarianten, die dieses Subsystem bereits trägt — nicht nur
-dagegen, *dass* eine Erweiterung grundsätzlich möglich ist, sondern *welches bestehende Invariant dadurch unter
-Druck gerät* und wie es gewahrt bleibt. Dieses Prinzip prägt insbesondere die Hyperkanten-Spezifikation (§6.5).
+### Leitprinzip
+
+**Korrektheit schlägt Performance schlägt Feature.**
+
+Jede Optimierung, die eine Korrektheitsgarantie (Datenintegrität, Nebenläufigkeitssicherheit,
+Wiederherstellbarkeit, Deadlockfreiheit) aufweicht, ist unzulässig — unabhängig vom Performancegewinn.
+Jede Performance-Optimierung, die eine noch nicht spezifizierte Fähigkeit vorwegnimmt, ist nachrangig
+gegenüber der Fertigstellung bereits spezifizierter Fähigkeiten. Jede Erweiterung eines bestehenden
+Subsystems muss geprüft werden gegen die Invarianten, die dieses Subsystem bereits trägt — nicht nur
+dagegen, *dass* eine Erweiterung grundsätzlich möglich ist, sondern *welches bestehende Invariant dadurch
+unter Druck gerät* und wie es gewahrt bleibt.
 
 ---
 
-<a id="vision"></a>
-## 2. Produktvision, Alleinstellungsmerkmale & Nicht-Ziele
+<a id="2-vision"></a>
+## 2. Produktvision, Alleinstellungsmerkmale und Nicht-Ziele
 
 ### 2.1 Was MemFuse ist
 
-Eine eingebettete (embedded) Gedächtnisschicht, kein Cloud-Service. MemFuse läuft im Prozess des aufrufenden
-Agenten oder als lokaler MCP-Server — es gibt keine serverseitige Multi-Tenant-Instanz und keine Datenübertragung
-an Dritte, sofern nicht explizit über das Cloud-Egress-Gateway (§10.4) angefordert.
+Eine eingebettete (embedded) Gedächtnisschicht, kein Cloud-Service. MemFuse läuft im Prozess des
+aufrufenden Agenten oder als lokaler MCP-Server — es gibt keine serverseitige Multi-Tenant-Instanz
+und keine Datenübertragung an Dritte, sofern nicht explizit über das Cloud-Egress-Gateway (§10.4)
+angefordert.
 
 ### 2.2 Distributionswege
 
@@ -88,94 +240,115 @@ an Dritte, sofern nicht explizit über das Cloud-Egress-Gateway (§10.4) angefor
 | Python-Bibliothek | `pip install memfuse` | In-Process-Einbettung in Python-Agenten |
 | Rust-Crate | `cargo add memfuse-db` | Native Rust-Anwendungen |
 
-Eine Desktop-Shell (`memfuse-tauri`) existierte als Prototyp, ist aber zugunsten der PyPI-Bibliothek und des
-MCP-Servers als primäre Vertriebswege eingestellt (deprecated).
+Eine Desktop-Shell (`memfuse-tauri`) existierte als Prototyp, ist aber zugunsten der PyPI-Bibliothek
+und des MCP-Servers als primäre Vertriebswege eingestellt (deprecated, ADR-077).
 
 ### 2.3 Alleinstellungsmerkmale und ihr Reifegrad
 
 1. **4-Signal-Hybridsuche** (🟢) — Vektorsuche (HNSW), Volltextsuche (BM25/BM25F), Wissensgraph-Traversierung
    (CSR + Forward-Push-Personalized-PageRank), Metadaten-Filter; fusioniert über Reciprocal Rank Fusion
    (RRF, Default 🟢) oder score-normalisierte Fusion (Opt-in 🟡, mit hartem RRF-Fallback bei Signaldegradation).
+
 2. **Kalibriertes Retrieval mit Lyapunov-Drift-Erkennung** (🟢) — Score-Schwellenwerte werden nicht statisch,
    sondern über ein laufend kalibriertes Modell mit gedeckelter Drift-Eskalation bestimmt.
+
 3. **MCP-native Zero-Trust-Sandbox** (🟢) — Tool-Ausführung mit getrennt konfigurierbarem Fuel- (Rechenschritt-)
    und Wall-Clock-Budget (Default 5 s), orthogonal zueinander konfigurierbar.
+
 4. **Kryptographische DSGVO-Art.-17-Löschung** (🟢) — Löschvorgänge erzeugen einen verifizierbaren `DeletionProof`
    über eine race-freie HMAC-Kette.
+
 5. **Session-DAG** (🟢) — Konversationsverzweigung als persistenter, azyklischer Graph.
+
 6. **Air-Gap-KV-Cache-Bridge mit LSM-Fallback-Spill** (🟢) — der KV-Cache liegt primär verschlüsselt im RAM; bei
    Speicherdruck greift kontrolliertes Auslagern auf die SSD statt verlustbehafteten Verwerfens.
+
 7. **Cloud-Egress Privacy Gateway** (🟢, weitgehend auditiert) — mehrschichtiger DLP-Pfad mit Surrogat-Tokenisierung,
    Bulk-Exfiltration-Erkennung und Rehydration der Cloud-Antwort (§10.4).
+
 8. **Contextual-Bandit-Routing** (🟢 Grundfunktion / 🟡 mathematisch korrekte Variante) — LinUCB-basiertes Routing;
    siehe §8 für die Unterscheidung zwischen Produktions-Default und Ridge-korrekter Opt-in-Variante.
+
 9. **Gestufte Vektorindex-Architektur** (🟢 HNSW / 🟢 DiskANN als Tier) — HNSW als Standard, DiskANN für
    RAM-sprengende Korpora.
+
 10. **Deutsche Morphologie inkl. BM25F** (🟢) — Kompositazerlegung im Volltextindex plus feldgewichtete Bewertung.
+
 11. **Zero-Copy-Storage-Pfad** (🟢) — seit der Grundarchitektur produktiv.
+
 12. **Key-granulare Schreibnebenläufigkeit** (🟢) — `kv_locks` statt collection-weitem Mutex.
+
 13. **N-äre Hyperkanten** (🔴, vollständig spezifiziert, siehe §6) — Fakten mit mehr als zwei Beteiligten als
     erstklassige, atomar invalidierbare Struktur statt Zerlegung in mehrere, im Zusammenhang verlorene Binärkanten.
-    Dies ist die einzige der hier geführten Fähigkeiten, die noch **nicht** implementiert ist; sie wird deshalb in
-    §6 mit besonderer Tiefe spezifiziert.
 
 ### 2.4 Nicht-Ziele
 
 MemFuse ist explizit **kein** Cloud-SaaS-Produkt, **kein** Multi-Tenant-Enterprise-System, **kein** Framework für
 LLM-Training, **keine** primär GUI-getriebene Desktop-Anwendung und **kein** Cluster-/Replikations-System. Ein
 `memfuse-cluster`-Veto besteht bewusst: verteilter Konsensbetrieb ist kein Ziel der aktuellen Produktphase.
-Passives WAL-Shipping für Backup-Zwecke ist als Fernziel vorgesehen (Roadmap-Stufe 4, §16), aber nicht Bestandteil
+Passives WAL-Shipping für Backup-Zwecke ist als Fernziel vorgesehen (Roadmap-Stufe 4, §18), aber nicht Bestandteil
 des Kernprodukts.
 
 ---
 
-<a id="prinzipien"></a>
+<a id="3-prinzipien"></a>
 ## 3. Architekturprinzipien P1–P25
 
 Diese Prinzipien sind normativ für jede gegenwärtige und künftige Erweiterung des Systems.
 
 **P1 — Korrektheit schlägt Performance schlägt Feature.** Siehe §1.
 
-**P2–P22 — Sovereign-Core-Grundsätze** (u. a. WAL-First-Persistenz, deterministische Recovery, keine
-stillschweigende I/O-Fehlerunterdrückung, strikte DAG-Modularität des Crate-Graphen, feingranulare
-`Result<T, E>`-Fehlerkategorisierung statt generischer `panic!`-Pfade, Verbot von `unwrap()`/`expect()` auf
-potenziell toxischen Ein-/Ausgaben). Diese Grundsätze sind seit der Kernarchitektur unverändert gültig und werden
-in §5–§10 an den jeweils betroffenen Subsystemen konkretisiert.
+**P2 — WAL-First-Persistenz.** Keine Zustandsänderung wird im Speicher sichtbar gemacht, bevor sie physisch
+in das Write-Ahead-Log geschrieben und mit dem Datenträger synchronisiert wurde.
+
+**P3 — Deterministische Recovery.** Der Systemzustand muss sich allein aus dem WAL rekonstruieren lassen.
+
+**P4 — Keine stillschweigende I/O-Fehlerunterdrückung.** `fsync`-Fehler IMMER mit `?` propagieren.
+
+**P5 — Strikte DAG-Modularität.** Abhängigkeiten im Crate-Graphen verlaufen strikt abwärts; ein Verstoß
+gilt als Architekturdefekt.
+
+**P6 — Feingranulare Fehlerbehandlung.** Domänenspezifische `Result<T, E>`-Enums statt generischer `panic!`-Pfade.
+
+**P7 — Verbot von `unwrap()`/`expect()` auf toxischen Daten.** CI-gated über `.unwrap-baseline.json`.
+
+**P8–P22 — Sovereign-Core-Grundsätze.** Umfassen u. a.: Verschlüsselung at rest als Default, HMAC-Kettenintegrität,
+Zero-Trust-Sandbox, Air-Gap-fähige Inferenz, deterministische Transaktions-ID-Vergabe, Tombstone-Bit-Disziplin,
+SSTable-Flush-Sichtbarkeit, Kaskaden-Invalidierung, kryptographische Löschnachweise, feingranulare Feature-Gates.
 
 **P23 — Zeitbudgets sind orthogonal konfigurierbar.** Rechenschritt-Budget (Fuel) und Wall-Clock-Budget für
 Sandbox-Ausführungen sind zwei unabhängige Achsen. Ein Tool kann rechnerisch günstig, aber durch blockierendes I/O
-langsam sein, oder umgekehrt — beide Fälle müssen unabhängig begrenzbar sein. **Produktiv erfüllt** (§10.2).
+langsam sein, oder umgekehrt — beide Fälle müssen unabhängig begrenzbar sein. 🟢 Produktiv erfüllt (§10.2).
 
 **P24 — Lokalität vor globaler Neuberechnung.** Jeder Algorithmus, dessen Eingabe eine anfragebestimmte Teilmenge
 des Gesamtzustands ist (PPR mit wenigen Seed-Knoten, Cascade-Invalidierung ausgehend von einem Dokument), MUSS
 eine zur Anfragegröße proportionale Laufzeit haben — niemals zur Größe des Gesamtzustands ($O(V+E)$ ist für
 solche Anfragen unzulässig). Dieses Prinzip ist der normative Grund für den Forward-Push-PPR-Algorithmus (§7.2)
-und für das harte Fan-out-Limit der Hyperkanten-Cascade-Invalidierung (§6.5, H5). Es gilt uneingeschränkt für jeden
-künftigen Graph- oder Retrieval-Algorithmus.
+und für das harte Fan-out-Limit der Hyperkanten-Cascade-Invalidierung (§6.5, H5).
 
 **P25 — Cache-Treffer sind lock-frei bzw. lock-günstig zu gestalten.** Ein Lesetreffer im Block-Cache soll nach
 Möglichkeit keinen exklusiv sperrenden, mutierenden Zugriff erfordern, da Cache-Treffer der mit Abstand häufigste
-Zugriffspfad sind und jede darin verborgene Schreibsperre unter Last zur Kontention wird (§5.2).
+Zugriffspfad sind und jede darin verborgene Schreibsperre unter Last zur Kontention wird (§5.4).
 
-**Ergänzende, aus der jüngsten Architekturüberarbeitung übernommene Grundsätze:**
+### Ergänzende Grundsätze
 
 - **Nebenläufigkeitssicherheit vor Nebenläufigkeitsperformance:** Sperrenhierarchien werden explizit dokumentiert
   und dürfen nicht durch bloßen Analogieschluss auf neue Mutationspfade übertragen werden, ohne die
   Deadlockfreiheit für den neuen Fall erneut zu beweisen (konkretes Beispiel: §6.5, H2).
+
 - **Geschlossene Enums bleiben geschlossen:** Wo ein Enum bewusst **nicht** `#[non_exhaustive]` deklariert ist
-  (z. B. das Signal-Typ-Enum der Fusionsschicht), ist das eine architektonische Entscheidung. Eine neue Kategorie
-  von Information wird in ein bestehendes offenes Signal integriert, statt das Enum breaking zu erweitern
-  (konkretes Beispiel: §6.5, H3).
-- **Kein Sicherungsnetz, keine Schema-Änderung:** Persistenzformat-Änderungen (insbesondere am
-  FlatBuffers-IPC-Schema) werden nur vorgenommen, wenn ein automatisiertes CI-Drift-Gate zwischen Schema und
-  generiertem Code aktiv läuft (konkretes Beispiel: §6.5, H4).
+  (z. B. `SignalKind`), ist das eine architektonische Entscheidung. Eine neue Kategorie von Information wird
+  in ein bestehendes offenes Signal integriert, statt das Enum breaking zu erweitern (§6.5, H3).
+
+- **Kein Sicherungsnetz, keine Schema-Änderung:** Persistenzformat-Änderungen werden nur vorgenommen, wenn ein
+  automatisiertes CI-Drift-Gate zwischen Schema und generiertem Code aktiv läuft (§6.5, H4).
+
 - **Explizite Unvollständigkeit statt stiller Lücken:** Wo ein Subsystem eine neue Datenklasse strukturell nicht
-  berücksichtigt, wird dies über ein sichtbares Konfigurations-/Report-Flag markiert, statt die Lücke
-  stillschweigend zu tolerieren (konkretes Beispiel: §6.5, H6).
+  berücksichtigt, wird dies über ein sichtbares Konfigurations-/Report-Flag markiert (§6.5, H6).
 
 ---
 
-<a id="architektur"></a>
+<a id="4-architektur"></a>
 ## 4. Systemarchitektur: der Crate-DAG
 
 MemFuse gliedert sich in einen mehrschichtigen Rust-Workspace. Abhängigkeiten verlaufen strikt abwärts; eine
@@ -183,41 +356,58 @@ Abhängigkeit, die gegen die Schichtrichtung verstößt, gilt als Architekturdef
 
 | Layer | Crates | Verantwortung |
 |---|---|---|
-| **0** | `memfuse-core-ipc-gen`, `memfuse-core` | FlatBuffers-generierter IPC-Code; Kerntypen, Traits, Fehlerbehandlung, `DocId`/`EntityId` (Default 64-Bit, 128-Bit-Variante feature-gated, §6.1). |
+| **0** | `memfuse-core-ipc-gen`, `memfuse-core` | FlatBuffers-generierter IPC-Code; Kerntypen (`DocId`, `EntityId`, `TxId`, `ConfigFingerprint`), Traits, Fehlerbehandlung. |
 | **1** | `memfuse-store` (LSM-Tree-Storage, WAL, Block-Cache), `memfuse-index` (HNSW/DiskANN-Vektorindex, SIMD-Distanz), `memfuse-text` (BM25/BM25F-Volltextindex, deutsche Morphologie), `memfuse-crypto` (AES-256-GCM-SIV, KV-Segment-Security, Deletion-Proof-Kette), `memfuse-graph` (CSR-Graph, PathRAG, Forward-Push-PPR, Leiden-Community-Detection, Hyperkanten), `memfuse-checkpoint` (Snapshotting), `memfuse-calibration` (Score-Kalibrierung, Drift-Erkennung) | Persistenz- und Indexierungs-Primitive. Keine Kenntnis voneinander außerhalb dieser Schicht. |
 | **2** | `memfuse-db` | Öffentliche `Collection`-API, 4-Signal-Fusion, Multi-Step-Query-Engine, Kontext-Kompaktierung, Provenance-Tracking. Konsumiert alle Layer-1-Crates. |
-| **3** | `memfuse-ollama` (Ollama-Client, Contextual-Chunk-Prefixing), `memfuse-candle` (natives GGUF-Inferenz-Backend, KV-Cache-Bridge), `memfuse-embed` (ONNX-Embeddings, Cross-Encoder-Reranking, feature-gated), `memfuse-agent` (persistente Agent-Workflow-Engine), `memfuse-router` (Contextual-Bandit-Routing), `memfuse-py` (Python-FFI via PyO3, eigener Cargo-Workspace zur Panic-Strategie-Isolation) | Inferenz-Backends und Anwendungslogik oberhalb der Datenschicht. |
-| **4** | `memfuse-mcp` (MCP-Server, Sandbox, Cloud-Egress-Gateway) | Externe Schnittstelle für Agenten (stdio-JSON-RPC). |
+| **3** | `memfuse-ollama` (Ollama-Client, Contextual-Chunk-Prefixing), `memfuse-candle` (natives GGUF-Inferenz-Backend, KV-Cache-Bridge), `memfuse-embed` (ONNX-Embeddings, Cross-Encoder-Reranking, feature-gated), `memfuse-agent` (persistente Agent-Workflow-Engine), `memfuse-router` (Contextual-Bandit-Routing), `memfuse-py` (Python-FFI via PyO3, eigener Cargo-Workspace) | Inferenz-Backends und Anwendungslogik oberhalb der Datenschicht. |
+| **4** | `memfuse-mcp` (MCP-Server, Sandbox, Cloud-Egress-Gateway), `memfuse-sandbox` (WASM Execution Boundary) | Externe Schnittstelle für Agenten (stdio-JSON-RPC). |
 | **5** | `memfuse-bench` | Reproduzierbarer Benchmark-Harness für Retrieval-Genauigkeit und Latenz. |
 
 ### 4.1 Safety-First-Doktrin
 
 Safe Rust ist der Standard; `#![forbid(unsafe_code)]` gilt per Default und wird nur in einer geschlossenen,
 dokumentierten Ausnahmeliste durchbrochen — jeweils mit einem `// SAFETY:`-Beweiskommentar direkt am Code, der die
-Invarianten (insbesondere Pointer-Alignment) beweist:
+Invarianten (insbesondere Pointer-Alignment) beweist (siehe §0.4 für die vollständige Ausnahmeliste).
 
-- `memfuse-index`: SIMD-Distanzberechnung (AVX2/AVX-512/NEON) und read-only Memory-Mapping des Indexformats.
-- `memfuse-store`: plattformspezifische ACL-Durchsetzung für WAL-Dateien unter Windows.
-- `memfuse-db`: `mlock`/`munlock` gegen OS-Swapping sensibler RAM-Puffer (feature-gated).
-- `memfuse-embed`: C-FFI zum ONNX-Runtime-Backend (feature-gated).
-- `memfuse-core-ipc-gen`: automatisch generierter FlatBuffers-IPC-Code.
-- `memfuse-router`: SIMD-Intrinsics für die Sherman-Morrison-Matrixarithmetik (§8.2) — die einzige Ausnahme des
-  `#![forbid(unsafe_code)]`-Paradigmas außerhalb der oben genannten Crates.
+### 4.2 Trait-Eindeutigkeit und Modul-Governance (⚠️ Opus-Optimierung 2.6, Stufe 2, mittel)
 
-Jeder Crate außerhalb dieser Liste erzwingt `#![forbid(unsafe_code)]` kompilierzeitlich. Bibliothekscode darf
-seinen Host-Prozess niemals durch einen Panic zum Absturz bringen — Fehlerbehandlung erfolgt konsequent über
-domänenspezifische `Result<T, E>`-Enums, nicht über `unwrap()`/`expect()` auf potenziell toxischen Daten.
+**Problem:** `memfuse-core/src/traits/` enthält zehn Dateien; `mod.rs` deklariert nur fünf. Vier Dateien
+(`graph_index.rs`, `lifecycle.rs`, `text_index.rs`, `vector_index.rs`) sind dadurch **nie kompiliert** und
+enthalten Zweitdefinitionen von neun Verträgen (`VectorIndex`, `TextEmbeddingEngine`, `SegmentSynthesizer`,
+`TextIndex`, `GraphIndex`, `DistanceCalculator`, `MemoryLifecycleManager`, `GroundingValidator`,
+`ResponseGroundingValidator`), die parallel in `index.rs`/`observability.rs` leben. `GraphIndex` ist zwischen <!-- doc-ref-ignore -->
+beiden Fassungen bereits inhaltlich auseinandergelaufen (abweichende Doc-Kontrakte und Default-Implementierungen)
+— der Compiler kann das nicht erkennen, weil die unverdrahtete Fassung nie gebaut wird. Das bestehende
+Duplikat-Gate (`xtask check_duplicate_symbols`) prüft laut eigener Spezifikation nur *innerhalb derselben Datei*
+und ist für dateiübergreifende Duplikate im selben Modulverzeichnis strukturell blind.
+
+**Einordnung:** Die vier unverdrahteten Dateien sind die **korrekte** Zerlegung (ein Vertrag pro Datei); der
+tatsächlich kompilierte Zustand ist der Monolith `index.rs` (drei unabhängige Verträge in einer Datei). Eine <!-- doc-ref-ignore -->
+Lösung, die schlicht die vier Dateien löscht, würde die bessere Zerlegung entfernen und die falsche behalten.
+
+**Maßnahme (verbindlich):**
+1. Divergenz in `GraphIndex` auflösen — die aktuell kompilierte Fassung in `index.rs` ist die Referenz für die <!-- doc-ref-ignore -->
+   Zusammenführung, nicht automatisch die inhaltlich richtige.
+2. `graph_index`, `vector_index`, `text_index`, `lifecycle` in `traits/mod.rs` deklarieren. <!-- doc-ref-ignore -->
+3. `index.rs` und die duplizierten Teile von `observability.rs` löschen, sobald (1)/(2) grün sind. <!-- doc-ref-ignore -->
+4. **Governance-Gate `GOV-D` (neu, CI-Pflicht):** `xtask check-module-reachability` verifiziert, dass jede
+   `.rs`-Datei unter `src/` von genau einer `mod`-Deklaration aus erreichbar ist. Eine unerreichbare, aber
+   vorhandene Datei ist ein CI-Fehler, kein stiller Zustand — dies schließt exakt die Lücke, die `CORE-D`
+   ermöglicht hat.
+
+**Testpflicht:** `crates/memfuse-core/tests/no_orphan_modules.rs` — schlägt fehl, sobald eine Datei unter `src/` <!-- doc-ref-ignore -->
+existiert, die von keinem `mod`-Pfad aus erreichbar ist.
 
 ---
 
-<a id="speicher"></a>
-## 5. Speicherschicht: LSM-Tree, WAL und lock-freies Cache-Management
+<a id="5-speicher"></a>
+## 5. Speicherschicht: LSM-Tree, WAL und Block-Cache
 
-### 5.1 Grundprinzip
+### 5.1 Grundprinzip und Lock-Hierarchie
 
 Keine Zustandsänderung wird im Speicher sichtbar gemacht, bevor sie physisch in das Write-Ahead-Log geschrieben
-und mit dem Datenträger synchronisiert wurde (WAL-First). Der Systemzustand muss sich allein aus dem Log
-rekonstruieren lassen (deterministische Recovery). Schreibzugriffe sperren nicht die gesamte Collection, sondern
+und mit dem Datenträger synchronisiert wurde (WAL-First, P2). Der Systemzustand muss sich allein aus dem Log
+rekonstruieren lassen (deterministische Recovery, P3). Schreibzugriffe sperren nicht die gesamte Collection, sondern
 nur die betroffenen Schlüssel über eine key-granulare Lock-Hierarchie:
 
 ```
@@ -226,34 +416,231 @@ collections (RwLock) → kv_locks (schlüssel-granular, KvKeyLocks) → embedder
 
 Diese Hierarchie ist für **Einzelschlüssel**-Mutationen ausgelegt und deadlockfrei bewiesen. Jede künftige
 Mutation, die mehrere Schlüssel gleichzeitig unter `kv_locks` hält, muss diesen Beweis für den Mehrschlüsselfall
-gesondert führen — sie darf sich nicht per Analogieschluss auf den Einzelschlüsselfall berufen (P24-Ergänzung,
-§3; konkret angewendet in §6.5, H2).
+gesondert führen — sie darf sich nicht per Analogieschluss auf den Einzelschlüsselfall berufen (konkret
+angewendet in §6.5, H2).
 
-### 5.2 Block-Cache: von sperrendem LRU zu lock-freiem SIEVE/S3-FIFO
+### 5.2 Modulstruktur `memfuse-store`
 
-**Befund:** Ein klassisches `RwLock<LruCache>`-Backend zwingt bei **jedem** Cache-Lesetreffer zur Akquise eines
-exklusiven Schreib-Locks, um das Element in der doppelt verketteten LRU-Liste an den Kopf zu bewegen. Unter der
-hochgradig parallelen Last eines Multi-Agenten-Systems degeneriert dies zu einem massiven Flaschenhals (Verstoß
-gegen P25).
+```
+crates/memfuse-store/src/
+├── lib.rs
+├── lsm.rs               # LSM-Tree, Compaction <!-- doc-ref-ignore -->
+├── wal.rs                # Write-Ahead-Log + HMAC-Kette <!-- doc-ref-ignore -->
+├── wal_ring_buffer.rs    # SPSC-Ring-Puffer (§5.3) <!-- doc-ref-ignore -->
+├── block_cache/
+│   ├── mod.rs            # BlockCacheBackend-Trait
+│   ├── lru.rs            # LruBlockCacheBackend (Default) <!-- doc-ref-ignore -->
+│   └── sieve.rs          # SieveCacheBackend (Opt-in, `block-cache-v2`) <!-- doc-ref-ignore -->
+├── kv_locks.rs           # KvKeyLocks (§5.2a) <!-- doc-ref-ignore -->
+└── error.rs
+```
 
-**Zielarchitektur:** Der Block-Cache wird als austauschbares `BlockCacheBackend`-Trait geführt. Neben dem
-klassischen LRU-Backend (Produktions-Default) spezifiziert diese Architektur ein lock-freies Backend nach dem
-**SIEVE**-Prinzip (ergänzbar um **S3-FIFO** für differenzierte Eviction-Strategien):
-
-- **S3-FIFO** evaluiert die Lebensdauer von Objekten über drei FIFO-Warteschlangen (Small ≈ 10 % der Kapazität,
-  Main, Ghost). Neue Objekte betreten die Small-Queue; werden sie dort nicht erneut referenziert, scheiden sie
-  schnell aus („Quick Demotion"), was verhindert, dass „One-Hit-Wonders" die Main-Queue blockieren.
-- **SIEVE** verzichtet vollständig auf Listen-Neuordnung bei einem Lesetreffer: Ein Cache-Hit reduziert sich auf
-  das Setzen eines einzigen atomaren `visited`-Bits (`Ordering::Relaxed`), ohne jede Mutation der Listenstruktur.
-  Eviction erfolgt über einen umlaufenden Zeiger („Hand"): Ein Objekt mit gesetztem `visited`-Bit wird begnadigt
-  (Bit gelöscht, verbleibt im Cache), ein Objekt mit gelöschtem Bit wird verdrängt. Diese „Lazy Promotion"
-  eliminiert den CPU-Overhead für Cache-Hits nahezu vollständig und liefert auf verzerrten (skewed) Workloads eine
-  höhere Trefferquote als LRU.
-
-**Schnittstellenspezifikation (Rust, Zielzustand):**
+### 5.2a Key-granulares Locking: `kv_locks.rs` (normativ) <!-- doc-ref-ignore -->
 
 ```rust
-use crossbeam_epoch::{Atomic, Guard, Shared};
+use ahash::AHashMap;
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
+
+/// Sperrenhierarchie (verbindlich, systemweit einzuhalten):
+///   collections (RwLock) → kv_locks (schlüssel-granular) → embedder (RwLock)
+pub struct KvKeyLocks {
+    shards: Vec<RwLock<()>>,
+    shard_mask: u64,
+}
+
+pub struct KeyGuard<'a> {
+    _guard: RwLockWriteGuard<'a, ()>,
+}
+
+pub struct MultiKeyGuard<'a> {
+    _guards: Vec<RwLockWriteGuard<'a, ()>>,
+}
+
+impl KvKeyLocks {
+    pub fn new(shard_count_pow2: u32) -> Self {
+        let n = 1u64 << shard_count_pow2;
+        Self {
+            shards: (0..n).map(|_| RwLock::new(())).collect(),
+            shard_mask: n - 1,
+        }
+    }
+
+    fn shard_for(&self, key_hash: u64) -> usize {
+        (key_hash & self.shard_mask) as usize
+    }
+
+    pub fn acquire(&self, key_hash: u64) -> KeyGuard<'_> {
+        let idx = self.shard_for(key_hash);
+        KeyGuard { _guard: self.shards[idx].write().unwrap() }
+    }
+
+    /// H2-Pflichtmethode: Erwirbt N Shards STRIKT in aufsteigender Shard-Index-Reihenfolge.
+    pub fn acquire_multi_sorted(&self, sorted_key_hashes: &[u64]) -> Result<MultiKeyGuard<'_>, LockError> {
+        let mut shard_indices: Vec<usize> = sorted_key_hashes.iter()
+            .map(|h| self.shard_for(*h)).collect();
+        shard_indices.sort_unstable();
+        shard_indices.dedup();
+        let guards = shard_indices.iter()
+            .map(|&idx| self.shards[idx].write().map_err(|_| LockError::Poisoned))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(MultiKeyGuard { _guards: guards })
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LockError {
+    #[error("lock poisoned")]
+    Poisoned,
+    #[error("lock acquisition timed out")]
+    Timeout,
+}
+```
+
+**Loom-Testpflicht:** `crates/memfuse-store/tests/loom_multi_key_lock.rs` MUSS unter `#[cfg(loom)]` zwei <!-- doc-ref-ignore -->
+nebenläufige `acquire_multi_sorted`-Aufrufe mit überlappenden, unterschiedlich sortierten Schlüsselmengen
+modellieren und deren Terminierung ohne Deadlock nachweisen.
+
+### 5.3 WAL-Ring-Puffer: `wal_ring_buffer.rs` (normativ) <!-- doc-ref-ignore -->
+
+Die klassische Implementierung leidet unter geteilter Eigentümerschaft am File-Handle, was zu HMAC-Ketten-Forks
+und stillen Datenverlusten führen kann. Die Zielarchitektur sieht eine lock-freie WAL-Pipe auf Basis eines
+Single-Producer-Single-Consumer-(SPSC-)Ring-Puffers vor.
+
+```rust
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// SPSC-Ring-Puffer. `capacity` MUSS eine Zweierpotenz sein (Invariante wird in `new` erzwungen),
+/// um Modulo durch `& (capacity - 1)` zu ersetzen.
+pub struct WalRingBuffer {
+    buf: Box<[std::mem::MaybeUninit<WalEntry>]>,
+    capacity_mask: usize,
+    write_idx: AtomicUsize,
+    read_idx: AtomicUsize,
+}
+
+pub struct WalEntry {
+    pub payload: Vec<u8>,
+    pub hmac_prev: [u8; 32],
+}
+
+impl WalRingBuffer {
+    pub fn new(capacity_pow2: usize) -> Result<Self, WalError> {
+        if !capacity_pow2.is_power_of_two() {
+            return Err(WalError::CapacityNotPowerOfTwo);
+        }
+        Ok(Self {
+            buf: (0..capacity_pow2).map(|_| std::mem::MaybeUninit::uninit()).collect(),
+            capacity_mask: capacity_pow2 - 1,
+            write_idx: AtomicUsize::new(0),
+            read_idx: AtomicUsize::new(0),
+        })
+    }
+
+    /// Producer-Seite: `Ordering::Release` beim Veröffentlichen des neuen write_idx.
+    pub fn try_push(&self, entry: WalEntry) -> Result<(), WalEntry> { unimplemented!() }
+
+    /// Consumer-Seite (Flusher-Task, exklusiv): `Ordering::Acquire` beim Lesen von write_idx.
+    pub fn try_pop(&self) -> Option<WalEntry> { unimplemented!() }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum WalError {
+    #[error("ring buffer capacity must be a power of two")]
+    CapacityNotPowerOfTwo,
+    #[error("hmac chain fork detected at sequence {0}")]
+    HmacChainFork(u64),
+}
+```
+
+Der Flusher-Task ist der **einzige** Aufrufer von `fsync`; er läuft als dedizierter `tokio::task`, der per `mpsc`
+über neue `try_pop`-Ergebnisse benachrichtigt wird, statt zu pollen.
+
+**⚠️ Opus-Optimierung 0.1 — WAL-Replay-Panic entschärfen (Stufe 0, gering):**
+Die Replay-Routine liest die Dateigröße einmalig vor dem `mmap`, prüft Zugriffsgrenzen aber gegen diesen separat
+gehaltenen Wert statt gegen die tatsächliche Länge der gemappten Region. Maßnahme: Dateigröße ausschließlich aus
+`mmap.len()` ableiten, alle Slice-Zugriffe auf `mmap.get(a..b)` mit `.ok_or(WalCorruption)` umstellen. Die zweite
+parallele Scan-Implementierung auf denselben Hilfsfunktions-Pfad reduzieren.
+
+**⚠️ Opus-Optimierung 0.5 — Recovery-Pfad differenzieren (Stufe 0, mittel):**
+Den Intent-Datensatz um einen expliziten Ergebnisstatus (committed/aborted) erweitern und bei Repair-on-Open
+auswerten, statt pauschal vorwärts zu committen.
+
+### 5.4 Block-Cache: `BlockCacheBackend`-Trait (normativ)
+
+```rust
+pub trait BlockCacheBackend<K, V>: Send + Sync {
+    fn get(&self, key: &K) -> Option<V>;
+    fn insert(&self, key: K, value: V);
+    fn capacity(&self) -> usize;
+    fn len(&self) -> usize;
+}
+```
+
+**`block_cache/lru.rs` (🟢 Produktions-Default):** <!-- doc-ref-ignore -->
+
+```rust
+pub struct LruBlockCacheBackend<K, V> {
+    inner: RwLock<lru::LruCache<K, V>>,
+}
+
+impl<K: Hash + Eq + Clone, V: Clone + Send + Sync> BlockCacheBackend<K, V>
+    for LruBlockCacheBackend<K, V>
+{
+    fn get(&self, key: &K) -> Option<V> {
+        // Cache-Hit erfordert Write-Lock, da LRU-Reordering mutiert (P25-Verstoß, dokumentiert als
+        // bewusster Trade-off des Default-Pfads — siehe SieveCacheBackend für den lock-freien Pfad).
+        self.inner.write().unwrap().get(key).cloned()
+    }
+    fn insert(&self, key: K, value: V) { self.inner.write().unwrap().put(key, value); }
+    fn capacity(&self) -> usize { self.inner.read().unwrap().cap().get() }
+    fn len(&self) -> usize { self.inner.read().unwrap().len() }
+}
+```
+
+**`block_cache/quick_cache.rs` (🟡 Opt-in `block-cache-v2`, produktiv im Code vorhanden):** <!-- doc-ref-ignore -->
+
+Der tatsächlich implementierte lock-günstige Pfad wrappt den `quick_cache`-Crate (S3-FIFO-artige Eviction über
+drei FIFO-Warteschlangen: Small ≈ 10 % Kapazität mit „Quick Demotion" für One-Hit-Wonders, Main, Ghost) als
+`QuickCacheBlockCacheBackend`. Dies ist der Stand, der durch `FINAL_12` §0.3 am Code verifiziert ist — `LRU`
+bleibt der Produktions-Default, `block-cache-v2` schaltet auf `QuickCacheBlockCacheBackend` um.
+
+```rust
+use quick_cache::sync::Cache as QuickCache;
+
+pub struct QuickCacheBlockCacheBackend<K, V> {
+    inner: QuickCache<K, V>,
+}
+
+impl<K, V> BlockCacheBackend<K, V> for QuickCacheBlockCacheBackend<K, V>
+where
+    K: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    V: Clone + Send + Sync + 'static,
+{
+    fn get(&self, key: &K) -> Option<V> { self.inner.get(key) }
+    fn insert(&self, key: K, value: V) { self.inner.insert(key, value); }
+    fn capacity(&self) -> usize { self.inner.capacity() as usize }
+    fn len(&self) -> usize { self.inner.len() }
+}
+```
+
+**`block_cache/sieve.rs` (🔴 Zielarchitektur, löst `QuickCacheBlockCacheBackend` perspektivisch ab):** <!-- doc-ref-ignore -->
+
+SIEVE ist die noch radikalere Reduktion gegenüber S3-FIFO: Es verzichtet vollständig auf Listen-Neuordnung bei
+Lesetreffern. Ein Cache-Hit reduziert sich auf das Setzen eines einzigen atomaren `visited`-Bits
+(`Ordering::Relaxed`), ohne jede Mutation der Listenstruktur — kein Aufruf in eine fremde Crate-Implementierung,
+volle Kontrolle über das Speicherlayout. Eviction erfolgt über einen umlaufenden Zeiger („Hand"): gesetztes
+`visited`-Bit → begnadigt (Bit gelöscht, verbleibt im Cache), gelöschtes Bit → verdrängt.
+
+**Verbindliche Einordnung (löst den Widerspruch zwischen `Cargo.toml`-Abhängigkeit und Zielarchitektur auf):**
+`quick_cache` bleibt so lange die deklarierte Abhängigkeit und `QuickCacheBlockCacheBackend` der Inhalt von
+`block-cache-v2`, bis `SieveCacheBackend` denselben Trait implementiert, denselben Loom-/Benchmark-Nachweis wie
+`QuickCacheBlockCacheBackend` erbringt und per ADR als Ablösung beschlossen wird — erst danach wird die
+`quick_cache`-Abhängigkeit aus `Cargo.toml` entfernt. Bis dahin ist `SieveCacheBackend` ein zusätzlicher,
+nicht kompilierter Zielentwurf unter `#[cfg(feature = "block-cache-sieve-experimental")]`, kein Ersatz für den
+bestehenden Opt-in-Pfad.
+
+```rust
+use crossbeam_epoch::{self as epoch, Atomic, Owned, Shared};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 pub struct SieveNode<K, V> {
@@ -269,108 +656,163 @@ pub struct SieveCacheBackend<K, V> {
     hand: Atomic<SieveNode<K, V>>,
     capacity: usize,
     size: AtomicUsize,
-    index: scc::HashMap<K, Shared<'static, SieveNode<K, V>>>,
+    index: scc::HashMap<K, ()>,
+}
+
+impl<K, V> BlockCacheBackend<K, V> for SieveCacheBackend<K, V>
+where
+    K: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+    V: Clone + Send + Sync + 'static,
+{
+    fn get(&self, key: &K) -> Option<V> {
+        let guard = epoch::pin();
+        self.lookup_node(key, &guard).map(|node| {
+            node.visited.store(true, Ordering::Relaxed);
+            node.value.clone()
+        })
+    }
+
+    fn insert(&self, key: K, value: V) {
+        if self.size.load(Ordering::Relaxed) >= self.capacity {
+            self.evict_one();
+        }
+        self.push_front(key, value);
+    }
+
+    fn capacity(&self) -> usize { self.capacity }
+    fn len(&self) -> usize { self.size.load(Ordering::Relaxed) }
 }
 ```
 
-Ein Lesetreffer über `get` erstellt zunächst einen Epochen-Guard (`crossbeam_epoch`), der garantiert, dass der
-referenzierte Speicher während der Guard-Lebensdauer nicht freigegeben wird. Der Lookup erfolgt über eine
-concurrent Hash-Map; bei Fund reduziert sich der Hit auf `node.visited.store(true, Ordering::Relaxed)` — keine
-Mutexe, keine Spin-Locks, keine Cache-Line-Invalidierung durch Pointer-Updates. Epochenbasierte Speicherfreigabe
-(Epoch-Based Reclamation, EBR) verhindert dabei ABA-Probleme und Use-After-Free, wenn Objekte entfernt werden,
-während andere Threads sie noch lesen.
+Epochenbasierte Speicherfreigabe (Epoch-Based Reclamation, EBR) verhindert ABA-Probleme und Use-After-Free.
 
-### 5.3 Write-Ahead-Log: SPSC-Ring-Puffer statt File-Handle-Mutex
+**Sharding:** Alle Backends werden über ein `ShardedBlockCache<K, V, B: BlockCacheBackend<K,V>>` mit
+konfigurierbarer Shard-Zahl (Default 16, `ahash`-basiertes Routing) gekapselt.
 
-Die klassische Implementierung leidet unter geteilter Eigentümerschaft am File-Handle, was zu HMAC-Ketten-Forks
-und stillen Datenverlusten führen kann. Die Zielarchitektur sieht eine lock-freie WAL-Pipe auf Basis eines
-Single-Producer-Single-Consumer-(SPSC-)Ring-Puffers vor. Die Puffergröße ist zwingend eine Zweierpotenz, um teure
-Modulo-Operationen durch bitweise UND-Maskierung (`& (capacity - 1)`) zu ersetzen. Synchronisation erfolgt über
-atomare Lese-/Schreibzeiger mit `Ordering::Acquire`/`Ordering::Release`. Ein dedizierter Flusher-Task übernimmt
-exklusiv den `fsync`, wodurch die Transaktionslatenz vom tatsächlichen I/O-Durchsatz entkoppelt wird.
+**⚠️ Opus-Optimierung 1.7 — Byte-basierte Cache-Kapazität (Stufe 1, mittel):**
+Kapazität byte-basiert statt eintragsbasiert führen (Eviction anhand der tatsächlichen Bytegröße) — gilt für
+`QuickCacheBlockCacheBackend` und die perspektivische `SieveCacheBackend` gleichermaßen.
 
-| Komponente | Bisheriges Modell | Zielarchitektur | Laufzeit (Hit/Append) |
-|---|---|---|---|
-| Block-Cache-Lesepfad | `RwLock<LruCache>` (Produktions-Default) | `SieveCacheBackend` mit `crossbeam_epoch` (Opt-in) | $O(1)$ lock-frei |
-| WAL-Synchronisation | Mutex pro File-Handle | SPSC-Atomic-Ring-Puffer + Flusher-Actor | lock-freies Append |
-| Schreib-Lock-Handoff | Collection-weiter Mutex | Key-granulares Lock-Striping (`kv_locks`) | lock-freie Hash-Auflösung |
+### 5.5 Öffentliche Storage-API
+
+```rust
+pub struct LsmStore {
+    wal: WalRingBuffer,
+    block_cache: Box<dyn BlockCacheBackend<BlockId, Bytes>>,
+    kv_locks: KvKeyLocks,
+}
+
+impl LsmStore {
+    pub fn get(&self, prefix: &str, key: &[u8]) -> Result<Option<Bytes>, StoreError>;
+    pub fn put(&self, prefix: &str, key: &[u8], value: Bytes) -> Result<(), StoreError>;
+    pub fn delete(&self, prefix: &str, key: &[u8]) -> Result<DeletionProof, StoreError>;
+    pub fn scan_prefix(&self, prefix: &str) -> Result<impl Iterator<Item = (Vec<u8>, Bytes)>, StoreError>;
+    pub fn compact(&self) -> Result<(), StoreError>;
+    pub fn compact_async(&self, max_compaction_peak_memory_mb: usize) -> tokio::task::JoinHandle<Result<(), StoreError>>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    #[error(transparent)] Wal(#[from] WalError),
+    #[error(transparent)] Lock(#[from] LockError),
+    #[error("compaction memory budget {budget_mb}MB exceeded (estimated {estimated_mb}MB)")]
+    CompactionBudgetExceeded { budget_mb: usize, estimated_mb: usize },
+    #[error(transparent)] Io(#[from] std::io::Error),
+}
+```
+
+**⚠️ Opus-Optimierung 1.4 — SSTable Zero-Copy-Slice (Stufe 1, trivial):**
+Beim Lesen eines Datenblocks nach CRC-Prüfung: referenzzählendes Slicing statt vollständiger Kopie.
+
+**⚠️ Opus-Optimierung 2.4 — Manifest-Batch-Fsync (Stufe 2, mittel):**
+Zusammengehörige Manifest-Änderungen in einem Batch, ein `fsync` pro Zustandsübergang statt pro Einzeleintrag.
+
+**⚠️ Opus-Optimierung 1.6 — MemTable Range-Sharding (Stufe 1, hoch):**
+Sharding-Grenzen aus dem Namensraum-Präfix ableiten, sodass Flush sortierfrei und Präfix-Scan auf eine Partition
+beschränkt wird.
+
+### 5.6 Compaction/MANIFEST-Atomarität (⚠️ Opus-Optimierung 0.6, Stufe 0, gering — STO-A)
+
+**Einordnung:** Dies ist einer der fünf systemweit schwerwiegendsten Befunde des Architektur-Reviews, auf
+derselben Prioritätsstufe wie der WAL-Replay-Panic-Fix (§5.3, Opus 0.1), und gehört ebenso in Stufe 0.
+
+**Problem:** `maybe_compact()` schreibt Manifest-Änderungen nicht als einen atomaren Übergang, sondern als
+Sequenz: (1) `manifest.append(Add { output_path })`, (2) In-Memory-Swap, (3) `manifest.append(Remove { old })` +
+Löschen der alten Dateien — Fehler in (3) werden nur geloggt, nicht propagiert. Ein Absturz oder ein regulärer
+Abbruch zwischen (1) und (3) hinterlässt ein MANIFEST, das die gemergte **und** alle Input-SSTables als gültig
+führt. Beim Recovery werden beide geladen; bei einer vollständigen Kompaktierung verwirft der Merge Tombstones —
+die alten SSTables enthalten die gelöschten Versionen jedoch noch. **Gelöschte Daten können nach einem Absturz
+zurückkehren.** Für ein System mit kryptographischer `DeletionProof`-Zusicherung (Art. 17 DSGVO / Machine
+Unlearning) ist das keine reine Storage-Performance-Frage, sondern ein Bruch des Sicherheitsversprechens aus §10.
+
+Zusätzlich: Ein beschädigtes oder nicht ladbares MANIFEST degradiert aktuell still auf „lade jede `.sst`-Datei im
+Verzeichnis" — ein Verstoß gegen die projektweite „No Silent Failures"-Doktrin (P4/P6) — und die Shadowing-
+Reihenfolge zwischen Merge-Ausgabe und ihren Inputs wird nicht persistiert, sondern nach Recovery lexikografisch
+neu geraten.
+
+**Lösung (verbindlich):**
+
+```rust
+/// Ein Zustandsübergang = ein Record, ein fsync. Ersetzt die bisherige Add/Remove-Paar-Sequenz.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManifestEntry {
+    pub kind: ManifestEntryKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ManifestEntryKind {
+    /// Atomarer Kompaktierungs-Übergang: entfernte Dateien, neue Datei, Position (löst die
+    /// Shadowing-Reihenfolge-Frage — die Position gehört in den Record, nicht in die Recovery-Heuristik).
+    Replace { removed: Vec<PathBuf>, added: PathBuf, position: u32 },
+    Add { path: PathBuf },
+}
+
+impl Manifest {
+    /// Geschrieben und ge-fsynct NACH erfolgreichem Merge, VOR dem In-Memory-Swap.
+    /// Ein halb geschriebener Record fällt über die CRC-Prüfung heraus — der Vorzustand gilt dann als aktuell.
+    pub fn commit_replace(&self, removed: Vec<PathBuf>, added: PathBuf, position: u32)
+        -> Result<(), ManifestError>;
+
+    /// MUSS `Err` propagieren — kein Fallback auf Verzeichnis-Scan bei Ladefehler.
+    pub fn load(path: &Path) -> Result<Vec<ManifestEntry>, ManifestError>;
+
+    /// Rollover per `MANIFEST.new` + atomarem `rename` statt unbegrenztem Wachstum der Historie —
+    /// Startzeit wird proportional zu den aktiven SSTables statt zur vollständigen Historie.
+    pub fn rollover(&self) -> Result<(), ManifestError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ManifestError {
+    #[error("manifest record failed CRC check at offset {0}, previous state retained")]
+    CorruptRecord(u64),
+    #[error(transparent)] Io(#[from] std::io::Error),
+}
+```
+
+Kandidatenauswahl für Compaction wird zusätzlich in **einem** Lock-Fenster gelesen und verwendet (nicht über
+drei getrennte Fenster hinweg), um den zugehörigen Out-of-Bounds-Panic-Pfad bei nebenläufiger Compaction
+auszuschließen.
+
+**Testpflicht:** `crates/memfuse-store/tests/manifest_crash_no_resurrection.rs` — simuliert einen Absturz nach <!-- doc-ref-ignore -->
+Schritt (1) im alten Modell (bzw. nach dem `commit_replace`-`fsync` im neuen Modell) und belegt, dass nach
+Recovery keine Tombstone-Version aus den alten SSTables sichtbar wird.
 
 ---
 
-<a id="graph"></a>
+<a id="6-graph"></a>
 ## 6. Wissensgraph-Datenmodell: binäre Kanten und n-äre Hyperkanten
 
-### 6.1 Binäre Kanten als Grundmodell
+### 6.1 Binäre Kanten als Grundmodell (🟢)
 
-Der Wissensgraph wird primär als gerichteter, gewichteter Graph in einer CSR-Struktur (Compressed Sparse Row)
-gehalten: `Edge { target: EntityId, weight: f32, edge_type: EdgeType, tx_valid_from/to, business_valid_from/to,
-source_doc_id }`. `EdgeType` ist als `#[non_exhaustive] enum { Default }` deklariert — strukturell auf einen
-impliziten Prädikat-Typ reduziert; es gibt keine typsystemische Unterscheidung nach Relationsart. Kanten tragen
-sowohl **transaktionale** Gültigkeit (MVCC-Systemzeit, `tx_valid_from/to`) als auch **fachliche** Gültigkeit
-(Business-Zeit, `business_valid_from/to`) — der Graph ist damit bi-temporal.
-
-`DocId` (Default `u64`, feature-gated `u128` via BLAKE3-Truncation, `#[repr(C, align(16))]`) und `EntityId`
-(`u64`) bilden die gemeinsame Identitätsgrundlage für alle Kantentypen, binär wie n-är — keine neue ID-Klasse ist
-für Hyperkanten nötig. Der `docid-128`-Rollout ist technisch über praktisch den gesamten Crate-DAG vollzogen,
-bleibt aber bewusst 🟡 hinter Feature-Flag: Der Wechsel des Produktions-Defaults ist an einen Major-Version-Cutover
-gebunden, gebündelt mit der DiskANN-Tier-Vollfreigabe (⚖️, kein Zieltermin normativ festgelegt).
-
-Cascade-Invalidierung (`cascade_invalidate_edges_for_superseded_doc`) markiert Kanten, deren Quelldokument durch
-eine neue Version ersetzt wurde, als tombstoniert; sie arbeitet auf `edges_for_doc(doc_id) -> Vec<(EntityId,
-EntityId)>` — strikt auf Kantenpaare festgelegt.
-
-Dieses Modell ist performant und ausreichend für die überwiegende Mehrheit von Fakten, die sich als
-Subjekt-Prädikat-Objekt-Aussage darstellen lassen. Es stößt jedoch strukturell an eine Grenze, sobald ein Faktum
-per Definition mehr als zwei Beteiligte hat: Ein Ereignis wie *„Anthropic (Subjekt) hat Claude Sonnet 5 (Objekt)
-am Datum X (Zeit) für den Enterprise-Tier (Qualifier) veröffentlicht (Prädikat)"* lässt sich im binären Modell nur
-als mehrere unabhängige Kanten zerlegen (Subjekt→Objekt, Subjekt→Zeit, Subjekt→Qualifier …), wodurch der
-Zusammenhang zwischen den Kanten — dass sie *ein und dasselbe* Ereignis beschreiben — verloren geht.
-
-### 6.2 Hyperkanten: Kernidee und Designentscheidung
-
-**Reifegrad: 🔴 spezifiziert, zu bauen.** MemFuse führt eine zweite, orthogonale Kantenklasse ein: **`HyperEdge`**
-— eine n-stellige Relation, die mehrere `EntityId`s in klar benannten Rollen (nicht nur „Quelle"/„Ziel") zu einem
-einzigen, gemeinsam versionierten und atomar invalidierbaren Faktum verbindet. Binäre `Edge`s bleiben der
-Default-Pfad für einfache Subjekt-Prädikat-Objekt-Fakten (Kompatibilität, unangetasteter Hotpath);
-`HyperEdge` ist die Erweiterung für Fakten, die per Definition mehr als zwei Beteiligte haben (Ereignisse,
-Transaktionen, n-äre Beziehungen, Zitate mit Quelle+Kontext+Zeitpunkt).
-
-**Designentscheidung (verbindlich):** Es wird **kein** generisches RDF-Reifikations-Pattern verwendet (Hyperkante
-als eigener Blank-Node mit N binären Kanten zu den Beteiligten). Begründung: Reifikation würde exakt das zu
-lösende Problem reproduzieren — der Zusammenhang der Teil-Kanten ginge im CSR-Traversal erneut verloren, und
-Cascade-Invalidierung müsste N synthetische Kanten einzeln statt eine Hyperkante atomar treffen. Stattdessen wird
-eine kohärente, erstklassige, im Speicher flach liegende Rust-Struktur mit Zero-Copy-Deserialisierung via
-FlatBuffers/Mmap spezifiziert.
-
-### 6.3 Datenstruktur
+Der Wissensgraph wird primär als gerichteter, gewichteter Graph in einer CSR-Struktur gehalten:
 
 ```rust
-/// Eindeutige ID einer Hyperkante — eigener Namensraum, kollidiert nicht mit EntityId/DocId.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct HyperEdgeId(pub u64);
-
-/// Rollenbezeichner innerhalb einer Hyperkante (z. B. "subject", "object", "time", "location").
-/// Interniert über denselben String-Interner wie EdgeType/Prädikate, um Allokationen im Hotpath
-/// zu vermeiden.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RoleId(pub u32);
-
-/// Ein Teilnehmer-Tupel: welche Entität füllt welche Rolle.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RoleBinding {
-    pub role: RoleId,
-    pub entity: EntityId,
-}
-
-/// N-äre Hyperkante — verbindet 2..N Entitäten zu einem gemeinsam gültigen Faktum.
-/// Zero-Copy-Variante für den Lesepfad: `ArcSlice` hält lediglich Pointer + Referenzzähler auf
-/// den Mmap-Bereich, statt den Puffer beim Einlesen aus dem LSM-Storage zu kopieren.
-pub struct HyperEdge<'a> {
-    pub id: HyperEdgeId,
-    pub predicate: EdgeType,                    // Wiederverwendung des bestehenden Prädikat-Typs
-    pub participants: ArcSlice<'a, RoleBinding>, // min. 2 Bindings (sonst degeneriert zur binären Edge)
+#[derive(Debug, Clone)]
+pub struct Edge {
+    pub target: EntityId,
     pub weight: f32,
-    pub tx_valid_from: Option<TxId>,
+    pub edge_type: EdgeType,
+    pub tx_valid_from: TxId,
     pub tx_valid_to: Option<TxId>,
     pub business_valid_from: Option<i64>,
     pub business_valid_to: Option<i64>,
@@ -378,416 +820,958 @@ pub struct HyperEdge<'a> {
 }
 ```
 
-**Persistenz:** Neues LSM-Präfix `__graph:hyperedge:` (analog zu `__graph:edge:`), Value =
-FlatBuffers-serialisiertes `HyperEdge` (Wiederverwendung der bestehenden FlatBuffers-Toolchain,
-`memfuse-core-ipc-gen`, keine neue Serialisierungsschicht). Zusätzlicher Sekundärindex
-`__graph:hyperedge_by_entity:{EntityId} -> Vec<HyperEdgeId>` für den Zugriffspfad „gib mir alle Hyperkanten, an
-denen Entität X in irgendeiner Rolle beteiligt ist". Einführung als **additives** Schema-Feld — kein Breaking
-Change für bestehende `Edge`/`PersistedEdgePayload`-Daten.
+`EdgeType` ist als `#[non_exhaustive] enum { Default }` deklariert. Kanten tragen sowohl transaktionale (MVCC)
+als auch fachliche (Business-Zeit) Gültigkeit — bi-temporal.
 
-**API-Oberfläche:** Neue öffentliche Methode
-`Collection::relate_n_ary(predicate, participants: &[(RoleId, EntityId)], doc_id) -> Result<HyperEdgeId>`, analog
-zur bestehenden `relate()`-Invariante: **muss** sowohl LSM-Write (Primär- und Sekundärindex) als auch
-`graph_index`-Registrierung atomar durchführen. `relate()` (binär) bleibt unverändert bestehen und wird **nicht**
-intern auf `relate_n_ary` mit 2 Teilnehmern umgestellt — der binäre Pfad bleibt der unangetastete Hotpath.
-
-**Nicht im Scope:** Automatische NLP-seitige Extraktion n-ärer Fakten aus Freitext (separates, vorgelagertes
-Thema der Extraction-Pipeline).
-
-### 6.4 Traversal-Semantik
-
-`CsrGraph` erhält eine neue Methode `hyperedges_for_entity(id: EntityId) -> Vec<HyperEdgeId>`, die intern den
-Sekundärindex nutzt — **kein** Eingriff in die bestehende CSR-Adjazenzstruktur für binäre Kanten (additive
-Erweiterung, keine Migration des Hotpfads). PathRAG wird um einen optionalen Hyperkanten-Expansionsschritt
-ergänzt: Beim Erreichen eines Knotens während der Forward-Push-Traversierung (§7.2) werden zusätzlich alle
-`RoleBinding`-Partner der an diesem Knoten anliegenden `HyperEdge`s als „virtuelle" Nachbarn mit
-rollenspezifischem Gewichtsabschlag eingespeist (Startwert `0.85`, analog zum bestehenden Hop-Abschlagsfaktor).
-Diese Einspeisung erfolgt gegen die Forward-Push-Queue-Logik (nicht gegen eine dichte Power-Iteration), da
-Forward-Push die produktive PPR-Zielarchitektur ist (§7.2).
-
-### 6.5 Integrationshindernisse H1–H6 und ihre verbindliche Lösung
-
-Diese sechs Hindernisse sind der eigentliche Kern der Spezifikation: Sie benennen nicht nur, *dass* eine
-Integration möglich ist, sondern *welches bestehende Invariant unter Druck gerät* und wie es gewahrt bleibt.
-
-#### H1 — RCU-Snapshot-Inkonsistenz zwischen CSR und Hyperkanten-Sekundärindex
-
-**Problem:** `CsrGraph::compact()`/`compact_async()` tauscht den gesamten Graphzustand atomar über einen
-`ArcSwap<GraphInner>`-Pointer aus — Leser sehen nie einen gemischten Alt-/Neu-Zustand. Würde der
-Hyperkanten-Sekundärindex als **separate** Struktur außerhalb von `GraphInner` geführt, entstünde ein
-Zeitfenster, in dem CSR- und Hyperkanten-Zustand auseinanderlaufen: Ein Leser könnte einen `HyperEdgeId` erhalten,
-dessen Teilnehmer-Entität im gerade getauschten Snapshot bereits tombstoniert ist.
-
-**Lösung (verbindlich):** Der Hyperkanten-Sekundärindex wird **Teil von `GraphInner` selbst**
-(`hyperedge_index: AHashMap<EntityId, Vec<HyperEdgeId>>` plus `hyperedges: AHashMap<HyperEdgeId, HyperEdge>`) —
-automatisch vom bestehenden `ArcSwap`-Swap miterfasst, keine neue Synchronisationsprimitive nötig. Die Freigabe
-obsoleter Snapshots wird über `crossbeam_epoch` orchestriert: Eine Epoche wird erst inkrementiert und der
-Speicher der alten Graphenstruktur erst dann freigegeben, wenn kein aktiver `Guard` mehr Lesezugriff anfordert.
-**Konsequenz:** `GraphInner::estimate_memory_bytes()` muss um die Hyperkanten-Anteile erweitert werden, damit der
-`compact_async`-Speicherbudget-Check (`max_compaction_peak_memory_mb`) das tatsächliche Peak-Memory bei großen
-Hyperkantenmengen nicht unterschätzt. Dies ist **Voraussetzung**, nicht Nachbarthema der Implementierung.
-
-#### H2 — Kanonisches Multi-Key-Locking zur Deadlock-Prävention
-
-**Problem:** Die Lock-Hierarchie `collections → kv_locks (key-granular) → embedder` (§5.1) ist für Mutationspfade
-auf **ein** Schlüsselpaar ausgelegt. `relate()` mutiert eine Kante, typischerweise ein Schlüsselpaar.
-`relate_n_ary()` mit N Teilnehmern muss dagegen **N Entitäten gleichzeitig** unter `kv_locks` konsistent halten
-(Sekundärindex-Einträge für alle N Teilnehmer müssen atomar mit der Hyperkante selbst geschrieben werden). Werden
-diese N Locks naiv nacheinander erworben, entsteht ein klassisches Lock-Ordering-Problem: Zwei gleichzeitige
-`relate_n_ary`-Aufrufe mit überlappenden, aber unterschiedlich sortierten Teilnehmermengen (`{A,B,C}` vs.
-`{C,B,A}`) können sich gegenseitig blockieren.
-
-**Lösung (verbindlich):** `relate_n_ary()` sortiert die Teilnehmer-`EntityId`s vor dem Locking **kanonisch**
-(aufsteigend nach `u64`-Wert) und erwirbt die zugehörigen `kv_locks`-Shards strikt in dieser Reihenfolge:
+`DocId` (Default `u64`, feature-gated `u128` via BLAKE3-Truncation) und `EntityId` (`u64`) bilden die gemeinsame
+Identitätsgrundlage:
 
 ```rust
-pub fn relate_n_ary(
-    &self,
-    predicate: EdgeType,
-    participants: &[RoleBinding],
-    doc_id: DocId,
-) -> Result<HyperEdgeId, GraphMutationError> {
-    let mut entities: Vec<EntityId> = participants.iter().map(|p| p.entity).collect();
-    // Kanonische Sortierung erzwingt deterministisches Lock-Ordering
-    entities.sort_unstable_by_key(|e| e.0);
-    entities.dedup();
+#[cfg(not(feature = "docid-128"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct DocId(pub u64);
 
-    let _guards = self.kv_locks.acquire_multi_sorted(&entities)?;
-    // Atomare Insertion in den LSM-Tree und Registrierung im RCU-Snapshot (H1)
+#[cfg(feature = "docid-128")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(C, align(16))]
+pub struct DocId(pub u128);
+
+impl DocId {
+    pub fn derive(collection_key: &[u8], seq: u64) -> Self {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(collection_key);
+        hasher.update(&seq.to_le_bytes());
+        let digest = hasher.finalize();
+        #[cfg(not(feature = "docid-128"))]
+        { Self(u64::from_le_bytes(digest.as_bytes()[0..8].try_into().unwrap())) }
+        #[cfg(feature = "docid-128")]
+        { Self(u128::from_le_bytes(digest.as_bytes()[0..16].try_into().unwrap())) }
+    }
 }
 ```
 
-Durch aufsteigendes Sortieren greifen alle Threads in exakt derselben Reihenfolge auf die Ressourcen zu — das
-eliminiert zyklische Abhängigkeiten im Wait-for-Graph des Schedulers und garantiert Deadlock-Freiheit. Dies ist
-ein **neuer Testfall** (mehr als zwei Schlüssel gleichzeitig unter `kv_locks`), kein Wiederverwendungsfall des
-Einzelschlüssel-Beweises — eigenes Abnahmekriterium (§14, AK-3).
+### 6.2 Modulstruktur `memfuse-graph`
+
+```
+crates/memfuse-graph/src/
+├── lib.rs
+├── csr.rs             # CsrGraph, GraphInner, ArcSwap-RCU
+├── edge.rs            # Edge, EdgeType-Nutzung, PersistedEdgePayload <!-- doc-ref-ignore -->
+├── hyperedge.rs       # HyperEdge, RoleBinding, RoleId, HyperEdgeId — 🔴
+├── ppr.rs             # Forward-Push (Andersen-Chung-Lang)
+├── path_rag.rs        # PathGraph, bidirektionale Suche, Hyperkanten-Expansion
+├── community.rs       # Leiden, Stern-Expansion-Projektion
+├── cascade.rs         # Cascade-Invalidierung binär + Hyperkanten
+└── error.rs
+```
+
+### 6.3 RCU-Snapshot-Architektur: `csr.rs` (normativ)
+
+```rust
+use arc_swap::ArcSwap;
+use ahash::AHashMap;
+use std::sync::Arc;
+
+pub struct GraphInner {
+    pub adjacency: Vec<Vec<Edge>>,
+    pub node_index: AHashMap<EntityId, usize>,
+    // 🔴 NEU (H1): Teil von GraphInner, NICHT separat — automatisch vom ArcSwap miterfasst.
+    pub hyperedges: AHashMap<HyperEdgeId, HyperEdge>,
+    pub hyperedge_index: AHashMap<EntityId, Vec<HyperEdgeId>>,
+}
+
+impl GraphInner {
+    /// MUSS um Hyperkanten-Anteile erweitert sein (H1).
+    pub fn estimate_memory_bytes(&self) -> usize {
+        let edge_bytes: usize = self.adjacency.iter()
+            .map(|v| v.len() * std::mem::size_of::<Edge>()).sum();
+        let hyperedge_bytes: usize = self.hyperedges.values()
+            .map(|h| std::mem::size_of::<HyperEdge>() + h.participants.len() * std::mem::size_of::<RoleBinding>())
+            .sum();
+        let hyperedge_index_bytes: usize = self.hyperedge_index.values()
+            .map(|v| v.len() * std::mem::size_of::<HyperEdgeId>())
+            .sum();
+        edge_bytes + hyperedge_bytes + hyperedge_index_bytes
+    }
+}
+
+pub struct CsrGraph {
+    inner: ArcSwap<GraphInner>,
+    kv_locks: Arc<memfuse_store::KvKeyLocks>,
+}
+
+impl CsrGraph {
+    /// Atomarer Snapshot-Austausch. Leser sehen NIE einen gemischten Alt-/Neu-Zustand.
+    pub fn compact(&self) -> Result<(), GraphError> {
+        let old = self.inner.load();
+        let new_inner = Self::rebuild(&old)?;
+        self.inner.store(Arc::new(new_inner));
+        Ok(())
+    }
+
+    pub fn compact_async(&self, max_compaction_peak_memory_mb: usize)
+        -> tokio::task::JoinHandle<Result<(), GraphError>>
+    {
+        let estimated = self.inner.load().estimate_memory_bytes() / (1024 * 1024);
+        if estimated > max_compaction_peak_memory_mb {
+            return tokio::spawn(async move {
+                Err(GraphError::CompactionBudgetExceeded {
+                    budget_mb: max_compaction_peak_memory_mb,
+                    estimated_mb: estimated,
+                })
+            });
+        }
+        unimplemented!()
+    }
+
+    pub fn neighbors_with_weights(&self, id: EntityId) -> Vec<(EntityId, f32)> { unimplemented!() }
+
+    /// Sekundärindex-Zugriff, additiv — kein Eingriff in CSR-Adjazenzstruktur.
+    pub fn hyperedges_for_entity(&self, id: EntityId) -> Vec<HyperEdgeId> {
+        self.inner.load().hyperedge_index.get(&id).cloned().unwrap_or_default()
+    }
+}
+```
+
+**⚠️ Opus-Optimierung 2.1 — Inkrementelle Graph-Kompaktierung (Stufe 2, hoch):**
+PPR-Pfad löst bei jeder Anfrage vollständigen CSR-Rebuild aus. Ziel: append-only Delta-Segmente plus
+periodischer Merge im Hintergrund.
+
+**⚠️ Opus-Optimierung 2.2 — CSR-Sentinel statt `Option` (Stufe 2, mittel):**
+Mehrere Kantenspalten als `Vec<Option<T>>` — ca. Halbierung des Speicherbedarfs pro Kante durch Sentinel-Werte.
+
+### 6.4 Hyperkanten: Datenstruktur (🔴 vollständig spezifiziert)
+
+**Designentscheidung (verbindlich):** Es wird **kein** generisches RDF-Reifikations-Pattern verwendet.
+Stattdessen wird eine kohärente, erstklassige Rust-Struktur mit Zero-Copy-Deserialisierung via FlatBuffers/Mmap
+spezifiziert. **Zwei Repräsentationen, ein Persistenzformat:** Der Schreibpfad (`relate_n_ary`) konstruiert eine
+neue Hyperkante ohnehin aus frisch übergebenen Daten — dort ist eine besitzende Struktur korrekt und einfach.
+Der Lesepfad (`hyperedges_for_entity`/Traversal) dereferenziert dagegen bei **jeder** Anfrage potenziell
+tausende bereits persistierter Hyperkanten aus dem RCU-Snapshot; hier erzwingt eine besitzende `Vec<RoleBinding>`
+pro gelesener Hyperkante eine Heap-Kopie, obwohl die Daten bereits deserialisiert im Snapshot-Speicher liegen.
+Die Lesesicht referenziert diesen Speicher stattdessen zero-copy:
+
+```rust
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct HyperEdgeId(pub u64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RoleId(pub u32);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RoleBinding {
+    pub role: RoleId,
+    pub entity: EntityId,
+}
+
+/// Referenzzählender Slice auf einen zusammenhängenden `RoleBinding`-Bereich innerhalb des
+/// Mmap-/RCU-Snapshot-Speichers. Hält nur Pointer + Länge + geteilten Referenzzähler auf den
+/// zugrundeliegenden `Arc`-Puffer — kein `Vec`-Allocation-Overhead beim Lesen.
+#[derive(Clone)]
+pub struct ArcSlice<T> {
+    backing: Arc<[T]>,
+    start: u32,
+    len: u32,
+}
+
+impl<T> std::ops::Deref for ArcSlice<T> {
+    type Target = [T];
+    fn deref(&self) -> &[T] { &self.backing[self.start as usize..(self.start + self.len) as usize] }
+}
+
+/// Besitzende Variante — Konstruktionspfad (`relate_n_ary`, Deserialisierung beim Schreiben).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HyperEdge {
+    pub id: HyperEdgeId,
+    pub predicate: EdgeType,
+    pub participants: Vec<RoleBinding>,         // min. 2, validiert in `relate_n_ary`
+    pub weight: f32,
+    pub tx_valid_from: Option<TxId>,
+    pub tx_valid_to: Option<TxId>,
+    pub business_valid_from: Option<i64>,
+    pub business_valid_to: Option<i64>,
+    pub source_doc_id: Option<DocId>,
+}
+
+/// Zero-Copy-Lesesicht — Traversal-Hotpath (`hyperedges_for_entity`, PPR-Expansion, §7.2).
+/// `participants` referenziert den RCU-Snapshot-Speicher direkt statt ihn zu kopieren.
+#[derive(Clone)]
+pub struct HyperEdgeView {
+    pub id: HyperEdgeId,
+    pub predicate: EdgeType,
+    pub participants: ArcSlice<RoleBinding>,
+    pub weight: f32,
+    pub source_doc_id: Option<DocId>,
+}
+
+impl HyperEdge {
+    /// Erzeugt die Zero-Copy-Sicht ohne die `participants` zu kopieren — teilt sich den `Arc`
+    /// mit dem im `GraphInner` gehaltenen Original (siehe §6.3, H1).
+    pub fn as_view(self: &Arc<Self>) -> HyperEdgeView {
+        HyperEdgeView {
+            id: self.id,
+            predicate: self.predicate,
+            participants: ArcSlice {
+                backing: Arc::from(self.participants.as_slice()),
+                start: 0,
+                len: self.participants.len() as u32,
+            },
+            weight: self.weight,
+            source_doc_id: self.source_doc_id,
+        }
+    }
+}
+
+/// Rollen-Interner — dieselbe Interning-Strategie wie EdgeType/Prädikate.
+pub struct RoleInterner {
+    forward: scc::HashMap<String, RoleId>,
+    backward: scc::HashMap<RoleId, String>,
+    next_id: std::sync::atomic::AtomicU32,
+}
+
+impl RoleInterner {
+    pub fn intern(&self, name: &str) -> RoleId;
+    pub fn resolve(&self, id: RoleId) -> Option<String>;
+}
+```
+
+**Konsequenz für `GraphInner` (§6.3, H1):** `hyperedges: AHashMap<HyperEdgeId, Arc<HyperEdge>>` (nicht `HyperEdge`
+direkt) — erst das `Arc` macht `as_view()` zero-copy-fähig, da mehrere `HyperEdgeView`s denselben Teilnehmer-
+Speicher teilen können, ohne dass ihre Lebensdauer an eine geliehene Referenz auf `GraphInner` gebunden ist
+(wichtig, weil `GraphInner` selbst per `ArcSwap` ausgetauscht wird, siehe H1-Lösung unten).
+
+**Persistenz:** Neues LSM-Präfix `__graph:hyperedge:`, Value = FlatBuffers-serialisiertes `HyperEdge`.
+Sekundärindex `__graph:hyperedge_by_entity:{EntityId} -> Vec<HyperEdgeId>`. Additiv — kein Breaking Change.
+
+**API-Oberfläche:**
+```rust
+impl Collection {
+    /// Binärer Pfad — bleibt Hotpath, KEINE interne Umleitung auf `relate_n_ary`.
+    pub fn relate(&self, from: EntityId, to: EntityId, predicate: EdgeType, doc_id: DocId) -> Result<(), DbError>;
+
+    /// NEU — Hyperkanten-Schreibpfad.
+    pub fn relate_n_ary(
+        &self,
+        predicate: EdgeType,
+        participants: &[(RoleId, EntityId)],
+        doc_id: DocId,
+    ) -> Result<HyperEdgeId, DbError>;
+}
+```
+
+### 6.5 Traversal-Semantik
+
+PathRAG wird um einen optionalen Hyperkanten-Expansionsschritt ergänzt: Beim Erreichen eines Knotens während der
+Forward-Push-Traversierung werden zusätzlich alle `RoleBinding`-Partner als „virtuelle" Nachbarn mit
+rollenspezifischem Gewichtsabschlag (Startwert `0.85`) eingespeist.
+
+### 6.6 Integrationshindernisse H1–H6 und ihre verbindliche Lösung
+
+Diese sechs Hindernisse benennen nicht nur, *dass* eine Integration möglich ist, sondern *welches bestehende
+Invariant unter Druck gerät* und wie es gewahrt bleibt.
+
+#### H1 — RCU-Snapshot-Inkonsistenz zwischen CSR und Hyperkanten-Sekundärindex
+
+**Problem:** Separater Hyperkanten-Index außerhalb von `GraphInner` → Zeitfenster für inkonsistenten Zustand.
+
+**Lösung (verbindlich):** Der Hyperkanten-Index wird **Teil von `GraphInner`** selbst — automatisch vom
+`ArcSwap`-Swap miterfasst. `GraphInner::estimate_memory_bytes()` MUSS Hyperkanten einschließen.
+
+#### H2 — Kanonisches Multi-Key-Locking zur Deadlock-Prävention
+
+**Problem:** `relate_n_ary()` mit N Teilnehmern muss N Entitäten gleichzeitig unter `kv_locks` halten.
+Naives Lock-Ordering → Deadlock bei überlappenden, unterschiedlich sortierten Mengen.
+
+**Lösung (verbindlich):**
+
+```rust
+impl CsrGraph {
+    pub fn relate_n_ary(
+        &self,
+        predicate: EdgeType,
+        participants: &[RoleBinding],
+        doc_id: DocId,
+    ) -> Result<HyperEdgeId, GraphMutationError> {
+        if participants.len() < 2 {
+            return Err(GraphMutationError::InsufficientParticipants(participants.len()));
+        }
+
+        // 1. Kanonische Sortierung (H2) — Grundlage der Deadlockfreiheit.
+        let mut entities: Vec<EntityId> = participants.iter().map(|p| p.entity).collect();
+        entities.sort_unstable_by_key(|e| e.0);
+        entities.dedup();
+        let key_hashes: Vec<u64> = entities.iter()
+            .map(|e| ahash::RandomState::new().hash_one(e)).collect();
+
+        // 2. Multi-Key-Lock in sortierter Shard-Reihenfolge.
+        let _guards = self.kv_locks.acquire_multi_sorted(&key_hashes)
+            .map_err(|_| GraphMutationError::LockAcquisitionTimeout)?;
+
+        // 3. Atomare LSM-Schreibung: Primär + Sekundärindex für JEDEN Teilnehmer.
+        let id = HyperEdgeId(self.next_hyperedge_id());
+        let hyperedge = HyperEdge {
+            id, predicate, participants: participants.to_vec(), weight: 1.0,
+            tx_valid_from: None, tx_valid_to: None,
+            business_valid_from: None, business_valid_to: None,
+            source_doc_id: Some(doc_id),
+        };
+        self.persist_hyperedge_atomic(&hyperedge)?;
+
+        // 4. RCU-Registrierung (H1).
+        self.register_in_rcu_snapshot(&hyperedge)?;
+
+        Ok(id)
+    }
+}
+```
+
+**Loom-Testpflicht (AK-3):** `crates/memfuse-graph/tests/loom_relate_n_ary.rs` mit überlappenden, <!-- doc-ref-ignore -->
+unterschiedlich geordneten Mengen.
 
 #### H3 — `SignalKind` ist ein geschlossenes Enum
 
-**Problem:** Im Unterschied zu `EdgeType` (`#[non_exhaustive]`) ist das Signal-Typ-Enum der Fusionsschicht
-(`SignalKind`) **nicht** `non_exhaustive` und hat vier feste Varianten (`Vector`, `Text`, `Graph`,
-`EdgeReinforcement`) mit `eq_ignore_ascii_case`-basiertem, allokationsfreiem Matching in `from_name()`/`as_str()`.
-Ein fünftes `SignalKind::Hyperedge` würde jeden `match`-Arm im Fusionspfad (Gewichtung, Metadata-Merge-Priorität)
-zum Anpassen zwingen — ein Breaking Change am geschlossenen Enum mit hohem Regressionsrisiko für den produktiven
-binären Fusionspfad (RRF ist Default).
+**Lösung (verbindlich):** Hyperkanten-Treffer fließen als zusätzliche Kandidaten **in `SignalKind::Graph`** ein —
+PathRAG liefert bereits ein Graph-Signal; Hyperkanten-Expansion ist ein interner Erweiterungsschritt der Pfadsuche.
+`SignalKind` bleibt strukturell unverändert. Diff-Test-Pflicht: `signal_kind_no_new_variant.rs`. <!-- doc-ref-ignore -->
 
-**Lösung (verbindlich):** Hyperkanten-Treffer werden **nicht** als eigenes Signal geführt, sondern fließen als
-zusätzliche Kandidaten **in das bestehende `SignalKind::Graph`-Signal** ein — PathRAG liefert ohnehin bereits ein
-Graph-RRF-Signal; Hyperkanten-Expansion ist dort ein interner Erweiterungsschritt der Pfadsuche (§6.4:
-„virtuelle Nachbarn mit Gewichtsabschlag"), kein separater Signalkanal. `SignalKind` bleibt strukturell
-unverändert — dies ist der **einzig zulässige** Integrationspunkt, nicht eine von mehreren Optionen
-(Diff-Test-Pflicht: keine neue Variante, siehe §14, AK-4).
+#### H4 — FlatBuffers-Schemaerweiterung erfordert aktives CI-Drift-Gate
 
-#### H4 — FlatBuffers-Schemaerweiterung erfordert ein aktives CI-Drift-Gate
-
-**Problem:** Ein FlatBuffers-Schema und der davon abgeleitete generierte Code (`memfuse-core-ipc-gen`) können
-stillschweigend auseinanderlaufen, wenn kein automatisiertes Gate dies verhindert. Hyperkanten fügen zwangsläufig
-neue FlatBuffers-Typen (`HyperEdge`, `RoleBinding`) hinzu — der riskanteste denkbare Zeitpunkt für eine
-Schemaänderung ist ausgerechnet einer, an dem ein solches Gate fehlt.
-
-**Lösung (verbindlich, harte Vorbedingung):** Ein FlatBuffers-CI-Drift-Gate (Schema-Datei gegen generierten Code
-per CI-Job abgesichert) MUSS produktiv und grün sein, **bevor** das `HyperEdge`-FlatBuffers-Schema gemerged wird.
-Diese Reihenfolge ist per CI-Job-Abhängigkeit zu erzwingen, nicht nur organisatorisch zu vereinbaren (§14, AK-5).
-Ist dieses Gate bereits vorhanden und produktiv, reduziert sich das Kriterium auf den reinen
-Ausführungsnachweis zum Zeitpunkt des Hyperkanten-Merges — andernfalls ist es Blocker Nummer eins vor Beginn der
-Hyperkanten-Implementierung.
+**Lösung (verbindlich, harte Vorbedingung):** Das FlatBuffers-CI-Drift-Gate MUSS produktiv und grün sein,
+**bevor** das `HyperEdge`-FlatBuffers-Schema gemerged wird — per CI-Job-Abhängigkeit erzwungen (`needs: [flatbuffers-drift-gate]`).
 
 #### H5 — Cascade-Invalidierung: hartes Fan-out-Limit gegen Kostenexplosion
 
-**Problem:** Die bestehende Cascade-Invalidierung für binäre Kanten arbeitet auf klar begrenzter Kardinalität
-(ein Dokument erzeugt typischerweise wenige Kanten). Eine Hyperkante mit z. B. sechs Teilnehmern, die selbst
-wieder Teil weiterer Hyperkanten sind (Ereignisketten), kann bei naiver Übertragung des Cascade-Musters zu einem
-Fan-out führen, der mit der Teilnehmerzahl **nicht linear**, sondern potenziell **quadratisch** wächst (jede
-Invalidierung muss den Sekundärindex für alle ihre Teilnehmer aktualisieren) — ein Verstoß gegen P24.
+**Lösung (verbindlich, Pflichtbestandteil):**
 
-**Lösung (verbindlich, Pflichtbestandteil, keine optionale Härtung):**
-`cascade_invalidate_hyperedges_for_superseded_doc()` erhält von Beginn an ein **hartes Fan-out-Limit**
-(Default-Vorschlag: 1.000 betroffene Hyperkanten pro Cascade-Lauf), analog zum bestehenden
-`MAX_TRAVERSAL_HOPS`/Visited-Node-Limit-Prinzip im CSR-Graphen — Verhinderung von Hub-Node-bedingter
-Ressourcenexplosion. Wird das Limit erreicht, wird der Rest asynchron über die bestehende
-Hintergrund-Worker-Infrastruktur nachgezogen statt synchron im Schreibpfad abgearbeitet. Dies garantiert
-deterministische Antwortzeiten im synchronen Hotpath (§14, AK-6).
+```rust
+pub const DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT: usize = 1_000;
 
-| Kriterium | Fehlerbehandlung (`Result<T, E>`) |
-|---|---|
-| Lock-Timeout | `GraphMutationError::LockAcquisitionTimeout` |
-| Fan-out überschritten | `GraphMutationError::PartialCascadeQueued(DeletionProof)` |
-| Ungültige Rolle | `GraphMutationError::RoleBindingInvalid` |
-| RCU-Snapshot veraltet | `GraphMutationError::EpochReclamationPending` |
+pub struct CascadeReport {
+    pub tombstoned_synchronously: usize,
+    pub queued_for_background: usize,
+    pub deletion_proof: Option<memfuse_crypto::DeletionProof>,
+}
+
+pub fn cascade_invalidate_hyperedges_for_superseded_doc(
+    graph: &CsrGraph,
+    doc_id: DocId,
+    fanout_limit: usize,
+) -> Result<CascadeReport, GraphMutationError> {
+    let affected = graph.hyperedges_for_doc(doc_id);
+    if affected.len() <= fanout_limit {
+        // Synchron: alle atomar tombstonieren.
+        for hedge_id in &affected {
+            graph.tombstone_hyperedge_atomic(*hedge_id)?;
+        }
+        Ok(CascadeReport { tombstoned_synchronously: affected.len(), queued_for_background: 0, deletion_proof: None })
+    } else {
+        let (sync_part, async_part) = affected.split_at(fanout_limit);
+        for hedge_id in sync_part {
+            graph.tombstone_hyperedge_atomic(*hedge_id)?;
+        }
+        let proof = enqueue_background_cascade(async_part.to_vec());
+        Err(GraphMutationError::PartialCascadeQueued(proof))
+    }
+}
+```
+
+Idempotenz-Pflicht: Wiederholter Lauf auf denselben `doc_id` darf keine doppelten Tombstones erzeugen.
 
 #### H6 — Community-Detection/Leiden sieht Hyperkanten nicht
 
-**Problem:** Der Leiden-Algorithmus für GraphRAG-Community-Erkennung operiert ausschließlich auf binären
-Kantengewichten und ist strukturell „blind" gegenüber n-ären Fakten. Ohne Erzwingungsmechanismus würde
-`detect_communities()` Hyperkanten-Fakten stillschweigend ignorieren, ohne dass dies für Aufrufer sichtbar wird —
-ein Nutzer, der annimmt, Community-Detection berücksichtige „den ganzen Graphen", erhielte ein leises,
-undokumentiertes Unvollständigkeitsrisiko.
+**Lösung (verbindlich für Sichtbarkeit):**
 
-**Lösung (verbindlich für Sichtbarkeit; Projektion selbst ist Folgethema):** `CommunityDetectionConfig` erhält ein
-Feld `hyperedges_included: bool` (Default `false`), das im Ergebnistyp `CommunityAssignment`/Report sichtbar
-mitgeführt wird — Unvollständigkeit wird explizit statt implizit. Eine echte Hyperkanten-Projektion bleibt
-separates Folgethema (§6.6), aber das Fehlen ist ab der Hyperkanten-Einführung messbar/sichtbar, nicht nur bekannt
-(§14, AK-7).
+```rust
+pub struct CommunityDetectionConfig {
+    pub resolution_gamma: f32,
+    /// H6: sichtbares Unvollständigkeits-Flag, Default false.
+    pub hyperedges_included: bool,
+}
 
-### 6.6 Hyperkanten-Projektion für Leiden: Stern-Expansion als Zielarchitektur
+pub struct CommunityAssignment {
+    pub node_to_community: AHashMap<EntityId, u32>,
+    pub hyperedges_included: bool, // 1:1 aus Config, im Report sichtbar
+}
+```
 
-Die Standard-Modularitätsfunktion, auf der Leiden basiert,
+**Stern-Expansion als Zielarchitektur:** Der Hypergraph wird in einen bipartiten Graphen überführt. Jede
+Hyperkante wird als künstlicher Knoten repräsentiert; es entstehen nur binäre Kanten mit $O(|e|)$
+Skalierung (statt $O(|e|^2)$ bei Cliquen-Expansion). Zero-Allocation: `StarExpansionIterator` generiert
+virtuelle Kanten on-the-fly.
 
-$$Q = \frac{1}{2m} \sum_{i,j} \left( A_{ij} - \gamma \frac{k_i k_j}{2m} \right) \delta(c_i, c_j)$$
+### 6.7 Hyperkanten-Fehler-Enum
 
-(mit $m$ = Gesamtgewichtsmasse, $k_i$ = Grad von Knoten $i$, $\gamma$ = Resolution-Parameter, $c_i$ = Community
-von Knoten $i$) ist ausschließlich für binäre Adjazenzmatrizen $A$ definiert. Um Hyperkanten nicht stillschweigend
-zu ignorieren (H6), aber auch ohne den asynchronen C-FFI-Code des Leiden-Solvers zu modifizieren, muss der
-Hypergraph $G_H = (V, E_H)$ auf einen binären Graphen projiziert werden. Zwei Projektionen stehen mathematisch zur
-Wahl:
-
-1. **Cliquen-Expansion:** Jede Hyperkante $e$ wird in eine Clique transformiert, bei der alle Knoten in $e$
-   paarweise verbunden werden, mit Kantengewicht $\frac{w(e)}{|e| - 1}$ (Erhaltung der Gesamtgewichtsmasse). Führt
-   bei großen Hyperkanten zu einer $O(|e|^2)$-Kantenexplosion — für hochvernetzte Hyperkanten inakzeptabel.
-2. **Stern-Expansion (verbindlich gewählt):** Der Hypergraph wird in einen bipartiten Graphen überführt. Jede
-   Hyperkante $e \in E_H$ wird als eigenständiger, künstlicher „Knoten" repräsentiert; es entstehen nur binäre
-   Kanten zwischen Entitätsknoten und dem neuen Hyperkanten-Knoten. Die Kantenanzahl skaliert linear mit
-   $O(|e|)$.
-
-Um Kopiervorgänge zu vermeiden, wird die bipartite Inzidenzmatrix $H$ **nicht** physisch materialisiert, sondern
-über einen typsicheren Iterator dem Leiden-Algorithmus on-the-fly vorgegaukelt (Zero-Allocation
-Arena-CSR-Speicherstruktur, analog zu §5.2/§7.2).
-
-### 6.7 Abnahmekriterien für die Hyperkanten-Erweiterung
-
-Siehe §14 für die vollständige, konsolidierte Liste (AK-1 bis AK-8) inklusive Regressionsfreiheit gegenüber dem
-bestehenden binären Pfad.
+```rust
+#[derive(Debug, thiserror::Error)]
+pub enum GraphMutationError {
+    #[error("lock acquisition timed out")]
+    LockAcquisitionTimeout,
+    #[error("cascade fan-out limit exceeded, {0} hyperedges queued for background processing")]
+    PartialCascadeQueued(memfuse_crypto::DeletionProof),
+    #[error("role binding invalid: {0}")]
+    RoleBindingInvalid(String),
+    #[error("rcu snapshot reclamation pending, retry")]
+    EpochReclamationPending,
+    #[error("hyperedge requires >= 2 participants, got {0}")]
+    InsufficientParticipants(usize),
+}
+```
 
 ---
 
-<a id="retrieval"></a>
+<a id="7-retrieval"></a>
 ## 7. Retrieval-Pipeline: 4-Signal-Fusion und ihre Algorithmen
 
 ### 7.1 4-Signal-Fusion
 
 Jede Hybridsuche kombiniert bis zu vier unabhängige Signale — Vektor (HNSW-k-NN), Text (BM25/BM25F), Graph
-(PPR-Traversierung inkl. Hyperkanten-Erweiterung, §6.4/§6.5-H3) und optional Kanten-Reinforcement
-(feature-gated) — über das geschlossene `SignalKind`-Enum (§6.5, H3). Die Fusion selbst erfolgt standardmäßig
-über **Reciprocal Rank Fusion (RRF)**, score-blind und robust bei Signalausfall. Eine score-normalisierte Fusion
-steht als Opt-in mit hartem RRF-Fallback bei Signaldegradation zur Verfügung — RRF bleibt in jedem Fall Default,
-kein Ersatz.
-
-### 7.2 Graph-Signal: Gestreamtes Personalized PageRank via Forward-Push
-
-**Problem der dichten Power-Iteration:** Eine PPR-Berechnung über dichte Power-Iteration berechnet die
-stationäre Wahrscheinlichkeitsverteilung über den **gesamten** Graphen — $O(V+E)$ pro Anfrage, unabhängig von der
-tatsächlichen Seed-Menge. Das verstößt gegen P24 und führt zu enormen Heap-Allokationen bei großen Graphen.
-
-**Zielarchitektur (🟢 produktiv):** Der lokale **Andersen-Chung-Lang-Forward-Push-Algorithmus** exploriert nur
-Knoten, die signifikant zur PageRank-Masse des Seed-Knotens beitragen. Die mathematische Spezifikation stützt
-sich auf einen Wahrscheinlichkeitsvektor $p$ und einen Restvektor $r$. Initialisierung für Seed-Knoten $s$:
-$r(s) = 1$, $p(s) = 0$. Für jeden Knoten $u$, bei dem $\frac{r(u)}{d(u)}$ einen Fehlertoleranz-Schwellenwert
-$\epsilon$ überschreitet, wird eine Push-Operation ausgeführt:
-
-1. $p(u) \leftarrow p(u) + \alpha \cdot r(u)$
-2. $r(u) \leftarrow (1 - \alpha) \frac{r(u)}{2}$ (Rückhaltung eines Teils der Restmasse)
-3. $r(v) \leftarrow r(v) + (1 - \alpha) \frac{r(u)}{2\, d(u)}$ für alle Nachbarn $v$ (gleichmäßige Verteilung der
-   verbleibenden Masse)
-
-Die Laufzeit ist strikt durch $O\!\left(\frac{1}{\alpha \epsilon}\right)$ begrenzt — unabhängig von der
-Gesamtgröße des Graphen. Der Graph-Lesepfad ist zusätzlich nebenläufigkeitssicher über RCU-Snapshot-Verfahren:
-`CsrGraph::compact()` tauscht den gesamten Graphzustand atomar über `ArcSwap<GraphInner>` aus, sodass Leser
-niemals einen gemischten Alt-/Neu-Zustand sehen (Grundlage von H1, §6.5).
-
-### 7.3 Volltextsuche: BM25 mit Block-Max WAND und Feldgewichtung (BM25F)
-
-**🟢 produktiv.** Der Volltextindex hält einen residenten In-Memory-Postinglisten-Index mit
-Block-Max-WAND-Traversierung für effiziente Top-k-Suche (kein Live-LSM-Range-Scan pro Query-Term) und
-unterstützt feldgewichtete Bewertung (BM25F), sodass z. B. Titel- und Fließtext-Treffer unterschiedlich gewichtet
-werden. Deutsche Komposita werden morphologisch zerlegt, sodass z. B. „Urlaubsantragsprozess" auch über „Urlaub",
-„Antrag", „Prozess" auffindbar ist.
-
-### 7.4 Vektorindex: gestuftes HNSW + DiskANN
-
-**🟢 produktiv (Stufe 0), 🔴 Stufe 1 spezifiziert.** HNSW ist der Standard-Vektorindex (SIMD-beschleunigte
-Distanzberechnung, SQ8-Quantisierung mit konfigurierbarem Perzentil-Clipping gegen Codebook-Drift, native
-Tombstone-Löschung). Für Korpora, die den verfügbaren RAM übersteigen, steht DiskANN als zweite Indexstufe zur
-Verfügung (mmap-basiertes, read-only Zugriffsmuster, ebenfalls native Tombstones).
-
-**Zielarchitektur „HNSW-Dateiformat v2" (🔴, Arena-Allocator):** Der aktuelle Traversierungs-Hotpath erzeugt pro
-abgerufenem Nachbarknoten eine Heap-Allokation (`Vec<u32>`) und verwendet redundante `RwLock`-Sperren pro Knoten.
-Ein Arena-Allocator reserviert beim Start einen zusammenhängenden Speicherblock; Knoten-Offsets ersetzen rohe
-Pointer, was den Hardware-Prefetcher der CPU maximal ausnutzt:
+(PPR-Traversierung inkl. Hyperkanten-Erweiterung), optional Kanten-Reinforcement (feature-gated) — über das
+geschlossene `SignalKind`-Enum:
 
 ```rust
-pub struct HnswArena<const D: usize> {
-    /// Lock-freie Arena, von Mmap oder großem Vektor gestützt
-    storage: Arc<MmapArena>,
-    /// Epochen-basierte Referenzen zur lock-freien Traversierung
-    head: crossbeam_epoch::Atomic<NodeRecord<D>>,
-    capacity: usize,
-}
-```
-
-Bei Updates (Neuverlinkung von Knoten) wird die Adjazenzliste nicht via Mutex gesperrt: Eine neue, verlängerte
-Liste wird erstellt, und der Zeiger im Knoten wird über ein atomares `compare_exchange` (CAS) ausgetauscht.
-Leser-Threads nutzen `crossbeam_epoch`, damit die alte Liste im Speicher verbleibt, bis der letzte Lesevorgang
-abgeschlossen ist (Zero-Allocation Traversal).
-
-**NaN-sichere Distanzberechnung:** Innerhalb der HNSW-Distanzschleife ist das Einfügen von Branches
-(`if val.is_nan()`) toxisch für die CPU-Pipeline. Stattdessen werden bitweise SIMD-Maskierungen genutzt: Ein
-Vektor-Register wird parallel auf `NaN` evaluiert, eine Bit-Maske erzeugt und ungültige Werte über bitweises
-UND/ODER auf `0.0` (bzw. auf Distanz $\infty$) gesetzt, ohne dass der Instruction Pointer verzweigen muss —
-garantiert Determinismus und Laufzeitstabilität.
-
-### 7.5 Community-Detection: Leiden
-
-**🟢 produktiv (binärer Pfad).** Graph-Clustering für GraphRAG erfolgt über den Leiden-Algorithmus
-(deterministisch, garantiert wohlverbundene Communities — im Unterschied zu Label-Propagation oder Louvain).
-Die Hyperkanten-Projektion (Stern-Expansion, §6.6) und das Sichtbarkeits-Flag `hyperedges_included` (§6.5, H6)
-sind Teil der Hyperkanten-Erweiterung und entsprechend 🔴 spezifiziert, solange Hyperkanten selbst nicht gebaut
-sind.
-
----
-
-<a id="bandit"></a>
-## 8. Contextual-Bandit-Routing
-
-MemFuse integriert einen Multi-Armed-Bandit-Router (LinUCB, Li et al. 2010) zur adaptiven Aussteuerung der
-Retrieval-Strategien zwischen Volltext, Vektor und Graph.
-
-### 8.1 Zwei Implementierungsvarianten unterschiedlicher mathematischer Korrektheit
-
-- **`DiagonalApproximation` (🟢 Produktions-Default):** `theta[i] += r_adj * xi / sigma_sq[i].max(1e-8);
-  sigma_sq[i] += xi * xi;` — eine laufende Summe ohne Renormierung gegen die Ridge-Regression-Matrix. Dies ist
-  strukturell ein SGD-artiges Verfahren mit **keiner** exakten Ridge-Regression im Sinne von $\theta = A^{-1}b$.
-- **`ShermanMorrison` (🟡 Opt-in, Feature-Flag):** vollständige inkrementelle Matrixinversion über die
-  **Sherman-Morrison-Formel**, die eine Rang-1-Aktualisierung der Inversen in $O(d^2)$ statt $O(d^3)$ ermöglicht:
-
-$$(A + xx^\top)^{-1} = A^{-1} - \frac{A^{-1}xx^\top A^{-1}}{1 + x^\top A^{-1} x}$$
-
-wobei $A = \sum x_t x_t^\top + \lambda I$ und $b = \sum r_t x_t$, $\theta = A^{-1}b$. Nur die exakte Inversion von
-$A$ generiert die korrekten Konfidenzintervalle, die das Exploration-Exploitation-Dilemma deterministisch lösen —
-diese Variante **ist** eine mathematisch korrekte, inkrementelle Ridge-Regression und die einzige, die die
-LinUCB-Regret-Garantie tatsächlich erfüllt.
-
-### 8.2 SIMD-optimiertes Update ohne Heap-Allokation
-
-Um strikte Latenzbudgets im Hotpath einzuhalten, wird die Sherman-Morrison-Aktualisierung über SIMD-Intrinsics
-(AVX-512/NEON) parallelisiert. Datenstrukturen sind an 64-Byte-Cache-Lines ausgerichtet, um „False Sharing"
-zwischen Threads zu verhindern:
-
-```rust
-#[repr(C, align(64))]
-pub struct AlignedVector<const D: usize> {
-    pub data: [f32; D],
+/// BEWUSST NICHT `#[non_exhaustive]` — Erweiterung erfolgt NIEMALS durch neue Varianten (H3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SignalKind {
+    Vector,
+    Text,
+    Graph,
+    EdgeReinforcement, // feature-gated
 }
 
-pub struct ShermanMorrisonBandit<const D: usize> {
-    pub inv_a: AlignedVector<{ D * D }>,   // Inverse Kovarianzmatrix, flach im Speicher
-    pub b: AlignedVector<D>,
-    pub theta: AlignedVector<D>,
-}
-
-impl<const D: usize> ShermanMorrisonBandit<D> {
-    /// O(d^2) Lock-free Update der Parameter ohne Heap-Allokationen
-    pub fn update_rank_1(&mut self, x: &AlignedVector<D>, reward: f32) -> Result<(), BanditError> {
-        // 1. v = A^{-1} x via AVX-512-Intrinsics
-        // 2. s = 1.0 + x^T * v
-        // 3. inv_a -= (v * v^T) / s via FMA-Instruktionen
-        // 4. Update b und theta
-        Ok(())
+impl SignalKind {
+    /// Allokationsfrei, `eq_ignore_ascii_case` statt `to_lowercase()`-Allokation.
+    pub fn from_name(name: &str) -> Option<Self> {
+        if name.eq_ignore_ascii_case("vector") { Some(Self::Vector) }
+        else if name.eq_ignore_ascii_case("text") { Some(Self::Text) }
+        else if name.eq_ignore_ascii_case("graph") { Some(Self::Graph) }
+        else if name.eq_ignore_ascii_case("edgereinforcement") { Some(Self::EdgeReinforcement) }
+        else { None }
     }
 }
 ```
 
-Jeder `unsafe`-Block für `core::arch`-Intrinsics ist zwingend mit einem `// SAFETY:`-Kommentar zu annotieren, der
-die Pointer-Alignment-Invarianten beweist (§4.1).
+Die Fusion erfolgt standardmäßig über **Reciprocal Rank Fusion (RRF)**, score-blind und robust bei
+Signalausfall. Score-normalisierte Fusion als Opt-in mit hartem RRF-Fallback.
 
-### 8.3 Gedeckelter Lyapunov-Drift-Regelkreis
+**⚠️ Opus-Optimierung 1.10 — Top-k-Selektion (Stufe 1, gering):**
+Volle Sortierung durch begrenzte Selektion in linearer Zeit ersetzen.
 
-Das Routing nutzt dynamisches Budgeting über einen PID-Controller. Unter Traffic-Spikes kann der
-$\alpha$-Explorationsparameter unbegrenzt nach oben driften (Exploration-Exploitation-Kollaps). **🟢 produktiv:**
-Ein zeitfensterbasiertes `drift_decay_window` (Default 50 Zeitschritte, `drift_gamma = 0.95`) deckelt die
-Eskalation. Fällt der PID-Regler in die Ausgangssättigung (CPU-Limit-Saturierung), stoppt der Integrator sofort
-(Anti-Windup), statt den Fehler unbegrenzt aufzuaddieren. Die Berechnung berücksichtigt das Delta $dt$ zwischen
-Abfragen für abtastratenunabhängige Regelung. Dieser Deckel gilt für **beide** Bandit-Implementierungsvarianten
-gleichermaßen.
+### 7.2 Graph-Signal: Forward-Push-PPR (🟢)
 
-### 8.4 Normative Bewertung
+**Andersen-Chung-Lang Forward-Push-Algorithmus.** Exploriert nur Knoten, die signifikant zur PageRank-Masse beitragen.
 
-Der Wechsel des Produktions-Defaults von `DiagonalApproximation` zu `ShermanMorrison` ist an ein
-CI-Latenzbudget-Gate gebunden (Kriterium: Sherman-Morrison-Latenz < 5 % der medianen LLM/SLM-Inferenzlatenz) —
-⚖️ Produktentscheidung, kein Implementierungsrückstand. Diagonal-Approximation bleibt in jedem Fall als
-Low-Memory-Opt-out erhalten.
+Initialisierung für Seed-Knoten $s$: $r(s) = 1$, $p(s) = 0$. Für jeden Knoten $u$ mit
+$\frac{r(u)}{d(u)} > \epsilon$:
+
+1. $p(u) \leftarrow p(u) + \alpha \cdot r(u)$
+2. $r(u) \leftarrow (1 - \alpha) \frac{r(u)}{2}$
+3. $r(v) \leftarrow r(v) + (1 - \alpha) \frac{r(u)}{2\, d(u)}$ für alle Nachbarn $v$
+
+Laufzeit: $O\!\left(\frac{1}{\alpha \epsilon}\right)$ — **unabhängig von der Gesamtgröße des Graphen** (P24).
+
+```rust
+pub struct PprParams {
+    pub alpha: f32,           // Teleport-Wahrscheinlichkeit
+    pub epsilon: f32,         // Fehlertoleranz-Schwellenwert
+    pub hyperedge_decay: f32, // Default 0.85
+}
+
+pub fn forward_push_ppr(
+    graph: &CsrGraph,
+    seeds: &[EntityId],
+    params: &PprParams,
+) -> AHashMap<EntityId, f32> {
+    let mut p: AHashMap<EntityId, f32> = AHashMap::new();
+    let mut r: AHashMap<EntityId, f32> = seeds.iter()
+        .map(|&s| (s, 1.0 / seeds.len() as f32)).collect();
+    let mut queue: std::collections::VecDeque<EntityId> = seeds.iter().copied().collect();
+
+    while let Some(u) = queue.pop_front() {
+        let degree = graph.degree(u).max(1) as f32;
+        let r_u = *r.get(&u).unwrap_or(&0.0);
+        if r_u / degree <= params.epsilon { continue; }
+
+        *p.entry(u).or_insert(0.0) += params.alpha * r_u;
+        let residual_kept = (1.0 - params.alpha) * r_u / 2.0;
+        r.insert(u, residual_kept);
+
+        let push_share = (1.0 - params.alpha) * r_u / (2.0 * degree);
+
+        // Binäre Nachbarn (unveränderter Hotpath).
+        for (v, _w) in graph.neighbors_with_weights(u) {
+            *r.entry(v).or_insert(0.0) += push_share;
+            queue.push_back(v);
+        }
+
+        // 🔴 NEU (H3): Hyperkanten-Partner als virtuelle Nachbarn, Gewichtsabschlag.
+        for hedge_id in graph.hyperedges_for_entity(u) {
+            for role_binding in graph.hyperedge_participants(hedge_id) {
+                if role_binding.entity == u { continue; }
+                *r.entry(role_binding.entity).or_insert(0.0) += push_share * params.hyperedge_decay;
+                queue.push_back(role_binding.entity);
+            }
+        }
+    }
+    p
+}
+```
+
+### 7.3 Volltextsuche: BM25 mit Block-Max WAND und BM25F (🟢)
+
+```rust
+pub struct ResidentPostingIndex {
+    postings: AHashMap<TermId, PostingList>,
+    doc_lengths: Vec<u32>,
+    field_lengths: AHashMap<(DocId, FieldId), u32>, // BM25F-Voraussetzung
+}
+
+pub struct Bm25fParams {
+    pub k1: f32,
+    pub b: f32,
+    pub field_weights: AHashMap<FieldId, f32>,
+}
+
+impl ResidentPostingIndex {
+    /// Block-Max WAND: Top-k ohne vollständige Postinglisten-Traversierung.
+    pub fn search_topk(&self, query_terms: &[TermId], k: usize, params: &Bm25fParams) -> Vec<(DocId, f32)>;
+
+    /// BM25F-Score für ein einzelnes Dokument, feldgewichtet.
+    fn bm25f_score(&self, doc: DocId, terms: &[TermId], params: &Bm25fParams) -> f32;
+}
+
+/// Deutsche Kompositazerlegung.
+pub fn decompose_german_compound(word: &str, dictionary: &CompoundDictionary) -> Vec<String>;
+```
+
+Persistenz: Residenter Index wird beim Start aus LSM-Präfix `__text:posting:` materialisiert.
+
+**⚠️ Opus-Optimierung 1.9 — Text-Posting-Format (Stufe 1, hoch):**
+Umstellung von Einzelschlüssel- auf Listenspeicherung. Delta-kodierte Dokument-IDs. Ein Lesezugriff
+pro Suchbegriff statt unbegrenztem Präfix-Scan.
+
+### 7.4 Vektorindex: HNSW + DiskANN (🟢)
+
+```rust
+pub struct HnswIndex<const D: usize> {
+    layers: Vec<HnswLayer<D>>,
+    entry_point: AtomicUsize,
+    sq8_codebook: Sq8Codebook,
+}
+
+pub struct Sq8Codebook {
+    pub min: [f32; D_MAX],
+    pub max: [f32; D_MAX],
+    pub clip_percentile: f32, // Default 0.999
+}
+
+impl<const D: usize> HnswIndex<D> {
+    pub fn search_knn(&self, query: &[f32; D], k: usize, ef_search: usize) -> Vec<(DocId, f32)>;
+    pub fn insert(&mut self, id: DocId, vector: [f32; D]) -> Result<(), IndexError>;
+    pub fn delete(&mut self, id: DocId) -> Result<(), IndexError>; // native Tombstone
+}
+```
+
+**NaN-sichere Distanz-Pipeline:**
+```rust
+/// Bitweise SIMD-Maskierung statt Branch: NaN → f32::INFINITY.
+#[inline]
+fn masked_l2_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
+    // SAFETY: `a`/`b` sind 64-Byte-aligned und exakt D Elemente lang.
+    unsafe { unimplemented!() }
+}
+```
+
+**DiskANN (🟢 offizieller Tier):**
+```rust
+pub struct DiskAnnIndex<const D: usize> {
+    mmap: memmap2::Mmap,
+    tombstones: scc::HashSet<DocId>, // native, kein HNSW-Fallback nötig
+    tombstone_wal: TombstoneWal,
+}
+
+pub enum VectorIndexTier {
+    Hnsw,
+    #[cfg(feature = "experimental-diskann")]
+    DiskAnn,
+}
+```
+
+**Zielarchitektur „HNSW v2" (🔴 Arena-Allocator):**
+```rust
+pub struct HnswArena<const D: usize> {
+    storage: std::sync::Arc<MmapArena>,
+    head: crossbeam_epoch::Atomic<NodeRecord<D>>,
+    capacity: usize,
+}
+
+pub struct NodeRecord<const D: usize> {
+    pub vector: [f32; D],
+    pub neighbor_offsets: [u32; MAX_M],   // Offsets statt Pointer
+    pub neighbor_count: u16,
+}
+
+impl<const D: usize> HnswArena<D> {
+    /// Relinking über CAS statt Mutex.
+    pub fn relink(&self, node_offset: u32, new_neighbors: &[u32]) -> Result<(), IndexError>;
+}
+```
+
+**⚠️ Opus-Optimierungen für den HNSW-Hot-Path:**
+
+| ID | Maßnahme | Aufwand |
+|---|---|---|
+| 1.1 | Nachbarlisten-Auflösung ohne Allokation — Referenz statt Kopie; mittelfristig fester Stride | Gering → Hoch |
+| 1.2 | Backlink-Auflösung von O(P×B) auf O(1) — HashMap pro Suche | Gering |
+| 1.3 | Lock auf Quantisierer einmalig pro Suchaufruf, Distanz direkt auf Mmap-Slice | Mittel |
+
+### 7.5 Community-Detection: Leiden (🟢 binärer Pfad)
+
+Stern-Expansion für Hyperkanten-Projektion (🔴). `StarExpansionIterator` gaukelt Leiden-Solver bipartite
+Inzidenzmatrix vor (Zero-Allocation):
+
+```rust
+pub struct StarExpansionIterator<'a> {
+    graph: &'a CsrGraph,
+    current_hyperedge_idx: usize,
+}
+
+impl<'a> Iterator for StarExpansionIterator<'a> {
+    type Item = (EntityId, VirtualHyperedgeNode);
+    fn next(&mut self) -> Option<Self::Item> { unimplemented!() }
+}
+```
+
+### 7.6 Provenance-Tracking
+
+**⚠️ Opus-Optimierung 1.8 — `build_provenance` Struct (Stufe 1, gering-mittel):**
+Von 14 positionellen Parametern auf benannte Struct:
+
+```rust
+#[derive(Default)]
+pub struct ProvenanceBuilder {
+    source_doc_id: Option<DocId>,
+    signal_contributions: Vec<(SignalKind, f32)>,
+    fusion_mode: Option<FusionMode>,
+    calibrated_threshold: Option<f32>,
+}
+
+impl ProvenanceBuilder {
+    pub fn source_doc_id(mut self, id: DocId) -> Self { self.source_doc_id = Some(id); self }
+    pub fn add_signal(mut self, kind: SignalKind, score: f32) -> Self {
+        self.signal_contributions.push((kind, score)); self
+    }
+    pub fn build(self) -> Result<ProvenanceRecord, DbError> { unimplemented!() }
+}
+```
 
 ---
 
-<a id="inferenz"></a>
+<a id="8-bandit"></a>
+## 8. Contextual-Bandit-Routing
+
+MemFuse integriert einen Multi-Armed-Bandit-Router (LinUCB, Li et al. 2010) zur adaptiven Aussteuerung der
+Retrieval-Strategien.
+
+### 8.1 Gemeinsame Schnittstelle
+
+```rust
+pub trait BanditPolicy: Send + Sync {
+    fn select_arm(&self, context: &[f32]) -> RetrievalStrategy;
+    fn update(&mut self, context: &[f32], arm: RetrievalStrategy, reward: f32);
+}
+
+pub enum RetrievalStrategy { Vector, Text, Graph, Hybrid }
+```
+
+### 8.2 Zwei Implementierungsvarianten
+
+**`DiagonalApproximation` (🟢 Produktions-Default):**
+
+```rust
+pub struct DiagonalApproximationBandit {
+    theta: Vec<f32>,
+    sigma_sq: Vec<f32>,
+    drift: LyapunovDriftWatcher,
+}
+
+impl BanditPolicy for DiagonalApproximationBandit {
+    fn update(&mut self, context: &[f32], _arm: RetrievalStrategy, reward: f32) {
+        for (i, &xi) in context.iter().enumerate() {
+            self.theta[i] += reward * xi / self.sigma_sq[i].max(1e-8);
+            self.sigma_sq[i] += xi * xi;
+        }
+    }
+    fn select_arm(&self, context: &[f32]) -> RetrievalStrategy { unimplemented!() }
+}
+```
+
+Dies ist strukturell ein SGD-artiges Verfahren — **keine** exakte Ridge-Regression im Sinne von $\theta = A^{-1}b$.
+
+**`ShermanMorrisonBandit` (🟡 Opt-in, `egress-sherman-morrison`):**
+
+Mathematisch korrekte inkrementelle Matrixinversion:
+
+$$(A + xx^\top)^{-1} = A^{-1} - \frac{A^{-1}xx^\top A^{-1}}{1 + x^\top A^{-1} x}$$
+
+wobei $A = \sum x_t x_t^\top + \lambda I$ und $b = \sum r_t x_t$, $\theta = A^{-1}b$.
+
+```rust
+#[repr(C, align(64))]
+pub struct AlignedVector<const D: usize> { pub data: [f32; D] }
+
+pub struct ShermanMorrisonBandit<const D: usize> {
+    pub inv_a: AlignedVector<{ D * D }>, // A^{-1}, flach, row-major
+    pub b: AlignedVector<D>,
+    pub theta: AlignedVector<D>,
+    pub lambda: f32,                     // Ridge-Regularisierung
+}
+
+impl<const D: usize> ShermanMorrisonBandit<D> {
+    /// O(d²) Lock-free Update via AVX-512/NEON SIMD.
+    pub fn update_rank_1(&mut self, x: &AlignedVector<D>, reward: f32) -> Result<(), BanditError> {
+        let v = self.matvec_inv_a(x);
+        let s = 1.0 + Self::dot(x, &v);
+        if s.abs() < 1e-8 { return Err(BanditError::SingularUpdate); }
+        self.rank1_update_inv_a(&v, s);
+        self.b.data.iter_mut().zip(x.data.iter()).for_each(|(bi, xi)| *bi += reward * xi);
+        self.theta = self.matvec_inv_a(&self.b);
+        Ok(())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum BanditError {
+    #[error("rank-1 update denominator near zero")]
+    SingularUpdate,
+}
+```
+
+64-Byte-Cache-Line-Alignment verhindert False Sharing. Jeder `unsafe`-Block für SIMD-Intrinsics erfordert
+`// SAFETY:`-Kommentar.
+
+**⚠️ Opus-Optimierung 0.2 — Dimensionsprüfung (Stufe 0, gering):**
+`score()`/`update()` von `debug_assert` auf harte `Result`-Fehlerbehandlung mit `DimensionMismatch { expected, actual }`.
+Dimensions-Versionierung in `BanditProfileState`.
+
+**⚠️ Opus-Optimierung 0.3 — Drift-Bandit-Kopplung (Stufe 0, gering):**
+Drift-Reaktionsmethode bei `DriftDetected` tatsächlich aufrufen statt nur loggen. Mit konfigurierbarem `k_drift`.
+
+### 8.3 Gedeckelter Lyapunov-Drift-Regelkreis (🟢)
+
+```rust
+pub struct LyapunovDriftWatcher {
+    pub drift_decay_window: u32,   // Default 50
+    pub drift_gamma: f32,          // Default 0.95
+    steps_remaining: std::sync::atomic::AtomicU32,
+    integrator_state: std::sync::atomic::AtomicU32, // f32-Bits
+}
+
+impl LyapunovDriftWatcher {
+    /// Anti-Windup: bei PID-Sättigung stoppt der Integrator sofort.
+    pub fn update(&self, error: f32, dt_seconds: f32, saturated: bool) -> f32 {
+        if saturated { return self.current_alpha(); }
+        // Zeitfensterbasierte, gedeckelte Eskalation.
+        unimplemented!()
+    }
+}
+```
+
+### 8.4 Default-Umstellung
+
+Der Wechsel des Produktions-Defaults zu `ShermanMorrison` ist an ein CI-Latenzbudget-Gate gebunden:
+Kriterium < 5 % der medianen LLM/SLM-Inferenzlatenz. `DiagonalApproximation` bleibt als Low-Memory-Opt-out.
+
+---
+
+<a id="9-inferenz"></a>
 ## 9. Inferenz, KV-Cache-Bridge und Zero-Copy-IPC
 
-### 9.1 Zero-Copy-Eviction-Bridge
+### 9.1 Zero-Copy-Eviction-Bridge (🟢)
 
-**🟢 produktiv.** Die Interprozesskommunikation und die Verwaltung des LLM-Kontexts erfordern durchgehende
-Zero-Copy-Datenpipelines auf Basis von `Bytes` und Mmap. FlatBuffers erlaubt das direkte Auslesen von Strukturen
-aus einem Byte-Slice (`&[u8]`), ohne Puffer im Heap neu anzulegen; der generierte IPC-Code
-(`memfuse-core-ipc-gen`) gibt alle Strings und Vektoren als Slice-Referenzen zurück.
+Durchgehende Zero-Copy-Datenpipeline auf Basis von `Bytes` und Mmap. FlatBuffers erlaubt direktes Auslesen
+aus `&[u8]` ohne Heap-Allokation.
 
-### 9.2 LSM-Fallback-Spill bei Speicherdruck
+### 9.2 KV-Cache-Bridge mit LSM-Fallback-Spill (🟢)
 
-**🟢 produktiv.** Der KV-Cache wird primär verschlüsselt im RAM gehalten (Paged-Encrypted). Bei Speicherdruck
-implementiert das System einen kontrollierten LSM-Fallback-Spill auf die SSD, statt den Cache verlustbehaftet zu
-verwerfen oder den Prozess außer Speicher laufen zu lassen. Die Sicherheitsschicht (AES-256-GCM-SIV) instanziiert
-die Verschlüsselungsinstanz (`Aes256GcmSiv`) einmalig in einem `OnceLock` und übergibt sie an einen dedizierten
-Worker-Thread, der Nachrichten über asynchrone Channels (`mpsc`) entgegennimmt — dies vermeidet den vormaligen
-Engpass, den erneuten Aufbau des Key-Schedules bei jeder kryptografischen Operation.
+```rust
+pub struct KvCacheBridge {
+    ram_cache: scc::HashMap<SessionId, EncryptedKvSegment>,
+    lsm_fallback: memfuse_store::LsmStore,
+    cipher_worker: CipherWorkerHandle,
+}
 
-### 9.3 Kryptographisch verifizierbare Löschung
+pub struct EncryptedKvSegment {
+    pub ciphertext: Vec<u8>,
+    pub rope_offset: u32,
+    pub model_fingerprint: [u8; 32],
+}
 
-Der Zero-Trust-WASM-Sandbox-Ansatz erfordert kryptografisch verifizierbare Deletion Proofs. Löschungen
-(Art. 17 DSGVO) sind deterministisch über HMAC-Ketten abgesichert: Ein gelöschter Schlüssel hinterlässt einen
-Tombstone, der integraler Bestandteil des Hash-Trees des LSM-Stores bleibt, wodurch die Löschung gegenüber der
-Cloud-Egress-Schicht kryptografisch beweisbar ist.
+impl KvCacheBridge {
+    pub fn get(&self, session: SessionId, model_fingerprint: [u8; 32])
+        -> Result<Option<KvCache>, KvBridgeError>
+    {
+        if let Some(seg) = self.ram_cache.get(&session) {
+            if seg.model_fingerprint != model_fingerprint {
+                return Err(KvBridgeError::FingerprintMismatch);
+            }
+            return Ok(Some(self.decrypt(seg)));
+        }
+        self.load_from_lsm_fallback(session)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum KvBridgeError {
+    #[error("rope offset mismatch")]
+    RopeOffsetMismatch,
+    #[error("model fingerprint mismatch")]
+    FingerprintMismatch,
+}
+```
+
+**Testpflicht:** Alle vier Kombinationen: RAM-Hit, RAM-Miss/LSM-Hit, beide-Miss, Fingerprint-Mismatch.
+
+### 9.3 AES-Schlüsselplan-Wiederverwendung
+
+```rust
+use aes_gcm_siv::Aes256GcmSiv;
+use std::sync::OnceLock;
+
+static CIPHER_INSTANCE: OnceLock<Aes256GcmSiv> = OnceLock::new();
+
+pub fn cipher() -> &'static Aes256GcmSiv { unimplemented!() }
+```
+
+**⚠️ Opus-Optimierung 1.5 — AES-Schlüsselplan (Stufe 1, mittel):**
+Cipher-Instanz einmalig pro Schlüssel aufbauen und wiederverwenden. Schlüsselrotation über gezielten Austausch.
+
+### 9.4 Layer-3-Crates
+
+- **`memfuse-ollama`:** `OllamaClient::generate(prompt, contextual_prefix) -> Result<String, OllamaError>`.
+  Contextual-Chunk-Prefixing fügt Retrieval-Kontext als System-Präfix ein.
+- **`memfuse-embed`:** `EmbeddingModel::embed(texts) -> Result<Vec<Vec<f32>>, EmbedError>` (ONNX, feature-gated),
+  `CrossEncoderReranker::rerank(query, candidates) -> Vec<SearchResult>`.
+- **`memfuse-agent`:** `AgentWorkflow`-Engine mit persistentem Zustand über `Checkpointable`.
+- **`memfuse-py`:** PyO3-Bindings in eigenem Cargo-Workspace (Panic-Strategie-Isolation: `panic = "unwind"` nur
+  hier, restlicher Workspace `panic = "abort"` für Release-Profile).
+
+**⚠️ Opus-Optimierung 2.5 — `memfuse-py` in Root-Workspace (Stufe 2, gering):**
+Crate in die `members`-Liste des Root-`Cargo.toml` aufnehmen, damit die FFI-Grenze denselben CI-Prüfungen
+unterliegt. Abweichende Profileinstellungen per paketspezifischem Profil erhalten.
 
 ---
 
-<a id="sicherheit"></a>
+<a id="10-sicherheit"></a>
 ## 10. Sicherheits- und Datenschutzmodell
 
 ### 10.1 Kryptographische Grundlagen
 
-AES-256-GCM-SIV für Daten at rest, WAL mit race-freier HMAC-Kette, `DeletionProof` für DSGVO-Art.-17-Nachweise
-(§9.3). Key-granulare Schreibisolation (`kv_locks`) reduziert zusätzlich die Angriffsfläche für lock-basierte
-Denial-of-Service-Muster gegenüber einem collection-weiten Mutex.
+AES-256-GCM-SIV für Daten at rest, WAL mit race-freier HMAC-Kette, `DeletionProof` für DSGVO-Art.-17-Nachweise.
 
-### 10.2 WASM-Sandbox
+```rust
+pub struct DeletionProof {
+    pub key_hash: [u8; 32],
+    pub hmac_chain_entry: [u8; 32],
+    pub prev_hmac: [u8; 32],
+    pub timestamp: i64,
+}
 
-**🟢 produktiv.** Zero-Trust-Ausführungsisolation für Agent-Tool-Aufrufe über `wasmtime`. Fuel-Budget (Rechenschritte)
-und Wall-Clock-Limit (`max_wall_clock_ms`, Default 5 s) sind orthogonal konfigurierbar (P23) — ein Tool kann
-rechnerisch günstig, aber durch blockierendes I/O langsam sein, oder umgekehrt; beide Fälle müssen unabhängig
-begrenzbar sein. `#![forbid(unsafe_code)]` gilt für den Sandbox-Crate uneingeschränkt.
+pub struct HmacChain {
+    last: std::sync::Mutex<[u8; 32]>,
+}
 
-### 10.3 Prompt-Injection-Schutz und Zero-Copy-Lesepfad
+impl HmacChain {
+    /// MUSS atomar gegenüber gleichzeitigen `append`-Aufrufen sein.
+    pub fn append(&self, payload: &[u8]) -> Result<[u8; 32], CryptoError>;
+    pub fn verify_chain(entries: &[[u8; 32]]) -> Result<(), CryptoError>;
+}
 
-Bestandteil des Sicherheitsmodells seit der Kernarchitektur, unverändert gültig: Eingaben aus dem Kontext eines
-Agenten werden nicht ungeprüft als Steuerbefehle interpretiert; der Lesepfad ist durchgehend Zero-Copy, um
-unnötige Pufferkopien sensibler Daten zu vermeiden.
+#[derive(Debug, thiserror::Error)]
+pub enum CryptoError {
+    #[error("hmac chain fork at index {0}")]
+    ChainFork(usize),
+    #[error("aead operation failed")]
+    AeadFailure,
+}
+```
 
-### 10.4 Cloud-Egress Privacy Gateway (Fünf-Schichten-Architektur)
+### 10.2 WASM-Sandbox (🟢)
 
-**🟢 produktiv, weitgehend auditiert.** Für den Fall, dass eine Anfrage dennoch an ein Cloud-LLM weitergereicht
-werden soll, besteht ein mehrschichtiger DLP-Pfad:
+```rust
+pub struct WasmCapabilities {
+    pub max_fuel: Option<u64>,
+    pub max_wall_clock_ms: u64, // Default 5000; 0 = unbegrenzt
+    pub allow_cloud_egress: bool, // Default false
+}
 
-1. **Token-Vaulting/Pattern-Matching (`EgressVault`):** `RegexSet`-Klassifikation sensibler Entitäten, Payload-Deckel.
+pub struct SandboxExecutor {
+    engine: wasmtime::Engine,
+}
+
+impl SandboxExecutor {
+    pub fn execute(&self, module: &[u8], caps: &WasmCapabilities) -> Result<Vec<u8>, SandboxError> {
+        let mut store = wasmtime::Store::new(&self.engine, ());
+        if let Some(fuel) = caps.max_fuel { store.set_fuel(fuel).map_err(SandboxError::from)?; }
+        // Wall-Clock unabhängig von Fuel via separatem Timeout-Task (P23).
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SandboxError {
+    #[error("fuel budget exhausted")]
+    FuelExhausted,
+    #[error("wall clock budget of {0}ms exceeded")]
+    WallClockExceeded(u64),
+}
+```
+
+`fd_write`-WASI-Stub MUSS `iovs` korrekt parsen.
+
+### 10.3 Prompt-Injection-Schutz
+
+Eingaben aus dem Agenten-Kontext werden nicht ungeprüft als Steuerbefehle interpretiert; der Lesepfad ist
+durchgehend Zero-Copy, um unnötige Pufferkopien sensibler Daten zu vermeiden.
+
+### 10.4 Cloud-Egress Privacy Gateway (🟢, 5-Schichten-Architektur)
+
+1. **Token-Vaulting/Pattern-Matching (`EgressVault`):** `RegexSet`-Klassifikation, Payload-Deckel.
 2. **Vorabstraktion.**
 3. **Graph-Generalisierung.**
-4. **Bulk-Exfiltration-Detektor:** erkennt großvolumige, potenziell exfiltrierende Anfragemuster.
-5. **Re-Hydration:** `CloudResponseRehydrator::rehydrate` übersetzt Surrogate in der Cloud-Antwort zurück in die
-   Originalentität — Round-Trip, unbekannte Surrogat-Token (No-Op) und Multibyte-UTF-8-Grenzfälle
-   (Panic-Sicherheit) sind Testpflicht.
+4. **Bulk-Exfiltration-Detektor:** Großvolumige Anfragemuster erkennen.
+5. **Re-Hydration:** `CloudResponseRehydrator::rehydrate` — Round-Trip-sicher, Multibyte-UTF-8-panic-sicher.
 
-**Surrogat-Tokenisierung:** `generate_surrogate`/`get_entity` erzeugen eine session-gebundene, bidirektionale
-Zuordnung zwischen Originalentität und Platzhalter (`[USER_ENTITY_xxxx]`-Format, Hash-basiert). Ein formaler
-Fünf-Schichten-Vollständigkeitsaudit dokumentiert den Reifegrad dieser Kette.
+```rust
+pub struct EgressVault {
+    pattern_matcher: regex::RegexSet,
+    surrogate_map: scc::HashMap<SurrogateToken, OriginalEntity>,
+}
+
+impl EgressVault {
+    pub fn generate_surrogate(&self, entity: &OriginalEntity, session: SessionId) -> SurrogateToken;
+    pub fn get_entity(&self, token: &SurrogateToken) -> Option<OriginalEntity>;
+}
+
+pub struct BulkExfiltrationDetector {
+    pub max_bytes_per_window: usize,
+    pub window: std::time::Duration,
+}
+
+pub struct CloudResponseRehydrator;
+impl CloudResponseRehydrator {
+    pub fn rehydrate(&self, response: &str, vault: &EgressVault) -> String { unimplemented!() }
+}
+```
+
+**⚠️ Opus-Optimierung 0.4 — Egress-Klassifizierung (Stufe 0, gering):**
+Eigene, restriktivere Policy-Kategorie für Cloud-Egress-Methoden statt gleiche wie lokale Lesezugriffe.
 
 ---
 
-<a id="betrieb"></a>
+<a id="11-betrieb"></a>
 ## 11. Betriebsmodi
 
 MemFuse wird ausschließlich eingebettet betrieben: im Prozess des aufrufenden Agenten (Rust- oder Python-Bindung)
@@ -797,361 +1781,51 @@ verlassen — ausschließlich auf explizite Anforderung, nie als Hintergrundtele
 
 ---
 
-<a id="features"></a>
-## 12. Feature-Flag-Politik: Produktions-Default vs. Opt-in
+<a id="12-schema"></a>
+## 12. FlatBuffers-Schema (vollständig, `schemas/memfuse.fbs`)
 
-Ein Breaking-Change- oder Performance-Trade-off-Feature wird hinter einem Cargo-Feature isoliert, bis eine
-explizite Produktentscheidung (Major-Version-Cutover bzw. CI-Benchmark-Gate-Erfolg) den Wechsel des Defaults
-auslöst. Dies ist **kein Mangel**, sondern verbindliche Politik — die Unterscheidung zwischen „im Code korrekt
-gelöst" und „im Produktionsbetrieb tatsächlich wirksam" ist für Abnahme- und Sicherheitszwecke wesentlich.
+```fbs
+namespace memfuse.ipc;
 
-| Feature-Flag | Reifegrad | Beschreibung |
-|---|---|---|
-| `cloud-egress-guard` | 🟢 | DLP/Egress-Kontrolle, Surrogat-Tokenisierung, Bulk-Exfiltration-Detektor, Rehydration (§10.4) |
-| `bandit-routing` | 🟢 | LinUCB-Grundfunktion, Lyapunov-Kopplung, gedeckelte Drift-Alpha-Eskalation (§8) |
-| `egress-sherman-morrison` | 🟡 | Mathematisch korrekte Ridge-Regression-Form (§8.1); einziger Pfad mit LinUCB-Regret-Garantie |
-| `kv-bridge` | 🟢 | KV-Cache-Bridge inkl. LSM-Fallback-Spill, Bincode + AES-256-GCM-SIV (§9) |
-| `wasm-sandbox` | 🟢 | Fuel- und Wall-Clock-Budget orthogonal (§10.2) |
-| `experimental-diskann` | 🟢 (offizieller Tier) | Native Tombstones, SQ8-Perzentil-Clipping (§7.4) |
-| `docid-128` | 🟡 | 128-Bit-BLAKE3-Truncation-DocId, Rollout über praktisch alle Crates vollzogen, Default bleibt `u64` (§6.1) |
-| `block-cache-v2` | 🟡 | SIEVE-/S3-FIFO-artiges Backend, Default bleibt klassisches `RwLock`-LRU (§5.2) |
-| `bm25f` | 🟢 | Feldgewichtete BM25-Bewertung (§7.3) |
-| `flatbuffers-drift-gate` (xtask) | 🟢 | CI-Gate gegen Schema-Drift — Vorbedingung für jede künftige Schemaerweiterung, insbesondere Hyperkanten (§6.5, H4) |
-| `fault-injection` | 🟢 | Test-only |
-| `loom` | Dev-Dependency | Nebenläufigkeits-Modelltests für Group-Commit und (künftig) Multi-Key-Locking (§6.5, H2) |
-| `adaptive-decay` / `-control` | 🟢 | Kalibrierungs-Feintuning |
-| `partial-index-rebuild` | 🟢 | Inkrementeller Indexaufbau |
-| `edge-reinforcement-learning` | 🟢 (Feature-Gate) | Kantenverstärkung als optionales fünftes Fusionsverhalten |
-| **Hyperkanten (`relate_n_ary`, `HyperEdge`)** | **🔴 kein Flag — nicht implementiert** | Siehe §6 |
+table RoleBindingFb {
+  role: uint32;
+  entity: uint64;
+}
 
----
+table HyperEdgeFb {
+  id: uint64;
+  predicate_tag: uint32;          // EdgeType-Diskriminante
+  participants: [RoleBindingFb];  // min. 2, validiert applikationsseitig
+  weight: float32;
+  tx_valid_from: uint64;
+  tx_valid_to: uint64;            // 0 = None (Sentinel, dokumentiert)
+  business_valid_from: int64;
+  business_valid_to: int64;       // i64::MIN = None (Sentinel)
+  source_doc_id: uint64;          // oder uint128-Encoding bei docid-128
+}
 
-<a id="governance"></a>
-## 13. Governance & Entwicklungsprozess
+table EdgeFb {
+  target: uint64;
+  weight: float32;
+  edge_type_tag: uint32;
+  tx_valid_from: uint64;
+  tx_valid_to: uint64;
+  business_valid_from: int64;
+  business_valid_to: int64;
+  source_doc_id: uint64;
+}
 
-- **Keine Statusaussage ohne Code-Gegenprobe:** Jede Aussage über den Reifegrad einer Fähigkeit beruht auf einer
-  Prüfung des tatsächlichen Codes (Dateilektüre, Tests, CI-Konfiguration) zum Zeitpunkt der Aussage — nicht auf
-  der Übernahme einer früheren, möglicherweise überholten Statuszeile.
-- **Persistenzformat-Änderungen sind an ein aktives CI-Drift-Gate gebunden** (§3, §6.5 H4) — keine Ausnahme,
-  auch nicht unter Zeitdruck.
-- **ADR-Disziplin:** Architekturentscheidungen mit Breaking-Change-Charakter (Bandit-Default, BlockCache-Default,
-  DocId-128-Cutover, HNSW/DiskANN-Stufenmodell, Fusionsstrategie) werden als eigenständige ADRs geführt, an ein
-  messbares Kriterium (Benchmark-Gate, Major-Release) gebunden und bei Code-Umsetzung formal revidiert — Code, der
-  seiner ADR-Dokumentation vorauseilt, ist ein zu schließender Governance-Befund, kein Dauerzustand.
-- **Explizite Nicht-Verifikationen werden benannt, nicht verschwiegen:** Wo eine Aussage (z. B. Approximationsgüte
-  eines Algorithmus, Inhalt eines Audit-Reports, tatsächliches CI-Laufergebnis) nicht bis auf Ausführungsebene
-  geprüft wurde, wird dies als solches gekennzeichnet, statt stillschweigend als „erledigt" geführt.
-- **Kein Merge risikoreicher Schemaänderungen ohne Sicherungsnetz** (§6.5, H4) — dies ist die zentrale, aus der
-  Hyperkanten-Analyse gewonnene und auf jede künftige Schemaerweiterung übertragbare Lehre.
+root_type HyperEdgeFb;
+```
+
+**CI-Drift-Gate (`xtask check-flatbuffers-drift`):** Vergleicht Hash des generierten Codes gegen committeten
+Referenz-Hash. Jede Schema-Änderung ohne begleitende Regenerierung schlägt den Merge-Gate-Job fehl. **Dieses
+Gate MUSS grün sein, bevor `HyperEdgeFb` gemerged wird (H4).**
 
 ---
 
-<a id="abnahme"></a>
-## 14. Abnahmekriterien des Endprodukts
-
-### 14.1 Kernsystem (Auszug, normativ)
-
-1. `insert_lock` vollständig durch key-granulare `kv_locks` ersetzt — kein collection-weiter Schreib-Mutex im Pfad.
-2. HNSW-Hotpath nutzt unaligned-SIMD-Distanzkernel statt Heap-Allokation pro Distanzberechnung.
-3. BM25-Suche nutzt residenten Postinglisten-Index mit Block-Max WAND, kein Live-LSM-Scan pro Query-Term.
-4. Block-Cache erzwingt bei reinem Lesetreffer im Opt-in-Backend (`block-cache-v2`) keinen exklusiven Write-Lock.
-5. DiskANN kann ohne HNSW-Fallback löschen (native Tombstones).
-6. Bandit-Router-Latenzbudget ist CI-gated, nicht nur literaturbasiert behauptet.
-7. Graph-`compact()` blockiert keine nebenläufigen Leser während des Rebuilds (RCU-Snapshot-Swap).
-8. PPR-Retrieval-Anfrage hat eine zur Seed-Menge, nicht zur Graphgröße proportionale Laufzeit (P24).
-9. `build_provenance` nutzt eine `ProvenanceBuilder`-Struktur statt vieler Positionsargumente.
-10. FlatBuffers-generierter Code hat ein CI-Drift-Gate gegen die Schema-Definition.
-11. `SignalKind::from_name`/`SignalKey::from_name` sind allokationsfrei (`eq_ignore_ascii_case`).
-12. BM25F ist produktiv nutzbar.
-13. KV-Cache-Bridge verfügt über LSM-Fallback-Spill mit Testabdeckung für RAM/LSM-Hit/Miss-Kombinationen.
-14. Bandit-Drift-Alpha-Eskalation ist zeitlich und wertmäßig gedeckelt.
-15. Cloud-Egress-Gateway: Layer-4-Bulk-Exfiltration-Detektor produktiv, Rehydration inkl. Multibyte-UTF-8-Sicherheit verifiziert.
-16. Der Produktions-Default des Bandit-Routers implementiert (⚖️, sobald Gate besteht) eine mathematisch korrekte
-    Ridge-Regression ($\theta = A^{-1}b$).
-17. Der Produktions-Default des Block-Caches zeigt (⚖️, sobald entschieden) S3-FIFO-/SIEVE-Verhalten.
-18. DocId-128 ist (⚖️, gebündelt mit Major-Release) Produktions-Default.
-19. Group-Commit-Loom-Test läuft sichtbar grün in CI.
-
-### 14.2 Abnahmekriterien für Hyperkanten (AK-1 bis AK-8, normativ und abschließend)
-
-1. `HyperEdge` mit ≥3 `RoleBinding`s persistiert, überlebt Prozess-Neustart, korrekt über `hyperedges_for_entity`
-   für jede beteiligte Entität auffindbar — **und** bleibt nach einem `compact()`-Lauf, der gleichzeitig mit einer
-   laufenden Leseoperation ausgeführt wird, konsistent (Regressionstest gegen H1: kein Leser darf je einen
-   `HyperEdgeId` sehen, dessen Teilnehmer im selben Snapshot bereits tombstoniert ist).
-2. `GraphInner::estimate_memory_bytes()` schließt Hyperkanten-Strukturen ein; der `compact_async`-Budget-Check
-   (`max_compaction_peak_memory_mb`) greift nachweislich auch bei Hyperkanten-dominiertem Speicherwachstum.
-3. Zwei gleichzeitige `relate_n_ary`-Aufrufe mit überlappenden, unterschiedlich geordneten Teilnehmermengen
-   terminieren beide ohne Deadlock (Loom- oder Stress-Test).
-4. PathRAG-Hyperkanten-Expansion fließt ausschließlich über das bestehende `SignalKind::Graph`-Signal;
-   `SignalKind`-Enum bleibt strukturell unverändert (Diff-Test: keine neue Variante).
-5. Das FlatBuffers-CI-Drift-Gate ist grün in CI, **bevor** das `HyperEdge`-FlatBuffers-Schema gemerged wird
-   (Reihenfolge-Constraint, per CI-Job-Abhängigkeit erzwungen, nicht nur organisatorisch vereinbart).
-6. `cascade_invalidate_hyperedges_for_superseded_doc` bricht bei >1.000 betroffenen Hyperkanten kontrolliert auf
-   Hintergrundverarbeitung um; ein Test mit synthetischem High-Fan-out-Graphen belegt, dass der synchrone
-   Schreibpfad dabei keine unbeschränkte Latenzspitze erzeugt.
-7. `CommunityDetectionConfig::hyperedges_included` ist im Report sichtbar `false`, solange keine
-   Hyperkanten-Projektion existiert — ein Test prüft das Flag selbst, nicht nur die zugrundeliegende Funktionalität.
-8. Kein Regressions-Impact auf bestehende binäre `relate()`/`Edge`-Benchmarks (Hotpath bleibt unangetastet).
-
----
-
-<a id="matrix"></a>
-## 15. Rückverfolgbarkeitsmatrix
-
-| Bereich | Reifegrad | Verweis |
-|---|---|---|
-| Key-granulare `kv_locks` statt collection-weitem Mutex | 🟢 | §5.1 |
-| HNSW-SIMD-Hotpath (unaligned Distanzkernel, `AHashSet`-Vorallokation, `try_write()`-Pruning) | 🟢 | §7.4 |
-| SQ8-Perzentil-Clipping | 🟢 | §7.4 |
-| BM25 residenter Index + Block-Max WAND | 🟢 | §7.3 |
-| BM25F feldgewichtete Bewertung | 🟢 | §7.3 |
-| Block-Cache: klassisches LRU | 🟢 (Default) | §5.2 |
-| Block-Cache: SIEVE/S3-FIFO | 🟡 | §5.2 |
-| Sherman-Morrison-Bandit + CI-Latency-Gate | 🟡 (Opt-in) / Gate 🟢 | §8 |
-| Leiden statt Label-Propagation (binärer Pfad) | 🟢 | §7.5 |
-| RCU-Snapshot-Swap für `CsrGraph::compact()` | 🟢 | §7.2 |
-| Native DiskANN-Tombstones | 🟢 | §7.4 |
-| DocId-128-Bit-Migration (Rollout) | 🟡 | §6.1 |
-| Score-normalisierte Fusion mit RRF-Fallback | 🟡 (Opt-in) | §7.1 |
-| Forward-Push-PPR | 🟢 | §7.2 |
-| `ProvenanceBuilder`-Struktur | 🟢 | §14 |
-| FlatBuffers-CI-Drift-Gate | 🟢 | §6.5 (H4), §13 |
-| Cloud-Egress Fünf-Schichten (Surrogat-Tokenisierung, Bulk-Exfiltration, Rehydration) | 🟢 | §10.4 |
-| KV-Cache-Bridge LSM-Fallback-Spill | 🟢 | §9.2 |
-| Bandit-Drift-Alpha-Eskalation gedeckelt | 🟢 | §8.3 |
-| Loom-Test sichtbar grün in CI | 🔴 | §14 |
-| HNSW-Dateiformat v2 (Arena) | 🔴 | §7.4 |
-| RaBitQ/PQ-Quantisierung jenseits SQ8 | 🔴 | §7.4 |
-| ADR-Formalrevision (Leiden statt LPA) | 🔴 (Dokumentationsnacharbeit) | §13 |
-| **N-äre Hyperkanten (gesamt: Datenmodell, H1–H6, `relate_n_ary`)** | **🔴 vollständig spezifiziert, nicht implementiert** | §6 |
-
----
-
-<a id="roadmap"></a>
-## 16. Roadmap
-
-### Stufe 0 — Unmittelbar
-
-1. Loom-Test für Group-Commit sichtbar grün in CI (reine Verifikationslücke, Test existiert bereits).
-2. Benchmark-Ausführung des Bandit-Latency-Gates mit produktivem $d$, um die Sherman-Morrison-Umstellung von
-   „Gate existiert" zu „Gate bestanden, Default umgestellt" zu überführen.
-
-### Stufe 1 — Strukturell
-
-3. **N-äre Hyperkanten** (§6), vollständig spezifiziert, unmittelbar startbereit — kein externer Blocker mehr,
-   sofern das FlatBuffers-CI-Drift-Gate (H4) produktiv ist. Reihenfolge innerhalb der Implementierung: H4-Nachweis
-   → Datenmodell (§6.3) → kanonisches Locking (§6.5 H2) → RCU-Integration (§6.5 H1) → PathRAG-Anschluss (§6.4,
-   §6.5 H3) → Cascade-Fan-out-Limit (§6.5 H5) → Leiden-Sichtbarkeitsflag (§6.5 H6) → Stern-Expansion-Projektion
-   (§6.6, separates Folgethema).
-4. HNSW-Dateiformat v2 (Arena + CSR + allokationsfreie Traversierung).
-
-### Stufe 2 — Produktions-Default-Entscheidungen
-
-5. Bandit-Default `DiagonalApproximation` → `ShermanMorrison`, sobald CI-Gate besteht.
-6. Block-Cache-Default `RwLock`-LRU → SIEVE-/S3-FIFO-Backend.
-7. RaBitQ- oder PQ-Evaluierung (nach HNSW v2).
-
-### Stufe 3 — Governance & Produktentscheidungen
-
-8. Formale ADR-Revision der Leiden-Umstellung (Code ist der Dokumentation voraus).
-9. Major-Release-Planung: 128-Bit-DocId-Cutover mit DiskANN-Tier-Vollfreigabe bündeln — technische Vorbedingung
-   ist bereits vollständig erfüllt.
-
-### Stufe 4 — Fernziele
-
-Memory Consolidation (`consolidate_via_llm()`), CausalEdge, passives WAL-Shipping, vollständige
-`ProvenanceRecord`-API-Exposition, `edge-reinforcement-learning`-Vollspezifikation, automatische NLP-Extraktion
-n-ärer Fakten aus Freitext (explizit außerhalb des Scopes der Hyperkanten-Spezifikation, §6.3).
-
----
-
-*Diese Spezifikation ist die einzige normative Produktquelle für MemFuse. Sie ist in sich geschlossen: Jede
-frühere Fassung, jedes Delta-Dokument und jede Zwischen-Review-Notiz zu den hier behandelten Themen — insbesondere
-zur Hyperkanten-Erweiterung (§6) — ist durch dieses Dokument vollständig ersetzt und wird nicht mehr referenziert.
-Künftige Änderungen erfolgen als direkte Überarbeitung dieses Dokuments, nicht als weiteres Delta-Dokument.*
-
-
-## 17. Opus Optimierungen (Roadmap Ergänzung)
-
-
-Dieser Plan enthält ausschließlich Maßnahmen, die aus den Opus-Architektur-Reviews stammen, im aktuellen Code verifiziert noch **nicht behoben** sind und sich als konkrete, abgrenzbare Implementierungsschritte umsetzen lassen. Bereits erledigte Punkte (WAL-Actor-Exklusivität, PID-Regler mit `dt`, Sherman-Morrison-Bandit, Hyperkanten-Grundgerüst, Block-Cache-v2, `to_lowercase`-Fix, HMAC-Lock-Handoff u. a.) sind nicht enthalten.
-
-Die Reihenfolge der Stufen ist bindend zu verstehen: Stufe 0 blockiert bzw. gefährdet den Betrieb, Stufe 1 ist der größte Hebel für Latenz/Durchsatz, Stufe 2 betrifft Speicherverbrauch und Struktur, Stufe 3 ist Prozess/Governance.
-
----
-
-## Stufe 0 — Korrektheit & Betriebssicherheit (zuerst)
-
-### 0.1 WAL-Replay: Panic-Pfad bei korrupter oder sich ändernder Datei entschärfen
-**Problem:** Die Replay-Routine liest die Dateigröße einmalig vor dem `mmap`, prüft alle Zugriffsgrenzen aber gegen diesen separat gehaltenen Wert statt gegen die tatsächliche Länge der gemappten Region. Verkürzt sich die Datei zwischen beiden Schritten (abgebrochener Schreibvorgang, konkurrierender Prozess, Netzwerk-Dateisystem), führt die anschließende direkte Byte-Indizierung zu einem Index-Panic statt zu einem behandelten Fehler. Mit `panic = "abort"` im Release-Profil beendet das den Prozess beim Öffnen der Datenbank — im schlimmsten Fall bei jedem Neustart erneut (Crash-Loop).
-**Maßnahme:**
-- Dateigröße ausschließlich aus `mmap.len()` ableiten, keinen separat gelesenen `file_size`-Parameter mehr durchreichen.
-- Alle Slice-Zugriffe auf `mmap.get(a..b)` mit `.ok_or(WalCorruption)` statt direkter Indizierung umstellen.
-- Die zweite, parallele Scan-Implementierung auf denselben Hilfsfunktions-Pfad reduzieren, damit nicht zwei Implementierungen mit potenziell unterschiedlichen Schranken existieren.
-**Nutzen:** Eliminiert den mit Abstand risikoreichsten verbleibenden Panic-Pfad im Storage-Layer; sehr geringer Aufwand bei hoher Risikoreduktion.
-
-### 0.2 Bandit: Dimensionsprüfung von `debug_assert` auf harte Fehlerbehandlung umstellen
-**Problem:** `score()` und `update()` des Contextual-Bandit-Routings prüfen die Übereinstimmung von Kontext- und Gewichtsvektor-Dimension nur über `debug_assert_eq!`. Im Release-Build greift diese Prüfung nicht; ein interner `zip` kürzt beide Vektoren stillschweigend auf die kürzere Länge. Ein Dimensionswechsel des Embedding-Modells (z. B. nach einem Modell-Upgrade) würde damit zu einem stillen Teil-Skalarprodukt in der Routing-Entscheidung führen, statt einen Fehler auszulösen. Zusätzlich wird der persistierte Bandit-Zustand ohne Dimensions-Versionierung serialisiert.
-**Maßnahme:**
-- Dimensionsprüfung in `score()`/`update()` als `Result`-Rückgabe mit eigenem Fehlervariant (`DimensionMismatch { expected, actual }`) statt `debug_assert`.
-- Ein Versionsfeld (oder die erwartete Dimension) in `BanditProfileState` mit persistieren und beim Laden gegen die aktuell konfigurierte Embedding-Dimension prüfen.
-**Nutzen:** Verhindert eine stillschweigend falsche Routing-Entscheidung nach Modellwechsel — geringer Aufwand, hohe Korrektheitswirkung.
-
-### 0.3 Lyapunov-Drift-Erkennung mit dem Bandit verdrahten
-**Problem:** Der Drift-Wächter erkennt Verteilungsverschiebungen der Non-Conformity-Scores zuverlässig und protokolliert sie, ruft aber an keiner Stelle die dafür vorgesehene Reaktionsmethode des Bandits auf. Die Eskalation der Exploration bei erkanntem Drift existiert im Code, ist aber vollständig unverdrahtet und wird derzeit nur aus dem eigenen Unit-Test heraus aufgerufen.
-**Maßnahme:** An der Stelle, an der `DriftDetected` erkannt und aktuell nur geloggt wird, zusätzlich die Drift-Reaktionsmethode auf dem zum jeweiligen Profil gehörenden Bandit-Zustand aufrufen (mit einem konfigurierbaren `k_drift`-Faktor).
-**Nutzen:** Schließt die einzige fehlende Verbindung zwischen zwei bereits fertigen Komponenten; erschließt eine bereits gebaute, aber bislang wirkungslose Funktion. Sehr geringer Aufwand.
-
-### 0.4 Cloud-Egress-Klassifizierung korrigieren
-**Problem:** Die einzige Werkzeugmethode, die eine Anfrage tatsächlich das lokale System verlassen lässt, ist derselben, permissiven Policy-Kategorie zugeordnet wie reine lokale Lesezugriffe. Sie wird dadurch von einem Flag gesteuert, das für harmlose Leseoperationen gedacht ist, nicht für Daten, die den Rechner verlassen.
-**Maßnahme:** Eine eigene Kategorie für Cloud-Egress-Methoden einführen, mit eigenem, restriktiverem Default-Policy-Feld, das unabhängig vom allgemeinen Lesezugriffs-Flag konfiguriert wird.
-**Nutzen:** Schließt eine sicherheitsrelevante Fehlkategorisierung; geringer Aufwand.
-
-### 0.5 Recovery-Pfad für offene Transaktions-Intents differenzieren
-**Problem:** Der Wiederherstellungspfad beim Öffnen der Datenbank behandelt jeden gefundenen offenen Transaktions-Intent unbedingt als „vorwärts committen und Indizes nachziehen“ — unabhängig davon, ob die Transaktion ursprünglich erfolgreich war oder mit einem Fehler abgebrochen wurde. Erfolg und Fehlschlag können dadurch denselben On-Disk-Endzustand erzeugen.
-**Maßnahme:** Den Intent-Datensatz um einen expliziten Ergebnisstatus (committed/aborted) erweitern, der beim Schreiben des Intents festgelegt und bei Repair-on-Open ausgewertet wird, statt pauschal vorwärts zu committen.
-**Nutzen:** Verhindert, dass abgebrochene Transaktionen nach einem Neustart fälschlich als abgeschlossen behandelt werden. Mittlerer Aufwand, da der Intent-Schreibpfad und alle Aufrufer angepasst werden müssen.
-
----
-
-## Stufe 1 — Hot-Path-Performance (größter Hebel)
-
-### 1.1 HNSW: Nachbarlisten-Auflösung ohne Allokation
-**Problem:** Die zentrale Funktion, die für jeden besuchten Knoten während einer Suche die Nachbarliste auflöst, gibt in jedem ihrer Rückgabepfade eine eigens allokierte Kopie zurück, obwohl die Signatur eine Referenz-oder-Kopie-Abstraktion vorsieht. Eine Suche, die mehrere hundert bis tausend Knoten besucht, erzeugt dadurch ebenso viele Heap-Allokationen allein für Adjazenzlisten — der mit Abstand größte Einzelfaktor im Suchpfad.
-**Maßnahme:**
-- Kurzfristig (ohne Formatwechsel): Wo die Nachbarn bereits als Referenz vorliegen (In-RAM-Knoten ohne konkurrierenden Schreibzugriff), tatsächlich den Referenz-Zweig statt der Kopie zurückgeben.
-- Mittelfristig: Umstellung des On-Disk-/Mmap-Knotenformats auf einen festen, ausgerichteten Datensatz-Stride mit pro Layer zusammenhängend abgelegten Nachbar-Indizes, sodass Nachbarlisten direkt als Byte-Slice referenziert statt dekodiert und kopiert werden können.
-**Nutzen:** Größter einzelner Effizienzgewinn im gesamten Suchpfad; die kurzfristige Teilmaßnahme ist mit geringem Aufwand umsetzbar, die vollständige Formatumstellung ist aufwendiger, aber Voraussetzung für alle weiteren HNSW-Optimierungen.
-
-### 1.2 HNSW: Backlink-Auflösung von O(P×B) auf O(1) pro Schritt
-**Problem:** Während eines Batch-Inserts wird für jeden im aktuellen Suchschritt expandierten Nachbarn eine lineare Suche über die gesamte Liste bereits vorbereiteter Einfüge-Operationen und deren Backlinks durchgeführt. Bei größeren Batches multipliziert sich das zu einer quadratischen Gesamtkomplexität über die Suche.
-**Maßnahme:** Einmal pro Suche eine Hash-Map von `(Nachbar-Index, Layer)` auf die zugehörige aktualisierte Nachbarliste aus den vorbereiteten Einfüge-Operationen aufbauen und im Suchkontext mitführen; Nachschlagen wird dadurch O(1) statt einer linearen Suche pro Schritt.
-**Nutzen:** Direkter algorithmischer Gewinn bei Batch-Inserts, insbesondere bei hoher Schreiblast; geringer Umsetzungsaufwand.
-
-### 1.3 HNSW: Lock- und Allokationsvermeidung im Distanzpfad
-**Problem:** Innerhalb der Distanzberechnung für quantisierte Vektoren wird bei jedem einzelnen Kandidaten ein Lese-Lock auf den gemeinsam genutzten Quantisierer erneut angefordert. Zusätzlich wird beim mmap-gestützten Distanzpfad der Vektor bei jeder Berechnung Element für Element dekodiert und in einen neu allokierten Puffer geschrieben, statt direkt aus dem gemappten Speicher zu lesen — der eigentliche Zweck der Mmap-Nutzung wird dadurch im heißesten Pfad wieder aufgehoben.
-**Maßnahme:**
-- Lock auf den Quantisierer einmalig pro Suchaufruf (nicht pro Kandidat) erwerben und als Referenz durch die Distanzschleife reichen.
-- Distanzfunktion so umbauen, dass sie direkt auf dem gemappten Byte-Slice operiert (z. B. über SIMD-Kernel, die auf `&[u8]`/`&[f32]`-Slices arbeiten), statt vorab in einen Heap-Vektor zu dekodieren.
-**Nutzen:** Reduziert Lock-Kontention und Allokationsrate im am häufigsten durchlaufenen Codepfad des Systems messbar; mittlerer Aufwand, hoher Ertrag.
-
-### 1.4 SSTable: Unnötige Kopie beim Block-Lesen entfernen
-**Problem:** Beim Lesen eines Datenblocks wird nach erfolgreicher CRC-Prüfung eine vollständige Kopie des Nutzdaten-Anteils angelegt, nur um die vorangestellten Prüfsummen-Bytes abzuschneiden — obwohl der zugrunde liegende Puffertyp Zero-Copy-Slicing mit geteiltem Referenzzähler unterstützt.
-**Maßnahme:** Die Kopieroperation durch ein referenzzählendes Slicing des bestehenden Puffers ersetzen, sodass keine zusätzliche Allokation und kein Memcopy der vollen Blockgröße mehr anfällt.
-**Nutzen:** Spart bei jedem Cache-Miss eine vollständige Blockkopie; trivialer Aufwand, sofort messbar.
-
-### 1.5 Kryptografie: AES-Schlüsselplan wiederverwenden statt pro Operation neu aufzubauen
-**Problem:** Bei jeder Verschlüsselungs-/Entschlüsselungsoperation wird die AES-256-GCM-SIV-Instanz aus dem Schlüsselmaterial neu aufgebaut. Der Aufbau des Schlüsselplans ist der teuerste Teil der Operation und wird dadurch bei jedem einzelnen Aufruf unnötig wiederholt — betrifft sowohl den WAL-Verschlüsselungspfad als auch Sandbox-/Vault-Operationen.
-**Maßnahme:** Die Cipher-Instanz einmalig pro Schlüssel (bzw. Schlüsselgeneration) aufbauen und danach wiederverwenden — etwa über eine einmalig initialisierte, threadsicher geteilte Referenz, die bei Schlüsselrotation gezielt ausgetauscht wird, statt bei jeder Operation neu konstruiert zu werden.
-**Nutzen:** Reduziert CPU-Kosten auf allen kryptografisch gesicherten Pfaden spürbar; mittlerer Aufwand wegen der Schlüsselrotations-Semantik, die erhalten bleiben muss.
-
-### 1.6 MemTable: Von Hash-Sharding auf Range-/Präfix-Sharding umstellen
-**Problem:** Die MemTable verteilt Schlüssel über eine feste Anzahl unabhängiger, hash-basiert ausgewählter Partitionen. Das beschleunigt einzelne Punktschreibungen, zerstört aber die beiden dominanten Zugriffsmuster des Systems: Beim Flush müssen alle Partitionen zusammengeführt und global neu sortiert werden (statt einer reinen Konkatenation), und ein Präfix-Scan über einen Namensraum muss grundsätzlich alle Partitionen durchsuchen, statt nur die eine, die den Präfix tatsächlich enthält.
-**Maßnahme:** Sharding-Grenzen aus dem Namensraum-Präfix ableiten (Range-Sharding), sodass jede Partition intern zusammenhängend bleibt. Alternativ, falls die Präfixverteilung zu ungleichmäßig ist: eine einzelne nebenläufige, geordnete Datenstruktur ohne Sharding-Kompromiss einsetzen.
-**Nutzen:** Macht den Flush-Pfad sortierfrei und reduziert Präfix-Scans von „alle Partitionen“ auf „eine Partition“; hoher Aufwand, aber hoher struktureller Ertrag für den am häufigsten durchlaufenen Schreibpfad.
-
-### 1.7 Block-Cache: Byte-basierte Kapazität statt Eintragsanzahl
-**Problem:** Die konfigurierte Cache-Kapazität wird in Anzahl Einträgen angegeben und implizit auf eine feste Blockgröße hochgerechnet. Blöcke können jedoch bis zu einer deutlich größeren Maximalgröße anwachsen, sodass ein nominell klein konfigurierter Cache tatsächlich ein Vielfaches an Speicher belegen kann, ohne dass dies vom zentralen Ressourcen-Budget erfasst wird.
-**Maßnahme:** Kapazität byte-basiert statt eintragsbasiert führen (Eviction anhand der tatsächlichen Bytegröße der zwischengespeicherten Werte); Anbindung an das zentrale Ressourcen-Tracking, damit der Cache im Gesamtspeicherbudget sichtbar ist.
-**Nutzen:** Verhindert unvorhersehbaren Speicherverbrauch unter variabler Blockgröße; mittlerer Aufwand.
-
-### 1.8 RRF-Fusion: `build_provenance`-Signatur entschärfen
-**Problem:** Die Funktion zum Aufbau des Provenance-Datensatzes nimmt vierzehn positionelle Parameter entgegen, davon acht vom identischen Typ (`Option<f32>`/`Option<u32>`). Eine Vertauschung zweier Argumente an der Aufrufstelle (z. B. Text- und Graph-Score) kompiliert fehlerfrei und erzeugt eine stillschweigend falsche Provenienz-Zuordnung.
-**Maßnahme:** Umstellung auf eine benannte Struct mit einem Feld pro Signal (oder ein `[SignalInput; N]`-Array), sodass Vertauschungen durch das Typsystem ausgeschlossen werden; zusätzlich `&str` statt `String` für Textfelder, um eine Allokation pro Ergebnis einzusparen.
-**Nutzen:** Beseitigt eine stille Fehlerquelle in der Ergebnis-Provenienz und eine unnötige Allokation pro Treffer; geringer bis mittlerer Aufwand (Signaturänderung mit mehreren Aufrufstellen).
-
-### 1.9 Text-Suche: Posting-Format von Einzelschlüssel- auf Listenspeicherung umstellen
-**Problem:** Jedes einzelne Posting (Term–Dokument-Paar) wird als eigenständiges Schlüssel-Wert-Paar abgelegt, mit dem Term und der Dokument-ID als Teil des Schlüssels. Das führt zu erheblicher Schreibverstärkung (ein Dokument mit vielen Termen erzeugt ebenso viele einzelne Schreiboperationen), zu erheblicher Leseverstärkung (ein häufiger Suchbegriff löst einen unbegrenzten Präfix-Scan über potenziell hunderttausende Einzelschlüssel aus) und zu einem Speicher-Overhead, bei dem der Schlüssel ein Vielfaches des eigentlichen Werts ausmacht.
-**Maßnahme:** Umstellung auf ein Format, bei dem die vollständige Postingliste eines Terms als ein einziger Wert abgelegt wird (z. B. Delta-kodierte Dokument-IDs mit Term-Frequenz und Dokumentlänge je Eintrag), ergänzt um einen separat gepflegten Dokumentfrequenz-Zähler pro Term. Das ermöglicht einen einzelnen Lesezugriff pro Suchbegriff statt eines unbegrenzten Scans und entfernt gleichzeitig das separate Nachladen der Dokumentlänge pro Treffer.
-**Nutzen:** Größter struktureller Einzelbefund im Textsuche-Pfad; hoher Aufwand (Formatwechsel inkl. Migration bestehender Indizes), aber Voraussetzung für jede weitere Optimierung der Volltextsuche (u. a. echte Top-k-Abbruchbedingungen).
-
-### 1.10 RRF/Textsuche: Volle Sortierung durch begrenzte Selektion ersetzen
-**Problem:** Sowohl in der Signal-Fusion als auch in der Textsuche werden sämtliche Kandidaten vollständig sortiert und danach auf die gewünschte Trefferzahl gekürzt, obwohl nur die besten k Einträge benötigt werden.
-**Maßnahme:** Auf eine Selektionsmethode umstellen, die die besten k Elemente in linearer Zeit bestimmt und erst diese Teilmenge sortiert, statt die Gesamtmenge vollständig zu sortieren.
-**Nutzen:** Reduziert die Komplexität von „M·log M“ auf „M“ bei großer Kandidatenzahl; geringer Umsetzungsaufwand, sobald 1.9 (Textsuche) bzw. die bestehende Fusion-Struktur dies zulässt.
-
----
-
-## Stufe 2 — Speicher & Struktur
-
-### 2.1 Graph: Inkrementelle Kompaktierung statt vollständigem Rebuild pro Anfrage
-**Problem:** Der Personalized-PageRank-Pfad löst bei jeder Anfrage mit Graph-Signal einen vollständigen Rebuild sämtlicher CSR-Spalten-Arrays aus, unabhängig davon, wie viele Änderungen seit dem letzten Rebuild tatsächlich aufgelaufen sind. Der Aufwand pro Anfrage skaliert damit mit der Gesamtgröße des Graphen statt mit der Menge der tatsächlichen Änderungen.
-**Maßnahme:** Kompaktierung auf ein inkrementelles Schema umstellen (append-only Delta-Segmente plus periodischer Merge im Hintergrund), sodass Traversierungen den stabilen CSR-Bestand plus ein kleines Delta lesen, statt bei jeder Anfrage neu aufzubauen.
-**Nutzen:** Entfernt einen Faktor „Gesamtgraphgröße“ aus dem Anfragepfad; hoher Aufwand, aber der wirkungsvollste strukturelle Eingriff im Graph-Layer.
-
-### 2.2 CSR-Kantenspalten: Speicherverbrauch durch Sentinel-Werte statt `Option`-Tags halbieren
-**Problem:** Mehrere Kantenspalten des Graphen sind als `Vec<Option<T>>` geführt, obwohl der zugrunde liegende Typ keine ungenutzten Bitmuster besitzt, die eine Nischenoptimierung erlauben würden. Jedes dieser Felder benötigt dadurch deutlich mehr Speicher, als für den Wertebereich nötig wäre — in Summe rund doppelt so viel Speicher pro Kante wie nötig.
-**Maßnahme:** Interne Indextypen auf einen kompakteren Ganzzahltyp umstellen, `Option`-Felder durch dedizierte Sentinel-Werte (z. B. Minimalwert des Zahlbereichs) oder Nischentypen ersetzen, bei identischer fachlicher Semantik.
-**Nutzen:** Etwa Halbierung des Speicherbedarfs pro Kante bei großen Graphen; mittlerer Aufwand, da alle Lese-/Schreibstellen der betroffenen Spalten angepasst werden müssen.
-
-### 2.3 Checkpoint-Store: Zwei Indizes unter einem gemeinsamen Lock zusammenführen
-**Problem:** Checkpoint-Metadaten werden in zwei separaten Strukturen (Sequenznummer-Index und Namens-Index) mit jeweils eigenem Lock geführt. Aktualisierungen erfolgen über mehrere unabhängige Lock-Erwerbe hintereinander; ein Leser, der über den Namen nachschlägt, kann zwischen den beiden Lookups einen inkonsistenten Zwischenzustand sehen (veraltete oder fehlende Zuordnung).
-**Maßnahme:** Beide Indizes in eine gemeinsame, unter einem einzigen Lock geführte Struktur zusammenfassen (z. B. eine Map von Namen auf Metadaten mit abgeleitetem Sequenz-Index), sodass Aktualisierung und Lookup atomar bezüglich beider Zugriffspfade sind.
-**Nutzen:** Beseitigt ein Zeitfenster für inkonsistente Checkpoint-Lookups; geringer bis mittlerer Aufwand.
-
-### 2.4 Manifest: Fsync pro Zustandsübergang statt pro Einzeleintrag
-**Problem:** Das Manifest führt aktuell für jeden einzelnen Eintrag einen eigenen `fsync` durch, auch wenn mehrere Einträge fachlich zu einem einzigen atomaren Zustandsübergang gehören (z. B. Kompaktierung mit mehreren neuen und mehreren entfernten Dateien). Das erzeugt unnötig viele synchrone Festplattenzugriffe für einen fachlich einzigen Vorgang.
-**Maßnahme:** Zusammengehörige Manifest-Änderungen in einem Batch sammeln und mit einem einzigen `fsync` pro Zustandsübergang statt pro Einzeleintrag persistieren.
-**Nutzen:** Reduziert die Anzahl synchroner I/O-Operationen bei Kompaktierung und Flush spürbar; mittlerer Aufwand, da die Aufrufstellen entsprechend gebündelt werden müssen.
-
-### 2.5 `memfuse-py` in den Cargo-Workspace aufnehmen
-**Problem:** Das Python-FFI-Crate deklariert einen eigenen, separaten Workspace und ist nicht Teil des Root-Workspace. Dadurch wird die PyO3-FFI-Grenze von `cargo build/clippy/test --workspace` nie mitgeprüft, und das Crate nutzt Pfad-Abhängigkeiten statt der geteilten Workspace-Versionen, was einen Versions-Drift bei gemeinsam genutzten Abhängigkeiten strukturell möglich macht.
-**Maßnahme:** Crate in die `members`-Liste des Root-`Cargo.toml` aufnehmen; abweichende Profileinstellungen (z. B. Panic-Verhalten für die `cdylib`) gezielt per paketspezifischem Profil erhalten.
-**Nutzen:** Stellt sicher, dass die FFI-Grenze denselben CI-Prüfungen unterliegt wie der restliche Workspace; geringer Aufwand.
-
----
-
-## Stufe 3 — Governance / Prozess
-
-### 3.1 Feature-Kombinationen in CI absichern
-**Problem:** Optionale Features (z. B. Edge-Reinforcement-Learning-Pfade und weitere Opt-in-Ausbaustufen) werden im Standard-CI-Lauf nie in Kombination gebaut, sodass nicht sichergestellt ist, dass sie überhaupt kompilieren, geschweige denn korrekt funktionieren.
-**Maßnahme:** Einen CI-Schritt ergänzen, der das Powerset der relevanten Feature-Flags baut und mindestens kompiliert (idealerweise inklusive Tests je Kombination).
-**Nutzen:** Verhindert stille Bit-Rot in selten aktivierten Codepfaden; geringer Einrichtungsaufwand, laufende CI-Zeitkosten.
-
-### 3.2 Panic-Inventar kontinuierlich pflegen
-**Problem:** Auch nach der bereits erfolgten deutlichen Reduzierung der bekannten Panic-Stellen im Produktivcode besteht das Risiko, dass neue `unwrap()`/`expect()`/`panic!()`-Aufrufe unbemerkt in produktiven Code-Pfaden landen, sofern das Gate nicht zwischen Test- und Produktivcode unterscheidet.
-**Maßnahme:** Sicherstellen, dass das bestehende Gate ausschließlich Produktivcode unter `src/` (ohne Benchmarks und Tests) zählt und eine harte Obergrenze durchsetzt, die nur sinken, nie steigen darf.
-**Nutzen:** Verhindert ein erneutes Anwachsen der bereits reduzierten Panic-Schuld; geringer Aufwand, sofern das Gate bereits die richtige Grundlage hat.
-
----
-
-## Kurzübersicht nach Aufwand/Nutzen
-
-| Sofort umsetzbar (geringer Aufwand, hoher Nutzen) | Mittelfristig (mittlerer Aufwand) | Struktureller Umbau (hoher Aufwand) |
-|---|---|---|
-| 0.1 WAL-Replay-Bounds | 1.3 Distanzpfad-Lock/Allokation | 1.1 HNSW-Nachbarformat |
-| 0.2 Bandit-Dimensionsprüfung | 1.5 AES-Schlüsselplan wiederverwenden | 1.6 MemTable Range-Sharding |
-| 0.3 Drift-Bandit-Kopplung | 1.7 Byte-basierte Cache-Kapazität | 1.9 Text-Posting-Format |
-| 0.4 Egress-Kategorisierung | 1.8 build_provenance-Struct | 2.1 Inkrementelle Graph-Kompaktierung |
-| 1.2 Backlink-Lookup | 2.2 CSR-Sentinel statt Option | |
-| 1.4 SSTable-Zero-Copy-Slice | 2.3 Checkpoint-Index-Merge | |
-| 2.5 memfuse-py in Workspace | 2.4 Manifest-Batch-Fsync | |
-| 3.1 / 3.2 Governance-Gates | 0.5 Transaktions-Intent-Status | |
-
-
-## 18. Feature-Flag-Katalog (aus Implementierungsspezifikation)
-
-### 0.3 Cargo-Feature-Katalog (crateübergreifend normativ)
-
-| Feature | Definierender Crate | Default | Wirkung |
-|---|---|---|---|
-| `docid-128` | `memfuse-core` | aus | `DocId` wird `u128` statt `u64` (§1.3) |
-| `block-cache-v2` | `memfuse-store` | aus | `SieveCacheBackend` statt `LruBlockCacheBackend` als aktives Backend (§2.4) |
-| `egress-sherman-morrison` | `memfuse-router` | aus | `ShermanMorrisonBandit` statt `DiagonalApproximation` (§10.2) |
-| `experimental-diskann` | `memfuse-index` | aus | `DiskAnnIndex` kompiliert und ist über `VectorIndexTier::DiskAnn` wählbar (§5.4) |
-| `bandit-routing` | `memfuse-router` | an | Aktiviert den Bandit-Router überhaupt |
-| `cloud-egress-guard` | `memfuse-mcp` | an | Aktiviert `egress_gateway`-Modul |
-| `wasm-sandbox` | `memfuse-mcp` | an | Aktiviert `sandbox`-Modul |
-| `kv-bridge` | `memfuse-candle` | an | Aktiviert `kv_cache_bridge`-Modul |
-| `edge-reinforcement-learning` | `memfuse-graph` | aus | Aktiviert `SignalKind::EdgeReinforcement`-Pfad |
-| `fault-injection` | `memfuse-store` | nur `dev-dependencies` | Deterministische I/O-Fehlerinjektion für Tests |
-| `loom` | `memfuse-store`, `memfuse-graph` | nur `dev-dependencies` | Aktiviert `loom::sync::*` statt `std::sync::*` hinter `#[cfg(loom)]` |
-
-
-
-## 19. Fehlertaxonomie
-
-### 19.1 Fehlertaxonomie (crateübergreifend)
+<a id="13-fehler"></a>
+## 13. Fehlertaxonomie (crateübergreifend)
 
 | Crate | Fehler-Enum | Einbettet |
 |---|---|---|
@@ -1169,6 +1843,306 @@ Die Reihenfolge der Stufen ist bindend zu verstehen: Stufe 0 blockiert bzw. gef�
 exportiert genau einen (oder wenige, klar abgegrenzte) `thiserror`-Fehlertyp(en); `memfuse-db` als oberste
 Konsumentenschicht bündelt alle Unterfehler verlustfrei per `#[from]`/`#[error(transparent)]`.
 
+```rust
+#[derive(Debug, thiserror::Error)]
+pub enum DbError {
+    #[error(transparent)] Store(#[from] memfuse_store::StoreError),
+    #[error(transparent)] Graph(#[from] memfuse_graph::GraphMutationError),
+    #[error(transparent)] Index(#[from] memfuse_index::IndexError),
+    #[error("provenance builder missing required field: {0}")]
+    ProvenanceIncomplete(&'static str),
+}
+```
+
 ---
 
-<a id="tests"></a>
+<a id="14-features"></a>
+## 14. Feature-Flag-Politik: Produktions-Default vs. Opt-in
+
+Ein Breaking-Change- oder Performance-Trade-off-Feature wird hinter einem Cargo-Feature isoliert, bis eine
+explizite Produktentscheidung den Wechsel des Defaults auslöst. Dies ist **kein Mangel**, sondern verbindliche
+Politik.
+
+| Feature-Flag | Reifegrad | Beschreibung |
+|---|---|---|
+| `cloud-egress-guard` | 🟢 | DLP/Egress-Kontrolle, Surrogat-Tokenisierung, Bulk-Exfiltration-Detektor |
+| `bandit-routing` | 🟢 | LinUCB-Grundfunktion, Lyapunov-Kopplung, gedeckelte Drift-Eskalation |
+| `egress-sherman-morrison` | 🟡 | Mathematisch korrekte Ridge-Regression; einziger Pfad mit LinUCB-Regret-Garantie |
+| `kv-bridge` | 🟢 | KV-Cache-Bridge inkl. LSM-Fallback, AES-256-GCM-SIV |
+| `wasm-sandbox` | 🟢 | Fuel- und Wall-Clock-Budget orthogonal |
+| `experimental-diskann` | 🟢 (Tier) | Native Tombstones, SQ8-Perzentil-Clipping |
+| `docid-128` | 🟡 | 128-Bit-BLAKE3-DocId, Rollout vollzogen, Default bleibt `u64` |
+| `block-cache-v2` | 🟡 | SIEVE-Backend, Default bleibt LRU |
+| `bm25f` | 🟢 | Feldgewichtete BM25-Bewertung |
+| `flatbuffers-drift-gate` (xtask) | 🟢 | CI-Gate gegen Schema-Drift |
+| `fault-injection` | 🟢 | Test-only |
+| `loom` | Dev | Nebenläufigkeits-Modelltests |
+| `adaptive-decay` / `-control` | 🟢 | Kalibrierungs-Feintuning |
+| `partial-index-rebuild` | 🟢 | Inkrementeller Indexaufbau |
+| `edge-reinforcement-learning` | 🟢 (Gate) | Kantenverstärkung als optionales Fusionsverhalten |
+| **Hyperkanten (`relate_n_ary`, `HyperEdge`)** | **🔴** | Nicht implementiert — kein Flag, siehe §6 |
+
+---
+
+<a id="15-tests"></a>
+## 15. Test- und CI-Spezifikation
+
+### 15.1 Unit-Tests
+
+Jede öffentliche Funktion mit nicht-trivialer Logik erhält mindestens:
+- einen Normalfall-Test,
+- einen Grenzfall-Test (leere Eingabe, einzelnes Element),
+- einen Fehlerfall-Test, der das korrekte `Result::Err`-Enum-Mitglied prüft (kein pauschales `is_err()`).
+
+### 15.2 Integrationstests
+
+| Testpfad | Zweck / AK |
+|---|---|
+| `crates/memfuse-graph/tests/hyperedge_persistence_survives_restart.rs` | AK-1 | <!-- doc-ref-ignore -->
+| `crates/memfuse-graph/tests/hyperedge_compact_race.rs` | AK-1 (nebenläufig zu `compact()`) | <!-- doc-ref-ignore -->
+| `crates/memfuse-graph/tests/hyperedge_memory_budget.rs` | AK-2 | <!-- doc-ref-ignore -->
+| `crates/memfuse-db/tests/signal_kind_no_new_variant.rs` | AK-4 | <!-- doc-ref-ignore -->
+| `crates/memfuse-graph/tests/hyperedge_cascade_fanout.rs` | AK-6 (High-Fan-out) | <!-- doc-ref-ignore -->
+| `crates/memfuse-graph/tests/community_hyperedges_included_flag.rs` | AK-7 | <!-- doc-ref-ignore -->
+| `crates/memfuse-graph/benches/binary_edge_regression.rs` | AK-8 (Baseline-Vergleich) | <!-- doc-ref-ignore -->
+
+### 15.3 Loom-Tests (`#[cfg(loom)]`, `loom`-Feature)
+
+| Testpfad | Zweck |
+|---|---|
+| `crates/memfuse-store/tests/loom_group_commit.rs` | Group-Commit-Atomizität |
+| `crates/memfuse-store/tests/loom_multi_key_lock.rs` | Multi-Key-Deadlockfreiheit | <!-- doc-ref-ignore -->
+| `crates/memfuse-graph/tests/loom_relate_n_ary.rs` | AK-3, Hyperkanten-Deadlockfreiheit | <!-- doc-ref-ignore -->
+
+Alle drei MÜSSEN als eigener CI-Job sichtbar grün laufen.
+
+### 15.4 `.github/workflows/merge-gate.yml` — Pflicht-Jobs
+
+```yaml
+jobs:
+  unit-tests:
+    run: cargo test --workspace
+  flatbuffers-drift-gate:
+    run: cargo run -p xtask -- check-flatbuffers-drift
+  hyperedge-schema-merge:
+    needs: [flatbuffers-drift-gate]
+    run: cargo test -p memfuse-graph --features hyperedges -- hyperedge
+  check-bandit-latency-budget:
+    run: cargo run -p xtask --features memfuse-router/egress-sherman-morrison -- check-bandit-latency-budget
+  loom-tests:
+    run: RUSTFLAGS="--cfg loom" cargo test --workspace --features loom -- --test-threads=1
+  check-unwrap-baseline:
+    run: cargo run -p xtask -- check-unwrap-baseline
+```
+
+**⚠️ Opus-Optimierung 3.1 — Feature-Kombinationen in CI (Stufe 3, gering):**
+Powerset-Build der relevanten Feature-Flags ergänzen.
+
+**⚠️ Opus-Optimierung 3.2 — Panic-Inventar (Stufe 3, gering):**
+Gate nur für `src/` (ohne Tests/Benchmarks), harte sinkende Obergrenze.
+
+---
+
+<a id="16-abnahme"></a>
+## 16. Vollständige Abnahmekriterien
+
+### 16.1 Kernsystem-Abnahmekriterien
+
+| Nr. | Kriterium | Reifegrad |
+|---|---|---|
+| K-1 | `insert_lock` vollständig durch key-granulare `kv_locks` ersetzt | 🟢 |
+| K-2 | HNSW-Hotpath nutzt unaligned-SIMD-Distanzkernel statt Heap-Allokation | 🟢 |
+| K-3 | BM25 nutzt residenten Postinglisten-Index mit Block-Max WAND | 🟢 |
+| K-4 | Block-Cache erzwingt bei Lesetreffer im Opt-in-Backend keinen Write-Lock | 🟡 |
+| K-5 | DiskANN löscht ohne HNSW-Fallback (native Tombstones) | 🟢 |
+| K-6 | Bandit-Latenzbudget CI-gated | 🟢 |
+| K-7 | `compact()` blockiert keine nebenläufigen Leser (RCU-Swap) | 🟢 |
+| K-8 | PPR proportional zur Seed-Menge, nicht zur Graphgröße (P24) | 🟢 |
+| K-9 | `build_provenance` nutzt `ProvenanceBuilder`-Struct | 🟢 |
+| K-10 | FlatBuffers-Drift-Gate aktiv | 🟢 |
+| K-11 | `SignalKind::from_name` allokationsfrei (`eq_ignore_ascii_case`) | 🟢 |
+| K-12 | BM25F produktiv nutzbar | 🟢 |
+| K-13 | KV-Cache-Bridge LSM-Fallback mit Testabdeckung für alle Kombinationen | 🟢 |
+| K-14 | Drift-Alpha gedeckelt | 🟢 |
+| K-15 | Cloud-Egress 5-Schichten produktiv, Rehydration inkl. UTF-8-Sicherheit | 🟢 |
+| K-16 | ⚖️ Bandit-Default → ShermanMorrison (sobald Gate besteht) | ⚖️ |
+| K-17 | ⚖️ Block-Cache-Default → SIEVE (sobald entschieden) | ⚖️ |
+| K-18 | ⚖️ DocId-128 als Produktions-Default (Major-Release) | ⚖️ |
+| K-19 | Group-Commit-Loom-Test sichtbar grün in CI | 🔴 |
+
+### 16.2 Hyperkanten-Abnahmekriterien AK-1 bis AK-8 (normativ und abschließend)
+
+| AK | Kriterium | Nachweis (Testpfad) |
+|---|---|---|
+| AK-1 | `HyperEdge` mit ≥3 `RoleBinding`s persistiert, restart-fest, per `hyperedges_for_entity` auffindbar, konsistent unter gleichzeitigem `compact()` | `hyperedge_persistence_survives_restart.rs`, `hyperedge_compact_race.rs` | <!-- doc-ref-ignore -->
+| AK-2 | `estimate_memory_bytes()` inkl. Hyperkanten; `compact_async`-Budget-Check greift | `hyperedge_memory_budget.rs` | <!-- doc-ref-ignore -->
+| AK-3 | Zwei gleichzeitige `relate_n_ary` mit überlappenden, unterschiedlich geordneten Mengen deadlockfrei | `loom_relate_n_ary.rs` |
+| AK-4 | `SignalKind` strukturell unverändert (kein `Hyperedge`-Signal) | `signal_kind_no_new_variant.rs` | <!-- doc-ref-ignore -->
+| AK-5 | FlatBuffers-Drift-Gate grün **vor** `HyperEdgeFb`-Merge | CI-Job-Abhängigkeit `hyperedge-schema-merge: needs: [flatbuffers-drift-gate]` |
+| AK-6 | Cascade bricht bei >1.000 Hyperkanten kontrolliert auf Hintergrundverarbeitung um | `hyperedge_cascade_fanout.rs` | <!-- doc-ref-ignore -->
+| AK-7 | `hyperedges_included` im Report sichtbar `false` ohne Projektion | `community_hyperedges_included_flag.rs` | <!-- doc-ref-ignore -->
+| AK-8 | Keine Regression auf binäre `relate()`/`Edge`-Benchmarks | `binary_edge_regression.rs` | <!-- doc-ref-ignore -->
+
+---
+
+<a id="17-optimierungen"></a>
+## 17. Priorisierte Optimierungs-Roadmap (Opus-Analyse)
+
+Die Reihenfolge der Stufen ist **verbindlich**: Stufe 0 blockiert bzw. gefährdet den Betrieb, Stufe 1 ist der
+größte Hebel für Latenz/Durchsatz, Stufe 2 betrifft Speicherverbrauch und Struktur, Stufe 3 ist Governance.
+
+### Stufe 0 — Korrektheit und Betriebssicherheit (ZUERST)
+
+| ID | Maßnahme | Problem | Aufwand |
+|---|---|---|---|
+| **0.1** | **WAL-Replay-Panic entschärfen** | Dateigröße separat von `mmap.len()`, Direktindizierung → Panic bei veränderter Datei, Crash-Loop möglich | Gering |
+| **0.2** | **Bandit-Dimensionsprüfung** | `debug_assert` statt `Result` bei Dimensionsmismatch → stilles Teil-Skalarprodukt nach Modellwechsel | Gering |
+| **0.3** | **Drift-Bandit-Kopplung verdrahten** | Drift-Wächter erkennt Verteilungsverschiebung, ruft aber Bandit-Reaktionsmethode nie auf | Gering |
+| **0.4** | **Cloud-Egress-Klassifizierung** | Egress-Methode in gleicher Policy-Kategorie wie lokale Lesezugriffe | Gering |
+| **0.5** | **Recovery-Pfad differenzieren** | Offene Intents werden pauschal vorwärts committet, egal ob Erfolg oder Abbruch | Mittel |
+
+### Stufe 1 — Hot-Path-Performance (größter Hebel)
+
+| ID | Maßnahme | Problem | Aufwand |
+|---|---|---|---|
+| **1.1** | **HNSW: Nachbarlisten ohne Allokation** | Pro Knoten eine Heap-Allokation für Adjazenzliste, größter Einzelfaktor im Suchpfad | Gering → Hoch |
+| **1.2** | **HNSW: Backlink O(1)** | Lineare Suche über Einfüge-Operationen bei Batch-Insert, quadratisch bei großen Batches | Gering |
+| **1.3** | **HNSW: Distanzpfad Lock/Allokation** | Lock auf Quantisierer pro Kandidat, Mmap-Vektor Element-für-Element dekodiert | Mittel |
+| **1.4** | **SSTable: Zero-Copy-Slice** | Vollständige Blockkopie nach CRC-Prüfung, obwohl Puffertyp Slicing unterstützt | Trivial |
+| **1.5** | **AES-Schlüsselplan wiederverwenden** | Key-Schedule-Neuaufbau pro Verschlüsselung/Entschlüsselung | Mittel |
+| **1.6** | **MemTable: Range-Sharding** | Hash-Sharding zerstört Flush-Sortierung und Präfix-Scans | Hoch |
+| **1.7** | **Block-Cache: Byte-basierte Kapazität** | Eintragsbasierte Kapazität bei variabler Blockgröße → unvorhersehbarer Speicher | Mittel |
+| **1.8** | **RRF: `build_provenance`-Struct** | 14 positionelle Parameter desselben Typs → stille Vertauschung möglich | Gering-Mittel |
+| **1.9** | **Text: Posting-Format umstellen** | Jedes Posting als Einzelschlüssel → massive Schreib-/Leseverstärkung | Hoch |
+| **1.10** | **RRF/Text: Top-k-Selektion** | Volle Sortierung statt linearer k-Selektion | Gering |
+
+### Stufe 2 — Speicher und Struktur
+
+| ID | Maßnahme | Problem | Aufwand |
+|---|---|---|---|
+| **2.1** | **Graph: Inkrementelle Kompaktierung** | PPR löst vollständigen CSR-Rebuild pro Anfrage aus | Hoch |
+| **2.2** | **CSR: Sentinel statt `Option`** | `Vec<Option<T>>` ohne Nischenoptimierung → doppelter Speicher pro Kante | Mittel |
+| **2.3** | **Checkpoint: Indizes zusammenführen** | Zwei separate Locks für Sequenz- und Namens-Index → Inkonsistenzfenster | Gering-Mittel |
+| **2.4** | **Manifest: Batch-Fsync** | Ein `fsync` pro Einzeleintrag statt pro Zustandsübergang | Mittel |
+| **2.5** | **`memfuse-py` in Workspace** | FFI-Grenze nicht von `cargo test --workspace` erfasst | Gering |
+
+### Stufe 3 — Governance und Prozess
+
+| ID | Maßnahme | Problem | Aufwand |
+|---|---|---|---|
+| **3.1** | **Feature-Kombinationen in CI** | Opt-in-Features werden nie in Kombination gebaut | Gering (Einrichtung) |
+| **3.2** | **Panic-Inventar kontinuierlich** | Gate unterscheidet nicht zwischen Test- und Produktivcode | Gering |
+
+### Kurzübersicht nach Aufwand/Nutzen
+
+| Sofort umsetzbar (gering, hoher Nutzen) | Mittelfristig (mittel) | Struktureller Umbau (hoch) |
+|---|---|---|
+| 0.1 WAL-Replay-Bounds | 1.3 Distanzpfad-Lock/Allokation | 1.1 HNSW-Nachbarformat |
+| 0.2 Bandit-Dimensionsprüfung | 1.5 AES-Schlüsselplan | 1.6 MemTable Range-Sharding |
+| 0.3 Drift-Bandit-Kopplung | 1.7 Byte-basierte Cache-Kapazität | 1.9 Text-Posting-Format |
+| 0.4 Egress-Kategorisierung | 1.8 build_provenance-Struct | 2.1 Inkrementelle Graph-Kompaktierung |
+| 1.2 Backlink-Lookup | 2.2 CSR-Sentinel statt Option | |
+| 1.4 SSTable-Zero-Copy-Slice | 2.3 Checkpoint-Index-Merge | |
+| 2.5 memfuse-py in Workspace | 2.4 Manifest-Batch-Fsync | |
+| 3.1 / 3.2 Governance-Gates | 0.5 Transaktions-Intent-Status | |
+
+---
+
+<a id="18-roadmap"></a>
+## 18. Gesamtroadmap
+
+### Stufe 0 — Unmittelbar
+
+1. **Opus-Optimierungen Stufe 0** (§17): WAL-Replay-Panic, Bandit-Dimensionsprüfung, Drift-Kopplung, Egress-Klassifizierung, Intent-Recovery.
+2. Loom-Test für Group-Commit sichtbar grün in CI (reine Verifikationslücke).
+3. Benchmark-Ausführung des Bandit-Latency-Gates mit produktivem $d$.
+
+### Stufe 1 — Strukturell
+
+4. **Opus-Optimierungen Stufe 1** (§17): HNSW-Hot-Path, SSTable, AES, MemTable, Block-Cache, Provenance, Text-Index, Fusion.
+5. **N-äre Hyperkanten** (§6), vollständig spezifiziert, Reihenfolge: H4-Nachweis → Datenmodell (§6.4) → H2 → H1 → H3 → H5 → H6 → Stern-Expansion.
+6. HNSW-Dateiformat v2 (Arena + CSR + allokationsfreie Traversierung).
+
+### Stufe 2 — Speicher, Struktur und Produktions-Default-Entscheidungen
+
+7. **Opus-Optimierungen Stufe 2** (§17): Graph-Kompaktierung, CSR-Sentinel, Checkpoint, Manifest, memfuse-py.
+8. Bandit-Default `DiagonalApproximation` → `ShermanMorrison` (⚖️ sobald Gate besteht).
+9. Block-Cache-Default LRU → SIEVE (⚖️ sobald entschieden).
+10. RaBitQ-/PQ-Evaluierung (nach HNSW v2).
+
+### Stufe 3 — Governance und Produktentscheidungen
+
+11. **Opus-Optimierungen Stufe 3** (§17): Feature-Powerset CI, Panic-Inventar.
+12. Formale ADR-Revision der Leiden-Umstellung.
+13. Major-Release-Planung: DocId-128-Cutover mit DiskANN-Tier-Vollfreigabe bündeln.
+
+### Stufe 4 — Fernziele
+
+14. Memory Consolidation (`consolidate_via_llm()`)
+15. CausalEdge
+16. Passives WAL-Shipping
+17. Vollständige `ProvenanceRecord`-API-Exposition
+18. `edge-reinforcement-learning`-Vollspezifikation
+19. Automatische NLP-Extraktion n-ärer Fakten aus Freitext
+
+---
+
+<a id="19-matrix"></a>
+## 19. Rückverfolgbarkeitsmatrix
+
+| Bereich | Reifegrad | Verweis |
+|---|---|---|
+| Key-granulare `kv_locks` statt collection-weitem Mutex | 🟢 | §5.1, §5.2a |
+| HNSW-SIMD-Hotpath (unaligned Distanzkernel, `AHashSet`-Vorallokation, `try_write()`-Pruning) | 🟢 | §7.4 |
+| SQ8-Perzentil-Clipping | 🟢 | §7.4 |
+| BM25 residenter Index + Block-Max WAND | 🟢 | §7.3 |
+| BM25F feldgewichtete Bewertung | 🟢 | §7.3 |
+| Block-Cache: klassisches LRU | 🟢 (Default) | §5.4 |
+| Block-Cache: SIEVE/S3-FIFO | 🟡 | §5.4 |
+| Sherman-Morrison-Bandit + CI-Latency-Gate | 🟡 (Opt-in) / Gate 🟢 | §8 |
+| Leiden statt Label-Propagation (binärer Pfad) | 🟢 | §7.5 |
+| RCU-Snapshot-Swap für `CsrGraph::compact()` | 🟢 | §6.3 |
+| Native DiskANN-Tombstones | 🟢 | §7.4 |
+| DocId-128-Bit-Migration (Rollout) | 🟡 | §6.1 |
+| Score-normalisierte Fusion mit RRF-Fallback | 🟡 (Opt-in) | §7.1 |
+| Forward-Push-PPR | 🟢 | §7.2 |
+| `ProvenanceBuilder`-Struktur | 🟢 | §7.6 |
+| FlatBuffers-CI-Drift-Gate | 🟢 | §12 |
+| Cloud-Egress Fünf-Schichten (Surrogat, Bulk, Rehydration) | 🟢 | §10.4 |
+| KV-Cache-Bridge LSM-Fallback-Spill | 🟢 | §9.2 |
+| Bandit-Drift-Alpha-Eskalation gedeckelt | 🟢 | §8.3 |
+| Loom-Test sichtbar grün in CI | 🔴 | §15.3 |
+| HNSW-Dateiformat v2 (Arena) | 🔴 | §7.4 |
+| RaBitQ/PQ-Quantisierung jenseits SQ8 | 🔴 | §7.4 |
+| ADR-Formalrevision (Leiden statt LPA) | 🔴 (Dokumentation) | §18 |
+| **N-äre Hyperkanten (gesamt: H1–H6, `relate_n_ary`)** | **🔴** | §6 |
+| WAL-Replay-Panic-Fix | ⚠️ Opus 0.1 | §5.3, §17 |
+| Bandit-Dimensionsprüfung | ⚠️ Opus 0.2 | §8.2, §17 |
+| Drift-Bandit-Kopplung verdrahten | ⚠️ Opus 0.3 | §8.2, §17 |
+| Egress-Klassifizierung korrigieren | ⚠️ Opus 0.4 | §10.4, §17 |
+| Intent-Recovery differenzieren | ⚠️ Opus 0.5 | §5.3, §17 |
+| HNSW-Nachbarlisten-Allokation | ⚠️ Opus 1.1 | §7.4, §17 |
+| HNSW-Backlink O(1) | ⚠️ Opus 1.2 | §7.4, §17 |
+| Distanzpfad Lock/Allokation | ⚠️ Opus 1.3 | §7.4, §17 |
+| SSTable Zero-Copy-Slice | ⚠️ Opus 1.4 | §5.5, §17 |
+| AES-Schlüsselplan wiederverwenden | ⚠️ Opus 1.5 | §9.3, §17 |
+| MemTable Range-Sharding | ⚠️ Opus 1.6 | §5, §17 |
+| Block-Cache byte-basiert | ⚠️ Opus 1.7 | §5.4, §17 |
+| `build_provenance` Struct | ⚠️ Opus 1.8 | §7.6, §17 |
+| Text-Posting-Format | ⚠️ Opus 1.9 | §7.3, §17 |
+| Top-k-Selektion | ⚠️ Opus 1.10 | §7.1, §17 |
+| Graph inkrementelle Kompaktierung | ⚠️ Opus 2.1 | §6.3, §17 |
+| CSR-Sentinel statt Option | ⚠️ Opus 2.2 | §6.3, §17 |
+| Checkpoint-Index-Merge | ⚠️ Opus 2.3 | §17 |
+| Manifest-Batch-Fsync | ⚠️ Opus 2.4 | §5, §17 |
+| `memfuse-py` in Root-Workspace | ⚠️ Opus 2.5 | §9.4, §17 |
+| Feature-Powerset CI | ⚠️ Opus 3.1 | §15.4, §17 |
+| Panic-Inventar-Gate | ⚠️ Opus 3.2 | §15.4, §17 |
+
+---
+
+*Diese finale konsolidierte Gesamtspezifikation vereinigt Produktvision, Zielarchitektur, normative
+Implementierungsvorgaben, algorithmische Spezifikationen, mikrofeingranulare Schnittstellendefinitionen
+und die priorisierte Optimierungs-Roadmap des MemFuse Cognitive OS. Sie ist in sich geschlossen und
+ersetzt alle vorherigen Einzeldokumente als maßgebliche Quelle. Künftige Änderungen erfolgen als direkte
+Überarbeitung dieses Dokuments, nicht als weiteres Delta-Dokument.*
