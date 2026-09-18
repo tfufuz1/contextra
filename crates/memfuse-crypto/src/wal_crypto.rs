@@ -239,7 +239,11 @@ impl IntegrityVerifier {
         } else if entry.op_type == 2 {
             // TxEnd
             mac.update(&[2u8]);
-            let committed = if entry.value.first().copied().unwrap_or(0) != 0 { 1u8 } else { 0u8 };
+            let committed = if entry.value.first().copied().unwrap_or(0) != 0 {
+                1u8
+            } else {
+                0u8
+            };
             mac.update(&[committed]);
         }
 
@@ -274,7 +278,11 @@ impl IntegrityVerifier {
             mac.update(&entry.key);
         } else if entry.op_type == 2 {
             // TxEnd
-            let committed = if entry.value.first().copied().unwrap_or(0) != 0 { 1u8 } else { 0u8 };
+            let committed = if entry.value.first().copied().unwrap_or(0) != 0 {
+                1u8
+            } else {
+                0u8
+            };
             mac.update(&[committed]);
         }
 

@@ -309,7 +309,10 @@ impl Wal {
             let len_bytes_slice = match slice.get(pos as usize..pos as usize + 4) {
                 Some(s) => s,
                 None => {
-                    tracing::warn!("WAL tail corruption (out of bounds length) at offset {}", pos);
+                    tracing::warn!(
+                        "WAL tail corruption (out of bounds length) at offset {}",
+                        pos
+                    );
                     break;
                 }
             };
@@ -361,7 +364,10 @@ impl Wal {
             let entry_data_raw = match slice.get(pos as usize + 4..pos as usize + 4 + len) {
                 Some(data) => data,
                 None => {
-                    tracing::warn!("WAL tail corruption (entry slice out of bounds) at offset {}", pos);
+                    tracing::warn!(
+                        "WAL tail corruption (entry slice out of bounds) at offset {}",
+                        pos
+                    );
                     break;
                 }
             };
@@ -427,15 +433,16 @@ impl Wal {
                             "Truncated inner WAL entry length in batch",
                         ));
                     }
-                    let inner_len_bytes: [u8; 4] = match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
-                        Some(b) => b,
-                        None => {
-                            return Err(MemFuseError::wal_corruption(
-                                chunk_start_pos,
-                                "Failed to extract inner WAL entry length",
-                            ));
-                        }
-                    };
+                    let inner_len_bytes: [u8; 4] =
+                        match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
+                            Some(b) => b,
+                            None => {
+                                return Err(MemFuseError::wal_corruption(
+                                    chunk_start_pos,
+                                    "Failed to extract inner WAL entry length",
+                                ));
+                            }
+                        };
                     let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
                     if inner_slice.len() < 4 + inner_len {
                         if pos >= file_size {
