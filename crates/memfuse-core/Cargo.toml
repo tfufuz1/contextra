@@ -1,5 +1,5 @@
-[lints.rust]
-unsafe_code = "forbid"
+[lints]
+workspace = true
 
 [package]
 name = "memfuse-core"

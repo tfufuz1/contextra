@@ -80,6 +80,14 @@
       "active": false,
       "expires_at": "2026-09-18T22:37:16.877731643+00:00",
       "released_at": "2026-09-18T18:54:30.559299639+00:00 [RELEASED]"
+    },
+    {
+      "krate": "lints-rollout-a",
+      "issue": "PHASE0-T4",
+      "timestamp": "2026-09-18T19:18:39.774174074+00:00",
+      "session_id": "16863457585288795557",
+      "active": true,
+      "expires_at": "2026-09-18T23:18:39.774152230+00:00"
     }
   ]
 }
