@@ -1,0 +1,22 @@
+# MemFuse Bottom-Up Verification — 2026-09-18T16:24:54+00:00
+# Modus: full | stop_on_fail=true | clippy=true
+CRATE                  CHECK    CLIPPY   TEST     ERRORS   DAUER(s)  
+memfuse-core-ipc-gen   PASS     PASS     PASS     0        1492      
+memfuse-core           PASS     PASS     PASS     0        53        
+memfuse-store          PASS     PASS     FAIL     0        61        
+memfuse-crypto         PASS     PASS     PASS     0        359       
+memfuse-text           PASS     PASS     FAIL     0        29        
+memfuse-index          PASS     FAIL     FAIL     0        52        
+memfuse-graph          PASS     PASS     FAIL     0        44        
+memfuse-checkpoint     PASS     PASS     PASS     0        29        
+memfuse-calibration    PASS     PASS     PASS     0        25        
+memfuse-sandbox        PASS     PASS     PASS     0        95        
+memfuse-db             FAIL     SKIP     SKIP     0        52        
+
+!!! memfuse-db kompiliert nicht (0 Fehler).
+!!! Granularer Report: results/20260918_162454/memfuse-db/report.md
+!!! STOP (bottom-up): Downstream-Crates werden übersprungen.
+!!! Fortsetzen nach Fix mit: ./verify_workspace.sh --resume memfuse-db
+
+Ergebnisverzeichnis: results/20260918_162454
+  - Duplicate-Symbole (pro Datei): results/20260918_162454/duplicate_symbols.txt
