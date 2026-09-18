@@ -81,6 +81,7 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/multistep.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/transaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
+| `2026-09-18T12:00:00Z` | `crates/memfuse-graph/src/csr.rs` | `AI-TAG` | `-` | `e095d708` | `OPEN` | `-` | // AI-TAG[TODO][IP-08-BUDGET-COUPLING](TS:2026-09-18T12:00:00Z)(SESSION:e095d708): Connect to global ResourceTracker when cross-crate tracker handle is integrated. |
 | `2026-09-17T17:59:57Z (SESSION: c9c5f937)` | `crates/memfuse-core/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Core types, traits, and error handling for MemFuse. |
 | `2026-09-16T21:00:00Z (SESSION: IP-07)` | `crates/memfuse-core/src/tombstone.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Trait und Referenzimplementierung für Tombstone-Semantik (IP-07 / ADR-041). |
 | `2026-09-16T16:47:30Z` | `crates/memfuse-py/src/lib.rs` | `REVIEW-PASS` | `-` | `29edb6a4` | `-` | `-` | // REVIEW-PASS[1/2] Systematischer Review der memfuse-py PyO3 FFI Bindings (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-16T16:47:30Z) (SESSION: 29edb6a4) |
@@ -318,9 +319,11 @@
 | `` | `crates/memfuse-index/benches/partial_rebuild_recall_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-JULES-16-followup: HNSW-Rebuild respektiert jetzt aktive search_at()-Snapshots via retention window / seq_log pinning. |
 | `` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `AGT-INDEX-f38b1a90` | `-` | `RESOLVED` | `0` | // AI-TAG[TEST][REGRESSION] RESOLVED: AGT-INDEX-f38b1a90 — Multi-instance fault injection isolation test. |
+| `` | `crates/memfuse-index/src/quantize_rabitq.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RaBitQ-Quantisierer (Binär-Quantisierung mit orthogonaler Rotation und Fehlerkorrektur). |
 | `` | `crates/memfuse-index/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/memfuse-index/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/memfuse-index/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/memfuse-mcp/src/bulk_exfiltration_detector.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 Bulk-Exfiltration-Detektor (Volumen/Zeitfenster pro Session) |
 | `` | `crates/memfuse-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |

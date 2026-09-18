@@ -1617,7 +1617,7 @@ impl CsrGraph {
                     max_compaction_peak_memory_mb = max_mb,
                     "compact_async deferred due to compaction memory budget constraint"
                 );
-                // TODO(IP-08-BUDGET-COUPLING): Connect to global ResourceTracker when cross-crate tracker handle is integrated.
+                // AI-TAG[TODO][IP-08-BUDGET-COUPLING](TS:2026-09-18T12:00:00Z)(SESSION:e095d708): Connect to global ResourceTracker when cross-crate tracker handle is integrated.
                 // NOTE(IP-20): Hyperedge memory contributions are included in estimate_memory_bytes() for accurate local budget checks.
                 return Ok(());
             }
@@ -4856,7 +4856,8 @@ mod tests {
         graph.insert_entity_direct(Entity::new(hub, "HubNode", "Supernode"))?;
         graph.insert_edge_direct(start, hub, 1.0).await?;
 
-        let num_neighbors = 1_000_000usize;
+        // Build 15,000 outgoing edges directly in CSR layout (exceeds MAX_VISITED_NODES = 10,000)
+        let num_neighbors = 15_000usize;
         for i in 0..num_neighbors {
             let leaf_id = EntityId::new(3 + i as u64);
             graph.insert_entity_direct(Entity::new(leaf_id, "Leaf", "Type"))?;
@@ -5180,8 +5181,8 @@ mod tests {
                     Edge::new(src, dst, "link").with_weight(0.9),
                 )
                 .await;
-                let _ = g_writer.commit(tx).await;
-                let _ = g_writer.compact_async().await;
+                g_writer.commit(tx).await.ok();
+                g_writer.compact_async().await.ok();
                 tokio::task::yield_now().await;
             }
         });
@@ -5498,10 +5499,10 @@ mod tests {
                 );
 
                 g_writer.insert_hyperedge(edge);
-                let _ = g_writer.insert_edge_direct(e1, e2, 1.0).await;
+                g_writer.insert_edge_direct(e1, e2, 1.0).await.ok();
 
                 if i % 5 == 0 {
-                    let _ = g_writer.compact_async().await;
+                    g_writer.compact_async().await.ok();
                 }
             }
         });

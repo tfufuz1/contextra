@@ -170,13 +170,10 @@ impl LsmStorage {
                 match &entry.op {
                     WalOp::Put { .. } | WalOp::Delete { .. } => {
                         let tx_id = entry.tx_id().inner();
-                        pending_tx_map
-                            .entry(tx_id)
-                            .or_default()
-                            .push(PendingTxOp {
-                                lsn: *lsn,
-                                op: entry.op.clone(),
-                            });
+                        pending_tx_map.entry(tx_id).or_default().push(PendingTxOp {
+                            lsn: *lsn,
+                            op: entry.op.clone(),
+                        });
                     }
                     WalOp::TxEnd { tx_id, committed } => {
                         let tx_raw = tx_id.inner();

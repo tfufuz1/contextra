@@ -114,17 +114,5 @@
   {
     "file": "crates/memfuse-store/src/manifest.rs",
     "hash": "ef755ef6871b8d62"
-  },
-  {
-    "file": "crates/memfuse-store/src/wal/replay.rs",
-    "hash": "003bbda7f2717e3a"
-  },
-  {
-    "file": "crates/memfuse-store/src/wal/replay.rs",
-    "hash": "69b4606da42f9ab5"
-  },
-  {
-    "file": "crates/memfuse-store/src/wal/replay.rs",
-    "hash": "9be243d03a12cad5"
   }
 ]
