@@ -1,4 +1,4 @@
-# MemFuse Cognitive OS — Finale Konsolidierte Gesamtspezifikation (Stabilisierungs-Edition)
+# MemFuse Cognitive OS — Finale Konsolidierte Gesamtspezifikation (Zielarchitektur-v2-Edition)
 
 > **Status:** Normativ · Einzige maßgebliche Quelle für Produkt, Architektur, Algorithmen,
 > Implementierungsvorgaben, Sicherheitsmodell, Schnittstellenspezifikation, Stabilisierungsphasen und
@@ -11,18 +11,34 @@
 > Spezifikationsfassungen, -deltas und separat geführten Stabilisierungspläne. **Es referenziert keine
 > externen Dokumente** — jede Aussage, die für die Arbeit an MemFuse nötig ist, steht hier.
 >
-> **Leitentscheidung dieser Fassung:** Gegenüber der Vorfassung ist dieses Dokument um **Teil A —
+> **Leitentscheidung dieser Fassung (2):** Gegenüber der Vorfassung ist dieses Dokument um **Teil A —
 > Stabilisierungsauftrag** ergänzt und in seiner Roadmap (§17, §18) komplett neu geordnet. Grund:
 > eine unabhängige Prüfung des Repository-Zustands hat gezeigt, dass Diagnose-Artefakte (Testergebnisse,
 > Lint-Reports, Audit-Dokumente) systematisch vom tatsächlichen Code-Zustand abweichen können, sobald sie
 > nicht mechanisch an einen Commit gebunden und automatisch neu erzeugt werden — mit der Folge, dass an
 > bereits gelöster Stelle weitergearbeitet und an tatsächlich offener Stelle vorbeigearbeitet wird. **Ab
-> sofort gilt: kein Feature-Ausbau, bevor Ground Truth hergestellt und das Fundament (Layer 0–2 des
-> Crate-DAG) nachweisbar stabil ist.** Teil A ist ranghöher als alle übrigen Teile dieses Dokuments; im
-> Konfliktfall gilt Teil A.
+> sofort gilt: kein Feature-Ausbau, bevor Ground Truth hergestellt und das Fundament (Ring 0–1 des
+> Crate-Graphen, vormals „Layer 0–2") nachweisbar stabil ist.** Teil A ist ranghöher als alle übrigen Teile
+> dieses Dokuments; im Konfliktfall gilt Teil A.
 >
-> **Sprache:** Rust 2021, Workspace-Layout, `#![forbid(unsafe_code)]` als Default in jedem Crate
-> ohne explizite Ausnahme (§0.4).
+> **Leitentscheidung dieser Fassung (3) — Zielarchitektur v2, ab sofort verbindlich:** Zusätzlich zu Teil A
+> ergänzt dieses Dokument **Teil A2 — Zielarchitektur v2 (Ring-Modell)** direkt im Anschluss an Teil A. Die
+> Prüfung `MEMFUSE_ZIELARCHITEKTUR.md` (v1, Basis-Commit `3f37ab30`) und ihre Korrektur
+> `MEMFUSE_ZIELARCHITEKTUR_v2.md` (Basis-Commit `806a40c1`) haben strukturelle Verstöße gegen P5 (Crate
+> `memfuse-db` hängt aufwärts von `memfuse-candle`/`memfuse-ollama`/`memfuse-embed` ab), eine unvollständige
+> Unsafe-Inventur, eine nicht funktionsfähige Lint-Mechanik (`forbid` plus Insel-`allow` verletzt Rust-Semantik,
+> E0453) sowie eine als 🟢 markierte, tatsächlich als Stub implementierte KV-Cache-Bridge belegt. **Ab sofort
+> gilt: Der bisherige Layer-0–5-Crate-DAG aus §4 (10 Crates) wird durch das in Teil A2/§4 beschriebene
+> Ring-0–4-Modell (27 Fach-Crates + 3 Tooling-Crates) ersetzt; neuer Code wird ausschließlich gegen das
+> Ring-Modell geschrieben.** Die alte Schichtdarstellung bleibt in §4 als „Vorher"-Referenz erhalten, damit
+> bestehender Code und bestehende Diskussionen zuordenbar bleiben — sie ist ab dieser Fassung **nicht mehr
+> normativ**. Teil A2 ist ranghöher als §3–§9 dieses Dokuments, soweit sie Crate-Zuschnitt, Abhängigkeitsrichtung,
+> Unsafe-Politik, Panic-Politik oder KV-Cache-Architektur betreffen; im Konfliktfall gilt Teil A2 vor Teil A
+> nachrangig, d. h. Ground-Truth-Herstellung (Teil A) hat Vorrang vor Struktur-Migration (Teil A2), aber beide
+> stehen über allen übrigen Abschnitten.
+>
+> **Sprache:** Rust 2021, Workspace-Layout, `#![forbid(unsafe_code)]` als Default in jedem Nicht-Insel-Crate
+> (drei Unsafe-Inseln, §0.4 — vormals sechs Ausnahme-Crates).
 >
 > **Lesart:** Jeder Abschnitt ist eigenständig implementierbar. Codeblöcke sind **normativ**, nicht
 > illustrativ — Feldnamen, Typnamen und Funktionssignaturen sind exakt zu übernehmen, sofern nicht
@@ -49,21 +65,28 @@
 >   übernommen, aber noch nicht gegen einen frischen CI-Lauf am aktuellen HEAD bestätigt. Jeder
 >   Contributor, der auf einen 🟢/🔴-Marker reagiert, MUSS ihn faktisch als 🔍 behandeln, bis Gate 0
 >   (§A.3) für den betroffenen Crate durchlaufen ist.
+>
+> **Korrektur durch Teil A2, verbindlich:** Der bisherige Marker 🟢 für die KV-Cache-Bridge (§9.2) war
+> **falsch** — die verifizierte Implementierung speichert nur einen Platzhalter-String und zählt einen
+> Zähler hoch, ohne echten Prefill einzusparen (§9.2, „Vorher/Jetzt"). Ab dieser Fassung gilt jeder 🟢-Marker
+> zusätzlich als widerrufen, sobald Teil A2 für den betroffenen Bereich einen belegten Gegenbefund („D#"
+> in Teil A2 §2) nennt; maßgeblich ist die Tabelle in §A2.9 (Spec-Übernahme).
 
 ---
 
 ## Inhaltsverzeichnis
 
+**A2.** [Zielarchitektur v2 — Ring-Modell, verbindlich ab sofort](#a2-zielarchitektur-v2)
 0. [Meta: Workspace-Layout und Build-Konfiguration](#0-meta)
 1. [Kernthese und Leitprinzip](#1-kernthese)
 2. [Produktvision, Alleinstellungsmerkmale und Nicht-Ziele](#2-vision)
-3. [Architekturprinzipien P1–P25](#3-prinzipien)
-4. [Systemarchitektur: der Crate-DAG](#4-architektur)
+3. [Architekturprinzipien P1–P30](#3-prinzipien)
+4. [Systemarchitektur: der Crate-Graph (Ring-Modell, vormals Crate-DAG)](#4-architektur)
 5. [Speicherschicht: LSM-Tree, WAL und Block-Cache](#5-speicher)
 6. [Wissensgraph-Datenmodell: binäre Kanten und n-äre Hyperkanten](#6-graph)
 7. [Retrieval-Pipeline: 4-Signal-Fusion und ihre Algorithmen](#7-retrieval)
 8. [Contextual-Bandit-Routing](#8-bandit)
-9. [Inferenz, KV-Cache-Bridge und Zero-Copy-IPC](#9-inferenz)
+9. [Inferenz, KV-Cache v2 und Zero-Copy-IPC](#9-inferenz)
 10. [Sicherheits- und Datenschutzmodell](#10-sicherheit)
 11. [Betriebsmodi](#11-betrieb)
 12. [FlatBuffers-Schema (vollständig)](#12-schema)
@@ -74,6 +97,98 @@
 17. [Priorisierte Optimierungs-Roadmap (Opus-Analyse)](#17-optimierungen)
 18. [Gesamtroadmap](#18-roadmap)
 19. [Rückverfolgbarkeitsmatrix](#19-matrix)
+20. [Migrationsplan v2 und ADR-Übersicht (neu)](#20-migration-v2)
+
+---
+
+<a id="a2-zielarchitektur-v2"></a>
+## Teil A2 — Zielarchitektur v2 (Ring-Modell), verbindlich ab sofort
+
+> Rang: ranghöher als §3–§9, nachrangig zu Teil A (§A.1–§A.5). Quelle: `MEMFUSE_ZIELARCHITEKTUR.md` (v1,
+> Basis `3f37ab30`) und ihre Korrekturfassung `MEMFUSE_ZIELARCHITEKTUR_v2.md` (v2, Basis `806a40c1`, ersetzt v1
+> vollständig). Kennzeichnung wie in der Quelle übernommen: **[V]** am Repo maschinell geprüft, **[D]** aus
+> Quelltext/Cargo-/rustc-Semantik abgeleitet, nicht ausgeführt, **[U]** Urteil.
+
+### A2.0 Warum diese Fassung existiert — vorher/jetzt in einem Satz
+
+**Vorher (Stand dieser Spec bis zur Vorfassung):** ein Layer-0–5-Crate-DAG mit 10 benannten Crates (§4 alt),
+`memfuse-db` als monolithische Fassade mit über 40 öffentlichen Methoden, KV-Cache-Bridge als 🟢 markiert,
+`#![forbid(unsafe_code)]` als Default mit sechs pauschalen Ausnahme-Crates, Reifegrad-Marker handgepflegt.
+**Jetzt (diese Fassung, ab sofort im Code umzusetzen):** ein Ring-0–4-Crate-Graph mit 27 Fach- plus 3
+Tooling-Crates, `memfuse-db` wird schrittweise in `engine`/`cognition`/`rank`/`adapt`/`router`/`privacy`
+zerlegt, KV-Cache auf 🔴 zurückgestuft und in drei Ausbaustufen A/B/C neu spezifiziert, genau drei benannte
+Unsafe-Inseln mit `deny`+`forbid`-Mechanik statt pauschalem `forbid`+Insel-`allow` (letzteres ist wegen E0453
+gar nicht baubar), Reifegrad-Marker sollen aus `capabilities.toml` generiert werden. Der Übergang erfolgt
+strangler-artig (§20), nicht per Big-Bang-Rewrite.
+
+### A2.1 Warum v1 nicht unverändert übernommen wird
+
+v1 (`MEMFUSE_ZIELARCHITEKTUR.md`) war architektonisch richtig ausgerichtet (Ports/Adapter, Sync-Kern,
+gestufter KV-Ausbau, generierte Spec), enthielt aber neun am Code belegte Defekte, die den direkten Weg in
+diese Spec verboten hätten. Maßgeblich ist ausschließlich v2; v1 wird hier nur referenziert, wo sie den
+historischen Ausgangspunkt einer Entscheidung erklärt.
+
+| # | Defekt in v1 | Beleg (v2) | Konsequenz in dieser Spec |
+|---|---|---|---|
+| D1 | Unsafe-Inventar unvollständig (v1: nur `simd` + mmap-Wrapper) | **[V]** Win32-ACL in `wal/io.rs` (13 unsafe), mmap in `wal/replay.rs`/`index/persistence.rs`, `mlock` in `db/volatile_vault.rs` (4), SIMD in `distance.rs` (73), Generat in `core-ipc-gen` (44) | Dritte Insel `memfuse-sys` (§0.4 neu) |
+| D2 | Lint-Mechanik `forbid` + Insel-`allow` nicht baubar | **[D]** `forbid` ist per Rust-Semantik nicht lokal überschreibbar (E0453); Cargo verbietet `[lints] workspace = true` neben eigenen `[lints.*]`-Tabellen | Workspace-`deny` + `#![forbid]` pro Nicht-Insel-Crate (§0.4 neu) |
+| D3 | `memfuse-checkpoint` fälschlich in `memfuse-store` verschmolzen gedacht | **[V]** `checkpoint` hängt nur an `core`/`StorageEngine`, nicht an `store`; eigener globaler Zustand (`ORPHAN_REGISTRY`) muss entfernt werden | `checkpoint` bleibt eigenes Ring-1-Crate, ohne globalen Zustand |
+| D4 | `memfuse-core`-Zerlegung im Migrationsplan unvollständig | **[V]** `core` = 10.353 LOC; `tx_buffer`, `seq_log`, `snapshot` u. a. waren v1 nicht zugeordnet | Neues Ring-0-Crate `memfuse-mvcc` |
+| D5 | Kennzahlen (async fn, Panic-Stellen) enthielten Testcode, waren 3–20× zu hoch | **[V]** echte Prod-Zahlen deutlich kleiner (§A2 unten, Migrationsplan) | Aufwandsschätzung Phase 2/Panic-Politik nach unten korrigiert |
+| D6 | `indexing_slicing = deny` workspace-weit geplant | **[V]** ≈ 640 Index-/Slice-Ausdrücke in Hot-Paths | `deny` nur an Parsing-Grenzen, sonst `warn` + `debug_assert!` |
+| D7 | Plan sah `deny.toml` „neu anlegen" vor | **[V]** `deny.toml` existiert bereits seit `81edd9af` (Lizenzen, Quellen, Bans) | Erweitern statt neu anlegen |
+| D8 | Prüfbefehl `cargo check --workspace` sollte Netzfreiheit belegen | **[D]** `--workspace` ignoriert `default-members`; Netzfreiheit kommt von der `onnx-bench`-Feature-Trennung | Exit-Kriterien in §20 korrigiert |
+| D9 | KV-Optionen unvollständig (Toleranz, Speicherebene, dtype ungeklärt) | **[D]** `ModelWeights` ist `Clone`; naives Spillen großer KV-Blöcke in eine LSM-Engine ist ein Fehlgriff (Write-Amplifikation) | KV in drei Stufen A/B/C, siehe §9 |
+
+### A2.2 Entfallende, neue und unveränderte Crates gegenüber der Vorfassung
+
+**Entfallen als eigenständige Crates** (gehen in die Ring-Struktur auf, Re-Export mit `#[deprecated]` während
+der Strangler-Phase, §20): `memfuse-core`, `memfuse-core-ipc-gen`, `memfuse-checkpoint` *(bleibt de facto
+erhalten, siehe D3 — nur die v1-Fusionsidee entfällt)*, `memfuse-calibration`, `memfuse-router` *(bleibt
+erhalten, wird nur schlanker)*, `memfuse-embed`, `memfuse-candle`, `memfuse-ollama`, `memfuse-db`.
+
+**Neu:** `memfuse-types`, `memfuse-ports`, `memfuse-mvcc`, `memfuse-wire` (vormals `core-ipc-gen`),
+`memfuse-sys`, `memfuse-simd` (vormals Teil von `memfuse-index`), `memfuse-vector` (vormals `memfuse-index`),
+`memfuse-rank` (vormals Teil von `memfuse-db` + `memfuse-calibration`), `memfuse-adapt` (vormals Teil von
+`memfuse-router` + `memfuse-db`), `memfuse-kvcache` (vormals Teil von `memfuse-crypto` + `memfuse-candle`),
+`memfuse-infer-candle`/`-ollama`/`-onnx` (vormals `memfuse-candle`/`-ollama`/`-embed`), `memfuse-engine`,
+`memfuse-cognition`, `memfuse-privacy` (vormals Teile von `memfuse-crypto` + `memfuse-mcp`), `memfuse`
+(neue, einzige Fassade/Composition Root).
+
+**Unverändert im Zuschnitt, nur ggf. intern angepasst:** `memfuse-store`, `memfuse-crypto` (schlanker, ohne
+Egress-Vault/KV-Segment, die nach `privacy`/`kvcache` wandern), `memfuse-text`, `memfuse-graph`,
+`memfuse-sandbox`, `memfuse-agent`, `memfuse-mcp`, `memfuse-py`, `memfuse-bench`, `xtask`.
+
+Vollständige Ring-Landkarte, Abhängigkeitsmatrix und Herkunftszuordnung: §4. Migrationsreihenfolge: §20.
+
+### A2.3 Leitprinzipien-Delta gegenüber §3 (P1–P25)
+
+Details und vollständiger Wortlaut der fünf neuen Prinzipien P26–P30 sowie der Δ-Änderungen an P5/P6/P9/P10/P11
+stehen in §3 selbst. Zusammengefasst: Sync-Kern wird erzwungen statt empfohlen (P26), Ports werden `dyn`-kompatibel
+konstruiert statt nativem AFIT (P27), Nichtdeterminismus-Quellen werden injiziert statt implizit genutzt (P28),
+globaler veränderlicher Zustand ist verboten (P29), jeder Crate-Zuschnitt braucht ein explizites Kriterium
+I/U/C/S/D (P30).
+
+### A2.4 Offene, noch nicht entschiedene Punkte (bewusst nicht in dieser Fassung präjudiziert)
+
+Diese Punkte sind **keine** stillschweigenden Annahmen, sondern explizit offene Entscheidungen, die vor dem
+jeweiligen Migrationsschritt (§20) einen Product-Owner-Beschluss oder einen Spike mit Exit-Kriterium brauchen:
+
+1. **ADR-N06 (Konsistenzmodell):** 2PC mit Intent-Keys härten (Option A) oder auf WAL-als-einzige-Wahrheit mit
+   abgeleitetem, per `applied_lsn` nachholendem Zustand umstellen (Option B, empfohlen, §4.3 der Quelle). Braucht
+   ein vom Product Owner genanntes Recovery-Zeit-Ziel, bevor der Spike (Phase 3a) freigegeben wird.
+2. **KV-Ambition:** nur Stufe A (RAM, Upstream-`ModelWeights::clone()`, kein Fork) oder A+B+C (eigenes
+   Llama-Modell mit `KvState`, optional Platten-Spill)? Stufe A liefert bereits Nutzen ohne Fork-Risiko;
+   B/C werden erst nach Messung an Stufe A entschieden (§9.2).
+3. **`DocId`-Migration (ADR-N05):** Umstieg auf externes 128-Bit-`DocId` mit internem dichten `DocIdx(u32)`
+   ändert das Persistenzformat (WAL v2, v1 bleibt lesbar). Akzeptanz dieses Formatbruchs ist offen, gekoppelt
+   an die Entscheidung zu ADR-N06.
+4. **Crate-Anzahl:** 27 Fach- + 3 Tooling-Crates werden vorläufig akzeptiert. Zeigt `cargo build --timings`
+   nach Phase 3 keinen Parallelitätsgewinn, ist eine Konsolidierung (`adapt`→`rank`, `mvcc`→`types`) offen.
+
+Diese vier Punkte dürfen **nicht** durch Weiterarbeit am Code stillschweigend entschieden werden; jede
+Umsetzung, die eine dieser Fragen präjudiziert, braucht vorab die zugehörige ADR (§20.3) im Status
+„beschlossen".
 
 ---
 
@@ -82,16 +197,59 @@
 
 ### 0.1 Verzeichnisstruktur
 
+**Jetzt (verbindlich ab dieser Fassung, Ring-Modell — Zielzustand, wird strangler-artig gemäß §20 erreicht):**
+
 ```
 memfuse/
-├── Cargo.toml                      # [workspace], resolver = "2"
-├── xtask/                          # CI-Tooling (Drift-Gates, Benchmarks)
+├── Cargo.toml                      # [workspace], resolver = "2", default-members ohne infer-onnx
+├── xtask/                          # CI-Tooling (Drift-Gates, Layering, Benchmarks; Ziel < 3k LOC)
 │   └── src/
 │       ├── main.rs
 │       ├── check_flatbuffers_drift.rs
 │       └── check_bandit_latency_budget.rs
 ├── schemas/
 │   └── memfuse.fbs                 # §12
+├── crates/
+│   ├── memfuse-types/              # Ring 0 — IDs, TxId, TenantId, Fingerprint, Filter-AST, Budgets
+│   ├── memfuse-ports/              # Ring 0 — Traits: StorageRead/Write, VectorIndex, TextIndex, GraphIndex, Embedder, Clock, Rng, IdGen, MetricsSink
+│   ├── memfuse-mvcc/               # Ring 0 — SeqLog, SnapshotRegistry, TxBuffer (loom-getestet)
+│   ├── memfuse-wire/               # Ring 0 — FlatBuffers-Generat + Adapter (vormals core-ipc-gen), Unsafe-Insel
+│   ├── memfuse-sys/                # Ring 0 — mmap, mlock, Win32-ACL, Unsafe-Insel (neu, §A2 D1)
+│   ├── memfuse-simd/               # Ring 0 — Distanzkernel, Laufzeit-Dispatch, Unsafe-Insel
+│   ├── memfuse-crypto/             # Ring 0 — Schlüsselhierarchie, AEAD, WAL-HMAC-Kette, Deletion-Proof, Zeroize
+│   ├── memfuse-vector/             # Ring 0 — HNSW, DiskANN, Quantisierung (vormals memfuse-index)
+│   ├── memfuse-text/               # Ring 0 — BM25/BM25F, deutsche Morphologie
+│   ├── memfuse-graph/              # Ring 0 — CSR, PPR, Leiden, Hyperkanten
+│   ├── memfuse-rank/               # Ring 0 — 4-Signal-Fusion, Isotonic/Platt-Kalibrierung, Drift
+│   ├── memfuse-adapt/              # Ring 0 — Bandit, Lyapunov, PID, Homeostat, Decay (Clock/Rng injiziert)
+│   ├── memfuse-store/              # Ring 1 — LSM-Tree, WAL (Group-Commit, HMAC), MVCC-Pin
+│   ├── memfuse-kvcache/            # Ring 1 — Prefix-Radix-Baum, KV-Blöcke, Tiering, AEAD, Segmentdateien
+│   ├── memfuse-checkpoint/         # Ring 1 — Time-Travel-Registry gegen Port StorageEngine, ohne Global-State
+│   ├── memfuse-infer-candle/       # Ring 2 — GGUF, eigenes Llama-Modell mit KvState (Stufe B)
+│   ├── memfuse-infer-ollama/       # Ring 2 — HTTP-Backend, Contextual-Chunk-Prefixing
+│   ├── memfuse-infer-onnx/         # Ring 2 — ort, Cross-Encoder; NICHT in default-members
+│   ├── memfuse-sandbox/            # Ring 2 — WASM-Isolation, Fuel + Wall-Clock; implementiert ToolSandbox
+│   ├── memfuse-engine/             # Ring 3 — Collection, Transaktionen, RetrievalPlanner, Ingestion, ComputePool
+│   ├── memfuse-cognition/          # Ring 3 — Consolidation, Synthese, Kompaktierung, Scheduler
+│   ├── memfuse-privacy/            # Ring 3 — Egress-Gateway, PII-Vault, DLP, GuardedPayload
+│   ├── memfuse-router/             # Ring 3 — SLM-Profil-Routing, MCP-Dispatch (schlank, keine Numerik mehr)
+│   ├── memfuse-agent/              # Ring 3 — Workflow-Engine, Audit, DLQ
+│   ├── memfuse/                    # Ring 4 — Fassade, Builder, einzige Composition Root
+│   ├── memfuse-mcp/                # Ring 4 — stdio-JSON-RPC, Protokoll, Tool-Wiring
+│   ├── memfuse-py/                 # Ring 4 — PyO3, eigene Runtime, catch_unwind
+│   ├── memfuse-testkit/            # Tooling — Fault-VFS, ManualClock, In-Memory-StorageEngine
+│   └── memfuse-bench/              # Tooling — Benchmark-Harness
+├── benchmarks/
+│   └── memfuse-bench/
+├── .github/workflows/
+│   └── merge-gate.yml              # §15.4
+└── docs/decisions/                 # ADR-0NN-*.md, siehe §20.3 für N01–N10
+```
+
+**Vorher (Fassung bis zur Vorgängerversion dieser Spec, Layer-0–5-Modell — nicht mehr normativ, siehe §4 „Vorher"):**
+
+```
+memfuse/
 ├── crates/
 │   ├── memfuse-core-ipc-gen/       # Layer 0 — FlatBuffers-generierter Code
 │   ├── memfuse-core/               # Layer 0 — Kerntypen, Traits, Fehlerbehandlung
@@ -108,18 +266,78 @@ memfuse/
 │   ├── memfuse-ollama/             # Layer 3 — Ollama-Client, Contextual-Chunk-Prefixing
 │   ├── memfuse-embed/              # Layer 3 — ONNX-Embeddings, Cross-Encoder (optional)
 │   ├── memfuse-agent/              # Layer 3 — Persistente Agent-Workflow-Engine
-│   ├── memfuse-py/                 # Layer 3 — Python-FFI via PyO3 (eigener Workspace)
+│   ├── memfuse-py/                 # Layer 3 — Python-FFI via PyO3 (eigener Workspace, war real nur Member)
 │   ├── memfuse-sandbox/            # Layer 6.5 — WASM Execution Boundary
 │   ├── memfuse-mcp/                # Layer 4 — MCP-Server, Egress-Gateway
 │   └── memfuse-bench/              # Layer 5 — Benchmark-Harness
-├── benchmarks/
-│   └── memfuse-bench/
-├── .github/workflows/
-│   └── merge-gate.yml              # §15.4
-└── docs/decisions/                 # ADR-0NN-*.md
 ```
 
+Grund der Ablösung, Zuordnung alt→neu je Crate und Migrationsreihenfolge: §A2.2, §4, §20.
+
 ### 0.2 Root-`Cargo.toml` (normativ)
+
+**Jetzt:** Werte werden **aus dem realen Manifest generiert** (P12/§A2.3), nicht mehr handgepflegt — Grund:
+die Vorfassung enthielt vier unbelegte Werte (`rust-version`, `license`, `flatbuffers`, `thiserror`), die am
+Code widerlegt sind (§A2.1, D8-Nachbarbefund). Bis der Generator (§20, Phase 5) steht, gelten die verifizierten
+Ist-Werte als normativ, ergänzt um die neu beschlossenen Workspace-Lints und das `release-abort`-Profil:
+
+```toml
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+default-members = [ "crates/*" ]     # ohne memfuse-infer-onnx / --features onnx-bench (§A2.1 D8)
+exclude = ["xtask"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.89"                # vorher fälschlich als 1.79 spezifiziert
+license = "MIT OR Apache-2.0"        # vorher fälschlich als "Apache-2.0" spezifiziert
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+flatbuffers = "24.3"                 # vorher fälschlich als "23" spezifiziert
+crossbeam-epoch = "0.9"
+arc-swap = "1"
+ahash = "0.8"
+scc = "2"
+quick_cache = "0.5"
+zerocopy = "0.7"
+thiserror = "2"                      # vorher fälschlich als "1" spezifiziert
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+aes-gcm-siv = "0.11"
+blake3 = "1"
+wasmtime = "25"
+
+# Neu ab dieser Fassung (§A2, §4.2 der Zielarchitektur-Quelle):
+[workspace.lints.rust]
+unsafe_code = "deny"                 # bewusst "deny", nicht "forbid" — s. Begründung unten
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+[profile.release]
+panic = "unwind"                     # Root bleibt unwind — vorher "abort" (widersprach memfuse-py, §A2.1)
+
+[profile.release-abort]
+inherits = "release"
+panic = "abort"                      # nur für Binaries ohne FFI, per Paket ausgewählt
+```
+
+**Warum `deny` statt `forbid` für `unsafe_code` (verbindliche Korrektur, §A2.1 D2):** `forbid` ist in Rust
+nicht lokal überschreibbar (Compiler-Fehler E0453); ein Versuch, `#![forbid(unsafe_code)]` workspace-weit zu
+setzen und in den drei Unsafe-Inseln (§0.4) per `#[allow(unsafe_code)]` zu durchbrechen, baut nicht. Stattdessen
+gilt: Workspace-Lint ist `deny`; jeder Nicht-Insel-Crate setzt zusätzlich in seiner `lib.rs` explizit
+`#![forbid(unsafe_code)]` (das ist zulässig, weil die Workspace-Stufe nur `deny` ist); jede Insel setzt
+`#![allow(unsafe_code)]`. Ein Inventar-Test erzwingt, dass kein weiterer Crate `allow(unsafe_code)` trägt
+(§0.4, `tests/unsafe_islands.rs`).
+
+**Vorher (nicht mehr normativ):**
 
 ```toml
 [workspace]
@@ -134,65 +352,90 @@ license = "Apache-2.0"
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 flatbuffers = "23"
-crossbeam-epoch = "0.9"
-arc-swap = "1"
-ahash = "0.8"
-scc = "2"
-quick_cache = "0.5"
-zerocopy = "0.7"
 thiserror = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
-aes-gcm-siv = "0.11"
-blake3 = "1"
 wasmtime = "23"
+# ... (gekürzt, siehe Git-Historie dieses Dokuments)
 ```
+
+`xtask` ist ab dieser Fassung kein Workspace-Member mehr (`exclude`), sondern ein eigenständiges Cargo-Projekt,
+damit CI-Tooling-Abhängigkeiten nicht in `cargo tree --workspace` erscheinen (Grundlage für den
+`cargo tree`-basierten Netzfreiheits- und Bans-Test, §20 Phase 0R).
 
 ### 0.3 Cargo-Feature-Katalog (crateübergreifend normativ)
 
-| Feature | Definierender Crate | Default | Wirkung |
-|---|---|---|---|
-| `docid-128` | `memfuse-core` | aus | `DocId` wird `u128` statt `u64` (§6.1) |
-| `block-cache-v2` | `memfuse-store` | aus | `SieveCacheBackend` statt `LruBlockCacheBackend` als aktives Backend (§5.4) |
-| `egress-sherman-morrison` | `memfuse-router` | aus | `ShermanMorrisonBandit` statt `DiagonalApproximation` (§8.2) |
-| `experimental-diskann` | `memfuse-index` | aus | `DiskAnnIndex` kompiliert und ist über `VectorIndexTier::DiskAnn` wählbar (§7.5) |
-| `bandit-routing` | `memfuse-router` | an | Aktiviert den Bandit-Router überhaupt |
-| `cloud-egress-guard` | `memfuse-mcp` | an | Aktiviert `egress_gateway`-Modul |
-| `wasm-sandbox` | `memfuse-mcp` | an | Aktiviert `sandbox`-Modul |
-| `kv-bridge` | `memfuse-candle` | an | Aktiviert `kv_cache_bridge`-Modul |
-| `edge-reinforcement-learning` | `memfuse-graph` | aus | Aktiviert `SignalKind::EdgeReinforcement`-Pfad |
-| `fault-injection` | `memfuse-store` | nur `dev-dependencies` | Deterministische I/O-Fehlerinjektion für Tests |
-| `loom` | `memfuse-store`, `memfuse-graph` | nur `dev-dependencies` | Aktiviert `loom::sync::*` statt `std::sync::*` hinter `#[cfg(loom)]` |
-| `bm25f` | `memfuse-text` | an | Feldgewichtete BM25-Bewertung |
-| `adaptive-decay` / `-control` | `memfuse-db` | an | Kalibrierungs-Feintuning |
-| `partial-index-rebuild` | `memfuse-index` | an | Inkrementeller Indexaufbau |
+**Politik ab dieser Fassung (P5/§A2.3):** Additive Features nur noch für **schwere optionale Abhängigkeiten**
+(onnx, cuda, metal, wasmtime). **Keine typverändernden Features mehr** — `docid-128` entfällt ersatzlos
+(ADR-N05, §20.3); Verhalten wird über Laufzeitkonfiguration statt Compile-Time-Flags gesteuert, wo immer das
+ohne Typenwechsel möglich ist. Der Katalog wird perspektivisch aus den Crate-Manifesten generiert (P12); bis
+dahin gilt die folgende, an den Ring-Zuschnitt angepasste Tabelle als normativ:
+
+| Feature | Definierender Crate (jetzt) | Definierender Crate (vorher) | Default | Wirkung |
+|---|---|---|---|---|
+| ~~`docid-128`~~ | — (entfällt) | `memfuse-core` | — | **Entfällt** (ADR-N05): typverändernde Features sind verboten; externes 128-Bit-`DocId` mit internem dichten `DocIdx(u32)` ist eine offene Entscheidung (§A2.4 Nr. 3), keine Compile-Time-Option |
+| `block-cache-v2` | `memfuse-store` | `memfuse-store` | aus | `SieveCacheBackend` statt `LruBlockCacheBackend` (§5.4) |
+| `egress-sherman-morrison` | `memfuse-adapt` | `memfuse-router` | aus | `ShermanMorrisonBandit` statt `DiagonalApproximation` (§8.2) |
+| `experimental-diskann` | `memfuse-vector` | `memfuse-index` | aus | `DiskAnnIndex` über `VectorIndexTier::DiskAnn` wählbar (§7.5) |
+| `bandit-routing` | `memfuse-adapt` | `memfuse-router` | an | Aktiviert den Bandit-Router überhaupt |
+| `cloud-egress-guard` | `memfuse-privacy` | `memfuse-mcp` | an | Aktiviert `egress_gateway`-Modul (im Manifest der Vorfassung real nicht vorhanden, wird mit dem Umzug nach `privacy` nachgezogen) |
+| `wasm-sandbox` | `memfuse-sandbox` | `memfuse-mcp` | an | Aktiviert die Sandbox; `memfuse-sandbox` ist bis zur Anbindung an einen Konsumenten aus `default-members` ausgeschlossen (§A2.2, Waisen-Crate) |
+| `kv-bridge` | `memfuse-kvcache` | `memfuse-candle` | **aus** | Aktiviert Stufe B/C (§9.2); Stufe A ist kein Feature, sondern Default-Verhalten sobald `memfuse-infer-candle` aktiv ist. War in der Vorfassung fälschlich als „an" mit 🟢-Status dokumentiert, obwohl der Code ein Stub war (§A2.1) |
+| `edge-reinforcement-learning` | `memfuse-graph` | `memfuse-graph` | aus | Aktiviert `SignalKind::EdgeReinforcement`-Pfad |
+| `fault-injection` | `memfuse-testkit` | `memfuse-store` | nur `dev-dependencies` | Deterministische I/O-Fehlerinjektion; wandert in den neuen Tooling-Crate `memfuse-testkit` |
+| `loom` | `memfuse-mvcc`, `memfuse-graph` | `memfuse-store`, `memfuse-graph` | nur `dev-dependencies` | `loom::sync::*` statt `std::sync::*` hinter `#[cfg(loom)]` |
+| `bm25f` | `memfuse-text` | `memfuse-text` | an | Feldgewichtete BM25-Bewertung |
+| `adaptive-decay` / `-control` | `memfuse-cognition` | `memfuse-db` | an | Kalibrierungs-Feintuning |
+| `partial-index-rebuild` | `memfuse-vector` | `memfuse-index` | an | Inkrementeller Indexaufbau |
+| `onnx-bench` | `memfuse-bench` | — (v1 erzwang `onnx` hart) | aus | Einzige Stelle, die `memfuse-infer-onnx`/`ort` in einen Benchmark-Build zieht; bereits umgesetzt (§A2.1 D8) |
 
 ### 0.4 Globale Compile-Time-Regeln
 
-Jeder Crate erhält in `lib.rs` genau eine der beiden folgenden Kopfzeilen:
+**Jetzt (verbindlich, §A2.1 D1/D2 — löst den Mechanismus der Vorfassung vollständig ab):** Es gibt **genau
+drei** Unsafe-Inseln, nicht sechs. Jeder Nicht-Insel-Crate erhält in `lib.rs`:
 
 ```rust
 #![forbid(unsafe_code)]
 ```
 
-oder, **ausschließlich** in den folgenden Crates, mit dokumentierter Begründung:
+Das ist zulässig, weil die Workspace-Lint-Stufe (§0.2) nur `deny` ist, nicht `forbid` — ein pauschaler
+Workspace-`forbid` mit lokalem `allow` in den Inseln, wie er in der Vorfassung beschrieben war, kompiliert
+wegen E0453 nicht und wurde deshalb verworfen.
 
-| Crate | Begründung für `#![deny(unsafe_code)]` |
-|---|---|
-| `memfuse-index` | SIMD-Hardware-Optimierungen (AVX2, AVX-512, NEON) und Read-only Memory-Mapped Index I/O (ADR-017/ADR-034) |
-| `memfuse-store` | Win32-DACL/ACL-File-Permission-Enforcement (`#[cfg(windows)]`) |
-| `memfuse-db` | RAM-Buffer Memory-Locking gegen OS-Swapping (`mlock`/`munlock`, feature-gated `volatile-vault`) |
-| `memfuse-embed` | C-FFI zum ONNX-Runtime-Backend (feature-gated) |
-| `memfuse-core-ipc-gen` | Automatisch generierter FlatBuffers-IPC-Code |
-| `memfuse-router` | SIMD-Intrinsics für Sherman-Morrison-Matrixarithmetik (§8.2) |
+| Insel (jetzt) | Begründung | Herkunft / Vorher |
+|---|---|---|
+| `memfuse-simd` | Distanzkernel mit Laufzeit-Dispatch (AVX2, AVX-512, NEON), Längenprüfung im safe Wrapper, `OnceLock<fn>`-Dispatch, Proptest gegen skalares Orakel je Stufe, Miri nur für den skalaren Pfad | vorher: `memfuse-index` (SIMD **und** mmap in einem Topf) |
+| `memfuse-sys` (**neu**, §A2.1 D1) | `ReadOnlyMap` (mmap), `LockedBuf` (`mlock`/`munlock`/`VirtualLock`), Owner-only-ACL (Win32); Verträge safe gekapselt (`Deref<Target=[u8]>` für Mmap; Zeroize-vor-`munlock`-Drop-Guard für `LockedBuf`) | vorher verteilt und **unvollständig erfasst** in `memfuse-store` (Win32-ACL), `memfuse-index` (mmap), `memfuse-db` (`mlock`, `volatile_vault`) — die Vorfassung nannte hierfür fälschlich `memfuse-store`, `memfuse-db` und `memfuse-index` als *drei separate* Ausnahmen statt einer gemeinsamen Insel |
+| `memfuse-wire` | FlatBuffers-Generat: `#![allow(unsafe_code, clippy::unwrap_used)]` auf Crate-Ebene, weil flatc-generierter Code `unwrap` für Felder mit Default erzeugt; bestehendes Drift-Gate `check_flatbuffers_drift` bleibt | vorher: `memfuse-core-ipc-gen` |
 
-Jeder Crate erhält zusätzlich:
+**Entfallen als Unsafe-Ausnahme (0 `unsafe` verifiziert, §A2.1 D1):** `memfuse-router`/`memfuse-adapt`
+(Sherman-Morrison-Arithmetik ist in Safe Rust implementiert, keine Intrinsics) und `memfuse-embed`/
+`memfuse-infer-onnx` (die C-FFI-Grenze zu `ort` liegt außerhalb des Crates in der `ort`-Bibliothek selbst).
+`memfuse-db` entfällt als Ausnahme-Crate, weil `mlock` in die neue Insel `memfuse-sys` wandert.
+
+**Erzwingung:** `tests/unsafe_islands.rs` (Workspace-Root) prüft (a) das Schlüsselwort `unsafe` kommt nur in
+`memfuse-sys`, `memfuse-simd`, `memfuse-wire` vor, (b) jede Nicht-Insel-`lib.rs` enthält `forbid(unsafe_code)`,
+(c) `allow(unsafe_code)` steht nur in den drei Inseln. Bis Migrationsphase 1c (§20) gilt eine explizit
+benannte Übergangsliste mit Datei:Zeile-Angaben für `memfuse-vector`, `memfuse-store`, `memfuse-db` (Feature
+`volatile-vault`) und `memfuse-wire` — diese Ausnahme ist befristet, nicht dauerhaft.
+
+Jeder Crate erhält zusätzlich workspace-weit (§0.2, `[workspace.lints.clippy]`):
 
 ```rust
-#![deny(clippy::unwrap_used, clippy::expect_used)]
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::todo, clippy::unimplemented)]
 ```
 
-mit einer versionierten Ausnahmeliste `.unwrap-baseline.json` im Crate-Root, die in CI gegen Neuvorkommen
-geprüft wird (Ratchet: die Datei darf nur schrumpfen, nie wachsen — CI-Job `check-unwrap-baseline`).
+**Vorher:** eine versionierte Ausnahmeliste `.unwrap-baseline.json` im Crate-Root plus CI-Ratchet
+(`check-unwrap-baseline`), der nur schrumpfen durfte. **Jetzt:** Der Ratchet entfällt ersatzlos (§20 Phase
+0R: `xtask/{unwrap_ratchet, check_unwrap_ratchet, check_unwrap_baseline_trend}.rs` werden gelöscht); die
+verifizierte Zahl produktiver `unwrap`/`expect`/`panic`-Stellen liegt bei ca. 11 (Store 1, DB/Engine 1,
+Crypto 3, Candle/Infer 1, Core/Types 1, Text 1, Py 3), diese werden im selben Umbau-PR behoben, in dem der
+Lint scharf geschaltet wird — kein Ratchet, kein Übergangszustand mit offener Ausnahmeliste. `xtask` selbst
+erhält befristet ein `#![allow]`, bis es in Phase 5 unter 3.000 Zeilen reduziert ist.
+
+**`indexing_slicing` (neu, §A2.1 D6):** entgegen einem ursprünglich erwogenen workspace-weiten `deny` (das an
+≈ 640 Hot-Path-Ausdrücken gescheitert wäre) gilt `deny` nur an klar benannten Parsing-/Decode-Grenzen
+(`store/wal/{replay,encode}`, `store/sstable`-Decode, `memfuse-wire`, `memfuse-mcp/protocol`,
+`memfuse-text/tokenizer`); in den rechenintensiven Kernen gilt `warn` plus `debug_assert!` am
+Schleifeneintritt, `get_unchecked` ist ausschließlich in `memfuse-simd` zulässig.
 
 ### 0.5 Non-Obvious Decisions (systemweit bindend)
 
@@ -307,9 +550,12 @@ des Kernprodukts.
 ---
 
 <a id="3-prinzipien"></a>
-## 3. Architekturprinzipien P1–P25
+## 3. Architekturprinzipien P1–P30
 
-Diese Prinzipien sind normativ für jede gegenwärtige und künftige Erweiterung des Systems.
+Diese Prinzipien sind normativ für jede gegenwärtige und künftige Erweiterung des Systems. **P1–P25 sind aus
+der Vorfassung unverändert übernommen** und gelten fort. **P26–P30 sind ab dieser Fassung neu** (Quelle: Teil
+A2, `MEMFUSE_ZIELARCHITEKTUR_v2.md` §2). Zusätzlich ändert Teil A2 die **Anwendung** von P5 und P8–P22 auf
+Crate-Ebene (siehe die Δ-Vermerke unten), ohne ihren Wortlaut zu ändern.
 
 **P1 — Korrektheit schlägt Performance schlägt Feature.** Siehe §1.
 
@@ -321,7 +567,13 @@ in das Write-Ahead-Log geschrieben und mit dem Datenträger synchronisiert wurde
 **P4 — Keine stillschweigende I/O-Fehlerunterdrückung.** `fsync`-Fehler IMMER mit `?` propagieren.
 
 **P5 — Strikte DAG-Modularität.** Abhängigkeiten im Crate-Graphen verlaufen strikt abwärts; ein Verstoß
-gilt als Architekturdefekt.
+gilt als Architekturdefekt. **Δ (verbindliche Korrektur, §A2.1):** In der Vorfassung war dieses Prinzip
+dokumentiert, aber am realen Crate `memfuse-db` (Layer 2) nachweislich verletzt — es hing hart von
+`memfuse-candle`/`memfuse-ollama` (Layer 3) und optional von `memfuse-embed` (Layer 3) ab, weil
+`EmbeddingBackend` samt Konstruktion in `memfuse-db` lag. Ab dieser Fassung wird P5 **maschinell** erzwungen
+(`tests/layering.rs` gegen `cargo_metadata`, plus `deny.toml`-Bans mit `wrappers`-Liste, §4.2 unten), nicht
+mehr nur dokumentiert. Reihenfolge und Richtung sind jetzt die Ring-Matrix in §4.2 (Ring-Modell), nicht mehr
+die alte Layer-Tabelle.
 
 **P6 — Feingranulare Fehlerbehandlung.** Domänenspezifische `Result<T, E>`-Enums statt generischer `panic!`-Pfade.
 
@@ -345,6 +597,41 @@ und für das harte Fan-out-Limit der Hyperkanten-Cascade-Invalidierung (§6.5, H
 Möglichkeit keinen exklusiv sperrenden, mutierenden Zugriff erfordern, da Cache-Treffer der mit Abstand häufigste
 Zugriffspfad sind und jede darin verborgene Schreibsperre unter Last zur Kontention wird (§5.4).
 
+### Neu ab dieser Fassung: P26–P30 (Teil A2)
+
+**P26 — Sync-Kern, async-Schale.** Ring 0 (`memfuse-types` … `memfuse-adapt`) enthält kein `tokio`. Kerne sind
+Zustandsautomaten ohne I/O; die Engine (Ring 3) treibt Persistenz und bindet Kerne per begrenztem `ComputePool`
+an. **Vorher/Jetzt:** Die Vorfassung empfahl Sync-Kerne als wünschenswert, ohne Ursache zu benennen; verifiziert
+ist, dass die tatsächliche Ursache heutiger `async fn` in den Kernen zweierlei ist — native AFIT-Ports (nicht
+`dyn`-kompatibel) und I/O-Aufrufe direkt in den Kernmodulen (`graph/csr.rs`, `text/inverted.rs`,
+`index/diskann.rs`), nicht Rechenlogik. Die Migration trennt daher zuerst die Ports (P27), dann das I/O (§4.1
+der Quelle), bevor Kerne als synchron gelten dürfen. Erzwingung: `cargo tree -e normal -p memfuse-{vector,text,graph,rank,adapt}` ohne `tokio`.
+
+**P27 — Ports sind `dyn`-kompatibel per Konstruktion.** Traits in `memfuse-ports` sind synchron, wo das
+Blockierverhalten ohnehin durch `mmap`/`pread` gegeben ist (`StorageRead`, `VectorIndex`, `TextIndex`,
+`GraphIndex`); wo echtes asynchrones Warten nötig ist (`StorageWrite::commit`, `Embedder::embed`), liefern sie
+`BoxFuture` statt natives `async fn`, weil natives AFIT nicht objektsicher ist. Grund: die Engine muss Backends
+zur Laufzeit als `Arc<dyn Trait>` austauschen können (Composition Root, §4.5).
+
+**P28 — Injizierter Nichtdeterminismus.** `Clock`, `Rng`, `IdGen` sind Ports, niemals direkte Aufrufe von
+`SystemTime::now()`/`rand::thread_rng()` in Kern- oder Persistenzcode. `memfuse-testkit` liefert
+`ManualClock` und eine In-Memory-`StorageEngine` für deterministische Simulationstests (WAL/LSM-Crash-Injektion,
+§20 Phase 3a) und `loom`-Lock-Protokoll-Tests. **Δ gegenüber Vorfassung:** `memfuse-testkit` entsteht bereits
+in Migrationsphase 0R, nicht erst nachträglich — Determinismus-Infrastruktur geht der Sync-Migration voraus,
+nicht hinterher.
+
+**P29 — Kein globaler veränderlicher Zustand.** `static OnceLock`/`Lazy` sind ausschließlich für unveränderliche
+Konstanten zulässig (Regex, Stopwortlisten). Veränderlicher Zustand gehört immer einer Instanz. **Grund:**
+verifiziert wurde ein globaler `static ORPHAN_REGISTRY: OnceLock` in `checkpoint/orphan.rs` sowie ein als
+`unimplemented!()` spezifizierter globaler `static CIPHER_INSTANCE` (§9.3) — beide widersprechen der
+Schlüssel- bzw. Registry-Hierarchie und werden im Zuge der Migration entfernt (§20 Phase 1c bzw. §9).
+
+**P30 — Jeder Crate-Zuschnitt braucht ein Kriterium.** Ein Crate existiert nur, wenn er mindestens eines
+erfüllt: **I** Isolation einer flüchtigen Abhängigkeit (candle, ort, wasmtime, pyo3, reqwest) · **U**
+Unsafe-Insel · **C** eigener Änderungsrhythmus/Bounded Context · **S** Größe > 8.000 LOC (Compile-Parallelität)
+· **D** Richtungserzwingung (z. B. Composition Root). Crates ohne erfülltes Kriterium werden zusammengelegt.
+Die vollständige Kriterienzuordnung für alle 27+3 Crates steht in §4.2.
+
 ### Ergänzende Grundsätze
 
 - **Nebenläufigkeitssicherheit vor Nebenläufigkeitsperformance:** Sperrenhierarchien werden explizit dokumentiert
@@ -364,27 +651,108 @@ Zugriffspfad sind und jede darin verborgene Schreibsperre unter Last zur Kontent
 ---
 
 <a id="4-architektur"></a>
-## 4. Systemarchitektur: der Crate-DAG
+## 4. Systemarchitektur: der Crate-Graph (Ring-Modell, vormals Crate-DAG)
 
-MemFuse gliedert sich in einen mehrschichtigen Rust-Workspace. Abhängigkeiten verlaufen strikt abwärts; eine
-Abhängigkeit, die gegen die Schichtrichtung verstößt, gilt als Architekturdefekt, nicht als Stilfrage.
+> **Status dieses Abschnitts:** Der Layer-0–5-Crate-DAG (unten unter „4.0 Vorher" archiviert) ist **nicht mehr
+> normativ**. Ab dieser Fassung gilt das in §4.2 beschriebene Ring-0–4-Modell aus Teil A2 als verbindlich. Der
+> Umbau erfolgt strangler-artig gemäß §20, nicht per Big-Bang — bis ein Migrationsschritt abgeschlossen ist,
+> existiert der jeweilige alte Crate als `#[deprecated]`-Re-Export.
+
+### 4.0 Vorher: der Layer-0–5-Crate-DAG (archiviert, nicht mehr normativ)
+
+MemFuse gliederte sich bis zur Vorfassung in einen mehrschichtigen Rust-Workspace mit zehn benannten Crates.
+Abhängigkeiten sollten strikt abwärts verlaufen; **verifiziert wurde jedoch, dass diese Regel selbst verletzt
+war** (§A2.1, P5-Δ) — der wichtigste Grund für die Ablösung durch das Ring-Modell.
 
 | Layer | Crates | Verantwortung |
 |---|---|---|
 | **0** | `memfuse-core-ipc-gen`, `memfuse-core` | FlatBuffers-generierter IPC-Code; Kerntypen (`DocId`, `EntityId`, `TxId`, `ConfigFingerprint`), Traits, Fehlerbehandlung. |
-| **1** | `memfuse-store` (LSM-Tree-Storage, WAL, Block-Cache), `memfuse-index` (HNSW/DiskANN-Vektorindex, SIMD-Distanz), `memfuse-text` (BM25/BM25F-Volltextindex, deutsche Morphologie), `memfuse-crypto` (AES-256-GCM-SIV, KV-Segment-Security, Deletion-Proof-Kette), `memfuse-graph` (CSR-Graph, PathRAG, Forward-Push-PPR, Leiden-Community-Detection, Hyperkanten), `memfuse-checkpoint` (Snapshotting), `memfuse-calibration` (Score-Kalibrierung, Drift-Erkennung) | Persistenz- und Indexierungs-Primitive. Keine Kenntnis voneinander außerhalb dieser Schicht. |
-| **2** | `memfuse-db` | Öffentliche `Collection`-API, 4-Signal-Fusion, Multi-Step-Query-Engine, Kontext-Kompaktierung, Provenance-Tracking. Konsumiert alle Layer-1-Crates. |
-| **3** | `memfuse-ollama` (Ollama-Client, Contextual-Chunk-Prefixing), `memfuse-candle` (natives GGUF-Inferenz-Backend, KV-Cache-Bridge), `memfuse-embed` (ONNX-Embeddings, Cross-Encoder-Reranking, feature-gated), `memfuse-agent` (persistente Agent-Workflow-Engine), `memfuse-router` (Contextual-Bandit-Routing), `memfuse-py` (Python-FFI via PyO3, eigener Cargo-Workspace) | Inferenz-Backends und Anwendungslogik oberhalb der Datenschicht. |
-| **4** | `memfuse-mcp` (MCP-Server, Sandbox, Cloud-Egress-Gateway), `memfuse-sandbox` (WASM Execution Boundary) | Externe Schnittstelle für Agenten (stdio-JSON-RPC). |
-| **5** | `memfuse-bench` | Reproduzierbarer Benchmark-Harness für Retrieval-Genauigkeit und Latenz. |
+| **1** | `memfuse-store`, `memfuse-index`, `memfuse-text`, `memfuse-crypto`, `memfuse-graph`, `memfuse-checkpoint`, `memfuse-calibration` | Persistenz- und Indexierungs-Primitive. Sollten einander laut Spec nicht kennen — real hingen `store` und `index` beide von `crypto` ab, `candle` von `store` (§A2.1, „§4 Tabelle" widerlegt). |
+| **2** | `memfuse-db` | Öffentliche `Collection`-API, 4-Signal-Fusion, Multi-Step-Query-Engine, Kontext-Kompaktierung, Provenance-Tracking. Real: 26,7k LOC, > 40 öffentliche Methoden, bündelte mehrere Bounded Contexts (Datenebene, Retrieval, Kognition, Ingestion, `volatile_vault`) und hing **aufwärts** von `candle`/`ollama`/`embed` ab. |
+| **3** | `memfuse-ollama`, `memfuse-candle`, `memfuse-embed`, `memfuse-agent`, `memfuse-router`, `memfuse-py` | Inferenz-Backends und Anwendungslogik. `memfuse-router` war laut Spec reine Bandit-Mathematik; real enthielt er zusätzlich SLM-Profil-Routing, MCP-Dispatch und Type-State-Egress-Schutz. |
+| **4** | `memfuse-mcp`, `memfuse-sandbox` | Externe Schnittstelle für Agenten. `memfuse-sandbox` war real ein Waisen-Crate ohne Konsumenten. |
+| **5** | `memfuse-bench` | Benchmark-Harness. Erzwang real ein hartes `onnx`-Feature und zog dadurch Netzwerk-Downloads in jeden `--workspace`-Build. |
+
+Diese Tabelle wird ausschließlich zur Einordnung bestehenden Codes und bestehender Diskussionen (Issues, PRs,
+ADRs vor dieser Fassung) aufbewahrt. Für neue Arbeit gilt ab sofort §4.2.
 
 ### 4.1 Safety-First-Doktrin
 
-Safe Rust ist der Standard; `#![forbid(unsafe_code)]` gilt per Default und wird nur in einer geschlossenen,
-dokumentierten Ausnahmeliste durchbrochen — jeweils mit einem `// SAFETY:`-Beweiskommentar direkt am Code, der die
-Invarianten (insbesondere Pointer-Alignment) beweist (siehe §0.4 für die vollständige Ausnahmeliste).
+Safe Rust ist der Standard; `#![forbid(unsafe_code)]` gilt per Default in jedem Nicht-Insel-Crate. **Jetzt: drei**
+namentlich benannte Unsafe-Inseln (`memfuse-sys`, `memfuse-simd`, `memfuse-wire`) mit `#![allow(unsafe_code)]`
+auf Crate-Ebene und `// SAFETY:`-Beweiskommentar an jeder Stelle (§0.4). **Vorher** waren es sechs pauschal
+benannte Ausnahme-Crates mit einer Mechanik (`forbid` + lokales `allow`), die wegen E0453 nicht kompilierbar
+gewesen wäre (§A2.1, D2) — dieser Fehler wird mit dieser Fassung korrigiert, nicht fortgeschrieben.
 
-### 4.2 Trait-Eindeutigkeit und Modul-Governance (⚠️ Opus-Optimierung 2.6, Stufe 2, mittel)
+### 4.2 Ring-Modell (Zielarchitektur v2, verbindlich)
+
+**Leitprinzipien:** siehe §3, P26–P30, sowie P1–P25 unverändert. **Warum diese Schnitte:** (a) reine Trennung
+gegen I/O, (b) Unsafe-Isolation, (c) flüchtige Abhängigkeiten (candle, ort, wasmtime, pyo3, reqwest) als
+Blätter, (d) Bounded Contexts, geprüft gegen das Kriterium I/U/C/S/D (P30). Die Anzahl der Crates ist kein
+Ziel für sich — sie ist eine Konsequenz der Kriterien, mit einer offenen Konsolidierungsoption (§A2.4 Nr. 4).
+
+| Ring | Crate | Inhalt | Herkunft (vorher) | Kriterium (P30) |
+|---|---|---|---|---|
+| **0** (sync, kein `tokio`) | `memfuse-types` | IDs (`DocId`, `DocIdx`, `TxId`, `TenantId`), `ModelFingerprint`, Filter-AST, Budgets, Importance, `ErrorClass`, Schema-Versionen, Tombstone-Semantik | `memfuse-core` (Teilmenge `types`) | D |
+| | `memfuse-ports` | Traits (P27): `VectorIndex`/`TextIndex`/`GraphIndex`/`StorageRead` (sync), `StorageWrite`/`Embedder`/`TextGenerator`/`KvPrefixStore`/`ToolSandbox` (async, `BoxFuture`), `Clock`/`Rng`/`IdGen`/`MetricsSink`/`DriftStatusProvider` | `memfuse-core` (Teilmenge `traits`), `memfuse-db::DriftStatusProvider` | D |
+| | `memfuse-mvcc` **(neu)** | `SeqLog`, `SnapshotRegistry`, `TxBuffer`; loom-getestet | `memfuse-core` (`seq_log`, `snapshot`, `tx_buffer` — in der Vorfassung des Migrationsplans nicht zugeordnet, §A2.1 D4) | C, D |
+| | `memfuse-wire` | FlatBuffers-Generat und Adapter, Unsafe-Insel | `memfuse-core-ipc-gen` | U |
+| | `memfuse-sys` **(neu)** | `ReadOnlyMap` (mmap), `LockedBuf` (mlock/VirtualLock), Owner-only-ACL (Win32), Unsafe-Insel | verteilt über `memfuse-store`, `memfuse-index`, `memfuse-db` (§0.4) | U |
+| | `memfuse-simd` | Distanzkernel, Laufzeit-Dispatch, Unsafe-Insel | `memfuse-index` (`distance.rs`) | U |
+| | `memfuse-crypto` | Schlüsselhierarchie, AEAD, WAL-HMAC-Kette, Deletion-Proof, Zeroize, Anti-Tamper | `memfuse-crypto` (verschlankt: Egress-Vault und KV-Segment wandern nach `privacy`/`kvcache`) | C |
+| | `memfuse-vector` | HNSW, DiskANN, Quantisierung | `memfuse-index` | S, C |
+| | `memfuse-text` | BM25/BM25F, Morphologie | `memfuse-text` | C |
+| | `memfuse-graph` | CSR, PPR, Leiden, Hyperkanten | `memfuse-graph` | S, C |
+| | `memfuse-rank` | 4-Signal-Fusion, Isotonic/Platt-Kalibrierung, Drift | `memfuse-db::fusion`, `memfuse-calibration` | C |
+| | `memfuse-adapt` | Bandit, Lyapunov, PID, Homeostat, Decay; `Clock`/`Rng` injiziert (P28) | `memfuse-router` (Bandit/Lyapunov-Teil), `memfuse-calibration::pid`, `memfuse-db` (Decay/Homeostat/PID) | C |
+| **1** (Persistenz, async an I/O-Grenzen erlaubt) | `memfuse-store` | WAL (Group-Commit, HMAC-Kette), LSM, MVCC-Pin | `memfuse-store` | S, C |
+| | `memfuse-kvcache` **(neu)** | Prefix-Radix-Baum, KV-Blöcke, Tiering, AEAD, Segmentdateien (§9) | `memfuse-crypto::kv_segment`, `memfuse-candle::kv_bridge` | C |
+| | `memfuse-checkpoint` | Time-Travel-Registry gegen Port `StorageEngine`, ohne globalen Zustand | `memfuse-checkpoint` (Global-State `ORPHAN_REGISTRY` entfernt, P29) | C, D |
+| **2** (Blätter, flüchtige Abhängigkeiten) | `memfuse-infer-candle` | GGUF, eigenes Llama-Modell mit `KvState` (§9, Stufe B) | `memfuse-candle` | I |
+| | `memfuse-infer-ollama` | HTTP-Backend, Contextual-Chunk-Prefixing | `memfuse-ollama` | I |
+| | `memfuse-infer-onnx` | `ort`, Cross-Encoder; aus `default-members` ausgeschlossen | `memfuse-embed` | I |
+| | `memfuse-sandbox` | WASM-Isolation, Fuel- und Wall-Clock-Budget; implementiert `ToolSandbox` | `memfuse-sandbox` (bislang Waisen-Crate, jetzt an `memfuse-agent`/`memfuse-mcp` angebunden) | I |
+| **3** (Anwendungskern) | `memfuse-engine` | Collection, Transaktionen, `RetrievalPlanner`, Ingestion, Export/Import, `ComputePool` | `memfuse-db` (Datenebene) | S, C |
+| | `memfuse-cognition` | Consolidation, Synthese, Kompaktierung, Scheduler | `memfuse-db` (Kontrollebene) | C |
+| | `memfuse-privacy` | Egress-Gateway, PII-Vault, DLP, `GuardedPayload`, Prompt-Injection-Filter | `memfuse-crypto::egress_vault`, `memfuse-mcp::egress_gateway`, `memfuse-router::guarded_payload` | C |
+| | `memfuse-router` | SLM-Profil-Routing, MCP-Dispatch (schlank; **keine** Numerik mehr — die wandert nach `adapt`) | `memfuse-router` (Rest nach Abzug von `adapt`) | C |
+| | `memfuse-agent` | Workflow-Engine, Audit, DLQ | `memfuse-agent` | C |
+| **4** (Ränder) | `memfuse` **(neu)** | Fassade, Builder, **einzige Composition Root** | `memfuse-db` (Fassaden-Anteil) | D |
+| | `memfuse-mcp` | stdio-JSON-RPC, Protokoll, Tool-Wiring | `memfuse-mcp` | C |
+| | `memfuse-py` | PyO3, eigene Runtime, `catch_unwind` | `memfuse-py` | I |
+| **Tooling** | `memfuse-testkit` **(neu)**, `memfuse-bench`, `xtask` | Fault-VFS, `ManualClock`, In-Memory-`StorageEngine` (P28); Benchmarks; CI-Tooling (Ziel < 3.000 LOC) | `memfuse-bench`, `xtask` | — |
+
+**Entfallen als eigenständige Crates:** `memfuse-core`, `memfuse-core-ipc-gen`, `memfuse-calibration`,
+`memfuse-embed`, `memfuse-candle`, `memfuse-ollama`, `memfuse-db` (nach Abschluss der Strangler-Phase, §20).
+**Löschkandidat, vor Löschung zu prüfen:** `memfuse-core/types/saos.rs` (707 LOC, nur intern referenziert).
+
+### 4.3 Abhängigkeitsmatrix (löst die alte Layer-Reihenfolge ab)
+
+```
+Ring 0  → Ring 0 in Reihenfolge  types → {ports, mvcc, wire, sys, simd, crypto} → {vector, text, graph, rank, adapt}
+          Kerne (vector, text, graph, rank, adapt) kennen einander nicht; Kommunikation nur über types/ports/mvcc.
+Ring 1  → Ring 0. Kein Ring-1-Crate hängt von einem anderen Ring-1-Crate ab.
+Ring 2  → types, ports (+ crypto für Fingerprints). Niemals Ring 1 oder 3.
+Ring 3  → Ring 0, Ring 1, Ports von Ring 2 (nie deren konkrete Crates).
+          Interne Ordnung: privacy < engine < {cognition, router, agent}.
+Ring 4  → alles.
+dev-Kanten → nur memfuse-testkit und Crates desselben oder tieferen Rings.
+```
+
+**Erzwingung (verbindlich ab Migrationsphase 1a, Warnmodus in Phase 0R, §20):**
+1. `tests/layering.rs` (Workspace-Root, `cargo_metadata`) prüft alle Kantentypen (normal, build, dev,
+   target-spezifisch) gegen die Matrix.
+2. `deny.toml` (bestehende Datei **erweitern**, nicht neu anlegen — §A2.1 D7) erhält `[[bans.deny]]`-Einträge
+   mit `wrappers`-Listen für `tokio` (verboten außerhalb Ring 1+), `candle-core`, `ort`, `wasmtime`, `pyo3`,
+   `reqwest` (je genau ein erlaubtes Blatt-Crate). `wrappers` begrenzt nur direkte Abhängige; transitives
+   Einschleppen prüft eine `cargo tree`-Assertion in CI zusätzlich.
+3. `tests/unsafe_islands.rs` (§0.4).
+
+### 4.4 Trait-Eindeutigkeit und Modul-Governance (⚠️ Opus-Optimierung 2.6, Stufe 2, mittel) — historischer Befund, Crate-Zuordnung aktualisiert
+
+**Hinweis:** Der folgende Befund wurde am vormaligen `memfuse-core/src/traits/` erhoben. Nach der Migration
+(§20, Phase 1b) liegt dieses Verzeichnis in `memfuse-ports`; die Maßnahmen gelten unverändert für den neuen
+Ort. Der Befund selbst bleibt hier unverändert dokumentiert, damit er nicht verloren geht.
 
 **Problem:** `memfuse-core/src/traits/` enthält zehn Dateien; `mod.rs` deklariert nur fünf. Vier Dateien
 (`graph_index.rs`, `lifecycle.rs`, `text_index.rs`, `vector_index.rs`) sind dadurch **nie kompiliert** und
@@ -1602,54 +1970,95 @@ Kriterium < 5 % der medianen LLM/SLM-Inferenzlatenz. `DiagonalApproximation` ble
 ---
 
 <a id="9-inferenz"></a>
-## 9. Inferenz, KV-Cache-Bridge und Zero-Copy-IPC
+## 9. Inferenz, KV-Cache v2 und Zero-Copy-IPC
 
-### 9.1 Zero-Copy-Eviction-Bridge (🟢)
+> **Statuskorrektur, verbindlich (§A2.1):** Die KV-Cache-Bridge war in jeder Vorfassung dieser Spec als 🟢
+> markiert. Eine Verifikation am Code (`candle/inference.rs:485`) hat ergeben, dass `generate_with_context`
+> nur `format!("kv_cache_tensor:…")` als Platzhalter-„Tensor" ablegt, ein Treffer lediglich einen Zähler
+> (`prefill_skip_count`) erhöht, ohne dass tatsächlich Prefill-Rechenzeit eingespart wird, und `generate()`
+> in jedem Fall den vollständigen Text neu verarbeitet. **Der Status wird hiermit korrigiert auf 🔴** — die
+> KV-Cache-Bridge ist spezifiziert, im Code nicht vorhanden, und bleibt 🔴, bis der in §9.2 genannte
+> Golden-Test grün ist.
+
+### 9.1 Zero-Copy-Eviction-Bridge (🟢, unverändert)
 
 Durchgehende Zero-Copy-Datenpipeline auf Basis von `Bytes` und Mmap. FlatBuffers erlaubt direktes Auslesen
-aus `&[u8]` ohne Heap-Allokation.
+aus `&[u8]` ohne Heap-Allokation. Diese Eigenschaft ist von der KV-Cache-Neuspezifikation unberührt.
 
-### 9.2 KV-Cache-Bridge mit LSM-Fallback-Spill (🟢)
+### 9.2 KV-Cache v2 (🔴, ersetzt §9.2 der Vorfassung vollständig)
+
+**Vorher (nicht mehr normativ — Grund für die Ablösung siehe Statuskorrektur oben):** eine `KvCacheBridge`
+mit `scc::HashMap<SessionId, EncryptedKvSegment>` als RAM-Tier und `memfuse_store::LsmStore` als
+Fallback-Spill; `EncryptedKvSegment` mit `rope_offset` pro Segment. Diese Skizze existierte nur in der Spec,
+nicht im Code, und ist außerdem architektonisch problematisch (siehe „Warum kein LSM-Spill" unten).
+
+**Jetzt: drei Ausbaustufen, deklariert über `KvReusePolicy`, Crate `memfuse-kvcache` (Ring 1).**
+
+**Fakten aus der Verifikation (§A2, `MEMFUSE_ZIELARCHITEKTUR_v2.md` §5.1):**
+- Upstream (`candle-transformers 0.11.0`, `quantized_llama.rs`): KV ist pro Layer privat
+  (`Option<(Tensor, Tensor)>`); jeder Schritt kopiert per `Tensor::cat` (O(n) je Layer und Token);
+  `index_pos == 0` verwirft den Cache; Keys werden nach RoPE gecacht; Werte sind F32, weil `QMatMul` F32
+  liefert. `LayerWeights.kv_cache` ist **privat**; öffentlich sind nur `forward` und `clear_kv_cache`.
+- Größenordnung (Beispiel Llama-3.2-3B, 28 Layer, 8 KV-Köpfe, head_dim 128): 224 KiB/Token, ein 16-Token-Block
+  ≈ 3,5 MiB, 2048 Token ≈ 448 MiB. Ein 2-GiB-RAM-Budget hält damit ≈ 4 gleichzeitige Prompts bei F32.
+- **Warum kein LSM-Spill (Korrektur gegenüber der „Vorher"-Skizze):** KV-Blöcke sind Megabyte-groß. Eine
+  Leveled-Compaction-LSM-Engine schreibt Werte dieser Größe mehrfach um (Größenordnung 10×,
+  konfigurationsabhängig) — das ist Write-Amplifikation ohne Gegenwert. Persistenz für KV-Blöcke erfolgt
+  stattdessen über **append-only Segmentdateien** in `memfuse-kvcache` (Header, Prüfsumme, AEAD; Index wird
+  beim Start aus den Segment-Headern aufgebaut). Die LSM-Engine (`memfuse-store`) trägt höchstens Metadaten.
+
+| Stufe | Inhalt | Modell | Persistenz | Gate vor Produktions-Default |
+|---|---|---|---|---|
+| **A** | In-RAM-Prefix-Reuse per `ModelWeights::clone()` nach Prefill an Segmentgrenzen (System-Prompt, Kontextsegmente); Gewichte/KV-Tensoren teilen sich per `Arc`, `cat` erzeugt neue Tensoren | Upstream unverändert, kein Fork | keine | Logit-Vergleich Clone vs. Neuberechnung (bitgleich erwartet bei gleicher Batch-Form) |
+| **B** | Eigenes Llama-Modell (Fork von `quantized_llama.rs`, Lizenz vorab prüfen) mit erstklassigem `KvState`: `truncate`, `export_block`, `import_block`; Radix-Baum, Copy-on-Write, Referenzzählung; RAII-Guards geben Blöcke bei `Drop` zurück (cancel-sicher) | eigenes Modell, an Upstream-Logits verifiziert | RAM | Golden-, Property- (Export→Import identisch), Cancellation-Test |
+| **C** | Spill in T2: verschlüsselte Segmentdateien, AEAD mit AAD aus Tenant/Fingerprint/Token-Hash/Positionsbereich; Löschen per Crypto-Shredding des Tenant-Schlüssels | eigenes Modell (B) | Platte | Isolations- und Crash-Test der Segmente |
+
+**Entscheidungsstatus (offen, §A2.4 Nr. 2):** Stufe A liefert bereits Nutzen ohne Fork-Risiko und ist der
+nächste konkrete Schritt. Ob B/C gebaut werden, entscheidet sich erst nach Messung von A — das ist keine
+Verzögerung, sondern eine bewusste Sequenzierung, damit die Fork-Wartungslast (Risiko Nr. 2, §A2.4) nicht
+ungeprüft eingegangen wird.
 
 ```rust
-pub struct KvCacheBridge {
-    ram_cache: scc::HashMap<SessionId, EncryptedKvSegment>,
-    lsm_fallback: memfuse_store::LsmStore,
-    cipher_worker: CipherWorkerHandle,
+// memfuse-ports — Vertrag, gilt ab Stufe B
+pub struct PrefixKey {
+    pub model: ModelFingerprint,
+    pub tokenizer_hash: [u8; 32],
+    pub layout: KvLayout,   // n_layer, n_kv_head, head_dim, dtype
+    pub rope: RopeConfig,  // base, scaling
 }
 
-pub struct EncryptedKvSegment {
-    pub ciphertext: Vec<u8>,
-    pub rope_offset: u32,
-    pub model_fingerprint: [u8; 32],
+pub trait KvPrefixStore: Send + Sync {
+    /// Längster exakt passender Prefix in Blöcken; kein Treffer ist kein Fehler.
+    fn lookup(&self, tenant: TenantId, key: &PrefixKey, tokens: &[u32]) -> Option<KvPrefixHit>;
+    fn insert(&self, tenant: TenantId, key: &PrefixKey, tokens: &[u32], blocks: Vec<KvBlock>) -> Result<(), KvError>;
 }
 
-impl KvCacheBridge {
-    pub fn get(&self, session: SessionId, model_fingerprint: [u8; 32])
-        -> Result<Option<KvCache>, KvBridgeError>
-    {
-        if let Some(seg) = self.ram_cache.get(&session) {
-            if seg.model_fingerprint != model_fingerprint {
-                return Err(KvBridgeError::FingerprintMismatch);
-            }
-            return Ok(Some(self.decrypt(seg)));
-        }
-        self.load_from_lsm_fallback(session)
-    }
-}
+// memfuse-infer-candle — KV wird erstklassig, nicht privat (Stufe B)
+pub struct KvState { layers: Vec<LayerKv>, pos: usize }
+pub struct LayerKv { k: Tensor, v: Tensor }   // Keys nach RoPE, wie im Upstream-Modell
 
-#[derive(Debug, thiserror::Error)]
-pub enum KvBridgeError {
-    #[error("rope offset mismatch")]
-    RopeOffsetMismatch,
-    #[error("model fingerprint mismatch")]
-    FingerprintMismatch,
+impl KvState {
+    pub fn truncate(&mut self, pos: usize);
+    pub fn export_block(&self, range: Range<usize>) -> Result<KvBlock, InferError>;
+    pub fn import_block(&mut self, block: &KvBlock) -> Result<(), InferError>;
 }
 ```
 
-**Testpflicht:** Alle vier Kombinationen: RAM-Hit, RAM-Miss/LSM-Hit, beide-Miss, Fingerprint-Mismatch.
+**Golden-Test-Kriterium (verschärft gegenüber der Vorfassung):** Die feste Toleranz 1e-4 aus der ursprünglichen
+Zielarchitektur-Prüfung entfällt — quantisierte Kernel liefern bei unterschiedlicher Batch-Form (Prefill n
+gegen m + Rest) nicht zwingend bitgleiche Summen. Stattdessen gilt: (i) identische Greedy-Tokenfolge über ein
+festes Prompt-Set (≥ 200 Prompts × 64 Token); (ii) `max |Δlogit| ≤ 2 ×` gemessene Run-to-Run-Varianz des
+Upstream-Modells. Zusätzlich: Tenant-Isolationstest (kein Teilen von Blöcken über Tenants oder Modelle hinweg
+— sonst verrät Cache-Hit-Timing fremde Prompts), Cancellation-Test (Abbruch mitten im Prefill gibt alle
+Blöcke zurück).
 
-### 9.3 AES-Schlüsselplan-Wiederverwendung
+**Metrik-Korrektur (Sofortmaßnahme, unabhängig vom Stufenausbau):** `prefill_skip_count` zählt derzeit jeden
+Cache-„Treffer" auf den Platzhalter hoch, obwohl kein Prefill übersprungen wird. Dieser Zähler wird korrigiert,
+bevor er in Dashboards oder Abnahmekriterien verwendet wird (§20, Phase 0R).
+
+### 9.3 AES-Schlüsselplan-Wiederverwendung — globaler Zustand entfernt (P29)
+
+**Vorher (nicht mehr normativ):**
 
 ```rust
 use aes_gcm_siv::Aes256GcmSiv;
@@ -1660,22 +2069,45 @@ static CIPHER_INSTANCE: OnceLock<Aes256GcmSiv> = OnceLock::new();
 pub fn cipher() -> &'static Aes256GcmSiv { unimplemented!() }
 ```
 
-**⚠️ Opus-Optimierung 1.5 — AES-Schlüsselplan (Stufe 1, mittel):**
-Cipher-Instanz einmalig pro Schlüssel aufbauen und wiederverwenden. Schlüsselrotation über gezielten Austausch.
+Dieser Entwurf verstößt gegen P29 (kein globaler veränderlicher Zustand, §3): ein einzelner globaler Cipher
+kann nicht pro Tenant/Schlüssel rotiert werden und widerspricht der in `memfuse-crypto` beschriebenen
+Schlüsselhierarchie.
 
-### 9.4 Layer-3-Crates
+**Jetzt (verbindlich):** Die Cipher-Instanz wird **pro Schlüssel** im `KeyManager` (Instanzzustand, nicht
+`static`) gecacht und thread-safe über `OnceCell`-Felder wiederverwendet:
 
-- **`memfuse-ollama`:** `OllamaClient::generate(prompt, contextual_prefix) -> Result<String, OllamaError>`.
+```rust
+pub struct KeyManager {
+    ciphers: scc::HashMap<KeyId, OnceCell<Aes256GcmSiv>>,
+    nonce_counters: scc::HashMap<KeyId, AtomicU64>,   // deterministischer Zähler statt Zufalls-Nonce
+}
+
+impl KeyManager {
+    pub fn cipher_for(&self, key_id: KeyId) -> Result<&Aes256GcmSiv, CryptoError>;
+}
+```
+
+Nonce-Verwaltung als deterministischer `AtomicU64`-Zähler statt zufälliger Nonces sichert vor Wiederverwendung
+bei AES-256-GCM-SIV. Schlüsselrotation erfolgt über gezielten Austausch des `OnceCell`-Eintrags je `KeyId`,
+nicht über einen globalen Austausch.
+
+### 9.4 Ring-2/3-Crates (vormals „Layer-3-Crates")
+
+- **`memfuse-infer-ollama`** (vormals `memfuse-ollama`): `OllamaClient::generate(prompt, contextual_prefix) -> Result<String, OllamaError>`.
   Contextual-Chunk-Prefixing fügt Retrieval-Kontext als System-Präfix ein.
-- **`memfuse-embed`:** `EmbeddingModel::embed(texts) -> Result<Vec<Vec<f32>>, EmbedError>` (ONNX, feature-gated),
-  `CrossEncoderReranker::rerank(query, candidates) -> Vec<SearchResult>`.
-- **`memfuse-agent`:** `AgentWorkflow`-Engine mit persistentem Zustand über `Checkpointable`.
-- **`memfuse-py`:** PyO3-Bindings in eigenem Cargo-Workspace (Panic-Strategie-Isolation: `panic = "unwind"` nur
-  hier, restlicher Workspace `panic = "abort"` für Release-Profile).
+- **`memfuse-infer-onnx`** (vormals `memfuse-embed`): `EmbeddingModel::embed(texts) -> Result<Vec<Vec<f32>>, EmbedError>`
+  (ONNX, aus `default-members` ausgeschlossen, §0.2/§0.3), `CrossEncoderReranker::rerank(query, candidates) -> Vec<SearchResult>`.
+- **`memfuse-agent`:** `AgentWorkflow`-Engine mit persistentem Zustand über `Checkpointable`. Unverändert im
+  Zuschnitt, jetzt Ring 3.
+- **`memfuse-py`:** PyO3-Bindings. **Δ gegenüber Vorfassung:** die Panic-Strategie-Isolation war spezifiziert,
+  aber am Root-Profil (`panic = "abort"`) real wirkungslos (`catch_unwind` ist im Release-Build mit
+  `panic = "abort"` funktionslos). Ab dieser Fassung: Root-Profil `panic = "unwind"` (§0.2), `memfuse-py` als
+  regulärer Workspace-Member, `release-abort` nur für Binaries ohne FFI. Testpflicht: ein Panic muss im
+  `maturin build --release`-Wheel als `PyErr` ankommen, nicht nur im Debug-Build.
 
-**⚠️ Opus-Optimierung 2.5 — `memfuse-py` in Root-Workspace (Stufe 2, gering):**
-Crate in die `members`-Liste des Root-`Cargo.toml` aufnehmen, damit die FFI-Grenze denselben CI-Prüfungen
-unterliegt. Abweichende Profileinstellungen per paketspezifischem Profil erhalten.
+`memfuse-py` ist damit — anders als in der Vorfassung dokumentiert — reguläres Workspace-Mitglied, nicht
+„eigener Workspace"; die davon abweichende Doku-Behauptung in `memfuse-py-ci.yml` und den Python-Tests wird
+im selben Zug korrigiert (§20, Phase 0R, Track T3).
 
 ---
 
@@ -3051,9 +3483,70 @@ _(Harte Abhängigkeit verzeichnet: H3 `relate_n_ary` setzt das in Stufe 2 implem
 
 ---
 
+<a id="20-migration-v2"></a>
+## 20. Migrationsplan v2 und ADR-Übersicht (neu)
 
-*Diese finale konsolidierte Gesamtspezifikation vereinigt Produktvision, Zielarchitektur, normative
-Implementierungsvorgaben, algorithmische Spezifikationen, mikrofeingranulare Schnittstellendefinitionen
-und die priorisierte Optimierungs-Roadmap des MemFuse Cognitive OS. Sie ist in sich geschlossen und
-ersetzt alle vorherigen Einzeldokumente als maßgebliche Quelle. Künftige Änderungen erfolgen als direkte
-Überarbeitung dieses Dokuments, nicht als weiteres Delta-Dokument.*
+Dieser Abschnitt operationalisiert Teil A2 (§A2) und §4.2–§4.3. Er beschreibt, **wie** vom archivierten
+Layer-0–5-Zustand (§4.0) in das Ring-Modell (§4.2) überführt wird — als Ergänzung, nicht als Ersatz der in §17/§18
+beschriebenen Stabilisierungs- und Optimierungs-Roadmap. Beide Roadmaps laufen nebeneinander: §17/§18 adressiert
+Korrektheit/Performance am bestehenden Code, §20 adressiert den Strukturumbau. Wo beide denselben Code betreffen,
+gilt Teil A (Ground Truth vor Feature-Ausbau) vor §20 vor §17/§18.
+
+### 20.1 Strangler-Regel (verbindlich)
+
+Neue Crates entstehen **neben** den alten. Alte Crates (`memfuse-core`, `memfuse-db`, `memfuse-candle`,
+`memfuse-ollama`, `memfuse-embed`, `memfuse-calibration`) re-exportieren die neuen Symbole mit `#[deprecated]`
+für einen vollen Release-Zyklus, bis alle internen und die dokumentierte externe API (`cargo add memfuse-db`,
+§2.2) umgestellt sind. Der neue, öffentlich beworbene Fassaden-Crate heißt `memfuse` (`cargo add memfuse`);
+`memfuse-db` bleibt als Kompatibilitäts-Re-Export bestehen, bis der Deprecation-Zyklus abgeschlossen ist.
+
+### 20.2 Phasenplan
+
+Umfang: **S** < 1 Woche, **M** 1–3 Wochen, **L** > 3 Wochen (Schätzung nach betroffenen LOC, nicht kalibriert).
+Jede Phase ist einzeln auslieferbar; das Exit-Kriterium ist zugleich das Merge-Gate.
+
+| Phase | Umfang | Inhalt | Exit-Kriterium |
+|---|---|---|---|
+| **0R** Rest der Leitplanken | S | `memfuse-py`-Panic-Test gegen das `maturin`-Release-Wheel; `memfuse-bench` ohne `onnx`-Zwang (bereits umgesetzt); Root-Lints zuerst setzen, danach Vererbung in allen 20+ Crates; `unwrap`/`expect`/`panic`-Prod-Stellen (≈ 11) im selben PR beheben; `.unwrap-baseline.json`-Ratchet löschen; `deny.toml` erweitern (nicht neu anlegen); `tests/layering.rs` im Warnmodus; `audit.toml` bereinigen; `prefill_skip_count`-Fix (§9.2); `memfuse-testkit`-Skelett (`ManualClock`, In-Memory-`StorageEngine`) | `cargo clippy --workspace --all-targets --locked -- -D warnings` grün mit den neuen Lints; 20/20 Crates erben `[workspace.lints]`; `cargo fetch --locked && cargo check --workspace --locked --offline` grün (Netzfreiheit über `default-members`, nicht über `--workspace`, §A2.1 D8); `cargo tree --workspace -e normal -i ort-sys` ohne Treffer; Layering-Test läuft (Warnmodus) |
+| **1a** Aufwärtskanten auflösen | M | Fassade `memfuse` + Builder entstehen; `memfuse-db`/`memfuse-engine` erhält `Arc<dyn Embedder>` statt eigener Backend-Konstruktion; `Weak`-Setter → `MetricsSink`/Ports; Kante `router → db` über Ports lösen | `cargo tree -p memfuse-db -e normal` ohne `candle`, `ollama`, `embed`; Layering-Test scharf für Ring 3 |
+| **1b** `core`-Zerlegung | M (≈ 10,3k LOC verschoben) | `memfuse-core` → `memfuse-types`/`memfuse-ports`/`memfuse-mvcc`; `memfuse-core` wird `#[deprecated]`-Re-Export; Entscheidung über `saos.rs` (Löschkandidat) | Kein Crate importiert `memfuse_core::` außer dem Re-Export-Test |
+| **1c** Unsafe-Inseln zuerst | M | `memfuse-sys`, `memfuse-simd` extrahieren; `memfuse-core-ipc-gen` → `memfuse-wire`; `memfuse-checkpoint` ohne globalen Zustand (P29) | `tests/unsafe_islands.rs` scharf; `memfuse-vector`, `memfuse-store`, `memfuse-db`/`memfuse-engine` tragen `#![forbid(unsafe_code)]` |
+| **2** Sync-Kerne | L | `StorageRead` (sync) / `StorageWrite` (async) trennen; Persistenzaufrufe aus `csr.rs`, `inverted.rs`, `diskann.rs` in die Engine verschieben; begrenzter `ComputePool` statt unbegrenztem `spawn_blocking` | `cargo tree -e normal -p memfuse-{vector,text,graph}` ohne `tokio`; Benchmark-p99 ≤ +3 % oder ≤ 2σ der vorher eingefrorenen Baseline |
+| **3a** Konsistenz-Spike | S | ADR-N06-Prototyp: Crash-Injektion über `memfuse-testkit`-Fault-VFS (≥ 10⁴ Läufe, deterministischer Seed) | Kriterien: rekonstruierte Indizes = Orakel; `visible_lsn` monoton; keine sichtbare Teilmenge eines Commits |
+| **3b** `db` zerlegen | L | Zerlegung in `engine`/`cognition`/`rank`/`adapt`/`router`/`privacy`; acht (real sechs) `hybrid_search_*`-Varianten → `search(SearchRequest)`; `docid-128` entfernt (ADR-N05) | `memfuse-db` nur noch Re-Export; Fassade `memfuse` ≤ 20 `pub fn` (heute 50 in `memfuse-db`) |
+| **4** KV echt | L | Stufe A messen → optional B (eigenes Llama-Modell mit `KvState`) → optional C (Segment-Spill) | Gates gemäß §9.2-Tabelle; Spec-Status wechselt erst nach grünem Golden-Test von 🔴 auf 🟡/🟢 |
+| **5** Hygiene | M | God-Files zerlegen (`csr`, `hnsw`, `fusion`, `sstable`, `compaction`, `diskann`, `ollama`-Client); Governance-Tag-Kommentare aus dem Quellcode; `xtask` auf < 3.000 LOC; `results/`-Verzeichnis (≈ 25 MB) aus dem Repo; Reifegrad-Marker und Feature-Katalog aus `capabilities.toml` generieren (P12) | Keine Datei > 1.000 Zeilen außerhalb Generat/Tests; alle Spec-Marker generiert, nicht handgepflegt |
+
+### 20.3 ADR-Übersicht (Kontext · Entscheidung · Konsequenzen · Alternativen · Exit-Kriterium je ADR-Dokument unter `docs/decisions/`)
+
+| ADR | Gegenstand | Status |
+|---|---|---|
+| N01 | Layer-Regeln maschinell (`cargo_metadata`-Test + `cargo-deny`-`wrappers`) | beschlossen, Warnmodus in Phase 0R, scharf ab 1a |
+| N02 | Sync-Kern: `StorageRead` sync / `StorageWrite` async, begrenzter `ComputePool` | beschlossen; Benchmark-Gate vor Phase 2 |
+| N03 | Drei Unsafe-Inseln (`sys`, `simd`, `wire`), Mechanik `deny`+`forbid` pro Crate | beschlossen; ersetzt die Sechs-Ausnahmen-Regel der Vorfassung vollständig |
+| N04 | Panic-Profile: Root `unwind`, `release-abort` nur für Binaries ohne FFI | Profil bereits umgesetzt; Release-Wheel-Test (memfuse-py) offen |
+| N05 | Identifikatoren: externes `DocId` (128 Bit) + internes dichtes `DocIdx(u32)` (Option C) | Empfehlung, gekoppelt an N06; **offen** (§A2.4 Nr. 3) |
+| N06 | Konsistenzmodell: WAL als einzige Wahrheit, abgeleiteter Zustand statt 2PC-Härtung (Option B) | Empfehlung, Spike-Gate; **offen** (§A2.4 Nr. 1) |
+| N07 | KV in Stufen A/B/C, Segmentdateien statt LSM-Spill | Stufe A beschlossen; B/C nach Messung |
+| N08 | Generierte Spec und Capability-Manifest (`capabilities.toml`, Testverweis pro Zeile) | beschlossen |
+| N09 | Crate-Schnittkriterien I/U/C/S/D (P30) | neu, beschlossen |
+| N10 | Kein globaler veränderlicher Zustand (P29) | neu, beschlossen |
+
+### 20.4 Was aus der Vorfassung unverändert beibehalten wird
+
+Um Missverständnisse auszuschließen: Diese Überarbeitung ist ein **Struktur**-Umbau, kein Widerruf der
+bewährten Kern-Invarianten. Unverändert bleiben: WAL-First mit HMAC-Kette (P2), MVCC, RCU-Snapshots im
+CSR-Graph, Tenant-Isolation, Sandbox mit getrennten Fuel-/Wall-Clock-Budgets (P23), deterministische Recovery
+(P3), und die DAG-Doktrin selbst (P5) — sie war immer richtig, sie wurde nur bislang nicht maschinell
+erzwungen, was diese Fassung nachholt.
+
+---
+
+
+*Diese finale konsolidierte Gesamtspezifikation vereinigt Produktvision, Zielarchitektur (jetzt: Ring-Modell,
+Teil A2/§4.2), normative Implementierungsvorgaben, algorithmische Spezifikationen, mikrofeingranulare
+Schnittstellendefinitionen, die priorisierte Optimierungs-Roadmap und den Migrationsplan v2 (§20) des MemFuse
+Cognitive OS. Sie ist in sich geschlossen und ersetzt alle vorherigen Einzeldokumente — einschließlich
+`MEMFUSE_ZIELARCHITEKTUR.md` und `MEMFUSE_ZIELARCHITEKTUR_v2.md`, deren Inhalt hiermit in Teil A2, §0, §3, §4
+und §9 aufgegangen ist — als maßgebliche Quelle. Künftige Änderungen erfolgen als direkte Überarbeitung dieses
+Dokuments, nicht als weiteres Delta-Dokument.*
