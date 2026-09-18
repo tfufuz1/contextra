@@ -29,6 +29,8 @@ pub enum ToolCategory {
     DatabaseWrite,
     /// Externe Code-Ausführung (höchste Risikostufe, standardmäßig gesperrt).
     CodeExecution,
+    /// Externe Cloud-Anfragen / Egress (standardmäßig gesperrt; erfordert explizites Opt-in).
+    CloudEgress,
 }
 
 /// Konfiguration der Sandbox-Policy.
@@ -37,6 +39,8 @@ pub struct SandboxPolicy {
     pub allow_db_reads: bool,
     pub allow_db_writes: bool,
     pub allow_code_execution: bool,
+    /// Cloud-Egress erlaubt? Standardmäßig `false` (additiv zu Layer 1/4 EgressGuard Bulk-Exfiltrationsprüfungen).
+    pub allow_cloud_egress: bool,
     /// Maximale Ausführungszeit pro Tool-Call in Millisekunden.
     pub max_execution_ms: u64,
 }
@@ -47,6 +51,7 @@ impl Default for SandboxPolicy {
             allow_db_reads: true,
             allow_db_writes: false,      // Schreibzugriff explizit opt-in
             allow_code_execution: false, // Code-Ausführung standardmäßig gesperrt
+            allow_cloud_egress: false, // Cloud-Egress gesperrt (erfordert explizites Opt-in via allow_cloud_egress)
             max_execution_ms: 5_000,
         }
     }
@@ -126,6 +131,12 @@ impl McpSandbox {
     }
 
     /// Validiert ob ein Tool-Call erlaubt ist.
+    ///
+    /// HINWEIS: Die Prüfung von `ToolCategory::CloudEgress` ist **additiv** zur
+    /// Egress-Guard- / Egress-Vault-Prüfung (`EgressClassifier`/`EgressGuardCheck` in `egress_gateway.rs`).
+    /// Die Sandbox-Policy entscheidet, ob die Methode überhaupt aufgerufen werden darf,
+    /// während der Egress-Guard zusätzlich prüft, ob der konkrete Payload bei erlaubtem Aufruf
+    /// unbedenklich ist (z. B. Schutz vor Bulk-Exfiltration).
     pub fn validate_tool_call(&self, method: &str, _params: &Value) -> Result<()> {
         if method.is_empty() || method.len() > 256 {
             return Err(MemFuseError::InvalidInput(format!(
@@ -156,6 +167,13 @@ impl McpSandbox {
                     ));
                 }
             }
+            ToolCategory::CloudEgress => {
+                if !self.policy.allow_cloud_egress {
+                    return Err(MemFuseError::InvalidInput(format!(
+                        "Sandbox: Cloud-Egress gesperrt für '{method}' — erfordert explizites Opt-in via `allow_cloud_egress`"
+                    )));
+                }
+            }
         }
         Ok(())
     }
@@ -163,9 +181,8 @@ impl McpSandbox {
     /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
     pub fn classify_method(method: &str) -> ToolCategory {
         match method {
-            "memfuse_search" | "memfuse_get" | "memfuse_collections" | "memfuse_cloud_query" => {
-                ToolCategory::DatabaseRead
-            }
+            "memfuse_search" | "memfuse_get" | "memfuse_collections" => ToolCategory::DatabaseRead,
+            "memfuse_cloud_query" => ToolCategory::CloudEgress,
             "memfuse_insert"
             | "memfuse_delete"
             | "memfuse_upsert"
@@ -254,6 +271,44 @@ mod hex {
 mod tests {
     use super::*;
 
+    /// Deckt OPUS-0.4 ab: Cloud-Egress ("memfuse_cloud_query") ist in eigener ToolCategory::CloudEgress
+    /// und im Default-Zustand (allow_cloud_egress: false) gesperrt.
+    #[test]
+    fn test_cloud_egress_classification_and_policy() {
+        // 1. Classification check
+        assert_eq!(
+            McpSandbox::classify_method("memfuse_cloud_query"),
+            ToolCategory::CloudEgress
+        );
+        assert_eq!(
+            McpSandbox::classify_method("memfuse_search"),
+            ToolCategory::DatabaseRead
+        );
+
+        // 2. Default policy: allow_cloud_egress is false
+        let default_sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap(); // unwrap
+        let default_res = default_sandbox.validate_tool_call("memfuse_cloud_query", &Value::Null);
+        assert!(default_res.is_err());
+        let err_msg = default_res.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Cloud-Egress gesperrt"),
+            "Expected 'Cloud-Egress gesperrt' in error message, got: {err_msg}"
+        );
+
+        // 3. Permitting policy: allow_cloud_egress is true
+        let policy = SandboxPolicy {
+            allow_db_reads: true,
+            allow_db_writes: false,
+            allow_code_execution: false,
+            allow_cloud_egress: true,
+            max_execution_ms: 5_000,
+        };
+        let permitting_sandbox = McpSandbox::new(policy).unwrap(); // unwrap
+        assert!(permitting_sandbox
+            .validate_tool_call("memfuse_cloud_query", &Value::Null)
+            .is_ok());
+    }
+
     /// Deckt R-01 ab: Schreibzugriff ist im Default gesperrt (Read-Only Safety Policy).
     #[test]
     fn test_sandbox_default_policy() {
@@ -278,6 +333,9 @@ mod tests {
         assert!(sandbox
             .validate_tool_call("unknown_code_tool", &Value::Null)
             .is_err());
+        assert!(sandbox
+            .validate_tool_call("memfuse_cloud_query", &Value::Null)
+            .is_err());
     }
 
     /// Deckt R-01 ab: Schreibzugriff ist erlaubt, wenn `allow_db_writes` explizit aktiviert ist.
@@ -287,6 +345,7 @@ mod tests {
             allow_db_reads: true,
             allow_db_writes: true,
             allow_code_execution: true,
+            allow_cloud_egress: true,
             max_execution_ms: 5_000,
         };
         let sandbox = McpSandbox::new(policy).unwrap(); // unwrap
@@ -353,6 +412,7 @@ mod tests {
             allow_db_reads: true,
             allow_db_writes: true,
             allow_code_execution: true,
+            allow_cloud_egress: true,
             max_execution_ms: 50,
         };
         let sandbox = McpSandbox::new(policy).unwrap(); // unwrap
