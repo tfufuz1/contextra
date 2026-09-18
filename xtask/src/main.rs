@@ -87,6 +87,7 @@ mod jules_preflight;
 mod jules_submit_gate;
 mod lint_unsafe_slice_bounds;
 mod migrate_docid_128;
+mod post_merge_report;
 mod record_mutation_score;
 mod unwrap_ratchet;
 mod validate_pr_checklist;
@@ -2339,6 +2340,13 @@ fn main() {
             let tags = scan_tags("crates");
             let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
             run_context_tags(&tags, extra_args);
+        }
+        "post-merge-report" => {
+            let root = find_root_dir();
+            let success = post_merge_report::run_post_merge_report(&root);
+            if !success {
+                process::exit(1);
+            }
         }
         "jules-preflight" => {
             let fast_only = args.iter().any(|arg| arg == "--fast");
