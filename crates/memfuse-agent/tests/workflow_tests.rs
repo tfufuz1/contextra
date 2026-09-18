@@ -226,7 +226,7 @@ async fn test_pre_execution_budget_check_prevents_tool_execution() {
     graph.try_add_edge("task_1", "task_2", None, 1).unwrap();
     graph.try_add_edge("task_2", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine
         .try_register_tool(Box::new(CountingTool {
             name: "count_tool".to_string(),
@@ -301,7 +301,7 @@ async fn test_replay_from_restores_budget_state() {
     graph.try_add_edge("start", "step_a", None, 1).unwrap();
     graph.try_add_edge("step_a", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine
         .try_register_tool(Box::new(CountingTool {
             name: "count_tool".to_string(),
@@ -374,7 +374,7 @@ async fn test_replay_from_identifier_resolution() {
 
     let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine
         .try_register_tool(Box::new(CountingTool {
             name: "count_tool".to_string(),
@@ -520,7 +520,7 @@ async fn test_audit_log_field_reused_across_steps() {
 
     let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine
         .try_register_tool(Box::new(CountingTool {
             name: "step_tool".to_string(),

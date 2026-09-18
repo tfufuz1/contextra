@@ -60,10 +60,14 @@ async fn test_group_commit_hmac_chain_no_bifurcation() {
         .expect("Failed to open WAL for replay verification");
     let replayed = wal.replay().await.expect("WAL replay failed");
 
+    // Each committed transaction writes 2 WAL entries: 1 Put/Delete operation + 1 TxEnd marker
+    let expected_wal_entries = num_tasks * 2;
     assert_eq!(
         replayed.len(),
-        num_tasks,
-        "Replayed WAL entry count mismatch"
+        expected_wal_entries,
+        "Replayed WAL entry count mismatch (expected {} entries for {} tasks)",
+        expected_wal_entries,
+        num_tasks
     );
 
     // Invariant 1: No HMAC chain bifurcation (each entry must have a unique prev_hmac)
@@ -76,28 +80,25 @@ async fn test_group_commit_hmac_chain_no_bifurcation() {
         );
     }
 
-    // Invariant 2: Strictly monotonically increasing sequence numbers
+    // Invariant 2: Unique transaction sequence numbers match the number of committed tasks
     let seq_nos: Vec<u64> = replayed.iter().map(|(seq, _, _)| *seq).collect();
     let mut sorted_seqs = seq_nos.clone();
     sorted_seqs.sort_unstable();
     sorted_seqs.dedup();
     assert_eq!(
-        seq_nos.len(),
         sorted_seqs.len(),
-        "Duplicate or non-monotone seq_nos detected"
+        num_tasks,
+        "Unique transaction sequence number count mismatch"
     );
 
-    // Invariant 3: Unbroken HMAC chain linkage (entry[i].prev_hmac == entry[i-1].checksum)
-    let mut replayed_sorted = replayed.clone();
-    replayed_sorted.sort_by_key(|(seq, _, _)| *seq);
-
-    for i in 1..replayed_sorted.len() {
-        let (_, prev_entry, _) = &replayed_sorted[i - 1];
-        let (_, curr_entry, _) = &replayed_sorted[i];
+    // Invariant 3: Unbroken HMAC chain linkage in physical WAL replay order
+    for i in 1..replayed.len() {
+        let (_, prev_entry, _) = &replayed[i - 1];
+        let (_, curr_entry, _) = &replayed[i];
         assert_eq!(
             curr_entry.prev_hmac, prev_entry.checksum,
-            "HMAC chain broken between seq {} and seq {}: prev_hmac {:?} != expected checksum {:?}",
-            prev_entry.seq_no, curr_entry.seq_no, curr_entry.prev_hmac, prev_entry.checksum
+            "HMAC chain broken between index {} and index {}: prev_hmac {:?} != expected checksum {:?}",
+            i - 1, i, curr_entry.prev_hmac, prev_entry.checksum
         );
     }
 }
@@ -168,7 +169,8 @@ async fn test_out_of_order_append_hmac_chain_ordering() {
         .expect("Failed to open WAL for replay verification");
     let replayed = wal.replay().await.expect("WAL replay failed");
 
-    assert_eq!(replayed.len(), 2, "Replayed WAL entry count mismatch");
+    // Each committed transaction writes 2 WAL entries: 1 Put operation + 1 TxEnd marker
+    assert_eq!(replayed.len(), 4, "Replayed WAL entry count mismatch");
 
     // Invariant 1: No HMAC chain bifurcation (each entry must have a unique prev_hmac)
     let mut prev_hmacs = HashSet::new();
@@ -180,28 +182,25 @@ async fn test_out_of_order_append_hmac_chain_ordering() {
         );
     }
 
-    // Invariant 2: Strictly monotonically increasing sequence numbers
+    // Invariant 2: Unique transaction sequence numbers match the number of committed tasks
     let seq_nos: Vec<u64> = replayed.iter().map(|(seq, _, _)| *seq).collect();
     let mut sorted_seqs = seq_nos.clone();
     sorted_seqs.sort_unstable();
     sorted_seqs.dedup();
     assert_eq!(
-        seq_nos.len(),
         sorted_seqs.len(),
-        "Duplicate or non-monotone seq_nos detected"
+        2,
+        "Unique transaction sequence number count mismatch"
     );
 
-    // Invariant 3: Unbroken HMAC chain linkage (entry[i].prev_hmac == entry[i-1].checksum)
-    let mut replayed_sorted = replayed.clone();
-    replayed_sorted.sort_by_key(|(seq, _, _)| *seq);
-
-    for i in 1..replayed_sorted.len() {
-        let (_, prev_entry, _) = &replayed_sorted[i - 1];
-        let (_, curr_entry, _) = &replayed_sorted[i];
+    // Invariant 3: Unbroken HMAC chain linkage in physical WAL replay order
+    for i in 1..replayed.len() {
+        let (_, prev_entry, _) = &replayed[i - 1];
+        let (_, curr_entry, _) = &replayed[i];
         assert_eq!(
             curr_entry.prev_hmac, prev_entry.checksum,
-            "HMAC chain broken between seq {} and seq {}: prev_hmac {:?} != expected checksum {:?}",
-            prev_entry.seq_no, curr_entry.seq_no, curr_entry.prev_hmac, prev_entry.checksum
+            "HMAC chain broken between index {} and index {}: prev_hmac {:?} != expected checksum {:?}",
+            i - 1, i, curr_entry.prev_hmac, prev_entry.checksum
         );
     }
 }

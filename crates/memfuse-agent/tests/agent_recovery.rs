@@ -89,7 +89,7 @@ async fn test_agent_auto_checkpoint_before_step() {
         .unwrap();
     graph.try_add_edge("start", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine.try_register_tool(Box::new(SuccessTool)).unwrap();
 
     engine.run(&mut ctx, &graph).await.expect("run failed");
@@ -131,7 +131,7 @@ async fn test_agent_replay_from_checkpoint() {
     graph.try_add_edge("start", "step2", None, 1).unwrap();
     graph.try_add_edge("step2", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine.try_register_tool(Box::new(SuccessTool)).unwrap();
 
     // Run first step
@@ -172,7 +172,7 @@ async fn test_agent_error_handling() {
         .unwrap();
     graph.try_add_edge("start", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine.try_register_tool(Box::new(FailingTool)).unwrap();
 
     let result = engine.run(&mut ctx, &graph).await;
@@ -215,7 +215,7 @@ async fn test_agent_audit_log_immutable() {
         .unwrap();
     graph.try_add_edge("start", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine.try_register_tool(Box::new(SuccessTool)).unwrap();
 
     engine.run(&mut ctx, &graph).await.expect("run failed");
@@ -255,7 +255,7 @@ async fn test_crash_during_execute_recovery() {
         .unwrap();
     graph.try_add_edge("start", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine.try_register_tool(Box::new(FailingTool)).unwrap();
 
     // Execution fails during execute()
@@ -312,7 +312,7 @@ async fn test_loop_rollback_integrity() {
     // Add a way out of the loop after 2 iterations (manual intervention simulated)
     graph.try_add_edge("A", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine.try_register_tool(Box::new(SuccessTool)).unwrap();
 
     // Run 5 steps: A(0) -> B(1) -> A(2) -> B(3) -> A(4)
@@ -362,7 +362,7 @@ async fn test_loop_rollback_integrity() {
 async fn test_agent_engine_recovers_orphaned_checkpoint_on_restart() {
     let (db, _tmp) = setup_env().await;
 
-    let engine_a = OrchestratorEngine::new(db.inner_storage());
+    let engine_a = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
 
     // Simulate an abrupt step drop (uncommitted guard)
     let orphan_cp = memfuse_checkpoint::StateCheckpoint {
@@ -390,7 +390,7 @@ async fn test_agent_engine_recovers_orphaned_checkpoint_on_restart() {
     drop(engine_a);
 
     // Create a new OrchestratorEngine instance (simulating restart) and run a task
-    let engine_b = OrchestratorEngine::new(db.inner_storage());
+    let engine_b = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
 
     let state_col = db.collection("agent_state_restart").await.unwrap();
     let mut ctx = AgentContext::try_new(
