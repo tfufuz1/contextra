@@ -13,6 +13,9 @@ pub use memfuse_crypto::egress_vault::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::bulk_exfiltration_detector::{
+    BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
+};
 use crate::protocol::McpError;
 
 // AI-TAG[SMELL][MAJOR][RESOLVED] AGT-MCP-egress-gateway — Replaced local stub DefaultEgressClassifier with official EgressVault contract from memfuse-security (TS: 2026-09-14T10:00:00Z) (SESSION: HEAD)
@@ -156,6 +159,37 @@ pub async fn handle_cloud_query_with_guard(
         results: vec![],
         abstraction_notice: None,
     })
+}
+
+/// Evaluates a query payload against the `BulkExfiltrationDetector` for a specific `SessionId`.
+pub fn check_bulk_exfiltration(
+    detector: &BulkExfiltrationDetector,
+    session: SessionId,
+    payload: &str,
+) -> Result<(), McpError> {
+    match detector.record_and_check(session, payload.len()) {
+        BulkExfiltrationOutcome::Allow => Ok(()),
+        BulkExfiltrationOutcome::Block {
+            window_bytes,
+            limit,
+        } => Err(McpError::invalid_params(format!(
+            "Egress volume rate limit exceeded: {window_bytes} bytes in window > {limit} limit"
+        ))),
+    }
+}
+
+/// Extended cloud query handler including additive Layer 4 bulk volume check along with DLP classifier and similarity guard.
+pub async fn handle_cloud_query_with_bulk_detector(
+    request: CloudQueryRequest,
+    classifier: &dyn EgressClassifier,
+    egress_guard: Option<&dyn EgressGuardCheck>,
+    bulk_detector: Option<(&BulkExfiltrationDetector, SessionId)>,
+) -> Result<CloudQueryResponse, McpError> {
+    if let Some((detector, session)) = bulk_detector {
+        check_bulk_exfiltration(detector, session, &request.query)?;
+    }
+
+    handle_cloud_query_with_guard(request, classifier, egress_guard).await
 }
 
 /// Processes inbound responses from cloud LLMs by checking for prompt injections
@@ -322,6 +356,52 @@ mod tests {
             rehydrated,
             "Hallo 🌍! [USER_ENTITY_äöü1] test Secret Entity 🚀 und 漢字."
         );
+    }
+
+    #[tokio::test]
+    async fn test_bulk_detector_integration_blocked_and_allowed(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let vault = EgressVault::new(vec![])?;
+        let detector = BulkExfiltrationDetector::new(100, std::time::Duration::from_secs(60));
+        let session = SessionId::from("integration_test_session");
+
+        let small_req = CloudQueryRequest {
+            query: "Short query".to_string(), // 11 bytes
+            collection: None,
+            max_results: None,
+        };
+
+        let resp = handle_cloud_query_with_bulk_detector(
+            small_req,
+            &vault,
+            None,
+            Some((&detector, session.clone())),
+        )
+        .await?;
+        assert_eq!(resp.status, "success");
+
+        let large_req = CloudQueryRequest {
+            query: "A".repeat(100), // 100 bytes -> cumulative 111 > 100 limit
+            collection: None,
+            max_results: None,
+        };
+
+        let res = handle_cloud_query_with_bulk_detector(
+            large_req,
+            &vault,
+            None,
+            Some((&detector, session)),
+        )
+        .await;
+
+        if let Err(err) = res {
+            assert!(err
+                .to_string()
+                .contains("Egress volume rate limit exceeded"));
+            Ok(())
+        } else {
+            Err("Expected bulk rate limit error".into())
+        }
     }
 
     #[tokio::test]

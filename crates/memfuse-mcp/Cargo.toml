@@ -28,6 +28,7 @@ memfuse-candle = { workspace = true, optional = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 rand = { workspace = true }
 parking_lot = { workspace = true }
+scc = "2"
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
