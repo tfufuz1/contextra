@@ -106,7 +106,7 @@ async fn test_orchestrator_tool_registration_boundaries() {
     let db = MemFuse::open_with_config(temp_dir.path(), config)
         .await
         .unwrap();
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
 
     // Empty tool name
     let empty_tool = Box::new(DummyTool {

@@ -51,7 +51,7 @@ async fn setup_engine(dim: usize) -> (OrchestratorEngine, Arc<MemFuse>, TempDir)
     );
 
     let storage = db.inner_storage();
-    let mut engine = OrchestratorEngine::new(storage);
+    let mut engine = OrchestratorEngine::try_new(storage).expect("engine try_new");
     engine.try_register_tool(Box::new(EchoTool)).unwrap();
 
     (engine, db, tmp)
