@@ -194,7 +194,7 @@ pub(crate) fn forward_push_ppr(
         if let Some(&idx) = inner.id_map.get(&seed) {
             if idx < n
                 && !deleted_nodes.contains(idx)
-                && inner.entities.get(idx).is_some_and(|e| e.is_some())
+                && inner.entity_at(idx).is_some()
                 && seen_seeds.insert(idx)
             {
                 ctx.valid_seeds.push(idx);
@@ -214,7 +214,7 @@ pub(crate) fn forward_push_ppr(
         ctx.out_weight_sums[..n].copy_from_slice(&inner.out_weight_sums[..n]);
     } else {
         for i in 0..n {
-            if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
+            if deleted_nodes.contains(i) || inner.entity_at(i).is_none() {
                 ctx.out_weight_sums[i] = 0.0;
                 continue;
             }
@@ -236,7 +236,7 @@ pub(crate) fn forward_push_ppr(
                 let weight = inner.weights[edge_idx];
 
                 if !deleted_nodes.contains(target)
-                    && inner.entities.get(target).is_some_and(|e| e.is_some())
+                    && inner.entity_at(target).is_some()
                     && weight > 0.0
                 {
                     sum += weight;
@@ -247,7 +247,7 @@ pub(crate) fn forward_push_ppr(
                 for edge in pending {
                     let target = edge.target;
                     if !deleted_nodes.contains(target)
-                        && inner.entities.get(target).is_some_and(|e| e.is_some())
+                        && inner.entity_at(target).is_some()
                         && edge.weight > 0.0
                     {
                         sum += edge.weight;
@@ -259,7 +259,7 @@ pub(crate) fn forward_push_ppr(
         }
     }
     for i in 0..n {
-        if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
+        if deleted_nodes.contains(i) || inner.entity_at(i).is_none() {
             ctx.out_weight_sums[i] = 0.0;
         }
     }
@@ -361,7 +361,7 @@ pub(crate) fn forward_push_ppr(
                 let weight = weights[edge_idx];
 
                 if !deleted_nodes.contains(target)
-                    && inner.entities.get(target).is_some_and(|e| e.is_some())
+                    && inner.entity_at(target).is_some()
                     && weight > 0.0
                 {
                     let share = push_mass * (weight / w_u);
@@ -374,7 +374,7 @@ pub(crate) fn forward_push_ppr(
                 for edge in pending {
                     let target = edge.target;
                     if !deleted_nodes.contains(target)
-                        && inner.entities.get(target).is_some_and(|e| e.is_some())
+                        && inner.entity_at(target).is_some()
                         && edge.weight > 0.0
                     {
                         let share = push_mass * (edge.weight / w_u);
@@ -413,10 +413,7 @@ pub(crate) fn forward_push_ppr(
     // Build and sort result vector
     let mut results = Vec::new();
     for (idx, rank) in p {
-        if !deleted_nodes.contains(idx)
-            && rank > 0.0
-            && inner.entities.get(idx).is_some_and(|e| e.is_some())
-        {
+        if !deleted_nodes.contains(idx) && rank > 0.0 && inner.entity_at(idx).is_some() {
             if let Some(&id) = inner.reverse_map.get(idx) {
                 results.push((id, rank));
             }
@@ -455,7 +452,7 @@ pub(crate) fn compute_ppr_dense(
         if let Some(&idx) = inner.id_map.get(&seed) {
             if idx < n
                 && !deleted_nodes.contains(idx)
-                && inner.entities.get(idx).is_some_and(|e| e.is_some())
+                && inner.entity_at(idx).is_some()
                 && seen_seeds.insert(idx)
             {
                 ctx.valid_seeds.push(idx);
@@ -479,7 +476,7 @@ pub(crate) fn compute_ppr_dense(
         ctx.out_weight_sums[..n].copy_from_slice(&inner.out_weight_sums[..n]);
     } else {
         for i in 0..n {
-            if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
+            if deleted_nodes.contains(i) || inner.entity_at(i).is_none() {
                 ctx.out_weight_sums[i] = 0.0;
                 continue;
             }
@@ -501,7 +498,7 @@ pub(crate) fn compute_ppr_dense(
                 let weight = inner.weights[edge_idx];
 
                 if !deleted_nodes.contains(target)
-                    && inner.entities.get(target).is_some_and(|e| e.is_some())
+                    && inner.entity_at(target).is_some()
                     && weight > 0.0
                 {
                     sum += weight;
@@ -512,7 +509,7 @@ pub(crate) fn compute_ppr_dense(
                 for edge in pending {
                     let target = edge.target;
                     if !deleted_nodes.contains(target)
-                        && inner.entities.get(target).is_some_and(|e| e.is_some())
+                        && inner.entity_at(target).is_some()
                         && edge.weight > 0.0
                     {
                         sum += edge.weight;
@@ -526,7 +523,7 @@ pub(crate) fn compute_ppr_dense(
 
     // Zero-out out_weight_sums for deleted or non-entity nodes
     for i in 0..n {
-        if deleted_nodes.contains(i) || !inner.entities.get(i).is_some_and(|e| e.is_some()) {
+        if deleted_nodes.contains(i) || inner.entity_at(i).is_none() {
             ctx.out_weight_sums[i] = 0.0;
         }
     }
@@ -564,7 +561,7 @@ pub(crate) fn compute_ppr_dense(
         let mut dangling_sum = 0.0f32;
         for i in 0..n {
             if !deleted_nodes.contains(i)
-                && inner.entities.get(i).is_some_and(|e| e.is_some())
+                && inner.entity_at(i).is_some()
                 && ctx.out_weight_sums[i] == 0.0
             {
                 dangling_sum += ctx.ranks[i];
@@ -599,7 +596,7 @@ pub(crate) fn compute_ppr_dense(
                     let weight = weights[edge_idx];
 
                     if !deleted_nodes.contains(target)
-                        && inner.entities.get(target).is_some_and(|e| e.is_some())
+                        && inner.entity_at(target).is_some()
                         && weight > 0.0
                     {
                         ctx.next_ranks[target] += share * weight;
@@ -654,10 +651,7 @@ pub(crate) fn compute_ppr_dense(
     // 6. Build and sort result vector (excluding deleted nodes)
     let mut results = Vec::new();
     for (idx, &rank) in ctx.ranks[..n].iter().enumerate() {
-        if !deleted_nodes.contains(idx)
-            && rank > 0.0
-            && inner.entities.get(idx).is_some_and(|e| e.is_some())
-        {
+        if !deleted_nodes.contains(idx) && rank > 0.0 && inner.entity_at(idx).is_some() {
             if let Some(&id) = inner.reverse_map.get(idx) {
                 results.push((id, rank));
             }
@@ -939,7 +933,7 @@ mod tests {
             for edge_idx in start..end {
                 let target = inner.targets[edge_idx];
                 let weight = inner.weights[edge_idx];
-                if inner.entities.get(target).is_some_and(|e| e.is_some()) && weight > 0.0 {
+                if inner.entity_at(target).is_some() && weight > 0.0 {
                     sum += weight;
                 }
             }
@@ -955,9 +949,7 @@ mod tests {
 
             let mut dangling_sum = 0.0f32;
             for i in 0..n {
-                if inner.entities.get(i).is_some_and(|e| e.is_some())
-                    && ctx.out_weight_sums[i] == 0.0
-                {
+                if inner.entity_at(i).is_some() && ctx.out_weight_sums[i] == 0.0 {
                     dangling_sum += ctx.ranks[i];
                 }
             }
@@ -986,7 +978,7 @@ mod tests {
                     for edge_idx in start..end {
                         let target = inner.targets[edge_idx];
                         let weight = inner.weights[edge_idx];
-                        if inner.entities.get(target).is_some_and(|e| e.is_some()) && weight > 0.0 {
+                        if inner.entity_at(target).is_some() && weight > 0.0 {
                             ctx.next_ranks[target] += share * weight;
                         }
                     }
