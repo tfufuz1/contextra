@@ -64,7 +64,7 @@ async fn test_agent_persistence_and_recovery() {
     graph.try_add_edge("start", "task_1", None, 1).unwrap();
     graph.try_add_edge("task_1", "end", None, 1).unwrap();
 
-    let mut engine = OrchestratorEngine::new(db.inner_storage());
+    let mut engine = OrchestratorEngine::try_new(db.inner_storage()).expect("engine try_new");
     engine.try_register_tool(Box::new(IncrementTool)).unwrap();
 
     let mut ctx = AgentContext::try_new(
@@ -119,7 +119,7 @@ async fn test_agent_persistence_and_recovery() {
     )
     .unwrap();
 
-    let mut engine2 = OrchestratorEngine::new(db2.inner_storage());
+    let mut engine2 = OrchestratorEngine::try_new(db2.inner_storage()).expect("engine try_new");
     engine2.try_register_tool(Box::new(IncrementTool)).unwrap();
 
     engine2
