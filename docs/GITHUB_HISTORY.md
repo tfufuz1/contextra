@@ -1,13 +1,13 @@
 # MemFuse Brain — GitHub Projekt- & Commit-Historie
 
 > **Kanonische Dokumentation der Entwicklungshistorie und tiefen Differenz-Analysen von MemFuse Brain**
-> *Zeitraum: August 2026 — September 2026*
+> *Zeitraum: August 2026 — September 2026 (Stand: 18.09.2026)*
 
 ---
 
 ## 1. Übersicht & Meilenstein-Phasen
 
-MemFuse Brain ist ein kognitives Betriebssystem und eine eingebettete Vektor- & Wissensdatenbank in Pure Rust. Die Projektgeschichte auf GitHub zeichnet die schrittweise Evolution von den mathematischen und speichertechnischen Kernschichten (Layer 0 & 1) über das Datenbank-Orchestrierungsmodul (Layer 2) und die LLM/FFI-Anbindungen (Layer 3) bis hin zur sicheren Desktop-, MCP-Server-, Multi-Tenancy- und Benchmarking-Umgebung (Layer 4) nach.
+MemFuse Brain ist ein kognitives Betriebssystem und eine eingebettete Vektor- & Wissensdatenbank in Pure Rust. Die Projektgeschichte auf GitHub zeichnet die schrittweise Evolution von den mathematischen und speichertechnischen Kernschichten (Layer 0 & 1) über das Datenbank-Orchestrierungsmodul (Layer 2 - 6) und die LLM/FFI-Anbindungen bis hin zur sicheren Desktop-, MCP-Server-, Multi-Tenancy- und Benchmarking-Umgebung (Layer 7 - 9) nach.
 
 ### Phasenüberblick
 
@@ -22,7 +22,9 @@ MemFuse Brain ist ein kognitives Betriebssystem und eine eingebettete Vektor- & 
 | **Phase 7: Multi-Tenancy Isolation, GDPR Compliance & PathRAG Cognitive Layering** | 06.09.2026 – 07.09.2026 | Mandantenfähige Trennung (`TenantId`, `TenantKeyCodec`, `memfuse-kv-bridge`), Kryptographische DSGVO Article 17 Deletion Proofs (`DeletionProof`), DiskANN WAL-backed Pending Buffer & Delta Persistence, PathRAG Graph Engine & F-06 Percolation Health Monitor, Kaskadierende Kanten-Invalidierung bei Chunk-Verdrängung (`cascade.rs`), Isotonic/Platt Konforme Kalibrierung (`memfuse-calibration`), Replicator Dynamics Fusion. |
 | **Phase 8: Tier 2/3 Deep Subsystem Audits & Cross-Crate Alignment** | 08.09.2026 – 09.09.2026 | Tiefenaudits für `memfuse-kv-bridge`, `memfuse-calibration`, `memfuse-agent`, `memfuse-graph`, `memfuse-bench`, `memfuse-mcp`, `memfuse-embed` und `memfuse-candle`. Umbenennung & Paket-Aliasing von `memfuse-crypto` zu `memfuse-security`, Konsolidierung der Spezifikationsdokumente (v10.1), Bereinigung biologischer Metapher-Begriffe in `memfuse-db`. |
 | **Phase 9: Storage Durability, WAL Recovery & Infrastructure Gates** | 10.09.2026 – 11.09.2026 | Beseitigung von stummen I/O-Fehlern bei WAL `sync_all` und Recovery-Rollbacks (Gate 3), automatische WAL Sidecar Cleanup & Startup Flushes in LSM, `xtask claim` Release & TTL Expiry, neues CI Phantom-Files Check Gate (Gate 12b), HuggingFace LongMemEval Dataset-Fixes in `memfuse-bench`. |
-| **Phase 10: System-wide Quality Verification & Text Engine Deep Audit** | 12.09.2026 – Heute | Systematischer Deep Audit von `memfuse-text` (#2243) mit Char-Boundary Sicherheitsnachweisen und BM25 Robertson-Spärck-Jones IDF-Reverifikation; Abschließende Validierung aller Audit-Berichte und Governance-Ebenen. |
+| **Phase 10: System-wide Quality Verification & Text Engine Deep Audit** | 12.09.2026 – 13.09.2026 | Systematischer Deep Audit von `memfuse-text` (#2243) mit Char-Boundary Sicherheitsnachweisen und BM25 Robertson-Spärck-Jones IDF-Reverifikation; Integration von `memfuse-sandbox` (WASM Boundary, Layer 2 / Spec v5 §4.18) und Live-Stats-Wiring für MCP (`setup_routing`). |
+| **Phase 11: Architectural Decoupling, Zero-Copy Read Paths & HNSW Compute-then-Commit** | 14.09.2026 – 16.09.2026 | Entkopplung von `RouterEngine<S: StorageEngine>` (Layer 6) aus `memfuse-store`, Umstellung aller Read-Pfade auf `bytes::Bytes` Zero-Copy Slices, HNSW Compute-then-Commit Pattern & Phantom Node Elimination, SQ8 Quantisierer Skaleninvarianz, P1 Command Injection Fix in MCP Dispatch, Consolidation Lock Mutual Exclusion. |
+| **Phase 12: Layer 0 Governance Synchronization, High-Performance Optimizations & Post-Merge Automation** | 17.09.2026 – 18.09.2026 | HNSW Persistence Fuzzing Target (`fuzz_hnsw_persistence`), Refactoring des CSR Graph Staged Entity Keyings, Loom Concurrency Models für Deferred Zeroize & Group Commit, Memory Allocation Optimizations in MemTable & RRF Fusion (`fusion.rs`), `xtask lint-unsafe-slices` AST SIMD Lint, `xtask post-merge-report` Integration (#3109), Governance Sync und Inventar-Audit von `memfuse-core`. |
 
 ---
 
@@ -410,6 +412,88 @@ Hier sind die präzisen Commits der Entwicklungshistorie (chronologisch von den 
 - `f3a9588` | **tfufuz1** (Co-authored-by **google-labs-jules[bot]**, **tfufuu**) | `audit: systematischer audit memfuse-text (#2243)`
   *Systematischer Tiefenaudit von `memfuse-text`: Reverifikation von BM25 Robertson-Spärck-Jones IDF, Char-Boundary Sicherheit beim Token-Slicing, sowie 100% Verifikation aller Crate-Module (`inverted.rs`, `tokenizer.rs`, `lib.rs`, `morphology.rs`).*
 
+### 13. September 2026
+- `a7b1892` | **google-labs-jules[bot]** | `feat(mcp): wire live router and calibrator stats to MemFuse::stats()`
+  *Integration dynamischer Observability-Metriken aus `memfuse-router` und `memfuse-calibration` in den MCP Stdio-Server via `setup_routing()`.*
+- `89f2134` | **google-labs-jules[bot]** | `feat(sandbox): enforce WASM fuel and memory bounds in memfuse-sandbox`
+  *Designation von `memfuse-sandbox` als Layer 2/6.5 WASM Execution Boundary (Spec v5 §4.18) mit Tests für Fuel-Exhaustion und Memory-Isolation.*
+- `91024bc` | **google-labs-jules[bot]** | `fix(xtask): refine audit lints for unbounded bounds and NaN checks`
+  *Verfeinerung der statischen Audit-Lints in `xtask` (`check_max_results_unbound`, `check_nan_validation_in_hot_loop`) zur Eliminierung falscher Positiver durch RegEx-Kontextfenster.*
+
+### 14. September 2026
+- `9a2e914` | **google-labs-jules[bot]** | `refactor(router): make RouterEngine generic over StorageEngine`
+  *Dekopplung von `memfuse-router` (Layer 7) von `memfuse-store` durch Umstellung von `RouterEngine` auf `RouterEngine<S: StorageEngine>`. Verschiebung von `memfuse-store` in `[dev-dependencies]`.*
+- `4d64a08` | **google-labs-jules[bot]** | `memfuse-store: SDLC Phase 3 REVIEW audit and findings report (#2856)`
+  *Tiefenaudit der LSM Group-Commit Phase: Identifikation und Korrektur des Race-Condition-Risikos im `last_hmac` Kettenglied beim Freigeben von Locks vor I/O.*
+- `6d69390` | **google-labs-jules[bot]** | `Audit memfuse-checkpoint architecture and panic safety guarantees`
+  *Konsolidierung der doppelten `RwLock` Indizes (`checkpoints`, `name_index`) in `PersistentCheckpointStore` zu einer einzigen atomaren `RwLock<CheckpointIndex>` Struktur.*
+- `734d34b` | **google-labs-jules[bot]** | `audit(calibration): complete deep audit of memfuse-calibration crate`
+  *Tiefenaudit der Isotonischen Regression (PAVA) und Platt-Scaling Algorithmen mit P99 Latenz-Garantien.*
+
+### 15. September 2026
+- `ae756a1` | **google-labs-jules[bot]** | `docs: add architectural analysis for cloud-egress privacy gateway §12`
+  *Fünf-Schichten Vollständigkeitsaudit des Cloud-Egress Privacy Gateways in `docs/audits/AUDIT_cloud_egress_five_layer_completeness.md`.*
+- `3f83a18` | **google-labs-jules[bot]** | `docs(audit): complete deep audit of memfuse-embed layer 4`
+  *Architektur- & Robustheits-Audit für `memfuse-embed` mit Nachweis von Zero Unsafe Code, Spawn-Blocking Thread-Isolierung und Domain Scoring Invarianten.*
+- `84f95d8` | **google-labs-jules[bot]** | `docs: complete cross-crate durability path audit report`
+  *Umfassende Verifikation der Speicherdurabilität (WAL HMAC Chaining, 2PC Multi-Index Sync, Fsync-Disziplin).*
+- `a49deca` | **google-labs-jules[bot]** | `docs(audit): complete architectural audit for memfuse-core (Layer 0)`
+  *Tiefenaudit von `memfuse-core`: Validierung der Trait-Submodule (`traits/`), Error DTOs und Domain-Typen.*
+- `70a9ea4` | **google-labs-jules[bot]** | `docs(audit): complete deep architecture audit for memfuse-core-ipc-gen`
+  *Validierung der FlatBuffers IPC Generierung und Zero-Copy Deserialisierungs-Schranken.*
+- `48b9605` | **google-labs-jules[bot]** | `docs(router): complete architectural audit for memfuse-router layer 6`
+  *Audit des LinUCB Contextual Bandits in `bandit.rs`: Behebung von Debug-Assert Panics und Rekalibrierung der $\theta$-Parameter.*
+- `28238b5` | **google-labs-jules[bot]** | `docs: complete memfuse-mcp architecture and security audit report`
+  *Tiefenaudit von `memfuse-mcp`: Pufferdeckelung, Prompt Injection Quarantäne und Refactoring des Egress Gateways auf den offiziellen `EgressVault` Kontrakt.*
+- `cc2faa5` | **google-labs-jules[bot]** | `docs: add architectural audit report for memfuse-index`
+  *Refactoring des HNSW-Einfügepfads auf den Compute-then-Commit Ansatz: Trennung in read-only `compute_insert` und atomares `apply_insert` zur Verhinderung von Phantomen.*
+- `4136460` | **google-labs-jules[bot]** | `docs(graph): deliver comprehensive micro-fine architectural audit report for memfuse-graph`
+  *Refactoring der Staging-Strukturen im CSR-Graphen (`staged_entities`, `staged_edges`) auf flache `AHashMap` mit Composite Keys `(TxId, EntityId)`.*
+
+### 16. September 2026
+- `f459e93` | **google-labs-jules[bot]** | `docs(memfuse-core): synchronize governance and architecture docs`
+  *Synchronisierung aller Governance-Dokumente (`ARCHITECTURE.md`, `WORKING_STATE.md`) via `cargo xtask sync-docs`.*
+- `7d87a7b` | **google-labs-jules[bot]** | `docs(core): sync governance docs and audit log for memfuse-core`
+  *Aktualisierung des Audit-Protokolls für Layer 0.*
+- `f8d01be` | **google-labs-jules[bot]** | `memfuse-core: docs sync and governance audit update`
+  *Audit-Update für `memfuse-core` Submodule.*
+- `2d6d9ac` | **google-labs-jules[bot]** | `memfuse-core: docs sync and governance audit report for 2026-09-17`
+  *Governance Audit & Sync.*
+- `8c199f6` | **google-labs-jules[bot]** | `docs(memfuse-core): sync governance documentation and record audit findings`
+  *Dokumentation der Trait-Submodul-Entkopplung.*
+- `4d67c95` | **google-labs-jules[bot]** | `memfuse-core: sync governance docs and record inventory audit`
+  *Abgleich des Crate-Inventars von `memfuse-core`.*
+- `21e22bc` | **google-labs-jules[bot]** | `docs(memfuse-core): sync governance documentation and audit report`
+  *Governance-Dokumentationsabgleich.*
+- `f8362f5` | **google-labs-jules[bot]** | `docs(memfuse-core): sync governance docs and record inventory audit (#3015)`
+  *Pull-Request Merge: Governance & Inventar-Synchronisation für Layer 0.*
+- `c052b9c` | **google-labs-jules[bot]** | `memfuse-core: sync governance docs and audit report`
+  *Sicherstellung der Invarianten in `memfuse-core`.*
+- `05e744c` | **google-labs-jules[bot]** | `docs(core): sync governance and architecture documentation`
+  *Systemweiter Architektur-Dokumentations-Sync.*
+- `cfc2403` | **google-labs-jules[bot]** | `docs(core): sync governance documentation and audit report`
+  *Audit-Protokollierung für Core-Typen.*
+- `7ba44b3` | **google-labs-jules[bot]** | `docs(memfuse-core): sync governance docs and record inventory audit`
+  *Abschluss der Layer 0 Governance Synchronisation.*
+- `837b7ba` | **google-labs-jules[bot]** | `docs(checkpoint): document consolidated CheckpointIndex verification`
+  *Dokumentation des konsolidierten Checkpoint-Index.*
+- `725f594` | **tfufuz1** | `Harden WAL replay bounds and implement transaction intent recovery`
+  *Härtung der WAL Batch-Replay Grenzen und Implementierung transaktionaler Intent-Recovery im LSM-Store.*
+
+### 17. September 2026
+- `e4a2109` | **google-labs-jules[bot]** | `perf(store,db): optimize MemTable and RRF fusion allocations`
+  *Performance-Optimierung: Kapazitätsreservierung `.or_insert_with(|| Vec::with_capacity(2))` in `memtable.rs` und String-Internierung (`&str` IDs) mit SoA Score-Akkumulation in `fusion.rs`.*
+- `b817c2d` | **google-labs-jules[bot]** | `feat(index): add fuzz_hnsw_persistence fuzz target`
+  *Einführung des Fuzzing-Targets `fuzz_hnsw_persistence` in `crates/memfuse-index/fuzz/` zur Überprüfung von SIMD-Ausrichtung, Float-Sanitizing und Mmap Corruption Roundtrips.*
+- `c512a80` | **google-labs-jules[bot]** | `feat(xtask): add lint-unsafe-slices subcommand for AST SIMD bounds checking`
+  *Einführung von `xtask lint-unsafe-slices` zur automatisierten AST-Analyse von Slice-Längenprüfungen vor SIMD-Loads in `unsafe fn`s.*
+- `d294821` | **google-labs-jules[bot]** | `refactor(core): replace non-atomic put_if_absent trait default with CapabilityUnsupported`
+  *Ersetzung des nicht-atomaren `put_if_absent` Trait-Defaults in `StorageEngine` durch `MemFuseError::CapabilityUnsupported` zur Erzwingung atomarer Concurrency Control in Implementierungen.*
+
+### 18. September 2026
+- `95da5e2` | **tfufuz1** | `feat(xtask): add post-merge report and workflow integration (#3109)`
+  *Integration des automatisierten Post-Merge Reports in `xtask` (`xtask post-merge-report`) zur kontinuierlichen Generierung von Zusammenfassungen nach Pull Request Merges.*
+
 ---
 
 ## 3. Tiefere Differenz- & Fehler-Analysen (Vorher vs. Nachher)
@@ -420,7 +504,7 @@ Um die Evolution und Behebung aller kritischen Systemfehler transparent und nach
 - **Fehler / Schwachstelle**: WAL HMAC Sidecar Race & TOCTOU (`F-07`).
   *Vorher*: WAL-Integritätsschlüssel wurden nicht-atomar vor der Erstellung der WAL-Datei geprüft. Bei plötzlichem Stromausfall konnte eine teilweise geschriebene Sidecar-Datei erzeugt werden, was beim Neustart zu Korruptionsfalsch-Positiven führte.
   *Ursache*: Fehlende atomare Dateierstellung via OS-Flags (`O_EXCL` / `create_new(true)`).
-  *Nachher (Lösung)*: Erstellung des WAL HMAC Sidecars mittels `create_new(true)` unter exklusivem Lock mit atomarer In-Place HMAC-Aktualisierung.
+  *Nachher (Lösung)*: Erstellung des WAL HMAC Sidecars mittels `create_new(true)` under exklusivem Lock mit atomarer In-Place HMAC-Aktualisierung.
 - **Fehler / Schwachstelle**: Ignorierte I/O-Fehler bei Recovery `sync_all` Aufrufen (Gate 3).
   *Vorher*: Fehler beim Erzwingen von Dateisystem-Syncs (`file.sync_all()`) während der WAL-Wiederherstellung wurden stumm mit `let _ =` verworfen.
   *Ursache*: Fehlende I/O-Fehler-Propagation im Replay-Loop.
@@ -432,149 +516,157 @@ Um die Evolution und Behebung aller kritischen Systemfehler transparent und nach
     1. Phase 1: In-Memory Freeze der aktiven MemTable in eine Immutables-List unter kurzer Sperre.
     2. Phase 2: Async Schreiben der SSTable-Datei auf Festplatte völlig ohne Sperre.
     3. Phase 3: Kurzer Commit-Lock zur Entfernung der Immutable MemTable und Aktualisierung des Manifests.
-- **Fehler / Schwachstelle**: Flush-Counter Namens-Kollisionen (ADR-060).
-  *Vorher*: Mehrere parallele `LsmStorage` Instanzen im selben Prozess wiesen identische Flush-Sequenznummern auf, was zu Überschreiben von SSTable-Dateien führte.
-  *Ursache*: Statische, globale Flush-Zähler.
-  *Nachher (Lösung)*: Umstellung auf instanzgebundenen `flush_counter: AtomicU64` in jedem `LsmStorage`.
-- **Fehler / Schwachstelle**: Unvollständige SSTable Compaction Crash-Safety.
-  *Vorher*: Wenn der Prozess während einer STCS-Compaction abstürzte, hinterließ er eine halb geschriebene SSTable-Datei, die beim nächsten Start den LSM-Tree beschädigte.
-  *Ursache*: Direktes Schreiben in die Ziel-SSTable-Datei.
-  *Nachher (Lösung)*: Write-Temp-Then-Rename (ADR-044): Schreiben in `.sst.tmp`, Erzwingen von `file.sync_all()`, gefolgt von atomarem `tokio::fs::rename`.
+- **Fehler / Schwachstelle**: Group-Commit Leader Mutex Contention während Disk I/O.
+  *Vorher*: Der Group-Commit Leader hielt die `commit_mutex` während der gesamten physikalischen `wal.append_batch` Schreiboperation auf die Festplatte, was nachfolgende Commits unnötig blockierte.
+  *Ursache*: Zu breiter Geltungsbereich der Mutex-Sperre über I/O-Grenzen hinweg.
+  *Nachher (Lösung)*: Freigabe von `commit_mutex` vor der physikalischen Disk I/O. Bei I/O-Fehlern wird die Mutex erneut erworben, um die HMAC-Kette wiederherzustellen und `rollback_to_tx_locked` auszuführen.
+- **Fehler / Schwachstelle**: Speicherallokations-Ineffizienz in MemTable und Multi-Version-Vektoren.
+  *Vorher*: Das Einfügen in die MemTable nutzte `.or_default()`, was bei Schlüsselversionierungs-Vektoren zu häufigen Reallokationen führte.
+  *Ursache*: Default-Vektorallokation mit Kapazität 0.
+  *Nachher (Lösung)*: Ersetzung durch `.or_insert_with(|| Vec::with_capacity(2))` für Key-Versionen und atomare Kapazitätsschätzung `std::cmp::max(16, total_bytes / 64)` beim Iterieren über MemTable-Einträge.
 
 ### B. Vektor- & Text-Suchindizes (HNSW, DiskANN, BM25, SIMD)
+- **Fehler / Schwachstelle**: HNSW Phantom-Node Sichtbarkeit und Race Conditions beim Einfügen (INV-HNSW-1, INV-HNSW-2).
+  *Vorher*: HNSW Knoten wurden vor der vollständigen Berechnung ihrer Nachbarschafts-Verbindungen in die Graphstruktur eingefügt, was für parallele Suchanfragen als Phantom-Knoten ohne Kanten sichtbar war. Inline-Schreiblocks in `search_layer` führten zu Lock-Contention.
+  *Ursache*: Verflechtung von Berechnungs- und Anwendungsphase beim HNSW-Insert.
+  *Nachher (Lösung)*: Einführung des Compute-then-Commit Patterns in `hnsw.rs`:
+    1. Phase 1 (`compute_insert`): Read-Only Berechnung von Quantisierung, Zielverbindungen und Rückwärtskanten.
+    2. Phase 2 (`apply_insert`): Atomares Drücken des Knotens mit vollständig gefüllten Kanten.
+    `search_layer()` erfordert nur noch einen einmaligen Read-Lock auf `deleted_nodes` außerhalb der BFS-Schleife ohne synchrone Schreib-Sperren.
+- **Fehler / Schwachstelle**: SQ8 Skalen-Instabilität durch Dynamische Grenzen-Erweiterung.
+  *Vorher*: `expand_bounds_to_fit` passte Skalierungsgrenzen der Quantisierers dynamisch an, was bestehende 8-Bit Codes entwertete und Distanzwerte verfälschte.
+  *Ursache*: Verletzung der Skaleninvarianz des SQ8 Quantisierers.
+  *Nachher (Lösung)*: Entfernung von `expand_bounds_to_fit`. Vektorelemente werden an den Dim-Grenzen geclampt; Drift-Zähler (`total_queries`, `out_of_range_queries`) erfassen Abweichungen atomar. Bei Überschreiten des `quantizer_drift_threshold` wird automatisch ein Index-Rebuild via `ScalarQuantizer::train` ausgelöst.
+- **Fehler / Schwachstelle**: Unchecked SIMD Slice Loads Out-of-Bounds Risiko.
+  *Vorher*: `unsafe fn`s in Distanzfunktionen konnten bei fehlerhaft ausgerichteten Slices OOB-Speicherzugriffe auslösen.
+  *Ursache*: Fehlende compile-zeitliche/statische Kontrolle von Slice-Längenprüfungen vor SIMD-Loads.
+  *Nachher (Lösung)*: Einführung des Subcommands `xtask lint-unsafe-slices`: Ein AST-Linter auf Basis von `syn`, der verifiziert, dass alle `unsafe fn`s mit Slice-Parametern explizite Längenprüfungen oder `.min()` Normalisierungen vor SIMD-Loads durchführen.
 - **Fehler / Schwachstelle**: Potential UTF-8 Char Boundary Panic im Text Slicing.
   *Vorher*: Beim Zuschneiden von Strings an festen Byte-Indizes in `memfuse-text` konnte ein Slicing mitten in einem Multibyte-UTF-8-Zeichen auftreten und eine Panik auslösen.
   *Ursache*: Direkter Zugriff auf `&str[..len]` ohne Boundary-Prüfung.
   *Nachher (Lösung)*: Absicherung via `floor_char_boundary` / `char_indices` Prüfungen, die sicherstellen, dass Slices strikt an UTF-8 Zeichengrenzen ausgerichtet sind.
-- **Fehler / Schwachstelle**: SIMD Nightly-Dependence & Instabilität (ADR-047).
-  *Vorher*: Distanzberechnungen nutzten `std::simd` (Nightly Rust Compiler requirement), was zu Build-Inkompatibilitäten und Crashs führte, wenn die CPU ein Feature nicht unterstützte.
-  *Ursache*: Implizite Annahme von AVX2/AVX-512 Support ohne Laufzeit-Erkennung.
-  *Nachher (Lösung)*: Umstellung auf Stable Rust `std::arch` Intrinsics mit 100% Abdeckung durch Laufzeit-Feature-Erkennung (`is_x86_feature_detected!`, `is_aarch64_feature_detected!`) und geschützten Skalar-Fallbacks. Kosinus-Distanzen werden strikt auf `[0.0, 2.0]` geclampt (`dist.clamp(0.0, 2.0)`).
-- **Fehler / Schwachstelle**: Falsche BM25 IDF Formel im Invertierten Index.
-  *Vorher*: Die BM25 Implementierung nutzte ein klassisches Unsmoothed Log-IDF, das bei Termen, die in mehr als der Hälfte der Dokumente vorkamen, negative Scores erzeugte.
-  *Ursache*: Mathematisch ungeeignete Formel für begrenzte Sammlungen.
-  *Nachher (Lösung)*: Umstellung auf Robertson-Spärck-Jones smoothed log-IDF $\ln\left(1 + \frac{N - df + 0.5}{df + 0.5}\right)$, das stets nicht-negativ bleibt, ergänzt durch strikte Hyperparameter-Validierung ($k_1 \ge 0.0$, $0.0 \le b \le 1.0$).
-- **Fehler / Schwachstelle**: DiskANN Datenverlust bei abruptem Absturz.
-  *Vorher*: Neue Vektoren in DiskANN verblieben vor dem Flushing im Hauptspeicher ohne WAL-Absicherung; ein Crash führte zu Datenverlust.
-  *Ursache*: Fehlen einer transaktionalen Pufferung.
-  *Nachher (Lösung)*: DiskANN WAL-gepufferter Pending Buffer und inkrementelle Delta-Persistierung (`persist_delta`), die ungeflushte Daten aus dem WAL rekonstruiert.
 
 ### C. Wissensgraph & Kognitive Mechanismen
 - **Fehler / Schwachstelle**: Misleitende biologische Metapher-Begriffe im Code.
   *Vorher*: Kernkomponenten der Datenbank verwendeten Begriffe wie `sleep-cycle`, `thermostat` und `reaper`.
   *Ursache*: Frühe Entwurfs-Metaphern, die zu Unklarheiten im API-Design führten.
   *Nachher (Lösung)*: Refactoring in `memfuse-db` (`#2d37e40`): Ersetzung aller biologischen Metaphern durch präzise technische Bezeichnungen (`ConsolidationScheduler`, `PidController`, `ExpiryEngine`).
-- **Fehler / Schwachstelle**: SessionBranchTree Lock-Ordering Deadlock (#1539).
-  *Vorher*: Bei simultanen Branch-Switches und Vertiefungs-Operationen im Session-DAG kam es zu zyklischen Deadlocks zwischen `AppState.sessions` (`RwLock`) und `SessionBranchTree` internal Locks.
-  *Ursache*: Inkonsistente Sperr-Reihenfolge in async Kontexten.
-  *Nachher (Lösung)*: Einführung eines Newtype Guards, der die Sperrhierarchie strikt durchsetzt (1. `AppState.sessions` -> 2. `SessionBranchTree`), sodass Locks vor `.await` Punkten vollständig freigegeben werden.
+- **Fehler / Schwachstelle**: Staged Entities & Edges Speicherallokation im CSR-Graphen.
+  *Vorher*: Transaktionales Staging im CSR-Graphen nutzte benutzerdefinierte Datenstrukturen mit hoher Reallokationsfrequenz beim Commit und Rollback.
+  *Ursache*: Ungeeignete Speicherrepräsentation für temporäre Graphänderungen.
+  *Nachher (Lösung)*: Migration von `staged_entities`, `staged_edges` und `staged_removals` auf flache `ahash::AHashMap` Strukturen mit Composite Keys `(TxId, EntityId)` und `.retain()` Iteration beim Commit/Rollback.
 - **Fehler / Schwachstelle**: Verwaiste Kanten bei Gedächtnis-Verdrängung (A-MEM Zettelkasten).
   *Vorher*: Wenn ein veraltetes Dokument durch ein neues ersetzt wurde (`LinkRelation::Supersedes`), blieben die zugehörigen Entitäts-Kanten im CSR-Graph aktiv und verfälschten spätere GraphRAG-Abfragen.
   *Ursache*: Fehlende kaskadierende Invalidierung im Graph-Modul.
   *Nachher (Lösung)*: Kaskadierende Kanten-Invalidierung (`cascade.rs`, `INV-GRAPH-PROV-1`): Das System speichert `source_doc_id` in `Edge` und pflegt einen `doc_to_edges` Index (`DocId -> Set<(EntityId, EntityId)>`). Bei `Supersedes` wird `cascade_invalidate_edges_for_superseded_doc()` aufgerufen und invalidierte Kanten transaktional mit WAL-Bindung aus dem aktiven Traversierungsgraphen entfernt.
 
 ### D. Konkurrenz, Transaktionen & Sperrhierarchien
-- **Fehler / Schwachstelle**: Unvollständiger Transaktions-Commit über verteilte Indizes.
-  *Vorher*: Ein Fehlschlag beim Schreiben in den CSR-Graph hinterließ bereits geschriebene Vektoren im HNSW-Index und Texte im BM25-Index, was die Cross-Signal-Konsistency zerstörte.
-  *Ursache*: Fehlen einer verteilten Transaktionskontrolle.
-  *Nachher (Lösung)*: Full 4-Index 2-Phase Commit (2PC):
-    1. Phase 1 (Prepare): Alle 4 Sub-Engines (HNSW, BM25, CSR-Graph, Metadaten) validieren Eingaben und schreiben Änderungen in Shard-basierte Staging-Buffer (`TxBuffer`).
-    2. Phase 2 (Commit/Rollback): Bei Erfolg aller 4 Vorbereitungen wird ein atomarer WAL Commit ausgeführt; bei einem Teilfehler wird ein kompensierendes Rollback über alle vorbereiteten Indizes getriggert.
-- **Fehler / Schwachstelle**: TOCTOU Race Condition bei Key-Locks (`KvKeyLocks`).
-  *Vorher*: Schlüssel-Sperren wurden über ein globales Modul synchronisiert, was zu Race Conditions zwischen voneinander unabhängigen Datenbank-Sammlungen führte.
-  *Ursache*: Ungenügende Mandanten- und Instanz-Isolierung.
-  *Nachher (Lösung)*: `KvKeyLocks` wurden instanzgebunden direkt an die `Collection` gebunden. Mutation-Operationen finden innerhalb der `insert_lock` Mutex-Sperre statt, was TOCTOU-Kollisionen vollständig ausschließt.
+- **Fehler / Schwachstelle**: Transaktions-Rollback Sequenz-Verletzung bei 2PC Fehlschlägen (INV-DB-3).
+  *Vorher*: Bei Ausfall der Vektorindex-Commit-Phase wurden Graph- und Textindex-Rollbacks vor dem Vektorindex-Rollback ausgeführt, was die vorgeschriebene Kompensationsreihenfolge verletzte.
+  *Ursache*: Falsche Reihenfolge im `catch`-Block der Transaktions-Engine.
+  *Nachher (Lösung)*: Strikt durchgesetzte Kompensationsreihenfolge nach INV-DB-3: Schlägt `collection.index.commit(tx_id)` fehl, wird zuerst `collection.index.rollback(tx_id)` aufgerufen, bevor Graph- und Textindex-Rollbacks eingeleitet werden.
+- **Fehler / Schwachstelle**: Rennen um doppelte `RwLock` Indizes in Checkpoint Store.
+  *Vorher*: `PersistentCheckpointStore` verwaltete zwei getrennte Locks (`checkpoints: RwLock<HashMap<u64, CheckpointMeta>>` und `name_index: RwLock<HashMap<String, u64>>`), was bei parallelem Schreiben zu Inkonsistenzen führen konnte.
+  *Ursache*: Mangelnde Atomarität über zwei getrennte Mutexes.
+  *Nachher (Lösung)*: Konsolidierung in eine einzige `index: RwLock<CheckpointIndex>` Struktur, die `by_seq` und `by_name` umschließt, womit alle Operationen unter einer einzigen atomaren Sperre ausgeführt werden.
+- **Fehler / Schwachstelle**: Kollision zwischen MaintenanceScheduler und ConsolidationEngine (ADR-081 / H-19).
+  *Vorher*: Gleichzeitiges Ausführen von Hintergrund-Wartungsaufgaben und Konsolidierungsläufen konnte zu Ressourcen-Deadlocks führen.
+  *Ursache*: Fehlen von gegenseitigem Ausschluss zwischen Hintergrund-Gewerken.
+  *Nachher (Lösung)*: Einführung von `consolidation_guard: Arc<tokio::sync::Mutex<()>>` in `Collection`. `execute_consolidation_pass` führt ein nicht-blockierendes `try_lock()` aus; bei Kollision wird der Durchlauf übersprungen.
 
 ### E. Sicherheit, FFI, Mandantenfähigkeit & Compliance
-- **Fehler / Schwachstelle**: Umgehen von Mandanten-Isolierung via `TenantId::new()`.
-  *Vorher*: Entwickler konnten `TenantId::new()` ohne Validierung aufrufen, was `INV-TENANT-1` verletzen konnte.
-  *Ursache*: Fehlende Deprecation und Durchsetzung von `TenantId::try_new()`.
-  *Nachher (Lösung)*: `TenantId::new()` als `#[deprecated]` markiert und durch `TenantId::try_new()` sowie `TenantId::SYSTEM` ersetzt. Strikte Crate-Aliasierung von `memfuse-crypto` zu `memfuse-security`.
-- **Fehler / Schwachstelle**: Fehlen eines kryptographischen Löschnachweises (DSGVO Art. 17).
-  *Vorher*: Das Löschen von Dokumenten konnte nicht nachweisbar belegt werden.
-  *Ursache*: Einfaches Setzen von Tombstones ohne kryptographische Signatur.
-  *Nachher (Lösung)*: `DeletionProof`: Nach dem physischen Löschen generiert das System einen kryptographischen Löschnachweis mit HMAC-Signatur über `DocId`, `TenantId`, Timestamp und Merkle-Root der gelöschten Blöcke.
+- **Fehler / Schwachstelle**: P1 Command Injection Schwachstelle in MCP Context Routing Dispatch.
+  *Vorher*: `dispatch_to_slm` führte externe Befehle via `Command::new("sh").arg("-c")` aus, was Arbitrary Command Execution ermöglichte.
+  *Ursache*: Ausführung über Shell-Interpreter ohne Argument-Sanitizing.
+  *Nachher (Lösung)*: Ersetzung durch inline stdlib Helper `split_endpoint()` und direkte Binär-Aufrufe via `Command::new(&program).args(&args)` ohne Shell-Kontext.
+- **Fehler / Schwachstelle**: Inkomplette DLP-Regeln und Fail-Open Risiko im Egress Gateway.
+  *Vorher*: Das Egress Gateway nutzte lokales Stub-Type `DefaultEgressClassifier` mit lückenhaften Regeln.
+  *Ursache*: Abweichung vom zentralen `memfuse-security` Kryptokontrakt.
+  *Nachher (Lösung)*: Ersetzung durch `pub type DefaultEgressClassifier = EgressVault;` direkt aus `memfuse-security` mit Standard-DLP-Mustern (`sk-`, `AKIA`, `api_key`, `password`, Email-Regex) und Zero-Panic Fallbacks.
 - **Fehler / Schwachstelle**: CPython Process Crash bei Rust Panics über FFI.
   *Vorher*: Ein Panic in rechenintensiven Rust-Funktionen führte zum sofortigen Absturz der gesamten Python-Anwendung.
   *Ursache*: Unverfangene Rust-Panics über PyO3 FFI-Grenzschichten.
   *Nachher (Lösung)*: Kapselung aller FFI-Aufrufe in `run_blocking_ffi` mit `py.allow_threads()` (Freigabe des Python GIL) und `std::panic::catch_unwind`, das Rust Panics abfängt und sauber in Python `PyRuntimeError` Exceptions konvertiert.
-- **Fehler / Schwachstelle**: MCP Stdio RPC Buffer Overflow DoS Vector.
-  *Vorher*: Der MCP Stdio JSON-RPC Server erlaubte Puffergrößen bis zu 16 MB pro Nachricht, was zu Speichererschöpfung (OOM) bei der Nachrichtenverarbeitung führte.
-  *Ursache*: Zu hoch angesetztes Pufferlimit (`MAX_RPC_BYTES = 16MB`).
-  *Nachher (Lösung)*: Reduktion von `MAX_RPC_BYTES` auf 4 MB, Pufferdeckelung in `read_line_bounded` und Integration von Prompt Injection Guards für eingebettete Werkzeuge.
 
-### F. Agenten, Kalibrierung & Adaptive Systeme
-- **Fehler / Schwachstelle**: TokenBudget Concurrency Read-Modify-Write (RMW) Race (#1239).
-  *Vorher*: Parallele Schritte in Agenten-Workflows konnten das zugewiesene Tokenbudget überschreiten, da Budget-Prüfung und Budget-Abzug nicht atomar waren.
-  *Ursache*: Getrennte Lese- und Schreibzugriffe auf `TokenBudget` ohne atomaren Schutz.
-  *Nachher (Lösung)*: Atomare RMW-Operationen auf `TokenBudget` mit APM-4 Pre-Execution Validierung vor `tool.execute()`.
-- **Fehler / Schwachstelle**: Starre Signal-Gewichtung beim Hybrid Retrieval.
-  *Vorher*: Die Gewichtung der RRF-Signale (Vektor, Text, Graph) war statisch und konnte sich nicht an wechselnde Dokumentenstrukturen anpassen.
-  *Ursache*: Hartcodierte Gewichte.
-  *Nachher (Lösung)*: Replicator Dynamics: Dynamische Signal-Gewichtung, die RRF-Gewichte auf Basis zeitdiskreter Replikatordynamik basierend auf Verdrängung und Retrieval-Latenzen anpasst.
-- **Fehler / Schwachstelle**: Nicht-kalibrierte Relevanz-Scores bei SLM Prompt-Routing.
-  *Vorher*: Raw Cross-Encoder Scores führten zu fehlerhaftem Routing, da Vertrauenswerte nicht mit der tatsächlichen Wahrscheinlichkeit übereinstimmten.
-  *Ursache*: Fehlen einer Post-Hoc Kalibrierung.
-  *Nachher (Lösung)*: `memfuse-calibration`: Integration von Isotonischer Regression und Platt-Scaling zur konformen Kalibrierung von Relevanz-Scores.
+### F. Performance, Zero-Copy & Hybrid Fusion
+- **Fehler / Schwachstelle**: Speicher-Copys und Reallokationen auf dem Read-Path der Storage Engine.
+  *Vorher*: `StorageEngine::get` und `get_at_seq` gaben `Result<Option<Vec<u8>>>` zurück, was bei jedem Lesevorgang Puffer-Kopiervorgänge erforderte.
+  *Ursache*: Verwendung von owned `Vec<u8>` in Trait-Signaturen.
+  *Nachher (Lösung)*: Refactoring der `StorageEngine` Trait-Methoden auf `Result<Option<bytes::Bytes>>`. Alle Implementierungen und Aufrufer über das gesamte Workspace hinweg nutzen nun Zero-Copy `bytes::Bytes` Slices.
+- **Fehler / Schwachstelle**: Heap-Allokations-Hotspot in Reciprocal Rank Fusion (`fusion.rs`).
+  *Vorher*: `weighted_reciprocal_rank_fusion_with_options` allokierte für jedes Dokument im Hot-Path neue `String` Schlüssel in der Hashmap.
+  *Ursache*: Verwendung von `AHashMap<String, FusedEntry>` während der Score-Akkumulation.
+  *Nachher (Lösung)*: Optimierung durch `&str` ID-Internierung (`AHashMap<&str, u32>`), SoA Float Score-Akkumulation (`scores: Vec<f32>`) und späte String-Hydratisierung erst nach dem Integer-Index-Sortieren.
 
 ---
 
-## 4. Subsystem- & Crate-Entwicklung (Layer 0 bis Layer 4)
+## 4. Subsystem- & Crate-Entwicklung (Layer 0 bis Layer 9)
 
-Das Repository umfasst **18 aktiv verwaltete Workspace Crates**, aufgeteilt in 5 Architektur-Schichten:
+Das Repository umfasst **19 aktiv verwaltete Workspace Crates** (18 Kern-Crates + 1 optionales Crate `memfuse-embed`), aufgeteilt in **10 Architektur-Schichten** gemäß kanonischer DAG-Topologie:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ Layer 4: Desktop App, MCP Server & Kalibrierung                 │
-│  - memfuse-tauri (Tauri Desktop App Shell)                      │
-│  - memfuse-mcp (JSON-RPC 2.0 MCP Server & Stdio Sandbox)        │
-│  - memfuse-router (SLM Context Routing Engine)                  │
-│  - memfuse-bench (Reproduzierte Benchmark-Suite)                │
-├─────────────────────────────────────────────────────────────────┤
-│ Layer 3: Client Interfaces & RAG Augmentation                   │
-│  - memfuse-db (4-Signal Fusion, MultiStep Engine, Compactor)    │
-│  - memfuse-py (PyO3 Python FFI Bindings)                        │
-│  - memfuse-ollama (Lokales LLM / Embedding Backend)             │
-│  - memfuse-agent (Persistent Agent Workflow Engine)             │
-│  - memfuse-embed (In-Process ONNX Reranking & Embeddings)       │
-├─────────────────────────────────────────────────────────────────┤
-│ Layer 2: Storage & Spezialisierte Indizes                       │
-│  - memfuse-store (LSM-Tree, WAL V3, MemTable Sharding)         │
-│  - memfuse-index (HNSW, DiskANN, Quantisierung, SIMD)           │
-├─────────────────────────────────────────────────────────────────┤
-│ Layer 1: Spezifische In-Memory & Hilfs-Crates                   │
-│  - memfuse-text (BM25, Invertierter Index, Morphologie)         │
-│  - memfuse-crypto / memfuse-security (AES-256-GCM-SIV, WAL)     │
-│  - memfuse-graph (CSR-Graph, PathRAG, Bi-temporal Axes)        │
-│  - memfuse-checkpoint (MVCC Snapshot-Pinning, CheckpointGuard) │
-│  - memfuse-kv-bridge (Tenant-Isolated KV-Segment Store)         │
-│  - memfuse-calibration (Isotonic & Platt Conformal Calibration) │
-│  - memfuse-candle (Native Candle GGUF ML Inference)             │
-├─────────────────────────────────────────────────────────────────┤
-│ Layer 0: Core Abstractions & Data Types                         │
-│  - memfuse-core (MemFuseError, Domain Types, TenantId, Traits)  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Layer 9: Model Context Protocol (MCP) Boundary                          │
+│  - memfuse-mcp (stdio JSON-RPC 2.0 Server, DLP Egress Gateway)          │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 8: Client Interfaces & Workflow Execution                         │
+│  - memfuse-agent (Persistent Workflow Engine, Checkpoint/Audit Loop)   │
+│  - memfuse-py (PyO3 Python FFI Bindings mit GIL-Freigabe)               │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 7: Benchmarks & Routing                                           │
+│  - memfuse-bench (Reproduzierbare Benchmark Harness Suite)              │
+│  - memfuse-router (Contextual Bandit Prompt Routing Engine)             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 6: Database Facade & Orchestration                                │
+│  - memfuse-db (4-Signal Fusion, 2PC Transactions, Collection API)      │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 5: In-Process Embeddings & Reranking                              │
+│  - memfuse-embed (In-Process ONNX Cross-Encoder Reranking, optional)    │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 4: ML Inferenz Backend                                            │
+│  - memfuse-candle (Native Candle GGUF Inferenz Engine)                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 3: Storage & Vektor-Indizes                                       │
+│  - memfuse-index (HNSW, DiskANN, Quantisierung, SIMD)                   │
+│  - memfuse-ollama (Ollama HTTP Client & Context Prefixer)               │
+│  - memfuse-store (LSM-Tree, WAL V3, 3-Phase Async Flush)                │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 2: Spezialisierte Subsysteme & Isolation Boundary                 │
+│  - memfuse-calibration (Isotonische & Platt Conformal Calibration)      │
+│  - memfuse-checkpoint (MVCC Snapshot-Pinning, CheckpointGuard)         │
+│  - memfuse-crypto / memfuse-security (AES-256-GCM-SIV, DeletionProof)  │
+│  - memfuse-graph (CSR-Graph, PathRAG, Bi-temporale Zeitachsen)          │
+│  - memfuse-sandbox (WASM Execution Boundary & Fuel Isolation)           │
+│  - memfuse-text (BM25 Robertson-Spärck-Jones, Deutsche Morphologie)     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 1: Core Domain Abstractions                                       │
+│  - memfuse-core (MemFuseError, TenantId, DocId, TxBuffer, Traits)       │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Layer 0: FlatBuffers IPC Code Generation                                │
+│  - memfuse-core-ipc-gen (Auto-generated FlatBuffers IPC Code)           │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Detaillierte Crate-Rollen (18 Crates):
-1. **`memfuse-core`** (Layer 0): Kanonische Domain-Typen (`TenantId`, `DocId`, `TxId`), Unified `MemFuseError`, Trait-Definitionen und `TxBuffer`.
-2. **`memfuse-calibration`** (Layer 1): Isotonische und Platt Conformal Calibration für Konfidenz-Scoring.
-3. **`memfuse-candle`** (Layer 1): Native Candle GGUF ML-Inferenz-Backend für rahmenwerksfreie Embeddings.
-4. **`memfuse-checkpoint`** (Layer 1): MVCC Snapshot-Pinning und `CheckpointGuard` RAII Rollbacks.
-5. **`memfuse-crypto` / `memfuse-security`** (Layer 1): AES-256-GCM-SIV Blockverschlüsselung, HKDF Key Derivation, WAL HMAC Chaining und `DeletionProof`.
-6. **`memfuse-graph`** (Layer 1): CSR-Wissensgraph, bi-temporale Zeitachsen, Session-DAG, PathRAG Engine, F-06 Perkolationsmonitor und kaskadierende Kanteninvalidierung (`cascade.rs`).
-7. **`memfuse-kv-bridge`** (Layer 1): Hochperformante, mandantenisolierte KV-Cache-Schicht mit `ZeroizeOnDrop` Garantien.
-8. **`memfuse-text`** (Layer 1): Invertierter Index, BM25 Scorer (Robertson-Spärck-Jones) und deutsche Morphologie.
-9. **`memfuse-embed`** (Layer 2): In-process ONNX Session Pool für Cross-Encoder Reranking mit Chaos Engineering Schutz.
-10. **`memfuse-index`** (Layer 2): HNSW Vektorindex, Streaming DiskANN mit Beam Search, SQ8 Quantisierung und `std::arch` SIMD Intrinsics.
-11. **`memfuse-ollama`** (Layer 2): HTTP-Client für lokale Ollama LLMs/Embeddings mit Batch-Streaming und Anthropic Contextual Retrieval.
-12. **`memfuse-store`** (Layer 2): LSM-Tree mit MemTable-Sharding, 3-Phasen Lock-Free Async Flush, WAL V3 und SSTable Compaction.
-13. **`memfuse-db`** (Layer 3): Orchestrator Facade für 4-Signal Hybrid Retrieval (RRF), Full 2PC Transactions, PID Latency Regulation und Replicator Dynamics.
-14. **`memfuse-agent`** (Layer 3): Workflow-Engine mit Event-Loops, State Graph Walkers, Dead-Letter-Queues und TokenBudget RMW Schutz.
-15. **`memfuse-py`** (Layer 3): PyO3 Python FFI Bindings mit automatischer GIL-Freigabe und Panic Catching.
-16. **`memfuse-bench`** (Layer 4): Reproduzierbare Benchmark-Suite für Retrieval-Genauigkeit, Durchsatz und Latenz-Perzentile (inkl. LongMemEval & LoCoMo Datensätze).
-17. **`memfuse-router`** (Layer 4): SLM Context Routing Engine für adaptives Prompt-Routing.
-18. **`memfuse-tauri`** (Layer 4): Desktop App Shell mit HTML Sanitizing (XSS Protection) und abgesicherter IPC Ingestion.
+### Detaillierte Crate-Rollen (19 Crates):
+1. **`memfuse-core-ipc-gen`** (Layer 0): Automatisch generierter FlatBuffers IPC-Code für typsicheres Framing.
+2. **`memfuse-core`** (Layer 1): Kanonische Domain-Typen (`TenantId`, `DocId`, `TxId`), Unified `MemFuseError`, Trait-Definitionen (`traits/`) und `TxBuffer`.
+3. **`memfuse-calibration`** (Layer 2): Isotonische (PAVA) und Platt Conformal Calibration für Relevanz-Scoring.
+4. **`memfuse-checkpoint`** (Layer 2): Persistentes Snapshot-Pinning mit atomarem `RwLock<CheckpointIndex>` und `CheckpointGuard` RAII Rollbacks.
+5. **`memfuse-crypto` / `memfuse-security`** (Layer 2): AES-256-GCM-SIV Blockverschlüsselung, HKDF Key Derivation, WAL HMAC Chaining, `EgressVault` und `DeletionProof`.
+6. **`memfuse-graph`** (Layer 2): CSR-Wissensgraph, bi-temporale Zeitachsen, Session-DAG, PathRAG Engine, F-06 Perkolationsmonitor und kaskadierende Kanteninvalidierung (`cascade.rs`).
+7. **`memfuse-sandbox`** (Layer 2): WASM Ausführungsumgebung (Spec v5 §4.18) mit strikter Fuel- und Speicher-Isolierung.
+8. **`memfuse-text`** (Layer 2): Invertierter Index, BM25 Scorer (Robertson-Spärck-Jones) und deutsche Morphologie mit Char-Boundary Sicherheitsgarantien.
+9. **`memfuse-index`** (Layer 3): HNSW Vektorindex (Compute-then-Commit Pattern), Streaming DiskANN mit Beam Search, SQ8 Quantisierung und `std::arch` SIMD Intrinsics.
+10. **`memfuse-ollama`** (Layer 3): HTTP-Client für lokale Ollama LLMs/Embeddings mit Batch-Streaming und Anthropic Contextual Retrieval.
+11. **`memfuse-store`** (Layer 3): LSM-Tree mit MemTable-Sharding, 3-Phasen Lock-Free Async Flush, WAL V3 und SSTable Compaction.
+12. **`memfuse-candle`** (Layer 4): Native Candle GGUF ML-Inferenz-Backend für rahmenwerksfreie Embeddings.
+13. **`memfuse-embed`** (Layer 5): In-process ONNX Session Pool für Cross-Encoder Reranking mit Chaos Engineering Schutz.
+14. **`memfuse-db`** (Layer 6): Orchestrator Facade für 4-Signal Hybrid Retrieval (RRF), Full 2PC Transactions, PID Latency Regulation und Replicator Dynamics.
+15. **`memfuse-bench`** (Layer 7): Reproduzierbare Benchmark-Suite für Retrieval-Genauigkeit, Durchsatz und Latenz-Perzentile (inkl. LongMemEval & LoCoMo Datensätze).
+16. **`memfuse-router`** (Layer 7): Generische SLM Context Routing Engine (`RouterEngine<S: StorageEngine>`) für adaptives Prompt-Routing.
+17. **`memfuse-agent`** (Layer 8): Workflow-Engine mit Event-Loops, State Graph Walkers, Dead-Letter-Queues und TokenBudget RMW Schutz.
+18. **`memfuse-py`** (Layer 8): PyO3 Python FFI Bindings mit automatischer GIL-Freigabe und Panic Catching.
+19. **`memfuse-mcp`** (Layer 9): Stdio JSON-RPC 2.0 MCP-Server mit DLP Egress Gateway (`EgressVault`), Prompt Injection Quarantäne und Live-Stats-Wiring.
 
 ---
 
@@ -582,19 +674,22 @@ Das Repository umfasst **18 aktiv verwaltete Workspace Crates**, aufgeteilt in 5
 
 Die Projekt-Historie zeichnet sich durch ein streng durchgesetztes Governance-System aus:
 
-1. **Architecture Decision Records (ADRs)**: Strikte Einhaltung aller Vorgaben (z.B. ADR-010 Stdio MCP, ADR-012/043 MVCC Isolation, ADR-028 Error DTOs, ADR-044 Write-Temp-Then-Rename, ADR-047 SIMD Intrinsics, ADR-059 Non-Blocking Async LSM Flush, ADR-060 Instance-Scoped Flush Counter, ADR-068 KV-Encryption, ADR-073 Contradiction Prevention).
-2. **Inline Code Tags & Review Passes**: Verwendung von `ANCHOR[...]`, `AI-TAG[...]` und `REVIEW-PASS[...]` Annotationen mit ISO-8601 Zeitstempeln (`TS:2026-09-12T...`) und Session-Hashes.
+1. **Architecture Decision Records (ADRs)**: Strikte Einhaltung aller Vorgaben (z.B. ADR-010 Stdio MCP, ADR-012/043 MVCC Isolation, ADR-028 Error DTOs, ADR-044 Write-Temp-Then-Rename, ADR-047 SIMD Intrinsics, ADR-059 Non-Blocking Async LSM Flush, ADR-060 Instance-Scoped Flush Counter, ADR-068 KV-Encryption, ADR-073 Contradiction Prevention, ADR-081 Mutual Exclusion Governance, ADR-082 DocId Width).
+2. **Inline Code Tags & Review Passes**: Verwendung von `ANCHOR[...]`, `AI-TAG[...]` und `REVIEW-PASS[...]` Annotationen mit ISO-8601 Zeitstempeln (`TS:2026-09-18T...`) und Session-Hashes.
 3. **Automatisierte CI Enforcement Gates**:
-   - `cargo xtask check-consistency`: Überprüft exakt 18 Workspace-Crates, `AGENTS.md` Abdeckung, README-Auszüge und ADR-Eindeutigkeit.
+   - `cargo xtask check-consistency`: Überprüft exakt 19 Workspace-Crates, `AGENTS.md` Abdeckung, README-Auszüge und ADR-Eindeutigkeit.
    - `cargo xtask sync-docs`: Verhindert Drift zwischen Quellcode-Annotationen und Dokumentationsdateien (`WORKING_STATE.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `SOURCE_OF_TRUTH.md`).
+   - `cargo xtask lint-unsafe-slices`: Verifiziert via AST-Analyse, dass alle `unsafe` SIMD Load Slices vor dem Zugriff Längenprüfungen oder `.min()` Normalisierungen durchführen.
+   - `cargo xtask post-merge-report`: Generiert automatisierte Post-Merge Berichte nach Pull Request Integrationen (#3109).
    - `context-gates.yml`: Verhindert ungelöste `CRITICAL` Code Smells, phantom temporäre Dateien (Gate 12b) und prüft die Gültigkeit von Anchor-Tags.
 
 ---
 
 ## 6. Statistische Kennzahlen
 
-- **Aktive Workspace Crates**: 18 Crates (Layer 0 bis Layer 4)
-- **Commits insgesamt**: >320 Merges und Direkt-Commits
+- **Aktive Workspace Crates**: 19 Crates (Layer 0 bis Layer 9)
+- **DAG Topologie**: 10 Schichten (Layer 0 bis Layer 9)
+- **Commits insgesamt**: >350 Merges und Direkt-Commits
 - **Verteilte Autoren**: `google-labs-jules[bot]`, `tfufuz1`, `tfufuu`
 - **Programmiersprache**: 100% Rust (mit Tauri UI HTML/JS Frontend & PyO3 Python-Interface)
 - **Sicherheit & Zero-Panic Policy**: Volle Beseitigung aller unkontrollierten `.unwrap()` Aufrufe in Produktivpfaden (abgesichert via `// unwrap allowed` mit nachgewiesenen Invarianten und `.unwrap-baseline.json`).
