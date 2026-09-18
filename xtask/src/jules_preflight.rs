@@ -150,6 +150,16 @@ pub fn check_no_active_claim_conflict(root: &Path, target_crate: Option<&str>) -
 
     let claims_path = root.join(".jules/claims.json");
     let db = ClaimsDatabase::load(&claims_path);
+
+    let active_count = db.count_active_claims();
+    let max_claims = crate::claim::get_max_active_claims();
+    if active_count > max_claims {
+        return CheckResult::Fail(format!(
+            "MemFuseError::ConcurrencyLimitExceeded: Globales Parallelitäts-Limit von {} aktiven Claims überschritten (aktuell {} aktive Claims).",
+            max_claims, active_count
+        ));
+    }
+
     if let Some(existing) = db.find_active_claim(&krate) {
         return CheckResult::Fail(format!(
             "Aktiver lokaler Claim für Crate '{}' (Issue '{}', seit {}).",
@@ -653,6 +663,46 @@ mod tests {
                 assert!(msg.contains("TASK-123"));
             }
             _ => panic!("Expected CheckResult::Fail for active local claim"),
+        }
+    }
+
+    #[test]
+    fn test_claim_conflict_check_global_concurrency_limit_fails() {
+        let dir = tempdir().unwrap();
+        let claims_dir = dir.path().join(".jules");
+        fs::create_dir_all(&claims_dir).unwrap();
+        let claims_path = claims_dir.join("claims.json");
+
+        let future_exp = (chrono::Utc::now() + chrono::Duration::hours(2)).to_rfc3339();
+        let mut db = ClaimsDatabase::default();
+        for i in 1..=4 {
+            db.claims.push(ClaimEntry {
+                krate: format!("memfuse-active-{}", i),
+                issue: format!("TASK-{}", i),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                session_id: format!("s{}", i),
+                active: true,
+                expires_at: Some(future_exp.clone()),
+                released_at: None,
+            });
+        }
+        db.save(&claims_path).unwrap();
+
+        let result = check_no_active_claim_conflict(dir.path(), Some("memfuse-new"));
+        match result {
+            CheckResult::Fail(msg) => {
+                assert!(
+                    msg.contains("MemFuseError::ConcurrencyLimitExceeded"),
+                    "Expected ConcurrencyLimitExceeded error, got: {}",
+                    msg
+                );
+                assert!(msg.contains("Globales Parallelitäts-Limit"));
+                assert!(msg.contains("4 aktive Claims"));
+            }
+            res => panic!(
+                "Expected CheckResult::Fail for exceeded concurrency limit, got {:?}",
+                res
+            ),
         }
     }
 
