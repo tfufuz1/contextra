@@ -2,8 +2,9 @@ use memfuse_core::traits::LlmTextGenerator;
 use memfuse_core::BoxFuture;
 use memfuse_core::DocId;
 use memfuse_db::{
-    execute_background_consolidation, execute_consolidation_pass, start_consolidation_worker,
-    CommunityStabilityTracker, ConsolidationConfig, MemFuse, MemFuseConfig, SynthesisConfig,
+    execute_background_consolidation, execute_consolidation_pass, CommunityStabilityTracker,
+    ConsolidationConfig, MaintenanceConfig, MaintenanceScheduler, MemFuse, MemFuseConfig,
+    SynthesisConfig,
 };
 use std::time::Duration;
 use tempfile::tempdir;
@@ -79,12 +80,23 @@ async fn test_consolidation_worker_periodic_execution_and_cancellation() {
     assert_eq!(collection.len().await, 10);
 
     let cancel_token = tokio_util::sync::CancellationToken::new();
-    let handle = start_consolidation_worker(
+    let maintenance_config = MaintenanceConfig {
+        tick_interval_secs: 1,
+        background_consolidation_enabled: true,
+        background_consolidation_episode_threshold: 10,
+        decay_enabled: false,
+        percolation_enabled: false,
+        replicator_enabled: false,
+        ..Default::default()
+    };
+
+    let scheduler = std::sync::Arc::new(MaintenanceScheduler::new(
+        maintenance_config,
         collection.clone(),
         ConsolidationConfig::default(),
-        Duration::from_millis(20),
-        cancel_token.clone(),
-    );
+    ));
+
+    let handle = scheduler.start(cancel_token.clone());
 
     // Wait for the worker ticker to execute consolidation
     let mut consolidated = false;

@@ -75,7 +75,7 @@ async fn setup(budget: TokenBudget) -> (OrchestratorEngine, Arc<MemFuse>, AgentC
     let ctx = AgentContext::try_new("test-task", "start", db.clone(), state_col, budget).unwrap();
 
     let storage = db.inner_storage();
-    let engine = OrchestratorEngine::new(storage);
+    let engine = OrchestratorEngine::try_new(storage).expect("engine try_new");
 
     (engine, db, ctx, tmp)
 }
