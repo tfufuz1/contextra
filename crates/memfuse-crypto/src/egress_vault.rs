@@ -558,8 +558,17 @@ mod tests {
         let mut huge_payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES - 1);
         huge_payload.push('!');
 
-        let patterns = vec![CompiledPattern::new("R-001", r"(a+)+b")
-            .unwrap_or_else(|_| CompiledPattern::new("R-001", r"a{1000,}").unwrap())];
+        // Erzeuge ein RegexSet mit vielen komplexen Mustern, damit die Evaluierung auf dem Blocking-Thread
+        // signifikant Zeit benötigt und bei Duration::ZERO garantiert deterministisch in das Timeout läuft.
+        let patterns: Vec<_> = (0..300)
+            .map(|i| {
+                CompiledPattern::new(
+                    format!("R-{i:03}"),
+                    &format!(r"([a-z0-9_]{{5,10}}@([a-z0-9_]{{5,10}}\.)+[a-z]{{2,4}})_{i}"),
+                )
+                .unwrap()
+            })
+            .collect();
 
         let start = Instant::now();
         // Setze extrem kurzes Timeout (Duration::ZERO), um Timeout-Pfad sicher zu triggern
@@ -605,21 +614,25 @@ mod tests {
     async fn test_egress_guard_fail_closed_on_index_unavailable() {
         use std::time::Duration;
 
-        // Erstelle echte Patterns — der Inhalt ist irrelevant,
-        // da der Test per Timeout blockt bevor Patterns geprüft werden.
-        let patterns = vec![CompiledPattern::new(
-            "email",
-            r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
-        )
-        .expect("valid email pattern")];
+        // Erzeuge ein RegexSet mit vielen komplexen Mustern, damit die Evaluierung auf dem Blocking-Thread
+        // signifikant Zeit benötigt und bei Duration::ZERO garantiert deterministisch in das Timeout läuft.
+        let patterns: Vec<_> = (0..300)
+            .map(|i| {
+                CompiledPattern::new(
+                    format!("R-{i:03}"),
+                    &format!(r"([a-z0-9_]{{5,10}}@([a-z0-9_]{{5,10}}\.)+[a-z]{{2,4}})_{i}"),
+                )
+                .unwrap()
+            })
+            .collect();
 
-        // Benutze ein ausreichend großes Payload, sodass `spawn_blocking`
-        // nicht sofort vor dem Timeout-Tick abschließt.
-        let payload = "This is a benign payload without any sensitive data. ".repeat(50_000);
+        // Benutze ein Payload genau unter MAX_CLASSIFY_PAYLOAD_BYTES (65_536 Bytes),
+        // damit die Prüfung nicht schon beim Pre-Check fehlschlägt.
+        let mut payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES - 1);
+        payload.push('!');
 
-        // Simuliere "Index unavailable" / Timeout: 1 Nanosekunde — wird immer überschritten
-        // da `spawn_blocking` allein mehrere Mikrosekunden braucht.
-        let result = classify_layer1(&payload, &patterns, Duration::from_nanos(1)).await;
+        // Simuliere "Index unavailable" / Timeout via Duration::ZERO
+        let result = classify_layer1(&payload, &patterns, Duration::ZERO).await;
 
         // INVARIANTE: Fail-Closed — bei Timeout MUSS Block zurückgegeben werden.
         assert!(
