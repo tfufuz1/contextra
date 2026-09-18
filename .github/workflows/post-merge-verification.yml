@@ -12,12 +12,30 @@ jobs:
     name: Post-Merge Jules Preflight Verification
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       issues: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Run Post-Merge Report
+        run: cargo run -p xtask -- post-merge-report
+
+      - name: Commit and push report changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add results/ docs/unwrap_baseline_history.jsonl
+          if git diff --staged --quiet; then
+            echo "ℹ️ Keine Änderungen in results/ oder docs/unwrap_baseline_history.jsonl — kein Commit erforderlich."
+          else
+            git commit -m "chore(report): auto-update post-merge report and unwrap history [skip ci]"
+            git push origin HEAD:main
+            echo "✅ Post-merge report und unwrap history erfolgreich ge-pusht."
+          fi
+
       - name: Run Full Jules Preflight
         run: cargo run -p xtask -- jules-preflight
 
