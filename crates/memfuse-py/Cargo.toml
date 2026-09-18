@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Python bindings for MemFuse using PyO3"
+# ADR-N04 (PHASE0-T3): FFI panic translation to PyErr and panic containment
 
 [lib]
 name = "_memfuse"
