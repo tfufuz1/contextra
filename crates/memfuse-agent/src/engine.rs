@@ -109,6 +109,7 @@ impl OrchestratorEngine {
     }
 
     /// Helper constructor creating OrchestratorEngine directly from MemFuse DB handle.
+    #[allow(deprecated)]
     #[deprecated(
         note = "Use try_from_db instead to handle initialization errors without panicking"
     )]

@@ -204,6 +204,10 @@ impl IsotonicCalibrator {
             return None;
         }
 
+        if model.len() == 1 {
+            return Some(model[0].1);
+        }
+
         match model.binary_search_by(|(threshold, _)| threshold.total_cmp(&raw_score)) {
             Ok(idx) => Some(model[idx].1),
             Err(idx) => {

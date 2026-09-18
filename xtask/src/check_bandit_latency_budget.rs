@@ -28,14 +28,14 @@ pub fn check_bandit_latency_budget() -> Result<(), String> {
     // Warmup
     for _ in 0..10 {
         let _ = profile_state.score(&x, cost, is_cloud);
-        profile_state.update(&x, reward, cost, is_cloud);
+        let _ = profile_state.update(&x, reward, cost, is_cloud);
     }
 
     // Measurement Loop
     for _ in 0..BENCHMARK_ITERATIONS {
         let start = Instant::now();
         let _score = profile_state.score(&x, cost, is_cloud);
-        profile_state.update(&x, reward, cost, is_cloud);
+        let _ = profile_state.update(&x, reward, cost, is_cloud);
         let elapsed_us = start.elapsed().as_micros() as u64;
         latencies_us.push(elapsed_us);
     }

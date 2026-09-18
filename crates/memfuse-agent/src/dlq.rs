@@ -43,11 +43,15 @@ impl DeadLetterQueue {
 
         let tx = self.allocate_tx().await?;
         if let Err(e) = self.storage.put(tx, key.as_bytes(), &value).await {
-            let _ = self.storage.rollback(tx).await;
+            if let Err(rollback_err) = self.storage.rollback(tx).await {
+                tracing::error!(error = %rollback_err, "Failed to rollback transaction after put failure in DLQ");
+            }
             return Err(e);
         }
         if let Err(e) = self.storage.commit(tx).await {
-            let _ = self.storage.rollback(tx).await;
+            if let Err(rollback_err) = self.storage.rollback(tx).await {
+                tracing::error!(error = %rollback_err, "Failed to rollback transaction after commit failure in DLQ");
+            }
             return Err(e);
         }
         Ok(())
@@ -68,11 +72,15 @@ impl DeadLetterQueue {
         if !keys_to_delete.is_empty() {
             let tx = self.allocate_tx().await?;
             if let Err(e) = self.storage.delete_many(tx, keys_to_delete).await {
-                let _ = self.storage.rollback(tx).await;
+                if let Err(rollback_err) = self.storage.rollback(tx).await {
+                    tracing::error!(error = %rollback_err, "Failed to rollback transaction after delete_many failure in DLQ");
+                }
                 return Err(e);
             }
             if let Err(e) = self.storage.commit(tx).await {
-                let _ = self.storage.rollback(tx).await;
+                if let Err(rollback_err) = self.storage.rollback(tx).await {
+                    tracing::error!(error = %rollback_err, "Failed to rollback transaction after commit failure in DLQ");
+                }
                 return Err(e);
             }
         }

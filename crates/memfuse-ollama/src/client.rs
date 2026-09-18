@@ -304,6 +304,7 @@ impl OllamaClient {
         let client = match reqwest::Client::builder()
             .timeout(config.request_timeout)
             .connect_timeout(config.connect_timeout)
+            .pool_max_idle_per_host(8)
             .build()
         {
             Ok(c) => c,
