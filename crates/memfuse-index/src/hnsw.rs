@@ -291,7 +291,6 @@ pub enum VectorData {
 pub struct HnswNode {
     doc_id: DocId,
     vector: VectorData,
-    connections: RwLock<Vec<Vec<u32>>>,
     max_layer: usize,
     committed_tx: u64,
 }
@@ -367,6 +366,42 @@ pub struct HnswHotCore {
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
     pub rebuilding: AtomicBool,
+    pub neighbor_arena: RwLock<Vec<u32>>,
+    pub neighbor_offsets: RwLock<Vec<usize>>,
+    pub neighbor_counts: RwLock<Vec<Vec<u8>>>,
+}
+
+impl HnswHotCore {
+    #[inline]
+    pub fn layer_offset(node_offset: usize, layer: usize, m: usize) -> usize {
+        if layer == 0 {
+            node_offset
+        } else {
+            node_offset + (m * 2) + (layer - 1) * m
+        }
+    }
+
+    pub fn get_ram_node_connections(&self, ram_idx: usize, layer: usize, m: usize) -> Vec<u32> {
+        let offsets = self.neighbor_offsets.read();
+        let counts = self.neighbor_counts.read();
+        if ram_idx >= offsets.len() || ram_idx >= counts.len() {
+            return Vec::new();
+        }
+        let count_vec = &counts[ram_idx];
+        if layer >= count_vec.len() {
+            return Vec::new();
+        }
+        let len = count_vec[layer] as usize;
+        let node_offset = offsets[ram_idx];
+        let l_offset = Self::layer_offset(node_offset, layer, m);
+
+        let arena = self.neighbor_arena.read();
+        if l_offset + len <= arena.len() {
+            arena[l_offset..l_offset + len].to_vec()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 pub struct HnswColdCore {
@@ -414,6 +449,9 @@ impl HnswIndex {
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
+                    neighbor_arena: RwLock::new(Vec::new()),
+                    neighbor_offsets: RwLock::new(Vec::new()),
+                    neighbor_counts: RwLock::new(Vec::new()),
                 },
                 cold: HnswColdCore {
                     config,
@@ -461,6 +499,9 @@ impl HnswIndex {
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
+                    neighbor_arena: RwLock::new(Vec::new()),
+                    neighbor_offsets: RwLock::new(Vec::new()),
+                    neighbor_counts: RwLock::new(Vec::new()),
                 },
                 cold: HnswColdCore {
                     config,
@@ -586,11 +627,19 @@ impl HnswIndex {
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
+            let q_guard = if self.inner.cold.config.quantize {
+                Some(self.inner.cold.quantizer.read())
+            } else {
+                None
+            };
+            let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
             let ctx = SearchContext {
                 nodes: &nodes,
                 mmap: mmap_guard.as_ref(),
                 mmap_node_count,
                 prior_prepared: &[],
+                backlink_map: None,
+                quantizer: q_ref.map(Cow::Borrowed),
             };
 
             let factor = if self.inner.cold.config.quantize {
@@ -1004,15 +1053,17 @@ impl HnswIndex {
             let mut conn_pos = connections_offset;
             for (i, node) in nodes.iter().enumerate() {
                 node_records[i].connections_offset = conn_pos;
-                let conns_guard = node.connections.read();
-                let num_layers = conns_guard.len() as u8;
+                let num_layers = (node.max_layer + 1) as u8;
                 writer
                     .write_all(&[num_layers])
                     .map_err(|e| MemFuseError::Storage(e.to_string()))?;
                 conn_pos += 1;
 
                 for layer in 0..num_layers as usize {
-                    let layer_conns = &conns_guard[layer];
+                    let layer_conns =
+                        inner
+                            .hot
+                            .get_ram_node_connections(i, layer, inner.cold.config.m);
                     let len = layer_conns.len() as u32;
                     writer
                         .write_all(&len.to_le_bytes())
@@ -1241,6 +1292,7 @@ pub struct BatchContext {
     pub running_max_layer: usize,
     pub has_entry_point: bool,
     pub has_ram_entry_point: bool,
+    pub backlink_map: AHashMap<(usize, usize), Vec<u32>>,
 }
 
 impl BatchContext {
@@ -1249,17 +1301,20 @@ impl BatchContext {
             running_max_layer: core.hot.max_layer.load(Ordering::SeqCst) as usize,
             has_entry_point: core.hot.entry_point.read().is_some(),
             has_ram_entry_point: core.hot.ram_entry_point.read().is_some(),
+            backlink_map: AHashMap::new(),
         }
     }
 }
 
 fn get_neighbor_conns_in_batch(
+    core: &HnswIndexCore,
     neighbor_idx: usize,
     layer: usize,
     base_batch_idx: usize,
     mmap_node_count: usize,
-    nodes_read: &[HnswNode],
+    _nodes_read: &[HnswNode],
     prior_prepared: &[PreparedInsert],
+    batch_ctx: &BatchContext,
 ) -> Vec<u32> {
     if neighbor_idx >= base_batch_idx {
         let offset = neighbor_idx - base_batch_idx;
@@ -1275,18 +1330,12 @@ fn get_neighbor_conns_in_batch(
     }
 
     let neighbor_ram_idx = neighbor_idx - mmap_node_count;
-    for prepared in prior_prepared.iter().rev() {
-        for bl in prepared.neighbor_backlinks.iter().rev() {
-            if bl.neighbor_ram_idx == neighbor_ram_idx && bl.layer == layer {
-                return bl.updated_connections.clone();
-            }
-        }
+    if let Some(conns) = batch_ctx.backlink_map.get(&(neighbor_ram_idx, layer)) {
+        return conns.clone();
     }
 
-    nodes_read
-        .get(neighbor_ram_idx)
-        .and_then(|node| node.connections.read().get(layer).cloned())
-        .unwrap_or_default()
+    core.hot
+        .get_ram_node_connections(neighbor_ram_idx, layer, core.cold.config.m)
 }
 
 /// Helper for hybrid resolution of nodes (RAM vs Mmap, plus in-flight batch prepared inserts).
@@ -1295,6 +1344,8 @@ struct SearchContext<'a> {
     mmap: Option<&'a crate::persistence::MmapIndex>,
     mmap_node_count: usize,
     prior_prepared: &'a [PreparedInsert],
+    backlink_map: Option<&'a AHashMap<(usize, usize), Vec<u32>>>,
+    quantizer: Option<Cow<'a, crate::quantize::ScalarQuantizer>>,
 }
 
 /// Liefert den aktuellen Rebuild-Status des Index.
@@ -1355,16 +1406,22 @@ impl HnswIndexCore {
         query_exact: &[f32],
         query_quantized: Option<&[u8]>,
         data: &VectorData,
+        quantizer_opt: Option<&crate::quantize::ScalarQuantizer>,
     ) -> Result<f32> {
         match data {
             VectorData::F32(v) => {
                 compute_distance_trusted(query_exact, v, self.cold.config.distance_metric)
             }
             VectorData::U8(v) => {
-                let guard = self.cold.quantizer.read();
-                let q = guard.as_ref().ok_or_else(|| {
-                    memfuse_core::MemFuseError::Index("Quantizer not trained".into())
-                })?;
+                let guard;
+                let q = if let Some(q_ref) = quantizer_opt {
+                    q_ref
+                } else {
+                    guard = self.cold.quantizer.read();
+                    guard.as_ref().ok_or_else(|| {
+                        memfuse_core::MemFuseError::Index("Quantizer not trained".into())
+                    })?
+                };
                 if let Some(qq) = query_quantized {
                     q.symmetric_dist(qq, v, self.cold.config.distance_metric)
                 } else {
@@ -1373,19 +1430,26 @@ impl HnswIndexCore {
             }
         }
     }
+
     fn compute_distance_with_mmap(
         &self,
         query_exact: &[f32],
         query_quantized: Option<&[u8]>,
         mmap: &crate::persistence::MmapIndex,
         record: &crate::persistence::NodeRecord,
+        quantizer_opt: Option<&crate::quantize::ScalarQuantizer>,
     ) -> Result<f32> {
         let vector_bytes = mmap.get_vector(record)?;
         if mmap.header.is_quantized() {
-            let guard = self.cold.quantizer.read();
-            let q = guard
-                .as_ref()
-                .ok_or_else(|| memfuse_core::MemFuseError::Index("Quantizer not trained".into()))?;
+            let guard;
+            let q = if let Some(q_ref) = quantizer_opt {
+                q_ref
+            } else {
+                guard = self.cold.quantizer.read();
+                guard.as_ref().ok_or_else(|| {
+                    memfuse_core::MemFuseError::Index("Quantizer not trained".into())
+                })?
+            };
             if let Some(qq) = query_quantized {
                 q.symmetric_dist(qq, vector_bytes, self.cold.config.distance_metric)
             } else {
@@ -1901,22 +1965,36 @@ impl HnswIndexCore {
         query_q: Option<&[u8]>,
         ctx: &SearchContext,
     ) -> Result<f32> {
+        let q_ref = ctx.quantizer.as_deref();
         let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
         if idx >= base_batch_idx {
             let prepared_offset = idx - base_batch_idx;
             if let Some(prepared) = ctx.prior_prepared.get(prepared_offset) {
-                return self.compute_distance_with_data(query, query_q, &prepared.vector_data);
+                return self.compute_distance_with_data(
+                    query,
+                    query_q,
+                    &prepared.vector_data,
+                    q_ref,
+                );
             }
         }
         if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
                 let record = mmap.get_node_record(idx)?;
-                return self.compute_distance_with_mmap(query, query_q, mmap, &record);
+                return self.compute_distance_with_mmap(query, query_q, mmap, &record, q_ref);
             }
-            let ram_idx = idx - ctx.mmap_node_count;
-            return self.compute_distance_with_data(query, query_q, &ctx.nodes[ram_idx].vector);
         }
-        self.compute_distance_with_data(query, query_q, &ctx.nodes[idx].vector)
+        let ram_idx = idx.saturating_sub(ctx.mmap_node_count);
+        if let Some(node) = ctx.nodes.get(ram_idx) {
+            return self.compute_distance_with_data(query, query_q, &node.vector, q_ref);
+        }
+        let latest_nodes = self.hot.nodes.read();
+        if let Some(node) = latest_nodes.get(ram_idx) {
+            return self.compute_distance_with_data(query, query_q, &node.vector, q_ref);
+        }
+        Err(MemFuseError::Index(format!(
+            "Node vector not found for index {idx}"
+        )))
     }
 
     fn resolve_connections<'a>(
@@ -1944,37 +2022,25 @@ impl HnswIndexCore {
                 return Ok(Cow::Owned(mmap.get_connections(&record, layer)?));
             }
             let ram_idx = idx - ctx.mmap_node_count;
-            let conns = ctx.nodes[ram_idx]
-                .connections
-                .read()
-                .get(layer)
-                .cloned()
-                .unwrap_or_default();
-
-            for prepared in ctx.prior_prepared.iter().rev() {
-                for bl in prepared.neighbor_backlinks.iter().rev() {
-                    if bl.neighbor_ram_idx == ram_idx && bl.layer == layer {
-                        return Ok(Cow::Owned(bl.updated_connections.clone()));
-                    }
+            if let Some(bmap) = ctx.backlink_map {
+                if let Some(conns) = bmap.get(&(ram_idx, layer)) {
+                    return Ok(Cow::Owned(conns.clone()));
                 }
             }
+            let conns = self
+                .hot
+                .get_ram_node_connections(ram_idx, layer, self.cold.config.m);
             return Ok(Cow::Owned(conns));
         }
 
-        let conns = ctx.nodes[idx]
-            .connections
-            .read()
-            .get(layer)
-            .cloned()
-            .unwrap_or_default();
-
-        for prepared in ctx.prior_prepared.iter().rev() {
-            for bl in prepared.neighbor_backlinks.iter().rev() {
-                if bl.neighbor_ram_idx == idx && bl.layer == layer {
-                    return Ok(Cow::Owned(bl.updated_connections.clone()));
-                }
+        if let Some(bmap) = ctx.backlink_map {
+            if let Some(conns) = bmap.get(&(idx, layer)) {
+                return Ok(Cow::Owned(conns.clone()));
             }
         }
+        let conns = self
+            .hot
+            .get_ram_node_connections(idx, layer, self.cold.config.m);
         Ok(Cow::Owned(conns))
     }
 
@@ -1991,10 +2057,18 @@ impl HnswIndexCore {
                 let record = mmap.get_node_record(idx)?;
                 return Ok(DocId::new(record.doc_id));
             }
-            let ram_idx = idx - ctx.mmap_node_count;
-            return Ok(ctx.nodes[ram_idx].doc_id);
         }
-        Ok(ctx.nodes[idx].doc_id)
+        let ram_idx = idx.saturating_sub(ctx.mmap_node_count);
+        if let Some(node) = ctx.nodes.get(ram_idx) {
+            return Ok(node.doc_id);
+        }
+        let latest_nodes = self.hot.nodes.read();
+        if let Some(node) = latest_nodes.get(ram_idx) {
+            return Ok(node.doc_id);
+        }
+        Err(MemFuseError::Index(format!(
+            "Node doc_id not found for index {idx}"
+        )))
     }
 
     fn search_layer(
@@ -2005,7 +2079,7 @@ impl HnswIndexCore {
         ef: usize,
         layer: usize,
     ) -> Result<Vec<Candidate>> {
-        self.search_layer_with_context(query, query_quantized, entry_points, ef, layer, &[])
+        self.search_layer_with_context(query, query_quantized, entry_points, ef, layer, &[], None)
     }
 
     fn search_layer_with_context(
@@ -2016,6 +2090,7 @@ impl HnswIndexCore {
         ef: usize,
         layer: usize,
         prior_prepared: &[PreparedInsert],
+        backlink_map: Option<&AHashMap<(usize, usize), Vec<u32>>>,
     ) -> Result<Vec<Candidate>> {
         let nodes_guard = self.hot.nodes.read();
         let mmap_guard = self.cold.mmap_index.read();
@@ -2024,11 +2099,20 @@ impl HnswIndexCore {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
+        let q_guard = if self.cold.config.quantize {
+            Some(self.cold.quantizer.read())
+        } else {
+            None
+        };
+        let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
+
         let ctx = SearchContext {
             nodes: &nodes_guard,
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
             prior_prepared,
+            backlink_map,
+            quantizer: q_ref.map(Cow::Borrowed),
         };
 
         // Pre-allocate capacity derived from search parameter `ef` and graph degree `M`.
@@ -2104,35 +2188,47 @@ impl HnswIndexCore {
             // UNLESS the dead neighbor is retained for active/pinned snapshots.
             if has_dead_neighbors && current.index >= mmap_node_count {
                 let ram_idx = current.index - mmap_node_count;
-                if let Some(node) = nodes_guard.get(ram_idx) {
-                    let seq_log = self.cold.seq_log.read();
-                    let min_retention_seq = seq_log.min_retention_seq();
-                    // Use try_write() to avoid blocking search traversal under contention.
-                    // If write lock acquisition fails, pruning is skipped for this visit and attempted again on next visit.
-                    if let Some(mut conns_guard) = node.connections.try_write() {
-                        if let Some(layer_conns) = conns_guard.get_mut(layer) {
-                            layer_conns.retain(|&neighbor_u32| {
-                                if !deleted_snapshot.contains(neighbor_u32 as u64) {
-                                    true
-                                } else if let Some(min_ret_seq) = min_retention_seq {
-                                    let neighbor_idx = neighbor_u32 as usize;
-                                    if neighbor_idx >= mmap_node_count {
-                                        let neighbor_ram_idx = neighbor_idx - mmap_node_count;
-                                        if let Some(neighbor_node) =
-                                            nodes_guard.get(neighbor_ram_idx)
-                                        {
-                                            if let Some(del_seq) =
-                                                seq_log.deletion_seq(neighbor_node.doc_id)
+                let seq_log = self.cold.seq_log.read();
+                let min_retention_seq = seq_log.min_retention_seq();
+                let m = self.cold.config.m;
+                if let (Some(offsets), Some(mut counts), Some(mut arena)) = (
+                    self.hot.neighbor_offsets.try_read(),
+                    self.hot.neighbor_counts.try_write(),
+                    self.hot.neighbor_arena.try_write(),
+                ) {
+                    if ram_idx < offsets.len() && ram_idx < counts.len() {
+                        let node_offset = offsets[ram_idx];
+                        let count_vec = &mut counts[ram_idx];
+                        if layer < count_vec.len() {
+                            let l_offset = HnswHotCore::layer_offset(node_offset, layer, m);
+                            let old_len = count_vec[layer] as usize;
+                            if l_offset + old_len <= arena.len() {
+                                let layer_slice = &arena[l_offset..l_offset + old_len];
+                                let mut kept = Vec::with_capacity(old_len);
+                                for &neighbor_u32 in layer_slice {
+                                    if !deleted_snapshot.contains(neighbor_u32 as u64) {
+                                        kept.push(neighbor_u32);
+                                    } else if let Some(min_ret_seq) = min_retention_seq {
+                                        let neighbor_idx = neighbor_u32 as usize;
+                                        if neighbor_idx >= mmap_node_count {
+                                            let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                                            if let Some(neighbor_node) =
+                                                nodes_guard.get(neighbor_ram_idx)
                                             {
-                                                return del_seq >= min_ret_seq;
+                                                if let Some(del_seq) =
+                                                    seq_log.deletion_seq(neighbor_node.doc_id)
+                                                {
+                                                    if del_seq >= min_ret_seq {
+                                                        kept.push(neighbor_u32);
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                    false
-                                } else {
-                                    false
                                 }
-                            });
+                                count_vec[layer] = kept.len() as u8;
+                                arena[l_offset..l_offset + kept.len()].copy_from_slice(&kept);
+                            }
                         }
                     }
                 }
@@ -2484,6 +2580,7 @@ impl HnswIndexCore {
                 1,
                 layer,
                 prior_prepared,
+                Some(&batch_ctx.backlink_map),
             )?;
             if let Some(closest) = best.first() {
                 ep = vec![closest.index];
@@ -2507,12 +2604,15 @@ impl HnswIndexCore {
                 self.cold.config.ef_construction,
                 layer,
                 prior_prepared,
+                Some(&batch_ctx.backlink_map),
             )?;
             let ctx = SearchContext {
                 nodes: &nodes_read,
                 mmap: mmap_guard.as_ref(),
                 mmap_node_count,
                 prior_prepared,
+                backlink_map: Some(&batch_ctx.backlink_map),
+                quantizer: None,
             };
             let selected = self.select_neighbors_heuristic_with_batch(
                 &ctx,
@@ -2538,12 +2638,14 @@ impl HnswIndexCore {
                 }
 
                 let existing_conns = get_neighbor_conns_in_batch(
+                    self,
                     neighbor_idx,
                     layer,
                     base_batch_idx,
                     mmap_node_count,
                     &nodes_read,
                     prior_prepared,
+                    batch_ctx,
                 );
 
                 let mut conn_indices = existing_conns;
@@ -2560,6 +2662,8 @@ impl HnswIndexCore {
                             mmap: mmap_guard.as_ref(),
                             mmap_node_count,
                             prior_prepared,
+                            backlink_map: Some(&batch_ctx.backlink_map),
+                            quantizer: None,
                         };
                         let dist = self.compute_symmetric_distance_hybrid_with_batch(
                             idx,
@@ -2580,6 +2684,8 @@ impl HnswIndexCore {
                         mmap: mmap_guard.as_ref(),
                         mmap_node_count,
                         prior_prepared,
+                        backlink_map: Some(&batch_ctx.backlink_map),
+                        quantizer: None,
                     };
                     self.select_neighbors_heuristic_with_batch(
                         &ctx,
@@ -2602,6 +2708,9 @@ impl HnswIndexCore {
                     }
                 } else {
                     let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                    batch_ctx
+                        .backlink_map
+                        .insert((neighbor_ram_idx, layer), selected.clone());
                     neighbor_backlinks.push(NeighborBacklink {
                         neighbor_ram_idx,
                         layer,
@@ -2640,26 +2749,55 @@ impl HnswIndexCore {
         let node = HnswNode {
             doc_id: prepared.doc_id,
             vector: prepared.vector_data,
-            connections: RwLock::new(prepared.final_connections),
             max_layer: prepared.new_layer,
             committed_tx: 0,
         };
+
+        let m = self.cold.config.m;
+        // Capacity per node in arena: Layer 0 has M*2, Layers 1..max_layer have M each
+        let node_capacity = (m * 2) + prepared.new_layer * m;
+
+        let mut offsets = self.hot.neighbor_offsets.write();
+        let mut counts = self.hot.neighbor_counts.write();
+        let mut arena = self.hot.neighbor_arena.write();
+
+        let start_offset = arena.len();
+        arena.resize(start_offset + node_capacity, 0);
+        offsets.push(start_offset);
+
+        let mut count_vec = vec![0u8; prepared.new_layer + 1];
+        for (layer, layer_conns) in prepared.final_connections.iter().enumerate() {
+            let l_offset = HnswHotCore::layer_offset(start_offset, layer, m);
+            let layer_cap = if layer == 0 { m * 2 } else { m };
+            let len = layer_conns.len().min(layer_cap);
+            arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
+            count_vec[layer] = len as u8;
+        }
+        counts.push(count_vec);
+
+        for backlink in prepared.neighbor_backlinks {
+            let ram_idx = backlink.neighbor_ram_idx;
+            if ram_idx < offsets.len() && ram_idx < counts.len() {
+                let node_offset = offsets[ram_idx];
+                let layer = backlink.layer;
+                if layer < counts[ram_idx].len() {
+                    let l_offset = HnswHotCore::layer_offset(node_offset, layer, m);
+                    let layer_cap = if layer == 0 { m * 2 } else { m };
+                    let len = backlink.updated_connections.len().min(layer_cap);
+                    if l_offset + len <= arena.len() {
+                        arena[l_offset..l_offset + len]
+                            .copy_from_slice(&backlink.updated_connections[..len]);
+                        counts[ram_idx][layer] = len as u8;
+                    }
+                }
+            }
+        }
 
         self.hot.nodes.write().push(node);
         self.hot
             .doc_to_node
             .write()
             .insert(prepared.doc_id.inner(), prepared.new_idx);
-
-        let nodes = self.hot.nodes.read();
-        for backlink in prepared.neighbor_backlinks {
-            if let Some(neighbor_node) = nodes.get(backlink.neighbor_ram_idx) {
-                let mut conns_guard = neighbor_node.connections.write();
-                if let Some(layer_conns) = conns_guard.get_mut(backlink.layer) {
-                    *layer_conns = backlink.updated_connections;
-                }
-            }
-        }
 
         if prepared.should_update_entry_point {
             *self.hot.entry_point.write() = Some(prepared.new_idx);
@@ -2892,15 +3030,37 @@ impl HnswIndexCore {
         let tombstoned_set: AHashSet<u32> =
             tombstoned_in_region.iter().map(|&id| id as u32).collect();
 
+        let m = self.cold.config.m;
+        let offsets = self.hot.neighbor_offsets.read();
+        let mut counts = self.hot.neighbor_counts.write();
+        let mut arena = self.hot.neighbor_arena.write();
+
         for (i, node) in nodes.iter().enumerate() {
             let global_idx = mmap_count + i;
             if deleted_nodes.contains(global_idx as u64) {
                 continue;
             }
 
-            let mut conns_guard = node.connections.write();
-            for conns in conns_guard.iter_mut() {
-                conns.retain(|neighbor_id| !tombstoned_set.contains(neighbor_id));
+            if i < offsets.len() && i < counts.len() {
+                let node_offset = offsets[i];
+                let count_vec = &mut counts[i];
+                for layer in 0..node.max_layer + 1 {
+                    if layer < count_vec.len() {
+                        let l_offset = HnswHotCore::layer_offset(node_offset, layer, m);
+                        let old_len = count_vec[layer] as usize;
+                        if l_offset + old_len <= arena.len() {
+                            let layer_slice = &arena[l_offset..l_offset + old_len];
+                            let mut kept = Vec::with_capacity(old_len);
+                            for &neighbor_u32 in layer_slice {
+                                if !tombstoned_set.contains(&neighbor_u32) {
+                                    kept.push(neighbor_u32);
+                                }
+                            }
+                            count_vec[layer] = kept.len() as u8;
+                            arena[l_offset..l_offset + kept.len()].copy_from_slice(&kept);
+                        }
+                    }
+                }
             }
         }
 
@@ -3150,6 +3310,10 @@ impl HnswIndexCore {
             let new_entry_point = *new_index.inner.hot.entry_point.read();
             let new_ram_entry_point = *new_index.inner.hot.ram_entry_point.read();
 
+            let new_offsets = std::mem::take(&mut *new_index.inner.hot.neighbor_offsets.write());
+            let new_counts = std::mem::take(&mut *new_index.inner.hot.neighbor_counts.write());
+            let new_arena = std::mem::take(&mut *new_index.inner.hot.neighbor_arena.write());
+
             let new_quantizer = new_index.inner.cold.quantizer.write().take();
             if new_quantizer.is_some() {
                 *self.cold.quantizer.write() = new_quantizer;
@@ -3159,6 +3323,10 @@ impl HnswIndexCore {
             *doc_to_node = new_doc_to_node;
             *entry_point = new_entry_point;
             *ram_entry_point = new_ram_entry_point;
+            *self.hot.neighbor_offsets.write() = new_offsets;
+            *self.hot.neighbor_counts.write() = new_counts;
+            *self.hot.neighbor_arena.write() = new_arena;
+
             self.hot.max_layer.store(
                 new_index.inner.hot.max_layer.load(Ordering::SeqCst),
                 Ordering::SeqCst,
@@ -3324,11 +3492,20 @@ impl VectorIndex for HnswIndex {
         let deleted = self.inner.cold.deleted_nodes.read();
         let mut results = Vec::with_capacity(k);
 
+        let q_guard = if self.inner.cold.config.quantize {
+            Some(self.inner.cold.quantizer.read())
+        } else {
+            None
+        };
+        let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
+
         let ctx = SearchContext {
             nodes: &nodes,
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
             prior_prepared: &[],
+            backlink_map: None,
+            quantizer: q_ref.map(Cow::Borrowed),
         };
 
         for c in candidates.iter() {
@@ -3672,6 +3849,8 @@ impl VectorIndex for HnswIndex {
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
             prior_prepared: &[],
+            backlink_map: None,
+            quantizer: None,
         };
 
         let total_nodes = mmap_node_count + nodes.len();
@@ -3729,16 +3908,8 @@ impl VectorIndex for HnswIndex {
             })
             .sum();
 
-        let connection_memory: usize = nodes
-            .iter()
-            .map(|n| {
-                n.connections
-                    .read()
-                    .iter()
-                    .map(|c| c.len() * std::mem::size_of::<u32>())
-                    .sum::<usize>()
-            })
-            .sum();
+        let connection_memory: usize =
+            self.inner.hot.neighbor_arena.read().len() * std::mem::size_of::<u32>();
 
         if let Some(mmap) = mmap_guard.as_ref() {
             vector_memory += mmap.mmap.len(); // Simple approximation: entire mmap file
@@ -3851,10 +4022,8 @@ mod tests {
         index.delete(tx2, DocId::from(5u64)).await.unwrap();
         index.commit(tx2).await.unwrap();
 
-        // Hold write lock on first node's connections
-        let nodes = index.inner.hot.nodes.read();
-        let first_node_conns = &nodes[0].connections;
-        let lock_guard = first_node_conns.write();
+        // Hold write lock on neighbor arena
+        let lock_guard = index.inner.hot.neighbor_arena.write();
 
         // Perform search while write lock is held.
         // Because search lazy pruning uses try_write(), search must complete without blocking!
