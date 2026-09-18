@@ -7,7 +7,7 @@
       "session_id": "4020660578212732193",
       "active": false,
       "expires_at": "2026-09-17T23:35:52.513683065+00:00",
-      "released_at": "2026-09-18T00:28:45.741380016+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-18T00:17:20.677420114+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-candle",
@@ -16,7 +16,7 @@
       "session_id": "563933830810746016",
       "active": false,
       "expires_at": "2026-09-18T00:07:28.513546193+00:00",
-      "released_at": "2026-09-18T00:28:45.741380016+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-18T00:17:20.677420114+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-graph",
@@ -35,12 +35,12 @@
       "expires_at": "2026-09-18T02:52:36.409832401+00:00"
     },
     {
-      "krate": "memfuse-core",
-      "issue": "WELLE5-SEQLOG-PIN-TTL",
-      "timestamp": "2026-09-18T00:12:51.994068341+00:00",
-      "session_id": "6334189884843523142",
+      "krate": "memfuse-candle",
+      "issue": "WELLE5-DOCID128-CANDLE",
+      "timestamp": "2026-09-18T00:09:55.182910158+00:00",
+      "session_id": "7475709940801589732",
       "active": true,
-      "expires_at": "2026-09-18T04:12:51.994032660+00:00"
+      "expires_at": "2026-09-18T04:09:55.182899883+00:00"
     }
   ]
 }

@@ -253,7 +253,7 @@ pub async fn detect_communities(
         }
 
         if config.hyperedges_included {
-            let mut virtual_map: HashMap<u64, usize> = HashMap::new();
+            let mut virtual_map: HashMap<crate::hyperedge::HyperEdgeId, usize> = HashMap::new();
             let mut next_virtual_idx = inner.reverse_map.len();
             let star_iter = StarExpansionIterator::new(graph);
 
@@ -312,7 +312,7 @@ pub async fn detect_communities(
         }
     });
 
-    let num_entity_nodes = node_indices.len();
+    let num_entity_nodes = num_real_nodes;
     if num_entity_nodes == 0 {
         return Ok(Vec::new());
     }
@@ -365,7 +365,7 @@ pub async fn detect_communities(
 
     let num_total_nodes = num_entity_nodes + vnode_u64_ids.len();
     let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_total_nodes);
-    for &eid in &local_entity_ids {
+    for &eid in &local_entity_ids[..num_entity_nodes] {
         local_u64_ids.push(eid.inner());
     }
     for &v_u64 in &vnode_u64_ids {
