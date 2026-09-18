@@ -41,6 +41,14 @@
       "session_id": "7475709940801589732",
       "active": true,
       "expires_at": "2026-09-18T04:09:55.182899883+00:00"
+    },
+    {
+      "krate": "workspace-audit",
+      "issue": "compilation-diagnostics-20260918",
+      "timestamp": "2026-09-18T12:41:12.847906049+00:00",
+      "session_id": "6647148775697148363",
+      "active": true,
+      "expires_at": "2026-09-18T16:41:12.847886389+00:00"
     }
   ]
 }
