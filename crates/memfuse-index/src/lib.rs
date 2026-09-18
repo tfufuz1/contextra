@@ -27,8 +27,13 @@ pub mod quantize;
 
 pub mod partial_rebuild;
 
+#[cfg(feature = "experimental-rabitq")]
+pub mod quantize_rabitq;
+
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 pub use hnsw::{HnswConfig, HnswIndex, RebuildStatus};
 pub use persistence::{HnswHeader, MmapIndex};
 pub use quantize::ScalarQuantizer;
+#[cfg(feature = "experimental-rabitq")]
+pub use quantize_rabitq::RaBitQQuantizer;
