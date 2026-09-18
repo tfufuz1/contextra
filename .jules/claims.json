@@ -54,12 +54,12 @@
       "expires_at": "2026-09-18T15:58:21.202874447+00:00"
     },
     {
-      "krate": "memfuse-calibration",
+      "krate": "memfuse-core",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-18T13:13:39.260449246+00:00",
-      "session_id": "128727503824090835",
+      "timestamp": "2026-09-18T12:56:48.124332751+00:00",
+      "session_id": "1948196510706783809",
       "active": true,
-      "expires_at": "2026-09-18T17:13:39.260411612+00:00"
+      "expires_at": "2026-09-18T16:56:48.124296129+00:00"
     }
   ]
 }

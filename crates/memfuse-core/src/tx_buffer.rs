@@ -846,7 +846,7 @@ mod tests {
                 for op in ops {
                     match op {
                         IndexOp::Insert { doc_id, data } => {
-                            prop_assert_eq!(doc_id.inner(), id);
+                            prop_assert_eq!(doc_id, DocId::from(id));
                             prop_assert_eq!(data, id);
                         },
                         _ => panic!("Unexpected op"),
@@ -901,7 +901,7 @@ mod tests {
             for (idx, op) in drained1.into_iter().enumerate() {
                 match op {
                     IndexOp::Insert { doc_id, data } => {
-                        prop_assert_eq!(doc_id.inner(), first_ops[idx]);
+                        prop_assert_eq!(doc_id, DocId::from(first_ops[idx]));
                         prop_assert_eq!(data, first_ops[idx]);
                     }
                     _ => panic!("Expected Insert"),
@@ -923,7 +923,7 @@ mod tests {
             for (idx, op) in drained2.into_iter().enumerate() {
                 match op {
                     IndexOp::Insert { doc_id, data } => {
-                        prop_assert_eq!(doc_id.inner(), second_ops[idx]);
+                        prop_assert_eq!(doc_id, DocId::from(second_ops[idx]));
                         prop_assert_eq!(data, second_ops[idx]);
                     }
                     _ => panic!("Expected Insert"),
@@ -976,7 +976,7 @@ mod tests {
                     prop_assert_eq!(ops.len(), 1);
                     match &ops[0] {
                         IndexOp::Insert { doc_id, data } => {
-                            prop_assert_eq!(doc_id.inner(), id);
+                            prop_assert_eq!(*doc_id, DocId::from(id));
                             prop_assert_eq!(*data, id);
                         }
                         _ => panic!("Expected Insert"),
