@@ -11,16 +11,22 @@
 //! [`AgentTool`] trait to participate in the orchestration loop.
 
 use crate::context::AgentContext;
-use memfuse_core::{BoxFuture, Result};
+use memfuse_core::{BoxFuture, Result, TxId};
 use serde::{Deserialize, Serialize};
 
-/// Ein fehlgeschlagener Agent-Schritt der für spätere Analyse persistiert wird.
+/// Ein fehlgeschlagener Agent-Schritt der für spätere Analyse und Idempotenz-Prüfung persistiert wird.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StepDeadLetter {
     /// Session-ID des Agenten
     pub session_id: String,
     /// Node-ID des fehlgeschlagenen Schritts
     pub node_id: String,
+    /// Schrittnummer im Workflow (0-indexed)
+    #[serde(default)]
+    pub step_index: u64,
+    /// WAL Transaktions-ID zum Zeitpunkt des Fehlschlags
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tx_id: Option<TxId>,
     /// Ursache des Fehlers
     pub failure_reason: DeadLetterReason,
     /// Input der zum Fehler geführt hat

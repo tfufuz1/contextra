@@ -40,6 +40,7 @@ async fn test_audit_logging_does_not_pollute_hnsw_index_count() -> Result<()> {
             tokens_consumed: 10,
             payload: serde_json::json!({"step": step}),
             error: None,
+            tx_id: None,
         };
         audit_log.append(&entry).await?;
     }
@@ -107,6 +108,7 @@ async fn test_vector_search_results_unaffected_by_massive_audit_logging() -> Res
             tokens_consumed: 15,
             payload: serde_json::json!({"idx": step}),
             error: None,
+            tx_id: None,
         };
         audit_log.append(&entry).await?;
     }
@@ -158,6 +160,7 @@ async fn test_migration_removes_legacy_zero_vectors_from_hnsw() -> Result<()> {
             tokens_consumed: 10,
             payload: serde_json::json!({"step": i}),
             error: None,
+            tx_id: None,
         };
         let doc_id = DocId::from_key(&key)?;
         let tx = col.allocate_tx()?;
@@ -326,6 +329,7 @@ async fn test_migration_hnsw_delete_failure_prevents_orphan_state() -> Result<()
             tokens_consumed: 10,
             payload: serde_json::json!({"step": i}),
             error: None,
+            tx_id: None,
         };
         let doc_id = DocId::from_key(&key)?;
         let tx = col.allocate_tx()?;

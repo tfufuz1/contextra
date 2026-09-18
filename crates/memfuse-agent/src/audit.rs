@@ -29,6 +29,8 @@ pub struct AuditEntry {
     pub payload: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tx_id: Option<memfuse_core::TxId>,
 }
 
 /// Summary statistics for legacy audit entry migration.
@@ -286,6 +288,7 @@ mod tests {
             tokens_consumed: 50,
             payload: serde_json::json!({"action": "init"}),
             error: None,
+            tx_id: None,
         };
 
         let entry2 = AuditEntry {
@@ -295,6 +298,7 @@ mod tests {
             tokens_consumed: 120,
             payload: serde_json::json!({"action": "compute"}),
             error: None,
+            tx_id: None,
         };
 
         audit_log.append(&entry1).await.unwrap(); // unwrap allowed
@@ -334,6 +338,7 @@ mod tests {
             tokens_consumed: 50,
             payload: serde_json::json!({"step": 1}),
             error: None,
+            tx_id: None,
         };
 
         audit_log.append(&entry).await.unwrap();
@@ -375,6 +380,7 @@ mod tests {
                 tokens_consumed: 10,
                 payload: serde_json::json!({"ok": true}),
                 error: None,
+                tx_id: None,
             };
             assert!(
                 matches!(
@@ -405,6 +411,7 @@ mod tests {
                 tokens_consumed: 10,
                 payload: serde_json::json!({"ok": true}),
                 error: None,
+                tx_id: None,
             };
             assert!(
                 matches!(
@@ -434,6 +441,7 @@ mod tests {
                 tokens_consumed: 10,
                 payload,
                 error: None,
+                tx_id: None,
             };
             assert!(
                 matches!(
@@ -456,6 +464,7 @@ mod tests {
                 tokens_consumed: 0,
                 payload: serde_json::Value::Null,
                 error: Some(err_msg.to_string()),
+                tx_id: None,
             };
             assert!(
                 matches!(

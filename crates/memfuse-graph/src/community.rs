@@ -205,7 +205,7 @@ pub async fn detect_communities(
     graph.compact();
 
     // Acquire read lock to access CSR arrays
-    let (valid_nodes, _num_real_nodes, reverse_map, adj_raw) = {
+    let (valid_nodes, num_real_nodes, reverse_map, adj_raw) = {
         let inner = graph.inner_read();
         let num_nodes = inner.reverse_map.len();
 
@@ -262,7 +262,7 @@ pub async fn detect_communities(
                     if inner.entities.get(u).is_some_and(|e| e.is_some()) {
                         let v_idx =
                             *virtual_map
-                                .entry(virtual_node.hyperedge_id.inner())
+                                .entry(virtual_node.hyperedge_id)
                                 .or_insert_with(|| {
                                     let idx = next_virtual_idx;
                                     next_virtual_idx += 1;
