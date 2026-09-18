@@ -245,11 +245,7 @@ async fn test_deleted_keys_hash_is_deterministic() {
         scope.clone(),
         keys_order_1,
         TxId::new(50),
-        vec![
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)
-                .unwrap(),
-        ],
+        vec![lsm_proof_1, sstable_proof_1],
         vec![],
         proof_key,
     )
@@ -270,11 +266,7 @@ async fn test_deleted_keys_hash_is_deterministic() {
         scope,
         keys_order_2,
         TxId::new(50),
-        vec![
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)
-                .unwrap(),
-        ],
+        vec![lsm_proof_2, sstable_proof_2],
         vec![],
         proof_key,
     )

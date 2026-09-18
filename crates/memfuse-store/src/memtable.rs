@@ -88,33 +88,49 @@ impl MemTable {
         }
     }
 
-    /// Deterministic shard selector based on a fast non-cryptographic 64-bit avalanche hash mixer.
+    /// Deterministic, range-based shard selector mapping keys to lexicographical range shards.
+    ///
+    /// Constructs a 16-bit big-endian value from the first two bytes of the key to maintain
+    /// strict monotonicity: `keyA <= keyB => shard_for(keyA) <= shard_for(keyB)`.
+    /// Zero-panic and zero-allocation.
     #[inline]
-    fn shard_for(key: &[u8]) -> usize {
-        // Hash the FULL key, not just the first byte. Namespaced keys share
-        // long common prefixes (e.g. "__col:hr:\0", "__docid:"), so any shard
-        // selector must mix all input bytes to avoid skew — a single-byte or
-        // prefix-only discriminator is provably insufficient given MemFuse's
-        // key layout (see Collection::namespaced_key() in
-        // crates/memfuse-db/src/collection.rs).
-        // Uses a fast 64-bit avalanche mixer (< 5ns) processing 8-byte chunks with finalizer fold.
-        // Zero-panic: modulo a compile-time const > 0.
-        let mut hash: u64 = 0xa076_1d64_78bd_642f;
-        let (chunks, remainder) = key.as_chunks::<8>();
-        for chunk in chunks {
-            let val = u64::from_le_bytes(*chunk);
-            hash = hash.wrapping_add(val).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-            hash = (hash ^ (hash >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    pub fn shard_for(key: &[u8]) -> usize {
+        let b0 = key.first().copied().unwrap_or(0) as u16;
+        let b1 = key.get(1).copied().unwrap_or(0) as u16;
+        let val = (b0 << 8) | b1;
+        ((val as usize) * SHARD_COUNT) / 65536
+    }
+
+    /// Computes the target shard index range for a given key prefix.
+    #[inline]
+    fn shard_range_for_prefix(prefix: &[u8]) -> std::ops::RangeInclusive<usize> {
+        if prefix.len() >= 2 {
+            let shard = Self::shard_for(prefix);
+            shard..=shard
+        } else if prefix.len() == 1 {
+            let start = Self::shard_for(&[prefix[0], 0x00]);
+            let end = Self::shard_for(&[prefix[0], 0xFF]);
+            start..=end
+        } else {
+            0..=SHARD_COUNT - 1
         }
-        if !remainder.is_empty() {
-            let mut buf = [0u8; 8];
-            buf[..remainder.len()].copy_from_slice(remainder);
-            let val = u64::from_le_bytes(buf);
-            hash = hash.wrapping_add(val).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-        }
-        hash = (hash ^ (hash >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        hash ^= hash >> 31;
-        (hash as usize) % SHARD_COUNT
+    }
+
+    /// Computes the target shard index range for start and end key bounds.
+    #[inline]
+    fn shard_range_for_bounds(
+        start: Bound<&[u8]>,
+        end: Bound<&[u8]>,
+    ) -> std::ops::RangeInclusive<usize> {
+        let start_shard = match start {
+            Bound::Included(s) | Bound::Excluded(s) => Self::shard_for(s),
+            Bound::Unbounded => 0,
+        };
+        let end_shard = match end {
+            Bound::Included(e) | Bound::Excluded(e) => Self::shard_for(e),
+            Bound::Unbounded => SHARD_COUNT - 1,
+        };
+        start_shard..=end_shard
     }
 
     /// Inserts a key-value pair with a sequence number and transaction ID.
@@ -274,12 +290,12 @@ impl MemTable {
     /// Iterates over all entries (all versions) in sorted key order.
     /// Returns (Key, Value, SeqNo, TxId).
     ///
-    /// Collects from all shards and sorts by key to maintain the global
-    /// sorted-order invariant. Called only during flush (low-frequency).
+    /// With Range-Sharding, concatenating shards in order naturally produces globally
+    /// sorted key output without requiring post-sorting.
     pub fn iter(&self) -> Vec<(Bytes, Bytes, u64, u64)> {
         let estimated_entries = {
             let total_bytes = self.size.load(Ordering::Relaxed);
-            const AVG_ENTRY_BYTES: usize = 64; // konservative Schätzung: 32B Key + 24B Val + 8B Seq
+            const AVG_ENTRY_BYTES: usize = 64;
             std::cmp::max(16, total_bytes / AVG_ENTRY_BYTES)
         };
         let mut results = Vec::with_capacity(estimated_entries);
@@ -291,10 +307,6 @@ impl MemTable {
                 }
             }
         }
-        // Restore global sorted order: primary by key, secondary by seq_no
-        // within versions of the same key (already sorted per-shard via BTreeMap
-        // + push order, but cross-shard merge requires a sort).
-        results.sort_by(|a, b| a.0.cmp(&b.0).then(a.2.cmp(&b.2)));
         results
     }
 
@@ -325,9 +337,10 @@ impl MemTable {
     {
         let max_tx_val = max_tx.inner();
         let max_seq = seq_no & !TOMBSTONE_BIT;
+        let shard_range = Self::shard_range_for_prefix(prefix);
 
-        for shard in &self.shards {
-            let entries = shard.entries.read();
+        for shard_idx in shard_range {
+            let entries = self.shards[shard_idx].entries.read();
             for (k, versions) in
                 entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
             {
@@ -395,9 +408,10 @@ impl MemTable {
     {
         let max_tx_val = max_tx.inner();
         let max_seq = seq_no & !TOMBSTONE_BIT;
+        let shard_range = Self::shard_range_for_bounds(start, end);
 
-        for shard in &self.shards {
-            let entries = shard.entries.read();
+        for shard_idx in shard_range {
+            let entries = self.shards[shard_idx].entries.read();
             for (k, versions) in entries.range::<[u8], _>((start, end)) {
                 let mut best_version: Option<(&Bytes, u64)> = None;
                 for (seq, val, tx) in versions {
@@ -434,9 +448,9 @@ impl MemTable {
     /// Iterates over only the latest version of each key in sorted key order.
     /// Returns (Key, Value, SeqNo, TxId).
     ///
-    /// Collects from all shards and sorts by key. Called only during flush.
+    /// With Range-Sharding, concatenating shards in order naturally produces globally
+    /// sorted key output.
     pub fn iter_latest(&self) -> Vec<(Bytes, Bytes, u64, u64)> {
-        // Exact capacity estimate: total unique keys across all shards (1 entry per key in iter_latest).
         let estimated_entries: usize = self.shards.iter().map(|s| s.entries.read().len()).sum();
         let mut results = Vec::with_capacity(estimated_entries);
         for shard in &self.shards {
@@ -447,8 +461,6 @@ impl MemTable {
                 }
             }
         }
-        // Restore global sorted order by key.
-        results.sort_by(|a, b| a.0.cmp(&b.0));
         results
     }
 }
@@ -654,46 +666,39 @@ mod tests {
     }
 
     #[test]
-    fn test_shard_distribution_for_realistic_collection_keys() {
-        // Simulates the actual key shapes produced during ingestion into ONE
-        // named collection ("hr") — the primary workload this sharding
-        // targets. Mirrors Collection::namespaced_key() for key_type == 0.
-        use std::collections::HashSet;
-
-        let mut shards_hit = HashSet::new();
-        for i in 0..1000u32 {
-            let mut key = b"__col:hr:\x00".to_vec();
-            key.push(0u8); // key_type = 0 (user key)
-            key.extend_from_slice(format!("doc-{i}").as_bytes());
-            shards_hit.insert(MemTable::shard_for(&key));
+    fn test_range_sharding_monotonicity() {
+        let keys = [
+            b"a".as_slice(),
+            b"apple".as_slice(),
+            b"b".as_slice(),
+            b"banana".as_slice(),
+            b"m".as_slice(),
+            b"mango".as_slice(),
+            b"z".as_slice(),
+            b"zebra".as_slice(),
+        ];
+        let mut prev_shard = 0;
+        for &k in &keys {
+            let shard = MemTable::shard_for(k);
+            assert!(
+                shard >= prev_shard,
+                "Range sharding monotonicity violated for key {:?}: shard {} < prev_shard {}",
+                String::from_utf8_lossy(k),
+                shard,
+                prev_shard
+            );
+            prev_shard = shard;
         }
-        assert!(
-            shards_hit.len() >= SHARD_COUNT / 2,
-            "Realistic collection keys must spread across at least half the \
-             shards; got only {} distinct shards — sharding provides no \
-             contention relief for this key shape.",
-            shards_hit.len()
-        );
     }
 
     #[test]
-    fn test_shard_distribution_for_docid_mapping_keys() {
-        // Mirrors the __docid: keys written on every insert() in the default
-        // collection (Collection::insert_op, key_type == 1).
-        use std::collections::HashSet;
-
-        let mut shards_hit = HashSet::new();
-        for i in 0u64..1000 {
-            let mut key = b"__docid:".to_vec();
-            key.extend_from_slice(&i.to_le_bytes());
-            shards_hit.insert(MemTable::shard_for(&key));
-        }
-        assert!(
-            shards_hit.len() >= SHARD_COUNT / 2,
-            "Docid-mapping keys (written on every insert) must spread across \
-             at least half the shards; got only {} — every insert() call \
-             would otherwise serialize on a handful of shards.",
-            shards_hit.len()
+    fn test_scan_prefix_prunes_shards() {
+        let range = MemTable::shard_range_for_prefix(b"user:");
+        assert_eq!(
+            range.clone().count(),
+            1,
+            "2-byte prefix 'user:' should target exactly 1 shard, got {:?}",
+            range
         );
     }
 

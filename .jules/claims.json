@@ -5,16 +5,18 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-17T19:35:52.513702308+00:00",
       "session_id": "4020660578212732193",
-      "active": true,
-      "expires_at": "2026-09-17T23:35:52.513683065+00:00"
+      "active": false,
+      "expires_at": "2026-09-17T23:35:52.513683065+00:00",
+      "released_at": "2026-09-18T00:17:20.677420114+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-candle",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-17T20:07:28.513569686+00:00",
       "session_id": "563933830810746016",
-      "active": true,
-      "expires_at": "2026-09-18T00:07:28.513546193+00:00"
+      "active": false,
+      "expires_at": "2026-09-18T00:07:28.513546193+00:00",
+      "released_at": "2026-09-18T00:17:20.677420114+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-graph",
@@ -23,7 +25,49 @@
       "session_id": "604547472940316711",
       "active": false,
       "expires_at": "2026-09-18T01:21:24.123038562+00:00",
-      "released_at": "2026-09-18T14:09:08.785826069+00:00"
+      "released_at": "2026-09-18T12:17:27.329296384+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-py",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-17T22:52:36.409854645+00:00",
+      "session_id": "15341767735733559964",
+      "active": false,
+      "expires_at": "2026-09-18T02:52:36.409832401+00:00",
+      "released_at": "2026-09-18T12:17:27.329296384+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-candle",
+      "issue": "WELLE5-DOCID128-CANDLE",
+      "timestamp": "2026-09-18T00:09:55.182910158+00:00",
+      "session_id": "7475709940801589732",
+      "active": false,
+      "expires_at": "2026-09-18T04:09:55.182899883+00:00",
+      "released_at": "2026-09-18T12:17:27.329296384+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-index",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-18T11:58:21.202900996+00:00",
+      "session_id": "6283323573057865446",
+      "active": true,
+      "expires_at": "2026-09-18T15:58:21.202874447+00:00"
+    },
+    {
+      "krate": "memfuse-core",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-18T12:56:48.124332751+00:00",
+      "session_id": "1948196510706783809",
+      "active": true,
+      "expires_at": "2026-09-18T16:56:48.124296129+00:00"
+    },
+    {
+      "krate": "memfuse-calibration",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-18T13:46:25.076729035+00:00",
+      "session_id": "3117774820071236116",
+      "active": true,
+      "expires_at": "2026-09-18T17:46:25.076713023+00:00"
     }
   ]
 }

@@ -37,13 +37,14 @@ pub struct CommunityDetectionConfig {
 
 /// Künstlicher bipartiter Knoten für eine Hyperkante in der Stern-Expansion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+
 pub struct VirtualHyperedgeNode {
     /// ID der zugrundeliegenden Hyperkante.
     pub hyperedge_id: crate::hyperedge::HyperEdgeId,
 }
 
 impl VirtualHyperedgeNode {
-    /// Erstellt einen neuen `VirtualHyperedgeNode` für eine gegebenen `hyperedge_id`.
+    /// Creates a new `VirtualHyperedgeNode`.
     pub fn new(hyperedge_id: u64) -> Self {
         Self {
             hyperedge_id: crate::hyperedge::HyperEdgeId::new(hyperedge_id),
@@ -309,8 +310,8 @@ pub async fn detect_communities(
         }
     });
 
-    let num_total_nodes = node_indices.len();
-    if num_total_nodes == 0 {
+    let num_entity_nodes = num_real_nodes;
+    if num_entity_nodes == 0 {
         return Ok(Vec::new());
     }
 
@@ -321,14 +322,54 @@ pub async fn detect_communities(
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
-        if global_idx < reverse_map.len() {
+        let (eid, _u64_id) = if global_idx < reverse_map.len() {
             let eid = reverse_map[global_idx];
             local_entity_ids.push(eid);
             local_u64_ids.push(eid.inner());
         } else {
             let u64_id = u64::MAX - (global_idx - reverse_map.len()) as u64;
-            local_u64_ids.push(u64_id);
+            (EntityId::new(0), u64_id)
+        };
+        local_entity_ids.push(eid);
+    }
+
+    // Entity lookup map from EntityId -> local index
+    let entity_to_local: HashMap<EntityId, usize> = local_entity_ids
+        .iter()
+        .enumerate()
+        .map(|(idx, &eid)| (eid, idx))
+        .collect();
+
+    // Virtual hyperedge nodes for star expansion (if enabled)
+    let mut vnode_u64_ids: Vec<u64> = Vec::new();
+    let mut vnode_local_adj: Vec<Vec<(usize, f32)>> = Vec::new();
+
+    if config.hyperedges_included {
+        let mut star_iter = StarExpansionIterator::new(graph);
+        // Map VirtualHyperedgeNode (hyperedge_id) to virtual local index starting at num_entity_nodes
+        let mut vnode_to_local: HashMap<crate::hyperedge::HyperEdgeId, usize> = HashMap::new();
+
+        while let Some((entity_id, vnode, weight)) = star_iter.next_with_weight() {
+            if let Some(&local_entity_idx) = entity_to_local.get(&entity_id) {
+                let v_idx = *vnode_to_local.entry(vnode.hyperedge_id).or_insert_with(|| {
+                    let idx = num_entity_nodes + vnode_u64_ids.len();
+                    vnode_u64_ids.push(vnode.hyperedge_id.inner());
+                    vnode_local_adj.push(Vec::new());
+                    idx
+                });
+
+                vnode_local_adj[v_idx - num_entity_nodes].push((local_entity_idx, weight));
+            }
         }
+    }
+
+    let num_total_nodes = num_entity_nodes + vnode_u64_ids.len();
+    let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_total_nodes);
+    for &eid in &local_entity_ids[..num_entity_nodes] {
+        local_u64_ids.push(eid.inner());
+    }
+    for &v_u64 in &vnode_u64_ids {
+        local_u64_ids.push(v_u64);
     }
 
     // Build dense local adjacency lists for all nodes (entities + virtual hyperedge nodes)

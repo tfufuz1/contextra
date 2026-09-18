@@ -338,9 +338,21 @@ impl Manifest {
 
     /// Appends a new entry to the manifest and performs flush + fsync.
     pub async fn append(&self, entry: &ManifestEntry) -> Result<()> {
-        let bytes = entry.to_bytes()?;
+        self.append_batch(std::slice::from_ref(entry)).await
+    }
+
+    /// Appends multiple entries to the manifest in a single atomic batch with flush + fsync.
+    pub async fn append_batch(&self, entries: &[ManifestEntry]) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let mut batch_bytes = Vec::new();
+        for entry in entries {
+            batch_bytes.extend(entry.to_bytes()?);
+        }
+
         let mut file = self.file.lock().await;
-        file.write_all(&bytes).await.map_err(|e| {
+        file.write_all(&batch_bytes).await.map_err(|e| {
             MemFuseError::Storage(format!(
                 "MANIFEST write failed for {}: {}",
                 self.path.display(),
@@ -557,11 +569,12 @@ fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[u8]) -> boo
                     return false;
                 }
                 if remaining.len() >= 12 {
-                    let path_len =
-                        u32::from_le_bytes(remaining[8..12].try_into().unwrap()) as usize;
-                    let expected_total_len = 4 + 1 + 8 + 4 + path_len;
-                    if claimed_len != expected_total_len {
-                        return false;
+                    if let Ok(bytes) = remaining[8..12].try_into() {
+                        let path_len = u32::from_le_bytes(bytes) as usize;
+                        let expected_total_len = 4 + 1 + 8 + 4 + path_len;
+                        if claimed_len != expected_total_len {
+                            return false;
+                        }
                     }
                 }
             }
@@ -571,10 +584,12 @@ fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[u8]) -> boo
                     return false;
                 }
                 if remaining.len() >= 4 {
-                    let path_len = u32::from_le_bytes(remaining[0..4].try_into().unwrap()) as usize;
-                    let expected_total_len = 4 + 1 + 4 + path_len;
-                    if claimed_len != expected_total_len {
-                        return false;
+                    if let Ok(bytes) = remaining[0..4].try_into() {
+                        let path_len = u32::from_le_bytes(bytes) as usize;
+                        let expected_total_len = 4 + 1 + 4 + path_len;
+                        if claimed_len != expected_total_len {
+                            return false;
+                        }
                     }
                 }
             }
@@ -590,29 +605,37 @@ fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[u8]) -> boo
                     return false;
                 }
                 if remaining.len() >= 20 {
-                    let added_path_len =
-                        u32::from_le_bytes(remaining[16..20].try_into().unwrap()) as usize;
-                    if remaining.len() >= 20 + added_path_len + 4 {
-                        let offset = 20 + added_path_len;
-                        let removed_count =
-                            u32::from_le_bytes(remaining[offset..offset + 4].try_into().unwrap())
-                                as usize;
+                    if let Ok(added_bytes) = remaining[16..20].try_into() {
+                        let added_path_len = u32::from_le_bytes(added_bytes) as usize;
+                        if remaining.len() >= 20 + added_path_len + 4 {
+                            let offset = 20 + added_path_len;
+                            if let Ok(cnt_bytes) = remaining[offset..offset + 4].try_into() {
+                                let removed_count = u32::from_le_bytes(cnt_bytes) as usize;
 
-                        let mut rem_offset = offset + 4;
-                        let mut calculated_len = 4 + 1 + 8 + 8 + 4 + added_path_len + 4;
-                        for _ in 0..removed_count {
-                            if remaining.len() >= rem_offset + 4 {
-                                let r_len = u32::from_le_bytes(
-                                    remaining[rem_offset..rem_offset + 4].try_into().unwrap(),
-                                ) as usize;
-                                rem_offset += 4 + r_len;
-                                calculated_len += 4 + r_len;
-                            } else {
-                                break;
+                                let mut rem_offset = offset + 4;
+                                let mut calculated_len = 4 + 1 + 8 + 8 + 4 + added_path_len + 4;
+                                let mut all_removed_parsed = true;
+                                for _ in 0..removed_count {
+                                    if remaining.len() >= rem_offset + 4 {
+                                        if let Ok(r_bytes) =
+                                            remaining[rem_offset..rem_offset + 4].try_into()
+                                        {
+                                            let r_len = u32::from_le_bytes(r_bytes) as usize;
+                                            rem_offset += 4 + r_len;
+                                            calculated_len += 4 + r_len;
+                                        } else {
+                                            all_removed_parsed = false;
+                                            break;
+                                        }
+                                    } else {
+                                        all_removed_parsed = false;
+                                        break;
+                                    }
+                                }
+                                if all_removed_parsed && claimed_len != calculated_len {
+                                    return false;
+                                }
                             }
-                        }
-                        if remaining.len() >= rem_offset && claimed_len != calculated_len {
-                            return false;
                         }
                     }
                 }
@@ -870,6 +893,64 @@ mod tests {
             "Truncated tail entry should be safely ignored"
         );
         assert_eq!(loaded[0], entry1);
+    }
+
+    #[tokio::test]
+    async fn test_manifest_replace_tail_truncation_discards_incomplete_replace() {
+        let dir = tempdir().expect("tempdir");
+        let manifest_path = dir.path().join("MANIFEST");
+
+        let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+
+        let add1 = ManifestEntry::Add {
+            path: PathBuf::from("sst-1.sst"),
+            max_tx: 10,
+        };
+        let add2 = ManifestEntry::Add {
+            path: PathBuf::from("sst-2.sst"),
+            max_tx: 20,
+        };
+        let replace_entry = ManifestEntry::Replace {
+            removed: vec![PathBuf::from("sst-1.sst"), PathBuf::from("sst-2.sst")],
+            added: PathBuf::from("sst-compact-1.sst"),
+            added_max_tx: 20,
+            rank: 0,
+        };
+
+        manifest.append(&add1).await.expect("append add1");
+        manifest.append(&add2).await.expect("append add2");
+        manifest
+            .append(&replace_entry)
+            .await
+            .expect("append replace");
+        drop(manifest);
+
+        // Truncate file in the middle of replace_entry (e.g., cut off last 10 bytes)
+        let mut file_bytes = tokio::fs::read(&manifest_path).await.expect("read file");
+        file_bytes.truncate(file_bytes.len() - 10);
+        tokio::fs::write(&manifest_path, file_bytes)
+            .await
+            .expect("write truncated file");
+
+        let loaded = Manifest::load(&manifest_path)
+            .await
+            .expect("load manifest with truncated replace entry");
+        assert_eq!(
+            loaded.len(),
+            2,
+            "Incomplete Replace tail entry must be discarded"
+        );
+        assert_eq!(loaded[0], add1);
+        assert_eq!(loaded[1], add2);
+
+        let valid = Manifest::reconstruct_valid_sstables(&loaded);
+        assert_eq!(
+            valid.len(),
+            2,
+            "Original input SSTables must remain valid when Replace entry was truncated during crash"
+        );
+        assert!(valid.iter().any(|(p, _)| p == Path::new("sst-1.sst")));
+        assert!(valid.iter().any(|(p, _)| p == Path::new("sst-2.sst")));
     }
 
     #[test]

@@ -129,361 +129,20 @@ impl Wal {
     }
 
     #[allow(clippy::type_complexity)]
-    fn parse_mmap_slice(
+    pub(crate) fn parse_mmap_slice(
         &self,
         mmap: &[u8],
         file_size: u64,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
+        let slice_len = (file_size as usize).min(mmap.len());
+        let slice = mmap
+            .get(..slice_len)
+            .ok_or_else(|| MemFuseError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
         let mut entries = Vec::new();
-        let mut entries_count = 0u64;
-        let mut pos = 0u64;
-        let mut version = WalVersion::V1;
-
-        if file_size == 0 {
-            return Ok((entries, version));
-        }
-
-        let integrity_key = self.get_integrity_key()?;
-        let mut verifier = IntegrityVerifier::new(&integrity_key);
-        let mut using_legacy_key = false;
-
-        // Detect version from header
-        if file_size >= 4 {
-            let header_bytes = &mmap[0..4];
-            if header_bytes == WAL_V3_HEADER {
-                version = WalVersion::V3;
-                pos = 4;
-            } else if header_bytes == WAL_V2_HEADER {
-                version = WalVersion::V2;
-                pos = 4;
-            } else {
-                pos = 0;
-            }
-        }
-
-        while pos < file_size {
-            if pos + 4 > file_size {
-                tracing::warn!(
-                    "WAL tail corruption (partial entry length) at offset {}",
-                    pos
-                );
-                break;
-            }
-
-            let len_bytes: [u8; 4] = mmap[pos as usize..pos as usize + 4].try_into().unwrap();
-            let len = u32::from_le_bytes(len_bytes) as usize;
-
-            if len > MAX_WAL_ENTRY_SIZE as usize {
-                if pos + 4 + len as u64 > file_size {
-                    if entries_count == 0 && file_size > 64 {
-                        return Err(MemFuseError::wal_corruption(
-                            pos,
-                            format!(
-                                "WAL entry length ({}) exceeds hard limit and file size",
-                                len
-                            ),
-                        ));
-                    }
-                    tracing::warn!("WAL tail corruption (huge len) at offset {}", pos);
-                    break;
-                }
-                return Err(MemFuseError::wal_corruption(
-                    pos,
-                    format!("WAL entry too large ({} bytes)", len),
-                ));
-            }
-
-            if pos + 4 + len as u64 > file_size {
-                if entries_count == 0 && file_size > 64 {
-                    return Err(MemFuseError::wal_corruption(
-                        pos,
-                        format!(
-                            "WAL entry length ({}) exceeds file size ({}) at start of file",
-                            len, file_size
-                        ),
-                    ));
-                }
-                tracing::warn!("WAL tail corruption (partial entry) at offset {}", pos);
-                break;
-            }
-
-            let chunk_start_pos = pos;
-            let entry_data_raw = &mmap[pos as usize + 4..pos as usize + 4 + len];
-            pos += 4 + len as u64;
-
-            if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some() {
-                let km = match self.key_manager.as_ref() {
-                    Some(km) => km,
-                    None => unreachable!(),
-                };
-                if entry_data_raw.len() < 12 {
-                    if pos >= file_size {
-                        tracing::warn!("WAL truncated during read at offset {}", chunk_start_pos);
-                        break;
-                    }
-                    return Err(MemFuseError::Storage(
-                        "WAL entry too short for nonce".into(),
-                    ));
-                }
-                let mut nonce = [0u8; 12];
-                nonce.copy_from_slice(&entry_data_raw[0..12]);
-                let decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
-                    Ok(data) => data,
-                    Err(e) => {
-                        if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), decryption failed: {}",
-                                chunk_start_pos,
-                                e
-                            );
-                            break;
-                        }
-                        return Err(MemFuseError::wal_corruption(
-                            chunk_start_pos,
-                            format!("Decryption failed: {}", e),
-                        ));
-                    }
-                };
-
-                let mut slice = decrypted_data.as_slice();
-                while !slice.is_empty() {
-                    if slice.len() < 4 {
-                        if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), incomplete inner framing",
-                                chunk_start_pos
-                            );
-                            break;
-                        }
-                        return Err(MemFuseError::wal_corruption(
-                            chunk_start_pos,
-                            "Truncated inner WAL entry length in batch",
-                        ));
-                    }
-                    let inner_len_bytes: [u8; 4] = match slice[0..4].try_into() {
-                        Ok(b) => b,
-                        Err(_) => {
-                            return Err(MemFuseError::wal_corruption(
-                                chunk_start_pos,
-                                "Failed to extract inner WAL entry length",
-                            ));
-                        }
-                    };
-                    let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
-                    if slice.len() < 4 + inner_len {
-                        if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), incomplete inner payload",
-                                chunk_start_pos
-                            );
-                            break;
-                        }
-                        return Err(MemFuseError::wal_corruption(
-                            chunk_start_pos,
-                            "Truncated inner WAL entry in batch",
-                        ));
-                    }
-                    let inner_entry_bytes = &slice[4..4 + inner_len];
-                    slice = &slice[4 + inner_len..];
-
-                    let entry = match WalEntry::from_bytes(inner_entry_bytes) {
-                        Ok(e) => e,
-                        Err(e) => {
-                            let err_msg = format!("{}", e);
-                            let is_crc_error = err_msg.contains("CRC mismatch");
-
-                            if pos >= file_size && !is_crc_error {
-                                tracing::warn!(
-                                    "WAL truncation at tail (offset {}), partial entry: {}",
-                                    chunk_start_pos,
-                                    e
-                                );
-                                break;
-                            } else {
-                                let reason = if is_crc_error {
-                                    format!("CRC validation failed: {e}")
-                                } else {
-                                    format!("Deserialization failed: {e}")
-                                };
-                                return Err(MemFuseError::wal_corruption(chunk_start_pos, reason));
-                            }
-                        }
-                    };
-
-                    let (op_type, key, value) = match &entry.op {
-                        WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
-                        WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
-                    };
-
-                    let snapshot = WalEntrySnapshot {
-                        tx_id: entry.tx_id().inner(),
-                        seq_no: entry.seq_no,
-                        op_type,
-                        key,
-                        value,
-                        checksum: entry.checksum,
-                        prev_hmac: entry.prev_hmac,
-                    };
-
-                    let verify_res = match version {
-                        WalVersion::V3 => verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
-                        WalVersion::V2 => verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
-                        WalVersion::V1 => {
-                            verifier.skip_hmac_verify_legacy(&snapshot);
-                            Ok(())
-                        }
-                    };
-
-                    if let Err(e) = verify_res {
-                        if !using_legacy_key && self.allow_legacy_integrity_key_fallback {
-                            let mut legacy_verifier =
-                                IntegrityVerifier::new(&legacy_integrity_key());
-                            legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
-                            let legacy_res =
-                                match version {
-                                    WalVersion::V3 => legacy_verifier
-                                        .verify_and_update_v3(&snapshot, chunk_start_pos),
-                                    WalVersion::V2 => legacy_verifier
-                                        .verify_and_update_v2(&snapshot, chunk_start_pos),
-                                    WalVersion::V1 => {
-                                        legacy_verifier.skip_hmac_verify_legacy(&snapshot);
-                                        Ok(())
-                                    }
-                                };
-                            if legacy_res.is_ok() {
-                                tracing::warn!(
-                                    "WAL nutzt veralteten Integritätsschlüssel — Datenbank sollte neu initialisiert werden"
-                                );
-                                verifier = legacy_verifier;
-                                using_legacy_key = true;
-                            } else {
-                                return Err(e.into());
-                            }
-                        } else {
-                            return Err(e.into());
-                        }
-                    }
-
-                    entries_count += 1;
-                    let seq = entry.seq_no;
-                    entries.push((seq, entry, pos));
-                }
-            } else {
-                let decrypted_data;
-                let entry_data = if let Some(km) = &self.key_manager {
-                    if entry_data_raw.len() < 12 {
-                        return Err(MemFuseError::Storage(
-                            "WAL entry too short for nonce".into(),
-                        ));
-                    }
-                    let mut nonce = [0u8; 12];
-                    nonce.copy_from_slice(&entry_data_raw[0..12]);
-                    decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
-                        Ok(data) => data,
-                        Err(e) => {
-                            if version == WalVersion::V1 {
-                                return Err(MemFuseError::Storage(format!(
-                                    "WAL entry at {} claims V1/plaintext format while KeyManager is active for {} \
-                                     (decryption failed: {}) — refusing potential downgrade attack. \
-                                     Set allow_legacy_integrity_key_fallback / min_wal_version appropriately if \
-                                     this WAL genuinely predates encryption and requires migration.",
-                                    chunk_start_pos,
-                                    self.path.display(),
-                                    e
-                                )));
-                            } else {
-                                if pos >= file_size {
-                                    tracing::warn!(
-                                        "WAL truncation at tail (offset {}), decryption failed: {}",
-                                        chunk_start_pos,
-                                        e
-                                    );
-                                    break;
-                                }
-                                return Err(MemFuseError::wal_corruption(
-                                    chunk_start_pos,
-                                    format!("Decryption failed: {}", e),
-                                ));
-                            }
-                        }
-                    };
-                    &decrypted_data
-                } else {
-                    entry_data_raw
-                };
-
-                let entry = match WalEntry::from_bytes(entry_data) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        if let Some(err) =
-                            Self::handle_wal_entry_parse_error(e, chunk_start_pos, pos, file_size)
-                        {
-                            return Err(err);
-                        }
-                        break;
-                    }
-                };
-
-                let (op_type, key, value) = match &entry.op {
-                    WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
-                    WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
-                };
-
-                let snapshot = WalEntrySnapshot {
-                    tx_id: entry.tx_id().inner(),
-                    seq_no: entry.seq_no,
-                    op_type,
-                    key,
-                    value,
-                    checksum: entry.checksum,
-                    prev_hmac: entry.prev_hmac,
-                };
-
-                let verify_res = match version {
-                    WalVersion::V3 => verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
-                    WalVersion::V2 => verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
-                    WalVersion::V1 => {
-                        verifier.skip_hmac_verify_legacy(&snapshot);
-                        Ok(())
-                    }
-                };
-
-                if let Err(e) = verify_res {
-                    if !using_legacy_key && self.allow_legacy_integrity_key_fallback {
-                        let mut legacy_verifier = IntegrityVerifier::new(&legacy_integrity_key());
-                        legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
-                        let legacy_res = match version {
-                            WalVersion::V3 => {
-                                legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
-                            }
-                            WalVersion::V2 => {
-                                legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
-                            }
-                            WalVersion::V1 => {
-                                legacy_verifier.skip_hmac_verify_legacy(&snapshot);
-                                Ok(())
-                            }
-                        };
-                        if legacy_res.is_ok() {
-                            tracing::warn!(
-                                "WAL nutzt veralteten Integritätsschlüssel — Datenbank sollte neu initialisiert werden"
-                            );
-                            verifier = legacy_verifier;
-                            using_legacy_key = true;
-                        } else {
-                            return Err(e.into());
-                        }
-                    } else {
-                        return Err(e.into());
-                    }
-                }
-
-                entries_count += 1;
-                let seq = entry.seq_no;
-                entries.push((seq, entry, pos));
-            }
-        }
-
+        let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
+            entries.push((seq, entry, pos));
+            true
+        })?;
         Ok((entries, version))
     }
 
@@ -621,15 +280,16 @@ impl Wal {
 
         // Detect version from header
         if file_size >= 4 && slice_len >= 4 {
-            let header_bytes: [u8; 4] = slice[0..4].try_into().unwrap();
-            if header_bytes == WAL_V3_HEADER {
-                version = WalVersion::V3;
-                pos = 4;
-            } else if header_bytes == WAL_V2_HEADER {
-                version = WalVersion::V2;
-                pos = 4;
-            } else {
-                pos = 0;
+            if let Some(header_slice) = slice.get(0..4) {
+                if header_slice == WAL_V3_HEADER {
+                    version = WalVersion::V3;
+                    pos = 4;
+                } else if header_slice == WAL_V2_HEADER {
+                    version = WalVersion::V2;
+                    pos = 4;
+                } else {
+                    pos = 0;
+                }
             }
         }
 
@@ -646,7 +306,25 @@ impl Wal {
                 break;
             }
 
-            let len_bytes: [u8; 4] = slice[pos as usize..pos as usize + 4].try_into().unwrap();
+            let len_bytes_slice = match slice.get(pos as usize..pos as usize + 4) {
+                Some(s) => s,
+                None => {
+                    tracing::warn!(
+                        "WAL tail corruption (out of bounds length) at offset {}",
+                        pos
+                    );
+                    break;
+                }
+            };
+            let len_bytes: [u8; 4] = match len_bytes_slice.try_into() {
+                Ok(b) => b,
+                Err(_) => {
+                    return Err(MemFuseError::wal_corruption(
+                        pos,
+                        "Failed to parse WAL entry length header",
+                    ));
+                }
+            };
             let len = u32::from_le_bytes(len_bytes) as usize;
 
             if len > MAX_WAL_ENTRY_SIZE as usize {
@@ -683,7 +361,16 @@ impl Wal {
                 break;
             }
 
-            let entry_data_raw = &slice[pos as usize + 4..pos as usize + 4 + len];
+            let entry_data_raw = match slice.get(pos as usize + 4..pos as usize + 4 + len) {
+                Some(data) => data,
+                None => {
+                    tracing::warn!(
+                        "WAL tail corruption (entry slice out of bounds) at offset {}",
+                        pos
+                    );
+                    break;
+                }
+            };
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
@@ -702,8 +389,18 @@ impl Wal {
                     ));
                 }
                 let mut nonce = [0u8; 12];
-                nonce.copy_from_slice(&entry_data_raw[0..12]);
-                let decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
+                let nonce_slice = match entry_data_raw.get(0..12) {
+                    Some(s) => s,
+                    None => {
+                        return Err(MemFuseError::wal_corruption(
+                            chunk_start_pos,
+                            "Failed to read entry nonce",
+                        ));
+                    }
+                };
+                nonce.copy_from_slice(nonce_slice);
+                let ciphertext = entry_data_raw.get(12..).unwrap_or(&[]);
+                let decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                     Ok(data) => data,
                     Err(e) => {
                         if pos >= file_size {
@@ -736,15 +433,16 @@ impl Wal {
                             "Truncated inner WAL entry length in batch",
                         ));
                     }
-                    let inner_len_bytes: [u8; 4] = match inner_slice[0..4].try_into() {
-                        Ok(b) => b,
-                        Err(_) => {
-                            return Err(MemFuseError::wal_corruption(
-                                chunk_start_pos,
-                                "Failed to extract inner WAL entry length",
-                            ));
-                        }
-                    };
+                    let inner_len_bytes: [u8; 4] =
+                        match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
+                            Some(b) => b,
+                            None => {
+                                return Err(MemFuseError::wal_corruption(
+                                    chunk_start_pos,
+                                    "Failed to extract inner WAL entry length",
+                                ));
+                            }
+                        };
                     let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
                     if inner_slice.len() < 4 + inner_len {
                         if pos >= file_size {
@@ -759,8 +457,16 @@ impl Wal {
                             "Truncated inner WAL entry in batch",
                         ));
                     }
-                    let inner_entry_bytes = &inner_slice[4..4 + inner_len];
-                    inner_slice = &inner_slice[4 + inner_len..];
+                    let inner_entry_bytes = match inner_slice.get(4..4 + inner_len) {
+                        Some(b) => b,
+                        None => {
+                            return Err(MemFuseError::wal_corruption(
+                                chunk_start_pos,
+                                "Truncated inner WAL entry in batch",
+                            ));
+                        }
+                    };
+                    inner_slice = inner_slice.get(4 + inner_len..).unwrap_or(&[]);
 
                     let entry = match WalEntry::from_bytes(inner_entry_bytes) {
                         Ok(e) => e,
@@ -789,6 +495,7 @@ impl Wal {
                     let (op_type, key, value) = match &entry.op {
                         WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                         WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+                        WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
                     };
 
                     let snapshot = WalEntrySnapshot {
@@ -824,8 +531,17 @@ impl Wal {
                         ));
                     }
                     let mut nonce = [0u8; 12];
-                    nonce.copy_from_slice(&entry_data_raw[0..12]);
-                    decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
+                    let nonce_slice = match entry_data_raw.get(0..12) {
+                        Some(s) => s,
+                        None => {
+                            return Err(MemFuseError::Storage(
+                                "WAL entry too short for nonce".into(),
+                            ));
+                        }
+                    };
+                    nonce.copy_from_slice(nonce_slice);
+                    let ciphertext = entry_data_raw.get(12..).unwrap_or(&[]);
+                    decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                         Ok(data) => data,
                         Err(e) => {
                             if version == WalVersion::V1 {
@@ -874,6 +590,7 @@ impl Wal {
                 let (op_type, key, value) = match &entry.op {
                     WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                     WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+                    WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
                 };
 
                 let snapshot = WalEntrySnapshot {

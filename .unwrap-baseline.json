@@ -94,37 +94,5 @@
   {
     "file": "crates/memfuse-index/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs",
     "hash": "f80018c0dda7e9f1"
-  },
-  {
-    "file": "crates/memfuse-store/src/manifest.rs",
-    "hash": "13ec4d6ef9f9600f"
-  },
-  {
-    "file": "crates/memfuse-store/src/manifest.rs",
-    "hash": "1702111cc0d1e6e3"
-  },
-  {
-    "file": "crates/memfuse-store/src/manifest.rs",
-    "hash": "7ea5d22c38ec10d3"
-  },
-  {
-    "file": "crates/memfuse-store/src/manifest.rs",
-    "hash": "c83487bf6484be38"
-  },
-  {
-    "file": "crates/memfuse-store/src/manifest.rs",
-    "hash": "ef755ef6871b8d62"
-  },
-  {
-    "file": "crates/memfuse-store/src/wal/replay.rs",
-    "hash": "003bbda7f2717e3a"
-  },
-  {
-    "file": "crates/memfuse-store/src/wal/replay.rs",
-    "hash": "69b4606da42f9ab5"
-  },
-  {
-    "file": "crates/memfuse-store/src/wal/replay.rs",
-    "hash": "9be243d03a12cad5"
   }
 ]

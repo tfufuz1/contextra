@@ -4,6 +4,7 @@
 #[allow(missing_docs)]
 #[allow(unused_imports)]
 #[allow(unsafe_code)]
+#[allow(mismatched_lifetime_syntaxes)]
 pub mod memfuse_generated;
 
 pub use memfuse_generated::mem_fuse::ipc::*;

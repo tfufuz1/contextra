@@ -1,0 +1,11 @@
+# MemFuse Bottom-Up Verification — 2026-09-18T13:00:13+00:00
+# Modus: full | stop_on_fail=false | clippy=true
+CRATE                  CHECK    CLIPPY   TEST     ERRORS   DAUER(s)
+memfuse-agent          PASS     FAIL     PASS     0        160
+memfuse-mcp            PASS     FAIL     FAIL     0        39
+memfuse-bench          PASS     FAIL     FAIL     0        66
+
+Ergebnisverzeichnis: results/20260918_130013
+  - Fehlerbericht (Jules-Prompt-Basis): results/20260918_130013/FEHLERBERICHT.md
+  - Benchmarks: results/20260918_130013/BENCHMARKS.md
+  - Duplicate-Symbole (pro Datei): results/20260918_130013/duplicate_symbols.txt

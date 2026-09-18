@@ -32,7 +32,7 @@ async fn test_tool_timeout_creates_dead_letter() -> Result<()> {
     let db = Arc::new(memfuse_db::MemFuse::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("dlq_test_col").await?;
 
-    let mut engine = OrchestratorEngine::from_db(&db);
+    let mut engine = OrchestratorEngine::try_from_db(&db)?;
     engine.try_register_tool(Box::new(HangingTool))?;
 
     let mut graph = StateGraph::new();
@@ -87,6 +87,81 @@ async fn test_tool_timeout_creates_dead_letter() -> Result<()> {
     assert!(
         list_after_drain.is_empty(),
         "DLQ should be empty after drain"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_dlq_replay_idempotency_scenarios() -> Result<()> {
+    use memfuse_agent::step::StepDeadLetter;
+    use memfuse_core::TxId;
+
+    let temp_dir = tempfile::TempDir::new()?;
+    let config = memfuse_db::MemFuseConfig::default();
+    let db = Arc::new(memfuse_db::MemFuse::open_with_config(temp_dir.path(), config).await?);
+    let state_coll = db.collection("dlq_idempotency_col").await?;
+
+    let dlq = memfuse_agent::DeadLetterQueue::new(db.inner_storage());
+
+    // Scenario (b): DLQ entry with TxId NOT committed in store
+    let uncommitted_letter = StepDeadLetter {
+        session_id: "idempotency_session".to_string(),
+        node_id: "node_step_1".to_string(),
+        step_index: 0,
+        tx_id: Some(TxId::new(9999)),
+        failure_reason: DeadLetterReason::ToolError {
+            message: "Failed before commit".to_string(),
+        },
+        input: serde_json::json!({"action": "test"}),
+        attempt: 0,
+        failed_at_secs: 1000,
+    };
+
+    let is_committed_before = dlq.is_already_committed(&uncommitted_letter).await?;
+    assert!(
+        !is_committed_before,
+        "Uncommitted TxId must return false for is_already_committed"
+    );
+
+    // Commit a state document into state_coll with TxId 500
+    let state_doc_id = "task:idempotency_session:step:0";
+    state_coll
+        .put_kv(
+            state_doc_id,
+            &serde_json::json!({
+                "stage": "commit",
+                "node": "node_step_1",
+                "tx_id": 500
+            }),
+        )
+        .await?;
+
+    // Scenario (a): DLQ entry with TxId matching committed TxId in store
+    let committed_letter = StepDeadLetter {
+        session_id: "idempotency_session".to_string(),
+        node_id: "node_step_1".to_string(),
+        step_index: 0,
+        tx_id: Some(TxId::new(500)),
+        failure_reason: DeadLetterReason::ToolError {
+            message: "Failed after commit".to_string(),
+        },
+        input: serde_json::json!({"action": "test"}),
+        attempt: 0,
+        failed_at_secs: 1000,
+    };
+
+    let is_committed_after = dlq.is_already_committed(&committed_letter).await?;
+    assert!(
+        is_committed_after,
+        "Committed TxId in store must return true for is_already_committed (Replay is No-Op)"
+    );
+
+    // Scenario (c): Consecutive calls for the same committed DLQ entry yield identical deterministic outcome
+    let second_check = dlq.is_already_committed(&committed_letter).await?;
+    assert!(
+        second_check,
+        "Consecutive idempotency checks must produce identical true result without side effects"
     );
 
     Ok(())
@@ -168,7 +243,7 @@ async fn test_tool_retry_succeeds_on_second_attempt() -> Result<()> {
     let db = Arc::new(memfuse_db::MemFuse::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("dlq_retry_col").await?;
 
-    let mut engine = OrchestratorEngine::from_db(&db);
+    let mut engine = OrchestratorEngine::try_from_db(&db)?;
     let flakey_tool = FlakeyTool {
         attempt: AtomicU32::new(0),
     };

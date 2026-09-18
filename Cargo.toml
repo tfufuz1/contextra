@@ -19,6 +19,7 @@ members = [
     "benchmarks/memfuse-bench",
     "crates/memfuse-candle",
     "crates/memfuse-sandbox",
+    "crates/memfuse-py",
     "xtask",
 ]
 
@@ -83,6 +84,7 @@ memfuse-router = { path = "crates/memfuse-router" }
 memfuse-calibration = { path = "crates/memfuse-calibration" }
 memfuse-candle = { path = "crates/memfuse-candle" }
 memfuse-sandbox = { path = "crates/memfuse-sandbox" }
+memfuse-py = { path = "crates/memfuse-py" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
 # memfuse-cluster, memfuse-sandbox, memfuse-saos-agent wurden in Phase 0 ausgelagert.

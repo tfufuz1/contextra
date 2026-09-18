@@ -27,6 +27,7 @@
 pub(crate) mod checkpoint;
 #[cfg(not(loom))]
 pub mod compaction;
+pub mod kv_locks;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
@@ -48,6 +49,7 @@ pub mod wal;
 
 #[cfg(not(loom))]
 pub use compaction::{CompactionConfig, CompactionEngine};
+pub use kv_locks::{KeyGuard, KvKeyLocks, LockError, MultiKeyGuard};
 #[cfg(not(loom))]
 pub use lsm::{LsmConfig, LsmStorage};
 #[cfg(not(loom))]
