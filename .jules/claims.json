@@ -80,6 +80,30 @@
       "active": false,
       "expires_at": "2026-09-18T22:37:16.877731643+00:00",
       "released_at": "2026-09-18T18:54:30.559299639+00:00 [RELEASED]"
+    },
+    {
+      "krate": "memfuse-index",
+      "issue": "PHASE0-T5",
+      "timestamp": "2026-09-18T19:15:34.050277050+00:00",
+      "session_id": "872714090895821023",
+      "active": true,
+      "expires_at": "2026-09-18T23:15:34.050252505+00:00"
+    },
+    {
+      "krate": "memfuse-sandbox",
+      "issue": "PHASE0-T5",
+      "timestamp": "2026-09-18T19:15:56.240748913+00:00",
+      "session_id": "872714090895821023",
+      "active": true,
+      "expires_at": "2026-09-18T23:15:56.240738968+00:00"
+    },
+    {
+      "krate": "memfuse-store",
+      "issue": "PHASE0-T5",
+      "timestamp": "2026-09-18T19:15:56.758471386+00:00",
+      "session_id": "872714090895821023",
+      "active": true,
+      "expires_at": "2026-09-18T23:15:56.758462697+00:00"
     }
   ]
 }
