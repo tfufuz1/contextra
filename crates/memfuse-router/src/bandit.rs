@@ -195,7 +195,12 @@ impl BanditProfileState {
     ///
     /// r̂_p(x) = θᵀx + α√(Σ(x)) - λ·cost - μ·is_cloud
     #[allow(clippy::needless_range_loop)]
-    pub fn score(&self, x: &[f32], cost: f32, is_cloud_transport: bool) -> Result<f32, BanditError> {
+    pub fn score(
+        &self,
+        x: &[f32],
+        cost: f32,
+        is_cloud_transport: bool,
+    ) -> Result<f32, BanditError> {
         if x.len() != self.theta.len() {
             return Err(BanditError::DimensionMismatch {
                 expected: self.theta.len(),
@@ -222,7 +227,8 @@ impl BanditProfileState {
                         .chunks_exact(d)
                         .zip(x.iter())
                         .map(|(row, &xi)| {
-                            let row_dot: f32 = row.iter().zip(x.iter()).map(|(&a, &xj)| a * xj).sum();
+                            let row_dot: f32 =
+                                row.iter().zip(x.iter()).map(|(&a, &xj)| a * xj).sum();
                             xi * row_dot
                         })
                         .sum();
@@ -301,7 +307,12 @@ impl BanditProfileState {
                 let denom_safe = denominator.max(1e-8);
 
                 // 3. Parameter Residual: r_adj - θᵀ x
-                let pred_theta_x: f32 = self.theta.iter().zip(x.iter()).map(|(&t, &xi)| t * xi).sum();
+                let pred_theta_x: f32 = self
+                    .theta
+                    .iter()
+                    .zip(x.iter())
+                    .map(|(&t, &xi)| t * xi)
+                    .sum();
                 let residual = r_adj - pred_theta_x;
 
                 // 4. Matrix-Update: A_new⁻¹ = γ⁻¹ A_old⁻¹ - k (v_disc)ᵀ
@@ -380,7 +391,9 @@ mod tests {
 
         // Perform 5 updates and verify numerical consistency and theta convergence
         for _ in 0..5 {
-            state.update(&x, reward, cost, is_cloud).expect("valid update");
+            state
+                .update(&x, reward, cost, is_cloud)
+                .expect("valid update");
         }
 
         assert!(
@@ -534,8 +547,12 @@ mod tests {
 
         // Phase 1: 500 stationäre Schritte mit hohem Reward (1.0)
         for _ in 0..500 {
-            state_discounted.update(&x, 1.0, 0.0, false).expect("valid update");
-            state_stiff.update(&x, 1.0, 0.0, false).expect("valid update");
+            state_discounted
+                .update(&x, 1.0, 0.0, false)
+                .expect("valid update");
+            state_stiff
+                .update(&x, 1.0, 0.0, false)
+                .expect("valid update");
         }
 
         let theta_disc_peak = state_discounted.theta[0];
@@ -551,8 +568,12 @@ mod tests {
 
         // Phase 3: 100 Schritte nach Drift mit neuem negativem Reward / Misserfolg (-1.0)
         for _ in 0..100 {
-            state_discounted.update(&x, -1.0, 0.0, false).expect("valid update");
-            state_stiff.update(&x, -1.0, 0.0, false).expect("valid update");
+            state_discounted
+                .update(&x, -1.0, 0.0, false)
+                .expect("valid update");
+            state_stiff
+                .update(&x, -1.0, 0.0, false)
+                .expect("valid update");
         }
 
         let drop_discounted = theta_disc_peak - state_discounted.theta[0];

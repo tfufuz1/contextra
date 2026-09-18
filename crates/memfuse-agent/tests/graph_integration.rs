@@ -59,7 +59,7 @@ async fn test_decision_node_condition_branching() {
     );
 
     let storage = db.inner_storage();
-    let engine = memfuse_agent::OrchestratorEngine::new(storage);
+    let engine = memfuse_agent::OrchestratorEngine::try_new(storage).expect("engine try_new");
 
     let mut graph = StateGraph::new();
     graph

@@ -32,7 +32,7 @@ async fn test_tool_timeout_creates_dead_letter() -> Result<()> {
     let db = Arc::new(memfuse_db::MemFuse::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("dlq_test_col").await?;
 
-    let mut engine = OrchestratorEngine::from_db(&db);
+    let mut engine = OrchestratorEngine::try_from_db(&db)?;
     engine.try_register_tool(Box::new(HangingTool))?;
 
     let mut graph = StateGraph::new();
@@ -243,7 +243,7 @@ async fn test_tool_retry_succeeds_on_second_attempt() -> Result<()> {
     let db = Arc::new(memfuse_db::MemFuse::open_with_config(temp_dir.path(), config).await?);
     let state_coll = db.collection("dlq_retry_col").await?;
 
-    let mut engine = OrchestratorEngine::from_db(&db);
+    let mut engine = OrchestratorEngine::try_from_db(&db)?;
     let flakey_tool = FlakeyTool {
         attempt: AtomicU32::new(0),
     };

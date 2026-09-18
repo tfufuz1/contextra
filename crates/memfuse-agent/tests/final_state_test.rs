@@ -19,7 +19,7 @@ async fn test_atomic_final_state_checkpoint() -> memfuse_core::Result<()> {
     let collection = db.collection("state").await?;
 
     let storage = db.inner_storage();
-    let engine = OrchestratorEngine::new(storage);
+    let engine = OrchestratorEngine::try_new(storage).expect("engine try_new");
 
     let mut graph = StateGraph::new();
     graph
