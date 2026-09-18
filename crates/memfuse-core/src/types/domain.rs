@@ -1501,7 +1501,7 @@ mod tests {
             assert!(doc_id.inner() > 0);
             let entity_id =
                 EntityId::from_key(key).expect("multibyte unicode key should derive entity_id"); // expect #[cfg(test)]
-            assert_eq!(entity_id.inner(), doc_id.inner());
+            assert_eq!(entity_id, EntityId::from_doc_id(doc_id));
         }
     }
 
@@ -1818,7 +1818,7 @@ mod tests {
 
     proptest::proptest! {
         fn prop_docid_serialization(id in proptest::num::u64::ANY) {
-            let doc = DocId::new(id);
+            let doc = DocId::from(id);
             let ser = serde_json::to_string(&doc).unwrap(); // unwrap
             let deser: DocId = serde_json::from_str(&ser).unwrap(); // unwrap
             prop_assert_eq!(doc, deser);
