@@ -205,7 +205,7 @@ pub async fn detect_communities(
     graph.compact();
 
     // Acquire read lock to access CSR arrays
-    let (valid_nodes, _num_real_nodes, reverse_map, adj_raw) = {
+    let (valid_nodes, num_real_nodes, reverse_map, adj_raw) = {
         let inner = graph.inner_read();
         let num_nodes = inner.reverse_map.len();
 
@@ -315,22 +315,22 @@ pub async fn detect_communities(
         return Ok(Vec::new());
     }
 
-    // Map global node indices to dense local 0..N-1 indices
+    let num_total_nodes = node_indices.len();
     let mut global_to_local: HashMap<usize, usize> = HashMap::with_capacity(num_total_nodes);
-    let mut local_entity_ids: Vec<EntityId> = Vec::with_capacity(_num_real_nodes);
+    let mut local_entity_ids: Vec<EntityId> = Vec::with_capacity(num_real_nodes);
     let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_total_nodes);
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
-        let (eid, _u64_id) = if global_idx < reverse_map.len() {
+        let (eid, u64_id) = if global_idx < reverse_map.len() {
             let eid = reverse_map[global_idx];
-            local_entity_ids.push(eid);
-            local_u64_ids.push(eid.inner());
+            (eid, eid.inner())
         } else {
             let u64_id = u64::MAX - (global_idx - reverse_map.len()) as u64;
             (EntityId::new(0), u64_id)
         };
         local_entity_ids.push(eid);
+        local_u64_ids.push(u64_id);
     }
 
     // Entity lookup map from EntityId -> local index
@@ -391,8 +391,8 @@ pub async fn detect_communities(
 
     // If graph has no edges, return singletons
     if total_2m <= 0.0 {
-        let mut assignments = Vec::with_capacity(_num_real_nodes);
-        for i in 0.._num_real_nodes {
+        let mut assignments = Vec::with_capacity(num_real_nodes);
+        for i in 0..num_real_nodes {
             assignments.push(CommunityAssignment {
                 entity_id: local_entity_ids[i],
                 community_id: local_u64_ids[i],
@@ -609,8 +609,8 @@ pub async fn detect_communities(
     }
 
     // Build final result list sorted by EntityId (only for actual Entity nodes, not virtual hyperedge nodes)
-    let mut assignments = Vec::with_capacity(_num_real_nodes);
-    for (i, &community_id) in communities.iter().enumerate().take(_num_real_nodes) {
+    let mut assignments = Vec::with_capacity(num_real_nodes);
+    for (i, &community_id) in communities.iter().enumerate().take(num_real_nodes) {
         let entity_id = local_entity_ids[i];
         assignments.push(CommunityAssignment {
             entity_id,

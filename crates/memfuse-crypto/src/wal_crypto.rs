@@ -158,7 +158,8 @@ impl WalHmac {
 ///
 /// # Usage
 /// Passed to `IntegrityVerifier::verify_and_update()` during WAL replay or recovery.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Zeroize)]
+#[zeroize(drop)]
 pub struct WalEntrySnapshot {
     pub tx_id: u64,
     pub seq_no: u64,
