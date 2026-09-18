@@ -187,7 +187,9 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: memfuse_core::Vec
                         error = %err,
                         "Failed to delete zero-vector entry from vector index during migration"
                     );
-                    let _ = collection.storage().rollback(tx).await;
+                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
+                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
+                    }
                     stats.failed += 1;
                     continue;
                 }
@@ -199,7 +201,9 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: memfuse_core::Vec
                         error = %err,
                         "Failed to commit vector index deletion during migration"
                     );
-                    let _ = collection.storage().rollback(tx).await;
+                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
+                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
+                    }
                     stats.failed += 1;
                     continue;
                 }
@@ -213,7 +217,9 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: memfuse_core::Vec
                         error = %err,
                         "Failed to delete doc_key mapping during migration"
                     );
-                    let _ = collection.storage().rollback(tx).await;
+                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
+                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
+                    }
                     stats.failed += 1;
                     continue;
                 }
@@ -225,7 +231,9 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: memfuse_core::Vec
                         error = %err,
                         "Failed to save pure KV entry during migration"
                     );
-                    let _ = collection.storage().rollback(tx).await;
+                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
+                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
+                    }
                     stats.failed += 1;
                     continue;
                 }
@@ -236,7 +244,9 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: memfuse_core::Vec
                         error = %err,
                         "Failed to commit storage transaction during migration"
                     );
-                    let _ = collection.storage().rollback(tx).await;
+                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
+                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
+                    }
                     stats.failed += 1;
                     continue;
                 }

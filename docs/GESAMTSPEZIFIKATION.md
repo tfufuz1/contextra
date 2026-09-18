@@ -1,13 +1,25 @@
-# MemFuse Cognitive OS — Finale Konsolidierte Gesamtspezifikation
+# MemFuse Cognitive OS — Finale Konsolidierte Gesamtspezifikation (Stabilisierungs-Edition)
 
 > **Status:** Normativ · Einzige maßgebliche Quelle für Produkt, Architektur, Algorithmen,
-> Implementierungsvorgaben, Sicherheitsmodell, Schnittstellenspezifikation und Optimierungs-Roadmap
-> des MemFuse Cognitive OS.
+> Implementierungsvorgaben, Sicherheitsmodell, Schnittstellenspezifikation, Stabilisierungsphasen und
+> Optimierungs-Roadmap des MemFuse Cognitive OS.
 >
 > **Charakter:** Dieses Dokument führt Produktvision, Zielarchitektur, normative Signaturen,
-> algorithmische Spezifikationen, mikrofeingranulare Schnittstellendefinitionen und die priorisierte
-> Optimierungs-Roadmap in einem einzigen, in sich geschlossenen Dokument zusammen. Es ersetzt
-> vollständig alle vorherigen Spezifikationsfassungen und -deltas.
+> algorithmische Spezifikationen, mikrofeingranulare Schnittstellendefinitionen, ein verbindliches
+> Stabilisierungs- und Gate-Modell sowie die priorisierte Optimierungs-Roadmap in einem einzigen,
+> in sich geschlossenen Dokument zusammen. Es ersetzt vollständig alle vorherigen
+> Spezifikationsfassungen, -deltas und separat geführten Stabilisierungspläne. **Es referenziert keine
+> externen Dokumente** — jede Aussage, die für die Arbeit an MemFuse nötig ist, steht hier.
+>
+> **Leitentscheidung dieser Fassung:** Gegenüber der Vorfassung ist dieses Dokument um **Teil A —
+> Stabilisierungsauftrag** ergänzt und in seiner Roadmap (§17, §18) komplett neu geordnet. Grund:
+> eine unabhängige Prüfung des Repository-Zustands hat gezeigt, dass Diagnose-Artefakte (Testergebnisse,
+> Lint-Reports, Audit-Dokumente) systematisch vom tatsächlichen Code-Zustand abweichen können, sobald sie
+> nicht mechanisch an einen Commit gebunden und automatisch neu erzeugt werden — mit der Folge, dass an
+> bereits gelöster Stelle weitergearbeitet und an tatsächlich offener Stelle vorbeigearbeitet wird. **Ab
+> sofort gilt: kein Feature-Ausbau, bevor Ground Truth hergestellt und das Fundament (Layer 0–2 des
+> Crate-DAG) nachweisbar stabil ist.** Teil A ist ranghöher als alle übrigen Teile dieses Dokuments; im
+> Konfliktfall gilt Teil A.
 >
 > **Sprache:** Rust 2021, Workspace-Layout, `#![forbid(unsafe_code)]` als Default in jedem Crate
 > ohne explizite Ausnahme (§0.4).
@@ -16,10 +28,15 @@
 > illustrativ — Feldnamen, Typnamen und Funktionssignaturen sind exakt zu übernehmen, sofern nicht
 > als „Beispiel" markiert. Wo `unimplemented!()` steht, ist die Signatur und das umgebende
 > Vertrags-/Fehlerverhalten normativ, der Funktionskörper ist gemäß der in Prosa/Formel gegebenen
-> Algorithmusbeschreibung des jeweiligen Abschnitts zu füllen.
+> Algorithmusbeschreibung des jeweiligen Abschnitts zu füllen. **Jeder Abschnitt außerhalb von Teil A
+> trägt zusätzlich eine Phasen-Kennzeichnung** (`[Phase 1]` … `[Phase 5]`, siehe §A.3) — sie sagt, ab
+> welchem Stabilisierungs-Gate an diesem Abschnitt gearbeitet werden darf. Ein Abschnitt ohne
+> ausdrückliche Phasen-Kennzeichnung gilt als `[Phase 1]` (Fundament).
 >
-> **Reifegrad-Kennzeichnung, durchgängig verwendet:**
-> - 🟢 **Produktiv** — im Code vorhanden, korrekt und als Produktions-Default aktiv.
+> **Reifegrad-Kennzeichnung, durchgängig verwendet — mit verschärfter Bedeutung, siehe §A.2:**
+> - 🟢 **Produktiv (Zielaussage)** — im Code vorhanden, korrekt und als Produktions-Default aktiv,
+>   **sofern durch einen frischen, commit-gebundenen CI-Lauf bestätigt** (§A.2). Unbestätigt ist die
+>   Markierung eine Behauptung aus einer Vorversion dieses Dokuments, keine verifizierte Tatsache.
 > - 🟡 **Hinter Feature-Flag** — im Code vollständig und korrekt vorhanden, aber nicht der
 >   Produktions-Default; Aktivierung erfordert ein explizites Cargo-Feature.
 > - 🔴 **Spezifiziert, zu bauen** — normativer Zielzustand dieses Dokuments, im Code noch nicht
@@ -28,6 +45,10 @@
 >   messbares Kriterium gebunden.
 > - ⚠️ **Opus-Optimierung** — aus Architektur-Review identifiziert, priorisiert umzusetzen, mit
 >   Stufe (0–3) und Aufwandseinschätzung versehen.
+> - 🔍 **Nachverifikation ausstehend** (neu) — Reifegrad aus einer früheren Dokumentfassung
+>   übernommen, aber noch nicht gegen einen frischen CI-Lauf am aktuellen HEAD bestätigt. Jeder
+>   Contributor, der auf einen 🟢/🔴-Marker reagiert, MUSS ihn faktisch als 🔍 behandeln, bis Gate 0
+>   (§A.3) für den betroffenen Crate durchlaufen ist.
 
 ---
 

@@ -172,3 +172,49 @@ async fn scenario4_crc_header_corruption_returns_err() {
         "Manifest::load must return Err on CRC header corruption"
     );
 }
+
+#[tokio::test]
+async fn scenario5_replace_mid_file_corruption_returns_err() {
+    let dir = tempdir().expect("tempdir");
+    let manifest_path = dir.path().join("MANIFEST");
+
+    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+
+    let add1 = ManifestEntry::Add {
+        path: PathBuf::from("sst-1.sst"),
+        max_tx: 10,
+    };
+    let replace_entry = ManifestEntry::Replace {
+        removed: vec![PathBuf::from("sst-1.sst")],
+        added: PathBuf::from("sst-compact-1.sst"),
+        added_max_tx: 10,
+        rank: 0,
+    };
+    let add2 = ManifestEntry::Add {
+        path: PathBuf::from("sst-2.sst"),
+        max_tx: 20,
+    };
+
+    manifest.append(&add1).await.expect("append add1");
+    manifest
+        .append(&replace_entry)
+        .await
+        .expect("append replace");
+    manifest.append(&add2).await.expect("append add2");
+    drop(manifest);
+
+    let mut raw = tokio::fs::read(&manifest_path).await.expect("read file");
+    // Corrupt bytes inside the ManifestEntry::Replace payload (middle of file)
+    let offset = raw.len() / 2;
+    raw[offset] ^= 0xFF;
+
+    tokio::fs::write(&manifest_path, raw)
+        .await
+        .expect("write corrupted file");
+
+    let res = Manifest::load(&manifest_path).await;
+    assert!(
+        res.is_err(),
+        "Mid-file corruption in ManifestEntry::Replace must return Err to prevent SSTable resurrection"
+    );
+}

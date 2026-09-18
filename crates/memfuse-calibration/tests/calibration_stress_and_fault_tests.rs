@@ -55,7 +55,7 @@ fn test_platt_scaler_extreme_finite_logits_monotonicity() {
             "PlattScaler output must be monotonically non-decreasing"
         );
         assert!(
-            w[0] >= 0.0 && w[0] <= 1.0,
+            (0.0..=1.0).contains(&w[0]),
             "PlattScaler output must be within [0, 1]"
         );
     }

@@ -198,9 +198,14 @@ impl IsotonicCalibrator {
     }
 
     fn lookup_isotonic(&self, raw_score: f32) -> Option<f32> {
+        // AI-TAG[FIX][MINOR] Use ? operator on Option<&Vec<(f32, f32)>> for concise early return (TS: 2026-09-18T10:00:00Z) (SESSION: jules)
         let model = self.cached_model.as_ref()?;
         if model.is_empty() {
             return None;
+        }
+
+        if model.len() == 1 {
+            return Some(model[0].1);
         }
 
         match model.binary_search_by(|(threshold, _)| threshold.total_cmp(&raw_score)) {

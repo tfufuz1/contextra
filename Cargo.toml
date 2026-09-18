@@ -22,6 +22,27 @@ members = [
     "crates/memfuse-py",
     "xtask",
 ]
+default-members = [
+    "crates/memfuse-core-ipc-gen",
+    "crates/memfuse-core",
+    "crates/memfuse-store",
+    "crates/memfuse-index",
+    "crates/memfuse-db",
+    "crates/memfuse-text",
+    "crates/memfuse-checkpoint",
+    "crates/memfuse-crypto",
+    "crates/memfuse-graph",
+    "crates/memfuse-embed",
+    "crates/memfuse-mcp",
+    "crates/memfuse-agent",
+    "crates/memfuse-ollama",
+    "crates/memfuse-router",
+    "crates/memfuse-calibration",
+    "crates/memfuse-candle",
+    "crates/memfuse-sandbox",
+    "crates/memfuse-py",
+    "xtask",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -111,9 +132,13 @@ unsafe_code = "forbid"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
-panic = "abort"
 strip = true
 overflow-checks = true
+
+# Profile for standalone binaries without FFI/PyO3 bindings.
+[profile.release-abort]
+inherits = "release"
+panic = "abort"
 
 [profile.bench]
 inherits = "release"

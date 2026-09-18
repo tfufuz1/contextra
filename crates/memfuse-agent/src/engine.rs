@@ -109,6 +109,7 @@ impl OrchestratorEngine {
     }
 
     /// Helper constructor creating OrchestratorEngine directly from MemFuse DB handle.
+    #[allow(deprecated)]
     #[deprecated(
         note = "Use try_from_db instead to handle initialization errors without panicking"
     )]
@@ -1040,7 +1041,7 @@ mod tests {
     #[tokio::test]
     async fn test_audit_before_commit_ordering() {
         let (ctx, _tmp) = create_dummy_context().await;
-        let orchestrator = OrchestratorEngine::from_db(&ctx.db);
+        let orchestrator = OrchestratorEngine::try_from_db(&ctx.db).expect("engine try_from_db");
 
         // Populate an existing KV entry under task:test-task-1:step:0 to force commit_step to fail
         // if state_collection.put_kv_if_absent was used, but put_kv overwrites.
@@ -1106,7 +1107,8 @@ mod tests {
     #[tokio::test]
     async fn test_try_register_tool_boundary_validations() {
         let (ctx, _tmp) = create_dummy_context().await;
-        let mut orchestrator = OrchestratorEngine::from_db(&ctx.db);
+        let mut orchestrator =
+            OrchestratorEngine::try_from_db(&ctx.db).expect("engine try_from_db");
 
         // 1. Valid tool registration
         let valid_tool = MockTool {
@@ -1145,7 +1147,7 @@ mod tests {
     #[tokio::test]
     async fn test_orchestrator_recover_orphans_succeeds() {
         let (ctx, _tmp) = create_dummy_context().await;
-        let orchestrator = OrchestratorEngine::from_db(&ctx.db);
+        let orchestrator = OrchestratorEngine::try_from_db(&ctx.db).expect("engine try_from_db");
         assert!(orchestrator.recover_orphans().await.is_ok());
     }
 }

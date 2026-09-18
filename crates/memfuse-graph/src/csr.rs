@@ -226,8 +226,8 @@ pub(crate) struct GraphInner {
     pub(crate) id_map: HashMap<EntityId, InternalIndex>,
     /// Mapping from internal index back to EntityId.
     pub(crate) reverse_map: Vec<EntityId>,
-    /// Entity metadata stored contiguously.
-    pub(crate) entities: Vec<Option<Entity>>,
+    /// Entity metadata stored contiguously (Sentinel Entity with id EntityId::new(0) represents None).
+    pub(crate) entities: Vec<Entity>,
     /// Community assignments mapping EntityId -> community_id.
     pub(crate) communities: HashMap<EntityId, u64>,
     /// Flag indicating whether communities have been loaded from storage or set in memory.
@@ -240,16 +240,16 @@ pub(crate) struct GraphInner {
     pub(crate) targets: Vec<InternalIndex>,
     /// CSR weights array: contiguous list of edge weights.
     pub(crate) weights: Vec<f32>,
-    /// CSR valid_from array: contiguous list of bi-temporal tx_valid_from TxIds.
-    pub(crate) tx_valid_froms: Vec<Option<TxId>>,
-    /// CSR valid_to array: contiguous list of bi-temporal tx_valid_to TxIds.
-    pub(crate) tx_valid_tos: Vec<Option<TxId>>,
-    /// CSR business_valid_from array: contiguous list of business_valid_from timestamps (ms).
-    pub(crate) business_valid_froms: Vec<Option<i64>>,
-    /// CSR business_valid_to array: contiguous list of business_valid_to timestamps (ms).
-    pub(crate) business_valid_tos: Vec<Option<i64>>,
-    /// CSR source_doc_id array: contiguous list of optional source document IDs.
-    pub(crate) source_doc_ids: Vec<Option<DocId>>,
+    /// CSR valid_from array: contiguous list of bi-temporal tx_valid_from TxIds (TxId::INVALID represents None).
+    pub(crate) tx_valid_froms: Vec<TxId>,
+    /// CSR valid_to array: contiguous list of bi-temporal tx_valid_to TxIds (TxId::INVALID represents None).
+    pub(crate) tx_valid_tos: Vec<TxId>,
+    /// CSR business_valid_from array: contiguous list of business_valid_from timestamps (ms) (i64::MIN represents None).
+    pub(crate) business_valid_froms: Vec<i64>,
+    /// CSR business_valid_to array: contiguous list of business_valid_to timestamps (ms) (i64::MIN represents None).
+    pub(crate) business_valid_tos: Vec<i64>,
+    /// CSR source_doc_id array: contiguous list of optional source document IDs (DocId with inner() == 0 represents None).
+    pub(crate) source_doc_ids: Vec<DocId>,
     /// Precomputed outgoing weight sums per internal node index.
     pub(crate) out_weight_sums: Vec<f32>,
 
@@ -282,6 +282,11 @@ pub(crate) struct GraphInner {
     pub(crate) doc_to_hyperedges: ahash::AHashMap<DocId, HashSet<crate::hyperedge::HyperEdgeId>>,
     /// Index mapping EntityId -> Set of HyperEdgeIds.
     pub(crate) hyperedge_index: ahash::AHashMap<EntityId, HashSet<crate::hyperedge::HyperEdgeId>>,
+}
+
+#[inline]
+pub(crate) fn sentinel_entity() -> Entity {
+    Entity::new(EntityId::new(0), "", "")
 }
 
 impl GraphInner {
@@ -317,17 +322,62 @@ impl GraphInner {
         }
     }
 
+    #[inline]
+    pub(crate) fn entity_at(&self, idx: usize) -> Option<&Entity> {
+        self.entities.get(idx).filter(|e| e.id != EntityId::new(0))
+    }
+
+    #[inline]
+    pub(crate) fn tx_valid_from_at(&self, idx: usize) -> Option<TxId> {
+        self.tx_valid_froms
+            .get(idx)
+            .copied()
+            .filter(|&tx| tx != TxId::INVALID)
+    }
+
+    #[inline]
+    pub(crate) fn tx_valid_to_at(&self, idx: usize) -> Option<TxId> {
+        self.tx_valid_tos
+            .get(idx)
+            .copied()
+            .filter(|&tx| tx != TxId::INVALID)
+    }
+
+    #[inline]
+    pub(crate) fn business_valid_from_at(&self, idx: usize) -> Option<i64> {
+        self.business_valid_froms
+            .get(idx)
+            .copied()
+            .filter(|&ts| ts != i64::MIN)
+    }
+
+    #[inline]
+    pub(crate) fn business_valid_to_at(&self, idx: usize) -> Option<i64> {
+        self.business_valid_tos
+            .get(idx)
+            .copied()
+            .filter(|&ts| ts != i64::MIN)
+    }
+
+    #[inline]
+    pub(crate) fn source_doc_id_at(&self, idx: usize) -> Option<DocId> {
+        self.source_doc_ids
+            .get(idx)
+            .copied()
+            .filter(|d| d.inner() != 0)
+    }
+
     pub(crate) fn estimate_memory_bytes(&self) -> usize {
         (self.reverse_map.len() * std::mem::size_of::<EntityId>())
-            + (self.entities.len() * std::mem::size_of::<Option<Entity>>())
+            + (self.entities.len() * std::mem::size_of::<Entity>())
             + (self.offsets.len() * std::mem::size_of::<usize>())
             + (self.targets.len() * std::mem::size_of::<usize>())
             + (self.weights.len() * std::mem::size_of::<f32>())
-            + (self.tx_valid_froms.len() * std::mem::size_of::<Option<TxId>>())
-            + (self.tx_valid_tos.len() * std::mem::size_of::<Option<TxId>>())
-            + (self.business_valid_froms.len() * std::mem::size_of::<Option<i64>>())
-            + (self.business_valid_tos.len() * std::mem::size_of::<Option<i64>>())
-            + (self.source_doc_ids.len() * std::mem::size_of::<Option<DocId>>())
+            + (self.tx_valid_froms.len() * std::mem::size_of::<TxId>())
+            + (self.tx_valid_tos.len() * std::mem::size_of::<TxId>())
+            + (self.business_valid_froms.len() * std::mem::size_of::<i64>())
+            + (self.business_valid_tos.len() * std::mem::size_of::<i64>())
+            + (self.source_doc_ids.len() * std::mem::size_of::<DocId>())
             + (self.out_weight_sums.len() * std::mem::size_of::<f32>())
             + (self.pending_edge_count * std::mem::size_of::<EdgePayload>())
             + (self.hyperedges.len() * std::mem::size_of::<crate::hyperedge::HyperEdge>())
@@ -411,7 +461,7 @@ impl GraphInner {
         if self.out_weight_sums.len() < num_nodes {
             self.out_weight_sums.resize(num_nodes, 0.0);
         }
-        if !self.entities.get(node_idx).is_some_and(|e| e.is_some()) {
+        if self.entity_at(node_idx).is_none() {
             self.out_weight_sums[node_idx] = 0.0;
             return;
         }
@@ -425,7 +475,7 @@ impl GraphInner {
                 let target = self.targets[j];
                 let w = self.weights[j];
                 if !self.tombstoned_edges.contains(&(node_idx, target))
-                    && self.entities.get(target).is_some_and(|e| e.is_some())
+                    && self.entity_at(target).is_some()
                     && w > 0.0
                 {
                     sum += w;
@@ -437,7 +487,7 @@ impl GraphInner {
             for edge in pending {
                 let target = edge.target;
                 if !self.tombstoned_edges.contains(&(node_idx, target))
-                    && self.entities.get(target).is_some_and(|e| e.is_some())
+                    && self.entity_at(target).is_some()
                     && edge.weight > 0.0
                 {
                     sum += edge.weight;
@@ -502,11 +552,11 @@ impl GraphInner {
                     node_edges.push(EdgePayload {
                         target,
                         weight: self.weights[j],
-                        tx_valid_from: self.tx_valid_froms.get(j).copied().flatten(),
-                        tx_valid_to: self.tx_valid_tos.get(j).copied().flatten(),
-                        business_valid_from: self.business_valid_froms.get(j).copied().flatten(),
-                        business_valid_to: self.business_valid_tos.get(j).copied().flatten(),
-                        source_doc_id: self.source_doc_ids.get(j).copied().flatten(),
+                        tx_valid_from: self.tx_valid_from_at(j),
+                        tx_valid_to: self.tx_valid_to_at(j),
+                        business_valid_from: self.business_valid_from_at(j),
+                        business_valid_to: self.business_valid_to_at(j),
+                        source_doc_id: self.source_doc_id_at(j),
                     });
                 }
             }
@@ -526,11 +576,11 @@ impl GraphInner {
             for edge in node_edges {
                 new_targets.push(edge.target);
                 new_weights.push(edge.weight);
-                new_tx_valid_froms.push(edge.tx_valid_from);
-                new_tx_valid_tos.push(edge.tx_valid_to);
-                new_business_valid_froms.push(edge.business_valid_from);
-                new_business_valid_tos.push(edge.business_valid_to);
-                new_source_doc_ids.push(edge.source_doc_id);
+                new_tx_valid_froms.push(edge.tx_valid_from.unwrap_or(TxId::INVALID));
+                new_tx_valid_tos.push(edge.tx_valid_to.unwrap_or(TxId::INVALID));
+                new_business_valid_froms.push(edge.business_valid_from.unwrap_or(i64::MIN));
+                new_business_valid_tos.push(edge.business_valid_to.unwrap_or(i64::MIN));
+                new_source_doc_ids.push(edge.source_doc_id.unwrap_or(DocId::new(0)));
                 current_offset += 1;
             }
 
@@ -560,7 +610,7 @@ impl GraphInner {
         // Recompute out_weight_sums for all nodes during compaction
         self.out_weight_sums.resize(num_nodes, 0.0);
         for i in 0..num_nodes {
-            if !self.entities.get(i).is_some_and(|e| e.is_some()) {
+            if self.entity_at(i).is_none() {
                 self.out_weight_sums[i] = 0.0;
                 continue;
             }
@@ -570,7 +620,7 @@ impl GraphInner {
             for j in start..end {
                 let target = self.targets[j];
                 let w = self.weights[j];
-                if self.entities.get(target).is_some_and(|e| e.is_some()) && w > 0.0 {
+                if self.entity_at(target).is_some() && w > 0.0 {
                     sum += w;
                 }
             }
@@ -864,7 +914,7 @@ impl CsrGraph {
     /// Returns the optional source document ID stored at the given edge index in `source_doc_ids`.
     pub fn get_source_doc_id(&self, index: usize) -> Option<DocId> {
         let inner = self.inner_read();
-        inner.source_doc_ids.get(index).copied().flatten()
+        inner.source_doc_id_at(index)
     }
 
     /// Returns the optional source document ID from which the edge (from, to) was derived.
@@ -895,7 +945,7 @@ impl CsrGraph {
             let end = inner.offsets[from_idx + 1];
             for j in start..end {
                 if inner.targets.get(j) == Some(&to_idx) {
-                    return inner.source_doc_ids.get(j).copied().flatten();
+                    return inner.source_doc_id_at(j);
                 }
             }
         }
@@ -936,7 +986,7 @@ impl CsrGraph {
                         for j in start..end {
                             if inner.targets.get(j) == Some(&t_idx) {
                                 if let Some(tx_to) = inner.tx_valid_tos.get_mut(j) {
-                                    *tx_to = Some(wal_tx);
+                                    *tx_to = wal_tx;
                                 }
                             }
                         }
@@ -1093,9 +1143,9 @@ impl CsrGraph {
         let mut inner = self.inner_write();
         let idx = inner.get_or_create_index(entity.id);
         if idx >= inner.entities.len() {
-            inner.entities.resize(idx + 1, None);
+            inner.entities.resize(idx + 1, sentinel_entity());
         }
-        inner.entities[idx] = Some(entity);
+        inner.entities[idx] = entity;
         Ok(())
     }
 
@@ -1265,9 +1315,9 @@ impl CsrGraph {
         let mut inner = self.inner_write();
         let idx = inner.get_or_create_index(entity.id);
         while inner.entities.len() <= idx {
-            inner.entities.push(None);
+            inner.entities.push(sentinel_entity());
         }
-        inner.entities[idx] = Some(entity);
+        inner.entities[idx] = entity;
         Ok(())
     }
 
@@ -1707,7 +1757,7 @@ impl CsrGraph {
             Some(&idx) => idx,
             None => return Ok(Vec::new()),
         };
-        if !inner.entities.get(start_idx).is_some_and(|e| e.is_some()) {
+        if inner.entity_at(start_idx).is_none() {
             return Ok(Vec::new());
         }
 
@@ -1727,10 +1777,7 @@ impl CsrGraph {
             for edge_idx in inner.offsets[start_idx]..inner.offsets[start_idx + 1] {
                 let neighbor_idx = inner.targets[edge_idx];
                 if !inner.tombstoned_edges.contains(&(start_idx, neighbor_idx))
-                    && inner
-                        .entities
-                        .get(neighbor_idx)
-                        .is_some_and(|e| e.is_some())
+                    && inner.entity_at(neighbor_idx).is_some()
                 {
                     if let Some(&id) = inner.reverse_map.get(neighbor_idx) {
                         push_if_new(id);
@@ -1743,10 +1790,7 @@ impl CsrGraph {
             for edge in pending {
                 let neighbor_idx = edge.target;
                 if !inner.tombstoned_edges.contains(&(start_idx, neighbor_idx))
-                    && inner
-                        .entities
-                        .get(neighbor_idx)
-                        .is_some_and(|e| e.is_some())
+                    && inner.entity_at(neighbor_idx).is_some()
                 {
                     if let Some(&id) = inner.reverse_map.get(neighbor_idx) {
                         push_if_new(id);
@@ -1830,7 +1874,7 @@ impl CsrGraph {
 
         let mut result = HashMap::new();
         for (idx, &rank) in ranks.iter().enumerate() {
-            if inner.entities.get(idx).is_some_and(|e| e.is_some()) {
+            if inner.entity_at(idx).is_some() {
                 if let Some(&id) = inner.reverse_map.get(idx) {
                     result.insert(id, rank);
                 }
@@ -1885,14 +1929,18 @@ impl CsrGraph {
 
     /// Returns the number of committed entities in the graph.
     pub fn entity_count(&self) -> usize {
-        self.inner_read().entities.iter().flatten().count()
+        self.inner_read()
+            .entities
+            .iter()
+            .filter(|e| e.id != EntityId::new(0))
+            .count()
     }
 
     /// Checks if a committed entity exists in the graph.
     pub fn entity_exists(&self, id: EntityId) -> bool {
         let inner = self.inner_read();
         if let Some(&idx) = inner.id_map.get(&id) {
-            inner.entities.get(idx).is_some_and(|e| e.is_some())
+            inner.entity_at(idx).is_some()
         } else {
             false
         }
@@ -2002,7 +2050,7 @@ impl GraphIndexExt for CsrGraph {
                 let mut inner = self.inner_write();
                 inner.id_map.remove(&entity);
                 if target_idx < inner.entities.len() {
-                    inner.entities[target_idx] = None;
+                    inner.entities[target_idx] = sentinel_entity();
                 }
                 inner.communities.remove(&entity);
                 inner.is_dirty = true;
@@ -2235,7 +2283,7 @@ impl GraphIndex for CsrGraph {
                 None => return Ok(Vec::new()),
             };
 
-            if !inner.entities.get(start_idx).is_some_and(|e| e.is_some()) {
+            if inner.entity_at(start_idx).is_none() {
                 return Ok(Vec::new());
             }
 
@@ -2276,13 +2324,10 @@ impl GraphIndex for CsrGraph {
                             if inner.tombstoned_edges.contains(&(node_idx, neighbor_idx)) {
                                 continue;
                             }
-                            let tx_valid_from =
-                                inner.tx_valid_froms.get(edge_idx).copied().flatten();
-                            let tx_valid_to = inner.tx_valid_tos.get(edge_idx).copied().flatten();
-                            let business_valid_from =
-                                inner.business_valid_froms.get(edge_idx).copied().flatten();
-                            let business_valid_to =
-                                inner.business_valid_tos.get(edge_idx).copied().flatten();
+                            let tx_valid_from = inner.tx_valid_from_at(edge_idx);
+                            let tx_valid_to = inner.tx_valid_to_at(edge_idx);
+                            let business_valid_from = inner.business_valid_from_at(edge_idx);
+                            let business_valid_to = inner.business_valid_to_at(edge_idx);
 
                             if !is_edge_visible_bitemporal(
                                 tx_valid_from,
@@ -2299,10 +2344,7 @@ impl GraphIndex for CsrGraph {
 
                             if (!visited.contains_key(&neighbor_idx)
                                 || visited[&neighbor_idx] < next_score)
-                                && inner
-                                    .entities
-                                    .get(neighbor_idx)
-                                    .is_some_and(|e| e.is_some())
+                                && inner.entity_at(neighbor_idx).is_some()
                             {
                                 if !visited.contains_key(&neighbor_idx)
                                     && visited.len() + queue.len() >= MAX_VISITED_NODES
@@ -2340,10 +2382,7 @@ impl GraphIndex for CsrGraph {
 
                             if (!visited.contains_key(&neighbor_idx)
                                 || visited[&neighbor_idx] < next_score)
-                                && inner
-                                    .entities
-                                    .get(neighbor_idx)
-                                    .is_some_and(|e| e.is_some())
+                                && inner.entity_at(neighbor_idx).is_some()
                             {
                                 if !visited.contains_key(&neighbor_idx)
                                     && visited.len() + queue.len() >= MAX_VISITED_NODES
@@ -2403,7 +2442,7 @@ impl GraphIndex for CsrGraph {
             };
 
             // If the start node itself is not committed, we shouldn't start traversal from it
-            if !inner.entities.get(start_idx).is_some_and(|e| e.is_some()) {
+            if inner.entity_at(start_idx).is_none() {
                 return Ok(Vec::new());
             }
 
@@ -2453,11 +2492,7 @@ impl GraphIndex for CsrGraph {
                                 || visited[&neighbor_idx] < next_score
                             {
                                 // Only visit nodes that have a committed entity (FIND-GRA-001)
-                                if inner
-                                    .entities
-                                    .get(neighbor_idx)
-                                    .is_some_and(|e| e.is_some())
-                                {
+                                if inner.entity_at(neighbor_idx).is_some() {
                                     if !visited.contains_key(&neighbor_idx)
                                         && visited.len() + queue.len() >= MAX_VISITED_NODES
                                     {
@@ -2485,10 +2520,7 @@ impl GraphIndex for CsrGraph {
 
                             if (!visited.contains_key(&neighbor_idx)
                                 || visited[&neighbor_idx] < next_score)
-                                && inner
-                                    .entities
-                                    .get(neighbor_idx)
-                                    .is_some_and(|e| e.is_some())
+                                && inner.entity_at(neighbor_idx).is_some()
                             {
                                 if !visited.contains_key(&neighbor_idx)
                                     && visited.len() + queue.len() >= MAX_VISITED_NODES
@@ -2557,9 +2589,9 @@ impl GraphIndex for CsrGraph {
                 for (id, entity) in tx_entities {
                     let idx = inner.get_or_create_index(id);
                     if idx >= inner.entities.len() {
-                        inner.entities.resize(idx + 1, None);
+                        inner.entities.resize(idx + 1, sentinel_entity());
                     }
-                    inner.entities[idx] = Some(entity);
+                    inner.entities[idx] = entity;
                 }
                 inner.is_dirty = true;
             }
@@ -2724,13 +2756,17 @@ impl GraphIndex for CsrGraph {
     fn stats<'a>(&'a self) -> BoxFuture<'a, Result<GraphIndexStats>> {
         Box::pin(async move {
             let inner = self.inner_read();
-            let num_entities = inner.entities.iter().flatten().count();
+            let num_entities = inner
+                .entities
+                .iter()
+                .filter(|e| e.id != EntityId::new(0))
+                .count();
             let num_edges = inner.targets.len()
                 + inner.pending_edge_count
                 + inner.staged_edges.values().map(|v| v.len()).sum::<usize>();
 
             let mem = (inner.reverse_map.len() * std::mem::size_of::<EntityId>())
-                + (inner.entities.len() * std::mem::size_of::<Option<Entity>>())
+                + (inner.entities.len() * std::mem::size_of::<Entity>())
                 + (inner.offsets.len() * std::mem::size_of::<usize>())
                 + (inner.targets.len() * std::mem::size_of::<usize>())
                 + (inner.weights.len() * std::mem::size_of::<f32>());
@@ -2751,7 +2787,7 @@ impl crate::path_rag::PathGraph for CsrGraph {
             Some(&idx) => idx,
             None => return Vec::new(),
         };
-        if !inner.entities.get(node_idx).is_some_and(|e| e.is_some()) {
+        if inner.entity_at(node_idx).is_none() {
             return Vec::new();
         }
 
@@ -2764,10 +2800,7 @@ impl crate::path_rag::PathGraph for CsrGraph {
             for edge_idx in start_edge..end_edge {
                 let neighbor_idx = inner.targets[edge_idx];
                 if !inner.tombstoned_edges.contains(&(node_idx, neighbor_idx))
-                    && inner
-                        .entities
-                        .get(neighbor_idx)
-                        .is_some_and(|e| e.is_some())
+                    && inner.entity_at(neighbor_idx).is_some()
                 {
                     if let Some(&id) = inner.reverse_map.get(neighbor_idx) {
                         if seen.insert(id) {
@@ -2782,10 +2815,7 @@ impl crate::path_rag::PathGraph for CsrGraph {
             for edge in pending {
                 let neighbor_idx = edge.target;
                 if !inner.tombstoned_edges.contains(&(node_idx, neighbor_idx))
-                    && inner
-                        .entities
-                        .get(neighbor_idx)
-                        .is_some_and(|e| e.is_some())
+                    && inner.entity_at(neighbor_idx).is_some()
                 {
                     if let Some(&id) = inner.reverse_map.get(neighbor_idx) {
                         if seen.insert(id) {
@@ -2805,7 +2835,7 @@ impl crate::path_rag::PathGraph for CsrGraph {
             Some(&idx) => idx,
             None => return Vec::new(),
         };
-        if !inner.entities.get(target_idx).is_some_and(|e| e.is_some()) {
+        if inner.entity_at(target_idx).is_none() {
             return Vec::new();
         }
 
@@ -2814,7 +2844,7 @@ impl crate::path_rag::PathGraph for CsrGraph {
         let num_nodes = inner.reverse_map.len();
 
         for u_idx in 0..num_nodes {
-            if !inner.entities.get(u_idx).is_some_and(|e| e.is_some()) {
+            if inner.entity_at(u_idx).is_none() {
                 continue;
             }
             let u_id = match inner.reverse_map.get(u_idx) {
@@ -2956,6 +2986,45 @@ mod tests {
         graph.commit(tx).await.expect("commit"); // expect
         graph.compact();
         graph
+    }
+
+    #[tokio::test]
+    async fn test_sentinel_representation_no_value_cases() {
+        let graph = Arc::new(CsrGraph::new());
+        let tx = TxId::new(1);
+        let id1 = EntityId::new(10);
+        let id2 = EntityId::new(20);
+
+        graph
+            .add_entity(tx, Entity::new(id1, "Node10", "Type"))
+            .await
+            .expect("add entity");
+        graph
+            .add_entity(tx, Entity::new(id2, "Node20", "Type"))
+            .await
+            .expect("add entity");
+
+        // Edge with no optional validities or doc_ids inserted directly with None validities
+        graph
+            .add_edge(id1, id2, 1.0, None, None, None, None, None, None, None)
+            .await
+            .expect("add edge");
+        graph.commit(tx).await.expect("commit");
+        graph.compact();
+
+        let inner = graph.inner_read();
+        assert_eq!(inner.tx_valid_froms[0], TxId::INVALID);
+        assert_eq!(inner.tx_valid_tos[0], TxId::INVALID);
+        assert_eq!(inner.business_valid_froms[0], i64::MIN);
+        assert_eq!(inner.business_valid_tos[0], i64::MIN);
+        assert_eq!(inner.source_doc_ids[0], DocId::new(0));
+
+        // Helper getters must return None for sentinel values
+        assert_eq!(inner.tx_valid_from_at(0), None);
+        assert_eq!(inner.tx_valid_to_at(0), None);
+        assert_eq!(inner.business_valid_from_at(0), None);
+        assert_eq!(inner.business_valid_to_at(0), None);
+        assert_eq!(inner.source_doc_id_at(0), None);
     }
 
     #[tokio::test]
@@ -3416,7 +3485,7 @@ mod tests {
         // Nach Commit ist der Zustand deterministisch (letzte staged Entity gewinnt)
         let inner = graph.inner_read();
         let idx = inner.id_map.get(&EntityId::new(10)).unwrap(); // unwrap
-        let entity = inner.entities[*idx].as_ref().unwrap(); // unwrap
+        let entity = inner.entity_at(*idx).unwrap(); // unwrap
         assert_eq!(&*entity.name, "EntityFromB");
     }
 
@@ -3816,7 +3885,7 @@ mod tests {
         let tx0 = TxId::new(1);
 
         // Pre-create center entity
-        let center_id = EntityId::new(0);
+        let center_id = EntityId::new(999);
         graph
             .add_entity(tx0, Entity::new(center_id, "Center", "Type"))
             .await
@@ -4270,7 +4339,7 @@ mod tests {
                         let num_nodes = inner.reverse_map.len();
                         for i in 0..num_nodes {
                             if let Some(&id) = inner.reverse_map.get(i) {
-                                if inner.entities.get(i).is_some_and(|e| e.is_some()) {
+                                if inner.entity_at(i).is_some() {
                                     entities.insert(id.inner());
                                 }
                             }
@@ -4279,8 +4348,8 @@ mod tests {
                             let old_end = if i < inner.offsets.len() - 1 { inner.offsets[i + 1] } else { 0 };
                             for j in old_start..old_end {
                                 let target_idx = inner.targets[j];
-                                let vf = inner.tx_valid_froms.get(j).copied().flatten().unwrap_or(TxId::new(0)).inner();
-                                let vt = inner.tx_valid_tos.get(j).copied().flatten().map(|t| t.inner());
+                                let vf = inner.tx_valid_from_at(j).unwrap_or(TxId::new(0)).inner();
+                                let vt = inner.tx_valid_to_at(j).map(|t| t.inner());
 
                                 if vf <= target_seq && vt.is_none_or(|t| target_seq < t) {
                                     if let (Some(&f), Some(&t)) = (inner.reverse_map.get(i), inner.reverse_map.get(target_idx)) {
@@ -5092,7 +5161,14 @@ mod tests {
 
         // Reader acquires point-in-time RCU snapshot BEFORE compaction
         let snapshot_v1 = graph.inner_read();
-        assert_eq!(snapshot_v1.entities.iter().flatten().count(), 500);
+        assert_eq!(
+            snapshot_v1
+                .entities
+                .iter()
+                .filter(|e| e.id != EntityId::new(0))
+                .count(),
+            500
+        );
 
         // Mutate graph with additional transaction
         let tx2 = TxId::new(2);
@@ -5115,11 +5191,25 @@ mod tests {
         graph.compact(); // Trigger full CSR compaction
 
         // Snapshot held by v1 MUST remain isolated on v1 state without torn reads
-        assert_eq!(snapshot_v1.entities.iter().flatten().count(), 500);
+        assert_eq!(
+            snapshot_v1
+                .entities
+                .iter()
+                .filter(|e| e.id != EntityId::new(0))
+                .count(),
+            500
+        );
 
         // New reader loads published post-compaction v2 snapshot
         let snapshot_v2 = graph.inner_read();
-        assert_eq!(snapshot_v2.entities.iter().flatten().count(), 1000);
+        assert_eq!(
+            snapshot_v2
+                .entities
+                .iter()
+                .filter(|e| e.id != EntityId::new(0))
+                .count(),
+            1000
+        );
     }
 
     #[tokio::test]
@@ -5235,7 +5325,14 @@ mod tests {
 
         // PPR contract: inner_read() returns point-in-time immutable Guard<Arc<GraphInner>>
         let snapshot = graph.inner_read();
-        assert_eq!(snapshot.entities.iter().flatten().count(), 2);
+        assert_eq!(
+            snapshot
+                .entities
+                .iter()
+                .filter(|e| e.id != EntityId::new(0))
+                .count(),
+            2
+        );
         assert!(!snapshot.reverse_map.is_empty());
 
         // Snapshot coerces to &GraphInner for PPR
@@ -5335,9 +5432,9 @@ mod tests {
             let target_id = inner.reverse_map[*target_idx];
             let source_doc = inner.source_doc_ids[idx];
             if target_id == id2 {
-                assert_eq!(source_doc, Some(doc100));
+                assert_eq!(source_doc, doc100);
             } else if target_id == id3 {
-                assert_eq!(source_doc, Some(doc200));
+                assert_eq!(source_doc, doc200);
             }
         }
     }

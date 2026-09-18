@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "memfuse-db"
 version.workspace = true
@@ -90,10 +93,6 @@ name = "hybrid_search"
 [[test]]
 name = "diskann_collection_fallback"
 required-features = ["experimental-diskann"]
-
-[[test]]
-name = "docid_128_consolidation"
-required-features = ["volatile-vault"]
 
 [[example]]
 name = "collections"

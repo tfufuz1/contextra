@@ -2,7 +2,9 @@
 // ZWECK: Quantifizierung von Schreibvolumen und Latenz-Trade-offs für PENDING_FLUSH_THRESHOLD (50 / 200 / 1.000)
 // STAND: TS:2026-09-07T00:00:00Z
 
+#[cfg(feature = "experimental-diskann")]
 use std::fs;
+#[cfg(feature = "experimental-diskann")]
 use std::time::Instant;
 
 #[cfg(feature = "experimental-diskann")]
@@ -14,6 +16,7 @@ use memfuse_index::diskann::{DiskAnnConfig, DiskAnnIndex};
 #[cfg(feature = "experimental-diskann")]
 use rand::Rng;
 
+#[cfg(feature = "experimental-diskann")]
 fn percentile(mut latencies: Vec<f64>, p: f64) -> f64 {
     if latencies.is_empty() {
         return 0.0;
