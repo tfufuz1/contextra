@@ -24,6 +24,7 @@ block-cache-v2 = ["dep:quick_cache"]
 docid-128 = ["memfuse-core/docid-128"]
 
 [dependencies]
+memfuse-sys = { workspace = true }
 memfuse-core = { workspace = true }
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }

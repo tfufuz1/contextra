@@ -102,7 +102,7 @@ impl Wal {
 
     /// Replays the WAL using zero-copy memory mapping (`mmap`).
     /// Returns all valid entries with sequence numbers, entries, end offsets, and detected WAL version.
-    #[allow(unsafe_code, clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     pub async fn replay_mmap(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let std_file = std::fs::File::open(&self.path)
             .map_err(|e| MemFuseError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
@@ -115,15 +115,8 @@ impl Wal {
             return Ok((Vec::new(), WalVersion::V1));
         }
 
-        let mmap = unsafe {
-            // SAFETY:
-            // 1. Invariant: `std_file` is a valid open read-only file descriptor to the WAL file.
-            // 2. Guarantor: `std::fs::File::open` opened read-only; the mmap buffer is read-only.
-            // 3. Call-site verified: `mmap` is held read-only locally within `replay_mmap` for entry parsing.
-            // 4. ADR reference: ADR-017 (Zero-Copy Mmap for WAL Replay).
-            memmap2::Mmap::map(&std_file)
-                .map_err(|e| MemFuseError::Storage(format!("WAL mmap failed: {e}")))?
-        };
+        let mmap = memfuse_sys::mmap_readonly(&std_file)
+            .map_err(|e| MemFuseError::Storage(format!("WAL mmap failed: {e}")))?;
 
         self.parse_mmap_slice(&mmap, file_size)
     }
@@ -150,7 +143,6 @@ impl Wal {
     ///
     /// If mmap mapping or slice scanning encounters any error, it logs a warning (`tracing::warn!`)
     /// and automatically falls back to stream-based scanning (`scan_entries_with_callback`).
-    #[allow(unsafe_code)]
     pub async fn scan_entries_mmap<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>
     where
         F: FnMut(u64, WalEntry, u64) -> bool,
@@ -164,11 +156,7 @@ impl Wal {
             let std_file = std::fs::File::open(&self.path).map_err(|e| {
                 MemFuseError::Storage(format!("Failed to open WAL file for mmap: {e}"))
             })?;
-            // SAFETY: Invariant: `std_file` is a valid open file descriptor opened in read-only mode for replay.
-            // Guarantor: std::fs::File::open returned Ok above.
-            // UB Prevention: Read-only mapping prevents data races. If file is truncated or removed,
-            // active mmap buffer remains valid for the duration of slice scanning.
-            let mmap = unsafe { memmap2::Mmap::map(&std_file) }.map_err(|e| {
+            let mmap = memfuse_sys::mmap_readonly(&std_file).map_err(|e| {
                 MemFuseError::Storage(format!(
                     "Failed to mmap WAL file {}: {e}",
                     self.path.display()

@@ -154,8 +154,8 @@ impl TenantIsolatedKvStore {
     /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Tenant.
     pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self {
         let mut store = Self::new();
-        store.segment_capacity = NonZeroUsize::new(segment_capacity_per_tenant.max(1))
-            .unwrap_or(NonZeroUsize::MIN);
+        store.segment_capacity =
+            NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap_or(NonZeroUsize::MIN);
         store
     }
 

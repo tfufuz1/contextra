@@ -91,12 +91,12 @@
       "released_at": "2026-09-19T01:23:04.852909147+00:00 [TTL-EXPIRED]"
     },
     {
-      "krate": "memfuse-simd",
+      "krate": "memfuse-sys",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-19T03:40:09.033985123+00:00",
-      "session_id": "5133359402785455002",
+      "timestamp": "2026-09-19T03:39:24.309586019+00:00",
+      "session_id": "3361491345051981022",
       "active": true,
-      "expires_at": "2026-09-19T07:40:09.033958402+00:00"
+      "expires_at": "2026-09-19T07:39:24.309553539+00:00"
     }
   ]
 }

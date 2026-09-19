@@ -69,22 +69,8 @@ async fn test_chaos_dropped_write_error_propagation_and_recovery() {
             if let Ok(target) = std::fs::read_link(entry.path()) {
                 if target == wal_path {
                     if let Ok(fd_num) = entry.file_name().to_string_lossy().parse::<i32>() {
-                        use std::os::unix::ffi::OsStrExt;
-                        let path_c =
-                            std::ffi::CString::new(wal_path.as_os_str().as_bytes()).unwrap();
-                        // SAFETY: Invariants & C-FFI Proof:
-                        // 1. CString pointer `path_c.as_ptr()` is guaranteed to be a valid, NUL-terminated C string valid for reads.
-                        // 2. `open`, `dup2`, and `close` are standard POSIX syscall wrappers on Linux target (`#[cfg(target_os = "linux")]`).
-                        // 3. `fd_num` was parsed directly from an existing `/proc/self/fd` entry pointing to `wal_path`, ensuring it is an open file descriptor belonging to the current process.
-                        // 4. Return values (`ro_fd >= 0`) are checked before `dup2` and `close` to prevent acting on invalid descriptors.
-                        unsafe {
-                            // SAFETY: Valid NUL-terminated CString path pointer and verified open file descriptor fd_num from /proc/self/fd.
-                            let ro_fd = open(path_c.as_ptr(), 0); // O_RDONLY = 0
-                            if ro_fd >= 0 {
-                                dup2(ro_fd, fd_num);
-                                close(ro_fd);
-                            }
-                        }
+                        let _ = memfuse_sys::reopen_and_dup2(&wal_path, fd_num, 0);
+                        // O_RDONLY = 0
                     }
                 }
             }
@@ -140,22 +126,8 @@ async fn test_chaos_dropped_write_error_propagation_and_recovery() {
             if let Ok(target) = std::fs::read_link(entry.path()) {
                 if target == wal_path {
                     if let Ok(fd_num) = entry.file_name().to_string_lossy().parse::<i32>() {
-                        use std::os::unix::ffi::OsStrExt;
-                        let path_c =
-                            std::ffi::CString::new(wal_path.as_os_str().as_bytes()).unwrap();
-                        // SAFETY: Invariants & C-FFI Proof:
-                        // 1. CString pointer `path_c.as_ptr()` is guaranteed to be a valid, NUL-terminated C string valid for reads.
-                        // 2. `open`, `dup2`, and `close` are standard POSIX syscall wrappers on Linux target (`#[cfg(target_os = "linux")]`).
-                        // 3. `fd_num` was parsed directly from an existing `/proc/self/fd` entry pointing to `wal_path`, ensuring it is an open file descriptor belonging to the current process.
-                        // 4. Return values (`rw_fd >= 0`) are checked before `dup2` and `close` to prevent acting on invalid descriptors.
-                        unsafe {
-                            // SAFETY: Valid NUL-terminated CString path pointer and verified open file descriptor fd_num from /proc/self/fd.
-                            let rw_fd = open(path_c.as_ptr(), 2 | 1024); // O_RDWR | O_APPEND
-                            if rw_fd >= 0 {
-                                dup2(rw_fd, fd_num);
-                                close(rw_fd);
-                            }
-                        }
+                        let _ = memfuse_sys::reopen_and_dup2(&wal_path, fd_num, 2 | 1024);
+                        // O_RDWR | O_APPEND
                     }
                 }
             }
