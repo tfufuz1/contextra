@@ -23,8 +23,9 @@ members = [
     "crates/memfuse-candle",
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
-    "xtask",
+    "crates/memfuse-testkit",
 ]
+exclude = ["xtask"]
 default-members = [
     "crates/memfuse-wire",
     "crates/memfuse-core-ipc-gen",
@@ -46,6 +47,7 @@ default-members = [
     "crates/memfuse-candle",
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
+    "crates/memfuse-testkit",
 ]
 
 [workspace.package]
@@ -113,6 +115,7 @@ memfuse-calibration = { path = "crates/memfuse-calibration" }
 memfuse-candle = { path = "crates/memfuse-candle" }
 memfuse-sandbox = { path = "crates/memfuse-sandbox" }
 memfuse-py = { path = "crates/memfuse-py" }
+memfuse-testkit = { path = "crates/memfuse-testkit" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
 # memfuse-cluster, memfuse-sandbox, memfuse-saos-agent wurden in Phase 0 ausgelagert.
@@ -145,6 +148,7 @@ todo = "deny"
 unimplemented = "deny"
 
 [profile.release]
+panic = "unwind"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
