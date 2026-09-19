@@ -168,12 +168,7 @@ pub fn dot_product_f32_u8(a: &[f32], b: &[u8]) -> f32 {
 }
 
 #[inline]
-pub fn euclidean_distance_sq_f32_u8(
-    a: &[f32],
-    b: &[u8],
-    alphas: &[f32],
-    mins: &[f32],
-) -> f32 {
+pub fn euclidean_distance_sq_f32_u8(a: &[f32], b: &[u8], alphas: &[f32], mins: &[f32]) -> f32 {
     let min_len = a.len().min(b.len()).min(alphas.len()).min(mins.len());
     let mut sum = 0.0f32;
     for i in 0..min_len {
