@@ -2436,7 +2436,6 @@ dependencies = [
  "blake3",
  "bytes",
  "criterion",
- "libc",
  "memfuse-calibration",
  "memfuse-candle",
  "memfuse-checkpoint",
@@ -2447,6 +2446,7 @@ dependencies = [
  "memfuse-index",
  "memfuse-ollama",
  "memfuse-store",
+ "memfuse-sys",
  "memfuse-text",
  "parking_lot",
  "proptest",
@@ -2635,6 +2635,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-simd"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "memfuse-core",
+ "proptest",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
 name = "memfuse-store"
 version = "0.1.0"
 dependencies = [
@@ -2648,6 +2659,7 @@ dependencies = [
  "lru",
  "memfuse-core",
  "memfuse-crypto",
+ "memfuse-sys",
  "memmap2",
  "parking_lot",
  "proptest",
@@ -2659,6 +2671,16 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "memfuse-sys"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "memmap2",
+ "tracing",
  "windows-sys 0.61.2",
 ]
 

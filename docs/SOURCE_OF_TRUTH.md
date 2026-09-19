@@ -80,7 +80,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | Crate | Layer | LOC | Status | Beschreibung / Hauptaufgabe |
 | :--- | :---: | :---: | :--- | :--- |
 | `memfuse-core-ipc-gen` | 0 | 1838 | 🟢 Clean | Auto-generated FlatBuffers IPC code for MemFuse Core |
-| `memfuse-wire` | 0 | 1873 | 🟢 Clean | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for MemFuse |
+| `memfuse-sys` | 0 | 437 | 🟢 Clean | Low-level unsafe system abstractions and FFI island for MemFuse (Ring 0) |
 | `memfuse-core` | 1 | 10589 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
 | `memfuse-calibration` | 2 | 1939 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 2 | 6126 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
@@ -90,10 +90,10 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-text` | 2 | 8235 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-index` | 3 | 19753 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-ollama` | 3 | 4571 | 🟢 Clean |  |
-| `memfuse-store` | 3 | 26644 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
+| `memfuse-store` | 3 | 26357 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-candle` | 4 | 4529 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-embed` | 5 | 2219 | 🧊 Optional |  |
-| `memfuse-db` | 6 | 37335 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 6 | 37318 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 7 | 5741 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-router` | 7 | 7156 | 🟢 Clean |  |
 | `memfuse-agent` | 8 | 6735 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |

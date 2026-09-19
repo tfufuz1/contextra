@@ -57,8 +57,7 @@
 //! # }
 //! ```
 
-#![cfg_attr(not(feature = "volatile-vault"), forbid(unsafe_code))]
-#![cfg_attr(feature = "volatile-vault", deny(unsafe_code))]
+#![forbid(unsafe_code)]
 
 // FILE-CONTEXT
 // STAND:       2026-08-29T15:22:34Z (SESSION: 2c814094)

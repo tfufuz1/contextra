@@ -30,7 +30,7 @@ Ergebnis: **2 offene Tags**
 | Crate | Layer | LOC | Status | Beschreibung / Hauptaufgabe |
 | :--- | :---: | :---: | :--- | :--- |
 | `memfuse-core-ipc-gen` | 0 | 1838 | 🟢 Clean | Auto-generated FlatBuffers IPC code for MemFuse Core |
-| `memfuse-wire` | 0 | 1873 | 🟢 Clean | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for MemFuse |
+| `memfuse-sys` | 0 | 437 | 🟢 Clean | Low-level unsafe system abstractions and FFI island for MemFuse (Ring 0) |
 | `memfuse-core` | 1 | 10589 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
 | `memfuse-calibration` | 2 | 1939 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 2 | 6126 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
@@ -40,10 +40,10 @@ Ergebnis: **2 offene Tags**
 | `memfuse-text` | 2 | 8235 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-index` | 3 | 19753 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-ollama` | 3 | 4571 | 🟢 Clean |  |
-| `memfuse-store` | 3 | 26644 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
+| `memfuse-store` | 3 | 26357 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-candle` | 4 | 4529 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-embed` | 5 | 2219 | 🧊 Optional |  |
-| `memfuse-db` | 6 | 37335 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 6 | 37318 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse-bench` | 7 | 5741 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-router` | 7 | 7156 | 🟢 Clean |  |
 | `memfuse-agent` | 8 | 6735 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
@@ -55,7 +55,7 @@ Ergebnis: **2 offene Tags**
 
 ```
 Layer 0:  memfuse-core-ipc-gen — Auto-generated FlatBuffers IPC code for MemFuse Core
-          memfuse-wire — Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for MemFuse
+          memfuse-sys — Low-level unsafe system abstractions and FFI island for MemFuse (Ring 0)
 Layer 1:  memfuse-core — Core types, traits, and error handling for MemFuse (deps: memfuse-core-ipc-gen)
 Layer 2:  memfuse-calibration —  (deps: memfuse-core)
           memfuse-checkpoint — Backup and snapshot management for MemFuse storage (deps: memfuse-core)
@@ -65,10 +65,10 @@ Layer 2:  memfuse-calibration —  (deps: memfuse-core)
           memfuse-text — MemFuse — Text processing and BM25 search for Hybrid Search (deps: memfuse-core)
 Layer 3:  memfuse-index — HNSW vector index with SIMD distance computation for MemFuse (deps: memfuse-core, memfuse-crypto)
           memfuse-ollama —  (deps: memfuse-calibration, memfuse-core)
-          memfuse-store — LSM-Tree storage engine for MemFuse (deps: memfuse-core, memfuse-crypto)
+          memfuse-store — LSM-Tree storage engine for MemFuse (deps: memfuse-core, memfuse-crypto, memfuse-sys)
 Layer 4:  memfuse-candle — Native Candle GGUF ML inference backend for MemFuse (deps: memfuse-calibration, memfuse-core, memfuse-crypto, memfuse-store)
 Layer 5:  memfuse-embed —  (deps: memfuse-calibration, memfuse-candle, memfuse-core)
-Layer 6:  memfuse-db — MemFuse — Embedded hybrid-search for AI agents (deps: memfuse-calibration, memfuse-candle, memfuse-checkpoint, memfuse-core, memfuse-crypto, memfuse-embed, memfuse-graph, memfuse-index, memfuse-ollama, memfuse-store, memfuse-text)
+Layer 6:  memfuse-db — MemFuse — Embedded hybrid-search for AI agents (deps: memfuse-calibration, memfuse-candle, memfuse-checkpoint, memfuse-core, memfuse-crypto, memfuse-embed, memfuse-graph, memfuse-index, memfuse-ollama, memfuse-store, memfuse-sys, memfuse-text)
 Layer 7:  memfuse-bench — MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy (deps: memfuse-core, memfuse-db, memfuse-embed, memfuse-graph, memfuse-index, memfuse-store, memfuse-text)
           memfuse-router —  (deps: memfuse-core, memfuse-db, memfuse-ollama, memfuse-store)
 Layer 8:  memfuse-agent — Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop (deps: memfuse-checkpoint, memfuse-core, memfuse-db, memfuse-graph, memfuse-router, memfuse-store)
