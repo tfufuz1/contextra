@@ -54,6 +54,7 @@ impl ManualClock {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -74,6 +75,9 @@ mod tests {
         let clock = ManualClock::default();
         clock.set_nanos(42);
         assert_eq!(clock.now_nanos(), 42);
-        assert_eq!(clock.now_system_time(), UNIX_EPOCH + Duration::from_nanos(42));
+        assert_eq!(
+            clock.now_system_time(),
+            UNIX_EPOCH + Duration::from_nanos(42)
+        );
     }
 }
