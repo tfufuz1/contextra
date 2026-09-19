@@ -95,32 +95,26 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-19T03:39:24.309586019+00:00",
       "session_id": "3361491345051981022",
-      "active": true,
-      "expires_at": "2026-09-19T07:39:24.309553539+00:00"
+      "active": false,
+      "expires_at": "2026-09-19T07:39:24.309553539+00:00",
+      "released_at": "2026-09-19T18:10:01.929249174+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-sandbox",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-19T05:34:13.685246574+00:00",
       "session_id": "16075693534472226469",
-      "active": true,
-      "expires_at": "2026-09-19T09:34:13.685235671+00:00"
+      "active": false,
+      "expires_at": "2026-09-19T09:34:13.685235671+00:00",
+      "released_at": "2026-09-19T18:10:01.929249174+00:00 [TTL-EXPIRED]"
     },
     {
-      "krate": "memfuse-index",
+      "krate": "memfuse-store",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-19T17:46:13.348920511+00:00",
-      "session_id": "14638300354081817690",
+      "timestamp": "2026-09-19T17:37:18.892012227+00:00",
+      "session_id": "6701087099082658347",
       "active": true,
-      "expires_at": "2026-09-19T21:46:13.348910978+00:00"
-    },
-    {
-      "krate": "memfuse-simd",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-19T17:46:13.967403252+00:00",
-      "session_id": "14638300354081817690",
-      "active": true,
-      "expires_at": "2026-09-19T21:46:13.967394174+00:00"
+      "expires_at": "2026-09-19T21:37:18.891970920+00:00"
     }
   ]
 }
