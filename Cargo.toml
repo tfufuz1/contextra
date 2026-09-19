@@ -92,6 +92,7 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Workspace crates
+memfuse-wire = { path = "crates/memfuse-wire" }
 memfuse-sys = { path = "crates/memfuse-sys" }
 memfuse-core-ipc-gen = { path = "crates/memfuse-core-ipc-gen" }
 memfuse-core = { path = "crates/memfuse-core" }

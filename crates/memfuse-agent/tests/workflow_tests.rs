@@ -151,6 +151,10 @@ impl memfuse_agent::AgentTool for CountingTool {
         &self.name
     }
 
+    fn estimated_cost(&self, _input: &serde_json::Value) -> usize {
+        self.tokens
+    }
+
     fn execute<'a>(
         &'a self,
         _ctx: &'a memfuse_agent::AgentContext,

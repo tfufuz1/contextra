@@ -73,6 +73,7 @@
 #![allow(async_fn_in_trait)]
 
 pub mod audit;
+pub mod budget;
 pub mod context;
 pub mod dlq;
 pub mod engine;
@@ -80,6 +81,7 @@ pub mod event_source;
 pub mod graph;
 pub mod step;
 
+pub use budget::{BudgetStrategy, Reservation, TokenBudget};
 pub use context::{AgentContext, AgentStatus};
 pub use dlq::DeadLetterQueue;
 pub use engine::{EventLoopExitReason, OrchestratorEngine, MAX_WORKFLOW_STEPS};

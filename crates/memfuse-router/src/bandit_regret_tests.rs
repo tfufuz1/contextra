@@ -3,7 +3,7 @@
 
 #![cfg(all(test, feature = "bandit-routing"))]
 
-use crate::bandit::BanditProfileState;
+use crate::bandit::{BanditImplementation, BanditProfileState};
 
 /// Einfacher deterministischer PRNG (Xorshift32) für reproduzierbare Test-Kontexte über feste Seeds.
 struct SimpleRng {
@@ -185,6 +185,7 @@ fn test_bandit_diagonal_vs_linucb_latency_budget() {
 
     let mut rng = SimpleRng::new(42); // SimpleRng ist in dieser Datei definiert
     let mut state = BanditProfileState::cold_start(DIM, 0.5);
+    state.implementation = BanditImplementation::DiagonalApproximation;
 
     // Erstelle realistische Testkontexte
     let x: Vec<f32> = (0..DIM).map(|_| rng.next_f32()).collect();
@@ -268,6 +269,7 @@ fn test_dimension_mismatch_returns_err() {
 #[test]
 fn test_reproduce_linucb_theta_update_math_deviation() {
     let mut state = BanditProfileState::cold_start(1, 0.5);
+    state.implementation = BanditImplementation::DiagonalApproximation;
     let x = vec![1.0f32];
 
     // Schritt 1: r_adj = 1.0

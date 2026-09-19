@@ -2635,4 +2635,60 @@ mod tests {
         mutator_cancel.cancel();
         let _ = mutator_handle.await;
     }
+
+    #[tokio::test]
+    async fn test_tombstone_retention_floor_with_active_snapshot() {
+        use memfuse_core::TOMBSTONE_BIT;
+
+        let tmp = TempDir::new().expect("temp dir");
+        let bc = create_block_cache(1);
+        let manifest = Arc::new(crate::manifest::Manifest::open(tmp.path().join("MANIFEST")).await.expect("manifest"));
+        let registry = Arc::new(SnapshotRegistry::new());
+
+        let mut config = CompactionConfig::default();
+        config.min_sstables_per_tier = 2;
+
+        let budget = Arc::new(memfuse_core::ResourceTracker::new(
+            memfuse_core::ResourceBudget {
+                memory_limit: 100 * 1024 * 1024,
+            },
+        ));
+        let engine = CompactionEngine::new(config, registry.clone(), bc.clone(), None, budget, Some(manifest));
+
+        // Active snapshot pinned at seq 15
+        registry.pin(15);
+
+        // Input 1: Put at seq 20, Tombstone at seq 18, Put at seq 5.
+        // Active snapshot is pinned at seq 15.
+        let sst1 = create_test_sstable(
+            tmp.path(),
+            "sst-ts-1.sst",
+            &[
+                (b"key-1", b"new_val", 20),
+                (b"key-1", b"", 18 | TOMBSTONE_BIT),
+                (b"key-1", b"old_val", 5),
+            ],
+            Arc::clone(&bc),
+        )
+        .await;
+
+        let output_path = tmp.path().join("sst-compacted.sst");
+        engine
+            .merge_sstables(&[sst1], &output_path, 15, true)
+            .await
+            .expect("compaction succeeds");
+
+        let reader = SstableReader::open(&output_path, bc).await.expect("open reader");
+        let entries = reader.iter().await.expect("iter entries");
+
+        // Under min_snapshot_seq = 15:
+        // 1) seq 20 (>= 15): kept.
+        // 2) seq 18 (>= 15, tombstone): kept because raw_seq >= min_snapshot_seq.
+        // 3) seq 5 (< 15): floor version below min_snapshot_seq, kept.
+        assert_eq!(entries.len(), 3, "Expected 3 entries (seq 20, seq 18 tombstone, seq 5 floor)");
+        assert_eq!(entries[0].2 & !TOMBSTONE_BIT, 20);
+        assert_eq!(entries[1].2 & !TOMBSTONE_BIT, 18);
+        assert_ne!(entries[1].2 & TOMBSTONE_BIT, 0, "seq 18 must be a tombstone");
+        assert_eq!(entries[2].2 & !TOMBSTONE_BIT, 5);
+    }
 }

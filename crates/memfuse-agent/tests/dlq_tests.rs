@@ -93,6 +93,62 @@ async fn test_tool_timeout_creates_dead_letter() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_dlq_remove_and_string_tx_id_idempotency() -> Result<()> {
+    use memfuse_agent::step::StepDeadLetter;
+    use memfuse_core::TxId;
+
+    let temp_dir = tempfile::TempDir::new()?;
+    let config = memfuse_db::MemFuseConfig::default();
+    let db = Arc::new(memfuse_db::MemFuse::open_with_config(temp_dir.path(), config).await?);
+    let state_coll = db.collection("dlq_remove_col").await?;
+
+    let dlq = memfuse_agent::DeadLetterQueue::new(db.inner_storage());
+
+    let letter = StepDeadLetter {
+        session_id: "remove_session".to_string(),
+        node_id: "node_x".to_string(),
+        step_index: 2,
+        tx_id: Some(TxId::new(777)),
+        failure_reason: DeadLetterReason::ToolError {
+            message: "error".to_string(),
+        },
+        input: serde_json::json!({}),
+        attempt: 0,
+        failed_at_secs: 2000,
+    };
+
+    dlq.push(&letter).await?;
+    let list_before = dlq.list().await?;
+    assert_eq!(list_before.len(), 1);
+
+    // Commit state with string tx_id "777"
+    let state_doc_id = "task:remove_session:step:2";
+    state_coll
+        .put_kv(
+            state_doc_id,
+            &serde_json::json!({
+                "stage": "commit",
+                "node": "node_x",
+                "tx_id": "777"
+            }),
+        )
+        .await?;
+
+    let is_committed = dlq.is_already_committed(&letter).await?;
+    assert!(
+        is_committed,
+        "String-formatted tx_id '777' should be recognized as committed"
+    );
+
+    // Remove letter from DLQ
+    dlq.remove(&letter).await?;
+    let list_after = dlq.list().await?;
+    assert!(list_after.is_empty(), "DLQ should be empty after remove()");
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_dlq_replay_idempotency_scenarios() -> Result<()> {
     use memfuse_agent::step::StepDeadLetter;
     use memfuse_core::TxId;
