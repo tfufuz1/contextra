@@ -343,7 +343,9 @@ impl CandleModelInner for QuantizedLlamaModel {
             let input_slice = if i == 0 {
                 all_tokens.clone()
             } else {
-                vec![*all_tokens.last().unwrap()]
+                vec![*all_tokens.last().ok_or_else(|| {
+                    MemFuseError::Internal("all_tokens cannot be empty during generation".into())
+                })?]
             };
 
             let input_tensor = candle_core::Tensor::new(&input_slice[..], device)

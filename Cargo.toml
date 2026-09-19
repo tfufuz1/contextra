@@ -41,7 +41,6 @@ default-members = [
     "crates/memfuse-candle",
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
-    "xtask",
 ]
 
 [workspace.package]
@@ -126,7 +125,16 @@ memfuse-py = { path = "crates/memfuse-py" }
 # reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
 
 [profile.release]
 opt-level = 3

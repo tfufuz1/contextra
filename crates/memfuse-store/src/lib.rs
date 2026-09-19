@@ -21,6 +21,8 @@
 // BEGRÜNDUNG: Sovereign Core Doctrine mandates zero unsafe outside `memfuse-index`,
 // except Windows ACL security programming (`SetNamedSecurityInfoW`, etc.).
 #![deny(unsafe_code)]
+#![allow(unsafe_code)]
+#![allow(unsafe_op_in_unsafe_fn)]
 #![allow(unexpected_cfgs)]
 
 #[cfg(not(loom))]

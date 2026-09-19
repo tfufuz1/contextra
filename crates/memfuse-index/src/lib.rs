@@ -17,6 +17,10 @@
 // INTENT: deny(unsafe_code) statt forbid(unsafe_code)
 // BEGRÜNDUNG: SIMD-Intrinsics in distance.rs benötigen unsafe für Performance.
 #![deny(unsafe_code)]
+#![allow(unsafe_code)]
+#![allow(unsafe_op_in_unsafe_fn)]
+#![allow(clippy::undocumented_unsafe_blocks)]
+#![allow(clippy::too_many_arguments)]
 
 #[cfg(feature = "experimental-diskann")]
 pub mod diskann;

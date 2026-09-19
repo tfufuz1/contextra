@@ -1,6 +1,5 @@
-[lints.rust]
-# TODO(ADR-N03): auf forbid umstellen, siehe PHASE0-T4-Fund
-unsafe_code = "warn"
+[lints]
+workspace = true
 
 [package]
 name = "memfuse-graph"

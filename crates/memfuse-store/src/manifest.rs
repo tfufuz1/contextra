@@ -775,7 +775,7 @@ impl Manifest {
                     );
                 }
             }
-            return Err(rollover_res.unwrap_err());
+            rollover_res?;
         }
 
         tracing::info!(

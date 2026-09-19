@@ -36,7 +36,7 @@ impl EvictionWorker {
     /// Spawnt den Eviction-Worker auf einem dedizierten OS-Thread.
     pub fn spawn(store: Arc<TenantIsolatedKvStore>) -> Self {
         let (sender, receiver) = mpsc::channel::<EvictionCommand>();
-        let handle = std::thread::Builder::new()
+        let handle_opt = std::thread::Builder::new()
             .name("kv-eviction-worker".into())
             .spawn(move || {
                 while let Ok(cmd) = receiver.recv() {
@@ -52,11 +52,15 @@ impl EvictionWorker {
                     }
                 }
             })
-            .expect("failed to spawn kv-eviction-worker thread");
+            .map_err(|e| {
+                tracing::error!(error = %e, "failed to spawn kv-eviction-worker thread");
+                e
+            })
+            .ok();
 
         Self {
             sender: parking_lot::Mutex::new(sender),
-            handle: parking_lot::Mutex::new(Some(handle)),
+            handle: parking_lot::Mutex::new(handle_opt),
         }
     }
 
