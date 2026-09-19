@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/memfuse-core-ipc-gen",
+    "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
     "crates/memfuse-index",
@@ -24,6 +25,7 @@ members = [
 ]
 default-members = [
     "crates/memfuse-core-ipc-gen",
+    "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
     "crates/memfuse-index",
@@ -86,7 +88,8 @@ tempfile = "3"
 criterion = { version = "0.5", features = ["async_tokio"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Workspace crates (18 Crates)
+# Workspace crates (19 Crates)
+memfuse-simd = { path = "crates/memfuse-simd" }
 memfuse-core-ipc-gen = { path = "crates/memfuse-core-ipc-gen" }
 memfuse-core = { path = "crates/memfuse-core" }
 memfuse-store = { path = "crates/memfuse-store" }

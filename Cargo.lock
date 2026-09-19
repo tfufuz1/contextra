@@ -2635,6 +2635,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-simd"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "memfuse-core",
+ "proptest",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
 name = "memfuse-store"
 version = "0.1.0"
 dependencies = [
