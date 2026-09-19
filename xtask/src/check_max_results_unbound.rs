@@ -154,15 +154,15 @@ fn run_hops(max_hops: u32) {
     let h = u32::MAX;
 }
 
-fn run_timeout(timeout: u64) {
+fn run_items(max_items: u64) {
     let t = u64::MAX;
 }
 
-fn run_budget(budget: usize) {
+fn run_count(max_count: usize) {
     let b = usize::MAX;
 }
 
-fn run_capacity(capacity: u32) {
+fn run_depth(max_depth: u32) {
     let c = i64::MAX;
 }
 "#,
