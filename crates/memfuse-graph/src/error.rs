@@ -10,10 +10,6 @@ pub enum GraphMutationError {
     #[error("Lock acquisition timed out: {0}")]
     LockAcquisitionTimeout(String),
 
-    /// Partial cascade operation was queued for document invalidation.
-    #[error("Partial cascade queued for doc_id: {0}")]
-    PartialCascadeQueued(u64),
-
     /// Provided role binding is invalid.
     #[error("Invalid role binding: {0}")]
     RoleBindingInvalid(String),
@@ -79,9 +75,6 @@ mod tests {
 
         let err2 = GraphMutationError::LockAcquisitionTimeout("test_lock".into());
         assert_eq!(err2.to_string(), "Lock acquisition timed out: test_lock");
-
-        let err3 = GraphMutationError::PartialCascadeQueued(42);
-        assert_eq!(err3.to_string(), "Partial cascade queued for doc_id: 42");
 
         let err4 = GraphMutationError::RoleBindingInvalid("invalid_role".into());
         assert_eq!(err4.to_string(), "Invalid role binding: invalid_role");

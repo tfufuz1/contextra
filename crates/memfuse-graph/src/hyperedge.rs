@@ -9,6 +9,7 @@ use memfuse_core::{DocId, EntityId, MemFuseError, Result, TxId};
 use scc::HashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 /// LSM-Key-Präfix für Hyperkanten.
 pub const HYPEREDGE_PREFIX: &str = "__graph:hyperedge:";
@@ -109,7 +110,7 @@ pub struct HyperEdge {
     ///
     /// # Invariante
     /// `participants` MUSS mindestens 2 Einträge enthalten (Validierung erfolgt in `relate_n_ary`).
-    pub participants: Vec<RoleBinding>,
+    pub participants: Arc<[RoleBinding]>,
     /// Gewichtung der Hyperkante.
     pub weight: f32,
     /// Start der Transaktionsgültigkeit (MVCC / Systemzeit).
@@ -134,13 +135,13 @@ impl HyperEdge {
     pub fn new(
         id: HyperEdgeId,
         predicate: EdgeType,
-        participants: Vec<RoleBinding>,
+        participants: impl Into<Arc<[RoleBinding]>>,
         weight: f32,
     ) -> Self {
         Self {
             id,
             predicate,
-            participants,
+            participants: participants.into(),
             weight,
             tx_valid_from: None,
             tx_valid_to: None,

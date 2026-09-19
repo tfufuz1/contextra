@@ -63,6 +63,9 @@ pub async fn cascade_invalidate_edges_for_superseded_doc(
     })
 }
 
+/// LSM-Key-Präfix für die persistent cascade queue (§6.6 / §6.8).
+pub const CASCADE_QUEUE_PREFIX: &str = "__graph:cascade_queue:";
+
 /// Report summarizing the cascade invalidation of hyperedges derived from a superseded document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HyperedgeCascadeReport {
@@ -70,6 +73,8 @@ pub struct HyperedgeCascadeReport {
     pub invalidated: Vec<crate::hyperedge::HyperEdgeId>,
     /// Hyperedges deferred for background processing due to fan-out limit.
     pub deferred: Vec<crate::hyperedge::HyperEdgeId>,
+    /// Number of hyperedges queued for background processing (§6.6 / §6.8).
+    pub queued_for_background: usize,
 }
 
 /// Alias for [`HyperedgeCascadeReport`] (§6.8 specification alignment).
@@ -78,9 +83,8 @@ pub type CascadeReport = HyperedgeCascadeReport;
 /// Cascade invalidates hyperedges derived from `superseded_doc_id` with fan-out protection.
 ///
 /// Up to `MAX_HYPEREDGE_CASCADE_FANOUT` hyperedges are tombstoned synchronously.
-/// Any excess hyperedges are returned in `deferred` for the caller (e.g., in `memfuse-db`)
-/// to schedule for deferred background processing, preserving DAG layering without
-/// cross-layer imports.
+/// Any excess hyperedges are persisted to LSM storage under `__graph:cascade_queue:...`
+/// and queued in `CsrGraph`'s cascade queue for deferred background processing.
 ///
 /// INVARIANTE: Jede hier tombstonierte Hyperkante erhält einen Provenienz-Eintrag
 /// mit der WAL-Sequenznummer dieses Aufrufs (INV-GRAPH-PROV-1).
@@ -95,6 +99,7 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
         return Ok(HyperedgeCascadeReport {
             invalidated: Vec::new(),
             deferred: Vec::new(),
+            queued_for_background: 0,
         });
     }
 
@@ -111,9 +116,25 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
         }
     }
 
+    if !deferred.is_empty() {
+        if let Some(storage) = graph.storage() {
+            for hid in &deferred {
+                let key = format!(
+                    "{CASCADE_QUEUE_PREFIX}{:016x}:{:016x}",
+                    superseded_doc_id.inner(),
+                    hid.inner()
+                );
+                storage.put(wal_tx, key.as_bytes(), &[]).await?;
+            }
+        }
+        graph.enqueue_cascade_deferred(superseded_doc_id, &deferred);
+    }
+
+    let queued = deferred.len();
     Ok(HyperedgeCascadeReport {
         invalidated,
         deferred,
+        queued_for_background: queued,
     })
 }
 

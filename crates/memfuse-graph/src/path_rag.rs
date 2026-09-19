@@ -13,6 +13,7 @@ use memfuse_core::DocId;
 pub use memfuse_core::EntityId;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
+use std::sync::Arc;
 
 /// Ein gefundener Pfad zwischen zwei Knoten.
 #[derive(Debug, Clone)]
@@ -39,15 +40,16 @@ pub trait PathGraph: Send + Sync {
     }
 
     /// Resolves a HyperEdgeId to its full HyperEdge details (default: None).
-    fn get_hyperedge(&self, _id: HyperEdgeId) -> Option<HyperEdge> {
+    fn get_hyperedge(&self, _id: HyperEdgeId) -> Option<Arc<HyperEdge>> {
         None
     }
 
     /// Returns participant role bindings for a given hyperedge ID (default: resolves via get_hyperedge).
-    fn hyperedge_participants(&self, id: HyperEdgeId) -> Vec<RoleBinding> {
-        self.get_hyperedge(id)
-            .map(|he| he.participants)
-            .unwrap_or_default()
+    fn hyperedge_participants(&self, id: HyperEdgeId) -> Arc<[RoleBinding]> {
+        match self.get_hyperedge(id) {
+            Some(he) => he.participants.clone(),
+            None => Arc::from([]),
+        }
     }
 }
 
@@ -98,7 +100,7 @@ pub fn forward_push_ppr<G: PathGraph>(
         let binary_neighbors = graph.neighbors_with_weights(u);
         let mut hyper_participants = Vec::new();
         for hedge_id in graph.hyperedges_for_entity(u) {
-            for role_binding in graph.hyperedge_participants(hedge_id) {
+            for role_binding in graph.hyperedge_participants(hedge_id).iter() {
                 if role_binding.entity != u {
                     hyper_participants.push(role_binding.entity);
                 }
@@ -235,7 +237,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
         for id in hyperedge_ids {
             if let Some(hyperedge) = self.graph.get_hyperedge(id) {
                 let virtual_weight = hyperedge.weight * self.config.hyperedge_weight_discount;
-                for participant in &hyperedge.participants {
+                for participant in hyperedge.participants.iter() {
                     if participant.entity != node {
                         candidates.push((participant.entity, virtual_weight));
                     }
@@ -642,7 +644,7 @@ mod tests {
 
             for he in hyperedges {
                 he_store.insert(he.id, he.clone());
-                for participant in &he.participants {
+                for participant in he.participants.iter() {
                     he_map.entry(participant.entity).or_default().push(he.id);
                 }
             }
@@ -678,8 +680,8 @@ mod tests {
         fn hyperedges_for_entity(&self, node: EntityId) -> Vec<HyperEdgeId> {
             self.hyperedges.get(&node).cloned().unwrap_or_default()
         }
-        fn get_hyperedge(&self, id: HyperEdgeId) -> Option<HyperEdge> {
-            self.hyperedge_store.get(&id).cloned()
+        fn get_hyperedge(&self, id: HyperEdgeId) -> Option<Arc<HyperEdge>> {
+            self.hyperedge_store.get(&id).cloned().map(Arc::new)
         }
     }
 

@@ -1,3 +1,4 @@
+#![allow(unsafe_code)]
 //! PPR Allocation Profiling and Correctness Benchmark Test for memfuse-graph
 //! Verifies allocation reduction in Personalized PageRank (PPR) before and after optimization.
 
