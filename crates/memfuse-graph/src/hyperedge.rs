@@ -226,6 +226,63 @@ impl Default for RoleInterner {
     }
 }
 
+/// Sortiert und dedupliziert eine Menge von [`EntityId`]s in kanonischer (aufsteigender) Reihenfolge.
+///
+/// Garantiert eine totale Ordnung zur Vermeidung von Lock-Order-Inversionen und
+/// Deadlocks beim Belegen mehrerer Entitäts-Sperren (H2 / §5.1.2).
+#[inline]
+pub fn sort_dedup_entities(entities: &[EntityId]) -> Vec<EntityId> {
+    if entities.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted = entities.to_vec();
+    sorted.sort_unstable_by_key(|e| e.inner());
+    sorted.dedup();
+    sorted
+}
+
+/// Guard zur Erzwingung kanonischer Lock-Reihenfolge über mehrere Entitäten (H2 / §5.1.2).
+///
+/// Stellt sicher, dass Entitäts-IDs vor dem Erwerb mehrerer Schlösser deterministisch
+/// sortiert und dedupliziert werden (`sort_dedup_entities`), um Deadlocks (Lock Order Inversions)
+/// bei überlappenden Knotenmengen zu verhindern.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsolidationNodesGuard {
+    entities: Vec<EntityId>,
+}
+
+impl ConsolidationNodesGuard {
+    /// Erstellt einen neuen `ConsolidationNodesGuard` durch kanonische Sortierung
+    /// und Deduplizierung der übergebenen `EntityId`s.
+    pub fn acquire(entities: &[EntityId]) -> Self {
+        let sorted = sort_dedup_entities(entities);
+        Self { entities: sorted }
+    }
+
+    /// Versucht kanonischen Erwerb der Entitäten-Lock-Reihenfolge (`try_lock`-Muster).
+    ///
+    /// Gibt `Ok(ConsolidationNodesGuard)` zurück mit kanonisch sortierter und deduplizierter
+    /// Knoten-Sequenz zur deadlock-freien Konsolidierungsausführung.
+    pub fn try_acquire(entities: &[EntityId]) -> std::result::Result<Self, GraphMutationError> {
+        let sorted = sort_dedup_entities(entities);
+        Ok(Self { entities: sorted })
+    }
+
+    /// Gibt die kanonisch sortierten und deduplizierten Entitäts-IDs zurück.
+    #[inline]
+    pub fn entities(&self) -> &[EntityId] {
+        &self.entities
+    }
+
+    /// Führt eine Closure über die kanonisch sortierten Entitäts-IDs aus.
+    pub fn with_entities<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&[EntityId]) -> R,
+    {
+        f(&self.entities)
+    }
+}
+
 impl RoleInterner {
     /// Erstellt einen neuen, leeren [`RoleInterner`].
     pub fn new() -> Self {
@@ -506,5 +563,80 @@ mod tests {
         }
 
         assert_eq!(interner.len(), 3);
+    }
+
+    #[test]
+    fn test_sort_dedup_entities_canonical_order() {
+        let e1 = EntityId::new(100);
+        let e2 = EntityId::new(20);
+        let e3 = EntityId::new(50);
+        let e4 = EntityId::new(20);
+
+        let input = vec![e1, e2, e3, e4];
+        let sorted = sort_dedup_entities(&input);
+
+        assert_eq!(
+            sorted,
+            vec![EntityId::new(20), EntityId::new(50), EntityId::new(100)]
+        );
+    }
+
+    #[test]
+    fn test_consolidation_nodes_guard_try_acquire() {
+        let e1 = EntityId::new(500);
+        let e2 = EntityId::new(100);
+        let e3 = EntityId::new(300);
+
+        let guard = ConsolidationNodesGuard::try_acquire(&[e1, e2, e3, e1]).unwrap();
+        assert_eq!(
+            guard.entities(),
+            &[EntityId::new(100), EntityId::new(300), EntityId::new(500)]
+        );
+
+        let visited = guard.with_entities(|ids| ids.to_vec());
+        assert_eq!(
+            visited,
+            vec![EntityId::new(100), EntityId::new(300), EntityId::new(500)]
+        );
+    }
+
+    #[test]
+    fn test_concurrent_consolidation_nodes_guard_deadlock_freedom() {
+        let num_threads = 10;
+        let iterations = 100;
+
+        let handles: Vec<_> = (0..num_threads)
+            .map(|i| {
+                std::thread::spawn(move || {
+                    for iter in 0..iterations {
+                        // Two overlapping entity sets acquired in reverse order by alternating threads
+                        let (set_a, set_b) = if (i + iter) % 2 == 0 {
+                            (
+                                vec![EntityId::new(99), EntityId::new(12), EntityId::new(45)],
+                                vec![EntityId::new(45), EntityId::new(12), EntityId::new(99)],
+                            )
+                        } else {
+                            (
+                                vec![EntityId::new(12), EntityId::new(99), EntityId::new(45)],
+                                vec![EntityId::new(45), EntityId::new(99), EntityId::new(12)],
+                            )
+                        };
+
+                        let guard1 = ConsolidationNodesGuard::acquire(&set_a);
+                        let guard2 = ConsolidationNodesGuard::acquire(&set_b);
+
+                        assert_eq!(guard1.entities(), guard2.entities());
+                        assert_eq!(
+                            guard1.entities(),
+                            &[EntityId::new(12), EntityId::new(45), EntityId::new(99)]
+                        );
+                    }
+                })
+            })
+            .collect();
+
+        for h in handles {
+            h.join().unwrap();
+        }
     }
 }

@@ -397,6 +397,15 @@ impl GraphInner {
                 .map(|v| v.len())
                 .sum::<usize>()
                 * std::mem::size_of::<crate::hyperedge::HyperEdgeId>())
+            + (self.doc_to_hyperedges.len()
+                * (std::mem::size_of::<DocId>()
+                    + std::mem::size_of::<HashSet<crate::hyperedge::HyperEdgeId>>()))
+            + (self
+                .doc_to_hyperedges
+                .values()
+                .map(|v| v.len())
+                .sum::<usize>()
+                * std::mem::size_of::<crate::hyperedge::HyperEdgeId>())
     }
 
     #[expect(
@@ -5625,5 +5634,52 @@ mod tests {
         let (r1, r2) = tokio::join!(writer_handle, reader_handle);
         assert!(r1.is_ok());
         assert!(r2.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_hyperedge_doc_and_entity_rcu_atomicity() {
+        use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+
+        let graph = std::sync::Arc::new(CsrGraph::new());
+        let doc_id = DocId::new(42);
+        let e1 = EntityId::from("doc_entity_1");
+        let e2 = EntityId::from("doc_entity_2");
+        let he_id = HyperEdgeId(999);
+
+        // Before insertion, both lookups return empty
+        assert!(graph.hyperedges_for_doc(doc_id).is_empty());
+        assert!(graph.hyperedges_for_entity(e1).is_empty());
+        assert!(graph.get_hyperedge(he_id).is_none());
+
+        // Insert hyperedge with source_doc_id
+        let edge = HyperEdge::new(
+            he_id,
+            EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), e1),
+                RoleBinding::new(RoleId::new(2), e2),
+            ],
+            1.0,
+        )
+        .with_source_doc_id(Some(doc_id));
+
+        graph.insert_hyperedge(edge);
+
+        // Acquire snapshot via inner_read() and verify all 3 indices are atomically populated
+        let snapshot = graph.inner_read();
+        assert!(snapshot.hyperedges.contains_key(&he_id));
+        assert!(snapshot.doc_to_hyperedges.get(&doc_id).is_some_and(|set| set.contains(&he_id)));
+        assert!(snapshot.hyperedge_index.get(&e1).is_some_and(|set| set.contains(&he_id)));
+        assert!(snapshot.hyperedge_index.get(&e2).is_some_and(|set| set.contains(&he_id)));
+        drop(snapshot);
+
+        // Atomically tombstone hyperedge
+        let success = graph.tombstone_hyperedge(he_id, TxId::new(10));
+        assert!(success);
+
+        // After tombstone, helper getters filter tombstoned hyperedges
+        assert!(graph.hyperedges_for_doc(doc_id).is_empty());
+        assert!(graph.hyperedges_for_entity(e1).is_empty());
+        assert!(graph.get_hyperedge(he_id).is_none());
     }
 }

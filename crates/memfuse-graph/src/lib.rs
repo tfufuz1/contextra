@@ -71,8 +71,8 @@ pub use edge_reinforcement_buffer::edge_reinforcement_buffer::{
 };
 pub use error::GraphMutationError;
 pub use hyperedge::{
-    HyperEdge, HyperEdgeId, RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX,
-    HYPEREDGE_PREFIX,
+    sort_dedup_entities, ConsolidationNodesGuard, HyperEdge, HyperEdgeId, RoleBinding, RoleId,
+    RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
 };
 pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
 #[cfg(feature = "graph-connectivity-health")]
