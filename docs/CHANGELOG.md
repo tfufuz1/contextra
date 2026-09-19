@@ -93,6 +93,7 @@
 | `2026-09-16T16:15:00Z` | `crates/memfuse-calibration/src/lib.rs` | `REVIEW-PASS` | `-` | `e72e11a3` | `PASS` | `-` | // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-16T16:15:00Z) (SESSION: e72e11a3) |
 | `2026-09-16T16:13:00Z (SESSION: afafdd44)` | `crates/memfuse-candle/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Crate root for memfuse-candle native GGUF inference backend. |
 | `2026-09-16T16:13:00Z` | `crates/memfuse-candle/src/lib.rs` | `REVIEW-PASS` | `AGT-CANDLE-d495a019` | `afafdd44` | `-` | `0` | // REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH |
+| `2026-09-16T00:00:00Z` | `crates/memfuse-wire/tests/ipc_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests, Fault-Injection und Nebenläufigkeitstests für FlatBuffers IPC (memfuse-wire) |
 | `2026-09-15T16:46:26Z` | `crates/memfuse-agent/src/lib.rs` | `REVIEW-PASS` | `AGT-AGENT-692d9982` | `692d9982` | `PASS` | `0` | // REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-AGENT-692d9982) (TS: 2026-09-15T16:46:26Z) (SESSION: 692d9982) (PRÜFER-KONTEXT: FRESH) |
 | `2026-09-15T16:15:00Z (SESSION: 1a43706f)` | `crates/memfuse-router/src/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit- und Integrationstest-Suite für memfuse-router. |
 | `2026-09-15T16:10:40Z (SESSION: ec33599e)` | `crates/memfuse-embed/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG). |

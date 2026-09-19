@@ -25,6 +25,7 @@ members = [
     "xtask",
 ]
 default-members = [
+    "crates/memfuse-wire",
     "crates/memfuse-core-ipc-gen",
     "crates/memfuse-simd",
     "crates/memfuse-core",
