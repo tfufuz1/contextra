@@ -103,7 +103,7 @@ FEATURE_CATALOG=(
 XTASK_GATES=(
   "check-flatbuffers-drift"
   "check-bandit-latency-budget|--features memfuse-router/egress-sherman-morrison"
-  "check-unwrap-baseline"
+  "check-module-reachability"
 )
 
 MODE="full"

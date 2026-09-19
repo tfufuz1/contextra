@@ -251,19 +251,19 @@ spec NAME:
 jules-preflight *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo run -p xtask -- jules-preflight "$@"
+    cargo run --manifest-path xtask/Cargo.toml -- jules-preflight "$@"
 
 # Claims a crate / feature for exclusive session execution
 claim *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo run -p xtask -- claim "$@"
+    cargo run --manifest-path xtask/Cargo.toml -- claim "$@"
 
 # Runs factual integrity check for AGENTS.md against workspace
 check-agents-integrity:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo run -p xtask -- check-agents-integrity
+    cargo run --manifest-path xtask/Cargo.toml -- check-agents-integrity
 
 
 # Führt alle 8 Bug-Proof-Tests aus (L1 Unit-Tests, rote→grüne Beweise)

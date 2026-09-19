@@ -1,22 +1,13 @@
 // xtask/src/post_merge_report.rs
 //
 // Post-Merge Verification & Reporting Subcommand
-// Executes workspace verification (cargo check, cargo clippy, cargo test),
-// records report summary into results/, and appends baseline stats to docs/unwrap_baseline_history.jsonl.
-//
-// NOTE REGARDING UNWRAP BASELINE HISTORY VS RATCHET GATE:
-// `docs/unwrap_baseline_history.jsonl` is used strictly for historical reporting and trend tracking.
-// The active CI enforcement gate (`check-unwrap-baseline` / `check-unwrap-ratchet`) evaluates live state
-// against `.unwrap-baseline.json`. Modifying or appending to `docs/unwrap_baseline_history.jsonl` does not
-// alter gate pass/fail criteria.
+// Executes workspace verification (cargo check, cargo clippy, cargo test)
+// and records report summary into results/.
 
 use chrono::Utc;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-
-use crate::check_unwrap_baseline_trend::{append_history_entry, load_tier1_crates};
-use crate::check_unwrap_ratchet::scan_unwrap_expect_occurrences;
 
 pub fn run_post_merge_report(root: &Path) -> bool {
     println!("=== Running xtask post-merge-report ===");
@@ -97,28 +88,6 @@ pub fn run_post_merge_report(root: &Path) -> bool {
         "\n📄 Post-merge summary report created at {}",
         report_path.display()
     );
-
-    // 4. Update docs/unwrap_baseline_history.jsonl
-    println!("\nUpdating docs/unwrap_baseline_history.jsonl ...");
-    match scan_unwrap_expect_occurrences(root) {
-        Ok(current_entries) => {
-            let tier1_crates = load_tier1_crates(root);
-            if let Err(e) = append_history_entry(root, &current_entries, &tier1_crates) {
-                eprintln!("⚠️ Failed to append entry to unwrap history: {}", e);
-            } else {
-                println!(
-                    "✅ History entry appended with {} unwrap/expect occurrences.",
-                    current_entries.len()
-                );
-            }
-        }
-        Err(e) => {
-            eprintln!(
-                "⚠️ Failed to scan unwrap occurrences for history update: {}",
-                e
-            );
-        }
-    }
 
     let overall_success = check_passed && clippy_passed && test_passed;
     if overall_success {
