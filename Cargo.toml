@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/memfuse-sys",
     "crates/memfuse-core-ipc-gen",
     "crates/memfuse-core",
     "crates/memfuse-store",
@@ -86,7 +87,8 @@ tempfile = "3"
 criterion = { version = "0.5", features = ["async_tokio"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Workspace crates (18 Crates)
+# Workspace crates
+memfuse-sys = { path = "crates/memfuse-sys" }
 memfuse-core-ipc-gen = { path = "crates/memfuse-core-ipc-gen" }
 memfuse-core = { path = "crates/memfuse-core" }
 memfuse-store = { path = "crates/memfuse-store" }

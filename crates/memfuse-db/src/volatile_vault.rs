@@ -15,14 +15,9 @@
 //!   Berechtigungen), bleibt der Vault nutzbar, aber ohne physische RAM-Fixierung.
 //!   Eine Warnung wird via `tracing::warn!` ausgegeben.
 
-#![allow(unsafe_code)]
-
 use memfuse_core::types::{DocId, TxId};
 use std::time::Instant;
 use zeroize::{Zeroize, ZeroizeOnDrop};
-
-#[cfg(unix)]
-use libc::{mlock, munlock};
 
 /// Modalität eines Vault-Chunks — bestimmt Verarbeitungskontext beim Commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -180,20 +175,10 @@ impl VolatileContextVault {
         // Memory-Locking (best-effort): chunk.content im RAM fixieren.
         #[cfg(unix)]
         if self.config.attempt_mlock {
-            let ptr = chunk.content.as_ptr() as *mut libc::c_void;
+            let ptr = chunk.content.as_ptr();
             let len = chunk.content.len();
             if len > 0 {
-                // SAFETY: ptr zeigt auf gültigen, uns gehörenden Speicher.
-                // munlock() wird in Drop aufgerufen oder wenn der Vault purged wird.
-                let ret = unsafe { mlock(ptr, len) };
-                if ret != 0 {
-                    tracing::warn!(
-                        "mlock() fehlgeschlagen für VaultChunk (len={}): errno={}. \
-                         Chunk ist nicht gegen Swap-Auslagerung geschützt.",
-                        len,
-                        std::io::Error::last_os_error()
-                    );
-                } else {
+                if memfuse_sys::mem_lock(ptr, len) {
                     self.mlock_regions.push((ptr as usize, len));
                 }
             }
@@ -228,8 +213,7 @@ impl VolatileContextVault {
         // 2. mlock-Regionen freigeben (nach Zeroize!).
         #[cfg(unix)]
         for (addr, len) in self.mlock_regions.drain(..) {
-            // SAFETY: addr/len stammen aus mlock() im ingest()-Pfad.
-            unsafe { munlock(addr as *mut libc::c_void, len) };
+            memfuse_sys::mem_unlock(addr, len);
         }
 
         // 3. Chunks droppen (ZeroizeOnDrop nochmals als Sicherheitsnetz).
@@ -257,7 +241,7 @@ impl VolatileContextVault {
         // munlock vor dem Drain (Chunks verlassen den Vault — mlock-Bindung aufheben).
         #[cfg(unix)]
         for (addr, len) in self.mlock_regions.drain(..) {
-            unsafe { munlock(addr as *mut libc::c_void, len) };
+            memfuse_sys::mem_unlock(addr, len);
         }
 
         self.current_bytes = 0;
@@ -321,7 +305,7 @@ impl Drop for VolatileContextVault {
             // munlock NACH Zeroize.
             #[cfg(unix)]
             for (addr, len) in self.mlock_regions.drain(..) {
-                unsafe { munlock(addr as *mut libc::c_void, len) };
+                memfuse_sys::mem_unlock(addr, len);
             }
         }
         // ZeroizeOnDrop auf VaultChunk läuft danach nochmals als Sicherheitsnetz.
