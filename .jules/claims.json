@@ -97,6 +97,14 @@
       "session_id": "3361491345051981022",
       "active": true,
       "expires_at": "2026-09-19T07:39:24.309553539+00:00"
+    },
+    {
+      "krate": "memfuse-candle",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-19T05:36:36.137532884+00:00",
+      "session_id": "6523251715707654783",
+      "active": true,
+      "expires_at": "2026-09-19T09:36:36.137522816+00:00"
     }
   ]
 }

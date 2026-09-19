@@ -99,7 +99,8 @@ impl PidController {
 
         let dt_s = dt.as_secs_f32().clamp(0.001, 10.0);
         let error = self.target_latency_ms - measured_latency_ms;
-        let candidate_integral = self.integral + error * dt_s;
+        let candidate_integral =
+            (self.integral + error * dt_s).clamp(-self.max_integral, self.max_integral);
         let derivative = (error - self.prev_error) / dt_s;
 
         let u = self.kp * error + self.ki * candidate_integral + self.kd * derivative;
