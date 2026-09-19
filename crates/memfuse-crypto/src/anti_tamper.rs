@@ -114,6 +114,7 @@ mod tests {
     // AI-TAG[CORRECTNESS][MAJOR][RESOLVED] Refactored zeroize test using ManuallyDrop (ID: AGT-CRYPTO-7519b7cd) (TS: 2026-09-03T19:31:53Z) (SESSION: a413a598)
     // RESOLVED: Refactored test to use ManuallyDrop and explicit Zeroize::zeroize without post-drop raw pointer dereferencing on stack memory, eliminating UAF/UB.
     #[test]
+    #[allow(unsafe_code)]
     fn test_zeroize_on_drop_wipes_memory() {
         use std::mem::ManuallyDrop;
 
