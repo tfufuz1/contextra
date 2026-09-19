@@ -4,6 +4,7 @@
 
 | Zeitstempel | Crate/Datei | Typ | ID | Session | Status | Review-Pässe (unabhängig) | Beschreibung |
 |---|---|---|---|---|---|---|---|
+| `TS:2026-09-17T19:00:00Z (SESSION: jules-agent-budget)` | `crates/memfuse-agent/src/budget.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Token budget RAII reservation abstraction for agent workflow steps. |
 | `TS:2026-09-13T01:36:52Z (SESSION: c1c85419)` | `crates/memfuse-agent/tests/proptest_workflow_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-based testing for memfuse-agent structural invariants (StateGraph, AgentContext, BackgroundEvent). |
 | `TS:2026-09-13T00:00:00Z (SESSION: pid-regler-impl)` | `crates/memfuse-db/src/pid_latency_controller.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | PID Latency Controller & Latency Budget Guard für Multi-Step Retrieval. |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-crypto/src/kv_segment/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation). |
@@ -329,6 +330,13 @@
 | `` | `crates/memfuse-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |
+| `` | `crates/memfuse-simd/src/dispatch.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Runtime Hardware Feature Detection & Dispatcher. |
+| `` | `crates/memfuse-simd/src/kernels/avx2.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen. |
+| `` | `crates/memfuse-simd/src/kernels/avx512.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AVX-512 SIMD-Intrinsics für f32, f32_bytes und u8 VNNI Distanzberechnungen. |
+| `` | `crates/memfuse-simd/src/kernels/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Kernel-Modul-Deklarationen für SIMD-Distanzfunktionen. |
+| `` | `crates/memfuse-simd/src/kernels/neon.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | ARM NEON SIMD-Intrinsics für f32 Distanzberechnungen. |
+| `` | `crates/memfuse-simd/src/kernels/scalar.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Skalare Fallback-Implementierung der Distanzmetriken (f32, f32_bytes, u8, f32_u8). |
+| `` | `crates/memfuse-simd/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-0 Ring-0 Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Dispatch. |
 | `` | `crates/memfuse-store/examples/chaos_writer.rs` | `FILE-CONTEXT` | `-` | `chaos_power_cut` | `-` | `-` |  |
 | `` | `crates/memfuse-store/src/compaction.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-H-3: LsmStorage hält eine persistente CompactionEngine-Instanz (LsmStorage.compaction_engine), wodurch Compaction-State & Zähler erhalten bleiben. |
 | `` | `crates/memfuse-store/src/lsm/mod.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-M-6: Drift-Counter budget_tracking_drift_bytes wird in LsmStorage::flush nach erfolgreichem Flush auf 0 zurückgesetzt. |

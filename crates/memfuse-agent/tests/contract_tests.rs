@@ -35,6 +35,10 @@ impl AgentTool for TokenTool {
         &self.name
     }
 
+    fn estimated_cost(&self, _input: &serde_json::Value) -> usize {
+        self.tokens
+    }
+
     fn execute<'a>(
         &'a self,
         _ctx: &'a AgentContext,

@@ -223,33 +223,38 @@ impl OrchestratorEngine {
                         0
                     };
 
-                    if node.node_type != NodeType::Start {
-                        if let Err(err) = ctx.budget.try_reserve(estimated_cost) {
-                            if let Some(ref dlq) = self.dead_letter_queue {
-                                let letter = StepDeadLetter {
-                                    session_id: ctx.task_id.clone(),
-                                    node_id: node.id.clone(),
-                                    step_index: ctx.step_count,
-                                    tx_id: Some(tx_id),
-                                    failure_reason: DeadLetterReason::BudgetExhausted {
-                                        available: ctx.budget.available(),
-                                        required: estimated_cost,
-                                    },
-                                    input: input.clone(),
-                                    attempt: 0,
-                                    failed_at_secs: SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap_or_default()
-                                        .as_secs(),
-                                };
-                                if let Err(e) = dlq.push(&letter).await {
-                                    tracing::error!("DLQ push failed: {}", e);
+                    let reservation = if node.node_type != NodeType::Start && estimated_cost > 0 {
+                        match ctx.budget.reserve(estimated_cost) {
+                            Ok(res) => Some(res),
+                            Err(err) => {
+                                if let Some(ref dlq) = self.dead_letter_queue {
+                                    let letter = StepDeadLetter {
+                                        session_id: ctx.task_id.clone(),
+                                        node_id: node.id.clone(),
+                                        step_index: ctx.step_count,
+                                        tx_id: Some(tx_id),
+                                        failure_reason: DeadLetterReason::BudgetExhausted {
+                                            available: ctx.budget.available(),
+                                            required: estimated_cost,
+                                        },
+                                        input: input.clone(),
+                                        attempt: 0,
+                                        failed_at_secs: SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap_or_default()
+                                            .as_secs(),
+                                    };
+                                    if let Err(e) = dlq.push(&letter).await {
+                                        tracing::error!("DLQ push failed: {}", e);
+                                    }
                                 }
+                                self.audit_log_failure(ctx, &err.to_string()).await?;
+                                return Err(err);
                             }
-                            self.audit_log_failure(ctx, &err.to_string()).await?;
-                            return Err(err);
                         }
-                    }
+                    } else {
+                        None
+                    };
 
                     // 2. Resolve handler (Optional for Start nodes)
                     let result_res = if let Some(handler_name) = &node.handler {
@@ -430,19 +435,24 @@ impl OrchestratorEngine {
 
                     let result = match result_res {
                         Ok(res) => {
-                            // Reconcile reserved budget with actual tokens consumed
-                            if res.tokens_consumed > estimated_cost {
-                                ctx.budget.consume(res.tokens_consumed - estimated_cost);
-                            } else if estimated_cost > res.tokens_consumed {
-                                ctx.budget.refund(estimated_cost - res.tokens_consumed);
+                            // Settle RAII reservation and reconcile actual tokens consumed
+                            if let Some(res_guard) = reservation {
+                                res_guard.settle();
+                                if res.tokens_consumed > estimated_cost {
+                                    ctx.budget.consume(res.tokens_consumed - estimated_cost);
+                                } else if estimated_cost > res.tokens_consumed {
+                                    ctx.budget.refund(estimated_cost - res.tokens_consumed);
+                                }
+                            } else if res.tokens_consumed > 0 {
+                                ctx.budget.consume(res.tokens_consumed);
                             }
                             ctx.memory
                                 .insert("last_output".to_string(), res.output.clone());
                             res
                         }
                         Err(err) => {
-                            // Refund pre-reserved tokens on execution failure
-                            ctx.budget.refund(estimated_cost);
+                            // On execution failure, reservation is dropped without settle(),
+                            // which automatically refunds estimated_cost via RAII Drop guard.
                             self.audit_log_failure(ctx, &err.to_string()).await?;
                             return Err(err);
                         }
@@ -567,7 +577,7 @@ impl OrchestratorEngine {
             .get("budget_consumed")
             .and_then(|v| v.as_u64())
         {
-            let mut restored_budget =
+            let restored_budget =
                 memfuse_core::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
                     .with_strategy(ctx.budget.strategy.clone());
             restored_budget.consume(consumed as usize);
@@ -582,7 +592,7 @@ impl OrchestratorEngine {
                 .effective_limit()
                 .saturating_sub(ctx.budget.reserved);
             let consumed = total_usable.saturating_sub(available as usize);
-            let mut restored_budget =
+            let restored_budget =
                 memfuse_core::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
                     .with_strategy(ctx.budget.strategy.clone());
             restored_budget.consume(consumed);

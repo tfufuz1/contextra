@@ -206,7 +206,10 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, MemFuseError>
 }
 
 #[inline]
-pub fn cosine_similarity_parts_u8(a: &[u8], b: &[u8]) -> Result<CosineSimilarityPartsU8, MemFuseError> {
+pub fn cosine_similarity_parts_u8(
+    a: &[u8],
+    b: &[u8],
+) -> Result<CosineSimilarityPartsU8, MemFuseError> {
     if a.len() != b.len() {
         return Err(MemFuseError::EmbeddingDimensionMismatch {
             expected: a.len(),

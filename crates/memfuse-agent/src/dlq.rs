@@ -16,6 +16,27 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 
+fn extract_tx_id(val: &serde_json::Value) -> Option<u64> {
+    val.as_u64()
+        .or_else(|| val.as_str().and_then(|s| s.parse::<u64>().ok()))
+}
+
+fn check_json_for_tx_id(val_bytes: &[u8], target_tx_id: u64) -> bool {
+    if let Ok(meta) = serde_json::from_slice::<serde_json::Value>(val_bytes) {
+        let tx_val = meta.get("tx_id").and_then(extract_tx_id).or_else(|| {
+            meta.get("metadata")
+                .and_then(|m| m.get("tx_id"))
+                .and_then(extract_tx_id)
+        });
+        if let Some(tx_u64) = tx_val {
+            if tx_u64 == target_tx_id {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Persistente Dead-Letter-Queue für fehlgeschlagene Agent-Schritte.
 /// Verwendet denselben Storage wie der Agent (LSM) mit einem fixen Key-Prefix.
 pub struct DeadLetterQueue {
@@ -101,6 +122,28 @@ impl DeadLetterQueue {
         Ok(letters)
     }
 
+    /// Entfernt einen spezifischen DLQ-Eintrag anhand seines `(session_id, node_id, step_index)` Schlüssels.
+    pub async fn remove(&self, letter: &StepDeadLetter) -> Result<bool> {
+        let key = format!(
+            "dlq:{}:{}:{}",
+            letter.session_id, letter.node_id, letter.step_index
+        );
+        let tx = self.allocate_tx().await?;
+        if let Err(e) = self.storage.delete(tx, key.as_bytes()).await {
+            if let Err(rollback_err) = self.storage.rollback(tx).await {
+                tracing::error!(error = %rollback_err, "Failed to rollback transaction after delete failure in DLQ");
+            }
+            return Err(e);
+        }
+        if let Err(e) = self.storage.commit(tx).await {
+            if let Err(rollback_err) = self.storage.rollback(tx).await {
+                tracing::error!(error = %rollback_err, "Failed to rollback transaction after commit failure in DLQ");
+            }
+            return Err(e);
+        }
+        Ok(true)
+    }
+
     /// Prüft vor dem Replay eines DLQ-Eintrags, ob die im Eintrag assoziierte `TxId`
     /// bereits im WAL/Storage für denselben `(Session, Node, Step)`-Schlüssel committet ist.
     ///
@@ -117,32 +160,14 @@ impl DeadLetterQueue {
 
         for doc_id in [&state_doc_id, &audit_id] {
             if let Ok(Some(val_bytes)) = self.storage.get(doc_id.as_bytes()).await {
-                if let Ok(meta) = serde_json::from_slice::<serde_json::Value>(&val_bytes) {
-                    let tx_val = meta.get("tx_id").and_then(|v| v.as_u64()).or_else(|| {
-                        meta.get("metadata")
-                            .and_then(|m| m.get("tx_id"))
-                            .and_then(|v| v.as_u64())
-                    });
-                    if let Some(tx_u64) = tx_val {
-                        if tx_u64 == letter_tx_id.0 {
-                            return Ok(true);
-                        }
-                    }
+                if check_json_for_tx_id(&val_bytes, letter_tx_id.0) {
+                    return Ok(true);
                 }
             }
             let namespaced_doc_key = format!("__col:agent:\x000{}", doc_id);
             if let Ok(Some(val_bytes)) = self.storage.get(namespaced_doc_key.as_bytes()).await {
-                if let Ok(meta) = serde_json::from_slice::<serde_json::Value>(&val_bytes) {
-                    let tx_val = meta.get("tx_id").and_then(|v| v.as_u64()).or_else(|| {
-                        meta.get("metadata")
-                            .and_then(|m| m.get("tx_id"))
-                            .and_then(|v| v.as_u64())
-                    });
-                    if let Some(tx_u64) = tx_val {
-                        if tx_u64 == letter_tx_id.0 {
-                            return Ok(true);
-                        }
-                    }
+                if check_json_for_tx_id(&val_bytes, letter_tx_id.0) {
+                    return Ok(true);
                 }
             }
         }
@@ -150,19 +175,10 @@ impl DeadLetterQueue {
         let entries = self.storage.scan_prefix(b"").await?;
         for (k, val_bytes) in entries {
             let key_str = String::from_utf8_lossy(&k);
-            if key_str.contains(&state_doc_id) || key_str.contains(&audit_id) {
-                if let Ok(meta) = serde_json::from_slice::<serde_json::Value>(&val_bytes) {
-                    let tx_val = meta.get("tx_id").and_then(|v| v.as_u64()).or_else(|| {
-                        meta.get("metadata")
-                            .and_then(|m| m.get("tx_id"))
-                            .and_then(|v| v.as_u64())
-                    });
-                    if let Some(tx_u64) = tx_val {
-                        if tx_u64 == letter_tx_id.0 {
-                            return Ok(true);
-                        }
-                    }
-                }
+            if (key_str.contains(&state_doc_id) || key_str.contains(&audit_id))
+                && check_json_for_tx_id(&val_bytes, letter_tx_id.0)
+            {
+                return Ok(true);
             }
         }
 
