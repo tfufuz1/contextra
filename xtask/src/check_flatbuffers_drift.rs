@@ -157,7 +157,7 @@ pub fn regenerate_flatbuffers() -> Result<(), String> {
 
     let root = find_root_dir();
     let schema_path = root.join("schemas/memfuse.fbs");
-    let out_dir = root.join("crates/memfuse-core-ipc-gen/src");
+    let out_dir = root.join("crates/memfuse-wire/src");
 
     if !schema_path.exists() {
         return Err(format!(

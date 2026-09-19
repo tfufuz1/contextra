@@ -81,6 +81,7 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/multistep.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/transaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
+| `2026-09-18T12:00:00Z` | `crates/memfuse-graph/src/csr.rs` | `AI-TAG` | `-` | `e095d708` | `OPEN` | `-` | // AI-TAG[TODO][IP-08-BUDGET-COUPLING](TS:2026-09-18T12:00:00Z)(SESSION:e095d708): Connect to global ResourceTracker when cross-crate tracker handle is integrated. |
 | `2026-09-18T10:00:00Z` | `crates/memfuse-calibration/src/isotonic.rs` | `AI-TAG` | `-` | `jules` | `OPEN` | `-` | // AI-TAG[FIX][MINOR] Use ? operator on Option<&Vec<(f32, f32)>> for concise early return (TS: 2026-09-18T10:00:00Z) (SESSION: jules) |
 | `2026-09-17T17:59:57Z (SESSION: c9c5f937)` | `crates/memfuse-core/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Core types, traits, and error handling for MemFuse. |
 | `2026-09-16T21:00:00Z (SESSION: IP-07)` | `crates/memfuse-core/src/tombstone.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Trait und Referenzimplementierung für Tombstone-Semantik (IP-07 / ADR-041). |
@@ -92,6 +93,7 @@
 | `2026-09-16T16:15:00Z` | `crates/memfuse-calibration/src/lib.rs` | `REVIEW-PASS` | `-` | `e72e11a3` | `PASS` | `-` | // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-16T16:15:00Z) (SESSION: e72e11a3) |
 | `2026-09-16T16:13:00Z (SESSION: afafdd44)` | `crates/memfuse-candle/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Crate root for memfuse-candle native GGUF inference backend. |
 | `2026-09-16T16:13:00Z` | `crates/memfuse-candle/src/lib.rs` | `REVIEW-PASS` | `AGT-CANDLE-d495a019` | `afafdd44` | `-` | `0` | // REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH |
+| `2026-09-16T00:00:00Z` | `crates/memfuse-wire/tests/ipc_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests, Fault-Injection und Nebenläufigkeitstests für FlatBuffers IPC (memfuse-wire) |
 | `2026-09-15T16:46:26Z` | `crates/memfuse-agent/src/lib.rs` | `REVIEW-PASS` | `AGT-AGENT-692d9982` | `692d9982` | `PASS` | `0` | // REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-AGENT-692d9982) (TS: 2026-09-15T16:46:26Z) (SESSION: 692d9982) (PRÜFER-KONTEXT: FRESH) |
 | `2026-09-15T16:15:00Z (SESSION: 1a43706f)` | `crates/memfuse-router/src/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit- und Integrationstest-Suite für memfuse-router. |
 | `2026-09-15T16:10:40Z (SESSION: ec33599e)` | `crates/memfuse-embed/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG). |

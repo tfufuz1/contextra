@@ -2683,6 +2683,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-wire"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "flatbuffers",
+]
+
+[[package]]
 name = "memmap2"
 version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
