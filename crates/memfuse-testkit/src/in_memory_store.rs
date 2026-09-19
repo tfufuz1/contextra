@@ -3,11 +3,11 @@
 // ZWECK: In-Memory StorageEngine implementation for fast, lightweight testing.
 // INVARIANTEN: Zero disk I/O, transactional staging & commit/rollback, zero unsafe.
 
+use bytes::Bytes;
+use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use bytes::Bytes;
-use parking_lot::RwLock;
 
 use memfuse_core::traits::{BoxFuture, StorageEngine, StorageStats};
 use memfuse_core::types::TxId;
@@ -217,6 +217,7 @@ impl StorageEngine for InMemoryStorageEngine {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
