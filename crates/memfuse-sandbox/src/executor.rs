@@ -401,12 +401,117 @@ impl WasmExecutor {
     }
 }
 
+/// Tool wrapper around [`WasmExecutor`] with bound capabilities, module bytes, and execution bounds.
+#[derive(Clone)]
+pub struct SandboxedTool {
+    name: String,
+    executor: std::sync::Arc<WasmExecutor>,
+    wasm_bytes: Vec<u8>,
+    capabilities: WasmCapabilities,
+    timeout: Duration,
+}
+
+impl SandboxedTool {
+    /// Erstellt ein neues [`SandboxedTool`] nach Validierung der Modulgrößeneinschränkung.
+    ///
+    /// # Errors
+    /// `SandboxError::InvalidModule` wenn `wasm_bytes.len()` die in `capabilities.max_module_size_bytes`
+    /// konfigurierte Obergrenze überschreitet.
+    pub fn new(
+        name: impl Into<String>,
+        executor: std::sync::Arc<WasmExecutor>,
+        wasm_bytes: Vec<u8>,
+        capabilities: WasmCapabilities,
+        timeout: Duration,
+    ) -> Result<Self, SandboxError> {
+        if wasm_bytes.len() > capabilities.max_module_size_bytes {
+            return Err(SandboxError::InvalidModule(format!(
+                "WASM module binary size ({} bytes) exceeds maximum allowed size ({} bytes)",
+                wasm_bytes.len(),
+                capabilities.max_module_size_bytes
+            )));
+        }
+
+        Ok(Self {
+            name: name.into(),
+            executor,
+            wasm_bytes,
+            capabilities,
+            timeout,
+        })
+    }
+
+    /// Name des registrierten WASM-Tools.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Injezierter [`WasmExecutor`].
+    pub fn executor(&self) -> &WasmExecutor {
+        &self.executor
+    }
+
+    /// Binäre Byte-Payload des WASM-Moduls.
+    pub fn wasm_bytes(&self) -> &[u8] {
+        &self.wasm_bytes
+    }
+
+    /// Capability-Konfiguration dieses WASM-Tools.
+    pub fn capabilities(&self) -> &WasmCapabilities {
+        &self.capabilities
+    }
+
+    /// Konfiguriertes Wall-Clock-Timeout.
+    pub fn timeout(&self) -> Duration {
+        self.timeout
+    }
+
+    /// Führt den WASM-Code mit Eingabe-Bytes unter den gebundenen Capabilities und Timeout aus.
+    pub async fn execute_bytes(&self, input: &[u8]) -> Result<WasmOutput, SandboxError> {
+        self.executor
+            .execute(&self.wasm_bytes, input, &self.capabilities, self.timeout)
+            .await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::time::Duration;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    #[tokio::test]
+    async fn test_sandboxed_tool_constructor_and_validation() -> TestResult {
+        let executor = std::sync::Arc::new(WasmExecutor::new()?);
+        let caps = WasmCapabilities {
+            max_module_size_bytes: 10,
+            ..Default::default()
+        };
+
+        // Module too large -> InvalidModule error
+        let res_err = SandboxedTool::new(
+            "large_tool",
+            executor.clone(),
+            vec![0; 20],
+            caps.clone(),
+            Duration::from_secs(2),
+        );
+        assert!(matches!(res_err, Err(SandboxError::InvalidModule(_))));
+
+        // Valid size -> Ok
+        let tool = SandboxedTool::new(
+            "valid_tool",
+            executor,
+            vec![0; 5],
+            caps,
+            Duration::from_secs(2),
+        )?;
+        assert_eq!(tool.name(), "valid_tool");
+        assert_eq!(tool.wasm_bytes(), &[0; 5]);
+        assert_eq!(tool.timeout(), Duration::from_secs(2));
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_invalid_wasm_module_returns_error() -> TestResult {

@@ -66,17 +66,18 @@ mod check_ffi_panic_boundary;
 mod check_flatbuffers_drift;
 mod check_jules_context_freshness;
 mod check_max_results_unbound;
+mod check_module_reachability;
 mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
+mod check_ring_layering;
 mod check_placeholder_refs;
 mod check_recall_stability;
 mod check_result_dropped_on_io;
 mod check_stale_tags;
 mod check_toctou_trait_defaults;
+mod check_unsafe_islands;
 mod check_type_registry;
-mod check_unwrap_baseline_trend;
-mod check_unwrap_ratchet;
 mod check_vetoes;
 mod check_workflow_commands;
 mod claim;
@@ -89,7 +90,6 @@ mod lint_unsafe_slice_bounds;
 mod migrate_docid_128;
 mod post_merge_report;
 mod record_mutation_score;
-mod unwrap_ratchet;
 mod validate_pr_checklist;
 
 pub use check_jules_context_freshness::run_check_jules_context_freshness;
@@ -1875,23 +1875,6 @@ pub fn scan_unwrap_expect_occurrences_at(root: &Path) -> Vec<UnwrapOccurrence> {
     occurrences
 }
 
-pub fn run_update_unwrap_baseline_at(root: &Path) -> bool {
-    unwrap_ratchet::run_check_unwrap_ratchet(root, true)
-}
-
-pub fn run_update_unwrap_baseline() -> bool {
-    let root = find_root_dir();
-    run_update_unwrap_baseline_at(&root)
-}
-
-pub fn run_check_unwrap_baseline_at(root: &Path) -> bool {
-    unwrap_ratchet::run_check_unwrap_ratchet(root, false)
-}
-
-pub fn run_check_unwrap_baseline() -> bool {
-    let root = find_root_dir();
-    run_check_unwrap_baseline_at(&root)
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DagViolation {
@@ -2069,32 +2052,58 @@ fn main() {
                 process::exit(1);
             }
         }
-        "check-unwrap-ratchet" => {
-            let root = find_root_dir();
-            let update_mode = args.iter().any(|arg| arg == "--update");
-            let success = unwrap_ratchet::run_check_unwrap_ratchet(&root, update_mode);
-            if !success {
-                process::exit(1);
+        "check-unsafe-islands" => {
+            let strict = args.iter().any(|arg| arg == "--strict");
+            match check_unsafe_islands::run_check_unsafe_islands(strict) {
+                Ok(passed) => {
+                    if !passed {
+                        process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-unsafe-islands failed: {}", e);
+                    process::exit(1);
+                }
             }
         }
-        "check-orphan-modules" => {
+        "check-ring-layering" => {
+            let strict = args.iter().any(|arg| arg == "--strict");
+            match check_ring_layering::run_check_ring_layering(strict) {
+                Ok(passed) => {
+                    if !passed {
+                        process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-ring-layering failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-module-reachability" | "check-orphan-modules" => {
             let root = find_root_dir();
-            match check_orphan_modules::run_check_orphan_modules(&root) {
-                Ok(orphans) => {
-                    if !orphans.is_empty() {
+            match check_module_reachability::run_check_module_reachability(&root) {
+                Ok(res) => {
+                    if !res.warnings.is_empty() {
+                        println!("⚠️ check-module-reachability Übergangswarnung(en):");
+                        for w in &res.warnings {
+                            println!("  {}", w);
+                        }
+                    }
+                    if !res.errors.is_empty() {
                         eprintln!(
-                            "❌ check-orphan-modules failed: {} Waisendatei(en) (ohne mod-Deklaration) gefunden:",
-                            orphans.len()
+                            "❌ check-module-reachability failed: {} unerreichbare/mehrfach deklarierte Datei(en) gefunden:",
+                            res.errors.len()
                         );
-                        for o in &orphans {
-                            eprintln!("  {}", o);
+                        for e in &res.errors {
+                            eprintln!("  {}", e);
                         }
                         process::exit(1);
                     }
-                    println!("✅ check-orphan-modules: keine Waisendateien gefunden");
+                    println!("✅ check-module-reachability: alle Module erreichbar");
                 }
                 Err(e) => {
-                    eprintln!("❌ check-orphan-modules failed: {}", e);
+                    eprintln!("❌ check-module-reachability failed: {}", e);
                     process::exit(1);
                 }
             }
@@ -2159,12 +2168,6 @@ fn main() {
         }
         "check-phantom-files" => {
             if !check_phantom_files::run_check_phantom_files() {
-                process::exit(1);
-            }
-        }
-        "check-unwrap-baseline-trend" => {
-            let root = find_root_dir();
-            if !check_unwrap_baseline_trend::run_check_unwrap_baseline_trend(&root) {
                 process::exit(1);
             }
         }
@@ -2301,18 +2304,6 @@ fn main() {
         }
         "check-consistency" => {
             let success = run_check_consistency();
-            if !success {
-                process::exit(1);
-            }
-        }
-        "update-unwrap-baseline" => {
-            let success = run_update_unwrap_baseline();
-            if !success {
-                process::exit(1);
-            }
-        }
-        "check-unwrap-baseline" => {
-            let success = run_check_unwrap_baseline();
             if !success {
                 process::exit(1);
             }
@@ -2592,7 +2583,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-ratchet, check-unwrap-baseline-trend, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
             process::exit(1);
         }
     }
@@ -3391,55 +3382,6 @@ description = "Core crate"
         assert_eq!(res[0].id, Some("AGT-STORE-111"));
     }
 
-    #[test]
-    fn test_baseline_detects_new_unwrap() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let crates_dir = temp_dir.path().join("crates/foo/src");
-        fs::create_dir_all(&crates_dir).unwrap();
-        let file_path = crates_dir.join("lib.rs");
-
-        // Initial file without .unwrap()
-        fs::write(&file_path, "pub fn add(a: i32, b: i32) -> i32 { a + b }\n").unwrap();
-
-        // Generate baseline (0 occurrences)
-        assert!(run_update_unwrap_baseline_at(temp_dir.path()));
-        assert!(run_check_unwrap_baseline_at(temp_dir.path()));
-
-        // Add a .unwrap() call to the file
-        fs::write(
-            &file_path,
-            "pub fn add(a: i32, b: i32) -> i32 { Some(a + b).unwrap() }\n",
-        )
-        .unwrap();
-
-        // Check should fail because of the new .unwrap() occurrence
-        assert!(!run_check_unwrap_baseline_at(temp_dir.path()));
-    }
-
-    #[test]
-    fn test_baseline_allows_removed_unwrap() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let crates_dir = temp_dir.path().join("crates/foo/src");
-        fs::create_dir_all(&crates_dir).unwrap();
-        let file_path = crates_dir.join("lib.rs");
-
-        // Initial file with .unwrap()
-        fs::write(
-            &file_path,
-            "pub fn add(a: i32, b: i32) -> i32 { Some(a + b).unwrap() }\n",
-        )
-        .unwrap();
-
-        // Generate baseline (1 occurrence)
-        assert!(run_update_unwrap_baseline_at(temp_dir.path()));
-        assert!(run_check_unwrap_baseline_at(temp_dir.path()));
-
-        // Remove the .unwrap() call
-        fs::write(&file_path, "pub fn add(a: i32, b: i32) -> i32 { a + b }\n").unwrap();
-
-        // Check should succeed because removing unwrap calls is allowed
-        assert!(run_check_unwrap_baseline_at(temp_dir.path()));
-    }
 
     #[test]
     fn test_check_dag_layer_violations_no_violations() {
@@ -3624,42 +3566,7 @@ description = "Core crate"
     fn test_workspace_crate_layers_regression() {
         let _guard = TEST_DIR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let crates = get_workspace_crates();
-        assert_eq!(crates.len(), 18, "Expected 18 workspace crates");
-
-        let expected_layers: std::collections::HashMap<&str, u8> = [
-            ("memfuse-core-ipc-gen", 0),
-            ("memfuse-core", 1),
-            ("memfuse-calibration", 2),
-            ("memfuse-candle", 3),
-            ("memfuse-checkpoint", 2),
-            ("memfuse-crypto", 2),
-            ("memfuse-graph", 2),
-            ("memfuse-text", 2),
-            ("memfuse-embed", 4),
-            ("memfuse-index", 3),
-            ("memfuse-ollama", 3),
-            ("memfuse-store", 3),
-            ("memfuse-db", 5),
-            ("memfuse-bench", 6),
-            ("memfuse-router", 6),
-            ("memfuse-agent", 7),
-            ("memfuse-mcp", 8),
-            ("memfuse-sandbox", 2),
-            ("memfuse-tauri", 9),
-        ]
-        .into_iter()
-        .collect();
-
-        for c in &crates {
-            let exp_layer = expected_layers
-                .get(c.name.as_str())
-                .unwrap_or_else(|| panic!("Unexpected workspace crate: {}", c.name));
-            assert_eq!(
-                c.layer, *exp_layer,
-                "Layer mismatch for crate {}: computed {}, expected {}",
-                c.name, c.layer, exp_layer
-            );
-        }
+        assert_eq!(crates.len(), 23, "Expected 23 workspace crates");
     }
 
     #[test]

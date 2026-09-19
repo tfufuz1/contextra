@@ -2239,6 +2239,7 @@ dependencies = [
  "memfuse-graph",
  "memfuse-index",
  "memfuse-router",
+ "memfuse-sandbox",
  "memfuse-store",
  "memfuse-text",
  "serde",
@@ -2248,6 +2249,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "wat",
 ]
 
 [[package]]

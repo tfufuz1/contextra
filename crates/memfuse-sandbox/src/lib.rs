@@ -17,5 +17,5 @@ pub mod output;
 
 pub use capabilities::WasmCapabilities;
 pub use error::SandboxError;
-pub use executor::WasmExecutor;
+pub use executor::{SandboxedTool, WasmExecutor};
 pub use output::WasmOutput;
