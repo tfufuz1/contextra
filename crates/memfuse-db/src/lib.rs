@@ -1457,9 +1457,16 @@ impl MemFuse {
         self.default_col().await?.delete(id).await
     }
 
-    /// Creates a bidirectional relationship between two documents.
+    /// Creates a relationship between two documents.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {
+        let col = self.default_col().await?;
+        col.relate(from, to, label).await
+    }
+
+    /// Creates a bidirectional relationship between two documents.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn relate_bidirectional(&self, from: &str, to: &str, label: &str) -> Result<()> {
         let col = self.default_col().await?;
         col.relate_bidirectional(from, to, label).await
     }

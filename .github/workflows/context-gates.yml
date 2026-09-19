@@ -14,16 +14,16 @@ jobs:
           fetch-depth: 0
 
       - name: "Gate -1: Xtask-Workflow-Command-Sync (Meta-Gate)"
-        run: cargo run -p xtask -- check-workflow-commands
+        run: cargo xtask check-workflow-commands
 
       - name: "Gate 0: Workspace Compile Check"
-        run: cargo run -p xtask -- check-compile
+        run: cargo xtask check-compile
 
       - name: "Gate 0b: FlatBuffers-Schema-Drift-Check (IP-16)"
-        run: cargo run -p xtask -- check-flatbuffers-drift
+        run: cargo xtask check-flatbuffers-drift
 
       - name: "Check for duplicate symbols (fast pre-build gate)"
-        run: cargo run -p xtask -- check-duplicate-symbols
+        run: cargo xtask check-duplicate-symbols
 
       - name: "DAG Integrity Check"
         run: cargo xtask check-dag
@@ -31,18 +31,21 @@ jobs:
       - name: "AGENTS.md Crate Integrity Gate"
         run: cargo xtask check-agents-integrity
 
+      - name: "GOV-D: Module-Reachability"
+        run: cargo xtask check-module-reachability
+
       - name: "Gate 12: Duplicate-PR-Intent-Detection"
         env:
           MEMFUSE_PR_BODY: ${{ github.event.pull_request.body || '' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: cargo run -p xtask -- check-duplicate-intent
+        run: cargo xtask check-duplicate-intent
 
       - name: "Gate 12b: Phantom-File-Verification"
         env:
           MEMFUSE_PR_BODY: ${{ github.event.pull_request.body || '' }}
           MEMFUSE_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
         run: |
-          cargo run -p xtask -- check-phantom-files
+          cargo xtask check-phantom-files
           echo "✅ Gate 12b: Keine Phantom-Dateien in Commit-Messages/PR-Body"
 
       - name: "Gate 1: Keine ungelösten kritischen AI-TAGs"
@@ -56,16 +59,18 @@ jobs:
           fi
           echo "✅ Keine offenen kritischen/blockierenden Tags"
 
-      - name: "Gate 2: Keine neuen .unwrap()/.expect() in Produktionscode"
-        run: cargo xtask check-unwrap-baseline
+<<<<<<< HEAD
+      # Unwrap-Ratchet entfällt (§0.4). Durchsetzung: merge-gate.yml → clippy-panic-lints
+=======
+      - name: "Gate 2: Ring-Layering Verification (Phase 0R Warnmodus)"
+        run: cargo xtask check-layering
 
-      # Gate 2b: Trend-Überwachung der .unwrap()/.expect() Baseline
-      # - BLOCKING: Nettowachstum (net > 0) in Tier-1-Crates (memfuse-core, memfuse-crypto, memfuse-store, memfuse-index) lässt den xtask-Check mit Exit-Code 1 fehlschlagen.
-      # - NON-BLOCKING: Nettowachstum in Tier-2/3-Crates wird dokumentiert und in der Historie erfasst, blockiert die CI jedoch nicht direkt.
-      - name: "Gate 2b: Trend-Überwachung der .unwrap()/.expect() Baseline"
-        env:
-          MEMFUSE_CI_BASE_REF: ${{ github.base_ref || github.event.before || 'origin/main' }}
-        run: cargo run -p xtask -- check-unwrap-baseline-trend
+      - name: "Gate 2b: Unsafe-Islands Inventory Gate"
+        run: cargo xtask check-unsafe-islands
+
+      - name: "Gate 2c: Module-Reachability Gate (GOV-D)"
+        run: cargo xtask check-module-reachability
+>>>>>>> 54333148 (Shell-Commit)
 
       - name: "Gate 3: Kein silent let _ für IO-Operationen"
         run: |
@@ -87,21 +92,8 @@ jobs:
           fi
           echo "✅ memfuse-mcp korrekt: kein axum"
 
-      - name: "Gate 4b: Kein allow(unsafe_code) in memfuse-core"
-        run: |
-          if grep -rn "allow(unsafe_code)" crates/memfuse-core/src 2>/dev/null; then
-            echo "❌ allow(unsafe_code) in memfuse-core/src gefunden"
-            exit 1
-          fi
-          echo "✅ memfuse-core/src ist zero-allow(unsafe_code)"
-
-      - name: "Gate 4c: Kein allow(unsafe_code) in memfuse-mcp"
-        run: |
-          if grep -rn "allow(unsafe_code)" crates/memfuse-mcp/src 2>/dev/null; then
-            echo "❌ allow(unsafe_code) in memfuse-mcp/src gefunden"
-            exit 1
-          fi
-          echo "✅ memfuse-mcp/src ist zero-allow(unsafe_code)"
+      - name: "Gate 4b/4c: Unsafe-Inseln (alle Nicht-Insel-Crates)"
+        run: cargo xtask check-unsafe-islands
 
       - name: "Gate 6: Keine TODOs ohne AI-TAG Grammatik"
         run: |
@@ -118,7 +110,7 @@ jobs:
 
       - name: "Gate 5: Dokumentation ist synchron mit Inline-Tags (kein Drift)"
         run: |
-          cargo run -p xtask -- sync-docs
+          cargo xtask sync-docs
           if ! git diff --quiet -- WORKING_STATE.md docs/ARCHITECTURE.md docs/SOURCE_OF_TRUTH.md; then
             echo "❌ Generierte Doku-Abschnitte sind veraltet. Lokal ausführen:"
             echo "    just sync-docs"
@@ -130,28 +122,28 @@ jobs:
 
       - name: "Gate 8: Mehrfach-Session-Review vor DONE erzwungen"
         run: |
-          cargo run -p xtask -- check-review-coverage
+          cargo xtask check-review-coverage
           echo "✅ Mehrfach-Session-Review-Abdeckung verifiziert"
 
       - name: "Gate: Audit-Verdict-Unabhängigkeit"
         run: |
-          cargo run -p xtask -- check-audit-verdict-independence
+          cargo xtask check-audit-verdict-independence
           echo "✅ Audit-Verdict-Unabhängigkeit verifiziert"
 
       - name: "Gate 9: Konsistenzprüfung der Dokumentation"
         run: |
-          cargo run -p xtask -- check-consistency
+          cargo xtask check-consistency
           echo "✅ Konsistenzprüfung erfolgreich"
 
       - name: "Gate 13: Keine Platzhalter-Referenzen in Governance-Dokumenten"
-        run: cargo run -p xtask -- check-placeholder-refs
+        run: cargo xtask check-placeholder-refs
 
       - name: "Gate 16: ADR Deprecation & Removal Deadline Monitoring"
-        run: cargo run -p xtask -- check-adr-deadlines
+        run: cargo xtask check-adr-deadlines
 
       - name: "Gate 10: Jules Context Frischeprüfung"
         run: |
-          cargo run -p xtask -- check-jules-context-freshness
+          cargo xtask check-jules-context-freshness
           echo "✅ Jules Context Frischeprüfung erfolgreich"
 
       - name: "Gate 10b: Prompter-Data Freshness"
@@ -199,7 +191,7 @@ jobs:
           echo "✅ Alle AGENTS.md Dateien entsprechen dem 8-Sektionen-Template"
 
       - name: "Gate 15: Validierung von Dateipfad-Referenzen in Dokumenten"
-        run: cargo run -p xtask -- check-doc-references
+        run: cargo xtask check-doc-references
 
       # TODO(P0-3): Nach 2 Wochen (ab 2026-09-26) manuell zu einem Hard-Gate hochstufen (exit 1 bei fehlender Zeile)
       - name: "Gate 15: Context-Read-Evidence im PR-Body"
@@ -226,13 +218,13 @@ jobs:
             export MEMFUSE_CLAIM_CRATE="$CLAIM_CRATE"
             echo "ℹ️ Claim-Crate aus PR-Body: $CLAIM_CRATE"
           fi
-          cargo run -p xtask -- jules-preflight --fast
+          cargo xtask jules-preflight --fast
           echo "✅ Jules Preflight: alle Checks bestanden"
 
       - name: "Gate 16: Commit Message Quality"
         env:
           MEMFUSE_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
-        run: cargo run -p xtask -- check-commit-messages
+        run: cargo xtask check-commit-messages
 
       - name: "Wöchentlicher Shell-Commit-Audit"
         run: |

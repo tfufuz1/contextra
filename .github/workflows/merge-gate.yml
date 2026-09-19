@@ -30,9 +30,13 @@ jobs:
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            xtask
 
       - name: Compile Check Gate
-        run: cargo run -p xtask -- check-compile
+        run: cargo xtask check-compile
 
       - name: Security Gate — No sh -c in dispatch.rs
         run: |
@@ -51,29 +55,62 @@ jobs:
       - name: Clippy Check (memfuse-py)
         run: cargo clippy --manifest-path crates/memfuse-py/Cargo.toml --all-targets -- -D warnings
 
+      - name: Clippy Check (xtask)
+        run: cargo clippy --manifest-path xtask/Cargo.toml --all-targets --locked -- -D warnings
+
       - name: Fast Unit Tests
         run: cargo test --workspace --exclude memfuse-tauri --lib --quiet
 
       - name: Fast Unit Tests (memfuse-py)
         run: cargo test --manifest-path crates/memfuse-py/Cargo.toml --quiet
 
+      - name: Fast Unit Tests (xtask)
+        run: cargo test --manifest-path xtask/Cargo.toml --locked
+
+      - name: Clippy Panic Lints
+        # ersetzt check-unwrap-ratchet (§0.4); Workspace-Lints folgen in Welle 2
+        run: cargo clippy --workspace --lib --bins --locked -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::todo -D clippy::unimplemented
+
+      - name: Ring Layering Check
+        # Phase 0R: Warnmodus (Exit 0). Phase 1a: --strict
+        run: cargo xtask check-ring-layering
+
+      - name: Unsafe Islands Check
+        # Phase 0R: Übergangsliste. Phase 1c: --strict
+        run: cargo xtask check-unsafe-islands
+
       - name: FFI Panic Boundary Check
         run: cargo xtask check-ffi-panic-boundary
 
       - name: Audit Verdict Independence Check
-        run: cargo run -p xtask -- check-audit-verdict-independence
+        run: cargo xtask check-audit-verdict-independence
 
       - name: Bandit Latency Budget Gate
         # Prüft dass LinUCB-Diagonal-Approximation das Latenzbudget (P95 ≤ 1ms) einhält.
         # Verhindert versehentliche O(d³)-Implementierungen im Hot-Path (§9.1, §13.2).
-        run: cargo run -p xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
+        run: cargo xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
         # Feature-Flag nötig da check_bandit_latency_budget memfuse_router::BanditProfileState nutzt.
 
       - name: FlatBuffers Schema Drift Gate
-        run: cargo run -p xtask -- check-fbs-drift
+        run: cargo xtask check-fbs-drift
 
-      - name: Unwrap Baseline Ratchet Gate
-        run: cargo run -p xtask -- check-unwrap-ratchet
+<<<<<<< HEAD
+      - name: Loom Concurrency Tests
+        run: |
+          for crate in $(git grep -rl 'cfg(loom)' crates/ | cut -d/ -f2 | sort -u); do
+            echo "Running Loom tests for $crate..."
+            RUSTFLAGS="--cfg loom" cargo test -p "$crate" --release --locked
+          done
+=======
+      - name: Ring Layering Gate (Phase 0R Warnmodus)
+        run: cargo xtask check-layering
+
+      - name: Unsafe Islands Inventory Gate
+        run: cargo xtask check-unsafe-islands
+
+      - name: Module Reachability Gate (GOV-D)
+        run: cargo xtask check-module-reachability
 
       - name: Loom Concurrency Tests (LSM / WAL)
         run: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
+>>>>>>> 54333148 (Shell-Commit)

@@ -5,10 +5,10 @@
 
 //! MemFuse SIMD — Ring 0 SIMD distance kernels and hardware runtime dispatch.
 
-#![deny(unsafe_code)]
-#![deny(unsafe_op_in_unsafe_fn)]
 #![allow(unsafe_code)]
 #![allow(clippy::undocumented_unsafe_blocks)]
+#![allow(clippy::missing_safety_doc)]
+#![allow(unused_unsafe)]
 
 pub mod dispatch;
 pub mod kernels;

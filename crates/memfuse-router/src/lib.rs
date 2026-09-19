@@ -2,6 +2,7 @@
 
 pub mod dispatch;
 pub mod lyapunov;
+pub mod offpolicy;
 pub mod outcome;
 pub mod profile;
 pub mod router;
@@ -23,6 +24,7 @@ mod tests;
 
 pub use dispatch::dispatch_to_slm;
 pub use lyapunov::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
+pub use offpolicy::{OffPolicyEvaluator, OffPolicyStats};
 pub use outcome::{DecisionId, RoutingOutcome};
 pub use profile::SlmProfile;
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};

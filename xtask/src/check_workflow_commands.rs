@@ -10,12 +10,14 @@ use walkdir::WalkDir;
 /// Extracts all valid xtask subcommand names defined in `xtask/src/main.rs`.
 pub fn extract_valid_subcommands(main_rs_content: &str) -> HashSet<String> {
     let mut valid_commands = HashSet::new();
-    let arm_regex = Regex::new(r#"^\s*"([a-z0-9_-]+)"\s*=>"#).expect("Valid regex");
+    let str_regex = Regex::new(r#""([a-z0-9_-]+)""#).expect("Valid regex");
 
     for line in main_rs_content.lines() {
-        if let Some(captures) = arm_regex.captures(line) {
-            if let Some(cmd) = captures.get(1) {
-                valid_commands.insert(cmd.as_str().to_string());
+        if let Some((patterns, _)) = line.split_once("=>") {
+            for caps in str_regex.captures_iter(patterns) {
+                if let Some(cmd) = caps.get(1) {
+                    valid_commands.insert(cmd.as_str().to_string());
+                }
             }
         }
     }
