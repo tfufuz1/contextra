@@ -459,12 +459,14 @@ pub fn start_orphan_cleanup_worker_with_config<
                         };
 
                         if is_on_cooldown {
-                            let remaining = cooldown.saturating_sub(last_rebuild_attempt.unwrap().elapsed());
-                            tracing::debug!(
-                                failures = failures,
-                                cooldown_remaining_ms = remaining.as_millis(),
-                                "HNSW index degraded but rebuild is on cooldown, skipping this tick"
-                            );
+                            if let Some(last_attempt) = last_rebuild_attempt {
+                                let remaining = cooldown.saturating_sub(last_attempt.elapsed());
+                                tracing::debug!(
+                                    failures = failures,
+                                    cooldown_remaining_ms = remaining.as_millis(),
+                                    "HNSW index degraded but rebuild is on cooldown, skipping this tick"
+                                );
+                            }
                         } else {
                             tracing::warn!(
                                 error = %err,

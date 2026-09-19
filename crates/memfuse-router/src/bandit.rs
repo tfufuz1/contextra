@@ -21,16 +21,10 @@ pub enum BanditError {
 /// (abhängig vom globalen Allocator), aber `repr(align(64))` richtet die Struct-Instanz selbst
 /// an einer 64-Byte-Grenze aus und der Heap-Buffer liefert bei `Vec::with_capacity` i. d. R.
 /// mindestens 16/32-Byte ausgerichtete Zeiger.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 #[repr(align(64))]
 pub struct AlignedF32Vec(pub Vec<f32>);
-
-impl Default for AlignedF32Vec {
-    fn default() -> Self {
-        Self(Vec::new())
-    }
-}
 
 impl std::ops::Deref for AlignedF32Vec {
     type Target = [f32];

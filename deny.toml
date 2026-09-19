@@ -29,6 +29,13 @@ confidence-threshold = 0.8
 multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
+deny = [
+    { name = "candle-core", wrappers = ["memfuse-candle"] },
+    { name = "ort", wrappers = ["memfuse-embed"] },
+    { name = "wasmtime", wrappers = ["memfuse-sandbox"] },
+    { name = "pyo3", wrappers = ["memfuse-py"] },
+    { name = "reqwest", wrappers = ["memfuse-ollama"] },
+]
 
 [sources]
 unknown-registry = "deny"
