@@ -277,11 +277,38 @@ pub(crate) struct GraphInner {
     pub(crate) edge_store: HashMap<EntityId, Vec<Edge>>,
 
     /// Hyperedge storage mapping HyperEdgeId -> HyperEdge.
-    pub(crate) hyperedges: HashMap<crate::hyperedge::HyperEdgeId, crate::hyperedge::HyperEdge>,
+    pub(crate) hyperedges: HashMap<crate::hyperedge::HyperEdgeId, Arc<crate::hyperedge::HyperEdge>>,
     /// Index mapping DocId -> Set of HyperEdgeIds.
     pub(crate) doc_to_hyperedges: ahash::AHashMap<DocId, HashSet<crate::hyperedge::HyperEdgeId>>,
     /// Index mapping EntityId -> Set of HyperEdgeIds.
     pub(crate) hyperedge_index: ahash::AHashMap<EntityId, HashSet<crate::hyperedge::HyperEdgeId>>,
+}
+
+/// Detailed memory estimate separating shared payloads from private structural allocations (§6.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MemoryEstimate {
+    /// Memory used by shared payloads (e.g. `Arc<HyperEdge>` / `Arc<[RoleBinding]>`).
+    pub shared_payload_bytes: usize,
+    /// Memory used by private internal graph structures (table capacities, vectors, indices).
+    pub private_bytes: usize,
+}
+
+impl MemoryEstimate {
+    /// Returns the total memory in bytes (`shared_payload_bytes + private_bytes`).
+    #[inline]
+    pub fn total_bytes(&self) -> usize {
+        self.shared_payload_bytes + self.private_bytes
+    }
+}
+
+#[inline]
+fn table_bytes<K, V>(capacity: usize) -> usize {
+    capacity * (std::mem::size_of::<(K, V)>() + 1)
+}
+
+#[inline]
+fn vec_bytes<T>(capacity: usize) -> usize {
+    capacity * std::mem::size_of::<T>()
 }
 
 #[inline]
@@ -367,45 +394,207 @@ impl GraphInner {
             .filter(|d| d.inner() != 0)
     }
 
+    pub(crate) fn estimate_memory(&self, presized: bool) -> MemoryEstimate {
+        let mut private = 0usize;
+
+        let id_map_cap = if presized {
+            self.id_map.len()
+        } else {
+            self.id_map.capacity()
+        };
+        private += table_bytes::<EntityId, usize>(id_map_cap);
+
+        let comm_cap = if presized {
+            self.communities.len()
+        } else {
+            self.communities.capacity()
+        };
+        private += table_bytes::<EntityId, u64>(comm_cap);
+
+        let staged_ent_cap = if presized {
+            self.staged_entities.len()
+        } else {
+            self.staged_entities.capacity()
+        };
+        private += table_bytes::<(TxId, EntityId), Entity>(staged_ent_cap);
+
+        let staged_edg_cap = if presized {
+            self.staged_edges.len()
+        } else {
+            self.staged_edges.capacity()
+        };
+        private += table_bytes::<(TxId, EntityId, EntityId), EdgePayload>(staged_edg_cap);
+
+        let staged_rem_cap = if presized {
+            self.staged_removals.len()
+        } else {
+            self.staged_removals.capacity()
+        };
+        private += table_bytes::<(TxId, EntityId, EntityId), ()>(staged_rem_cap);
+
+        let tombstone_cap = if presized {
+            self.tombstoned_edges.len()
+        } else {
+            self.tombstoned_edges.capacity()
+        };
+        private += table_bytes::<(EntityId, EntityId), ()>(tombstone_cap);
+
+        let rev_cap = if presized {
+            self.reverse_map.len()
+        } else {
+            self.reverse_map.capacity()
+        };
+        private += vec_bytes::<EntityId>(rev_cap);
+
+        let ent_cap = if presized {
+            self.entities.len()
+        } else {
+            self.entities.capacity()
+        };
+        private += vec_bytes::<Entity>(ent_cap);
+
+        let off_cap = if presized {
+            self.offsets.len()
+        } else {
+            self.offsets.capacity()
+        };
+        private += vec_bytes::<usize>(off_cap);
+
+        let tar_cap = if presized {
+            self.targets.len()
+        } else {
+            self.targets.capacity()
+        };
+        private += vec_bytes::<usize>(tar_cap);
+
+        let w_cap = if presized {
+            self.weights.len()
+        } else {
+            self.weights.capacity()
+        };
+        private += vec_bytes::<f32>(w_cap);
+
+        let tvf_cap = if presized {
+            self.tx_valid_froms.len()
+        } else {
+            self.tx_valid_froms.capacity()
+        };
+        private += vec_bytes::<TxId>(tvf_cap);
+
+        let tvt_cap = if presized {
+            self.tx_valid_tos.len()
+        } else {
+            self.tx_valid_tos.capacity()
+        };
+        private += vec_bytes::<TxId>(tvt_cap);
+
+        let bvf_cap = if presized {
+            self.business_valid_froms.len()
+        } else {
+            self.business_valid_froms.capacity()
+        };
+        private += vec_bytes::<i64>(bvf_cap);
+
+        let bvt_cap = if presized {
+            self.business_valid_tos.len()
+        } else {
+            self.business_valid_tos.capacity()
+        };
+        private += vec_bytes::<i64>(bvt_cap);
+
+        let doc_cap = if presized {
+            self.source_doc_ids.len()
+        } else {
+            self.source_doc_ids.capacity()
+        };
+        private += vec_bytes::<DocId>(doc_cap);
+
+        let ows_cap = if presized {
+            self.out_weight_sums.len()
+        } else {
+            self.out_weight_sums.capacity()
+        };
+        private += vec_bytes::<f32>(ows_cap);
+
+        let pending_map_cap = if presized {
+            self.pending_edges.len()
+        } else {
+            self.pending_edges.capacity()
+        };
+        private += table_bytes::<(EntityId, EntityId), Vec<EdgePayload>>(pending_map_cap);
+        for v in self.pending_edges.values() {
+            let v_cap = if presized { v.len() } else { v.capacity() };
+            private += vec_bytes::<EdgePayload>(v_cap);
+        }
+
+        let doc_edges_map_cap = if presized {
+            self.doc_to_edges.len()
+        } else {
+            self.doc_to_edges.capacity()
+        };
+        private += table_bytes::<DocId, HashSet<(EntityId, EntityId)>>(doc_edges_map_cap);
+        for set in self.doc_to_edges.values() {
+            let set_cap = if presized { set.len() } else { set.capacity() };
+            private += table_bytes::<(EntityId, EntityId), ()>(set_cap);
+        }
+
+        let hyperedges_map_cap = if presized {
+            self.hyperedges.len()
+        } else {
+            self.hyperedges.capacity()
+        };
+        private += table_bytes::<crate::hyperedge::HyperEdgeId, Arc<crate::hyperedge::HyperEdge>>(
+            hyperedges_map_cap,
+        );
+
+        let doc_hyperedges_map_cap = if presized {
+            self.doc_to_hyperedges.len()
+        } else {
+            self.doc_to_hyperedges.capacity()
+        };
+        private +=
+            table_bytes::<DocId, HashSet<crate::hyperedge::HyperEdgeId>>(doc_hyperedges_map_cap);
+        for set in self.doc_to_hyperedges.values() {
+            let set_cap = if presized { set.len() } else { set.capacity() };
+            private += table_bytes::<crate::hyperedge::HyperEdgeId, ()>(set_cap);
+        }
+
+        let hyperedge_index_map_cap = if presized {
+            self.hyperedge_index.len()
+        } else {
+            self.hyperedge_index.capacity()
+        };
+        private += table_bytes::<EntityId, HashSet<crate::hyperedge::HyperEdgeId>>(
+            hyperedge_index_map_cap,
+        );
+        for set in self.hyperedge_index.values() {
+            let set_cap = if presized { set.len() } else { set.capacity() };
+            private += table_bytes::<crate::hyperedge::HyperEdgeId, ()>(set_cap);
+        }
+
+        let shared_payload_bytes = self
+            .hyperedges
+            .values()
+            .map(|e| {
+                std::mem::size_of::<crate::hyperedge::HyperEdge>()
+                    + (e.participants.len() * std::mem::size_of::<crate::hyperedge::RoleBinding>())
+            })
+            .sum::<usize>();
+
+        MemoryEstimate {
+            shared_payload_bytes,
+            private_bytes: private,
+        }
+    }
+
     pub(crate) fn estimate_memory_bytes(&self) -> usize {
-        (self.reverse_map.len() * std::mem::size_of::<EntityId>())
-            + (self.entities.len() * std::mem::size_of::<Entity>())
-            + (self.offsets.len() * std::mem::size_of::<usize>())
-            + (self.targets.len() * std::mem::size_of::<usize>())
-            + (self.weights.len() * std::mem::size_of::<f32>())
-            + (self.tx_valid_froms.len() * std::mem::size_of::<TxId>())
-            + (self.tx_valid_tos.len() * std::mem::size_of::<TxId>())
-            + (self.business_valid_froms.len() * std::mem::size_of::<i64>())
-            + (self.business_valid_tos.len() * std::mem::size_of::<i64>())
-            + (self.source_doc_ids.len() * std::mem::size_of::<DocId>())
-            + (self.out_weight_sums.len() * std::mem::size_of::<f32>())
-            + (self.pending_edge_count * std::mem::size_of::<EdgePayload>())
-            + (self.hyperedges.len() * std::mem::size_of::<crate::hyperedge::HyperEdge>())
-            + self
-                .hyperedges
-                .values()
-                .map(|e| {
-                    e.participants.len() * std::mem::size_of::<crate::hyperedge::RoleBinding>()
-                })
-                .sum::<usize>()
-            + (self.hyperedge_index.len()
-                * (std::mem::size_of::<EntityId>()
-                    + std::mem::size_of::<HashSet<crate::hyperedge::HyperEdgeId>>()))
-            + (self
-                .hyperedge_index
-                .values()
-                .map(|v| v.len())
-                .sum::<usize>()
-                * std::mem::size_of::<crate::hyperedge::HyperEdgeId>())
-            + (self.doc_to_hyperedges.len()
-                * (std::mem::size_of::<DocId>()
-                    + std::mem::size_of::<HashSet<crate::hyperedge::HyperEdgeId>>()))
-            + (self
-                .doc_to_hyperedges
-                .values()
-                .map(|v| v.len())
-                .sum::<usize>()
-                * std::mem::size_of::<crate::hyperedge::HyperEdgeId>())
+        self.estimate_memory(false).total_bytes()
+    }
+
+    pub(crate) fn estimate_compaction_peak_bytes(&self) -> usize {
+        let current = self.estimate_memory(false);
+        let rebuild_private = self.estimate_memory(true).private_bytes;
+        current.total_bytes() + rebuild_private
     }
 
     #[expect(
@@ -425,13 +614,13 @@ impl GraphInner {
     )]
     pub(crate) fn insert_hyperedge(&mut self, edge: crate::hyperedge::HyperEdge) {
         let edge_id = edge.id;
-        for participant in &edge.participants {
+        for participant in edge.participants.iter() {
             self.hyperedge_index
                 .entry(participant.entity)
                 .or_default()
                 .insert(edge_id);
         }
-        self.hyperedges.insert(edge_id, edge);
+        self.hyperedges.insert(edge_id, Arc::new(edge));
     }
 
     fn get_or_create_index(&mut self, id: EntityId) -> InternalIndex {
@@ -820,6 +1009,8 @@ pub struct CsrGraph {
     consistency_enforcer: Option<RwLock<ConsistencyEnforcer>>,
     /// Rückverfolgung DocId -> betroffene Kanten, für Cascading-Invalidation (INV-GRAPH-PROV-1).
     pub doc_edge_index: crate::provenance::DocEdgeIndex,
+    /// In-memory FIFO cascade queue for hyperedges deferred during high fan-out invalidation (§6.6 / §6.8).
+    cascade_queue: Arc<Mutex<VecDeque<(DocId, crate::hyperedge::HyperEdgeId)>>>,
 }
 
 impl CsrGraph {
@@ -839,6 +1030,7 @@ impl CsrGraph {
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: None,
             doc_edge_index: crate::provenance::DocEdgeIndex::new(),
+            cascade_queue: Arc::new(Mutex::new(VecDeque::new())),
         }
     }
 
@@ -861,6 +1053,7 @@ impl CsrGraph {
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: None,
             doc_edge_index: crate::provenance::DocEdgeIndex::new(),
+            cascade_queue: Arc::new(Mutex::new(VecDeque::new())),
         }
     }
 
@@ -877,6 +1070,7 @@ impl CsrGraph {
                 suppression_threshold,
             ))),
             doc_edge_index: crate::provenance::DocEdgeIndex::new(),
+            cascade_queue: Arc::new(Mutex::new(VecDeque::new())),
         }
     }
 
@@ -918,6 +1112,80 @@ impl CsrGraph {
     /// Returns a reference to the optional persistent storage handle.
     pub fn storage(&self) -> Option<Arc<dyn StorageEngine>> {
         self.storage.clone()
+    }
+
+    /// Enqueues deferred hyperedges for background cascade invalidation.
+    pub fn enqueue_cascade_deferred(
+        &self,
+        doc_id: DocId,
+        hyperedge_ids: &[crate::hyperedge::HyperEdgeId],
+    ) {
+        let mut queue = self.cascade_queue.lock();
+        for &hid in hyperedge_ids {
+            queue.push_back((doc_id, hid));
+        }
+    }
+
+    /// Returns the number of hyperedges pending in the in-memory cascade queue.
+    pub fn pending_cascade_queue_len(&self) -> usize {
+        self.cascade_queue.lock().len()
+    }
+
+    /// Drains and processes up to `batch_size` deferred hyperedges from the cascade queue.
+    ///
+    /// Tombstones each hyperedge and removes its key from persistent storage if present.
+    pub async fn process_cascade_queue(&self, batch_size: usize, wal_tx: TxId) -> Result<usize> {
+        let mut items = Vec::new();
+        {
+            let mut queue = self.cascade_queue.lock();
+            let count = batch_size.min(queue.len());
+            for _ in 0..count {
+                if let Some(item) = queue.pop_front() {
+                    items.push(item);
+                }
+            }
+        }
+
+        if items.is_empty() {
+            return Ok(0);
+        }
+
+        let mut tombstoned_count = 0usize;
+        for (doc_id, hid) in items {
+            if self.tombstone_hyperedge(hid, wal_tx) {
+                tombstoned_count += 1;
+            }
+            if let Some(storage) = self.storage() {
+                let key = format!(
+                    "{}{:016x}:{:016x}",
+                    crate::cascade::CASCADE_QUEUE_PREFIX,
+                    doc_id.inner(),
+                    hid.inner()
+                );
+                let _ = storage.delete(wal_tx, key.as_bytes()).await;
+            }
+        }
+
+        Ok(tombstoned_count)
+    }
+
+    /// Returns a detailed memory estimate of the graph (§6.3).
+    pub fn estimate_memory(&self, presized: bool) -> MemoryEstimate {
+        let inner = self.inner_read();
+        (*inner).estimate_memory(presized)
+    }
+
+    /// Returns the estimated total memory usage of the graph in bytes based on allocation capacities (§6.3).
+    pub fn estimate_memory_bytes(&self) -> usize {
+        let inner = self.inner_read();
+        (*inner).estimate_memory_bytes()
+    }
+
+    /// Returns the estimated peak memory usage during compaction (§6.3),
+    /// combining residence total bytes with the private structural bytes of a presized rebuild.
+    pub fn estimate_compaction_peak_bytes(&self) -> usize {
+        let inner = self.inner_read();
+        (*inner).estimate_compaction_peak_bytes()
     }
 
     /// Returns the optional source document ID stored at the given edge index in `source_doc_ids`.
@@ -1016,23 +1284,24 @@ impl CsrGraph {
 
     /// Directly inserts a hyperedge into memory.
     pub fn insert_hyperedge_direct(&self, hyperedge: crate::hyperedge::HyperEdge) {
+        let hyperedge_arc = Arc::new(hyperedge);
         let mut inner = self.inner_write();
-        let hyperedge_id = hyperedge.id;
-        if let Some(doc_id) = hyperedge.source_doc_id {
+        let hyperedge_id = hyperedge_arc.id;
+        if let Some(doc_id) = hyperedge_arc.source_doc_id {
             inner
                 .doc_to_hyperedges
                 .entry(doc_id)
                 .or_default()
                 .insert(hyperedge_id);
         }
-        for participant in &hyperedge.participants {
+        for participant in hyperedge_arc.participants.iter() {
             inner
                 .hyperedge_index
                 .entry(participant.entity)
                 .or_default()
                 .insert(hyperedge_id);
         }
-        inner.hyperedges.insert(hyperedge_id, hyperedge);
+        inner.hyperedges.insert(hyperedge_id, hyperedge_arc);
     }
 
     /// Returns all non-tombstoned hyperedge IDs derived from `doc_id`.
@@ -1059,7 +1328,7 @@ impl CsrGraph {
     pub fn get_hyperedge(
         &self,
         id: crate::hyperedge::HyperEdgeId,
-    ) -> Option<crate::hyperedge::HyperEdge> {
+    ) -> Option<Arc<crate::hyperedge::HyperEdge>> {
         let inner = self.inner_read();
         inner
             .hyperedges
@@ -1099,18 +1368,21 @@ impl CsrGraph {
     pub fn tombstone_hyperedge(&self, id: crate::hyperedge::HyperEdgeId, wal_tx: TxId) -> bool {
         let mut inner = self.inner_write();
         let inner_ptr = &mut *inner;
-        let edge = match inner_ptr.hyperedges.get_mut(&id) {
+        let existing = match inner_ptr.hyperedges.get(&id) {
             Some(edge) => {
                 if edge.tx_valid_to.is_some() {
                     return false;
                 }
-                edge.tx_valid_to = Some(wal_tx);
-                edge
+                edge.clone()
             }
             None => return false,
         };
 
-        if let Some(doc_id) = edge.source_doc_id {
+        let mut updated = (*existing).clone();
+        updated.tx_valid_to = Some(wal_tx);
+        let updated_arc = Arc::new(updated);
+
+        if let Some(doc_id) = updated_arc.source_doc_id {
             if let Some(set) = inner_ptr.doc_to_hyperedges.get_mut(&doc_id) {
                 set.remove(&id);
                 if set.is_empty() {
@@ -1119,7 +1391,7 @@ impl CsrGraph {
             }
         }
 
-        for participant in &edge.participants {
+        for participant in updated_arc.participants.iter() {
             if let Some(set) = inner_ptr.hyperedge_index.get_mut(&participant.entity) {
                 set.remove(&id);
                 if set.is_empty() {
@@ -1127,6 +1399,8 @@ impl CsrGraph {
                 }
             }
         }
+
+        inner_ptr.hyperedges.insert(id, updated_arc);
 
         true
     }
@@ -2896,7 +3170,7 @@ impl crate::path_rag::PathGraph for CsrGraph {
     fn get_hyperedge(
         &self,
         id: crate::hyperedge::HyperEdgeId,
-    ) -> Option<crate::hyperedge::HyperEdge> {
+    ) -> Option<Arc<crate::hyperedge::HyperEdge>> {
         self.get_hyperedge(id)
     }
 }
@@ -2914,7 +3188,7 @@ impl crate::path_rag::PathGraph for &CsrGraph {
     fn get_hyperedge(
         &self,
         id: crate::hyperedge::HyperEdgeId,
-    ) -> Option<crate::hyperedge::HyperEdge> {
+    ) -> Option<Arc<crate::hyperedge::HyperEdge>> {
         (*self).get_hyperedge(id)
     }
 }
@@ -2932,7 +3206,7 @@ impl crate::path_rag::PathGraph for Arc<CsrGraph> {
     fn get_hyperedge(
         &self,
         id: crate::hyperedge::HyperEdgeId,
-    ) -> Option<crate::hyperedge::HyperEdge> {
+    ) -> Option<Arc<crate::hyperedge::HyperEdge>> {
         self.as_ref().get_hyperedge(id)
     }
 }
@@ -5464,7 +5738,7 @@ mod tests {
         graph.insert_hyperedge(edge.clone());
 
         let retrieved = graph.get_hyperedge(he_id);
-        assert_eq!(retrieved, Some(edge));
+        assert_eq!(retrieved.as_deref(), Some(&edge));
 
         let e1_hes = graph.hyperedges_for_entity(e1);
         assert_eq!(e1_hes, vec![he_id]);
@@ -5668,9 +5942,18 @@ mod tests {
         // Acquire snapshot via inner_read() and verify all 3 indices are atomically populated
         let snapshot = graph.inner_read();
         assert!(snapshot.hyperedges.contains_key(&he_id));
-        assert!(snapshot.doc_to_hyperedges.get(&doc_id).is_some_and(|set| set.contains(&he_id)));
-        assert!(snapshot.hyperedge_index.get(&e1).is_some_and(|set| set.contains(&he_id)));
-        assert!(snapshot.hyperedge_index.get(&e2).is_some_and(|set| set.contains(&he_id)));
+        assert!(snapshot
+            .doc_to_hyperedges
+            .get(&doc_id)
+            .is_some_and(|set| set.contains(&he_id)));
+        assert!(snapshot
+            .hyperedge_index
+            .get(&e1)
+            .is_some_and(|set| set.contains(&he_id)));
+        assert!(snapshot
+            .hyperedge_index
+            .get(&e2)
+            .is_some_and(|set| set.contains(&he_id)));
         drop(snapshot);
 
         // Atomically tombstone hyperedge

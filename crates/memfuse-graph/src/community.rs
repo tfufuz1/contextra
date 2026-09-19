@@ -57,7 +57,7 @@ impl VirtualHyperedgeNode {
 /// Inzidenzmatrix H vor, ohne zusätzlichen Speicher für die volle Expansion zu allozieren.
 pub struct StarExpansionIterator<'a> {
     _graph: &'a CsrGraph,
-    active_hyperedges: Vec<crate::hyperedge::HyperEdge>,
+    active_hyperedges: Vec<std::sync::Arc<crate::hyperedge::HyperEdge>>,
     current_hyperedge_idx: usize,
     current_participant_idx: usize,
 }
