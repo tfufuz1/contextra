@@ -3,12 +3,12 @@
 // ZWECK: Deterministic I/O error injector and Virtual File System test utility.
 // INVARIANTEN: Zero real data corruption, deterministic fault triggers based on operation count.
 
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 /// Configuration for fault injection.
 #[derive(Debug, Clone, Default)]
@@ -70,7 +70,10 @@ impl FaultVfs {
         let current = self.write_count.fetch_add(1, Ordering::SeqCst);
         if let Some(limit) = cfg.fail_writes_after {
             if current >= limit {
-                return Err(io::Error::new(ErrorKind::WriteZero, "Simulated disk write failure"));
+                return Err(io::Error::new(
+                    ErrorKind::WriteZero,
+                    "Simulated disk write failure",
+                ));
             }
         }
         Ok(())
@@ -88,7 +91,10 @@ impl FaultVfs {
         let current = self.read_count.fetch_add(1, Ordering::SeqCst);
         if let Some(limit) = cfg.fail_reads_after {
             if current >= limit {
-                return Err(io::Error::new(ErrorKind::UnexpectedEof, "Simulated disk read failure"));
+                return Err(io::Error::new(
+                    ErrorKind::UnexpectedEof,
+                    "Simulated disk read failure",
+                ));
             }
         }
         Ok(())
@@ -146,6 +152,7 @@ impl FaultVfs {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

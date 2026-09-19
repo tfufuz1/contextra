@@ -117,12 +117,21 @@
       "expires_at": "2026-09-19T21:37:18.891970920+00:00"
     },
     {
-      "krate": "xtask",
+      "krate": "memfuse-testkit",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-19T20:50:21.971072381+00:00",
-      "session_id": "8841400263463833571",
+      "timestamp": "2026-09-19T20:49:45.286227940+00:00",
+      "session_id": "7926726196791221600",
+      "active": false,
+      "expires_at": "2026-09-20T00:49:45.286217501+00:00",
+      "released_at": "2026-09-19T20:59:40.807300318+00:00 [RELEASED]"
+    },
+    {
+      "krate": "memfuse-testkit",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-19T20:59:56.190922094+00:00",
+      "session_id": "7926726196791221600",
       "active": true,
-      "expires_at": "2026-09-20T00:50:21.971061216+00:00"
+      "expires_at": "2026-09-20T00:59:56.190912160+00:00"
     }
   ]
 }
