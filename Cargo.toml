@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/memfuse-wire",
     "crates/memfuse-sys",
     "crates/memfuse-core-ipc-gen",
     "crates/memfuse-simd",
