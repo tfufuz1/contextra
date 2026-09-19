@@ -80,6 +80,8 @@ mod check_unsafe_islands;
 mod check_type_registry;
 mod check_vetoes;
 mod check_workflow_commands;
+mod check_layering;
+mod check_unsafe_islands;
 mod claim;
 mod gen_prompter_data;
 mod generate_adr;
@@ -1875,6 +1877,25 @@ pub fn scan_unwrap_expect_occurrences_at(root: &Path) -> Vec<UnwrapOccurrence> {
     occurrences
 }
 
+<<<<<<< HEAD
+=======
+pub fn run_update_unwrap_baseline_at(_root: &Path) -> bool {
+    println!("ℹ️ unwrap-baseline retired per GESAMTSPEZIFIKATION §0.4 (enforced by clippy workspace lints)");
+    true
+}
+
+pub fn run_update_unwrap_baseline() -> bool {
+    true
+}
+
+pub fn run_check_unwrap_baseline_at(_root: &Path) -> bool {
+    true
+}
+
+pub fn run_check_unwrap_baseline() -> bool {
+    true
+}
+>>>>>>> 54333148 (Shell-Commit)
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DagViolation {
@@ -2052,6 +2073,7 @@ fn main() {
                 process::exit(1);
             }
         }
+<<<<<<< HEAD
         "check-unsafe-islands" => {
             let strict = args.iter().any(|arg| arg == "--strict");
             match check_unsafe_islands::run_check_unsafe_islands(strict) {
@@ -2076,11 +2098,51 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("❌ check-ring-layering failed: {}", e);
+=======
+        "check-unwrap-ratchet" => {
+            println!("✅ unwrap-ratchet retired per GESAMTSPEZIFIKATION §0.4 (enforced by clippy workspace lints)");
+        }
+        "check-layering" => {
+            let root = find_root_dir();
+            let warn_only = !args.iter().any(|arg| arg == "--strict");
+            if !check_layering::run_check_layering(&root, warn_only) {
+                process::exit(1);
+            }
+        }
+        "check-unsafe-islands" => {
+            let root = find_root_dir();
+            if !check_unsafe_islands::run_check_unsafe_islands(&root) {
+                process::exit(1);
+            }
+        }
+        "check-module-reachability" => {
+            let root = find_root_dir();
+            match check_orphan_modules::run_check_orphan_modules(&root) {
+                Ok(orphans) => {
+                    if !orphans.is_empty() {
+                        eprintln!(
+                            "❌ check-module-reachability failed: {} Waisendatei(en) (ohne mod-Deklaration) gefunden:",
+                            orphans.len()
+                        );
+                        for o in &orphans {
+                            eprintln!("   - {}", o);
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ check-module-reachability: keine Waisendateien gefunden");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-module-reachability failed: {}", e);
+>>>>>>> 54333148 (Shell-Commit)
                     process::exit(1);
                 }
             }
         }
+<<<<<<< HEAD
         "check-module-reachability" | "check-orphan-modules" => {
+=======
+        "check-orphan-modules" => {
+>>>>>>> 54333148 (Shell-Commit)
             let root = find_root_dir();
             match check_module_reachability::run_check_module_reachability(&root) {
                 Ok(res) => {
@@ -2171,6 +2233,12 @@ fn main() {
                 process::exit(1);
             }
         }
+<<<<<<< HEAD
+=======
+        "check-unwrap-baseline-trend" => {
+            println!("✅ unwrap-baseline-trend retired per GESAMTSPEZIFIKATION §0.4 (enforced by clippy workspace lints)");
+        }
+>>>>>>> 54333148 (Shell-Commit)
         "check-audit-duplication" => {
             if let Err(e) = check_audit_duplication::run_check_audit_duplication(0.85) {
                 eprintln!("❌ check-audit-duplication failed: {}", e);
@@ -2308,6 +2376,18 @@ fn main() {
                 process::exit(1);
             }
         }
+<<<<<<< HEAD
+=======
+        "update-unwrap-baseline" => {
+            let success = run_update_unwrap_baseline();
+            if !success {
+                process::exit(1);
+            }
+        }
+        "check-unwrap-baseline" => {
+            println!("✅ unwrap-baseline retired per GESAMTSPEZIFIKATION §0.4 (enforced by clippy workspace lints)");
+        }
+>>>>>>> 54333148 (Shell-Commit)
         "check-dag" => {
             if !run_check_dag() {
                 process::exit(1);
@@ -2583,7 +2663,11 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
+<<<<<<< HEAD
             eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+=======
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, update-unwrap-baseline, check-unwrap-baseline, check-unwrap-ratchet, check-unwrap-baseline-trend, check-layering, check-unsafe-islands, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+>>>>>>> 54333148 (Shell-Commit)
             process::exit(1);
         }
     }
@@ -3382,6 +3466,10 @@ description = "Core crate"
         assert_eq!(res[0].id, Some("AGT-STORE-111"));
     }
 
+<<<<<<< HEAD
+=======
+        // Unwrap ratchet tests retired per GESAMTSPEZIFIKATION §0.4
+>>>>>>> 54333148 (Shell-Commit)
 
     #[test]
     fn test_check_dag_layer_violations_no_violations() {

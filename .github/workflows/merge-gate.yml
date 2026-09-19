@@ -88,15 +88,29 @@ jobs:
       - name: Bandit Latency Budget Gate
         # Prüft dass LinUCB-Diagonal-Approximation das Latenzbudget (P95 ≤ 1ms) einhält.
         # Verhindert versehentliche O(d³)-Implementierungen im Hot-Path (§9.1, §13.2).
-        run: cargo run -p xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
+        run: cargo xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
         # Feature-Flag nötig da check_bandit_latency_budget memfuse_router::BanditProfileState nutzt.
 
       - name: FlatBuffers Schema Drift Gate
         run: cargo xtask check-fbs-drift
 
+<<<<<<< HEAD
       - name: Loom Concurrency Tests
         run: |
           for crate in $(git grep -rl 'cfg(loom)' crates/ | cut -d/ -f2 | sort -u); do
             echo "Running Loom tests for $crate..."
             RUSTFLAGS="--cfg loom" cargo test -p "$crate" --release --locked
           done
+=======
+      - name: Ring Layering Gate (Phase 0R Warnmodus)
+        run: cargo xtask check-layering
+
+      - name: Unsafe Islands Inventory Gate
+        run: cargo xtask check-unsafe-islands
+
+      - name: Module Reachability Gate (GOV-D)
+        run: cargo xtask check-module-reachability
+
+      - name: Loom Concurrency Tests (LSM / WAL)
+        run: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
+>>>>>>> 54333148 (Shell-Commit)

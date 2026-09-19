@@ -29,6 +29,7 @@ highlight = "all"
 # tokio ban rule is omitted from deny.toml because the direct dependency list (>15 entries, including hyper, tower, etc.)
 # is overly complex/brittle. Ring-0 tokio-freedom is enforced via `cargo tree` assertions and `check-ring-layering`.
 deny = [
+<<<<<<< HEAD
     # §4.2 Ring-Modell: Candle-Inferenz nur in memfuse-candle (TRANSITION; künftig memfuse-infer-candle) sowie Candle-Eigencrates
     # "memfuse-infer-candle",  # ab Phase 4
     { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "memfuse-candle"] },
@@ -42,6 +43,13 @@ deny = [
     # §4.2 Ring-Modell: Wasmtime-Sandbox nur in memfuse-sandbox
     # "memfuse-sandbox",  # ab Phase 4: memfuse-sandbox
     { crate = "wasmtime", wrappers = ["memfuse-sandbox"] },
+=======
+    { name = "candle-core", wrappers = ["memfuse-candle", "memfuse-infer-candle"] },
+    { name = "ort", wrappers = ["memfuse-embed", "memfuse-infer-onnx"] },
+    { name = "wasmtime", wrappers = ["memfuse-sandbox", "memfuse-privacy"] },
+    { name = "pyo3", wrappers = ["memfuse-py"] },
+    { name = "reqwest", wrappers = ["memfuse-ollama", "memfuse-infer-ollama"] },
+>>>>>>> 54333148 (Shell-Commit)
 ]
 
 [sources]
