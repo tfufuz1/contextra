@@ -54,12 +54,17 @@ impl AlignedF32Vec {
 /// LinUCB-Implementierungsvariante (§13.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum BanditImplementation {
-    /// Diagonal-Approximation O(d): kein BLAS, Default.
+    /// Sherman-Morrison O(d²): Produktions-Default.
     #[default]
-    DiagonalApproximation,
-    /// Sherman-Morrison O(d²): opt-in via Feature `egress-sherman-morrison`.
-    #[cfg(feature = "egress-sherman-morrison")]
     ShermanMorrison,
+    /// Diagonal-Approximation O(d): Opt-in-Variante.
+    DiagonalApproximation,
+}
+
+/// Trait für Bandit-Routing Policies mit Konzeptdrift-Anpassung (§5.2.3).
+pub trait BanditPolicy: Send + Sync {
+    /// Wendet Drift-Penalty / Covariance Discounting bei erkannter concept drift an.
+    fn apply_drift_penalty(&mut self, k_drift: f32, alpha_max: f32, gamma: f32);
 }
 
 fn default_gamma() -> f32 {
@@ -82,12 +87,94 @@ fn default_alpha_max_multiplier() -> f32 {
     4.0
 }
 
+/// Berechnet das Skalarprodukt zweier f32-Slices mit 8-facher Unrolling-Schleife für autovektorisierte SIMD-Kompilierung.
+///
+/// Hinweissystem (§5.2.2): Sobald `memfuse-simd` Matrix-Vektor Kernel anbietet, kann dieser Helper durch Re-Export
+/// aus `memfuse-simd` abgelöst werden.
+#[inline(always)]
+fn dot_product_f32(a: &[f32], b: &[f32]) -> f32 {
+    let len = a.len().min(b.len());
+    let mut sum0 = 0.0f32;
+    let mut sum1 = 0.0f32;
+    let mut sum2 = 0.0f32;
+    let mut sum3 = 0.0f32;
+
+    let mut i = 0;
+    while i + 16 <= len {
+        sum0 += a[i] * b[i];
+        sum1 += a[i + 1] * b[i + 1];
+        sum2 += a[i + 2] * b[i + 2];
+        sum3 += a[i + 3] * b[i + 3];
+
+        sum0 += a[i + 4] * b[i + 4];
+        sum1 += a[i + 5] * b[i + 5];
+        sum2 += a[i + 6] * b[i + 6];
+        sum3 += a[i + 7] * b[i + 7];
+
+        sum0 += a[i + 8] * b[i + 8];
+        sum1 += a[i + 9] * b[i + 9];
+        sum2 += a[i + 10] * b[i + 10];
+        sum3 += a[i + 11] * b[i + 11];
+
+        sum0 += a[i + 12] * b[i + 12];
+        sum1 += a[i + 13] * b[i + 13];
+        sum2 += a[i + 14] * b[i + 14];
+        sum3 += a[i + 15] * b[i + 15];
+
+        i += 16;
+    }
+    while i + 4 <= len {
+        sum0 += a[i] * b[i];
+        sum1 += a[i + 1] * b[i + 1];
+        sum2 += a[i + 2] * b[i + 2];
+        sum3 += a[i + 3] * b[i + 3];
+        i += 4;
+    }
+    while i < len {
+        sum0 += a[i] * b[i];
+        i += 1;
+    }
+    (sum0 + sum1) + (sum2 + sum3)
+}
+
+/// Fused-Row-Update für die Sherman-Morrison Matrixinversion (§5.2.2).
+/// `row[j] = scale_row * row[j] - scale_v * v[j]`
+/// Nutzt 16-faches Unrolling zur autovektorisierten SIMD-Kompilierung.
+#[inline(always)]
+fn fused_row_update(row: &mut [f32], v: &[f32], scale_row: f32, scale_v: f32) {
+    let len = row.len().min(v.len());
+    let mut i = 0;
+    while i + 16 <= len {
+        row[i] = scale_row * row[i] - scale_v * v[i];
+        row[i + 1] = scale_row * row[i + 1] - scale_v * v[i + 1];
+        row[i + 2] = scale_row * row[i + 2] - scale_v * v[i + 2];
+        row[i + 3] = scale_row * row[i + 3] - scale_v * v[i + 3];
+        row[i + 4] = scale_row * row[i + 4] - scale_v * v[i + 4];
+        row[i + 5] = scale_row * row[i + 5] - scale_v * v[i + 5];
+        row[i + 6] = scale_row * row[i + 6] - scale_v * v[i + 6];
+        row[i + 7] = scale_row * row[i + 7] - scale_v * v[i + 7];
+        row[i + 8] = scale_row * row[i + 8] - scale_v * v[i + 8];
+        row[i + 9] = scale_row * row[i + 9] - scale_v * v[i + 9];
+        row[i + 10] = scale_row * row[i + 10] - scale_v * v[i + 10];
+        row[i + 11] = scale_row * row[i + 11] - scale_v * v[i + 11];
+        row[i + 12] = scale_row * row[i + 12] - scale_v * v[i + 12];
+        row[i + 13] = scale_row * row[i + 13] - scale_v * v[i + 13];
+        row[i + 14] = scale_row * row[i + 14] - scale_v * v[i + 14];
+        row[i + 15] = scale_row * row[i + 15] - scale_v * v[i + 15];
+        i += 16;
+    }
+    while i < len {
+        row[i] = scale_row * row[i] - scale_v * v[i];
+        i += 1;
+    }
+}
+
 /// Laufzeitzustand eines LinUCB-Bandits pro Profil.
 ///
 /// # Formeln (§13.2)
 /// Score: r̂_p(x) = θ_pᵀ x + α_p √(Σ_p(x)) - λ·c_p - μ·1[transport=HttpCloud]
 /// Reward: r_adj = r_outcome - λ·c_p - μ·1[transport=HttpCloud]
-/// Update (Discounted-Diagonal, Garivier & Moulines 2011):
+/// Update (Discounted-Diagonal / Sherman-Morrison, Garivier & Moulines 2011):
 ///   σ²_p[i] ← max(γ · σ²_p[i], 1.0)
 ///   θ_p[i] += r_adj · x[i] / σ²_p[i]
 ///   σ²_p[i] += x[i]²
@@ -133,8 +220,25 @@ pub struct BanditProfileState {
     /// Dauer des Post-Drift Decay-Fensters in Update-Schritten (Default: 50).
     #[serde(default = "default_drift_decay_window")]
     pub drift_decay_window: usize,
-    /// Implementierungsvariante.
+    /// Implementierungsvariante (Default: ShermanMorrison).
     pub implementation: BanditImplementation,
+}
+
+impl BanditPolicy for BanditProfileState {
+    fn apply_drift_penalty(&mut self, k_drift: f32, alpha_max: f32, gamma: f32) {
+        self.alpha = (self.alpha * k_drift).min(self.alpha_base * alpha_max);
+        self.drift_steps_remaining = self.drift_decay_window;
+
+        // Immediate Covariance Discounting (§5.2.3):
+        // $A \leftarrow \gamma A \implies A^{-1} \leftarrow \gamma^{-1} A^{-1}$
+        let gamma_inv = 1.0 / gamma.clamp(0.01, 1.0);
+        for val in self.inv_a.iter_mut() {
+            *val *= gamma_inv;
+        }
+        for val in self.sigma_sq.iter_mut() {
+            *val = (*val * gamma).max(1.0);
+        }
+    }
 }
 
 impl BanditProfileState {
@@ -202,7 +306,7 @@ impl BanditProfileState {
             });
         }
 
-        let dot: f32 = self.theta.iter().zip(x.iter()).map(|(t, xi)| t * xi).sum();
+        let dot: f32 = dot_product_f32(&self.theta, x);
 
         let variance_term = match self.implementation {
             BanditImplementation::DiagonalApproximation => self
@@ -212,7 +316,6 @@ impl BanditProfileState {
                 .map(|(s, xi)| xi * xi / s.max(1e-8))
                 .sum::<f32>()
                 .sqrt(),
-            #[cfg(feature = "egress-sherman-morrison")]
             BanditImplementation::ShermanMorrison => {
                 let d = self.theta.len();
                 if self.inv_a.len() == d * d {
@@ -221,8 +324,7 @@ impl BanditProfileState {
                         .chunks_exact(d)
                         .zip(x.iter())
                         .map(|(row, &xi)| {
-                            let row_dot: f32 =
-                                row.iter().zip(x.iter()).map(|(&a, &xj)| a * xj).sum();
+                            let row_dot: f32 = dot_product_f32(row, x);
                             xi * row_dot
                         })
                         .sum();
@@ -279,7 +381,6 @@ impl BanditProfileState {
                     self.sigma_sq[i] += xi * xi;
                 }
             }
-            #[cfg(feature = "egress-sherman-morrison")]
             BanditImplementation::ShermanMorrison => {
                 let d = self.theta.len();
                 self.ensure_inv_a();
@@ -287,10 +388,10 @@ impl BanditProfileState {
 
                 let gamma_inv = 1.0 / effective_gamma.max(1e-5);
 
-                // 1. Berechne v_disc = γ⁻¹ A⁻¹ x in work_buf und xᵀ v_disc
+                // 1. Berechne v_disc = γ⁻¹ A⁻¹ x in work_buf und xᵀ v_disc (SIMD dot_product_f32)
                 let mut xt_v_disc = 0.0f32;
                 for (i, row) in self.inv_a.chunks_exact(d).enumerate() {
-                    let row_dot: f32 = row.iter().zip(x.iter()).map(|(&a, &xj)| a * xj).sum();
+                    let row_dot = dot_product_f32(row, x);
                     let v_disc_i = gamma_inv * row_dot;
                     self.work_buf[i] = v_disc_i;
                     xt_v_disc += x[i] * v_disc_i;
@@ -301,23 +402,16 @@ impl BanditProfileState {
                 let denom_safe = denominator.max(1e-8);
 
                 // 3. Parameter Residual: r_adj - θᵀ x
-                let pred_theta_x: f32 = self
-                    .theta
-                    .iter()
-                    .zip(x.iter())
-                    .map(|(&t, &xi)| t * xi)
-                    .sum();
+                let pred_theta_x = dot_product_f32(&self.theta, x);
                 let residual = r_adj - pred_theta_x;
 
-                // 4. Matrix-Update: A_new⁻¹ = γ⁻¹ A_old⁻¹ - k (v_disc)ᵀ
+                // 4. Matrix-Update: A_new⁻¹ = γ⁻¹ A_old⁻¹ - k (v_disc)ᵀ (fused_row_update)
                 // Parameter-Update: θ_new = θ_old + (r_adj - θ_oldᵀ x) * k
                 let work_slice = &self.work_buf[..d];
                 for (i, row) in self.inv_a.chunks_exact_mut(d).enumerate() {
                     let k_i = work_slice[i] / denom_safe;
 
-                    for (row_j, &v_j) in row.iter_mut().zip(work_slice.iter()) {
-                        *row_j = gamma_inv * *row_j - k_i * v_j;
-                    }
+                    fused_row_update(row, work_slice, gamma_inv, k_i);
 
                     self.theta[i] += residual * k_i;
                     self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0) + x[i] * x[i];
@@ -328,13 +422,12 @@ impl BanditProfileState {
         Ok(())
     }
 
-    /// Drift-Kopplung: Erhöhe α temporär und aktiviere beschleunigten Decay bei erkannter Drift (§13.2).
+    /// Drift-Kopplung: Erhöhe α temporär und aktiviere beschleunigten Decay bei erkannter Drift (§13.2, §5.2.3).
     ///
     /// α_p ← min(α_p · k_drift, α_base · alpha_max_multiplier)
     /// drift_steps_remaining ← drift_decay_window (Default: 50)
     pub fn on_drift_detected(&mut self, k_drift: f32) {
-        self.alpha = (self.alpha * k_drift).min(self.alpha_base * self.alpha_max_multiplier);
-        self.drift_steps_remaining = self.drift_decay_window;
+        self.apply_drift_penalty(k_drift, self.alpha_max_multiplier, self.drift_gamma);
     }
 }
 
@@ -343,7 +436,30 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(feature = "egress-sherman-morrison")]
+    fn test_default_implementation_is_sherman_morrison() {
+        assert_eq!(
+            BanditImplementation::default(),
+            BanditImplementation::ShermanMorrison
+        );
+        let state = BanditProfileState::cold_start(4, 0.5);
+        assert_eq!(state.implementation, BanditImplementation::ShermanMorrison);
+    }
+
+    #[test]
+    fn test_bandit_policy_drift_penalty() {
+        let mut state = BanditProfileState::cold_start(2, 0.5);
+        let alpha_before = state.alpha;
+        let inv_a_0_before = state.inv_a[0];
+
+        state.apply_drift_penalty(2.0, 4.0, 0.95);
+
+        assert!((state.alpha - alpha_before * 2.0).abs() < 1e-6);
+        assert_eq!(state.drift_steps_remaining, state.drift_decay_window);
+        // A^{-1} scaled by 1/0.95 > 1
+        assert!(state.inv_a[0] > inv_a_0_before);
+    }
+
+    #[test]
     fn test_sherman_morrison_score_and_update() {
         let mut state = BanditProfileState::cold_start(4, 0.5);
         state.implementation = BanditImplementation::ShermanMorrison;
@@ -360,7 +476,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "egress-sherman-morrison")]
     fn test_sherman_morrison_correctness_and_precision() {
         let d = 8;
         let mut state = BanditProfileState::cold_start(d, 0.5);
@@ -403,7 +518,6 @@ mod tests {
 
     #[test]
     #[ignore]
-    #[cfg(feature = "egress-sherman-morrison")]
     fn bench_sherman_morrison_p95_latency() {
         use std::time::Instant;
 

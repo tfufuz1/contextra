@@ -2624,7 +2624,7 @@ mod tests {
         let current_state = router.state.load_full();
         let mut new_state = (*current_state).clone();
         if let Some(watcher) = new_state.lyapunov_watchers.get_mut("drift-slm") {
-            for _ in 0..10 {
+            for _ in 0..20 {
                 watcher.observe_score(0.95);
             }
         }

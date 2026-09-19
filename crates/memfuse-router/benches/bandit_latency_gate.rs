@@ -17,7 +17,24 @@ fn bench_bandit_latency_gate(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("bandit_latency_gate");
 
-    // 1. Benchmark Diagonal-Approximation O(d)
+    // 1. Benchmark Sherman-Morrison O(d²) — Produktions-Default
+    group.bench_function("sherman_morrison_d768", |b| {
+        let mut state = BanditProfileState::cold_start(FEATURE_DIM, 0.5);
+        state.implementation = BanditImplementation::ShermanMorrison;
+
+        b.iter(|| {
+            let score = state.score(black_box(&x), black_box(cost), black_box(is_cloud));
+            let _ = state.update(
+                black_box(&x),
+                black_box(reward),
+                black_box(cost),
+                black_box(is_cloud),
+            );
+            black_box(score)
+        });
+    });
+
+    // 2. Benchmark Diagonal-Approximation O(d) — Opt-in
     group.bench_function("diagonal_approximation_d768", |b| {
         let mut state = BanditProfileState::cold_start(FEATURE_DIM, 0.5);
         state.implementation = BanditImplementation::DiagonalApproximation;
@@ -33,26 +50,6 @@ fn bench_bandit_latency_gate(c: &mut Criterion) {
             black_box(score)
         });
     });
-
-    // 2. Benchmark Sherman-Morrison O(d²) — opt-in via Feature egress-sherman-morrison
-    #[cfg(feature = "egress-sherman-morrison")]
-    {
-        group.bench_function("sherman_morrison_d768", |b| {
-            let mut state = BanditProfileState::cold_start(FEATURE_DIM, 0.5);
-            state.implementation = BanditImplementation::ShermanMorrison;
-
-            b.iter(|| {
-                let score = state.score(black_box(&x), black_box(cost), black_box(is_cloud));
-                let _ = state.update(
-                    black_box(&x),
-                    black_box(reward),
-                    black_box(cost),
-                    black_box(is_cloud),
-                );
-                black_box(score)
-            });
-        });
-    }
 
     group.finish();
 }
