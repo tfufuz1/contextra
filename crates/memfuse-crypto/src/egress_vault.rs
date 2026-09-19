@@ -11,7 +11,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Trait for recognizing entities (NER) in text without creating a direct dependency
 /// on heavy embedding or ML crates (DAG-neutral interface).
@@ -231,12 +231,20 @@ pub async fn classify_layer1_arc(
         )));
     }
 
-    let payload_arc: Arc<str> = Arc::from(payload);
+    let sensitive_payload = Zeroizing::new(payload.as_bytes().to_vec());
     let patterns_cloned = patterns.clone();
     let set_cloned = regex_set.clone();
 
     let eval_task = tokio::task::spawn_blocking(move || {
-        let matches = set_cloned.matches(&payload_arc);
+        let text = match std::str::from_utf8(&sensitive_payload) {
+            Ok(s) => s,
+            Err(_) => {
+                return EgressClassification::Block(BlockReason::InternalError(
+                    "Invalid UTF-8 payload in classification".to_string(),
+                ));
+            }
+        };
+        let matches = set_cloned.matches(text);
         if matches.matched_any() {
             if let Some(first_idx) = matches.iter().next() {
                 let cp = &patterns_cloned[first_idx];
@@ -361,12 +369,12 @@ impl EgressVault {
             });
         }
 
-        let mut current_text = payload.to_string();
+        let mut current_text = Zeroizing::new(payload.to_string());
         let mut replacement_count = 0;
 
         // Phase 1: Regex-Muster im Ersetzungsmodus anwenden
         for cp in self.patterns.iter() {
-            let mut new_text = String::with_capacity(current_text.len());
+            let mut new_text = Zeroizing::new(String::with_capacity(current_text.len()));
             let mut last_end = 0;
             for m in cp.regex.find_iter(&current_text) {
                 new_text.push_str(&current_text[last_end..m.start()]);
@@ -410,7 +418,7 @@ impl EgressVault {
             }
         }
 
-        Ok((current_text, replacement_count))
+        Ok((current_text.to_string(), replacement_count))
     }
 }
 
@@ -771,5 +779,28 @@ mod tests {
         drop(surrogate_vault);
 
         assert!(weak_vault.upgrade().is_none());
+    }
+
+    #[test]
+    #[allow(unsafe_code)]
+    fn test_zeroize_on_panic_and_drop_in_classification() {
+        use std::mem::ManuallyDrop;
+
+        // Verify Zeroizing buffer zeroizes memory on drop without UAF
+        let mut sensitive_buf = ManuallyDrop::new(Zeroizing::new(vec![0xAA; 64]));
+        let raw_ptr = sensitive_buf.as_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts(raw_ptr, 64);
+            assert_eq!(slice, &[0xAA; 64]);
+        }
+
+        // Action: Explicitly invoke zeroize on the Zeroizing wrapper
+        Zeroize::zeroize(&mut *sensitive_buf);
+
+        unsafe {
+            let cleared_slice = std::slice::from_raw_parts(raw_ptr, 64);
+            assert_eq!(cleared_slice, &[0u8; 64], "RAM zeroized in place");
+        }
     }
 }

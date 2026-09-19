@@ -2,6 +2,8 @@
 // ZWECK: Property-based Tests für KvSegment, TenantIsolatedKvStore und LRU-Eviction.
 // STAND: TS:2026-09-09T13:17:00Z (SESSION: a413a598)
 
+#![allow(unsafe_code)]
+
 use memfuse_core::TenantId;
 use memfuse_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use proptest::prelude::*;
