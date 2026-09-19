@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/memfuse-sys",
     "crates/memfuse-core-ipc-gen",
+    "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
     "crates/memfuse-index",
@@ -25,6 +26,7 @@ members = [
 ]
 default-members = [
     "crates/memfuse-core-ipc-gen",
+    "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
     "crates/memfuse-index",
