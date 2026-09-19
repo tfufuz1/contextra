@@ -17,12 +17,7 @@
 // REVIEW-PASS[1/2] Systematischer Tiefen-Audit von memfuse-store (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-13T01:33:57Z) (SESSION: 60ca322c)
 // MODUL-HIERARCHIE: lsm.rs orchestriert, memtable/wal/sstable sind Bausteine.
 
-// INTENT: deny unsafe_code except Windows Win32 API calls for file permissions
-// BEGRÜNDUNG: Sovereign Core Doctrine mandates zero unsafe outside `memfuse-index`,
-// except Windows ACL security programming (`SetNamedSecurityInfoW`, etc.).
-#![deny(unsafe_code)]
-#![allow(unsafe_code)]
-#![allow(unsafe_op_in_unsafe_fn)]
+#![forbid(unsafe_code)]
 #![allow(unexpected_cfgs)]
 
 #[cfg(not(loom))]

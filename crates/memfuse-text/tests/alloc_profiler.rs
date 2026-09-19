@@ -44,7 +44,9 @@ unsafe impl GlobalAlloc for CountingAllocator {
         DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
         // SAFETY: `ptr` and `layout` are guaranteed valid by caller of `GlobalAlloc::dealloc`, forwarded directly to `System.dealloc`.
         #[allow(unsafe_code)]
-        unsafe { System.dealloc(ptr, layout) }; // SAFETY: Forward ptr and layout to System allocator.
+        unsafe {
+            System.dealloc(ptr, layout)
+        }; // SAFETY: Forward ptr and layout to System allocator.
     }
 }
 

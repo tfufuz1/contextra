@@ -1,0 +1,25 @@
+[lints]
+workspace = true
+
+[package]
+name = "memfuse-sys"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Low-level unsafe system abstractions and FFI island for MemFuse (Ring 0)"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Threading",
+] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dependencies]
+memmap2 = { workspace = true }
+tracing = { workspace = true }
