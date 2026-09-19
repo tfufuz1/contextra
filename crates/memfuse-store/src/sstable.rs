@@ -2660,6 +2660,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_block_cache_byte_capacity_eviction_threshold() {
+        // Set per-shard capacity to 20 bytes
+        let cache = Arc::new(BlockCache::new(20));
+        let file_id = 100u64;
+
+        // Find offsets mapping to shard 0
+        let mut offsets = Vec::new();
+        let mut cand = 0u64;
+        while offsets.len() < 2 {
+            if cache.shard_idx(file_id, cand) == 0 {
+                offsets.push(cand);
+            }
+            cand += 1;
+        }
+
+        let block1 = Bytes::from(vec![0u8; 15]); // 15 bytes
+        let block2 = Bytes::from(vec![1u8; 10]); // 10 bytes (total 25 > 20 capacity_bytes)
+
+        cache.insert(file_id, offsets[0], block1);
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains(file_id, offsets[0]));
+
+        // Insert block2, causing total bytes (25) to exceed shard capacity (20) -> evicts block1
+        cache.insert(file_id, offsets[1], block2);
+        assert_eq!(cache.len(), 1);
+        assert!(!cache.contains(file_id, offsets[0]), "block1 must be evicted due to byte capacity limit");
+        assert!(cache.contains(file_id, offsets[1]));
+    }
+
+    #[tokio::test]
     async fn test_sstable_builder_duplicate_keys_coexist() {
         let tmp = TempDir::new().expect("temp dir"); // expect #[cfg(test)]
         let path = tmp.path().join("duplicate_keys.sst");
