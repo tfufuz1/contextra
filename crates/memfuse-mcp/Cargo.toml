@@ -19,6 +19,7 @@ docid-128 = ["memfuse-core/docid-128"]
 memfuse-db = { workspace = true }
 memfuse-core = { workspace = true }
 memfuse-crypto = { workspace = true }
+memfuse-privacy = { workspace = true }
 memfuse-ollama = { workspace = true }
 memfuse-router = { workspace = true }
 memfuse-calibration = { workspace = true }
