@@ -1,13 +1,13 @@
 use crate::config::RouterConfig;
+use memfuse::MemFuse;
 use memfuse_core::MemFuseError;
-use memfuse_db::MemFuse;
 use std::sync::Arc;
 
 /// Holds strong Arc references to routing and calibration components to maintain live Weak references in `MemFuse`.
 pub struct RoutingHandle {
-    pub router: Arc<memfuse_router::DefaultRouterEngine>,
-    pub calibrator: Arc<parking_lot::Mutex<memfuse_calibration::IsotonicCalibrator>>,
-    pub pid_controller: Arc<parking_lot::Mutex<memfuse_calibration::PidController>>,
+    pub router: Arc<memfuse::router::DefaultRouterEngine>,
+    pub calibrator: Arc<parking_lot::Mutex<memfuse::calibration::IsotonicCalibrator>>,
+    pub pid_controller: Arc<parking_lot::Mutex<memfuse::calibration::PidController>>,
 }
 
 /// Conditionally sets up `RouterEngine`, `IsotonicCalibrator`, and `PidController` if routing profiles are configured.
@@ -22,22 +22,21 @@ pub async fn setup_routing(
     }
 
     let default_col = db.collection("default").await?;
-    let router = Arc::new(memfuse_router::RouterEngine::new(
+    let router = Arc::new(memfuse::router::RouterEngine::new(
         default_col,
         config.profiles.clone(),
         config.calibration_store_path.clone(),
     ));
 
     let calibrator = Arc::new(parking_lot::Mutex::new(
-        memfuse_calibration::IsotonicCalibrator::with_defaults(),
+        memfuse::calibration::IsotonicCalibrator::with_defaults(),
     ));
 
     let pid_controller = Arc::new(parking_lot::Mutex::new(
-        memfuse_calibration::PidController::default(),
+        memfuse::calibration::PidController::default(),
     ));
 
-    let router_weak =
-        Arc::downgrade(&router) as std::sync::Weak<dyn memfuse_db::DriftStatusProvider>;
+    let router_weak = Arc::downgrade(&router) as std::sync::Weak<dyn memfuse::DriftStatusProvider>;
     db.set_router(router_weak);
     db.set_calibrator(Arc::downgrade(&calibrator));
     db.set_pid_controller(Arc::downgrade(&pid_controller));

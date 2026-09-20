@@ -2232,6 +2232,7 @@ dependencies = [
 name = "memfuse"
 version = "0.1.0"
 dependencies = [
+ "memfuse-calibration",
  "memfuse-candle",
  "memfuse-core",
  "memfuse-db",
@@ -2413,6 +2414,7 @@ dependencies = [
  "lru",
  "memfuse-core",
  "memfuse-crypto",
+ "memfuse-privacy",
  "parking_lot",
  "proptest",
  "rand 0.8.8",
@@ -2435,6 +2437,7 @@ dependencies = [
  "blake3",
  "bytes",
  "criterion",
+ "memfuse-adapt",
  "memfuse-calibration",
  "memfuse-checkpoint",
  "memfuse-cognition",
@@ -2577,15 +2580,12 @@ name = "memfuse-mcp"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "memfuse",
  "memfuse-agent",
- "memfuse-calibration",
  "memfuse-candle",
  "memfuse-core",
  "memfuse-crypto",
- "memfuse-db",
  "memfuse-embed",
- "memfuse-ollama",
- "memfuse-router",
  "parking_lot",
  "rand 0.8.8",
  "scc",
@@ -2649,6 +2649,25 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+]
+
+[[package]]
+name = "memfuse-privacy"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "memfuse-core",
+ "parking_lot",
+ "rand 0.8.8",
+ "regex",
+ "scc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]

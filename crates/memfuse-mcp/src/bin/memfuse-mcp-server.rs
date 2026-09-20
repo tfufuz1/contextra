@@ -5,7 +5,7 @@
 // HOTSPOTS:    main()
 // SIEHE AUCH:  ADR-010, crates/memfuse-mcp/src/lib.rs
 
-use memfuse_db::MemFuse;
+use memfuse::MemFuse;
 use memfuse_mcp::{setup_routing, EmbeddingConfig, McpServer, RouterConfig};
 use std::sync::Arc;
 
@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let path = std::path::PathBuf::from(val);
             if let Ok(bytes) = std::fs::read(&path) {
                 if let Ok(loaded) =
-                    serde_json::from_slice::<Vec<memfuse_router::SlmProfile>>(&bytes)
+                    serde_json::from_slice::<Vec<memfuse::router::SlmProfile>>(&bytes)
                 {
                     router_config.profiles = loaded;
                 }

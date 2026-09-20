@@ -1,13 +1,28 @@
 # memfuse-index
 
-This crate provides the core HNSW vector index implementation along with hardware-accelerated, highly optimized SIMD distance mathematical routines.
+`memfuse-index` stellt den HNSW- und DiskANN-Vektorindex sowie Skalar-/RaBitQ-Quantisierung bereit (Ring 0 / In Migration nach `memfuse-vector`).
 
-## Zero-Unsafe Doctrine Exceptions (SIMD Safety)
+## Zweck
 
-In compliance with the MemFuse Sovereign Core Doctrine, all crates mandate `#![forbid(unsafe_code)]` with exactly **one exception**: `memfuse-index`. The performance demands of vector clustering and graph traversal require hardware-specific instructions (AVX2, AVX-512, FMA) which are inherently `unsafe` in Rust.
+Core Vector Search Engine für k-NN Abfragen, HNSW-Graphaufbau, DiskANN Disk-Backed Indexierung, SQ8 Skalarquantisierung und Mmap-Persistenz.
 
-To guarantee cryptographic isolation and memory crash-safety inside this module:
-1. `compute_distance` acts as an absolute safety barrier. It rigorously enforces equal dimensionality limits (`a.len() == b.len()`) to guarantee `in-bounds` mapping prior to calling unchecked vectorized memory offsets.
-2. Dynamic feature detection (`is_x86_feature_detected!`) routes the control flow only when intrinsic instructions are undeniably available.
-3. Every internal `unsafe` memory manipulation is mapped with robust `ANCHOR:SAFETY:` blocks that prove safe slice-bounds and pointer-arithmetic (verified by `cargo check`).
-4. Native architecture scalar fallbacks (`compute_distance_scalar`) are fully implemented in Safe Rust to ensure standard evaluation without any panics.
+## Ring-Zugehörigkeit & Status
+
+- **Ring:** Ring 0 (Synchroner Vektorindex-Kern)
+- **Status:** 🟡 In Migration (Zielzustand: `memfuse-vector`)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` (SIMD-Kernels wurden nach `memfuse-simd` ausgelagert)
+
+## Öffentliche API-Übersicht
+
+- **HNSW Index:** `HnswIndex`, `HnswConfig`, `RebuildStatus`
+- **DiskANN Index:** `DiskAnnIndex`, `DiskAnnConfig`, `DiskAnnFallbackPolicy`
+- **Quantisierung:** `ScalarQuantizer`, `RaBitQQuantizer`
+- **Persistenz:** `HnswHeader`, `MmapIndex`
+
+## Safety & SIMD Isolation
+
+Im Zuge der Zielarchitektur v2 wurden alle hardwarenahen SIMD-Assembly/Intrinsics-Codeblöcke aus `memfuse-index` in das dedizierte Unsafe-Insel-Crate `memfuse-simd` ausgelagert. `memfuse-index` selbst erzwingt `#![forbid(unsafe_code)]`.
+
+## Architektur & Verweise
+
+Details zum HNSW- und DiskANN-Index finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §7.4.

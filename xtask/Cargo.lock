@@ -767,6 +767,7 @@ dependencies = [
  "hmac",
  "lru",
  "memfuse-core",
+ "memfuse-privacy",
  "parking_lot",
  "rand",
  "regex",
@@ -787,6 +788,7 @@ dependencies = [
  "ahash",
  "blake3",
  "bytes",
+ "memfuse-adapt",
  "memfuse-calibration",
  "memfuse-checkpoint",
  "memfuse-cognition",
@@ -906,6 +908,24 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "memfuse-privacy"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "memfuse-core",
+ "parking_lot",
+ "rand",
+ "regex",
+ "scc",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]

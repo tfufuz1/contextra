@@ -23,6 +23,7 @@ memfuse-text = { workspace = true }
 memfuse-checkpoint = { workspace = true }
 memfuse-graph = { workspace = true }
 memfuse-calibration = { workspace = true }
+memfuse-adapt = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
