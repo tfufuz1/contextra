@@ -2391,6 +2391,7 @@ dependencies = [
  "lru",
  "memfuse-core",
  "memfuse-crypto",
+ "memfuse-privacy",
  "parking_lot",
  "proptest",
  "rand 0.8.8",
@@ -2594,6 +2595,25 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+]
+
+[[package]]
+name = "memfuse-privacy"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "memfuse-core",
+ "parking_lot",
+ "rand 0.8.8",
+ "regex",
+ "scc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]
