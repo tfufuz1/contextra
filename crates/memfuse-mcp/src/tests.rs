@@ -1,8 +1,8 @@
 #[cfg(test)]
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse};
 use crate::McpServer;
+use memfuse::MemFuse;
 use memfuse_core::BoxFuture;
-use memfuse_db::MemFuse;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tempfile::TempDir;

@@ -2232,6 +2232,7 @@ dependencies = [
 name = "memfuse"
 version = "0.1.0"
 dependencies = [
+ "memfuse-calibration",
  "memfuse-candle",
  "memfuse-core",
  "memfuse-db",
@@ -2523,15 +2524,12 @@ name = "memfuse-mcp"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "memfuse",
  "memfuse-agent",
- "memfuse-calibration",
  "memfuse-candle",
  "memfuse-core",
  "memfuse-crypto",
- "memfuse-db",
  "memfuse-embed",
- "memfuse-ollama",
- "memfuse-router",
  "parking_lot",
  "rand 0.8.8",
  "scc",

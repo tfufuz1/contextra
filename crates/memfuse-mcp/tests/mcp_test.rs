@@ -1,5 +1,5 @@
+use memfuse::MemFuse;
 use memfuse_core::BoxFuture;
-use memfuse_db::MemFuse;
 use memfuse_mcp::{
     protocol::JsonRpcRequest,
     sandbox::{McpSandbox, SandboxPolicy},
@@ -970,7 +970,7 @@ async fn test_mcp_boot_with_routing_config() {
     let db = Arc::new(MemFuse::open(tmp.path()).await.expect("open db"));
     let embedder = Arc::new(MockEmbedder { dimension: 768 });
 
-    let profile = memfuse_router::SlmProfile::new(
+    let profile = memfuse::router::SlmProfile::new(
         "test-profile",
         "http://localhost:11434",
         vec![1],

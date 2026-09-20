@@ -5,10 +5,10 @@
 //! und garantiert striktes Fail-Closed-Verhalten bei Index-Fehlern, Timeouts
 //! oder nicht vorhandenen/leeren Suchergebnissen.
 
+use memfuse::Collection;
 use memfuse_crypto::egress_vault::{
     BlockReason, BoxFuture, EgressClassification, EgressClassifier,
 };
-use memfuse_db::Collection;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -21,7 +21,7 @@ pub const DEFAULT_EGRESS_GUARD_MIN_BYTES: usize = 128;
 
 /// Layer-4 EgressGuard zur Erkennung und Blockierung von Bulk-Exfiltrationen.
 ///
-/// Baut auf dem lokalen HNSW-Vektorindex einer `memfuse_db::Collection` auf.
+/// Baut auf dem lokalen HNSW-Vektorindex einer `memfuse::Collection` auf.
 /// Outbound-Payloads mit mindestens `min_bytes` werden über `search_text` abgefragt.
 /// Bei Cosine Similarity $\ge$ `threshold` wird die Anfrage blockiert.
 /// Strikte **Fail-Closed**-Semantik bei Index-Fehlern, Timeouts oder leeren Ergebnissen.
@@ -136,8 +136,8 @@ impl EgressClassifier for EgressGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use memfuse::MemFuse;
     use memfuse_core::traits::{BoxFuture, EmbeddingError, EmbeddingProvider, TextEmbeddingEngine};
-    use memfuse_db::MemFuse;
     use tempfile::TempDir;
 
     #[derive(Clone, Debug)]
