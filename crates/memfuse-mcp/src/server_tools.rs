@@ -3,8 +3,8 @@ use crate::io::MAX_SEARCH_QUERY_BYTES;
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
+use memfuse::chunker::{ChunkerConfig, MarkdownChunker};
 use memfuse_core::{DocId, StorageEngine, MAX_SEARCH_K};
-use memfuse_db::chunker::{ChunkerConfig, MarkdownChunker};
 use serde_json::{json, Value};
 
 impl McpServer {
@@ -426,18 +426,17 @@ impl McpServer {
                 }
 
                 let turns_scanned = turns.len();
-                let (consolidation_res, synthesis_res) =
-                    memfuse_db::execute_background_consolidation(
-                        col.as_ref(),
-                        &turns,
-                        &memfuse_db::memory_consolidation::ConsolidationConfig::default(),
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .await
-                    .map_err(McpError::from)?;
+                let (consolidation_res, synthesis_res) = memfuse::execute_background_consolidation(
+                    col.as_ref(),
+                    &turns,
+                    &memfuse::memory_consolidation::ConsolidationConfig::default(),
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .await
+                .map_err(McpError::from)?;
 
                 let duplicates_tombstoned_count = consolidation_res.duplicates_tombstoned.len();
                 let cascade_tombstones_count =
