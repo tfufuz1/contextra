@@ -8,8 +8,6 @@ use std::collections::HashSet;
 /// Verhindert Hartcodierung im Quelltext und ermöglicht einfache Erweiterbarkeit.
 const DEFAULT_GERMAN_WORDS: &str = include_str!("../data/german_words.txt");
 
-
-
 /// Trait for morphological tokenization.
 ///
 /// Decomposes compound words into constituent morphemes.

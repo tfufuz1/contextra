@@ -27,11 +27,11 @@ impl Ring {
             // Ring 1: Storage & Specialized Compute
             "memfuse-mvcc" | "memfuse-vector" | "memfuse-rank" | "memfuse-adapt" | "memfuse-store"
             | "memfuse-text" | "memfuse-checkpoint" | "memfuse-graph" | "memfuse-kvcache"
-            | "memfuse-index" => Some(Ring::Ring1),
+            | "memfuse-vector" => Some(Ring::Ring1),
             // Ring 2: Ports & External Providers
             "memfuse-ports" | "memfuse-calibration" | "memfuse-crypto" | "memfuse-infer-candle"
-            | "memfuse-infer-ollama" | "memfuse-infer-onnx" | "memfuse-candle" | "memfuse-ollama"
-            | "memfuse-embed" => Some(Ring::Ring2),
+            | "memfuse-infer-ollama" | "memfuse-infer-onnx" | "memfuse-infer-candle" | "memfuse-infer-ollama"
+            | "memfuse-infer-onnx" => Some(Ring::Ring2),
             // Ring 3: Engine & Cognition
             "memfuse-engine" | "memfuse-cognition" | "memfuse-router" | "memfuse-agent"
             | "memfuse-privacy" | "memfuse-db" | "memfuse-sandbox" => Some(Ring::Ring3),

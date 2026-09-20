@@ -6,8 +6,8 @@ use memfuse_core::{
 };
 use memfuse_db::{MemFuse, MemFuseConfig};
 use memfuse_graph::CsrGraph;
-use memfuse_index::{HnswConfig, HnswIndex};
 use memfuse_store::{LsmConfig, LsmStorage};
+use memfuse_vector::{HnswConfig, HnswIndex};
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

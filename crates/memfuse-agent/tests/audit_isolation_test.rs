@@ -4,7 +4,7 @@ use memfuse_core::{
 };
 use memfuse_db::{Collection, MemFuse, MemFuseConfig};
 use memfuse_graph::CsrGraph;
-use memfuse_index::{HnswConfig, HnswIndex};
+use memfuse_vector::{HnswConfig, HnswIndex};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tempfile::TempDir;

@@ -8,9 +8,9 @@ use memfuse_core::traits::{BoxFuture, EmbeddingProvider, TextEmbeddingEngine};
 use memfuse_core::{DocId, StorageEngine, VectorIndex};
 use memfuse_db::collection::Collection;
 use memfuse_graph::csr::CsrGraph;
-use memfuse_index::{HnswConfig, HnswIndex};
 use memfuse_store::lsm::{LsmConfig, LsmStorage};
 use memfuse_text::Language;
+use memfuse_vector::{HnswConfig, HnswIndex};
 
 use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;

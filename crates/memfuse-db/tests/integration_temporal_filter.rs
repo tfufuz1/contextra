@@ -1,8 +1,8 @@
 use memfuse_core::TxId;
 use memfuse_db::{Collection, DistanceMetric, Language};
 use memfuse_graph::CsrGraph;
-use memfuse_index::{HnswConfig, HnswIndex};
 use memfuse_store::{LsmConfig, LsmStorage};
+use memfuse_vector::{HnswConfig, HnswIndex};
 use serde_json::json;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;

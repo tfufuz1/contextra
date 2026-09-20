@@ -25,11 +25,11 @@ path = "src/bin/compare_baseline.rs"
 [dependencies]
 memfuse-core = { workspace = true }
 memfuse-store = { workspace = true }
-memfuse-index = { workspace = true }
+memfuse-vector = { workspace = true }
 memfuse-text = { workspace = true }
 memfuse-graph = { workspace = true }
 memfuse-db = { workspace = true }
-memfuse-embed = { workspace = true }
+memfuse-infer-onnx = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -43,4 +43,4 @@ rand = { workspace = true }
 [features]
 default = []
 external-benchmarks = []
-onnx-bench = ["memfuse-embed/onnx", "memfuse-db/reranking"]
+onnx-bench = ["memfuse-infer-onnx/onnx", "memfuse-db/reranking"]

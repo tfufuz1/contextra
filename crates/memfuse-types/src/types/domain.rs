@@ -691,8 +691,6 @@ impl DistanceMetric {
     }
 }
 
-
-
 /// Vector embedding representation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Embedding {

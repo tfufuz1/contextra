@@ -7,9 +7,9 @@
 use memfuse_core::{DistanceMetric, DocId, VectorIndex};
 use memfuse_db::Collection;
 use memfuse_graph::csr::CsrGraph;
-use memfuse_index::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use memfuse_store::LsmStorage;
 use memfuse_text::Language;
+use memfuse_vector::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 

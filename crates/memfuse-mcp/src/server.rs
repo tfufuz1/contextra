@@ -21,7 +21,7 @@ pub struct McpServer {
     pub egress_classifier: Arc<dyn EgressClassifier>,
     pub routing: Option<Arc<RoutingHandle>>,
     #[cfg(feature = "kv-bridge")]
-    pub kv_bridge: Option<Arc<memfuse_candle::KvBridgeAdapter>>,
+    pub kv_bridge: Option<Arc<memfuse_infer_candle::KvBridgeAdapter>>,
 }
 
 impl McpServer {
@@ -72,7 +72,7 @@ impl McpServer {
     #[cfg(feature = "kv-bridge")]
     pub fn with_kv_bridge(
         mut self,
-        kv_bridge: Option<Arc<memfuse_candle::KvBridgeAdapter>>,
+        kv_bridge: Option<Arc<memfuse_infer_candle::KvBridgeAdapter>>,
     ) -> Self {
         self.kv_bridge = kv_bridge;
         self

@@ -313,7 +313,7 @@ impl ContextCompactor {
 /// Prevents lost updates / phantom erasures by verifying that no source documents were modified
 /// while asynchronous LLM summarization was in progress. Also journals a `CommitIntent::Consolidation`
 /// entry into storage for crash resilience (INV-CONSOLIDATE-1, INV-CONSOLIDATE-2).
-pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = memfuse_index::HnswIndex> {
+pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = memfuse_vector::HnswIndex> {
     /// Reference to the active collection.
     pub collection: &'a Collection<S, V>,
     /// Source document IDs and their transaction IDs captured at read snapshot time.
@@ -879,8 +879,8 @@ mod tests {
 
     use memfuse_core::StorageStats;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::{HnswConfig, HnswIndex};
     use memfuse_store::{LsmConfig, LsmStorage};
+    use memfuse_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;
 

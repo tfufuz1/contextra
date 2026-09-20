@@ -41,7 +41,7 @@ pub fn get_threshold_for_crate(crate_name: &str) -> f64 {
     match crate_name {
         "memfuse-store" => 80.0,
         "memfuse-db" => 75.0,
-        "memfuse-index" => 75.0,
+        "memfuse-vector" => 75.0,
         "memfuse-graph" => 70.0,
         "memfuse-text" => 70.0,
         "memfuse-core" => 85.0,
@@ -125,7 +125,7 @@ mod tests {
     fn test_coverage_thresholds() {
         assert_eq!(get_threshold_for_crate("memfuse-store"), 80.0);
         assert_eq!(get_threshold_for_crate("memfuse-db"), 75.0);
-        assert_eq!(get_threshold_for_crate("memfuse-index"), 75.0);
+        assert_eq!(get_threshold_for_crate("memfuse-vector"), 75.0);
         assert_eq!(get_threshold_for_crate("memfuse-graph"), 70.0);
         assert_eq!(get_threshold_for_crate("memfuse-text"), 70.0);
         assert_eq!(get_threshold_for_crate("memfuse-core"), 85.0);

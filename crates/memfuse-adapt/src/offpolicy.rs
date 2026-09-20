@@ -188,9 +188,17 @@ mod tests {
             let val = ((rng_state >> 33) & 0xFF) as f32 / 255.0;
 
             let reward = if logged_action == 0 {
-                if val < 0.8 { 1.0 } else { 0.0 }
+                if val < 0.8 {
+                    1.0
+                } else {
+                    0.0
+                }
             } else {
-                if val < 0.2 { 1.0 } else { 0.0 }
+                if val < 0.2 {
+                    1.0
+                } else {
+                    0.0
+                }
             };
 
             // Target policy always chooses action 0

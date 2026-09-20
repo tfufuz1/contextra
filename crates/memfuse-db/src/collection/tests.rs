@@ -8,7 +8,7 @@
 async fn test_collection_scan_prefix_batches_via_mock_storage() {
     use memfuse_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
     use memfuse_graph::csr::CsrGraph;
-    use memfuse_index::HnswIndex;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
@@ -123,7 +123,7 @@ async fn test_collection_scan_prefix_batches_via_mock_storage() {
         bounded_call_count: AtomicUsize::new(0),
     });
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -149,8 +149,8 @@ async fn test_collection_scan_prefix_batches_via_mock_storage() {
 async fn test_maintenance_pagination_over_10k_documents() {
     use memfuse_core::EXPIRY_METADATA_KEY;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -166,7 +166,7 @@ async fn test_maintenance_pagination_over_10k_documents() {
         .unwrap(),
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -282,8 +282,8 @@ async fn test_maintenance_pagination_over_10k_documents() {
 #[tokio::test]
 async fn test_insert_with_ttl_and_reap_expired_documents() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -298,7 +298,7 @@ async fn test_insert_with_ttl_and_reap_expired_documents() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -352,8 +352,8 @@ async fn test_insert_with_ttl_and_reap_expired_documents() {
 async fn test_relate_success_visible_in_storage_and_graph() {
     use memfuse_core::EntityId;
     use memfuse_graph::csr::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::{LsmConfig, LsmStorage};
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -368,7 +368,7 @@ async fn test_relate_success_visible_in_storage_and_graph() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -403,7 +403,7 @@ async fn test_relate_success_visible_in_storage_and_graph() {
 async fn test_relate_rollback_semantics_on_storage_commit_failure() {
     use memfuse_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
     use memfuse_graph::csr::CsrGraph;
-    use memfuse_index::HnswIndex;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
@@ -481,7 +481,7 @@ async fn test_relate_rollback_semantics_on_storage_commit_failure() {
 
     let storage = Arc::new(FailOnStorageCommit);
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -513,8 +513,8 @@ async fn test_relate_rollback_semantics_on_storage_commit_failure() {
 async fn test_relate_rollback_semantics_on_graph_commit_failure() {
     use memfuse_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
     use memfuse_graph::csr::{CsrGraph, CsrGraphConfig};
-    use memfuse_index::HnswIndex;
     use memfuse_store::{LsmConfig, LsmStorage};
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -604,7 +604,7 @@ async fn test_relate_rollback_semantics_on_graph_commit_failure() {
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -672,8 +672,8 @@ async fn test_collection_embedder_async_embed() {
 #[tokio::test]
 async fn hybrid_search_caps_k_at_max_search_k() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -684,7 +684,7 @@ async fn hybrid_search_caps_k_at_max_search_k() {
         ..Default::default()
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
-    let hnsw_config = memfuse_index::HnswConfig {
+    let hnsw_config = memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     };
@@ -718,8 +718,8 @@ async fn hybrid_search_caps_k_at_max_search_k() {
 #[tokio::test]
 async fn test_input_guards_boundary_validation() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -730,7 +730,7 @@ async fn test_input_guards_boundary_validation() {
         ..Default::default()
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
-    let hnsw_config = memfuse_index::HnswConfig {
+    let hnsw_config = memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     };
@@ -824,8 +824,8 @@ async fn test_input_guards_boundary_validation() {
 #[tokio::test]
 async fn test_hybrid_search_k_clamping_boundaries() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -836,7 +836,7 @@ async fn test_hybrid_search_k_clamping_boundaries() {
         ..Default::default()
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
-    let hnsw_config = memfuse_index::HnswConfig {
+    let hnsw_config = memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     };
@@ -876,8 +876,8 @@ async fn test_hybrid_search_k_clamping_boundaries() {
 async fn test_doc_id_collision_rejected() {
     use memfuse_core::{DocId, MemFuseError, StorageEngine, TxId};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -889,7 +889,7 @@ async fn test_doc_id_collision_rejected() {
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -956,8 +956,8 @@ async fn test_doc_id_collision_rejected() {
 #[allow(deprecated)]
 async fn test_collection_next_tx_sequence() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -969,7 +969,7 @@ async fn test_collection_next_tx_sequence() {
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1000,8 +1000,8 @@ async fn test_collection_next_tx_sequence() {
 #[tokio::test]
 async fn test_collection_allocate_tx_sequence() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -1013,7 +1013,7 @@ async fn test_collection_allocate_tx_sequence() {
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1044,8 +1044,8 @@ async fn test_collection_allocate_tx_sequence() {
 #[tokio::test]
 async fn test_concurrent_insert_and_write_ops_lock_safety() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -1057,7 +1057,7 @@ async fn test_concurrent_insert_and_write_ops_lock_safety() {
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1133,8 +1133,8 @@ async fn test_concurrent_insert_and_write_ops_lock_safety() {
 #[tokio::test]
 async fn test_ttl_missing_created_at_does_not_expire() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -1150,7 +1150,7 @@ async fn test_ttl_missing_created_at_does_not_expire() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1181,8 +1181,8 @@ async fn test_ttl_missing_created_at_does_not_expire() {
 #[tokio::test]
 async fn test_ttl_zero_does_not_expire() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -1198,7 +1198,7 @@ async fn test_ttl_zero_does_not_expire() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1246,8 +1246,8 @@ async fn test_extract_text_with_contextual_prefix() {
 #[tokio::test]
 async fn test_ttl_overflow_does_not_expire() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -1263,7 +1263,7 @@ async fn test_ttl_overflow_does_not_expire() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1295,8 +1295,8 @@ async fn test_ttl_overflow_does_not_expire() {
 async fn test_migrate_doc_keys_v1() {
     use memfuse_core::{DocId, StorageEngine, TxId};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -1312,7 +1312,7 @@ async fn test_migrate_doc_keys_v1() {
         .unwrap(), // unwrap allowed (AGENT:04)
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1370,8 +1370,8 @@ async fn test_migrate_doc_keys_v1() {
 #[cfg(feature = "reranking")]
 async fn test_hybrid_search_reranked_none() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -1386,7 +1386,7 @@ async fn test_hybrid_search_reranked_none() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1437,13 +1437,11 @@ fn test_importance_score_parser_robust() {
     assert_eq!(super::parse_importance_score("invalid text"), 0.5);
 }
 
-
-
 #[tokio::test]
 async fn test_update_document_importance_persists_model_id_provenance() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -1458,7 +1456,7 @@ async fn test_update_document_importance_persists_model_id_provenance() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1483,7 +1481,7 @@ async fn test_update_document_importance_persists_model_id_provenance() {
 
     let doc = col.get("doc_test_prov").await.unwrap().unwrap(); // unwrap
     let meta = doc.metadata.unwrap(); // unwrap
-    
+
     let imp = meta.get("importance").unwrap();
     let imp_score: memfuse_core::MemoryImportance = serde_json::from_value(imp.clone()).unwrap();
     assert_eq!(imp_score.base_score.value(), 0.92);
@@ -1529,8 +1527,8 @@ fn test_extract_effective_importance_defaults() {
 #[tokio::test]
 async fn test_begin_transaction_returns_active_db_transaction() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -1542,7 +1540,7 @@ async fn test_begin_transaction_returns_active_db_transaction() {
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1569,8 +1567,8 @@ async fn test_begin_transaction_returns_active_db_transaction() {
 async fn test_expiry_cleanup_deletes_decayed_working_memory() {
     use memfuse_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -1586,7 +1584,7 @@ async fn test_expiry_cleanup_deletes_decayed_working_memory() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1639,8 +1637,8 @@ async fn test_expiry_cleanup_deletes_decayed_working_memory() {
 async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
     use memfuse_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -1656,7 +1654,7 @@ async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1765,8 +1763,8 @@ fn test_importance_metadata_integration_and_filtering() {
 #[tokio::test]
 async fn test_insert_typed_episodic_has_decay_metadata() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::{LsmConfig, LsmStorage};
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
@@ -1780,7 +1778,7 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1816,8 +1814,8 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
 #[tokio::test]
 async fn test_insert_typed_working_has_ttl_metadata() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::{LsmConfig, LsmStorage};
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
@@ -1831,7 +1829,7 @@ async fn test_insert_typed_working_has_ttl_metadata() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -1869,9 +1867,9 @@ async fn test_insert_typed_working_has_ttl_metadata() {
 async fn test_collection_with_diskann_index_hybrid_search() {
     use memfuse_core::{DocId, StorageEngine, TextIndex};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::{DiskAnnConfig, DiskAnnIndex};
     use memfuse_store::LsmStorage;
     use memfuse_text::Language;
+    use memfuse_vector::{DiskAnnConfig, DiskAnnIndex};
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -1992,8 +1990,8 @@ async fn test_collection_with_diskann_index_hybrid_search() {
 #[tokio::test]
 async fn test_insert_backward_compatible_has_semantic_default() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::{LsmConfig, LsmStorage};
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
@@ -2007,7 +2005,7 @@ async fn test_insert_backward_compatible_has_semantic_default() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -2044,8 +2042,8 @@ async fn test_insert_backward_compatible_has_semantic_default() {
 async fn test_hybrid_search_with_query_memory_type_filter() {
     use memfuse_core::{HybridQuery, MemoryType};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::{LsmConfig, LsmStorage};
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -2060,7 +2058,7 @@ async fn test_hybrid_search_with_query_memory_type_filter() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -2162,8 +2160,8 @@ async fn test_hybrid_search_with_query_memory_type_filter() {
 #[tokio::test]
 async fn test_invalid_doc_ids_rejected() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2178,7 +2176,7 @@ async fn test_invalid_doc_ids_rejected() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -2213,8 +2211,8 @@ async fn test_invalid_doc_ids_rejected() {
 #[tokio::test]
 async fn test_search_dimension_mismatch_rejected() {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2229,7 +2227,7 @@ async fn test_search_dimension_mismatch_rejected() {
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -2257,8 +2255,8 @@ async fn test_search_dimension_mismatch_rejected() {
 async fn test_concurrent_insert_many_collision_safety() {
     use memfuse_core::{DocId, MemFuseError, StorageEngine, TxId};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2269,7 +2267,7 @@ async fn test_concurrent_insert_many_collision_safety() {
         ..Default::default()
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
-    let hnsw_config = memfuse_index::HnswConfig {
+    let hnsw_config = memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     };
@@ -2373,8 +2371,8 @@ async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     use memfuse_core::EntityId;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2387,7 +2385,7 @@ async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -2531,8 +2529,8 @@ async fn test_run_percolation_check_rebonding() -> memfuse_core::Result<()> {
 #[tokio::test]
 async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> memfuse_core::Result<()> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2545,7 +2543,7 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> memfus
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -2582,8 +2580,8 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> memfus
 #[tokio::test]
 async fn test_collection_mandatory_matrix_empty_inputs() -> memfuse_core::Result<()> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2596,7 +2594,7 @@ async fn test_collection_mandatory_matrix_empty_inputs() -> memfuse_core::Result
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -2624,8 +2622,8 @@ async fn test_collection_mandatory_matrix_empty_inputs() -> memfuse_core::Result
 #[tokio::test]
 async fn test_collection_mandatory_matrix_error_paths() -> memfuse_core::Result<()> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2638,7 +2636,7 @@ async fn test_collection_mandatory_matrix_error_paths() -> memfuse_core::Result<
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -2672,8 +2670,8 @@ async fn test_collection_mandatory_matrix_error_paths() -> memfuse_core::Result<
 #[tokio::test]
 async fn test_apm3_lock_contention_fallback() -> memfuse_core::Result<()> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2686,7 +2684,7 @@ async fn test_apm3_lock_contention_fallback() -> memfuse_core::Result<()> {
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -2725,8 +2723,8 @@ async fn test_apm3_lock_contention_fallback() -> memfuse_core::Result<()> {
 #[tokio::test]
 async fn test_insert_does_not_block_on_collection_wide_lock() -> memfuse_core::Result<()> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2739,7 +2737,7 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> memfuse_core::R
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -2789,8 +2787,8 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> memfuse_core::R
 #[tokio::test]
 async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> memfuse_core::Result<()> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2803,7 +2801,7 @@ async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> memfuse_cor
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -2849,8 +2847,8 @@ async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> memfuse_cor
 #[tokio::test]
 async fn test_apm7_utf8_multibyte_boundary_handling() -> memfuse_core::Result<()> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -2863,7 +2861,7 @@ async fn test_apm7_utf8_multibyte_boundary_handling() -> memfuse_core::Result<()
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -2914,8 +2912,8 @@ proptest::proptest! {
 #[tokio::test]
 async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> memfuse_core::Result<()> {
     use memfuse_graph::csr::CsrGraph;
-    use memfuse_index::{HnswConfig, HnswIndex};
     use memfuse_store::lsm::{LsmConfig, LsmStorage};
+    use memfuse_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
@@ -2969,8 +2967,8 @@ async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> memfuse_co
 #[tokio::test]
 async fn test_hybrid_search_snapshot_unsupported_strategies() -> memfuse_core::Result<()> {
     use memfuse_graph::csr::CsrGraph;
-    use memfuse_index::{HnswConfig, HnswIndex};
     use memfuse_store::lsm::{LsmConfig, LsmStorage};
+    use memfuse_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
@@ -3080,7 +3078,7 @@ async fn test_single_pid_controller_instantiation_in_query_builder() {
 async fn test_checkpoint_unpin_on_search_error_path() {
     use memfuse_core::{BoxFuture, FilterExpr, Result, StorageEngine, StorageStats, TxId};
     use memfuse_graph::csr::CsrGraph;
-    use memfuse_index::HnswIndex;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
     use std::sync::Arc;
 
@@ -3181,7 +3179,7 @@ async fn test_checkpoint_unpin_on_search_error_path() {
         total_unpins: AtomicU64::new(0),
     });
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -3227,8 +3225,8 @@ async fn test_checkpoint_unpin_on_search_error_path() {
 async fn test_search_k_zero_returns_canonical_error_message(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -3241,7 +3239,7 @@ async fn test_search_k_zero_returns_canonical_error_message(
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -3285,8 +3283,8 @@ async fn test_search_k_zero_returns_canonical_error_message(
 async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -3299,7 +3297,7 @@ async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
         })
         .await?,
     );
-    let index = Arc::new(HnswIndex::try_new(memfuse_index::HnswConfig {
+    let index = Arc::new(HnswIndex::try_new(memfuse_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })?);
@@ -3348,8 +3346,8 @@ async fn test_post_rrf_supersedes_displacement_truncation_preserves_k() -> memfu
 {
     use memfuse_core::DocId;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -3364,7 +3362,7 @@ async fn test_post_rrf_supersedes_displacement_truncation_preserves_k() -> memfu
         .unwrap(),
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -3450,7 +3448,7 @@ async fn test_post_rrf_supersedes_displacement_truncation_preserves_k() -> memfu
 async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
     use memfuse_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
     use memfuse_graph::csr::CsrGraph;
-    use memfuse_index::HnswIndex;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
@@ -3544,7 +3542,7 @@ async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
 
     let storage = Arc::new(FailingRollbackMockStorage);
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -3585,8 +3583,8 @@ async fn test_query_builder_query_config_include_superseded_displacement(
 ) -> memfuse_core::Result<()> {
     use memfuse_core::{DocId, HybridQuery};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -3601,7 +3599,7 @@ async fn test_query_builder_query_config_include_superseded_displacement(
         .unwrap(), // unwrap
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -3663,8 +3661,8 @@ async fn test_query_builder_query_config_include_superseded_displacement(
 async fn test_link_memories_cycle_prevention_for_all_relations() -> memfuse_core::Result<()> {
     use memfuse_core::DocId;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -3679,7 +3677,7 @@ async fn test_link_memories_cycle_prevention_for_all_relations() -> memfuse_core
         .unwrap(),
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
@@ -3723,8 +3721,8 @@ async fn test_link_memories_cycle_prevention_for_all_relations() -> memfuse_core
 async fn test_concurrent_mutation_aborts_consolidation() -> memfuse_core::Result<()> {
     use memfuse_core::DocId;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -3739,7 +3737,7 @@ async fn test_concurrent_mutation_aborts_consolidation() -> memfuse_core::Result
         .unwrap(),
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })

@@ -614,7 +614,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         text: &str,
         vector: &[f32],
         k: usize,
-        reranker: Option<&memfuse_embed::CrossEncoderReranker>,
+        reranker: Option<&memfuse_infer_onnx::CrossEncoderReranker>,
         anchor_entities: Option<&[memfuse_core::EntityId]>,
     ) -> Result<Vec<crate::SearchResult>> {
         let mut builder = self.query().text(text).vector(vector).k(k);

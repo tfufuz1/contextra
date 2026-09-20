@@ -314,7 +314,7 @@ pub enum CommitIntent {
 type StagedKeyOp = (Vec<u8>, Option<Bytes>);
 
 /// A transaction wrapper that ensures atomic multi-index commits across LSM-Store, HNSW-Index, Text-Index, and Graph-Index.
-pub struct DbTransaction<S: StorageEngine, V: VectorIndex = memfuse_index::HnswIndex> {
+pub struct DbTransaction<S: StorageEngine, V: VectorIndex = memfuse_vector::HnswIndex> {
     pub tx_id: TxId,
     collection: Collection<S, V>,
     staged_forward_keys: Mutex<Vec<StagedKeyOp>>,
@@ -1044,8 +1044,8 @@ impl<S: StorageEngine, V: VectorIndex> Drop for DbTransaction<S, V> {
 mod tests {
     use super::*;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
     use tempfile::tempdir;
@@ -1058,7 +1058,7 @@ mod tests {
         };
         let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })

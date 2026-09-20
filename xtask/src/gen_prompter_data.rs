@@ -404,7 +404,7 @@ mod tests {
 | Crate | Layer | LOC | Status | Beschreibung / Hauptaufgabe |
 | :--- | :---: | :---: | :--- | :--- |
 | `memfuse-core` | 1 | 9364 | 🟢 Clean | Core types |
-| `memfuse-embed` | 4 | 2033 | 🧊 Optional | Embedder |
+| `memfuse-infer-onnx` | 4 | 2033 | 🧊 Optional | Embedder |
 | `memfuse-custom` | 5 | 1000 | 🟡 Warning | Custom |
 | `memfuse-broken` | 6 | 500 | 🔴 Critical | Broken |
 | `memfuse-unknown-status` | 7 | 100 | ⚪ Unknown | Unknown |
@@ -415,7 +415,7 @@ mod tests {
             "✅"
         );
         assert_eq!(
-            derive_status_from_working_state("memfuse-embed", sample_ws),
+            derive_status_from_working_state("memfuse-infer-onnx", sample_ws),
             "🧊"
         );
         assert_eq!(

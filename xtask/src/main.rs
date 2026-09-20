@@ -536,7 +536,7 @@ pub fn get_workspace_crates() -> Vec<CrateInfo> {
         let crate_dir = root_dir.join(path_str);
         let loc = calculate_crate_loc(&crate_dir);
 
-        let status = if name == "memfuse-embed" {
+        let status = if name == "memfuse-infer-onnx" {
             "🧊 Optional".to_string()
         } else {
             "🟢 Clean".to_string()
@@ -984,11 +984,11 @@ fn generate_dag_topology_section(crates: &[CrateInfo]) -> String {
     }
     out.push_str("```\n\n");
 
-    let core_crates_count = crates.iter().filter(|c| c.name != "memfuse-embed").count();
-    let has_optional = crates.iter().any(|c| c.name == "memfuse-embed");
+    let core_crates_count = crates.iter().filter(|c| c.name != "memfuse-infer-onnx").count();
+    let has_optional = crates.iter().any(|c| c.name == "memfuse-infer-onnx");
 
     if has_optional {
-        out.push_str(&format!("**Aktiver Workspace-Build**: {} Workspace Crates ({} Kern-Crates + 1 optionales Crate `memfuse-embed`).", crates.len(), core_crates_count));
+        out.push_str(&format!("**Aktiver Workspace-Build**: {} Workspace Crates ({} Kern-Crates + 1 optionales Crate `memfuse-infer-onnx`).", crates.len(), core_crates_count));
     } else {
         out.push_str(&format!(
             "**Aktiver Workspace-Build**: {} Kern-Crates.",
@@ -2923,8 +2923,8 @@ description = "Core crate"
 
     #[test]
     fn test_title_similarity_and_tokenization() {
-        let title1 = "refactor(memfuse-index): rename partial-rebuild-pruning feature flag";
-        let title2 = "refactor(memfuse-index): rename partial-rebuild-pruning feature flag to partial-index-rebuild";
+        let title1 = "refactor(memfuse-vector): rename partial-rebuild-pruning feature flag";
+        let title2 = "refactor(memfuse-vector): rename partial-rebuild-pruning feature flag to partial-index-rebuild";
 
         let tokens1 = tokenize_title(title1);
         let tokens2 = tokenize_title(title2);
@@ -2936,7 +2936,7 @@ description = "Core crate"
             score
         );
 
-        assert_eq!(extract_scope(title1), "memfuse-index");
+        assert_eq!(extract_scope(title1), "memfuse-vector");
     }
 
     #[test]
@@ -3066,7 +3066,7 @@ description = "Core crate"
 
         // Fixture 4: Unsafe file anchor with 2 passes (should fail because 3 are required)
         let mut tags_unsafe_file = vec![TagItem {
-            file_path: "crates/memfuse-index/src/distance.rs".to_string(),
+            file_path: "crates/memfuse-vector/src/distance.rs".to_string(),
             line_num: 10,
             tag_type: "ANCHOR".to_string(),
             raw: "// ANCHOR[PERF:SIMD-001] STATUS:DONE (ID: AGT-INDEX-b4f29c1d) (TS:2026-08-29T09:14:07Z) (SESSION:a3f29c1d)".to_string(),
@@ -3080,7 +3080,7 @@ description = "Core crate"
             is_resolved: true,
         }];
         tags_unsafe_file.push(TagItem {
-            file_path: "crates/memfuse-index/src/distance.rs".to_string(),
+            file_path: "crates/memfuse-vector/src/distance.rs".to_string(),
             line_num: 15,
             tag_type: "REVIEW-PASS".to_string(),
             raw: "// REVIEW-PASS[1/3] STATUS:PASS (ID: AGT-INDEX-b4f29c1d) (TS:2026-08-29T10:00:00Z) (SESSION:b8e4f1a2)".to_string(),
@@ -3094,7 +3094,7 @@ description = "Core crate"
             is_resolved: false,
         });
         tags_unsafe_file.push(TagItem {
-            file_path: "crates/memfuse-index/src/distance.rs".to_string(),
+            file_path: "crates/memfuse-vector/src/distance.rs".to_string(),
             line_num: 16,
             tag_type: "REVIEW-PASS".to_string(),
             raw: "// REVIEW-PASS[2/3] STATUS:PASS (ID: AGT-INDEX-b4f29c1d) (TS:2026-08-29T11:00:00Z) (SESSION:c9f5e2b3)".to_string(),
@@ -3115,7 +3115,7 @@ description = "Core crate"
         // Fixture 5: Unsafe file anchor with 3 independent passes (should pass)
         let mut tags_unsafe_3_passes = tags_unsafe_file.clone();
         tags_unsafe_3_passes.push(TagItem {
-            file_path: "crates/memfuse-index/src/distance.rs".to_string(),
+            file_path: "crates/memfuse-vector/src/distance.rs".to_string(),
             line_num: 17,
             tag_type: "REVIEW-PASS".to_string(),
             raw: "// REVIEW-PASS[3/3] STATUS:PASS (ID: AGT-INDEX-b4f29c1d) (TS:2026-08-29T12:00:00Z) (SESSION:d0a1b2c3)".to_string(),
@@ -3137,7 +3137,7 @@ description = "Core crate"
     #[test]
     fn test_check_review_coverage_unsafe_and_security_requires_3_passes() {
         let anchor_unsafe = TagItem {
-            file_path: "crates/memfuse-index/src/distance.rs".to_string(),
+            file_path: "crates/memfuse-vector/src/distance.rs".to_string(),
             line_num: 10,
             tag_type: "ANCHOR".to_string(),
             raw: "// ANCHOR[PERF:DIST-001] STATUS:DONE (ID: AGT-INDEX-distance1) (TS:2026-08-29T09:14:07Z) (SESSION:a3f29c1d)".to_string(),
@@ -3152,7 +3152,7 @@ description = "Core crate"
         };
 
         let pass1 = TagItem {
-            file_path: "crates/memfuse-index/src/distance.rs".to_string(),
+            file_path: "crates/memfuse-vector/src/distance.rs".to_string(),
             line_num: 11,
             tag_type: "REVIEW-PASS".to_string(),
             raw: "// REVIEW-PASS[1/3] STATUS:PASS (ID: AGT-INDEX-distance1) (TS:2026-08-29T10:00:00Z) (SESSION:b8e4f1a2)".to_string(),
@@ -3167,7 +3167,7 @@ description = "Core crate"
         };
 
         let pass2 = TagItem {
-            file_path: "crates/memfuse-index/src/distance.rs".to_string(),
+            file_path: "crates/memfuse-vector/src/distance.rs".to_string(),
             line_num: 12,
             tag_type: "REVIEW-PASS".to_string(),
             raw: "// REVIEW-PASS[2/3] STATUS:PASS (ID: AGT-INDEX-distance1) (TS:2026-08-29T11:00:00Z) (SESSION:c9f5e2b3)".to_string(),
@@ -3182,7 +3182,7 @@ description = "Core crate"
         };
 
         let pass3 = TagItem {
-            file_path: "crates/memfuse-index/src/distance.rs".to_string(),
+            file_path: "crates/memfuse-vector/src/distance.rs".to_string(),
             line_num: 13,
             tag_type: "REVIEW-PASS".to_string(),
             raw: "// REVIEW-PASS[3/3] STATUS:PASS (ID: AGT-INDEX-distance1) (TS:2026-08-29T12:00:00Z) (SESSION:d0a6f3c4)".to_string(),
@@ -3324,7 +3324,7 @@ description = "Core crate"
                 is_resolved: false,
             },
             TagItem {
-                file_path: "crates/memfuse-index/src/hnsw.rs".to_string(),
+                file_path: "crates/memfuse-vector/src/hnsw.rs".to_string(),
                 line_num: 99,
                 tag_type: "AI-TAG".to_string(),
                 raw: "// AI-TAG[DEBT][WARN] test2".to_string(),
@@ -3364,7 +3364,7 @@ description = "Core crate"
                 is_resolved: false,
             },
             TagItem {
-                file_path: "crates/memfuse-index/src/hnsw.rs".to_string(),
+                file_path: "crates/memfuse-vector/src/hnsw.rs".to_string(),
                 line_num: 99,
                 tag_type: "AI-TAG".to_string(),
                 raw: "// AI-TAG[DEBT][WARN] test2".to_string(),
@@ -3424,11 +3424,11 @@ description = "Core crate"
                 loc: 100,
                 status: "Clean".to_string(),
                 description: "DB".to_string(),
-                dependencies: vec!["memfuse-ollama".to_string()],
+                dependencies: vec!["memfuse-infer-ollama".to_string()],
             },
             CrateInfo {
-                name: "memfuse-ollama".to_string(),
-                path: "crates/memfuse-ollama".to_string(),
+                name: "memfuse-infer-ollama".to_string(),
+                path: "crates/memfuse-infer-ollama".to_string(),
                 layer: 3,
                 loc: 100,
                 status: "Clean".to_string(),
@@ -3440,7 +3440,7 @@ description = "Core crate"
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].from_crate, "memfuse-db");
         assert_eq!(violations[0].from_layer, 2);
-        assert_eq!(violations[0].to_crate, "memfuse-ollama");
+        assert_eq!(violations[0].to_crate, "memfuse-infer-ollama");
         assert_eq!(violations[0].to_layer, 3);
     }
 
@@ -3449,10 +3449,10 @@ description = "Core crate"
         let violations = vec![DagViolation {
             from_crate: "memfuse-db".to_string(),
             from_layer: 2,
-            to_crate: "memfuse-ollama".to_string(),
+            to_crate: "memfuse-infer-ollama".to_string(),
             to_layer: 3,
         }];
-        let known_exceptions: &[(&str, &str)] = &[("memfuse-db", "memfuse-ollama")];
+        let known_exceptions: &[(&str, &str)] = &[("memfuse-db", "memfuse-infer-ollama")];
 
         let mut untracked = Vec::new();
         for v in &violations {
@@ -3619,7 +3619,7 @@ Always ensure all unit tests pass cleanly.
                 is_resolved: true,
             },
             TagItem {
-                file_path: "crates/memfuse-index/src/hnsw.rs".to_string(),
+                file_path: "crates/memfuse-vector/src/hnsw.rs".to_string(),
                 line_num: 99,
                 tag_type: "AI-TAG".to_string(),
                 raw: "// AI-TAG[DEBT][WARN] test2".to_string(),

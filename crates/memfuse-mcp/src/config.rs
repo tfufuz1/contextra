@@ -28,8 +28,8 @@ impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
             provider: "ollama".to_string(),
-            ollama_url: memfuse_ollama::DEFAULT_BASE_URL.to_string(),
-            embed_model: memfuse_ollama::DEFAULT_EMBED_MODEL.to_string(),
+            ollama_url: memfuse_infer_ollama::DEFAULT_BASE_URL.to_string(),
+            embed_model: memfuse_infer_ollama::DEFAULT_EMBED_MODEL.to_string(),
             onnx_model_path: None,
             candle_model_dir: None,
         }
@@ -44,10 +44,10 @@ impl EmbeddingConfig {
             .unwrap_or_else(|_| "ollama".to_string());
 
         let ollama_url = std::env::var("MEMFUSE_OLLAMA_URL")
-            .unwrap_or_else(|_| memfuse_ollama::DEFAULT_BASE_URL.to_string());
+            .unwrap_or_else(|_| memfuse_infer_ollama::DEFAULT_BASE_URL.to_string());
 
         let embed_model = std::env::var("MEMFUSE_EMBED_MODEL")
-            .unwrap_or_else(|_| memfuse_ollama::DEFAULT_EMBED_MODEL.to_string());
+            .unwrap_or_else(|_| memfuse_infer_ollama::DEFAULT_EMBED_MODEL.to_string());
 
         let onnx_model_path = std::env::var("MEMFUSE_ONNX_MODEL_PATH")
             .ok()
@@ -88,7 +88,7 @@ pub fn create_embedding_provider(
 ) -> Result<Arc<dyn EmbeddingProvider>, MemFuseError> {
     match provider_type.to_lowercase().trim() {
         "ollama" => {
-            let embedder = memfuse_ollama::OllamaEmbedder::new(ollama_url, embed_model);
+            let embedder = memfuse_infer_ollama::OllamaEmbedder::new(ollama_url, embed_model);
             Ok(Arc::new(embedder))
         }
         #[cfg(feature = "onnx")]
@@ -98,7 +98,7 @@ pub fn create_embedding_provider(
                     "onnx_model_path is required when embedding provider is 'onnx'".to_string(),
                 )
             })?;
-            let embedder = memfuse_embed::OnnxEmbedder::from_path(path)?;
+            let embedder = memfuse_infer_onnx::OnnxEmbedder::from_path(path)?;
             Ok(Arc::new(embedder))
         }
         #[cfg(not(feature = "onnx"))]
@@ -119,11 +119,12 @@ pub fn create_embedding_provider(
                     "candle_model_dir is required when embedding provider is 'candle'".to_string(),
                 )
             })?;
-            let quantization = memfuse_candle::model_registry::CandleQuantization::Q4KM;
-            let embedder = memfuse_candle::CandleEmbedClient::from_dir(model_dir, quantization)
-                .map_err(|e| {
-                    MemFuseError::Internal(format!("Failed to load Candle embed model: {e}"))
-                })?;
+            let quantization = memfuse_infer_candle::model_registry::CandleQuantization::Q4KM;
+            let embedder =
+                memfuse_infer_candle::CandleEmbedClient::from_dir(model_dir, quantization)
+                    .map_err(|e| {
+                        MemFuseError::Internal(format!("Failed to load Candle embed model: {e}"))
+                    })?;
             Ok(Arc::new(embedder))
         }
         #[cfg(not(feature = "candle"))]
@@ -161,7 +162,7 @@ impl Default for LlmConfig {
     fn default() -> Self {
         Self {
             provider: "ollama".to_string(),
-            ollama_url: memfuse_ollama::DEFAULT_BASE_URL.to_string(),
+            ollama_url: memfuse_infer_ollama::DEFAULT_BASE_URL.to_string(),
             llm_model: "llama3.2:3b".to_string(),
             candle_model_dir: None,
         }
@@ -176,7 +177,7 @@ impl LlmConfig {
             .unwrap_or_else(|_| "ollama".to_string());
 
         let ollama_url = std::env::var("MEMFUSE_OLLAMA_URL")
-            .unwrap_or_else(|_| memfuse_ollama::DEFAULT_BASE_URL.to_string());
+            .unwrap_or_else(|_| memfuse_infer_ollama::DEFAULT_BASE_URL.to_string());
 
         let llm_model =
             std::env::var("MEMFUSE_LLM_MODEL").unwrap_or_else(|_| "llama3.2:3b".to_string());
@@ -215,12 +216,12 @@ pub fn create_llm_text_generator(
         "ollama" => {
             // AI-TAG[SMELL][MAJOR][RESOLVED] Field reassignment on Default::default instance triggers clippy::field_reassign_with_default (ID: AGT-MCP-98350010) (TS: 2026-09-09T14:04:00Z) (SESSION: fdf816df)
             // FIX: Refactored to struct init expression with ..Default::default() spread.
-            let config = memfuse_ollama::OllamaConfig {
+            let config = memfuse_infer_ollama::OllamaConfig {
                 base_url: ollama_url.to_string(),
                 model: llm_model.to_string(),
                 ..Default::default()
             };
-            let client = memfuse_ollama::OllamaClient::with_config(config);
+            let client = memfuse_infer_ollama::OllamaClient::with_config(config);
             Ok(Arc::new(client))
         }
         #[cfg(feature = "candle")]
@@ -231,11 +232,11 @@ pub fn create_llm_text_generator(
                     "candle_model_dir is required when LLM provider is 'candle'".to_string(),
                 )
             })?;
-            let quantization = memfuse_candle::model_registry::CandleQuantization::Q4KM;
-            let generator = memfuse_candle::CandleLlmClient::from_dir(model_dir, quantization)
-                .map_err(|e| {
-                    MemFuseError::Internal(format!("Failed to load Candle LLM model: {e}"))
-                })?;
+            let quantization = memfuse_infer_candle::model_registry::CandleQuantization::Q4KM;
+            let generator =
+                memfuse_infer_candle::CandleLlmClient::from_dir(model_dir, quantization).map_err(
+                    |e| MemFuseError::Internal(format!("Failed to load Candle LLM model: {e}")),
+                )?;
             Ok(Arc::new(generator))
         }
         #[cfg(not(feature = "candle"))]
@@ -323,8 +324,11 @@ mod tests {
     fn test_embedding_config_defaults() {
         let config = EmbeddingConfig::default();
         assert_eq!(config.provider, "ollama");
-        assert_eq!(config.ollama_url, memfuse_ollama::DEFAULT_BASE_URL);
-        assert_eq!(config.embed_model, memfuse_ollama::DEFAULT_EMBED_MODEL);
+        assert_eq!(config.ollama_url, memfuse_infer_ollama::DEFAULT_BASE_URL);
+        assert_eq!(
+            config.embed_model,
+            memfuse_infer_ollama::DEFAULT_EMBED_MODEL
+        );
         assert!(config.onnx_model_path.is_none());
         assert!(config.candle_model_dir.is_none());
     }
@@ -333,7 +337,7 @@ mod tests {
     fn test_llm_config_defaults() {
         let config = LlmConfig::default();
         assert_eq!(config.provider, "ollama");
-        assert_eq!(config.ollama_url, memfuse_ollama::DEFAULT_BASE_URL);
+        assert_eq!(config.ollama_url, memfuse_infer_ollama::DEFAULT_BASE_URL);
         assert_eq!(config.llm_model, "llama3.2:3b");
         assert!(config.candle_model_dir.is_none());
     }

@@ -9,8 +9,8 @@ use memfuse_db::maintenance_scheduler::MaintenanceScheduler;
 use memfuse_db::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
 use memfuse_db::Collection;
 use memfuse_graph::CsrGraph;
-use memfuse_index::HnswIndex;
 use memfuse_store::LsmStorage;
+use memfuse_vector::HnswIndex;
 use serde_json::json;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -28,7 +28,7 @@ async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, te
         .expect("LsmStorage"),
     );
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })

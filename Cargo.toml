@@ -6,20 +6,20 @@ members = [
     "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
-    "crates/memfuse-index",
+    "crates/memfuse-vector",
     "crates/memfuse-db",
     "crates/memfuse-text",
     "crates/memfuse-checkpoint",
     "crates/memfuse-crypto",
     "crates/memfuse-graph",
-    "crates/memfuse-embed",
+    "crates/memfuse-infer-onnx",
     "crates/memfuse-mcp",
     "crates/memfuse-agent",
-    "crates/memfuse-ollama",
+    "crates/memfuse-infer-ollama",
     "crates/memfuse-router",
     "crates/memfuse-calibration",
     "benchmarks/memfuse-bench",
-    "crates/memfuse-candle",
+    "crates/memfuse-infer-candle",
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
     "crates/memfuse-testkit", "crates/memfuse", "crates/memfuse-types", "crates/memfuse-ports", "crates/memfuse-mvcc", "crates/memfuse-adapt", "crates/memfuse-kvcache",
@@ -30,19 +30,19 @@ default-members = [
     "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
-    "crates/memfuse-index",
+    "crates/memfuse-vector",
     "crates/memfuse-db",
     "crates/memfuse-text",
     "crates/memfuse-checkpoint",
     "crates/memfuse-crypto",
     "crates/memfuse-graph",
-    "crates/memfuse-embed",
+    "crates/memfuse-infer-onnx",
     "crates/memfuse-mcp",
     "crates/memfuse-agent",
-    "crates/memfuse-ollama",
+    "crates/memfuse-infer-ollama",
     "crates/memfuse-router",
     "crates/memfuse-calibration",
-    "crates/memfuse-candle",
+    "crates/memfuse-infer-candle",
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
     "crates/memfuse-testkit",
@@ -103,19 +103,24 @@ memfuse-sys = { path = "crates/memfuse-sys" }
 memfuse-simd = { path = "crates/memfuse-simd" }
 memfuse-core = { path = "crates/memfuse-core" }
 memfuse-store = { path = "crates/memfuse-store" }
-memfuse-index = { path = "crates/memfuse-index" }
+memfuse-vector = { path = "crates/memfuse-vector" }
+memfuse-infer-candle = { path = "crates/memfuse-infer-candle" }
+memfuse-infer-ollama = { path = "crates/memfuse-infer-ollama" }
+memfuse-infer-onnx = { path = "crates/memfuse-infer-onnx" }
+# Backward-compatible workspace aliases for forbidden parallel crates
+memfuse-index = { package = "memfuse-vector", path = "crates/memfuse-vector" }
+memfuse-candle = { package = "memfuse-infer-candle", path = "crates/memfuse-infer-candle" }
+memfuse-ollama = { package = "memfuse-infer-ollama", path = "crates/memfuse-infer-ollama" }
+memfuse-embed = { package = "memfuse-infer-onnx", path = "crates/memfuse-infer-onnx" }
 memfuse-db = { path = "crates/memfuse-db" }
 memfuse-text = { path = "crates/memfuse-text" }
 memfuse-checkpoint = { path = "crates/memfuse-checkpoint" }
 memfuse-crypto = { path = "crates/memfuse-crypto" }
 memfuse-graph = { path = "crates/memfuse-graph" }
-memfuse-embed = { path = "crates/memfuse-embed" }
 memfuse-mcp   = { path = "crates/memfuse-mcp" }
 memfuse-agent = { path = "crates/memfuse-agent" }
-memfuse-ollama = { path = "crates/memfuse-ollama" }
 memfuse-router = { path = "crates/memfuse-router" }
 memfuse-calibration = { path = "crates/memfuse-calibration" }
-memfuse-candle = { path = "crates/memfuse-candle" }
 memfuse-sandbox = { path = "crates/memfuse-sandbox" }
 memfuse-py = { path = "crates/memfuse-py" }
 memfuse-testkit = { path = "crates/memfuse-testkit" }

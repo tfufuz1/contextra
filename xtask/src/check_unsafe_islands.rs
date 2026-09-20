@@ -2,7 +2,7 @@
 //! Validiert die 3-Insel-Invarianten für `unsafe`-Code (§0.4, ADR-N03):
 //! 1. Keyword `unsafe` ist nur in den definierten Inseln zulässig:
 //!    `memfuse-sys`, `memfuse-simd`, `memfuse-wire`
-//!    (Phase 0R Übergangsliste: `memfuse-index`, `memfuse-store`, `memfuse-db`).
+//!    (Phase 0R Übergangsliste: `memfuse-vector`, `memfuse-store`, `memfuse-db`).
 //! 2. Jede Nicht-Insel-`lib.rs` enthält `#![forbid(unsafe_code)]`.
 //! 3. `#![allow(unsafe_code)]` ist NUR in den 3 Inseln zulässig.
 //!
@@ -17,7 +17,7 @@ pub const ALLOWED_ISLANDS: &[&str] = &["memfuse-sys", "memfuse-simd", "memfuse-w
 
 /// Phase 0R Übergangsliste für Bestands-`unsafe` Vorkommen
 pub const PHASE_0R_TRANSITION_ISLANDS: &[&str] = &[
-    "memfuse-index",
+    "memfuse-vector",
     "memfuse-store",
     "memfuse-db",
     // TRANSITION-EXTRA: test allocators, benchmark fixtures

@@ -9,18 +9,18 @@ description = "MemFuse — Embedded hybrid-search for AI agents (Facade)"
 [dependencies]
 memfuse-core = { workspace = true }
 memfuse-db = { workspace = true }
-memfuse-candle = { workspace = true, optional = true }
-memfuse-ollama = { workspace = true, optional = true }
-memfuse-embed = { workspace = true, optional = true }
+memfuse-infer-candle = { workspace = true, optional = true }
+memfuse-infer-ollama = { workspace = true, optional = true }
+memfuse-infer-onnx = { workspace = true, optional = true }
 memfuse-router = { workspace = true, optional = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 
 [features]
 default = []
-onnx = ["memfuse-embed/onnx", "memfuse-db/onnx"]
-candle = ["memfuse-candle"]
-ollama = ["memfuse-ollama"]
+onnx = ["memfuse-infer-onnx/onnx", "memfuse-db/onnx"]
+candle = ["memfuse-infer-candle"]
+ollama = ["memfuse-infer-ollama"]
 router = ["memfuse-router"]
 
 [lints]

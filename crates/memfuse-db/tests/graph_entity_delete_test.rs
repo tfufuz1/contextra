@@ -2,8 +2,8 @@ use memfuse_core::{Edge, Entity, EntityId, GraphIndex, PprConfig};
 use memfuse_db::transaction::DbTransaction;
 use memfuse_db::Collection;
 use memfuse_graph::CsrGraph;
-use memfuse_index::HnswIndex;
 use memfuse_store::{LsmConfig, LsmStorage};
+use memfuse_vector::HnswIndex;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -19,7 +19,7 @@ async fn create_test_collection(
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
     let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
+        HnswIndex::try_new(memfuse_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })
