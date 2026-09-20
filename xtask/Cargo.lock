@@ -766,6 +766,7 @@ dependencies = [
  "ahash",
  "blake3",
  "bytes",
+ "memfuse-adapt",
  "memfuse-calibration",
  "memfuse-checkpoint",
  "memfuse-core",
