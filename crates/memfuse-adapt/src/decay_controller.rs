@@ -24,7 +24,9 @@ pub struct DecaySignalInputs {
     /// Berechnung: 1 - (queries_in_window / max_queries_per_window).
     /// Hoher Wert = wenig Queries = System idle = konservativer Verfall.
     pub query_load_inverse: f32,
+    /// Gewichtung für Tombstone-Ratio im Verfallssignal.
     pub w_tombstone: f32,
+    /// Gewichtung für Inverse-Query-Load im Verfallssignal.
     pub w_query: f32,
 }
 
@@ -60,16 +62,19 @@ impl Default for DecayControllerConfig {
     }
 }
 
+/// Adaptive Decay Controller für time-weighted Cache-Eviction.
 #[derive(Debug, Clone)]
 pub struct AdaptiveDecayController {
     config: DecayControllerConfig,
 }
 
 impl AdaptiveDecayController {
+    /// Erstellt einen neuen `AdaptiveDecayController` mit der angegebenen Konfiguration.
     pub fn new(config: DecayControllerConfig) -> Self {
         Self { config }
     }
 
+    /// Erstellt einen neuen `AdaptiveDecayController` mit Standardwerten.
     pub fn with_defaults() -> Self {
         Self::new(DecayControllerConfig::default())
     }
