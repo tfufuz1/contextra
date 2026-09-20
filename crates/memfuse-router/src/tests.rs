@@ -2544,6 +2544,7 @@ mod tests {
             )
             .await?;
 
+        #[allow(unused_mut)]
         let mut profile = SlmProfile::new(
             "lyapunov-slm",
             "http://localhost:9999/mcp",

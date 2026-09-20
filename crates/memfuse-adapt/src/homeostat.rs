@@ -5,20 +5,20 @@
 
 //! PID Controller and Deadline Management for Retrieval Latency Control.
 //!
-//! NOTE: `RerankPidController` and `pid_regulated_candidate_pool` have been consolidated into `memfuse_calibration::PidController`.
+//! NOTE: `RerankPidController` and `pid_regulated_candidate_pool` have been consolidated into `crate::PidController`.
 
 use std::time::{Duration, Instant};
 
 /// P95 Latency-feedback PID Controller for dynamically tuning candidate pool sizes.
 ///
-/// DEPRECATED: Use [`memfuse_calibration::PidController`] instead.
+/// DEPRECATED: Use [`crate::PidController`] instead.
 #[deprecated(
     since = "0.1.0",
-    note = "Consolidated into `memfuse_calibration::PidController`. Use `memfuse_calibration::PidController` directly."
+    note = "Consolidated into `crate::PidController`. Use `crate::PidController` directly."
 )]
 #[derive(Debug, Clone)]
 pub struct RerankPidController {
-    inner: memfuse_calibration::PidController,
+    inner: crate::PidController,
 }
 
 #[allow(deprecated)]
@@ -38,7 +38,7 @@ impl RerankPidController {
         initial_pool: usize,
     ) -> Self {
         Self {
-            inner: memfuse_calibration::PidController::new(
+            inner: crate::PidController::new(
                 target_p95_latency_ms,
                 k_min,
                 k_max,
@@ -94,7 +94,7 @@ impl RerankPidController {
 /// Free function to update the PID controller with observed latency and return the regulated candidate pool size.
 #[deprecated(
     since = "0.1.0",
-    note = "Consolidated into `memfuse_calibration::PidController`. Use `memfuse_calibration::PidController::update` directly."
+    note = "Consolidated into `crate::PidController`. Use `crate::PidController::update` directly."
 )]
 #[allow(deprecated)]
 pub fn pid_regulated_candidate_pool(

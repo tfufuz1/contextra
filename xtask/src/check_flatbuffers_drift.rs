@@ -149,7 +149,7 @@ pub fn check_flatbuffers_drift() -> Result<(), String> {
     }
 }
 
-/// Regenerates `crates/memfuse-core-ipc-gen/src/memfuse_generated.rs` directly from `schemas/memfuse.fbs`.
+/// Regenerates `crates/memfuse-wire/src/memfuse_generated.rs` directly from `schemas/memfuse.fbs`.
 pub fn regenerate_flatbuffers() -> Result<(), String> {
     println!("=== XTask: Regenerate FlatBuffers Rust Code ===");
 
