@@ -9,8 +9,8 @@
 use std::future::Future;
 use std::pin::Pin;
 
-pub use memfuse_types::{error, error_dto, model_fingerprint, schema, tombstone, types};
 pub use memfuse_types::*;
+pub use memfuse_types::{error, error_dto, model_fingerprint, schema, tombstone, types};
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;

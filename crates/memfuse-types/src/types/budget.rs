@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn test_token_budget_edge_cases() {
-        let mut budget = TokenBudget::new(100, 20);
+        let budget = TokenBudget::new(100, 20);
         assert_eq!(budget.effective_limit(), 100);
         assert_eq!(budget.available(), 80);
 
