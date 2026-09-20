@@ -141,14 +141,20 @@ pub trait SandboxBridge: Send + Sync {
 }
 
 // mod Collection is used via pub mod collection
-pub mod decay_controller;
+pub mod decay_controller {
+    pub use memfuse_adapt::decay_controller::*;
+}
 pub mod filter;
 pub mod fusion;
-pub mod homeostat;
+pub mod homeostat {
+    pub use memfuse_adapt::homeostat::*;
+}
 pub mod maintenance_config;
 pub mod maintenance_scheduler;
 pub mod multistep;
-pub mod pid_latency_controller;
+pub mod pid_latency_controller {
+    pub use memfuse_adapt::pid_latency_controller::*;
+}
 pub mod transaction;
 
 // Jarvis-Erweiterungs-Module (Feature-gated)
@@ -2474,10 +2480,6 @@ mod tests {
             }
         );
     }
-
-    #[tokio::test]
-
-    #[tokio::test]
 
     #[tokio::test]
     #[cfg(feature = "onnx")]
