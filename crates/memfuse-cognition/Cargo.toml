@@ -1,0 +1,37 @@
+[lints]
+workspace = true
+
+[package]
+name = "memfuse-cognition"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "MemFuse — Memory consolidation, compaction, and context management"
+
+[dependencies]
+memfuse-engine = { workspace = true }
+memfuse-core = { workspace = true }
+memfuse-store = { workspace = true }
+memfuse-index = { workspace = true }
+memfuse-graph = { workspace = true }
+bytes = { workspace = true }
+ahash = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+tokio-util = { version = "0.7.18", features = ["rt"] }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
+
+[features]
+default = []
+graph-connectivity-health = ["memfuse-graph/physio-percolation", "memfuse-engine/graph-connectivity-health"]
+edge-reinforcement-learning = ["memfuse-graph/edge-reinforcement-learning", "memfuse-engine/edge-reinforcement-learning"]
+docid-128 = ["memfuse-core/docid-128", "memfuse-engine/docid-128"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+tempfile = { workspace = true }

@@ -48,6 +48,8 @@ Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENT
 | `memfuse-candle` | `crates/memfuse-candle/AGENTS.md` |
 | `memfuse-embed` | `crates/memfuse-embed/AGENTS.md` |
 | `memfuse-db` | `crates/memfuse-db/AGENTS.md` |
+| `memfuse-engine` | `crates/memfuse-engine/AGENTS.md` |
+| `memfuse-cognition` | `crates/memfuse-cognition/AGENTS.md` |
 | `memfuse-bench` | `benchmarks/memfuse-bench/AGENTS.md` |
 | `memfuse-router` | `crates/memfuse-router/AGENTS.md` |
 | `memfuse-agent` | `crates/memfuse-agent/AGENTS.md` |

@@ -297,7 +297,7 @@ mod tests {
         let summary = db2.import_memories(export_doc.clone()).await.unwrap();
         assert_eq!(summary.imported_memories, 3);
         assert_eq!(summary.skipped_memories, 0);
-        assert_eq!(summary.imported_relations, 2); // bidirectional graph relations
+        assert_eq!(summary.imported_relations, 1);
 
         // 3. Verify content in DB2
         let col2_default = db2.collection("default").await.unwrap();

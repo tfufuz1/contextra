@@ -7,13 +7,13 @@
 //                       ist für Drift-Erkennung reaktionsschneller als ein periodischer 60s-Tick.
 // STAND: TS:2026-08-31T00:00:00Z
 
-use crate::collection::{Collection, StoredDocument};
 use crate::consolidation_executor::{execute_consolidation_pass, ConsolidationLockGuard};
-use crate::decay_controller::AdaptiveDecayController;
 use crate::maintenance_config::MaintenanceConfig;
 use crate::memory_consolidation::ConsolidationConfig;
 use memfuse_core::traits::{StorageEngine, VectorIndex};
 use memfuse_core::{DocId, MemFuseError, TxId};
+use memfuse_engine::collection::{Collection, StoredDocument};
+use memfuse_engine::decay_controller::AdaptiveDecayController;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -214,11 +214,11 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
             {
                 Ok(entries) => {
                     let mut turns: Vec<(DocId, Vec<f32>)> = Vec::new();
-                    for (k, v) in entries {
+                    for (k, v) in &entries {
                         if self.collection.name() == "default" && k.starts_with(b"__") {
                             continue;
                         }
-                        if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
+                        if let Ok(stored) = serde_json::from_slice::<StoredDocument>(v) {
                             if let Ok(doc_id) = DocId::from_key(&stored.id) {
                                 turns.push((doc_id, stored.embedding));
                             }
@@ -348,7 +348,7 @@ mod tests {
             Arc::new(CsrGraph::new()),
             Arc::new(AtomicU64::new(1)),
             4,
-            memfuse_text::Language::English,
+            memfuse_engine::Language::English,
         ))
     }
 

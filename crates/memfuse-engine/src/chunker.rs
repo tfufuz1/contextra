@@ -10,12 +10,76 @@
 //! heading hierarchy. Merges small sections and attaches heading paths as
 //! metadata breadcrumbs.
 
-use crate::context::ContextManager;
 use memfuse_core::{ContextChunk, DocId};
 use serde_json::json;
 
-/// Approximate character count per token (BPE ratio consistent with `ContextManager::estimate_tokens`).
+/// Approximate character count per token (BPE ratio).
 const CHARS_PER_TOKEN: usize = 4;
+
+/// Schätzt die Token-Anzahl eines Textes mit heuristischen Regeln.
+pub fn estimate_tokens(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+
+    let mut tokens: f64 = 0.0;
+    let mut in_code_block = false;
+    let code_multiplier = 1.8f64;
+
+    for line in text.lines() {
+        if line.starts_with("```") {
+            in_code_block = !in_code_block;
+            tokens += 1.0;
+            continue;
+        }
+
+        let multiplier = if in_code_block { code_multiplier } else { 1.0 };
+
+        let mut char_iter = line.chars().peekable();
+        while let Some(c) = char_iter.next() {
+            match c {
+                '\u{4E00}'..='\u{9FFF}'
+                | '\u{3400}'..='\u{4DBF}'
+                | '\u{20000}'..='\u{2A6DF}'
+                | '\u{3040}'..='\u{309F}'
+                | '\u{30A0}'..='\u{30FF}' => {
+                    tokens += 1.0 * multiplier;
+                }
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    let mut word_len = 1usize;
+                    while char_iter
+                        .peek()
+                        .is_some_and(|c| c.is_alphanumeric() || *c == '_')
+                    {
+                        char_iter.next();
+                        word_len += 1;
+                    }
+                    let word_tokens = if word_len <= 4 {
+                        1.0
+                    } else {
+                        1.0 + (word_len as f64 - 4.0) / 4.0
+                    };
+                    tokens += word_tokens * multiplier;
+                }
+                '0'..='9' => {
+                    let mut num_len = 1usize;
+                    while char_iter.peek().is_some_and(|c| c.is_ascii_digit()) {
+                        char_iter.next();
+                        num_len += 1;
+                    }
+                    tokens += ((num_len as f64) / 3.0).ceil() * multiplier;
+                }
+                ' ' | '\t' => {}
+                _ => {
+                    tokens += 0.25 * multiplier;
+                }
+            }
+        }
+        tokens += 0.1;
+    }
+
+    (tokens.ceil() as usize).max(1)
+}
 
 /// Configuration for the Markdown chunker.
 pub struct ChunkerConfig {
@@ -97,7 +161,7 @@ impl MarkdownChunker {
             if is_heading {
                 if !current_lines.is_empty() {
                     let content = current_lines.join("\n");
-                    let tokens = ContextManager::estimate_tokens(&content);
+                    let tokens = estimate_tokens(&content);
                     raw_sections.push(RawSection {
                         lines: std::mem::take(&mut current_lines),
                         breadcrumb: current_breadcrumb.clone(),
@@ -108,7 +172,6 @@ impl MarkdownChunker {
                 }
 
                 heading_stack.retain(|(lvl, _)| *lvl < h_level);
-                // Simplify heading display for breadcrumb
                 let heading_text = line.trim_start_matches('#').trim();
                 let breadcrumb_part = format!("{} {}", parts_first(line, h_level), heading_text);
                 heading_stack.push((h_level, breadcrumb_part));
@@ -128,7 +191,7 @@ impl MarkdownChunker {
 
         if !current_lines.is_empty() {
             let content = current_lines.join("\n");
-            let tokens = ContextManager::estimate_tokens(&content);
+            let tokens = estimate_tokens(&content);
             raw_sections.push(RawSection {
                 lines: current_lines,
                 breadcrumb: current_breadcrumb,
@@ -138,14 +201,12 @@ impl MarkdownChunker {
             });
         }
 
-        // Enforce hard limits by splitting large sections
         let mut limited_sections = Vec::new();
         let window_chars = hard_limit * CHARS_PER_TOKEN;
-        let overlap_chars = window_chars / 5; // ~20% overlap
+        let overlap_chars = window_chars / 5;
 
         for sec in raw_sections {
             if sec.tokens > hard_limit {
-                // Approximate paragraph splitting
                 let content = sec.lines.join("\n");
                 let paragraphs: Vec<&str> = content.split("\n\n").collect();
                 let mut current_p_lines = Vec::new();
@@ -153,13 +214,12 @@ impl MarkdownChunker {
 
                 let push_paragraph_section = |lines: Vec<String>, target: &mut Vec<RawSection>| {
                     let p_content = lines.join("\n");
-                    let actual_tokens = ContextManager::estimate_tokens(&p_content);
+                    let actual_tokens = estimate_tokens(&p_content);
                     if actual_tokens > hard_limit {
-                        // Fallback for oversized paragraphs/sections: split into sliding token windows with overlap
                         let windows =
                             chunk_text_with_overlap(&p_content, window_chars, overlap_chars);
                         for w in windows {
-                            let w_tokens = ContextManager::estimate_tokens(w);
+                            let w_tokens = estimate_tokens(w);
                             target.push(RawSection {
                                 lines: vec![w.to_string()],
                                 breadcrumb: sec.breadcrumb.clone(),
@@ -180,8 +240,7 @@ impl MarkdownChunker {
                 };
 
                 for p in paragraphs {
-                    let p_tokens = ContextManager::estimate_tokens(p);
-                    // Add back the double newline logic
+                    let p_tokens = estimate_tokens(p);
                     let p_text = if current_p_lines.is_empty() {
                         p.to_string()
                     } else {
@@ -208,18 +267,15 @@ impl MarkdownChunker {
             }
         }
 
-        // Merge small sections
         let mut final_sections: Vec<RawSection> = Vec::new();
         for sec in limited_sections {
             if let Some(last) = final_sections.last_mut() {
                 if (last.tokens < self.config.min_tokens || sec.tokens < self.config.min_tokens)
                     && (last.tokens + sec.tokens) <= hard_limit
                 {
-                    // Prepend newline before pushing the extra lines if needed, wait, lines themselves might not have newlines
-                    // If we just join lines and split later, it's safer. Let's just extend.
-                    last.lines.push("".to_string()); // empty line for separation?
+                    last.lines.push("".to_string());
                     last.lines.extend(sec.lines);
-                    last.tokens += sec.tokens; // approximation might drift slightly, but safe enough
+                    last.tokens += sec.tokens;
                     continue;
                 }
             }
@@ -240,7 +296,7 @@ impl MarkdownChunker {
                 };
 
                 let content = sec.lines.join("\n");
-                let token_count = ContextManager::estimate_tokens(&content);
+                let token_count = estimate_tokens(&content);
 
                 ContextChunk {
                     doc_id,
@@ -264,8 +320,6 @@ fn parts_first(_line: &str, h_level: u8) -> String {
     s
 }
 
-/// Splits a text string into overlapping chunks of at most `window_chars` Unicode characters (code points),
-/// safely respecting UTF-8 character boundaries using `str::char_indices()`.
 pub fn chunk_text_with_overlap(text: &str, window_chars: usize, overlap_chars: usize) -> Vec<&str> {
     if text.is_empty() || window_chars == 0 {
         return Vec::new();
@@ -301,8 +355,6 @@ pub fn chunk_text_with_overlap(text: &str, window_chars: usize, overlap_chars: u
     chunks
 }
 
-/// Splits a text string into chunks of at most `chunk_size` Unicode characters (code points),
-/// safely respecting UTF-8 character boundaries using `str::char_indices()`.
 pub fn chunk_text(text: &str, chunk_size: usize) -> Vec<&str> {
     if text.is_empty() || chunk_size == 0 {
         return Vec::new();
@@ -334,8 +386,6 @@ mod tests {
 
     #[test]
     fn test_chunk_text_unicode_german_umlauts() {
-        // German string with umlauts (ä, ö, ü, ß) and unicode characters.
-        // Total character count = 100 unicode chars (50 chars * 2).
         let text = "Äpfel, Öle, Übermut und Straße sind wunderschön!! ".repeat(2);
         let char_count = text.chars().count();
         assert!(
@@ -348,7 +398,6 @@ mod tests {
         assert!(!chunks.is_empty());
 
         for chunk in &chunks {
-            // Check that chunk is valid UTF-8 (slice indexing would panic otherwise)
             assert!(std::str::from_utf8(chunk.as_bytes()).is_ok());
             assert!(chunk.chars().count() <= 30);
         }
@@ -407,15 +456,15 @@ mod tests {
 
         assert_eq!(chunks.len(), 3);
 
-        let m0 = chunks[0].metadata.as_ref().unwrap(); // unwrap
+        let m0 = chunks[0].metadata.as_ref().unwrap();
         assert_eq!(m0["breadcrumb"], "# Title");
         assert_eq!(m0["heading_level"], 1);
 
-        let m1 = chunks[1].metadata.as_ref().unwrap(); // unwrap
+        let m1 = chunks[1].metadata.as_ref().unwrap();
         assert_eq!(m1["breadcrumb"], "# Title > ## Section 1");
         assert_eq!(m1["heading_level"], 2);
 
-        let m2 = chunks[2].metadata.as_ref().unwrap(); // unwrap
+        let m2 = chunks[2].metadata.as_ref().unwrap();
         assert_eq!(m2["breadcrumb"], "# Title > ## Section 1 > ### Sub 1");
         assert_eq!(m2["heading_level"], 3);
     }
@@ -431,11 +480,9 @@ mod tests {
         let doc_id = DocId::new(2);
         let chunks = chunker.chunk(doc_id, markdown);
 
-        // 5 small sections of 1 token each. They should merge into 1 chunk (since total < 50)
         assert_eq!(chunks.len(), 1);
 
-        // The merged chunk inherits the breadcrumb of the first sub-section.
-        let m = chunks[0].metadata.as_ref().unwrap(); // unwrap
+        let m = chunks[0].metadata.as_ref().unwrap();
         assert_eq!(m["breadcrumb"], "# S1");
         assert!(chunks[0].content.contains("e"));
     }
@@ -453,7 +500,6 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
 
-        // Normalizing spaces exactly is tricky depending on how splits happen, but let's just check if all words exist
         let orig_words: Vec<_> = markdown.split_whitespace().collect();
         let concat_words: Vec<_> = concatenated.split_whitespace().collect();
         assert_eq!(orig_words, concat_words);
@@ -464,7 +510,6 @@ mod tests {
         let chunker = MarkdownChunker::with_defaults();
         let doc_id = DocId::new(4);
 
-        // Use a dummy large doc to simulate AGENTS.md
         let mut markdown = String::new();
         for i in 0..100 {
             markdown.push_str(&format!("## Heading {}\n", i));
@@ -473,7 +518,6 @@ mod tests {
             }
         }
 
-        // The hard limit is 512 * 1.2 = 614 tokens
         let limit = (chunker.config.max_tokens as f64 * 1.2) as usize;
 
         let chunks = chunker.chunk(doc_id, &markdown);
@@ -510,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_chunk_text_exact_chunk_size_multiple() {
-        let text = "abcdefghij"; // 10 chars
+        let text = "abcdefghij";
         let chunks = chunk_text(text, 5);
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0], "abcde");
@@ -534,7 +578,7 @@ mod tests {
         let chunks = chunker.chunk(DocId::new(5), "Plain single line document.");
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].content, "Plain single line document.");
-        let meta = chunks[0].metadata.as_ref().unwrap(); // unwrap
+        let meta = chunks[0].metadata.as_ref().unwrap();
         assert_eq!(meta["breadcrumb"], "");
         assert_eq!(meta["heading_level"], 0);
     }
@@ -542,24 +586,22 @@ mod tests {
     #[test]
     fn test_chunker_unsplit_heading_level_ignored() {
         let config = ChunkerConfig {
-            split_levels: vec![1, 2], // H3 (###) ignored
+            split_levels: vec![1, 2],
             min_tokens: 0,
             ..Default::default()
         };
         let chunker = MarkdownChunker::new(config);
         let markdown = "# Level 1\nText 1\n### Level 3\nText 3";
         let chunks = chunker.chunk(DocId::new(6), markdown);
-        // Level 3 heading should NOT split into a new section
         assert_eq!(chunks.len(), 1);
-        let meta = chunks[0].metadata.as_ref().unwrap(); // unwrap
+        let meta = chunks[0].metadata.as_ref().unwrap();
         assert_eq!(meta["breadcrumb"], "# Level 1");
     }
 
     #[test]
     fn chunker_handles_headingless_single_paragraph_document() {
-        // Construct continuous plaintext of ~3000 words without '#' headings or '\n\n' breaks
         let line = "This is a continuous sentence representing extracted PDF text with single line breaks.\n";
-        let text = line.repeat(250); // ~2500 words, >> hard_limit tokens
+        let text = line.repeat(250);
         assert!(!text.contains("#"));
         assert!(!text.contains("\n\n"));
 
@@ -585,14 +627,13 @@ mod tests {
 
     #[test]
     fn chunk_text_with_overlap_produces_overlapping_windows() {
-        let text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; // 36 chars
+        let text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         let window_chars = 10;
         let overlap_chars = 3;
 
         let windows = chunk_text_with_overlap(text, window_chars, overlap_chars);
         assert!(!windows.is_empty());
 
-        // Check overlap between consecutive windows
         for i in 0..windows.len() - 1 {
             let w1 = windows[i];
             let w2 = windows[i + 1];
@@ -607,7 +648,6 @@ mod tests {
             );
         }
 
-        // Verify first window starts at index 0 and last window finishes at text end
         assert_eq!(
             windows.first().unwrap().chars().take(3).collect::<String>(),
             "ABC"

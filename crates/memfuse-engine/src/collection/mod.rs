@@ -47,7 +47,7 @@ impl Default for CollectionConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct StoredDocument {
+pub struct StoredDocument {
     pub id: String,
     pub embedding: Vec<f32>,
     pub metadata: Option<serde_json::Value>,
@@ -56,7 +56,7 @@ pub(crate) struct StoredDocument {
 /// Leichtgewichtige Metadaten (für doc_key, key_type=1) — KEIN Embedding.
 /// Wird für DocId-basierte Hydration nach HNSW/BM25-Suche verwendet.
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct StoredDocumentMeta {
+pub struct StoredDocumentMeta {
     pub id: String,
     pub metadata: Option<serde_json::Value>,
 }
@@ -250,7 +250,7 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) next_tx: Arc<AtomicU64>,
     pub(super) dimension: usize,
     pub(super) embedder: parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>,
-    pub(super) consolidation_guard: Arc<tokio::sync::Mutex<()>>,
+    pub consolidation_guard: Arc<tokio::sync::Mutex<()>>,
     pub(super) kv_locks: Arc<kv_lock::KvKeyLocks>,
     /// Optionaler tenant-isolierter KV-Cache-Store zur automatischen KV-Cache-Bereinigung bei Rollbacks.
     pub(super) kv_store: Option<Arc<memfuse_crypto::TenantIsolatedKvStore>>,

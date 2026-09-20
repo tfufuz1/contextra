@@ -6,7 +6,6 @@
 //! Verbindet Structural Consolidation Pass-Ergebnisse mit der Collection-Mutation-API.
 //! INVARIANTE: Nur Structural Consolidation Pass (rein strukturell) hier. Keine LLM-Calls.
 
-use crate::collection::{Collection, StoredDocumentMeta};
 use crate::memory_consolidation::{
     compute_community_hash, run_consolidation_pass, run_structural_synthesis_pass,
     CommunityStabilityTracker, ConsolidationConfig, ConsolidationPhaseResult, SynthesisConfig,
@@ -16,6 +15,8 @@ use memfuse_core::traits::{
     LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex,
 };
 use memfuse_core::{DocId, Result};
+use memfuse_engine::collection::{Collection, StoredDocument, StoredDocumentMeta};
+use memfuse_engine::decay_controller::AdaptiveDecayController;
 use memfuse_graph::{detect_communities, CommunityDetectionConfig};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -168,7 +169,7 @@ pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
 
     let synthesis_result = if let (Some(synth_cfg), Some(llm_gen)) = (synthesis_config, llm) {
         let assignments = detect_communities(
-            &collection.graph_index,
+            &collection.graph_index(),
             &CommunityDetectionConfig::default(),
         )
         .await?;
@@ -300,6 +301,43 @@ pub async fn execute_sleep_cycle<S: StorageEngine, V: VectorIndex>(
     .await
 }
 
+/// Starts a background task for periodic consolidation.
+pub fn start_consolidation_worker<S: StorageEngine + 'static, V: VectorIndex + 'static>(
+    collection: Arc<Collection<S, V>>,
+    consolidation_config: ConsolidationConfig,
+    synthesis_config: SynthesisConfig,
+    interval: std::time::Duration,
+    cancel_token: tokio_util::sync::CancellationToken,
+) -> tokio::task::JoinHandle<()> {
+    let engine = Arc::new(ConsolidationEngine::new(
+        collection,
+        consolidation_config,
+        synthesis_config,
+        interval,
+        cancel_token,
+    ));
+    engine.start()
+}
+
+/// Deprecated legacy alias for `start_consolidation_worker`.
+#[deprecated(note = "use start_consolidation_worker instead")]
+#[allow(deprecated)]
+pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + 'static>(
+    collection: Arc<Collection<S, V>>,
+    consolidation_config: ConsolidationConfig,
+    synthesis_config: SynthesisConfig,
+    interval: std::time::Duration,
+    cancel_token: tokio_util::sync::CancellationToken,
+) -> tokio::task::JoinHandle<()> {
+    start_consolidation_worker(
+        collection,
+        consolidation_config,
+        synthesis_config,
+        interval,
+        cancel_token,
+    )
+}
+
 /// Tokio-Background-Task Engine für periodische Speicher-Konsolidierung und Wissenssynthese.
 pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex = memfuse_index::HnswIndex> {
     collection: Arc<Collection<S, V>>,
@@ -350,6 +388,24 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
         tokio::spawn(async move {
             self.run().await;
         })
+    }
+
+    /// Starts a background task for periodic consolidation.
+    pub fn start_worker(
+        collection: Arc<Collection<S, V>>,
+        consolidation_config: ConsolidationConfig,
+        synthesis_config: SynthesisConfig,
+        interval: std::time::Duration,
+        cancel_token: tokio_util::sync::CancellationToken,
+    ) -> tokio::task::JoinHandle<()> {
+        let engine = Arc::new(ConsolidationEngine::new(
+            collection,
+            consolidation_config,
+            synthesis_config,
+            interval,
+            cancel_token,
+        ));
+        engine.start()
     }
 
     /// Hauptschleife der `ConsolidationEngine`.
@@ -436,7 +492,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             if self.collection.name() == "default" && k.starts_with(b"__") {
                 continue;
             }
-            if let Ok(stored) = serde_json::from_slice::<crate::collection::StoredDocument>(&v) {
+            if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
                 if let Ok(doc_id) = DocId::from_key(&stored.id) {
                     turns.push((doc_id, stored.embedding));
                 }
@@ -480,8 +536,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
         // Synthetisierte Summaries wurden bereits in execute_background_consolidation erzeugt & persistiert.
         // Erst NACH dem Bestätigen der Summaries wird der Decay Controller angewendet.
         if synthesis_res.is_some() {
-            let decay_controller =
-                crate::decay_controller::AdaptiveDecayController::with_defaults();
+            let decay_controller = AdaptiveDecayController::with_defaults();
             let _ = self
                 .collection
                 .evict_decayed_chunks(&decay_controller, 100)
@@ -563,7 +618,7 @@ mod tests {
             graph,
             next_tx,
             4,
-            memfuse_text::Language::English,
+            memfuse_engine::Language::English,
         ));
         (col, dir)
     }

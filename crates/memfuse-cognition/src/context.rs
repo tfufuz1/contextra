@@ -15,7 +15,7 @@
 // TEST: cargo test -p memfuse-db
 // DONE: ContextManager nutzt MarkdownChunker zur Dokument-Zerlegung.
 
-use memfuse_core::{ContextChunk, ContextWindow, DocId, Result, TokenBudget};
+use memfuse_core::{ContextChunk, ContextWindow, Result, TokenBudget};
 
 /// Manages autonomous context preparation for LLM consumption.
 ///
@@ -33,42 +33,6 @@ pub struct ContextManager {
 impl Default for ContextManager {
     fn default() -> Self {
         Self::with_defaults()
-    }
-}
-
-impl TryFrom<crate::SearchResult> for ContextChunk {
-    type Error = memfuse_core::MemFuseError;
-
-    fn try_from(r: crate::SearchResult) -> std::result::Result<Self, Self::Error> {
-        let doc_id = DocId::from_key(&r.id).map_err(|e| {
-            memfuse_core::MemFuseError::InvalidInput(format!(
-                "SearchResult-ID '{}' ungültig: {e}",
-                r.id
-            ))
-        })?;
-        let content = r
-            .metadata
-            .as_ref()
-            .and_then(|m| m.get("text").or_else(|| m.get("content")))
-            .and_then(|t| t.as_str())
-            .unwrap_or("")
-            .to_string();
-        let token_count = ContextManager::estimate_tokens(&content);
-        let links: Vec<memfuse_core::types::domain::MemoryLink> = r
-            .metadata
-            .as_ref()
-            .and_then(|m| m.get("links"))
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
-            .unwrap_or_default();
-        Ok(ContextChunk {
-            doc_id,
-            content,
-            relevance: r.score,
-            token_count,
-            metadata: r.metadata,
-            contextual_prefix: None,
-            links,
-        })
     }
 }
 
@@ -460,6 +424,7 @@ mod tests {
 #[cfg(test)]
 mod token_tests {
     use super::*;
+    use memfuse_core::DocId;
 
     #[test]
     fn test_estimate_tokens_empty() {
@@ -496,12 +461,12 @@ mod token_tests {
 
     #[test]
     fn test_context_chunk_try_from_search_result_invalid_id() {
-        let sr = crate::SearchResult {
+        let sr = memfuse_engine::SearchResult {
             id: "".to_string(),
             score: 0.9,
             metadata: None,
             matched_signals: vec![],
-            provenance: Some(crate::ProvenanceRecord {
+            provenance: Some(memfuse_engine::ProvenanceRecord {
                 index_type: Some("context".to_string()),
                 ..Default::default()
             }),
@@ -517,12 +482,12 @@ mod token_tests {
     fn test_context_chunk_try_from_search_result_valid_id() {
         let valid_key = "doc_123_sample";
         let expected_doc_id = DocId::from_key(valid_key).unwrap(); // unwrap
-        let sr = crate::SearchResult {
+        let sr = memfuse_engine::SearchResult {
             id: valid_key.to_string(),
             score: 0.85,
             metadata: Some(serde_json::json!({"text": "sample text content"})),
             matched_signals: vec!["vector".into()],
-            provenance: Some(crate::ProvenanceRecord {
+            provenance: Some(memfuse_engine::ProvenanceRecord {
                 index_type: Some("context".to_string()),
                 ..Default::default()
             }),

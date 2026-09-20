@@ -8,8 +8,6 @@ use std::collections::HashSet;
 /// Verhindert Hartcodierung im Quelltext und ermöglicht einfache Erweiterbarkeit.
 const DEFAULT_GERMAN_WORDS: &str = include_str!("../data/german_words.txt");
 
-
-
 /// Trait for morphological tokenization.
 ///
 /// Decomposes compound words into constituent morphemes.
@@ -59,7 +57,6 @@ pub trait MorphologicalTokenizer: Send + Sync {
 /// release builds.
 ///
 /// Fallback: returns the original token unsplit.
-
 pub struct GermanCompoundSplitter {
     /// Minimum component length for splitting.
     min_component_len: usize,
