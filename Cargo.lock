@@ -2361,7 +2361,6 @@ dependencies = [
  "blake3",
  "bytes",
  "memfuse-core",
- "memfuse-embed",
  "memfuse-engine",
  "memfuse-graph",
  "memfuse-index",
