@@ -4,6 +4,8 @@
 // RISIKO-FOKUS: Numerische Stabilität (kein Integrator-Windup, Non-Finite Schutz, Clamping).
 // STAND: TS:2026-09-13T00:00:00Z (SESSION: pid-regler-impl)
 
+//! PID Latency Controller & Latency Budget Guard.
+
 use std::time::Instant;
 
 /// Konservativer Default für das P95-Latenzziel in Millisekunden (100ms).

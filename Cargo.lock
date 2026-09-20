@@ -2413,6 +2413,7 @@ dependencies = [
  "blake3",
  "bytes",
  "criterion",
+ "memfuse-adapt",
  "memfuse-calibration",
  "memfuse-checkpoint",
  "memfuse-core",
