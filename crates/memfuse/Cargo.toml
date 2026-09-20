@@ -13,6 +13,7 @@ memfuse-candle = { workspace = true, optional = true }
 memfuse-ollama = { workspace = true, optional = true }
 memfuse-embed = { workspace = true, optional = true }
 memfuse-router = { workspace = true, optional = true }
+memfuse-calibration = { workspace = true, optional = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 
@@ -21,7 +22,7 @@ default = []
 onnx = ["memfuse-embed/onnx", "memfuse-db/onnx"]
 candle = ["memfuse-candle"]
 ollama = ["memfuse-ollama"]
-router = ["memfuse-router"]
+router = ["memfuse-router", "memfuse-calibration"]
 
 [lints]
 workspace = true

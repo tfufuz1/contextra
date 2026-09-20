@@ -54,11 +54,11 @@ Layer 5:  memfuse-candle — Native Candle GGUF ML inference backend for MemFuse
           memfuse-db — MemFuse — Embedded hybrid-search for AI agents (deps: memfuse-calibration, memfuse-checkpoint, memfuse-core, memfuse-crypto, memfuse-graph, memfuse-index, memfuse-store, memfuse-sys, memfuse-text)
 Layer 6:  memfuse-embed —  (deps: memfuse-calibration, memfuse-candle, memfuse-core)
           memfuse-router —  (deps: memfuse-adapt, memfuse-core, memfuse-db, memfuse-store)
-Layer 7:  memfuse — MemFuse — Embedded hybrid-search for AI agents (Facade) (deps: memfuse-candle, memfuse-core, memfuse-db, memfuse-embed, memfuse-ollama, memfuse-router)
+Layer 7:  memfuse — MemFuse — Embedded hybrid-search for AI agents (Facade) (deps: memfuse-calibration, memfuse-candle, memfuse-core, memfuse-db, memfuse-embed, memfuse-ollama, memfuse-router)
           memfuse-agent — Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop (deps: memfuse-checkpoint, memfuse-core, memfuse-db, memfuse-graph, memfuse-router, memfuse-store)
           memfuse-bench — MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy (deps: memfuse-core, memfuse-db, memfuse-embed, memfuse-graph, memfuse-index, memfuse-store, memfuse-text)
           memfuse-py — Python bindings for MemFuse using PyO3 (deps: memfuse-calibration, memfuse-core, memfuse-db, memfuse-router)
-Layer 8:  memfuse-mcp —  (deps: memfuse-agent, memfuse-calibration, memfuse-candle, memfuse-core, memfuse-crypto, memfuse-db, memfuse-embed, memfuse-ollama, memfuse-router)
+Layer 8:  memfuse-mcp —  (deps: memfuse-agent, memfuse-candle, memfuse-core, memfuse-crypto, memfuse-embed)
 ```
 
 **Aktiver Workspace-Build**: 28 Workspace Crates (27 Kern-Crates + 1 optionales Crate `memfuse-embed`).

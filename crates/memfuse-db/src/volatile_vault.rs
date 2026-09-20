@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! Ephemerer RAM-Puffer für sensitive Kontexte (Safe-Modus).
 //!
 //! `VolatileContextVault` speichert Chunks ausschließlich im Heap, nie auf
@@ -6,8 +7,8 @@
 //!
 //! # Sicherheitshinweise
 //!
-//! - **Memory-Locking:** Sensitive Chunks werden via `mlock()` (UNIX) / `VirtualLock()`
-//!   (Windows) im physischen RAM fixiert, um OS-Swap-Auslagerung zu verhindern (best-effort).
+//! - **Memory-Locking:** Sensitive Chunks werden via `memfuse_sys::LockedRegions`
+//!   (mlock / VirtualLock) im physischen RAM fixiert, um OS-Swap-Auslagerung zu verhindern (best-effort).
 //! - **`std::mem::forget`:** Das Aufrufen von `std::mem::forget(vault)` ÜBERSPRINGT den
 //!   `Drop`-Impl und damit die Zeroize-Garantie. Dies muss der Aufrufer selbst vermeiden.
 //!   Nutze ausschließlich `purge()` oder lass den Vault per RAII droppen.
@@ -16,6 +17,7 @@
 //!   Eine Warnung wird via `tracing::warn!` ausgegeben.
 
 use memfuse_core::types::{DocId, TxId};
+use memfuse_sys::LockedRegions;
 use std::time::Instant;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -132,10 +134,9 @@ pub struct VolatileContextVault {
     chunks: Vec<VaultChunk>,
     config: VaultConfig,
     current_bytes: usize,
-    /// Zeigeradresse und Länge des mlock'd Speicherbereichs (UNIX): (addr, len) pro Chunk.
-    /// Wird in munlock() aufgelöst, wenn der Vault dropped wird.
-    #[cfg(unix)]
-    mlock_regions: Vec<(usize, usize)>,
+    /// Gekapselte mlock'd Speicherbereiche.
+    /// Wird in munlock() aufgelöst, wenn der Vault dropped oder ge-purged wird.
+    mlock_regions: LockedRegions,
     /// Interne Konsumptions-Flag: verhindert doppeltes purge()/commit().
     consumed: bool,
 }
@@ -147,8 +148,7 @@ impl VolatileContextVault {
             chunks: Vec::new(),
             current_bytes: 0,
             config,
-            #[cfg(unix)]
-            mlock_regions: Vec::new(),
+            mlock_regions: LockedRegions::new(),
             consumed: false,
         }
     }
@@ -173,16 +173,8 @@ impl VolatileContextVault {
         }
 
         // Memory-Locking (best-effort): chunk.content im RAM fixieren.
-        #[cfg(unix)]
-        if self.config.attempt_mlock {
-            let ptr = chunk.content.as_ptr();
-            let len = chunk.content.len();
-            if len > 0 {
-                if memfuse_sys::mem_lock(ptr, len) {
-                    self.mlock_regions.push((ptr as usize, len));
-                }
-            }
-        }
+        self.mlock_regions
+            .lock_slice(&chunk.content, self.config.attempt_mlock);
 
         self.current_bytes += new_bytes;
         self.chunks.push(chunk);
@@ -211,10 +203,7 @@ impl VolatileContextVault {
         }
 
         // 2. mlock-Regionen freigeben (nach Zeroize!).
-        #[cfg(unix)]
-        for (addr, len) in self.mlock_regions.drain(..) {
-            memfuse_sys::mem_unlock(addr, len);
-        }
+        self.mlock_regions.unlock_all();
 
         // 3. Chunks droppen (ZeroizeOnDrop nochmals als Sicherheitsnetz).
         self.chunks.clear();
@@ -239,10 +228,7 @@ impl VolatileContextVault {
         self.consumed = true;
 
         // munlock vor dem Drain (Chunks verlassen den Vault — mlock-Bindung aufheben).
-        #[cfg(unix)]
-        for (addr, len) in self.mlock_regions.drain(..) {
-            memfuse_sys::mem_unlock(addr, len);
-        }
+        self.mlock_regions.unlock_all();
 
         self.current_bytes = 0;
         std::mem::take(&mut self.chunks)
@@ -303,10 +289,7 @@ impl Drop for VolatileContextVault {
             }
 
             // munlock NACH Zeroize.
-            #[cfg(unix)]
-            for (addr, len) in self.mlock_regions.drain(..) {
-                memfuse_sys::mem_unlock(addr, len);
-            }
+            self.mlock_regions.unlock_all();
         }
         // ZeroizeOnDrop auf VaultChunk läuft danach nochmals als Sicherheitsnetz.
     }
