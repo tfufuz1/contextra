@@ -80,7 +80,6 @@ mod check_unsafe_islands;
 mod check_type_registry;
 mod check_vetoes;
 mod check_workflow_commands;
-mod check_layering;
 mod claim;
 mod gen_prompter_data;
 mod generate_adr;
