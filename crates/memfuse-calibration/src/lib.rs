@@ -10,7 +10,10 @@ pub use isotonic::IsotonicCalibrator;
 pub use memfuse_core::ConfigFingerprint;
 pub use platt::PlattScaler;
 
-#[deprecated(since = "0.1.0", note = "Moved to memfuse_adapt::PidController as part of Ring-Modell Phase 1b")]
+#[deprecated(
+    since = "0.1.0",
+    note = "Moved to memfuse_adapt::PidController as part of Ring-Modell Phase 1b"
+)]
 pub use memfuse_adapt::PidController;
 
 // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-16T16:15:00Z) (SESSION: e72e11a3)

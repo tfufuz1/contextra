@@ -4,9 +4,21 @@
 
 #![forbid(unsafe_code)]
 
-pub use memfuse_core::types::domain::{DocId, ScoredDocument};
 pub use memfuse_core::error::MemFuseError;
-pub use memfuse_db::{MemFuse, MemFuseConfig, Collection, CollectionConfig};
+pub use memfuse_core::types::domain::{DocId, ScoredDocument};
+pub use memfuse_db::{
+    chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
+    DriftStatusProvider, MemFuse, MemFuseConfig,
+};
+
+#[cfg(feature = "router")]
+pub use memfuse_router as router;
+
+#[cfg(feature = "router")]
+pub use memfuse_calibration as calibration;
+
+#[cfg(feature = "ollama")]
+pub use memfuse_ollama as ollama;
 
 /// A builder for creating a `MemFuse` instance.
 pub struct MemFuseBuilder {

@@ -10,6 +10,7 @@
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-crypto/src/kv_segment/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation). |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-db/src/consolidation_locks.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Guard-Konstrukt fuer typsicheres Locking und geordnete Kaskaden-Invalidierung in der Sleep-Cycle-Konsolidierung. |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-kvcache/src/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation). |
+| `TS:2026-09-13 (SESSION: HEAD)` | `crates/memfuse-crypto/src/egress_vault.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cloud-Egress-Vault mit Layer-1-Regex-Klassifikation und Fail-Closed-Semantik. |
 | `TS:2026-09-12T00:00:00Z` | `crates/memfuse-db/tests/consolidation_double_trigger_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrierter Test zur Verifizierung des Double-Trigger-Schutzes zwischen ConsolidationEngine und MaintenanceScheduler. |
 | `TS:2026-09-12` | `crates/memfuse-db/src/export.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Export-Funktionalität für Memory-Export-Format v1 (Schema Version "1.0"). |
 | `TS:2026-09-12` | `crates/memfuse-db/src/import.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Import-Funktionalität & Zusammenfassung für Memory-Export-Format v1 (Schema Version "1.0"). |
@@ -320,14 +321,10 @@
 | `` | `crates/memfuse-index/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/memfuse-index/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/memfuse-index/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
-| `` | `crates/memfuse-mcp/src/bulk_exfiltration_detector.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 Bulk-Exfiltration-Detektor (Re-export from memfuse-privacy) |
-| `` | `crates/memfuse-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries (Re-export from memfuse-privacy) |
-| `` | `crates/memfuse-mcp/src/egress_guard.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 EgressGuard (Re-export from memfuse-privacy) |
+| `` | `crates/memfuse-mcp/src/bulk_exfiltration_detector.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 Bulk-Exfiltration-Detektor (Volumen/Zeitfenster pro Session) |
+| `` | `crates/memfuse-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries |
 | `` | `crates/memfuse-mcp/src/routing.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/server_dispatch.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |
-| `` | `crates/memfuse-privacy/src/bulk_exfiltration_detector.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 Bulk-Exfiltration-Detektor (Volumen/Zeitfenster pro Session) |
-| `` | `crates/memfuse-privacy/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud Queries |
-| `` | `crates/memfuse-privacy/src/egress_vault.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cloud-Egress-Vault mit Layer-1-Regex-Klassifikation und Fail-Closed-Semantik. |
 | `` | `crates/memfuse-simd/src/dispatch.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Runtime Hardware Feature Detection & Dispatcher. |
 | `` | `crates/memfuse-simd/src/kernels/avx2.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen. |
 | `` | `crates/memfuse-simd/src/kernels/avx512.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AVX-512 SIMD-Intrinsics für f32, f32_bytes und u8 VNNI Distanzberechnungen. |

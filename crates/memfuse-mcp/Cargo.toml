@@ -16,13 +16,9 @@ test-utils = ["memfuse-core/test-utils"]
 docid-128 = ["memfuse-core/docid-128"]
 
 [dependencies]
-memfuse-db = { workspace = true }
+memfuse = { workspace = true, features = ["ollama", "router"] }
 memfuse-core = { workspace = true }
 memfuse-crypto = { workspace = true }
-memfuse-privacy = { workspace = true }
-memfuse-ollama = { workspace = true }
-memfuse-router = { workspace = true }
-memfuse-calibration = { workspace = true }
 memfuse-embed = { workspace = true, optional = true }
 memfuse-agent = { workspace = true, optional = true }
 memfuse-candle = { workspace = true, optional = true }
