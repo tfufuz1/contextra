@@ -89,12 +89,6 @@ pub fn run_post_merge_report(root: &Path) -> bool {
         report_path.display()
     );
 
-<<<<<<< HEAD
-=======
-    // 4. Unwrap baseline history tracking retired per GESAMTSPEZIFIKATION §0.4
-    println!("\nℹ️ unwrap-baseline tracking retired per GESAMTSPEZIFIKATION §0.4 (enforced by clippy workspace lints).");
-
->>>>>>> 54333148 (Shell-Commit)
     let overall_success = check_passed && clippy_passed && test_passed;
     if overall_success {
         println!("\n✅ Post-merge verification PASSED.");

@@ -1,7 +1,7 @@
 //! Inter-Process Communication (IPC) protocol definitions for `MemFuse`.
 //!
 //! # `FlatBuffers` Code Generation
-//! The Rust code for FlatBuffers schemas is **auto-generated** in [`memfuse_core_ipc_gen`]
+//! The Rust code for FlatBuffers schemas is **auto-generated** in [`memfuse_wire`]
 //! from the FlatBuffers schema located at `schemas/memfuse.fbs`.
 
 pub mod jsonrpc;

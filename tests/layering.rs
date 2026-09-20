@@ -38,7 +38,7 @@ impl Ring {
             // Ring 4: Facade & Protocols
             "memfuse" | "memfuse-mcp" | "memfuse-py" => Some(Ring::Ring4),
             // Tooling / Deprecated
-            "memfuse-core" | "memfuse-core-ipc-gen" => Some(Ring::Ring0), // Legacy Layer 0/1 mapped to Ring 0 during transition
+            "memfuse-core" => Some(Ring::Ring0), // Legacy Layer 0/1 mapped to Ring 0 during transition
             "memfuse-bench" | "xtask" => Some(Ring::Tooling),
             _ => None,
         }

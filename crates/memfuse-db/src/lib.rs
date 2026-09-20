@@ -314,11 +314,8 @@ pub struct MemFuseStats {
     pub storage_stats: memfuse_core::StorageStats,
 }
 
-/// Trait for querying Lyapunov drift status from an attached router engine without creating a cyclic dependency.
-pub trait DriftStatusProvider: Send + Sync {
-    /// Returns the overall drift status string ("stabil", "warnung", "kritisch", or "unbekannt").
-    fn overall_drift_status(&self) -> String;
-}
+/// Re-export of DriftStatusProvider from memfuse-ports (ADR-080).
+pub use memfuse_core::DriftStatusProvider;
 
 /// Backward compatibility alias for `MemFuseStats`.
 pub type DbStats = MemFuseStats;
@@ -341,8 +338,7 @@ impl Default for CommunityDetectionConfig {
 
 /// Specifying the embedding engine backend.
 ///
-/// Note: Ollama remains available via explicit configuration (`EmbeddingBackend::Ollama(...)`).
-/// Candle provides a pure Rust native embedding provider without C++ runtime dependencies (true air-gapped mode).
+/// Note: External backends (Ollama, Candle) must be injected via `Arc<dyn TextEmbeddingEngine>` or `memfuse` facade.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EmbeddingBackend {
     /// ONNX Runtime local embedding provider (default). Requires C++ ONNX Runtime library dependencies.
@@ -351,20 +347,6 @@ pub enum EmbeddingBackend {
         model_name: String,
         /// Optional custom path for model storage/cache.
         cache_dir: Option<std::path::PathBuf>,
-    },
-    /// Ollama HTTP API embedding provider.
-    Ollama {
-        /// Base URL for Ollama HTTP API (default: "http://localhost:11434").
-        base_url: String,
-        /// Model identifier for Ollama embeddings (default: "nomic-embed-text").
-        model: String,
-    },
-    /// Native Candle pure-Rust local embedding provider (pure Rust, true air-gap, no C++ runtime).
-    Candle {
-        /// Local directory containing model weights (safetensors/gguf) and tokenizer.json.
-        model_dir: std::path::PathBuf,
-        /// Quantization grade (e.g., "Q4KM", "Q8_0", "f32"). Default is Q4KM if None.
-        quantization: Option<String>,
     },
     /// Disabled / manual embedding provider.
     None,
@@ -603,7 +585,7 @@ impl MemFuse {
         Ok(db)
     }
 
-    /// Initializes configured embedding backend (ONNX, Ollama, or Candle).
+    /// Initializes configured embedding backend (ONNX or None).
     async fn init_embedding_backend(&self, backend: &EmbeddingBackend) -> Result<()> {
         match backend {
             EmbeddingBackend::Onnx {
@@ -627,23 +609,6 @@ impl MemFuse {
                          Recompile with feature 'onnx' or 'reranking' to enable local ONNX embeddings."
                     );
                 }
-            }
-            EmbeddingBackend::Ollama { base_url, model } => {
-                let embedder = memfuse_ollama::OllamaEmbedder::new(base_url, model);
-                let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(embedder);
-                self.set_embedder(embedder_arc).await?;
-            }
-            EmbeddingBackend::Candle {
-                model_dir,
-                quantization,
-            } => {
-                let quant = quantization
-                    .as_deref()
-                    .and_then(|q| q.parse().ok())
-                    .unwrap_or(memfuse_candle::CandleQuantization::Q4KM);
-                let client = memfuse_candle::CandleEmbedClient::from_dir(model_dir, quant)?;
-                let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(client);
-                self.set_embedder(embedder_arc).await?;
             }
             EmbeddingBackend::None => {}
         }
@@ -2511,52 +2476,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_explicit_ollama_backend_config_e2e() {
-        let tmp = TempDir::new().expect("temp dir");
-        let config = MemFuseConfig {
-            dimension: 768,
-            embedding_backend: EmbeddingBackend::Ollama {
-                base_url: "http://127.0.0.1:11434".to_string(),
-                model: "nomic-embed-text".to_string(),
-            },
-            ..Default::default()
-        };
-
-        let db = MemFuse::open_with_config(tmp.path(), config)
-            .await
-            .expect("open_with_config");
-        assert!(db.embedder.read().is_some());
-    }
 
     #[tokio::test]
-    async fn test_explicit_candle_backend_config_e2e() {
-        let tmp = TempDir::new().expect("temp dir");
-        let model_dir = tmp.path().join("mock_candle_model");
-        std::fs::create_dir_all(&model_dir).expect("create model dir");
-
-        let config = MemFuseConfig {
-            dimension: 384,
-            embedding_backend: EmbeddingBackend::Candle {
-                model_dir,
-                quantization: Some("Q4KM".to_string()),
-            },
-            ..Default::default()
-        };
-
-        let db = MemFuse::open_with_config(tmp.path().join("db"), config)
-            .await
-            .expect("open_with_config");
-
-        assert!(db.embedder.read().is_some());
-        let embedder = db.embedder.read().as_ref().cloned().expect("embedder");
-        let vec = embedder
-            .embed("test candle document")
-            .await
-            .expect("embed test");
-        assert_eq!(vec.len(), 384);
-        let norm_sq: f32 = vec.iter().map(|v| v * v).sum();
-        assert!((norm_sq.sqrt() - 1.0).abs() < 1e-4);
-    }
 
     #[tokio::test]
     #[cfg(feature = "onnx")]

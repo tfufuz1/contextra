@@ -9,7 +9,6 @@ license.workspace = true
 
 [features]
 default = []
-ollama = ["dep:memfuse-ollama"]
 bandit-routing = ["egress-sherman-morrison"]
 cloud-egress-guard = []
 egress-sherman-morrison = []
@@ -17,9 +16,9 @@ egress-sherman-morrison = []
 [dependencies]
 shlex = "1"
 memfuse-core = { workspace = true }
+memfuse-adapt = { workspace = true }
 memfuse-store = { workspace = true }
 memfuse-db = { workspace = true }
-memfuse-ollama = { workspace = true, optional = true }
 arc-swap = "1"
 parking_lot = { workspace = true }
 tokio = { workspace = true }

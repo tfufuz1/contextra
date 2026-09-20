@@ -73,7 +73,7 @@ jobs:
 
       - name: Ring Layering Check
         # Phase 0R: Warnmodus (Exit 0). Phase 1a: --strict
-        run: cargo xtask check-ring-layering
+        run: cargo xtask check-ring-layering --strict
 
       - name: Unsafe Islands Check
         # Phase 0R: Übergangsliste. Phase 1c: --strict
@@ -94,23 +94,5 @@ jobs:
       - name: FlatBuffers Schema Drift Gate
         run: cargo xtask check-fbs-drift
 
-<<<<<<< HEAD
-      - name: Loom Concurrency Tests
-        run: |
-          for crate in $(git grep -rl 'cfg(loom)' crates/ | cut -d/ -f2 | sort -u); do
-            echo "Running Loom tests for $crate..."
-            RUSTFLAGS="--cfg loom" cargo test -p "$crate" --release --locked
-          done
-=======
-      - name: Ring Layering Gate (Phase 0R Warnmodus)
-        run: cargo xtask check-layering
-
-      - name: Unsafe Islands Inventory Gate
-        run: cargo xtask check-unsafe-islands
-
-      - name: Module Reachability Gate (GOV-D)
-        run: cargo xtask check-module-reachability
-
       - name: Loom Concurrency Tests (LSM / WAL)
         run: RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
->>>>>>> 54333148 (Shell-Commit)

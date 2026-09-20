@@ -88,7 +88,7 @@ async fn proof_trait_default_removed() {
 
 #[test]
 fn proof_put_if_absent_default_trait_removed() {
-    let source = include_str!("../../memfuse-core/src/traits/storage.rs");
+    let source = include_str!("../../memfuse-ports/src/storage.rs");
     let has_toctou = source.contains("fn put_if_absent")
         && source.contains("self.get(key)")
         && source.contains("self.put(tx_id");

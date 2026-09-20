@@ -2229,6 +2229,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse"
+version = "0.1.0"
+dependencies = [
+ "memfuse-candle",
+ "memfuse-core",
+ "memfuse-db",
+ "memfuse-embed",
+ "memfuse-ollama",
+ "memfuse-router",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "memfuse-adapt"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
 name = "memfuse-agent"
 version = "0.1.0"
 dependencies = [
@@ -2276,6 +2300,7 @@ dependencies = [
 name = "memfuse-calibration"
 version = "0.1.0"
 dependencies = [
+ "memfuse-adapt",
  "memfuse-core",
  "parking_lot",
  "proptest",
@@ -2337,6 +2362,9 @@ dependencies = [
  "bytes",
  "flatbuffers",
  "futures-util",
+ "memfuse-mvcc",
+ "memfuse-ports",
+ "memfuse-types",
  "memfuse-wire",
  "parking_lot",
  "proptest",
@@ -2345,14 +2373,6 @@ dependencies = [
  "sha2",
  "thiserror 2.0.20",
  "tokio",
-]
-
-[[package]]
-name = "memfuse-core-ipc-gen"
-version = "0.1.0"
-dependencies = [
- "flatbuffers",
- "memfuse-wire",
 ]
 
 [[package]]
@@ -2393,14 +2413,11 @@ dependencies = [
  "bytes",
  "criterion",
  "memfuse-calibration",
- "memfuse-candle",
  "memfuse-checkpoint",
  "memfuse-core",
  "memfuse-crypto",
- "memfuse-embed",
  "memfuse-graph",
  "memfuse-index",
- "memfuse-ollama",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
@@ -2484,6 +2501,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-kvcache"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bincode",
+ "lru",
+ "memfuse-core",
+ "memfuse-crypto",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "memfuse-mcp"
 version = "0.1.0"
 dependencies = [
@@ -2513,6 +2548,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-mvcc"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bytes",
+ "memfuse-types",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "memfuse-ollama"
 version = "0.1.0"
 dependencies = [
@@ -2532,6 +2581,20 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-test",
+]
+
+[[package]]
+name = "memfuse-ports"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bytes",
+ "futures-util",
+ "memfuse-types",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]
@@ -2558,11 +2621,11 @@ dependencies = [
  "arc-swap",
  "bytes",
  "criterion",
+ "memfuse-adapt",
  "memfuse-core",
  "memfuse-db",
  "memfuse-graph",
  "memfuse-index",
- "memfuse-ollama",
  "memfuse-store",
  "memfuse-text",
  "parking_lot",
@@ -2671,6 +2734,21 @@ dependencies = [
  "tokio",
  "tracing",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "memfuse-types"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bincode",
+ "blake3",
+ "bytes",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

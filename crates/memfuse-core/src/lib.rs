@@ -1,59 +1,55 @@
-//! `MemFuse` Core — Types, traits, and error handling.
+//! `MemFuse` Core — Types, traits, and error handling (Strangler Facade).
 //!
-//! This crate provides the foundational building blocks for the `MemFuse`
-//! embedded hybrid-search library.
+//! # Architecture Role (Legacy Triebwerk — Layer 0 -> Ring 0-4 Migration)
 //!
-//! # Architecture Role (Triebwerk — Layer 0)
+//! As part of the Ring-0-4 migration (Phase 1b), the functionality of `memfuse-core`
+//! has been decomposed into modular Ring-0 crates:
+//! - [`memfuse_types`]: Canonical domain models, IDs, budgets, filters, and error types.
+//! - [`memfuse_ports`]: Abstract `dyn`-compatible subsystem interfaces and traits.
+//! - [`memfuse_mvcc`]: Multi-version concurrency control, sequence log, and tx staging.
 //!
-//! This is the **dependency root** of the entire workspace. Every other crate
-//! depends on `memfuse-core`. It provides:
-//! - **Type IDs**: [`DocId`], [`EntityId`], [`TxId`] — all `#[repr(transparent)]` u64 newtypes
-//! - **Traits**: [`StorageEngine`], [`VectorIndex`] — async interfaces for subsystems
-//! - **Error**: [`MemFuseError`] — unified error enum, zero-panic via `?` propagation
-//! - **`TxBuffer`**: Sharded transaction staging with orphan reaper
-//! - **Snapshots**: MVCC read isolation via [`SnapshotRegistry`]
-
-// FILE-CONTEXT
-// STAND: 2026-09-17T17:59:57Z (SESSION: c9c5f937)
-// ZWECK: Core types, traits, and error handling for MemFuse.
-// INVARIANTEN: Triebwerk-Fundament: Alle anderen Crates hängen von memfuse-core ab. Kein I/O, kein async, kein Netzwerk in types.
-// HOTSPOTS: 1-45
-// NICHT-OFFENSICHTLICH: TxId allocation base ranges separate system and collection transactions.
-// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-028)
-// AGENT-NOTIZ: Demonstrating second-precision TS, SESSION hash, hash-based ID and REVIEW-PASS grammar.
-
-// ANCHOR[DEBT:CORE-INLINE-001] STATUS:DONE (ID: AGT-CORE-a3f29c1d) (TS:2026-08-29T09:14:07Z) (SESSION: a3f29c1d)
-// REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-CORE-a3f29c1d) (TS: 2026-08-30T19:00:00Z) (SESSION: b8e4f1a2)
-// REVIEW-PASS[2/2] STATUS:PASS (ID: AGT-CORE-a3f29c1d) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3)
-// REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-CORE-a3f29c1d) (TS:2026-09-02T08:38:03Z) (SESSION:963f93c2)
-// REVIEW-PASS[2/2] STATUS:PASS (ID: AGT-CORE-a3f29c1d) (TS: 2026-09-09T15:39:55Z) (SESSION: 96e5c38b)
-// PRÜFER-KONTEXT: FRESH
-// BEFUND: Verified Layer 0 memfuse-core zero-panic, zero-unsafe, and ADR-028 TxId range boundaries. All 163 tests pass cleanly.
-// AUFGABE : Inline-Kontextsystem demonstrieren und absichern
-// GATE    : cargo test -p memfuse-core
+//! This crate acts as a backward-compatible Strangler Facade, re-exporting all types
+//! with deprecation markers to avoid breaking existing downstream callers.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-pub mod error;
-pub mod error_dto;
-pub mod ipc;
-pub mod model_fingerprint;
-pub mod schema;
-pub mod seq_log;
-pub mod snapshot;
-pub mod tombstone;
-pub mod traits;
-pub mod tx_buffer;
-pub mod types;
+// Re-export Ring-0 modular crates
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_types as part of Ring-Modell Phase 1b")]
+pub use memfuse_types::error;
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_types as part of Ring-Modell Phase 1b")]
+pub use memfuse_types::error_dto;
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_types as part of Ring-Modell Phase 1b")]
+pub use memfuse_types::model_fingerprint;
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_types as part of Ring-Modell Phase 1b")]
+pub use memfuse_types::schema;
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_types as part of Ring-Modell Phase 1b")]
+pub use memfuse_types::tombstone;
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_types as part of Ring-Modell Phase 1b")]
+pub use memfuse_types::types;
 
-pub use error::{MemFuseError, Result};
-pub use error_dto::MemFuseErrorDto;
-pub use model_fingerprint::ModelFingerprint;
-pub use schema::{DocIdWidth, ManifestSchemaVersion};
-pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
-pub use snapshot::{SnapshotGuard, SnapshotRegistry};
-pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
-pub use traits::*;
-pub use tx_buffer::{IndexOp, TxBuffer};
-pub use types::*;
+/// Traits submodule re-exporting `memfuse_ports` for backward compatibility.
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_ports as part of Ring-Modell Phase 1b")]
+pub mod traits {
+    pub use memfuse_ports::*;
+}
+
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_mvcc as part of Ring-Modell Phase 1b")]
+pub use memfuse_mvcc::seq_log;
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_mvcc as part of Ring-Modell Phase 1b")]
+pub use memfuse_mvcc::snapshot;
+#[deprecated(since = "0.1.0", note = "Moved to memfuse_mvcc as part of Ring-Modell Phase 1b")]
+pub use memfuse_mvcc::tx_buffer;
+
+pub mod ipc;
+
+pub use memfuse_types::error::{MemFuseError, Result};
+pub use memfuse_types::error_dto::MemFuseErrorDto;
+pub use memfuse_types::model_fingerprint::ModelFingerprint;
+pub use memfuse_types::schema::{DocIdWidth, ManifestSchemaVersion};
+pub use memfuse_mvcc::seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
+pub use memfuse_mvcc::snapshot::{SnapshotGuard, SnapshotRegistry};
+pub use memfuse_mvcc::tx_buffer::{IndexOp, TxBuffer};
+pub use memfuse_types::tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
+pub use memfuse_ports::*;
+

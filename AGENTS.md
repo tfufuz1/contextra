@@ -10,12 +10,12 @@
 <!-- §7 = Non-Obvious Decisions (would cause wrong code without this knowledge) -->
 
 <a id="1"></a>
-## Verifizierter Codestand · HEAD `b4efbc09f55deb9d1ac5e9f47f401a988127f6bd` · Stand 2026-09-19 22:16:24 +0200
+## Verifizierter Codestand · HEAD `6eb0c782145c65989718e86c058d6e859028933d` · Stand 2026-09-20 00:47:35 +0200
 
 > **Für AI-Assistenten:** Diese Datei beschreibt was TATSÄCHLICH implementiert ist,
 > nicht was Spezifikationen oder ungeprüfte Dokumente behaupten. Bei Widerspruch gilt:
 > Code-Befund & `cargo metadata` > diese Datei > Spezifikationen (§0.1 Quellenhierarchie).
-> **Basis-Commit dieser Fassung:** `b4efbc09f55deb9d1ac5e9f47f401a988127f6bd`.
+> **Basis-Commit dieser Fassung:** `6eb0c782145c65989718e86c058d6e859028933d`.
 
 ---
 
@@ -40,9 +40,9 @@ Die Mitglieder im Hauptworkspace plus isolierte/exkludierte Members (`memfuse-py
 | `memfuse-text` | Ring 0 | ✅ vorhanden | BM25/BM25F Volltextsuche, deutsche Morphologie & Komposita (C) |
 | `memfuse-graph` | Ring 0 | ✅ vorhanden | CSR-Graph, PPR, Leiden, Hyperkanten (`HyperEdge`, `RoleBinding`) (S, C) |
 | `memfuse-rank` | Ring 0 | 🔄 Legacy (`memfuse-calibration` + `memfuse-db::fusion`, Phase 1b) | 4-Signal-Fusion (RRF), Platt/Isotonic-Kalibrierung, Drift (C) | <!-- doc-ref-ignore -->
-| `memfuse-adapt` | Ring 0 | 🔄 Legacy (`memfuse-router` + `memfuse-calibration::pid`, Phase 1b) | LinUCB-Bandit, Lyapunov, PID, Decay; `Clock`/`Rng` injiziert (P28) (C) | <!-- doc-ref-ignore -->
+| `memfuse-adapt` | Ring 0 | ✅ vorhanden (Phase 1b) | LinUCB-Bandit, Lyapunov, PID, Off-Policy; `#[forbid(unsafe_code)]` (C) | <!-- doc-ref-ignore -->
 | `memfuse-store` | Ring 1 | ✅ vorhanden | LSM-Tree, WAL (Group Commit, HMAC), MVCC-Pin (S, C) |
-| `memfuse-kvcache` | Ring 1 | 🔜 geplant (Phase 4) | Prefix-Radix-Baum, KV-Blöcke, Tiering, AEAD, Segmentdateien (C) | <!-- doc-ref-ignore -->
+| `memfuse-kvcache` | Ring 1 | ✅ vorhanden (Phase 1) | In-Memory LRU-Cache, Eviction-Worker, Tenant-Isolation, Tiering (C) |
 | `memfuse-checkpoint` | Ring 1 | ✅ vorhanden | RAII-Checkpoint & Persistent Store Management, time-travel snapshots (C, D) |
 | `memfuse-infer-candle` | Ring 2 | 🔄 Legacy (`memfuse-candle`, Phase 1a) | Native GGUF ML Inferenz (Candle), KV-State (I) | <!-- doc-ref-ignore -->
 | `memfuse-infer-ollama` | Ring 2 | 🔄 Legacy (`memfuse-ollama`, Phase 1a) | HTTP Ollama Client & Context Prefix Engine (I) | <!-- doc-ref-ignore -->
@@ -90,6 +90,7 @@ Ring 4  → Composition Root / Fassaden.
 | Komponente / Typ | File:Line Reference | Beschreibung / Anmerkung |
 |---|---|---|
 | `memfuse-testkit` | `crates/memfuse-testkit/` | Neu in Welle 1 (Phase 0R). Determinismus-Infrastruktur (`ManualClock`, `FaultVfs`, `InMemoryStore`) |
+| `memfuse-kvcache` | `crates/memfuse-kvcache/` | Neu in Phase 1 (Cache & Inferenz). KV-Cache LRU-Store, Eviction-Worker, Tenant-Isolation |
 | `memfuse-wire` | `crates/memfuse-wire/` | Neu in Welle 1 (Phase 0R). Auto-generated FlatBuffers IPC code (`memfuse.fbs`) |
 | `memfuse-sys` | `crates/memfuse-sys/` | Neu in Welle 1 (Phase 0R). Unsafe-Insel für mmap/mlock/Win32-ACLs |
 | `memfuse-simd` | `crates/memfuse-simd/` | Neu in Welle 1 (Phase 0R). Unsafe-Insel für SIMD-Distanzkernel |
@@ -115,6 +116,7 @@ Ring 4  → Composition Root / Fassaden.
 | Gate `check-module-reachability` | `xtask/src/check_orphan_modules.rs` | Neu in Welle 1 (Phase 0R). Prüft unerreichbare `.rs`-Dateien |
 | Gate `check-dag` | `xtask/src/main.rs` | Neu in Welle 1 (Phase 0R). Layering-Prüfung nach Ring-Modell |
 | Gate `check-agents-integrity` | `xtask/src/check_agents_integrity.rs` | Neu in Welle 1 (Phase 0R). Prüft Integrität von AGENTS.md |
+| `memfuse-adapt` | `crates/memfuse-adapt/` | Neu in Phase 1b. LinUCB Bandit, Lyapunov Drift, PID Controller, OffPolicy |
 
 ### Fehlt / In Arbeit 🔴 / 🔄
 
@@ -122,7 +124,7 @@ Ring 4  → Composition Root / Fassaden.
 |---|---|---|
 | `memfuse` Fassade | 🔜 GEPLANT | Phase 1a. Neue Composition Root & Builder | <!-- doc-ref-ignore -->
 | `memfuse-types`, `ports`, `mvcc` | 🔜 GEPLANT | Phase 1b. Zerlegung von `memfuse-core` | <!-- doc-ref-ignore -->
-| `memfuse-engine`, `cognition`, `rank`, `adapt`, `privacy` | 🔜 GEPLANT | Phase 1b–3b. Zerlegung von `memfuse-db` & `memfuse-router` | <!-- doc-ref-ignore -->
+| `memfuse-engine`, `cognition`, `rank`, `privacy` | 🔜 GEPLANT | Phase 1b–3b. Zerlegung von `memfuse-db` & `memfuse-router` | <!-- doc-ref-ignore -->
 | KV-Cache-Bridge (echter Prefill) | 🔴 SOLL | Phase 4. Derzeitiger Status ist Stub in `memfuse-candle` (§9.2), Ausbau in Stufen A/B/C |
 | N-äre Hyperkanten (`relate_n_ary`, `HyperEdge`) | 🔴 SOLL | Phase 1. Bipartite Stern-Expansion (§6) |
 

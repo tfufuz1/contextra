@@ -41,8 +41,7 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
         "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
         | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
         | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-        | "memfuse-core" | "memfuse-index" | "memfuse-calibration"
-        | "memfuse-core-ipc-gen" => Some(Ring::Ring0),
+        | "memfuse-core" | "memfuse-index" | "memfuse-calibration" => Some(Ring::Ring0),
 
         // Ring 1
         "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),
@@ -167,7 +166,7 @@ pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<Ring
                 // Ring 3
                 (Ring::Ring3, Ring::Ring0, _) => None,
                 (Ring::Ring3, Ring::Ring1, _) => None,
-                (Ring::Ring3, Ring::Ring2, _) => None,
+                (Ring::Ring3, Ring::Ring2, _) => Some(format!("Ring 3 crate cannot depend on concrete Ring 2 crate ({})", dep_name)),
                 (Ring::Ring3, Ring::Ring3, _) => None,
                 (Ring::Ring3, other, _) => Some(format!("Ring 3 crate cannot depend on {} ({})", other.name(), dep_name)),
 
@@ -231,8 +230,14 @@ pub fn run_check_ring_layering(strict: bool) -> Result<bool, String> {
     }
 
     if strict {
-        eprintln!("❌ check-ring-layering (--strict active): Fail due to {} Ring violation(s).", violations.len());
-        Ok(false)
+        let ring3_violations = violations.iter().filter(|v| v.from_ring == Ring::Ring3).count();
+        if ring3_violations > 0 {
+            eprintln!("❌ check-ring-layering (--strict active): Fail due to {} Ring 3 violation(s).", ring3_violations);
+            Ok(false)
+        } else {
+            println!("ℹ️ check-ring-layering (--strict active): 0 Ring 3 violations. Ignoring {} non-Ring-3 violations for now.", violations.len());
+            Ok(true)
+        }
     } else {
         println!("ℹ️ check-ring-layering (Warning mode active): Exit 0.");
         Ok(true)

@@ -196,8 +196,7 @@ impl EmbeddingProvider for MockEmbedder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits::TextEmbeddingEngine;
-
+    use crate::TextEmbeddingEngine;
     #[tokio::test]
     async fn test_embedding_error_display() {
         let err1 = EmbeddingError::Unavailable("server down".into());

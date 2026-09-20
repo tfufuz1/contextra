@@ -6,14 +6,11 @@
 
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
-use memfuse_calibration::IsotonicCalibrator;
 use memfuse_core::{
     DocId, EntityId, GraphIndex, MemFuseError, Result, StorageEngine, TextIndex, TxId, VectorIndex,
     EXPIRY_METADATA_KEY,
 };
 use memfuse_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
-use memfuse_ollama::{score_importance_with_calibrator, OllamaClient};
-use parking_lot::Mutex;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -587,18 +584,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.trigger_expiry_cleanup().await
     }
 
-    /// Bewertet die Wichtigkeit eines Dokuments via LLM (Ollama) und
-    /// aktualisiert den Importance-Score sowie die Provenance in den Metadaten.
+    /// Aktualisiert den Importance-Score sowie die Provenance (Modell-ID) in den Metadaten.
     ///
-    /// # Fehlerverhalten
-    /// Bei LLM-Fehler wird der bestehende Score NICHT überschrieben.
-    /// Fehler werden als Err(MemFuseError::Internal) zurückgegeben.
-    pub async fn evaluate_importance_with_llm(
+    /// Diese Funktion entkoppelt die LLM-Bewertung (die z.B. über Ollama geschieht)
+    /// von der reinen Datenbank-Operation.
+    pub async fn update_document_importance(
         &self,
         doc_id: &str,
-        client: &OllamaClient,
-        calibrator: Option<&Arc<Mutex<IsotonicCalibrator>>>,
-    ) -> Result<memfuse_core::ImportanceScore> {
+        importance_score: f32,
+        model_id: &str,
+    ) -> Result<()> {
         let user_key = self.namespaced_key(doc_id.as_bytes(), 0);
         let Some(data) = self.storage.get(&user_key).await? else {
             return Err(memfuse_core::MemFuseError::NotFound(format!(
@@ -606,16 +601,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             )));
         };
         let mut stored: StoredDocument = serde_json::from_slice(&data)?;
-
-        let text = extract_text(&stored.metadata).unwrap_or_else(|| stored.id.clone());
-
-        let assessment = score_importance_with_calibrator(client, &text, calibrator)
-            .await
-            .map_err(|e| {
-                MemFuseError::Internal(format!("LLM importance evaluation failed: {e}"))
-            })?;
-
-        let importance_score = assessment.score;
 
         let tx = self.allocate_tx()?;
         let doc_id_typed = DocId::from_key(doc_id)?;
@@ -640,18 +625,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             if let Ok(mut existing_imp) =
                 serde_json::from_value::<memfuse_core::MemoryImportance>(imp_val.clone())
             {
-                existing_imp.base_score = importance_score;
+                existing_imp.base_score = memfuse_core::ImportanceScore::new(importance_score);
                 existing_imp
             } else {
                 memfuse_core::MemoryImportance::new(
-                    importance_score,
+                    memfuse_core::ImportanceScore::new(importance_score),
                     memfuse_core::DecayFunction::None,
                     tx,
                 )
             }
         } else {
             memfuse_core::MemoryImportance::new(
-                importance_score,
+                memfuse_core::ImportanceScore::new(importance_score),
                 memfuse_core::DecayFunction::None,
                 tx,
             )
@@ -663,7 +648,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         meta_obj.insert(
             "model_id".to_string(),
-            serde_json::json!(assessment.model_id),
+            serde_json::json!(model_id),
         );
 
         let meta_only = StoredDocumentMeta::from(&stored);
@@ -675,7 +660,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.storage.put(tx, &doc_key, &doc_bytes).await?;
         self.storage.commit(tx).await?;
 
-        Ok(importance_score)
+        Ok(())
     }
 
     /// Runs Leiden Community Detection on the collection's graph index

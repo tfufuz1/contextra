@@ -245,8 +245,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
     }
 }
 
-/// QueryRewriter Stub-Struktur.
-pub struct OllamaQueryRewriter;
+
 
 #[cfg(test)]
 mod tests {

@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "crates/memfuse-wire",
     "crates/memfuse-sys",
-    "crates/memfuse-core-ipc-gen",
     "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
@@ -23,12 +22,11 @@ members = [
     "crates/memfuse-candle",
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
-    "crates/memfuse-testkit",
+    "crates/memfuse-testkit", "crates/memfuse", "crates/memfuse-types", "crates/memfuse-ports", "crates/memfuse-mvcc", "crates/memfuse-adapt", "crates/memfuse-kvcache",
 ]
 exclude = ["xtask"]
 default-members = [
     "crates/memfuse-wire",
-    "crates/memfuse-core-ipc-gen",
     "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
@@ -48,6 +46,12 @@ default-members = [
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
     "crates/memfuse-testkit",
+    "crates/memfuse",
+    "crates/memfuse-types",
+    "crates/memfuse-ports",
+    "crates/memfuse-mvcc",
+    "crates/memfuse-adapt",
+    "crates/memfuse-kvcache",
 ]
 
 [workspace.package]
@@ -96,7 +100,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Workspace crates
 memfuse-wire = { path = "crates/memfuse-wire" }
 memfuse-sys = { path = "crates/memfuse-sys" }
-memfuse-core-ipc-gen = { path = "crates/memfuse-core-ipc-gen" }
 memfuse-simd = { path = "crates/memfuse-simd" }
 memfuse-core = { path = "crates/memfuse-core" }
 memfuse-store = { path = "crates/memfuse-store" }
@@ -116,6 +119,12 @@ memfuse-candle = { path = "crates/memfuse-candle" }
 memfuse-sandbox = { path = "crates/memfuse-sandbox" }
 memfuse-py = { path = "crates/memfuse-py" }
 memfuse-testkit = { path = "crates/memfuse-testkit" }
+memfuse = { path = "crates/memfuse" }
+memfuse-types = { path = "crates/memfuse-types" }
+memfuse-ports = { path = "crates/memfuse-ports" }
+memfuse-mvcc = { path = "crates/memfuse-mvcc" }
+memfuse-adapt = { path = "crates/memfuse-adapt" }
+memfuse-kvcache = { path = "crates/memfuse-kvcache" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
 # memfuse-cluster, memfuse-sandbox, memfuse-saos-agent wurden in Phase 0 ausgelagert.

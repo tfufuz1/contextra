@@ -8,6 +8,7 @@ edition.workspace = true
 
 [dependencies]
 memfuse-core = { path = "../memfuse-core" }
+memfuse-adapt = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 parking_lot = { workspace = true }
 tracing = { workspace = true }

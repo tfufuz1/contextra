@@ -20,10 +20,7 @@ memfuse-index = { workspace = true }
 memfuse-text = { workspace = true }
 memfuse-checkpoint = { workspace = true }
 memfuse-graph = { workspace = true }
-memfuse-ollama = { workspace = true }
 memfuse-calibration = { workspace = true }
-memfuse-candle = { workspace = true }
-memfuse-embed = { workspace = true, optional = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
@@ -46,9 +43,9 @@ memfuse-index = { workspace = true, features = ["experimental-diskann"] }
 default = []
 bench = []
 sandbox = []
-onnx = ["memfuse-embed/onnx"]
+reranking = []
+onnx = []
 experimental-diskann = ["memfuse-index/experimental-diskann"]
-reranking = ["memfuse-embed/onnx"]
 background-maintenance = []
 graph-connectivity-health = ["memfuse-graph/physio-percolation"]
 coherence-bonus-fusion = []

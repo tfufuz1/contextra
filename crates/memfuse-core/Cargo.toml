@@ -11,9 +11,12 @@ description = "Core types, traits, and error handling for MemFuse"
 
 [features]
 test-utils = []
-docid-128 = []
+docid-128 = ["memfuse-types/docid-128"]
 
 [dependencies]
+memfuse-types = { workspace = true }
+memfuse-ports = { workspace = true }
+memfuse-mvcc = { workspace = true }
 # Standard error derive macro for MemFuseError.
 thiserror = { workspace = true }
 # Bincode serialization error support.

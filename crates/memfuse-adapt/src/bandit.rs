@@ -12,7 +12,12 @@ use thiserror::Error;
 pub enum BanditError {
     /// Dimension des Eingabevektors stimmt nicht mit dem Bandit-Zustand überein.
     #[error("Embedding dimension mismatch: expected {expected}, actual {actual}")]
-    DimensionMismatch { expected: usize, actual: usize },
+    DimensionMismatch {
+        /// Erwartete Dimension.
+        expected: usize,
+        /// Tatsächliche Dimension.
+        actual: usize,
+    },
 }
 
 /// 64-Byte cache-aligned Wrapper um `Vec<f32>` zur Vermeidung von False Sharing.

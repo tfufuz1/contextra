@@ -691,15 +691,7 @@ impl DistanceMetric {
     }
 }
 
-impl crate::traits::DistanceCalculator for DistanceMetric {
-    fn compute_f32(&self, a: &[f32], b: &[f32]) -> Result<f32> {
-        self.compute(a, b)
-    }
 
-    fn compute_u8(&self, a: &[u8], b: &[u8]) -> Result<u32> {
-        self.compute_u8(a, b)
-    }
-}
 
 /// Vector embedding representation.
 #[derive(Debug, Clone, Serialize, Deserialize)]

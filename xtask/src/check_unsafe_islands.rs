@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! Gate: check-unsafe-islands
 //! Validiert die 3-Insel-Invarianten für `unsafe`-Code (§0.4, ADR-N03):
 //! 1. Keyword `unsafe` ist nur in den definierten Inseln zulässig:
@@ -9,16 +8,10 @@
 //!
 //! Note: `memfuse-py` (isolierter PyO3 Workspace) ist vom Scan ausgenommen.
 
-=======
-// MemFuse — Unsafe Islands Gate (GESAMTSPEZIFIKATION §0.2, §0.4, §20 Phase 0R)
-
-use std::collections::HashSet;
->>>>>>> 54333148 (Shell-Commit)
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
-<<<<<<< HEAD
 /// Die 3 zulässigen Unsafe-Inseln
 pub const ALLOWED_ISLANDS: &[&str] = &["memfuse-sys", "memfuse-simd", "memfuse-wire"];
 
@@ -27,8 +20,7 @@ pub const PHASE_0R_TRANSITION_ISLANDS: &[&str] = &[
     "memfuse-index",
     "memfuse-store",
     "memfuse-db",
-    // TRANSITION-EXTRA: Auto-generated FlatBuffers code, test allocators, benchmark fixtures
-    "memfuse-core-ipc-gen",
+    // TRANSITION-EXTRA: test allocators, benchmark fixtures
     "memfuse-crypto",
     "memfuse-graph",
     "memfuse-text",
@@ -345,98 +337,10 @@ pub fn run_check_unsafe_islands_at(
                         warnings.push(format!("MISSING-FORBID: {}", msg));
                     }
                 }
-=======
-pub const ALLOWED_UNSAFE_ISLANDS: &[&str] = &[
-    "memfuse-simd",
-    "memfuse-sys",
-    "memfuse-wire",
-];
-
-pub const TRANSITION_ALLOWED_CRATES: &[&str] = &[
-    "memfuse-core-ipc-gen", // FlatBuffers legacy, superseded by memfuse-wire
-    "memfuse-index",        // SIMD + Mmap, being moved to memfuse-simd / memfuse-sys in Phase 1c
-    "memfuse-store",        // Win32 ACL, being moved to memfuse-sys in Phase 1c
-    "memfuse-db",           // volatile-vault mlock, being moved to memfuse-sys in Phase 1c
-    "memfuse-crypto",       // test-only Zeroize drop semantics verification
-];
-
-pub fn run_check_unsafe_islands(root: &Path) -> bool {
-    let crates_dir = root.join("crates");
-    let mut violations = Vec::new();
-    let islands: HashSet<&str> = ALLOWED_UNSAFE_ISLANDS.iter().copied().collect();
-    let transition: HashSet<&str> = TRANSITION_ALLOWED_CRATES.iter().copied().collect();
-
-    if !crates_dir.exists() {
-        return true;
-    }
-
-    let entries = match fs::read_dir(&crates_dir) {
-        Ok(e) => e,
-        Err(err) => {
-            eprintln!("❌ Failed to read crates directory: {}", err);
-            return false;
-        }
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
-
-        let crate_name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(name) => name,
-            None => continue,
-        };
-
-        let is_island = islands.contains(crate_name);
-        let is_transition = transition.contains(crate_name);
-
-        let src_dir = path.join("src");
-        if !src_dir.exists() {
-            continue;
-        }
-
-        let lib_rs = src_dir.join("lib.rs");
-        if lib_rs.exists() {
-            if let Ok(lib_content) = fs::read_to_string(&lib_rs) {
-                let has_allow_unsafe = lib_content.contains("#![allow(unsafe_code)]");
-                if has_allow_unsafe && !is_island && !is_transition {
-                    violations.push(format!(
-                        "Crate '{}' has '#![allow(unsafe_code)]' but is not an approved Unsafe Island ({:?})",
-                        crate_name, ALLOWED_UNSAFE_ISLANDS
-                    ));
-                }
-            }
-        }
-
-        if !is_island && !is_transition {
-            for file_entry in WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {
-                let p = file_entry.path();
-                if p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("rs") {
-                    if let Ok(file_content) = fs::read_to_string(p) {
-                        for (line_no, line) in file_content.lines().enumerate() {
-                            let trimmed = line.trim();
-                            if trimmed.starts_with("//") {
-                                continue;
-                            }
-                            if trimmed.contains("unsafe ") || trimmed.starts_with("unsafe{") || trimmed == "unsafe" {
-                                violations.push(format!(
-                                    "Forbidden unsafe found in non-island crate '{}' at {}:{}",
-                                    crate_name,
-                                    p.strip_prefix(root).unwrap_or(p).display(),
-                                    line_no + 1
-                                ));
-                            }
-                        }
-                    }
-                }
->>>>>>> 54333148 (Shell-Commit)
             }
         }
     }
 
-<<<<<<< HEAD
     errors.sort();
     warnings.sort();
 
@@ -525,19 +429,5 @@ mod tests {
 
         let res_strict = run_check_unsafe_islands_at(repo_root, true).unwrap();
         assert_eq!(res_strict.errors.len(), 1);
-=======
-    println!("=== MemFuse Unsafe Islands Inventory Verification ===");
-    println!("Approved Islands: {:?}", ALLOWED_UNSAFE_ISLANDS);
-    println!("Transition Crates (Phase 0R..1c): {:?}", TRANSITION_ALLOWED_CRATES);
-
-    if !violations.is_empty() {
-        for v in &violations {
-            eprintln!("❌ {}", v);
-        }
-        false
-    } else {
-        println!("✅ Unsafe Islands Inventory verified (0 illegal unsafe occurrences found)");
-        true
->>>>>>> 54333148 (Shell-Commit)
     }
 }

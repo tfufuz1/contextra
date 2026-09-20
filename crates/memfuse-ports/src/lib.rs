@@ -3,19 +3,14 @@
 //! These traits define the abstract interfaces that concrete implementations
 //! must fulfill, enabling modularity and testability.
 
-// FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
-// ZWECK: Kern-Trait-Hierarchien (StorageEngine, VectorIndex, TextIndex, GraphIndex, Checkpoint, etc.) für Layer 0.
-// INVARIANTEN: Downward-only Trait interfaces; neue Trait-Methoden brauchen Default-Impls (Abwärtskompatibilität).
-// HOTSPOTS: mod declaration & re-exports
-// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-024)
-
-// INVARIANT: Trait-Contracts sind das API-Rückgrat des Workspace.
-// REGEL: Neue Methoden MÜSSEN Default-Impl haben (backward compat).
-// NOTE(GOV-D): `xtask check_duplicate_symbols` erkennt Symbolduplikate automatisch auf Verzeichnisebene (cross-file über alle .rs-Dateien eines Crates hinweg).
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 use std::future::Future;
 use std::pin::Pin;
+
+pub use memfuse_types::{error, error_dto, model_fingerprint, schema, tombstone, types};
+pub use memfuse_types::*;
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -44,9 +39,20 @@ pub use checkpoint::*;
 pub use embedding::*;
 pub use graph_index::*;
 pub use lifecycle::*;
+pub use observability::*;
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
+
+impl lifecycle::DistanceCalculator for memfuse_types::DistanceMetric {
+    fn compute_f32(&self, a: &[f32], b: &[f32]) -> memfuse_types::Result<f32> {
+        self.compute(a, b)
+    }
+
+    fn compute_u8(&self, a: &[u8], b: &[u8]) -> memfuse_types::Result<u32> {
+        self.compute_u8(a, b)
+    }
+}
 
 #[cfg(test)]
 mod dyn_safety {

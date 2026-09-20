@@ -1,0 +1,21 @@
+[package]
+name = "memfuse-adapt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Adaptive controllers, bandits, and PID regulators for MemFuse"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+[features]
+default = ["bandit-routing"]
+bandit-routing = []
+egress-sherman-morrison = ["bandit-routing"]
+
+[lints]
+workspace = true
+
