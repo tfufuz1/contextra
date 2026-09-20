@@ -150,6 +150,14 @@
       "session_id": "18135303663892651424",
       "active": true,
       "expires_at": "2026-09-20T05:36:32.182621546+00:00"
+    },
+    {
+      "krate": "memfuse-router",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-20T02:12:25.433072464+00:00",
+      "session_id": "1963289702136099381",
+      "active": true,
+      "expires_at": "2026-09-20T06:12:25.433062698+00:00"
     }
   ]
 }
