@@ -172,7 +172,7 @@ pub struct DeletionProof {
     /// `excluded_scopes` ungesichert bleiben.
     ///
     /// Version 2 (Aktuell): Signiert `scope`, `deleted_keys_hash`, `deleted_after_tx`,
-    /// `covered_layers` und `excluded_scopes`. Alle neuen Proofs werden mit Version 2 erzeugt.
+    /// `covered_layers`, `excluded_scopes` und optional `wal_chain_receipt`.
     #[serde(default = "default_signature_version")]
     pub signature_version: u8,
     /// Target scope of deletion.
@@ -188,6 +188,9 @@ pub struct DeletionProof {
     pub covered_layers: Vec<DeletionLayer>,
     /// Pflicht für DSGVO Art. 17-Compliance.
     pub excluded_scopes: Vec<ExcludedScope>,
+    /// Kryptographische Quittung H(hmac_prev || delete_event) der WAL-HMAC-Kette.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub wal_chain_receipt: Option<[u8; 32]>,
     /// Integritätswarnung für Legacy-Proofs (Version 1).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub integrity_warning: Option<String>,
@@ -206,10 +209,31 @@ impl DeletionProof {
     /// 3. DeletionProof::create() aufrufen
     pub fn create(
         scope: DeletionScope,
+        deleted_keys: Vec<Vec<u8>>,
+        deleted_after_tx: TxId,
+        covered_layers: Vec<LayerCleanupProof>,
+        excluded_scopes: Vec<ExcludedScope>,
+        proof_key: &[u8],
+    ) -> Result<Self> {
+        Self::create_with_wal_receipt(
+            scope,
+            deleted_keys,
+            deleted_after_tx,
+            covered_layers,
+            excluded_scopes,
+            None,
+            proof_key,
+        )
+    }
+
+    /// Erstellt und signiert einen DeletionProof inklusive optionaler WAL-HMAC-Kettenquittung.
+    pub fn create_with_wal_receipt(
+        scope: DeletionScope,
         mut deleted_keys: Vec<Vec<u8>>,
         deleted_after_tx: TxId,
         covered_layers: Vec<LayerCleanupProof>,
         excluded_scopes: Vec<ExcludedScope>,
+        wal_chain_receipt: Option<[u8; 32]>,
         proof_key: &[u8],
     ) -> Result<Self> {
         // Keys sortieren für deterministischen Hash
@@ -234,6 +258,13 @@ impl DeletionProof {
         let excluded_scopes_bytes = bincode::serialize(&excluded_scopes)
             .map_err(|e| MemFuseError::Internal(e.to_string()))?;
 
+        let receipt_bytes = wal_chain_receipt.unwrap_or([0u8; 32]);
+        let receipt_part = if wal_chain_receipt.is_some() {
+            receipt_bytes.as_slice()
+        } else {
+            &[]
+        };
+
         let signature = compute_hmac_sha256(
             proof_key,
             &[
@@ -242,6 +273,7 @@ impl DeletionProof {
                 &tx_bytes,
                 &covered_layers_bytes,
                 &excluded_scopes_bytes,
+                receipt_part,
             ],
         )?;
 
@@ -253,6 +285,7 @@ impl DeletionProof {
             signature,
             covered_layers,
             excluded_scopes,
+            wal_chain_receipt,
             integrity_warning: None,
         })
     }
@@ -274,6 +307,12 @@ impl DeletionProof {
                     .map_err(|e| MemFuseError::Internal(e.to_string()))?;
                 let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
                     .map_err(|e| MemFuseError::Internal(e.to_string()))?;
+                let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
+                let receipt_part = if self.wal_chain_receipt.is_some() {
+                    receipt_bytes.as_slice()
+                } else {
+                    &[]
+                };
                 compute_hmac_sha256(
                     proof_key,
                     &[
@@ -282,6 +321,7 @@ impl DeletionProof {
                         &tx_bytes,
                         &covered_layers_bytes,
                         &excluded_scopes_bytes,
+                        receipt_part,
                     ],
                 )?
             }
@@ -319,6 +359,31 @@ impl DeletionProof {
             DeletionScope::Tenant { tenant_id } => *tenant_id,
         }
     }
+}
+
+/// Erzeugt eine WAL-Löschquittung H(hmac_prev || delete_event) für den Nachweis
+/// auf WAL-Ebene gemäß DSGVO Art. 17.
+pub fn compute_wal_delete_receipt(
+    prev_hmac: &[u8; 32],
+    delete_event_payload: &[u8],
+    integrity_key: &[u8],
+) -> Result<[u8; 32]> {
+    compute_hmac_sha256(
+        integrity_key,
+        &[b"memfuse-wal-delete-v1", prev_hmac, delete_event_payload],
+    )
+}
+
+/// Verifiziert eine WAL-Löschquittung in O(1) konstanter Zeit ohne Klartextzugang.
+pub fn verify_wal_delete_receipt(
+    receipt: &[u8; 32],
+    prev_hmac: &[u8; 32],
+    delete_event_payload: &[u8],
+    integrity_key: &[u8],
+) -> Result<bool> {
+    use subtle::ConstantTimeEq;
+    let expected = compute_wal_delete_receipt(prev_hmac, delete_event_payload, integrity_key)?;
+    Ok(expected.ct_eq(receipt).into())
 }
 
 fn compute_hmac_sha256(key: &[u8], data_parts: &[&[u8]]) -> Result<[u8; 32]> {
@@ -647,6 +712,7 @@ mod tests {
             signature: v1_signature,
             covered_layers: vec![DeletionLayer::LsmMemtable],
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            wal_chain_receipt: None,
             integrity_warning: None,
         };
 
@@ -702,6 +768,7 @@ mod tests {
             signature: v1_signature,
             covered_layers: vec![DeletionLayer::LsmMemtable],
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            wal_chain_receipt: None,
             integrity_warning: None,
         };
 
@@ -741,6 +808,64 @@ mod tests {
             !json.contains("integrity_warning"),
             "v2 export MUST NOT contain integrity_warning"
         );
+    }
+
+    #[test]
+    fn test_wal_delete_receipt_computation_and_o1_verification() {
+        let integrity_key = b"integrity-key-32-bytes-wal-rec!";
+        let prev_hmac = [0x55u8; 32];
+        let delete_event = b"delete_event:doc_id=42:tx_id=100";
+
+        let receipt = compute_wal_delete_receipt(&prev_hmac, delete_event, integrity_key).unwrap();
+
+        // O(1) Verification without cleartext
+        assert!(
+            verify_wal_delete_receipt(&receipt, &prev_hmac, delete_event, integrity_key).unwrap()
+        );
+
+        // Tampered receipt or wrong key fails
+        let wrong_key = b"wrong-integrity-key-32-bytes---";
+        assert!(!verify_wal_delete_receipt(&receipt, &prev_hmac, delete_event, wrong_key).unwrap());
+
+        let tampered_event = b"delete_event:doc_id=43:tx_id=100";
+        assert!(
+            !verify_wal_delete_receipt(&receipt, &prev_hmac, tampered_event, integrity_key)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_deletion_proof_with_wal_receipt_creation_and_tamper_check() {
+        let scope = DeletionScope::Document {
+            doc_id: DocId(42),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let integrity_key = b"integrity-key-32-bytes-wal-rec!";
+        let prev_hmac = [0x77u8; 32];
+        let delete_event = b"doc_42_delete";
+
+        let receipt = compute_wal_delete_receipt(&prev_hmac, delete_event, integrity_key).unwrap();
+
+        let proof = DeletionProof::create_with_wal_receipt(
+            scope,
+            vec![b"k42".to_vec()],
+            TxId(100),
+            vec![
+                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+            ],
+            vec![ExcludedScope::LlmParameterMemory],
+            Some(receipt),
+            &test_key(),
+        )
+        .unwrap();
+
+        assert_eq!(proof.wal_chain_receipt, Some(receipt));
+        assert!(proof.verify(&test_key()).unwrap());
+
+        // Tamper with receipt
+        let mut tampered_proof = proof.clone();
+        tampered_proof.wal_chain_receipt = Some([0xFFu8; 32]);
+        assert!(!tampered_proof.verify(&test_key()).unwrap());
     }
 
     #[test]

@@ -33,7 +33,7 @@ pub use deletion_proof::{
 };
 pub use egress_vault::{
     BlockReason, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
-    EgressVaultError,
+    EgressVaultError, PolicyCategory,
 };
 pub use error::{CryptoError, Result};
 pub use kv_cipher::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};

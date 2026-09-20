@@ -102,7 +102,7 @@ impl Wal {
 
     /// Replays the WAL using zero-copy memory mapping (`mmap`).
     /// Returns all valid entries with sequence numbers, entries, end offsets, and detected WAL version.
-    #[allow(unsafe_code, clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     pub async fn replay_mmap(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let std_file = std::fs::File::open(&self.path)
             .map_err(|e| MemFuseError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
@@ -115,15 +115,8 @@ impl Wal {
             return Ok((Vec::new(), WalVersion::V1));
         }
 
-        let mmap = unsafe {
-            // SAFETY:
-            // 1. Invariant: `std_file` is a valid open read-only file descriptor to the WAL file.
-            // 2. Guarantor: `std::fs::File::open` opened read-only; the mmap buffer is read-only.
-            // 3. Call-site verified: `mmap` is held read-only locally within `replay_mmap` for entry parsing.
-            // 4. ADR reference: ADR-017 (Zero-Copy Mmap for WAL Replay).
-            memmap2::Mmap::map(&std_file)
-                .map_err(|e| MemFuseError::Storage(format!("WAL mmap failed: {e}")))?
-        };
+        let mmap = memfuse_sys::mmap_readonly(&std_file)
+            .map_err(|e| MemFuseError::Storage(format!("WAL mmap failed: {e}")))?;
 
         self.parse_mmap_slice(&mmap, file_size)
     }
@@ -150,7 +143,6 @@ impl Wal {
     ///
     /// If mmap mapping or slice scanning encounters any error, it logs a warning (`tracing::warn!`)
     /// and automatically falls back to stream-based scanning (`scan_entries_with_callback`).
-    #[allow(unsafe_code)]
     pub async fn scan_entries_mmap<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>
     where
         F: FnMut(u64, WalEntry, u64) -> bool,
@@ -164,11 +156,7 @@ impl Wal {
             let std_file = std::fs::File::open(&self.path).map_err(|e| {
                 MemFuseError::Storage(format!("Failed to open WAL file for mmap: {e}"))
             })?;
-            // SAFETY: Invariant: `std_file` is a valid open file descriptor opened in read-only mode for replay.
-            // Guarantor: std::fs::File::open returned Ok above.
-            // UB Prevention: Read-only mapping prevents data races. If file is truncated or removed,
-            // active mmap buffer remains valid for the duration of slice scanning.
-            let mmap = unsafe { memmap2::Mmap::map(&std_file) }.map_err(|e| {
+            let mmap = memfuse_sys::mmap_readonly(&std_file).map_err(|e| {
                 MemFuseError::Storage(format!(
                     "Failed to mmap WAL file {}: {e}",
                     self.path.display()
@@ -280,15 +268,16 @@ impl Wal {
 
         // Detect version from header
         if file_size >= 4 && slice_len >= 4 {
-            let header_bytes: [u8; 4] = slice[0..4].try_into().unwrap();
-            if header_bytes == WAL_V3_HEADER {
-                version = WalVersion::V3;
-                pos = 4;
-            } else if header_bytes == WAL_V2_HEADER {
-                version = WalVersion::V2;
-                pos = 4;
-            } else {
-                pos = 0;
+            if let Some(header_slice) = slice.get(0..4) {
+                if header_slice == WAL_V3_HEADER {
+                    version = WalVersion::V3;
+                    pos = 4;
+                } else if header_slice == WAL_V2_HEADER {
+                    version = WalVersion::V2;
+                    pos = 4;
+                } else {
+                    pos = 0;
+                }
             }
         }
 
@@ -305,7 +294,25 @@ impl Wal {
                 break;
             }
 
-            let len_bytes: [u8; 4] = slice[pos as usize..pos as usize + 4].try_into().unwrap();
+            let len_bytes_slice = match slice.get(pos as usize..pos as usize + 4) {
+                Some(s) => s,
+                None => {
+                    tracing::warn!(
+                        "WAL tail corruption (out of bounds length) at offset {}",
+                        pos
+                    );
+                    break;
+                }
+            };
+            let len_bytes: [u8; 4] = match len_bytes_slice.try_into() {
+                Ok(b) => b,
+                Err(_) => {
+                    return Err(MemFuseError::wal_corruption(
+                        pos,
+                        "Failed to parse WAL entry length header",
+                    ));
+                }
+            };
             let len = u32::from_le_bytes(len_bytes) as usize;
 
             if len > MAX_WAL_ENTRY_SIZE as usize {
@@ -342,7 +349,16 @@ impl Wal {
                 break;
             }
 
-            let entry_data_raw = &slice[pos as usize + 4..pos as usize + 4 + len];
+            let entry_data_raw = match slice.get(pos as usize + 4..pos as usize + 4 + len) {
+                Some(data) => data,
+                None => {
+                    tracing::warn!(
+                        "WAL tail corruption (entry slice out of bounds) at offset {}",
+                        pos
+                    );
+                    break;
+                }
+            };
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
@@ -361,8 +377,18 @@ impl Wal {
                     ));
                 }
                 let mut nonce = [0u8; 12];
-                nonce.copy_from_slice(&entry_data_raw[0..12]);
-                let decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
+                let nonce_slice = match entry_data_raw.get(0..12) {
+                    Some(s) => s,
+                    None => {
+                        return Err(MemFuseError::wal_corruption(
+                            chunk_start_pos,
+                            "Failed to read entry nonce",
+                        ));
+                    }
+                };
+                nonce.copy_from_slice(nonce_slice);
+                let ciphertext = entry_data_raw.get(12..).unwrap_or(&[]);
+                let decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                     Ok(data) => data,
                     Err(e) => {
                         if pos >= file_size {
@@ -395,15 +421,16 @@ impl Wal {
                             "Truncated inner WAL entry length in batch",
                         ));
                     }
-                    let inner_len_bytes: [u8; 4] = match inner_slice[0..4].try_into() {
-                        Ok(b) => b,
-                        Err(_) => {
-                            return Err(MemFuseError::wal_corruption(
-                                chunk_start_pos,
-                                "Failed to extract inner WAL entry length",
-                            ));
-                        }
-                    };
+                    let inner_len_bytes: [u8; 4] =
+                        match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
+                            Some(b) => b,
+                            None => {
+                                return Err(MemFuseError::wal_corruption(
+                                    chunk_start_pos,
+                                    "Failed to extract inner WAL entry length",
+                                ));
+                            }
+                        };
                     let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
                     if inner_slice.len() < 4 + inner_len {
                         if pos >= file_size {
@@ -418,8 +445,16 @@ impl Wal {
                             "Truncated inner WAL entry in batch",
                         ));
                     }
-                    let inner_entry_bytes = &inner_slice[4..4 + inner_len];
-                    inner_slice = &inner_slice[4 + inner_len..];
+                    let inner_entry_bytes = match inner_slice.get(4..4 + inner_len) {
+                        Some(b) => b,
+                        None => {
+                            return Err(MemFuseError::wal_corruption(
+                                chunk_start_pos,
+                                "Truncated inner WAL entry in batch",
+                            ));
+                        }
+                    };
+                    inner_slice = inner_slice.get(4 + inner_len..).unwrap_or(&[]);
 
                     let entry = match WalEntry::from_bytes(inner_entry_bytes) {
                         Ok(e) => e,
@@ -448,9 +483,13 @@ impl Wal {
                     let (op_type, key, value) = match &entry.op {
                         WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                         WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+<<<<<<< HEAD
+                        WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
+=======
                         WalOp::TxEnd { committed, .. } => {
                             (2u8, vec![if *committed { 1u8 } else { 0u8 }], Vec::new())
                         }
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
                     };
 
                     let snapshot = WalEntrySnapshot {
@@ -486,8 +525,17 @@ impl Wal {
                         ));
                     }
                     let mut nonce = [0u8; 12];
-                    nonce.copy_from_slice(&entry_data_raw[0..12]);
-                    decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
+                    let nonce_slice = match entry_data_raw.get(0..12) {
+                        Some(s) => s,
+                        None => {
+                            return Err(MemFuseError::Storage(
+                                "WAL entry too short for nonce".into(),
+                            ));
+                        }
+                    };
+                    nonce.copy_from_slice(nonce_slice);
+                    let ciphertext = entry_data_raw.get(12..).unwrap_or(&[]);
+                    decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                         Ok(data) => data,
                         Err(e) => {
                             if version == WalVersion::V1 {
@@ -536,9 +584,13 @@ impl Wal {
                 let (op_type, key, value) = match &entry.op {
                     WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                     WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+<<<<<<< HEAD
+                    WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
+=======
                     WalOp::TxEnd { committed, .. } => {
                         (2u8, vec![if *committed { 1u8 } else { 0u8 }], Vec::new())
                     }
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
                 };
 
                 let snapshot = WalEntrySnapshot {

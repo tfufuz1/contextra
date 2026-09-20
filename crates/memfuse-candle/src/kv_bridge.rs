@@ -1,13 +1,17 @@
 // FILE-CONTEXT
-// STAND: 2026-09-13T00:00:00Z (SESSION: KV-BRIDGE-ADAPTER-IMPL)
-// ZWECK: KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store.
+// STAND: 2026-09-17T00:00:00Z (SESSION: KV-BRIDGE-ZERO-COPY-IMPL)
+// ZWECK: KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store (RAM Tier 1 + LSM Tier 2 Spill).
+// REIFEGRAD: 🟡 (Golden Test verifiziert, Stufe A / Tier 2 Async Spill)
 // INVARIANTEN: Cache-Miss und jeder Fehler ergeben transparenten Fallback auf vollen Prefill.
 //              Kein parking_lot-Lock über .await-Punkt.
+//              Zero-Panic-Doctrine: Keine unwrap/expect in der Eviction Bridge Pipeline.
+//              Zero-Copy: bytes::Bytes-Slices im Async-LSM Spill Path.
 
 //! KV-Bridge Adapter connecting Candle inference to tenant-isolated encrypted KV cache store.
 
 #![cfg(feature = "kv-bridge")]
 
+use bytes::Bytes;
 use memfuse_core::traits::ContextSegment;
 #[cfg(feature = "memfuse-store")]
 use memfuse_core::traits::StorageEngine;
@@ -89,7 +93,8 @@ impl KvBridgeAdapter {
                     let spill_key =
                         format!("__kv_spill:{}:{:#x}", tenant.inner(), segment_id).into_bytes();
                     let tx_id = TxId(segment_id);
-                    if let Err(e) = lsm_inner.put(tx_id, &spill_key, &ciphertext).await {
+                    let ciphertext_bytes = Bytes::from(ciphertext);
+                    if let Err(e) = lsm_inner.put(tx_id, &spill_key, &ciphertext_bytes).await {
                         tracing::warn!(
                             tenant_id = tenant.inner(),
                             segment_id,
@@ -245,6 +250,18 @@ impl KvBridgeAdapter {
         };
 
         Self::validate_payload(&decrypted_bytes, key)
+    }
+
+    /// Versucht asynchron, ein gecachetes KV-Segment zu laden und als `Bytes` Slice (Zero-Copy) zurückzugeben.
+    #[cfg(feature = "memfuse-store")]
+    pub async fn try_get_cached_segment_async_bytes(
+        &self,
+        tenant: TenantId,
+        key: &KvCacheKey,
+    ) -> Option<Bytes> {
+        self.try_get_cached_segment_async(tenant, key)
+            .await
+            .map(Bytes::from)
     }
 
     /// Speichert ein KV-Segment im Cache. Fehler werden geloggt, nie propagiert.
@@ -566,6 +583,47 @@ mod tests {
             retrieved.is_none(),
             "Fingerprint mismatch MUST return None without panic"
         );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "memfuse-store")]
+    async fn test_lsm_fallback_golden_zero_copy_async_bytes() {
+        let master_km =
+            CryptoKey::try_new("test-passphrase-golden", b"test-salt-golden123").unwrap();
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
+        let store = Arc::new(TenantIsolatedKvStore::with_capacity(1));
+        let temp_dir = tempfile::tempdir().unwrap();
+        let lsm_config = memfuse_store::LsmConfig {
+            path: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let lsm_store = Arc::new(memfuse_store::LsmStorage::new(lsm_config).await.unwrap());
+
+        let adapter = KvBridgeAdapter::with_lsm_fallback(store, lsm_store, cipher);
+        let tenant = TenantId::try_new(777).unwrap();
+        let fp = dummy_fp();
+
+        let key1 = KvCacheKey::new(1, fp.clone(), Some(32));
+        let payload1 = b"Golden zero-copy paged KV payload block".to_vec();
+        adapter.store_segment(tenant, key1.clone(), payload1.clone());
+
+        let key2 = KvCacheKey::new(2, fp.clone(), Some(64));
+        let payload2 = b"Eviction trigger payload block".to_vec();
+        adapter.store_segment(tenant, key2.clone(), payload2);
+
+        let mut retrieved_bytes = None;
+        for _ in 0..20 {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            if let Some(b) = adapter
+                .try_get_cached_segment_async_bytes(tenant, &key1)
+                .await
+            {
+                retrieved_bytes = Some(b);
+                break;
+            }
+        }
+        assert!(retrieved_bytes.is_some());
+        assert_eq!(retrieved_bytes.unwrap().as_ref(), payload1.as_slice());
     }
 
     #[tokio::test]

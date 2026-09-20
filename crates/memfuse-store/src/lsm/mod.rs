@@ -598,13 +598,18 @@ impl StorageEngine for LsmStorage {
                 return Ok(());
             }
 
-            let mut wal_ops = Vec::with_capacity(ops.len());
+            let mut wal_ops = Vec::with_capacity(ops.len() + 1);
             let mut mem_updates = Vec::with_capacity(ops.len());
+            let mut last_seq = 0u64;
 
             let mut last_op_seq = 0u64;
             for op in &ops {
                 let seq_no = self.next_seq_no.fetch_add(1, Ordering::SeqCst);
+<<<<<<< HEAD
+                last_seq = seq_no;
+=======
                 last_op_seq = seq_no;
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
                 match op {
                     IndexOp::Insert { doc_id: _, data } => {
                         let (key, value) = data;
@@ -639,13 +644,20 @@ impl StorageEngine for LsmStorage {
                 }
             }
 
+<<<<<<< HEAD
+=======
             // Append TxEnd marker as the terminal operation for repair-on-open recovery using the last op's seq_no
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             wal_ops.push((
                 WalOp::TxEnd {
                     tx_id,
                     committed: true,
                 },
+<<<<<<< HEAD
+                last_seq,
+=======
                 last_op_seq,
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             ));
 
             // --- PHASE 2: Prepare WAL entries under commit_mutex ---

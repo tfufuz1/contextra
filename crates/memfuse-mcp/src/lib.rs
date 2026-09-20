@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 //! Layer-7-Rand-Crate ohne jegliche unsafe-Toleranz — verarbeitet direkt untrusted stdio-Input, siehe ADR-010.
 
+pub mod bulk_exfiltration_detector;
 pub mod config;
 pub mod egress_gateway;
 pub mod egress_guard;
@@ -10,6 +11,9 @@ pub mod sandbox;
 #[cfg(test)]
 mod tests;
 
+pub use bulk_exfiltration_detector::{
+    BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
+};
 pub use config::*;
 
 pub use egress_gateway::{
@@ -231,6 +235,7 @@ impl McpServer {
             allow_db_reads: true,
             allow_db_writes,
             allow_code_execution: false,
+            allow_cloud_egress: false,
             max_execution_ms: 5_000,
         };
         let sandbox = McpSandbox::new(policy)

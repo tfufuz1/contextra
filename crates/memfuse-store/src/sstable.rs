@@ -116,52 +116,90 @@ pub trait BlockCacheBackend: Send + Sync {
     }
 }
 
-/// Standard strict-LRU block cache backend using `parking_lot::RwLock<LruCache>`.
+struct LruBlockCacheState {
+    cache: LruCache<(u64, u64), Bytes>,
+    current_bytes: usize,
+    capacity_bytes: usize,
+}
+
+/// Standard strict-LRU block cache backend using `parking_lot::RwLock<LruCache>` with byte-based capacity.
 pub struct LruBlockCacheBackend {
-    cache: RwLock<LruCache<(u64, u64), Bytes>>,
+    state: RwLock<LruBlockCacheState>,
 }
 
 impl BlockCacheBackend for LruBlockCacheBackend {
-    fn new(capacity: usize) -> Self {
-        let cap =
-            std::num::NonZeroUsize::new(capacity.max(1)).unwrap_or(std::num::NonZeroUsize::MIN);
+    fn new(capacity_bytes: usize) -> Self {
+        let capacity_bytes = capacity_bytes.max(1);
         Self {
-            cache: RwLock::new(LruCache::new(cap)),
+            state: RwLock::new(LruBlockCacheState {
+                cache: LruCache::unbounded(),
+                current_bytes: 0,
+                capacity_bytes,
+            }),
         }
     }
 
     #[inline]
     fn get(&self, key: &(u64, u64)) -> Option<Bytes> {
-        self.cache.write().get(key).cloned()
+        self.state.write().cache.get(key).cloned()
     }
 
     #[inline]
     fn insert(&self, key: (u64, u64), value: Bytes) {
-        self.cache.write().put(key, value);
+        let mut s = self.state.write();
+        let val_len = value.len();
+        if let Some(old_val) = s.cache.put(key, value) {
+            s.current_bytes = s.current_bytes.saturating_sub(old_val.len());
+        }
+        s.current_bytes += val_len;
+
+        while s.current_bytes > s.capacity_bytes && !s.cache.is_empty() {
+            if let Some((_k, popped)) = s.cache.pop_lru() {
+                s.current_bytes = s.current_bytes.saturating_sub(popped.len());
+            } else {
+                break;
+            }
+        }
     }
 
     #[inline]
     fn len(&self) -> usize {
-        self.cache.read().len()
+        self.state.read().cache.len()
     }
 
     #[inline]
     fn contains(&self, key: &(u64, u64)) -> bool {
-        self.cache.read().contains(key)
+        self.state.read().cache.contains(key)
     }
 }
 
-/// Lock-optimized block cache backend using `quick_cache::sync::Cache` (S3-FIFO / Clock-based eviction).
+#[cfg(feature = "block-cache-v2")]
+#[derive(Clone)]
+struct BlockWeighter;
+
+#[cfg(feature = "block-cache-v2")]
+impl quick_cache::Weighter<(u64, u64), Bytes> for BlockWeighter {
+    fn weight(&self, _key: &(u64, u64), value: &Bytes) -> u32 {
+        value.len().try_into().unwrap_or(u32::MAX)
+    }
+}
+
+/// Lock-optimized block cache backend using `quick_cache::sync::Cache` (S3-FIFO / Clock-based eviction) with byte-based capacity.
 #[cfg(feature = "block-cache-v2")]
 pub struct QuickCacheBlockCacheBackend {
-    cache: quick_cache::sync::Cache<(u64, u64), Bytes>,
+    cache: quick_cache::sync::Cache<(u64, u64), Bytes, BlockWeighter>,
 }
 
 #[cfg(feature = "block-cache-v2")]
 impl BlockCacheBackend for QuickCacheBlockCacheBackend {
-    fn new(capacity: usize) -> Self {
+    fn new(capacity_bytes: usize) -> Self {
+        let estimated_items = (capacity_bytes / 4096).max(16);
         Self {
-            cache: quick_cache::sync::Cache::new(capacity.max(1)),
+            cache: quick_cache::sync::Cache::with_weighter(
+                estimated_items,
+                capacity_bytes as u64,
+                BlockWeighter,
+            ),
         }
     }
 
@@ -428,12 +466,14 @@ pub fn create_block_cache(capacity_mb: usize) -> Arc<BlockCache> {
     create_block_cache_with_shards(capacity_mb, BLOCK_CACHE_SHARDS)
 }
 
-/// Creates a new block cache instance with configurable shard count. Capacity is in MB (assuming 4KB blocks).
+/// Creates a new block cache instance with configurable shard count. Capacity is in MB.
 pub fn create_block_cache_with_shards(capacity_mb: usize, num_shards: usize) -> Arc<BlockCache> {
     let num_shards = num_shards.max(1);
-    let total_blocks = capacity_mb.saturating_mul(256).clamp(256, 8 * 1024 * 256);
-    let per_shard = (total_blocks / num_shards).max(16);
-    Arc::new(BlockCache::new_with_shards(per_shard, num_shards))
+    let total_bytes = capacity_mb
+        .saturating_mul(1024 * 1024)
+        .clamp(1024 * 1024, 8 * 1024 * 1024 * 1024);
+    let per_shard_bytes = (total_bytes / num_shards).max(64 * 1024);
+    Arc::new(BlockCache::new_with_shards(per_shard_bytes, num_shards))
 }
 
 /// Block size for SSTable data blocks (4KB).
@@ -1347,7 +1387,7 @@ impl SstableReader {
                     offset,
                 ));
             }
-            Ok(Bytes::copy_from_slice(payload))
+            Ok(block_data.slice(4..))
         } else {
             Ok(block_data)
         }
@@ -2581,8 +2621,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_block_cache_eviction_under_load() {
-        // Create a 1-block per shard cache directly
-        let cache = Arc::new(BlockCache::new(1));
+        // Create a 10-byte capacity per shard cache directly (for 6-byte blocks)
+        let cache = Arc::new(BlockCache::new(10));
 
         let file_id = 1u64;
         // Find 3 offsets that map to the exact same shard index using ahash
@@ -2617,6 +2657,39 @@ mod tests {
         assert!(!cache.contains(file_id, offset1));
         assert!(!cache.contains(file_id, offset2));
         assert!(cache.contains(file_id, offset3));
+    }
+
+    #[tokio::test]
+    async fn test_block_cache_byte_capacity_eviction_threshold() {
+        // Set per-shard capacity to 20 bytes
+        let cache = Arc::new(BlockCache::new(20));
+        let file_id = 100u64;
+
+        // Find offsets mapping to shard 0
+        let mut offsets = Vec::new();
+        let mut cand = 0u64;
+        while offsets.len() < 2 {
+            if cache.shard_idx(file_id, cand) == 0 {
+                offsets.push(cand);
+            }
+            cand += 1;
+        }
+
+        let block1 = Bytes::from(vec![0u8; 15]); // 15 bytes
+        let block2 = Bytes::from(vec![1u8; 10]); // 10 bytes (total 25 > 20 capacity_bytes)
+
+        cache.insert(file_id, offsets[0], block1);
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains(file_id, offsets[0]));
+
+        // Insert block2, causing total bytes (25) to exceed shard capacity (20) -> evicts block1
+        cache.insert(file_id, offsets[1], block2);
+        assert_eq!(cache.len(), 1);
+        assert!(
+            !cache.contains(file_id, offsets[0]),
+            "block1 must be evicted due to byte capacity limit"
+        );
+        assert!(cache.contains(file_id, offsets[1]));
     }
 
     #[tokio::test]

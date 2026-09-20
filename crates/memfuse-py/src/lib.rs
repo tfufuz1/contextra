@@ -339,8 +339,8 @@ fn check_subinterpreter_guard(py: Python<'_>) -> PyResult<()> {
 // AI-TAG[SECURITY][MAJOR][RESOLVED] panic="abort" in workspace Cargo.toml release profile disables catch_unwind (ID: AGT-PY-d5d2be30) (TS: 2026-09-10T00:00:00Z) (SESSION: 55a96348)
 // BEFUND: Resolved by decoupling `crates/memfuse-py` into an independent workspace with its own `[profile.release]` setting `panic = "unwind"`.
 // BEHOBEN: `std::panic::catch_unwind` in `run_blocking_ffi` intercepts panics in release builds, converting them into catchable PyRuntimeError exceptions without aborting CPython via SIGABRT.
-// Siehe docs/decisions/ADR-064-memfuse-py-separater-workspace-panic-strategie.md
-// für die vollständige Begründung dieser Workspace-Trennung.
+// Siehe docs/decisions/ADR-064-memfuse-py-separater-workspace-panic-strategie.md und ADR-N04 (PHASE0-T3)
+// für die vollständige Begründung dieser FFI Panic Boundary Isolation.
 // AI-TAG[FIX][PY-3][RESOLVED] Poison engine instance on caught panic (APM-PY-A) (TS: 2026-09-10T19:22:55Z) (SESSION: 0b2ff57d)
 // Checks poisoned AtomicBool prior to execution and sets poisoned = true when catch_unwind catches a panic.
 /// Safely executes a blocking closure across FFI boundaries with thread state release
@@ -1090,6 +1090,7 @@ impl PyMemFuse {
 
     /// Internal helper method for testing FFI panic isolation and engine poisoning.
     #[pyo3(signature = (message=None))]
+    #[allow(clippy::panic)]
     pub fn _trigger_panic_for_test(&self, py: Python<'_>, message: Option<String>) -> PyResult<()> {
         let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
         run_blocking_ffi(py, &self.poisoned, move || -> PyResult<()> {
@@ -1238,6 +1239,7 @@ impl PyCollection {
 
     /// Internal helper method for testing FFI panic isolation and engine poisoning.
     #[pyo3(signature = (message=None))]
+    #[allow(clippy::panic)]
     pub fn _trigger_panic_for_test(&self, py: Python<'_>, message: Option<String>) -> PyResult<()> {
         let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
         run_blocking_ffi(py, &self.poisoned, move || -> PyResult<()> {
@@ -1817,6 +1819,7 @@ mod tests {
 // RESOLVED: _trigger_panic_for_test now calls run_blocking_ffi internally triggering a panic in the closure to test FFI panic containment.
 /// Internal helper function for testing FFI panic isolation.
 #[pyfunction]
+#[allow(clippy::panic)]
 fn _trigger_panic_for_test(py: Python<'_>, message: Option<String>) -> PyResult<()> {
     let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
     let dummy_poison = AtomicBool::new(false);

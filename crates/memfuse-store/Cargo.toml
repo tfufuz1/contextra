@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "memfuse-store"
 version.workspace = true
@@ -21,6 +24,7 @@ block-cache-v2 = ["dep:quick_cache"]
 docid-128 = ["memfuse-core/docid-128"]
 
 [dependencies]
+memfuse-sys = { workspace = true }
 memfuse-core = { workspace = true }
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
@@ -32,6 +36,7 @@ parking_lot = { workspace = true }
 tokio = { workspace = true }
 memmap2 = { workspace = true }
 tracing = { workspace = true }
+thiserror = { workspace = true }
 
 rand = { workspace = true }
 lru = "0.16.3"

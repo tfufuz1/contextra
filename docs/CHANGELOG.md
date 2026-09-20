@@ -4,6 +4,7 @@
 
 | Zeitstempel | Crate/Datei | Typ | ID | Session | Status | Review-Pässe (unabhängig) | Beschreibung |
 |---|---|---|---|---|---|---|---|
+| `TS:2026-09-17T19:00:00Z (SESSION: jules-agent-budget)` | `crates/memfuse-agent/src/budget.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Token budget RAII reservation abstraction for agent workflow steps. |
 | `TS:2026-09-13T01:36:52Z (SESSION: c1c85419)` | `crates/memfuse-agent/tests/proptest_workflow_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-based testing for memfuse-agent structural invariants (StateGraph, AgentContext, BackgroundEvent). |
 | `TS:2026-09-13T00:00:00Z (SESSION: pid-regler-impl)` | `crates/memfuse-db/src/pid_latency_controller.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | PID Latency Controller & Latency Budget Guard für Multi-Step Retrieval. |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-crypto/src/kv_segment/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation). |
@@ -81,7 +82,10 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/multistep.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-db/src/transaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
+| `2026-09-18T12:00:00Z` | `crates/memfuse-graph/src/csr.rs` | `AI-TAG` | `-` | `e095d708` | `OPEN` | `-` | // AI-TAG[TODO][IP-08-BUDGET-COUPLING](TS:2026-09-18T12:00:00Z)(SESSION:e095d708): Connect to global ResourceTracker when cross-crate tracker handle is integrated. |
+| `2026-09-18T10:00:00Z` | `crates/memfuse-calibration/src/isotonic.rs` | `AI-TAG` | `-` | `jules` | `OPEN` | `-` | // AI-TAG[FIX][MINOR] Use ? operator on Option<&Vec<(f32, f32)>> for concise early return (TS: 2026-09-18T10:00:00Z) (SESSION: jules) |
 | `2026-09-17T17:59:57Z (SESSION: c9c5f937)` | `crates/memfuse-core/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Core types, traits, and error handling for MemFuse. |
+| `2026-09-17T00:00:00Z (SESSION: KV-BRIDGE-ZERO-COPY-IMPL)` | `crates/memfuse-candle/src/kv_bridge.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store (RAM Tier 1 + LSM Tier 2 Spill). |
 | `2026-09-16T21:00:00Z (SESSION: IP-07)` | `crates/memfuse-core/src/tombstone.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Trait und Referenzimplementierung für Tombstone-Semantik (IP-07 / ADR-041). |
 | `2026-09-16T16:47:30Z` | `crates/memfuse-py/src/lib.rs` | `REVIEW-PASS` | `-` | `29edb6a4` | `-` | `-` | // REVIEW-PASS[1/2] Systematischer Review der memfuse-py PyO3 FFI Bindings (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-16T16:47:30Z) (SESSION: 29edb6a4) |
 | `2026-09-16T16:24:19Z` | `crates/memfuse-ollama/src/lib.rs` | `REVIEW-PASS` | `-` | `4b816c9a` | `PASS` | `-` | // REVIEW-PASS[2/2] STATUS:PASS (TS: 2026-09-16T16:24:19Z) (SESSION: 4b816c9a) PRÜFER-KONTEXT: FRESH - Independent diff review verified: prompt injection XML-escaping, retry & backoff error classification, forbid(unsafe_code) invariant, and 91 tests green. |
@@ -91,6 +95,7 @@
 | `2026-09-16T16:15:00Z` | `crates/memfuse-calibration/src/lib.rs` | `REVIEW-PASS` | `-` | `e72e11a3` | `PASS` | `-` | // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-16T16:15:00Z) (SESSION: e72e11a3) |
 | `2026-09-16T16:13:00Z (SESSION: afafdd44)` | `crates/memfuse-candle/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Crate root for memfuse-candle native GGUF inference backend. |
 | `2026-09-16T16:13:00Z` | `crates/memfuse-candle/src/lib.rs` | `REVIEW-PASS` | `AGT-CANDLE-d495a019` | `afafdd44` | `-` | `0` | // REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH |
+| `2026-09-16T00:00:00Z` | `crates/memfuse-wire/tests/ipc_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests, Fault-Injection und Nebenläufigkeitstests für FlatBuffers IPC (memfuse-wire) |
 | `2026-09-15T16:46:26Z` | `crates/memfuse-agent/src/lib.rs` | `REVIEW-PASS` | `AGT-AGENT-692d9982` | `692d9982` | `PASS` | `0` | // REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-AGENT-692d9982) (TS: 2026-09-15T16:46:26Z) (SESSION: 692d9982) (PRÜFER-KONTEXT: FRESH) |
 | `2026-09-15T16:15:00Z (SESSION: 1a43706f)` | `crates/memfuse-router/src/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit- und Integrationstest-Suite für memfuse-router. |
 | `2026-09-15T16:10:40Z (SESSION: ec33599e)` | `crates/memfuse-embed/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG). |
@@ -122,7 +127,6 @@
 | `2026-09-13T01:35:00Z` | `crates/memfuse-crypto/src/crypto.rs` | `REVIEW-PASS` | `AGT-CRYPTO-81653b64` | `dd990e1d` | `PASS` | `0` | // REVIEW-PASS[8/3] STATUS:PASS (ID: AGT-CRYPTO-81653b64) (TS: 2026-09-13T01:35:00Z) (SESSION: dd990e1d) (PRÜFER-KONTEXT: FRESH) |
 | `2026-09-13T01:33:57Z` | `crates/memfuse-store/src/lib.rs` | `REVIEW-PASS` | `-` | `60ca322c` | `-` | `-` | // REVIEW-PASS[1/2] Systematischer Tiefen-Audit von memfuse-store (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-13T01:33:57Z) (SESSION: 60ca322c) |
 | `2026-09-13T01:25:00Z` | `crates/memfuse-text/src/lib.rs` | `REVIEW-PASS` | `-` | `89a61398` | `-` | `-` | // REVIEW-PASS[2/2] Tier-2 audit verified: gate-stack green, 0 unsafe, APM-14/16/22/23/24/36 validated, 3x concurrency runs clean. (TS: 2026-09-13T01:25:00Z) (SESSION: 89a61398) (PRÜFER-KONTEXT: FRESH) |
-| `2026-09-13T00:00:00Z (SESSION: KV-BRIDGE-ADAPTER-IMPL)` | `crates/memfuse-candle/src/kv_bridge.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store. |
 | `2026-09-12T18:43:13Z` | `crates/memfuse-db/src/collection/maintenance.rs` | `AI-TAG` | `AGT-DB-f18d79a2` | `-` | `RESOLVED` | `0` | // AI-TAG[SMELL][MAJOR] RESOLVED: AGT-DB-f18d79a2 — reap_expired_documents uses cursor-based batch pagination to avoid 10k silent truncation limit (TS: 2026-09-12T18:43:13Z) |
 | `2026-09-12T00:00:00Z (SESSION: BACKPRESSURE-CONTRACT-D1)` | `crates/memfuse-candle/src/embedding.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Native Candle ML vector embedding client implementation. |
 | `2026-09-12T00:00:00Z (SESSION: BACKPRESSURE-CONTRACT-D1)` | `crates/memfuse-candle/src/inference.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Candle LLM text generator client implementing LlmTextGenerator. |
@@ -318,12 +322,21 @@
 | `` | `crates/memfuse-index/benches/partial_rebuild_recall_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-JULES-16-followup: HNSW-Rebuild respektiert jetzt aktive search_at()-Snapshots via retention window / seq_log pinning. |
 | `` | `crates/memfuse-index/src/hnsw.rs` | `AI-TAG` | `AGT-INDEX-f38b1a90` | `-` | `RESOLVED` | `0` | // AI-TAG[TEST][REGRESSION] RESOLVED: AGT-INDEX-f38b1a90 — Multi-instance fault injection isolation test. |
+| `` | `crates/memfuse-index/src/quantize_rabitq.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RaBitQ-Quantisierer (Binär-Quantisierung mit orthogonaler Rotation und Fehlerkorrektur). |
 | `` | `crates/memfuse-index/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/memfuse-index/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/memfuse-index/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/memfuse-mcp/src/bulk_exfiltration_detector.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 Bulk-Exfiltration-Detektor (Volumen/Zeitfenster pro Session) |
 | `` | `crates/memfuse-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/lib.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |
+| `` | `crates/memfuse-simd/src/dispatch.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Runtime Hardware Feature Detection & Dispatcher. |
+| `` | `crates/memfuse-simd/src/kernels/avx2.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen. |
+| `` | `crates/memfuse-simd/src/kernels/avx512.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AVX-512 SIMD-Intrinsics für f32, f32_bytes und u8 VNNI Distanzberechnungen. |
+| `` | `crates/memfuse-simd/src/kernels/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Kernel-Modul-Deklarationen für SIMD-Distanzfunktionen. |
+| `` | `crates/memfuse-simd/src/kernels/neon.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | ARM NEON SIMD-Intrinsics für f32 Distanzberechnungen. |
+| `` | `crates/memfuse-simd/src/kernels/scalar.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Skalare Fallback-Implementierung der Distanzmetriken (f32, f32_bytes, u8, f32_u8). |
+| `` | `crates/memfuse-simd/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-0 Ring-0 Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Dispatch. |
 | `` | `crates/memfuse-store/examples/chaos_writer.rs` | `FILE-CONTEXT` | `-` | `chaos_power_cut` | `-` | `-` |  |
 | `` | `crates/memfuse-store/src/compaction.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-H-3: LsmStorage hält eine persistente CompactionEngine-Instanz (LsmStorage.compaction_engine), wodurch Compaction-State & Zähler erhalten bleiben. |
 | `` | `crates/memfuse-store/src/lsm/mod.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-M-6: Drift-Counter budget_tracking_drift_bytes wird in LsmStorage::flush nach erfolgreichem Flush auf 0 zurückgesetzt. |

@@ -23,6 +23,8 @@ use memfuse_core::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+<<<<<<< HEAD
+=======
 /// Represents a synthetic bipartite hyperedge node generated during star expansion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VirtualHyperedgeNode {
@@ -97,6 +99,7 @@ impl<'a> Iterator for StarExpansionIterator<'a> {
     }
 }
 
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
 /// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunityDetectionConfig {
@@ -109,6 +112,89 @@ pub struct CommunityDetectionConfig {
     pub hyperedges_included: bool,
 }
 
+<<<<<<< HEAD
+/// Künstlicher bipartiter Knoten für eine Hyperkante in der Stern-Expansion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+
+pub struct VirtualHyperedgeNode {
+    /// ID der zugrundeliegenden Hyperkante.
+    pub hyperedge_id: crate::hyperedge::HyperEdgeId,
+}
+
+impl VirtualHyperedgeNode {
+    /// Creates a new `VirtualHyperedgeNode`.
+    pub fn new(hyperedge_id: u64) -> Self {
+        Self {
+            hyperedge_id: crate::hyperedge::HyperEdgeId::new(hyperedge_id),
+        }
+    }
+}
+
+/// Stern-Expansion: Jede Hyperkante wird als künstlicher bipartiter Knoten
+/// (`VirtualHyperedgeNode`) repräsentiert. Der Iterator gaukelt dem Leiden-Solver die
+/// Inzidenzmatrix H vor, ohne zusätzlichen Speicher für die volle Expansion zu allozieren.
+pub struct StarExpansionIterator<'a> {
+    _graph: &'a CsrGraph,
+    active_hyperedges: Vec<crate::hyperedge::HyperEdge>,
+    current_hyperedge_idx: usize,
+    current_participant_idx: usize,
+}
+
+impl<'a> StarExpansionIterator<'a> {
+    /// Erstellt einen neuen `StarExpansionIterator` für den gegebenen CsrGraph.
+    pub fn new(graph: &'a CsrGraph) -> Self {
+        let inner = graph.inner_read();
+        let active_hyperedges = inner
+            .hyperedges
+            .values()
+            .filter(|h| h.tx_valid_to.is_none() && h.participants.len() >= 2)
+            .cloned()
+            .collect();
+
+        Self {
+            _graph: graph,
+            active_hyperedges,
+            current_hyperedge_idx: 0,
+            current_participant_idx: 0,
+        }
+    }
+
+    /// Liest das nächste Element inkl. Kantengewicht.
+    pub fn next_with_weight(&mut self) -> Option<(EntityId, VirtualHyperedgeNode, f32)> {
+        while self.current_hyperedge_idx < self.active_hyperedges.len() {
+            let hedge = &self.active_hyperedges[self.current_hyperedge_idx];
+            if self.current_participant_idx < hedge.participants.len() {
+                let entity_id = hedge.participants[self.current_participant_idx].entity;
+                let vnode = VirtualHyperedgeNode {
+                    hyperedge_id: hedge.id,
+                };
+                let weight = if hedge.weight > 0.0 {
+                    hedge.weight
+                } else {
+                    1.0
+                };
+                self.current_participant_idx += 1;
+                return Some((entity_id, vnode, weight));
+            } else {
+                self.current_hyperedge_idx += 1;
+                self.current_participant_idx = 0;
+            }
+        }
+        None
+    }
+}
+
+impl<'a> Iterator for StarExpansionIterator<'a> {
+    type Item = (EntityId, VirtualHyperedgeNode);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_with_weight()
+            .map(|(entity, vnode, _w)| (entity, vnode))
+    }
+}
+
+=======
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
 impl Default for CommunityDetectionConfig {
     fn default() -> Self {
         Self {
@@ -205,7 +291,7 @@ pub async fn detect_communities(
 
         let mut valid_nodes = Vec::new();
         for idx in 0..num_nodes {
-            if inner.entities.get(idx).is_some_and(|e| e.is_some()) {
+            if inner.entity_at(idx).is_some() {
                 valid_nodes.push(idx);
             }
         }
@@ -224,9 +310,7 @@ pub async fn detect_communities(
                 let end = inner.offsets[u + 1];
                 for edge_idx in start..end {
                     let v = inner.targets[edge_idx];
-                    if !inner.tombstoned_edges.contains(&(u, v))
-                        && inner.entities.get(v).is_some_and(|e| e.is_some())
-                    {
+                    if !inner.tombstoned_edges.contains(&(u, v)) && inner.entity_at(v).is_some() {
                         let w = inner.weights[edge_idx];
                         let w_val = if w > 0.0 { w } else { 1.0 };
                         adj_raw
@@ -247,13 +331,13 @@ pub async fn detect_communities(
         }
 
         if config.hyperedges_included {
-            let mut virtual_map: HashMap<u64, usize> = HashMap::new();
+            let mut virtual_map: HashMap<crate::hyperedge::HyperEdgeId, usize> = HashMap::new();
             let mut next_virtual_idx = inner.reverse_map.len();
             let star_iter = StarExpansionIterator::new(graph);
 
             for (entity_id, virtual_node) in star_iter {
                 if let Some(&u) = inner.id_map.get(&entity_id) {
-                    if inner.entities.get(u).is_some_and(|e| e.is_some()) {
+                    if inner.entity_at(u).is_some() {
                         let v_idx =
                             *virtual_map
                                 .entry(virtual_node.hyperedge_id.inner())
@@ -306,14 +390,15 @@ pub async fn detect_communities(
         }
     });
 
-    let num_entity_nodes = node_indices.len();
+    let num_entity_nodes = num_real_nodes;
     if num_entity_nodes == 0 {
         return Ok(Vec::new());
     }
 
-    // Map global node indices to dense local 0..N-1 indices
-    let mut global_to_local: HashMap<usize, usize> = HashMap::with_capacity(num_entity_nodes);
-    let mut local_entity_ids: Vec<EntityId> = Vec::with_capacity(num_entity_nodes);
+    let num_total_nodes = node_indices.len();
+    let mut global_to_local: HashMap<usize, usize> = HashMap::with_capacity(num_total_nodes);
+    let mut local_entity_ids: Vec<EntityId> = Vec::with_capacity(num_real_nodes);
+    let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_total_nodes);
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
@@ -325,6 +410,7 @@ pub async fn detect_communities(
             (EntityId::new(0), u64_id)
         };
         local_entity_ids.push(eid);
+        local_u64_ids.push(u64_id);
     }
 
     // Entity lookup map from EntityId -> local index
@@ -345,14 +431,12 @@ pub async fn detect_communities(
 
         while let Some((entity_id, vnode, weight)) = star_iter.next_with_weight() {
             if let Some(&local_entity_idx) = entity_to_local.get(&entity_id) {
-                let v_idx = *vnode_to_local
-                    .entry(vnode.hyperedge_id)
-                    .or_insert_with(|| {
-                        let idx = num_entity_nodes + vnode_u64_ids.len();
-                        vnode_u64_ids.push(vnode.hyperedge_id.inner());
-                        vnode_local_adj.push(Vec::new());
-                        idx
-                    });
+                let v_idx = *vnode_to_local.entry(vnode.hyperedge_id).or_insert_with(|| {
+                    let idx = num_entity_nodes + vnode_u64_ids.len();
+                    vnode_u64_ids.push(vnode.hyperedge_id.inner());
+                    vnode_local_adj.push(Vec::new());
+                    idx
+                });
 
                 vnode_local_adj[v_idx - num_entity_nodes].push((local_entity_idx, weight));
             }
@@ -361,7 +445,7 @@ pub async fn detect_communities(
 
     let num_total_nodes = num_entity_nodes + vnode_u64_ids.len();
     let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_total_nodes);
-    for &eid in &local_entity_ids {
+    for &eid in &local_entity_ids[..num_entity_nodes] {
         local_u64_ids.push(eid.inner());
     }
     for &v_u64 in &vnode_u64_ids {
@@ -383,25 +467,12 @@ pub async fn detect_communities(
         }
     }
 
-    if config.hyperedges_included {
-        for (v_sub_idx, neighbors) in vnode_local_adj.into_iter().enumerate() {
-            let v_local_idx = num_entity_nodes + v_sub_idx;
-            for (entity_local_idx, weight) in neighbors {
-                local_adj[v_local_idx].push((entity_local_idx, weight));
-                node_degrees[v_local_idx] += weight;
-
-                local_adj[entity_local_idx].push((v_local_idx, weight));
-                node_degrees[entity_local_idx] += weight;
-            }
-        }
-    }
-
     let total_2m: f32 = node_degrees.iter().sum();
 
     // If graph has no edges, return singletons
     if total_2m <= 0.0 {
-        let mut assignments = Vec::with_capacity(num_entity_nodes);
-        for i in 0..num_entity_nodes {
+        let mut assignments = Vec::with_capacity(num_real_nodes);
+        for i in 0..num_real_nodes {
             assignments.push(CommunityAssignment {
                 entity_id: local_entity_ids[i],
                 community_id: local_u64_ids[i],
@@ -618,8 +689,8 @@ pub async fn detect_communities(
     }
 
     // Build final result list sorted by EntityId (only for actual Entity nodes, not virtual hyperedge nodes)
-    let mut assignments = Vec::with_capacity(num_entity_nodes);
-    for (i, &community_id) in communities.iter().enumerate().take(num_entity_nodes) {
+    let mut assignments = Vec::with_capacity(num_real_nodes);
+    for (i, &community_id) in communities.iter().enumerate().take(num_real_nodes) {
         let entity_id = local_entity_ids[i];
         assignments.push(CommunityAssignment {
             entity_id,
@@ -1358,14 +1429,20 @@ mod tests {
         // Cluster 1: Nodes 1, 2, 3 (no binary edges)
         for id in 1..=3 {
             graph
-                .add_entity(tx, Entity::new(EntityId::new(id), format!("C1_{id}"), "Node"))
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(id), format!("C1_{id}"), "Node"),
+                )
                 .await
                 .unwrap(); // unwrap allowed
         }
         // Cluster 2: Nodes 10, 11, 12 (no binary edges)
         for id in 10..=12 {
             graph
-                .add_entity(tx, Entity::new(EntityId::new(id), format!("C2_{id}"), "Node"))
+                .add_entity(
+                    tx,
+                    Entity::new(EntityId::new(id), format!("C2_{id}"), "Node"),
+                )
                 .await
                 .unwrap(); // unwrap allowed
         }

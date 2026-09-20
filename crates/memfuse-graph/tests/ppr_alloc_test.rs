@@ -1,6 +1,8 @@
 //! PPR Allocation Profiling and Correctness Benchmark Test for memfuse-graph
 //! Verifies allocation reduction in Personalized PageRank (PPR) before and after optimization.
 
+#![allow(unsafe_code)]
+
 use memfuse_core::{Entity, EntityId, PprConfig};
 use memfuse_graph::{CsrGraph, PprContext};
 use std::alloc::{GlobalAlloc, Layout, System};
@@ -24,8 +26,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
         ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
         ALLOC_BYTES.fetch_add(layout.size() as u64, Ordering::Relaxed);
         // SAFETY: `layout` is guaranteed valid by caller of `GlobalAlloc::alloc`, forwarded directly to `System.alloc`.
-        let ptr = unsafe { System.alloc(layout) }; // SAFETY: Forward layout to System allocator.
-        ptr
+        unsafe { System.alloc(layout) }
     }
 
     // SAFETY: Pointer and layout invariants are guaranteed by the `GlobalAlloc` contract caller (`ptr` was allocated by `alloc` with matching `layout`).

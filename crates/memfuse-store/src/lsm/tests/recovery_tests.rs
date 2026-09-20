@@ -711,7 +711,11 @@ async fn test_wal_discovery_mixed_filenames() {
                     tx_id: tx1,
                     committed: true,
                 },
+<<<<<<< HEAD
+                1,
+=======
                 2,
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             ),
         ])
         .await
@@ -730,14 +734,22 @@ async fn test_wal_discovery_mixed_filenames() {
                     key: b"k2".to_vec(),
                     value: b"v2".to_vec(),
                 },
+<<<<<<< HEAD
+                2,
+=======
                 3,
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             ),
             (
                 WalOp::TxEnd {
                     tx_id: tx2,
                     committed: true,
                 },
+<<<<<<< HEAD
+                2,
+=======
                 4,
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             ),
         ])
         .await
@@ -758,14 +770,22 @@ async fn test_wal_discovery_mixed_filenames() {
                     key: b"k3".to_vec(),
                     value: b"v3".to_vec(),
                 },
+<<<<<<< HEAD
+                3,
+=======
                 5,
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             ),
             (
                 WalOp::TxEnd {
                     tx_id: tx3,
                     committed: true,
                 },
+<<<<<<< HEAD
+                3,
+=======
                 6,
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             ),
         ])
         .await
@@ -924,4 +944,79 @@ async fn test_rollback_spanning_sstable_below_min_entries_threshold() {
         Some(bytes::Bytes::from_static(b"v1"))
     );
     assert_eq!(storage.get(b"k2").await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn test_uncommitted_transaction_discarded_on_open_recovery() {
+    let tmp = TempDir::new().expect("temp dir");
+    let wal_path = tmp.path().join("wal.log");
+
+    {
+        let wal = Wal::open_with_key_manager(&wal_path, None)
+            .await
+            .expect("open wal");
+
+        let tx1 = TxId::new(1);
+        let tx2 = TxId::new(2);
+
+        // Transaction 1: complete with Put + TxEnd
+        let (batch1, _) = wal
+            .prepare_batch(vec![
+                (
+                    WalOp::Put {
+                        tx_id: tx1,
+                        key: b"committed_key".to_vec(),
+                        value: b"committed_val".to_vec(),
+                    },
+                    1,
+                ),
+                (
+                    WalOp::TxEnd {
+                        tx_id: tx1,
+                        committed: true,
+                    },
+                    1,
+                ),
+            ])
+            .await
+            .expect("batch 1");
+        wal.append_batch(batch1).await.expect("append 1");
+
+        // Transaction 2: incomplete, missing TxEnd marker (simulating crash mid-transaction)
+        let (batch2, _) = wal
+            .prepare_batch(vec![(
+                WalOp::Put {
+                    tx_id: tx2,
+                    key: b"uncommitted_key".to_vec(),
+                    value: b"uncommitted_val".to_vec(),
+                },
+                2,
+            )])
+            .await
+            .expect("batch 2");
+        wal.append_batch(batch2).await.expect("append 2");
+    }
+
+    // Open LsmStorage on the data directory with the uncommitted WAL entries
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config)
+        .await
+        .expect("LsmStorage recovery startup");
+
+    // Committed key MUST be visible
+    let val1 = storage.get(b"committed_key").await.expect("get committed");
+    assert_eq!(val1, Some(bytes::Bytes::from_static(b"committed_val")));
+
+    // Uncommitted key MUST NOT be visible (discarded by Repair-on-Open)
+    let val2 = storage
+        .get(b"uncommitted_key")
+        .await
+        .expect("get uncommitted");
+    assert_eq!(
+        val2, None,
+        "Uncommitted transaction entries must be discarded during recovery replay"
+    );
 }

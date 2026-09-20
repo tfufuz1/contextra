@@ -158,7 +158,8 @@ impl WalHmac {
 ///
 /// # Usage
 /// Passed to `IntegrityVerifier::verify_and_update()` during WAL replay or recovery.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Zeroize)]
+#[zeroize(drop)]
 pub struct WalEntrySnapshot {
     pub tx_id: u64,
     pub seq_no: u64,
@@ -236,11 +237,23 @@ impl IntegrityVerifier {
             mac.update(&[1u8]);
             mac.update(&(entry.key.len() as u32).to_le_bytes());
             mac.update(&entry.key);
+<<<<<<< HEAD
+        } else if entry.op_type == 2 {
+            // TxEnd
+            mac.update(&[2u8]);
+            let committed = if entry.value.first().copied().unwrap_or(0) != 0 {
+                1u8
+            } else {
+                0u8
+            };
+            mac.update(&[committed]);
+=======
         } else {
             // TxEnd (op_type == 2)
             mac.update(&[2u8]);
             mac.update(&(entry.key.len() as u32).to_le_bytes());
             mac.update(&entry.key);
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
         }
 
         use subtle::ConstantTimeEq;
@@ -265,10 +278,21 @@ impl IntegrityVerifier {
         mac.update(&entry.seq_no.to_le_bytes());
 
         mac.update(&[entry.op_type]);
-        mac.update(&entry.key);
         if entry.op_type == 0 {
             // Put
+            mac.update(&entry.key);
             mac.update(&entry.value);
+        } else if entry.op_type == 1 {
+            // Delete
+            mac.update(&entry.key);
+        } else if entry.op_type == 2 {
+            // TxEnd
+            let committed = if entry.value.first().copied().unwrap_or(0) != 0 {
+                1u8
+            } else {
+                0u8
+            };
+            mac.update(&[committed]);
         }
 
         use subtle::ConstantTimeEq;

@@ -62,8 +62,12 @@ pub struct FusionWeights {
 
 impl Default for FusionWeights {
     fn default() -> Self {
-        FusionWeights::new(1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0)
-            .expect("1/3 + 1/3 + 1/3 must be valid FusionWeights")
+        Self {
+            vector: 1.0 / 3.0,
+            text: 1.0 / 3.0,
+            graph: 1.0 / 3.0,
+            metadata: 0.0,
+        }
     }
 }
 

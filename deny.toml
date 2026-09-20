@@ -5,13 +5,9 @@ targets = []
 feature-depth = 1
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "warn"
-notice = "warn"
 ignore = []
 
 [licenses]
-unlicensed = "deny"
 allow = [
     "MIT",
     "Apache-2.0",
@@ -29,6 +25,32 @@ confidence-threshold = 0.8
 multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
+# Note on tokio (§4.2 Ring-Modell):
+# tokio ban rule is omitted from deny.toml because the direct dependency list (>15 entries, including hyper, tower, etc.)
+# is overly complex/brittle. Ring-0 tokio-freedom is enforced via `cargo tree` assertions and `check-ring-layering`.
+deny = [
+<<<<<<< HEAD
+    # §4.2 Ring-Modell: Candle-Inferenz nur in memfuse-candle (TRANSITION; künftig memfuse-infer-candle) sowie Candle-Eigencrates
+    # "memfuse-infer-candle",  # ab Phase 4
+    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "memfuse-candle"] },
+    # §4.2 Ring-Modell: ONNX/ort nur in memfuse-embed (TRANSITION; künftig memfuse-infer-onnx)
+    # { crate = "ort", wrappers = ["memfuse-embed"] },  # ONNX/ort ist aktuell nicht im Dependency-Tree; ab Phase 4: memfuse-infer-onnx
+    # §4.2 Ring-Modell: PyO3 nur in memfuse-py (isoliertes Workspace-Crate) und Interop-Crates
+    { crate = "pyo3", wrappers = ["memfuse-py", "numpy", "pythonize"] },
+    # §4.2 Ring-Modell: reqwest nur in memfuse-ollama (TRANSITION; künftig memfuse-infer-ollama)
+    # "memfuse-infer-ollama",  # ab Phase 4
+    { crate = "reqwest", wrappers = ["memfuse-ollama"] },
+    # §4.2 Ring-Modell: Wasmtime-Sandbox nur in memfuse-sandbox
+    # "memfuse-sandbox",  # ab Phase 4: memfuse-sandbox
+    { crate = "wasmtime", wrappers = ["memfuse-sandbox"] },
+=======
+    { name = "candle-core", wrappers = ["memfuse-candle", "memfuse-infer-candle"] },
+    { name = "ort", wrappers = ["memfuse-embed", "memfuse-infer-onnx"] },
+    { name = "wasmtime", wrappers = ["memfuse-sandbox", "memfuse-privacy"] },
+    { name = "pyo3", wrappers = ["memfuse-py"] },
+    { name = "reqwest", wrappers = ["memfuse-ollama", "memfuse-infer-ollama"] },
+>>>>>>> 54333148 (Shell-Commit)
+]
 
 [sources]
 unknown-registry = "deny"

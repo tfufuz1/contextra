@@ -11,7 +11,7 @@
 
 #![doc(hidden)]
 
-use crate::distance::compute_distance;
+use crate::distance::{compute_distance_trusted, validate_vector};
 use ahash::AHashMap;
 use memfuse_core::{
     DistanceMetric, DocId, MemFuseError, Result, ScoredDocument, TxId, VectorIndex,
@@ -405,7 +405,9 @@ impl DiskAnnIndex {
     fn get_dist_to_query(&self, query: &[f32], node_idx: u32) -> Result<f32> {
         let node = self.load_node(node_idx)?;
         match &node.vector {
-            VectorData::F32(v) => compute_distance(query, v, self.inner.config.distance_metric),
+            VectorData::F32(v) => {
+                compute_distance_trusted(query, v, self.inner.config.distance_metric)
+            }
             VectorData::U8(v) => {
                 let q_guard = self.inner.quantizer.read();
                 let q = q_guard
@@ -428,7 +430,7 @@ impl DiskAnnIndex {
         let mut candidates = BinaryHeap::new();
         let mut results = BinaryHeap::new();
 
-        let ep_dist = compute_distance(
+        let ep_dist = compute_distance_trusted(
             query,
             &vectors[entry_point as usize],
             self.inner.config.distance_metric,
@@ -463,7 +465,7 @@ impl DiskAnnIndex {
                 if !visited.insert(neighbor) {
                     continue;
                 }
-                let dist = compute_distance(
+                let dist = compute_distance_trusted(
                     query,
                     &vectors[neighbor as usize],
                     self.inner.config.distance_metric,
@@ -515,7 +517,7 @@ impl DiskAnnIndex {
 
             let mut keep = true;
             for &p_idx in &pruned {
-                let dist_p_cand = compute_distance(
+                let dist_p_cand = compute_distance_trusted(
                     &vectors[cand.index as usize],
                     &vectors[p_idx as usize],
                     self.inner.config.distance_metric,
@@ -628,13 +630,27 @@ impl DiskAnnIndex {
         }
 
         let mut offset = TOMBSTONE_WAL_HEADER_SIZE;
-        let mut buf_id = [0u8; 8];
+        let doc_id_size = std::mem::size_of::<DocId>();
+        let mut buf_id = vec![0u8; doc_id_size];
 
         while file.read_exact(&mut buf_id).is_ok() {
             let entry_offset = offset;
-            offset += 8;
+            offset += doc_id_size;
 
-            let doc_id = u64::from_le_bytes(buf_id);
+            #[cfg(not(feature = "docid-128"))]
+            let doc_id = u64::from_le_bytes(
+                buf_id
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("Corrupt DocId in WAL".into()))?,
+            );
+            #[cfg(feature = "docid-128")]
+            let doc_id = u128::from_le_bytes(
+                buf_id
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("Corrupt DocId in WAL".into()))?,
+            );
 
             let mut buf_hmac = [0u8; 32];
             if file.read_exact(&mut buf_hmac).is_err() {
@@ -648,7 +664,7 @@ impl DiskAnnIndex {
             let computed_hmac = hmac.finalize();
 
             if computed_hmac.ct_eq(&buf_hmac).into() {
-                bitset.insert(doc_id);
+                bitset.insert(doc_id as u64);
             } else {
                 tracing::error!(
                     offset = entry_offset,
@@ -772,12 +788,13 @@ impl DiskAnnIndex {
 
         let mut recovered = Vec::new();
         let mut offset = PENDING_WAL_HEADER_SIZE;
-        let mut buf_id = [0u8; 8];
+        let doc_id_size = std::mem::size_of::<DocId>();
+        let mut buf_id = vec![0u8; doc_id_size];
         let mut buf_dim = [0u8; 4];
 
         while file.read_exact(&mut buf_id).is_ok() {
             let entry_offset = offset;
-            offset += 8;
+            offset += doc_id_size;
 
             if file.read_exact(&mut buf_dim).is_err() {
                 tracing::warn!("Truncated dim in pending.wal");
@@ -785,7 +802,16 @@ impl DiskAnnIndex {
             }
             offset += 4;
 
-            let doc_id = DocId::from(u64::from_le_bytes(buf_id));
+            #[cfg(not(feature = "docid-128"))]
+            let doc_id =
+                DocId::from(u64::from_le_bytes(buf_id.as_slice().try_into().map_err(
+                    |_| MemFuseError::Storage("Corrupt DocId in WAL".into()),
+                )?));
+            #[cfg(feature = "docid-128")]
+            let doc_id =
+                DocId::from(u128::from_le_bytes(buf_id.as_slice().try_into().map_err(
+                    |_| MemFuseError::Storage("Corrupt DocId in WAL".into()),
+                )?));
             let dim = u32::from_le_bytes(buf_dim) as usize;
 
             if dim == 0 || dim > MAX_PENDING_WAL_DIM {
@@ -944,6 +970,7 @@ impl DiskAnnIndex {
         self.load().await // Mmap neu laden
     }
 
+    #[allow(clippy::unnecessary_cast)]
     async fn load_all_vectors_from_mmap(&self) -> Result<(Vec<Vec<f32>>, Vec<DocId>)> {
         let disk_count = {
             let guard = self.inner.header.read();
@@ -956,7 +983,7 @@ impl DiskAnnIndex {
 
         for i in 0..disk_count as u32 {
             let node = self.load_node(i)?;
-            if tombstones.contains(node.doc_id.inner()) {
+            if tombstones.contains(node.doc_id.inner() as u64) {
                 continue;
             }
             let vec_f32 = match node.vector {
@@ -986,7 +1013,7 @@ impl DiskAnnIndex {
             self.get_dist_to_query(query, idx)
         } else {
             let new_idx = idx as usize - existing_count;
-            compute_distance(
+            compute_distance_trusted(
                 query,
                 &new_vecs[new_idx].1,
                 self.inner.config.distance_metric,
@@ -1117,7 +1144,7 @@ impl DiskAnnIndex {
 
             for p_v in &pruned_vecs {
                 let dist_p_cand =
-                    compute_distance(&cand_node_v, p_v, self.inner.config.distance_metric)?;
+                    compute_distance_trusted(&cand_node_v, p_v, self.inner.config.distance_metric)?;
                 if !dist_p_cand.is_finite() || !cand.distance.is_finite() {
                     tracing::warn!(
                         "DiskANN robust-prune: non-finite distance encountered, treating candidate as non-prunable (fail-open, candidate retained)"
@@ -1220,7 +1247,7 @@ impl DiskAnnIndex {
                             Vec::with_capacity(graph[neighbor_idx].len());
                         for &idx in &graph[neighbor_idx] {
                             let idx_v = self.get_vec_mixed(idx, existing_count, new_vecs)?;
-                            let dist = compute_distance(
+                            let dist = compute_distance_trusted(
                                 &nbr_v,
                                 &idx_v,
                                 self.inner.config.distance_metric,
@@ -1306,7 +1333,7 @@ impl DiskAnnIndex {
                             let mut cand_vec: Vec<SearchCandidate> = graph[neighbor_idx]
                                 .iter()
                                 .map(|&idx| {
-                                    let dist = compute_distance(
+                                    let dist = compute_distance_trusted(
                                         &vectors[neighbor_idx],
                                         &vectors[idx as usize],
                                         self.inner.config.distance_metric,
@@ -1964,6 +1991,7 @@ impl DiskAnnIndex {
         }
     }
 
+    #[allow(clippy::unnecessary_cast)]
     fn search_blocking(
         &self,
         query: &[f32],
@@ -2045,6 +2073,11 @@ impl DiskAnnIndex {
 
         let mut final_results = Vec::with_capacity(k);
         let mut sorted_results: Vec<SearchCandidate> = results.into_vec();
+        if sorted_results.len() > beam_width {
+            sorted_results
+                .select_nth_unstable_by(beam_width - 1, |a, b| a.distance.total_cmp(&b.distance));
+            sorted_results.truncate(beam_width);
+        }
         sorted_results.sort_by(|a, b| a.distance.total_cmp(&b.distance));
 
         let tombstones = self.inner.tombstones.read();
@@ -2053,7 +2086,7 @@ impl DiskAnnIndex {
                 break;
             }
             let node = self.load_node(c.index)?;
-            if tombstones.contains(node.doc_id.inner()) {
+            if tombstones.contains(node.doc_id.inner() as u64) {
                 continue;
             }
             let score = match metric {
@@ -2084,6 +2117,7 @@ impl VectorIndex for DiskAnnIndex {
             return hnsw.insert(tx, id, embedding).await;
         }
 
+        validate_vector(embedding)?;
         self.check_quantizer_drift(embedding);
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
@@ -2115,6 +2149,7 @@ impl VectorIndex for DiskAnnIndex {
         self.search_internal(query, k).await
     }
 
+    #[allow(clippy::unnecessary_cast)]
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
         let fallback_opt = self.inner.hnsw_fallback.read().clone();
         if let Some(hnsw) = fallback_opt {
@@ -2123,7 +2158,7 @@ impl VectorIndex for DiskAnnIndex {
 
         let doc_id_u64 = id.inner();
 
-        if self.inner.tombstones.read().contains(doc_id_u64) {
+        if self.inner.tombstones.read().contains(doc_id_u64 as u64) {
             return Err(MemFuseError::NotFound(format!(
                 "DocId {} not found in index or already deleted",
                 doc_id_u64
@@ -2145,7 +2180,7 @@ impl VectorIndex for DiskAnnIndex {
             )));
         }
 
-        self.inner.tombstones.write().insert(doc_id_u64);
+        self.inner.tombstones.write().insert(doc_id_u64 as u64);
 
         let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
         Self::append_to_tombstone_wal(&tombstone_wal, id).await?;
@@ -2177,6 +2212,7 @@ impl VectorIndex for DiskAnnIndex {
         Ok(())
     }
 
+    #[allow(clippy::unnecessary_cast)]
     async fn all_doc_ids(&self) -> Result<Vec<DocId>> {
         let fallback_opt = self.inner.hnsw_fallback.read().clone();
         if let Some(hnsw) = fallback_opt {
@@ -2186,12 +2222,12 @@ impl VectorIndex for DiskAnnIndex {
         let mut ids = Vec::new();
 
         for &id in self.inner.doc_ids.read().iter() {
-            if !tombstones.contains(id.inner()) {
+            if !tombstones.contains(id.inner() as u64) {
                 ids.push(id);
             }
         }
         for (id, _) in self.inner.pending_inserts.read().iter() {
-            if !tombstones.contains(id.inner()) && !ids.contains(id) {
+            if !tombstones.contains(id.inner() as u64) && !ids.contains(id) {
                 ids.push(*id);
             }
         }
@@ -2317,7 +2353,7 @@ mod tests {
     async fn test_diskann_delete_non_existent_returns_not_found() {
         let index = DiskAnnIndex::try_new(DiskAnnConfig::default()).expect("valid config");
         let tx = TxId::new(1);
-        let doc_id = DocId::from(100);
+        let doc_id = DocId::from(100u64);
 
         let delete_res = index.delete(tx, doc_id).await;
         assert!(matches!(delete_res, Err(MemFuseError::NotFound(_))));
@@ -2343,29 +2379,29 @@ mod tests {
             vec![2.0, 0.0, 0.0, 0.0],
             vec![3.0, 0.0, 0.0, 0.0],
         ];
-        let ids = vec![DocId::from(10), DocId::from(20), DocId::from(30)];
+        let ids = vec![DocId::from(10u64), DocId::from(20u64), DocId::from(30u64)];
         index.build(&vecs, &ids).await?;
 
         // 1. Initial search finds doc 10 as top result
         let query = vec![1.0, 0.0, 0.0, 0.0];
         let res = index.search(&query, 1).await?;
-        assert_eq!(res[0].doc_id, DocId::from(10));
+        assert_eq!(res[0].doc_id, DocId::from(10u64));
         assert_eq!(index.len().await, 3);
 
         // 2. Delete doc 10
-        index.delete(TxId(1), DocId::from(10)).await?;
+        index.delete(TxId(1), DocId::from(10u64)).await?;
         assert_eq!(index.len().await, 2);
 
         // Deleting doc 10 again returns NotFound
-        let del2 = index.delete(TxId(1), DocId::from(10)).await;
+        let del2 = index.delete(TxId(1), DocId::from(10u64)).await;
         assert!(matches!(del2, Err(MemFuseError::NotFound(_))));
 
         // 3. Search query no longer returns doc 10, instead returns doc 20
         let res_after_del = index.search(&query, 1).await?;
-        assert_eq!(res_after_del[0].doc_id, DocId::from(20));
+        assert_eq!(res_after_del[0].doc_id, DocId::from(20u64));
 
         let all_ids = index.all_doc_ids().await?;
-        assert!(!all_ids.contains(&DocId::from(10)));
+        assert!(!all_ids.contains(&DocId::from(10u64)));
         assert_eq!(all_ids.len(), 2);
 
         let stats = index.stats().await?;
@@ -2379,7 +2415,7 @@ mod tests {
 
         assert_eq!(reloaded.len().await, 2);
         let res_reloaded = reloaded.search(&query, 1).await?;
-        assert_eq!(res_reloaded[0].doc_id, DocId::from(20));
+        assert_eq!(res_reloaded[0].doc_id, DocId::from(20u64));
 
         Ok(())
     }
@@ -2393,7 +2429,9 @@ mod tests {
             ..DiskAnnConfig::default()
         };
         let index = DiskAnnIndex::try_new(config).unwrap();
-        let result = index.insert(TxId(1), DocId(42), &[0.1, 0.2, 0.3]).await;
+        let result = index
+            .insert(TxId(1), DocId::from(42u64), &[0.1, 0.2, 0.3])
+            .await;
         assert!(result.is_ok(), "insert() darf kein Err mehr zurückgeben");
     }
 
@@ -2429,7 +2467,7 @@ mod tests {
 
         let vecs: Vec<Vec<f32>> = (0..5).map(|i| vec![i as f32; 64]).collect();
         // Build initial index
-        let ids: Vec<DocId> = (0..5).map(DocId::from).collect();
+        let ids: Vec<DocId> = (0..5u64).map(DocId::from).collect();
         index.build(&vecs, &ids).await.unwrap();
 
         // Insert new vectors
@@ -2485,7 +2523,7 @@ mod tests {
 
         let index = DiskAnnIndex::try_new(config).expect("valid config"); // expect
         let vectors = vec![vec![1.0; 8]];
-        let ids = vec![DocId::from(42)];
+        let ids = vec![DocId::from(42u64)];
         index.build(&vectors, &ids).await.expect("build"); // expect
 
         let data = tokio::fs::read(&index_path).await.expect("read file"); // expect
@@ -2586,7 +2624,7 @@ mod tests {
 
         let index = DiskAnnIndex::try_new(config.clone()).expect("valid config"); // expect
         let vectors = vec![vec![1.0f32; dimension]];
-        let ids = vec![DocId::from(1)];
+        let ids = vec![DocId::from(1u64)];
 
         index.build(&vectors, &ids).await.expect("Build failed"); // expect
 
@@ -2643,7 +2681,7 @@ mod tests {
 
         let index = DiskAnnIndex::try_new(config.clone()).expect("valid config"); // expect
         let vectors = vec![vec![1.0; 8]];
-        let ids = vec![DocId::from(1)];
+        let ids = vec![DocId::from(1u64)];
         index.build(&vectors, &ids).await.expect("build"); // expect
 
         // Mutate magic bytes
@@ -2680,7 +2718,7 @@ mod tests {
 
         let index = DiskAnnIndex::try_new(config.clone()).expect("valid config"); // expect
         let vectors = vec![vec![1.0; 8]];
-        let ids = vec![DocId::from(1)];
+        let ids = vec![DocId::from(1u64)];
         index.build(&vectors, &ids).await.expect("build"); // expect
 
         // Mutate version to 99
@@ -2718,7 +2756,7 @@ mod tests {
 
         let index = DiskAnnIndex::try_new(config).expect("valid config"); // expect
         let vectors = vec![vec![1.0; 8]];
-        let ids = vec![DocId::from(1)];
+        let ids = vec![DocId::from(1u64)];
         index.build(&vectors, &ids).await.expect("build"); // expect
 
         // After build completes, index_path must exist and .tmp must NOT exist
@@ -2748,7 +2786,7 @@ mod tests {
 
         let index = DiskAnnIndex::try_new(build_config).expect("valid config"); // expect
         let vectors = vec![vec![1.0; 8]];
-        let ids = vec![DocId::from(1)];
+        let ids = vec![DocId::from(1u64)];
         index.build(&vectors, &ids).await.expect("build"); // expect
 
         let load_config = DiskAnnConfig {
@@ -2786,7 +2824,7 @@ mod tests {
         };
         let index = DiskAnnIndex::try_new(config)?;
         let vectors: Vec<Vec<f32>> = (0..10).map(|i| vec![i as f32, 0.0, 0.0, 0.0]).collect();
-        let ids: Vec<DocId> = (0..10).map(DocId::from).collect();
+        let ids: Vec<DocId> = (0..10u64).map(DocId::from).collect();
         index.build(&vectors, &ids).await?;
         let query = vec![9.0f32, 0.0, 0.0, 0.0];
         let results = index.search(&query, 1).await?;
@@ -2857,7 +2895,7 @@ mod tests {
 
         let index = DiskAnnIndex::try_new(config.clone()).unwrap();
         let vectors = vec![vec![1.0; 8]];
-        let ids = vec![DocId::from(1)];
+        let ids = vec![DocId::from(1u64)];
         index.build(&vectors, &ids).await.unwrap();
 
         // Mutate node_count in header to 10,000 without expanding file size -> offset out of bounds
@@ -3034,7 +3072,7 @@ mod tests {
 
         let index = DiskAnnIndex::try_new(config.clone()).unwrap();
         let vectors = vec![vec![1.0; 8]];
-        let ids = vec![DocId::from(42)];
+        let ids = vec![DocId::from(42u64)];
         index.build(&vectors, &ids).await.unwrap();
 
         // 1. Verify index file contains a valid DiskAnnFooter at the end
@@ -3097,7 +3135,7 @@ mod tests {
             vec![4.0, 0.0, 0.0, 0.0],
             vec![5.0, 0.0, 0.0, 0.0],
         ];
-        let base_ids: Vec<DocId> = (1..=5).map(DocId::from).collect();
+        let base_ids: Vec<DocId> = (1..=5u64).map(DocId::from).collect();
         index.build(&base_vecs, &base_ids).await?;
 
         // 2. Füge 3 Vektoren ein (unterhalb von PENDING_FLUSH_THRESHOLD=50) -> WAL wird geschrieben, persist_delta NICHT aufgerufen
@@ -3186,8 +3224,8 @@ mod tests {
             },
         ];
         let new_vecs = vec![
-            (DocId::from(1), vec![0.0, 0.0, 0.0, 0.0]),
-            (DocId::from(2), vec![1.0, 0.0, 0.0, 0.0]),
+            (DocId::from(1u64), vec![0.0, 0.0, 0.0, 0.0]),
+            (DocId::from(2u64), vec![1.0, 0.0, 0.0, 0.0]),
         ];
         let pruned_streaming =
             index.prune_streaming(0, &mut streaming_candidates, 0, &new_vecs, 4, 1.2)?;
@@ -3218,14 +3256,14 @@ mod tests {
             vec![0.0, 1.0, 0.0, 0.0],
             vec![0.0, 0.0, 1.0, 0.0],
         ];
-        let ids = vec![DocId::from(1), DocId::from(2), DocId::from(3)];
+        let ids = vec![DocId::from(1u64), DocId::from(2u64), DocId::from(3u64)];
         index.build(&vectors, &ids).await?;
 
         // Query with normal vector should succeed and find results
         let query = vec![1.0, 0.0, 0.0, 0.0];
         let results = index.search(&query, 2).await?;
         assert!(!results.is_empty());
-        assert_eq!(results[0].doc_id, DocId::from(1));
+        assert_eq!(results[0].doc_id, DocId::from(1u64));
 
         Ok(())
     }

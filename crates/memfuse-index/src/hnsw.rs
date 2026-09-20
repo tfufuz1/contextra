@@ -54,11 +54,11 @@ use roaring::RoaringTreemap;
 use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use tokio::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-use std::arch::x86_64::*;
+/// Sentinel-Wert für ungültigen / nicht gesetzten Entry-Point in HNSW.
+pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
+use tokio::sync::Mutex;
 
 /// Standard-Löschanteil (0.10 = 10 % gelöschte Knoten), ab dem ein Rebuild getriggert wird.
 ///
@@ -291,7 +291,6 @@ pub enum VectorData {
 pub struct HnswNode {
     doc_id: DocId,
     vector: VectorData,
-    connections: RwLock<Vec<Vec<u32>>>,
     max_layer: usize,
     committed_tx: u64,
 }
@@ -359,14 +358,97 @@ pub struct HnswHotCore {
     pub doc_to_node: RwLock<AHashMap<u64, usize>>,
     #[cfg(feature = "docid-128")]
     pub doc_to_node: RwLock<AHashMap<u128, usize>>,
-    pub entry_point: RwLock<Option<usize>>,
-    pub ram_entry_point: RwLock<Option<usize>>,
+    pub entry_point: AtomicU32,
+    pub ram_entry_point: AtomicU32,
     pub max_layer: AtomicU64,
     pub ml: f64,
     pub deleted_count: AtomicU64,
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
     pub rebuilding: AtomicBool,
+    pub neighbor_arena: RwLock<Vec<u32>>,
+    pub neighbor_offsets: RwLock<Vec<usize>>,
+    pub neighbor_count_offsets: RwLock<Vec<usize>>,
+    pub neighbor_counts: RwLock<Vec<u8>>,
+}
+
+impl HnswHotCore {
+    #[inline]
+    pub fn get_entry_point(&self) -> Option<usize> {
+        let ep = self.entry_point.load(Ordering::Acquire);
+        if ep == SENTINEL_NO_ENTRY_POINT {
+            None
+        } else {
+            Some(ep as usize)
+        }
+    }
+
+    #[inline]
+    pub fn set_entry_point(&self, ep: Option<usize>) {
+        let val = match ep {
+            Some(idx) => idx as u32,
+            None => SENTINEL_NO_ENTRY_POINT,
+        };
+        self.entry_point.store(val, Ordering::Release);
+    }
+
+    #[inline]
+    pub fn get_ram_entry_point(&self) -> Option<usize> {
+        let ep = self.ram_entry_point.load(Ordering::Acquire);
+        if ep == SENTINEL_NO_ENTRY_POINT {
+            None
+        } else {
+            Some(ep as usize)
+        }
+    }
+
+    #[inline]
+    pub fn set_ram_entry_point(&self, ep: Option<usize>) {
+        let val = match ep {
+            Some(idx) => idx as u32,
+            None => SENTINEL_NO_ENTRY_POINT,
+        };
+        self.ram_entry_point.store(val, Ordering::Release);
+    }
+
+    pub fn layer_offset(node_offset: usize, layer: usize, m: usize) -> usize {
+        if layer == 0 {
+            node_offset
+        } else {
+            node_offset + (m * 2) + (layer - 1) * m
+        }
+    }
+
+    pub fn get_ram_node_connections(&self, ram_idx: usize, layer: usize, m: usize) -> Vec<u32> {
+        let offsets = self.neighbor_offsets.read();
+        let count_offsets = self.neighbor_count_offsets.read();
+        let counts = self.neighbor_counts.read();
+        if ram_idx >= offsets.len() || ram_idx >= count_offsets.len() {
+            return Vec::new();
+        }
+        let count_start = count_offsets[ram_idx];
+        if count_start + layer >= counts.len() {
+            return Vec::new();
+        }
+        let count_end = if ram_idx + 1 < count_offsets.len() {
+            count_offsets[ram_idx + 1]
+        } else {
+            counts.len()
+        };
+        if count_start + layer >= count_end {
+            return Vec::new();
+        }
+        let len = counts[count_start + layer] as usize;
+        let node_offset = offsets[ram_idx];
+        let l_offset = Self::layer_offset(node_offset, layer, m);
+
+        let arena = self.neighbor_arena.read();
+        if l_offset + len <= arena.len() {
+            arena[l_offset..l_offset + len].to_vec()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 pub struct HnswColdCore {
@@ -406,14 +488,18 @@ impl HnswIndex {
                 hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
                     doc_to_node: RwLock::new(AHashMap::new()),
-                    entry_point: RwLock::new(None),
-                    ram_entry_point: RwLock::new(None),
+                    entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
+                    ram_entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
                     max_layer: AtomicU64::new(0),
                     ml,
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
+                    neighbor_arena: RwLock::new(Vec::new()),
+                    neighbor_offsets: RwLock::new(Vec::new()),
+                    neighbor_count_offsets: RwLock::new(Vec::new()),
+                    neighbor_counts: RwLock::new(Vec::new()),
                 },
                 cold: HnswColdCore {
                     config,
@@ -453,14 +539,18 @@ impl HnswIndex {
                 hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
                     doc_to_node: RwLock::new(AHashMap::new()),
-                    entry_point: RwLock::new(None),
-                    ram_entry_point: RwLock::new(None),
+                    entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
+                    ram_entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
                     max_layer: AtomicU64::new(0),
                     ml,
                     deleted_count: AtomicU64::new(0),
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
+                    neighbor_arena: RwLock::new(Vec::new()),
+                    neighbor_offsets: RwLock::new(Vec::new()),
+                    neighbor_count_offsets: RwLock::new(Vec::new()),
+                    neighbor_counts: RwLock::new(Vec::new()),
                 },
                 cold: HnswColdCore {
                     config,
@@ -567,10 +657,10 @@ impl HnswIndex {
         };
 
         let mut ep = Vec::new();
-        if let Some(global_ep) = *self.inner.hot.entry_point.read() {
+        if let Some(global_ep) = self.inner.hot.get_entry_point() {
             ep.push(global_ep);
         }
-        if let Some(ram_ep) = *self.inner.hot.ram_entry_point.read() {
+        if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -586,11 +676,19 @@ impl HnswIndex {
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
+            let q_guard = if self.inner.cold.config.quantize {
+                Some(self.inner.cold.quantizer.read())
+            } else {
+                None
+            };
+            let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
             let ctx = SearchContext {
                 nodes: &nodes,
                 mmap: mmap_guard.as_ref(),
                 mmap_node_count,
                 prior_prepared: &[],
+                backlink_map: None,
+                quantizer: q_ref.map(Cow::Borrowed),
             };
 
             let factor = if self.inner.cold.config.quantize {
@@ -635,7 +733,7 @@ impl HnswIndex {
         }
 
         // Add RAM entry point back for the final layer search to ensure hybrid recall
-        if let Some(ram_ep) = *self.inner.hot.ram_entry_point.read() {
+        if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -734,13 +832,20 @@ impl HnswIndex {
             results.push(ScoredDocument::new(doc_id, score));
         }
 
-        // Must re-sort and truncate after Phase 2 reranking; tie-break equal scores by DocId for deterministic ordering
+        // Select top k using select_nth_unstable_by (O(N)) then sort top k (O(k log k))
+        if results.len() > k {
+            results.select_nth_unstable_by(k - 1, |a, b| {
+                b.score
+                    .total_cmp(&a.score)
+                    .then_with(|| a.doc_id.cmp(&b.doc_id))
+            });
+            results.truncate(k);
+        }
         results.sort_by(|a, b| {
             b.score
                 .total_cmp(&a.score)
                 .then_with(|| a.doc_id.cmp(&b.doc_id))
         });
-        results.truncate(k);
 
         Ok(results)
     }
@@ -905,7 +1010,7 @@ impl HnswIndex {
             use std::io::{Seek, Write};
 
             let nodes = inner.hot.nodes.read();
-            let entry_point = inner.hot.entry_point.read();
+            let entry_point = inner.hot.get_entry_point();
             let q_guard = inner.cold.quantizer.read();
 
             // INTENT: Atomic Save to prevent SIGBUS on mmap
@@ -1004,15 +1109,17 @@ impl HnswIndex {
             let mut conn_pos = connections_offset;
             for (i, node) in nodes.iter().enumerate() {
                 node_records[i].connections_offset = conn_pos;
-                let conns_guard = node.connections.read();
-                let num_layers = conns_guard.len() as u8;
+                let num_layers = (node.max_layer + 1) as u8;
                 writer
                     .write_all(&[num_layers])
                     .map_err(|e| MemFuseError::Storage(e.to_string()))?;
                 conn_pos += 1;
 
                 for layer in 0..num_layers as usize {
-                    let layer_conns = &conns_guard[layer];
+                    let layer_conns =
+                        inner
+                            .hot
+                            .get_ram_node_connections(i, layer, inner.cold.config.m);
                     let len = layer_conns.len() as u32;
                     writer
                         .write_all(&len.to_le_bytes())
@@ -1134,9 +1241,8 @@ impl HnswIndex {
         };
 
         {
-            let mut ep_guard = self.inner.hot.entry_point.write();
-            *ep_guard = ep;
-            *self.inner.hot.ram_entry_point.write() = None;
+            self.inner.hot.set_entry_point(ep);
+            self.inner.hot.set_ram_entry_point(None);
             self.inner.hot.max_layer.store(max_layer, Ordering::SeqCst);
         }
 
@@ -1236,30 +1342,38 @@ pub struct NeighborBacklink {
 }
 
 /// Batch tracking context for running state across multi-operation transaction commits.
+///
+/// # Invariant 5.5.2: O(1) Backlink Lookups
+/// `backlink_map` uses composite keys `(neighbor_ram_idx, layer)` with `AHashMap`
+/// for constant-time $O(1)$ backlink connection lookups during transaction staging.
 #[derive(Debug)]
 pub struct BatchContext {
     pub running_max_layer: usize,
     pub has_entry_point: bool,
     pub has_ram_entry_point: bool,
+    pub backlink_map: AHashMap<(usize, usize), Vec<u32>>,
 }
 
 impl BatchContext {
     pub fn new(core: &HnswIndexCore) -> Self {
         Self {
             running_max_layer: core.hot.max_layer.load(Ordering::SeqCst) as usize,
-            has_entry_point: core.hot.entry_point.read().is_some(),
-            has_ram_entry_point: core.hot.ram_entry_point.read().is_some(),
+            has_entry_point: core.hot.get_entry_point().is_some(),
+            has_ram_entry_point: core.hot.get_ram_entry_point().is_some(),
+            backlink_map: AHashMap::new(),
         }
     }
 }
 
 fn get_neighbor_conns_in_batch(
+    core: &HnswIndexCore,
     neighbor_idx: usize,
     layer: usize,
     base_batch_idx: usize,
     mmap_node_count: usize,
-    nodes_read: &[HnswNode],
+    _nodes_read: &[HnswNode],
     prior_prepared: &[PreparedInsert],
+    batch_ctx: &BatchContext,
 ) -> Vec<u32> {
     if neighbor_idx >= base_batch_idx {
         let offset = neighbor_idx - base_batch_idx;
@@ -1275,18 +1389,12 @@ fn get_neighbor_conns_in_batch(
     }
 
     let neighbor_ram_idx = neighbor_idx - mmap_node_count;
-    for prepared in prior_prepared.iter().rev() {
-        for bl in prepared.neighbor_backlinks.iter().rev() {
-            if bl.neighbor_ram_idx == neighbor_ram_idx && bl.layer == layer {
-                return bl.updated_connections.clone();
-            }
-        }
+    if let Some(conns) = batch_ctx.backlink_map.get(&(neighbor_ram_idx, layer)) {
+        return conns.clone();
     }
 
-    nodes_read
-        .get(neighbor_ram_idx)
-        .and_then(|node| node.connections.read().get(layer).cloned())
-        .unwrap_or_default()
+    core.hot
+        .get_ram_node_connections(neighbor_ram_idx, layer, core.cold.config.m)
 }
 
 /// Helper for hybrid resolution of nodes (RAM vs Mmap, plus in-flight batch prepared inserts).
@@ -1295,6 +1403,8 @@ struct SearchContext<'a> {
     mmap: Option<&'a crate::persistence::MmapIndex>,
     mmap_node_count: usize,
     prior_prepared: &'a [PreparedInsert],
+    backlink_map: Option<&'a AHashMap<(usize, usize), Vec<u32>>>,
+    quantizer: Option<Cow<'a, crate::quantize::ScalarQuantizer>>,
 }
 
 /// Liefert den aktuellen Rebuild-Status des Index.
@@ -1355,16 +1465,22 @@ impl HnswIndexCore {
         query_exact: &[f32],
         query_quantized: Option<&[u8]>,
         data: &VectorData,
+        quantizer_opt: Option<&crate::quantize::ScalarQuantizer>,
     ) -> Result<f32> {
         match data {
             VectorData::F32(v) => {
                 compute_distance_trusted(query_exact, v, self.cold.config.distance_metric)
             }
             VectorData::U8(v) => {
-                let guard = self.cold.quantizer.read();
-                let q = guard.as_ref().ok_or_else(|| {
-                    memfuse_core::MemFuseError::Index("Quantizer not trained".into())
-                })?;
+                let guard;
+                let q = if let Some(q_ref) = quantizer_opt {
+                    q_ref
+                } else {
+                    guard = self.cold.quantizer.read();
+                    guard.as_ref().ok_or_else(|| {
+                        memfuse_core::MemFuseError::Index("Quantizer not trained".into())
+                    })?
+                };
                 if let Some(qq) = query_quantized {
                     q.symmetric_dist(qq, v, self.cold.config.distance_metric)
                 } else {
@@ -1373,19 +1489,26 @@ impl HnswIndexCore {
             }
         }
     }
+
     fn compute_distance_with_mmap(
         &self,
         query_exact: &[f32],
         query_quantized: Option<&[u8]>,
         mmap: &crate::persistence::MmapIndex,
         record: &crate::persistence::NodeRecord,
+        quantizer_opt: Option<&crate::quantize::ScalarQuantizer>,
     ) -> Result<f32> {
         let vector_bytes = mmap.get_vector(record)?;
         if mmap.header.is_quantized() {
-            let guard = self.cold.quantizer.read();
-            let q = guard
-                .as_ref()
-                .ok_or_else(|| memfuse_core::MemFuseError::Index("Quantizer not trained".into()))?;
+            let guard;
+            let q = if let Some(q_ref) = quantizer_opt {
+                q_ref
+            } else {
+                guard = self.cold.quantizer.read();
+                guard.as_ref().ok_or_else(|| {
+                    memfuse_core::MemFuseError::Index("Quantizer not trained".into())
+                })?
+            };
             if let Some(qq) = query_quantized {
                 q.symmetric_dist(qq, vector_bytes, self.cold.config.distance_metric)
             } else {
@@ -1399,477 +1522,6 @@ impl HnswIndexCore {
                 self.cold.config.distance_metric,
             )
         }
-    }
-
-    #[allow(dead_code)]
-    #[allow(unsafe_code)]
-    fn euclidean_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        {
-            if is_x86_feature_detected!("avx512f") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX-512F detected.
-                return unsafe { Self::euclidean_distance_raw_avx512(query, raw) };
-            }
-            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX2+FMA detected.
-                return unsafe { Self::euclidean_distance_raw_avx2(query, raw) };
-            }
-        }
-        #[cfg(target_arch = "aarch64")]
-        {
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). NEON detected.
-                return unsafe { Self::euclidean_distance_raw_neon(query, raw) };
-            }
-        }
-        Self::euclidean_distance_raw_scalar(query, raw)
-    }
-
-    #[allow(dead_code)]
-    #[allow(unsafe_code)]
-    fn dot_product_distance_raw_f32(query: &[f32], raw: &[u8]) -> f32 {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        {
-            if is_x86_feature_detected!("avx512f") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX-512F detected.
-                return unsafe { -Self::dot_product_raw_avx512(query, raw) };
-            }
-            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). AVX2+FMA detected.
-                return unsafe { -Self::dot_product_raw_avx2(query, raw) };
-            }
-        }
-        #[cfg(target_arch = "aarch64")]
-        {
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                // SAFETY: Bounds checked in compute_distance_raw_f32 (raw.len() >= query.len() * 4). NEON detected.
-                return unsafe { -Self::dot_product_raw_neon(query, raw) };
-            }
-        }
-        -Self::dot_product_raw_scalar(query, raw)
-    }
-
-    #[allow(dead_code)]
-    fn dot_product_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
-        let dim = query.len();
-        let mut sum = 0.0f32;
-        for i in 0..dim {
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            sum += query[i] * y;
-        }
-        sum
-    }
-
-    #[allow(dead_code)]
-    fn cosine_distance_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
-        let dim = query.len();
-        let mut dot = 0.0f32;
-        let mut norm_a = 0.0f32;
-        let mut norm_b = 0.0f32;
-        for i in 0..dim {
-            let x = query[i];
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            dot += x * y;
-            norm_a += x * x;
-            norm_b += y * y;
-        }
-        if norm_a == 0.0 || norm_b == 0.0 {
-            1.0
-        } else {
-            let norm_a_f32: f32 = norm_a;
-            let norm_b_f32: f32 = norm_b;
-            let dist = 1.0 - (dot / (norm_a_f32.sqrt() * norm_b_f32.sqrt()));
-            dist.clamp(0.0, 2.0)
-        }
-    }
-
-    #[allow(dead_code)]
-    fn euclidean_distance_raw_scalar(query: &[f32], raw: &[u8]) -> f32 {
-        let dim = query.len();
-        let mut sum = 0.0f32;
-        for i in 0..dim {
-            let x = query[i];
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            let diff = x - y;
-            sum += diff * diff;
-        }
-        sum.max(0.0).sqrt()
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx2")]
-    #[allow(unsafe_code)]
-    #[allow(dead_code)]
-    unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
-        // SAFETY: Standard AVX/AVX2 horizontal reduction sequence on target with AVX/AVX2 support.
-        let x128 = _mm_add_ps(_mm256_extractf128_ps(v, 1), _mm256_castps256_ps128(v));
-        let x64 = _mm_add_ps(x128, _mm_movehl_ps(x128, x128));
-        let x32 = _mm_add_ss(x64, _mm_shuffle_ps(x64, x64, 0x55));
-        _mm_cvtss_f32(x32)
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx512f")]
-    #[allow(dead_code)]
-    #[allow(unsafe_code)]
-    unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
-        // SAFETY: Extract top 256 bits and add to bottom 256 bits, then reduce via hsum256_ps_avx.
-        let x256 = _mm256_add_ps(_mm512_extractf32x8_ps(v, 1), _mm512_castps512_ps256(v));
-        Self::hsum256_ps_avx(x256)
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx2")]
-    #[target_feature(enable = "fma")]
-    #[allow(dead_code)]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports AVX2 and FMA, and `raw.len() >= query.len() * 4`.
-    unsafe fn dot_product_raw_avx2(query: &[f32], raw: &[u8]) -> f32 {
-        let mut sum_v = _mm256_setzero_ps();
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 8 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds because `(i + 8) * 4 <= n * 4 <= raw.len()`
-            // and `i + 8 <= query.len()`. `_mm256_loadu_ps` handles unaligned reads safely.
-            let va = _mm256_loadu_ps(query_ptr.add(i));
-            let vb = _mm256_loadu_ps(raw_ptr.add(i));
-            sum_v = _mm256_fmadd_ps(va, vb, sum_v);
-            i += 8;
-        }
-
-        let mut sum = Self::hsum256_ps_avx(sum_v);
-        while i < n {
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            sum += query[i] * y;
-            i += 1;
-        }
-        sum
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx2")]
-    #[target_feature(enable = "fma")]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports AVX2 and FMA, and `raw.len() >= query.len() * 4`.
-    #[allow(dead_code)]
-    unsafe fn cosine_distance_raw_avx2(query: &[f32], raw: &[u8]) -> f32 {
-        let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
-            _mm256_setzero_ps(),
-            _mm256_setzero_ps(),
-            _mm256_setzero_ps(),
-        );
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 8 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds because `(i + 8) * 4 <= n * 4 <= raw.len()`.
-            let va = _mm256_loadu_ps(query_ptr.add(i));
-            let vb = _mm256_loadu_ps(raw_ptr.add(i));
-
-            dot_v = _mm256_fmadd_ps(va, vb, dot_v);
-            norm_a_v = _mm256_fmadd_ps(va, va, norm_a_v);
-            norm_b_v = _mm256_fmadd_ps(vb, vb, norm_b_v);
-            i += 8;
-        }
-
-        let (mut dot, mut norm_a, mut norm_b) = (
-            Self::hsum256_ps_avx(dot_v),
-            Self::hsum256_ps_avx(norm_a_v),
-            Self::hsum256_ps_avx(norm_b_v),
-        );
-
-        while i < n {
-            let x = query[i];
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            dot += x * y;
-            norm_a += x * x;
-            norm_b += y * y;
-            i += 1;
-        }
-
-        if norm_a == 0.0 || norm_b == 0.0 {
-            1.0
-        } else {
-            let norm_a_f32: f32 = norm_a;
-            let norm_b_f32: f32 = norm_b;
-            let dist = 1.0 - (dot / (norm_a_f32.sqrt() * norm_b_f32.sqrt()));
-            dist.clamp(0.0, 2.0)
-        }
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx2")]
-    #[target_feature(enable = "fma")]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports AVX2 and FMA, and `raw.len() >= query.len() * 4`.
-    unsafe fn euclidean_distance_raw_avx2(query: &[f32], raw: &[u8]) -> f32 {
-        let mut sum_v = _mm256_setzero_ps();
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 8 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds because `(i + 8) * 4 <= n * 4 <= raw.len()`.
-            let va = _mm256_loadu_ps(query_ptr.add(i));
-            let vb = _mm256_loadu_ps(raw_ptr.add(i));
-            let diff = _mm256_sub_ps(va, vb);
-            sum_v = _mm256_fmadd_ps(diff, diff, sum_v);
-            i += 8;
-        }
-
-        let mut sum = Self::hsum256_ps_avx(sum_v);
-        while i < n {
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            let diff = query[i] - y;
-            sum += diff * diff;
-            i += 1;
-        }
-
-        sum.max(0.0).sqrt()
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx512f")]
-    #[allow(dead_code)]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports AVX-512F, and `raw.len() >= query.len() * 4`.
-    unsafe fn dot_product_raw_avx512(query: &[f32], raw: &[u8]) -> f32 {
-        let mut sum_v = _mm512_setzero_ps();
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 16 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds because `(i + 16) * 4 <= n * 4 <= raw.len()`.
-            let va = _mm512_loadu_ps(query_ptr.add(i));
-            let vb = _mm512_loadu_ps(raw_ptr.add(i));
-            sum_v = _mm512_fmadd_ps(va, vb, sum_v);
-            i += 16;
-        }
-
-        let mut sum = Self::hsum512_ps_avx(sum_v);
-        while i < n {
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            sum += query[i] * y;
-            i += 1;
-        }
-        sum
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx512f")]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports AVX-512F, and `raw.len() >= query.len() * 4`.
-    #[allow(dead_code)]
-    unsafe fn cosine_distance_raw_avx512(query: &[f32], raw: &[u8]) -> f32 {
-        let (mut dot_v, mut norm_a_v, mut norm_b_v) = (
-            _mm512_setzero_ps(),
-            _mm512_setzero_ps(),
-            _mm512_setzero_ps(),
-        );
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 16 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds because `(i + 16) * 4 <= n * 4 <= raw.len()`.
-            let va = _mm512_loadu_ps(query_ptr.add(i));
-            let vb = _mm512_loadu_ps(raw_ptr.add(i));
-
-            dot_v = _mm512_fmadd_ps(va, vb, dot_v);
-            norm_a_v = _mm512_fmadd_ps(va, va, norm_a_v);
-            norm_b_v = _mm512_fmadd_ps(vb, vb, norm_b_v);
-            i += 16;
-        }
-
-        let (mut dot, mut norm_a, mut norm_b) = (
-            Self::hsum512_ps_avx(dot_v),
-            Self::hsum512_ps_avx(norm_a_v),
-            Self::hsum512_ps_avx(norm_b_v),
-        );
-
-        while i < n {
-            let x = query[i];
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            dot += x * y;
-            norm_a += x * x;
-            norm_b += y * y;
-            i += 1;
-        }
-
-        if norm_a == 0.0 || norm_b == 0.0 {
-            1.0
-        } else {
-            let norm_a_f32: f32 = norm_a;
-            let norm_b_f32: f32 = norm_b;
-            let dist = 1.0 - (dot / (norm_a_f32.sqrt() * norm_b_f32.sqrt()));
-            dist.clamp(0.0, 2.0)
-        }
-    }
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx512f")]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports AVX-512F, and `raw.len() >= query.len() * 4`.
-    unsafe fn euclidean_distance_raw_avx512(query: &[f32], raw: &[u8]) -> f32 {
-        let mut sum_v = _mm512_setzero_ps();
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 16 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds because `(i + 16) * 4 <= n * 4 <= raw.len()`.
-            let va = _mm512_loadu_ps(query_ptr.add(i));
-            let vb = _mm512_loadu_ps(raw_ptr.add(i));
-            let diff = _mm512_sub_ps(va, vb);
-            sum_v = _mm512_fmadd_ps(diff, diff, sum_v);
-            i += 16;
-        }
-
-        let mut sum = Self::hsum512_ps_avx(sum_v);
-        while i < n {
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            let diff = query[i] - y;
-            sum += diff * diff;
-            i += 1;
-        }
-
-        sum.max(0.0).sqrt()
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    #[target_feature(enable = "neon")]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports NEON, and `raw.len() >= query.len() * 4`.
-    unsafe fn dot_product_raw_neon(query: &[f32], raw: &[u8]) -> f32 {
-        let mut sum_v = vdupq_n_f32(0.0);
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 4 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds `(i + 4) * 4 <= raw.len()`. `vld1q_f32` handles unaligned reads.
-            let va = vld1q_f32(query_ptr.add(i));
-            let vb = vld1q_f32(raw_ptr.add(i));
-            sum_v = vfmaq_f32(sum_v, va, vb);
-            i += 4;
-        }
-
-        let mut sum = vaddvq_f32(sum_v);
-        while i < n {
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            sum += query[i] * y;
-            i += 1;
-        }
-        sum
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    #[target_feature(enable = "neon")]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports NEON, and `raw.len() >= query.len() * 4`.
-    unsafe fn cosine_distance_raw_neon(query: &[f32], raw: &[u8]) -> f32 {
-        let (mut dot_v, mut norm_a_v, mut norm_b_v) =
-            (vdupq_n_f32(0.0), vdupq_n_f32(0.0), vdupq_n_f32(0.0));
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 4 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds `(i + 4) * 4 <= raw.len()`.
-            let va = vld1q_f32(query_ptr.add(i));
-            let vb = vld1q_f32(raw_ptr.add(i));
-
-            dot_v = vfmaq_f32(dot_v, va, vb);
-            norm_a_v = vfmaq_f32(norm_a_v, va, va);
-            norm_b_v = vfmaq_f32(norm_b_v, vb, vb);
-            i += 4;
-        }
-
-        let (mut dot, mut norm_a, mut norm_b) = (
-            vaddvq_f32(dot_v),
-            vaddvq_f32(norm_a_v),
-            vaddvq_f32(norm_b_v),
-        );
-
-        while i < n {
-            let x = query[i];
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            dot += x * y;
-            norm_a += x * x;
-            norm_b += y * y;
-            i += 1;
-        }
-
-        if norm_a == 0.0 || norm_b == 0.0 {
-            1.0
-        } else {
-            let dist = 1.0 - (dot / (norm_a.sqrt() * norm_b.sqrt()));
-            dist.clamp(0.0, 2.0)
-        }
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    #[target_feature(enable = "neon")]
-    #[allow(unsafe_code)]
-    /// # Safety
-    /// Caller must ensure CPU supports NEON, and `raw.len() >= query.len() * 4`.
-    unsafe fn euclidean_distance_raw_neon(query: &[f32], raw: &[u8]) -> f32 {
-        let mut sum_v = vdupq_n_f32(0.0);
-        let n = query.len();
-        let mut i = 0;
-        let query_ptr = query.as_ptr();
-        let raw_ptr = raw.as_ptr() as *const f32;
-
-        while i + 4 <= n {
-            // SAFETY: Pointer arithmetic stays within bounds `(i + 4) * 4 <= raw.len()`.
-            let va = vld1q_f32(query_ptr.add(i));
-            let vb = vld1q_f32(raw_ptr.add(i));
-            let diff = vsubq_f32(va, vb);
-            sum_v = vfmaq_f32(sum_v, diff, diff);
-            i += 4;
-        }
-
-        let mut sum = vaddvq_f32(sum_v);
-        while i < n {
-            let y_bytes = [raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2], raw[i * 4 + 3]];
-            let y = f32::from_le_bytes(y_bytes);
-            let diff = query[i] - y;
-            sum += diff * diff;
-            i += 1;
-        }
-
-        sum.max(0.0).sqrt()
     }
 
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
@@ -1894,6 +1546,8 @@ impl HnswIndexCore {
         }
     }
 
+    /// Computes candidate distance with zero heap allocation and minimal lock hold times (Invariant 5.5.3).
+    /// Vector and quantizer references are resolved from pre-acquired `SearchContext` outside the hot loop.
     fn resolve_dist(
         &self,
         idx: usize,
@@ -1901,22 +1555,36 @@ impl HnswIndexCore {
         query_q: Option<&[u8]>,
         ctx: &SearchContext,
     ) -> Result<f32> {
+        let q_ref = ctx.quantizer.as_deref();
         let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
         if idx >= base_batch_idx {
             let prepared_offset = idx - base_batch_idx;
             if let Some(prepared) = ctx.prior_prepared.get(prepared_offset) {
-                return self.compute_distance_with_data(query, query_q, &prepared.vector_data);
+                return self.compute_distance_with_data(
+                    query,
+                    query_q,
+                    &prepared.vector_data,
+                    q_ref,
+                );
             }
         }
         if let Some(mmap) = ctx.mmap {
             if idx < ctx.mmap_node_count {
                 let record = mmap.get_node_record(idx)?;
-                return self.compute_distance_with_mmap(query, query_q, mmap, &record);
+                return self.compute_distance_with_mmap(query, query_q, mmap, &record, q_ref);
             }
-            let ram_idx = idx - ctx.mmap_node_count;
-            return self.compute_distance_with_data(query, query_q, &ctx.nodes[ram_idx].vector);
         }
-        self.compute_distance_with_data(query, query_q, &ctx.nodes[idx].vector)
+        let ram_idx = idx.saturating_sub(ctx.mmap_node_count);
+        if let Some(node) = ctx.nodes.get(ram_idx) {
+            return self.compute_distance_with_data(query, query_q, &node.vector, q_ref);
+        }
+        let latest_nodes = self.hot.nodes.read();
+        if let Some(node) = latest_nodes.get(ram_idx) {
+            return self.compute_distance_with_data(query, query_q, &node.vector, q_ref);
+        }
+        Err(MemFuseError::Index(format!(
+            "Node vector not found for index {idx}"
+        )))
     }
 
     fn resolve_connections<'a>(
@@ -1944,37 +1612,25 @@ impl HnswIndexCore {
                 return Ok(Cow::Owned(mmap.get_connections(&record, layer)?));
             }
             let ram_idx = idx - ctx.mmap_node_count;
-            let conns = ctx.nodes[ram_idx]
-                .connections
-                .read()
-                .get(layer)
-                .cloned()
-                .unwrap_or_default();
-
-            for prepared in ctx.prior_prepared.iter().rev() {
-                for bl in prepared.neighbor_backlinks.iter().rev() {
-                    if bl.neighbor_ram_idx == ram_idx && bl.layer == layer {
-                        return Ok(Cow::Owned(bl.updated_connections.clone()));
-                    }
+            if let Some(bmap) = ctx.backlink_map {
+                if let Some(conns) = bmap.get(&(ram_idx, layer)) {
+                    return Ok(Cow::Owned(conns.clone()));
                 }
             }
+            let conns = self
+                .hot
+                .get_ram_node_connections(ram_idx, layer, self.cold.config.m);
             return Ok(Cow::Owned(conns));
         }
 
-        let conns = ctx.nodes[idx]
-            .connections
-            .read()
-            .get(layer)
-            .cloned()
-            .unwrap_or_default();
-
-        for prepared in ctx.prior_prepared.iter().rev() {
-            for bl in prepared.neighbor_backlinks.iter().rev() {
-                if bl.neighbor_ram_idx == idx && bl.layer == layer {
-                    return Ok(Cow::Owned(bl.updated_connections.clone()));
-                }
+        if let Some(bmap) = ctx.backlink_map {
+            if let Some(conns) = bmap.get(&(idx, layer)) {
+                return Ok(Cow::Owned(conns.clone()));
             }
         }
+        let conns = self
+            .hot
+            .get_ram_node_connections(idx, layer, self.cold.config.m);
         Ok(Cow::Owned(conns))
     }
 
@@ -1991,10 +1647,18 @@ impl HnswIndexCore {
                 let record = mmap.get_node_record(idx)?;
                 return Ok(DocId::new(record.doc_id));
             }
-            let ram_idx = idx - ctx.mmap_node_count;
-            return Ok(ctx.nodes[ram_idx].doc_id);
         }
-        Ok(ctx.nodes[idx].doc_id)
+        let ram_idx = idx.saturating_sub(ctx.mmap_node_count);
+        if let Some(node) = ctx.nodes.get(ram_idx) {
+            return Ok(node.doc_id);
+        }
+        let latest_nodes = self.hot.nodes.read();
+        if let Some(node) = latest_nodes.get(ram_idx) {
+            return Ok(node.doc_id);
+        }
+        Err(MemFuseError::Index(format!(
+            "Node doc_id not found for index {idx}"
+        )))
     }
 
     fn search_layer(
@@ -2005,7 +1669,7 @@ impl HnswIndexCore {
         ef: usize,
         layer: usize,
     ) -> Result<Vec<Candidate>> {
-        self.search_layer_with_context(query, query_quantized, entry_points, ef, layer, &[])
+        self.search_layer_with_context(query, query_quantized, entry_points, ef, layer, &[], None)
     }
 
     fn search_layer_with_context(
@@ -2016,6 +1680,7 @@ impl HnswIndexCore {
         ef: usize,
         layer: usize,
         prior_prepared: &[PreparedInsert],
+        backlink_map: Option<&AHashMap<(usize, usize), Vec<u32>>>,
     ) -> Result<Vec<Candidate>> {
         let nodes_guard = self.hot.nodes.read();
         let mmap_guard = self.cold.mmap_index.read();
@@ -2024,11 +1689,20 @@ impl HnswIndexCore {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
+        let q_guard = if self.cold.config.quantize {
+            Some(self.cold.quantizer.read())
+        } else {
+            None
+        };
+        let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
+
         let ctx = SearchContext {
             nodes: &nodes_guard,
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
             prior_prepared,
+            backlink_map,
+            quantizer: q_ref.map(Cow::Borrowed),
         };
 
         // Pre-allocate capacity derived from search parameter `ef` and graph degree `M`.
@@ -2104,35 +1778,53 @@ impl HnswIndexCore {
             // UNLESS the dead neighbor is retained for active/pinned snapshots.
             if has_dead_neighbors && current.index >= mmap_node_count {
                 let ram_idx = current.index - mmap_node_count;
-                if let Some(node) = nodes_guard.get(ram_idx) {
-                    let seq_log = self.cold.seq_log.read();
-                    let min_retention_seq = seq_log.min_retention_seq();
-                    // Use try_write() to avoid blocking search traversal under contention.
-                    // If write lock acquisition fails, pruning is skipped for this visit and attempted again on next visit.
-                    if let Some(mut conns_guard) = node.connections.try_write() {
-                        if let Some(layer_conns) = conns_guard.get_mut(layer) {
-                            layer_conns.retain(|&neighbor_u32| {
-                                if !deleted_snapshot.contains(neighbor_u32 as u64) {
-                                    true
-                                } else if let Some(min_ret_seq) = min_retention_seq {
-                                    let neighbor_idx = neighbor_u32 as usize;
-                                    if neighbor_idx >= mmap_node_count {
-                                        let neighbor_ram_idx = neighbor_idx - mmap_node_count;
-                                        if let Some(neighbor_node) =
-                                            nodes_guard.get(neighbor_ram_idx)
-                                        {
-                                            if let Some(del_seq) =
-                                                seq_log.deletion_seq(neighbor_node.doc_id)
+                let seq_log = self.cold.seq_log.read();
+                let min_retention_seq = seq_log.min_retention_seq();
+                let m = self.cold.config.m;
+                if let (Some(offsets), Some(count_offsets), Some(mut counts), Some(mut arena)) = (
+                    self.hot.neighbor_offsets.try_read(),
+                    self.hot.neighbor_count_offsets.try_read(),
+                    self.hot.neighbor_counts.try_write(),
+                    self.hot.neighbor_arena.try_write(),
+                ) {
+                    if ram_idx < offsets.len() && ram_idx < count_offsets.len() {
+                        let node_offset = offsets[ram_idx];
+                        let count_start = count_offsets[ram_idx];
+                        let count_end = if ram_idx + 1 < count_offsets.len() {
+                            count_offsets[ram_idx + 1]
+                        } else {
+                            counts.len()
+                        };
+                        if count_start + layer < count_end {
+                            let l_offset = HnswHotCore::layer_offset(node_offset, layer, m);
+                            let old_len = counts[count_start + layer] as usize;
+                            if l_offset + old_len <= arena.len() {
+                                let layer_slice = &arena[l_offset..l_offset + old_len];
+                                let mut kept = Vec::with_capacity(old_len);
+                                for &neighbor_u32 in layer_slice {
+                                    if !deleted_snapshot.contains(neighbor_u32 as u64) {
+                                        kept.push(neighbor_u32);
+                                    } else if let Some(min_ret_seq) = min_retention_seq {
+                                        let neighbor_idx = neighbor_u32 as usize;
+                                        if neighbor_idx >= mmap_node_count {
+                                            let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                                            if let Some(neighbor_node) =
+                                                nodes_guard.get(neighbor_ram_idx)
                                             {
-                                                return del_seq >= min_ret_seq;
+                                                if let Some(del_seq) =
+                                                    seq_log.deletion_seq(neighbor_node.doc_id)
+                                                {
+                                                    if del_seq >= min_ret_seq {
+                                                        kept.push(neighbor_u32);
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                    false
-                                } else {
-                                    false
                                 }
-                            });
+                                counts[count_start + layer] = kept.len() as u8;
+                                arena[l_offset..l_offset + kept.len()].copy_from_slice(&kept);
+                            }
                         }
                     }
                 }
@@ -2401,7 +2093,7 @@ impl HnswIndexCore {
         };
 
         let new_layer = self.random_layer();
-        let entry_point_opt = *self.hot.entry_point.read();
+        let entry_point_opt = self.hot.get_entry_point();
 
         let mmap_node_count = self
             .cold
@@ -2442,7 +2134,7 @@ impl HnswIndexCore {
             if !ep.contains(&b_ram_ep) {
                 ep.push(b_ram_ep);
             }
-        } else if let Some(ram_ep) = *self.hot.ram_entry_point.read() {
+        } else if let Some(ram_ep) = self.hot.get_ram_entry_point() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -2484,6 +2176,7 @@ impl HnswIndexCore {
                 1,
                 layer,
                 prior_prepared,
+                Some(&batch_ctx.backlink_map),
             )?;
             if let Some(closest) = best.first() {
                 ep = vec![closest.index];
@@ -2493,7 +2186,7 @@ impl HnswIndexCore {
         let mut final_connections = vec![vec![]; new_layer + 1];
 
         for layer in (0..=new_layer.min(current_max_layer)).rev() {
-            let ram_ep_candidate = batch_ram_ep.or_else(|| *self.hot.ram_entry_point.read());
+            let ram_ep_candidate = batch_ram_ep.or_else(|| self.hot.get_ram_entry_point());
             if let Some(ram_ep) = ram_ep_candidate {
                 if !ep.contains(&ram_ep) {
                     ep.push(ram_ep);
@@ -2507,12 +2200,15 @@ impl HnswIndexCore {
                 self.cold.config.ef_construction,
                 layer,
                 prior_prepared,
+                Some(&batch_ctx.backlink_map),
             )?;
             let ctx = SearchContext {
                 nodes: &nodes_read,
                 mmap: mmap_guard.as_ref(),
                 mmap_node_count,
                 prior_prepared,
+                backlink_map: Some(&batch_ctx.backlink_map),
+                quantizer: None,
             };
             let selected = self.select_neighbors_heuristic_with_batch(
                 &ctx,
@@ -2538,12 +2234,14 @@ impl HnswIndexCore {
                 }
 
                 let existing_conns = get_neighbor_conns_in_batch(
+                    self,
                     neighbor_idx,
                     layer,
                     base_batch_idx,
                     mmap_node_count,
                     &nodes_read,
                     prior_prepared,
+                    batch_ctx,
                 );
 
                 let mut conn_indices = existing_conns;
@@ -2560,6 +2258,8 @@ impl HnswIndexCore {
                             mmap: mmap_guard.as_ref(),
                             mmap_node_count,
                             prior_prepared,
+                            backlink_map: Some(&batch_ctx.backlink_map),
+                            quantizer: None,
                         };
                         let dist = self.compute_symmetric_distance_hybrid_with_batch(
                             idx,
@@ -2580,6 +2280,8 @@ impl HnswIndexCore {
                         mmap: mmap_guard.as_ref(),
                         mmap_node_count,
                         prior_prepared,
+                        backlink_map: Some(&batch_ctx.backlink_map),
+                        quantizer: None,
                     };
                     self.select_neighbors_heuristic_with_batch(
                         &ctx,
@@ -2602,6 +2304,9 @@ impl HnswIndexCore {
                     }
                 } else {
                     let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                    batch_ctx
+                        .backlink_map
+                        .insert((neighbor_ram_idx, layer), selected.clone());
                     neighbor_backlinks.push(NeighborBacklink {
                         neighbor_ram_idx,
                         layer,
@@ -2640,10 +2345,57 @@ impl HnswIndexCore {
         let node = HnswNode {
             doc_id: prepared.doc_id,
             vector: prepared.vector_data,
-            connections: RwLock::new(prepared.final_connections),
             max_layer: prepared.new_layer,
             committed_tx: 0,
         };
+
+        let m = self.cold.config.m;
+        // Capacity per node in arena: Layer 0 has M*2, Layers 1..max_layer have M each
+        let node_capacity = (m * 2) + prepared.new_layer * m;
+
+        let mut offsets = self.hot.neighbor_offsets.write();
+        let mut count_offsets = self.hot.neighbor_count_offsets.write();
+        let mut counts = self.hot.neighbor_counts.write();
+        let mut arena = self.hot.neighbor_arena.write();
+
+        let start_offset = arena.len();
+        arena.resize(start_offset + node_capacity, 0);
+        offsets.push(start_offset);
+
+        let count_start = counts.len();
+        count_offsets.push(count_start);
+
+        for (layer, layer_conns) in prepared.final_connections.iter().enumerate() {
+            let l_offset = HnswHotCore::layer_offset(start_offset, layer, m);
+            let layer_cap = if layer == 0 { m * 2 } else { m };
+            let len = layer_conns.len().min(layer_cap);
+            arena[l_offset..l_offset + len].copy_from_slice(&layer_conns[..len]);
+            counts.push(len as u8);
+        }
+
+        for backlink in prepared.neighbor_backlinks {
+            let ram_idx = backlink.neighbor_ram_idx;
+            if ram_idx < offsets.len() && ram_idx < count_offsets.len() {
+                let node_offset = offsets[ram_idx];
+                let layer = backlink.layer;
+                let count_start = count_offsets[ram_idx];
+                let count_end = if ram_idx + 1 < count_offsets.len() {
+                    count_offsets[ram_idx + 1]
+                } else {
+                    counts.len()
+                };
+                if count_start + layer < count_end {
+                    let l_offset = HnswHotCore::layer_offset(node_offset, layer, m);
+                    let layer_cap = if layer == 0 { m * 2 } else { m };
+                    let len = backlink.updated_connections.len().min(layer_cap);
+                    if l_offset + len <= arena.len() {
+                        arena[l_offset..l_offset + len]
+                            .copy_from_slice(&backlink.updated_connections[..len]);
+                        counts[count_start + layer] = len as u8;
+                    }
+                }
+            }
+        }
 
         self.hot.nodes.write().push(node);
         self.hot
@@ -2651,25 +2403,15 @@ impl HnswIndexCore {
             .write()
             .insert(prepared.doc_id.inner(), prepared.new_idx);
 
-        let nodes = self.hot.nodes.read();
-        for backlink in prepared.neighbor_backlinks {
-            if let Some(neighbor_node) = nodes.get(backlink.neighbor_ram_idx) {
-                let mut conns_guard = neighbor_node.connections.write();
-                if let Some(layer_conns) = conns_guard.get_mut(backlink.layer) {
-                    *layer_conns = backlink.updated_connections;
-                }
-            }
-        }
-
         if prepared.should_update_entry_point {
-            *self.hot.entry_point.write() = Some(prepared.new_idx);
+            self.hot.set_entry_point(Some(prepared.new_idx));
             self.hot
                 .max_layer
                 .store(prepared.new_layer as u64, Ordering::SeqCst);
         }
 
         if prepared.should_update_ram_entry_point {
-            *self.hot.ram_entry_point.write() = Some(prepared.new_idx);
+            self.hot.set_ram_entry_point(Some(prepared.new_idx));
         }
     }
 
@@ -2688,10 +2430,10 @@ impl HnswIndexCore {
             // ANCHOR[ALG-FIX:D2-001] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Entry-Point-Aktualisierung nach Delete (INV-HNSW-4)
             // INVARIANTE (INV-HNSW-4): Wenn der gelöschte Knoten der aktuelle Entry-Point (oder RAM-Entry-Point) war,
             // wird unter den verbleibenden nicht-gelöschten Knoten derjenige mit der höchsten Schicht (max_layer) als neuer Entry-Point gewählt.
-            let mut ep = self.hot.entry_point.write();
-            let mut ram_ep = self.hot.ram_entry_point.write();
+            let ep_val = self.hot.get_entry_point();
+            let ram_ep_val = self.hot.get_ram_entry_point();
 
-            if *ep == Some(idx) || *ram_ep == Some(idx) {
+            if ep_val == Some(idx) || ram_ep_val == Some(idx) {
                 let nodes = self.hot.nodes.read();
                 let mmap_guard = self.cold.mmap_index.read();
                 let mmap_node_count = mmap_guard
@@ -2736,8 +2478,8 @@ impl HnswIndexCore {
                     }
                 }
 
-                if *ep == Some(idx) {
-                    *ep = best_node;
+                if ep_val == Some(idx) {
+                    self.hot.set_entry_point(best_node);
                     if let Some(new_idx) = best_node {
                         let node_max_layer = if let Some(mmap) = mmap_guard.as_ref() {
                             if new_idx < mmap_node_count {
@@ -2758,8 +2500,8 @@ impl HnswIndexCore {
                     }
                 }
 
-                if *ram_ep == Some(idx) {
-                    *ram_ep = best_ram_node;
+                if ram_ep_val == Some(idx) {
+                    self.hot.set_ram_entry_point(best_ram_node);
                 }
             }
         }
@@ -2892,15 +2634,43 @@ impl HnswIndexCore {
         let tombstoned_set: AHashSet<u32> =
             tombstoned_in_region.iter().map(|&id| id as u32).collect();
 
+        let m = self.cold.config.m;
+        let offsets = self.hot.neighbor_offsets.read();
+        let count_offsets = self.hot.neighbor_count_offsets.read();
+        let mut counts = self.hot.neighbor_counts.write();
+        let mut arena = self.hot.neighbor_arena.write();
+
         for (i, node) in nodes.iter().enumerate() {
             let global_idx = mmap_count + i;
             if deleted_nodes.contains(global_idx as u64) {
                 continue;
             }
 
-            let mut conns_guard = node.connections.write();
-            for conns in conns_guard.iter_mut() {
-                conns.retain(|neighbor_id| !tombstoned_set.contains(neighbor_id));
+            if i < offsets.len() && i < count_offsets.len() {
+                let node_offset = offsets[i];
+                let count_start = count_offsets[i];
+                let count_end = if i + 1 < count_offsets.len() {
+                    count_offsets[i + 1]
+                } else {
+                    counts.len()
+                };
+                for layer in 0..node.max_layer + 1 {
+                    if count_start + layer < count_end {
+                        let l_offset = HnswHotCore::layer_offset(node_offset, layer, m);
+                        let old_len = counts[count_start + layer] as usize;
+                        if l_offset + old_len <= arena.len() {
+                            let layer_slice = &arena[l_offset..l_offset + old_len];
+                            let mut kept = Vec::with_capacity(old_len);
+                            for &neighbor_u32 in layer_slice {
+                                if !tombstoned_set.contains(&neighbor_u32) {
+                                    kept.push(neighbor_u32);
+                                }
+                            }
+                            counts[count_start + layer] = kept.len() as u8;
+                            arena[l_offset..l_offset + kept.len()].copy_from_slice(&kept);
+                        }
+                    }
+                }
             }
         }
 
@@ -3141,14 +2911,18 @@ impl HnswIndexCore {
         {
             let mut nodes = self.hot.nodes.write();
             let mut doc_to_node = self.hot.doc_to_node.write();
-            let mut entry_point = self.hot.entry_point.write();
-            let mut ram_entry_point = self.hot.ram_entry_point.write();
             let mut deleted_nodes = self.cold.deleted_nodes.write();
 
             let new_nodes = std::mem::take(&mut *new_index.inner.hot.nodes.write());
             let new_doc_to_node = std::mem::take(&mut *new_index.inner.hot.doc_to_node.write());
-            let new_entry_point = *new_index.inner.hot.entry_point.read();
-            let new_ram_entry_point = *new_index.inner.hot.ram_entry_point.read();
+            let new_entry_point = new_index.inner.hot.get_entry_point();
+            let new_ram_entry_point = new_index.inner.hot.get_ram_entry_point();
+
+            let new_offsets = std::mem::take(&mut *new_index.inner.hot.neighbor_offsets.write());
+            let new_count_offsets =
+                std::mem::take(&mut *new_index.inner.hot.neighbor_count_offsets.write());
+            let new_counts = std::mem::take(&mut *new_index.inner.hot.neighbor_counts.write());
+            let new_arena = std::mem::take(&mut *new_index.inner.hot.neighbor_arena.write());
 
             let new_quantizer = new_index.inner.cold.quantizer.write().take();
             if new_quantizer.is_some() {
@@ -3157,8 +2931,13 @@ impl HnswIndexCore {
 
             *nodes = new_nodes;
             *doc_to_node = new_doc_to_node;
-            *entry_point = new_entry_point;
-            *ram_entry_point = new_ram_entry_point;
+            self.hot.set_entry_point(new_entry_point);
+            self.hot.set_ram_entry_point(new_ram_entry_point);
+            *self.hot.neighbor_offsets.write() = new_offsets;
+            *self.hot.neighbor_count_offsets.write() = new_count_offsets;
+            *self.hot.neighbor_counts.write() = new_counts;
+            *self.hot.neighbor_arena.write() = new_arena;
+
             self.hot.max_layer.store(
                 new_index.inner.hot.max_layer.load(Ordering::SeqCst),
                 Ordering::SeqCst,
@@ -3266,10 +3045,10 @@ impl VectorIndex for HnswIndex {
             .unwrap_or(0);
 
         let mut ep = Vec::new();
-        if let Some(global_ep) = *self.inner.hot.entry_point.read() {
+        if let Some(global_ep) = self.inner.hot.get_entry_point() {
             ep.push(global_ep);
         }
-        if let Some(ram_ep) = *self.inner.hot.ram_entry_point.read() {
+        if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -3292,7 +3071,7 @@ impl VectorIndex for HnswIndex {
         }
 
         // Add RAM entry point back for the final layer search to ensure hybrid recall
-        if let Some(ram_ep) = *self.inner.hot.ram_entry_point.read() {
+        if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
             }
@@ -3324,11 +3103,20 @@ impl VectorIndex for HnswIndex {
         let deleted = self.inner.cold.deleted_nodes.read();
         let mut results = Vec::with_capacity(k);
 
+        let q_guard = if self.inner.cold.config.quantize {
+            Some(self.inner.cold.quantizer.read())
+        } else {
+            None
+        };
+        let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
+
         let ctx = SearchContext {
             nodes: &nodes,
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
             prior_prepared: &[],
+            backlink_map: None,
+            quantizer: q_ref.map(Cow::Borrowed),
         };
 
         for c in candidates.iter() {
@@ -3364,9 +3152,20 @@ impl VectorIndex for HnswIndex {
             results.push(ScoredDocument::new(doc_id, score));
         }
 
-        // Must re-sort and truncate after Phase 2 reranking
-        results.sort_by(|a, b| b.score.total_cmp(&a.score));
-        results.truncate(k);
+        // Select top k using select_nth_unstable_by (O(N)) then sort top k (O(k log k))
+        if results.len() > k {
+            results.select_nth_unstable_by(k - 1, |a, b| {
+                b.score
+                    .total_cmp(&a.score)
+                    .then_with(|| a.doc_id.cmp(&b.doc_id))
+            });
+            results.truncate(k);
+        }
+        results.sort_by(|a, b| {
+            b.score
+                .total_cmp(&a.score)
+                .then_with(|| a.doc_id.cmp(&b.doc_id))
+        });
 
         Ok(results)
     }
@@ -3672,6 +3471,8 @@ impl VectorIndex for HnswIndex {
             mmap: mmap_guard.as_ref(),
             mmap_node_count,
             prior_prepared: &[],
+            backlink_map: None,
+            quantizer: None,
         };
 
         let total_nodes = mmap_node_count + nodes.len();
@@ -3729,16 +3530,8 @@ impl VectorIndex for HnswIndex {
             })
             .sum();
 
-        let connection_memory: usize = nodes
-            .iter()
-            .map(|n| {
-                n.connections
-                    .read()
-                    .iter()
-                    .map(|c| c.len() * std::mem::size_of::<u32>())
-                    .sum::<usize>()
-            })
-            .sum();
+        let connection_memory: usize =
+            self.inner.hot.neighbor_arena.read().len() * std::mem::size_of::<u32>();
 
         if let Some(mmap) = mmap_guard.as_ref() {
             vector_memory += mmap.mmap.len(); // Simple approximation: entire mmap file
@@ -3851,10 +3644,8 @@ mod tests {
         index.delete(tx2, DocId::from(5u64)).await.unwrap();
         index.commit(tx2).await.unwrap();
 
-        // Hold write lock on first node's connections
-        let nodes = index.inner.hot.nodes.read();
-        let first_node_conns = &nodes[0].connections;
-        let lock_guard = first_node_conns.write();
+        // Hold write lock on neighbor arena
+        let lock_guard = index.inner.hot.neighbor_arena.write();
 
         // Perform search while write lock is held.
         // Because search lazy pruning uses try_write(), search must complete without blocking!
@@ -4316,7 +4107,7 @@ mod tests {
         for i in 0..test_queries {
             let query = &data[i * 5];
             let results = index.search(query, 1).await.expect("search"); // expect
-            if !results.is_empty() && results[0].doc_id == DocId::new((i * 5) as u64) {
+            if !results.is_empty() && results[0].doc_id == DocId::from((i * 5) as u64) {
                 hits += 1;
             }
         }
@@ -4627,7 +4418,7 @@ mod tests {
                     let active_docs: std::collections::HashSet<_> = {
                         let log = index.inner.cold.seq_log.read();
                         (1u64..30)
-                            .map(DocId::new)
+                            .map(DocId::from)
                             .filter(|&doc_id| log.is_visible(doc_id, target_seq))
                             .collect()
                     };
@@ -5370,6 +5161,86 @@ mod tests {
             "index_normal commit must succeed cleanly without fault injection spillover"
         );
         assert_eq!(index_normal.len().await, 5);
+    }
+
+    #[tokio::test]
+    async fn test_partial_rebuild_recall_preservation_guarantee() {
+        // Requirement 5.5.7: Test proving recall preservation guarantee after local partial rebuild
+        let config = HnswConfig {
+            dimension: 16,
+            m: 16,
+            ef_construction: 64,
+            ef_search: 64,
+            distance_metric: DistanceMetric::Euclidean,
+            ..test_config(16)
+        };
+        let index = HnswIndex::try_new(config).unwrap();
+        let tx1 = TxId::new(1);
+
+        // 1. Insert 100 vectors
+        let mut dataset = Vec::with_capacity(100);
+        for i in 0u64..100 {
+            let mut v = vec![0.0f32; 16];
+            v[0] = i as f32;
+            v[1] = (i % 10) as f32 * 0.1;
+            dataset.push((i, v.clone()));
+            index.insert(tx1, DocId::from(i), &v).await.unwrap();
+        }
+        index.commit(tx1).await.unwrap();
+
+        // 2. Query vector
+        let query = vec![45.2f32; 16];
+
+        // Ground truth brute-force exact top-5
+        let mut ground_truth: Vec<(u64, f32)> = dataset
+            .iter()
+            .map(|(id, v)| {
+                let d = crate::distance::euclidean_distance_scalar(&query, v);
+                (*id, d)
+            })
+            .collect();
+        ground_truth.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let gt_ids: std::collections::HashSet<u64> =
+            ground_truth.iter().take(5).map(|(id, _)| *id).collect();
+
+        // Initial search
+        let initial_res = index.search(&query, 5).await.unwrap();
+        let initial_hits = initial_res
+            .iter()
+            .filter(|doc| gt_ids.contains(&(doc.doc_id.inner() as u64)))
+            .count();
+        let initial_recall = initial_hits as f32 / 5.0;
+
+        // 3. Delete some nodes in region (e.g. 10, 11, 12)
+        let tx2 = TxId::new(2);
+        index.delete(tx2, DocId::from(10u64)).await.unwrap();
+        index.delete(tx2, DocId::from(11u64)).await.unwrap();
+        index.delete(tx2, DocId::from(12u64)).await.unwrap();
+        index.commit(tx2).await.unwrap();
+
+        // 4. Perform partial rebuild on region
+        let region = vec![10u64, 11, 12, 13, 14, 15];
+        index.rebuild_region(region).await.unwrap();
+
+        // 5. Post partial rebuild search
+        let post_res = index.search(&query, 5).await.unwrap();
+        let post_hits = post_res
+            .iter()
+            .filter(|doc| gt_ids.contains(&(doc.doc_id.inner() as u64)))
+            .count();
+        let post_recall = post_hits as f32 / 5.0;
+
+        assert!(
+            post_recall >= initial_recall - 0.02,
+            "Partial rebuild must preserve recall: post_recall ({}) vs initial_recall ({})",
+            post_recall,
+            initial_recall
+        );
+        assert!(
+            post_recall >= 0.80,
+            "Post partial rebuild recall should be high, got {}",
+            post_recall
+        );
     }
 
     #[test]

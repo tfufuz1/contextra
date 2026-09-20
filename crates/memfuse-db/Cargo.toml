@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "memfuse-db"
 version.workspace = true
@@ -7,6 +10,7 @@ rust-version.workspace = true
 description = "MemFuse — Embedded hybrid-search for AI agents"
 
 [dependencies]
+memfuse-sys = { workspace = true }
 memfuse-core = { workspace = true }
 bytes = { workspace = true }
 memfuse-crypto = { workspace = true }
@@ -30,8 +34,6 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
 thiserror = { workspace = true }
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
@@ -90,10 +92,6 @@ name = "hybrid_search"
 [[test]]
 name = "diskann_collection_fallback"
 required-features = ["experimental-diskann"]
-
-[[test]]
-name = "docid_128_consolidation"
-required-features = ["volatile-vault"]
 
 [[example]]
 name = "collections"

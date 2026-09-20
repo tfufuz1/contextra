@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "memfuse-core-ipc-gen"
 version.workspace = true
@@ -8,3 +11,4 @@ description = "Auto-generated FlatBuffers IPC code for MemFuse Core"
 
 [dependencies]
 flatbuffers = { workspace = true }
+memfuse-wire = { workspace = true }

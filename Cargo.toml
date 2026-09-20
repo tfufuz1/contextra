@@ -1,7 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/memfuse-wire",
+    "crates/memfuse-sys",
     "crates/memfuse-core-ipc-gen",
+    "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
     "crates/memfuse-index",
@@ -19,7 +22,32 @@ members = [
     "benchmarks/memfuse-bench",
     "crates/memfuse-candle",
     "crates/memfuse-sandbox",
-    "xtask",
+    "crates/memfuse-py",
+    "crates/memfuse-testkit",
+]
+exclude = ["xtask"]
+default-members = [
+    "crates/memfuse-wire",
+    "crates/memfuse-core-ipc-gen",
+    "crates/memfuse-simd",
+    "crates/memfuse-core",
+    "crates/memfuse-store",
+    "crates/memfuse-index",
+    "crates/memfuse-db",
+    "crates/memfuse-text",
+    "crates/memfuse-checkpoint",
+    "crates/memfuse-crypto",
+    "crates/memfuse-graph",
+    "crates/memfuse-embed",
+    "crates/memfuse-mcp",
+    "crates/memfuse-agent",
+    "crates/memfuse-ollama",
+    "crates/memfuse-router",
+    "crates/memfuse-calibration",
+    "crates/memfuse-candle",
+    "crates/memfuse-sandbox",
+    "crates/memfuse-py",
+    "crates/memfuse-testkit",
 ]
 
 [workspace.package]
@@ -65,8 +93,11 @@ tempfile = "3"
 criterion = { version = "0.5", features = ["async_tokio"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Workspace crates (18 Crates)
+# Workspace crates
+memfuse-wire = { path = "crates/memfuse-wire" }
+memfuse-sys = { path = "crates/memfuse-sys" }
 memfuse-core-ipc-gen = { path = "crates/memfuse-core-ipc-gen" }
+memfuse-simd = { path = "crates/memfuse-simd" }
 memfuse-core = { path = "crates/memfuse-core" }
 memfuse-store = { path = "crates/memfuse-store" }
 memfuse-index = { path = "crates/memfuse-index" }
@@ -83,6 +114,8 @@ memfuse-router = { path = "crates/memfuse-router" }
 memfuse-calibration = { path = "crates/memfuse-calibration" }
 memfuse-candle = { path = "crates/memfuse-candle" }
 memfuse-sandbox = { path = "crates/memfuse-sandbox" }
+memfuse-py = { path = "crates/memfuse-py" }
+memfuse-testkit = { path = "crates/memfuse-testkit" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
 # memfuse-cluster, memfuse-sandbox, memfuse-saos-agent wurden in Phase 0 ausgelagert.
@@ -103,15 +136,29 @@ memfuse-sandbox = { path = "crates/memfuse-sandbox" }
 # reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
 
 [profile.release]
+panic = "unwind"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
-panic = "abort"
 strip = true
 overflow-checks = true
+
+# Profile for standalone binaries without FFI/PyO3 bindings.
+[profile.release-abort]
+inherits = "release"
+panic = "abort"
 
 [profile.bench]
 inherits = "release"

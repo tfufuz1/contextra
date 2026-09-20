@@ -5,16 +5,66 @@
 #![allow(clippy::needless_range_loop)]
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// Fehlerzustände des Contextual Bandits.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum BanditError {
+    /// Dimension des Eingabevektors stimmt nicht mit dem Bandit-Zustand überein.
+    #[error("Embedding dimension mismatch: expected {expected}, actual {actual}")]
+    DimensionMismatch { expected: usize, actual: usize },
+}
+
+/// 64-Byte cache-aligned Wrapper um `Vec<f32>` zur Vermeidung von False Sharing.
+///
+/// Hinweis: Der `Vec<f32>`-Heap-Buffer selbst folgt zwar nicht zwingend der 64-Byte-Grenze des Structs
+/// (abhängig vom globalen Allocator), aber `repr(align(64))` richtet die Struct-Instanz selbst
+/// an einer 64-Byte-Grenze aus und der Heap-Buffer liefert bei `Vec::with_capacity` i. d. R.
+/// mindestens 16/32-Byte ausgerichtete Zeiger.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+#[repr(align(64))]
+pub struct AlignedF32Vec(pub Vec<f32>);
+
+impl std::ops::Deref for AlignedF32Vec {
+    type Target = [f32];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for AlignedF32Vec {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl AlignedF32Vec {
+    /// Erstellt einen neuen `AlignedF32Vec` aus einem `Vec<f32>`.
+    pub fn new(vec: Vec<f32>) -> Self {
+        Self(vec)
+    }
+
+    /// Erstellt einen neuen `AlignedF32Vec` mit `len` Nullen.
+    pub fn zeros(len: usize) -> Self {
+        Self(vec![0.0f32; len])
+    }
+}
 
 /// LinUCB-Implementierungsvariante (§13.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum BanditImplementation {
-    /// Diagonal-Approximation O(d): kein BLAS, Default.
+    /// Sherman-Morrison O(d²): Produktions-Default.
     #[default]
-    DiagonalApproximation,
-    /// Sherman-Morrison O(d²): opt-in via Feature `egress-sherman-morrison`.
-    #[cfg(feature = "egress-sherman-morrison")]
     ShermanMorrison,
+    /// Diagonal-Approximation O(d): Opt-in-Variante.
+    DiagonalApproximation,
+}
+
+/// Trait für Bandit-Routing Policies mit Konzeptdrift-Anpassung (§5.2.3).
+pub trait BanditPolicy: Send + Sync {
+    /// Wendet Drift-Penalty / Covariance Discounting bei erkannter concept drift an.
+    fn apply_drift_penalty(&mut self, k_drift: f32, alpha_max: f32, gamma: f32);
 }
 
 fn default_gamma() -> f32 {
@@ -37,12 +87,94 @@ fn default_alpha_max_multiplier() -> f32 {
     4.0
 }
 
+/// Berechnet das Skalarprodukt zweier f32-Slices mit 8-facher Unrolling-Schleife für autovektorisierte SIMD-Kompilierung.
+///
+/// Hinweissystem (§5.2.2): Sobald `memfuse-simd` Matrix-Vektor Kernel anbietet, kann dieser Helper durch Re-Export
+/// aus `memfuse-simd` abgelöst werden.
+#[inline(always)]
+fn dot_product_f32(a: &[f32], b: &[f32]) -> f32 {
+    let len = a.len().min(b.len());
+    let mut sum0 = 0.0f32;
+    let mut sum1 = 0.0f32;
+    let mut sum2 = 0.0f32;
+    let mut sum3 = 0.0f32;
+
+    let mut i = 0;
+    while i + 16 <= len {
+        sum0 += a[i] * b[i];
+        sum1 += a[i + 1] * b[i + 1];
+        sum2 += a[i + 2] * b[i + 2];
+        sum3 += a[i + 3] * b[i + 3];
+
+        sum0 += a[i + 4] * b[i + 4];
+        sum1 += a[i + 5] * b[i + 5];
+        sum2 += a[i + 6] * b[i + 6];
+        sum3 += a[i + 7] * b[i + 7];
+
+        sum0 += a[i + 8] * b[i + 8];
+        sum1 += a[i + 9] * b[i + 9];
+        sum2 += a[i + 10] * b[i + 10];
+        sum3 += a[i + 11] * b[i + 11];
+
+        sum0 += a[i + 12] * b[i + 12];
+        sum1 += a[i + 13] * b[i + 13];
+        sum2 += a[i + 14] * b[i + 14];
+        sum3 += a[i + 15] * b[i + 15];
+
+        i += 16;
+    }
+    while i + 4 <= len {
+        sum0 += a[i] * b[i];
+        sum1 += a[i + 1] * b[i + 1];
+        sum2 += a[i + 2] * b[i + 2];
+        sum3 += a[i + 3] * b[i + 3];
+        i += 4;
+    }
+    while i < len {
+        sum0 += a[i] * b[i];
+        i += 1;
+    }
+    (sum0 + sum1) + (sum2 + sum3)
+}
+
+/// Fused-Row-Update für die Sherman-Morrison Matrixinversion (§5.2.2).
+/// `row[j] = scale_row * row[j] - scale_v * v[j]`
+/// Nutzt 16-faches Unrolling zur autovektorisierten SIMD-Kompilierung.
+#[inline(always)]
+fn fused_row_update(row: &mut [f32], v: &[f32], scale_row: f32, scale_v: f32) {
+    let len = row.len().min(v.len());
+    let mut i = 0;
+    while i + 16 <= len {
+        row[i] = scale_row * row[i] - scale_v * v[i];
+        row[i + 1] = scale_row * row[i + 1] - scale_v * v[i + 1];
+        row[i + 2] = scale_row * row[i + 2] - scale_v * v[i + 2];
+        row[i + 3] = scale_row * row[i + 3] - scale_v * v[i + 3];
+        row[i + 4] = scale_row * row[i + 4] - scale_v * v[i + 4];
+        row[i + 5] = scale_row * row[i + 5] - scale_v * v[i + 5];
+        row[i + 6] = scale_row * row[i + 6] - scale_v * v[i + 6];
+        row[i + 7] = scale_row * row[i + 7] - scale_v * v[i + 7];
+        row[i + 8] = scale_row * row[i + 8] - scale_v * v[i + 8];
+        row[i + 9] = scale_row * row[i + 9] - scale_v * v[i + 9];
+        row[i + 10] = scale_row * row[i + 10] - scale_v * v[i + 10];
+        row[i + 11] = scale_row * row[i + 11] - scale_v * v[i + 11];
+        row[i + 12] = scale_row * row[i + 12] - scale_v * v[i + 12];
+        row[i + 13] = scale_row * row[i + 13] - scale_v * v[i + 13];
+        row[i + 14] = scale_row * row[i + 14] - scale_v * v[i + 14];
+        row[i + 15] = scale_row * row[i + 15] - scale_v * v[i + 15];
+        i += 16;
+    }
+    while i < len {
+        row[i] = scale_row * row[i] - scale_v * v[i];
+        i += 1;
+    }
+}
+
 /// Laufzeitzustand eines LinUCB-Bandits pro Profil.
 ///
 /// # Formeln (§13.2)
 /// Score: r̂_p(x) = θ_pᵀ x + α_p √(Σ_p(x)) - λ·c_p - μ·1[transport=HttpCloud]
 /// Reward: r_adj = r_outcome - λ·c_p - μ·1[transport=HttpCloud]
-/// Update (Discounted-Diagonal, Garivier & Moulines 2011):
+/// Update (Discounted-Diagonal / Sherman-Morrison, Garivier & Moulines 2011):
 ///   σ²_p[i] ← max(γ · σ²_p[i], 1.0)
 ///   θ_p[i] += r_adj · x[i] / σ²_p[i]
 ///   σ²_p[i] += x[i]²
@@ -59,10 +191,10 @@ pub struct BanditProfileState {
     pub sigma_sq: Vec<f32>,
     /// Inverser Kovarianzmatrix-Speicher A⁻¹ (d x d, Row-Major) für Sherman-Morrison O(d²).
     #[serde(default)]
-    pub inv_a: Vec<f32>,
+    pub inv_a: AlignedF32Vec,
     /// Pre-allocated Buffer für Matrix-Vektor Produkte (d Elemente) zur Vermeidung von Hot-Path Allokationen.
     #[serde(skip, default)]
-    pub work_buf: Vec<f32>,
+    pub work_buf: AlignedF32Vec,
     /// Exploration-Parameter α_p.
     pub alpha: f32,
     /// Cold-Start Baseline Exploration Parameter α_base (Default: 0.5).
@@ -88,8 +220,25 @@ pub struct BanditProfileState {
     /// Dauer des Post-Drift Decay-Fensters in Update-Schritten (Default: 50).
     #[serde(default = "default_drift_decay_window")]
     pub drift_decay_window: usize,
-    /// Implementierungsvariante.
+    /// Implementierungsvariante (Default: ShermanMorrison).
     pub implementation: BanditImplementation,
+}
+
+impl BanditPolicy for BanditProfileState {
+    fn apply_drift_penalty(&mut self, k_drift: f32, alpha_max: f32, gamma: f32) {
+        self.alpha = (self.alpha * k_drift).min(self.alpha_base * alpha_max);
+        self.drift_steps_remaining = self.drift_decay_window;
+
+        // Immediate Covariance Discounting (§5.2.3):
+        // $A \leftarrow \gamma A \implies A^{-1} \leftarrow \gamma^{-1} A^{-1}$
+        let gamma_inv = 1.0 / gamma.clamp(0.01, 1.0);
+        for val in self.inv_a.iter_mut() {
+            *val *= gamma_inv;
+        }
+        for val in self.sigma_sq.iter_mut() {
+            *val = (*val * gamma).max(1.0);
+        }
+    }
 }
 
 impl BanditProfileState {
@@ -102,8 +251,8 @@ impl BanditProfileState {
         Self {
             theta: vec![0.0f32; d],
             sigma_sq: vec![1.0f32; d], // Uninformative Prior
-            inv_a,
-            work_buf: vec![0.0f32; d],
+            inv_a: AlignedF32Vec::new(inv_a),
+            work_buf: AlignedF32Vec::zeros(d),
             alpha: alpha_base,
             alpha_base,
             alpha_max_multiplier: default_alpha_max_multiplier(),
@@ -120,32 +269,44 @@ impl BanditProfileState {
     fn ensure_inv_a(&mut self) {
         let d = self.theta.len();
         if self.inv_a.len() != d * d {
-            self.inv_a = vec![0.0f32; d * d];
+            let mut inv_a = vec![0.0f32; d * d];
             for i in 0..d {
-                self.inv_a[i * d + i] = 1.0;
+                inv_a[i * d + i] = 1.0;
             }
+            self.inv_a = AlignedF32Vec::new(inv_a);
         }
     }
 
     fn ensure_work_buf(&mut self) {
         let d = self.theta.len();
         if self.work_buf.len() != d {
-            self.work_buf.resize(d, 0.0);
+            self.work_buf = AlignedF32Vec::zeros(d);
         }
+    }
+
+    /// Gibt die erwartete Dimension der Feature-Vektoren zurück.
+    pub fn expected_dim(&self) -> usize {
+        self.theta.len()
     }
 
     /// Berechnet UCB-Score für Kontext-Embedding `x` und Profilkosten `cost`.
     ///
     /// r̂_p(x) = θᵀx + α√(Σ(x)) - λ·cost - μ·is_cloud
     #[allow(clippy::needless_range_loop)]
-    pub fn score(&self, x: &[f32], cost: f32, is_cloud_transport: bool) -> f32 {
-        debug_assert_eq!(
-            x.len(),
-            self.theta.len(),
-            "Embedding-Dimension muss übereinstimmen"
-        );
+    pub fn score(
+        &self,
+        x: &[f32],
+        cost: f32,
+        is_cloud_transport: bool,
+    ) -> Result<f32, BanditError> {
+        if x.len() != self.theta.len() {
+            return Err(BanditError::DimensionMismatch {
+                expected: self.theta.len(),
+                actual: x.len(),
+            });
+        }
 
-        let dot: f32 = self.theta.iter().zip(x.iter()).map(|(t, xi)| t * xi).sum();
+        let dot: f32 = dot_product_f32(&self.theta, x);
 
         let variance_term = match self.implementation {
             BanditImplementation::DiagonalApproximation => self
@@ -155,20 +316,18 @@ impl BanditProfileState {
                 .map(|(s, xi)| xi * xi / s.max(1e-8))
                 .sum::<f32>()
                 .sqrt(),
-            #[cfg(feature = "egress-sherman-morrison")]
-            #[allow(clippy::needless_range_loop)]
             BanditImplementation::ShermanMorrison => {
                 let d = self.theta.len();
                 if self.inv_a.len() == d * d {
-                    let mut var_sum = 0.0f32;
-                    for i in 0..d {
-                        let row_offset = i * d;
-                        let mut row_dot = 0.0f32;
-                        for j in 0..d {
-                            row_dot += self.inv_a[row_offset + j] * x[j];
-                        }
-                        var_sum += x[i] * row_dot;
-                    }
+                    let var_sum: f32 = self
+                        .inv_a
+                        .chunks_exact(d)
+                        .zip(x.iter())
+                        .map(|(row, &xi)| {
+                            let row_dot: f32 = dot_product_f32(row, x);
+                            xi * row_dot
+                        })
+                        .sum();
                     var_sum.max(0.0).sqrt()
                 } else {
                     self.sigma_sq
@@ -183,14 +342,25 @@ impl BanditProfileState {
 
         let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
 
-        dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty
+        Ok(dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty)
     }
 
     /// Aktualisiert θ und σ² (sowie A⁻¹ bei Sherman-Morrison) nach beobachtetem Outcome unter Berücksichtigung von Discounting.
     ///
     /// r_adj = r_outcome - λ·cost - μ·is_cloud
-    pub fn update(&mut self, x: &[f32], r_outcome: f32, cost: f32, is_cloud_transport: bool) {
-        debug_assert_eq!(x.len(), self.theta.len());
+    pub fn update(
+        &mut self,
+        x: &[f32],
+        r_outcome: f32,
+        cost: f32,
+        is_cloud_transport: bool,
+    ) -> Result<(), BanditError> {
+        if x.len() != self.theta.len() {
+            return Err(BanditError::DimensionMismatch {
+                expected: self.theta.len(),
+                actual: x.len(),
+            });
+        }
 
         let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
         let r_adj = r_outcome - self.lambda * cost - privacy_penalty;
@@ -211,7 +381,6 @@ impl BanditProfileState {
                     self.sigma_sq[i] += xi * xi;
                 }
             }
-            #[cfg(feature = "egress-sherman-morrison")]
             BanditImplementation::ShermanMorrison => {
                 let d = self.theta.len();
                 self.ensure_inv_a();
@@ -219,57 +388,46 @@ impl BanditProfileState {
 
                 let gamma_inv = 1.0 / effective_gamma.max(1e-5);
 
-                // 1. Berechne v_x = A⁻¹ x in work_buf
-                let mut xt_vx = 0.0f32;
-                for i in 0..d {
-                    let row_offset = i * d;
-                    let mut sum = 0.0f32;
-                    for j in 0..d {
-                        sum += self.inv_a[row_offset + j] * x[j];
-                    }
-                    self.work_buf[i] = sum;
-                    xt_vx += x[i] * sum;
+                // 1. Berechne v_disc = γ⁻¹ A⁻¹ x in work_buf und xᵀ v_disc (SIMD dot_product_f32)
+                let mut xt_v_disc = 0.0f32;
+                for (i, row) in self.inv_a.chunks_exact(d).enumerate() {
+                    let row_dot = dot_product_f32(row, x);
+                    let v_disc_i = gamma_inv * row_dot;
+                    self.work_buf[i] = v_disc_i;
+                    xt_v_disc += x[i] * v_disc_i;
                 }
 
-                // 2. Diskonterte Zwischenwerte
-                let denominator = 1.0 + gamma_inv * xt_vx;
+                // 2. Denominator und Gain Vector k
+                let denominator = 1.0 + xt_v_disc;
                 let denom_safe = denominator.max(1e-8);
 
-                // 3. Gain Vector k = (γ⁻¹ A⁻¹ x) / (1 + γ⁻¹ xᵀ A⁻¹ x)
-                // Matrix-Update: A_new⁻¹ = γ⁻¹ A_old⁻¹ - k (γ⁻¹ A_old⁻¹ x)ᵀ
-                // Parameter-Update: θ_new = θ_old + (r_adj - θ_oldᵀ x) * k
-                let mut pred_theta_x = 0.0f32;
-                for i in 0..d {
-                    pred_theta_x += self.theta[i] * x[i];
-                }
+                // 3. Parameter Residual: r_adj - θᵀ x
+                let pred_theta_x = dot_product_f32(&self.theta, x);
                 let residual = r_adj - pred_theta_x;
 
-                // Aktualisiere inv_a und theta
-                for i in 0..d {
-                    let v_disc_i = gamma_inv * self.work_buf[i];
-                    let k_i = v_disc_i / denom_safe;
+                // 4. Matrix-Update: A_new⁻¹ = γ⁻¹ A_old⁻¹ - k (v_disc)ᵀ (fused_row_update)
+                // Parameter-Update: θ_new = θ_old + (r_adj - θ_oldᵀ x) * k
+                let work_slice = &self.work_buf[..d];
+                for (i, row) in self.inv_a.chunks_exact_mut(d).enumerate() {
+                    let k_i = work_slice[i] / denom_safe;
 
-                    let row_offset = i * d;
-                    for j in 0..d {
-                        let v_disc_j = gamma_inv * self.work_buf[j];
-                        self.inv_a[row_offset + j] =
-                            gamma_inv * self.inv_a[row_offset + j] - k_i * v_disc_j;
-                    }
+                    fused_row_update(row, work_slice, gamma_inv, k_i);
 
                     self.theta[i] += residual * k_i;
                     self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0) + x[i] * x[i];
                 }
             }
         }
+
+        Ok(())
     }
 
-    /// Drift-Kopplung: Erhöhe α temporär und aktiviere beschleunigten Decay bei erkannter Drift (§13.2).
+    /// Drift-Kopplung: Erhöhe α temporär und aktiviere beschleunigten Decay bei erkannter Drift (§13.2, §5.2.3).
     ///
     /// α_p ← min(α_p · k_drift, α_base · alpha_max_multiplier)
     /// drift_steps_remaining ← drift_decay_window (Default: 50)
     pub fn on_drift_detected(&mut self, k_drift: f32) {
-        self.alpha = (self.alpha * k_drift).min(self.alpha_base * self.alpha_max_multiplier);
-        self.drift_steps_remaining = self.drift_decay_window;
+        self.apply_drift_penalty(k_drift, self.alpha_max_multiplier, self.drift_gamma);
     }
 }
 
@@ -278,20 +436,123 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(feature = "egress-sherman-morrison")]
+    fn test_default_implementation_is_sherman_morrison() {
+        assert_eq!(
+            BanditImplementation::default(),
+            BanditImplementation::ShermanMorrison
+        );
+        let state = BanditProfileState::cold_start(4, 0.5);
+        assert_eq!(state.implementation, BanditImplementation::ShermanMorrison);
+    }
+
+    #[test]
+    fn test_bandit_policy_drift_penalty() {
+        let mut state = BanditProfileState::cold_start(2, 0.5);
+        let alpha_before = state.alpha;
+        let inv_a_0_before = state.inv_a[0];
+
+        state.apply_drift_penalty(2.0, 4.0, 0.95);
+
+        assert!((state.alpha - alpha_before * 2.0).abs() < 1e-6);
+        assert_eq!(state.drift_steps_remaining, state.drift_decay_window);
+        // A^{-1} scaled by 1/0.95 > 1
+        assert!(state.inv_a[0] > inv_a_0_before);
+    }
+
+    #[test]
     fn test_sherman_morrison_score_and_update() {
         let mut state = BanditProfileState::cold_start(4, 0.5);
         state.implementation = BanditImplementation::ShermanMorrison;
         let x = vec![1.0f32, 0.0, 0.0, 0.0];
 
-        let score_before = state.score(&x, 0.0, false);
+        let score_before = state.score(&x, 0.0, false).expect("valid score");
         assert!(score_before > 0.0);
 
-        state.update(&x, 1.0, 0.0, false);
+        state.update(&x, 1.0, 0.0, false).expect("valid update");
         assert!(state.theta[0] > 0.0);
 
-        let score_after = state.score(&x, 0.0, false);
+        let score_after = state.score(&x, 0.0, false).expect("valid score");
         assert_ne!(score_after, score_before);
+    }
+
+    #[test]
+    fn test_sherman_morrison_correctness_and_precision() {
+        let d = 8;
+        let mut state = BanditProfileState::cold_start(d, 0.5);
+        state.implementation = BanditImplementation::ShermanMorrison;
+
+        let x = vec![0.5f32, -0.2, 0.8, 0.1, -0.4, 0.6, -0.1, 0.3];
+        let cost = 0.15f32;
+        let is_cloud = false;
+        let reward = 0.85f32;
+
+        let score_initial = state.score(&x, cost, is_cloud).expect("valid score");
+        // Cold start theta = 0, inv_a = I -> x^T I x = norm(x)^2 = 1.36
+        // dot = 0, variance = sqrt(1.36) ≈ 1.16619, alpha = 0.5, cost*0.1 = 0.015
+        let expected_var = x.iter().map(|&v| v * v).sum::<f32>().sqrt();
+        let expected_score = 0.5 * expected_var - 0.1 * cost;
+        assert!(
+            (score_initial - expected_score).abs() < 1e-5,
+            "Initial UCB score calculation mismatch: expected {}, got {}",
+            expected_score,
+            score_initial
+        );
+
+        // Perform 5 updates and verify numerical consistency and theta convergence
+        for _ in 0..5 {
+            state
+                .update(&x, reward, cost, is_cloud)
+                .expect("valid update");
+        }
+
+        assert!(
+            state.theta[0] > 0.0,
+            "Theta[0] must be positive after positive rewards"
+        );
+        let score_updated = state.score(&x, cost, is_cloud).expect("valid score");
+        assert!(
+            score_updated > score_initial,
+            "Score must increase after positive updates"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_sherman_morrison_p95_latency() {
+        use std::time::Instant;
+
+        let d = 768;
+        let iterations = 1000;
+        let mut state = BanditProfileState::cold_start(d, 0.5);
+        state.implementation = BanditImplementation::ShermanMorrison;
+
+        let x = vec![0.5f32; d];
+        let cost = 0.2f32;
+        let is_cloud = false;
+        let reward = 0.8f32;
+
+        // Warmup
+        for _ in 0..10 {
+            let _ = state.score(&x, cost, is_cloud);
+            let _ = state.update(&x, reward, cost, is_cloud);
+        }
+
+        let mut latencies_us = Vec::with_capacity(iterations);
+        for _ in 0..iterations {
+            let start = Instant::now();
+            let _score = state.score(&x, cost, is_cloud);
+            let _ = state.update(&x, reward, cost, is_cloud);
+            latencies_us.push(start.elapsed().as_micros() as u64);
+        }
+
+        latencies_us.sort_unstable();
+        let p95_idx = (iterations as f64 * 0.95) as usize;
+        let p95_us = latencies_us[p95_idx.min(iterations - 1)];
+
+        println!(
+            "\n[BENCHMARK RESULT] Sherman-Morrison (d={}) P95 Decision + Update Latency over {} iterations: {} µs",
+            d, iterations, p95_us
+        );
     }
 
     #[test]
@@ -307,7 +568,7 @@ mod tests {
         let state = BanditProfileState::cold_start(4, 0.5);
         let x = vec![1.0f32; 4];
         // Cold-Start: θᵀx = 0, Varianzterm > 0 → Score > 0
-        let score = state.score(&x, 0.0, false);
+        let score = state.score(&x, 0.0, false).expect("valid score");
         assert!(
             score > 0.0,
             "Cold-Start Score muss durch Exploration > 0 sein"
@@ -318,7 +579,7 @@ mod tests {
     fn test_update_increases_theta_on_positive_reward() {
         let mut state = BanditProfileState::cold_start(2, 0.5);
         let x = vec![1.0f32, 0.0f32];
-        state.update(&x, 1.0, 0.0, false); // Success = 1.0
+        state.update(&x, 1.0, 0.0, false).expect("valid update"); // Success = 1.0
         assert!(
             state.theta[0] > 0.0,
             "θ[0] muss nach positivem Reward steigen"
@@ -330,8 +591,8 @@ mod tests {
     fn test_cloud_transport_penalty_reduces_score() {
         let state = BanditProfileState::cold_start(2, 0.5);
         let x = vec![1.0f32, 1.0f32];
-        let score_local = state.score(&x, 0.0, false);
-        let score_cloud = state.score(&x, 0.0, true);
+        let score_local = state.score(&x, 0.0, false).expect("valid score");
+        let score_cloud = state.score(&x, 0.0, true).expect("valid score");
         assert!(
             score_local > score_cloud,
             "Cloud-Transport-Penalty muss Score reduzieren"
@@ -394,8 +655,12 @@ mod tests {
 
         // Phase 1: 500 stationäre Schritte mit hohem Reward (1.0)
         for _ in 0..500 {
-            state_discounted.update(&x, 1.0, 0.0, false);
-            state_stiff.update(&x, 1.0, 0.0, false);
+            state_discounted
+                .update(&x, 1.0, 0.0, false)
+                .expect("valid update");
+            state_stiff
+                .update(&x, 1.0, 0.0, false)
+                .expect("valid update");
         }
 
         let theta_disc_peak = state_discounted.theta[0];
@@ -411,8 +676,12 @@ mod tests {
 
         // Phase 3: 100 Schritte nach Drift mit neuem negativem Reward / Misserfolg (-1.0)
         for _ in 0..100 {
-            state_discounted.update(&x, -1.0, 0.0, false);
-            state_stiff.update(&x, -1.0, 0.0, false);
+            state_discounted
+                .update(&x, -1.0, 0.0, false)
+                .expect("valid update");
+            state_stiff
+                .update(&x, -1.0, 0.0, false)
+                .expect("valid update");
         }
 
         let drop_discounted = theta_disc_peak - state_discounted.theta[0];

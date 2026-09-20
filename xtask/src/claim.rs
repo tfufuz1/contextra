@@ -14,6 +14,17 @@ use std::path::Path;
 
 use crate::find_root_dir;
 
+/// Globales Standard-Parallelitäts-Limit für gleichzeitig aktive Claims.
+pub const MAX_ACTIVE_CLAIMS: usize = 3;
+
+/// Ermittelt das globale Parallelitäts-Limit (konfigurierbar über MEMFUSE_MAX_ACTIVE_CLAIMS).
+pub fn get_max_active_claims() -> usize {
+    std::env::var("MEMFUSE_MAX_ACTIVE_CLAIMS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(MAX_ACTIVE_CLAIMS)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ClaimEntry {
     pub krate: String,
@@ -86,6 +97,27 @@ impl ClaimsDatabase {
             true
         })
     }
+
+    /// Zählt alle aktuell aktiven, nicht-abgelaufenen Claims über alle Crates hinweg.
+    pub fn count_active_claims(&self) -> usize {
+        let now = Utc::now();
+        self.claims
+            .iter()
+            .filter(|c| {
+                if !c.active {
+                    return false;
+                }
+                if let Some(exp) = &c.expires_at {
+                    if let Ok(exp_dt) = exp.parse::<chrono::DateTime<Utc>>() {
+                        if now > exp_dt {
+                            return false;
+                        }
+                    }
+                }
+                true
+            })
+            .count()
+    }
 }
 
 /// Prüft alle Claims in `.jules/claims.json` auf TTL-Ablauf.
@@ -141,11 +173,12 @@ pub fn run_release_local(args: &[String]) -> bool {
     let claims_path = root.join(".jules/claims.json");
     let mut db = ClaimsDatabase::load(&claims_path);
     let now_str = Utc::now().to_rfc3339();
+    let released_str = format!("{} [RELEASED]", now_str);
     let mut found = false;
     for entry in db.claims.iter_mut() {
         if entry.krate == krate && entry.active {
             entry.active = false;
-            entry.released_at = Some(now_str.clone());
+            entry.released_at = Some(released_str.clone());
             found = true;
         }
     }
@@ -234,6 +267,18 @@ fn run_claim_local(args: &[String]) -> bool {
                 krate, issue, current_session
             );
             return true;
+        }
+    }
+
+    let max_claims = get_max_active_claims();
+    let active_count = db.count_active_claims();
+    if active_count >= max_claims {
+        eprintln!(
+            "⚠️ KONFLIKT: Globales Parallelitäts-Limit von {} aktiven Claims überschritten (aktuell {} aktive Claims).",
+            max_claims, active_count
+        );
+        if !dry_run {
+            return false;
         }
     }
 
@@ -609,5 +654,116 @@ mod tests {
         assert_eq!(active.krate, "memfuse-active");
         assert!(active.active);
         assert!(active.released_at.is_none());
+    }
+
+    #[test]
+    fn test_count_active_claims() {
+        let mut db = ClaimsDatabase::default();
+        let future_exp = (Utc::now() + chrono::Duration::hours(2)).to_rfc3339();
+        let past_exp = (Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+
+        db.claims.push(ClaimEntry {
+            krate: "crate1".to_string(),
+            issue: "ISSUE-1".to_string(),
+            timestamp: Utc::now().to_rfc3339(),
+            session_id: "s1".to_string(),
+            active: true,
+            expires_at: Some(future_exp.clone()),
+            released_at: None,
+        });
+        db.claims.push(ClaimEntry {
+            krate: "crate2".to_string(),
+            issue: "ISSUE-2".to_string(),
+            timestamp: Utc::now().to_rfc3339(),
+            session_id: "s2".to_string(),
+            active: true,
+            expires_at: Some(future_exp.clone()),
+            released_at: None,
+        });
+        db.claims.push(ClaimEntry {
+            krate: "crate3".to_string(),
+            issue: "ISSUE-3".to_string(),
+            timestamp: Utc::now().to_rfc3339(),
+            session_id: "s3".to_string(),
+            active: false,
+            expires_at: Some(future_exp),
+            released_at: Some("2026-09-18T10:00:00Z [RELEASED]".to_string()),
+        });
+        db.claims.push(ClaimEntry {
+            krate: "crate4".to_string(),
+            issue: "ISSUE-4".to_string(),
+            timestamp: Utc::now().to_rfc3339(),
+            session_id: "s4".to_string(),
+            active: true,
+            expires_at: Some(past_exp),
+            released_at: None,
+        });
+
+        assert_eq!(db.count_active_claims(), 2);
+    }
+
+    #[test]
+    fn test_release_local_released_suffix() {
+        let dir = tempdir().unwrap();
+        let claims_path = dir.path().join(".jules/claims.json");
+        let mut db = ClaimsDatabase::default();
+        db.claims.push(ClaimEntry {
+            krate: "memfuse-test-explicit-release".to_string(),
+            issue: "REL-2".to_string(),
+            timestamp: Utc::now().to_rfc3339(),
+            session_id: "s1".to_string(),
+            active: true,
+            expires_at: Some((Utc::now() + chrono::Duration::hours(4)).to_rfc3339()),
+            released_at: None,
+        });
+        db.save(&claims_path).unwrap();
+
+        let now_str = Utc::now().to_rfc3339();
+        let released_str = format!("{} [RELEASED]", now_str);
+        for entry in db.claims.iter_mut() {
+            if entry.krate == "memfuse-test-explicit-release" && entry.active {
+                entry.active = false;
+                entry.released_at = Some(released_str.clone());
+            }
+        }
+        db.save(&claims_path).unwrap();
+
+        let loaded = ClaimsDatabase::load(&claims_path);
+        assert!(!loaded.claims[0].active);
+        assert!(loaded.claims[0]
+            .released_at
+            .as_ref()
+            .unwrap()
+            .contains("[RELEASED]"));
+    }
+
+    #[test]
+    fn test_run_claim_local_concurrency_limit_exceeded() {
+        std::env::set_var("MEMFUSE_MAX_ACTIVE_CLAIMS", "2");
+        let future_exp = (Utc::now() + chrono::Duration::hours(2)).to_rfc3339();
+        let mut db = ClaimsDatabase::default();
+        db.claims.push(ClaimEntry {
+            krate: "c1".to_string(),
+            issue: "I1".to_string(),
+            timestamp: Utc::now().to_rfc3339(),
+            session_id: "s1".to_string(),
+            active: true,
+            expires_at: Some(future_exp.clone()),
+            released_at: None,
+        });
+        db.claims.push(ClaimEntry {
+            krate: "c2".to_string(),
+            issue: "I2".to_string(),
+            timestamp: Utc::now().to_rfc3339(),
+            session_id: "s2".to_string(),
+            active: true,
+            expires_at: Some(future_exp),
+            released_at: None,
+        });
+
+        assert_eq!(db.count_active_claims(), 2);
+        assert_eq!(get_max_active_claims(), 2);
+
+        std::env::remove_var("MEMFUSE_MAX_ACTIVE_CLAIMS");
     }
 }

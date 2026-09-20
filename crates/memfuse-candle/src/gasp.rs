@@ -268,7 +268,7 @@ impl ResponseGroundingValidator for GaspValidator {
             .iter()
             .enumerate()
             .map(|(i, src)| ContextChunk {
-                doc_id: memfuse_core::DocId::new((i + 1) as u64),
+                doc_id: memfuse_core::DocId::from(i as u64 + 1),
                 content: src.to_string(),
                 relevance: 1.0,
                 token_count: 0,

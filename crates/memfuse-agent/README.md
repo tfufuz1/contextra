@@ -38,13 +38,13 @@ use std::sync::Arc;
 
 let db = Arc::new(MemFuse::open_with_config(path, config).await?);
 let state_col = db.collection("agent_state").await?;
-let mut ctx = AgentContext::new("task-100", "start", db.clone(), state_col, TokenBudget::new(1000, 0));
+let mut ctx = AgentContext::try_new("task-100", "start", db.clone(), state_col, TokenBudget::new(1000, 0))?;
 
 let mut graph = StateGraph::new();
-graph.add_node("start", "Start Node", NodeType::Start, None);
-graph.add_node("end", "End Node", NodeType::End, None);
-graph.add_edge("start", "end", None, 1);
+graph.try_add_node("start", "Start Node", NodeType::Start, None)?;
+graph.try_add_node("end", "End Node", NodeType::End, None)?;
+graph.try_add_edge("start", "end", None, 1)?;
 
-let engine = OrchestratorEngine::new(db.inner_storage());
+let engine = OrchestratorEngine::try_new(db.inner_storage())?;
 engine.run(&mut ctx, &graph).await?;
 ```

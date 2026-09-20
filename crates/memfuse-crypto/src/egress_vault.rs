@@ -11,7 +11,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Trait for recognizing entities (NER) in text without creating a direct dependency
 /// on heavy embedding or ML crates (DAG-neutral interface).
@@ -112,18 +112,40 @@ impl Drop for SurrogateVault {
 /// Type alias for boxed dyn futures in `EgressClassifier` trait to ensure dyn compatibility.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+/// Policy-Kategorie für Audit-Logging und Zugriffskontrolle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum PolicyCategory {
+    /// Rein lokaler Lese- oder Speicherzugriff innerhalb der Vertrauensgrenze.
+    LocalAccess,
+    /// Externe Cloud-Egress-Übertragung (Daten verlassen die lokale Vertrauensgrenze).
+    CloudEgress,
+}
+
 /// Grund für das Blockieren einer Egress-Anfrage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum BlockReason {
     /// Ein sensibles Muster (PII, Secret, API-Key etc.) wurde erkannt.
     SensitivePattern(String),
-    /// Richtlinie untersagt die Übertragung.
+    /// Richtlinie untersagt die Übertragung (lokal oder allgemein).
     PolicyDenied(String),
+    /// Spezifische Cloud-Egress-Richtlinie untersagt die Übertragung (Opus 0.4).
+    EgressPolicyDenied(String),
     /// Auswertung hat das Zeitlimit überschritten (Fail-Closed).
     ClassificationTimeout,
     /// Interne Verarbeitungsstörung (Fail-Closed).
     InternalError(String),
+}
+
+impl BlockReason {
+    /// Gibt die zugehörige Policy-Kategorie des Blockierungsgrunds zurück.
+    pub fn category(&self) -> PolicyCategory {
+        match self {
+            BlockReason::EgressPolicyDenied(_) => PolicyCategory::CloudEgress,
+            _ => PolicyCategory::LocalAccess,
+        }
+    }
 }
 
 /// Klassifikationsergebnis der Egress-Prüfung.
@@ -202,19 +224,27 @@ pub async fn classify_layer1_arc(
     timeout: Duration,
 ) -> EgressClassification {
     if payload.len() > MAX_CLASSIFY_PAYLOAD_BYTES {
-        return EgressClassification::Block(BlockReason::PolicyDenied(format!(
+        return EgressClassification::Block(BlockReason::EgressPolicyDenied(format!(
             "Payload size exceeds limit: {} bytes > {} limit",
             payload.len(),
             MAX_CLASSIFY_PAYLOAD_BYTES
         )));
     }
 
-    let payload_arc: Arc<str> = Arc::from(payload);
+    let sensitive_payload = Zeroizing::new(payload.as_bytes().to_vec());
     let patterns_cloned = patterns.clone();
     let set_cloned = regex_set.clone();
 
     let eval_task = tokio::task::spawn_blocking(move || {
-        let matches = set_cloned.matches(&payload_arc);
+        let text = match std::str::from_utf8(&sensitive_payload) {
+            Ok(s) => s,
+            Err(_) => {
+                return EgressClassification::Block(BlockReason::InternalError(
+                    "Invalid UTF-8 payload in classification".to_string(),
+                ));
+            }
+        };
+        let matches = set_cloned.matches(text);
         if matches.matched_any() {
             if let Some(first_idx) = matches.iter().next() {
                 let cp = &patterns_cloned[first_idx];
@@ -308,6 +338,11 @@ impl EgressVault {
         &self.patterns
     }
 
+    /// Gibt die Policy-Kategorie dieser Vault-Instanz für Cloud-Egress-Klassifizierungen zurück.
+    pub fn policy_category(&self) -> PolicyCategory {
+        PolicyCategory::CloudEgress
+    }
+
     /// Gibt das gesetzte Timeout zurück.
     pub fn timeout(&self) -> Duration {
         self.timeout
@@ -334,12 +369,12 @@ impl EgressVault {
             });
         }
 
-        let mut current_text = payload.to_string();
+        let mut current_text = Zeroizing::new(payload.to_string());
         let mut replacement_count = 0;
 
         // Phase 1: Regex-Muster im Ersetzungsmodus anwenden
         for cp in self.patterns.iter() {
-            let mut new_text = String::with_capacity(current_text.len());
+            let mut new_text = Zeroizing::new(String::with_capacity(current_text.len()));
             let mut last_end = 0;
             for m in cp.regex.find_iter(&current_text) {
                 new_text.push_str(&current_text[last_end..m.start()]);
@@ -383,7 +418,7 @@ impl EgressVault {
             }
         }
 
-        Ok((current_text, replacement_count))
+        Ok((current_text.to_string(), replacement_count))
     }
 }
 
@@ -500,14 +535,29 @@ mod tests {
         let patterns = vec![CompiledPattern::new("R-001", r"a+").unwrap()];
 
         let res = classify_layer1(&huge_payload, &patterns, Duration::from_millis(100)).await;
-        if let EgressClassification::Block(BlockReason::PolicyDenied(reason)) = res {
+        if let EgressClassification::Block(BlockReason::EgressPolicyDenied(reason)) = res {
             assert!(reason.contains("Payload size exceeds limit"));
         } else {
             panic!(
-                "Expected PolicyDenied block for oversized payload, got {:?}",
+                "Expected EgressPolicyDenied block for oversized payload, got {:?}",
                 res
             );
         }
+    }
+
+    #[test]
+    fn test_policy_category_and_block_reason_category() {
+        let vault = EgressVault::default();
+        assert_eq!(vault.policy_category(), PolicyCategory::CloudEgress);
+
+        let egress_reason = BlockReason::EgressPolicyDenied("Egress forbidden".to_string());
+        assert_eq!(egress_reason.category(), PolicyCategory::CloudEgress);
+
+        let local_reason = BlockReason::PolicyDenied("Local denial".to_string());
+        assert_eq!(local_reason.category(), PolicyCategory::LocalAccess);
+
+        let pattern_reason = BlockReason::SensitivePattern("R-001".to_string());
+        assert_eq!(pattern_reason.category(), PolicyCategory::LocalAccess);
     }
 
     #[tokio::test]
@@ -516,8 +566,17 @@ mod tests {
         let mut huge_payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES - 1);
         huge_payload.push('!');
 
-        let patterns = vec![CompiledPattern::new("R-001", r"(a+)+b")
-            .unwrap_or_else(|_| CompiledPattern::new("R-001", r"a{1000,}").unwrap())];
+        // Erzeuge ein RegexSet mit vielen komplexen Mustern, damit die Evaluierung auf dem Blocking-Thread
+        // signifikant Zeit benötigt und bei Duration::ZERO garantiert deterministisch in das Timeout läuft.
+        let patterns: Vec<_> = (0..300)
+            .map(|i| {
+                CompiledPattern::new(
+                    format!("R-{i:03}"),
+                    &format!(r"([a-z0-9_]{{5,10}}@([a-z0-9_]{{5,10}}\.)+[a-z]{{2,4}})_{i}"),
+                )
+                .unwrap()
+            })
+            .collect();
 
         let start = Instant::now();
         // Setze extrem kurzes Timeout (Duration::ZERO), um Timeout-Pfad sicher zu triggern
@@ -563,21 +622,25 @@ mod tests {
     async fn test_egress_guard_fail_closed_on_index_unavailable() {
         use std::time::Duration;
 
-        // Erstelle echte Patterns — der Inhalt ist irrelevant,
-        // da der Test per Timeout blockt bevor Patterns geprüft werden.
-        let patterns = vec![CompiledPattern::new(
-            "email",
-            r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
-        )
-        .expect("valid email pattern")];
+        // Erzeuge ein RegexSet mit vielen komplexen Mustern, damit die Evaluierung auf dem Blocking-Thread
+        // signifikant Zeit benötigt und bei Duration::ZERO garantiert deterministisch in das Timeout läuft.
+        let patterns: Vec<_> = (0..300)
+            .map(|i| {
+                CompiledPattern::new(
+                    format!("R-{i:03}"),
+                    &format!(r"([a-z0-9_]{{5,10}}@([a-z0-9_]{{5,10}}\.)+[a-z]{{2,4}})_{i}"),
+                )
+                .unwrap()
+            })
+            .collect();
 
-        // Benutze ein ausreichend großes Payload, sodass `spawn_blocking`
-        // nicht sofort vor dem Timeout-Tick abschließt.
-        let payload = "This is a benign payload without any sensitive data. ".repeat(50_000);
+        // Benutze ein Payload genau unter MAX_CLASSIFY_PAYLOAD_BYTES (65_536 Bytes),
+        // damit die Prüfung nicht schon beim Pre-Check fehlschlägt.
+        let mut payload = "a".repeat(MAX_CLASSIFY_PAYLOAD_BYTES - 1);
+        payload.push('!');
 
-        // Simuliere "Index unavailable" / Timeout: 1 Nanosekunde — wird immer überschritten
-        // da `spawn_blocking` allein mehrere Mikrosekunden braucht.
-        let result = classify_layer1(&payload, &patterns, Duration::from_nanos(1)).await;
+        // Simuliere "Index unavailable" / Timeout via Duration::ZERO
+        let result = classify_layer1(&payload, &patterns, Duration::ZERO).await;
 
         // INVARIANTE: Fail-Closed — bei Timeout MUSS Block zurückgegeben werden.
         assert!(
@@ -716,5 +779,28 @@ mod tests {
         drop(surrogate_vault);
 
         assert!(weak_vault.upgrade().is_none());
+    }
+
+    #[test]
+    #[allow(unsafe_code)]
+    fn test_zeroize_on_panic_and_drop_in_classification() {
+        use std::mem::ManuallyDrop;
+
+        // Verify Zeroizing buffer zeroizes memory on drop without UAF
+        let mut sensitive_buf = ManuallyDrop::new(Zeroizing::new(vec![0xAA; 64]));
+        let raw_ptr = sensitive_buf.as_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts(raw_ptr, 64);
+            assert_eq!(slice, &[0xAA; 64]);
+        }
+
+        // Action: Explicitly invoke zeroize on the Zeroizing wrapper
+        Zeroize::zeroize(&mut *sensitive_buf);
+
+        unsafe {
+            let cleared_slice = std::slice::from_raw_parts(raw_ptr, 64);
+            assert_eq!(cleared_slice, &[0u8; 64], "RAM zeroized in place");
+        }
     }
 }

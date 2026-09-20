@@ -1,5 +1,5 @@
-[lints.rust]
-unsafe_code = "forbid"
+[lints]
+workspace = true
 
 [package]
 name = "memfuse-core"
@@ -37,7 +37,7 @@ futures-util = "0.3"
 bytes = { workspace = true }
 # Zero-copy IPC serialization support.
 flatbuffers = { workspace = true }
-memfuse-core-ipc-gen = { workspace = true }
+memfuse-wire = { workspace = true }
 
 [dev-dependencies]
 # Async runtime for executing async unit tests.

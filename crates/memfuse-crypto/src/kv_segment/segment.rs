@@ -204,6 +204,7 @@ mod tests {
     use std::mem::ManuallyDrop;
 
     #[test]
+    #[allow(unsafe_code)]
     fn test_kv_segment_zeroize_on_drop() {
         let tenant = TenantId::try_new(1).unwrap();
         let data = vec![0xAAu8; 1024];

@@ -40,11 +40,15 @@ use aes_gcm_siv::{
 use hkdf::Hkdf;
 use rand::RngCore;
 use sha2::Sha256;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 
 /// Manager for encryption keys and block encryption.
 pub struct KeyManager {
     key: VolatileEncryptionKey,
+    cipher_cache: OnceLock<Aes256GcmSiv>,
     nonce_prefix: [u8; 4],
+    nonce_counter: AtomicU64,
 }
 
 impl std::fmt::Debug for KeyManager {
@@ -80,12 +84,19 @@ impl KeyManager {
         hk.expand(b"memfuse-aes-256-gcm-key", &mut key_raw)
             .map_err(|e| CryptoError::Crypto(format!("HKDF expansion failed: {}", e)))?;
 
+        let cipher = Aes256GcmSiv::new_from_slice(&key_raw)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+        let cipher_cache = OnceLock::new();
+        let _ = cipher_cache.set(cipher);
+
         let mut nonce_prefix = [0u8; 4];
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(key_raw),
+            cipher_cache,
             nonce_prefix,
+            nonce_counter: AtomicU64::new(1),
         })
     }
 
@@ -128,12 +139,19 @@ impl KeyManager {
         hk.expand(&info, &mut sub_key)
             .map_err(|e| CryptoError::Crypto(format!("HKDF sub-key expansion failed: {}", e)))?;
 
+        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+        let cipher_cache = OnceLock::new();
+        let _ = cipher_cache.set(cipher);
+
         let mut nonce_prefix = [0u8; 4];
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
+            cipher_cache,
             nonce_prefix,
+            nonce_counter: AtomicU64::new(1),
         })
     }
 
@@ -147,12 +165,19 @@ impl KeyManager {
             CryptoError::Crypto(format!("HKDF segment key expansion failed: {}", e))
         })?;
 
+        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+        let cipher_cache = OnceLock::new();
+        let _ = cipher_cache.set(cipher);
+
         let mut nonce_prefix = [0u8; 4];
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
+            cipher_cache,
             nonce_prefix,
+            nonce_counter: AtomicU64::new(1),
         })
     }
 
@@ -198,12 +223,19 @@ impl KeyManager {
         hk.expand(&info, &mut sub_key)
             .map_err(|e| CryptoError::Crypto(format!("HKDF KV sub-key expansion failed: {}", e)))?;
 
+        let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+        let cipher_cache = OnceLock::new();
+        let _ = cipher_cache.set(cipher);
+
         let mut nonce_prefix = [0u8; 4];
         rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
 
         Ok(Self {
             key: VolatileEncryptionKey::new(sub_key),
+            cipher_cache,
             nonce_prefix,
+            nonce_counter: AtomicU64::new(1),
         })
     }
 
@@ -228,27 +260,28 @@ impl KeyManager {
         Ok(key)
     }
 
-    /// Encrypts a block of data with an automatically generated random nonce.
+    /// Internal accessor for instance-bound cached AES-256-GCM-SIV cipher.
+    fn cipher(&self) -> Result<&Aes256GcmSiv> {
+        if let Some(c) = self.cipher_cache.get() {
+            return Ok(c);
+        }
+        let cipher = Aes256GcmSiv::new_from_slice(self.key.as_bytes())
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+        let _ = self.cipher_cache.set(cipher);
+        self.cipher_cache.get().ok_or_else(|| {
+            CryptoError::Crypto("Failed to retrieve cached Aes256GcmSiv cipher".to_string())
+        })
+    }
+
+    /// Encrypts a block of data with a deterministically generated 12-byte nonce.
     /// Returns the ciphertext and the full 12-byte nonce used.
     pub fn encrypt_auto_nonce(&self, data: &[u8]) -> Result<(Vec<u8>, [u8; 12])> {
-        // AES-256-GCM-SIV: nonce-reuse-resistant (RFC 8452). Ciphertext-Integrität
-        // bleibt auch bei versehentlicher Nonce-Wiederverwendung gewahrt, anders
-        // als bei AES-GCM das bei Nonce-Reuse den Auth-Key leakt.
+        let counter_val = self.nonce_counter.fetch_add(1, Ordering::Relaxed);
         let mut nonce_bytes = [0u8; 12];
         nonce_bytes[0..4].copy_from_slice(&self.nonce_prefix);
-        // SAFETY: Fresh 8-byte random suffix generated per call via OsRng avoids atomic counter persistence requirements.
-        // Nonce-Kollisionswahrscheinlichkeit (Birthday Bound):
-        // Bei 8 zufälligen Suffix-Bytes (64 Bit Zufallsraum) liegt die Anzahl an
-        // Nachrichten, ab der die Kollisionswahrscheinlichkeit relevant wird
-        // (P ≈ 2^-32), bei ungefähr 2^16,5 Nachrichten — NICHT bei 2^32, wie zuvor
-        // fälschlich hier dokumentiert. Praktisch stellt dies dennoch KEIN
-        // Sicherheitsrisiko dar, da AES-256-GCM-SIV explizit nonce-misuse-resistant
-        // konstruiert ist: eine Nonce-Kollision leakt hierbei keinen Authentifizierungs-
-        // schlüssel, sondern lediglich Wiederholungs-Metadaten (Repeat-Detection).
-        rand::rngs::OsRng.fill_bytes(&mut nonce_bytes[4..12]);
+        nonce_bytes[4..12].copy_from_slice(&counter_val.to_be_bytes());
 
-        let cipher = Aes256GcmSiv::new_from_slice(self.key.as_bytes())
-            .map_err(|e| CryptoError::Crypto(format!("Crypto error: {}", e)))?;
+        let cipher = self.cipher()?;
         let nonce = Nonce::from_slice(&nonce_bytes);
         let ciphertext = cipher
             .encrypt(nonce, data)
@@ -259,17 +292,18 @@ impl KeyManager {
 
     /// Decrypts a block of data using a full 12-byte nonce.
     pub fn decrypt_auto_nonce(&self, ciphertext: &[u8], nonce_bytes: &[u8; 12]) -> Result<Vec<u8>> {
-        let cipher = Aes256GcmSiv::new_from_slice(self.key.as_bytes())
-            .map_err(|e| CryptoError::Crypto(format!("Crypto error: {}", e)))?;
+        let cipher = self.cipher()?;
         let nonce = Nonce::from_slice(nonce_bytes);
         cipher
             .decrypt(nonce, ciphertext)
             .map_err(|e| CryptoError::Crypto(format!("Decryption failed: {}", e)))
     }
 
-    /// Emergency Trigger: Explicitly wipes the key from memory.
+    /// Emergency Trigger: Explicitly wipes the key from memory and clears cipher cache.
     pub fn emergency_wipe(&mut self) {
         self.key.emergency_wipe();
+        self.cipher_cache.take();
+        self.nonce_counter.store(0, Ordering::SeqCst);
     }
 
     /// Provides access to the key bytes ONLY during testing.

@@ -30,6 +30,10 @@ impl AgentTool for HeavyTokenTool {
         &self.name
     }
 
+    fn estimated_cost(&self, _input: &serde_json::Value) -> usize {
+        self.tokens
+    }
+
     fn execute<'a>(
         &'a self,
         _ctx: &'a AgentContext,
@@ -58,7 +62,7 @@ async fn setup_env(
     };
     let db = Arc::new(MemFuse::open_with_config(tmp_dir.path(), config).await?);
     let state_col = db.collection("agent_state").await?;
-    let engine = OrchestratorEngine::from_db(&db);
+    let engine = OrchestratorEngine::try_from_db(&db).expect("engine try_from_db");
     let ctx = AgentContext::try_new(
         "task-race-1",
         "start",
@@ -104,6 +108,55 @@ async fn test_sequential_workflow_budget_check() -> Result<()> {
         }
         Ok(_) => unreachable!(),
     }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_failed_step_raii_drop_refunds_tokens() -> Result<()> {
+    struct FailingTool;
+    impl AgentTool for FailingTool {
+        fn name(&self) -> &str {
+            "failing_tool"
+        }
+        fn estimated_cost(&self, _input: &serde_json::Value) -> usize {
+            100
+        }
+        fn execute<'a>(
+            &'a self,
+            _ctx: &'a AgentContext,
+            _input: serde_json::Value,
+        ) -> BoxFuture<'a, Result<StepResult>> {
+            Box::pin(async move {
+                Err(memfuse_core::MemFuseError::Internal(
+                    "Simulated tool error".into(),
+                ))
+            })
+        }
+    }
+
+    let (mut engine, _db, mut ctx, _tmp) = setup_env(200).await?;
+
+    let mut graph = StateGraph::new();
+    graph.try_add_node("start", "Start Node", NodeType::Start, None)?;
+    graph.try_add_node("step_1", "Step 1", NodeType::Task, Some("failing_tool"))?;
+    graph.try_add_node("end", "End Node", NodeType::End, None)?;
+
+    graph.try_add_edge("start", "step_1", None, 1)?;
+    graph.try_add_edge("step_1", "end", None, 1)?;
+
+    engine.try_register_tool(Box::new(FailingTool))?;
+
+    assert_eq!(ctx.budget.consumed(), 0);
+    let res = engine.run(&mut ctx, &graph).await;
+    assert!(res.is_err());
+
+    // After step failure, RAII reservation dropped without settle(), so consumed tokens must be 0!
+    assert_eq!(
+        ctx.budget.consumed(),
+        0,
+        "Reserved tokens should be automatically refunded via RAII Drop on execution failure"
+    );
 
     Ok(())
 }
@@ -226,7 +279,7 @@ async fn test_atomic_budget_reservation_concurrency_stress() -> Result<()> {
             handles.push(tokio::spawn(async move {
                 // ATOMIC CHECK-AND-RESERVE via TokenBudget::try_reserve before tool execution
                 let reserved = {
-                    let mut guard = budget_ref.lock().await;
+                    let guard = budget_ref.lock().await;
                     let est = tool.estimated_cost(&serde_json::Value::Null);
                     guard.try_reserve(est).is_ok()
                 };

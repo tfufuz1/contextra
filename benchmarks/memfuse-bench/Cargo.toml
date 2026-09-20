@@ -28,8 +28,8 @@ memfuse-store = { workspace = true }
 memfuse-index = { workspace = true }
 memfuse-text = { workspace = true }
 memfuse-graph = { workspace = true }
-memfuse-db = { workspace = true, features = ["reranking"] }
-memfuse-embed = { workspace = true, features = ["onnx"] }
+memfuse-db = { workspace = true }
+memfuse-embed = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -43,3 +43,4 @@ rand = { workspace = true }
 [features]
 default = []
 external-benchmarks = []
+onnx-bench = ["memfuse-embed/onnx", "memfuse-db/reranking"]

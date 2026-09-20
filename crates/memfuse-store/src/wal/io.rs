@@ -236,9 +236,13 @@ where
                 let (op_type, key, value) = match &entry.op {
                     WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                     WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+<<<<<<< HEAD
+                    WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
+=======
                     WalOp::TxEnd { committed, .. } => {
                         (2u8, vec![if *committed { 1u8 } else { 0u8 }], Vec::new())
                     }
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
                 };
 
                 let snapshot = WalEntrySnapshot {
@@ -355,9 +359,13 @@ where
             let (op_type, key, value) = match &entry.op {
                 WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                 WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+<<<<<<< HEAD
+                WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
+=======
                 WalOp::TxEnd { committed, .. } => {
                     (2u8, vec![if *committed { 1u8 } else { 0u8 }], Vec::new())
                 }
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             };
 
             let snapshot = WalEntrySnapshot {
@@ -515,7 +523,119 @@ impl Wal {
             last_hmac_val,
             ack: ack_tx,
         })
+        .await
         .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
+
+        ack_rx
+            .await
+            .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
+        Ok(())
+    }
+
+    /// Non-blocking attempt to append a prepared batch. Returns `Err(MemFuseError::Storage("WAL queue full (backpressure)"))`
+    /// if the flusher channel buffer is full.
+    pub async fn try_append_batch(&self, batch: PreparedBatch) -> Result<()> {
+        let truncate_guard = self.truncate_lock.lock().await;
+        self.try_append_batch_locked(batch, &truncate_guard).await
+    }
+
+    pub async fn try_append_batch_locked(
+        &self,
+        batch: PreparedBatch,
+        _guard: &tokio::sync::MutexGuard<'_, ()>,
+    ) -> Result<()> {
+        if self.is_sealed() {
+            return Err(MemFuseError::Storage(format!(
+                "Cannot append to sealed WAL segment {}",
+                self.path.display()
+            )));
+        }
+
+        let entries = &batch.0;
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        #[cfg(feature = "fault-injection")]
+        {
+            let fail_tx = FAIL_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
+            if fail_tx != 0
+                && entries
+                    .iter()
+                    .any(|e| e.tx_id().inner() == fail_tx || fail_tx == u64::MAX)
+            {
+                FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
+                return Err(MemFuseError::Storage(
+                    "Simulated WAL append_batch I/O failure via fault injection".into(),
+                ));
+            }
+
+            let delay_tx = DELAY_APPEND_FOR_TX.load(std::sync::atomic::Ordering::SeqCst);
+            if delay_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == delay_tx) {
+                let delay_ms = DELAY_APPEND_MS.load(std::sync::atomic::Ordering::SeqCst);
+                DELAY_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
+                if delay_ms > 0 {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                }
+            }
+        }
+
+        let estimated_size = entries.len() * 256;
+        let mut payload_bytes = Vec::with_capacity(estimated_size);
+        let mut last_hmac_val = [0u8; 32];
+
+        if let Some(km) = &self.key_manager {
+            let mut batch_plaintext = Vec::with_capacity(estimated_size);
+            for entry in entries {
+                let bytes = entry.to_bytes()?;
+                batch_plaintext.extend_from_slice(&bytes);
+                last_hmac_val = entry.checksum;
+            }
+
+            let km_clone = Arc::clone(km);
+            let encrypted_result =
+                tokio::task::spawn_blocking(move || km_clone.encrypt_auto_nonce(&batch_plaintext))
+                    .await
+                    .map_err(|e| {
+                        MemFuseError::Storage(format!("WAL encryption task panicked: {e}"))
+                    })?;
+
+            let (encrypted, nonce) = encrypted_result?;
+            let chunk_len = (12 + encrypted.len()) as u32;
+
+            payload_bytes.extend_from_slice(&chunk_len.to_le_bytes());
+            payload_bytes.extend_from_slice(&nonce);
+            payload_bytes.extend_from_slice(&encrypted);
+        } else {
+            for entry in entries {
+                let bytes = entry.to_bytes()?;
+                payload_bytes.extend_from_slice(&bytes);
+                last_hmac_val = entry.checksum;
+            }
+        }
+
+        let flusher_tx = {
+            let guard = self.flusher_tx.read().unwrap_or_else(|e| e.into_inner());
+            guard.clone()
+        };
+
+        let tx = flusher_tx
+            .ok_or_else(|| MemFuseError::Storage("WAL flusher actor is not enabled".into()))?;
+
+        let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+        tx.try_send(WalCommand::Append {
+            payload: payload_bytes,
+            last_hmac_val,
+            ack: ack_tx,
+        })
+        .map_err(|e| match e {
+            tokio::sync::mpsc::error::TrySendError::Full(_) => {
+                MemFuseError::Storage("WAL queue full (backpressure)".into())
+            }
+            tokio::sync::mpsc::error::TrySendError::Closed(_) => {
+                MemFuseError::Storage("WAL flusher channel closed".into())
+            }
+        })?;
 
         ack_rx
             .await
@@ -562,6 +682,7 @@ impl Wal {
             item_tx,
             ack: ack_tx,
         })
+        .await
         .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
 
         let mut stopped = false;
@@ -599,6 +720,7 @@ impl Wal {
             integrity_key,
             ack: ack_tx,
         })
+        .await
         .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
 
         ack_rx
@@ -631,6 +753,7 @@ impl Wal {
             new_last_hmac,
             ack: ack_tx,
         })
+        .await
         .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
 
         ack_rx.await.map_err(|_| {
@@ -656,6 +779,7 @@ impl Wal {
 
         let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
         tx.send(WalCommand::Seal { ack: ack_tx })
+            .await
             .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
 
         let sealed_path = ack_rx
@@ -713,134 +837,7 @@ impl Wal {
     }
 }
 
-#[cfg(windows)]
-#[allow(unsafe_code, dead_code)]
-pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-    use std::ptr::null_mut;
-    use windows_sys::Win32::Foundation::{
-        CloseHandle, GetLastError, ERROR_SUCCESS, GENERIC_ALL, HANDLE,
-    };
-    use windows_sys::Win32::Security::Authorization::{SetNamedSecurityInfoW, SE_FILE_OBJECT};
-    use windows_sys::Win32::Security::{
-        AddAccessAllowedAce, GetLengthSid, GetTokenInformation, InitializeAcl, TokenUser,
-        ACCESS_ALLOWED_ACE, ACL, ACL_REVISION, DACL_SECURITY_INFORMATION,
-        PROTECTED_DACL_SECURITY_INFORMATION, TOKEN_QUERY, TOKEN_USER,
-    };
-    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
-
-    let mut token_handle: HANDLE = std::ptr::null_mut();
-    let res = unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle) };
-    if res == 0 {
-        let err = unsafe { GetLastError() };
-        return Err(MemFuseError::Storage(format!(
-            "Failed to open process token for ACL restriction: Win32 error {}",
-            err
-        )));
-    }
-
-    struct TokenGuard(HANDLE);
-    impl Drop for TokenGuard {
-        fn drop(&mut self) {
-            if !self.0.is_null() {
-                unsafe { CloseHandle(self.0) };
-            }
-        }
-    }
-    let _guard = TokenGuard(token_handle);
-
-    let mut len = 0u32;
-    unsafe {
-        GetTokenInformation(token_handle, TokenUser, null_mut(), 0, &mut len);
-    }
-
-    if len == 0 {
-        return Err(MemFuseError::Storage(
-            "GetTokenInformation returned 0 buffer length for TokenUser".into(),
-        ));
-    }
-
-    let mut buffer = vec![0u8; len as usize];
-    let res = unsafe {
-        GetTokenInformation(
-            token_handle,
-            TokenUser,
-            buffer.as_mut_ptr().cast(),
-            len,
-            &mut len,
-        )
-    };
-    if res == 0 {
-        let err = unsafe { GetLastError() };
-        return Err(MemFuseError::Storage(format!(
-            "Failed to retrieve process owner SID: Win32 error {}",
-            err
-        )));
-    }
-
-    let token_user = buffer.as_ptr() as *const TOKEN_USER;
-    let owner_sid = unsafe { (*token_user).User.Sid };
-    if owner_sid.is_null() {
-        return Err(MemFuseError::Storage(
-            "Retrieved null owner SID from process token".into(),
-        ));
-    }
-
-    let sid_len = unsafe { GetLengthSid(owner_sid) };
-    let acl_size =
-        std::mem::size_of::<ACL>() + std::mem::size_of::<ACCESS_ALLOWED_ACE>() + sid_len as usize;
-
-    let mut acl_buf = vec![0u8; acl_size];
-    let p_acl = acl_buf.as_mut_ptr() as *mut ACL;
-
-    if unsafe { InitializeAcl(p_acl, acl_size as u32, ACL_REVISION) } == 0 {
-        let err = unsafe { GetLastError() };
-        return Err(MemFuseError::Storage(format!(
-            "Failed to initialize ACL: Win32 error {}",
-            err
-        )));
-    }
-
-    if unsafe { AddAccessAllowedAce(p_acl, ACL_REVISION, GENERIC_ALL, owner_sid) } == 0 {
-        let err = unsafe { GetLastError() };
-        return Err(MemFuseError::Storage(format!(
-            "Failed to add ACE to ACL: Win32 error {}",
-            err
-        )));
-    }
-
-    let path_wide: Vec<u16> = path
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-
-    let status = unsafe {
-        SetNamedSecurityInfoW(
-            path_wide.as_ptr() as *mut _,
-            SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-            null_mut(),
-            null_mut(),
-            p_acl,
-            null_mut(),
-        )
-    };
-
-    if status != ERROR_SUCCESS {
-        return Err(MemFuseError::Storage(format!(
-            "SetNamedSecurityInfoW failed for {} with Win32 error code {}",
-            path.display(),
-            status
-        )));
-    }
-
-    Ok(())
-}
-
-#[cfg(not(windows))]
 #[allow(dead_code)]
 pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
-    let _ = path;
-    Ok(())
+    memfuse_sys::set_restrictive_file_acl(path).map_err(|e| MemFuseError::Storage(e.to_string()))
 }

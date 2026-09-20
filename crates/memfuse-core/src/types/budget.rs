@@ -18,6 +18,7 @@
 
 use crate::error::{MemFuseError, Result};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// Strategie für Token-Budget-Management.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -32,7 +33,7 @@ pub enum BudgetStrategy {
 }
 
 /// Token budget configuration for LLM context management.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct TokenBudget {
     /// Maximum total token limit.
     pub limit: usize,
@@ -41,7 +42,81 @@ pub struct TokenBudget {
     /// Reserved tokens for system prompt and generated answer.
     pub reserved: usize,
     /// Currently consumed tokens.
-    consumed: usize,
+    consumed: AtomicUsize,
+}
+
+impl Clone for TokenBudget {
+    fn clone(&self) -> Self {
+        Self {
+            limit: self.limit,
+            strategy: self.strategy.clone(),
+            reserved: self.reserved,
+            consumed: AtomicUsize::new(self.consumed.load(Ordering::Acquire)),
+        }
+    }
+}
+
+impl PartialEq for TokenBudget {
+    fn eq(&self, other: &Self) -> bool {
+        self.limit == other.limit
+            && self.strategy == other.strategy
+            && self.reserved == other.reserved
+            && self.consumed.load(Ordering::Acquire) == other.consumed.load(Ordering::Acquire)
+    }
+}
+
+impl Serialize for TokenBudget {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct TokenBudgetSer<'a> {
+            limit: usize,
+            strategy: &'a BudgetStrategy,
+            reserved: usize,
+            consumed: usize,
+        }
+
+        let helper = TokenBudgetSer {
+            limit: self.limit,
+            strategy: &self.strategy,
+            reserved: self.reserved,
+            consumed: self.consumed.load(Ordering::Acquire),
+        };
+        helper.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for TokenBudget {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct TokenBudgetDe {
+            limit: usize,
+            strategy: BudgetStrategy,
+            reserved: usize,
+            consumed: usize,
+        }
+
+        let helper = TokenBudgetDe::deserialize(deserializer)?;
+        Ok(Self {
+            limit: helper.limit,
+            strategy: helper.strategy,
+            reserved: helper.reserved,
+            consumed: AtomicUsize::new(helper.consumed),
+        })
+    }
+}
+
+/// RAII reservation structure for guaranteed atomicity & drop-refund against double-spend.
+#[derive(Debug)]
+pub struct Reservation<'a> {
+    budget: &'a TokenBudget,
+    amount: usize,
+    settled: AtomicBool,
 }
 
 impl TokenBudget {
@@ -51,7 +126,7 @@ impl TokenBudget {
             limit: max_tokens,
             strategy: BudgetStrategy::Exact(max_tokens),
             reserved: reserve_tokens,
-            consumed: 0,
+            consumed: AtomicUsize::new(0),
         }
     }
 
@@ -82,7 +157,7 @@ impl TokenBudget {
             limit,
             strategy: BudgetStrategy::Conservative,
             reserved: 0,
-            consumed: 0,
+            consumed: AtomicUsize::new(0),
         }
     }
 
@@ -111,18 +186,65 @@ impl TokenBudget {
     pub fn available(&self) -> usize {
         self.effective_limit()
             .saturating_sub(self.reserved)
-            .saturating_sub(self.consumed)
+            .saturating_sub(self.consumed.load(Ordering::Acquire))
     }
 
     /// Records `tokens` as consumed, reducing future availability.
-    pub fn consume(&mut self, tokens: usize) {
-        self.consumed = self.consumed.saturating_add(tokens);
+    pub fn consume(&self, tokens: usize) {
+        loop {
+            let current = self.consumed.load(Ordering::Acquire);
+            let next = current.saturating_add(tokens);
+            if self
+                .consumed
+                .compare_exchange_weak(current, next, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                break;
+            }
+        }
+    }
+
+    /// Reserviert `amount` Tokens atomar. Schlägt fehl, wenn das verfügbare Budget
+    /// (limit - reserved - consumed) unterschritten würde.
+    pub fn reserve(&self, amount: usize) -> Result<Reservation<'_>> {
+        loop {
+            let current_consumed = self.consumed.load(Ordering::Acquire);
+            let effective = self.effective_limit();
+            let avail = effective
+                .saturating_sub(self.reserved)
+                .saturating_sub(current_consumed);
+
+            if avail == 0 || avail < amount {
+                return Err(MemFuseError::Internal(format!(
+                    "Token budget exhausted before step execution (available: {}, required: {})",
+                    avail, amount
+                )));
+            }
+
+            let next_consumed = current_consumed.saturating_add(amount);
+            if self
+                .consumed
+                .compare_exchange_weak(
+                    current_consumed,
+                    next_consumed,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                )
+                .is_ok()
+            {
+                return Ok(Reservation {
+                    budget: self,
+                    amount,
+                    settled: AtomicBool::new(false),
+                });
+            }
+        }
     }
 
     /// Tries to reserve `tokens` from the available budget before step execution.
     ///
     /// Returns `Err(MemFuseError::Internal(...))` if available budget is 0 or less than `tokens`.
-    pub fn try_reserve(&mut self, tokens: usize) -> Result<()> {
+    pub fn try_reserve(&self, tokens: usize) -> Result<()> {
         let avail = self.available();
         if avail == 0 || avail < tokens {
             return Err(MemFuseError::Internal(format!(
@@ -135,13 +257,55 @@ impl TokenBudget {
     }
 
     /// Refunds `tokens` back to the available budget if execution fails or consumes less than estimated.
-    pub fn refund(&mut self, tokens: usize) {
-        self.consumed = self.consumed.saturating_sub(tokens);
+    pub fn refund(&self, tokens: usize) {
+        loop {
+            let current = self.consumed.load(Ordering::Acquire);
+            let next = current.saturating_sub(tokens);
+            if self
+                .consumed
+                .compare_exchange_weak(current, next, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                break;
+            }
+        }
     }
 
     /// Returns total tokens consumed so far.
     pub fn consumed(&self) -> usize {
-        self.consumed
+        self.consumed.load(Ordering::Acquire)
+    }
+}
+
+impl<'a> Reservation<'a> {
+    /// Bestätigt den Verbrauch endgültig. Nach `settle()` erfolgt bei Drop KEINE Rückerstattung mehr.
+    ///
+    /// # Compile-time Duplicate Call Prevention
+    /// `settle(self)` consumes `self` by value. A second `settle()` call on the same reservation instance
+    /// is compile-time impossible due to Rust ownership transfer semantics.
+    pub fn settle(self) {
+        self.settled.store(true, Ordering::Release);
+    }
+}
+
+impl<'a> Drop for Reservation<'a> {
+    /// Falls NICHT `settle()` aufgerufen meinte (z. B. wegen eines vorzeitigen `?`-Returns
+    /// im Aufrufer), wird die reservierte Menge garantiert und atomar zurückerstattet.
+    fn drop(&mut self) {
+        if !self.settled.load(Ordering::Acquire) {
+            loop {
+                let current = self.budget.consumed.load(Ordering::Acquire);
+                let next = current.saturating_sub(self.amount);
+                if self
+                    .budget
+                    .consumed
+                    .compare_exchange_weak(current, next, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -151,7 +315,7 @@ impl Default for TokenBudget {
             limit: 8192,
             strategy: BudgetStrategy::Conservative,
             reserved: 512,
-            consumed: 0,
+            consumed: AtomicUsize::new(0),
         }
     }
 }
@@ -420,7 +584,7 @@ mod tests {
         let default_b = TokenBudget::default();
         assert_eq!(default_b.limit, 8192);
         assert_eq!(default_b.reserved, 512);
-        assert_eq!(default_b.consumed, 0);
+        assert_eq!(default_b.consumed(), 0);
 
         // Unknown model string falls back to 8192
         let unknown_b = TokenBudget::for_model("custom-llm-v1");
@@ -433,7 +597,7 @@ mod tests {
             limit: 10_000,
             strategy: BudgetStrategy::Aggressive,
             reserved: 500,
-            consumed: 100,
+            consumed: AtomicUsize::new(100),
         };
         // 95% of 10_000 = 9500
         assert_eq!(b.effective_limit(), 9500);
@@ -443,5 +607,84 @@ mod tests {
         let b_exact = b.with_strategy(BudgetStrategy::Exact(4000));
         assert_eq!(b_exact.effective_limit(), 4000);
         assert_eq!(b_exact.available(), 3400);
+    }
+
+    #[test]
+    fn test_reservation_successful_settle() {
+        let budget = TokenBudget::new(1000, 100);
+        assert_eq!(budget.available(), 900);
+
+        let reservation = budget.reserve(200).expect("reservation should succeed");
+        assert_eq!(budget.available(), 700);
+        assert_eq!(budget.consumed(), 200);
+
+        reservation.settle();
+        assert_eq!(budget.available(), 700);
+        assert_eq!(budget.consumed(), 200);
+    }
+
+    #[test]
+    fn test_reservation_drop_refund() {
+        let budget = TokenBudget::new(1000, 100);
+        assert_eq!(budget.available(), 900);
+
+        {
+            let _res = budget.reserve(300).expect("reservation should succeed");
+            assert_eq!(budget.available(), 600);
+            assert_eq!(budget.consumed(), 300);
+            // Drop without settle()
+        }
+
+        assert_eq!(budget.available(), 900);
+        assert_eq!(budget.consumed(), 0);
+    }
+
+    #[test]
+    fn test_reservation_over_budget_leaves_consumed_unchanged() {
+        let budget = TokenBudget::new(1000, 100);
+        assert_eq!(budget.available(), 900);
+
+        let res = budget.reserve(950);
+        assert!(res.is_err());
+        assert_eq!(budget.available(), 900);
+        assert_eq!(budget.consumed(), 0);
+    }
+
+    #[test]
+    fn test_reservation_concurrent_double_spend() {
+        let budget = TokenBudget::new(1000, 100);
+        // Available: 900
+        let req_amount = 600; // Two concurrent requests for 600 will total 1200 > 900
+
+        let (success_count, fail_count) = std::thread::scope(|s| {
+            let t1 = s.spawn(|| budget.reserve(req_amount));
+            let t2 = s.spawn(|| budget.reserve(req_amount));
+
+            let res1 = t1.join().unwrap(); // unwrap
+            let res2 = t2.join().unwrap(); // unwrap
+
+            let mut succ = 0;
+            let mut fail = 0;
+
+            if let Ok(r1) = res1 {
+                r1.settle();
+                succ += 1;
+            } else {
+                fail += 1;
+            }
+
+            if let Ok(r2) = res2 {
+                r2.settle();
+                succ += 1;
+            } else {
+                fail += 1;
+            }
+
+            (succ, fail)
+        });
+
+        assert_eq!(success_count, 1);
+        assert_eq!(fail_count, 1);
+        assert_eq!(budget.consumed(), 600);
     }
 }

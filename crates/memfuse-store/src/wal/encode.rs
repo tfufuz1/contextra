@@ -13,7 +13,11 @@ pub enum WalOp {
     },
     /// Deletes a key.
     Delete { tx_id: TxId, key: Vec<u8> },
+<<<<<<< HEAD
+    /// Transaction outcome marker (committed / aborted).
+=======
     /// Marks transaction outcome (committed/aborted) for repair-on-open recovery.
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
     TxEnd { tx_id: TxId, committed: bool },
 }
 
@@ -142,9 +146,13 @@ impl WalEntry {
             }
             WalOp::TxEnd { committed, .. } => {
                 mac.update(&[2u8]); // op type
+<<<<<<< HEAD
+                mac.update(&[*committed as u8]);
+=======
                 let flag = [if *committed { 1u8 } else { 0u8 }];
                 mac.update(&(flag.len() as u32).to_le_bytes());
                 mac.update(&flag);
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             }
         }
         Ok(mac.finalize())
@@ -173,7 +181,11 @@ impl WalEntry {
             }
             WalOp::TxEnd { committed, .. } => {
                 mac.update(&[2u8]);
+<<<<<<< HEAD
+                mac.update(&[*committed as u8]);
+=======
                 mac.update(&[if *committed { 1u8 } else { 0u8 }]);
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             }
         }
         Ok(mac.finalize())
@@ -242,7 +254,11 @@ impl WalEntry {
             WalOp::TxEnd { tx_id, committed } => {
                 buf.push(2u8);
                 buf.extend_from_slice(&tx_id.inner().to_le_bytes());
+<<<<<<< HEAD
+                buf.push(*committed as u8);
+=======
                 buf.push(if *committed { 1u8 } else { 0u8 });
+>>>>>>> 7cc9ce9 (fix(memfuse-store): harden wal replay bounds and transaction intent recovery)
             }
         }
 

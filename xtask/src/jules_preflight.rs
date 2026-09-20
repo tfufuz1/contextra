@@ -1,8 +1,8 @@
 use crate::claim::{expire_stale_claims, ClaimsDatabase};
 use crate::{
-    check_duplicate_symbols, check_orphan_modules, run_check_consistency, run_check_dag,
-    run_check_jules_context_freshness, run_check_review_coverage, run_check_unwrap_baseline,
-    run_sync_docs, run_validate_tags, scan_tags,
+    check_duplicate_symbols, check_module_reachability, check_ring_layering, check_unsafe_islands,
+    run_check_consistency, run_check_dag, run_check_jules_context_freshness,
+    run_check_review_coverage, run_sync_docs, run_validate_tags, scan_tags,
 };
 use regex::Regex;
 use std::fs;
@@ -150,6 +150,16 @@ pub fn check_no_active_claim_conflict(root: &Path, target_crate: Option<&str>) -
 
     let claims_path = root.join(".jules/claims.json");
     let db = ClaimsDatabase::load(&claims_path);
+
+    let active_count = db.count_active_claims();
+    let max_claims = crate::claim::get_max_active_claims();
+    if active_count > max_claims {
+        return CheckResult::Fail(format!(
+            "MemFuseError::ConcurrencyLimitExceeded: Globales Parallelitäts-Limit von {} aktiven Claims überschritten (aktuell {} aktive Claims).",
+            max_claims, active_count
+        ));
+    }
+
     if let Some(existing) = db.find_active_claim(&krate) {
         return CheckResult::Fail(format!(
             "Aktiver lokaler Claim für Crate '{}' (Issue '{}', seit {}).",
@@ -224,26 +234,75 @@ pub fn run_jules_preflight(fast_only: bool) -> bool {
         });
     }
 
-    // Orphan Modules Check
+    // Module Reachability Check
     {
         let start = Instant::now();
         let root = crate::find_root_dir();
-        let orphan_res = check_orphan_modules::run_check_orphan_modules(&root);
-        let (passed, detail) = match orphan_res {
-            Ok(orphans) if orphans.is_empty() => (true, None),
-            Ok(orphans) => (
+        let reach_res = check_module_reachability::run_check_module_reachability(&root);
+        let (passed, detail) = match reach_res {
+            Ok(res) if res.errors.is_empty() => {
+                let detail = if res.warnings.is_empty() {
+                    None
+                } else {
+                    Some(format!(
+                        "{} Übergangswarnung(en):\n{}",
+                        res.warnings.len(),
+                        res.warnings.join("\n")
+                    ))
+                };
+                (true, detail)
+            }
+            Ok(res) => (
                 false,
                 Some(format!(
-                    "{} Waisendatei(en) gefunden:\n{}",
-                    orphans.len(),
-                    orphans.join("\n")
+                    "{} unerreichbare/mehrfach deklarierte Datei(en):\n{}",
+                    res.errors.len(),
+                    res.errors.join("\n")
                 )),
             ),
             Err(e) => (false, Some(format!("Fehler: {}", e))),
         };
         results.push(GateResult {
             name: format!(
-                "Orphan Modules Check ({:.1}s)",
+                "Module Reachability Check ({:.1}s)",
+                start.elapsed().as_secs_f64()
+            ),
+            passed,
+            detail,
+        });
+    }
+
+    // Unsafe Islands Check (Default / Transition Mode)
+    {
+        let start = Instant::now();
+        let unsafe_res = check_unsafe_islands::run_check_unsafe_islands(false);
+        let (passed, detail) = match unsafe_res {
+            Ok(true) => (true, None),
+            Ok(false) => (false, Some("Unsafe-Island-Verstöße gefunden".to_string())),
+            Err(e) => (false, Some(format!("Fehler: {}", e))),
+        };
+        results.push(GateResult {
+            name: format!(
+                "Unsafe Islands Check ({:.1}s)",
+                start.elapsed().as_secs_f64()
+            ),
+            passed,
+            detail,
+        });
+    }
+
+    // Ring Layering Check (Warning Mode)
+    {
+        let start = Instant::now();
+        let ring_res = check_ring_layering::run_check_ring_layering(false);
+        let (passed, detail) = match ring_res {
+            Ok(true) => (true, None),
+            Ok(false) => (false, Some("Ring-Verstöße gefunden".to_string())),
+            Err(e) => (false, Some(format!("Fehler: {}", e))),
+        };
+        results.push(GateResult {
+            name: format!(
+                "Ring Layering Check ({:.1}s)",
                 start.elapsed().as_secs_f64()
             ),
             passed,
@@ -268,19 +327,6 @@ pub fn run_jules_preflight(fast_only: bool) -> bool {
         });
     }
 
-    // Gate 2: Unwrap-Baseline
-    {
-        let start = Instant::now();
-        let passed = run_check_unwrap_baseline();
-        results.push(GateResult {
-            name: format!(
-                "Gate 2: Unwrap-Baseline ({:.1}s)",
-                start.elapsed().as_secs_f64()
-            ),
-            passed,
-            detail: None,
-        });
-    }
 
     // Gate 3: Silent IO-Fehler
     {
@@ -653,6 +699,46 @@ mod tests {
                 assert!(msg.contains("TASK-123"));
             }
             _ => panic!("Expected CheckResult::Fail for active local claim"),
+        }
+    }
+
+    #[test]
+    fn test_claim_conflict_check_global_concurrency_limit_fails() {
+        let dir = tempdir().unwrap();
+        let claims_dir = dir.path().join(".jules");
+        fs::create_dir_all(&claims_dir).unwrap();
+        let claims_path = claims_dir.join("claims.json");
+
+        let future_exp = (chrono::Utc::now() + chrono::Duration::hours(2)).to_rfc3339();
+        let mut db = ClaimsDatabase::default();
+        for i in 1..=4 {
+            db.claims.push(ClaimEntry {
+                krate: format!("memfuse-active-{}", i),
+                issue: format!("TASK-{}", i),
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                session_id: format!("s{}", i),
+                active: true,
+                expires_at: Some(future_exp.clone()),
+                released_at: None,
+            });
+        }
+        db.save(&claims_path).unwrap();
+
+        let result = check_no_active_claim_conflict(dir.path(), Some("memfuse-new"));
+        match result {
+            CheckResult::Fail(msg) => {
+                assert!(
+                    msg.contains("MemFuseError::ConcurrencyLimitExceeded"),
+                    "Expected ConcurrencyLimitExceeded error, got: {}",
+                    msg
+                );
+                assert!(msg.contains("Globales Parallelitäts-Limit"));
+                assert!(msg.contains("4 aktive Claims"));
+            }
+            res => panic!(
+                "Expected CheckResult::Fail for exceeded concurrency limit, got {:?}",
+                res
+            ),
         }
     }
 

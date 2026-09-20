@@ -2,56 +2,83 @@
 
 <!-- Anker-Index (für §N-Referenzen in anderen Dokumenten) -->
 <!-- §1 = Verifizierter Codestand -->
-<!-- §2 = Crate-Topologie (verifiziert aus Cargo.toml & DAG-Analyse) -->
+<!-- §2 = Crate-Topologie (Ring-0–4-Modell) -->
 <!-- §3 = Was TATSÄCHLICH implementiert ist vs. FEHLT (verifiziert) -->
 <!-- §4 = Bekannte offene Risiken -->
 <!-- §5 = ⚠️ Frischhaltungspflicht dieser Datei -->
-<!-- §6 = Entwicklungsprozess: Analyse- und Implementierungsstufe -->
+<!-- §6 = Phasenmodell & Entwicklungsprozess -->
 <!-- §7 = Non-Obvious Decisions (would cause wrong code without this knowledge) -->
 
 <a id="1"></a>
-## Verifizierter Codestand · HEAD `6a7ca31d42841ffa80afc583c1a3389410a2e9e2` · Stand 2026-09-14
+## Verifizierter Codestand · HEAD `b4efbc09f55deb9d1ac5e9f47f401a988127f6bd` · Stand 2026-09-19 22:16:24 +0200
 
 > **Für AI-Assistenten:** Diese Datei beschreibt was TATSÄCHLICH implementiert ist,
-> nicht was die Spec behauptet. Bei Widerspruch zwischen dieser Datei und Spec/README:
-> Diese Datei hat Vorrang (Code-Befund > Spezifikation, §0.1 Quellenhierarchie).
+> nicht was Spezifikationen oder ungeprüfte Dokumente behaupten. Bei Widerspruch gilt:
+> Code-Befund & `cargo metadata` > diese Datei > Spezifikationen (§0.1 Quellenhierarchie).
+> **Basis-Commit dieser Fassung:** `b4efbc09f55deb9d1ac5e9f47f401a988127f6bd`.
 
 ---
 
 <a id="2"></a>
-## Crate-Topologie (verifiziert aus Cargo.toml & DAG-Analyse)
+## Crate-Topologie (Ring-0–4-Modell, IST + SOLL)
 
-MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspace-Crates (17 Crates im Hauptworkspace + `memfuse-py` als isoliertes Workspace) halten sich an einen strikten gerichteten azyklischen Graphen (DAG):
+MemFuse wird von der historischen Schichtarchitektur (Layer 0–8) auf das verifizierte **Ring-0–4-Modell** (27 Fach-Crates + 3 Tooling-Crates) umgestellt (`docs/GESAMTSPEZIFIKATION.md` §A2, §4, §20).
+Die Mitglieder im Hauptworkspace plus isolierte/exkludierte Members (`memfuse-py`, `xtask`, `memfuse-bench`) bilden folgenden Stand (IST-Status per `cargo metadata` am HEAD und SOLL-Zielphase):
 
-- **Layer 0 — Fundament (IPC Gen)**:
-  - `memfuse-core-ipc-gen`: Auto-generated FlatBuffers IPC code (`crates/memfuse-core-ipc-gen`)
-- **Layer 1 — Core Infrastructure**:
-  - `memfuse-core`: Core types (`TenantId`, `ConfigFingerprint`, etc.), traits, and error handling (`crates/memfuse-core`)
-- **Layer 2 — Storage-Primitiven & Vertikalen**:
-  - `memfuse-calibration`: Calibration scalers (Platt, Isotonic, Replicator) (`crates/memfuse-calibration`)
-  - `memfuse-checkpoint`: Snapshot & backup management (`crates/memfuse-checkpoint`)
-  - `memfuse-graph`: CSR-Graph, `ConsistencyEnforcer` (F-04), `PathRAGEngine`, `EdgeProvenance` (`crates/memfuse-graph`)
-  - `memfuse-security`: Encryption at Rest, `DeletionProof`, and KV-Cache Security (`crates/memfuse-crypto`, Package Name: `memfuse-security`; `memfuse-kv-bridge` ist in `crates/memfuse-crypto/src/kv_segment/` konsolidiert)
-  - `memfuse-text`: BM25 full-text search & DACH compound splitting (`crates/memfuse-text`)
-- **Layer 3 — Subsysteme**:
-  - `memfuse-candle`: Native Candle GGUF ML inference backend (`crates/memfuse-candle`)
-  - `memfuse-index`: HNSW vector index, SQ8 quantization, DiskANN (`crates/memfuse-index`)
-  - `memfuse-ollama`: Ollama HTTP client & context prefix engine (`crates/memfuse-ollama`)
-  - `memfuse-store`: LSM-Tree storage engine & WAL (`crates/memfuse-store`)
-- **Layer 4 — Embeddings & Reranking**:
-  - `memfuse-embed`: Text embeddings & Cross-Encoder reranking (`crates/memfuse-embed`, optional)
-- **Layer 5 — Hauptdatenbank**:
-  - `memfuse-db`: Embedded hybrid search & collection engine (`crates/memfuse-db`)
-- **Layer 6 — Benchmarking & Routing**:
-  - `memfuse-bench`: Reproducible benchmark harness (`benchmarks/memfuse-bench`)
-  - `memfuse-router`: Conformal router engine & SLM profiles (`crates/memfuse-router`)
-  - `memfuse-tauri`: Deprecated/Entfernt (Produktfokus auf PyPI Library & MCP Server, ADR-077)
-- **Layer 6.5 — WASM Execution Boundary**:
-  - `memfuse-sandbox`: WASM Execution Boundary for MemFuse MCP CodeExecution Permission (`crates/memfuse-sandbox`)
-- **Layer 7 — Agenten-Engine**:
-  - `memfuse-agent`: Persistent agent workflow loop (`crates/memfuse-agent`)
-- **Layer 8 — Protocol & Server**:
-  - `memfuse-mcp`: Model Context Protocol (MCP) stdio JSON-RPC 2.0 server & `uvx`-paketierte Distribution (`crates/memfuse-mcp`)
+### Ring-Matrix & Crate-Status (30 Crates)
+
+| Crate | Ring | Status | Kurzbeschreibung & Kriterium (P30: I/U/C/S/D) |
+|---|---|---|---|
+| `memfuse-types` | Ring 0 | 🔜 geplant (Phase 1b) | IDs (`DocId`, `DocIdx`, `TxId`, `TenantId`), Filter-AST, Budgets, Schema-Versionen (C, D) | <!-- doc-ref-ignore -->
+| `memfuse-ports` | Ring 0 | 🔜 geplant (Phase 1b) | `dyn`-kompatible Traits: `StorageRead`, `VectorIndex`, `TextIndex`, `GraphIndex`, `Clock`, `Rng` (D) | <!-- doc-ref-ignore -->
+| `memfuse-mvcc` | Ring 0 | 🔜 geplant (Phase 1b) | `SeqLog`, `SnapshotRegistry`, `TxBuffer` (loom-getestet) (C, D) | <!-- doc-ref-ignore -->
+| `memfuse-wire` | Ring 0 | ✅ vorhanden (Phase 0R) | FlatBuffers-Generat (`memfuse.fbs`) + IPC-Adapter (U — Unsafe-Insel) |
+| `memfuse-sys` | Ring 0 | ✅ vorhanden (Phase 0R) | Unsafe-Insel: `ReadOnlyMap` (mmap), Win32-ACL (`crates/memfuse-store/src/wal/io.rs`) (U — Unsafe-Insel) |
+| `memfuse-simd` | Ring 0 | ✅ vorhanden (Phase 0R) | Unsafe-Insel: SIMD-Distanzkernel, Laufzeit-Dispatch (AVX2/NEON) (U — Unsafe-Insel) |
+| `memfuse-crypto` | Ring 0 | ✅ vorhanden (Package: `memfuse-security`) | Schlüsselhierarchie, AEAD, WAL-HMAC-Kette, `DeletionProof`, Zeroize (C) |
+| `memfuse-vector` | Ring 0 | 🔄 Legacy (`memfuse-index`, Phase 1c) | HNSW, SQ8-Quantisierung, DiskANN (S, C) | <!-- doc-ref-ignore -->
+| `memfuse-text` | Ring 0 | ✅ vorhanden | BM25/BM25F Volltextsuche, deutsche Morphologie & Komposita (C) |
+| `memfuse-graph` | Ring 0 | ✅ vorhanden | CSR-Graph, PPR, Leiden, Hyperkanten (`HyperEdge`, `RoleBinding`) (S, C) |
+| `memfuse-rank` | Ring 0 | 🔄 Legacy (`memfuse-calibration` + `memfuse-db::fusion`, Phase 1b) | 4-Signal-Fusion (RRF), Platt/Isotonic-Kalibrierung, Drift (C) | <!-- doc-ref-ignore -->
+| `memfuse-adapt` | Ring 0 | 🔄 Legacy (`memfuse-router` + `memfuse-calibration::pid`, Phase 1b) | LinUCB-Bandit, Lyapunov, PID, Decay; `Clock`/`Rng` injiziert (P28) (C) | <!-- doc-ref-ignore -->
+| `memfuse-store` | Ring 1 | ✅ vorhanden | LSM-Tree, WAL (Group Commit, HMAC), MVCC-Pin (S, C) |
+| `memfuse-kvcache` | Ring 1 | 🔜 geplant (Phase 4) | Prefix-Radix-Baum, KV-Blöcke, Tiering, AEAD, Segmentdateien (C) | <!-- doc-ref-ignore -->
+| `memfuse-checkpoint` | Ring 1 | ✅ vorhanden | RAII-Checkpoint & Persistent Store Management, time-travel snapshots (C, D) |
+| `memfuse-infer-candle` | Ring 2 | 🔄 Legacy (`memfuse-candle`, Phase 1a) | Native GGUF ML Inferenz (Candle), KV-State (I) | <!-- doc-ref-ignore -->
+| `memfuse-infer-ollama` | Ring 2 | 🔄 Legacy (`memfuse-ollama`, Phase 1a) | HTTP Ollama Client & Context Prefix Engine (I) | <!-- doc-ref-ignore -->
+| `memfuse-infer-onnx` | Ring 2 | 🔄 Legacy (`memfuse-embed`, Phase 1a) | `ort` Cross-Encoder, ONNX Embedding Backend; exkludiert aus `default-members` (I) | <!-- doc-ref-ignore -->
+| `memfuse-sandbox` | Ring 2 | ✅ vorhanden | WASM Execution Boundary, Fuel + Wall-Clock Budgets, `ToolSandbox` (I) |
+| `memfuse-engine` | Ring 3 | 🔄 Legacy (`memfuse-db` Datenebene, Phase 3b) | Collection, Transaktionen, `RetrievalPlanner`, Ingestion, ComputePool (S, C) | <!-- doc-ref-ignore -->
+| `memfuse-cognition` | Ring 3 | 🔄 Legacy (`memfuse-db` Kontrollebene, Phase 3b) | `ConsolidationEngine`, Context Compaction, Scheduler (C) | <!-- doc-ref-ignore -->
+| `memfuse-privacy` | Ring 3 | 🔄 Legacy (`memfuse-crypto::egress_vault` + `memfuse-mcp::egress_gateway`, Phase 1a) | Cloud-Egress Gateway, DLP, Surrogat-Tokenisierung, `GuardedPayload` (C) | <!-- doc-ref-ignore -->
+| `memfuse-router` | Ring 3 | ✅ vorhanden (Schlankungs-Ziel Phase 1b) | SLM-Profil-Routing, MCP-Dispatch (keine Numerik mehr) (C) |
+| `memfuse-agent` | Ring 3 | ✅ vorhanden | Multi-Step Persistent Agent Workflow Loop, Audit, DLQ (C) |
+| `memfuse` | Ring 4 | 🔜 geplant (Phase 1a) | Hauptfassade, Builder, einzige Composition Root (D) | <!-- doc-ref-ignore -->
+| `memfuse-mcp` | Ring 4 | ✅ vorhanden | Model Context Protocol stdio JSON-RPC 2.0 Server (C) |
+| `memfuse-py` | Ring 4 | ✅ vorhanden (Isolierter Workspace) | PyO3 Python-Bindings, FFI catch_unwind (I) |
+| `memfuse-testkit` | Tooling | ✅ vorhanden (Phase 0R) | Fault-VFS, `ManualClock`, In-Memory-`StorageEngine` (P28) |
+| `memfuse-bench` | Tooling | ✅ vorhanden | Reproduzierbare Benchmark-Harness (`benchmarks/memfuse-bench`) |
+| `xtask` | Tooling | ✅ vorhanden (Exkludiert aus Root-`members`) | Custom CI/CD Tasks, Preflight, Drift Gates, Layering Checks |
+
+### Die 3 Unsafe-Inseln (§0.4 & §4.1)
+
+Jeder Nicht-Insel-Crate setzt zwingend `#-[#![forbid(unsafe_code)]` in seiner `lib.rs`. `unsafe` Rust ist exklusiv auf folgende **drei Unsafe-Inseln** beschränkt: <!-- doc-ref-ignore -->
+1. `memfuse-simd`: SIMD Hardware-Optimierungen (AVX2, AVX-512, NEON) mit Laufzeit-Dispatch.
+2. `memfuse-sys`: Systemprimitiven — `ReadOnlyMap` (mmap), `LockedBuf` (`mlock`/`munlock`), Win32 ACLs (`crates/memfuse-store/src/wal/io.rs`).
+3. `memfuse-wire`: Auto-generierter FlatBuffers-Code (`memfuse.fbs`).
+
+*(Befristete Ausnahmeliste bis Phase 1c wird per CI-Prüfung kontrolliert).* <!-- doc-ref-ignore -->
+
+### Ring-Matrix & Abhängigkeitsregeln (§4.3)
+
+```
+Ring 0  → Ring 0 (Typen/Ports/Sys/Simd/Wire/Crypto -> Fachkerne Vector/Text/Graph/Rank/Adapt)
+          Kerne (vector, text, graph, rank, adapt) kennen einander nicht!
+Ring 1  → Ring 0. Kein Ring-1-Crate hängt von einem anderen Ring-1-Crate ab.
+Ring 2  → types, ports, crypto. Niemals Ring 1 oder Ring 3.
+Ring 3  → Ring 0, Ring 1, Ports von Ring 2 (nie deren konkrete Crates).
+Ring 4  → Composition Root / Fassaden.
+```
 
 ---
 
@@ -62,145 +89,107 @@ MemFuse ist in ein Schichten-Modell (Layer 0–7) gegliedert. Sämtliche Workspa
 
 | Komponente / Typ | File:Line Reference | Beschreibung / Anmerkung |
 |---|---|---|
-| `TenantId` | `crates/memfuse-core/src/types/domain.rs:59` | Mandanten-Identifikator |
-| `ConfigFingerprint` | `crates/memfuse-core/src/types/domain.rs:914` | Invalidation-Fingerprint für Kalibrierung & Profile |
-| `DeletionProof` & `LayerCleanupProof` (D1) | `crates/memfuse-crypto/src/deletion_proof.rs:81` | Kryptographischer Löschnachweis mit typsystemischer Absicherung (PR #1921, #1926) |
-| `memfuse-security` | `crates/memfuse-crypto/` | Package-Name `memfuse-security` in Cargo.toml. Encryption-at-Rest & konsolidierte KV-Cache Security (`crates/memfuse-crypto/src/kv_segment/`) |
-| `EdgeProvenance` | `crates/memfuse-graph/src/provenance.rs:11` | Herkunftsnachweis für Graph-Kanten (`INV-GRAPH-PROV-1`, `DocEdgeIndex`) |
-| `Kaskadierende CSR-Invalidierung` | `crates/memfuse-db/src/collection/crud.rs:958` | Kaskadierendes Tombstoning verknüpfter Graph-Kanten bei Dokument-Superseding via `DocEdgeIndex` |
-| `memfuse-calibration` | `crates/memfuse-calibration/` | Scaler (Platt, Isotonic, Replicator) & P8 Compliance |
-| `PathRAGEngine` | `crates/memfuse-graph/src/path_rag.rs:35` | Bidirektionale Graph-Retrieval Search Engine |
-| `ConsistencyEnforcer` (F-04) | `crates/memfuse-graph/src/consistency_enforcement.rs:86` | Widerspruchserkennung & Edge-Suppression (ADR-069) |
-| `memfuse-candle` | `crates/memfuse-candle/` | Workspace-Member (Layer 2), GGUF Inferenz-Backend |
-| `ConsolidationSession` | `crates/memfuse-db/src/context_compaction.rs:188` | Context Compaction mit Transaktionssicherheit |
-| `AdaptiveDecayController` (F-01) | `crates/memfuse-db/src/decay_controller.rs:64` | Thermodynamisches Adaptive-Decay hinter `adaptive-decay-control` / `adaptive-decay` (ADR-069) |
-| `ConsolidationEngine` | `crates/memfuse-db/src/consolidation_executor.rs:107` | Hintergrund-Konsolidierung und Community-Synthese (`execute_sleep_cycle`) |
+| `memfuse-testkit` | `crates/memfuse-testkit/` | Neu in Welle 1 (Phase 0R). Determinismus-Infrastruktur (`ManualClock`, `FaultVfs`, `InMemoryStore`) |
+| `memfuse-wire` | `crates/memfuse-wire/` | Neu in Welle 1 (Phase 0R). Auto-generated FlatBuffers IPC code (`memfuse.fbs`) |
+| `memfuse-sys` | `crates/memfuse-sys/` | Neu in Welle 1 (Phase 0R). Unsafe-Insel für mmap/mlock/Win32-ACLs |
+| `memfuse-simd` | `crates/memfuse-simd/` | Neu in Welle 1 (Phase 0R). Unsafe-Insel für SIMD-Distanzkernel |
+| `TenantId` | `crates/memfuse-core/src/types/domain.rs` | Mandanten-Identifikator |
+| `ConfigFingerprint` | `crates/memfuse-core/src/types/domain.rs` | Invalidation-Fingerprint für Kalibrierung & Profile |
+| `DeletionProof` & `LayerCleanupProof` | `crates/memfuse-crypto/src/deletion_proof.rs` | Kryptographischer Löschnachweis mit typsystemischer Absicherung |
+| `memfuse-security` | `crates/memfuse-crypto/` | Package-Name `memfuse-security` in Cargo.toml. Encryption-at-Rest & KV-Segment-Security |
+| `EdgeProvenance` | `crates/memfuse-graph/src/provenance.rs` | Herkunftsnachweis für Graph-Kanten (`DocEdgeIndex`) |
+| `PathRAGEngine` | `crates/memfuse-graph/src/path_rag.rs` | Bidirektionale Graph-Retrieval Search Engine |
+| `ConsistencyEnforcer` | `crates/memfuse-graph/src/consistency_enforcement.rs` | Widerspruchserkennung & Edge-Suppression |
+| `ConsolidationSession` | `crates/memfuse-db/src/context_compaction.rs` | Context Compaction mit Transaktionssicherheit |
+| `AdaptiveDecayController` | `crates/memfuse-db/src/decay_controller.rs` | Thermodynamisches Adaptive-Decay hinter `adaptive-decay` |
 | `MarkdownChunker` | `crates/memfuse-db/src/chunker.rs` | Strukturiertes Dokumentsplitting vor Vektor-Embedding |
-| `MultiStepEngine` & `total_cmp` (H) | `crates/memfuse-db/src/multistep.rs` & `fusion.rs` | Iterative Search Engine mit RRF-Signal-Fusion & robuster HeapEntry-Sortierung (PR #1925) |
-| `scan_bounded` (F) | `crates/memfuse-core`, `memfuse-store`, `memfuse-db` | Speicherbeschränkter Range-Scan zur OOM-Vermeidung (PR #1927) |
-| `WAL Header State Atomicity` | `crates/memfuse-store/src/wal/mod.rs` | Atomare Schreibzustandsverfolgung im WAL Header (PR #1924) |
-| `DiskANN HMAC Hardening` | `crates/memfuse-index/src/diskann.rs` | HMAC-Integritätsschutz für DiskANN-Indizes (PR #1919) |
+| `MultiStepEngine` & RRF | `crates/memfuse-db/src/multistep.rs` | Iterative Search Engine mit RRF-Signal-Fusion |
+| `scan_bounded` | `crates/memfuse-core/src/traits/storage.rs` | Speicherbeschränkter Range-Scan zur OOM-Vermeidung |
 | `CheckpointGuard` | `crates/memfuse-checkpoint/src/lib.rs` | RAII-Checkpoint & Persistent Store Management |
-| `CrossEncoderReranker` | `crates/memfuse-embed/src/reranker.rs` | Cross-Encoder Reranking für High-Precision Retrieval (ONNX ist Default-Embedding-Backend) |
-| `Inference Semaphore & Backpressure` (H-5) | `crates/memfuse-candle/src/inference.rs` | Bounded Inferenz-Concurrency / Backpressure für Candle ML Engine geschlossen |
-| `Dimension Default 768` (H-8) | `crates/memfuse-py/` & `memfuse-core` | Dimension-Default auf 768 vereinheitlicht geschlossen |
-| `memfuse_consolidate Tool` (H-13) | `crates/memfuse-mcp/src/lib.rs` | Fünftes MCP-Tool für sofortigen Konsolidierungstrigger geschlossen |
-| `McpSandbox` | `crates/memfuse-mcp/src/lib.rs` | Read-Only MCP-Server Sandbox & Write Authorization Guard |
+| `CrossEncoderReranker` | `crates/memfuse-embed/src/reranker.rs` | Cross-Encoder Reranking für High-Precision Retrieval |
 | `ContextPrefixEngine` | `crates/memfuse-ollama/src/context_prefixer.rs` | Context Prefix Compression Engine |
-| `CSRGraph` & PPR | `crates/memfuse-graph/src/csr.rs` | Compressed Sparse Row Graph mit Personalized PageRank |
-| `PersistentAgentWorkflow` | `crates/memfuse-agent/src/lib.rs` | Multi-Step Agent Execution Loop mit State Graph & Checkpointing |
-| `EmbeddingBackend::Candle` | `crates/memfuse-db/src/lib.rs:605` | In Serving-Pipeline von `memfuse-db` als GGUF ML Inferenz/Embedding Backend verdrahtet |
-| `ExportDocumentV1` & `ExportCollectionV1` | `crates/memfuse-db/src/export.rs:17` | Memory-Export-Format v1 mit Schema Version "1.0" und Idempotenz |
-| `LlmTextGeneratorStreaming` | `crates/memfuse-core/src/traits/embedding.rs:63` | Streaming Trait-Abstraktion für LLM-Textgenerierung |
-| `PyDbStats` Metriken | `crates/memfuse-py/src/lib.rs:518` | FFI Export von `drift_status`, `calibration_ece` und `last_calibration_at` in Python API |
-| `Wal::rotate_and_seal()` | `crates/memfuse-store/src/wal/io.rs:637` | Atomares Versiegeln und Read-Only-Flagging für passives WAL-Shipping (PR #2419) |
-| `WalFlusherConfig` `batch_window_micros` | `crates/memfuse-store/src/wal/flusher.rs:81` | Konfigurierbares Batch-Window für WAL-Flusher-Actor (PR #2436) |
-| `memfuse_cloud_query` MCP-Tool & `egress_gateway.rs` | `crates/memfuse-mcp/src/egress_gateway.rs` | Scaffolded MCP-Tool & Gateway für Egress-Shield (AI-TAG[SMELL][MAJOR] behoben, verwendet offiziellen `memfuse-security`-Contract `EgressVault`) |
-| `BanditRouter` Module | `crates/memfuse-router/src/` | `bandit.rs`, `routing_strategy.rs`, `transport.rs`, `guarded_payload.rs` scaffolded (PR #2422, #2433) |
-| `check-bandit-latency-budget` xtask | `xtask/src/check_bandit_latency_budget.rs` | Latenz-Budget-Prüfung für LinUCB-Bandit implementiert (PR #2433, noch nicht in merge-gate.yml) |
+| `CSRGraph` & PPR | `crates/memfuse-graph/src/csr.rs` | Compressed Sparse Row Graph mit Forward-Push PageRank |
+| `PersistentAgentWorkflow` | `crates/memfuse-agent/src/lib.rs` | Multi-Step Agent Execution Loop mit State Graph |
+| `BanditRouter` | `crates/memfuse-router/src/bandit.rs` | LinUCB Diagonal & Sherman-Morrison Bandit Routing |
+| `check-bandit-latency-budget` | `xtask/src/check_bandit_latency_budget.rs` | Latenz-Budget-Prüfung für LinUCB-Bandit |
+| Gate `check-module-reachability` | `xtask/src/check_orphan_modules.rs` | Neu in Welle 1 (Phase 0R). Prüft unerreichbare `.rs`-Dateien |
+| Gate `check-dag` | `xtask/src/main.rs` | Neu in Welle 1 (Phase 0R). Layering-Prüfung nach Ring-Modell |
+| Gate `check-agents-integrity` | `xtask/src/check_agents_integrity.rs` | Neu in Welle 1 (Phase 0R). Prüft Integrität von AGENTS.md |
 
-### Fehlt / Nicht integriert ❌
+### Fehlt / In Arbeit 🔴 / 🔄
 
-*(Keine bekannten nicht-integrierten Workspace-Crates)*
-
-### Bewusst entkoppelte Architektur-Komponenten (Keine technische Schuld) 🟢
-
-| Komponente / Feature | Status | Begründung / Dokumentation |
+| Komponente / Feature | Status | Ziel-Phase / Beschreibung |
 |---|---|---|
-| `memfuse-py` Workspace-Isolierung | BEWUSST ISOLIERT | Eigenständiger Workspace in `crates/memfuse-py`, nicht in Root-`Cargo.toml` `members` (ADR-064). Benötigt `panic = "unwind"` im Release-Profil für FFI `catch_unwind()`, während der Haupt-Workspace `panic = "abort"` nutzt. CI deckt den Crate separat ab. |
+| `memfuse` Fassade | 🔜 GEPLANT | Phase 1a. Neue Composition Root & Builder | <!-- doc-ref-ignore -->
+| `memfuse-types`, `ports`, `mvcc` | 🔜 GEPLANT | Phase 1b. Zerlegung von `memfuse-core` | <!-- doc-ref-ignore -->
+| `memfuse-engine`, `cognition`, `rank`, `adapt`, `privacy` | 🔜 GEPLANT | Phase 1b–3b. Zerlegung von `memfuse-db` & `memfuse-router` | <!-- doc-ref-ignore -->
+| KV-Cache-Bridge (echter Prefill) | 🔴 SOLL | Phase 4. Derzeitiger Status ist Stub in `memfuse-candle` (§9.2), Ausbau in Stufen A/B/C |
+| N-äre Hyperkanten (`relate_n_ary`, `HyperEdge`) | 🔴 SOLL | Phase 1. Bipartite Stern-Expansion (§6) |
 
 ---
 
 <a id="4"></a>
 ## Bekannte offene Risiken
 
-1. **`rebuild_region()` ohne Recall-Tests (F-02, `crates/memfuse-index/src/hnsw.rs:1812`)**:
-   `rebuild_region()` führt reines Tombstone-Pruning durch, ohne dass wissenschaftliche Recall-Tests oder ein offizielles ADR vorliegen. Das Feature-Flag `partial-rebuild-pruning` MUSS deaktiviert bleiben, bis entsprechende Regressionstests vorliegen.
-2. **`egress_gateway.rs` Egress Contract Alignment (F1) [BEHOBEN]**:
-   Direkte Einbindung des offiziellen `memfuse-security`-Contracts (`EgressVault`) ohne lokale Stub-Typen.
-3. **`memfuse-mcp` Sandbox-Kopplung (F2)**:
-   `memfuse-mcp` hat kein `wasm-sandbox`-Feature und keine `memfuse-sandbox`-Abhängigkeit in Cargo.toml.
-4. **Fehlende Pflicht-Tests §10.14 (F3)**:
-   4 Pflicht-Tests aus Spec §10.14 fehlen im Test-Suite (`test_wasm_memory_isolation`, `test_wasm_fuel_exhaustion_returns_error`, `test_egress_guard_fail_closed_on_index_unavailable`, `test_bandit_diagonal_vs_linucb_latency_budget`).
-5. **`check-bandit-latency-budget` xtask nicht in CI (F4)**:
-   `check-bandit-latency-budget` xtask ist implementiert, aber noch NICHT in `.github/workflows/merge-gate.yml` eingebunden.
+1. **`rebuild_region()` ohne Recall-Tests (F-02, `crates/memfuse-index/src/hnsw.rs`)**:
+   `rebuild_region()` führt reines Tombstone-Pruning durch, ohne dass wissenschaftliche Recall-Tests vorliegen. `partial-rebuild-pruning` MUSS deaktiviert bleiben.
+2. **KV-Cache-Bridge ist ein Stub (🔴, §9.2)**:
+   `generate_with_context` speichert nur Platzhalter-Strings und Zähler (`prefill_skip_count`), ohne echten Inferenz-Prefill einzusparen. Echter Ausbau erfolgt in Stufen A/B/C (Phase 4).
+3. **`memfuse-sandbox` Waisen-Status (F2)**:
+   `memfuse-sandbox` existiert als funktionierendes WASM-Isolation-Crate, ist jedoch noch von keinem Konsumenten (`memfuse-mcp` / `memfuse-agent`) verdrahtet.
+4. **LSM Compaction & MANIFEST TOCTOU / Lock Window (H-1, H-2, §5.6)**:
+   TOCTOU-Fenster bei Candidate Selection in `crates/memfuse-store/src/compaction.rs` und Latency-Flaschenhals bei `LsmStorage::commit` unter Write-Lock.
+5. **Hyperkanten Cascade-Invalidierungs-Fanout (H-5, §6.6)**:
+   Synchrone Kaskaden-Löschung bei großem Fan-Out blockiert den Main-Thread. Geforderte Lösung: Persistente idempotente Background-Queue für $N > \theta$.
 
 ---
 
 <a id="5"></a>
 ## ⚠️ Frischhaltungspflicht dieser Datei
 
-Diese Datei MUSS bei jedem PR aktualisiert werden, der:
-- Eine neue Top-Level-Komponente hinzufügt (neuer Typ in memfuse-core, neues Crate)
-- Eine als "Fehlt" markierte Komponente implementiert
-- Ein Feature-Flag von non-default auf default umstellt
+Diese Datei MUSS bei jedem PR und Phasen-Merge aktualisiert werden (§5 Frischhaltungspflicht, `docs/GESAMTSPEZIFIKATION.md` §5):
+- HEAD-Commit Hash und Datum gegen `git log -1 --format='%H %ci'` prüfen und aktualisieren.
+- Neue Crates oder Statusänderungen von `🔜 geplant` / `🔄 Legacy` zu `✅ vorhanden` eintragen.
+- Bei Umsetzung bisher fehlender Komponenten die Tabellen in §2 und §3 anpassen.
 
-**Prüfpflicht vor jedem Commit-Merge:** Diff dieser Datei gegen `git log --oneline -20`
-gegenprüfen — wurde in den letzten 20 Commits etwas implementiert, das hier noch
-als "Fehlt" steht?
+**Prüfpflicht vor jedem Commit-Merge:** Diff dieser Datei gegen `git log --oneline -20` prüfen — wurde etwas implementiert, das hier noch als "Fehlt" oder "Geplant" steht?
 
 Eine veraltete AGENTS.md ist schlimmer als keine — sie führt Agenten aktiv in die Irre.
-
-**Dokumentations-Governance & HEAD-Zitierung:**
-Jedes Dokument, das einen Repository-Zustand als 'verifiziert' beschreibt, MUSS den HEAD-Commit-Hash im Format `HEAD <vollständiger-hash>, <ISO-Datum> <Uhrzeit mit Zeitzone>` exakt aus `git log -1 --format='%H %ci'` übernehmen — kein manuelles Abtippen von Kurz-Hashes.
 
 ---
 
 <a id="6"></a>
-## Entwicklungsprozess: Analyse- und Implementierungsstufe
+## Phasenmodell & Entwicklungsprozess (§20.2)
 
-### Stufe 1 — Analyse (Claude)
-Claude liest Repository-Stand, analysiert Architektur und ADRs, identifiziert
-Konflikte und trifft Entscheidungen. Claude schreibt KEINE Code-Änderungen.
-Output: präzise Jules-Prompt-Spezifikation mit Dateiliste, Schritten, Constraints.
+Die Migration auf das Ring-Modell folgt dem verbindlichen Phasenplan aus `docs/GESAMTSPEZIFIKATION.md` §20.2:
 
-### Stufe 2 — Implementierung (Jules)
-Jules empfängt den Prompt, führt Mandatory Bootstrap aus, setzt Claim,
-implementiert genau die spezifizierten Änderungen, keine darüber hinaus.
-
-### Regel: ADR-Erstellung durch Jules
-Jules erstellt KEINEN neuen ADR eigenständig, wenn die Entscheidung
-architekturrelevant ist (neue Dependency, DAG-Layer-Änderung, Feature-Scope-Änderung).
-Stattdessen: Draft-Notiz im PR-Body mit Prefix "ADR-VORSCHLAG:" hinterlassen
-und auf menschliche Freigabe warten (gemäß §5 ASK-Grenzen).
-Jules DARF ADRs für rein technische Umsetzungsentscheidungen (Typ, Signatur,
-Impl-Detail) schreiben, wenn keine Alternativen offen sind.
-
-### Claim-Pflicht vor Arbeitsbeginn
-Jede Session MUSS vor erstem Schreibzugriff einen Claim setzen:
-  `cargo xtask claim --crate <ZIEL-CRATE> --issue <TASK-ID>`
-Bei Claim-Konflikt: STOP — warten oder koordinieren, nicht überschreiben.
+- **Phase 0R (Welle 1 — UMGESETZT):** `memfuse-testkit` angelegt; `xtask` aus Root-Workspace exkludiert; Unwrap-Ratchet durch `clippy-panic-lints` ersetzt; Lints workspace-weit aktiviert; neue Gates `check-orphan-modules`, `check-dag`, `check-agents-integrity`; `deny.toml` mit Ring-Bans; `loom-tests` als eigener Job.
+- **Phase 1a (Aufwärtskanten auflösen):** Fassade `memfuse` anlegen; `memfuse-db` entkoppeln (`Arc<dyn Embedder>`); Layering-Test scharf für Ring 3. <!-- doc-ref-ignore -->
+- **Phase 1b (`core`-Zerlegung & `router`-Schlankung):** `memfuse-core` → `types`/`ports`/`mvcc`; `memfuse-router` → `adapt` (Numerik) & `router` (Routing/MCP). <!-- doc-ref-ignore -->
+- **Phase 1c (Unsafe-Inseln erzwingen):** `memfuse-sys`, `memfuse-simd`, `memfuse-wire` vollständig isolieren; `#![forbid(unsafe_code)]` in allen anderen Crates.
+- **Phase 2 (Sync-Kerne):** Synchronen Kern von I/O trennen (`StorageRead` sync / `StorageWrite` async); `tokio` aus Ring 0 verbannen.
+- **Phase 3a (Konsistenz-Spike):** Crash-Injektion via `memfuse-testkit` Fault-VFS; WAL-Recovery validieren.
+- **Phase 3b (`db`-Zerlegung):** `memfuse-db` in `engine`, `cognition`, `rank`, `adapt`, `router`, `privacy` zerlegen; `memfuse` Fassade als primäre API etablieren. <!-- doc-ref-ignore -->
+- **Phase 4 (KV-Cache echtschalten):** Stufen A (RAM-Prefix) → B (eigenes Llama-Modell mit `KvState`) → C (Segment-Spill).
+- **Phase 5 (Hygiene & Doku-Generierung):** God-Files zerlegen; Reifegrad-Marker aus Capability-Manifest generieren. <!-- doc-ref-ignore -->
 
 ---
 
 <a id="7"></a>
 ## Non-Obvious Decisions (would cause wrong code without this knowledge)
 
+- **P26 Sync-Kern, async-Schale:** Ring 0 (`memfuse-types` … `memfuse-adapt`) enthält kein `tokio`. Kerne sind synchron; I/O und Async liegen in Ring 1+ (`memfuse-store`, `memfuse-engine`). <!-- doc-ref-ignore -->
+- **P27 `dyn`-kompatible Ports:** Traits in `memfuse-ports` are synchron where mmap/pread blocks, or return `BoxFuture` instead of AFIT, to allow runtime interchangeability via `Arc<dyn Trait>`. <!-- doc-ref-ignore -->
+- **P28 Injizierter Nichtdeterminismus:** `Clock`, `Rng`, `IdGen` sind injizierte Ports. Kein direkter Aufruf von `SystemTime::now()` oder `rand::thread_rng()` in Kern- oder Persistenzcode. `memfuse-testkit` stellt `ManualClock` bereit.
+- **P29 Kein globaler veränderlicher Zustand:** Keine mutable `static` Variablenspeicher oder globale `OnceLock`-Registries. Zustand gehört Instanzen.
+- **P30 Crate-Zuschnitt-Kriterien (I/U/C/S/D):** Jeder Crate-Zuschnitt begründet sich durch Isolation (I), Unsafe-Insel (U), Bounded Context (C), Größe > 8k LOC (S) oder Richtungserzwingung (D).
+- **Strangler-Regel:** Legacy-Crates (`memfuse-core`, `memfuse-db`, `memfuse-candle`, etc.) re-exportieren neue Typen mit `#[deprecated]` während der Migrationsphasen, um schrittweisen Umbau ohne Big-Bang-Breakage zu garantieren.
+- **ADR-Verweise:** Nur real existierende ADRs in `docs/decisions/` zitieren (`ADR-027-community-detection.md`, `ADR-082-docid-width.md`, `ADR-083-hnsw-diskann-stufenmodell.md`, `ADR-084-flatbuffers-drift-gate.md`, `ADR-0XX-memfuse-sandbox.md`). Die geplanten Refactoring-ADRs N01–N10 sind ausdrücklich als `🔜 geplant` zu kennzeichnen.
 - **TxId generation**: ALWAYS `collection.allocate_tx()` — NEVER `SystemTime::as_nanos()`
 - **fsync errors**: ALWAYS propagate with `?` — NEVER `let _ = dir.sync_all()`
-- **unsafe scope**: EXCLUSIVELY in five production modules + test-only verification:
-  - `memfuse-index/src/distance.rs` (SIMD hardware optimizations: AVX2, AVX-512, NEON; ADR-017/ADR-034)
-  - `memfuse-index/src/diskann.rs` (Read-only memory-mapped index I/O: Mmap; ADR-017)
-  - `memfuse-index/src/persistence.rs` (Read-only memory-mapped index persistence: Mmap; ADR-017)
-  - `memfuse-store/src/wal/io.rs` (Win32 DACL/ACL file permission enforcement; `#[cfg(windows)]`)
-  - `memfuse-db/src/volatile_vault.rs` (RAM buffer memory locking against OS swapping: `mlock`/`munlock`; feature-gated `volatile-vault`)
-  - Exception: Test-only unsafe in `memfuse-crypto/src/anti_tamper.rs` (and `crates/memfuse-crypto/src/kv_segment/segment.rs` unit tests) exclusively for Zeroize drop-semantics verification via raw pointer inspection.
-  All other crates strictly enforce `#![forbid(unsafe_code)]` or `#![deny(unsafe_code)]` with inline rationale.
-- **AI-TAG[SMELL][CRITICAL]**: ALWAYS fix immediately — never just comment
 - **Document chunking**: ALWAYS use `MarkdownChunker` — NEVER embed entire text as 1 vector
 - **MCP transport**: stdio JSON-RPC 2.0 ONLY — axum was removed (ADR-010)
 - **WAL HMAC key**: ALWAYS via `load_or_create_integrity_key()` — NEVER hardcoded
-- **AI-TAG & ID Schema**: Alle neuen Tags verwenden das hash-basierte Schema `AGT-<CRATE>-<8-hex-hash>` (z.B. `AGT-STORE-a3f29c1d`). Bestehende `AGT-<CRATE>-NNN` IDs haben Bestandsschutz.
-- **Tag-Zeitstempel- & Session-Pflicht**: Alle `AI-TAG`, `ANCHOR` und `REVIEW-PASS` Kommentare tragen zwingend sekundengenaue ISO-8601-UTC-Zeitstempel im Format `(TS: YYYY-MM-DDTHH:MM:SSZ)` und das `(SESSION: <8-hex-hash>)` Token (siehe `rules/tag_taxonomy.md`).
-- **Trait-Default-Pflichttest**: Für jedes `pub trait` mit einer Default-Methode-Implementierung MUSS im selben PR, der einen neuen Implementor dieses Traits hinzufügt, ein Integrationstest existieren, der beweist, dass die Default-Implementierung NICHT still greift (entweder weil sie explizit überschrieben wurde, oder weil ein Test explizit den Default-Fehlerpfad als erwartetes, dokumentiertes Verhalten prüft). Referenz im Code: `capability_coverage` in `crates/memfuse-core/src/traits.rs` (prüft z.B. `VectorIndex::search_at` & `GraphIndex::traverse_at`). <!-- doc-ref-ignore -->
-- **Typ-Dopplungs-Prävention**: Vor Anlegen eines neuen Typs oder Traits: `docs/TYPE_REGISTRY.md` nach ähnlichem Namen/Zweck durchsuchen. Bei Kollision: bestehenden Typ erweitern statt Duplikat anlegen, oder Kollision explizit per ADR begründen. Das CI-Gate `check-duplicate-symbols` läuft standardmäßig dateiintern (schnell, immer aktiv). Bei P0-Symbol-Neuanlagen wird die crate-weite Prüfung per `cargo xtask check-duplicate-symbols --cross-module` empfohlen.
-- **Audit-Finding-Verifikation**: Jeder Finding aus einem extern zugelieferten Audit-Dokument oder Prompt MUSS vor Implementierung am AKTUELLEN Quellcode gegengelesen werden (siehe `.jules/AUDIT_INTAKE_PROTOCOL.md`). Falls der Finding nicht mehr zutrifft (Code bereits geändert, Test existiert bereits, Fix bereits gemerged): Finding im PR-Kommentar/Log explizit als "entkräftet" markieren mit Begründung — NICHT stillschweigend ignorieren und NICHT blind implementieren.
-- **Sync-Docs Nix-Fallback**: `just sync-docs` verwendet `nix develop -c` — bei fehlendem Nix direkt `cargo xtask sync-docs` aufrufen. Beide Pfade sind in der justfile mit `||`-Fallback abgesichert.
-- **Keine HTTP in memfuse-mcp**: Laut ADR-010 ausschließlich stdio JSON-RPC 2.0. Das GLOSSARY.md definierte dies fälschlicherweise als HTTP/JSON-RPC — die korrekte Definition gilt aus ADR-010 und AGENTS.md, nicht aus dem Glossar (wenn Konflikt). <!-- doc-ref-ignore -->
-- **Typ-Existenz vor Anlage prüfen**: `find crates/ -name "*.rs" | xargs grep -l "<TYPNAME>"` und `grep "<TYPNAME>" docs/TYPE_REGISTRY.md` ausführen, bevor ein neuer Typ angelegt wird.
-- **ADR-Nummernvergabe**: Vor Vergabe einer neuen ADR-Nummer IMMER `ls docs/decisions/ | grep -oP '(?<=ADR-)\d+' | sort -n | tail -1` live ausführen, NIEMALS eine Nummer aus einem älteren Prompt oder einer älteren Analyse übernehmen (schützt vor Duplikaten durch parallele Sessions, siehe ADR-020, ADR-046).
-- **Namenskonventionen & Standard-Terminologie**: Gemäß [ADR-069](docs/decisions/ADR-069-standard-terminologie-norm.md) sind biologische Metaphern und Anbieter-Branding in Typnamen, Feature-Flags (`physio-*`) und Architektur-Labels untersagt; neue Features und Muster folgen verbindlich der MemFuse-Standard-Terminologie ("MemFuse [Funktion] Pattern"). <!-- doc-ref-ignore -->
 - **TOMBSTONE_BIT-Disziplin (ADR-041)**: Bit 63 strikt maskieren (`seq & !TOMBSTONE_BIT`) vor `max_seq` Vergleichen.
 - **SSTable Flush-Sichtbarkeit (ADR-043)**: `last_committed_tx` vor `sstables.push()` in `LsmStorage::flush` aktualisieren.
 - **MCP Write-Authorization & Sandbox Policy (ADR-044)**: DB-Schreibzugriffe im MCP Server sind standardmäßig GESPERRT (Read-Only Policy).
-- **Entkopplung memfuse-router und memfuse-mcp (ADR-045)**: JSON-RPC Typen liegen in `memfuse-core::ipc`, `memfuse-router` ist hängtfrei von `memfuse-mcp`.

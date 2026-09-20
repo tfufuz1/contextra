@@ -109,6 +109,7 @@ impl OrchestratorEngine {
     }
 
     /// Helper constructor creating OrchestratorEngine directly from MemFuse DB handle.
+    #[allow(deprecated)]
     #[deprecated(
         note = "Use try_from_db instead to handle initialization errors without panicking"
     )]
@@ -222,31 +223,38 @@ impl OrchestratorEngine {
                         0
                     };
 
-                    if node.node_type != NodeType::Start {
-                        if let Err(err) = ctx.budget.try_reserve(estimated_cost) {
-                            if let Some(ref dlq) = self.dead_letter_queue {
-                                let letter = StepDeadLetter {
-                                    session_id: ctx.task_id.clone(),
-                                    node_id: node.id.clone(),
-                                    failure_reason: DeadLetterReason::BudgetExhausted {
-                                        available: ctx.budget.available(),
-                                        required: estimated_cost,
-                                    },
-                                    input: input.clone(),
-                                    attempt: 0,
-                                    failed_at_secs: SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap_or_default()
-                                        .as_secs(),
-                                };
-                                if let Err(e) = dlq.push(&letter).await {
-                                    tracing::error!("DLQ push failed: {}", e);
+                    let reservation = if node.node_type != NodeType::Start && estimated_cost > 0 {
+                        match ctx.budget.reserve(estimated_cost) {
+                            Ok(res) => Some(res),
+                            Err(err) => {
+                                if let Some(ref dlq) = self.dead_letter_queue {
+                                    let letter = StepDeadLetter {
+                                        session_id: ctx.task_id.clone(),
+                                        node_id: node.id.clone(),
+                                        step_index: ctx.step_count,
+                                        tx_id: Some(tx_id),
+                                        failure_reason: DeadLetterReason::BudgetExhausted {
+                                            available: ctx.budget.available(),
+                                            required: estimated_cost,
+                                        },
+                                        input: input.clone(),
+                                        attempt: 0,
+                                        failed_at_secs: SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap_or_default()
+                                            .as_secs(),
+                                    };
+                                    if let Err(e) = dlq.push(&letter).await {
+                                        tracing::error!("DLQ push failed: {}", e);
+                                    }
                                 }
+                                self.audit_log_failure(ctx, &err.to_string()).await?;
+                                return Err(err);
                             }
-                            self.audit_log_failure(ctx, &err.to_string()).await?;
-                            return Err(err);
                         }
-                    }
+                    } else {
+                        None
+                    };
 
                     // 2. Resolve handler (Optional for Start nodes)
                     let result_res = if let Some(handler_name) = &node.handler {
@@ -275,6 +283,8 @@ impl OrchestratorEngine {
                                             let letter = StepDeadLetter {
                                                 session_id: ctx.task_id.clone(),
                                                 node_id: node.id.clone(),
+                                                step_index: ctx.step_count,
+                                                tx_id: Some(tx_id),
                                                 failure_reason: DeadLetterReason::BudgetExhausted {
                                                     available: 0,
                                                     required: estimated_cost,
@@ -316,6 +326,8 @@ impl OrchestratorEngine {
                                                 let letter = StepDeadLetter {
                                                     session_id: ctx.task_id.clone(),
                                                     node_id: node.id.clone(),
+                                                    step_index: ctx.step_count,
+                                                    tx_id: Some(tx_id),
                                                     failure_reason: DeadLetterReason::ToolError {
                                                         message: err_msg,
                                                     },
@@ -336,6 +348,8 @@ impl OrchestratorEngine {
                                                 let letter = StepDeadLetter {
                                                     session_id: ctx.task_id.clone(),
                                                     node_id: node.id.clone(),
+                                                    step_index: ctx.step_count,
+                                                    tx_id: Some(tx_id),
                                                     failure_reason:
                                                         DeadLetterReason::MaxRetriesExceeded {
                                                             attempts: max_attempts,
@@ -364,6 +378,8 @@ impl OrchestratorEngine {
                                             let letter = StepDeadLetter {
                                                 session_id: ctx.task_id.clone(),
                                                 node_id: node.id.clone(),
+                                                step_index: ctx.step_count,
+                                                tx_id: Some(tx_id),
                                                 failure_reason: DeadLetterReason::Timeout {
                                                     timeout_ms: tool.timeout_ms(),
                                                 },
@@ -419,19 +435,24 @@ impl OrchestratorEngine {
 
                     let result = match result_res {
                         Ok(res) => {
-                            // Reconcile reserved budget with actual tokens consumed
-                            if res.tokens_consumed > estimated_cost {
-                                ctx.budget.consume(res.tokens_consumed - estimated_cost);
-                            } else if estimated_cost > res.tokens_consumed {
-                                ctx.budget.refund(estimated_cost - res.tokens_consumed);
+                            // Settle RAII reservation and reconcile actual tokens consumed
+                            if let Some(res_guard) = reservation {
+                                res_guard.settle();
+                                if res.tokens_consumed > estimated_cost {
+                                    ctx.budget.consume(res.tokens_consumed - estimated_cost);
+                                } else if estimated_cost > res.tokens_consumed {
+                                    ctx.budget.refund(estimated_cost - res.tokens_consumed);
+                                }
+                            } else if res.tokens_consumed > 0 {
+                                ctx.budget.consume(res.tokens_consumed);
                             }
                             ctx.memory
                                 .insert("last_output".to_string(), res.output.clone());
                             res
                         }
                         Err(err) => {
-                            // Refund pre-reserved tokens on execution failure
-                            ctx.budget.refund(estimated_cost);
+                            // On execution failure, reservation is dropped without settle(),
+                            // which automatically refunds estimated_cost via RAII Drop guard.
                             self.audit_log_failure(ctx, &err.to_string()).await?;
                             return Err(err);
                         }
@@ -556,7 +577,7 @@ impl OrchestratorEngine {
             .get("budget_consumed")
             .and_then(|v| v.as_u64())
         {
-            let mut restored_budget =
+            let restored_budget =
                 memfuse_core::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
                     .with_strategy(ctx.budget.strategy.clone());
             restored_budget.consume(consumed as usize);
@@ -571,7 +592,7 @@ impl OrchestratorEngine {
                 .effective_limit()
                 .saturating_sub(ctx.budget.reserved);
             let consumed = total_usable.saturating_sub(available as usize);
-            let mut restored_budget =
+            let restored_budget =
                 memfuse_core::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
                     .with_strategy(ctx.budget.strategy.clone());
             restored_budget.consume(consumed);
@@ -664,13 +685,15 @@ impl OrchestratorEngine {
 
     async fn commit_step(&self, ctx: &AgentContext, result: &StepResult) -> Result<()> {
         let state_doc_id = format!("task:{}:step:{}", ctx.task_id, ctx.step_count);
+        let tx_id = ctx.db.inner_storage().last_tx_id().await?;
         let metadata = serde_json::json!({
             "stage": "commit",
             "node": ctx.current_node,
             "memory": ctx.memory,
             "output": result.output,
             "tokens_consumed": result.tokens_consumed,
-            "status": ctx.status
+            "status": ctx.status,
+            "tx_id": tx_id.0
         });
 
         // Use direct KV storage pattern for workflow history without vector index participation
@@ -684,6 +707,7 @@ impl OrchestratorEngine {
     /// In such recovery scenarios, the caller must advance to a new `step_count` (e.g., via
     /// `ctx.next_retry_step_count()`), and NOT attempt to overwrite the existing entry.
     async fn audit_log(&self, ctx: &AgentContext, result: &StepResult) -> Result<()> {
+        let tx_id = ctx.db.inner_storage().last_tx_id().await?;
         // Generate immutable audit trace and store it
         let entry = crate::audit::AuditEntry {
             task_id: ctx.task_id.clone(),
@@ -692,12 +716,14 @@ impl OrchestratorEngine {
             tokens_consumed: result.tokens_consumed,
             payload: result.output.clone(),
             error: None,
+            tx_id: Some(tx_id),
         };
 
         crate::audit::AuditLog::append_to(&ctx.state_collection, &entry).await
     }
 
     async fn audit_log_failure(&self, ctx: &AgentContext, error_message: &str) -> Result<()> {
+        let tx_id = ctx.db.inner_storage().last_tx_id().await.ok();
         let entry = crate::audit::AuditEntry {
             task_id: ctx.task_id.clone(),
             step_count: ctx.step_count,
@@ -705,6 +731,7 @@ impl OrchestratorEngine {
             tokens_consumed: 0,
             payload: serde_json::Value::Null,
             error: Some(error_message.to_string()),
+            tx_id,
         };
 
         crate::audit::AuditLog::append_to(&ctx.state_collection, &entry).await
@@ -795,341 +822,9 @@ impl OrchestratorEngine {
     }
 }
 
-/// Helper to look up a key or dot-notation path in [`AgentContext`].
-fn get_context_value<'a>(
-    key: &str,
-    ctx: &'a AgentContext,
-) -> Option<std::borrow::Cow<'a, serde_json::Value>> {
-    let key = key.trim();
-    if key.is_empty() {
-        return None;
-    }
+mod condition;
 
-    // 1. Direct lookup in memory
-    if let Some(v) = ctx.memory.get(key) {
-        return Some(std::borrow::Cow::Borrowed(v));
-    }
-
-    // 2. Dot-notation path in memory (e.g. "output.status")
-    if key.contains('.') {
-        let parts: Vec<&str> = key.split('.').collect();
-        if let Some(mut current) = ctx.memory.get(parts[0]) {
-            let mut found = true;
-            for part in &parts[1..] {
-                if let serde_json::Value::Object(map) = current {
-                    if let Some(next_val) = map.get(*part) {
-                        current = next_val;
-                    } else {
-                        found = false;
-                        break;
-                    }
-                } else {
-                    found = false;
-                    break;
-                }
-            }
-            if found {
-                return Some(std::borrow::Cow::Borrowed(current));
-            }
-        }
-    }
-
-    // 3. Built-in context properties
-    match key {
-        "task_id" => Some(std::borrow::Cow::Owned(serde_json::Value::String(
-            ctx.task_id.clone(),
-        ))),
-        "current_node" => Some(std::borrow::Cow::Owned(serde_json::Value::String(
-            ctx.current_node.clone(),
-        ))),
-        "step_count" => Some(std::borrow::Cow::Owned(serde_json::Value::Number(
-            ctx.step_count.into(),
-        ))),
-        "status" => Some(std::borrow::Cow::Owned(serde_json::Value::String(format!(
-            "{:?}",
-            ctx.status
-        )))),
-        _ => None,
-    }
-}
-
-/// Helper to check if a [`serde_json::Value`] matches a raw string representation value.
-fn value_matches(val: &serde_json::Value, raw_val_str: &str) -> bool {
-    let target = raw_val_str.trim().trim_matches('"').trim_matches('\'');
-    match val {
-        serde_json::Value::String(s) => s == target || s == raw_val_str.trim(),
-        serde_json::Value::Bool(b) => {
-            b.to_string() == target || b.to_string() == raw_val_str.trim()
-        }
-        serde_json::Value::Number(n) => {
-            n.to_string() == target || n.to_string() == raw_val_str.trim()
-        }
-        serde_json::Value::Null => target == "null" || target == "Null" || target.is_empty(),
-        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(raw_val_str.trim()) {
-                val == &parsed
-            } else {
-                false
-            }
-        }
-    }
-}
-
-/// Evaluates a declarative condition expression against the provided [`AgentContext`].
-///
-/// # Supported Grammar:
-/// - `<key> exists`: Returns `true` if `<key>` is present in context memory or context properties and is not `null`.
-/// - `<key> == <value>`: Returns `true` if the value at `<key>` matches `<value>`.
-/// - `<key> != <value>`: Returns `true` if the value at `<key>` does not match `<value>` (or if `<key>` does not exist).
-///
-/// Key resolution supports direct keys in `ctx.memory` (e.g. `"result"`), nested dot-notation paths
-/// (e.g. `"output.status"`), and built-in context fields (`"task_id"`, `"current_node"`, `"step_count"`, `"status"`).
-///
-/// # Error Handling:
-/// Expression syntax errors or invalid formats do NOT panic; they emit a [`tracing::warn!`] log and evaluate to `false`.
-pub fn evaluate_condition_expr(expr: &str, ctx: &AgentContext) -> bool {
-    let trimmed = expr.trim();
-    if trimmed.is_empty() {
-        tracing::warn!("Empty condition expression evaluated as false");
-        return false;
-    }
-
-    if let Some(key_part) = trimmed.strip_suffix(" exists") {
-        let key = key_part.trim();
-        if key.is_empty() {
-            tracing::warn!(
-                "Condition expression missing key before 'exists': '{}'",
-                expr
-            );
-            return false;
-        }
-        if let Some(v) = get_context_value(key, ctx) {
-            return !v.is_null();
-        }
-        return false;
-    }
-
-    if let Some((key_part, val_part)) = trimmed.split_once("!=") {
-        let key = key_part.trim();
-        let val = val_part.trim();
-        if key.is_empty() {
-            tracing::warn!("Condition expression missing key before '!=': '{}'", expr);
-            return false;
-        }
-        if let Some(v) = get_context_value(key, ctx) {
-            return !value_matches(&v, val);
-        }
-        // Missing key does not match value, so != holds true
-        return true;
-    }
-
-    if let Some((key_part, val_part)) = trimmed.split_once("==") {
-        let key = key_part.trim();
-        let val = val_part.trim();
-        if key.is_empty() {
-            tracing::warn!("Condition expression missing key before '==': '{}'", expr);
-            return false;
-        }
-        if let Some(v) = get_context_value(key, ctx) {
-            return value_matches(&v, val);
-        }
-        return false;
-    }
-
-    tracing::warn!("Unparseable condition expression: '{}'", expr);
-    false
-}
+pub use condition::evaluate_condition_expr;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use memfuse_core::TokenBudget;
-    use memfuse_db::{DistanceMetric, MemFuse, MemFuseConfig};
-    use serde_json::json;
-    use std::sync::Arc;
-    use tempfile::TempDir;
-
-    async fn create_dummy_context() -> (AgentContext, TempDir) {
-        let tmp = TempDir::new().expect("temp dir");
-        let config = MemFuseConfig {
-            dimension: 4,
-            max_elements: 1000,
-            distance_metric: DistanceMetric::Cosine,
-            ..Default::default()
-        };
-        let db = Arc::new(
-            MemFuse::open_with_config(tmp.path(), config)
-                .await
-                .expect("open db"),
-        );
-        let state_col = db.collection("test-state").await.expect("collection");
-        let ctx = AgentContext::try_new(
-            "test-task-1",
-            "start",
-            db,
-            state_col,
-            TokenBudget::new(1000, 0),
-        )
-        .expect("agent context");
-        (ctx, tmp)
-    }
-
-    #[tokio::test]
-    async fn test_evaluate_condition_expr_grammar_and_outcomes() {
-        let (mut ctx, _tmp) = create_dummy_context().await;
-        ctx.memory.insert("simple_str".to_string(), json!("hello"));
-        ctx.memory.insert("number_val".to_string(), json!(42));
-        ctx.memory.insert("bool_val".to_string(), json!(true));
-        ctx.memory.insert("null_val".to_string(), json!(null));
-        ctx.memory.insert(
-            "nested".to_string(),
-            json!({
-                "status": "approved",
-                "code": 200
-            }),
-        );
-
-        // 1. "exists" checks
-        assert!(evaluate_condition_expr("simple_str exists", &ctx));
-        assert!(evaluate_condition_expr("nested.status exists", &ctx));
-        assert!(evaluate_condition_expr("task_id exists", &ctx));
-        assert!(!evaluate_condition_expr("null_val exists", &ctx));
-        assert!(!evaluate_condition_expr("missing_key exists", &ctx));
-        assert!(!evaluate_condition_expr(" exists", &ctx)); // missing key
-
-        // 2. "==" checks
-        assert!(evaluate_condition_expr("simple_str == hello", &ctx));
-        assert!(evaluate_condition_expr("simple_str == \"hello\"", &ctx));
-        assert!(evaluate_condition_expr("number_val == 42", &ctx));
-        assert!(evaluate_condition_expr("bool_val == true", &ctx));
-        assert!(evaluate_condition_expr("nested.status == approved", &ctx));
-        assert!(evaluate_condition_expr("nested.code == 200", &ctx));
-        assert!(evaluate_condition_expr("task_id == test-task-1", &ctx));
-        assert!(!evaluate_condition_expr("simple_str == world", &ctx));
-        assert!(!evaluate_condition_expr("missing_key == foo", &ctx));
-
-        // 3. "!=" checks
-        assert!(evaluate_condition_expr("simple_str != world", &ctx));
-        assert!(evaluate_condition_expr("missing_key != foo", &ctx));
-        assert!(!evaluate_condition_expr("simple_str != hello", &ctx));
-
-        // 4. Unparseable & invalid expressions (no panic)
-        assert!(!evaluate_condition_expr("invalid condition syntax", &ctx));
-        assert!(!evaluate_condition_expr("", &ctx));
-        assert!(!evaluate_condition_expr("   ", &ctx));
-        assert!(!evaluate_condition_expr("== value_without_key", &ctx));
-        assert!(!evaluate_condition_expr("!= value_without_key", &ctx));
-    }
-
-    #[tokio::test]
-    async fn test_audit_before_commit_ordering() {
-        let (ctx, _tmp) = create_dummy_context().await;
-        let orchestrator = OrchestratorEngine::from_db(&ctx.db);
-
-        // Populate an existing KV entry under task:test-task-1:step:0 to force commit_step to fail
-        // if state_collection.put_kv_if_absent was used, but put_kv overwrites.
-        // Wait, put_kv doesn't fail on existing key, put_kv_if_absent does!
-        // To simulate commit_step failure after successful audit_log:
-        // Populate audit entry manually? No, audit_log uses put_kv_if_absent under "audit:test-task-1:step:0".
-        // commit_step uses put_kv under "task:test-task-1:step:0".
-        // If we want commit_step to fail while audit_log succeeds, we can simulate an error in commit_step or
-        // test ordering directly.
-        // Let's test calling audit_log directly then commit_step with invalid state ID or pre-condition,
-        // or test that after audit_log succeeds, state_collection contains the audit entry "audit:test-task-1:step:0"
-        // even if commit_step fails, and step_count is NOT incremented (remains 0).
-        let step_res = StepResult {
-            node_id: "start".to_string(),
-            output: json!({"res": "ok"}),
-            tokens_consumed: 10,
-            next_edge: None,
-        };
-
-        // Call audit_log first (as in new loop order)
-        let audit_res = orchestrator.audit_log(&ctx, &step_res).await;
-        assert!(audit_res.is_ok());
-
-        // Verify audit entry exists in state_collection
-        let audit_id = format!("audit:{}:step:{}", ctx.task_id, ctx.step_count);
-        let audit_entry = ctx.state_collection.get_kv(&audit_id).await.unwrap();
-        assert!(audit_entry.is_some());
-
-        // Verify state doc key for commit_step does NOT exist yet
-        let state_doc_id = format!("task:{}:step:{}", ctx.task_id, ctx.step_count);
-        let state_entry = ctx.state_collection.get_kv(&state_doc_id).await.unwrap();
-        assert!(state_entry.is_none());
-
-        // Verify step_count was not incremented
-        assert_eq!(ctx.step_count, 0);
-    }
-
-    struct MockTool {
-        tool_name: String,
-    }
-
-    impl AgentTool for MockTool {
-        fn name(&self) -> &str {
-            &self.tool_name
-        }
-
-        fn execute<'a>(
-            &'a self,
-            _ctx: &'a AgentContext,
-            _input: serde_json::Value,
-        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<StepResult>> {
-            Box::pin(async move {
-                Ok(StepResult {
-                    node_id: "test".to_string(),
-                    output: serde_json::Value::Null,
-                    tokens_consumed: 0,
-                    next_edge: None,
-                })
-            })
-        }
-    }
-
-    #[tokio::test]
-    async fn test_try_register_tool_boundary_validations() {
-        let (ctx, _tmp) = create_dummy_context().await;
-        let mut orchestrator = OrchestratorEngine::from_db(&ctx.db);
-
-        // 1. Valid tool registration
-        let valid_tool = MockTool {
-            tool_name: "valid_tool".to_string(),
-        };
-        assert!(orchestrator.try_register_tool(Box::new(valid_tool)).is_ok());
-
-        // 2. Empty tool name
-        let empty_tool = MockTool {
-            tool_name: "".to_string(),
-        };
-        assert!(matches!(
-            orchestrator.try_register_tool(Box::new(empty_tool)),
-            Err(MemFuseError::InvalidInput(_))
-        ));
-
-        // 3. Null byte in tool name
-        let null_tool = MockTool {
-            tool_name: "tool\0null".to_string(),
-        };
-        assert!(matches!(
-            orchestrator.try_register_tool(Box::new(null_tool)),
-            Err(MemFuseError::InvalidInput(_))
-        ));
-
-        // 4. Oversized tool name
-        let oversized_tool = MockTool {
-            tool_name: "t".repeat(257),
-        };
-        assert!(matches!(
-            orchestrator.try_register_tool(Box::new(oversized_tool)),
-            Err(MemFuseError::InvalidInput(_))
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_orchestrator_recover_orphans_succeeds() {
-        let (ctx, _tmp) = create_dummy_context().await;
-        let orchestrator = OrchestratorEngine::from_db(&ctx.db);
-        assert!(orchestrator.recover_orphans().await.is_ok());
-    }
-}
+mod tests;

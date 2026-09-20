@@ -254,32 +254,68 @@ pub async fn block_max_wand_search<S: StorageEngine>(
             Some(l) => l,
             None => {
                 let prefix = prefix_helper(term);
-                let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;
-                let mut postings = Vec::with_capacity(raw_entries.len());
-                for (key, val_bytes) in raw_entries {
-                    let suffix_bytes = &key[prefix.len()..];
-                    if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
-                        if let Ok(doc_id_raw) = suffix.parse::<u64>() {
-                            if val_bytes.len() == 4 {
-                                let doc_id = DocId::new(doc_id_raw);
-                                let tf = u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(
-                                    |_| MemFuseError::Storage("Invalid posting tf length".into()),
-                                )?);
-                                let dl_key = doc_len_key_helper(doc_id.inner());
-                                let doc_len = match storage.get(&dl_key).await? {
-                                    Some(dl_bytes) if dl_bytes.len() == 4 => u32::from_le_bytes(
-                                        (&dl_bytes[..]).try_into().map_err(|_| {
-                                            MemFuseError::Storage("Invalid doc_len length".into())
-                                        })?,
-                                    ),
-                                    _ => 0,
-                                };
-                                postings.push(Posting::new(doc_id, tf, doc_len));
+
+                // Construct batch posting list key by replacing "pl:" with "plb:" and stripping trailing ":"
+                let mut batch_key = Vec::with_capacity(prefix.len() + 1);
+                if let Some(pos) = prefix.windows(3).position(|w| w == b"pl:") {
+                    batch_key.extend_from_slice(&prefix[..pos]);
+                    batch_key.extend_from_slice(b"plb:");
+                    let remaining = &prefix[pos + 3..];
+                    if remaining.ends_with(b":") {
+                        batch_key.extend_from_slice(&remaining[..remaining.len() - 1]);
+                    } else {
+                        batch_key.extend_from_slice(remaining);
+                    }
+                } else {
+                    batch_key = prefix.clone();
+                }
+
+                let loaded_list = if let Some(bytes) = storage.get_at_seq(&batch_key, seq).await? {
+                    bincode::deserialize::<PostingList>(&bytes).ok()
+                } else {
+                    None
+                };
+
+                let plist = match loaded_list {
+                    Some(l) => l,
+                    None => {
+                        let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;
+                        let mut postings = Vec::with_capacity(raw_entries.len());
+                        for (key, val_bytes) in raw_entries {
+                            let suffix_bytes = &key[prefix.len()..];
+                            if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
+                                if let Ok(doc_id_raw) = suffix.parse::<u64>() {
+                                    if val_bytes.len() == 4 {
+                                        let doc_id = DocId::new(doc_id_raw);
+                                        let tf = u32::from_le_bytes(
+                                            (&val_bytes[..4]).try_into().map_err(|_| {
+                                                MemFuseError::Storage(
+                                                    "Invalid posting tf length".into(),
+                                                )
+                                            })?,
+                                        );
+                                        let dl_key = doc_len_key_helper(doc_id.inner());
+                                        let doc_len = match storage.get(&dl_key).await? {
+                                            Some(dl_bytes) if dl_bytes.len() == 4 => {
+                                                u32::from_le_bytes(
+                                                    (&dl_bytes[..]).try_into().map_err(|_| {
+                                                        MemFuseError::Storage(
+                                                            "Invalid doc_len length".into(),
+                                                        )
+                                                    })?,
+                                                )
+                                            }
+                                            _ => 0,
+                                        };
+                                        postings.push(Posting::new(doc_id, tf, doc_len));
+                                    }
+                                }
                             }
                         }
+                        PostingList::new(postings)
                     }
-                }
-                let plist = PostingList::new(postings);
+                };
+
                 resident_index.insert_list(term.clone(), plist);
                 match resident_index.get(term) {
                     Some(l) => l,
@@ -302,8 +338,22 @@ pub async fn block_max_wand_search<S: StorageEngine>(
             for (tbs_key, _) in active_tbs_entries {
                 if let Ok(key_str) = std::str::from_utf8(&tbs_key) {
                     if key_str.ends_with(&term_suffix) {
-                        term_tbs_count += 1;
-                        tbs_cache.insert(tbs_key, true);
+                        tbs_cache.insert(tbs_key.clone(), true);
+                        // Extract doc_id from tombstone key: {prefix}tbs:{doc_id}:{term}
+                        let suffix = &tbs_key[tbs_global_prefix.len()..];
+                        if let Some(colon_pos) = suffix.iter().position(|&b| b == b':') {
+                            if let Ok(doc_id_str) = std::str::from_utf8(&suffix[..colon_pos]) {
+                                if let Ok(doc_id_raw) = doc_id_str.parse::<u64>() {
+                                    if list
+                                        .as_slice()
+                                        .binary_search_by_key(&doc_id_raw, |p| p.doc_id)
+                                        .is_ok()
+                                    {
+                                        term_tbs_count += 1;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

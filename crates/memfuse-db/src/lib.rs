@@ -57,8 +57,7 @@
 //! # }
 //! ```
 
-#![cfg_attr(not(feature = "volatile-vault"), forbid(unsafe_code))]
-#![cfg_attr(feature = "volatile-vault", deny(unsafe_code))]
+#![forbid(unsafe_code)]
 
 // FILE-CONTEXT
 // STAND:       2026-08-29T15:22:34Z (SESSION: 2c814094)
@@ -1458,9 +1457,16 @@ impl MemFuse {
         self.default_col().await?.delete(id).await
     }
 
-    /// Creates a bidirectional relationship between two documents.
+    /// Creates a relationship between two documents.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {
+        let col = self.default_col().await?;
+        col.relate(from, to, label).await
+    }
+
+    /// Creates a bidirectional relationship between two documents.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn relate_bidirectional(&self, from: &str, to: &str, label: &str) -> Result<()> {
         let col = self.default_col().await?;
         col.relate_bidirectional(from, to, label).await
     }

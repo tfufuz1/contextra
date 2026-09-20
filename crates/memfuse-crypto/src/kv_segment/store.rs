@@ -145,7 +145,8 @@ impl TenantIsolatedKvStore {
             shard_count,
             global_shard_offset: AtomicUsize::new(0),
             eviction_round_offsets: offsets,
-            segment_capacity: NonZeroUsize::new(Self::DEFAULT_SEGMENT_CAPACITY_PER_TENANT).unwrap(),
+            segment_capacity: NonZeroUsize::new(Self::DEFAULT_SEGMENT_CAPACITY_PER_TENANT)
+                .unwrap_or(NonZeroUsize::MIN),
             spill_handler: RwLock::new(None),
         }
     }
@@ -153,7 +154,8 @@ impl TenantIsolatedKvStore {
     /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Tenant.
     pub fn with_capacity(segment_capacity_per_tenant: usize) -> Self {
         let mut store = Self::new();
-        store.segment_capacity = NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap();
+        store.segment_capacity =
+            NonZeroUsize::new(segment_capacity_per_tenant.max(1)).unwrap_or(NonZeroUsize::MIN);
         store
     }
 
