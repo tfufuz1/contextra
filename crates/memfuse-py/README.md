@@ -1,6 +1,16 @@
-# MemFuse Python Bindings (`memfuse`)
+# MemFuse Python Bindings (`memfuse-py`)
 
 Official Python bindings for MemFuse — an embedded 4-signal hybrid-search vector database built with Rust and PyO3.
+
+## Purpose
+
+Brücke zwischen Rust-Kern und Python-Ökosystem. Ermöglicht NumPy-Zero-Copy-Umschlag, Python-Collection-Management und FFI-Anbindung.
+
+## Ring-Zugehörigkeit & Status
+
+- **Ring:** Ring 4 (Ränder / FFI Bindings)
+- **Status:** 🟢 Fertig
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
 ## Installation
 
@@ -26,13 +36,16 @@ for res in results:
     print(res.id, res.score, res.text)
 ```
 
-## Breaking Changes & Release Notes
+## Öffentliche API-Übersicht
 
-- **Default Dimension Change**: The default `dimension` parameter in `memfuse.open()` was changed from `1536` to `768` to align with `MemFuseConfig::default().dimension` in `memfuse-db` (matching `nomic-embed-text`, the default ONNX embedding model). Callers relying implicitly on `1536` dimensions must explicitly pass `dimension=1536`.
+- **Runtime State:** `PyRuntimeState`
+- **PyO3 Types:** `PySearchResult`, `PyDocument`, `PyVectorIndexStats`, `PyStorageStats`, `PyDbStats`
+- **CRUD Operations:** `insert`, `get`, `update`, `upsert`, `delete`
 
 ## Development & Publishing
 
 Refer to [PUBLISHING.md](PUBLISHING.md) for instructions on local building, testing, and release management.
 
-> **Note on Workspace Architecture**:
-> Dieses Crate wird ABSICHTLICH NICHT im Root-Workspace geführt, da es ein abweichendes Panic-Profil (`unwind` statt `abort`) für sichere FFI-Panic-Behandlung benötigt (siehe `run_blocking_ffi`, AGT-PY-d5d2be30). Build separat via `cd crates/memfuse-py && cargo build --release`.
+## Architektur & Verweise
+
+Details zu FFI-Invarianten und Python-Anbindung finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §9.4.

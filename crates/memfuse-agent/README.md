@@ -6,16 +6,17 @@ Persistent agent workflow engine for MemFuse — `checkpoint → execute → com
 
 `memfuse-agent` provides a pure Rust, sovereign orchestrator engine for multi-step AI agent workflows without external dependencies like LangGraph or AutoGen.
 
-## Architectural Position (Layer 3)
+## Ring-Zugehörigkeit & Status
 
-`memfuse-agent` operates at Layer 3 of the MemFuse DAG:
+- **Ring:** Ring 3 (Anwendungskern / Workflow Engine)
+- **Status:** 🟢 Fertig
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
-- **Depends on**:
-  - `memfuse-core`: Result types, errors, `TokenBudget`, `StorageEngine` trait.
-  - `memfuse-store`: `LsmStorage` persistence backend.
-  - `memfuse-checkpoint`: Snapshot persistence (`PersistentCheckpointStore`) & RAII `CheckpointGuard`.
-  - `memfuse-graph`: `StateGraph`, `AgentNode`, `NodeType`, `WorkflowEdge`.
-  - `memfuse-db`: `MemFuse` engine, `Collection` document/vector storage.
+## Öffentliche API-Übersicht
+
+- **Context & Graph:** `AgentContext`, `StateGraph`, `AgentNode`, `NodeType`, `WorkflowEdge`
+- **Orchestrator Engine:** `OrchestratorEngine`, `StepResult`, `AgentTool`
+- **Audit & Checkpoints:** `AuditEntry`, `PersistentCheckpointStore`
 
 ## Invariants & Core Loop
 
@@ -48,3 +49,7 @@ graph.try_add_edge("start", "end", None, 1)?;
 let engine = OrchestratorEngine::try_new(db.inner_storage())?;
 engine.run(&mut ctx, &graph).await?;
 ```
+
+## Architektur & Verweise
+
+Details zur Workflow Engine finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) und `README.md` §4.2.

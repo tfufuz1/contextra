@@ -280,53 +280,49 @@ Umsetzung, die eine dieser Fragen präjudiziert, braucht vorab die zugehörige A
 
 ### 0.1 Verzeichnisstruktur
 
-**Jetzt (verbindlich ab dieser Fassung, Ring-Modell — Zielzustand, wird strangler-artig gemäß §20 erreicht):**
+**Tatsächlicher Workspace-Bestand (IST-Stand laut `ls crates/`, 27 Fach-/Modul-Crates):**
+
+> **Hinweis zur Migration:** IST-Stand weicht stellenweise vom normativen SOLL-Zielzustand (§A2/§4.2) ab. Wo Namen oder Ring-Zuweisungen im Code-Bestand noch dem Übergangsstadium entsprechen (z. B. `memfuse-db` als Monolith statt getrennter `engine`/`cognition`/`privacy`, `memfuse-index` statt `memfuse-vector`, `memfuse-candle` statt `memfuse-infer-candle`), ist dies explizit als „In Migration" bzw. „Strangler / Legacy" gekennzeichnet. Für Details zur Ring-Zuordnung und Migrationsreihenfolge siehe `ARCHITECTURE.md` (folgt in Kürze) und §20.
 
 ```
 memfuse/
-├── Cargo.toml                      # [workspace], resolver = "2", default-members ohne infer-onnx
-├── xtask/                          # CI-Tooling (Drift-Gates, Layering, Benchmarks; Ziel < 3k LOC)
-│   └── src/
-│       ├── main.rs
-│       ├── check_flatbuffers_drift.rs
-│       └── check_bandit_latency_budget.rs
+├── Cargo.toml                      # [workspace], resolver = "2"
+├── xtask/                          # CI-Tooling (Drift-Gates, Layering, Benchmarks)
 ├── schemas/
-│   └── memfuse.fbs                 # §12
+│   └── memfuse.fbs                 # FlatBuffers IPC-Schema (§12)
 ├── crates/
-│   ├── memfuse-types/              # Ring 0 — IDs, TxId, TenantId, Fingerprint, Filter-AST, Budgets
-│   ├── memfuse-ports/              # Ring 0 — Traits: StorageRead/Write, VectorIndex, TextIndex, GraphIndex, Embedder, Clock, Rng, IdGen, MetricsSink
-│   ├── memfuse-mvcc/               # Ring 0 — SeqLog, SnapshotRegistry, TxBuffer (loom-getestet)
-│   ├── memfuse-wire/               # Ring 0 — FlatBuffers-Generat + Adapter (vormals core-ipc-gen), Unsafe-Insel
-│   ├── memfuse-sys/                # Ring 0 — mmap, mlock, Win32-ACL, Unsafe-Insel (neu, §A2 D1)
-│   ├── memfuse-simd/               # Ring 0 — Distanzkernel, Laufzeit-Dispatch, Unsafe-Insel
-│   ├── memfuse-crypto/             # Ring 0 — Schlüsselhierarchie, AEAD, WAL-HMAC-Kette, Deletion-Proof, Zeroize
-│   ├── memfuse-vector/             # Ring 0 — HNSW, DiskANN, Quantisierung (vormals memfuse-index)
-│   ├── memfuse-text/               # Ring 0 — BM25/BM25F, deutsche Morphologie
-│   ├── memfuse-graph/              # Ring 0 — CSR, PPR, Leiden, Hyperkanten
-│   ├── memfuse-rank/               # Ring 0 — 4-Signal-Fusion, Isotonic/Platt-Kalibrierung, Drift
-│   ├── memfuse-adapt/              # Ring 0 — Bandit, Lyapunov, PID, Homeostat, Decay (Clock/Rng injiziert)
-│   ├── memfuse-store/              # Ring 1 — LSM-Tree, WAL (Group-Commit, HMAC), MVCC-Pin
-│   ├── memfuse-kvcache/            # Ring 1 — Prefix-Radix-Baum, KV-Blöcke, Tiering, AEAD, Segmentdateien
-│   ├── memfuse-checkpoint/         # Ring 1 — Time-Travel-Registry gegen Port StorageEngine, ohne Global-State
-│   ├── memfuse-infer-candle/       # Ring 2 — GGUF, eigenes Llama-Modell mit KvState (Stufe B)
-│   ├── memfuse-infer-ollama/       # Ring 2 — HTTP-Backend, Contextual-Chunk-Prefixing
-│   ├── memfuse-infer-onnx/         # Ring 2 — ort, Cross-Encoder; NICHT in default-members
-│   ├── memfuse-sandbox/            # Ring 2 — WASM-Isolation, Fuel + Wall-Clock; implementiert ToolSandbox
-│   ├── memfuse-engine/             # Ring 3 — Collection, Transaktionen, RetrievalPlanner, Ingestion, ComputePool
-│   ├── memfuse-cognition/          # Ring 3 — Consolidation, Synthese, Kompaktierung, Scheduler
-│   ├── memfuse-privacy/            # Ring 3 — Egress-Gateway, PII-Vault, DLP, GuardedPayload
-│   ├── memfuse-router/             # Ring 3 — SLM-Profil-Routing, MCP-Dispatch (schlank, keine Numerik mehr)
-│   ├── memfuse-agent/              # Ring 3 — Workflow-Engine, Audit, DLQ
-│   ├── memfuse/                    # Ring 4 — Fassade, Builder, einzige Composition Root
-│   ├── memfuse-mcp/                # Ring 4 — stdio-JSON-RPC, Protokoll, Tool-Wiring
-│   ├── memfuse-py/                 # Ring 4 — PyO3, eigene Runtime, catch_unwind
-│   ├── memfuse-testkit/            # Tooling — Fault-VFS, ManualClock, In-Memory-StorageEngine
-│   └── memfuse-bench/              # Tooling — Benchmark-Harness
+│   ├── memfuse/                    # Ring 4 — Shell / Facade & Composition Root (In Migration)
+│   ├── memfuse-adapt/              # Ring 0 — Adaptive Control & Bandit (Fertig)
+│   ├── memfuse-agent/              # Ring 3 — Workflow Engine, Audit & DLQ (Fertig)
+│   ├── memfuse-calibration/        # Ring 0 — Legacy Score Calibration (Strangler / In Migration nach adapt/rank)
+│   ├── memfuse-candle/             # Ring 2 — Inferenz-Candle & GGUF (In Migration nach infer-candle)
+│   ├── memfuse-checkpoint/         # Ring 1 — Snapshot & Time-Travel Checkpoint Registry (Fertig)
+│   ├── memfuse-core/               # Ring 0 — Legacy Facade & Re-exports (Strangler / In Migration)
+│   ├── memfuse-crypto/             # Ring 0 — Crypto Kernel, AEAD & Deletion Proofs (Fertig)
+│   ├── memfuse-db/                 # Ring 3 — Database Orchestrator & Collection Monolith (In Migration)
+│   ├── memfuse-embed/              # Ring 2 — Inferenz-ONNX Embeddings & Reranker (In Migration nach infer-onnx)
+│   ├── memfuse-graph/              # Ring 0 — CSR Graph, Forward-Push PPR & Hyperedges (Fertig)
+│   ├── memfuse-index/              # Ring 0 — HNSW, DiskANN & Quantisierung (In Migration / Vektor-Index)
+│   ├── memfuse-kvcache/            # Ring 1 — Tenant Isolated KV-Cache & Segment Storage (Fertig)
+│   ├── memfuse-mcp/                # Ring 4 — MCP Server, Stdio Protocol & Egress Guard (Fertig)
+│   ├── memfuse-mvcc/               # Ring 0 — SeqLog, SnapshotRegistry & TxBuffer (Fertig)
+│   ├── memfuse-ollama/             # Ring 2 — Ollama Inferenz Client & Context Prefixer (Fertig)
+│   ├── memfuse-ports/              # Ring 0 — Core Abstract Traits & Interfaces (Fertig)
+│   ├── memfuse-py/                 # Ring 4 — PyO3 Python Bindings (Fertig)
+│   ├── memfuse-router/             # Ring 3 — SLM Profile Router & Dispatcher (Fertig)
+│   ├── memfuse-sandbox/            # Ring 2 — WASM Execution Boundary (Fertig)
+│   ├── memfuse-simd/               # Ring 0 — Unsafe Island: SIMD Distance Kernels (Fertig)
+│   ├── memfuse-store/              # Ring 1 — LSM Storage Engine, WAL & KvKeyLocks (Fertig)
+│   ├── memfuse-sys/                # Ring 0 — Unsafe Island: OS System Call Wrappers (Fertig)
+│   ├── memfuse-testkit/            # Tooling — FaultVfs, ManualClock & In-Memory Store (Fertig)
+│   ├── memfuse-text/               # Ring 0 — BM25/BM25F Search & German Morphology (Fertig)
+│   ├── memfuse-types/              # Ring 0 — Canonical Domain Types & Error Enums (Fertig)
+│   └── memfuse-wire/               # Ring 0 — Unsafe Island: FlatBuffers IPC Generat & Adapters (Fertig)
 ├── benchmarks/
-│   └── memfuse-bench/
+│   └── memfuse-bench/              # Benchmark Harness
 ├── .github/workflows/
-│   └── merge-gate.yml              # §15.4
-└── docs/decisions/                 # ADR-0NN-*.md, siehe §20.3 für N01–N10
+│   └── merge-gate.yml              # CI Merge Gate
+└── docs/decisions/                 # ADR-0NN-*.md
 ```
 
 **Vorher (Fassung bis zur Vorgängerversion dieser Spec, Layer-0–5-Modell — nicht mehr normativ, siehe §4 „Vorher"):**
