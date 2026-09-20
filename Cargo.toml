@@ -23,6 +23,7 @@ members = [
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
     "crates/memfuse-testkit", "crates/memfuse", "crates/memfuse-types", "crates/memfuse-ports", "crates/memfuse-mvcc", "crates/memfuse-adapt", "crates/memfuse-kvcache",
+    "crates/memfuse-engine", "crates/memfuse-cognition",
 ]
 exclude = ["xtask"]
 default-members = [
@@ -52,6 +53,8 @@ default-members = [
     "crates/memfuse-mvcc",
     "crates/memfuse-adapt",
     "crates/memfuse-kvcache",
+    "crates/memfuse-engine",
+    "crates/memfuse-cognition",
 ]
 
 [workspace.package]
@@ -125,6 +128,8 @@ memfuse-ports = { path = "crates/memfuse-ports" }
 memfuse-mvcc = { path = "crates/memfuse-mvcc" }
 memfuse-adapt = { path = "crates/memfuse-adapt" }
 memfuse-kvcache = { path = "crates/memfuse-kvcache" }
+memfuse-engine = { path = "crates/memfuse-engine" }
+memfuse-cognition = { path = "crates/memfuse-cognition" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
 # memfuse-cluster, memfuse-sandbox, memfuse-saos-agent wurden in Phase 0 ausgelagert.

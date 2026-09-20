@@ -245,8 +245,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;

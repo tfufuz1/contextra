@@ -4,8 +4,8 @@ use super::validation::{
     build_rag_prompt, validate_batch_size, validate_model_name, validate_text_length,
 };
 use super::wire::{
-    BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk,
-    EmbedRequest, EmbedResponse, GenerateRequest, GenerateResponse,
+    BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk, EmbedRequest,
+    EmbedResponse, GenerateRequest, GenerateResponse,
 };
 use futures_util::StreamExt;
 use memfuse_core::{MemFuseError, Result};

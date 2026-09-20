@@ -3,7 +3,7 @@
 // INVARIANTEN: P10: Wiederverwendung bestehender Konfigurationsobjekte (DecayControllerConfig, PercolationConfig) ohne Duplikation.
 // STAND: TS:2026-08-31T00:00:00Z
 
-use crate::decay_controller::DecayControllerConfig;
+use memfuse_engine::decay_controller::DecayControllerConfig;
 
 #[cfg(feature = "graph-connectivity-health")]
 use memfuse_graph::percolation::PercolationConfig;

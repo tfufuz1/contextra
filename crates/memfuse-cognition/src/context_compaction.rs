@@ -12,12 +12,13 @@
 //! Replaces stale tool outputs and long conversation histories with compact status tokens
 //! to preserve the LLM context window.
 
-use crate::collection::Collection;
-use crate::ProvenanceRecord;
 use memfuse_core::{
     ContextChunk, ContextSegment, DocId, LlmTextGenerator, MemFuseError, Result, StorageEngine,
     TenantId, TokenBudget, TxId, VectorIndex,
 };
+use memfuse_engine::collection::{Collection, StoredDocumentMeta};
+use memfuse_engine::transaction::CommitIntent;
+use memfuse_engine::ProvenanceRecord;
 
 /// Strategie für Context Compaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -342,7 +343,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         }
 
         let intent_key = collection.namespaced_key(&target_id.inner().to_le_bytes(), 3);
-        let intent = crate::transaction::CommitIntent::Consolidation {
+        let intent = CommitIntent::Consolidation {
             source_docs: source_docs.clone(),
             target_id,
             base_tx,
@@ -416,7 +417,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         self.source_docs = new_source_docs;
 
         // Update intent in storage
-        let intent = crate::transaction::CommitIntent::Consolidation {
+        let intent = CommitIntent::Consolidation {
             source_docs: self.source_docs.clone(),
             target_id: self.target_id,
             base_tx: new_base_tx,
@@ -459,9 +460,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
                 .collection
                 .namespaced_key(&doc_id.inner().to_le_bytes(), 1);
             if let Some(val) = self.collection.storage().get(&doc_key).await? {
-                if let Ok(meta) =
-                    serde_json::from_slice::<crate::collection::StoredDocumentMeta>(&val)
-                {
+                if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
                     if let Some(doc) = self.collection.get(&meta.id).await? {
                         let content = doc
                             .metadata
@@ -506,9 +505,9 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
             .unwrap_or_default();
 
         let target_str_id = format!("doc_{}", self.target_id.inner());
-        let dim_f32 = (self.collection.dimension.max(1)) as f32;
+        let dim_f32 = (self.collection.dimension().max(1)) as f32;
         let norm_val = 1.0f32 / dim_f32.sqrt();
-        let valid_embedding = vec![norm_val; self.collection.dimension];
+        let valid_embedding = vec![norm_val; self.collection.dimension()];
 
         // 4. Commit
         self.commit_ref(&target_str_id, &valid_embedding, summary_text, None)
@@ -568,26 +567,25 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
                 .collection
                 .namespaced_key(&src_id.inner().to_le_bytes(), 1);
             match self.collection.storage().get(&doc_key).await? {
-                Some(val) => {
-                    match serde_json::from_slice::<crate::collection::StoredDocumentMeta>(&val) {
-                        Ok(meta) => {
-                            self.collection
-                                .delete_op(&mut db_tx, &meta.id)
-                                .await
-                                .map_err(|e| {
-                                    MemFuseError::Internal(format!(
+                Some(val) => match serde_json::from_slice::<StoredDocumentMeta>(&val) {
+                    Ok(meta) => {
+                        self.collection
+                            .delete_op(&mut db_tx, &meta.id)
+                            .await
+                            .map_err(|e| {
+                                MemFuseError::Internal(format!(
                                     "Consolidation commit: failed to delete source doc {:?}: {}",
                                     src_id, e
                                 ))
-                                })?;
-                        }
-                        Err(e) => {
-                            return Err(MemFuseError::Serialization(format!(
-                                "Consolidation commit: cannot deserialize meta for source doc {:?}: {}", src_id, e
-                            )));
-                        }
+                            })?;
                     }
-                }
+                    Err(e) => {
+                        return Err(MemFuseError::Serialization(format!(
+                            "Consolidation commit: cannot deserialize meta for source doc {:?}: {}",
+                            src_id, e
+                        )));
+                    }
+                },
                 None => {
                     tracing::warn!(src_id = ?src_id, "Consolidation: source doc not found, already deleted — skipping");
                 }
@@ -625,8 +623,8 @@ pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
 
         for (key, value) in orphaned_keys {
             let is_consolidation = key.starts_with(b"consolidation_intent:")
-                || serde_json::from_slice::<crate::transaction::CommitIntent>(&value)
-                    .map(|i| matches!(i, crate::transaction::CommitIntent::Consolidation { .. }))
+                || serde_json::from_slice::<CommitIntent>(&value)
+                    .map(|i| matches!(i, CommitIntent::Consolidation { .. }))
                     .unwrap_or(false);
 
             if is_consolidation {
@@ -1024,7 +1022,7 @@ mod tests {
             graph,
             next_tx,
             dim,
-            memfuse_text::Language::English,
+            memfuse_engine::Language::English,
         );
 
         // 1. Insert source document
@@ -1082,9 +1080,8 @@ mod tests {
         let lsm = Arc::new(LsmStorage::new(lsm_config).await?);
         let next_tx = Arc::new(AtomicU64::new(10));
 
-        // Create two orphaned consolidation intent entries
         let target_doc_id = DocId::new(42);
-        let intent = crate::transaction::CommitIntent::Consolidation {
+        let intent = CommitIntent::Consolidation {
             source_docs: vec![(DocId::new(1), TxId::new(1))],
             target_id: target_doc_id,
             base_tx: TxId::new(5),
@@ -1099,7 +1096,6 @@ mod tests {
             .await?;
         lsm.commit(setup_tx).await?;
 
-        // Before cleanup, last_tx in storage might be 1, but next_tx counter is 10.
         let prev_counter = next_tx.load(Ordering::SeqCst);
         let cleaned = cleanup_orphaned_consolidation_intents(lsm.as_ref(), &next_tx).await?;
         assert_eq!(cleaned, 2, "Should clean up exactly 2 orphaned intents");
@@ -1111,11 +1107,94 @@ mod tests {
             "next_tx counter must increment monotonically by the number of cleaned intents"
         );
 
-        // Verify storage entries are removed
         let remaining1 = lsm.get(b"consolidation_intent:1").await?;
         let remaining2 = lsm.get(b"consolidation_intent:2").await?;
         assert!(remaining1.is_none());
         assert!(remaining2.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
+        let tmp = tempfile::tempdir().unwrap();
+        let lsm_config = LsmConfig {
+            path: tmp.path().to_path_buf(),
+            ..Default::default()
+        };
+        let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
+        let index = Arc::new(
+            HnswIndex::try_new(HnswConfig {
+                dimension: 4,
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+        let col = Collection::new(
+            "default".to_string(),
+            storage,
+            index,
+            Arc::new(CsrGraph::new()),
+            Arc::new(AtomicU64::new(1)),
+            4,
+            memfuse_engine::Language::English,
+        );
+
+        col.insert(
+            "source_1",
+            &[1.0, 0.0, 0.0, 0.0],
+            Some(serde_json::json!({"text": "Fact 1"})),
+        )
+        .await?;
+        col.insert(
+            "source_2",
+            &[0.0, 1.0, 0.0, 0.0],
+            Some(serde_json::json!({"text": "Fact 2"})),
+        )
+        .await?;
+
+        let d1 = DocId::from_key("source_1")?;
+        let d2 = DocId::from_key("source_2")?;
+        let target_id = DocId::from_key("summary_12")?;
+
+        let session = ConsolidationSession::start(&col, &[d1, d2], target_id).await?;
+
+        col.update(
+            "source_2",
+            &[0.0, 1.0, 0.0, 0.0],
+            Some(serde_json::json!({"text": "Fact 2 updated by agent"})),
+        )
+        .await?;
+
+        let commit_res = session
+            .commit(
+                "summary_12",
+                &[0.5, 0.5, 0.0, 0.0],
+                "Summary of 1 and 2",
+                None,
+            )
+            .await;
+        assert!(
+            commit_res.is_err(),
+            "Consolidation commit must fail under concurrent mutation"
+        );
+        match commit_res.unwrap_err() {
+            MemFuseError::StaleRead(msg) => {
+                assert!(msg.contains("OCC conflict"));
+            }
+            other => panic!("Expected StaleRead error, got: {:?}", other),
+        }
+
+        let doc1 = col.get("source_1").await?;
+        let doc2 = col.get("source_2").await?;
+        assert!(
+            doc1.is_some(),
+            "source_1 must not be deleted on aborted consolidation"
+        );
+        assert!(
+            doc2.is_some(),
+            "source_2 must not be deleted on aborted consolidation"
+        );
 
         Ok(())
     }

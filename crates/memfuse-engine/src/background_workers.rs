@@ -4,12 +4,9 @@
 // NICHT-OFFENSICHTLICH: Orphan Cleanup Worker triggert bei HNSW-Indextrennung automatischen Rebuild mit Timeout.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
-use crate::collection::{Collection, StoredDocument};
-use crate::consolidation_executor::{execute_consolidation_pass, ConsolidationLockGuard};
-use crate::memory_consolidation::ConsolidationConfig;
+use crate::collection::Collection;
 use memfuse_core::traits::StorageEngine;
 use memfuse_core::tx_buffer::TxBuffer;
-use memfuse_core::DocId;
 #[cfg(feature = "background-maintenance")]
 use memfuse_core::VectorIndex;
 use memfuse_graph::hyperedge::HyperEdgeId;
@@ -78,7 +75,7 @@ impl OrphanCleanupIndex for memfuse_index::hnsw::HnswIndex {
 }
 
 #[cfg(feature = "background-maintenance")]
-use crate::decay_controller::{AdaptiveDecayController, DecayControllerConfig};
+use memfuse_adapt::{AdaptiveDecayController, DecayControllerConfig};
 
 /// Maximum number of orphan transactions processed in a single worker tick
 /// to avoid starving foreground operations.
@@ -119,132 +116,7 @@ impl DeferredHyperedgeQueue {
     }
 }
 
-/// Starts a background task for periodic consolidation.
-#[deprecated(
-    note = "Konsolidiert in MaintenanceScheduler — siehe maintenance_scheduler.rs. Wird nach Migrationsfrist entfernt."
-)]
-pub fn start_consolidation_worker<S: StorageEngine>(
-    collection: Arc<Collection<S>>,
-    consolidation_config: ConsolidationConfig,
-    interval: Duration,
-    cancel_token: tokio_util::sync::CancellationToken,
-) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(interval);
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-        tracing::info!(
-            collection = %collection.name(),
-            interval = ?interval,
-            "Consolidation worker task started"
-        );
-
-        loop {
-            tokio::select! {
-                _ = ticker.tick() => {
-                    // P14-Compliance: Koordination mit ConsolidationEngine und MaintenanceScheduler
-                    let _guard = match ConsolidationLockGuard::try_acquire(
-                        &collection.consolidation_in_progress(),
-                    ) {
-                        Some(g) => g,
-                        None => {
-                            tracing::debug!(
-                                collection = %collection.name(),
-                                "consolidation_in_progress, skipping trigger"
-                            );
-                            continue;
-                        }
-                    };
-
-                    // Extract turns from collection (chronologically sorted)
-                    let user_key_prefix = collection.user_key_prefix();
-                    let entries = match collection.storage().scan_prefix(&user_key_prefix).await {
-                        Ok(entries) => entries,
-                        Err(err) => {
-                            tracing::error!(
-                                collection = %collection.name(),
-                                error = %err,
-                                "Consolidation worker: failed to scan collection"
-                            );
-                            continue;
-                        }
-                    };
-
-                    let mut turns: Vec<(DocId, Vec<f32>)> = Vec::new();
-                    for (k, v) in entries {
-                        if collection.name() == "default" && k.starts_with(b"__") {
-                            continue;
-                        }
-                        if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
-                            if let Ok(doc_id) = DocId::from_key(&stored.id) {
-                                turns.push((doc_id, stored.embedding));
-                            }
-                        }
-                    }
-
-                    if turns.is_empty() {
-                        continue;
-                    }
-
-                    match execute_consolidation_pass(&collection, &turns, &consolidation_config).await {
-                        Ok(res) => {
-                            if !res.duplicates_tombstoned.is_empty() {
-                                tracing::info!(
-                                    collection = %collection.name(),
-                                    tombstoned = res.duplicates_tombstoned.len(),
-                                    segments = res.segments_created,
-                                    "Consolidation worker: consolidated duplicate turns"
-                                );
-                            }
-                        }
-                        Err(err) => {
-                            tracing::error!(
-                                collection = %collection.name(),
-                                error = %err,
-                                "Consolidation worker: pass execution failed"
-                            );
-                        }
-                    }
-                }
-                _ = cancel_token.cancelled() => {
-                    tracing::info!(
-                        collection = %collection.name(),
-                        "Consolidation worker task shutting down via token"
-                    );
-                    break;
-                }
-            }
-        }
-    })
-}
-
-/// Deprecated legacy alias for `start_consolidation_worker`.
-#[deprecated(note = "use start_consolidation_worker instead")]
-#[allow(deprecated)]
-pub fn start_consolidation_reaper<S: StorageEngine>(
-    collection: Arc<Collection<S>>,
-    consolidation_config: ConsolidationConfig,
-    interval: Duration,
-    cancel_token: tokio_util::sync::CancellationToken,
-) -> tokio::task::JoinHandle<()> {
-    start_consolidation_worker(collection, consolidation_config, interval, cancel_token)
-}
-
 /// Starts a background task to process deferred hyperedge tombstones.
-///
-/// ARCHITEKTUR-HINTERGRUND (H5 / AK-6 & Welle 8 Prompt 7):
-/// Wenn beim Ersetzen/Invalidieren eines Dokuments in `consolidation_locks.rs` das
-/// Kaskadier-Limit für Hyperkanten erreicht wird, werden verbleibende Hyperkanten nicht
-/// synchron im Schreibpfad entwertet, sondern als `deferred: Vec<HyperEdgeId>` zurückgegeben.
-/// Die DAG-Hierarchie `memfuse-db -> memfuse-graph` verbietet einen direkten Aufruf von
-/// `memfuse-graph` in `background_workers.rs` zurück nach `memfuse-db` — stattdessen reiht der
-/// Aufrufer in `memfuse-db` die IDs in die `DeferredHyperedgeQueue` ein.
-///
-/// Dieser Worker nimmt pro Tick bis zu `MAX_DEFERRED_HYPEREDGES_PER_TICK` HyperEdgeIDs aus der Queue
-/// und ruft `collection.graph_index().tombstone_hyperedge(id)` auf.
-/// Die tatsächliche Befüllung der Queue via `.enqueue(...)` mit dem `deferred`-Feld aus
-/// `HyperedgeCascadeReport` ist ein Folge-Schritt in `consolidation_locks.rs::cascade_invalidate_edges_ordered`,
-/// sobald diese Datei freigegeben ist.
 pub fn start_hyperedge_cascade_deferred_worker<S: StorageEngine>(
     collection: Arc<Collection<S>>,
     queue: Arc<DeferredHyperedgeQueue>,
@@ -625,9 +497,7 @@ mod tests {
             let should_restore = self.rebuild_should_restore.load(Ordering::SeqCst);
             Box::pin(async move {
                 calls.fetch_add(1, Ordering::SeqCst);
-                if should_restore {
-                    // connectivity will be restored after rebuild
-                }
+                if should_restore {}
                 Ok(())
             })
         }
@@ -637,11 +507,9 @@ mod tests {
     async fn test_deferred_hyperedge_queue_fifo_and_limits() {
         let queue = DeferredHyperedgeQueue::new();
 
-        // (c) drain_up_to on empty queue returns empty Vec without panic
         let empty = queue.drain_up_to(100).await;
         assert!(empty.is_empty());
 
-        // (a) FIFO ordering test
         queue
             .enqueue(vec![
                 HyperEdgeId::new(10),
@@ -656,7 +524,6 @@ mod tests {
             vec![HyperEdgeId::new(10), HyperEdgeId::new(20)]
         );
 
-        // (b) drain_up_to with max larger than queue content returns all remaining elements without panic
         let drained_all = queue.drain_up_to(100).await;
         assert_eq!(drained_all, vec![HyperEdgeId::new(30)]);
 
@@ -711,7 +578,6 @@ mod tests {
             cancel_token.clone(),
         );
 
-        // (d) Worker processes a tick with fewer than MAX_DEFERRED_HYPEREDGES_PER_TICK completely
         let mut processed = false;
         for _ in 0..50 {
             sleep(Duration::from_millis(10)).await;
@@ -763,7 +629,6 @@ mod tests {
 
         let queue = Arc::new(DeferredHyperedgeQueue::new());
 
-        // (e) Enqueue 2,500 items (> MAX_DEFERRED_HYPEREDGES_PER_TICK = 1,000)
         let total_items = 2_500;
         let items: Vec<HyperEdgeId> = (1..=total_items).map(HyperEdgeId::new).collect();
         queue.enqueue(items).await;
@@ -776,7 +641,6 @@ mod tests {
             cancel_token.clone(),
         );
 
-        // Wait for multiple ticks to drain all 2,500 items
         let mut fully_drained = false;
         for _ in 0..100 {
             sleep(Duration::from_millis(15)).await;
@@ -839,7 +703,6 @@ mod tests {
             .await;
 
         let cancel_token = tokio_util::sync::CancellationToken::new();
-        // Cancel token before worker even runs
         cancel_token.cancel();
 
         let handle = start_hyperedge_cascade_deferred_worker(
@@ -852,7 +715,6 @@ mod tests {
         let res = handle.await;
         assert!(res.is_ok(), "Task should exit cleanly upon cancellation");
 
-        // (f) Shutdown preserves unhandled items in queue
         let remaining = queue.drain_up_to(100).await;
         assert_eq!(
             remaining,
@@ -894,7 +756,6 @@ mod tests {
             cancel_token.clone(),
         );
 
-        // Tick 1 (t=0ms): Rebuild attempt #1 fires immediately. Cooldown set to 100ms.
         sleep(Duration::from_millis(40)).await;
         assert_eq!(
             rebuild_calls.load(Ordering::SeqCst),
@@ -907,7 +768,6 @@ mod tests {
             "First failed rebuild incremented failure counter"
         );
 
-        // During 100ms cooldown (t=40..120ms): Ticks occur every 10ms, but backoff prevents extra rebuild calls.
         sleep(Duration::from_millis(50)).await;
         assert_eq!(
             rebuild_calls.load(Ordering::SeqCst),
@@ -915,7 +775,6 @@ mod tests {
             "Backoff must prevent rebuild on subsequent ticks during cooldown"
         );
 
-        // After cooldown expires (t > 140ms): Attempt #2 fires. Cooldown set to 200ms.
         sleep(Duration::from_millis(80)).await;
         assert_eq!(
             rebuild_calls.load(Ordering::SeqCst),
@@ -928,7 +787,6 @@ mod tests {
             "Second failed rebuild incremented failure counter"
         );
 
-        // After 200ms cooldown (t > 360ms): Attempt #3 fires. Counter reaches 3 (alert threshold).
         sleep(Duration::from_millis(220)).await;
         assert_eq!(
             rebuild_calls.load(Ordering::SeqCst),
@@ -941,13 +799,11 @@ mod tests {
             "Failure counter should reach alert threshold 3"
         );
 
-        // Now simulate successful restoration on next rebuild
         mock_index
             .rebuild_should_restore
             .store(true, Ordering::SeqCst);
         mock_index.connectivity_ok.store(true, Ordering::SeqCst);
 
-        // Next tick checks connectivity -> healthy -> resets failure counter
         sleep(Duration::from_millis(50)).await;
         assert_eq!(
             failures_counter.load(Ordering::SeqCst),
@@ -967,21 +823,21 @@ mod tests {
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
 
-        let dir = tempdir().unwrap(); // unwrap
+        let dir = tempdir().unwrap();
         let storage = Arc::new(
             LsmStorage::new(memfuse_store::LsmConfig {
                 path: dir.path().to_path_buf(),
                 ..Default::default()
             })
             .await
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let index = Arc::new(
             HnswIndex::try_new(memfuse_index::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let col = Arc::new(crate::Collection::new(
             "default".to_string(),
@@ -996,11 +852,10 @@ mod tests {
         let vec = vec![1.0, 0.0, 0.0, 0.0];
         col.insert_with_ttl("doc_task_ttl", &vec, None, 2)
             .await
-            .unwrap(); // unwrap
+            .unwrap();
 
-        // Perform 2 dummy commits
-        col.insert("d1", &vec, None).await.unwrap(); // unwrap
-        col.insert("d2", &vec, None).await.unwrap(); // unwrap
+        col.insert("d1", &vec, None).await.unwrap();
+        col.insert("d2", &vec, None).await.unwrap();
 
         let cancel_token = tokio_util::sync::CancellationToken::new();
         let handle = start_expiry_cleanup_worker(
@@ -1013,7 +868,6 @@ mod tests {
         for _ in 0..50 {
             sleep(Duration::from_millis(10)).await;
             if col.get("doc_task_ttl").await.unwrap().is_none() {
-                // unwrap
                 cleaned = true;
                 break;
             }
@@ -1047,7 +901,7 @@ mod tests {
 
         let cancel_token = tokio_util::sync::CancellationToken::new();
         let config = memfuse_index::hnsw::HnswConfig::default();
-        let hnsw_index = Arc::new(memfuse_index::hnsw::HnswIndex::try_new(config).unwrap()); // unwrap
+        let hnsw_index = Arc::new(memfuse_index::hnsw::HnswIndex::try_new(config).unwrap());
         let _worker = start_orphan_cleanup_worker(
             buffer.clone(),
             hnsw_index.clone(),
@@ -1080,18 +934,18 @@ mod tests {
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
 
-        let dir = tempdir().unwrap(); // unwrap
+        let dir = tempdir().unwrap();
         let lsm_config = memfuse_store::LsmConfig {
             path: dir.path().to_path_buf(),
             ..Default::default()
         };
-        let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+        let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
         let index = Arc::new(
             HnswIndex::try_new(memfuse_index::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let graph = Arc::new(CsrGraph::new());
         let next_tx = Arc::new(AtomicU64::new(1));
@@ -1109,7 +963,7 @@ mod tests {
         let vec = vec![1.0, 0.0, 0.0, 0.0];
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap() // unwrap
+            .unwrap()
             .as_millis() as u64;
 
         col.insert(
@@ -1118,10 +972,10 @@ mod tests {
             Some(json!({"created_at_ms": now_ms - 100, "ttl_ms": 50})),
         )
         .await
-        .unwrap(); // unwrap
+        .unwrap();
 
-        col.trigger_expiry_cleanup().await.unwrap(); // unwrap
-        let result = col.get("doc1").await.unwrap(); // unwrap
+        col.trigger_expiry_cleanup().await.unwrap();
+        let result = col.get("doc1").await.unwrap();
         assert!(result.is_none(), "Expired document must be deleted");
     }
 
@@ -1133,21 +987,21 @@ mod tests {
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
 
-        let dir = tempdir().unwrap(); // unwrap
+        let dir = tempdir().unwrap();
         let storage = Arc::new(
             LsmStorage::new(memfuse_store::LsmConfig {
                 path: dir.path().to_path_buf(),
                 ..Default::default()
             })
             .await
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let index = Arc::new(
             HnswIndex::try_new(memfuse_index::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let col = Arc::new(crate::Collection::new(
             "default".to_string(),
@@ -1160,7 +1014,7 @@ mod tests {
         ));
 
         let cancel_token = tokio_util::sync::CancellationToken::new();
-        cancel_token.cancel(); // cancel before starting
+        cancel_token.cancel();
 
         let handle = start_expiry_cleanup_worker(col, Duration::from_secs(60), cancel_token);
         let res = handle.await;
@@ -1178,21 +1032,21 @@ mod tests {
         use std::sync::atomic::Ordering;
         use tempfile::tempdir;
 
-        let dir = tempdir().unwrap(); // unwrap
+        let dir = tempdir().unwrap();
         let storage = Arc::new(
             LsmStorage::new(memfuse_store::LsmConfig {
                 path: dir.path().to_path_buf(),
                 ..Default::default()
             })
             .await
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let index = Arc::new(
             HnswIndex::try_new(memfuse_index::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
 
@@ -1208,7 +1062,6 @@ mod tests {
 
         let vec = vec![1.0, 0.0, 0.0, 0.0];
 
-        // 1. Add 10 old low-score chunks
         for i in 0..10 {
             let id = format!("old_low_{i}");
             let imp = MemoryImportance::new(
@@ -1218,10 +1071,9 @@ mod tests {
             );
             col.insert(&id, &vec, Some(json!({ "importance": imp })))
                 .await
-                .unwrap(); // unwrap
+                .unwrap();
         }
 
-        // 2. Add fresh high-score chunks
         for i in 0..5 {
             let id = format!("fresh_high_{i}");
             let imp = MemoryImportance::new(
@@ -1233,10 +1085,9 @@ mod tests {
             );
             col.insert(&id, &vec, Some(json!({ "importance": imp })))
                 .await
-                .unwrap(); // unwrap
+                .unwrap();
         }
 
-        // Advance current transaction ID to 50_000
         next_tx.store(50_000, Ordering::SeqCst);
 
         let decay_controller = AdaptiveDecayController::new(DecayControllerConfig {
@@ -1245,22 +1096,19 @@ mod tests {
             eviction_threshold: 0.01,
         });
 
-        // Reap with decay controller sweep
         let evicted = col
             .evict_decayed_chunks(&decay_controller, 100)
             .await
-            .unwrap(); // unwrap
+            .unwrap();
         assert_eq!(evicted, 10, "All 10 old low-score chunks should be evicted");
 
-        // Verify old_low chunks are gone
         for i in 0..10 {
-            let res = col.get(&format!("old_low_{i}")).await.unwrap(); // unwrap
+            let res = col.get(&format!("old_low_{i}")).await.unwrap();
             assert!(res.is_none(), "old_low_{i} must be deleted");
         }
 
-        // Verify fresh_high chunks remain
         for i in 0..5 {
-            let res = col.get(&format!("fresh_high_{i}")).await.unwrap(); // unwrap
+            let res = col.get(&format!("fresh_high_{i}")).await.unwrap();
             assert!(res.is_some(), "fresh_high_{i} must remain");
         }
     }
@@ -1268,7 +1116,7 @@ mod tests {
     #[cfg(feature = "background-maintenance")]
     #[tokio::test]
     async fn test_start_decay_cleanup_worker_background_task() {
-        use crate::decay_controller::DecayControllerConfig;
+        use memfuse_adapt::DecayControllerConfig;
         use memfuse_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
         use memfuse_graph::CsrGraph;
         use memfuse_index::HnswIndex;
@@ -1277,21 +1125,21 @@ mod tests {
         use std::sync::atomic::Ordering;
         use tempfile::tempdir;
 
-        let dir = tempdir().unwrap(); // unwrap
+        let dir = tempdir().unwrap();
         let storage = Arc::new(
             LsmStorage::new(memfuse_store::LsmConfig {
                 path: dir.path().to_path_buf(),
                 ..Default::default()
             })
             .await
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let index = Arc::new(
             HnswIndex::try_new(memfuse_index::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
 
@@ -1313,7 +1161,7 @@ mod tests {
         );
         col.insert("decay_target", &vec, Some(json!({ "importance": imp })))
             .await
-            .unwrap(); // unwrap
+            .unwrap();
 
         next_tx.store(100_000, Ordering::SeqCst);
 
@@ -1329,7 +1177,6 @@ mod tests {
         for _ in 0..50 {
             sleep(Duration::from_millis(10)).await;
             if col.get("decay_target").await.unwrap().is_none() {
-                // unwrap
                 evicted = true;
                 break;
             }

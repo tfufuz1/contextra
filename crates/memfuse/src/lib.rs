@@ -4,9 +4,9 @@
 
 #![forbid(unsafe_code)]
 
-pub use memfuse_core::types::domain::{DocId, ScoredDocument};
 pub use memfuse_core::error::MemFuseError;
-pub use memfuse_db::{MemFuse, MemFuseConfig, Collection, CollectionConfig};
+pub use memfuse_core::types::domain::{DocId, ScoredDocument};
+pub use memfuse_db::{Collection, CollectionConfig, MemFuse, MemFuseConfig};
 
 /// A builder for creating a `MemFuse` instance.
 pub struct MemFuseBuilder {

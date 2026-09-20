@@ -646,10 +646,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             meta_obj.insert("importance".to_string(), val);
         }
 
-        meta_obj.insert(
-            "model_id".to_string(),
-            serde_json::json!(model_id),
-        );
+        meta_obj.insert("model_id".to_string(), serde_json::json!(model_id));
 
         let meta_only = StoredDocumentMeta::from(&stored);
         let user_bytes = serde_json::to_vec(&stored)?;

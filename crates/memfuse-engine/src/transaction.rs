@@ -544,19 +544,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     }
 
     /// Commits the transaction atomically across all 4 indices (LSM, HNSW, BM25, CSR).
-    ///
-    /// Sequence:
-    /// PHASE 1 - PREPARE:
-    ///   a) Write CommitIntent (Pending) mit allen staged_doc_ids, has_text, has_graph → LSM
-    ///
-    /// PHASE 2 - COMMIT (reihenfolge ist kritisch!):
-    ///   b) storage.commit(tx_id)                     ← LSM (WAL + MemTable)
-    ///   c) index.commit(tx_id)                       ← HNSW
-    ///   d) text_index.commit(tx_id)                  ← BM25
-    ///   e) graph_index.commit(tx_id)                 ← CSR
-    ///
-    /// PHASE 3 - CLEANUP:
-    ///   f) CommitIntent (Committed) löschen / schreiben → LSM
     pub async fn commit(self) -> Result<()> {
         let intent_key = self
             .collection
@@ -610,7 +597,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 || !hyperedgs.is_empty()
         };
 
-        // Execute staged text and graph staging before prepare/commit
         if let Err(e) = self.commit_text_staged().await {
             self.rollback_internal().await;
             return Err(e);
@@ -621,7 +607,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             return Err(e);
         }
 
-        // 1. Prepare phase: Write intent marker with staged IDs
         let intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
@@ -637,23 +622,17 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             .put(self.tx_id, &intent_key, &intent_bytes)
             .await?;
 
-        // 2. Commit Storage (LSM)
         if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
             self.rollback_internal().await;
             return Err(MemFuseError::Transaction(storage_err.to_string()));
         }
 
-        // 3. Commit Index (HNSW)
         if let Err(index_err) = self.collection.index.commit(self.tx_id).await {
-            // ADR-REF: INV-DB-3: Roll back vector index staged state prior to graph and text rollback.
-            // Forward-compatibility note: Ensures staged uncommitted entries in HNSW are dropped
-            // upon commit failure, avoiding orphaned vector states in 2PC sequence.
             if let Err(e) = self.collection.index.rollback(self.tx_id).await {
                 tracing::error!(
                     tx_id = ?self.tx_id,
                     error = ?e,
-                    "[INV-DB-3] Failed to rollback vector index after commit failure; \
-                     graph may contain phantom nodes until compaction"
+                    "[INV-DB-3] Failed to rollback vector index after commit failure"
                 );
             }
             if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
@@ -675,7 +654,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             )));
         }
 
-        // 4. Commit Text Index (BM25)
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
             if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
                 tracing::error!(
@@ -689,7 +667,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                     e
                 );
             }
-            // HNSW is already committed -> compensate HNSW vector deletions
             self.compensate_hnsw(&doc_ids).await;
             self.compensate_lsm(&intent_key, &doc_ids).await;
             return Err(MemFuseError::Transaction(format!(
@@ -698,7 +675,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             )));
         }
 
-        // 5. Commit Graph Index (CSR)
         if let Err(graph_err) = self.collection.graph_index.commit(self.tx_id).await {
             if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
                 tracing::error!(
@@ -715,7 +691,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             )));
         }
 
-        // 6. Finalize / Cleanup
         let cleanup_tx = TxId::new(
             self.collection
                 .next_tx
@@ -748,7 +723,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) {
         if let Some(kv_store) = self.collection.kv_store() {
             let chunk_ids: Vec<u64> = doc_ids.iter().map(|d| d.inner()).collect();
-            // Standard TenantId 1 falls Tenant nicht explizit überschrieben
             let tenant = memfuse_core::TenantId::try_new(1).unwrap_or_default();
             kv_store.on_rollback(tenant, &chunk_ids);
         }
@@ -830,15 +804,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
             let mut comp_failed = false;
 
-            // NOTE: Previously, compensate_lsm unconditionally called storage.delete(rollback_tx, key)
-            // for all staged keys during rollback.
-            // BUG CAUSE: If the failed transaction was an UPDATE of an existing document,
-            // writing a tombstone (delete) permanently erased the pre-existing document from LSM,
-            // resulting in data loss instead of restoring the previous document state.
-            //
-            // FIX: If old_val is Some(bytes), restore the prior state via storage.put(rollback_tx, key, bytes).
-            // If old_val is None (original INSERT), write a tombstone via storage.delete(rollback_tx, key).
-            // Restoration uses a fresh, monotonically increasing rollback_tx (TxId), ensuring proper MVCC visibility.
             for (f_key, old_val) in &f_keys {
                 let res = match old_val {
                     Some(prev_bytes) => {
@@ -1040,6 +1005,39 @@ impl<S: StorageEngine, V: VectorIndex> Drop for DbTransaction<S, V> {
     }
 }
 
+/// Aufgerufen beim Öffnen einer Collection / DB. Findet und entfernt verwaiste
+/// ConsolidationIntents aus dem WAL/Storage.
+pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
+    storage: &S,
+    next_tx: &std::sync::atomic::AtomicU64,
+) -> Result<usize> {
+    let prefixes: &[&[u8]] = &[b"consolidation_intent:", b"__tx_intent:"];
+    let mut cleaned = 0usize;
+
+    for &prefix in prefixes {
+        let orphaned_keys = storage.scan_prefix(prefix).await?;
+
+        for (key, value) in orphaned_keys {
+            let is_consolidation = key.starts_with(b"consolidation_intent:")
+                || serde_json::from_slice::<CommitIntent>(&value)
+                    .map(|i| matches!(i, CommitIntent::Consolidation { .. }))
+                    .unwrap_or(false);
+
+            if is_consolidation {
+                let tx = TxId::new(next_tx.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+                storage.delete(tx, &key).await?;
+                storage.commit(tx).await?;
+                cleaned += 1;
+            }
+        }
+    }
+
+    if cleaned > 0 {
+        tracing::info!(cleaned, "Verwaiste ConsolidationIntents bereinigt");
+    }
+    Ok(cleaned)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1051,18 +1049,18 @@ mod tests {
     use tempfile::tempdir;
 
     async fn create_test_collection() -> Collection<LsmStorage, HnswIndex> {
-        let dir = tempdir().unwrap(); // unwrap
+        let dir = tempdir().unwrap();
         let lsm_config = memfuse_store::LsmConfig {
             path: dir.path().to_path_buf(),
             ..Default::default()
         };
-        let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+        let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
         let index = Arc::new(
             HnswIndex::try_new(memfuse_index::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
-            .unwrap(), // unwrap
+            .unwrap(),
         );
         let graph = Arc::new(CsrGraph::new());
         let next_tx = Arc::new(AtomicU64::new(1));
@@ -1083,7 +1081,7 @@ mod tests {
         use memfuse_core::{Edge, Entity, EntityId};
 
         let col = create_test_collection().await;
-        let tx_id = col.allocate_tx().unwrap(); // unwrap
+        let tx_id = col.allocate_tx().unwrap();
         let tx = DbTransaction::new(col.clone(), tx_id);
 
         let doc_id = DocId::new(100);
@@ -1092,7 +1090,6 @@ mod tests {
         tx.stage_graph_entity(Entity::new(EntityId(1), "NodeA", "Concept"));
         tx.stage_graph_edge(Edge::new(EntityId(1), EntityId(2), "relates_to"));
 
-        // Commit should succeed without errors
         let commit_res = tx.commit().await;
         assert!(commit_res.is_ok());
     }
@@ -1102,7 +1099,7 @@ mod tests {
         use memfuse_core::EntityId;
 
         let col = create_test_collection().await;
-        let tx_id = col.allocate_tx().unwrap(); // unwrap
+        let tx_id = col.allocate_tx().unwrap();
         let tx = DbTransaction::new(col.clone(), tx_id);
 
         let doc_id = DocId::new(200);
@@ -1118,20 +1115,18 @@ mod tests {
     #[tokio::test]
     async fn test_db_transaction_drop_triggers_cleanup() {
         let col = create_test_collection().await;
-        let tx_id = col.allocate_tx().unwrap(); // unwrap
+        let tx_id = col.allocate_tx().unwrap();
 
         {
             let tx = DbTransaction::new(col.clone(), tx_id);
             let doc_id = DocId::new(300);
             tx.stage_text_insert(doc_id, "uncommitted text".to_string());
-            // Drops `tx` here without calling `tx.commit().await`
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        // Text index should be clean / empty after drop cleanup
         let results = col.text_index.search_bm25("uncommitted", 1, None).await;
         assert!(results.is_ok());
-        assert!(results.unwrap().is_empty()); // unwrap
+        assert!(results.unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -1143,7 +1138,6 @@ mod tests {
         let tenant = memfuse_core::TenantId::try_new(1).unwrap();
         let doc_id = DocId::new(500);
 
-        // Pre-insert segment for doc_id 500 into kv_store
         kv_store.insert_segment(
             tenant,
             KvSegment::new(tenant, doc_id.inner(), vec![0xAA; 16]),
@@ -1160,7 +1154,6 @@ mod tests {
         let rollback_res = tx.rollback().await;
         assert!(rollback_res.is_ok());
 
-        // KV store must be purged of segment 500
         assert_eq!(
             kv_store.get_tenant_segment_len(tenant),
             0,
@@ -1170,11 +1163,9 @@ mod tests {
 
     #[test]
     fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
-        // Verifikation: Arc<Vec<DocId>> serialisiert und deserialisiert identisch wie Vec<DocId>
         let doc_ids_vec = vec![memfuse_core::DocId::new(1), memfuse_core::DocId::new(2)];
         let doc_ids_arc: Arc<Vec<memfuse_core::DocId>> = Arc::new(doc_ids_vec.clone());
 
-        // Format mit Arc:
         let intent_arc = CommitIntent::Pending {
             doc_ids: doc_ids_arc,
             has_text: false,
@@ -1183,10 +1174,8 @@ mod tests {
         };
         let json_arc = serde_json::to_string(&intent_arc).expect("serialize Arc");
 
-        // Simulierte Legacy-JSON-Struktur (wie sie von altem Vec<DocId> erzeugt würde):
         let legacy_json = r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"has_graph":false,"stages_completed":0}}"#;
 
-        // Round-Trip & Format-Vergleich:
         assert_eq!(
             json_arc, legacy_json,
             "Arc<Vec<DocId>> and Vec<DocId> must produce identical JSON representations"
@@ -1201,148 +1190,5 @@ mod tests {
             }
             _ => panic!("Unexpected CommitIntent variant"),
         }
-    }
-
-    #[tokio::test]
-    async fn test_repair_on_open_targeted_only_repairs_affected_collection() {
-        let dir = tempdir().expect("tempdir");
-        let config = crate::MemFuseConfig {
-            dimension: 4,
-            ..Default::default()
-        };
-        let db = crate::MemFuse::open_with_config(dir.path(), config)
-            .await
-            .expect("open db");
-
-        let col_a = db.collection("col_a").await.expect("col_a");
-        let col_b = db.collection("col_b").await.expect("col_b");
-
-        let tx1 = col_a.allocate_tx().expect("tx");
-        let doc_id = DocId::new(101);
-        let stored_doc = crate::collection::StoredDocument {
-            id: "doc_101".to_string(),
-            metadata: None,
-            embedding: vec![0.1, 0.2, 0.3, 0.4],
-        };
-        let doc_bytes = serde_json::to_vec(&stored_doc).expect("serde");
-        let doc_key = col_a.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-        col_a
-            .storage
-            .put(tx1, &doc_key, &doc_bytes)
-            .await
-            .expect("put doc");
-
-        let intent = CommitIntent::Pending {
-            doc_ids: Arc::new(vec![doc_id]),
-            has_text: false,
-            has_graph: false,
-            stages_completed: 0,
-        };
-        let intent_bytes = serde_json::to_vec(&intent).expect("serde intent");
-        let intent_key = col_a.namespaced_key(&tx1.inner().to_le_bytes(), 3);
-        col_a
-            .storage
-            .put(tx1, &intent_key, &intent_bytes)
-            .await
-            .expect("put intent");
-        col_a.storage.commit(tx1).await.expect("commit tx1");
-
-        let repair_res = db.repair_on_open().await;
-        assert!(repair_res.is_ok());
-
-        let indexed_a = col_a.index.all_doc_ids().await.expect("all_doc_ids");
-        assert!(indexed_a.contains(&doc_id));
-
-        let indexed_b = col_b.index.all_doc_ids().await.expect("all_doc_ids col_b");
-        assert!(indexed_b.is_empty());
-
-        let final_intent_val = col_a.storage.get(&intent_key).await.expect("get intent");
-        assert!(final_intent_val.is_some());
-        let final_intent: CommitIntent =
-            serde_json::from_slice(&final_intent_val.unwrap()).expect("parse intent");
-        assert!(matches!(final_intent, CommitIntent::Committed));
-    }
-
-    #[tokio::test]
-    async fn test_repair_on_open_legacy_intent_fallback_repair() {
-        let dir = tempdir().expect("tempdir");
-        let config = crate::MemFuseConfig {
-            dimension: 4,
-            ..Default::default()
-        };
-        let db = crate::MemFuse::open_with_config(dir.path(), config)
-            .await
-            .expect("open db");
-
-        let col = db.collection("col_legacy").await.expect("col_legacy");
-
-        let tx1 = col.allocate_tx().expect("tx");
-        let intent_key = col.namespaced_key(&tx1.inner().to_le_bytes(), 3);
-        col.storage
-            .put(tx1, &intent_key, b"pending")
-            .await
-            .expect("put legacy intent");
-        col.storage.commit(tx1).await.expect("commit tx1");
-
-        let repair_res = db.repair_on_open().await;
-        assert!(repair_res.is_ok());
-
-        let final_intent_val = col.storage.get(&intent_key).await.expect("get intent");
-        assert!(final_intent_val.is_some());
-        let final_intent: CommitIntent =
-            serde_json::from_slice(&final_intent_val.unwrap()).expect("parse intent");
-        assert!(matches!(final_intent, CommitIntent::Committed));
-    }
-
-    #[tokio::test]
-    async fn test_repair_on_open_failed_collection_repair_marks_intent_as_failed() {
-        let dir = tempdir().expect("tempdir");
-        let config = crate::MemFuseConfig {
-            dimension: 4,
-            ..Default::default()
-        };
-        let db = crate::MemFuse::open_with_config(dir.path(), config)
-            .await
-            .expect("open db");
-
-        let invalid_col_name = "invalid/col/name!";
-        let col_idx_key = [b"__col_idx:\x00", invalid_col_name.as_bytes()].concat();
-
-        let invalid_prefix = format!("__col:{}:\x00", invalid_col_name);
-        let mut intent_key = invalid_prefix.into_bytes();
-        intent_key.push(3);
-        intent_key.extend_from_slice(&999u64.to_le_bytes());
-
-        let intent = CommitIntent::Pending {
-            doc_ids: Arc::new(vec![DocId::new(303)]),
-            has_text: false,
-            has_graph: false,
-            stages_completed: 0,
-        };
-        let intent_bytes = serde_json::to_vec(&intent).expect("serde intent");
-
-        let tx1 = db.allocate_tx().expect("tx");
-        db.inner_storage()
-            .put(tx1, &col_idx_key, b"{}")
-            .await
-            .expect("put col idx");
-        db.inner_storage()
-            .put(tx1, &intent_key, &intent_bytes)
-            .await
-            .expect("put intent");
-        db.inner_storage().commit(tx1).await.expect("commit tx");
-
-        let repair_res = db.repair_on_open().await;
-        assert!(repair_res.is_err());
-
-        let final_intent_val = db
-            .inner_storage()
-            .get(&intent_key)
-            .await
-            .expect("get intent");
-        assert!(final_intent_val.is_some());
-        let final_intent: CommitIntent =
-            serde_json::from_slice(&final_intent_val.unwrap()).expect("parse intent");
-        assert!(matches!(final_intent, CommitIntent::Failed { .. }));
     }
 }

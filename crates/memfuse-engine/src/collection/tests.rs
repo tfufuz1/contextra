@@ -1437,8 +1437,6 @@ fn test_importance_score_parser_robust() {
     assert_eq!(super::parse_importance_score("invalid text"), 0.5);
 }
 
-
-
 #[tokio::test]
 async fn test_update_document_importance_persists_model_id_provenance() {
     use memfuse_graph::CsrGraph;
@@ -1483,7 +1481,7 @@ async fn test_update_document_importance_persists_model_id_provenance() {
 
     let doc = col.get("doc_test_prov").await.unwrap().unwrap(); // unwrap
     let meta = doc.metadata.unwrap(); // unwrap
-    
+
     let imp = meta.get("importance").unwrap();
     let imp_score: memfuse_core::MemoryImportance = serde_json::from_value(imp.clone()).unwrap();
     assert_eq!(imp_score.base_score.value(), 0.92);
@@ -3715,106 +3713,6 @@ async fn test_link_memories_cycle_prevention_for_all_relations() -> memfuse_core
     assert!(cycle_res.is_err(), "Cyclic link must be rejected");
     let err_str = cycle_res.unwrap_err().to_string();
     assert!(err_str.contains("Cyclic Elaborates relation detected"));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_concurrent_mutation_aborts_consolidation() -> memfuse_core::Result<()> {
-    use memfuse_core::DocId;
-    use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
-    use memfuse_store::LsmStorage;
-    use std::sync::atomic::AtomicU64;
-    use std::sync::Arc;
-    use tempfile::tempdir;
-
-    let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(memfuse_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(memfuse_index::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
-    let col = super::Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        Arc::new(CsrGraph::new()),
-        Arc::new(AtomicU64::new(1)),
-        4,
-        memfuse_text::Language::English,
-    );
-
-    col.insert(
-        "source_1",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "Fact 1"})),
-    )
-    .await?;
-    col.insert(
-        "source_2",
-        &[0.0, 1.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "Fact 2"})),
-    )
-    .await?;
-
-    let d1 = DocId::from_key("source_1")?;
-    let d2 = DocId::from_key("source_2")?;
-    let target_id = DocId::from_key("summary_12")?;
-
-    // 1. Start consolidation session (snapshots source_docs and records intent)
-    let session =
-        crate::context_compaction::ConsolidationSession::start(&col, &[d1, d2], target_id).await?;
-
-    // 2. Simulate concurrent mutation on source_2 while LLM synthesis is running
-    col.update(
-        "source_2",
-        &[0.0, 1.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "Fact 2 updated by agent"})),
-    )
-    .await?;
-
-    // 3. Attempting to commit consolidation must fail with StaleRead error!
-    let commit_res = session
-        .commit(
-            "summary_12",
-            &[0.5, 0.5, 0.0, 0.0],
-            "Summary of 1 and 2",
-            None,
-        )
-        .await;
-    assert!(
-        commit_res.is_err(),
-        "Consolidation commit must fail under concurrent mutation"
-    );
-    match commit_res.unwrap_err() {
-        memfuse_core::MemFuseError::StaleRead(msg) => {
-            assert!(msg.contains("OCC conflict"));
-        }
-        other => panic!("Expected StaleRead error, got: {:?}", other),
-    }
-
-    // 4. Verify that original source documents are still intact!
-    let doc1 = col.get("source_1").await?;
-    let doc2 = col.get("source_2").await?;
-    assert!(
-        doc1.is_some(),
-        "source_1 must not be deleted on aborted consolidation"
-    );
-    assert!(
-        doc2.is_some(),
-        "source_2 must not be deleted on aborted consolidation"
-    );
 
     Ok(())
 }

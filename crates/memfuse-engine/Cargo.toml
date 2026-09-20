@@ -2,16 +2,14 @@
 workspace = true
 
 [package]
-name = "memfuse-db"
+name = "memfuse-engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "MemFuse — Embedded hybrid-search for AI agents"
+description = "MemFuse — Core storage, index, and transaction orchestrator engine"
 
 [dependencies]
-memfuse-engine = { workspace = true }
-memfuse-cognition = { workspace = true }
 memfuse-sys = { workspace = true }
 memfuse-core = { workspace = true }
 bytes = { workspace = true }
@@ -23,6 +21,7 @@ memfuse-text = { workspace = true }
 memfuse-checkpoint = { workspace = true }
 memfuse-graph = { workspace = true }
 memfuse-calibration = { workspace = true }
+memfuse-adapt = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
@@ -33,11 +32,9 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
 thiserror = { workspace = true }
 
-
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
-criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
 memfuse-index = { workspace = true, features = ["experimental-diskann"] }
 
@@ -50,47 +47,7 @@ onnx = []
 experimental-diskann = ["memfuse-index/experimental-diskann"]
 background-maintenance = []
 graph-connectivity-health = ["memfuse-graph/physio-percolation"]
+docid-128 = ["memfuse-core/docid-128"]
+edge-reinforcement-learning = ["memfuse-graph/edge-reinforcement-learning"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = []
-volatile-vault = []
-docid-128 = ["memfuse-core/docid-128"]
-# RESOLVED: AGT-DB-897f3a5c — Forward edge-reinforcement-learning feature to memfuse-graph/edge-reinforcement-learning (TS: 2026-09-09T15:48:51Z) (SESSION: 2c31404a)
-edge-reinforcement-learning = ["memfuse-graph/edge-reinforcement-learning"]
-
-[[bench]]
-name = "migration_benchmarks"
-path = "../../benches/migration_benchmarks.rs"
-harness = false
-
-[[bench]]
-name = "scale_bench"
-path = "../../benches/scale_bench.rs"
-harness = false
-
-[[bench]]
-name = "rrf_scale_bench"
-path = "../../benches/rrf_scale_bench.rs"
-harness = false
-
-[[bench]]
-name = "competitive_bench"
-path = "../../benches/competitive_bench.rs"
-harness = false
-
-[[bench]]
-name = "relate_bench"
-path = "../../benches/relate_bench.rs"
-harness = false
-
-[[example]]
-name = "quickstart"
-
-[[example]]
-name = "hybrid_search"
-
-[[test]]
-name = "diskann_collection_fallback"
-required-features = ["experimental-diskann"]
-
-[[example]]
-name = "collections"

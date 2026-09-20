@@ -2353,6 +2353,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-cognition"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "blake3",
+ "bytes",
+ "memfuse-core",
+ "memfuse-embed",
+ "memfuse-engine",
+ "memfuse-graph",
+ "memfuse-index",
+ "memfuse-store",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "memfuse-core"
 version = "0.1.0"
 dependencies = [
@@ -2414,8 +2437,10 @@ dependencies = [
  "criterion",
  "memfuse-calibration",
  "memfuse-checkpoint",
+ "memfuse-cognition",
  "memfuse-core",
  "memfuse-crypto",
+ "memfuse-engine",
  "memfuse-graph",
  "memfuse-index",
  "memfuse-store",
@@ -2451,6 +2476,35 @@ dependencies = [
  "tokenizers 0.19.1",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "memfuse-engine"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "blake3",
+ "bytes",
+ "memfuse-adapt",
+ "memfuse-calibration",
+ "memfuse-checkpoint",
+ "memfuse-core",
+ "memfuse-crypto",
+ "memfuse-graph",
+ "memfuse-index",
+ "memfuse-store",
+ "memfuse-sys",
+ "memfuse-text",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]

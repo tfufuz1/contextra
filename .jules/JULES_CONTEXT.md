@@ -1,5 +1,5 @@
 # MemFuse — Jules Agent Context
-> Version: 2.1 | Stand: 2026-09-16 | Permanent Ambient Context für Jules Sessions
+> Version: 2.1 | Stand: 2026-09-20 | Permanent Ambient Context für Jules Sessions
 >
 > ⚠️ **FRISCHEGARANTIE**: Diese Datei regelt ausschließlich die Session-Prozessführung für Jules.
 > Die tatsächlichen Code-Fakten, Crate-Strukturen, Invarianten und Implementierungsstände
@@ -48,6 +48,8 @@ Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENT
 | `memfuse-candle` | `crates/memfuse-candle/AGENTS.md` |
 | `memfuse-embed` | `crates/memfuse-embed/AGENTS.md` |
 | `memfuse-db` | `crates/memfuse-db/AGENTS.md` |
+| `memfuse-engine` | `crates/memfuse-engine/AGENTS.md` |
+| `memfuse-cognition` | `crates/memfuse-cognition/AGENTS.md` |
 | `memfuse-bench` | `benchmarks/memfuse-bench/AGENTS.md` |
 | `memfuse-router` | `crates/memfuse-router/AGENTS.md` |
 | `memfuse-agent` | `crates/memfuse-agent/AGENTS.md` |

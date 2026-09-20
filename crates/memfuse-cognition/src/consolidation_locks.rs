@@ -13,9 +13,9 @@
 //! importiert werden. `ConsolidationNodesGuard` implementiert das gleiche strukturelle Muster (einziger
 //! Einstiegspunkt fuer geordnete Graph-/Node-Invalidierung waehrend der Konsolidierung).
 
-use crate::collection::Collection;
 use memfuse_core::traits::{StorageEngine, VectorIndex};
 use memfuse_core::{DocId, Result};
+use memfuse_engine::collection::Collection;
 use memfuse_graph::cascade::CascadeInvalidationReport;
 use tokio::sync::MutexGuard;
 
@@ -73,7 +73,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
 
         for doc_id in sorted_doc_ids {
             match memfuse_graph::cascade_invalidate_edges_for_superseded_doc(
-                &self.collection.graph_index,
+                &self.collection.graph_index(),
                 doc_id,
                 wal_seq,
             )

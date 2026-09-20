@@ -150,6 +150,22 @@
       "session_id": "18135303663892651424",
       "active": true,
       "expires_at": "2026-09-20T05:36:32.182621546+00:00"
+    },
+    {
+      "krate": "memfuse-engine",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-20T02:01:43.586159862+00:00",
+      "session_id": "16378629428331419404",
+      "active": true,
+      "expires_at": "2026-09-20T06:01:43.586150354+00:00"
+    },
+    {
+      "krate": "memfuse-cognition",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-20T02:02:22.707590474+00:00",
+      "session_id": "16378629428331419404",
+      "active": true,
+      "expires_at": "2026-09-20T06:02:22.707580509+00:00"
     }
   ]
 }
