@@ -113,8 +113,9 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-19T17:37:18.892012227+00:00",
       "session_id": "6701087099082658347",
-      "active": true,
-      "expires_at": "2026-09-19T21:37:18.891970920+00:00"
+      "active": false,
+      "expires_at": "2026-09-19T21:37:18.891970920+00:00",
+      "released_at": "2026-09-20T01:27:41.523881026+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-testkit",
@@ -130,8 +131,17 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-19T20:59:56.190922094+00:00",
       "session_id": "7926726196791221600",
+      "active": false,
+      "expires_at": "2026-09-20T00:59:56.190912160+00:00",
+      "released_at": "2026-09-20T01:27:41.523881026+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-types",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-20T01:25:30.003004922+00:00",
+      "session_id": "11637149307408335169",
       "active": true,
-      "expires_at": "2026-09-20T00:59:56.190912160+00:00"
+      "expires_at": "2026-09-20T05:25:30.002995406+00:00"
     }
   ]
 }
