@@ -41,8 +41,7 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
         "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
         | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
         | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-        | "memfuse-core" | "memfuse-index" | "memfuse-calibration"
-        | "memfuse-core-ipc-gen" => Some(Ring::Ring0),
+        | "memfuse-core" | "memfuse-index" | "memfuse-calibration" => Some(Ring::Ring0),
 
         // Ring 1
         "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),

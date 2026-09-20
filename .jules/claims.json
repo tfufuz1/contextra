@@ -150,6 +150,14 @@
       "session_id": "18135303663892651424",
       "active": true,
       "expires_at": "2026-09-20T05:36:32.182621546+00:00"
+    },
+    {
+      "krate": "memfuse-core-ipc-gen",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-20T02:15:31.653832835+00:00",
+      "session_id": "2377089971131829664",
+      "active": true,
+      "expires_at": "2026-09-20T06:15:31.653821028+00:00"
     }
   ]
 }
