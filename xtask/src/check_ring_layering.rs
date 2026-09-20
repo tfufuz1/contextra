@@ -41,14 +41,14 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
         "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
         | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
         | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-        | "memfuse-core" | "memfuse-index" | "memfuse-calibration" => Some(Ring::Ring0),
+        | "memfuse-core" | "memfuse-index" | "memfuse-calibration"
+        | "memfuse-core-ipc-gen" => Some(Ring::Ring0),
 
         // Ring 1
         "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),
 
         // Ring 2
-        "memfuse-infer-candle" | "memfuse-infer-ollama" | "memfuse-infer-onnx"
-        | "memfuse-sandbox" | "memfuse-embed" | "memfuse-candle"
+        "memfuse-sandbox" | "memfuse-embed" | "memfuse-candle"
         | "memfuse-ollama" => Some(Ring::Ring2),
 
         // Ring 3
@@ -65,6 +65,63 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AllowlistEntry {
+    pub from_crate: &'static str,
+    pub to_crate: &'static str,
+    pub target_phase: &'static str,
+    pub reason: &'static str,
+}
+
+pub const LAYER_ALLOWLIST: &[AllowlistEntry] = &[
+    AllowlistEntry {
+        from_crate: "memfuse-graph",
+        to_crate: "memfuse-store",
+        target_phase: "Phase 1a",
+        reason: "Dev-dependency on store for graph integration tests; to be isolated into memfuse-testkit in Phase 1a",
+    },
+    AllowlistEntry {
+        from_crate: "memfuse-embed",
+        to_crate: "memfuse-calibration",
+        target_phase: "Phase 1b",
+        reason: "Embed depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
+    },
+    AllowlistEntry {
+        from_crate: "memfuse-embed",
+        to_crate: "memfuse-candle",
+        target_phase: "Phase 1b",
+        reason: "Embed depends on candle provider; execution provider abstraction in Phase 1b",
+    },
+    AllowlistEntry {
+        from_crate: "memfuse-candle",
+        to_crate: "memfuse-calibration",
+        target_phase: "Phase 1b",
+        reason: "Candle provider depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
+    },
+    AllowlistEntry {
+        from_crate: "memfuse-candle",
+        to_crate: "memfuse-store",
+        target_phase: "Phase 1b",
+        reason: "Candle provider uses store directly; store traits abstraction in Phase 1b",
+    },
+    AllowlistEntry {
+        from_crate: "memfuse-ollama",
+        to_crate: "memfuse-calibration",
+        target_phase: "Phase 1b",
+        reason: "Ollama provider depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
+    },
+    AllowlistEntry {
+        from_crate: "memfuse-ollama",
+        to_crate: "memfuse-embed",
+        target_phase: "Phase 1b",
+        reason: "Ollama provider dev-dependency on embed for benchmarks/tests; to be isolated in Phase 1b",
+    },
+];
+
+pub fn find_allowlist_entry(from_crate: &str, to_crate: &str) -> Option<&'static AllowlistEntry> {
+    LAYER_ALLOWLIST.iter().find(|e| e.from_crate == from_crate && e.to_crate == to_crate)
+}
+
 #[derive(Debug, Clone)]
 pub struct RingViolation {
     pub from_crate: String,
@@ -73,6 +130,8 @@ pub struct RingViolation {
     pub to_ring: Ring,
     pub dep_kind: String, // "normal", "build", "dev"
     pub rule_reason: String,
+    pub is_allowlisted: bool,
+    pub allowlist_phase: Option<&'static str>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -178,6 +237,7 @@ pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<Ring
             };
 
             if let Some(reason) = violation_reason {
+                let allow_entry = find_allowlist_entry(pkg_name, dep_name);
                 violations.push(RingViolation {
                     from_crate: pkg_name.clone(),
                     from_ring,
@@ -185,6 +245,8 @@ pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<Ring
                     to_ring,
                     dep_kind: kind.to_string(),
                     rule_reason: reason,
+                    is_allowlisted: allow_entry.is_some(),
+                    allowlist_phase: allow_entry.map(|e| e.target_phase),
                 });
             }
         }
@@ -216,26 +278,46 @@ pub fn run_check_ring_layering(strict: bool) -> Result<bool, String> {
         return Ok(true);
     }
 
-    println!("⚠️ check-ring-layering: {} Ring-Verstoß/Verstöße gefunden:", violations.len());
-    for v in &violations {
-        println!(
-            "  RING-VIOLATION: {} ({}) -> {} ({}) [kind={}]: {}",
-            v.from_crate,
-            v.from_ring.name(),
-            v.to_crate,
-            v.to_ring.name(),
-            v.dep_kind,
-            v.rule_reason
-        );
+    let allowlisted: Vec<_> = violations.iter().filter(|v| v.is_allowlisted).collect();
+    let unallowlisted: Vec<_> = violations.iter().filter(|v| !v.is_allowlisted).collect();
+
+    if !allowlisted.is_empty() {
+        println!("⚠️ check-ring-layering: {} dokumentierte Allowlist-Ausnahme(n) gefunden:", allowlisted.len());
+        for v in &allowlisted {
+            println!(
+                "  ALLOWLISTED [{}] {} ({}) -> {} ({}) [kind={}]: {}",
+                v.allowlist_phase.unwrap_or("Phase ?"),
+                v.from_crate,
+                v.from_ring.name(),
+                v.to_crate,
+                v.to_ring.name(),
+                v.dep_kind,
+                v.rule_reason
+            );
+        }
+    }
+
+    if !unallowlisted.is_empty() {
+        println!("❌ check-ring-layering: {} UNDOKUMENTIERTE Ring-Verstöße gefunden:", unallowlisted.len());
+        for v in &unallowlisted {
+            println!(
+                "  RING-VIOLATION: {} ({}) -> {} ({}) [kind={}]: {}",
+                v.from_crate,
+                v.from_ring.name(),
+                v.to_crate,
+                v.to_ring.name(),
+                v.dep_kind,
+                v.rule_reason
+            );
+        }
     }
 
     if strict {
-        let ring3_violations = violations.iter().filter(|v| v.from_ring == Ring::Ring3).count();
-        if ring3_violations > 0 {
-            eprintln!("❌ check-ring-layering (--strict active): Fail due to {} Ring 3 violation(s).", ring3_violations);
+        if !unallowlisted.is_empty() {
+            eprintln!("❌ check-ring-layering (--strict active): Fail due to {} unallowlisted Ring violation(s).", unallowlisted.len());
             Ok(false)
         } else {
-            println!("ℹ️ check-ring-layering (--strict active): 0 Ring 3 violations. Ignoring {} non-Ring-3 violations for now.", violations.len());
+            println!("ℹ️ check-ring-layering (--strict active): All {} violation(s) are documented on the phased allowlist.", violations.len());
             Ok(true)
         }
     } else {
