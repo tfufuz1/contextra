@@ -159,6 +159,14 @@
       "active": false,
       "expires_at": "2026-09-20T06:00:47.674612205+00:00",
       "released_at": "2026-09-20T02:06:26.175279941+00:00 [RELEASED]"
+    },
+    {
+      "krate": "docs-readme",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-20T02:43:58.831221960+00:00",
+      "session_id": "4422798258836074216",
+      "active": true,
+      "expires_at": "2026-09-20T06:43:58.831211155+00:00"
     }
   ]
 }

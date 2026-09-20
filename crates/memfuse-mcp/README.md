@@ -2,6 +2,12 @@
 
 Model Context Protocol (MCP) Server für **MemFuse Brain** — Ermöglicht es KI-Agenten (wie Claude Desktop, Cursor oder custom MCP-Clients), lokal über das standardisierte Model Context Protocol auf die 4-Signal RAG-Engine von MemFuse zuzugreifen.
 
+## Ring-Zugehörigkeit & Status
+
+- **Ring:** Ring 4 (Ränder / Protocol & Transport)
+- **Status:** 🟢 Fertig
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+
 ---
 
 ## 1. Installation & Build-Anleitung
@@ -257,7 +263,7 @@ Der Server exponiert 4 Kern-Tools:
 - **Lösung:** Starten Sie das Binary mit dem Flag `--allow-write` oder setzen Sie die Umgebungsvariable `MEMFUSE_MCP_ALLOW_WRITE=1`.
 
 ### Fehler: Ollama-Verbindung fehlgeschlagen (`connection refused`)
-- **Ursache:** Ollama läuft nicht oder ist unter der angegebenen URL nicht erreichbar.
+- **Ursache:** Ollama läuft nicht oder ist unter der angegebenen URL nicht erreibar.
 - **Lösung:**
   1. Stellen Sie sicher, dass Ollama läuft (`ollama serve` oder Ollama App gestartet).
   2. Überprüfen Sie, ob das Embedding-Modell vorhanden ist: `ollama pull nomic-embed-text`.
@@ -270,3 +276,7 @@ Der Server exponiert 4 Kern-Tools:
 ### Fehler: Database Lock / Permission Denied
 - **Ursache:** Das Datenbankverzeichnis ist von einem anderen Prozess blockiert oder es fehlen Schreibrechte.
 - **Lösung:** Stellen Sie sicher, dass keine zweite Instanz von MemFuse exklusiv auf `--db-path` zugreift und die Verzeichnisrechte stimmen.
+
+## 7. Architektur & Verweise
+
+Details zum MCP Transport und Egress Gateway finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) und `README.md` §10.
