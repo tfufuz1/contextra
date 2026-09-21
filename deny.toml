@@ -25,10 +25,36 @@ confidence-threshold = 0.8
 multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
-# Note on tokio (§4.2 Ring-Modell):
-# tokio ban rule is omitted from deny.toml because the direct dependency list (>15 entries, including hyper, tower, etc.)
-# is overly complex/brittle. Ring-0 tokio-freedom is enforced via `cargo tree` assertions and `check-ring-layering`.
 deny = [
+    # §4.2 Ring-Modell: tokio-Nutzung ist in Ring-0-Kernen (memfuse-vector, memfuse-text, memfuse-graph) verboten und nur in Höher-Ring-Fassaden sowie erlaubter Peripherie gestattet
+    { crate = "tokio", wrappers = [
+        "criterion",
+        "hyper",
+        "hyper-rustls",
+        "hyper-util",
+        "memfuse",
+        "memfuse-agent",
+        "memfuse-bench",
+        "memfuse-checkpoint",
+        "memfuse-cognition",
+        "memfuse-crypto",
+        "memfuse-db",
+        "memfuse-engine",
+        "memfuse-infer-candle",
+        "memfuse-infer-ollama",
+        "memfuse-infer-onnx",
+        "memfuse-kvcache",
+        "memfuse-mcp",
+        "memfuse-privacy",
+        "memfuse-py",
+        "memfuse-router",
+        "memfuse-sandbox",
+        "memfuse-store",
+        "reqwest",
+        "tokio-rustls",
+        "tokio-util",
+        "tower",
+    ] },
     # §4.2 Ring-Modell: Candle-Inferenz nur in memfuse-candle (TRANSITION; künftig memfuse-infer-candle) sowie Candle-Eigencrates
     { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "memfuse-candle", "memfuse-infer-candle"] },
     # §4.2 Ring-Modell: ONNX/ort nur in memfuse-embed (TRANSITION; künftig memfuse-infer-onnx)

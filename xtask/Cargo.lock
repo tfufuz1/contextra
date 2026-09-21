@@ -738,21 +738,10 @@ dependencies = [
 name = "memfuse-core"
 version = "0.1.0"
 dependencies = [
- "ahash",
- "bincode",
- "blake3",
- "bytes",
- "flatbuffers",
- "futures-util",
  "memfuse-mvcc",
  "memfuse-ports",
  "memfuse-types",
  "memfuse-wire",
- "parking_lot",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
 ]
 
 [[package]]
