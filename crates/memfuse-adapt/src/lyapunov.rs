@@ -72,6 +72,26 @@ pub enum LyapunovResult {
     InsufficientData,
 }
 
+impl LyapunovResult {
+    /// Wendet `apply_drift_penalty` auf die gegebene `BanditPolicy` an, falls `DriftDetected` vorliegt.
+    /// Gibt `true` zurück, falls Drift erkannt und die Penalty angewendet wurde.
+    #[cfg(feature = "bandit-routing")]
+    pub fn apply_drift_if_detected<P: crate::bandit::BanditPolicy + ?Sized>(
+        &self,
+        policy: &mut P,
+        k_drift: f32,
+        alpha_max: f32,
+        gamma: f32,
+    ) -> bool {
+        if matches!(self, LyapunovResult::DriftDetected { .. }) {
+            policy.apply_drift_penalty(k_drift, alpha_max, gamma);
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Proaktiver Drift-Wächter auf Basis diskreter Lyapunov-Exponenten über KL-Divergenzen.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LyapunovDriftWatcher {
@@ -320,15 +340,26 @@ mod tests {
             last_res = watcher.update(&current);
         }
 
-        match last_res {
+        match &last_res {
             LyapunovResult::DriftDetected {
                 lyapunov_exponent,
                 reason,
             } => {
-                assert!(lyapunov_exponent > 0.0);
+                assert!(*lyapunov_exponent > 0.0);
                 assert!(reason.kl_divergence > 0.0);
             }
             other => panic!("Expected DriftDetected, got {:?}", other),
+        }
+
+        #[cfg(feature = "bandit-routing")]
+        {
+            use crate::bandit::BanditProfileState;
+            let mut bandit = BanditProfileState::cold_start(2, 0.5);
+            let alpha_before = bandit.alpha;
+
+            let applied = last_res.apply_drift_if_detected(&mut bandit, 2.0, 4.0, 0.95);
+            assert!(applied);
+            assert!((bandit.alpha - alpha_before * 2.0).abs() < 1e-6);
         }
     }
 
