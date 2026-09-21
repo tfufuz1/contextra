@@ -170,6 +170,15 @@
       "active": false,
       "expires_at": "2026-09-20T06:43:58.831211155+00:00",
       "released_at": "2026-09-21T07:52:50.525666573+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "workspace-root",
+      "issue": "WELLE-2026-09-21-ONNX-DEFAULT-MEMBERS",
+      "timestamp": "2026-09-21T13:09:31.259173+00:00",
+      "session_id": "manual-jules-session",
+      "active": true,
+      "expires_at": "2026-09-21T17:09:31.259198+00:00",
+      "released_at": null
     }
   ]
 }
