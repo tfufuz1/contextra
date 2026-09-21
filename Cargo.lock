@@ -2675,6 +2675,7 @@ dependencies = [
  "memfuse-core",
  "memfuse-db",
  "memfuse-graph",
+ "memfuse-privacy",
  "memfuse-store",
  "memfuse-text",
  "memfuse-vector",
