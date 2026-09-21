@@ -178,7 +178,7 @@
       "session_id": "manual-jules-session",
       "active": false,
       "expires_at": "2026-09-21T17:09:31.259198+00:00",
-      "released_at": "2026-09-21T18:19:15.516628141+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-21T18:20:42.622397268+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "docs-decisions",
@@ -190,12 +190,12 @@
       "released_at": "2026-09-21T13:56:27.901083926+00:00 [RELEASED]"
     },
     {
-      "krate": "memfuse-core",
+      "krate": "workspace-root",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-21T18:17:18.312094275+00:00",
-      "session_id": "4434866641567863807",
+      "timestamp": "2026-09-21T18:14:20.180368201+00:00",
+      "session_id": "10672640857832740238",
       "active": true,
-      "expires_at": "2026-09-21T22:17:18.312079235+00:00"
+      "expires_at": "2026-09-21T22:14:20.180353482+00:00"
     }
   ]
 }
