@@ -2584,6 +2584,7 @@ dependencies = [
  "memfuse-crypto",
  "memfuse-infer-candle",
  "memfuse-infer-onnx",
+ "memfuse-privacy",
  "parking_lot",
  "rand 0.8.8",
  "scc",
