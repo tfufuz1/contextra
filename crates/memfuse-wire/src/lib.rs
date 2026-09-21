@@ -16,5 +16,7 @@
 pub mod memfuse_generated;
 
 pub mod adapter;
+pub mod jsonrpc;
 
+pub use jsonrpc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 pub use memfuse_generated::mem_fuse::ipc::*;
