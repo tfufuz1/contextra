@@ -96,7 +96,7 @@ pub use check_jules_context_freshness::run_check_jules_context_freshness;
 
 use chrono::{NaiveDate, NaiveDateTime};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
@@ -1808,74 +1808,6 @@ pub fn run_validate_tags(fix: bool) -> bool {
     }
     final_success
 }
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct UnwrapBaselineEntry {
-    pub file: String,
-    pub hash: String,
-}
-
-pub struct UnwrapOccurrence {
-    pub file: String,
-    pub line_num: usize,
-    pub hash: String,
-}
-
-pub fn fnv1a_hash(input: &str) -> String {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for byte in input.bytes() {
-        hash ^= u64::from(byte);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    format!("{:016x}", hash)
-}
-
-pub fn scan_unwrap_expect_occurrences_at(root: &Path) -> Vec<UnwrapOccurrence> {
-    let mut occurrences = Vec::new();
-    let scan_dir = if root.join("crates").exists() {
-        root.join("crates")
-    } else {
-        root.to_path_buf()
-    };
-
-    for entry in WalkDir::new(&scan_dir)
-        .sort_by_file_name()
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        let path = entry.path();
-        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("rs") {
-            let rel_path = path
-                .strip_prefix(root)
-                .unwrap_or(path)
-                .to_string_lossy()
-                .replace('\\', "/");
-
-            if let Ok(content) = fs::read_to_string(path) {
-                let lines: Vec<&str> = content.lines().collect();
-                for (idx, line) in lines.iter().enumerate() {
-                    if line.contains(".unwrap()") || line.contains(".expect(") {
-                        let line_num = idx + 1;
-                        let start = if idx > 0 { idx - 1 } else { 0 };
-                        let end = std::cmp::min(idx + 1, lines.len().saturating_sub(1));
-                        let window_str = lines[start..=end].join("\n");
-                        let hash = fnv1a_hash(&window_str);
-
-                        occurrences.push(UnwrapOccurrence {
-                            file: rel_path.clone(),
-                            line_num,
-                            hash,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    occurrences
-}
-
-
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct DagViolation {
