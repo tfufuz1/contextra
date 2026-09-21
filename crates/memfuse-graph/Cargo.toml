@@ -46,3 +46,7 @@ criterion = { workspace = true }
 [[bench]]
 name = "csr_traversal_bench"
 harness = false
+
+[[bench]]
+name = "binary_edge_regression"
+harness = false
