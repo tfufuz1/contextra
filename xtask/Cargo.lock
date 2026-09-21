@@ -672,11 +672,11 @@ dependencies = [
  "hdrhistogram",
  "memfuse-core",
  "memfuse-db",
- "memfuse-embed",
  "memfuse-graph",
- "memfuse-index",
+ "memfuse-infer-onnx",
  "memfuse-store",
  "memfuse-text",
+ "memfuse-vector",
  "rand",
  "serde",
  "serde_json",
@@ -723,8 +723,8 @@ dependencies = [
  "memfuse-core",
  "memfuse-engine",
  "memfuse-graph",
- "memfuse-index",
  "memfuse-store",
+ "memfuse-vector",
  "parking_lot",
  "serde",
  "serde_json",
@@ -796,10 +796,10 @@ dependencies = [
  "memfuse-crypto",
  "memfuse-engine",
  "memfuse-graph",
- "memfuse-index",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
+ "memfuse-vector",
  "parking_lot",
  "serde",
  "serde_json",
@@ -808,18 +808,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "zeroize",
-]
-
-[[package]]
-name = "memfuse-embed"
-version = "0.1.0"
-dependencies = [
- "memfuse-calibration",
- "memfuse-core",
- "parking_lot",
- "serde",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -835,10 +823,10 @@ dependencies = [
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-graph",
- "memfuse-index",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
+ "memfuse-vector",
  "parking_lot",
  "serde",
  "serde_json",
@@ -868,19 +856,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-index"
+name = "memfuse-infer-onnx"
 version = "0.1.0"
 dependencies = [
- "ahash",
+ "memfuse-calibration",
  "memfuse-core",
- "memfuse-crypto",
- "memfuse-simd",
- "memmap2",
  "parking_lot",
- "rand",
- "roaring",
  "serde",
- "subtle",
  "tokio",
  "tracing",
 ]
@@ -1022,11 +1004,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-vector"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "memfuse-core",
+ "memfuse-crypto",
+ "memfuse-simd",
+ "memmap2",
+ "parking_lot",
+ "rand",
+ "roaring",
+ "serde",
+ "subtle",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "memfuse-wire"
 version = "0.1.0"
 dependencies = [
  "bytes",
  "flatbuffers",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

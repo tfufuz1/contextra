@@ -270,7 +270,7 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: memfuse_core::Vec
 mod tests {
     use super::*;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::{HnswConfig, HnswIndex};
+    use memfuse_vector::{HnswConfig, HnswIndex};
 
     #[tokio::test]
     async fn test_audit_log_in_memory_storage() {

@@ -12,3 +12,5 @@ description = "Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zer
 [dependencies]
 flatbuffers = { workspace = true }
 bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

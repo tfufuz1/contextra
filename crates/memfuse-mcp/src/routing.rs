@@ -50,7 +50,7 @@ pub async fn setup_routing(
 
 /// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
 #[cfg(feature = "kv-bridge")]
-pub fn setup_kv_bridge(_db: &Arc<MemFuse>) -> Option<Arc<memfuse_candle::KvBridgeAdapter>> {
+pub fn setup_kv_bridge(_db: &Arc<MemFuse>) -> Option<Arc<memfuse_infer_candle::KvBridgeAdapter>> {
     // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert
     tracing::info!(
         "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"

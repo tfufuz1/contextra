@@ -61,7 +61,7 @@ pub trait OrphanCleanupIndex: Send + Sync {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = memfuse_core::Result<()>> + Send + '_>>;
 }
 
-impl OrphanCleanupIndex for memfuse_index::hnsw::HnswIndex {
+impl OrphanCleanupIndex for memfuse_vector::hnsw::HnswIndex {
     fn check_connectivity(&self) -> memfuse_core::Result<()> {
         self.check_connectivity()
     }
@@ -411,7 +411,7 @@ pub fn start_orphan_cleanup_worker_with_config<
 /// configured timeout without being committed or rolled back.
 pub fn start_orphan_cleanup_worker<T: Clone + Send + Sync + 'static>(
     buffer: Arc<TxBuffer<T>>,
-    hnsw_index: Arc<memfuse_index::hnsw::HnswIndex>,
+    hnsw_index: Arc<memfuse_vector::hnsw::HnswIndex>,
     interval: Duration,
     cancel_token: tokio_util::sync::CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
@@ -429,7 +429,7 @@ pub fn start_orphan_cleanup_worker<T: Clone + Send + Sync + 'static>(
 #[deprecated(note = "use start_orphan_cleanup_worker instead")]
 pub fn start_orphan_reaper<T: Clone + Send + Sync + 'static>(
     buffer: Arc<TxBuffer<T>>,
-    hnsw_index: Arc<memfuse_index::hnsw::HnswIndex>,
+    hnsw_index: Arc<memfuse_vector::hnsw::HnswIndex>,
     interval: Duration,
     cancel_token: tokio_util::sync::CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
@@ -534,8 +534,8 @@ mod tests {
     #[tokio::test]
     async fn test_deferred_hyperedge_worker_single_tick_processing() {
         use memfuse_graph::CsrGraph;
-        use memfuse_index::HnswIndex;
         use memfuse_store::LsmStorage;
+        use memfuse_vector::HnswIndex;
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
 
@@ -549,7 +549,7 @@ mod tests {
             .unwrap(),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
@@ -596,8 +596,8 @@ mod tests {
     #[tokio::test]
     async fn test_deferred_hyperedge_worker_fanout_multitick_processing() {
         use memfuse_graph::CsrGraph;
-        use memfuse_index::HnswIndex;
         use memfuse_store::LsmStorage;
+        use memfuse_vector::HnswIndex;
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
 
@@ -611,7 +611,7 @@ mod tests {
             .unwrap(),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
@@ -662,8 +662,8 @@ mod tests {
     #[tokio::test]
     async fn test_deferred_hyperedge_worker_graceful_shutdown_preserves_queue() {
         use memfuse_graph::CsrGraph;
-        use memfuse_index::HnswIndex;
         use memfuse_store::LsmStorage;
+        use memfuse_vector::HnswIndex;
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
 
@@ -677,7 +677,7 @@ mod tests {
             .unwrap(),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
@@ -818,8 +818,8 @@ mod tests {
     #[tokio::test]
     async fn test_expiry_cleanup_worker_task_cleans_documents() {
         use memfuse_graph::CsrGraph;
-        use memfuse_index::HnswIndex;
         use memfuse_store::LsmStorage;
+        use memfuse_vector::HnswIndex;
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
 
@@ -833,7 +833,7 @@ mod tests {
             .unwrap(),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
@@ -900,8 +900,8 @@ mod tests {
         );
 
         let cancel_token = tokio_util::sync::CancellationToken::new();
-        let config = memfuse_index::hnsw::HnswConfig::default();
-        let hnsw_index = Arc::new(memfuse_index::hnsw::HnswIndex::try_new(config).unwrap());
+        let config = memfuse_vector::hnsw::HnswConfig::default();
+        let hnsw_index = Arc::new(memfuse_vector::hnsw::HnswIndex::try_new(config).unwrap());
         let _worker = start_orphan_cleanup_worker(
             buffer.clone(),
             hnsw_index.clone(),
@@ -928,8 +928,8 @@ mod tests {
     #[tokio::test]
     async fn trigger_expiry_cleanup_deletes_expired_documents() {
         use memfuse_graph::CsrGraph;
-        use memfuse_index::HnswIndex;
         use memfuse_store::LsmStorage;
+        use memfuse_vector::HnswIndex;
         use serde_json::json;
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
@@ -941,7 +941,7 @@ mod tests {
         };
         let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
@@ -982,8 +982,8 @@ mod tests {
     #[tokio::test]
     async fn test_worker_immediate_cancellation() {
         use memfuse_graph::CsrGraph;
-        use memfuse_index::HnswIndex;
         use memfuse_store::LsmStorage;
+        use memfuse_vector::HnswIndex;
         use std::sync::atomic::AtomicU64;
         use tempfile::tempdir;
 
@@ -997,7 +997,7 @@ mod tests {
             .unwrap(),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
@@ -1026,8 +1026,8 @@ mod tests {
         use crate::decay_controller::{AdaptiveDecayController, DecayControllerConfig};
         use memfuse_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
         use memfuse_graph::CsrGraph;
-        use memfuse_index::HnswIndex;
         use memfuse_store::LsmStorage;
+        use memfuse_vector::HnswIndex;
         use serde_json::json;
         use std::sync::atomic::Ordering;
         use tempfile::tempdir;
@@ -1042,7 +1042,7 @@ mod tests {
             .unwrap(),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })
@@ -1119,8 +1119,8 @@ mod tests {
         use memfuse_adapt::DecayControllerConfig;
         use memfuse_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
         use memfuse_graph::CsrGraph;
-        use memfuse_index::HnswIndex;
         use memfuse_store::LsmStorage;
+        use memfuse_vector::HnswIndex;
         use serde_json::json;
         use std::sync::atomic::Ordering;
         use tempfile::tempdir;
@@ -1135,7 +1135,7 @@ mod tests {
             .unwrap(),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })

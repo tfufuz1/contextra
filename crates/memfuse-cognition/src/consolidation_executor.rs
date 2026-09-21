@@ -339,7 +339,7 @@ pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + '
 }
 
 /// Tokio-Background-Task Engine für periodische Speicher-Konsolidierung und Wissenssynthese.
-pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex = memfuse_index::HnswIndex> {
+pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex = memfuse_vector::HnswIndex> {
     collection: Arc<Collection<S, V>>,
     llm: Option<Arc<dyn LlmTextGenerator>>,
     validator: Option<Arc<dyn ResponseGroundingValidator>>,
@@ -553,8 +553,8 @@ mod tests {
     use memfuse_core::traits::LlmTextGenerator;
     use memfuse_core::BoxFuture;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;
@@ -602,7 +602,7 @@ mod tests {
             .expect("LsmStorage"),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })

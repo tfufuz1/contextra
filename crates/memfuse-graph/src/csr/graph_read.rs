@@ -56,6 +56,16 @@ impl CsrGraph {
             return Ok(());
         }
 
+        if let Some(ref tracker) = self.config.resource_tracker {
+            if !tracker.has_memory_capacity() {
+                tracing::warn!(
+                    "compact_async deferred due to global ResourceTracker memory budget exhaustion"
+                );
+                // AI-TAG[RESOLVED][IP-08-BUDGET-COUPLING](TS:2026-09-18T12:00:00Z)(SESSION:e095d708): Connected to global ResourceTracker when cross-crate tracker handle is configured.
+                return Ok(());
+            }
+        }
+
         if let Some(max_mb) = self.config.max_compaction_peak_memory_mb {
             let estimated_bytes = snapshot.estimate_memory_bytes();
             let estimated_peak_bytes = estimated_bytes * 2;
@@ -66,7 +76,6 @@ impl CsrGraph {
                     max_compaction_peak_memory_mb = max_mb,
                     "compact_async deferred due to compaction memory budget constraint"
                 );
-                // AI-TAG[TODO][IP-08-BUDGET-COUPLING](TS:2026-09-18T12:00:00Z)(SESSION:e095d708): Connect to global ResourceTracker when cross-crate tracker handle is integrated.
                 // NOTE(IP-20): Hyperedge memory contributions are included in estimate_memory_bytes() for accurate local budget checks.
                 return Ok(());
             }

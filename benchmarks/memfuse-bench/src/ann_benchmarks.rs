@@ -10,7 +10,7 @@ use anyhow::Result;
 use hdrhistogram::Histogram;
 use memfuse_core::traits::VectorIndex;
 use memfuse_core::types::{DistanceMetric, DocId, TxId};
-use memfuse_index::{HnswConfig, HnswIndex};
+use memfuse_vector::{HnswConfig, HnswIndex};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};

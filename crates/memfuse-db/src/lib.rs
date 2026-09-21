@@ -72,18 +72,14 @@ pub use memfuse_cognition::start_consolidation_reaper;
 pub mod decay_controller {
     pub use memfuse_adapt::decay_controller::*;
 }
-pub mod filter;
-pub mod fusion;
+pub use memfuse_engine::fusion;
 pub mod homeostat {
     pub use memfuse_adapt::homeostat::*;
 }
-pub mod maintenance_config;
-pub mod maintenance_scheduler;
 pub mod multistep;
 pub mod pid_latency_controller {
     pub use memfuse_adapt::pid_latency_controller::*;
 }
-pub mod transaction;
 
 #[cfg(feature = "volatile-vault")]
 pub mod volatile_vault;
@@ -112,15 +108,6 @@ pub use memfuse_core::DriftStatusProvider;
 pub use memfuse_core::SegmentSynthesizer;
 pub use memfuse_core::TextEmbeddingEngine;
 pub use serde_json::json;
-
-impl MemFuse {
-    /// Returns the underlying storage engine.
-    /// Internal use only for benchmarks and tests.
-    #[doc(hidden)]
-    pub fn inner_storage(&self) -> Arc<LsmStorage> {
-        self.storage.clone()
-    }
-}
 
 #[cfg(feature = "sandbox")]
 impl SandboxBridge for MemFuse {

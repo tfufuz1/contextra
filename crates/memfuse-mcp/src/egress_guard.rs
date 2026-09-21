@@ -6,6 +6,7 @@ use memfuse_crypto::egress_vault::{
     BlockReason, BoxFuture, EgressClassification, EgressClassifier,
 };
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Standard-Timeout für EgressGuard Vector-Search (200 ms).
 pub const DEFAULT_EGRESS_GUARD_TIMEOUT: Duration = Duration::from_millis(200);
@@ -122,11 +123,6 @@ impl EgressGuard {
     }
 }
 
-impl CollectionSearchEngine {
-    pub fn new(collection: Arc<memfuse_db::Collection>) -> Self {
-        Self { collection }
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -155,6 +151,7 @@ mod tests {
             if text.contains("secret") {
                 v[0] = 1.0;
             }
-        })
+            Box::pin(async move { Ok(v) })
+        }
     }
 }

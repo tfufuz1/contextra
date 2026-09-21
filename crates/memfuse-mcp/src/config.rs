@@ -98,7 +98,7 @@ pub fn create_embedding_provider(
                     "onnx_model_path is required when embedding provider is 'onnx'".to_string(),
                 )
             })?;
-            let embedder = memfuse_embed::OnnxEmbedder::from_path(path)?;
+            let embedder = memfuse_infer_onnx::OnnxEmbedder::from_path(path)?;
             Ok(Arc::new(embedder))
         }
         #[cfg(not(feature = "onnx"))]
@@ -119,11 +119,12 @@ pub fn create_embedding_provider(
                     "candle_model_dir is required when embedding provider is 'candle'".to_string(),
                 )
             })?;
-            let quantization = memfuse_candle::model_registry::CandleQuantization::Q4KM;
-            let embedder = memfuse_candle::CandleEmbedClient::from_dir(model_dir, quantization)
-                .map_err(|e| {
-                    MemFuseError::Internal(format!("Failed to load Candle embed model: {e}"))
-                })?;
+            let quantization = memfuse_infer_candle::model_registry::CandleQuantization::Q4KM;
+            let embedder =
+                memfuse_infer_candle::CandleEmbedClient::from_dir(model_dir, quantization)
+                    .map_err(|e| {
+                        MemFuseError::Internal(format!("Failed to load Candle embed model: {e}"))
+                    })?;
             Ok(Arc::new(embedder))
         }
         #[cfg(not(feature = "candle"))]
@@ -231,11 +232,11 @@ pub fn create_llm_text_generator(
                     "candle_model_dir is required when LLM provider is 'candle'".to_string(),
                 )
             })?;
-            let quantization = memfuse_candle::model_registry::CandleQuantization::Q4KM;
-            let generator = memfuse_candle::CandleLlmClient::from_dir(model_dir, quantization)
-                .map_err(|e| {
-                    MemFuseError::Internal(format!("Failed to load Candle LLM model: {e}"))
-                })?;
+            let quantization = memfuse_infer_candle::model_registry::CandleQuantization::Q4KM;
+            let generator =
+                memfuse_infer_candle::CandleLlmClient::from_dir(model_dir, quantization).map_err(
+                    |e| MemFuseError::Internal(format!("Failed to load Candle LLM model: {e}")),
+                )?;
             Ok(Arc::new(generator))
         }
         #[cfg(not(feature = "candle"))]

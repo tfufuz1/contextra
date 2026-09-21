@@ -754,7 +754,7 @@ async fn test_kv_bridge_adapter_consulted_on_retrieve() {
     let store = Arc::new(memfuse_crypto::TenantIsolatedKvStore::new());
     let master_km = memfuse_crypto::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
     let cipher = Arc::new(memfuse_crypto::KvSegmentCipher::new(master_km));
-    let bridge_adapter = Arc::new(memfuse_candle::KvBridgeAdapter::new(store, cipher));
+    let bridge_adapter = Arc::new(memfuse_infer_candle::KvBridgeAdapter::new(store, cipher));
 
     let server = Arc::new(
         McpServer::with_write_permission(Arc::new(db), embedder, true)

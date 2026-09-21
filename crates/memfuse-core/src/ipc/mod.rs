@@ -4,10 +4,12 @@
 //! The Rust code for FlatBuffers schemas is **auto-generated** in [`memfuse_wire`]
 //! from the FlatBuffers schema located at `schemas/memfuse.fbs`.
 
-pub mod jsonrpc;
-
-pub use jsonrpc::*;
 pub use memfuse_wire::*;
+#[deprecated(
+    since = "0.1.0",
+    note = "Moved to memfuse_wire as part of Ring-Modell Phase 1b"
+)]
+pub use memfuse_wire::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 
 #[cfg(test)]
 mod tests {
