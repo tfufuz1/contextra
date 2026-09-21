@@ -38,7 +38,6 @@ default-members = [
     "crates/memfuse-checkpoint",
     "crates/memfuse-crypto",
     "crates/memfuse-graph",
-    "crates/memfuse-infer-onnx",
     "crates/memfuse-mcp",
     "crates/memfuse-agent",
     "crates/memfuse-infer-ollama",
