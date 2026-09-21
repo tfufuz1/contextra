@@ -204,6 +204,14 @@
       "session_id": "2090223400654574052",
       "active": true,
       "expires_at": "2026-09-22T00:00:37.526179874+00:00"
+    },
+    {
+      "krate": "memfuse-graph-tests-budget",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-21T20:51:33.270330815+00:00",
+      "session_id": "3158607085084724643",
+      "active": true,
+      "expires_at": "2026-09-22T00:51:33.270319798+00:00"
     }
   ]
 }
