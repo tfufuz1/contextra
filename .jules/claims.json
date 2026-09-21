@@ -177,8 +177,16 @@
       "timestamp": "2026-09-21T13:09:31.259173+00:00",
       "session_id": "manual-jules-session",
       "active": true,
-      "expires_at": "2026-09-21T17:09:31.259198+00:00",
-      "released_at": null
+      "expires_at": "2026-09-21T17:09:31.259198+00:00"
+    },
+    {
+      "krate": "docs-decisions",
+      "issue": "WELLE-2026-09-21-V3-ADR-N02",
+      "timestamp": "2026-09-21T13:38:39.856585817+00:00",
+      "session_id": "15516823758931695528",
+      "active": false,
+      "expires_at": "2026-09-21T17:38:39.856571205+00:00",
+      "released_at": "2026-09-21T13:56:27.901083926+00:00 [RELEASED]"
     }
   ]
 }
