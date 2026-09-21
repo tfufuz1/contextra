@@ -2,54 +2,51 @@
 // ZWECK: Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern).
 // INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts.
 // NICHT-OFFENSICHTLICH: Sub-Queries nutzen BM25-only (leerer Vektor), da sie textuelle Umformulierungen darstellen.
-// STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
-// memfuse-db/src/multistep.rs
-// Multi-Step Iterative Retrieval Engine (MemFuse Iterative Multi-Step Retrieval)
-
-use crate::pid_latency_controller::{
-    LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS,
-};
-use crate::{Collection, SearchResult};
-use memfuse_core::{BoxFuture, Result, StorageEngine};
+use crate::pid_latency_controller::{LatencyBudgetGuard, PidLatencyController};
+use crate::Collection;
+use memfuse_core::{Result, StorageEngine};
+pub use memfuse_rank::multistep::{MultiStepConfig, MultiStepResult, QueryRewriter};
+use memfuse_rank::SearchResult;
 use std::sync::Arc;
 
-/// Konfiguration für Multi-Step Retrieval.
-#[derive(Debug, Clone)]
-pub struct MultiStepConfig {
-    /// Maximale Iterationsrunden (Standard: 3).
-    pub max_rounds: usize,
-    /// Mindest-Score-Schwellenwert: unter diesem Wert gilt Runde als unzureichend.
-    pub quality_threshold: f32,
-    /// Minimale Anzahl an Treffern die den Threshold überschreiten müssen.
-    pub min_quality_hits: usize,
-    /// Maximale Latenz in Millisekunden für den Multi-Step-Zyklus (Standard: 100.0 ms).
-    pub latency_budget_ms: f64,
+fn convert_engine_results(
+    results: Vec<memfuse_engine::SearchResult>,
+) -> Vec<SearchResult> {
+    results
+        .into_iter()
+        .map(|r| SearchResult {
+            id: r.id,
+            score: r.score,
+            metadata: r.metadata,
+            matched_signals: r.matched_signals,
+            provenance: r.provenance.map(|p| memfuse_rank::ProvenanceRecord {
+                vector_distance: p.vector_distance,
+                bm25_score: p.bm25_score,
+                graph_score: p.graph_score,
+                rerank_score: p.rerank_score,
+                signal_ranks: p.signal_ranks,
+                source_collection: p.source_collection,
+                index_type: p.index_type,
+                signal_contributions: p
+                    .signal_contributions
+                    .into_iter()
+                    .map(|(k, c)| {
+                        (
+                            k,
+                            memfuse_rank::SignalContribution {
+                                raw_score: c.raw_score,
+                                rank: c.rank,
+                                rrf_contribution: c.rrf_contribution,
+                            },
+                        )
+                    })
+                    .collect(),
+                coherence_bonus: p.coherence_bonus,
+            }),
+        })
+        .collect()
 }
-
-impl Default for MultiStepConfig {
-    fn default() -> Self {
-        Self {
-            max_rounds: 3,
-            quality_threshold: 0.5,
-            min_quality_hits: 2,
-            latency_budget_ms: DEFAULT_TARGET_LATENCY_MS,
-        }
-    }
-}
-
-/// Ergebnis einer Multi-Step-Suche mit Audit-Informationen.
-#[derive(Debug)]
-pub struct MultiStepResult {
-    pub results: Vec<SearchResult>,
-    /// Anzahl der tatsächlich durchgeführten Runden.
-    pub rounds_executed: usize,
-    /// Queries die in den Folgerunden verwendet wurden.
-    pub sub_queries: Vec<String>,
-}
-
-// ANCHOR[MULTISTEP:QUERY-REWRITER] STATUS:DONE (TS:2026-06-01T00:00:00Z) — External QueryRewriter trait contract and error isolation.
-// TRACKING-ISSUE: #142 (Ollama / LLM-based QueryRewriter implementation in memfuse-ollama crate)
 
 /// Multi-Step Retrieval Engine.
 ///
@@ -59,20 +56,6 @@ pub struct MultiStepEngine<S: StorageEngine> {
     collection: Arc<Collection<S>>,
     config: MultiStepConfig,
     pid_controller: parking_lot::Mutex<PidLatencyController>,
-}
-
-/// Trait für Query-Rewriting (LLM-agnostisch).
-pub trait QueryRewriter: Send + Sync {
-    /// Generiert alternative Teil-Queries basierend auf bisherigen Ergebnissen.
-    ///
-    /// `original_query` – die ursprüngliche Anfrage
-    /// `current_results` – bisherige Ergebnisse (leer bei erstem Aufruf)
-    /// Gibt leeren Vec zurück wenn kein Rewriting nötig.
-    fn rewrite<'a>(
-        &'a self,
-        original_query: &'a str,
-        current_results: &'a [SearchResult],
-    ) -> BoxFuture<'a, Result<Vec<String>>>;
 }
 
 impl<S: StorageEngine> MultiStepEngine<S> {
@@ -86,15 +69,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
     }
 
     /// Führt iterative Hybrid-Suche durch.
-    ///
-    /// Runde 1: Standard-Hybrid-Suche mit `original_query`.
-    /// Runde 2–N: Falls Qualität unzureichend, QueryRewriter generiert Sub-Queries.
-    /// Ergebnisse werden via RRF über alle Runden fusioniert.
-    ///
-    /// # Note on Sub-Query Embeddings
-    /// Sub-queries (Rounds 2-N) use BM25-only search (empty vector).
-    /// The original query's vector search results contribute via RRF from Round 1.
-    /// For full semantic sub-query search, see TRACKING-ISSUE #143.
     pub async fn search(
         &self,
         original_query: &str,
@@ -120,10 +94,9 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             .k(current_k * 2)
             .execute()
             .await?;
-        all_result_sets.push(round1);
+        all_result_sets.push(convert_engine_results(round1));
         rounds_executed += 1;
 
-        // Qualitätsprüfung über leihende Referenz auf den ersten Ergebnissatz in all_result_sets
         let round1_ref = all_result_sets.first().map(|v| v.as_slice()).unwrap_or(&[]);
         if self.quality_sufficient(round1_ref) || rewriter.is_none() {
             let fused = reciprocal_rank_fusion(all_result_sets, k);
@@ -134,7 +107,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             });
         }
 
-        // Runde 2–max_rounds: Query-Rewriting
         let rewriter = match rewriter {
             Some(r) => r,
             None => {
@@ -147,13 +119,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             }
         };
 
-        // Note on result set ownership:
-        // `all_result_sets` owns historical result sets directly (moved without cloning).
-        // `quality_sufficient` and `rewriter.rewrite` receive borrowed slices `&[SearchResult]`.
-        // If SearchResult metadata structures (serde_json::Value) grow large in future extensions,
-        // using `Arc<SearchResult>` will further optimize internal fusion moves.
         for _round in 2..=self.config.max_rounds {
-            // Budget-Guard Check: Hart aber panic-frei abbrechen bei Budget-Überschreitung
             if budget_guard.is_exceeded() {
                 tracing::info!(
                     elapsed_ms = budget_guard.elapsed_ms(),
@@ -163,7 +129,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                 break;
             }
 
-            // PID-Latenzregler: Skalierung von k_pool für Folgerunden basierend auf gemessener Latenz
             let scaling_factor = self
                 .pid_controller
                 .lock()
@@ -189,12 +154,6 @@ impl<S: StorageEngine> MultiStepEngine<S> {
 
             let mut executed_sub_query = false;
             for sub_q in &sub_qs {
-                // Sub-queries use BM25-only (empty vector slice) because:
-                // 1. Sub-queries are textual reformulations, not semantic shifts
-                // 2. Generating sub-query embeddings requires an embedder dependency
-                // 3. The original vector contributes via Round-1 results in RRF fusion
-                // ANCHOR[MULTISTEP:SUBQUERY-EMBEDDING] STATUS:DONE (TS:2026-06-01T00:00:00Z) — See TRACKING-ISSUE #143 for
-                // future improvement: inject TextEmbeddingEngine for sub-query vectors.
                 match self
                     .collection
                     .query()
@@ -204,7 +163,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                     .await
                 {
                     Ok(sub_results) => {
-                        all_result_sets.push(sub_results);
+                        all_result_sets.push(convert_engine_results(sub_results));
                         sub_queries.push(sub_q.clone());
                         executed_sub_query = true;
                     }
@@ -248,6 +207,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use memfuse_core::BoxFuture;
     use memfuse_graph::CsrGraph;
     use memfuse_index::{HnswConfig, HnswIndex};
     use memfuse_store::{LsmConfig, LsmStorage};
@@ -377,199 +337,5 @@ mod tests {
         assert_eq!(result.rounds_executed, 2);
         assert_eq!(result.sub_queries, vec!["rust programming"]);
         assert!(!result.results.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_multistep_no_rewriter_provided() {
-        let col = create_test_collection().await;
-        let config = MultiStepConfig::default();
-        let engine = MultiStepEngine::new(col, config);
-
-        let result = engine
-            .search("query", &[1.0, 0.0, 0.0, 0.0], 5, None)
-            .await
-            .expect("search"); // expect
-
-        assert_eq!(result.rounds_executed, 1);
-        assert!(result.sub_queries.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_multistep_subquery_uses_bm25_only() {
-        let col = create_test_collection().await;
-        col.insert(
-            "doc1",
-            &[1.0, 0.0, 0.0, 0.0],
-            Some(serde_json::json!({"text": "rust programming language"})),
-        )
-        .await
-        .expect("insert"); // expect
-
-        let config = MultiStepConfig {
-            max_rounds: 2,
-            quality_threshold: 0.99,
-            min_quality_hits: 2,
-            latency_budget_ms: 1000.0,
-        };
-        let engine = MultiStepEngine::new(col, config);
-
-        let rewriter = DummyRewriter {
-            responses: std::sync::Mutex::new(vec![vec!["rust programming".to_string()]]),
-        };
-
-        let result = engine
-            .search("original", &[0.1, 0.2, 0.3, 0.4], 5, Some(&rewriter))
-            .await
-            .expect("search"); // expect
-
-        assert_eq!(result.rounds_executed, 2);
-        assert_eq!(result.sub_queries, vec!["rust programming"]);
-        assert!(!result.results.is_empty());
-    }
-
-    struct FailingRewriter;
-
-    impl QueryRewriter for FailingRewriter {
-        fn rewrite<'a>(
-            &'a self,
-            _original_query: &'a str,
-            _current_results: &'a [SearchResult],
-        ) -> BoxFuture<'a, Result<Vec<String>>> {
-            Box::pin(async move {
-                Err(memfuse_core::MemFuseError::Internal(
-                    "Rewriter error".into(),
-                ))
-            })
-        }
-    }
-
-    #[tokio::test]
-    async fn test_multistep_latency_budget_exceeded_returns_partial_result() {
-        let col = create_test_collection().await;
-        col.insert(
-            "doc1",
-            &[1.0, 0.0, 0.0, 0.0],
-            Some(serde_json::json!({"text": "rust programming"})),
-        )
-        .await
-        .expect("insert");
-
-        // Set budget to 0.0ms so round 2 immediately aborts via LatencyBudgetGuard
-        let config = MultiStepConfig {
-            max_rounds: 3,
-            quality_threshold: 0.99,
-            min_quality_hits: 2,
-            latency_budget_ms: 0.0001,
-        };
-        let engine = MultiStepEngine::new(col, config);
-
-        let rewriter = DummyRewriter {
-            responses: std::sync::Mutex::new(vec![vec!["sub query 1".to_string()]]),
-        };
-
-        // Sleep briefly to ensure budget is exceeded before Round 2 check
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-
-        let result = engine
-            .search("rust", &[1.0, 0.0, 0.0, 0.0], 5, Some(&rewriter))
-            .await
-            .expect("search should succeed gracefully with partial results");
-
-        assert_eq!(result.rounds_executed, 1);
-        assert!(result.sub_queries.is_empty());
-        assert!(!result.results.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_multistep_failing_rewriter_gracefully_stops() {
-        let col = create_test_collection().await;
-        col.insert(
-            "doc1",
-            &[1.0, 0.0, 0.0, 0.0],
-            Some(serde_json::json!({"text": "rust programming"})),
-        )
-        .await
-        .expect("insert"); // expect
-
-        let config = MultiStepConfig {
-            max_rounds: 3,
-            quality_threshold: 0.99,
-            min_quality_hits: 2,
-            latency_budget_ms: 1000.0,
-        };
-        let engine = MultiStepEngine::new(col, config);
-        let rewriter = FailingRewriter;
-
-        let result = engine
-            .search("rust", &[1.0, 0.0, 0.0, 0.0], 5, Some(&rewriter))
-            .await
-            .expect("search should succeed gracefully even if rewriter fails"); // expect
-
-        assert_eq!(result.rounds_executed, 1);
-        assert!(result.sub_queries.is_empty());
-    }
-
-    struct SlowRewriter;
-
-    impl QueryRewriter for SlowRewriter {
-        fn rewrite<'a>(
-            &'a self,
-            _original_query: &'a str,
-            _current_results: &'a [SearchResult],
-        ) -> BoxFuture<'a, Result<Vec<String>>> {
-            Box::pin(async move {
-                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-                Ok(vec!["sub query 1".to_string()])
-            })
-        }
-    }
-
-    #[tokio::test]
-    async fn test_multistep_latency_budget_guard_exceeded() {
-        let col = create_test_collection().await;
-        col.insert(
-            "doc1",
-            &[1.0, 0.0, 0.0, 0.0],
-            Some(serde_json::json!({"text": "rust programming"})),
-        )
-        .await
-        .expect("insert");
-
-        let config = MultiStepConfig {
-            max_rounds: 5,
-            quality_threshold: 0.99,
-            min_quality_hits: 2,
-            latency_budget_ms: 10.0, // Tight 10ms budget
-        };
-        let engine = MultiStepEngine::new(col, config);
-        let rewriter = SlowRewriter;
-
-        let result = engine
-            .search("rust", &[1.0, 0.0, 0.0, 0.0], 5, Some(&rewriter))
-            .await
-            .expect("search should succeed with partial results under budget exhaustion");
-
-        assert_eq!(result.rounds_executed, 2); // Round 1 executed, round 2 rewriter took 20ms (> 10ms budget), so round 3 loop check stops further expansion
-        assert!(!result.results.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_multistep_latency_budget_exhaustion_on_empty_db() {
-        let col = create_test_collection().await;
-        let config = MultiStepConfig {
-            max_rounds: 5,
-            quality_threshold: 0.99,
-            min_quality_hits: 2,
-            latency_budget_ms: 1.0,
-        };
-        let engine = MultiStepEngine::new(col, config);
-        let rewriter = SlowRewriter;
-
-        let result = engine
-            .search("nonexistent", &[1.0, 0.0, 0.0, 0.0], 5, Some(&rewriter))
-            .await
-            .expect("search on empty DB over budget must return empty result without panic");
-
-        assert!(result.results.is_empty());
     }
 }

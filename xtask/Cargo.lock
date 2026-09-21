@@ -692,6 +692,7 @@ version = "0.1.0"
 dependencies = [
  "memfuse-adapt",
  "memfuse-core",
+ "memfuse-rank",
  "parking_lot",
  "serde",
  "tracing",
@@ -797,6 +798,7 @@ dependencies = [
  "memfuse-engine",
  "memfuse-graph",
  "memfuse-index",
+ "memfuse-rank",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
@@ -926,6 +928,18 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "memfuse-rank"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "memfuse-core",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]
