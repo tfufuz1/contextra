@@ -1,0 +1,50 @@
+[lints]
+workspace = true
+
+[package]
+name = "memfuse-infer-onnx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+memfuse-core = { workspace = true }
+memfuse-calibration = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+parking_lot = { workspace = true }
+memfuse-candle = { workspace = true, optional = true }
+
+# Optional — nur mit Feature-Flag aktiv
+[features]
+default = []
+onnx = ["ort", "tokenizers", "ndarray", "dep:reqwest"]
+candle-backend = ["dep:memfuse-candle"]
+
+[dependencies.reqwest]
+version = "0.12"
+default-features = false
+features = ["json", "rustls-tls", "stream"]
+optional = true
+
+[dependencies.ort]
+version = "2.0.0-rc.12"
+default-features = false
+features = ["std", "download-binaries", "tls-rustls"]
+optional = true
+
+[dependencies.tokenizers]
+version = "0.19"
+optional = true
+
+[dependencies.ndarray]
+version = "0.15"
+optional = true
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+criterion = { workspace = true }
+proptest = "1.4"

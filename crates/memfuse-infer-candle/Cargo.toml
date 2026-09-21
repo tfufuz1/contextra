@@ -1,0 +1,52 @@
+[lints]
+workspace = true
+
+[package]
+name = "memfuse-infer-candle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Native Candle GGUF ML inference backend for MemFuse"
+
+[dependencies]
+candle-core = "0.11"
+candle-nn = "0.11"
+candle-transformers = "0.11"
+tokenizers = "0.21"
+bytes = { workspace = true }
+sha2 = "0.10"
+tokio = { workspace = true }
+futures-util = "0.3"
+serde = { workspace = true }
+tracing = { workspace = true }
+bincode = { workspace = true, optional = true }
+memfuse-core = { workspace = true }
+memfuse-calibration = { workspace = true }
+memfuse-crypto = { workspace = true, optional = true }
+memfuse-store = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = "1.4"
+criterion = { workspace = true }
+memfuse-core = { workspace = true }
+memfuse-crypto = { workspace = true }
+
+[[bench]]
+name = "kv_bridge_bench"
+harness = false
+required-features = ["kv-bridge"]
+
+[features]
+default = []
+candle = []
+docid-128 = ["memfuse-core/docid-128"]
+kv-bridge = ["dep:memfuse-crypto", "memfuse-crypto/kv-encryption", "dep:bincode", "dep:memfuse-store", "memfuse-store"]
+memfuse-store = ["dep:memfuse-store"]
+cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { version = "0.11", features = ["metal"] }
+candle-nn = { version = "0.11", features = ["metal"] }
+candle-transformers = { version = "0.11", features = ["metal"] }

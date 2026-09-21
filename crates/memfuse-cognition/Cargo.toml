@@ -13,7 +13,7 @@ description = "MemFuse — Memory consolidation, compaction, and context managem
 memfuse-engine = { workspace = true }
 memfuse-core = { workspace = true }
 memfuse-store = { workspace = true }
-memfuse-index = { workspace = true }
+memfuse-vector = { workspace = true }
 memfuse-graph = { workspace = true }
 bytes = { workspace = true }
 ahash = { workspace = true }

@@ -9,9 +9,9 @@ edition.workspace = true
 [features]
 default = []
 agent-workflows = ["memfuse-agent"]
-onnx = ["memfuse-embed", "memfuse-embed/onnx"]
-candle = ["dep:memfuse-candle"]
-kv-bridge = ["memfuse-candle/kv-bridge", "dep:memfuse-candle"]
+onnx = ["memfuse-infer-onnx", "memfuse-infer-onnx/onnx"]
+candle = ["dep:memfuse-infer-candle"]
+kv-bridge = ["memfuse-infer-candle/kv-bridge", "dep:memfuse-infer-candle"]
 test-utils = ["memfuse-core/test-utils"]
 docid-128 = ["memfuse-core/docid-128"]
 
@@ -19,9 +19,9 @@ docid-128 = ["memfuse-core/docid-128"]
 memfuse = { workspace = true, features = ["ollama", "router"] }
 memfuse-core = { workspace = true }
 memfuse-crypto = { workspace = true }
-memfuse-embed = { workspace = true, optional = true }
+memfuse-infer-onnx = { workspace = true, optional = true }
 memfuse-agent = { workspace = true, optional = true }
-memfuse-candle = { workspace = true, optional = true }
+memfuse-infer-candle = { workspace = true, optional = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 rand = { workspace = true }
 parking_lot = { workspace = true }

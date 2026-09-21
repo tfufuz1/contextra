@@ -11,7 +11,7 @@ use memfuse_bench::long_mem_eval::{
 use memfuse_core::Result;
 use memfuse_db::{MemFuse, MemFuseConfig};
 #[cfg(feature = "onnx-bench")]
-use memfuse_embed::{CrossEncoderReranker, RerankConfig};
+use memfuse_infer_onnx::{CrossEncoderReranker, RerankConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;

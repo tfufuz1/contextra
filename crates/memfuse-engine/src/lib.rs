@@ -12,8 +12,8 @@ use memfuse_core::{CollectionId, DocId, Result, StorageEngine, TenantId, TxId};
 use memfuse_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
 };
-use memfuse_index::{HnswConfig, HnswIndex};
 use memfuse_store::LsmStorage;
+use memfuse_vector::{HnswConfig, HnswIndex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
@@ -410,10 +410,12 @@ impl MemFuse {
             } => {
                 #[cfg(feature = "onnx")]
                 {
-                    let model_dir =
-                        memfuse_embed::ensure_onnx_model_download(model_name, cache_dir.as_deref())
-                            .await?;
-                    let embedder = memfuse_embed::OnnxEmbedder::load(model_dir)?;
+                    let model_dir = memfuse_infer_onnx::ensure_onnx_model_download(
+                        model_name,
+                        cache_dir.as_deref(),
+                    )
+                    .await?;
+                    let embedder = memfuse_infer_onnx::OnnxEmbedder::load(model_dir)?;
                     let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(embedder);
                     self.set_embedder(embedder_arc).await?;
                 }
@@ -1093,7 +1095,7 @@ impl MemFuse {
         text: &str,
         vector: &[f32],
         k: usize,
-        reranker: Option<&memfuse_embed::CrossEncoderReranker>,
+        reranker: Option<&memfuse_infer_onnx::CrossEncoderReranker>,
         anchor_entities: Option<&[memfuse_core::EntityId]>,
     ) -> Result<Vec<SearchResult>> {
         let col = self.default_col().await?;

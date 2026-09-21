@@ -19,7 +19,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// Zentraler Scheduler für die Ausführung der Background-Maintenance-Prozesse (ADR-079).
-pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex = memfuse_index::HnswIndex> {
+pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex = memfuse_vector::HnswIndex> {
     config: MaintenanceConfig,
     collection: Arc<Collection<S, V>>,
     consolidation_config: ConsolidationConfig,
@@ -318,8 +318,8 @@ async fn complete_tick_intent<S: StorageEngine, V: VectorIndex>(
 mod tests {
     use super::*;
     use memfuse_graph::CsrGraph;
-    use memfuse_index::HnswIndex;
     use memfuse_store::LsmStorage;
+    use memfuse_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
     use tokio::time::sleep;
@@ -335,7 +335,7 @@ mod tests {
             .unwrap(),
         );
         let index = Arc::new(
-            HnswIndex::try_new(memfuse_index::HnswConfig {
+            HnswIndex::try_new(memfuse_vector::HnswConfig {
                 dimension: 4,
                 ..Default::default()
             })

@@ -2233,11 +2233,11 @@ name = "memfuse"
 version = "0.1.0"
 dependencies = [
  "memfuse-calibration",
- "memfuse-candle",
  "memfuse-core",
  "memfuse-db",
- "memfuse-embed",
- "memfuse-ollama",
+ "memfuse-infer-candle",
+ "memfuse-infer-ollama",
+ "memfuse-infer-onnx",
  "memfuse-router",
  "thiserror 2.0.20",
  "tokio",
@@ -2262,10 +2262,10 @@ dependencies = [
  "memfuse-core",
  "memfuse-db",
  "memfuse-graph",
- "memfuse-index",
  "memfuse-router",
  "memfuse-store",
  "memfuse-text",
+ "memfuse-vector",
  "serde",
  "serde_json",
  "tempfile",
@@ -2283,11 +2283,11 @@ dependencies = [
  "hdrhistogram",
  "memfuse-core",
  "memfuse-db",
- "memfuse-embed",
  "memfuse-graph",
- "memfuse-index",
+ "memfuse-infer-onnx",
  "memfuse-store",
  "memfuse-text",
+ "memfuse-vector",
  "rand 0.8.8",
  "serde",
  "serde_json",
@@ -2307,30 +2307,6 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-candle"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "bytes",
- "candle-core",
- "candle-nn",
- "candle-transformers",
- "criterion",
- "futures-util",
- "memfuse-calibration",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-store",
- "proptest",
- "serde",
- "sha2",
- "tempfile",
- "tokenizers 0.21.4",
- "tokio",
  "tracing",
 ]
 
@@ -2363,8 +2339,8 @@ dependencies = [
  "memfuse-core",
  "memfuse-engine",
  "memfuse-graph",
- "memfuse-index",
  "memfuse-store",
+ "memfuse-vector",
  "parking_lot",
  "serde",
  "serde_json",
@@ -2444,10 +2420,10 @@ dependencies = [
  "memfuse-crypto",
  "memfuse-engine",
  "memfuse-graph",
- "memfuse-index",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
+ "memfuse-vector",
  "parking_lot",
  "proptest",
  "serde",
@@ -2458,26 +2434,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "zeroize",
-]
-
-[[package]]
-name = "memfuse-embed"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "memfuse-calibration",
- "memfuse-candle",
- "memfuse-core",
- "ndarray 0.15.6",
- "ort",
- "parking_lot",
- "proptest",
- "reqwest",
- "serde",
- "tempfile",
- "tokenizers 0.19.1",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -2493,10 +2449,10 @@ dependencies = [
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-graph",
- "memfuse-index",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
+ "memfuse-vector",
  "parking_lot",
  "proptest",
  "serde",
@@ -2534,24 +2490,67 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-index"
+name = "memfuse-infer-candle"
 version = "0.1.0"
 dependencies = [
- "ahash",
  "bincode",
+ "bytes",
+ "candle-core",
+ "candle-nn",
+ "candle-transformers",
  "criterion",
- "loom",
+ "futures-util",
+ "memfuse-calibration",
  "memfuse-core",
  "memfuse-crypto",
- "memfuse-simd",
- "memmap2",
+ "memfuse-store",
+ "proptest",
+ "serde",
+ "sha2",
+ "tempfile",
+ "tokenizers 0.21.4",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "memfuse-infer-ollama"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "futures-util",
+ "memfuse-calibration",
+ "memfuse-core",
+ "memfuse-infer-onnx",
  "parking_lot",
  "proptest",
+ "quick-xml",
  "rand 0.8.8",
- "roaring",
+ "regex",
+ "reqwest",
  "serde",
- "subtle",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-test",
+]
+
+[[package]]
+name = "memfuse-infer-onnx"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "memfuse-calibration",
+ "memfuse-core",
+ "memfuse-infer-candle",
+ "ndarray 0.15.6",
+ "ort",
+ "parking_lot",
+ "proptest",
+ "reqwest",
+ "serde",
  "tempfile",
+ "tokenizers 0.19.1",
  "tokio",
  "tracing",
 ]
@@ -2581,10 +2580,10 @@ dependencies = [
  "futures-util",
  "memfuse",
  "memfuse-agent",
- "memfuse-candle",
  "memfuse-core",
  "memfuse-crypto",
- "memfuse-embed",
+ "memfuse-infer-candle",
+ "memfuse-infer-onnx",
  "parking_lot",
  "rand 0.8.8",
  "scc",
@@ -2612,28 +2611,6 @@ dependencies = [
  "serde",
  "thiserror 2.0.20",
  "tokio",
-]
-
-[[package]]
-name = "memfuse-ollama"
-version = "0.1.0"
-dependencies = [
- "futures",
- "futures-util",
- "memfuse-calibration",
- "memfuse-core",
- "memfuse-embed",
- "parking_lot",
- "proptest",
- "quick-xml",
- "rand 0.8.8",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-test",
 ]
 
 [[package]]
@@ -2697,9 +2674,9 @@ dependencies = [
  "memfuse-core",
  "memfuse-db",
  "memfuse-graph",
- "memfuse-index",
  "memfuse-store",
  "memfuse-text",
+ "memfuse-vector",
  "parking_lot",
  "proptest",
  "serde",
@@ -2821,6 +2798,29 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "memfuse-vector"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bincode",
+ "criterion",
+ "loom",
+ "memfuse-core",
+ "memfuse-crypto",
+ "memfuse-simd",
+ "memmap2",
+ "parking_lot",
+ "proptest",
+ "rand 0.8.8",
+ "roaring",
+ "serde",
+ "subtle",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

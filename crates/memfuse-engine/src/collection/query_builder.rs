@@ -156,7 +156,7 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     include_provenance: bool,
     filter_fn: Option<Box<dyn Fn(DocId) -> bool + Send + Sync>>,
     #[cfg(feature = "reranking")]
-    reranker: Option<&'a memfuse_embed::CrossEncoderReranker>,
+    reranker: Option<&'a memfuse_infer_onnx::CrossEncoderReranker>,
     rerank_pool_multiplier: Option<usize>,
     rerank_pool_max: Option<usize>,
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
@@ -313,7 +313,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
 
     /// Sets optional CrossEncoder reranker for post-retrieval ranking.
     #[cfg(feature = "reranking")]
-    pub fn reranker(mut self, reranker: &'a memfuse_embed::CrossEncoderReranker) -> Self {
+    pub fn reranker(mut self, reranker: &'a memfuse_infer_onnx::CrossEncoderReranker) -> Self {
         self.reranker = Some(reranker);
         self
     }
@@ -586,8 +586,8 @@ mod tests {
     use crate::{Collection, DistanceMetric, Language};
     use memfuse_core::{FilterExpr, HybridQuery};
     use memfuse_graph::CsrGraph;
-    use memfuse_index::{HnswConfig, HnswIndex};
     use memfuse_store::{LsmConfig, LsmStorage};
+    use memfuse_vector::{HnswConfig, HnswIndex};
     use serde_json::json;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -792,7 +792,7 @@ mod tests {
             .unwrap();
         }
 
-        let reranker = memfuse_embed::CrossEncoderReranker::passthrough();
+        let reranker = memfuse_infer_onnx::CrossEncoderReranker::passthrough();
         let res = col
             .query()
             .text("rust system")
@@ -827,7 +827,7 @@ mod tests {
             .unwrap();
         }
 
-        let reranker = memfuse_embed::CrossEncoderReranker::passthrough();
+        let reranker = memfuse_infer_onnx::CrossEncoderReranker::passthrough();
 
         // Query with k=100 and default pool settings (mult=10, max=200) -> fetch_k = min(100*10, 200) = 200
         let res_default = col
@@ -888,8 +888,9 @@ mod tests {
         .await
         .unwrap(); // unwrap
 
-        let reranker_res =
-            memfuse_embed::CrossEncoderReranker::new(memfuse_embed::RerankConfig::default());
+        let reranker_res = memfuse_infer_onnx::CrossEncoderReranker::new(
+            memfuse_infer_onnx::RerankConfig::default(),
+        );
         if let Ok(reranker) = reranker_res {
             let res = col
                 .query()
@@ -944,7 +945,7 @@ mod tests {
         .await
         .unwrap();
 
-        let reranker = memfuse_embed::CrossEncoderReranker::passthrough();
+        let reranker = memfuse_infer_onnx::CrossEncoderReranker::passthrough();
         let pid = Arc::new(parking_lot::Mutex::new(
             memfuse_calibration::PidController::default(),
         ));
@@ -999,13 +1000,13 @@ mod tests {
         .await
         .unwrap(); // unwrap
 
-        let config = memfuse_embed::RerankConfig {
+        let config = memfuse_infer_onnx::RerankConfig {
             rerank_deadline_ms: Some(10),
             simulate_delay_ms: Some(100),
             ..Default::default()
         };
 
-        let reranker = memfuse_embed::CrossEncoderReranker::passthrough_with_config(config);
+        let reranker = memfuse_infer_onnx::CrossEncoderReranker::passthrough_with_config(config);
 
         let res = col
             .query()
@@ -1043,8 +1044,9 @@ mod tests {
             .await
             .unwrap(); // unwrap
 
-        let reranker_res =
-            memfuse_embed::CrossEncoderReranker::new(memfuse_embed::RerankConfig::default());
+        let reranker_res = memfuse_infer_onnx::CrossEncoderReranker::new(
+            memfuse_infer_onnx::RerankConfig::default(),
+        );
         if let Ok(reranker) = reranker_res {
             let res = col
                 .query()
