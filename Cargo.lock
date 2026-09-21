@@ -2355,22 +2355,11 @@ dependencies = [
 name = "memfuse-core"
 version = "0.1.0"
 dependencies = [
- "ahash",
- "bincode",
- "blake3",
- "bytes",
- "flatbuffers",
- "futures-util",
  "memfuse-mvcc",
  "memfuse-ports",
  "memfuse-types",
  "memfuse-wire",
- "parking_lot",
  "proptest",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 2.0.20",
  "tokio",
 ]
 
