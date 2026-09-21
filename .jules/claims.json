@@ -187,6 +187,14 @@
       "active": false,
       "expires_at": "2026-09-21T17:38:39.856571205+00:00",
       "released_at": "2026-09-21T13:56:27.901083926+00:00 [RELEASED]"
+    },
+    {
+      "krate": "memfuse-vector",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-21T18:17:52.064669658+00:00",
+      "session_id": "2253238048538778047",
+      "active": true,
+      "expires_at": "2026-09-21T22:17:52.064656432+00:00"
     }
   ]
 }
