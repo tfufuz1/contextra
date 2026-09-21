@@ -69,3 +69,10 @@ Publishing authenticates via the Repository Secret:
 - `PYPI_API_TOKEN` (configured under GitHub Repository Settings -> Secrets and variables -> Actions).
 
 The secret is passed via `MATURIN_PYPI_TOKEN` securely without being printed in logs.
+
+---
+
+## 6. Package Architecture & MCP Extras
+
+- **`memfuse-mcp` (Rust Package)**: A standalone Rust binary crate delivering the high-performance native MemFuse Model Context Protocol (MCP) server executable.
+- **`memfuse[mcp]` (Python Package Extra)**: The optional Python extra for `memfuse-py`, enabling Python FastMCP server integration via `memfuse.mcp.create_mcp_server(db_path, embed_fn=...)`.
