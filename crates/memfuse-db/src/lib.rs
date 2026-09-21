@@ -72,7 +72,7 @@ pub use memfuse_cognition::start_consolidation_reaper;
 pub mod decay_controller {
     pub use memfuse_adapt::decay_controller::*;
 }
-pub mod fusion;
+pub use memfuse_engine::fusion;
 pub mod homeostat {
     pub use memfuse_adapt::homeostat::*;
 }
