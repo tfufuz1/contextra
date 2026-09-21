@@ -18,7 +18,7 @@ shlex = "1"
 memfuse-core = { workspace = true }
 memfuse-adapt = { workspace = true }
 memfuse-store = { workspace = true }
-memfuse-db = { workspace = true }
+memfuse-privacy = { workspace = true }
 arc-swap = "1"
 parking_lot = { workspace = true }
 tokio = { workspace = true }
@@ -28,6 +28,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+memfuse-db = { workspace = true }
 memfuse-index = { workspace = true }
 bytes = { workspace = true }
 memfuse-graph = { workspace = true }

@@ -9,10 +9,15 @@
 
 use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, RoutingOutcome};
+use crate::ports_local::{
+    CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
+    HybridSearchProvider,
+};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
-use memfuse_core::{ContextChunk, ContextWindow, EntityId, MemFuseError, Result, StorageEngine};
-use memfuse_db::{collection::Collection, context::ContextManager};
+use memfuse_core::{
+    ContextChunk, ContextWindow, EntityId, MemFuseError, Result, StorageEngine,
+};
 use memfuse_store::LsmStorage;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -104,8 +109,10 @@ pub struct RouterState {
 ///   Type-Alias for Backward-Compatibility using `LsmStorage`.
 pub type DefaultRouterEngine = RouterEngine<LsmStorage>;
 
-pub struct RouterEngine<S: StorageEngine> {
-    collection: Arc<Collection<S>>,
+pub struct RouterEngine<S: StorageEngine = LsmStorage> {
+    search_provider: Arc<dyn HybridSearchProvider>,
+    community_resolver: Arc<dyn CommunityResolver>,
+    context_preparer: Arc<dyn ContextPreparer>,
     /// Atomic state snapshot via `ArcSwap`: active profiles, conformal calibration, and Lyapunov drift
     /// watchers are maintained together as an immutable, atomically replaceable snapshot.
     pub(crate) state: ArcSwap<RouterState>,
@@ -116,12 +123,15 @@ pub struct RouterEngine<S: StorageEngine> {
     /// eliminates state-cloning overhead while keeping transient outcome tracking isolated from core
     /// routing calibration consistency.
     pub(crate) pending_decisions: RwLock<HashMap<DecisionId, (String, Instant)>>,
+    _marker: std::marker::PhantomData<S>,
 }
 
 impl<S: StorageEngine> RouterEngine<S> {
-    /// Creates a new `RouterEngine` instance.
+    /// Creates a new `RouterEngine` instance from decoupled ports.
     pub fn new(
-        collection: Arc<Collection<S>>,
+        search_provider: Arc<dyn HybridSearchProvider>,
+        community_resolver: Arc<dyn CommunityResolver>,
+        context_preparer: Arc<dyn ContextPreparer>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
     ) -> Self {
@@ -163,22 +173,33 @@ impl<S: StorageEngine> RouterEngine<S> {
         };
 
         Self {
-            collection,
+            search_provider,
+            community_resolver,
+            context_preparer,
             state: ArcSwap::from(Arc::new(router_state)),
             pending_decisions: RwLock::new(HashMap::new()),
+            _marker: std::marker::PhantomData,
         }
     }
 
     /// Validates all profiles and creates a new `RouterEngine` instance.
     pub fn try_new(
-        collection: Arc<Collection<S>>,
+        search_provider: Arc<dyn HybridSearchProvider>,
+        community_resolver: Arc<dyn CommunityResolver>,
+        context_preparer: Arc<dyn ContextPreparer>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
     ) -> Result<Self> {
         for p in &profiles {
             p.validate()?;
         }
-        Ok(Self::new(collection, profiles, calibration_store_path))
+        Ok(Self::new(
+            search_provider,
+            community_resolver,
+            context_preparer,
+            profiles,
+            calibration_store_path,
+        ))
     }
 
     /// Dynamically updates configured SLM profiles at runtime (Hot-Reload).
@@ -392,36 +413,29 @@ impl<S: StorageEngine> RouterEngine<S> {
         }
 
         // 1. Perform hybrid search with standard fusion weights
-        let search_results = self
-            .collection
-            .query()
-            .text(query_text)
-            .embedding(query_embedding)
-            .k(10)
-            .execute()
+        let search_chunks = self
+            .search_provider
+            .search_hybrid(query_text, query_embedding, 10)
             .await?;
 
-        if search_results.is_empty() {
+        if search_chunks.is_empty() {
             return Err(MemFuseError::NotFound(
                 "Keine relevanten Suchergebnisse für Routing gefunden".to_string(),
             ));
         }
 
         // 2. Identify communities and score candidate profiles
-        // Convert search results into ContextChunks first using TryFrom / ContextChunk construction
         let mut chunks: Vec<(ContextChunk, Option<u64>)> = Vec::new();
 
-        for res in &search_results {
-            let chunk_res = res.clone();
-            if let Ok(mut chunk) = ContextChunk::try_from(chunk_res) {
-                // Determine community ID directly from chunk.doc_id (derived from res.id in TryFrom)
-                let eid = EntityId::from_doc_id(chunk.doc_id);
-                let comm_id = self.collection.get_community(eid).await.ok().flatten();
-
-                // Ensure content uses ContextChunk::combined_text_owned() for context preparation
-                chunk.content = chunk.combined_text_owned();
-                chunks.push((chunk, comm_id));
-            }
+        for chunk in search_chunks {
+            let eid = EntityId::from_doc_id(chunk.doc_id);
+            let comm_id = self
+                .community_resolver
+                .get_community(eid)
+                .await
+                .ok()
+                .flatten();
+            chunks.push((chunk, comm_id));
         }
 
         // 3. Perform profile selection, scoring, calibration tracking, and confidence metric generation
@@ -567,9 +581,11 @@ impl<S: StorageEngine> RouterEngine<S> {
         // Store updated state atomically via ArcSwap
         self.state.store(Arc::new(new_state));
 
-        let mut context_mgr = ContextManager::new(selected_profile.token_budget.clone());
-        context_mgr.set_relevance_threshold(selected_profile.min_relevance_score);
-        let context_window = context_mgr.prepare_context(raw_chunks)?;
+        let context_window = self.context_preparer.prepare_context(
+            raw_chunks,
+            &selected_profile.token_budget,
+            selected_profile.min_relevance_score,
+        )?;
 
         Ok(RoutingDecision {
             profile: selected_profile,
@@ -897,7 +913,7 @@ pub(crate) fn select_profile_from_chunks(
     }
 }
 
-impl<S: StorageEngine> memfuse_db::DriftStatusProvider for RouterEngine<S> {
+impl<S: StorageEngine> LocalDriftStatusProvider for RouterEngine<S> {
     fn overall_drift_status(&self) -> String {
         self.overall_drift_status()
     }
