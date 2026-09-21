@@ -1642,3 +1642,28 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 - Das CI-Gate `check-flatbuffers-drift` kann in Merge-Gates eingebunden werden.
 
 ---
+
+# ADR-N02: Sync-Kern — `StorageRead` synchron, `StorageWrite` asynchron (begrenzter `ComputePool`)
+
+* **Status:** beschlossen; Benchmark-Gate vor Phase 2
+* **Datum:** 2026-09-21
+* **Target Path:** crates/memfuse-vector/src/diskann.rs, crates/memfuse-text/src/inverted.rs, crates/memfuse-graph/src/csr.rs
+* **Kontext / Auslöser:** Entkopplung der Ring-0-Speicherkerne von Asynchronitäts-Laufzeiten (`tokio`), Vermeidung unbegrenzter `spawn_blocking`-Threads bei Lesezugriffen und Vorbereitung der sauberen Trennung von synchronem Kern-Lese-Zugriff und asynchronem Schreib-Zugriff.
+
+## Entscheidung
+1. **Entkopplung der Speicherkerne von `tokio`:** Lese-Operationen über `StorageRead` werden rein synchron ausgeführt. Schreib- und Persistierungsoperationen (`StorageWrite`) verbleiben asynchron bzw. werden in die übergeordnete Engine verlagert.
+2. **Architekturänderung in den Indexstrukturen:** Direktes Ausführen von Persistenzaufrufen innerhalb von `csr.rs`, `inverted.rs` und `diskann.rs` wird in die übergeordnete Engine verlagert.
+3. **ComputePool-Begrenzung:** Ersetzung unbegrenzter `spawn_blocking`-Aufrufe durch einen dedizierten, kapazitätsbegrenzten `ComputePool`.
+
+## Begründung
+- **Lese-Performanz & Simplizität:** Synchroner Lesezugriff in Ring 0 eliminiert Async-Runtime-Overhead und erleichtert die formale Verifikation der In-Memory- und Lese-Pfade.
+- **Ressourcen-Garantie:** Ein begrenzter ComputePool schützt das Gesamtsystem vor Thread-Explosionen und unbegrenztem Speicherverbrauch bei hoher paralleler Leselast.
+
+## Alternativen
+- **Beibehaltung unbegrenzter `spawn_blocking`-Calls:** Führt bei hoher Last zu hoher Thread-Contention und nicht vorhersehbarem Speicherbedarf.
+- **Vollständige Asynchronität in Ring 0:** Erzeugt unbegründeten Runtime-Overhead in reinen In-Memory-Lese-Algorithmen.
+
+## Konsequenzen
+- Dieses ADR bildet die formale Spezifikationsgrundlage für die künftige Code-Welle zu Punkt "2-04" (Ring-0-Kerne ohne `tokio`), welche NICHT Teil dieses Dokuments oder Tasks ist.
+- **Merge-Gate / Exit-Kriterium:** `cargo tree -e normal -p memfuse-{vector,text,graph}` zeigt keine `tokio`-Abhängigkeit.
+- **Benchmark-Gate:** Benchmark-p99-Latenz $\le +3\%$ oder $\le 2\sigma$ der vorher eingefrorenen Baseline.
