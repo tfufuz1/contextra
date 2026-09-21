@@ -1027,6 +1027,8 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "flatbuffers",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
