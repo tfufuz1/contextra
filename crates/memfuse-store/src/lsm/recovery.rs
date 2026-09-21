@@ -261,18 +261,20 @@ impl LsmStorage {
 
         let manifest_path = config.path.join("MANIFEST");
         let manifest_exists = manifest_path.exists();
-        let _valid_manifest_sstables: Option<std::collections::HashSet<std::path::PathBuf>> =
-            if manifest_exists {
-                let entries = crate::manifest::Manifest::load(&manifest_path).await?;
-                Some(
-                    crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
-                        .into_iter()
-                        .map(|(path, _rank)| path)
-                        .collect(),
-                )
-            } else {
-                None
-            };
+        let (valid_manifest_sstables, dead_manifest_sstables): (
+            Option<std::collections::HashSet<std::path::PathBuf>>,
+            Option<std::collections::HashSet<std::path::PathBuf>>,
+        ) = if manifest_exists {
+            let entries = crate::manifest::Manifest::load(&manifest_path).await?;
+            let valid_set = crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
+                .into_iter()
+                .map(|(path, _rank)| path)
+                .collect();
+            let dead_set = crate::manifest::Manifest::reconstruct_dead_sstables(&entries);
+            (Some(valid_set), Some(dead_set))
+        } else {
+            (None, None)
+        };
 
         let mut sst_files = Vec::new();
         if let Ok(mut entries) = tokio::fs::read_dir(&config.path).await {
@@ -289,10 +291,21 @@ impl LsmStorage {
                         tracing::warn!("Failed to remove leftover temp file {:?}: {}", path, e);
                     }
                 } else if path.extension().is_some_and(|ext| ext == "sst") {
-                    if let Some(ref valid_set) = _valid_manifest_sstables {
+                    if let Some(ref valid_set) = valid_manifest_sstables {
                         let path_key = std::path::Path::new(file_name);
                         if valid_set.contains(path_key) {
                             sst_files.push(path);
+                        } else if dead_manifest_sstables
+                            .as_ref()
+                            .is_some_and(|dead_set| dead_set.contains(path_key))
+                        {
+                            tracing::info!(
+                                "Removing dead SSTable file proven by MANIFEST: {:?}",
+                                path
+                            );
+                            if let Err(e) = tokio::fs::remove_file(&path).await {
+                                tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
+                            }
                         } else {
                             tracing::warn!(
                                 "Unmanifested or orphaned SSTable file found in data directory (skipping): {:?}",
