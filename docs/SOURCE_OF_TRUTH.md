@@ -85,7 +85,8 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-wire` | 0 | 2019 | 🟢 Clean | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for MemFuse |
 | `memfuse-mvcc` | 1 | 1958 | 🟢 Clean | Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for MemFuse |
 | `memfuse-ports` | 1 | 2254 | 🟢 Clean | Canonical dyn-compatible port traits for MemFuse subsystems |
-| `memfuse-core` | 2 | 355 | 🟢 Clean | Core types, traits, and error handling for MemFuse |
+| `memfuse-core` | 2 | 368 | 🟢 Clean | Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for MemFuse |
+| `memfuse-rank` | 2 | 1954 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
 | `memfuse-calibration` | 3 | 1550 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 3 | 6123 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-graph` | 3 | 16817 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
@@ -99,7 +100,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-infer-onnx` | 4 | 2219 | 🟢 Clean |  |
 | `memfuse-kvcache` | 5 | 1420 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
 | `memfuse-store` | 5 | 27251 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
-| `memfuse-vector` | 5 | 17322 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
+| `memfuse-vector` | 5 | 15487 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 18984 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
 | `memfuse-infer-candle` | 6 | 4607 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-router` | 6 | 6046 | 🟢 Clean |  |

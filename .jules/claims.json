@@ -194,8 +194,9 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T18:14:20.180368201+00:00",
       "session_id": "10672640857832740238",
-      "active": true,
-      "expires_at": "2026-09-21T22:14:20.180353482+00:00"
+      "active": false,
+      "expires_at": "2026-09-21T22:14:20.180353482+00:00",
+      "released_at": "2026-09-21T22:15:31.099765137+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-rank",
@@ -204,6 +205,14 @@
       "session_id": "2090223400654574052",
       "active": true,
       "expires_at": "2026-09-22T00:00:37.526179874+00:00"
+    },
+    {
+      "krate": "memfuse-vector-hnsw",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-21T20:51:14.565137534+00:00",
+      "session_id": "8476297408128512959",
+      "active": true,
+      "expires_at": "2026-09-22T00:51:14.565125356+00:00"
     }
   ]
 }
