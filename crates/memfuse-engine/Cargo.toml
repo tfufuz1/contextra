@@ -16,7 +16,7 @@ bytes = { workspace = true }
 memfuse-crypto = { workspace = true }
 memfuse-store = { workspace = true }
 blake3 = { workspace = true }
-memfuse-index = { workspace = true }
+memfuse-vector = { workspace = true }
 memfuse-text = { workspace = true }
 memfuse-checkpoint = { workspace = true }
 memfuse-graph = { workspace = true }
@@ -36,7 +36,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 proptest = "1.4"
-memfuse-index = { workspace = true, features = ["experimental-diskann"] }
+memfuse-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [features]
 default = []
@@ -44,7 +44,7 @@ bench = []
 sandbox = []
 reranking = []
 onnx = []
-experimental-diskann = ["memfuse-index/experimental-diskann"]
+experimental-diskann = ["memfuse-vector/experimental-diskann"]
 background-maintenance = []
 graph-connectivity-health = ["memfuse-graph/physio-percolation"]
 docid-128 = ["memfuse-core/docid-128"]

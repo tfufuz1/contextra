@@ -22,10 +22,10 @@ mod tests;
 
 use memfuse_core::{DocId, Result, StorageEngine, TextEmbeddingEngine, TxId, VectorIndex};
 use memfuse_graph::CsrGraph;
-use memfuse_index::HnswIndex;
 use memfuse_store::LsmStorage;
 use memfuse_text::inverted::InvertedIndex;
 use memfuse_text::Language;
+use memfuse_vector::HnswIndex;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;

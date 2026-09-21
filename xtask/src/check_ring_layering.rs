@@ -41,14 +41,14 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
         "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
         | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
         | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-        | "memfuse-core" | "memfuse-index" | "memfuse-calibration" => Some(Ring::Ring0),
+        | "memfuse-core" | "memfuse-vector" | "memfuse-calibration" => Some(Ring::Ring0),
 
         // Ring 1
         "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),
 
         // Ring 2
-        "memfuse-sandbox" | "memfuse-embed" | "memfuse-candle"
-        | "memfuse-ollama" => Some(Ring::Ring2),
+        "memfuse-sandbox" | "memfuse-infer-onnx" | "memfuse-infer-candle"
+        | "memfuse-infer-ollama" => Some(Ring::Ring2),
 
         // Ring 3
         "memfuse-engine" | "memfuse-cognition" | "memfuse-privacy"
@@ -80,38 +80,38 @@ pub const LAYER_ALLOWLIST: &[AllowlistEntry] = &[
         reason: "Dev-dependency on store for graph integration tests; to be isolated into memfuse-testkit in Phase 1a",
     },
     AllowlistEntry {
-        from_crate: "memfuse-embed",
+        from_crate: "memfuse-infer-onnx",
         to_crate: "memfuse-calibration",
         target_phase: "Phase 1b",
         reason: "Embed depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-embed",
-        to_crate: "memfuse-candle",
+        from_crate: "memfuse-infer-onnx",
+        to_crate: "memfuse-infer-candle",
         target_phase: "Phase 1b",
         reason: "Embed depends on candle provider; execution provider abstraction in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-candle",
+        from_crate: "memfuse-infer-candle",
         to_crate: "memfuse-calibration",
         target_phase: "Phase 1b",
         reason: "Candle provider depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-candle",
+        from_crate: "memfuse-infer-candle",
         to_crate: "memfuse-store",
         target_phase: "Phase 1b",
         reason: "Candle provider uses store directly; store traits abstraction in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-ollama",
+        from_crate: "memfuse-infer-ollama",
         to_crate: "memfuse-calibration",
         target_phase: "Phase 1b",
         reason: "Ollama provider depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-ollama",
-        to_crate: "memfuse-embed",
+        from_crate: "memfuse-infer-ollama",
+        to_crate: "memfuse-infer-onnx",
         target_phase: "Phase 1b",
         reason: "Ollama provider dev-dependency on embed for benchmarks/tests; to be isolated in Phase 1b",
     },
@@ -333,7 +333,7 @@ mod tests {
     fn test_ring_mapping_all_crates_covered() {
         assert_eq!(get_crate_ring("memfuse-core"), Some(Ring::Ring0));
         assert_eq!(get_crate_ring("memfuse-store"), Some(Ring::Ring1));
-        assert_eq!(get_crate_ring("memfuse-candle"), Some(Ring::Ring2));
+        assert_eq!(get_crate_ring("memfuse-infer-candle"), Some(Ring::Ring2));
         assert_eq!(get_crate_ring("memfuse-db"), Some(Ring::Ring3));
         assert_eq!(get_crate_ring("memfuse-mcp"), Some(Ring::Ring4));
         assert_eq!(get_crate_ring("xtask"), Some(Ring::Tooling));

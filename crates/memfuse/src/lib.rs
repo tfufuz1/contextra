@@ -18,7 +18,7 @@ pub use memfuse_router as router;
 pub use memfuse_calibration as calibration;
 
 #[cfg(feature = "ollama")]
-pub use memfuse_ollama as ollama;
+pub use memfuse_infer_ollama as ollama;
 
 /// A builder for creating a `MemFuse` instance.
 pub struct MemFuseBuilder {
