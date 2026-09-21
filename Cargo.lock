@@ -2654,6 +2654,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-rank"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "memfuse-ports",
+ "memfuse-types",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
 name = "memfuse-router"
 version = "0.1.0"
 dependencies = [
