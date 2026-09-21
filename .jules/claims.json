@@ -177,8 +177,16 @@
       "timestamp": "2026-09-21T13:09:31.259173+00:00",
       "session_id": "manual-jules-session",
       "active": true,
-      "expires_at": "2026-09-21T17:09:31.259198+00:00",
-      "released_at": null
+      "expires_at": "2026-09-21T17:09:31.259198+00:00"
+    },
+    {
+      "krate": "memfuse-store",
+      "issue": "OPUS0-6-MANIFEST-CRASH",
+      "timestamp": "2026-09-21T14:54:06.855531055+00:00",
+      "session_id": "11682799888001574576",
+      "active": false,
+      "expires_at": "2026-09-21T18:54:06.855520827+00:00",
+      "released_at": "2026-09-21T15:13:37.132036659+00:00 [RELEASED]"
     }
   ]
 }

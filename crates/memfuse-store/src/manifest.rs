@@ -542,6 +542,45 @@ impl Manifest {
         sorted
     }
 
+    /// Reconstructs the set of SSTable file names (or path components) that are proven dead
+    /// (explicitly removed via `Remove` or `Replace.removed`) and are not in the valid set.
+    pub fn reconstruct_dead_sstables(
+        entries: &[ManifestEntry],
+    ) -> std::collections::HashSet<PathBuf> {
+        let valid = Self::reconstruct_valid_sstables(entries);
+        let valid_set: std::collections::HashSet<PathBuf> =
+            valid.into_iter().map(|(p, _)| p).collect();
+        let mut dead_set = std::collections::HashSet::new();
+
+        for entry in entries {
+            match entry {
+                ManifestEntry::Remove { path } => {
+                    let key = path
+                        .file_name()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| path.clone());
+                    if !valid_set.contains(&key) {
+                        dead_set.insert(key);
+                    }
+                }
+                ManifestEntry::Replace { removed, .. } => {
+                    for p in removed {
+                        let key = p
+                            .file_name()
+                            .map(PathBuf::from)
+                            .unwrap_or_else(|| p.clone());
+                        if !valid_set.contains(&key) {
+                            dead_set.insert(key);
+                        }
+                    }
+                }
+                ManifestEntry::Add { .. } | ManifestEntry::RollbackComplete { .. } => {}
+            }
+        }
+
+        dead_set
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -982,6 +1021,13 @@ mod tests {
         let valid = Manifest::reconstruct_valid_sstables(&entries);
         assert_eq!(valid.len(), 1);
         assert_eq!(valid[0], (PathBuf::from("sst-compact-1.sst"), 1));
+
+        let dead = Manifest::reconstruct_dead_sstables(&entries);
+        assert_eq!(dead.len(), 3);
+        assert!(dead.contains(Path::new("sst-1.sst")));
+        assert!(dead.contains(Path::new("sst-2.sst")));
+        assert!(dead.contains(Path::new("sst-3.sst")));
+        assert!(!dead.contains(Path::new("sst-compact-1.sst")));
     }
 
     #[tokio::test]
