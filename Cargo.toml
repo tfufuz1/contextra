@@ -29,6 +29,7 @@ members = [
 exclude = ["xtask"]
 default-members = [
     "crates/memfuse-wire",
+    "crates/memfuse-sys",
     "crates/memfuse-simd",
     "crates/memfuse-core",
     "crates/memfuse-store",
@@ -37,6 +38,7 @@ default-members = [
     "crates/memfuse-text",
     "crates/memfuse-checkpoint",
     "crates/memfuse-crypto",
+    "crates/memfuse-privacy",
     "crates/memfuse-graph",
     "crates/memfuse-mcp",
     "crates/memfuse-agent",
