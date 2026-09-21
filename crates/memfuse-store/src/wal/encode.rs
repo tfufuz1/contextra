@@ -253,18 +253,18 @@ impl WalEntry {
 
     /// Deserializes a WAL entry from bytes, verifying CRC32.
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() < 4 {
-            return Err(MemFuseError::Serialization(
-                "WAL entry too short for CRC header".into(),
-            ));
-        }
+        let crc_bytes = data.get(0..4).ok_or_else(|| {
+            MemFuseError::Serialization("WAL entry too short for CRC header".into())
+        })?;
 
         let stored_crc = u32::from_le_bytes(
-            data[0..4]
+            crc_bytes
                 .try_into()
                 .map_err(|_| MemFuseError::Serialization("Invalid CRC format".into()))?,
         );
-        let payload = &data[4..];
+        let payload = data
+            .get(4..)
+            .ok_or_else(|| MemFuseError::Serialization("WAL entry missing payload".into()))?;
         let computed_crc = crc32fast::hash(payload);
 
         if stored_crc != computed_crc {
@@ -276,109 +276,140 @@ impl WalEntry {
             )));
         }
 
-        if payload.len() < 73 {
-            // 8(seq) + 32(checksum) + 32(prev_hmac) + 1(op_type)
-            return Err(MemFuseError::Serialization("WAL payload too short".into()));
-        }
+        let seq_bytes = payload.get(0..8).ok_or_else(|| {
+            MemFuseError::Serialization("WAL payload too short for seq_no".into())
+        })?;
+        let checksum_bytes = payload.get(8..40).ok_or_else(|| {
+            MemFuseError::Serialization("WAL payload too short for checksum".into())
+        })?;
+        let prev_hmac_bytes = payload.get(40..72).ok_or_else(|| {
+            MemFuseError::Serialization("WAL payload too short for prev_hmac".into())
+        })?;
+        let op_type = *payload.get(72).ok_or_else(|| {
+            MemFuseError::Serialization("WAL payload too short for op_type".into())
+        })?;
+        let remaining = payload
+            .get(73..)
+            .ok_or_else(|| MemFuseError::Serialization("WAL payload missing op body".into()))?;
 
         let seq_no = u64::from_le_bytes(
-            payload[0..8]
+            seq_bytes
                 .try_into()
                 .map_err(|_| MemFuseError::Serialization("Invalid seq_no format".into()))?,
         );
-        let checksum: [u8; 32] = payload[8..40]
+        let checksum: [u8; 32] = checksum_bytes
             .try_into()
             .map_err(|_| MemFuseError::Serialization("Invalid checksum format".into()))?;
-        let prev_hmac: [u8; 32] = payload[40..72]
+        let prev_hmac: [u8; 32] = prev_hmac_bytes
             .try_into()
             .map_err(|_| MemFuseError::Serialization("Invalid prev_hmac format".into()))?;
-        let op_type = payload[72];
-        let remaining = &payload[73..];
 
-        let op =
-            match op_type {
-                0 => {
-                    // Put
-                    if remaining.len() < 12 {
-                        return Err(MemFuseError::Serialization("Put op too short".into()));
-                    }
-                    let tx_id = TxId::new(u64::from_le_bytes(remaining[0..8].try_into().map_err(
-                        |_| MemFuseError::Serialization("Invalid tx_id format".into()),
-                    )?));
-                    let key_len = u32::from_le_bytes(remaining[8..12].try_into().map_err(|_| {
+        let op = match op_type {
+            0 => {
+                // Put
+                let tx_bytes = remaining.get(0..8).ok_or_else(|| {
+                    MemFuseError::Serialization("Put op too short for tx_id".into())
+                })?;
+                let klen_bytes = remaining.get(8..12).ok_or_else(|| {
+                    MemFuseError::Serialization("Put op too short for key_len".into())
+                })?;
+
+                let tx_id =
+                    TxId::new(u64::from_le_bytes(tx_bytes.try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid tx_id format".into())
+                    })?));
+                let key_len =
+                    u32::from_le_bytes(klen_bytes.try_into().map_err(|_| {
                         MemFuseError::Serialization("Invalid key_len format".into())
                     })?) as usize;
-                    if key_len > 1024 * 1024 {
-                        return Err(MemFuseError::Serialization(
-                            "key_len exceeds 1 MiB limit".into(),
-                        ));
-                    }
-                    if remaining.len() < 12 + key_len + 4 {
-                        return Err(MemFuseError::Serialization(
-                            "Put op missing key/val_len".into(),
-                        ));
-                    }
-                    let key = remaining[12..12 + key_len].to_vec();
-                    let val_start = 12 + key_len;
-                    let val_len =
-                        u32::from_le_bytes(remaining[val_start..val_start + 4].try_into().map_err(
-                            |_| MemFuseError::Serialization("Invalid val_len format".into()),
-                        )?) as usize;
-                    if val_len > 128 * 1024 * 1024 {
-                        return Err(MemFuseError::Serialization(
-                            "val_len exceeds 128 MiB limit".into(),
-                        ));
-                    }
-                    if remaining.len() < val_start + 4 + val_len {
-                        return Err(MemFuseError::Serialization(
-                            "Put op missing value data".into(),
-                        ));
-                    }
-                    let value = remaining[val_start + 4..val_start + 4 + val_len].to_vec();
-                    WalOp::Put { tx_id, key, value }
+                if key_len > 1024 * 1024 {
+                    return Err(MemFuseError::Serialization(
+                        "key_len exceeds 1 MiB limit".into(),
+                    ));
                 }
-                1 => {
-                    // Delete
-                    if remaining.len() < 12 {
-                        return Err(MemFuseError::Serialization("Delete op too short".into()));
-                    }
-                    let tx_id = TxId::new(u64::from_le_bytes(remaining[0..8].try_into().map_err(
-                        |_| MemFuseError::Serialization("Invalid tx_id format".into()),
-                    )?));
-                    let key_len = u32::from_le_bytes(remaining[8..12].try_into().map_err(|_| {
+
+                let key = remaining
+                    .get(12..12 + key_len)
+                    .ok_or_else(|| MemFuseError::Serialization("Put op missing key data".into()))?
+                    .to_vec();
+
+                let val_start = 12 + key_len;
+                let vlen_bytes = remaining
+                    .get(val_start..val_start + 4)
+                    .ok_or_else(|| MemFuseError::Serialization("Put op missing val_len".into()))?;
+
+                let val_len =
+                    u32::from_le_bytes(vlen_bytes.try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid val_len format".into())
+                    })?) as usize;
+                if val_len > 128 * 1024 * 1024 {
+                    return Err(MemFuseError::Serialization(
+                        "val_len exceeds 128 MiB limit".into(),
+                    ));
+                }
+
+                let value = remaining
+                    .get(val_start + 4..val_start + 4 + val_len)
+                    .ok_or_else(|| MemFuseError::Serialization("Put op missing value data".into()))?
+                    .to_vec();
+
+                WalOp::Put { tx_id, key, value }
+            }
+            1 => {
+                // Delete
+                let tx_bytes = remaining.get(0..8).ok_or_else(|| {
+                    MemFuseError::Serialization("Delete op too short for tx_id".into())
+                })?;
+                let klen_bytes = remaining.get(8..12).ok_or_else(|| {
+                    MemFuseError::Serialization("Delete op too short for key_len".into())
+                })?;
+
+                let tx_id =
+                    TxId::new(u64::from_le_bytes(tx_bytes.try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid tx_id format".into())
+                    })?));
+                let key_len =
+                    u32::from_le_bytes(klen_bytes.try_into().map_err(|_| {
                         MemFuseError::Serialization("Invalid key_len format".into())
                     })?) as usize;
-                    if key_len > 1024 * 1024 {
-                        return Err(MemFuseError::Serialization(
-                            "key_len exceeds 1 MiB limit".into(),
-                        ));
-                    }
-                    if remaining.len() < 12 + key_len {
-                        return Err(MemFuseError::Serialization(
-                            "Delete op missing key data".into(),
-                        ));
-                    }
-                    let key = remaining[12..12 + key_len].to_vec();
-                    WalOp::Delete { tx_id, key }
+                if key_len > 1024 * 1024 {
+                    return Err(MemFuseError::Serialization(
+                        "key_len exceeds 1 MiB limit".into(),
+                    ));
                 }
-                2 => {
-                    // TxEnd
-                    if remaining.len() < 9 {
-                        return Err(MemFuseError::Serialization("TxEnd op too short".into()));
-                    }
-                    let tx_id = TxId::new(u64::from_le_bytes(remaining[0..8].try_into().map_err(
-                        |_| MemFuseError::Serialization("Invalid tx_id format".into()),
-                    )?));
-                    let committed = remaining[8] != 0;
-                    WalOp::TxEnd { tx_id, committed }
-                }
-                _ => {
-                    return Err(MemFuseError::Serialization(format!(
-                        "Unknown WAL op type: {}",
-                        op_type
-                    )))
-                }
-            };
+
+                let key = remaining
+                    .get(12..12 + key_len)
+                    .ok_or_else(|| {
+                        MemFuseError::Serialization("Delete op missing key data".into())
+                    })?
+                    .to_vec();
+
+                WalOp::Delete { tx_id, key }
+            }
+            2 => {
+                // TxEnd
+                let tx_bytes = remaining.get(0..8).ok_or_else(|| {
+                    MemFuseError::Serialization("TxEnd op too short for tx_id".into())
+                })?;
+                let committed_byte = *remaining.get(8).ok_or_else(|| {
+                    MemFuseError::Serialization("TxEnd op too short for committed flag".into())
+                })?;
+
+                let tx_id =
+                    TxId::new(u64::from_le_bytes(tx_bytes.try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid tx_id format".into())
+                    })?));
+                let committed = committed_byte != 0;
+                WalOp::TxEnd { tx_id, committed }
+            }
+            _ => {
+                return Err(MemFuseError::Serialization(format!(
+                    "Unknown WAL op type: {}",
+                    op_type
+                )))
+            }
+        };
 
         Ok(Self {
             op,
