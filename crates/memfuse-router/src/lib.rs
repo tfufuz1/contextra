@@ -2,6 +2,7 @@
 
 pub mod dispatch;
 pub mod outcome;
+pub mod ports_local;
 pub mod profile;
 pub mod router;
 pub mod serde_helpers;
@@ -22,8 +23,13 @@ pub use memfuse_adapt::lyapunov;
 )]
 pub use memfuse_adapt::offpolicy;
 
+#[deprecated(
+    since = "0.1.0",
+    note = "Moved to memfuse_privacy as part of Ring-Modell Phase 1b"
+)]
 #[cfg(feature = "cloud-egress-guard")]
-pub mod guarded_payload;
+pub use memfuse_privacy::guarded_payload;
+
 #[cfg(feature = "bandit-routing")]
 pub mod routing_strategy;
 #[cfg(feature = "cloud-egress-guard")]
@@ -41,8 +47,12 @@ pub use outcome::{DecisionId, RoutingOutcome};
 pub use profile::SlmProfile;
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 
+#[deprecated(
+    since = "0.1.0",
+    note = "Moved to memfuse_privacy as part of Ring-Modell Phase 1b"
+)]
 #[cfg(feature = "cloud-egress-guard")]
-pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
+pub use memfuse_privacy::guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 #[cfg(feature = "bandit-routing")]
 pub use memfuse_adapt::{BanditError, BanditImplementation, BanditPolicy, BanditProfileState};
 #[cfg(feature = "bandit-routing")]

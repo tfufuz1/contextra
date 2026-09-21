@@ -1,7 +1,4 @@
 //! Type-State GuardedPayload<S> — Compile-Zeit-Schutz gegen ungesanitisierten Cloud-Egress (§4.14).
-//! Feature `cloud-egress-guard` ist Voraussetzung.
-
-#![cfg(feature = "cloud-egress-guard")]
 
 use std::marker::PhantomData;
 
@@ -47,7 +44,7 @@ impl GuardedPayload<Unsanitized> {
 
 impl GuardedPayload<Sanitized> {
     /// Nur von `egress_gateway.rs` aufzurufen nach Durchlauf aller 5 Layer.
-    pub(crate) fn from_sanitized(sanitized: String, session_id: String) -> Self {
+    pub fn from_sanitized(sanitized: String, session_id: String) -> Self {
         Self {
             inner: sanitized,
             session_id,

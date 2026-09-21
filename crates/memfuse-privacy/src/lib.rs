@@ -6,6 +6,7 @@ pub mod egress_gateway;
 pub mod egress_guard;
 pub mod egress_vault;
 pub mod error;
+pub mod guarded_payload;
 
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
@@ -24,3 +25,4 @@ pub use egress_vault::{
     EgressVaultError, EntityRecognizer, NoOpRecognizer, PolicyCategory, SurrogateVault,
 };
 pub use error::EgressError;
+pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};

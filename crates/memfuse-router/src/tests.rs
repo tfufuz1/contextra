@@ -142,7 +142,9 @@ mod tests {
             0.5,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let adapter = Arc::new(CollectionAdapter::new(collection));
+        let preparer = Arc::new(TestContextPreparer);
+        let router = RouterEngine::new(adapter.clone(), adapter, preparer, vec![profile], None);
         assert_eq!(router.profiles().len(), 1);
         assert_eq!(router.profiles()[0].name, "mock-slm");
     }
@@ -224,7 +226,7 @@ mod tests {
             0.01,
         );
 
-        let router = RouterEngine::new(
+        let router = create_test_router(
             collection.clone(),
             vec![coding_profile.clone(), docs_profile.clone()],
             None,
@@ -278,7 +280,7 @@ mod tests {
             0.99, // unreachable score threshold
         );
 
-        let router = RouterEngine::new(collection.clone(), vec![strict_profile], None);
+        let router = create_test_router(collection.clone(), vec![strict_profile], None);
 
         let result = router.route(&[0.1, 0.1, 0.1, 0.1], "search").await;
         assert!(result.is_err());
@@ -384,7 +386,7 @@ mod tests {
             0.01,
         );
 
-        let router = Arc::new(RouterEngine::new(collection, vec![profile_v1], None));
+        let router = Arc::new(create_test_router(collection, vec![profile_v1], None));
 
         // Spawn 20 reader tasks continuously calling route()
         let mut handles = Vec::new();
@@ -471,7 +473,7 @@ mod tests {
             ),
         ];
 
-        let router = RouterEngine::new(collection, initial_profiles, None);
+        let router = create_test_router(collection, initial_profiles, None);
 
         // Pre-reload decision: deterministic tie-breaking picks profile-a (lower index 0)
         let d1 = router.route(&vec_data, "test content").await.unwrap(); // unwrap
@@ -766,7 +768,7 @@ mod tests {
         let db = MemFuse::open_with_config(dir.path(), config).await.unwrap(); // unwrap
         let collection = db.collection("default").await.unwrap(); // unwrap
 
-        let router = RouterEngine::new(collection, vec![], None);
+        let router = create_test_router(collection, vec![], None);
         let err = router.route(&[1.0, 0.0, 0.0, 0.0], "test").await;
         assert!(
             matches!(err, Err(MemFuseError::NotFound(msg)) if msg.contains("Keine SLM-Profile"))
@@ -790,7 +792,7 @@ mod tests {
             TokenBudget::new(1000, 100),
             0.01,
         );
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         let err = router.route(&[1.0, 0.0, 0.0, 0.0], "test").await;
         assert!(
@@ -826,7 +828,7 @@ mod tests {
             0.0,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
         let result = router.route(&[1.0, 0.0, 0.0, 0.0], "plain doc").await;
         // Unparseable entity ID results in comm_id = None, which fails community matching for profile
         assert!(matches!(result, Err(MemFuseError::NotFound(_))));
@@ -869,7 +871,7 @@ mod tests {
             0.0, // Low min threshold to guarantee selection
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
         let res = router.route(&[1.0, 0.0, 0.0, 0.0], "rust code").await;
         assert!(res.is_ok());
     }
@@ -1075,7 +1077,7 @@ mod tests {
             })
             .collect();
 
-        let router = RouterEngine::try_new(collection, profiles_50, None).unwrap(); // unwrap
+        let router = try_create_test_router(collection, profiles_50, None).unwrap(); // unwrap
         let decision = router.route(&vec_data, "sample text").await.unwrap(); // unwrap
         assert_eq!(decision.profile.name, "profile-0");
 
@@ -1142,7 +1144,7 @@ mod tests {
             TokenBudget::new(100, 10),
             0.1,
         );
-        let router = RouterEngine::new(collection, vec![profile.clone()], None);
+        let router = create_test_router(collection, vec![profile.clone()], None);
         let profiles = router.profiles();
         assert_eq!(profiles.len(), 1);
         assert_eq!(profiles[0].name, "p-acc");
@@ -1252,14 +1254,14 @@ mod tests {
             0.1,
         );
 
-        let res_try_new = RouterEngine::try_new(
+        let res_try_new = try_create_test_router(
             collection.clone(),
             vec![valid_profile.clone(), invalid_profile.clone()],
             None,
         );
         assert!(matches!(res_try_new, Err(MemFuseError::InvalidInput(_))));
 
-        let router = RouterEngine::new(collection, vec![valid_profile.clone()], None);
+        let router = create_test_router(collection, vec![valid_profile.clone()], None);
         let res_try_update = router.try_update_profiles(vec![valid_profile, invalid_profile]);
         assert!(matches!(res_try_update, Err(MemFuseError::InvalidInput(_))));
     }
@@ -1423,7 +1425,7 @@ mod tests {
             0.0,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
         let res = router.route(&[1.0, 0.0, 0.0, 0.0], "sample text").await;
         assert!(matches!(res, Err(MemFuseError::NotFound(_))));
     }
@@ -1464,7 +1466,7 @@ mod tests {
             0.0,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
         let res = router.route(&[1.0, 0.0, 0.0, 0.0], "valid content").await;
         assert!(res.is_ok());
         Ok(())
@@ -1515,7 +1517,7 @@ mod tests {
             .unwrap();
         let collection = rt.block_on(db.collection("default")).unwrap();
 
-        let router = RouterEngine::new(collection, profiles.clone(), None);
+        let router = create_test_router(collection, profiles.clone(), None);
         let calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
 
         // Chunk score: 0.5 (with community 1 match: 0.5 * 1.2 = 0.6)
@@ -1582,7 +1584,7 @@ mod tests {
             .unwrap();
         let collection = rt.block_on(db.collection("default")).unwrap();
 
-        let router = RouterEngine::new(collection, profiles.clone(), None);
+        let router = create_test_router(collection, profiles.clone(), None);
         let calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
 
         // Chunk score = 0.1 (0.1 * 1.2 = 0.12) < low threshold (0.5) -> falls through to last profile
@@ -1649,7 +1651,7 @@ mod tests {
         )
         .with_fingerprint(fp.clone());
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         // Perform 105 routing calls and record outcomes
         let mut last_calibrated = false;
@@ -1709,7 +1711,7 @@ mod tests {
         )
         .with_fingerprint(fp1.clone());
 
-        let router = RouterEngine::new(collection, vec![profile1], None);
+        let router = create_test_router(collection, vec![profile1], None);
 
         // Warm up with 105 successful outcomes under fp1
         for _ in 0..105 {
@@ -1808,7 +1810,7 @@ mod tests {
         )
         .with_fingerprint(fp_hash1.clone());
 
-        let router = RouterEngine::new(collection, vec![profile1], None);
+        let router = create_test_router(collection, vec![profile1], None);
 
         for _ in 0..105 {
             let decision = router
@@ -1882,7 +1884,7 @@ mod tests {
         )
         .with_fingerprint(fp_q8.clone());
 
-        let router = RouterEngine::new(collection, vec![profile1], None);
+        let router = create_test_router(collection, vec![profile1], None);
 
         for _ in 0..105 {
             let decision = router
@@ -1953,7 +1955,7 @@ mod tests {
             0.001,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         // Perform 50 decisions with record_outcome without fingerprint set
         for _ in 0..50 {
@@ -2016,7 +2018,7 @@ mod tests {
             0.0,
         );
 
-        let router = RouterEngine::new(collection, vec![p1, p2], None);
+        let router = create_test_router(collection, vec![p1, p2], None);
 
         let first_decision = router
             .route(&vec_data, "deterministic content")
@@ -2077,7 +2079,7 @@ mod tests {
         )
         .with_fingerprint(fp);
 
-        let router = Arc::new(RouterEngine::new(collection, vec![profile], None));
+        let router = Arc::new(create_test_router(collection, vec![profile], None));
 
         // Spawn 100 parallel route() tasks and record outcome
         let mut handles = Vec::new();
@@ -2160,7 +2162,7 @@ mod tests {
         let p1 = SlmProfile::new("p1", "http://ep1", vec![1], TokenBudget::default(), 0.1);
         let p2 = SlmProfile::new("p2", "http://ep2", vec![2], TokenBudget::default(), 0.2);
 
-        let router = RouterEngine::new(collection, vec![p1, p2], None);
+        let router = create_test_router(collection, vec![p1, p2], None);
         {
             let cal = router.calibration_stats();
             assert_eq!(cal["p1"].times_selected, 0);
@@ -2198,7 +2200,7 @@ mod tests {
         let collection = db.collection("default").await.unwrap();
 
         let p = SlmProfile::new("p", "http://ep", vec![1], TokenBudget::default(), 0.1);
-        let router = RouterEngine::new(collection, vec![p], None);
+        let router = create_test_router(collection, vec![p], None);
 
         let res_nan = router.route(&[f32::NAN, 0.0, 0.0, 0.0], "query").await;
         assert!(
@@ -2333,7 +2335,7 @@ mod tests {
         )
         .with_fingerprint(fp);
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
         let decision = router.route(&vec_coding, "function test").await.unwrap();
 
         let cal_before = router.calibration_stats();
@@ -2391,7 +2393,7 @@ mod tests {
             .unwrap();
         let collection = db.collection("default").await.unwrap();
 
-        let router = RouterEngine::new(collection, vec![p1], Some(cal_path));
+        let router = create_test_router(collection, vec![p1], Some(cal_path));
         let stats = router.calibration_stats();
         assert_eq!(stats["p1"].times_selected, 42);
 
@@ -2417,7 +2419,7 @@ mod tests {
             0.01,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
         let unknown_id = DecisionId::new();
 
         assert!(!router.record_outcome(unknown_id, RoutingOutcome::Success));
@@ -2441,7 +2443,7 @@ mod tests {
             0.01,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         // Initial status for unknown profile should be None
         assert_eq!(router.drift_status("unknown-slm"), None);
@@ -2558,7 +2560,7 @@ mod tests {
             profile.bandit_state = Some(crate::bandit::BanditProfileState::cold_start(4, 0.5));
         }
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         // Perform 25 routing decisions
         let mut last_decision = None;
@@ -2615,7 +2617,7 @@ mod tests {
         );
         profile.bandit_state = Some(crate::bandit::BanditProfileState::cold_start(4, 0.5));
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         // Baseline setzen damit Lyapunov Watcher sofort analysieren kann
         let baseline: Vec<f32> = (0..50).map(|i| (i as f32) / 100.0 * 0.1).collect();
@@ -2681,7 +2683,7 @@ mod tests {
             0.1,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         // Fill pending_decisions with MAX_PENDING_DECISIONS stale entries older than TTL (300s)
         let stale_timestamp =
@@ -2735,7 +2737,7 @@ mod tests {
             0.1,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         // Fill pending_decisions with MAX_PENDING_DECISIONS + 1 stale entries without record_outcome
         let stale_timestamp =
@@ -2784,7 +2786,7 @@ mod tests {
         let db = rt.block_on(MemFuse::open_with_config(dir.path(), config))?;
         let collection = rt.block_on(db.collection("default"))?;
 
-        let router = RouterEngine::new(collection, vec![profile.clone()], None);
+        let router = create_test_router(collection, vec![profile.clone()], None);
 
         let mut cal_state = ProfileCalibrationState::new(0.4);
         cal_state.conformal.alpha = 0.15;
@@ -2851,7 +2853,7 @@ mod tests {
         let db = rt.block_on(MemFuse::open_with_config(dir.path(), config))?;
         let collection = rt.block_on(db.collection("default"))?;
 
-        let router = RouterEngine::new(collection, vec![profile.clone()], None);
+        let router = create_test_router(collection, vec![profile.clone()], None);
 
         let mut cal_state = ProfileCalibrationState::new(0.1);
         cal_state.conformal.quantile_threshold = 0.8; // higher than score
@@ -2989,7 +2991,7 @@ mod tests {
             SlmProfile::new("", "http://localhost", vec![1], TokenBudget::default(), 0.5);
 
         let try_new_res =
-            RouterEngine::try_new(collection.clone(), vec![invalid_profile.clone()], None);
+            try_create_test_router(collection.clone(), vec![invalid_profile.clone()], None);
         assert!(try_new_res.is_err());
 
         let valid_profile = SlmProfile::new(
@@ -2999,7 +3001,7 @@ mod tests {
             TokenBudget::default(),
             0.5,
         );
-        let router = RouterEngine::new(collection, vec![valid_profile], None);
+        let router = create_test_router(collection, vec![valid_profile], None);
 
         let try_update_res = router.try_update_profiles(vec![invalid_profile]);
         assert!(try_update_res.is_err());
@@ -3025,7 +3027,7 @@ mod tests {
             TokenBudget::default(),
             0.5,
         );
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = create_test_router(collection, vec![profile], None);
 
         assert!(router.drift_status("nonexistent").is_none());
         assert!(!router.set_lyapunov_baseline("nonexistent", &[0.1, 0.2]));
@@ -3069,7 +3071,7 @@ mod tests {
             0.8,
         );
         let profiles = vec![profile1.clone(), profile2.clone()];
-        let router = RouterEngine::new(collection, profiles.clone(), None);
+        let router = create_test_router(collection, profiles.clone(), None);
 
         let mut calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
         calibration.insert("p1".to_string(), ProfileCalibrationState::new(0.9));
@@ -3234,7 +3236,7 @@ mod tests {
             0.5,
         );
 
-        let router = RouterEngine::new(
+        let router = create_test_router(
             collection.clone(),
             vec![profile.clone()],
             Some(corrupt_file),
@@ -3348,7 +3350,7 @@ mod tests {
         // Input configuration order: expensive, cheapest, mid
         let profiles = vec![expensive_profile, cheapest_profile, mid_profile];
 
-        let router = RouterEngine::new(collection, profiles, None);
+        let router = create_test_router(collection, profiles, None);
 
         // Before reaching CALIBRATION_WARMUP_WINDOW samples (calibrated == false)
         let decision = router
@@ -3429,7 +3431,7 @@ mod tests {
         let p1 = SlmProfile::new("p1", "http://ep1", vec![1], TokenBudget::default(), 0.1);
         let p2 = SlmProfile::new("p2", "http://ep2", vec![2], TokenBudget::default(), 0.1);
 
-        let router = RouterEngine::new(collection, vec![p1, p2], None);
+        let router = create_test_router(collection, vec![p1, p2], None);
 
         // Initial state before score observation -> "unbekannt"
         assert_eq!(router.overall_drift_status(), "unbekannt");

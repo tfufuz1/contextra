@@ -2698,6 +2698,7 @@ dependencies = [
  "memfuse-db",
  "memfuse-graph",
  "memfuse-index",
+ "memfuse-privacy",
  "memfuse-store",
  "memfuse-text",
  "parking_lot",
