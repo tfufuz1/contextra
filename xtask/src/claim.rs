@@ -531,7 +531,7 @@ mod tests {
 
         let future_exp = (Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
         db.claims.push(ClaimEntry {
-            krate: "memfuse-infer-onnx".to_string(),
+            krate: "memfuse-embed".to_string(),
             issue: "EXP-2".to_string(),
             timestamp: Utc::now().to_rfc3339(),
             session_id: "s2".to_string(),
@@ -541,7 +541,7 @@ mod tests {
         });
 
         assert_eq!(
-            db.find_active_claim("memfuse-infer-onnx").unwrap().issue,
+            db.find_active_claim("memfuse-embed").unwrap().issue,
             "EXP-2"
         );
     }

@@ -2480,6 +2480,8 @@ mod tests {
     }
 
     #[tokio::test]
+    #[tokio::test]
+    #[tokio::test]
     #[cfg(feature = "onnx")]
     async fn test_onnx_default_backend_e2e_with_fixture() {
         let tmp = TempDir::new().expect("temp dir");

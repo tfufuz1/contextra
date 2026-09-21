@@ -200,7 +200,7 @@ pub fn run_validate_pr_checklist() -> bool {
     // VETO-01: Partieller HNSW-Rebuild
     let hnsw_changes = diff_files
         .iter()
-        .any(|f| f.contains("memfuse-vector/") && (f.contains("hnsw") || f.contains("rebuild")));
+        .any(|f| f.contains("memfuse-index/") && (f.contains("hnsw") || f.contains("rebuild")));
     if hnsw_changes {
         let has_rebuild_region = diff.contains("rebuild_region");
         veto_checks.push(CheckItem {

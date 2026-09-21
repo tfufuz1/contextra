@@ -140,27 +140,24 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-20T01:11:28.771049190+00:00",
       "session_id": "1450221314676869243",
-      "active": false,
-      "expires_at": "2026-09-20T05:11:28.771035232+00:00",
-      "released_at": "2026-09-20T14:31:19.204514314+00:00 [TTL-EXPIRED]"
+      "active": true,
+      "expires_at": "2026-09-20T05:11:28.771035232+00:00"
     },
     {
       "krate": "memfuse-candle",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-20T01:38:42.908892561+00:00",
       "session_id": "14605695932706959249",
-      "active": false,
-      "expires_at": "2026-09-20T05:38:42.908881927+00:00",
-      "released_at": "2026-09-20T14:31:19.204514314+00:00 [TTL-EXPIRED]"
+      "active": true,
+      "expires_at": "2026-09-20T05:38:42.908881927+00:00"
     },
     {
       "krate": "memfuse-ollama",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-20T01:38:43.214414825+00:00",
       "session_id": "14605695932706959249",
-      "active": false,
-      "expires_at": "2026-09-20T05:38:43.214405182+00:00",
-      "released_at": "2026-09-20T14:31:19.204514314+00:00 [TTL-EXPIRED]"
+      "active": true,
+      "expires_at": "2026-09-20T05:38:43.214405182+00:00"
     }
   ]
 }

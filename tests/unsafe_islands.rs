@@ -16,7 +16,7 @@ pub const ALLOWED_UNSAFE_ISLANDS: &[&str] = &[
 ];
 
 pub const TRANSITION_ALLOWED_CRATES: &[&str] = &[
-    "memfuse-vector",        // SIMD + Mmap, being moved to memfuse-simd / memfuse-sys in Phase 1c
+    "memfuse-index",        // SIMD + Mmap, being moved to memfuse-simd / memfuse-sys in Phase 1c
     "memfuse-store",        // Win32 ACL, being moved to memfuse-sys in Phase 1c
     "memfuse-db",           // volatile-vault mlock, being moved to memfuse-sys in Phase 1c
     "memfuse-crypto",       // test-only Zeroize drop semantics verification

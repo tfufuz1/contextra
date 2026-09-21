@@ -41,14 +41,15 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
         "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
         | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
         | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-        | "memfuse-core" | "memfuse-calibration" => Some(Ring::Ring0),
+        | "memfuse-core" | "memfuse-index" | "memfuse-calibration" => Some(Ring::Ring0),
 
         // Ring 1
         "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),
 
         // Ring 2
         "memfuse-infer-candle" | "memfuse-infer-ollama" | "memfuse-infer-onnx"
-        | "memfuse-sandbox" => Some(Ring::Ring2),
+        | "memfuse-sandbox" | "memfuse-embed" | "memfuse-candle"
+        | "memfuse-ollama" => Some(Ring::Ring2),
 
         // Ring 3
         "memfuse-engine" | "memfuse-cognition" | "memfuse-privacy"
@@ -251,7 +252,7 @@ mod tests {
     fn test_ring_mapping_all_crates_covered() {
         assert_eq!(get_crate_ring("memfuse-core"), Some(Ring::Ring0));
         assert_eq!(get_crate_ring("memfuse-store"), Some(Ring::Ring1));
-        assert_eq!(get_crate_ring("memfuse-infer-candle"), Some(Ring::Ring2));
+        assert_eq!(get_crate_ring("memfuse-candle"), Some(Ring::Ring2));
         assert_eq!(get_crate_ring("memfuse-db"), Some(Ring::Ring3));
         assert_eq!(get_crate_ring("memfuse-mcp"), Some(Ring::Ring4));
         assert_eq!(get_crate_ring("xtask"), Some(Ring::Tooling));

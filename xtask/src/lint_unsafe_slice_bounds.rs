@@ -204,7 +204,7 @@ pub fn lint_code_str(code: &str, file_name: &str) -> Result<Vec<LintViolation>, 
 pub fn run_lint_unsafe_slice_bounds() -> bool {
     println!("=== xtask lint-unsafe-slices ===");
     let mut all_violations = Vec::new();
-    let target_dir = Path::new("crates/memfuse-vector/src");
+    let target_dir = Path::new("crates/memfuse-index/src");
 
     if !target_dir.exists() {
         eprintln!("Target directory {} does not exist!", target_dir.display());
