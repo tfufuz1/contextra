@@ -180,13 +180,13 @@
       "expires_at": "2026-09-21T17:09:31.259198+00:00"
     },
     {
-      "krate": "memfuse-store",
-      "issue": "OPUS0-6-MANIFEST-CRASH",
-      "timestamp": "2026-09-21T14:54:06.855531055+00:00",
-      "session_id": "11682799888001574576",
+      "krate": "docs-decisions",
+      "issue": "WELLE-2026-09-21-V3-ADR-N02",
+      "timestamp": "2026-09-21T13:38:39.856585817+00:00",
+      "session_id": "15516823758931695528",
       "active": false,
-      "expires_at": "2026-09-21T18:54:06.855520827+00:00",
-      "released_at": "2026-09-21T15:13:37.132036659+00:00 [RELEASED]"
+      "expires_at": "2026-09-21T17:38:39.856571205+00:00",
+      "released_at": "2026-09-21T13:56:27.901083926+00:00 [RELEASED]"
     }
   ]
 }
