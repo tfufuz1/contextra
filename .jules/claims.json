@@ -176,8 +176,9 @@
       "issue": "WELLE-2026-09-21-ONNX-DEFAULT-MEMBERS",
       "timestamp": "2026-09-21T13:09:31.259173+00:00",
       "session_id": "manual-jules-session",
-      "active": true,
-      "expires_at": "2026-09-21T17:09:31.259198+00:00"
+      "active": false,
+      "expires_at": "2026-09-21T17:09:31.259198+00:00",
+      "released_at": "2026-09-21T18:20:42.622397268+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "docs-decisions",
@@ -187,6 +188,14 @@
       "active": false,
       "expires_at": "2026-09-21T17:38:39.856571205+00:00",
       "released_at": "2026-09-21T13:56:27.901083926+00:00 [RELEASED]"
+    },
+    {
+      "krate": "workspace-root",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-21T18:14:20.180368201+00:00",
+      "session_id": "10672640857832740238",
+      "active": true,
+      "expires_at": "2026-09-21T22:14:20.180353482+00:00"
     }
   ]
 }
