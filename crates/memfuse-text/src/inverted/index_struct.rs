@@ -12,10 +12,10 @@ use memfuse_core::{
 /// An inverted index tied to a specific collection namespace.
 ///
 /// # Concurrency & Lock Hierarchy:
-/// 1. `commit_lock` (`tokio::sync::Mutex`): Ensures single-writer serialization during transactional stats commits.
+/// 1. `commit_lock` (`parking_lot::Mutex`): Ensures single-writer serialization during transactional stats commits.
 /// 2. `staged_stats` (`parking_lot::Mutex`): Synchronous, short-lived spinlock guarding in-memory uncommitted transaction statistics.
 ///
-/// **Rule**: `commit_lock` must ALWAYS be acquired BEFORE acquiring `staged_stats`. Never hold `staged_stats` lock across `.await` points.
+/// **Rule**: `commit_lock` must ALWAYS be acquired BEFORE acquiring `staged_stats`. Never hold synchronous lock guards across `.await` points.
 pub struct InvertedIndex<S: StorageEngine> {
     storage: Arc<S>,
     prefix: Vec<u8>,
@@ -25,7 +25,7 @@ pub struct InvertedIndex<S: StorageEngine> {
     pub(crate) avg_doc_len_x1000: Arc<AtomicU64>, // Cached fixed-point (FIND-TXT-004)
     pub(crate) staged_stats: Arc<parking_lot::Mutex<HashMap<TxId, StagedStatsChange>>>,
     pub(crate) staged_terms: Arc<parking_lot::Mutex<HashMap<TxId, Vec<String>>>>,
-    commit_lock: Arc<tokio::sync::Mutex<()>>,
+    commit_lock: Arc<parking_lot::Mutex<()>>,
     pub(crate) resident_index: Arc<ResidentPostingIndex>,
 }
 
@@ -81,7 +81,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
             avg_doc_len_x1000: Arc::new(AtomicU64::new(0)),
             staged_stats: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             staged_terms: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-            commit_lock: Arc::new(tokio::sync::Mutex::new(())),
+            commit_lock: Arc::new(parking_lot::Mutex::new(())),
             resident_index: Arc::new(ResidentPostingIndex::new()),
         }
     }
@@ -504,18 +504,20 @@ impl<S: StorageEngine> InvertedIndex<S> {
             self.avg_doc_len_x1000.store(avg_len, Ordering::SeqCst);
         }
 
-        let _guard = self.commit_lock.lock().await;
-        let docs = self.total_docs.load(Ordering::SeqCst);
-        let tokens = self.total_tokens.load(Ordering::SeqCst);
-        let avg_len = self.avg_doc_len_x1000.load(Ordering::SeqCst);
+        let meta_bytes = {
+            let _guard = self.commit_lock.lock();
+            let docs = self.total_docs.load(Ordering::SeqCst);
+            let tokens = self.total_tokens.load(Ordering::SeqCst);
+            let avg_len = self.avg_doc_len_x1000.load(Ordering::SeqCst);
 
-        let meta = TextIndexMetadata {
-            total_docs: docs,
-            total_tokens: tokens,
-            avg_doc_len_x1000: avg_len,
+            let meta = TextIndexMetadata {
+                total_docs: docs,
+                total_tokens: tokens,
+                avg_doc_len_x1000: avg_len,
+            };
+            bincode::serialize(&meta)
+                .map_err(|e| MemFuseError::Storage(format!("bincode: {}", e)))?
         };
-        let meta_bytes = bincode::serialize(&meta)
-            .map_err(|e| MemFuseError::Storage(format!("bincode: {}", e)))?;
         let meta_key = self.key("meta:stats");
 
         self.storage.put(tx, &meta_key, &meta_bytes).await
