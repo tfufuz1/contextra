@@ -999,6 +999,7 @@ dependencies = [
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-simd",
+ "memfuse-sys",
  "memmap2",
  "parking_lot",
  "rand",

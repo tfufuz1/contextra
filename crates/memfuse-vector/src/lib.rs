@@ -14,13 +14,8 @@
 // ANCHOR[REFACTOR:WP-0.0-STABLESIMD] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Remove nightly portable_simd
 // TEST: cargo +stable check -p memfuse-index
 // DONE: #![feature(portable_simd)] ist entfernt und distance.rs nutzt stabiles Rust.
-// INTENT: deny(unsafe_code) statt forbid(unsafe_code)
-// BEGRÜNDUNG: SIMD-Kernels wurden nach `memfuse-simd` ausgelagert.
-// Die verbleibenden `unsafe`-Blöcke beschränken sich auf `Mmap::map` in `persistence.rs` / `diskann.rs`.
-#![deny(unsafe_code)]
-#![allow(unsafe_code)]
-#![allow(unsafe_op_in_unsafe_fn)]
-#![allow(clippy::undocumented_unsafe_blocks)]
+// INVARIANTE: Zero unsafe code in memfuse-vector. SIMD an memfuse-simd, mmap an memfuse-sys ausgelagert.
+#![forbid(unsafe_code)]
 #![allow(clippy::too_many_arguments)]
 
 #[cfg(feature = "experimental-diskann")]
