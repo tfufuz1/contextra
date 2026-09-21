@@ -23,6 +23,7 @@ pub mod crypto;
 pub mod deletion_proof;
 pub mod egress_vault;
 pub mod error;
+pub mod kdf;
 pub mod kv_cipher;
 pub mod kv_segment;
 pub mod wal_crypto;
@@ -36,6 +37,7 @@ pub use egress_vault::{
     EgressVaultError, PolicyCategory,
 };
 pub use error::{CryptoError, Result};
+pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use kv_cipher::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
 pub use kv_segment::{
     eviction_worker::{emergency_wipe, EvictionWorker},
