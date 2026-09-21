@@ -47,14 +47,14 @@ pub use outcome::{DecisionId, RoutingOutcome};
 pub use profile::SlmProfile;
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 
+#[cfg(feature = "bandit-routing")]
+pub use memfuse_adapt::{BanditError, BanditImplementation, BanditPolicy, BanditProfileState};
 #[deprecated(
     since = "0.1.0",
     note = "Moved to memfuse_privacy as part of Ring-Modell Phase 1b"
 )]
 #[cfg(feature = "cloud-egress-guard")]
 pub use memfuse_privacy::guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
-#[cfg(feature = "bandit-routing")]
-pub use memfuse_adapt::{BanditError, BanditImplementation, BanditPolicy, BanditProfileState};
 #[cfg(feature = "bandit-routing")]
 pub use routing_strategy::RoutingStrategy;
 #[cfg(feature = "cloud-egress-guard")]

@@ -15,9 +15,7 @@ use crate::ports_local::{
 };
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
-use memfuse_core::{
-    ContextChunk, ContextWindow, EntityId, MemFuseError, Result, StorageEngine,
-};
+use memfuse_core::{ContextChunk, ContextWindow, EntityId, MemFuseError, Result, StorageEngine};
 use memfuse_store::LsmStorage;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
