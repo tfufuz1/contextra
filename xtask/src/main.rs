@@ -1230,7 +1230,7 @@ pub fn check_no_orphan_adr_files(root_dir: &Path) -> bool {
         return true;
     }
 
-    let adr_file_re = Regex::new(r"^ADR-\d+.*\.md$").unwrap();
+    let adr_file_re = Regex::new(r"^ADR-(\d+|N\d+).*\.md$").unwrap();
 
     let invalid_files: Vec<_> = match fs::read_dir(&decisions_dir) {
         Ok(dir) => dir
