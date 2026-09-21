@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use memfuse_core::{DocId, EntityId, TxId};
+use memfuse_core::{DocId, EntityId, ResourceTracker, TxId};
 
 pub(crate) const GRAPH_ENTITY_PREFIX: &[u8] = b"__graph:entity:";
 pub(crate) const GRAPH_EDGE_PREFIX: &[u8] = b"__graph:edge:";
@@ -73,6 +73,8 @@ pub struct CsrGraphConfig {
     pub rebuild_threshold: usize,
     /// Max compaction peak memory limit in MB (IP-08). Compaction will be deferred if current graph memory + rebuild allocation exceeds this threshold.
     pub max_compaction_peak_memory_mb: Option<usize>,
+    /// Optional global ResourceTracker handle for cross-crate memory budget coupling (IP-08).
+    pub resource_tracker: Option<Arc<ResourceTracker>>,
 }
 
 impl Default for CsrGraphConfig {
@@ -80,6 +82,7 @@ impl Default for CsrGraphConfig {
         Self {
             rebuild_threshold: 1000,
             max_compaction_peak_memory_mb: Some(1024),
+            resource_tracker: None,
         }
     }
 }
