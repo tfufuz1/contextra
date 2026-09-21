@@ -37,3 +37,6 @@ benchmarks/memfuse-bench/tests/data/
 
 # Kompilierte Ad-hoc-Binaries ohne Cargo-Build-System
 /fix_unsafe
+
+# Benchmark- und Report-Ergebnisse
+results/
