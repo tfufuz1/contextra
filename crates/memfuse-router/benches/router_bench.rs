@@ -1,7 +1,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use memfuse_core::{BoxFuture, ContextChunk, EntityId, Result, StorageEngine, TokenBudget};
 use memfuse_db::{Collection, MemFuse, MemFuseConfig};
-use memfuse_router::ports_local::{CommunityResolver, HybridSearchProvider, PassthroughContextPreparer};
+use memfuse_router::ports_local::{
+    CommunityResolver, HybridSearchProvider, PassthroughContextPreparer,
+};
 use memfuse_router::{RouterEngine, SlmProfile};
 use serde_json::json;
 use std::sync::Arc;
@@ -47,10 +49,7 @@ impl<S: StorageEngine + 'static> HybridSearchProvider for CollectionAdapter<S> {
 }
 
 impl<S: StorageEngine + 'static> CommunityResolver for CollectionAdapter<S> {
-    fn get_community<'a>(
-        &'a self,
-        entity_id: EntityId,
-    ) -> BoxFuture<'a, Result<Option<u64>>> {
+    fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>> {
         Box::pin(async move { self.collection.get_community(entity_id).await })
     }
 }
