@@ -45,11 +45,11 @@ Ergebnis: **0 offene Tags**
 | `memfuse-infer-ollama` | 4 | 4598 | 🟢 Clean |  |
 | `memfuse-infer-onnx` | 4 | 2219 | 🟢 Clean |  |
 | `memfuse-kvcache` | 5 | 1420 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
-| `memfuse-store` | 5 | 27485 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
+| `memfuse-store` | 5 | 27482 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 18984 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
 | `memfuse-infer-candle` | 6 | 4667 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
-| `memfuse-router` | 6 | 6128 | 🟢 Clean |  |
+| `memfuse-router` | 6 | 6180 | 🟢 Clean |  |
 | `memfuse-cognition` | 7 | 4510 | 🟢 Clean | MemFuse — Memory consolidation, compaction, and context management |
 | `memfuse-db` | 8 | 12835 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse` | 9 | 258 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents (Facade) |

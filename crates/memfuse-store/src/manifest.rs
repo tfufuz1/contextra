@@ -742,6 +742,27 @@ impl Manifest {
     ///
     /// If an error occurs prior to `rename`, the temporary file is cleaned up and the original `MANIFEST`
     /// remains untouched and valid.
+    /// Forces an atomic rollover of the MANIFEST file regardless of current size.
+    ///
+    /// Writes live entries into `MANIFEST.new.<pid>.<rand>`, flushes, fsyncs,
+    /// atomically renames to `MANIFEST`, and fsyncs the parent directory.
+    pub async fn rollover(&self, live_entries: &[ManifestEntry]) -> Result<()> {
+        let _ = self.maybe_rollover(live_entries, 0).await?;
+        Ok(())
+    }
+
+    /// Evaluates whether the MANIFEST file size exceeds `threshold_bytes` and performs an atomic
+    /// rollover if needed.
+    ///
+    /// Rollover process:
+    /// (a) Write current live entries (`live_entries`) as a snapshot into a temporary `MANIFEST.new` file.
+    /// (b) `flush` + `sync_all` on the temporary file.
+    /// (c) Atomically `rename` temporary file to `MANIFEST`.
+    /// (d) `fsync` the parent directory.
+    /// (e) Re-open `MANIFEST` handle in append mode and update `self.file`.
+    ///
+    /// If an error occurs prior to `rename`, the temporary file is cleaned up and the original `MANIFEST`
+    /// remains untouched and valid.
     pub async fn maybe_rollover(
         &self,
         live_entries: &[ManifestEntry],
@@ -1251,5 +1272,26 @@ mod tests {
         assert!(valid_sstables
             .iter()
             .any(|(p, _)| p == Path::new("sst-20.sst")));
+    }
+
+    #[tokio::test]
+    async fn test_manifest_explicit_rollover() {
+        let dir = tempdir().expect("tempdir");
+        let manifest_path = dir.path().join("MANIFEST");
+
+        let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+
+        let entry1 = ManifestEntry::Add {
+            path: PathBuf::from("sst-1.sst"),
+            max_tx: 10,
+        };
+        manifest.append(&entry1).await.expect("append 1");
+
+        let live = vec![entry1.clone()];
+        manifest.rollover(&live).await.expect("explicit rollover");
+
+        let loaded = Manifest::load(&manifest_path).await.expect("load manifest");
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0], entry1);
     }
 }

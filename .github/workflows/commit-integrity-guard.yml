@@ -1,0 +1,79 @@
+# Commit Integrity Guard Workflow
+# Detects empty commits carrying misleading commit messages claiming non-existent file additions or multi-line changelogs.
+# Triggered by incident class cab4fc5a (22.09.2026) where an empty diff commit claimed additions of five files.
+
+name: Commit Integrity Guard
+
+on: [push, pull_request]
+
+jobs:
+  commit-integrity-guard:
+    name: Commit Integrity Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Check Commit Integrity (No Empty Commits with Misleading Messages)"
+        env:
+          MEMFUSE_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+        run: |
+          set -euo pipefail
+
+          BASE_REF="${MEMFUSE_CI_BASE_REF:-origin/main}"
+          if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+            BASE_REF="HEAD~1"
+          fi
+
+          COMMITS=$(git rev-list "$BASE_REF..HEAD" 2>/dev/null || echo "")
+
+          if [ -z "$COMMITS" ]; then
+            echo "No commits found in range $BASE_REF..HEAD or empty range."
+            exit 0
+          fi
+
+          FAILED=0
+
+          for COMMIT in $COMMITS; do
+            PARENT=$(git rev-parse "${COMMIT}^1" 2>/dev/null || true)
+            if [ -z "$PARENT" ]; then
+              continue
+            fi
+
+            COMMIT_TREE=$(git rev-parse "${COMMIT}^{tree}")
+            PARENT_TREE=$(git rev-parse "${PARENT}^{tree}")
+
+            if [ "$COMMIT_TREE" = "$PARENT_TREE" ]; then
+              MSG_LINE_COUNT=$(git log -1 --format="%B" "$COMMIT" | grep -v '^\s*$' | wc -l | tr -d ' ')
+
+              IS_MISLEADING=0
+
+              if [ "$MSG_LINE_COUNT" -gt 1 ]; then
+                IS_MISLEADING=1
+              fi
+
+              if git log -1 --format="%B" "$COMMIT" | grep -i -E '\b(add|implement|fix|update)\b.*\b[a-zA-Z0-9_/-]+\.[a-zA-Z0-9]+\b' >/dev/null 2>&1; then
+                IS_MISLEADING=1
+              fi
+
+              if [ "$IS_MISLEADING" -eq 1 ]; then
+                echo "❌ INTEGRITY GUARD FAILURE: Empty commit with misleading message detected!"
+                echo "  Commit SHA: $COMMIT"
+                echo "  Tree Hash:  $COMMIT_TREE (identical to parent $PARENT)"
+                echo "  Commit Message:"
+                git log -1 --format="    %B" "$COMMIT"
+                echo ""
+                echo "  EXPLANATION:"
+                echo "  This check guards against empty commits carrying misleading messages claiming non-existent file additions or multi-line changelogs."
+                echo "  Incident Reference Class: cab4fc5a (22.09.2026) where commit cab4fc5a claimed 'add SignalKind, IPS propensity...' with 5 files but had an empty diff."
+                FAILED=1
+              fi
+            fi
+          done
+
+          if [ "$FAILED" -ne 0 ]; then
+            exit 1
+          fi
+
+          echo "✅ Commit integrity check passed: No empty commits with misleading messages found."

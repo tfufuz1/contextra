@@ -402,7 +402,7 @@ mod tests {
         }
 
         fn get_at_seq(&self, key: &[u8], _seq: u64) -> Result<Option<Bytes>> {
-            self.get(key)
+            Ok(self.data.get(key).cloned().map(Bytes::from))
         }
 
         fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
