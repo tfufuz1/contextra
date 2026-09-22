@@ -182,6 +182,7 @@ fn proof_usize_max_removed_from_search_path() {
 
     let mut unannotated_found = Vec::new();
 
+    let src_dir = Path::new(&manifest_dir).join("src");
     if src_dir.exists() {
         for entry in std::fs::read_dir(&src_dir).unwrap() {
             let entry = entry.unwrap();

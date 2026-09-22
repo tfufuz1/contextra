@@ -8,7 +8,7 @@
 
 #[cfg(test)]
 #[allow(clippy::module_inception)]
-mod tests {
+pub(crate) mod tests {
     use crate::{
         dispatch_to_slm, DecisionId, RouterEngine, RoutingDecision, RoutingOutcome, SlmProfile,
     };
@@ -116,6 +116,104 @@ mod tests {
         }
     }
 
+    // AI-TAG[CORRECTNESS][BLOCKER][RESOLVED]: Refactor commit 0f231376 decoupled memfuse-router from memfuse-db,
+    // requiring CollectionAdapter, TestContextPreparer, create_test_router, and try_create_test_router helper adapters for unit tests.
+
+    pub(crate) struct CollectionAdapter<S: StorageEngine + 'static> {
+        collection: Arc<memfuse_db::Collection<S>>,
+    }
+
+    impl<S: StorageEngine + 'static> CollectionAdapter<S> {
+        pub(crate) fn new(collection: Arc<memfuse_db::Collection<S>>) -> Self {
+            Self { collection }
+        }
+    }
+
+    impl<S: StorageEngine + 'static> crate::ports_local::HybridSearchProvider for CollectionAdapter<S> {
+        fn search_hybrid<'a>(
+            &'a self,
+            query_text: &'a str,
+            query_embedding: &'a [f32],
+            top_k: usize,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<memfuse_core::ContextChunk>>> {
+            Box::pin(async move {
+                let search_results = self
+                    .collection
+                    .query()
+                    .text(query_text)
+                    .embedding(query_embedding)
+                    .k(top_k)
+                    .execute()
+                    .await?;
+
+                let mut chunks = Vec::with_capacity(search_results.len());
+                for res in search_results {
+                    if let Ok(mut chunk) = memfuse_core::ContextChunk::try_from(res) {
+                        chunk.content = chunk.combined_text_owned();
+                        chunks.push(chunk);
+                    }
+                }
+                Ok(chunks)
+            })
+        }
+    }
+
+    impl<S: StorageEngine + 'static> crate::ports_local::CommunityResolver for CollectionAdapter<S> {
+        fn get_community<'a>(
+            &'a self,
+            entity_id: EntityId,
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<u64>>> {
+            Box::pin(async move { self.collection.get_community(entity_id).await })
+        }
+    }
+
+    pub(crate) struct TestContextPreparer;
+
+    impl crate::ports_local::ContextPreparer for TestContextPreparer {
+        fn prepare_context(
+            &self,
+            chunks: Vec<memfuse_core::ContextChunk>,
+            budget: &TokenBudget,
+            relevance_threshold: f32,
+        ) -> memfuse_core::Result<memfuse_core::ContextWindow> {
+            let mut manager = memfuse_db::context::ContextManager::new(budget.clone());
+            manager.set_relevance_threshold(relevance_threshold);
+            manager.prepare_context(chunks)
+        }
+    }
+
+    pub(crate) fn create_test_router<S: StorageEngine + 'static>(
+        collection: Arc<memfuse_db::Collection<S>>,
+        profiles: Vec<SlmProfile>,
+        calibration_store_path: Option<std::path::PathBuf>,
+    ) -> RouterEngine<S> {
+        let adapter = Arc::new(CollectionAdapter::new(collection));
+        let preparer = Arc::new(TestContextPreparer);
+        RouterEngine::new(
+            adapter.clone(),
+            adapter,
+            preparer,
+            profiles,
+            calibration_store_path,
+        )
+    }
+
+    pub(crate) fn try_create_test_router<S: StorageEngine + 'static>(
+        collection: Arc<memfuse_db::Collection<S>>,
+        profiles: Vec<SlmProfile>,
+        calibration_store_path: Option<std::path::PathBuf>,
+    ) -> memfuse_core::Result<RouterEngine<S>> {
+        let adapter = Arc::new(CollectionAdapter::new(collection));
+        let preparer = Arc::new(TestContextPreparer);
+        RouterEngine::try_new(
+            adapter.clone(),
+            adapter,
+            preparer,
+            profiles,
+            calibration_store_path,
+        )
+    }
+
     #[tokio::test]
     async fn test_router_engine_instantiation_with_mock_storage() {
         let storage = Arc::new(MockStorageEngine);
@@ -144,7 +242,8 @@ mod tests {
 
         let adapter = Arc::new(CollectionAdapter::new(collection));
         let preparer = Arc::new(TestContextPreparer);
-        let router = RouterEngine::new(adapter.clone(), adapter, preparer, vec![profile], None);
+        let router: RouterEngine<MockStorageEngine> =
+            RouterEngine::new(adapter.clone(), adapter, preparer, vec![profile], None);
         assert_eq!(router.profiles().len(), 1);
         assert_eq!(router.profiles()[0].name, "mock-slm");
     }

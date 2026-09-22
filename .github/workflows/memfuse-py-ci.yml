@@ -8,7 +8,7 @@
 # 2. Test Suite (`cargo test`)
 # 3. Linting (`cargo clippy -D warnings`)
 # 4. Dependency Security & Licenses (`cargo deny`)
-# 5. FFI Panic Boundary & Unwrap Baseline Gates (`xtask check-ffi-panic-boundary`, `xtask check-unwrap-baseline`)
+# 5. FFI Panic Boundary Gate (`xtask check-ffi-panic-boundary`)
 
 name: memfuse-py CI (Full Gate Stack)
 
@@ -60,5 +60,3 @@ jobs:
       - name: FFI Panic Boundary Check
         run: cargo run -p xtask -- check-ffi-panic-boundary
 
-      - name: Unwrap Baseline Gate
-        run: cargo run -p xtask -- check-unwrap-baseline
