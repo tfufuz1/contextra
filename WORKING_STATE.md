@@ -55,7 +55,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse` | 9 | 50 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents (Facade) |
 | `memfuse-agent` | 9 | 6971 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
 | `memfuse-bench` | 9 | 5741 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
-| `memfuse-py` | 9 | 1880 | 🟢 Clean | Python bindings for MemFuse using PyO3 |
+| `memfuse-py` | 9 | 1827 | 🟢 Clean | Python bindings for MemFuse using PyO3 |
 | `memfuse-mcp` | 10 | 7058 | 🟢 Clean |  |
 
 
