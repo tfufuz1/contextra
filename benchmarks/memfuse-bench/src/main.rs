@@ -944,7 +944,7 @@ async fn run_long_mem_eval_cmd(
                 "session_idx": sess_idx,
             });
             batch.push((doc_id, dummy_vec.clone(), Some(metadata)));
-            if batch.len() >= 50 {
+            if batch.len() >= 10 {
                 col.insert_many(&batch).await?;
                 batch.clear();
             }
