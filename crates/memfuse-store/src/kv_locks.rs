@@ -3,6 +3,7 @@
 //! Provides `KvKeyLocks` for fine-grained key locking across $2^N$ shards with canonical
 //! lock acquisition ordering (`acquire_multi_sorted`) to prevent multi-key deadlocks.
 
+use std::hash::Hash;
 use std::sync::{RwLock, RwLockWriteGuard};
 use thiserror::Error;
 
@@ -22,6 +23,7 @@ pub enum LockError {
 pub struct KvKeyLocks {
     shards: Vec<RwLock<()>>,
     shard_mask: u64,
+    hasher: ahash::RandomState,
 }
 
 /// RAII guard holding a write lock for a single key shard.
@@ -41,7 +43,22 @@ impl KvKeyLocks {
         let num_shards = 1usize << pow2;
         let shard_mask = (num_shards as u64) - 1;
         let shards = (0..num_shards).map(|_| RwLock::new(())).collect();
-        Self { shards, shard_mask }
+        let hasher = ahash::RandomState::with_seeds(
+            0x9E37_79B9_7F4A_7C15,
+            0xBF58_476D_1CE4_E5B9,
+            0x94D0_49BB_1331_11EB,
+            0x2545_F491_4F6C_DD1D,
+        );
+        Self {
+            shards,
+            shard_mask,
+            hasher,
+        }
+    }
+
+    /// Generates a stable key lock hash for a given key using the fixed-seed hasher instance.
+    pub fn key_hash<T: Hash + ?Sized>(&self, key: &T) -> u64 {
+        self.hasher.hash_one(key)
     }
 
     /// Acquires a write lock on the shard corresponding to `key_hash`.

@@ -25,7 +25,7 @@ Ergebnis: **0 offene Tags**
 
 | Crate | Layer | LOC | Status | Beschreibung / Hauptaufgabe |
 | :--- | :---: | :---: | :--- | :--- |
-| `memfuse-adapt` | 0 | 2656 | 🟢 Clean | Adaptive controllers, bandits, and PID regulators for MemFuse |
+| `memfuse-adapt` | 0 | 2833 | 🟢 Clean | Adaptive controllers, bandits, and PID regulators for MemFuse |
 | `memfuse-sys` | 0 | 526 | 🟢 Clean | Low-level unsafe system abstractions and FFI island for MemFuse (Ring 0) |
 | `memfuse-types` | 0 | 5951 | 🟢 Clean | Canonical domain types, IDs, budgets, filters, and error types for MemFuse |
 | `memfuse-wire` | 0 | 2019 | 🟢 Clean | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for MemFuse |
@@ -35,7 +35,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-rank` | 2 | 1954 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
 | `memfuse-calibration` | 3 | 1550 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 3 | 6112 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
-| `memfuse-graph` | 3 | 17782 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `memfuse-graph` | 3 | 17773 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-privacy` | 3 | 1865 | 🟢 Clean | Cloud Egress Security, DLP & Exfiltration Protection for MemFuse (Ring 3) |
 | `memfuse-sandbox` | 3 | 992 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
 | `memfuse-simd` | 3 | 1388 | 🟢 Clean | Ring 0 SIMD distance kernels and runtime dispatch for MemFuse (Unsafe Island) |
@@ -46,17 +46,18 @@ Ergebnis: **0 offene Tags**
 | `memfuse-infer-onnx` | 4 | 2219 | 🟢 Clean |  |
 | `memfuse-router` | 4 | 6128 | 🟢 Clean |  |
 | `memfuse-kvcache` | 5 | 1420 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
-| `memfuse-store` | 5 | 27303 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
+| `memfuse-store` | 5 | 27482 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 18984 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
 | `memfuse-infer-candle` | 6 | 4667 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
+| `memfuse-router` | 6 | 6180 | 🟢 Clean |  |
 | `memfuse-cognition` | 7 | 4510 | 🟢 Clean | MemFuse — Memory consolidation, compaction, and context management |
-| `memfuse-db` | 8 | 12841 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 8 | 12835 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse` | 9 | 258 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents (Facade) |
 | `memfuse-agent` | 9 | 6971 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
 | `memfuse-bench` | 9 | 5741 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-py` | 9 | 1827 | 🟢 Clean | Python bindings for MemFuse using PyO3 |
-| `memfuse-mcp` | 10 | 7394 | 🟢 Clean |  |
+| `memfuse-mcp` | 10 | 7395 | 🟢 Clean |  |
 
 
 ## DAG-Topologie
@@ -87,6 +88,7 @@ Layer 5:  memfuse-kvcache — Ring 1 Prefix-Radix tree, KV-Block cache, tenant-i
           memfuse-vector — HNSW vector index with SIMD distance computation for MemFuse (deps: memfuse-core, memfuse-crypto, memfuse-simd, memfuse-sys)
 Layer 6:  memfuse-engine — MemFuse — Core storage, index, and transaction orchestrator engine (deps: memfuse-adapt, memfuse-calibration, memfuse-checkpoint, memfuse-core, memfuse-crypto, memfuse-graph, memfuse-store, memfuse-sys, memfuse-text, memfuse-vector)
           memfuse-infer-candle — Native Candle GGUF ML inference backend for MemFuse (deps: memfuse-calibration, memfuse-core, memfuse-crypto, memfuse-store)
+          memfuse-router —  (deps: memfuse-adapt, memfuse-core, memfuse-ports, memfuse-privacy, memfuse-store)
 Layer 7:  memfuse-cognition — MemFuse — Memory consolidation, compaction, and context management (deps: memfuse-core, memfuse-engine, memfuse-graph, memfuse-store, memfuse-vector)
 Layer 8:  memfuse-db — MemFuse — Embedded hybrid-search for AI agents (deps: memfuse-adapt, memfuse-calibration, memfuse-checkpoint, memfuse-cognition, memfuse-core, memfuse-crypto, memfuse-engine, memfuse-graph, memfuse-index, memfuse-store, memfuse-sys, memfuse-text)
 Layer 9:  memfuse — MemFuse — Embedded hybrid-search for AI agents (Facade) (deps: memfuse-calibration, memfuse-core, memfuse-db, memfuse-infer-candle, memfuse-infer-ollama, memfuse-infer-onnx, memfuse-router)
