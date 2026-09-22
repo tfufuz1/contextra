@@ -1020,13 +1020,11 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
         });
     }
 
-    let results = if let Some(cfg) = resonance_config {
+    if let Some(cfg) = resonance_config {
         apply_resonance_bonus(results, valid_signal_count, cfg)
     } else {
         results
-    };
-
-    results
+    }
 }
 
 /// Fuses search result sets using the specified `FusionStrategy`.
@@ -1316,13 +1314,11 @@ pub fn score_normalized_fusion_with_options(
         });
     }
 
-    let results = if let Some(cfg) = resonance_config {
+    if let Some(cfg) = resonance_config {
         apply_resonance_bonus(results, valid_signal_count, cfg)
     } else {
         results
-    };
-
-    results
+    }
 }
 
 /// Converts optional `FusionWeights` into (vector, text, graph) weight tuple.

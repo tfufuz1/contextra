@@ -114,7 +114,7 @@ impl OffPolicyEvaluator {
         propensity: f32,
         reward: f32,
     ) {
-        if propensity.is_nan() || propensity < 0.0 || propensity > 1.0 {
+        if !(0.0..=1.0).contains(&propensity) {
             self.discarded += 1;
             self.samples += 1;
             return;
