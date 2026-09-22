@@ -1643,27 +1643,488 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 
 ---
 
-# ADR-N02: Sync-Kern — `StorageRead` synchron, `StorageWrite` asynchron (begrenzter `ComputePool`)
+# ADR-N01: Maschinelle Durchsetzung der Layer-Regeln (DAG & Ring-Schichtenmodell)
 
-* **Status:** beschlossen; Benchmark-Gate vor Phase 2
-* **Datum:** 2026-09-21
-* **Target Path:** crates/memfuse-vector/src/diskann.rs, crates/memfuse-text/src/inverted.rs, crates/memfuse-graph/src/csr.rs
-* **Kontext / Auslöser:** Entkopplung der Ring-0-Speicherkerne von Asynchronitäts-Laufzeiten (`tokio`), Vermeidung unbegrenzter `spawn_blocking`-Threads bei Lesezugriffen und Vorbereitung der sauberen Trennung von synchronem Kern-Lese-Zugriff und asynchronem Schreib-Zugriff.
+* **Status:** Final
+* **Datum:** 2026-09-22
+* **Kontext / Auslöser:**
+  In verteilten Entwicklungsumgebungen und bei der Zusammenarbeit mit automatisierten KI-Agenten reicht eine reine Freitext-Dokumentation von Architektur- und Schichtgrenzen (z. B. in `ARCHITECTURE.md` oder `README.md`) nicht aus, um architektonische Regelverstöße zuverlässig zu verhindern.
+  Ohne maschinelle Sperren entstehen schleichend unzulässige Aufwärts-Abhängigkeiten (z. B. Ring-0-Domänenkerne, die auf höhergestellte Service- oder Engine-Crates zugreifen) oder unzulässige Laufzeit-Kopplungen (z. B. direkte `tokio`-Importe in synchronen Ring-0-Kernmodulen).
 
-## Entscheidung
-1. **Entkopplung der Speicherkerne von `tokio`:** Lese-Operationen über `StorageRead` werden rein synchron ausgeführt. Schreib- und Persistierungsoperationen (`StorageWrite`) verbleiben asynchron bzw. werden in die übergeordnete Engine verlagert.
-2. **Architekturänderung in den Indexstrukturen:** Direktes Ausführen von Persistenzaufrufen innerhalb von `csr.rs`, `inverted.rs` und `diskann.rs` wird in die übergeordnete Engine verlagert.
-3. **ComputePool-Begrenzung:** Ersetzung unbegrenzter `spawn_blocking`-Aufrufe durch einen dedizierten, kapazitätsbegrenzten `ComputePool`.
+  Zur Vermeidung von Architektur-Drift und zur Einhaltung der DAG-Matrix (GESAMTSPEZIFIKATION §0.3, §1.1, §4.3) erfordert das MemFuse Cognitive OS ein automatisiertes, maschinell erzwungenes Gate.
 
-## Begründung
-- **Lese-Performanz & Simplizität:** Synchroner Lesezugriff in Ring 0 eliminiert Async-Runtime-Overhead und erleichtert die formale Verifikation der In-Memory- und Lese-Pfade.
-- **Ressourcen-Garantie:** Ein begrenzter ComputePool schützt das Gesamtsystem vor Thread-Explosionen und unbegrenztem Speicherverbrauch bei hoher paralleler Leselast.
+## Entscheidungen
 
-## Alternativen
-- **Beibehaltung unbegrenzter `spawn_blocking`-Calls:** Führt bei hoher Last zu hoher Thread-Contention und nicht vorhersehbarem Speicherbedarf.
-- **Vollständige Asynchronität in Ring 0:** Erzeugt unbegründeten Runtime-Overhead in reinen In-Memory-Lese-Algorithmen.
+1. **Maschinell erzwungenes Layering-Gate:**
+   Sämtliche Crate-Abhängigkeiten und Schichtenregeln werden automatisiert über das Test-Harness `tests/layering.rs` sowie die `xtask`-Befehle `just dag-check` / `cargo xtask check-ring-layering` auf Basis von `cargo metadata` verifiziert.
+
+2. **Ring-Schichtenmodell (Ring 0 bis 4):**
+   Das Repository unterliegt einer Fünf-Ring-Topologie:
+   * **Ring 0 (Foundation & Core Domain Logic):** `memfuse-types`, `memfuse-ports`, `memfuse-mvcc`, `memfuse-vector`, `memfuse-rank`, `memfuse-adapt`, `memfuse-text`, `memfuse-graph`, `memfuse-crypto`, `memfuse-simd`, `memfuse-sys`, `memfuse-wire`, `memfuse-core`, `memfuse-calibration`.
+     * *Invariante:* **Keine Aufwärts-Abhängigkeiten** und **keine `tokio`-Abhängigkeit** (ausgenommen `memfuse-core` als zentrales Trait-Definitions-Modul). Ring-0-Kerne operieren streng synchron.
+   * **Ring 1 (Storage & Persistence):** `memfuse-store`, `memfuse-checkpoint`, `memfuse-kvcache`.
+     * *Invariante:* Dürfen nur von Ring 0 abhängen; keine gegenseitigen Querverweise untereinander.
+   * **Ring 2 (External Integrations & Execution Sandboxes):** `memfuse-sandbox`, `memfuse-infer-onnx`, `memfuse-infer-candle`, `memfuse-infer-ollama`.
+     * *Invariante:* Nur Abhängigkeiten auf freigegebene Ring-0-Basismodule (`types`, `ports`, `crypto`, `core`, `simd`).
+   * **Ring 3 (Engine, Reasoning & Cognition):** `memfuse-engine`, `memfuse-cognition`, `memfuse-privacy`, `memfuse-router`, `memfuse-agent`, `memfuse-db`.
+     * *Invariante:* Dürfen auf Ring 0 und Ring 1 zugreifen, jedoch **nicht** auf konkrete Ring-2-Integrations-Crates.
+   * **Ring 4 (Public Facade & Protocols):** `memfuse`, `memfuse-mcp`, `memfuse-py`.
+     * *Invariante:* Konsumieren die darunterliegenden Schichten als öffentliche Schnittstelle.
+
+3. **Gesteuerte Ausnahmen über `LAYER_ALLOWLIST`:**
+   Temporäre Übergangs-Abhängigkeiten während Refactoring-Phasen dürfen ausschließlich über ein strukturiertes `AllowlistEntry`-Array in `tests/layering.rs` eingetragen werden. Jeder Eintrag erfordert:
+   * `from_crate` und `to_crate`
+   * `target_phase` (Ziel-Phase zur Beseitigung)
+   * `reason` (explizite technische Begründung)
 
 ## Konsequenzen
-- Dieses ADR bildet die formale Spezifikationsgrundlage für die künftige Code-Welle zu Punkt "2-04" (Ring-0-Kerne ohne `tokio`), welche NICHT Teil dieses Dokuments oder Tasks ist.
-- **Merge-Gate / Exit-Kriterium:** `cargo tree -e normal -p memfuse-{vector,text,graph}` zeigt keine `tokio`-Abhängigkeit.
-- **Benchmark-Gate:** Benchmark-p99-Latenz $\le +3\%$ oder $\le 2\sigma$ der vorher eingefrorenen Baseline.
+
+* **CI-Pflicht:** Das Gate läuft verpflichtend in den CI-Pipelines (`context-gates.yml`, `rust-ci.yml`) und schlägt fehl (`exit status 1`), sobald eine unangemeldete Schichtgrenzen-Verletzung vorliegt.
+* **Refactoring-Schutz:** Refactorings und Crate-Hinzufügungen müssen die Zuordnung in `Ring::for_crate()` pflegen und die Invarianten erfüllen.
+* **Architektur-Transparenz:** Entwickler und Agenten erhalten bei Regelverstößen präzise Fehlermeldungen mit betroffenen Crates, Ringen und Regel-Nummern.
+
+---
+
+# ADR-N02: Sync-Kern — StorageRead synchron, StorageWrite asynchron (begrenzter ComputePool)
+
+* **Status:** Final
+* **Datum:** 2026-09-22
+* **Kontext / Auslöser:**
+  Die Ring-0-Speicherkerne (`memfuse-vector`, `memfuse-text`, `memfuse-graph`) bilden das fundamentale Hochleistungs-Fundament für In-Memory Lookups und Traversierungen im Hot-Path.
+  Das direkte Mischen von Asynchronitäts-Laufzeiten (`tokio`) in reinen In-Memory-Suchalgorithmen erzeugt unnötigen Runtime-Overhead, erschwert die formale Korrektheitsanalyse und birgt die Gefahr von Thread-Explosionen durch unbegrenzte `spawn_blocking`-Aufrufe bei hoher paralleler Leselast.
+
+  Gleichzeitig erfordern Disk-Persistierungs- und Schreiboperationen (`StorageWrite`, SSTable-/WAL-Flushes) asynchrone I/O-Orchestrierung. Es bedarf einer klaren Trennung zwischen synchronen Kern-Lese-Zugriffen und asynchronen Schreib-Workflows.
+
+## Entscheidungen
+
+1. **Entkopplung der Ring-0-Speicherkerne von `tokio`:**
+   Lese-Operationen über die Schnittstelle `StorageRead` innerhalb von Ring 0 werden streng synchron ausgeführt. Die Kern-Suchindizes (`csr.rs`, `inverted.rs`, `diskann.rs`) enthalten keine direkten `tokio`-Abhängigkeiten.
+
+2. **Verlagerung von Persistenz-Aufrufen (`StorageWrite`):**
+   Schreib-, Mutations- und Persistierungsoperationen (`StorageWrite`, z. B. `persist_delta()`, SSTable- / WAL-Flushes) werden aus den Ring-0-Modulen heraus gelöst und in die übergeordnete Orchestrierungsschicht (`memfuse-engine`, Ring 3) verlagert.
+
+3. **Begrenzter `ComputePool` für CPU-intensive Tasks:**
+   Unbegrenzte `tokio::task::spawn_blocking`-Aufrufe bei parallelen Lese- und Indexierungs-Workloads werden durch einen kapazitätsbegrenzten, dedizierten `ComputePool` in `memfuse-engine` ersetzt. Dies garantiert harte Obergrenzen für zeitgleiche Thread-Belegungen.
+
+## Konsequenzen
+
+* **Hot-Path Lese-Performanz:** In-Memory-Lese-Pfade in Ring 0 laufen ohne Async-Context-Switches ab und bieten vorhersehbare Microsecond-Latenzen (p99-Budget $\le +3\%$ vs. Frozen Baseline).
+* **Zero-`tokio`-Invariante in Ring 0:** `cargo tree -e normal -p memfuse-vector`, `-p memfuse-text` und `-p memfuse-graph` zeigen keine `tokio`-Laufzeitabhängigkeit.
+* **Resilienter Ressourcen-Schutz:** Der begrenzte ComputePool schützt den Server vor Thread-Contention und Memory-Pressure bei hoher paralleler Last.
+
+---
+
+# ADR-N03: Drei erlaubte Unsafe-Inseln, Deny/Forbid-Mechanik und Unsafe-Transition-Tracking
+
+* **Status:** Final
+* **Datum:** 2026-09-22
+* **Kontext / Auslöser:**
+  MemFuse folgt dem Grundsatz der maximalen Speichersicherheit (Pure Rust Policy / Sovereign Core, ADR-004). Jedoch verlangen plattform- und hardwarenahe Optimierungen (wie Zero-Copy Mmap-I/O oder SIMD-Vector-Math) nach der Nutzung von `unsafe` Rust-Blöcken.
+  Wildwuchs von `unsafe`-Code über verschiedene Domänen- und Datenbank-Crates hinweg würde die Auditierbarkeit zerstören und Memory-Safety-Bugs wie Undefined Behavior, Out-of-Bounds-Reads oder Use-After-Free riskieren.
+
+## Entscheidungen
+
+1. **Standardmäßiges `#![forbid(unsafe_code)]` im Workspace:**
+   Das Wurzel-`Cargo.toml` erzwingt global `[workspace.lints.rust] unsafe_code = "deny"` und `undocumented_unsafe_blocks = "deny"`. Sämtliche Fach-, Speicher-, Engine- und Protokoll-Crates durchsetzen am Crate-Root `#![forbid(unsafe_code)]`.
+
+2. **Drei explizit genehmigte Unsafe-Inseln:**
+   `unsafe`-Code ist ausschließlich in drei isolierten Kapseln erlaubt:
+   * **`memfuse-sys`:** Systemnahe OS-Schnittstellen (wie FFI, Mmap-Dateizugriffe). Stellt sichere Fassaden (z. B. `memfuse_sys::mmap_readonly`) bereit.
+   * **`memfuse-simd`:** Vektor-Distanzberechnungen und Hardware-Intrinsics (AVX2, AVX-512, NEON) mit strenger Runtime-Feature-Detection (`is_x86_feature_detected!`).
+   * **Übergangs-Whitelists (`memfuse-vector`, `memfuse-store` / `memfuse-crypto` Test-Only):** Temporäre `unsafe`-Nutzung auf dem Migrationspfad MUSS zwingend in einer lokalen `UNSAFE_TRANSITION.md`-Datei nachverfolgt werden.
+
+3. **Verpflichtendes `UNSAFE_TRANSITION.md`-Tracking:**
+   Tritt aus historischen Gründen `unsafe`-Code in Whitelist-Crates auf, MUSS jede Fundstelle mit einer Tracking-ID (z. B. `TRANS-VEC-001`), Quellpfad, Begründung, Ziel-Crate und Migrationsstatus in `UNSAFE_TRANSITION.md` dokumentiert sein.
+   Nach erfolgreicher Migration in `memfuse-sys` oder `memfuse-simd` wird das Crate unverzüglich auf `#![forbid(unsafe_code)]` zurückgestellt.
+
+4. **Verpflichtende `// SAFETY:`-Dokumentationsregel:**
+   Jeder verbleibende `unsafe`-Block erfordert ausnahmslos einen vorangestellten `// SAFETY:`-Kommentar, der die mathematischen oder speicherbezogenen Preconditions und Invarianten belegt. Word-identische Copy-Paste-Kommentare sind unzulässig (ADR-035).
+
+## Konsequenzen
+
+* **Maximale Auditsicherheit:** Sicherheitsaudits müssen nur die isolierten Inseln (`memfuse-sys`, `memfuse-simd`) und aktive `UNSAFE_TRANSITION.md`-Whitelists prüfen.
+* **Keine Korruption im Fachcode:** 95%+ des Gesamtrepositories (inklusive `memfuse-db`, `memfuse-agent`, `memfuse-mcp`, `memfuse-py`) bleiben garantiert frei von Unsafe-Code.
+* **Maschinelles Enforcement:** Compiler und Linter schlagen bei unautorisierten `unsafe`-Blöcken in geschützten Crates sofort mit E0133/Linter-Error fehl.
+
+---
+
+# ADR-N04: Panic-Profilierung — Workspace unwind vs. Release-Abort & FFI Panic-Isolation
+
+* **Status:** Final
+* **Datum:** 2026-09-22
+* **Kontext / Auslöser:**
+  In Rust-Projekten, die C- oder Python-FFI-Schnittstellen exponieren (wie `memfuse-py` via PyO3), führt eine unbedachte Verwendung von `panic = "abort"` im Release-Profil dazu, dass Unhandled Panics im CPython-Interpreter-Prozess direkt zu unkontrollierten Prozessabstürzen via `SIGABRT` (exit code 134) führen.
+  Dies verletzt die Stabilitätsanforderungen von FFI-Grenzschichten. Gleichzeitig benötigen eigenständige Server- und CLI-Binaries ohne FFI-Anbindung maximale Binärgrößen-Optimierungen und deterministischen Abbruch.
+
+## Entscheidungen
+
+1. **Gezielte Profil-Konfiguration im Root-`Cargo.toml`:**
+   * **Standard Release-Profil (`[profile.release]`):** Verwendet ausnahmslos `panic = "unwind"`, um Stack-Unwinding über FFI-Grenzen hinweg sowie geordnetes `catch_unwind` zu ermöglichen.
+   * **`release-abort` Profil (`[profile.release-abort]`):** Erbt von `release` und setzt explizit `panic = "abort"`. Dieses Profil gilt ausschließlich für reine Standalone-Binaries ohne FFI/PyO3-Grenzen.
+
+2. **FFI Panic Isolation in `memfuse-py`:**
+   * Sämtliche FFI-Aufrufe in `memfuse-py` fangen Rust-Panics an der FFI-Schnittstellen-Grenze mittels `std::panic::catch_unwind` (über die Hilfsfunktion `run_blocking_ffi`) ab.
+   * Abgefangene Panics werden kontrolliert in strukturierte Python `PyRuntimeError`-Exceptions ("Rust panic caught at FFI boundary") übersetzt (ADR-056 / ADR-059).
+   * Bei einem Panic-Ereignis werden betroffene `Db`- und `Collection`-Instanzen atomar als vergiftet (`is_poisoned = true`) markiert. Nachfolgende Operationen auf vergifteten Instanzen werden geordnet mit einem Poison-Fehler abgelehnt.
+
+3. **Verifikation durch FFI-Panic-Testsuite:**
+   Die Korrektheit der Panic-Isolation wird automatisiert über die Testsuite `crates/memfuse-py/tests/test_panic_to_pyerr.py` verifiziert. Sie prüft:
+   * Übersetzung von Rust-Panics in `PyRuntimeError`.
+   * Subprozess-Prozessüberleben ohne SIGABRT-Absturz.
+   * Atomare Poisoning-Sperre nach Panics.
+
+## Konsequenzen
+
+* **Interpreter-Stabilität:** Python-Anwendungen und Jupyter-Notebooks, die `memfuse-py` nutzen, stürzen bei internen Rust-Fehlern nicht ab, sondern erhalten behandelbare Python-Exceptions.
+* **Prozess-Sicherheit:** Vergiftete Datenbank-Instanzen verhindern nach einem Panic folgenschwere Folgeinkonsistenzen auf SSTable-/WAL-Ebene.
+
+---
+
+# ADR-N05: Dokumenten-Identifikatoren — Externes DocId(128-Bit/Key) vs. Internes DocIdx(u32)
+
+* **Status:** Proposed / Pending Product-Owner-Entscheidung (gemäß §A2.4 Nr. 3)
+* **Datum:** 2026-09-22
+* **Kontext / Auslöser:**
+  Im MemFuse Cognitive OS besteht eine architektonische Spannung zwischen der externen, benutzerseitigen Dokumenten-Identifikation (`DocId`, 128-Bit BLAKE3-Truncation oder String-Key; siehe ADR-082) und dem internen Kompakt-Index (`DocIdx`, `u32` / 32-Bit In-Memory Slot-Index):
+
+  1. **Externes `DocId` (128-Bit BLAKE3 / String):**
+     * Deterministische Hash-Derivierung aus dem Quellschlüssel (`key`).
+     * Kryptographisch kollisionsfrei bis in den Billionen-Dokumenten-Bereich ($p(k) \approx 10^{-15}$ bei $10^{12}$ Dokumenten).
+     * Bietet ideale Eigenschaften für verteilte Systeme, Re-Derivierung und Zero-Central-Registry-Design.
+
+  2. **Internes `DocIdx` (`u32` Slot-Index):**
+     * Kompakter 32-Bit-Ganzzahl-Index (4 Bytes pro Knoten) in In-Memory Vektor-Graphen (`HnswIndex`, `DiskAnnIndex` CSR) und Inverted-Indices (`Bm25Scorer`).
+     * Maximale L1/L2-Cache-Effizienz und minimale Speicherbelegung während Vektor-Traversierungen und BM25-Scoring.
+     * Limitiert jedoch das System pro Collection auf theoretisch $2^{32}-1$ (~4,29 Milliarden) zeitgleiche In-Memory Slot-Positionen und erfordert zwingend eine interne Bi-Map-Adressübersetzung (`DocId` $\leftrightarrow$ `DocIdx`).
+
+## Offene Product-Owner-Entscheidungsoptionen
+
+*Hinweis: Gemäß §A2.4 Nr. 3 dokumentiert dieses ADR eine offene Strategieentscheidung. Es wird an dieser Stelle KEINE automatisierte Wahl getroffen und KEINE Code-Änderung angestoßen.*
+
+Zur finalen Entscheidung durch den Product Owner (PO) stehen folgende drei Architekturpfade:
+
+### Option A: Beibehaltung der zweistufigen Identifikator-Architektur (Status Quo)
+* **Beschreibung:** Externes `DocId` (128-Bit BLAKE3) bleibt die kaskadierende globale ID. Intern verwenden Vektor- und Text-Indizes weiterhin ein kompaktes `DocIdx` (`u32`) mit transparenter Bi-Map-Übersetzung auf Collection-Ebene.
+* **Vorteile:** Optimaler RAM-Footprint für Vektor-Graphen (4 Bytes pro Adjazenzzeiger); bewährte In-Memory-Traversierungs-Performanz.
+* **Nachteile:** Zusätzlicher Speicher- und Latenz-Overhead für die Bi-Map-Übersetzung (`DocId` $\leftrightarrow$ `DocIdx`); Beschränkung auf $2^{32}-1$ aktive Slots pro Collection.
+
+### Option B: Durchgängige 128-Bit-ID im gesamten Index- und Graph-Layer
+* **Beschreibung:** Abschaffung des internen `DocIdx` (`u32`). Vektor-Graphen (`HnswIndex`, `DiskAnnIndex`) und Text-Indizes speichern und verarbeiten direkt die 128-Bit `DocId` (16 Bytes).
+* **Vorteile:** Eliminiert die Bi-Map-Übersetzungsschicht vollständig; vereinfacht MVCC- und Snapshot-Logiken; unbegrenzte Skalierbarkeit ohne Slot-Indizierungsgrenzen.
+* **Nachteile:** Vervierfachung des Speicherbedarfs für Kantenlisten in Vektor-Graphen (16 Bytes statt 4 Bytes pro Knoten-ID); verminderte CPU-Cache-Effizienz bei Traversierungen.
+
+### Option C: Dynamisch wählbarer/skalierter Slot-Index (Feature-Gated `docidx-u64`)
+* **Beschreibung:** Beibehaltung der zweistufigen Trennung, jedoch mit konfigurierbarer/generischer Bitbreite für `DocIdx` (z. B. `u32` als Default für Embedded-Desktop, `u64` per Cargo-Feature / Collection-Schema V2 für Enterprise-Cluster).
+* **Vorteile:** Bietet maximale Flexibilität für unterschiedliche Deployment-Szenarien (Embedded vs. Scale-Out Cluster).
+* **Nachteile:** Höhere Code-Komplexität durch Generizität über Index-Slots hinweg.
+
+## Konsequenzen
+
+* **Status-Sperre:** Der Status bleibt explizit auf **Proposed / Pending Product-Owner-Entscheidung** gesetzt.
+* **Keine Code-Invasivität:** Es erfolgen keine Änderungen an `memfuse-core`, `memfuse-db` oder Index-Crates bis zur formellen Beschlussfassung durch den Product Owner.
+
+---
+
+# ADR-N06: Konsistenzmodell — WAL als einzige Wahrheit vs. 2PC-Härtung
+
+* **Status:** Proposed / Pending Product-Owner-Entscheidung (offen, Gesamtspezifikation §A2.4 Nr. 1)
+* **Datum:** 2026-09-17
+* **Kontext / Auslöser:**
+  In heterogenen verteilten und mehrkomponentigen Speichersystemen wie MemFuse Cognitive OS stellt sich bei Multi-Engine-Transaktionen (LSM-Store, HNSW/DiskANN-Vektorindizes, CSR-Wissensgraph, BM25-Textindizes) die Frage nach dem primären Konsistenz- und Recovery-Modell.
+
+  Bisher existiert ein zweiphasiges Commit-Protokoll (2PC) mit unvollständiger Intent-Key-Pessimisierung, das bei plötzlichen Prozess-Crashes oder I/O-Teilausfällen komplexe Invarianten-Verletzungen zwischen primärem Storage und Indizes auslösen kann.
+
+  Gemäß Gesamtspezifikation §A2.4 Nr. 1 und §20.3 muss eine fundamentale Architektur-Entscheidung zwischen zwei Konsistenzmodellen getroffen werden, ohne den Beschluss vorab im Quellcode zu präjudizieren.
+
+---
+
+## 1. Neutrale Evaluierung der Optionen
+
+### Option A: Zweiphasiges Commit-Protokoll (2PC) mit gehärteten Intent-Keys
+* **Funktionsweise:**
+  Jede Transaktion schreibt in Phase 1 Staging- bzw. Intent-Einträge ("Prepare") in alle beteiligten Subsysteme (LSM, Vektorindex, Graph, BM25) unter Verwendung expliziter Distributiv-Locks oder Intent-Schlüssel. Erst nach positiver Rückmeldung aller Subsysteme wird in Phase 2 ein globaler `Commit`-Marker im WAL und in den Systemen gesetzt.
+* **Vorteile:**
+  - Synchrones Lesen nach Commit spiegelt sofort den exakten In-Memory-Zustand aller Subsysteme wider.
+  - Keine zeitliche Asynchronität zwischen Index und Hauptspeicher.
+* **Nachteile / Risiken:**
+  - Hohe Komplexität beim Handhaben von Teil-Crashes während Phase 2 (Distributed Deadlocks, verwaiste Intents).
+  - Hoher Performance-Overhead durch Multi-Rundtrip-Protokolle und Koordinationssperren.
+  - Erhöhte Anfälligkeit für TOCTOU-Gefahren und Distributed Deadlocks unter hoher Nebenläufigkeit.
+
+### Option B: WAL als einzige Wahrheit (Derived State via `applied_lsn`) — *Spezifikations-Empfehlung*
+* **Funktionsweise:**
+  Nur das Write-Ahead Log (`memfuse-store::wal`) gilt als unumstößliche primäre Datenquelle ("Single Source of Truth"). Transaktionen schreiben ausschließlich einen sequentiellen, HMAC-gesicherten WAL-Record mit `WalOp::TxEnd { committed: true }`.
+  Secondary Indizes (HNSW, CSR-Graph, BM25) sind reine abgeleitete Sichten ("Derived State"), die Änderungen asynchron oder synchron-gepuffert konsumieren und ihren Fortschritt über eine monotonically steigende `applied_lsn` nachhalten. Bei einem Crash wird der abgeleitete Zustand ausgehend vom letzten validen `applied_lsn`-Checkpoint aus dem WAL deterministisch replayed und rekonstruiert.
+* **Vorteile:**
+  - Drastische Vereinfachung des Recovery-Pfads und Vermeidung verteilter Transaktionszustände.
+  - Höhere Schreib-Performanz durch Beseitigung von Multi-Engine 2PC-Locks.
+  - Garantierte Deterministik im Crash-Recovery-Fall.
+* **Nachteile / Risiken:**
+  - Potenziell längere Recovery-Zeiten beim Systemstart, wenn Indizes nach einem unsauberen Shutdown aus dem WAL nachgezogen werden müssen.
+  - Lese-Sichten müssen bei asynchronem Index-Replay das `applied_lsn`-Wasserzeichen berücksichtigen (Read-Your-Writes Guarantees erfordern ggf. Catch-up-Waits).
+
+---
+
+## 2. Entscheidungskriterien & PO-Entscheidungsvorbehalt
+
+Gemäß **Gesamtspezifikation §A2.4 Nr. 1** darf diese Entscheidung nicht durch Entwicklungsarbeiten präjudiziert werden. Die Entscheidung obliegt dem Product Owner basierend auf folgenden Grundlagen:
+
+1. **PO Recovery-Zeit-Ziel (RTO / Recovery Time Objective):** Der Product Owner muss das akzeptable Zeitfenster für das Wiederanlaufen des Systems nach einem harten Crash (z.B. < 500 ms vs. < 5 s) definieren.
+2. **Phase 3a Crash-Injektions-Spike (`memfuse-testkit` / Fault-VFS):**
+   Als Entscheidungsgrundlage dient ein empirischer Benchmark und Crash-Simulationstest unter Verwendung der `Fault-VFS`-Infrastruktur im `memfuse-testkit` (Phase 3a der Migration). Der Spike misst:
+   - Durchsatz- und Latenzunterschiede zwischen 2PC und WAL-Only im Regelbetrieb.
+   - Replay-Dauer und Speicherverbrauch bei der WAL-Rekonstruktion nach simulierten Systemabstürzen.
+
+---
+
+## 3. Status & Exit-Kriterium
+
+* **Aktueller Status:** `Proposed / Pending Product-Owner-Entscheidung`
+* **Exit-Kriterium für Statusübergang zu "Beschlossen":**
+  1. Durchführung des Phase 3a Crash-Injektions-Spikes mit `memfuse-testkit` (Fault-VFS).
+  2. Vorgelegter Evaluierungsbericht zur Recovery-Zeit und Durchsatz-Metriken.
+  3. Formeller Beschluss des Product Owners zur Festlegung von Option A oder Option B.
+
+---
+
+## 4. Konsequenzen
+
+* Der Produktionscode darf vor dem PO-Beschluss keine Annahmen treffen, die eine der Optionen unmöglich machen.
+* Das `memfuse-testkit` bereitet in Phase 0R/3a die Testwerkzeuge für die Fault-VFS Simulation vor.
+
+---
+
+# ADR-N07: KV-Cache-Stufen A, B und C (Prefix-Reuse, KvState-Modellierung, Verschlüsselte Segmentdateien)
+
+* **Status:** Proposed / In Evaluation (Stufe A beschlossen; Stufen B & C offen, Gesamtspezifikation §A2.4 Nr. 2)
+* **Datum:** 2026-09-17
+* **Kontext / Auslöser:**
+  Für LLM-Inferenz- und RAG-Pipelines stellt die Wiederverwendung von Key-Value-Caches (KV-Cache) einen zentralen Performance-Hebel dar. Die Implementierung eines Caching-Mechanismus birgt jedoch Risiken bezüglich Speicherverbrauch, Upstream-Forking-Wartungsaufwand und kryptographischer Mandantentrennung.
+
+  Gemäß Gesamtspezifikation §9.2, §20.3 und §A2.4 Nr. 2 muss die KV-Cache-Architektur in einem gestuften Modell strukturiert werden, wobei die Ambition (nur Stufe A vs. A+B+C) vom Product Owner nach empirischen Messungen entschieden wird.
+
+---
+
+## 1. Übersicht der KV-Cache Stufenmodellierung
+
+### Stufe A: In-RAM Prefix-Reuse (Fork-Free Default) — *Beschlossen*
+* **Konzept:**
+  Wiederverwendung von In-RAM KV-Cache-Blöcken auf Basis von Radix-Tree-Prefix-Matching (`memfuse-kvcache`) unter Nutzung der unveränderten Upstream-Abstraktionen (`ModelWeights::clone()`).
+* **Eigenschaften:**
+  - Kein Upstream-Fork von Candle/Ort-Modell-Backends erforderlich.
+  - Zero-Copy In-Memory Prefix-Lookup.
+  - Eliminierung redundanter Prompt-Prefill-Phasen bei identischen Prompt-Anfängen.
+* **Risiko / Overhead:** Minimal; geringe Komplexität.
+
+### Stufe B: Eigenes Llama-Modell mit direkter `KvState`-Kopplung — *In Evaluation / Offen*
+* **Konzept:**
+  Tiefe Integration in die Transformer-Inferenzschleife durch Modikation/Forking der Tensor-Generierung, sodass `KvState` direkt aus dem MemFuse-KV-Cache in die Attention-Matrizen injiziert wird.
+* **Eigenschaften:**
+  - Fein-granulares Token-Level Paging und Swapping.
+  - Höhere Speicher-Effizienz bei stark fragmentierten Caches.
+* **Risiko / Overhead:** Erhöhte Wartungs- und Sync-Last gegenüber Upstream-LLM-Bibliotheken (Fork-Risiko Nr. 2).
+
+### Stufe C: Verschlüsselte Segmentdateien / Platten-Spill — *In Evaluation / Offen*
+* **Konzept:**
+  Auslagerung nicht aktiver KV-Cache-Segmente auf sekundäre Speichermedien (NVMe/SSD) in Form verschlüsselter Segmentdateien (`memfuse-security/kv-encryption`), um RAM-Engpässe bei extrem großen Kontextfenstern zu vermeiden.
+* **Eigenschaften:**
+  - Nahezu unbegrenzte Kontext-Größe bei moderater I/O-Latenz.
+  - Strenge Mandatentrennung via AEAD-AES-256-GCM Verschlüsselung pro Tenant und Segment.
+* **Risiko / Overhead:** Komplexität bei I/O-Paging, Key-Management und Garbage Collection.
+
+---
+
+## 2. Neutrale PO-Entscheidungsmatrix zur Ambitionsstufe
+
+Gemäß **Gesamtspezifikation §A2.4 Nr. 2** wird die finale Ambitionsstufe (nur Stufe A betreiben vs. Ausbau auf Stufen A+B+C) neutral vorgelegt und erst nach Messung an Stufe A entschieden.
+
+| Kriterium | Nur Stufe A | Stufen A + B + C |
+|---|---|---|
+| **Upstream-Fork-Risiko** | Keines (nutzt Standard-Interfaces) | Mittel bis Hoch (Fork-Wartungslast) |
+| **RAM-Budget-Grenze** | Auf physischen RAM beschränkt | Durch NVMe-Spill dynamisch erweitert |
+| **Entwicklungs- & Testaufwand** | Gering | Hoch (AEAD, Swapping, I/O-Teilausfälle) |
+| **Nutzen-Verhältnis** | Hoher Initialnutzen für Prompt-Prefixes | Maximaler Nutzen bei extrem langen Kontexten |
+
+---
+
+## 3. Status & Exit-Kriterium
+
+* **Aktueller Status:** Stufe A beschlossen; Stufen B & C `Proposed / In Evaluation`.
+* **Exit-Kriterium für Stufen B & C:**
+  1. Produktiver Betrieb und Performance-Benchmark von Stufe A unter Reallast.
+  2. Nachweis, dass RAM-Limits bei Ziel-Workloads ohne Platten-Spill nicht eingehalten werden können.
+  3. Formeller Beschluss des Product Owners zur Freigabe der Stufen B und/oder C.
+
+---
+
+## 4. Konsequenzen
+
+* Derzeitige Arbeiten beschränken sich auf die isolierte Implementierung von Stufe A in `memfuse-kvcache`.
+* Code für Stufe B/C bleibt hinter entsprechenden Feature-Flags (`kv-bridge`) isoliert.
+
+---
+
+# ADR-N08: Generierte Spezifikation und Capability-Manifest (`capabilities.toml`)
+
+* **Status:** Beschlossen / Final (Prinzip P12, Gesamtspezifikation §20.3)
+* **Datum:** 2026-09-17
+* **Kontext / Auslöser:**
+  In komplexen Multi-Crate-Systemen führt die manuelle Pflege von Dokumentation, Feature-Katalogen und Reifegrad-Markern (z.B. Alpha, Beta, Production) häufig zu Diskrepanzen zwischen dem tatsächlichen Code-Zustand und den Spezifikationsdokumenten (Spezifikations-Drift).
+
+  Um dies nachhaltig zu verhindern, führt Prinzip **P12** das Konzept einer maschinell ausgewerteten Single Source of Truth für Feature-Reifegrade und System-Capabilities ein.
+
+---
+
+## 1. Finale Entscheidung
+
+Es wird verabschiedet, dass **`capabilities.toml` im Repository-Root** als die **einzige maßgebliche Quelle (Single Source of Truth)** für Feature-Reifegrade, Crate-Capabilities und Audit-Marker definiert wird.
+
+### 1.1 Struktur von `capabilities.toml`
+Die Datei `capabilities.toml` erfasst deklarativ:
+- Crate-Namen und zugewiesene Architecture-Ringe (Ring 0 bis Ring 3).
+- Feature-Reifegrad (z.B. `Experimental`, `Stable`, `Deprecated`).
+- Zugehörige Test-Garantien und Verweise auf CI-Gates (z.B. Coverage, Drift-Check, Benchmarks).
+
+### 1.2 Maschinelle Dokumentations-Generierung (`cargo xtask sync-docs`)
+1. **Keine manuelle Synchonisierung:** Reifegrad-Tabellen in `WORKING_STATE.md`, `docs/ARCHITECTURE.md` und `docs/SOURCE_OF_TRUTH.md` dürfen **nicht mehr manuell** editiert werden.
+2. **Generierung via Tooling:** `cargo xtask sync-docs` liest `capabilities.toml` sowie Inline-Code-Tags (`AI-TAG`, `ANCHOR`, `REVIEW-PASS`) aus und generiert die entsprechenden Abschnitte in den Dokumentationsdateien automatisiert.
+3. **CI-Gate enforcement:** `cargo xtask sync-docs --check` (bzw. `just sync-docs-check`) prüft in der CI-Pipeline, ob die generierten Dokumente exakt mit `capabilities.toml` übereinstimmen. Bei Abweichungen schlägt der Build fehl.
+
+---
+
+## 2. Begründung
+
+- **Vermeidung von Dokumentations-Drift:** Dokumentation spiegelt garantiert den tatsächlichen, in `capabilities.toml` hinterlegten Stand wider.
+- **Transparenz:** Entwickler und Product Owner haben eine zentrale, übersichtliche TOML-Datei zur Verwaltung aller Feature-Status.
+- **Automatisierbarkeit:** CI-Pipelines können Reifegrad-Marker direkt parsen und z.B. experimentelle Features automatisch in Production-Builds sperren.
+
+---
+
+## 3. Konsequenzen
+
+- Manuelle Änderungen an generierten Abschnitten in den Dokumentationsdateien werden durch CI-Gated-Checks abgelehnt.
+- Neue Features oder Statusänderungen müssen zuerst in `capabilities.toml` eingetragen und mittels `cargo xtask sync-docs` in die Dokumente synchronisiert werden.
+
+---
+
+# ADR-N09: Crate-Schnittkriterien I/U/C/S/D
+
+* **Status:** Beschlossen / Final (Prinzip P30, Gesamtspezifikation §4.2, §20.3)
+* **Datum:** 2026-09-17
+* **Kontext / Auslöser:**
+  Im Zuge der Entwicklung neigte das MemFuse Cognitive OS Repository zu einer unkontrollierten Crate-Zersplitterung ("Crate Sprawl"). Ohne ein klares, objektives Regelwerk führen zu viele feingliedrige Crates zu unnötigem Build-Overhead, komplexen Pass-Through-Abstraktionen und unübersichtlichen Monorepo-Abhängigkeiten.
+
+  Um den Crate-Zuschnitt im Workspace streng zu reglementieren, führt Prinzip **P30** eine verbindliche Entscheidungsheuristik basierend auf fünf Kriterien (**I/U/C/S/D**) ein.
+
+---
+
+## 1. Die I/U/C/S/D Schnittkriterien (Prinzip P30)
+
+Ein Modul oder eine Komponente darf nur dann als **eigenes Crate** im Workspace existieren, wenn es **mindestens eines** der folgenden fünf Kriterien erfüllt:
+
+1. **I — Isolation flüchtiger/schwerer Abhängigkeiten (Isolation):**
+   Isolation externer, schwerer oder plattformspezifischer C-Bindings/Bibliotheken (z.B. `candle`, `ort`, `wasmtime`, `pyo3`, `reqwest`), um Build-Zeiten zu kapseln und optionale Feature-Gates sauber abzugrenzen.
+   *Beispiele:* `memfuse-infer-onnx`, `memfuse-sandbox`, `memfuse-py`.
+
+2. **U — Unsafe-Insel (Unsafe Island):**
+   Kapselung von `unsafe`-Code-Blöcken in eine dedizierte, auditierte System-Insel, damit alle abhängigen Crates `#![forbid(unsafe_code)]` erzwingen können.
+   *Beispiele:* `memfuse-sys`, `memfuse-simd`, `memfuse-wire`.
+
+3. **C — Eigenes Änderungsrhythmus / Cohesion (Bounded Context):**
+   Starke fachliche Kohäsion mit eigenständiger Fach-Domäne und unabhängiger Weiterentwicklung.
+   *Beispiele:* `memfuse-graph` (CSR/PPR), `memfuse-vector` (HNSW/DiskANN), `memfuse-text` (BM25).
+
+4. **S — Stabilität & Skalierung / Größe > 8.000 LOC (Size/Compile Parallelism):**
+   Crates, deren Quellcode-Umfang 8.000 Zeilen Code überschreitet, um die parallele Kompilierung der Rust-Compiler-Pipeline optimal auszulasten.
+
+5. **D — Richtungserzwingung / Architektur-Ebenen (Dependencies / Composition Root):**
+   Erzwingung von unidirektionalen Modul-Abhängigkeiten zur Vermeidung zyklischer Crate-Graph-Beziehungen oder als explizite Composition Root (z.B. Ports vs. Implementierung).
+   *Beispiele:* `memfuse-ports` (Ring 0 Abstraktionen), `memfuse-types` (Ring 0 Fundament).
+
+---
+
+## 2. Konsolidierungsregel für Crates ohne Kriterium
+
+Crates, die **keines** dieser fünf Kriterien (I, U, C, S, D) nachweisbar erfüllen, **dürfen nicht als eigenständiges Crate fortbestehen**. Sie müssen mit dem nächstgelegenen logischen Crate verschmolzen werden.
+
+### Anwendungsbeispiel: Zerlegung & Konsolidierung
+* `memfuse-core` wurde im Zuge der Ring-Reorganisation aufgeteilt:
+  - `unsafe` System-Teile → `memfuse-sys` / `memfuse-simd` (Kriterium U)
+  - Interne IPC-Generate → `memfuse-wire` (Kriterium U)
+  - Reine Domain-Typen → `memfuse-types` (Kriterium D)
+* Sollten sich zwei kleine Hilfs-Crates ohne schwere Dep oder Unsafe identifizieren lassen, werden diese gemäß §A2.4 Nr. 4 zusammengelegt (z.B. `adapt` + `rank`).
+
+---
+
+## 3. Konsequenzen
+
+* Neue Crates dürfen im Monorepo nur noch unter Nachweis mindestens eines I/U/C/S/D-Kriteriums angelegt werden.
+* Das CI-Tooling (`cargo xtask check-dag` / Layering-Test) prüft die Einhaltung der Crate-Grenzen und Ring-Architektur.
+
+---
+
+# ADR-N10: Kein globaler veränderlicher Zustand
+
+* **Status:** Beschlossen / Final (Prinzip P29, Gesamtspezifikation §3, §20.3)
+* **Datum:** 2026-09-17
+* **Kontext / Auslöser:**
+  Veränderlicher globaler Zustand (`static mut`, global mutable `OnceLock`/`RwLock`/`Mutex` Singletons) erzeugt in hochgradig nebenläufigen, asynchronen Rust-Systemen schwere Architekturmängel:
+  1. **Race Conditions in Tests:** Parallele Testausführungen (`cargo test`) beeinflussen sich gegenseitig über globale Singletons.
+  2. **Verletzung der Mandantentrennung & Kapselung:** Globale Registries erschweren die saubere Isolation von Instanzen und Multi-Tenant-Grenzen.
+  3. **Undefiniertes Shutdown-Verhalten:** Keine deterministische Lebensdauer-Steuerung von Ressourcen.
+
+  Zur nachhaltigen Behebung dieser Risiken formuliert **Prinzip P29** das strikte Verbot von globalem veränderlichem Zustand im gesamten Workspace.
+
+---
+
+## 1. Das Architektur-Prinzip P29
+
+> **P29 — Kein globaler veränderlicher Zustand.**
+> `static OnceLock`/`Lazy` sind ausschließlich für **unveränderliche Konstanten** zulässig (z.B. vorkompilierte Regex-Muster, statische Stopwort-Listen, Standard-Konfigurations-Defaults).
+> **Veränderlicher Zustand gehört ausnahmslos einer konkreten Instanz** (z.B. eingebracht via Dependency Injection, Struct-Felder oder Context-Handles).
+
+---
+
+## 2. Fallbeispiele & Refactoring-Analyse
+
+### Fallbeispiel 1: `ORPHAN_REGISTRY` in `memfuse-checkpoint`
+* **Problem-Analyse:**
+  In `crates/memfuse-checkpoint/src/orphan.rs` existierte ein globaler statischer Singleton `static ORPHAN_REGISTRY: OnceLock<OrphanRegistry>`.
+  In parallelen Unit-Tests (`cargo test`) führte der simultane Zugriff auf dieses Singleton zu sporadischen Flaky Tests und Lock-Kontention (dokumentiert als Race-Condition in `AUDIT_memfuse-checkpoint.md`).
+* **Soll-Zustand / Refactoring:**
+  Entfernung des globalen `ORPHAN_REGISTRY` Singletons. Die Waisen-Registrierung (`OrphanRegistry`) wird direkt als Instanzfeld in den `PersistentCheckpointStore` bzw. die jeweilige `StorageEngine`-Instanz eingebettet. Lebensdauer und State-Tracking sind somit strikt an die jeweilige Store-Instanz gebunden.
+
+### Fallbeispiel 2: `CIPHER_INSTANCE` & Nonce-Counter in `memfuse-crypto` / Security
+* **Problem-Analyse:**
+  Entwürfe mit globalen `static CIPHER_INSTANCE` oder globalen RAM-basierten `AtomicU64`-Nonce-Zählern verstoßen ebenfalls gegen P29. Ein RAM-basierter Nonce-Zähler beginnt nach einem Prozess-Neustart wieder bei 0, was bei Wiederverwendung desselben Schlüssels zum kryptographischen Kollaps führen würde.
+* **Soll-Zustand / Refactoring:**
+  Schlüssel- und Cipher-Manager werden per Dependency Injection über Instanzen (`KeyManager`) verwaltet. Cryptographic Nonces nutzen `OsRng` bzw. persistierte Hochwasserstände anstelle RAM-globaler Zähler.
+
+---
+
+## 3. Konsequenzen
+
+* **Erzwingung bei Reviews:** Jedes PR-Code-Review prüft neue `static`-Variablen streng auf Unveränderlichkeit.
+* **Test-Isolation:** Sämtliche Unit- und Integrationstests laufen vollständig isoliert und ohne gegenseitige Beeinflussung ab.
+* **Dependency Injection:** Komponenten nehmen benötigte Registries oder Manager explizit über Konstruktoren (`new(registry: Arc<...>)`) entgegen.
+
+---
+
+# ADR-0XX: memfuse-sandbox — WASM Execution Boundary
+
+**Status:** Proposed
+**Datum:** 2026-09-13
+**Blocker für Merge:** Dieses ADR MUSS auf "Accepted" gesetzt werden vor dem Merge in main.
+
+## Kontext
+`memfuse-mcp` benötigt eine sichere WASM-Ausführungsgrenze für die `CodeExecution`-Permission.
+
+## Entscheidung
+Neues Crate `memfuse-sandbox` (Layer 6.5) mit `wasmtime` als Backend.
+`#![forbid(unsafe_code)]`. Fuel + Wall-Clock-Timeout beide aktiv.
+
+## Konsequenzen
++ Echte Execution-Isolation für WASM-Guests
++ Keine C-FFI-Erweiterung (wasmtime ist Pure-Rust-nutzbar)
+- `wasmtime` erhöht Compile-Zeit und Binary-Größe
+- Layer-6.5-Sublayer muss in DAG-Check konfiguriert werden
