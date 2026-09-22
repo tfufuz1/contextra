@@ -1,9 +1,10 @@
 // FILE-CONTEXT
 // STAND: 2026-09-15T14:45:00Z (SESSION: 527bbb50)
-// ZWECK: Stress, fault-injection, and multi-threading concurrency tests for memfuse-calibration.
+// ZWECK: Stress, fault-injection, and multi-threading concurrency tests for memfuse-rank calibration.
 // INVARIANTEN: INV-CAL-1 (no silent fallback before warmup), INV-CAL-2 (fingerprint reset), PID anti-windup & k_min floor >= 50.
 
-use memfuse_calibration::{IsotonicCalibrator, PidController, PlattScaler};
+use memfuse_adapt::PidController;
+use memfuse_rank::{IsotonicCalibrator, PlattScaler};
 use proptest::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::thread;

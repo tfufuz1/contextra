@@ -3059,9 +3059,9 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> memfuse_core::R
 
 #[tokio::test]
 async fn test_single_pid_controller_instantiation_in_query_builder() {
-    // Regression test: verify that exactly one PID controller type (memfuse_calibration::PidController)
+    // Regression test: verify that exactly one PID controller type (memfuse_adapt::PidController)
     // is instantiated across production collection search and query_builder modules.
-    let mut pid = memfuse_calibration::PidController::default();
+    let mut pid = memfuse_adapt::PidController::default();
     assert_eq!(pid.kp, 0.5);
     assert_eq!(pid.ki, 0.05);
     assert_eq!(pid.kd, 0.1);

@@ -68,8 +68,8 @@ CRATES_ALL=(
   memfuse-text           # Layer 1
   memfuse-index          # Layer 1
   memfuse-graph          # Layer 1
+  memfuse-rank           # Layer 0
   memfuse-checkpoint     # Layer 1
-  memfuse-calibration    # Layer 1
   memfuse-sandbox        # Layer 6.5 (aber Blattabhängigkeit, früh prüfbar)
   memfuse-db             # Layer 2
   memfuse-router         # Layer 3

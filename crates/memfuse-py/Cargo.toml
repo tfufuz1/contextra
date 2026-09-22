@@ -23,12 +23,12 @@ tokio = { workspace = true }
 # ANCHOR:ARCH:DAG-003 — Architektur-Layer durchbrochen (Ausnahme für Bindings)
 # WP:NONE PRIO:2 NEEDS:NONE
 # AGENT:06 DATE:2026-05-09 STATUS:DONE
-# VERLETZUNG: memfuse-py importiert memfuse-db, memfuse-router und memfuse-calibration gegen die DAG-Invariante.
+# VERLETZUNG: memfuse-py importiert memfuse-db, memfuse-router und memfuse-rank gegen die DAG-Invariante.
 # RECHTFERTIGUNG: Als High-Level Python-Bridge (Layer 3) benötigt memfuse-py Zugriff
 # auf die orchestrating Facade in memfuse-db sowie Routing- und Kalibrierungskomponenten. Dies ist eine beabsichtigte Ausnahme
 # vom Sovereign Core DAG, da Bindings per Definition an der Grenze zum Nutzer stehen.
 memfuse-router = { workspace = true }
-memfuse-calibration = { workspace = true }
+memfuse-rank = { workspace = true }
 parking_lot = { workspace = true }
 memfuse-core = { workspace = true }
 memfuse-db = { workspace = true }

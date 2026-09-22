@@ -1,9 +1,11 @@
 // FILE-CONTEXT
 // STAND: 2026-09-09T12:37:35Z (SESSION: 20c1aaf4)
-// ZWECK: Deep integration, proptest, and adversarial test suite for memfuse-calibration.
+// ZWECK: Deep integration, proptest, and adversarial test suite for memfuse-rank calibration.
 // INVARIANTEN: INV-CAL-1 (no silent fallback before warmup), INV-CAL-2 (invalidation resets observations/weights), P8 compliance.
 
-use memfuse_calibration::{ConfigFingerprint, IsotonicCalibrator, PidController, PlattScaler};
+use memfuse_adapt::PidController;
+use memfuse_rank::{IsotonicCalibrator, PlattScaler};
+use memfuse_types::ConfigFingerprint;
 use proptest::prelude::*;
 use std::time::Duration;
 
@@ -275,7 +277,6 @@ fn test_pid_controller_non_finite_latency_safety() {
 fn test_isotonic_pava_block_merging_fluctuating_sequence() {
     let mut cal = IsotonicCalibrator::new(6, 100);
     // Non-monotone outcome sequence for strictly increasing raw scores
-    // Force multiple PAVA merges: [0.1: 1.0], [0.2: 0.0], [0.3: 1.0], [0.4: 0.0], [0.5: 1.0], [0.6: 0.0]
     let sequence = vec![
         (0.1, true),
         (0.2, false),
@@ -289,7 +290,6 @@ fn test_isotonic_pava_block_merging_fluctuating_sequence() {
     }
 
     assert!(cal.is_calibrated());
-    // Force rebuild and check monotonic output
     cal.force_rebuild();
 
     let p1 = cal.calibrated_probability(0.1).unwrap();
@@ -298,7 +298,6 @@ fn test_isotonic_pava_block_merging_fluctuating_sequence() {
 
     assert!(p1 <= p2, "p1 ({p1}) must be <= p2 ({p2})");
     assert!(p2 <= p3, "p2 ({p2}) must be <= p3 ({p3})");
-    // Hand-calculated expected pooled probability across all 6 items with 3 true / 3 false: 0.5
     assert!(
         (p2 - 0.5).abs() < 1e-5,
         "Expected 0.5 pooled average, got {p2}"
@@ -307,7 +306,6 @@ fn test_isotonic_pava_block_merging_fluctuating_sequence() {
 
 #[test]
 fn test_platt_scaler_gradient_clipping_and_extreme_logits() {
-    // Highly separable extreme logit data to test gradient clipping & L2 regularization
     let mut obs = Vec::new();
     for i in -50..=50 {
         let logit = i as f32 * 10.0;
@@ -323,7 +321,6 @@ fn test_platt_scaler_gradient_clipping_and_extreme_logits() {
         "Params must remain finite despite extreme logits"
     );
 
-    // Extreme positive/negative logit output bounds
     let p_pos = scaler.predict(1000.0);
     let p_neg = scaler.predict(-1000.0);
     assert!(
@@ -338,7 +335,6 @@ fn test_platt_scaler_gradient_clipping_and_extreme_logits() {
 
 #[test]
 fn test_pid_controller_hard_floor_50_enforcement_in_constructor() {
-    // Passing min_pool_size = 10 must be clamped to hard floor 50
     let pid = PidController::new(150.0, 10, 200, Some(100));
     assert_eq!(
         pid.min_pool_size, 50,

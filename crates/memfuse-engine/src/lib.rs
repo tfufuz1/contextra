@@ -285,10 +285,10 @@ pub struct MemFuse {
     orphan_registry: Arc<memfuse_checkpoint::InstanceOrphanRegistry>,
     router: parking_lot::RwLock<Option<std::sync::Weak<dyn DriftStatusProvider>>>,
     calibrator: parking_lot::RwLock<
-        Option<std::sync::Weak<parking_lot::Mutex<memfuse_calibration::IsotonicCalibrator>>>,
+        Option<std::sync::Weak<parking_lot::Mutex<memfuse_rank::IsotonicCalibrator>>>,
     >,
     pid_controller: parking_lot::RwLock<
-        Option<std::sync::Weak<parking_lot::Mutex<memfuse_calibration::PidController>>>,
+        Option<std::sync::Weak<parking_lot::Mutex<memfuse_adapt::PidController>>>,
     >,
 }
 
@@ -1220,14 +1220,14 @@ impl MemFuse {
 
     pub fn set_calibrator(
         &self,
-        calibrator: std::sync::Weak<parking_lot::Mutex<memfuse_calibration::IsotonicCalibrator>>,
+        calibrator: std::sync::Weak<parking_lot::Mutex<memfuse_rank::IsotonicCalibrator>>,
     ) {
         *self.calibrator.write() = Some(calibrator);
     }
 
     pub fn set_pid_controller(
         &self,
-        pid_controller: std::sync::Weak<parking_lot::Mutex<memfuse_calibration::PidController>>,
+        pid_controller: std::sync::Weak<parking_lot::Mutex<memfuse_adapt::PidController>>,
     ) {
         *self.pid_controller.write() = Some(pid_controller);
     }

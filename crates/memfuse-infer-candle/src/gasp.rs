@@ -13,16 +13,16 @@
 //! Antwort tatsächlich durch mindestens einen abgerufenen Kontext-Chunk belegt ist.
 //!
 //! # Kalibrierung & Abstention (P8)
-//! `GaspValidator` verwendet `IsotonicCalibrator` und `ConfigFingerprint` aus `memfuse-calibration`.
+//! `GaspValidator` verwendet `IsotonicCalibrator` und `ConfigFingerprint` aus `memfuse-rank`.
 //! Fällt der Konfidenz-Score unter den konfigurierbaren Schwellenwert (`threshold`), wird
 //! ein Abstention-Pfad ausgelöst (`Err(MemFuseError::PolicyViolation(...))` mit `LowConfidenceGrounding`),
 //! anstatt die ungeprüfte/unsichere Antwort durchzureichen.
 
-use memfuse_calibration::IsotonicCalibrator;
 use memfuse_core::traits::{
     BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
 };
 use memfuse_core::{ConfigFingerprint, ContextChunk, MemFuseError, Result};
+use memfuse_rank::IsotonicCalibrator;
 use std::sync::Mutex;
 
 /// Standard-Schwellenwert für Grounding-Konfidenz (Default: 0.70).
@@ -615,7 +615,7 @@ mod tests {
         // 2. Refresh config with the SAME fingerprint fp2
         validator.refresh_config(config2);
 
-        // Observation count must be retained when fingerprint is unchanged
+        // Observation count must be preserved when fingerprint is unchanged
         assert_eq!(
             validator.observation_count(),
             1,

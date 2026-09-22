@@ -20,6 +20,7 @@ memfuse = { workspace = true, features = ["ollama", "router"] }
 memfuse-core = { workspace = true }
 memfuse-crypto = { workspace = true }
 memfuse-privacy = { workspace = true }
+memfuse-adapt = { workspace = true }
 memfuse-infer-onnx = { workspace = true, optional = true }
 memfuse-agent = { workspace = true, optional = true }
 memfuse-infer-candle = { workspace = true, optional = true }
