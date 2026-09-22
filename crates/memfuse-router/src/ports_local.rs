@@ -4,6 +4,7 @@
     since = "0.1.0",
     note = "Moved to memfuse_ports as part of Ring-Modell Welle 2 (siehe docs/refactor/router-db-edge-audit.md)"
 )]
+use memfuse_core::Result;
 pub use memfuse_ports::{
     CommunityResolver, ContextChunk, ContextPreparer, ContextWindow, DriftStatusProvider,
     HybridSearchProvider, TokenBudget,

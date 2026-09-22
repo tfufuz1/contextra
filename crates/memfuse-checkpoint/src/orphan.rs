@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Type alias for sequence numbers managed as pinned checkpoint identifiers.
 pub type PinId = u64;
 
+#[allow(deprecated)]
 static DUMMY_ORPHAN_REGISTRY: std::sync::OnceLock<OrphanRegistry> = std::sync::OnceLock::new();
 
 fn warn_deprecated_global_orphan_path() {

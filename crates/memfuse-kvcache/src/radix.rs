@@ -302,7 +302,7 @@ impl PrefixRadixTree {
     }
 
     fn remove_from_vec(
-        nodes: &mut Vec<RadixNode>,
+        nodes: &mut [RadixNode],
         tokens: &[u32],
         total_entries: &mut usize,
     ) -> Option<u64> {
