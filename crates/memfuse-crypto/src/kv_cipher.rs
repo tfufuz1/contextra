@@ -306,4 +306,38 @@ mod tests {
             "Expected KvFormatVersionMismatch, got: {err:?}"
         );
     }
+
+    #[test]
+    fn test_derive_key_for_segment_version_0_vs_version_1() {
+        let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
+        let cipher = KvSegmentCipher::new(master_km);
+        let tenant_id = TenantId::try_new(101).unwrap();
+
+        let km_v0 = cipher.derive_key_for_segment(tenant_id, 42, 0).unwrap();
+        let km_v1 = cipher.derive_key_for_segment(tenant_id, 42, 1).unwrap();
+        let km_v2 = cipher.derive_key_for_segment(tenant_id, 42, 2).unwrap();
+
+        // Exact match check for version 0 info string (kills `version == 0` replaced with `!=` mutant)
+        let expected_info_v0 = format!("memfuse-kv-segment-{}-42", tenant_id);
+        let km_v0_direct = cipher
+            .key_manager
+            .derive_segment_key(&expected_info_v0)
+            .unwrap();
+        assert_eq!(
+            km_v0.inspect_key_bytes_for_test(),
+            km_v0_direct.inspect_key_bytes_for_test(),
+            "Version 0 MUST derive key using 'memfuse-kv-segment-tenant_id-42'"
+        );
+
+        assert_ne!(
+            km_v0.inspect_key_bytes_for_test(),
+            km_v1.inspect_key_bytes_for_test(),
+            "Version 0 and Version 1 segment keys MUST be distinct"
+        );
+        assert_ne!(
+            km_v1.inspect_key_bytes_for_test(),
+            km_v2.inspect_key_bytes_for_test(),
+            "Version 1 and Version 2 segment keys MUST be distinct"
+        );
+    }
 }

@@ -14,6 +14,7 @@ thiserror = { workspace = true }
 sha2 = "0.10"
 hmac = "0.12"
 aes-gcm-siv = "0.11"
+argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
 hkdf = "0.12"
 subtle = "2.6"
 blake3 = { workspace = true }

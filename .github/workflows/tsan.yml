@@ -7,7 +7,7 @@ on:
   pull_request:
     paths:
       - 'crates/memfuse-store/**'
-      - 'crates/memfuse-index/**'
+      - 'crates/memfuse-vector/**'
       - 'crates/memfuse-graph/**'
 
 env:
@@ -42,7 +42,7 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=thread"
         run: |
-          cargo +nightly test -p memfuse-index \
+          cargo +nightly test -p memfuse-vector \
             --test deleted_nodes_lock_contention \
             --target x86_64-unknown-linux-gnu \
             -- --test-threads=1 --nocapture

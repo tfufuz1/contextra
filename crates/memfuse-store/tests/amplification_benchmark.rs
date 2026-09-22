@@ -97,6 +97,7 @@ fn test_bloom_filter_fpr_100k() -> (usize, usize, usize, f64, f64) {
 }
 
 #[tokio::test]
+#[ignore = "long-running benchmark"]
 async fn run_amplification_benchmark() {
     println!("============================================================");
     println!("MEMFUSE-STORE WRITE & READ AMPLIFICATION BENCHMARK SUITE");
