@@ -247,7 +247,10 @@ impl<'a> HyperEdgeView<'a> {
     }
 
     /// Creates a sub-view of participants without copying.
-    pub fn slice_participants(&self, range: impl std::ops::RangeBounds<usize>) -> ArcSlice<RoleBinding> {
+    pub fn slice_participants(
+        &self,
+        range: impl std::ops::RangeBounds<usize>,
+    ) -> ArcSlice<RoleBinding> {
         self.participants.slice(range)
     }
 }

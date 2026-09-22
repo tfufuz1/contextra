@@ -9,7 +9,8 @@ use memfuse_core::MemFuseError;
 use memfuse_infer_candle::kv_state::{KvState, LayerKv};
 
 #[test]
-fn test_kv_state_4d_model_tensor_export_import_truncation() -> Result<(), Box<dyn std::error::Error>> {
+fn test_kv_state_4d_model_tensor_export_import_truncation() -> Result<(), Box<dyn std::error::Error>>
+{
     let device = Device::Cpu;
     // Model weights shape: (batch=1, n_kv_head=2, seq_len=32, head_dim=4)
     let k0 = Tensor::zeros((1, 2, 32, 4), DType::F32, &device)?;

@@ -92,7 +92,8 @@ impl StarExpansionIterator {
                     let vnode = VirtualHyperedgeNode {
                         hyperedge_id: hedge.id,
                     };
-                    let weight = crate::hyperedge::star_weight(hedge.weight, hedge.participants.len());
+                    let weight =
+                        crate::hyperedge::star_weight(hedge.weight, hedge.participants.len());
                     self.current_participant_idx += 1;
                     return Some((entity_id, vnode, weight));
                 }
