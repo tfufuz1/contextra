@@ -27,10 +27,7 @@ impl std::fmt::Debug for MemFuseBuilder {
             .field("config", &self.config)
             .field(
                 "embedder",
-                &self
-                    .embedder
-                    .as_ref()
-                    .map(|_| "<dyn TextEmbeddingEngine>"),
+                &self.embedder.as_ref().map(|_| "<dyn TextEmbeddingEngine>"),
             )
             .finish()
     }
@@ -154,12 +151,16 @@ mod tests {
             Some("secret_pass".to_string())
         );
         assert!(!builder.config.consolidation_enabled);
-        assert_eq!(builder.config.consolidation_interval, Duration::from_secs(300));
+        assert_eq!(
+            builder.config.consolidation_interval,
+            Duration::from_secs(300)
+        );
     }
 
     #[tokio::test]
     async fn test_builder_build_roundtrip() {
-        let tmp_path = std::env::temp_dir().join(format!("memfuse_builder_test_{}", std::process::id()));
+        let tmp_path =
+            std::env::temp_dir().join(format!("memfuse_builder_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp_path);
 
         let db = MemFuseBuilder::new(4)

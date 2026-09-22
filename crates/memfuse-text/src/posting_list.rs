@@ -206,9 +206,9 @@ impl PostingList {
                 let tf_u64 = decode_varint(bytes, &mut offset)?;
                 let doc_len_u64 = decode_varint(bytes, &mut offset)?;
 
-                let doc_id = prev_doc_id
-                    .checked_add(delta)
-                    .ok_or_else(|| MemFuseError::Storage("DocId overflow during delta decoding".to_string()))?;
+                let doc_id = prev_doc_id.checked_add(delta).ok_or_else(|| {
+                    MemFuseError::Storage("DocId overflow during delta decoding".to_string())
+                })?;
                 let tf: u32 = tf_u64
                     .try_into()
                     .map_err(|_| MemFuseError::Storage("TF overflow in varint".to_string()))?;
@@ -216,7 +216,11 @@ impl PostingList {
                     .try_into()
                     .map_err(|_| MemFuseError::Storage("DocLen overflow in varint".to_string()))?;
 
-                postings.push(Posting { doc_id, tf, doc_len });
+                postings.push(Posting {
+                    doc_id,
+                    tf,
+                    doc_len,
+                });
                 prev_doc_id = doc_id;
             }
 
@@ -260,7 +264,9 @@ fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, MemFuseError> 
             return Err(MemFuseError::Storage("Varint overflow".to_string()));
         }
     }
-    Err(MemFuseError::Storage("Unexpected EOF while decoding varint".to_string()))
+    Err(MemFuseError::Storage(
+        "Unexpected EOF while decoding varint".to_string(),
+    ))
 }
 
 /// In-Memory resident index mapping terms to their posting lists.
