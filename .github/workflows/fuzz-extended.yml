@@ -13,10 +13,10 @@ jobs:
         target:
           - { crate: memfuse-store,  target: wal_mutation_chaos }
           - { crate: memfuse-store,  target: fuzz_manifest_load }
-          - { crate: memfuse-index,  target: fuzz_hnsw_persistence }
+          - { crate: memfuse-vector,  target: fuzz_hnsw_persistence }
           - { crate: memfuse-db,     target: fuzz_rrf_edge_cases }
           - { crate: memfuse-text,   target: fuzz_bm25_query }
-          - { crate: memfuse-index,  target: fuzz_distance_boundaries }
+          - { crate: memfuse-vector,  target: fuzz_distance_boundaries }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly

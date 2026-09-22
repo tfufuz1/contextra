@@ -8,11 +8,13 @@
 // 5. MVCC-Sichtbarkeit und Tombstones werden weiterhin dynamisch pro Anfrage evaluiert.
 // INVARIANTEN: Zero-Panic Doctrine, repr(C, align(8)) Layout für Postings, RCU-Locking ohne globale Exklusivlocks.
 
-use memfuse_core::DocId;
+use memfuse_core::{DocId, MemFuseError};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+
+pub const POSTING_LIST_V2_MAGIC: &[u8; 4] = b"PL\x02\x00";
 
 /// Block size for Block-Max WAND decomposition.
 pub const BLOCK_SIZE: usize = 64;
@@ -163,6 +165,102 @@ impl PostingList {
             blocks,
         }
     }
+
+    /// Encodes the posting list into a compact binary format with Delta-Varint encoding.
+    pub fn encode_compact(&self) -> Result<Vec<u8>, MemFuseError> {
+        let mut buf = Vec::with_capacity(4 + 8 + self.postings.len() * 8);
+        buf.extend_from_slice(POSTING_LIST_V2_MAGIC);
+        encode_varint(self.postings.len() as u64, &mut buf);
+
+        let mut prev_doc_id = 0u64;
+        for p in &self.postings {
+            let delta = p.doc_id.checked_sub(prev_doc_id).ok_or_else(|| {
+                MemFuseError::Storage("Unsorted or overflow doc_id in posting list".to_string())
+            })?;
+            encode_varint(delta, &mut buf);
+            encode_varint(p.tf as u64, &mut buf);
+            encode_varint(p.doc_len as u64, &mut buf);
+            prev_doc_id = p.doc_id;
+        }
+
+        Ok(buf)
+    }
+
+    /// Decodes a posting list from compact Delta-Varint binary format,
+    /// with legacy bincode V1 fallback.
+    pub fn decode_compact(bytes: &[u8]) -> Result<Self, MemFuseError> {
+        if bytes.starts_with(POSTING_LIST_V2_MAGIC) {
+            let mut offset = POSTING_LIST_V2_MAGIC.len();
+            let count = decode_varint(bytes, &mut offset)?;
+            if count > 100_000_000 {
+                return Err(MemFuseError::Storage(format!(
+                    "Oversized posting list count: {}",
+                    count
+                )));
+            }
+            let mut postings = Vec::with_capacity(count as usize);
+            let mut prev_doc_id = 0u64;
+
+            for _ in 0..count {
+                let delta = decode_varint(bytes, &mut offset)?;
+                let tf_u64 = decode_varint(bytes, &mut offset)?;
+                let doc_len_u64 = decode_varint(bytes, &mut offset)?;
+
+                let doc_id = prev_doc_id
+                    .checked_add(delta)
+                    .ok_or_else(|| MemFuseError::Storage("DocId overflow during delta decoding".to_string()))?;
+                let tf: u32 = tf_u64
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("TF overflow in varint".to_string()))?;
+                let doc_len: u32 = doc_len_u64
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("DocLen overflow in varint".to_string()))?;
+
+                postings.push(Posting { doc_id, tf, doc_len });
+                prev_doc_id = doc_id;
+            }
+
+            if offset != bytes.len() {
+                return Err(MemFuseError::Storage(format!(
+                    "Extra trailing bytes after posting list decoding: {} remaining",
+                    bytes.len() - offset
+                )));
+            }
+
+            let blocks = compute_blocks(&postings);
+            Ok(Self { postings, blocks })
+        } else {
+            // Legacy V1 bincode fallback
+            bincode::deserialize::<PostingList>(bytes)
+                .map_err(|e| MemFuseError::Storage(format!("bincode legacy decode error: {}", e)))
+        }
+    }
+}
+
+fn encode_varint(mut val: u64, buf: &mut Vec<u8>) {
+    while val >= 0x80 {
+        buf.push((val as u8 & 0x7f) | 0x80);
+        val >>= 7;
+    }
+    buf.push(val as u8);
+}
+
+fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, MemFuseError> {
+    let mut result = 0u64;
+    let mut shift = 0u32;
+    while *offset < bytes.len() {
+        let byte = bytes[*offset];
+        *offset += 1;
+        result |= ((byte & 0x7f) as u64) << shift;
+        if (byte & 0x80) == 0 {
+            return Ok(result);
+        }
+        shift += 7;
+        if shift >= 64 {
+            return Err(MemFuseError::Storage("Varint overflow".to_string()));
+        }
+    }
+    Err(MemFuseError::Storage("Unexpected EOF while decoding varint".to_string()))
 }
 
 /// In-Memory resident index mapping terms to their posting lists.
@@ -288,5 +386,42 @@ mod tests {
 
         index.remove_posting_from_terms(std::slice::from_ref(&term), DocId::new(100));
         assert!(index.get(&term).is_none());
+    }
+
+    #[test]
+    fn test_delta_varint_encode_decode_roundtrip() {
+        let p1 = Posting::new(DocId::new(10), 2, 100);
+        let p2 = Posting::new(DocId::new(100), 5, 250);
+        let p3 = Posting::new(DocId::new(1000), 1, 50);
+
+        let plist = PostingList::new(vec![p1, p2, p3]);
+        let bytes = plist.encode_compact().expect("encoding should succeed");
+        assert!(bytes.starts_with(POSTING_LIST_V2_MAGIC));
+
+        let decoded = PostingList::decode_compact(&bytes).expect("decoding should succeed");
+        assert_eq!(decoded.len(), 3);
+        assert_eq!(decoded.as_slice(), plist.as_slice());
+        assert_eq!(decoded.blocks(), plist.blocks());
+    }
+
+    #[test]
+    fn test_delta_varint_legacy_bincode_fallback() {
+        let p1 = Posting::new(DocId::new(10), 2, 100);
+        let p2 = Posting::new(DocId::new(100), 5, 250);
+        let plist = PostingList::new(vec![p1, p2]);
+
+        let legacy_bytes = bincode::serialize(&plist).expect("bincode serialize");
+        assert!(!legacy_bytes.starts_with(POSTING_LIST_V2_MAGIC));
+
+        let decoded = PostingList::decode_compact(&legacy_bytes).expect("fallback decode");
+        assert_eq!(decoded.len(), 2);
+        assert_eq!(decoded.as_slice(), plist.as_slice());
+    }
+
+    #[test]
+    fn test_delta_varint_corrupted_payload_no_panic() {
+        let invalid_bytes = b"PL\x02\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
+        let res = PostingList::decode_compact(invalid_bytes);
+        assert!(res.is_err());
     }
 }

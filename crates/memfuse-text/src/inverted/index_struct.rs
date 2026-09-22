@@ -168,7 +168,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
         let plb_key = self.key_batch_posting_list(term);
         if let Some(bytes) = self.storage.get(&plb_key).await? {
-            if let Ok(plist) = bincode::deserialize::<crate::posting_list::PostingList>(&bytes) {
+            if let Ok(plist) = crate::posting_list::PostingList::decode_compact(&bytes) {
                 self.resident_index.insert_list(term.to_string(), plist);
                 if let Some(l) = self.resident_index.get(term) {
                     return Ok(l);
@@ -306,8 +306,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
                 .upsert_posting(term, Posting::new(doc_id, *tf, new_len));
 
             if let Some(plist) = self.resident_index.get(term) {
-                let batch_bytes = bincode::serialize(plist.as_ref())
-                    .map_err(|e| MemFuseError::Storage(format!("bincode: {}", e)))?;
+                let batch_bytes = plist.encode_compact()?;
                 let plb_key = self.key_batch_posting_list(term);
                 self.storage.put(tx, &plb_key, &batch_bytes).await?;
             }
@@ -386,8 +385,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
                 let plb_key = self.key_batch_posting_list(&term);
                 if let Some(plist) = self.resident_index.get(&term) {
-                    let batch_bytes = bincode::serialize(plist.as_ref())
-                        .map_err(|e| MemFuseError::Storage(format!("bincode: {}", e)))?;
+                    let batch_bytes = plist.encode_compact()?;
                     self.storage.put(tx, &plb_key, &batch_bytes).await?;
                 } else {
                     self.storage.delete(tx, &plb_key).await?;
@@ -435,8 +433,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
                     let plb_key = self.key_batch_posting_list(term);
                     if let Some(plist) = self.resident_index.get(term) {
-                        let batch_bytes = bincode::serialize(plist.as_ref())
-                            .map_err(|e| MemFuseError::Storage(format!("bincode: {}", e)))?;
+                        let batch_bytes = plist.encode_compact()?;
                         self.storage.put(tx, &plb_key, &batch_bytes).await?;
                     } else {
                         self.storage.delete(tx, &plb_key).await?;

@@ -194,8 +194,9 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T18:14:20.180368201+00:00",
       "session_id": "10672640857832740238",
-      "active": true,
-      "expires_at": "2026-09-21T22:14:20.180353482+00:00"
+      "active": false,
+      "expires_at": "2026-09-21T22:14:20.180353482+00:00",
+      "released_at": "2026-09-22T01:23:00.692039314+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-rank",
@@ -206,12 +207,12 @@
       "expires_at": "2026-09-22T00:00:37.526179874+00:00"
     },
     {
-      "krate": "memfuse-graph-tests-persistence",
+      "krate": "docs-adr-n01-n05",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-21T20:51:07.694815566+00:00",
-      "session_id": "8185159236911695191",
+      "timestamp": "2026-09-21T20:49:03.018199847+00:00",
+      "session_id": "3736256039108358980",
       "active": true,
-      "expires_at": "2026-09-22T00:51:07.694805960+00:00"
+      "expires_at": "2026-09-22T00:49:03.018186895+00:00"
     }
   ]
 }

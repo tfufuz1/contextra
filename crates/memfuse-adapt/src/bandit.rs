@@ -561,6 +561,51 @@ mod tests {
     }
 
     #[test]
+    fn test_dimension_mismatch_returns_error() {
+        let mut state = BanditProfileState::cold_start(4, 0.5);
+        let x_mismatch = vec![1.0f32, 2.0f32]; // Expected 4, actual 2
+
+        let err_score = state.score(&x_mismatch, 0.0, false).unwrap_err();
+        assert_eq!(
+            err_score,
+            BanditError::DimensionMismatch {
+                expected: 4,
+                actual: 2
+            }
+        );
+
+        let err_update = state.update(&x_mismatch, 1.0, 0.0, false).unwrap_err();
+        assert_eq!(
+            err_update,
+            BanditError::DimensionMismatch {
+                expected: 4,
+                actual: 2
+            }
+        );
+
+        // Also test DiagonalApproximation implementation
+        state.implementation = BanditImplementation::DiagonalApproximation;
+
+        let err_score_diag = state.score(&x_mismatch, 0.0, false).unwrap_err();
+        assert_eq!(
+            err_score_diag,
+            BanditError::DimensionMismatch {
+                expected: 4,
+                actual: 2
+            }
+        );
+
+        let err_update_diag = state.update(&x_mismatch, 1.0, 0.0, false).unwrap_err();
+        assert_eq!(
+            err_update_diag,
+            BanditError::DimensionMismatch {
+                expected: 4,
+                actual: 2
+            }
+        );
+    }
+
+    #[test]
     fn test_cold_start_zero_theta_unit_sigma() {
         let state = BanditProfileState::cold_start(4, 0.5);
         assert!(state.theta.iter().all(|&v| v == 0.0));
