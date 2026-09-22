@@ -78,10 +78,9 @@ impl SstableStream {
                             .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
                     ) as usize;
                     ep += 2;
-                    if ep + k_len > block_data.len() {
-                        return Err(MemFuseError::Storage("missing entry_key".into()));
-                    }
-                    let entry_key = block_data.slice(ep..ep + k_len);
+                    let entry_key = block_data
+                        .get(ep..ep + k_len)
+                        .ok_or_else(|| MemFuseError::Storage("missing entry_key".into()))?;
                     ep += k_len;
 
                     let seq_no = u64::from_le_bytes(
@@ -110,12 +109,14 @@ impl SstableStream {
                             .map_err(|_| MemFuseError::Storage("invalid slice".into()))?,
                     ) as usize;
                     ep += 4;
-                    if ep + v_len > block_data.len() {
-                        return Err(MemFuseError::Storage("missing entry_val".into()));
-                    }
                     let entry_val = block_data.slice(ep..ep + v_len);
                     self.entry_idx += 1;
-                    return Ok(Some((entry_key, entry_val, seq_no, tx_id)));
+                    return Ok(Some((
+                        Bytes::copy_from_slice(entry_key),
+                        entry_val,
+                        seq_no,
+                        tx_id,
+                    )));
                 }
             }
             self.current_block = None;

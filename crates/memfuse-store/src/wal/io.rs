@@ -183,16 +183,15 @@ where
                         "Truncated inner WAL entry length in batch",
                     ));
                 }
-                let inner_len_bytes: [u8; 4] =
-                    match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
-                        Some(b) => b,
-                        None => {
-                            return Err(MemFuseError::wal_corruption(
-                                chunk_start_pos,
-                                "Failed to extract inner WAL entry length",
-                            ));
-                        }
-                    };
+                let inner_len_bytes: [u8; 4] = match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
+                    Some(b) => b,
+                    None => {
+                        return Err(MemFuseError::wal_corruption(
+                            chunk_start_pos,
+                            "Failed to extract inner WAL entry length",
+                        ));
+                    }
+                };
                 let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
                 if inner_slice.len() < 4 + inner_len {
                     if pos >= file_size {
