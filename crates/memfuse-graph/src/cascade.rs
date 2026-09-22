@@ -66,6 +66,75 @@ pub async fn cascade_invalidate_edges_for_superseded_doc(
 /// LSM-Key-Präfix für die persistent cascade queue (§6.6 / §6.8).
 pub const CASCADE_QUEUE_PREFIX: &str = "__graph:cascade_queue:";
 
+/// Status tracking for a cascade invalidation ticket (§6.8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CascadeStatus {
+    /// Invalidation task is queued and pending.
+    Pending,
+    /// Invalidation task is currently processing.
+    InFlight,
+    /// Invalidation completed successfully with a deletion proof.
+    Completed,
+    /// Invalidation failed.
+    Failed,
+}
+
+/// Proof of edge / hyperedge deletion during cascade invalidation (§6.8).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DeletionProof {
+    pub doc_id: DocId,
+    pub tombstoned_count: usize,
+    pub wal_seq: u64,
+}
+
+/// Ticket tracking persistent cascade invalidation status (§6.8).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CascadeTicket {
+    pub id: u64,
+    pub doc_id: DocId,
+    pub status: CascadeStatus,
+    pub proof: Option<DeletionProof>,
+}
+
+/// Garbage collection trait for sweeping orphaned hyperedge references (Anhang B §B.5.1.7).
+pub trait GraphGarbageCollection {
+    /// Sweeps orphaned hyperedges whose participants no longer exist or are fully tombstoned.
+    fn sweep_orphans(&self, wal_tx: TxId) -> Result<usize>;
+}
+
+impl GraphGarbageCollection for CsrGraph {
+    fn sweep_orphans(&self, wal_tx: TxId) -> Result<usize> {
+        let candidate_ids = {
+            let inner = self.inner_read();
+            let mut orphaned = Vec::new();
+            for (id, hedge) in inner.hyperedges.iter() {
+                if hedge.tx_valid_to.is_none() {
+                    let mut all_tombstoned_or_missing = true;
+                    for p in hedge.participants.iter() {
+                        if inner.id_map.contains_key(&p.entity) {
+                            all_tombstoned_or_missing = false;
+                            break;
+                        }
+                    }
+                    if all_tombstoned_or_missing {
+                        orphaned.push(*id);
+                    }
+                }
+            }
+            orphaned
+        };
+
+        let mut swept_count = 0usize;
+        for hid in candidate_ids {
+            if self.tombstone_hyperedge(hid, wal_tx) {
+                swept_count += 1;
+            }
+        }
+
+        Ok(swept_count)
+    }
+}
+
 /// Report summarizing the cascade invalidation of hyperedges derived from a superseded document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HyperedgeCascadeReport {
