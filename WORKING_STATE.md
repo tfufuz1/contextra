@@ -35,7 +35,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-rank` | 2 | 2741 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
 | `memfuse-checkpoint` | 3 | 6113 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-graph` | 3 | 18101 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
-| `memfuse-infer-ollama` | 3 | 4596 | 🟢 Clean |  |
+| `memfuse-infer-ollama` | 3 | 4597 | 🟢 Clean |  |
 | `memfuse-infer-onnx` | 3 | 2219 | 🟢 Clean |  |
 | `memfuse-privacy` | 3 | 1865 | 🟢 Clean | Cloud Egress Security, DLP & Exfiltration Protection for MemFuse (Ring 3) |
 | `memfuse-sandbox` | 3 | 992 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
@@ -48,12 +48,12 @@ Ergebnis: **0 offene Tags**
 | `memfuse-store` | 5 | 28242 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 15527 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
-| `memfuse-infer-candle` | 6 | 5818 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
+| `memfuse-infer-candle` | 6 | 5819 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-cognition` | 7 | 4510 | 🟢 Clean | MemFuse — Memory consolidation, compaction, and context management |
 | `memfuse-db` | 8 | 12523 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse` | 9 | 494 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents (Facade) |
 | `memfuse-agent` | 9 | 6971 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
-| `memfuse-bench` | 9 | 5741 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
+| `memfuse-bench` | 9 | 5751 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
 | `memfuse-py` | 9 | 1827 | 🟢 Clean | Python bindings for MemFuse using PyO3 |
 | `memfuse-mcp` | 10 | 7419 | 🟢 Clean |  |
 
