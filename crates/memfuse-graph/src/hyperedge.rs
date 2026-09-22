@@ -3,11 +3,13 @@
 //! Implementiert n-äre Hyperkanten für komplexe Wissensrepräsentation (IP-20 / ADR-064).
 //! Persistenz erfolgt serde/bincode-kompatibel analog zu `PersistedEdgePayload`.
 
+use crate::arc_slice::ArcSlice;
 use crate::csr::EdgeType;
 use crate::error::GraphMutationError;
 use memfuse_core::{DocId, EntityId, MemFuseError, Result, TxId};
 use scc::HashMap;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -16,6 +18,19 @@ pub const HYPEREDGE_PREFIX: &str = "__graph:hyperedge:";
 
 /// LSM-Key-Präfix für Hyperkanten-Index nach Entity.
 pub const HYPEREDGE_BY_ENTITY_PREFIX: &str = "__graph:hyperedge_by_entity:";
+
+/// Berechnet das Kantengewicht in der Stern-Expansion nach Konvention K (§6.6 H6).
+///
+/// Formula: `w_star = 2 * w / (|e| - 1)` for hyperedge weight `w` and cardinality `|e| >= 2`.
+/// Note: Reverting or altering this weight convention would require explicit PO decision per §14 #6.
+#[inline]
+pub fn star_weight(weight: f32, cardinality: usize) -> f32 {
+    if cardinality < 2 {
+        weight
+    } else {
+        (2.0 * weight) / ((cardinality - 1) as f32)
+    }
+}
 
 /// Eindeutiger Identifikator für eine Hyperkante.
 #[derive(
@@ -207,6 +222,42 @@ impl HyperEdge {
     pub fn deserialize(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes)
             .map_err(|e| MemFuseError::Internal(format!("Failed to deserialize hyperedge: {e}")))
+    }
+
+    /// Erstellt eine Zero-Copy-Teilsicht (`HyperEdgeView`) auf diese Hyperkante.
+    pub fn view(&self) -> HyperEdgeView<'_> {
+        HyperEdgeView::new(self)
+    }
+}
+
+/// Zero-Copy read-only view of a [`HyperEdge`] backed by [`ArcSlice<RoleBinding>`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct HyperEdgeView<'a> {
+    pub edge: &'a HyperEdge,
+    pub participants: ArcSlice<RoleBinding>,
+}
+
+impl<'a> HyperEdgeView<'a> {
+    /// Creates a new `HyperEdgeView` for the given hyperedge.
+    pub fn new(edge: &'a HyperEdge) -> Self {
+        Self {
+            edge,
+            participants: ArcSlice::new(Arc::clone(&edge.participants)),
+        }
+    }
+
+    /// Creates a sub-view of participants without copying.
+    pub fn slice_participants(&self, range: impl std::ops::RangeBounds<usize>) -> ArcSlice<RoleBinding> {
+        self.participants.slice(range)
+    }
+}
+
+impl<'a> Deref for HyperEdgeView<'a> {
+    type Target = HyperEdge;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.edge
     }
 }
 
