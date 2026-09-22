@@ -934,6 +934,7 @@ dependencies = [
  "arc-swap",
  "memfuse-adapt",
  "memfuse-core",
+ "memfuse-ports",
  "memfuse-privacy",
  "memfuse-store",
  "parking_lot",
