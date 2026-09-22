@@ -14,6 +14,51 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  flatbuffers-drift-gate:
+    name: FlatBuffers Schema Drift Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: FlatBuffers Schema Drift Gate
+        run: cargo xtask check-fbs-drift
+
+  hyperedge-schema-merge:
+    name: HyperEdge Schema Merge Gate
+    needs: [flatbuffers-drift-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: HyperEdge Schema Test
+        run: cargo test -p memfuse-graph -- hyperedge
+
   merge-gate:
     name: Merge Gate (Schnell)
     runs-on: ubuntu-latest
@@ -88,7 +133,7 @@ jobs:
       - name: Bandit Latency Budget Gate
         # Prüft dass LinUCB-Diagonal-Approximation das Latenzbudget (P95 ≤ 1ms) einhält.
         # Verhindert versehentliche O(d³)-Implementierungen im Hot-Path (§9.1, §13.2).
-        run: cargo xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
+        run: cargo run -p xtask --features memfuse-router/bandit-routing -- check-bandit-latency-budget
         # Feature-Flag nötig da check_bandit_latency_budget memfuse_router::BanditProfileState nutzt.
 
       - name: FlatBuffers Schema Drift Gate

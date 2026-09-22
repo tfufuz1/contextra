@@ -77,3 +77,54 @@ jobs:
           fi
 
           echo "✅ Commit integrity check passed: No empty commits with misleading messages found."
+
+      - name: "PR Diff Stat vs Commit Message Discrepancy Gate (PZ-01)"
+        env:
+          MEMFUSE_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+        run: |
+          set -euo pipefail
+
+          BASE_REF="${MEMFUSE_CI_BASE_REF:-origin/main}"
+          if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+            BASE_REF="HEAD~1"
+          fi
+
+          echo "🔍 Evaluating git diff --stat $BASE_REF HEAD..."
+          git diff --stat "$BASE_REF" HEAD || true
+
+          COMMITS=$(git rev-list "$BASE_REF..HEAD" 2>/dev/null || echo "")
+          if [ -z "$COMMITS" ]; then
+            echo "No commits in range $BASE_REF..HEAD to inspect."
+            exit 0
+          fi
+
+          FAILED=0
+          for COMMIT in $COMMITS; do
+            PARENT=$(git rev-parse "${COMMIT}^1" 2>/dev/null || true)
+            if [ -z "$PARENT" ]; then
+              continue
+            fi
+
+            COMMIT_TREE=$(git rev-parse "${COMMIT}^{tree}")
+            PARENT_TREE=$(git rev-parse "${PARENT}^{tree}")
+
+            if [ "$COMMIT_TREE" = "$PARENT_TREE" ]; then
+              MSG=$(git log -1 --format="%B" "$COMMIT")
+              MSG_LEN=${#MSG}
+
+              if echo "$MSG" | grep -i -E '\b(add|implement|fix)\b' >/dev/null 2>&1 || [ "$MSG_LEN" -gt 80 ]; then
+                echo "❌ PZ-01 DISCREPANCY FAILURE: Commit $COMMIT claims additions/fixes or has significant message length ($MSG_LEN chars), but git diff --stat shows an empty diff!"
+                echo "  Commit SHA: $COMMIT"
+                echo "  Commit Message:"
+                echo "$MSG" | sed 's/^/    /'
+                FAILED=1
+              fi
+            fi
+          done
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "❌ PZ-01: Empty commit discrepancy check failed."
+            exit 1
+          fi
+
+          echo "✅ PZ-01: git diff --stat matches commit messages in PR range."
