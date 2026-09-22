@@ -31,8 +31,39 @@ pub trait ContextPreparer: Send + Sync {
     ) -> Result<ContextWindow>;
 }
 
-/// Contract for monitoring Lyapunov drift status across active profile watchers.
-pub trait DriftStatusProvider: Send + Sync {
-    /// Returns human-readable summary string of overall drift status.
-    fn overall_drift_status(&self) -> String;
+/// Default no-op implementation for `CommunityResolver`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoopCommunityResolver;
+
+impl CommunityResolver for NoopCommunityResolver {
+    fn get_community<'a>(&'a self, _entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>> {
+        Box::pin(async move { Ok(None) })
+    }
 }
+
+/// Default passthrough implementation for `ContextPreparer`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PassthroughContextPreparer;
+
+impl ContextPreparer for PassthroughContextPreparer {
+    fn prepare_context(
+        &self,
+        chunks: Vec<ContextChunk>,
+        _budget: &TokenBudget,
+        relevance_threshold: f32,
+    ) -> Result<ContextWindow> {
+        let filtered_chunks: Vec<ContextChunk> = chunks
+            .into_iter()
+            .filter(|c| c.relevance >= relevance_threshold)
+            .collect();
+        let total_tokens = filtered_chunks.iter().map(|c| c.token_count).sum();
+        Ok(ContextWindow {
+            chunks: filtered_chunks,
+            total_tokens,
+            truncated: false,
+        })
+    }
+}
+
+/// Re-export contract for monitoring Lyapunov drift status across active profile watchers (ADR-080).
+pub use memfuse_core::DriftStatusProvider;

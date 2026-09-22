@@ -13,7 +13,7 @@ memfuse-infer-candle = { workspace = true, optional = true }
 memfuse-infer-ollama = { workspace = true, optional = true }
 memfuse-infer-onnx = { workspace = true, optional = true }
 memfuse-router = { workspace = true, optional = true }
-memfuse-calibration = { workspace = true, optional = true }
+memfuse-rank = { workspace = true, optional = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 
@@ -22,7 +22,7 @@ default = []
 onnx = ["memfuse-infer-onnx/onnx", "memfuse-db/onnx"]
 candle = ["memfuse-infer-candle"]
 ollama = ["memfuse-infer-ollama"]
-router = ["memfuse-router", "memfuse-calibration"]
+router = ["memfuse-router", "memfuse-rank"]
 
 [lints]
 workspace = true

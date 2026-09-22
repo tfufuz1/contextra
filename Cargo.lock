@@ -2232,12 +2232,12 @@ dependencies = [
 name = "memfuse"
 version = "0.1.0"
 dependencies = [
- "memfuse-calibration",
  "memfuse-core",
  "memfuse-db",
  "memfuse-infer-candle",
  "memfuse-infer-ollama",
  "memfuse-infer-onnx",
+ "memfuse-rank",
  "memfuse-router",
  "thiserror 2.0.20",
  "tokio",
@@ -2295,19 +2295,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "memfuse-calibration"
-version = "0.1.0"
-dependencies = [
- "memfuse-adapt",
- "memfuse-core",
- "parking_lot",
- "proptest",
- "serde",
- "serde_json",
- "tracing",
 ]
 
 [[package]]
@@ -2402,13 +2389,13 @@ dependencies = [
  "bytes",
  "criterion",
  "memfuse-adapt",
- "memfuse-calibration",
  "memfuse-checkpoint",
  "memfuse-cognition",
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-engine",
  "memfuse-graph",
+ "memfuse-rank",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
@@ -2433,11 +2420,11 @@ dependencies = [
  "blake3",
  "bytes",
  "memfuse-adapt",
- "memfuse-calibration",
  "memfuse-checkpoint",
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-graph",
+ "memfuse-rank",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
@@ -2489,9 +2476,9 @@ dependencies = [
  "candle-transformers",
  "criterion",
  "futures-util",
- "memfuse-calibration",
  "memfuse-core",
  "memfuse-crypto",
+ "memfuse-rank",
  "memfuse-store",
  "proptest",
  "serde",
@@ -2508,9 +2495,9 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "futures-util",
- "memfuse-calibration",
  "memfuse-core",
  "memfuse-infer-onnx",
+ "memfuse-rank",
  "parking_lot",
  "proptest",
  "quick-xml",
@@ -2529,9 +2516,9 @@ name = "memfuse-infer-onnx"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "memfuse-calibration",
  "memfuse-core",
  "memfuse-infer-candle",
+ "memfuse-rank",
  "ndarray 0.15.6",
  "ort",
  "parking_lot",
@@ -2568,12 +2555,14 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "memfuse",
+ "memfuse-adapt",
  "memfuse-agent",
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-infer-candle",
  "memfuse-infer-onnx",
  "memfuse-privacy",
+ "memfuse-rank",
  "parking_lot",
  "rand 0.8.8",
  "scc",
@@ -2641,10 +2630,12 @@ name = "memfuse-py"
 version = "0.1.0"
 dependencies = [
  "flatbuffers",
- "memfuse-calibration",
+ "memfuse-adapt",
  "memfuse-core",
  "memfuse-db",
+ "memfuse-rank",
  "memfuse-router",
+ "memfuse-store",
  "numpy",
  "parking_lot",
  "pyo3",

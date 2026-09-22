@@ -1054,8 +1054,8 @@ macro_rules! memfuse_batch_methods {
 /// nicht sofort droppen. Analog zu `RoutingHandle` in memfuse-mcp.
 struct PyRoutingHandle {
     _router: Arc<memfuse_router::DefaultRouterEngine>,
-    _calibrator: Arc<parking_lot::Mutex<memfuse_calibration::IsotonicCalibrator>>,
-    _pid_controller: Arc<parking_lot::Mutex<memfuse_calibration::PidController>>,
+    _calibrator: Arc<parking_lot::Mutex<memfuse_rank::IsotonicCalibrator>>,
+    _pid_controller: Arc<parking_lot::Mutex<memfuse_adapt::PidController>>,
 }
 
 /// Router configuration container for internal routing setup in `open()`.
@@ -1358,20 +1358,52 @@ fn open(
             if router_config.profiles.is_empty() {
                 return Ok::<Option<PyRoutingHandle>, memfuse_core::MemFuseError>(None);
             }
+            struct CollectionSearchAdapter(Arc<memfuse_db::Collection<memfuse_store::LsmStorage>>);
+
+            impl memfuse_router::ports_local::HybridSearchProvider for CollectionSearchAdapter {
+                fn search_hybrid<'a>(
+                    &'a self,
+                    query_text: &'a str,
+                    query_embedding: &'a [f32],
+                    top_k: usize,
+                ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<memfuse_core::ContextChunk>>> {
+                    let col = self.0.clone();
+                    Box::pin(async move {
+                        let search_results = col
+                            .query()
+                            .text(query_text)
+                            .vector(query_embedding)
+                            .k(top_k)
+                            .execute()
+                            .await?;
+                        search_results
+                            .into_iter()
+                            .map(memfuse_core::ContextChunk::try_from)
+                            .collect()
+                    })
+                }
+            }
+
             let default_col = db.collection("default").await?;
+            let search_provider = Arc::new(CollectionSearchAdapter(default_col));
+            let community_resolver = Arc::new(memfuse_router::ports_local::NoopCommunityResolver);
+            let context_preparer = Arc::new(memfuse_router::ports_local::PassthroughContextPreparer);
+
             let router = Arc::new(memfuse_router::RouterEngine::new(
-                default_col,
+                search_provider,
+                community_resolver,
+                context_preparer,
                 router_config.profiles.clone(),
                 router_config.calibration_store_path.clone(),
             ));
             let calibrator = Arc::new(parking_lot::Mutex::new(
-                memfuse_calibration::IsotonicCalibrator::with_defaults(),
+                memfuse_rank::IsotonicCalibrator::with_defaults(),
             ));
             let pid_controller = Arc::new(parking_lot::Mutex::new(
-                memfuse_calibration::PidController::default(),
+                memfuse_adapt::PidController::default(),
             ));
             let router_weak =
-                Arc::downgrade(&router) as std::sync::Weak<dyn memfuse_db::DriftStatusProvider>;
+                Arc::downgrade(&router) as std::sync::Weak<dyn memfuse_core::DriftStatusProvider>;
             db.set_router(router_weak);
             db.set_calibrator(Arc::downgrade(&calibrator));
             db.set_pid_controller(Arc::downgrade(&pid_controller));

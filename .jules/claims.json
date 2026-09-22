@@ -204,6 +204,14 @@
       "session_id": "2090223400654574052",
       "active": true,
       "expires_at": "2026-09-22T00:00:37.526179874+00:00"
+    },
+    {
+      "krate": "memfuse-calibration",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-21T20:47:35.797666838+00:00",
+      "session_id": "17760186897507248404",
+      "active": true,
+      "expires_at": "2026-09-22T00:47:35.797656007+00:00"
     }
   ]
 }
