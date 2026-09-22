@@ -54,14 +54,14 @@ Layer 5:  memfuse-kvcache — Ring 1 Prefix-Radix tree, KV-Block cache, tenant-i
           memfuse-vector — HNSW vector index with SIMD distance computation for MemFuse (deps: memfuse-core, memfuse-crypto, memfuse-simd)
 Layer 6:  memfuse-engine — MemFuse — Core storage, index, and transaction orchestrator engine (deps: memfuse-adapt, memfuse-calibration, memfuse-checkpoint, memfuse-core, memfuse-crypto, memfuse-graph, memfuse-store, memfuse-sys, memfuse-text, memfuse-vector)
           memfuse-infer-candle — Native Candle GGUF ML inference backend for MemFuse (deps: memfuse-calibration, memfuse-core, memfuse-crypto, memfuse-store)
-          memfuse-router —  (deps: memfuse-adapt, memfuse-core, memfuse-privacy, memfuse-store)
 Layer 7:  memfuse-cognition — MemFuse — Memory consolidation, compaction, and context management (deps: memfuse-core, memfuse-engine, memfuse-graph, memfuse-store, memfuse-vector)
 Layer 8:  memfuse-db — MemFuse — Embedded hybrid-search for AI agents (deps: memfuse-adapt, memfuse-calibration, memfuse-checkpoint, memfuse-cognition, memfuse-core, memfuse-crypto, memfuse-engine, memfuse-graph, memfuse-index, memfuse-store, memfuse-sys, memfuse-text)
-Layer 9:  memfuse — MemFuse — Embedded hybrid-search for AI agents (Facade) (deps: memfuse-calibration, memfuse-core, memfuse-db, memfuse-infer-candle, memfuse-infer-ollama, memfuse-infer-onnx, memfuse-router)
+Layer 9:  memfuse-bench — MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy (deps: memfuse-core, memfuse-db, memfuse-graph, memfuse-infer-onnx, memfuse-store, memfuse-text, memfuse-vector)
+          memfuse-router —  (deps: memfuse-adapt, memfuse-core, memfuse-db, memfuse-store)
+Layer 10:  memfuse — MemFuse — Embedded hybrid-search for AI agents (Facade) (deps: memfuse-calibration, memfuse-core, memfuse-db, memfuse-infer-candle, memfuse-infer-ollama, memfuse-infer-onnx, memfuse-router)
           memfuse-agent — Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop (deps: memfuse-checkpoint, memfuse-core, memfuse-db, memfuse-graph, memfuse-router, memfuse-store)
-          memfuse-bench — MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy (deps: memfuse-core, memfuse-db, memfuse-graph, memfuse-infer-onnx, memfuse-store, memfuse-text, memfuse-vector)
           memfuse-py — Python bindings for MemFuse using PyO3 (deps: memfuse-calibration, memfuse-core, memfuse-db, memfuse-router)
-Layer 10:  memfuse-mcp —  (deps: memfuse-agent, memfuse-core, memfuse-crypto, memfuse-infer-candle, memfuse-infer-onnx, memfuse-privacy)
+Layer 11:  memfuse-mcp —  (deps: memfuse-agent, memfuse-core, memfuse-crypto, memfuse-infer-candle, memfuse-infer-onnx)
 ```
 
 **Aktiver Workspace-Build**: 31 Kern-Crates.
