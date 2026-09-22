@@ -1,10 +1,59 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use memfuse_core::{EntityId, StorageEngine, TokenBudget};
-use memfuse_db::{MemFuse, MemFuseConfig};
+use memfuse_core::{BoxFuture, ContextChunk, EntityId, Result, StorageEngine, TokenBudget};
+use memfuse_db::{Collection, MemFuse, MemFuseConfig};
+use memfuse_router::ports_local::{CommunityResolver, HybridSearchProvider, PassthroughContextPreparer};
 use memfuse_router::{RouterEngine, SlmProfile};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
+
+struct CollectionAdapter<S: StorageEngine + 'static> {
+    collection: Arc<Collection<S>>,
+}
+
+impl<S: StorageEngine + 'static> CollectionAdapter<S> {
+    fn new(collection: Arc<Collection<S>>) -> Self {
+        Self { collection }
+    }
+}
+
+impl<S: StorageEngine + 'static> HybridSearchProvider for CollectionAdapter<S> {
+    fn search_hybrid<'a>(
+        &'a self,
+        query_text: &'a str,
+        query_embedding: &'a [f32],
+        top_k: usize,
+    ) -> BoxFuture<'a, Result<Vec<ContextChunk>>> {
+        Box::pin(async move {
+            let search_results = self
+                .collection
+                .query()
+                .text(query_text)
+                .embedding(query_embedding)
+                .k(top_k)
+                .execute()
+                .await?;
+
+            let mut chunks = Vec::with_capacity(search_results.len());
+            for res in search_results {
+                if let Ok(mut chunk) = ContextChunk::try_from(res) {
+                    chunk.content = chunk.combined_text_owned();
+                    chunks.push(chunk);
+                }
+            }
+            Ok(chunks)
+        })
+    }
+}
+
+impl<S: StorageEngine + 'static> CommunityResolver for CollectionAdapter<S> {
+    fn get_community<'a>(
+        &'a self,
+        entity_id: EntityId,
+    ) -> BoxFuture<'a, Result<Option<u64>>> {
+        Box::pin(async move { self.collection.get_community(entity_id).await })
+    }
+}
 
 fn bench_router_engine(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
@@ -59,7 +108,9 @@ fn bench_router_engine(c: &mut Criterion) {
             ));
         }
 
-        let router = Arc::new(RouterEngine::new(collection.clone(), profiles, None));
+        let adapter = Arc::new(CollectionAdapter::new(collection.clone()));
+        let preparer = Arc::new(PassthroughContextPreparer);
+        let router = Arc::new(RouterEngine::new(adapter.clone(), adapter, preparer, profiles, None));
 
         c.bench_function(&format!("router_route_{}_profiles", profile_count), |b| {
             b.to_async(&rt).iter(|| {
