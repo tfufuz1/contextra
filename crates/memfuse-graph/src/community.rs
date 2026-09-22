@@ -55,58 +55,56 @@ impl VirtualHyperedgeNode {
 /// Stern-Expansion: Jede Hyperkante wird als künstlicher bipartiter Knoten
 /// (`VirtualHyperedgeNode`) repräsentiert. Der Iterator gaukelt dem Leiden-Solver die
 /// Inzidenzmatrix H vor, ohne zusätzlichen Speicher für die volle Expansion zu allozieren.
-pub struct StarExpansionIterator<'a> {
-    _graph: &'a CsrGraph,
-    active_hyperedges: Vec<std::sync::Arc<crate::hyperedge::HyperEdge>>,
+pub struct StarExpansionIterator {
+    inner: arc_swap::Guard<std::sync::Arc<crate::csr::inner::GraphInner>>,
+    hyperedge_keys: Vec<crate::hyperedge::HyperEdgeId>,
     current_hyperedge_idx: usize,
     current_participant_idx: usize,
 }
 
-impl<'a> StarExpansionIterator<'a> {
+impl StarExpansionIterator {
     /// Erstellt einen neuen `StarExpansionIterator` für den gegebenen CsrGraph.
-    pub fn new(graph: &'a CsrGraph) -> Self {
+    pub fn new(graph: &CsrGraph) -> Self {
         let inner = graph.inner_read();
-        let active_hyperedges = inner
+        let mut hyperedge_keys: Vec<crate::hyperedge::HyperEdgeId> = inner
             .hyperedges
-            .values()
-            .filter(|h| h.tx_valid_to.is_none() && h.participants.len() >= 2)
-            .cloned()
+            .iter()
+            .filter(|(_, h)| h.tx_valid_to.is_none() && h.participants.len() >= 2)
+            .map(|(k, _)| *k)
             .collect();
+        hyperedge_keys.sort();
 
         Self {
-            _graph: graph,
-            active_hyperedges,
+            inner,
+            hyperedge_keys,
             current_hyperedge_idx: 0,
             current_participant_idx: 0,
         }
     }
 
-    /// Liest das nächste Element inkl. Kantengewicht.
+    /// Liest das nächste Element inkl. Kantengewicht (Konvention K: `2w/(|e|-1)`).
     pub fn next_with_weight(&mut self) -> Option<(EntityId, VirtualHyperedgeNode, f32)> {
-        while self.current_hyperedge_idx < self.active_hyperedges.len() {
-            let hedge = &self.active_hyperedges[self.current_hyperedge_idx];
-            if self.current_participant_idx < hedge.participants.len() {
-                let entity_id = hedge.participants[self.current_participant_idx].entity;
-                let vnode = VirtualHyperedgeNode {
-                    hyperedge_id: hedge.id,
-                };
-                let weight = if hedge.weight > 0.0 {
-                    hedge.weight
-                } else {
-                    1.0
-                };
-                self.current_participant_idx += 1;
-                return Some((entity_id, vnode, weight));
-            } else {
-                self.current_hyperedge_idx += 1;
-                self.current_participant_idx = 0;
+        while self.current_hyperedge_idx < self.hyperedge_keys.len() {
+            let key = self.hyperedge_keys[self.current_hyperedge_idx];
+            if let Some(hedge) = self.inner.hyperedges.get(&key) {
+                if self.current_participant_idx < hedge.participants.len() {
+                    let entity_id = hedge.participants[self.current_participant_idx].entity;
+                    let vnode = VirtualHyperedgeNode {
+                        hyperedge_id: hedge.id,
+                    };
+                    let weight = crate::hyperedge::star_weight(hedge.weight, hedge.participants.len());
+                    self.current_participant_idx += 1;
+                    return Some((entity_id, vnode, weight));
+                }
             }
+            self.current_hyperedge_idx += 1;
+            self.current_participant_idx = 0;
         }
         None
     }
 }
 
-impl<'a> Iterator for StarExpansionIterator<'a> {
+impl Iterator for StarExpansionIterator {
     type Item = (EntityId, VirtualHyperedgeNode);
 
     fn next(&mut self) -> Option<Self::Item> {

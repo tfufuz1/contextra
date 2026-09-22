@@ -21,6 +21,7 @@ windows-sys = { version = "0.61", features = [
 default = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
+sieve-cache = []
 docid-128 = ["memfuse-core/docid-128"]
 
 [dependencies]
