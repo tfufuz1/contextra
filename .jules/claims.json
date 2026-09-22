@@ -203,24 +203,35 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T20:00:37.526191799+00:00",
       "session_id": "2090223400654574052",
-      "active": true,
-      "expires_at": "2026-09-22T00:00:37.526179874+00:00"
+      "active": false,
+      "expires_at": "2026-09-22T00:00:37.526179874+00:00",
+      "released_at": "2026-09-22T10:47:55.189785464+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "docs-adr-n01-n05",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T20:49:03.018199847+00:00",
       "session_id": "3736256039108358980",
-      "active": true,
-      "expires_at": "2026-09-22T00:49:03.018186895+00:00"
+      "active": false,
+      "expires_at": "2026-09-22T00:49:03.018186895+00:00",
+      "released_at": "2026-09-22T10:47:55.189785464+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-crypto",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T21:11:50.550788344+00:00",
       "session_id": "13433224761969093272",
+      "active": false,
+      "expires_at": "2026-09-22T01:11:50.550778179+00:00",
+      "released_at": "2026-09-22T10:47:55.189785464+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-py",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-22T10:46:11.355225230+00:00",
+      "session_id": "18289024268338314085",
       "active": true,
-      "expires_at": "2026-09-22T01:11:50.550778179+00:00"
+      "expires_at": "2026-09-22T14:46:11.355215670+00:00"
     }
   ]
 }
