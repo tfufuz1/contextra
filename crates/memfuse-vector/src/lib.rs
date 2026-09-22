@@ -24,6 +24,7 @@ pub mod distance;
 pub mod hnsw;
 pub mod persistence;
 pub mod quantize;
+pub mod quantization;
 
 pub mod partial_rebuild;
 

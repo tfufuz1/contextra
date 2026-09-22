@@ -8,6 +8,7 @@
 //! HNSW (Hierarchical Navigable Small World) vector index module.
 
 pub mod arena;
+pub mod graph;
 pub mod sq8_bias;
 
 pub use arena::{BacklinkTable, HnswArena};
