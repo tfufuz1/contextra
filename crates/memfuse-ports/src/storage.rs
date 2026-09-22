@@ -47,6 +47,7 @@ pub trait StorageRead: Send + Sync + 'static {
     fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
     /// Scans a range of keys with the given prefix, limit, and optional cursor pagination synchronously.
+    #[allow(clippy::type_complexity)]
     fn scan_prefix_bounded(
         &self,
         prefix: &[u8],
@@ -94,6 +95,7 @@ pub trait StorageRead: Send + Sync + 'static {
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
     /// Scans a range of keys with bounds, limit, and cursor synchronously.
+    #[allow(clippy::type_complexity)]
     fn scan_bounded(
         &self,
         _start: std::ops::Bound<&[u8]>,

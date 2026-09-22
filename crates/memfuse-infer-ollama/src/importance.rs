@@ -10,7 +10,6 @@
 use crate::client::xml_escape;
 use crate::OllamaClient;
 use memfuse_core::{ImportanceScore, MemFuseError, Result};
-use memfuse_rank::IsotonicCalibrator;
 use parking_lot::Mutex;
 use regex::Regex;
 use std::sync::{Arc, OnceLock};

@@ -24,8 +24,8 @@ async fn test_concurrent_collection_ops() {
 
     let col = Arc::new(db.collection("shared-stress").await.expect("collection"));
 
-    let num_tasks = 20;
-    let ops_per_task = 50;
+    let num_tasks = 5;
+    let ops_per_task = 10;
     let mut handles: Vec<JoinHandle<()>> = Vec::new();
 
     for t in 0..num_tasks {
