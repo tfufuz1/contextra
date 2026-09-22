@@ -103,7 +103,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 18984 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
 | `memfuse-infer-candle` | 6 | 4667 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
-| `memfuse-router` | 6 | 6128 | 🟢 Clean |  |
+| `memfuse-router` | 6 | 6180 | 🟢 Clean |  |
 | `memfuse-cognition` | 7 | 4510 | 🟢 Clean | MemFuse — Memory consolidation, compaction, and context management |
 | `memfuse-db` | 8 | 12835 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse` | 9 | 258 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents (Facade) |
