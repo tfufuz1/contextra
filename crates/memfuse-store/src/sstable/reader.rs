@@ -117,30 +117,36 @@ impl SstableReader {
         let mut is_mfsx = false;
 
         if trailer_len >= 54 {
-            let magic_v1 = u32::from_le_bytes(
-                trailer_data[50..54]
-                    .try_into()
-                    .map_err(|_| MemFuseError::Storage("Invalid trailer".into()))?,
-            );
-            if magic_v1 == SSTABLE_MAGIC_MFSX {
-                format_version = u16::from_le_bytes(
-                    trailer_data[48..50]
+            if let Some(slice) = trailer_data.get(50..54) {
+                let magic_v1 = u32::from_le_bytes(
+                    slice
                         .try_into()
                         .map_err(|_| MemFuseError::Storage("Invalid trailer".into()))?,
                 );
-                is_mfsx = true;
+                if magic_v1 == SSTABLE_MAGIC_MFSX {
+                    if let Some(ver_slice) = trailer_data.get(48..50) {
+                        format_version = u16::from_le_bytes(
+                            ver_slice
+                                .try_into()
+                                .map_err(|_| MemFuseError::Storage("Invalid trailer".into()))?,
+                        );
+                        is_mfsx = true;
+                    }
+                }
             }
         }
 
         if !is_mfsx && trailer_len >= 52 {
-            let magic_v0 = u32::from_le_bytes(
-                trailer_data[48..52]
-                    .try_into()
-                    .map_err(|_| MemFuseError::Storage("Invalid trailer".into()))?,
-            );
-            if magic_v0 == SSTABLE_MAGIC_MFSX {
-                is_mfsx = true;
-                format_version = 0;
+            if let Some(slice) = trailer_data.get(48..52) {
+                let magic_v0 = u32::from_le_bytes(
+                    slice
+                        .try_into()
+                        .map_err(|_| MemFuseError::Storage("Invalid trailer".into()))?,
+                );
+                if magic_v0 == SSTABLE_MAGIC_MFSX {
+                    is_mfsx = true;
+                    format_version = 0;
+                }
             }
         }
 
