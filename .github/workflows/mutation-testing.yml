@@ -14,7 +14,7 @@ on:
       - 'crates/memfuse-store/**'
       - 'crates/memfuse-candle/**'
       - 'crates/memfuse-db/**'
-      - 'crates/memfuse-index/**'
+      - 'crates/memfuse-vector/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -61,8 +61,8 @@ jobs:
             if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/memfuse-db/'; then
               CRATES="$CRATES memfuse-db"
             fi
-            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/memfuse-index/'; then
-              CRATES="$CRATES memfuse-index"
+            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/memfuse-vector/'; then
+              CRATES="$CRATES memfuse-vector"
             fi
             if [ -z "$CRATES" ]; then
               CRATES="memfuse-crypto"
