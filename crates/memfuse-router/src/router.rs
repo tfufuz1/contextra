@@ -11,12 +11,11 @@ use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
-use memfuse_core::{ContextChunk, ContextWindow, EntityId, MemFuseError, Result, StorageEngine};
+use memfuse_core::{ContextChunk, ContextWindow, EntityId, MemFuseError, Result};
 use memfuse_ports::{
     CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
     HybridSearchProvider,
 };
-use memfuse_store::LsmStorage;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -104,10 +103,11 @@ pub struct RouterState {
 ///   independently per `DecisionId` and do not affect the atomic snapshot guarantees of `RouterState`.
 /// - **Concurrency Safety**: This separation presents **zero concurrency risk**. Routing queries read `RouterState`
 ///   lock-free and briefly acquire a write lock on `pending_decisions` solely to record decision IDs.
-///   Type-Alias for Backward-Compatibility using `LsmStorage`.
-pub type DefaultRouterEngine = RouterEngine<LsmStorage>;
+///
+/// Type-Alias for Backward-Compatibility.
+pub type DefaultRouterEngine = RouterEngine;
 
-pub struct RouterEngine<S: StorageEngine = LsmStorage> {
+pub struct RouterEngine {
     search_provider: Arc<dyn HybridSearchProvider>,
     community_resolver: Arc<dyn CommunityResolver>,
     context_preparer: Arc<dyn ContextPreparer>,
@@ -121,10 +121,9 @@ pub struct RouterEngine<S: StorageEngine = LsmStorage> {
     /// eliminates state-cloning overhead while keeping transient outcome tracking isolated from core
     /// routing calibration consistency.
     pub(crate) pending_decisions: RwLock<HashMap<DecisionId, (String, Instant)>>,
-    _marker: std::marker::PhantomData<S>,
 }
 
-impl<S: StorageEngine> RouterEngine<S> {
+impl RouterEngine {
     /// Creates a new `RouterEngine` instance from decoupled ports.
     pub fn new(
         search_provider: Arc<dyn HybridSearchProvider>,
@@ -176,7 +175,6 @@ impl<S: StorageEngine> RouterEngine<S> {
             context_preparer,
             state: ArcSwap::from(Arc::new(router_state)),
             pending_decisions: RwLock::new(HashMap::new()),
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -911,7 +909,7 @@ pub(crate) fn select_profile_from_chunks(
     }
 }
 
-impl<S: StorageEngine> LocalDriftStatusProvider for RouterEngine<S> {
+impl LocalDriftStatusProvider for RouterEngine {
     fn overall_drift_status(&self) -> String {
         self.overall_drift_status()
     }
@@ -948,7 +946,8 @@ mod tests {
             0.8,
         );
 
-        let router = RouterEngine::new(collection, vec![profile1, profile2], None);
+        let router =
+            crate::tests::tests::create_test_router(collection, vec![profile1, profile2], None);
         let stats = router.calibration_stats();
         assert_eq!(stats.len(), 2);
         assert_eq!(stats["p1"].times_selected, 0);
@@ -991,7 +990,7 @@ mod tests {
             0.5,
         );
 
-        let router = RouterEngine::new(collection, vec![profile], None);
+        let router = crate::tests::tests::create_test_router(collection, vec![profile], None);
         {
             let current = router.state.load_full();
             let mut new_state = (*current).clone();
