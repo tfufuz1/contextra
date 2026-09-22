@@ -86,13 +86,149 @@ async fn test_tools_list_returns_all_tools() {
         .unwrap() // unwrap
         .clone();
     let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
-    assert_eq!(tools.len(), 6);
+    assert_eq!(tools.len(), 7);
     assert!(names.contains(&"memfuse_search"));
     assert!(names.contains(&"memfuse_insert"));
     assert!(names.contains(&"memfuse_get"));
+    assert!(names.contains(&"memfuse_forget"));
     assert!(names.contains(&"memfuse_collections"));
     assert!(names.contains(&"memfuse_consolidate"));
     assert!(names.contains(&"memfuse_cloud_query"));
+}
+
+#[tokio::test]
+async fn test_memfuse_forget_single_doc() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // 1. Insert document
+    let insert_req = make_request(
+        "memfuse_insert",
+        json!({
+            "id": "forget_doc_1",
+            "text": "Secret data to forget",
+            "collection": "default"
+        }),
+    );
+    let resp = server.handle(insert_req).await;
+    assert!(resp.error.is_none());
+
+    // 2. Forget single doc without confirm=true should fail
+    let forget_req_no_confirm = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_forget",
+            "arguments": {
+                "collection": "default",
+                "id": "forget_doc_1"
+            }
+        }),
+    );
+    let resp_nc = server.handle(forget_req_no_confirm).await;
+    let res_nc = serde_json::to_value(&resp_nc).unwrap();
+    assert_eq!(res_nc["result"]["isError"], true);
+
+    // 3. Forget single doc with confirm=true
+    let forget_req = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_forget",
+            "arguments": {
+                "collection": "default",
+                "id": "forget_doc_1",
+                "confirm": true
+            }
+        }),
+    );
+    let resp_f = server.handle(forget_req).await;
+    assert!(resp_f.error.is_none());
+    let res_f = serde_json::to_value(&resp_f).unwrap();
+    assert_ne!(res_f["result"]["isError"], true);
+    let text = res_f["result"]["content"][0]["text"].as_str().unwrap();
+    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
+    assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["id"], "forget_doc_1");
+    assert_eq!(json_res["proof"], serde_json::Value::Null);
+    assert_eq!(json_res["proof_scope"], "collection_only");
+
+    // 4. Verify memfuse_get returns null
+    let get_req = make_request(
+        "memfuse_get",
+        json!({
+            "id": "forget_doc_1",
+            "collection": "default"
+        }),
+    );
+    let resp_g = server.handle(get_req).await;
+    assert_eq!(resp_g.result.unwrap(), serde_json::Value::Null);
+}
+
+#[tokio::test]
+async fn test_memfuse_forget_collection_with_proof() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // Create custom collection and insert a document
+    let col_name = "drop_me_col";
+    let insert_req = make_request(
+        "memfuse_insert",
+        json!({
+            "id": "doc_in_col",
+            "text": "Data in custom collection",
+            "collection": col_name
+        }),
+    );
+    let resp = server.handle(insert_req).await;
+    assert!(resp.error.is_none());
+
+    // 1. Without proof key configured -> fails
+    std::env::remove_var("MEMFUSE_DELETION_PROOF_KEY");
+    std::env::remove_var("MEMFUSE_PROOF_KEY");
+    let forget_req_nokey = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_forget",
+            "arguments": {
+                "collection": col_name,
+                "confirm": true
+            }
+        }),
+    );
+    let resp_nokey = server.handle(forget_req_nokey).await;
+    let res_nokey = serde_json::to_value(&resp_nokey).unwrap();
+    assert_eq!(res_nokey["result"]["isError"], true);
+    let err_text = res_nokey["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(err_text.contains("deletion proof key not configured"));
+
+    // 2. With proof key configured -> succeeds and generates DeletionProof
+    let test_key = "test_deletion_proof_key_32_bytes!";
+    std::env::set_var("MEMFUSE_DELETION_PROOF_KEY", test_key);
+
+    let forget_req = make_request(
+        "tools/call",
+        json!({
+            "name": "memfuse_forget",
+            "arguments": {
+                "collection": col_name,
+                "confirm": true
+            }
+        }),
+    );
+    let resp_drop = server.handle(forget_req).await;
+    assert!(resp_drop.error.is_none());
+    let res_drop = serde_json::to_value(&resp_drop).unwrap();
+    assert_ne!(res_drop["result"]["isError"], true);
+
+    let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
+    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
+    assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["collection"], col_name);
+    assert_eq!(json_res["proof_scope"], "collection");
+
+    let proof_val = &json_res["proof"];
+    let proof: memfuse_crypto::deletion_proof::DeletionProof =
+        serde_json::from_value(proof_val.clone()).unwrap();
+    assert!(proof.verify(test_key.as_bytes()).unwrap());
+
+    std::env::remove_var("MEMFUSE_DELETION_PROOF_KEY");
 }
 
 #[tokio::test]
