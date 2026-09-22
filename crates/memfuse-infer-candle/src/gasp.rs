@@ -18,7 +18,6 @@
 //! ein Abstention-Pfad ausgelöst (`Err(MemFuseError::PolicyViolation(...))` mit `LowConfidenceGrounding`),
 //! anstatt die ungeprüfte/unsichere Antwort durchzureichen.
 
-use memfuse_rank::IsotonicCalibrator;
 use memfuse_core::traits::{
     BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
 };

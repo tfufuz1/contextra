@@ -75,7 +75,7 @@ impl memfuse_core::DriftStatusProvider for RouterDriftAdapter {
 /// Holds strong Arc references to routing and calibration components to maintain live Weak references in `MemFuse`.
 pub struct RoutingHandle {
     pub router: Arc<memfuse::router::DefaultRouterEngine>,
-    pub calibrator: Arc<parking_lot::Mutex<memfuse::calibration::IsotonicCalibrator>>,
+    pub calibrator: Arc<parking_lot::Mutex<memfuse_rank::IsotonicCalibrator>>,
     pub pid_controller: Arc<parking_lot::Mutex<memfuse_adapt::PidController>>,
     pub _drift_adapter: Arc<dyn memfuse_core::DriftStatusProvider>,
 }

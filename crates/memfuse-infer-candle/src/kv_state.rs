@@ -221,9 +221,10 @@ impl KvState {
             let dim_k = Self::tensor_seq_dim(&layer.k, self.pos);
             let dim_v = Self::tensor_seq_dim(&layer.v, self.pos);
 
-            let k_slice = layer.k.narrow(dim_k, range.start, len).map_err(|e| {
-                MemFuseError::Internal(format!("Failed to slice key tensor: {e}"))
-            })?;
+            let k_slice = layer
+                .k
+                .narrow(dim_k, range.start, len)
+                .map_err(|e| MemFuseError::Internal(format!("Failed to slice key tensor: {e}")))?;
             let v_slice = layer.v.narrow(dim_v, range.start, len).map_err(|e| {
                 MemFuseError::Internal(format!("Failed to slice value tensor: {e}"))
             })?;
@@ -254,10 +255,9 @@ impl KvState {
 
     /// Imports a `KvBlock` and concatenates its layer tensors onto the current state.
     pub fn import_block(&mut self, block: &KvBlock) -> Result<(), MemFuseError> {
-        let payload: KvStateBlockPayload =
-            bincode::deserialize(&block.data).map_err(|e| {
-                MemFuseError::InvalidInput(format!("Failed to deserialize KvBlock payload: {e}"))
-            })?;
+        let payload: KvStateBlockPayload = bincode::deserialize(&block.data).map_err(|e| {
+            MemFuseError::InvalidInput(format!("Failed to deserialize KvBlock payload: {e}"))
+        })?;
 
         let device = if let Some(first_layer) = self.layers.first() {
             first_layer.k.device().clone()

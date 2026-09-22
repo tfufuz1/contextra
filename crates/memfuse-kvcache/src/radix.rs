@@ -177,7 +177,12 @@ impl PrefixRadixTree {
             ));
         }
 
-        Self::insert_into_vec(&mut self.children, tokens, block_id, &mut self.total_entries);
+        Self::insert_into_vec(
+            &mut self.children,
+            tokens,
+            block_id,
+            &mut self.total_entries,
+        );
         Ok(())
     }
 
@@ -375,7 +380,10 @@ mod tests {
         assert_eq!(pm.matched_tokens, vec![10, 20, 30, 40, 50]);
 
         // Partial match < min_prefix_len (3 < 4)
-        let res = tree.find_longest_prefix(&[10, 20, 30], KvReusePolicy::CostBased { min_prefix_len: 4 });
+        let res = tree.find_longest_prefix(
+            &[10, 20, 30],
+            KvReusePolicy::CostBased { min_prefix_len: 4 },
+        );
         assert!(res.is_none());
 
         // Same partial match with Always policy
