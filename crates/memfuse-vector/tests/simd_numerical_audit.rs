@@ -98,7 +98,7 @@ fn test_simd_vs_scalar_vs_f64_all_metrics() {
 
         // 3. Dot Product Distance (compute_distance returns -dot)
         let dot_f64 = dot_product_f64_ref(&a, &b);
-        let dot_scalar = dot_product_scalar(&a, &b) as f64;
+        let dot_scalar = -dot_product_scalar(&a, &b) as f64;
         let dot_simd = -compute_distance(&a, &b, DistanceMetric::DotProduct).unwrap() as f64;
 
         let dot_diff_scalar = (dot_scalar - dot_f64).abs();

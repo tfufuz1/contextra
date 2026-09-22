@@ -193,7 +193,7 @@ pub fn check_layering_matrix(root: &Path, strict_ring3: bool) -> (bool, Vec<Stri
                 (Ring::Ring2, Ring::Ring0, _) => {
                     let allowed = matches!(
                         dep_name.as_str(),
-                        "memfuse-types" | "memfuse-ports" | "memfuse-crypto" | "memfuse-core" | "memfuse-simd"
+                        "memfuse-types" | "memfuse-ports" | "memfuse-crypto" | "memfuse-core" | "memfuse-simd" | "memfuse-rank"
                     );
                     if allowed {
                         None

@@ -150,7 +150,9 @@ fn test_mmap_connection_len_overflow_returns_err() {
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("overflow.hnsw");
 
-    // Header mit validen Basiswerten + connections_offset = 64
+    let nodes_offset = HnswHeader::SIZE as u64;
+    let connections_offset = 128u64;
+
     let header = HnswHeader::new(
         4,  // dim
         16, // m
@@ -159,21 +161,21 @@ fn test_mmap_connection_len_overflow_returns_err() {
         0.0, 1.0, // q_min, q_max
         1,   // node_count
         0,   // entry_point
-        64,  // nodes_offset
-        128, // connections_offset
+        nodes_offset,
+        connections_offset,
         1,   // last_tx_id
     );
 
     let mut data = Vec::new();
-    data.extend_from_slice(&header.to_bytes()); // 0..64
+    data.extend_from_slice(&header.to_bytes()); // 0..84
     let record = NodeRecord {
         doc_id: 1,
         max_layer: 1,
-        vector_offset: 200,
-        connections_offset: 128,
+        vector_offset: nodes_offset + NodeRecord::SIZE as u64,
+        connections_offset,
     };
-    data.extend_from_slice(&record.to_bytes()); // 64..89
-    data.resize(128, 0); // Padding bis connections_offset (128)
+    data.extend_from_slice(&record.to_bytes());
+    data.resize(connections_offset as usize, 0); // Padding bis connections_offset (128)
 
     // num_layers = 1
     data.push(1u8);

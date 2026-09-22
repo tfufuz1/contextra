@@ -2266,8 +2266,12 @@ dependencies = [
  "memfuse-infer-onnx",
  "memfuse-rank",
  "memfuse-router",
+ "serde",
+ "serde_json",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -2505,8 +2509,10 @@ dependencies = [
  "candle-transformers",
  "criterion",
  "futures-util",
+ "half",
  "memfuse-core",
  "memfuse-crypto",
+ "memfuse-ports",
  "memfuse-rank",
  "memfuse-store",
  "proptest",
@@ -2678,6 +2684,7 @@ name = "memfuse-rank"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "memfuse-adapt",
  "memfuse-ports",
  "memfuse-types",
  "proptest",
@@ -2700,7 +2707,6 @@ dependencies = [
  "memfuse-graph",
  "memfuse-ports",
  "memfuse-privacy",
- "memfuse-store",
  "memfuse-text",
  "memfuse-vector",
  "parking_lot",

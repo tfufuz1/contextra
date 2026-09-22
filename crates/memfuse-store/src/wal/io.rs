@@ -148,9 +148,21 @@ where
                     "WAL entry too short for nonce".into(),
                 ));
             }
+            let nonce_slice = match entry_data_raw.get(0..12) {
+                Some(s) => s,
+                None => {
+                    return Err(MemFuseError::wal_corruption(
+                        chunk_start_pos,
+                        "WAL entry too short for nonce",
+                    ));
+                }
+            };
             let mut nonce = [0u8; 12];
-            nonce.copy_from_slice(&entry_data_raw[0..12]);
-            let decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
+            nonce.copy_from_slice(nonce_slice);
+            let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
+                MemFuseError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
+            })?;
+            let decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                 Ok(data) => data,
                 Err(e) => {
                     if pos >= file_size {
@@ -183,15 +195,16 @@ where
                         "Truncated inner WAL entry length in batch",
                     ));
                 }
-                let inner_len_bytes: [u8; 4] = match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
-                    Some(b) => b,
-                    None => {
-                        return Err(MemFuseError::wal_corruption(
-                            chunk_start_pos,
-                            "Failed to extract inner WAL entry length",
-                        ));
-                    }
-                };
+                let inner_len_bytes: [u8; 4] =
+                    match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
+                        Some(b) => b,
+                        None => {
+                            return Err(MemFuseError::wal_corruption(
+                                chunk_start_pos,
+                                "Failed to extract inner WAL entry length",
+                            ));
+                        }
+                    };
                 let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
                 if inner_slice.len() < 4 + inner_len {
                     if pos >= file_size {
@@ -310,9 +323,21 @@ where
                         "WAL entry too short for nonce".into(),
                     ));
                 }
+            let nonce_slice = match entry_data_raw.get(0..12) {
+                Some(s) => s,
+                None => {
+                    return Err(MemFuseError::wal_corruption(
+                        chunk_start_pos,
+                        "WAL entry too short for nonce",
+                    ));
+                }
+            };
                 let mut nonce = [0u8; 12];
-                nonce.copy_from_slice(&entry_data_raw[0..12]);
-                decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
+            nonce.copy_from_slice(nonce_slice);
+            let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
+                MemFuseError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
+            })?;
+            decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                     Ok(data) => data,
                     Err(e) => {
                         if version == WalVersion::V1 {
@@ -426,15 +451,22 @@ where
 
 impl Wal {
     pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
-        let truncate_guard = self.truncate_lock.lock().await;
-        self.append_batch_locked(batch, &truncate_guard).await
+        let ack_rx = {
+            let truncate_guard = self.truncate_lock.lock().await;
+            self.enqueue_append_batch_locked(batch, &truncate_guard)
+                .await?
+        };
+        ack_rx
+            .await
+            .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
+        Ok(())
     }
 
-    pub async fn append_batch_locked(
+    pub async fn enqueue_append_batch_locked(
         &self,
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
-    ) -> Result<()> {
+    ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
                 "Cannot append to sealed WAL segment {}",
@@ -444,7 +476,9 @@ impl Wal {
 
         let entries = &batch.0;
         if entries.is_empty() {
-            return Ok(());
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            let _ = ack_tx.send(Ok(()));
+            return Ok(ack_rx);
         }
 
         #[cfg(feature = "fault-injection")]
@@ -522,6 +556,15 @@ impl Wal {
         .await
         .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
 
+        Ok(ack_rx)
+    }
+
+    pub async fn append_batch_locked(
+        &self,
+        batch: PreparedBatch,
+        guard: &tokio::sync::MutexGuard<'_, ()>,
+    ) -> Result<()> {
+        let ack_rx = self.enqueue_append_batch_locked(batch, guard).await?;
         ack_rx
             .await
             .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
@@ -531,15 +574,22 @@ impl Wal {
     /// Non-blocking attempt to append a prepared batch. Returns `Err(MemFuseError::Storage("WAL queue full (backpressure)"))`
     /// if the flusher channel buffer is full.
     pub async fn try_append_batch(&self, batch: PreparedBatch) -> Result<()> {
-        let truncate_guard = self.truncate_lock.lock().await;
-        self.try_append_batch_locked(batch, &truncate_guard).await
+        let ack_rx = {
+            let truncate_guard = self.truncate_lock.lock().await;
+            self.try_enqueue_append_batch_locked(batch, &truncate_guard)
+                .await?
+        };
+        ack_rx
+            .await
+            .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
+        Ok(())
     }
 
-    pub async fn try_append_batch_locked(
+    pub async fn try_enqueue_append_batch_locked(
         &self,
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
-    ) -> Result<()> {
+    ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
                 "Cannot append to sealed WAL segment {}",
@@ -549,7 +599,9 @@ impl Wal {
 
         let entries = &batch.0;
         if entries.is_empty() {
-            return Ok(());
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            let _ = ack_tx.send(Ok(()));
+            return Ok(ack_rx);
         }
 
         #[cfg(feature = "fault-injection")]
@@ -633,6 +685,15 @@ impl Wal {
             }
         })?;
 
+        Ok(ack_rx)
+    }
+
+    pub async fn try_append_batch_locked(
+        &self,
+        batch: PreparedBatch,
+        guard: &tokio::sync::MutexGuard<'_, ()>,
+    ) -> Result<()> {
+        let ack_rx = self.try_enqueue_append_batch_locked(batch, guard).await?;
         ack_rx
             .await
             .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;

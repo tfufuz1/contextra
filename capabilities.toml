@@ -32,14 +32,14 @@ capabilities = ["hnsw-index", "diskann-index", "scalar-quantization"]
 [crates.memfuse-rank]
 ring = "Ring 0"
 maturity = "stable"
-description = "Ranking- und Fusion-Algorithmen (Reciprocal Rank Fusion, Bonus Scorers)"
-capabilities = ["rrf-fusion", "coherence-bonus"]
+description = "Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers)"
+capabilities = ["rrf-fusion", "coherence-bonus", "platt-scaler", "isotonic-calibrator"]
 
 [crates.memfuse-adapt]
 ring = "Ring 0"
 maturity = "experimental"
-description = "Anpassungs- und Transformations-Layer für Datenmodelle"
-capabilities = ["model-adaption"]
+description = "Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller)"
+capabilities = ["model-adaption", "pid-latency-controller"]
 
 [crates.memfuse-text]
 ring = "Ring 0"
@@ -82,12 +82,6 @@ ring = "Ring 0"
 maturity = "stable"
 description = "Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer"
 capabilities = ["tombstone-semantics", "tx-buffer"]
-
-[crates.memfuse-calibration]
-ring = "Ring 0"
-maturity = "stable"
-description = "Score-Kalibrierung (Platt Scaling, Isotonische Regr., PID Controller)"
-capabilities = ["platt-scaler", "isotonic-calibrator", "pid-latency-controller"]
 
 [crates.memfuse-store]
 ring = "Ring 1"

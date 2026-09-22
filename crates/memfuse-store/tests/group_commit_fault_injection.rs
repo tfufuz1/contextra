@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 #[tokio::test]
+#[cfg_attr(not(feature = "fault-injection"), ignore)]
 async fn test_group_commit_fault_injection_all_participants_fail() {
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {

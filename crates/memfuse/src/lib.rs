@@ -4,8 +4,10 @@
 
 #![forbid(unsafe_code)]
 
+pub mod agent_memory;
 pub mod builder;
 
+pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::MemFuseBuilder;
 pub use memfuse_core::error::MemFuseError;
 pub use memfuse_core::types::domain::{DocId, ScoredDocument};
@@ -55,7 +57,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_facade_open_and_builder_entrypoints() {
-        let base_tmp = std::env::temp_dir().join(format!("memfuse_facade_test_{}", std::process::id()));
+        let base_tmp =
+            std::env::temp_dir().join(format!("memfuse_facade_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base_tmp);
 
         let db1_path = base_tmp.join("db1");
@@ -65,9 +68,7 @@ mod tests {
         let mut config = MemFuseConfig::default();
         config.dimension = 16;
         let db2_path = base_tmp.join("db2");
-        let db2 = open_with_config(&db2_path, config)
-            .await
-            .expect("open db2");
+        let db2 = open_with_config(&db2_path, config).await.expect("open db2");
         assert_eq!(db2.len().await.expect("len"), 0);
 
         let db3_path = base_tmp.join("db3");
