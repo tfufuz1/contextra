@@ -451,15 +451,22 @@ where
 
 impl Wal {
     pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {
-        let truncate_guard = self.truncate_lock.lock().await;
-        self.append_batch_locked(batch, &truncate_guard).await
+        let ack_rx = {
+            let truncate_guard = self.truncate_lock.lock().await;
+            self.enqueue_append_batch_locked(batch, &truncate_guard)
+                .await?
+        };
+        ack_rx
+            .await
+            .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
+        Ok(())
     }
 
-    pub async fn append_batch_locked(
+    pub async fn enqueue_append_batch_locked(
         &self,
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
-    ) -> Result<()> {
+    ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
                 "Cannot append to sealed WAL segment {}",
@@ -469,7 +476,9 @@ impl Wal {
 
         let entries = &batch.0;
         if entries.is_empty() {
-            return Ok(());
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            let _ = ack_tx.send(Ok(()));
+            return Ok(ack_rx);
         }
 
         #[cfg(feature = "fault-injection")]
@@ -547,6 +556,15 @@ impl Wal {
         .await
         .map_err(|_| MemFuseError::Storage("WAL flusher channel closed".into()))?;
 
+        Ok(ack_rx)
+    }
+
+    pub async fn append_batch_locked(
+        &self,
+        batch: PreparedBatch,
+        guard: &tokio::sync::MutexGuard<'_, ()>,
+    ) -> Result<()> {
+        let ack_rx = self.enqueue_append_batch_locked(batch, guard).await?;
         ack_rx
             .await
             .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
@@ -556,15 +574,22 @@ impl Wal {
     /// Non-blocking attempt to append a prepared batch. Returns `Err(MemFuseError::Storage("WAL queue full (backpressure)"))`
     /// if the flusher channel buffer is full.
     pub async fn try_append_batch(&self, batch: PreparedBatch) -> Result<()> {
-        let truncate_guard = self.truncate_lock.lock().await;
-        self.try_append_batch_locked(batch, &truncate_guard).await
+        let ack_rx = {
+            let truncate_guard = self.truncate_lock.lock().await;
+            self.try_enqueue_append_batch_locked(batch, &truncate_guard)
+                .await?
+        };
+        ack_rx
+            .await
+            .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
+        Ok(())
     }
 
-    pub async fn try_append_batch_locked(
+    pub async fn try_enqueue_append_batch_locked(
         &self,
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
-    ) -> Result<()> {
+    ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
         if self.is_sealed() {
             return Err(MemFuseError::Storage(format!(
                 "Cannot append to sealed WAL segment {}",
@@ -574,7 +599,9 @@ impl Wal {
 
         let entries = &batch.0;
         if entries.is_empty() {
-            return Ok(());
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            let _ = ack_tx.send(Ok(()));
+            return Ok(ack_rx);
         }
 
         #[cfg(feature = "fault-injection")]
@@ -658,6 +685,15 @@ impl Wal {
             }
         })?;
 
+        Ok(ack_rx)
+    }
+
+    pub async fn try_append_batch_locked(
+        &self,
+        batch: PreparedBatch,
+        guard: &tokio::sync::MutexGuard<'_, ()>,
+    ) -> Result<()> {
+        let ack_rx = self.try_enqueue_append_batch_locked(batch, guard).await?;
         ack_rx
             .await
             .map_err(|_| MemFuseError::Storage("WAL flusher dropped".into()))??;
