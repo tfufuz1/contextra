@@ -118,6 +118,7 @@ async fn test_manifest_crash_scenario_a_no_resurrection_and_dead_sst_cleanup() -
     Ok(())
 }
 
+
 /// Scenario B: Crash BEFORE Replace append (unmanifested SSTable on disk).
 /// Invariant: Input SSTables remain active and readable, unmanifested SSTable is skipped and NOT deleted.
 #[tokio::test]

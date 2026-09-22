@@ -21,27 +21,3 @@ mod tests {
         fn _assert_drift_status_provider<T: DriftStatusProvider + ?Sized>() {}
     }
 }
-
-/// Default passthrough implementation for `ContextPreparer`.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct PassthroughContextPreparer;
-
-impl ContextPreparer for PassthroughContextPreparer {
-    fn prepare_context(
-        &self,
-        chunks: Vec<memfuse_ports::ContextChunk>,
-        _budget: &memfuse_ports::TokenBudget,
-        relevance_threshold: f32,
-    ) -> memfuse_ports::Result<memfuse_ports::ContextWindow> {
-        let filtered_chunks: Vec<memfuse_ports::ContextChunk> = chunks
-            .into_iter()
-            .filter(|c| c.relevance >= relevance_threshold)
-            .collect();
-        let total_tokens = filtered_chunks.iter().map(|c| c.token_count).sum();
-        Ok(memfuse_ports::ContextWindow {
-            chunks: filtered_chunks,
-            total_tokens,
-            truncated: false,
-        })
-    }
-}
