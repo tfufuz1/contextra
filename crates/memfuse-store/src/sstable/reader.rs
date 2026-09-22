@@ -281,17 +281,18 @@ impl SstableReader {
             .map_err(|e| MemFuseError::Storage(format!("Index read failed: {}", e)))?
         };
 
-        let index_data = if has_crc {
-            if index_data_raw.len() < 4 {
+        let index_bytes_raw = Bytes::from(index_data_raw);
+        let index_bytes = if has_crc {
+            if index_bytes_raw.len() < 4 {
                 return Err(MemFuseError::Storage("Index data too short for CRC".into()));
             }
             let stored_crc = u32::from_le_bytes(
-                index_data_raw[0..4]
+                index_bytes_raw[0..4]
                     .try_into()
                     .map_err(|_| MemFuseError::Serialization("Invalid CRC".into()))?,
             );
-            let payload = &index_data_raw[4..];
-            if crc32fast::hash(payload) != stored_crc {
+            let payload = index_bytes_raw.slice(4..);
+            if crc32fast::hash(&payload) != stored_crc {
                 return Err(MemFuseError::checksum_mismatch(
                     path_buf.to_string_lossy(),
                     index_offset,
@@ -299,16 +300,16 @@ impl SstableReader {
             }
             payload
         } else {
-            &index_data_raw
+            index_bytes_raw
         };
 
         let mut index = Vec::new();
         let mut pos = 0;
-        let index_len = index_data.len();
+        let index_len = index_bytes.len();
 
         while pos + 10 <= index_len {
             let key_len = u16::from_le_bytes(
-                index_data[pos..pos + 2]
+                index_bytes[pos..pos + 2]
                     .try_into()
                     .map_err(|_| MemFuseError::ParseError("corrupted index: key_len".into()))?,
             ) as usize;
@@ -320,11 +321,11 @@ impl SstableReader {
                 ));
             }
 
-            let key = Bytes::copy_from_slice(&index_data[pos..pos + key_len]);
+            let key = index_bytes.slice(pos..pos + key_len);
             pos += key_len;
 
             let offset = u64::from_le_bytes(
-                index_data[pos..pos + 8]
+                index_bytes[pos..pos + 8]
                     .try_into()
                     .map_err(|_| MemFuseError::ParseError("corrupted index: offset".into()))?,
             );
@@ -355,7 +356,7 @@ impl SstableReader {
                         .map_err(|_| MemFuseError::ParseError("corrupted block: k_len".into()))?,
                 ) as usize;
                 if block.len() >= 2 + k_len {
-                    Bytes::copy_from_slice(&block[2..2 + k_len])
+                    block.slice(2..2 + k_len)
                 } else {
                     Bytes::new()
                 }
