@@ -8,7 +8,6 @@ pub use memfuse_ports::{
     CommunityResolver, ContextChunk, ContextPreparer, ContextWindow, DriftStatusProvider,
     HybridSearchProvider, TokenBudget,
 };
-use memfuse_core::Result;
 
 #[cfg(test)]
 mod tests {

@@ -97,9 +97,9 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-testkit` | 3 | 537 | 🟢 Clean | Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for MemFuse |
 | `memfuse-text` | 3 | 8432 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-crypto` | 4 | 6964 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
-| `memfuse-router` | 4 | 6300 | 🟢 Clean |  |
+| `memfuse-router` | 4 | 6296 | 🟢 Clean |  |
 | `memfuse-kvcache` | 5 | 2639 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
-| `memfuse-store` | 5 | 28242 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
+| `memfuse-store` | 5 | 28241 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 15527 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
 | `memfuse-infer-candle` | 6 | 5819 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
