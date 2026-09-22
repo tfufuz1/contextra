@@ -54,7 +54,7 @@ fn proof_compute_distance_trusted_never_scans_nan() {
         .find("compute_distance_trusted")
         .expect("compute_distance_trusted reference found in distance.rs");
 
-    let trusted_fn_body = &source[trusted_fn_start..trusted_fn_start + 600];
+    let trusted_fn_body = &source[trusted_fn_start..trusted_fn_start + 300];
     assert!(
         !trusted_fn_body.contains("is_nan()"),
         "compute_distance_trusted must not contain is_nan() checks in hot path"

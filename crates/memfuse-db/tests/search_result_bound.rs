@@ -74,7 +74,7 @@ async fn proof_search_never_exceeds_k() {
         results.len()
     );
 
-    // B-1 Regression Guard: Ensure no unannotated usize::MAX in search.rs
+    // B-1 Regression Guard: Ensure no unannotated usize::MAX in db source files
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let search_rs_path = Path::new(&manifest_dir).join("../memfuse-engine/src/collection/search.rs");
     let file_content = std::fs::read_to_string(&search_rs_path)
@@ -165,17 +165,26 @@ fn proof_usize_max_removed_from_search_path() {
 
     let mut unannotated_found = Vec::new();
 
-    for (line_no, line) in file_content.lines().enumerate() {
-        if (line.contains("usize::MAX") || line.contains("u64::MAX"))
-            && !line.contains("// UNBOUNDED-OK:")
-        {
-            unannotated_found.push((line_no + 1, line.trim().to_string()));
+    if src_dir.exists() {
+        for entry in std::fs::read_dir(&src_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                let file_content = std::fs::read_to_string(&path).unwrap();
+                for (line_no, line) in file_content.lines().enumerate() {
+                    if (line.contains("usize::MAX") || line.contains("u64::MAX"))
+                        && !line.contains("// UNBOUNDED-OK:")
+                    {
+                        unannotated_found.push((path.clone(), line_no + 1, line.trim().to_string()));
+                    }
+                }
+            }
         }
     }
 
     if !unannotated_found.is_empty() {
         panic!(
-            "Unbounded MAX found without '// UNBOUNDED-OK:' in search.rs:\n{:#?}",
+            "Unbounded MAX found without '// UNBOUNDED-OK:' in db sources:\n{:#?}",
             unannotated_found
         );
     }
