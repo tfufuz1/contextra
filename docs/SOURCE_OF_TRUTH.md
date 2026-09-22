@@ -90,6 +90,8 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-calibration` | 3 | 1550 | 🟢 Clean |  |
 | `memfuse-checkpoint` | 3 | 6112 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-graph` | 3 | 17773 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `memfuse-infer-ollama` | 3 | 4598 | 🟢 Clean |  |
+| `memfuse-infer-onnx` | 3 | 2219 | 🟢 Clean |  |
 | `memfuse-privacy` | 3 | 1865 | 🟢 Clean | Cloud Egress Security, DLP & Exfiltration Protection for MemFuse (Ring 3) |
 | `memfuse-sandbox` | 3 | 992 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
 | `memfuse-simd` | 3 | 1388 | 🟢 Clean | Ring 0 SIMD distance kernels and runtime dispatch for MemFuse (Unsafe Island) |
@@ -102,7 +104,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-kvcache` | 5 | 1420 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
 | `memfuse-store` | 5 | 27482 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
-| `memfuse-engine` | 6 | 18984 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
+| `memfuse-engine` | 6 | 15896 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
 | `memfuse-infer-candle` | 6 | 4667 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-router` | 6 | 6180 | 🟢 Clean |  |
 | `memfuse-cognition` | 7 | 4510 | 🟢 Clean | MemFuse — Memory consolidation, compaction, and context management |

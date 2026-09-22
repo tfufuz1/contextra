@@ -12,14 +12,14 @@ pub use memfuse_rank::fusion::{
 
 pub use memfuse_core::FusionStrategy;
 
-/// Fuses search result sets using the specified `FusionStrategy` (`Rrf` or `ScoreNormalized`).
+/// Fuses search result sets using the specified FusionStrategy.
 pub fn fuse_search_results_with_strategy(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
     priority: MetadataMergePriority,
     include_provenance: bool,
     resonance_config: Option<&ResonanceConfig>,
-    strategy: FusionStrategy,
+    strategy: memfuse_core::FusionStrategy,
 ) -> Vec<SearchResult> {
     memfuse_rank::fusion::fuse_search_results_with_strategy(
         result_sets,

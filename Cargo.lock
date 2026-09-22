@@ -2684,6 +2684,7 @@ name = "memfuse-rank"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "memfuse-adapt",
  "memfuse-ports",
  "memfuse-types",
  "proptest",

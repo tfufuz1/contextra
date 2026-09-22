@@ -1,6 +1,6 @@
 use crate::config::RouterConfig;
 use memfuse::MemFuse;
-use memfuse_core::{BoxFuture, ContextChunk, ContextWindow, EntityId, MemFuseError, TokenBudget};
+use memfuse_core::{ContextChunk, ContextWindow, EntityId, MemFuseError, TokenBudget};
 use std::sync::Arc;
 
 struct CollectionAdapter(Arc<memfuse::Collection>);
@@ -11,7 +11,7 @@ impl memfuse::router::ports_local::HybridSearchProvider for CollectionAdapter {
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
-    ) -> BoxFuture<'a, Result<Vec<ContextChunk>, MemFuseError>> {
+    ) -> memfuse_core::BoxFuture<'a, Result<Vec<ContextChunk>, MemFuseError>> {
         Box::pin(async move {
             let search_results = self
                 .0
@@ -39,7 +39,7 @@ impl memfuse::router::ports_local::CommunityResolver for CommunityAdapter {
     fn get_community<'a>(
         &'a self,
         _entity_id: EntityId,
-    ) -> BoxFuture<'a, Result<Option<u64>, MemFuseError>> {
+    ) -> memfuse_core::BoxFuture<'a, Result<Option<u64>, MemFuseError>> {
         Box::pin(async move { Ok(None) })
     }
 }
@@ -76,7 +76,7 @@ impl memfuse_core::DriftStatusProvider for RouterDriftAdapter {
 pub struct RoutingHandle {
     pub router: Arc<memfuse::router::DefaultRouterEngine>,
     pub calibrator: Arc<parking_lot::Mutex<memfuse::calibration::IsotonicCalibrator>>,
-    pub pid_controller: Arc<parking_lot::Mutex<memfuse::calibration::PidController>>,
+    pub pid_controller: Arc<parking_lot::Mutex<memfuse_adapt::PidController>>,
     pub _drift_adapter: Arc<dyn memfuse_core::DriftStatusProvider>,
 }
 
@@ -157,7 +157,6 @@ pub async fn setup_routing(
 /// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
 #[cfg(feature = "kv-bridge")]
 pub fn setup_kv_bridge(_db: &Arc<MemFuse>) -> Option<Arc<memfuse_infer_candle::KvBridgeAdapter>> {
-    // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert
     tracing::info!(
         "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
     );
