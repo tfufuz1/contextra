@@ -221,6 +221,14 @@
       "session_id": "13433224761969093272",
       "active": true,
       "expires_at": "2026-09-22T01:11:50.550778179+00:00"
+    },
+    {
+      "krate": "workspace-root",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-22T10:31:07.350539037+00:00",
+      "session_id": "7176791335467082323",
+      "active": true,
+      "expires_at": "2026-09-22T14:31:07.350525596+00:00"
     }
   ]
 }
