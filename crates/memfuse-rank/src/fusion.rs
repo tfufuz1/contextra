@@ -2,7 +2,50 @@
 
 use ahash::AHashMap;
 pub use memfuse_types::FusionStrategy;
+use memfuse_types::{ContextChunk, DocId, MemFuseError, MemoryLink};
 use serde::{Deserialize, Serialize};
+
+fn estimate_tokens(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+    let words = text.split_whitespace().count();
+    let chars = text.chars().count();
+    ((words as f64 * 1.3).max(chars as f64 / 4.0)).ceil() as usize
+}
+
+impl TryFrom<SearchResult> for ContextChunk {
+    type Error = MemFuseError;
+
+    fn try_from(r: SearchResult) -> std::result::Result<Self, Self::Error> {
+        let doc_id = DocId::from_key(&r.id).map_err(|e| {
+            MemFuseError::InvalidInput(format!("SearchResult-ID '{}' ungültig: {e}", r.id))
+        })?;
+        let content = r
+            .metadata
+            .as_ref()
+            .and_then(|m| m.get("text").or_else(|| m.get("content")))
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string();
+        let token_count = estimate_tokens(&content);
+        let links: Vec<MemoryLink> = r
+            .metadata
+            .as_ref()
+            .and_then(|m| m.get("links"))
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default();
+        Ok(ContextChunk {
+            doc_id,
+            content,
+            relevance: r.score,
+            token_count,
+            metadata: r.metadata,
+            contextual_prefix: None,
+            links,
+        })
+    }
+}
 
 /// Provenance record for fused search result.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -42,6 +85,21 @@ pub struct ProvenanceRecord {
     /// Resonance coherence bonus value.
     #[serde(default)]
     pub coherence_bonus: f32,
+}
+
+impl ProvenanceRecord {
+    /// Constructs a `ProvenanceRecord` synthesized from source document IDs.
+    pub fn synthesized_from(source_doc_ids: &[memfuse_types::DocId]) -> Self {
+        let mut signal_ranks = AHashMap::new();
+        for (idx, id) in source_doc_ids.iter().enumerate() {
+            signal_ranks.insert(id.0.to_string(), (idx + 1) as u32);
+        }
+        ProvenanceRecord {
+            index_type: Some("consolidated".to_string()),
+            signal_ranks,
+            ..Default::default()
+        }
+    }
 }
 
 /// Signal contribution details.

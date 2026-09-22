@@ -46,11 +46,12 @@ impl Clone for MemFuseBuilder {
 impl MemFuseBuilder {
     /// Creates a new `MemFuseBuilder` with specified vector dimension.
     pub fn new(dimension: usize) -> Self {
-        let mut config = MemFuseConfig::default();
-        config.dimension = dimension;
         Self {
             storage_path: PathBuf::from("./memfuse_data"),
-            config,
+            config: MemFuseConfig {
+                dimension,
+                ..Default::default()
+            },
             embedder: None,
         }
     }

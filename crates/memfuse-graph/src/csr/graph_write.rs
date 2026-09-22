@@ -11,6 +11,9 @@ use memfuse_core::{
     BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
     StorageEngine, TxId,
 };
+use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
+use crate::error::GraphMutationError;
+use crate::GraphIndexExt;
 
 use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::{
@@ -310,6 +313,52 @@ impl CsrGraph {
     }
 
     /// Directly inserts a hyperedge into memory.
+    /// Erstellt eine n-äre Hyperkante mit H2-Multi-Key-Locking unter Verwending von [`ConsolidationNodesGuard`].
+    ///
+    /// Sortiert alle beteiligten Entity-IDs deterministisch vor dem Erwerb/Mutation, um Deadlocks
+    /// bei überlappenden Knotenmengen zu verhindern (H2 / §5.1.2).
+    pub fn relate_n_ary(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+        predicate: crate::csr::EdgeType,
+        participants: Vec<crate::hyperedge::RoleBinding>,
+        weight: f32,
+        doc_id: Option<DocId>,
+    ) -> std::result::Result<crate::hyperedge::HyperEdge, GraphMutationError> {
+        let entity_ids: Vec<EntityId> = participants.iter().map(|p| p.entity).collect();
+        let guard = crate::hyperedge::ConsolidationNodesGuard::try_acquire(&entity_ids)?;
+
+        let hyperedge = crate::hyperedge::HyperEdge::new(id, predicate, participants, weight)
+            .with_source_doc_id(doc_id);
+        hyperedge.validate()?;
+
+        guard.with_entities(|_sorted_entities| {
+            self.insert_hyperedge_direct(hyperedge.clone());
+        });
+
+        Ok(hyperedge)
+    }
+
+    /// Persists a hyperedge to storage under `__graph:hyperedge:` and secondary index `__graph:hyperedge_by_entity:`.
+    pub async fn persist_hyperedge(&self, tx: TxId, hyperedge: &crate::hyperedge::HyperEdge) -> Result<()> {
+        if let Some(storage) = self.storage() {
+            let key = format!("{}{:016x}", crate::hyperedge::HYPEREDGE_PREFIX, hyperedge.id.inner());
+            let value = hyperedge.serialize()?;
+            storage.put(tx, key.as_bytes(), &value).await?;
+
+            for participant in hyperedge.participants.iter() {
+                let sec_key = format!(
+                    "{}{:016x}:{:016x}",
+                    crate::hyperedge::HYPEREDGE_BY_ENTITY_PREFIX,
+                    participant.entity.inner(),
+                    hyperedge.id.inner()
+                );
+                storage.put(tx, sec_key.as_bytes(), &[]).await?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn insert_hyperedge_direct(&self, hyperedge: crate::hyperedge::HyperEdge) {
         let hyperedge_arc = Arc::new(hyperedge);
         let mut inner = self.inner_write();

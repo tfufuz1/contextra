@@ -11,10 +11,12 @@ pub use memfuse_engine as engine;
 pub use memfuse_engine::{
     background_workers, chunker, collection, export, filter, import, temporal_filter, transaction,
 };
+#[allow(deprecated)]
+pub use memfuse_engine::MetadataFilter;
 pub use memfuse_engine::{
     CommunityDetectionConfig, DbStats, Document, EmbeddingBackend, ExportCollectionV1,
     ExportDocumentV1, ExportMemoryV1, ExportRelationV1, HybridQueryBuilder, ImportSummary,
-    Language, MemFuse, MemFuseConfig, MemFuseStats, MetadataFilter, ProvenanceRecord, SearchResult,
+    Language, MemFuse, MemFuseConfig, MemFuseStats, ProvenanceRecord, SearchResult,
     SearchStrategy, SignalContribution, SignalWeights, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
 };
 
@@ -24,10 +26,12 @@ pub use memfuse_engine::collection::maintenance::PercolationResult;
 pub use memfuse_engine::SandboxBridge;
 
 // Re-exports from memfuse-cognition
+#[allow(deprecated)]
+pub use memfuse_cognition::execute_sleep_cycle;
 pub use memfuse_cognition::{
     cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
     compute_community_hash, detect_near_duplicates, execute_background_consolidation,
-    execute_consolidation_pass, execute_sleep_cycle, group_turns_into_segments,
+    execute_consolidation_pass, group_turns_into_segments,
     run_consolidation_pass, run_synthesis_pass, CommunityStabilityTracker, CompactedContext,
     CompactionStrategy, ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard,
     ConsolidationPhaseResult, ConsolidationSession, ContextCompactor, ContextManager,
@@ -109,68 +113,12 @@ pub use memfuse_core::SegmentSynthesizer;
 pub use memfuse_core::TextEmbeddingEngine;
 pub use serde_json::json;
 
-#[cfg(feature = "sandbox")]
-impl SandboxBridge for MemFuse {
-    fn db_search<'a>(&'a self, query: &'a [u8], k: usize) -> BoxFuture<'a, Result<Vec<u8>>> {
-        Box::pin(async move {
-            // Assume query is a binary f32 array (little endian)
-            let f32_count = query.len() / 4;
-            let mut vector = Vec::with_capacity(f32_count);
-            for i in 0..f32_count {
-                let start = i * 4;
-                let bits = u32::from_le_bytes(
-                    query
-                        .get(start..start + 4)
-                        .ok_or_else(|| {
-                            memfuse_core::MemFuseError::Serialization("Query too short".into())
-                        })?
-                        .try_into()
-                        .map_err(|_| {
-                            memfuse_core::MemFuseError::Serialization("Invalid slice".into())
-                        })?,
-                );
-                vector.push(f32::from_bits(bits));
-            }
-
-            let results: Vec<SearchResult> = self.search(&vector, k).await?;
-            serde_json::to_vec(&results)
-                .map_err(|e| memfuse_core::MemFuseError::Internal(e.to_string()))
-        })
-    }
-
-    fn db_insert<'a>(&'a self, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move {
-            let id = String::from_utf8_lossy(key).to_string();
-            // Assume value is a JSON representing (embedding, metadata) or just value
-            let val_json: Value = serde_json::from_slice(value)
-                .unwrap_or(serde_json::json!({ "raw_data": String::from_utf8_lossy(value) }));
-
-            self.insert(&id, &[], Some(val_json)).await
-        })
-    }
-
-    fn db_get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Vec<u8>>>> {
-        Box::pin(async move {
-            let id = String::from_utf8_lossy(key).to_string();
-            let doc = self.get(&id).await?;
-            match doc {
-                Some(d) => {
-                    Ok(Some(serde_json::to_vec(&d).map_err(|e| {
-                        memfuse_core::MemFuseError::Internal(e.to_string())
-                    })?))
-                }
-                None => Ok(None),
-            }
-        })
-    }
-}
-
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests {
-    // expect #[cfg(test)]
-    // unwrap #[cfg(test)]
     use super::*;
+    use memfuse_core::types::TenantId;
+    use std::sync::Arc;
     use tempfile::TempDir;
 
     async fn test_db(dim: usize) -> (MemFuse, TempDir) {
@@ -341,7 +289,7 @@ mod tests {
             .await
             .expect("insert"); // expect
 
-        db.relate("doc-1", "doc-2", "references")
+        db.relate_bidirectional("doc-1", "doc-2", "references")
             .await
             .expect("relate"); // expect
         db.relate("doc-1", "doc-3", "references")
@@ -407,10 +355,10 @@ mod tests {
 
         let router_arc: Arc<dyn DriftStatusProvider> = Arc::new(DummyRouter);
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
-            memfuse_calibration::IsotonicCalibrator::new(5, 100),
+            memfuse_rank::IsotonicCalibrator::new(5, 100),
         ));
         let pid_arc = Arc::new(parking_lot::Mutex::new(
-            memfuse_calibration::PidController::new(150.0, 50, 200, Some(100)),
+            memfuse_adapt::PidController::new(150.0, 50, 200, Some(100)),
         ));
 
         // Warmup calibrator so ECE is populated
@@ -507,24 +455,6 @@ mod tests {
         let get_agent = db.get("agent-1").await.expect("get"); // expect
         assert!(get_agent.is_none());
         assert_eq!(db.len().await.expect("len"), 2); // 3 inserted, 1 deleted // expect
-    }
-
-    #[tokio::test]
-    async fn test_allocate_tx_exhaustion_returns_err() {
-        let tmp = TempDir::new().expect("temp dir"); // expect
-        let config = MemFuseConfig {
-            dimension: 4,
-            ..Default::default()
-        };
-        let db = MemFuse::open_with_config(tmp.path(), config)
-            .await
-            .expect("open db"); // expect
-        db.next_tx.store(TxId::INTERNAL_BASE, Ordering::SeqCst);
-        let res = db.allocate_tx();
-        assert!(matches!(
-            res,
-            Err(memfuse_core::MemFuseError::Transaction(_))
-        ));
     }
 
     #[tokio::test]
@@ -713,236 +643,6 @@ mod tests {
         assert_eq!(list.len(), 4);
     }
 
-    #[tokio::test]
-    async fn test_repair_on_open_resolves_pending_intents() {
-        let tmp = tempfile::TempDir::new().expect("temp dir"); // expect
-        let path = tmp.path().to_path_buf();
-        let config = MemFuseConfig {
-            dimension: 4,
-            ..Default::default()
-        };
-
-        // 1. Create a doc in LSM but NOT in HNSW to simulate a partial commit
-        {
-            let db = MemFuse::open_with_config(&path, config.clone())
-                .await
-                .expect("open 1"); // expect
-            let col = db.collection("recovery-test").await.expect("col"); // expect
-
-            // We'll use a direct LSM put to bypass HNSW
-            let doc_id = DocId::from_key("recovered-doc").expect("doc_id"); // expect
-            let stored = crate::collection::StoredDocument {
-                id: "recovered-doc".to_string(),
-                embedding: vec![1.0, 0.0, 0.0, 0.0],
-                metadata: Some(json!({"status": "recovered"})),
-            };
-            let data = serde_json::to_vec(&stored).expect("json"); // expect
-
-            let user_key = col.namespaced_key(b"recovered-doc", 0);
-            let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-
-            // Put in LSM
-            let tx = TxId::new(db.next_tx.fetch_add(1, Ordering::SeqCst));
-            db.storage
-                .put(tx, &user_key, &data)
-                .await
-                .expect("put user"); // expect
-            db.storage.put(tx, &doc_key, &data).await.expect("put doc"); // expect
-
-            // Manually write a "pending" intent
-            let intent_key = col.namespaced_key(tx.inner().to_le_bytes().as_ref(), 3);
-            db.storage
-                .put(tx, &intent_key, b"pending")
-                .await
-                .expect("put intent"); // expect
-
-            db.storage.commit(tx).await.expect("commit"); // expect
-
-            // Verify it's NOT in HNSW yet (search should fail to find it)
-            let results = col.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search"); // expect
-            assert!(results.is_empty(), "Should not be in HNSW yet");
-
-            db.close().await.expect("close"); // expect
-        }
-
-        // 2. Re-open: repair_on_open should trigger and re-sync
-        {
-            let db = MemFuse::open_with_config(&path, config)
-                .await
-                .expect("open 2 (repair)"); // expect
-            let col = db.collection("recovery-test").await.expect("col"); // expect
-
-            // Verify it IS now in HNSW
-            let results = col.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search"); // expect
-            assert_eq!(results.len(), 1, "Should be repaired and found in HNSW");
-            assert_eq!(results[0].id, "recovered-doc");
-
-            // Verify intent is marked as committed/repaired
-            let entries = db
-                .storage
-                .scan_prefix(b"__col:recovery-test:\x00\x03")
-                .await
-                .expect("scan intents"); // expect
-            let found_repaired = entries.iter().any(|(_, v)| {
-                v == b"repaired"
-                    || serde_json::from_slice::<crate::transaction::CommitIntent>(v)
-                        .map(|i| matches!(i, crate::transaction::CommitIntent::Committed))
-                        .unwrap_or(false)
-            });
-            assert!(found_repaired, "Intent should be marked as Committed");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_repair_on_open_idempotent_with_existing_vector() {
-        use memfuse_core::VectorIndex;
-        let tmp = tempfile::TempDir::new().expect("temp dir"); // expect
-        let path = tmp.path().to_path_buf();
-        let config = MemFuseConfig {
-            dimension: 4,
-            ..Default::default()
-        };
-
-        // 1. Create a doc in LSM and also insert its vector into HNSW, but leave intent as Pending
-        {
-            let db = MemFuse::open_with_config(&path, config.clone())
-                .await
-                .expect("open 1"); // expect
-            let col = db.collection("idempotent-test").await.expect("col"); // expect
-
-            let doc_id = DocId::from_key("already-indexed-doc").expect("doc_id"); // expect
-            let stored = crate::collection::StoredDocument {
-                id: "already-indexed-doc".to_string(),
-                embedding: vec![1.0, 0.0, 0.0, 0.0],
-                metadata: Some(json!({"status": "already_indexed"})),
-            };
-            let data = serde_json::to_vec(&stored).expect("json"); // expect
-
-            let user_key = col.namespaced_key(b"already-indexed-doc", 0);
-            let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-
-            let tx = TxId::new(db.next_tx.fetch_add(1, Ordering::SeqCst));
-            db.storage
-                .put(tx, &user_key, &data)
-                .await
-                .expect("put user"); // expect
-            db.storage.put(tx, &doc_key, &data).await.expect("put doc"); // expect
-
-            // Insert into HNSW directly as well
-            col.index
-                .insert(tx, doc_id, &stored.embedding)
-                .await
-                .expect("insert hnsw"); // expect
-            col.index.commit(tx).await.expect("commit index"); // expect
-
-            // Manually write a Pending intent
-            let intent_key = col.namespaced_key(tx.inner().to_le_bytes().as_ref(), 3);
-            let intent = crate::transaction::CommitIntent::Pending {
-                doc_ids: Arc::new(vec![doc_id]),
-                has_text: false,
-                has_graph: false,
-                stages_completed: 0,
-            };
-            let intent_bytes = serde_json::to_vec(&intent).expect("serialize intent"); // expect
-            db.storage
-                .put(tx, &intent_key, &intent_bytes)
-                .await
-                .expect("put intent"); // expect
-
-            db.storage.commit(tx).await.expect("commit storage"); // expect
-
-            db.close().await.expect("close"); // expect
-        }
-
-        // 2. Re-open: repair_on_open triggers. Since vector is already in index or re-inserted idempotently, it must succeed.
-        {
-            let db = MemFuse::open_with_config(&path, config)
-                .await
-                .expect("open 2 (repair idempotent)"); // expect
-            let col = db.collection("idempotent-test").await.expect("col"); // expect
-
-            let results = col.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search"); // expect
-            assert_eq!(results.len(), 1);
-            assert_eq!(results[0].id, "already-indexed-doc");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_repair_on_open_failure_propagates_error() {
-        let tmp = tempfile::TempDir::new().expect("temp dir"); // expect
-        let path = tmp.path().to_path_buf();
-        let config = MemFuseConfig {
-            dimension: 4,
-            ..Default::default()
-        };
-
-        {
-            let db = MemFuse::open_with_config(&path, config.clone())
-                .await
-                .expect("open 1"); // expect
-            let col = db.collection("corrupt-test").await.expect("col"); // expect
-
-            // Create a pending intent, user_key (key_type=0) with dim mismatch, and doc_key (key_type=1)
-            let doc_id = DocId::from_key("corrupt-doc").expect("doc_id"); // expect
-            let stored = crate::collection::StoredDocument {
-                id: "corrupt-doc".to_string(),
-                embedding: vec![1.0, 0.0], // dim mismatch (2 instead of 4)
-                metadata: None,
-            };
-            let data = serde_json::to_vec(&stored).expect("json"); // expect
-            let meta_only = crate::collection::StoredDocumentMeta::from(&stored);
-            let meta_data = serde_json::to_vec(&meta_only).expect("meta json"); // expect
-
-            let user_key = col.namespaced_key(b"corrupt-doc", 0);
-            let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-            let tx = TxId::new(db.next_tx.fetch_add(1, Ordering::SeqCst));
-
-            db.storage
-                .put(tx, &user_key, &data)
-                .await
-                .expect("put user_key"); // expect
-            db.storage
-                .put(tx, &doc_key, &meta_data)
-                .await
-                .expect("put doc_key"); // expect
-
-            // Write pending intent (key_type=3) referencing doc_id
-            let intent_key = col.namespaced_key(tx.inner().to_le_bytes().as_ref(), 3);
-            let intent = crate::transaction::CommitIntent::Pending {
-                doc_ids: Arc::new(vec![doc_id]),
-                has_text: false,
-                has_graph: false,
-                stages_completed: 0,
-            };
-            let intent_bytes = serde_json::to_vec(&intent).expect("intent json"); // expect
-            db.storage
-                .put(tx, &intent_key, &intent_bytes)
-                .await
-                .expect("put intent"); // expect
-
-            db.storage.commit(tx).await.expect("commit"); // expect
-
-            db.close().await.expect("close"); // expect
-        }
-
-        // Re-open with database: repair_on_open will invoke col.repair() which fails on dimension mismatch
-        let res = MemFuse::open_with_config(&path, config).await;
-        assert!(
-            res.is_err(),
-            "open_with_config should fail when repair fails"
-        );
-
-        if let Err(e) = res {
-            let err_msg = e.to_string();
-            assert!(
-                err_msg.contains("repair_on_open")
-                    && err_msg.contains("Datenbankintegrität nicht garantiert"),
-                "Expected repair error message, got: {}",
-                err_msg
-            );
-        }
-    }
-
     #[test]
     fn test_memfuse_config_defaults_to_onnx_backend() {
         let config = MemFuseConfig::default();
@@ -1006,7 +706,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_open_dimension_mismatch_fails() -> Result<()> {
+    async fn test_open_dimension_mismatch_fails() -> memfuse_core::Result<()> {
         let dir = tempfile::tempdir()
             .map_err(|e| memfuse_core::MemFuseError::InvalidInput(e.to_string()))?;
         let config_768 = MemFuseConfig {
@@ -1178,17 +878,5 @@ mod tests {
             text_results[0].provenance.is_some(),
             "Text search results must contain provenance record"
         );
-    }
-}
-
-#[cfg(all(test, feature = "sandbox"))]
-mod dyn_safety {
-    use super::*;
-
-    fn _assert_dyn_sandbox_bridge(_: Option<&dyn SandboxBridge>) {}
-
-    #[test]
-    fn test_sandbox_bridge_dyn_safety() {
-        _assert_dyn_sandbox_bridge(None);
     }
 }

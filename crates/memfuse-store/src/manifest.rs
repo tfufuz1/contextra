@@ -98,6 +98,7 @@ impl ManifestEntry {
     }
 
     /// Deserializes a manifest entry from a slice containing `[crc32: u32 LE] [payload...]`.
+    #[deny(clippy::indexing_slicing)]
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         if data.len() < 5 {
             return Err(MemFuseError::Serialization(
@@ -105,12 +106,17 @@ impl ManifestEntry {
             ));
         }
 
+        let stored_crc_bytes = data.get(0..4).ok_or_else(|| {
+            MemFuseError::Serialization("Failed to read stored CRC bytes".into())
+        })?;
         let stored_crc = u32::from_le_bytes(
-            data[0..4]
+            stored_crc_bytes
                 .try_into()
                 .map_err(|_| MemFuseError::Serialization("Invalid CRC format".into()))?,
         );
-        let payload = &data[4..];
+        let payload = data.get(4..).ok_or_else(|| {
+            MemFuseError::Serialization("Failed to read payload bytes".into())
+        })?;
         let computed_crc = crc32fast::hash(payload);
 
         if stored_crc != computed_crc {
@@ -120,8 +126,12 @@ impl ManifestEntry {
             )));
         }
 
-        let op_tag = payload[0];
-        let remaining = &payload[1..];
+        let op_tag = *payload.get(0).ok_or_else(|| {
+            MemFuseError::Serialization("Failed to read op_tag".into())
+        })?;
+        let remaining = payload.get(1..).ok_or_else(|| {
+            MemFuseError::Serialization("Failed to read remaining payload".into())
+        })?;
 
         match op_tag {
             0 => {
@@ -129,20 +139,27 @@ impl ManifestEntry {
                 if remaining.len() < 12 {
                     return Err(MemFuseError::Serialization("Add payload too short".into()));
                 }
-                let max_tx =
-                    u64::from_le_bytes(remaining[0..8].try_into().map_err(|_| {
-                        MemFuseError::Serialization("Invalid max_tx format".into())
-                    })?);
-                let path_len =
-                    u32::from_le_bytes(remaining[8..12].try_into().map_err(|_| {
-                        MemFuseError::Serialization("Invalid path_len format".into())
-                    })?) as usize;
+                let max_tx_bytes = remaining.get(0..8).ok_or_else(|| {
+                    MemFuseError::Serialization("Add max_tx bytes missing".into())
+                })?;
+                let max_tx = u64::from_le_bytes(max_tx_bytes.try_into().map_err(|_| {
+                    MemFuseError::Serialization("Invalid max_tx format".into())
+                })?);
+                let path_len_bytes = remaining.get(8..12).ok_or_else(|| {
+                    MemFuseError::Serialization("Add path_len bytes missing".into())
+                })?;
+                let path_len = u32::from_le_bytes(path_len_bytes.try_into().map_err(|_| {
+                    MemFuseError::Serialization("Invalid path_len format".into())
+                })?) as usize;
                 if remaining.len() < 12 + path_len {
                     return Err(MemFuseError::Serialization(
                         "Add path data truncated".into(),
                     ));
                 }
-                let path_str = std::str::from_utf8(&remaining[12..12 + path_len]).map_err(|e| {
+                let path_bytes = remaining.get(12..12 + path_len).ok_or_else(|| {
+                    MemFuseError::Serialization("Add path bytes missing".into())
+                })?;
+                let path_str = std::str::from_utf8(path_bytes).map_err(|e| {
                     MemFuseError::Serialization(format!("Invalid path UTF-8: {}", e))
                 })?;
                 Ok(ManifestEntry::Add {
@@ -157,16 +174,21 @@ impl ManifestEntry {
                         "Remove payload too short".into(),
                     ));
                 }
-                let path_len =
-                    u32::from_le_bytes(remaining[0..4].try_into().map_err(|_| {
-                        MemFuseError::Serialization("Invalid path_len format".into())
-                    })?) as usize;
+                let path_len_bytes = remaining.get(0..4).ok_or_else(|| {
+                    MemFuseError::Serialization("Remove path_len bytes missing".into())
+                })?;
+                let path_len = u32::from_le_bytes(path_len_bytes.try_into().map_err(|_| {
+                    MemFuseError::Serialization("Invalid path_len format".into())
+                })?) as usize;
                 if remaining.len() < 4 + path_len {
                     return Err(MemFuseError::Serialization(
                         "Remove path data truncated".into(),
                     ));
                 }
-                let path_str = std::str::from_utf8(&remaining[4..4 + path_len]).map_err(|e| {
+                let path_bytes = remaining.get(4..4 + path_len).ok_or_else(|| {
+                    MemFuseError::Serialization("Remove path bytes missing".into())
+                })?;
+                let path_str = std::str::from_utf8(path_bytes).map_err(|e| {
                     MemFuseError::Serialization(format!("Invalid path UTF-8: {}", e))
                 })?;
                 Ok(ManifestEntry::Remove {
@@ -180,10 +202,12 @@ impl ManifestEntry {
                         "RollbackComplete payload too short".into(),
                     ));
                 }
-                let target_tx =
-                    u64::from_le_bytes(remaining[0..8].try_into().map_err(|_| {
-                        MemFuseError::Serialization("Invalid target_tx format".into())
-                    })?);
+                let target_tx_bytes = remaining.get(0..8).ok_or_else(|| {
+                    MemFuseError::Serialization("target_tx bytes missing".into())
+                })?;
+                let target_tx = u64::from_le_bytes(target_tx_bytes.try_into().map_err(|_| {
+                    MemFuseError::Serialization("Invalid target_tx format".into())
+                })?);
                 Ok(ManifestEntry::RollbackComplete { target_tx })
             }
             3 => {
@@ -193,26 +217,36 @@ impl ManifestEntry {
                         "Replace payload header too short".into(),
                     ));
                 }
-                let added_max_tx =
-                    u64::from_le_bytes(remaining[0..8].try_into().map_err(|_| {
-                        MemFuseError::Serialization("Invalid added_max_tx format".into())
-                    })?);
+                let added_max_tx_bytes = remaining.get(0..8).ok_or_else(|| {
+                    MemFuseError::Serialization("added_max_tx bytes missing".into())
+                })?;
+                let added_max_tx = u64::from_le_bytes(added_max_tx_bytes.try_into().map_err(|_| {
+                    MemFuseError::Serialization("Invalid added_max_tx format".into())
+                })?);
+                let rank_bytes = remaining.get(8..16).ok_or_else(|| {
+                    MemFuseError::Serialization("rank bytes missing".into())
+                })?;
                 let rank = u64::from_le_bytes(
-                    remaining[8..16]
+                    rank_bytes
                         .try_into()
                         .map_err(|_| MemFuseError::Serialization("Invalid rank format".into()))?,
                 );
-                let added_path_len =
-                    u32::from_le_bytes(remaining[16..20].try_into().map_err(|_| {
-                        MemFuseError::Serialization("Invalid added_path_len format".into())
-                    })?) as usize;
+                let added_path_len_bytes = remaining.get(16..20).ok_or_else(|| {
+                    MemFuseError::Serialization("added_path_len bytes missing".into())
+                })?;
+                let added_path_len = u32::from_le_bytes(added_path_len_bytes.try_into().map_err(|_| {
+                    MemFuseError::Serialization("Invalid added_path_len format".into())
+                })?) as usize;
                 let mut offset = 20;
                 if remaining.len() < offset + added_path_len {
                     return Err(MemFuseError::Serialization(
                         "Replace added path data truncated".into(),
                     ));
                 }
-                let added_str = std::str::from_utf8(&remaining[offset..offset + added_path_len])
+                let added_path_bytes = remaining.get(offset..offset + added_path_len).ok_or_else(|| {
+                    MemFuseError::Serialization("added_path bytes missing".into())
+                })?;
+                let added_str = std::str::from_utf8(added_path_bytes)
                     .map_err(|e| {
                         MemFuseError::Serialization(format!("Invalid added path UTF-8: {}", e))
                     })?;
@@ -224,10 +258,12 @@ impl ManifestEntry {
                         "Replace removed count truncated".into(),
                     ));
                 }
-                let removed_count =
-                    u32::from_le_bytes(remaining[offset..offset + 4].try_into().map_err(|_| {
-                        MemFuseError::Serialization("Invalid removed_count format".into())
-                    })?) as usize;
+                let removed_count_bytes = remaining.get(offset..offset + 4).ok_or_else(|| {
+                    MemFuseError::Serialization("removed_count bytes missing".into())
+                })?;
+                let removed_count = u32::from_le_bytes(removed_count_bytes.try_into().map_err(|_| {
+                    MemFuseError::Serialization("Invalid removed_count format".into())
+                })?) as usize;
                 offset += 4;
 
                 let mut removed = Vec::with_capacity(removed_count);
@@ -237,23 +273,27 @@ impl ManifestEntry {
                             "Replace removed path length truncated".into(),
                         ));
                     }
-                    let r_len =
-                        u32::from_le_bytes(remaining[offset..offset + 4].try_into().map_err(
-                            |_| MemFuseError::Serialization("Invalid r_len format".into()),
-                        )?) as usize;
+                    let r_len_bytes = remaining.get(offset..offset + 4).ok_or_else(|| {
+                        MemFuseError::Serialization("r_len bytes missing".into())
+                    })?;
+                    let r_len = u32::from_le_bytes(r_len_bytes.try_into().map_err(|_| {
+                        MemFuseError::Serialization("Invalid r_len format".into())
+                    })?) as usize;
                     offset += 4;
                     if remaining.len() < offset + r_len {
                         return Err(MemFuseError::Serialization(
                             "Replace removed path data truncated".into(),
                         ));
                     }
-                    let r_str =
-                        std::str::from_utf8(&remaining[offset..offset + r_len]).map_err(|e| {
-                            MemFuseError::Serialization(format!(
-                                "Invalid removed path UTF-8: {}",
-                                e
-                            ))
-                        })?;
+                    let r_bytes = remaining.get(offset..offset + r_len).ok_or_else(|| {
+                        MemFuseError::Serialization("r_path bytes missing".into())
+                    })?;
+                    let r_str = std::str::from_utf8(r_bytes).map_err(|e| {
+                        MemFuseError::Serialization(format!(
+                            "Invalid removed path UTF-8: {}",
+                            e
+                        ))
+                    })?;
                     removed.push(PathBuf::from(r_str));
                     offset += r_len;
                 }
@@ -690,6 +730,27 @@ fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[u8]) -> boo
 }
 
 impl Manifest {
+    /// Evaluates whether the MANIFEST file size exceeds `threshold_bytes` and performs an atomic
+    /// rollover if needed.
+    ///
+    /// Rollover process:
+    /// (a) Write current live entries (`live_entries`) as a snapshot into a temporary `MANIFEST.new` file.
+    /// (b) `flush` + `sync_all` on the temporary file.
+    /// (c) Atomically `rename` temporary file to `MANIFEST`.
+    /// (d) `fsync` the parent directory.
+    /// (e) Re-open `MANIFEST` handle in append mode and update `self.file`.
+    ///
+    /// If an error occurs prior to `rename`, the temporary file is cleaned up and the original `MANIFEST`
+    /// remains untouched and valid.
+    /// Forces an atomic rollover of the MANIFEST file regardless of current size.
+    ///
+    /// Writes live entries into `MANIFEST.new.<pid>.<rand>`, flushes, fsyncs,
+    /// atomically renames to `MANIFEST`, and fsyncs the parent directory.
+    pub async fn rollover(&self, live_entries: &[ManifestEntry]) -> Result<()> {
+        let _ = self.maybe_rollover(live_entries, 0).await?;
+        Ok(())
+    }
+
     /// Evaluates whether the MANIFEST file size exceeds `threshold_bytes` and performs an atomic
     /// rollover if needed.
     ///
@@ -1211,5 +1272,26 @@ mod tests {
         assert!(valid_sstables
             .iter()
             .any(|(p, _)| p == Path::new("sst-20.sst")));
+    }
+
+    #[tokio::test]
+    async fn test_manifest_explicit_rollover() {
+        let dir = tempdir().expect("tempdir");
+        let manifest_path = dir.path().join("MANIFEST");
+
+        let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+
+        let entry1 = ManifestEntry::Add {
+            path: PathBuf::from("sst-1.sst"),
+            max_tx: 10,
+        };
+        manifest.append(&entry1).await.expect("append 1");
+
+        let live = vec![entry1.clone()];
+        manifest.rollover(&live).await.expect("explicit rollover");
+
+        let loaded = Manifest::load(&manifest_path).await.expect("load manifest");
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0], entry1);
     }
 }

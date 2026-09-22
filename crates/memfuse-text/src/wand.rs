@@ -247,6 +247,16 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     let mut doc_len_cache: HashMap<DocId, Option<u32>> = HashMap::new();
     let mut tbs_cache: HashMap<Vec<u8>, bool> = HashMap::new();
 
+    // Prefetch active tombstones globally at snapshot `seq` in a single prefix scan
+    let tbs_global_prefix = tombstone_key_helper(DocId::new(0), "")
+        .into_iter()
+        .take_while(|&b| b != b'0')
+        .collect::<Vec<u8>>();
+    let active_tbs_entries = storage.scan_prefix_at(&tbs_global_prefix, seq).await?;
+    for (tbs_key, _) in &active_tbs_entries {
+        tbs_cache.insert(tbs_key.clone(), true);
+    }
+
     // Retrieve posting lists for all query terms
     let mut cursors: Vec<TermCursor> = Vec::with_capacity(terms.len());
     for term in terms {
@@ -325,20 +335,12 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if !list.is_empty() {
-            // Count active tombstones for `term` at snapshot `seq` using a fast prefix scan
-            // Notice tombstone key format in inverted.rs is `__txt:{ns}:tbs:{doc_id}:{term}`.
-            // To scan tombstones for term, we scan prefix `__txt:{ns}:tbs:` and filter by `:{term}` suffix.
-            let tbs_global_prefix = tombstone_key_helper(DocId::new(0), "")
-                .into_iter()
-                .take_while(|&b| b != b'0')
-                .collect::<Vec<u8>>();
-            let active_tbs_entries = storage.scan_prefix_at(&tbs_global_prefix, seq).await?;
+            // Count active tombstones for `term` at snapshot `seq` from pre-cached global tombstones
             let mut term_tbs_count = 0u32;
             let term_suffix = format!(":{}", term);
-            for (tbs_key, _) in active_tbs_entries {
-                if let Ok(key_str) = std::str::from_utf8(&tbs_key) {
+            for (tbs_key, _) in &active_tbs_entries {
+                if let Ok(key_str) = std::str::from_utf8(tbs_key) {
                     if key_str.ends_with(&term_suffix) {
-                        tbs_cache.insert(tbs_key.clone(), true);
                         // Extract doc_id from tombstone key: {prefix}tbs:{doc_id}:{term}
                         let suffix = &tbs_key[tbs_global_prefix.len()..];
                         if let Some(colon_pos) = suffix.iter().position(|&b| b == b':') {

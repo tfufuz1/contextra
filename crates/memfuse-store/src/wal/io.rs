@@ -148,9 +148,21 @@ where
                     "WAL entry too short for nonce".into(),
                 ));
             }
+            let nonce_slice = match entry_data_raw.get(0..12) {
+                Some(s) => s,
+                None => {
+                    return Err(MemFuseError::wal_corruption(
+                        chunk_start_pos,
+                        "WAL entry too short for nonce",
+                    ));
+                }
+            };
             let mut nonce = [0u8; 12];
-            nonce.copy_from_slice(&entry_data_raw[0..12]);
-            let decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
+            nonce.copy_from_slice(nonce_slice);
+            let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
+                MemFuseError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
+            })?;
+            let decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                 Ok(data) => data,
                 Err(e) => {
                     if pos >= file_size {
@@ -311,9 +323,21 @@ where
                         "WAL entry too short for nonce".into(),
                     ));
                 }
+            let nonce_slice = match entry_data_raw.get(0..12) {
+                Some(s) => s,
+                None => {
+                    return Err(MemFuseError::wal_corruption(
+                        chunk_start_pos,
+                        "WAL entry too short for nonce",
+                    ));
+                }
+            };
                 let mut nonce = [0u8; 12];
-                nonce.copy_from_slice(&entry_data_raw[0..12]);
-                decrypted_data = match km.decrypt_auto_nonce(&entry_data_raw[12..], &nonce) {
+            nonce.copy_from_slice(nonce_slice);
+            let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
+                MemFuseError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
+            })?;
+            decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                     Ok(data) => data,
                     Err(e) => {
                         if version == WalVersion::V1 {

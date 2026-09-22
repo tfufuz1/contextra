@@ -411,6 +411,65 @@ mod tests {
     }
 
     #[test]
+    fn test_delta_varint_encode_decode_comprehensive_roundtrip() {
+        // Test 1: Empty posting list
+        let empty_list = PostingList::empty();
+        let empty_bytes = empty_list.encode_compact().expect("encode empty");
+        let decoded_empty = PostingList::decode_compact(&empty_bytes).expect("decode empty");
+        assert_eq!(decoded_empty.len(), 0);
+        assert!(decoded_empty.is_empty());
+        assert!(decoded_empty.blocks().is_empty());
+
+        // Test 2: Single posting
+        let single_list = PostingList::new(vec![Posting::new(DocId::new(42), 7, 120)]);
+        let single_bytes = single_list.encode_compact().expect("encode single");
+        let decoded_single = PostingList::decode_compact(&single_bytes).expect("decode single");
+        assert_eq!(decoded_single.len(), 1);
+        assert_eq!(decoded_single.as_slice()[0].doc_id(), DocId::new(42));
+        assert_eq!(decoded_single.as_slice()[0].tf, 7);
+        assert_eq!(decoded_single.as_slice()[0].doc_len, 120);
+
+        // Test 3: Multi-block posting list across block boundaries (> BLOCK_SIZE)
+        let count = BLOCK_SIZE * 3 + 15; // 207 postings
+        let mut postings = Vec::with_capacity(count);
+        let mut curr_doc_id = 5u64;
+        for i in 0..count {
+            // Mix small delta (+1) and large delta (+1000)
+            let delta = if i % 5 == 0 { 1000 } else { 1 };
+            curr_doc_id += delta;
+            let tf = ((i % 20) + 1) as u32;
+            let doc_len = (50 + (i % 100)) as u32;
+            postings.push(Posting::new(DocId::new(curr_doc_id), tf, doc_len));
+        }
+
+        let multi_list = PostingList::new(postings);
+        let multi_bytes = multi_list.encode_compact().expect("encode multi-block");
+        assert!(multi_bytes.starts_with(POSTING_LIST_V2_MAGIC));
+
+        let decoded_multi = PostingList::decode_compact(&multi_bytes).expect("decode multi-block");
+        assert_eq!(decoded_multi.len(), count);
+        assert_eq!(decoded_multi.as_slice(), multi_list.as_slice());
+        assert_eq!(decoded_multi.blocks(), multi_list.blocks());
+
+        // Verify block-max metadata upper bounds match decoded postings
+        let blocks = decoded_multi.blocks();
+        assert_eq!(blocks.len(), count.div_ceil(BLOCK_SIZE));
+        for (idx, block) in blocks.iter().enumerate() {
+            let start = idx * BLOCK_SIZE;
+            let end = (start + BLOCK_SIZE).min(count);
+            let chunk = &decoded_multi.as_slice()[start..end];
+
+            let chunk_max_doc = chunk.last().unwrap().doc_id;
+            let chunk_max_tf = chunk.iter().map(|p| p.tf).max().unwrap();
+            let chunk_min_dl = chunk.iter().map(|p| p.doc_len).min().unwrap();
+
+            assert_eq!(block.max_doc_id, chunk_max_doc);
+            assert_eq!(block.max_tf, chunk_max_tf);
+            assert_eq!(block.min_doc_len, chunk_min_dl);
+        }
+    }
+
+    #[test]
     fn test_delta_varint_legacy_bincode_fallback() {
         let p1 = Posting::new(DocId::new(10), 2, 100);
         let p2 = Posting::new(DocId::new(100), 5, 250);
