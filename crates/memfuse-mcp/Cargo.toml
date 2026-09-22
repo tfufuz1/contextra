@@ -18,6 +18,8 @@ docid-128 = ["memfuse-core/docid-128"]
 [dependencies]
 memfuse = { workspace = true, features = ["ollama", "router"] }
 memfuse-core = { workspace = true }
+memfuse-rank = { workspace = true }
+memfuse-adapt = { workspace = true }
 memfuse-crypto = { workspace = true }
 memfuse-privacy = { workspace = true }
 memfuse-infer-onnx = { workspace = true, optional = true }

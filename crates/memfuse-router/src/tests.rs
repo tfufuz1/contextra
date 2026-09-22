@@ -135,7 +135,8 @@ pub(crate) mod tests {
             query_text: &'a str,
             query_embedding: &'a [f32],
             top_k: usize,
-        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<memfuse_core::ContextChunk>>> {
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<memfuse_core::ContextChunk>>>
+        {
             Box::pin(async move {
                 let search_results = self
                     .collection
@@ -186,7 +187,7 @@ pub(crate) mod tests {
         collection: Arc<memfuse_db::Collection<S>>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
-    ) -> RouterEngine<S> {
+    ) -> RouterEngine {
         let adapter = Arc::new(CollectionAdapter::new(collection));
         let preparer = Arc::new(TestContextPreparer);
         RouterEngine::new(
@@ -202,7 +203,7 @@ pub(crate) mod tests {
         collection: Arc<memfuse_db::Collection<S>>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
-    ) -> memfuse_core::Result<RouterEngine<S>> {
+    ) -> memfuse_core::Result<RouterEngine> {
         let adapter = Arc::new(CollectionAdapter::new(collection));
         let preparer = Arc::new(TestContextPreparer);
         RouterEngine::try_new(
@@ -242,7 +243,7 @@ pub(crate) mod tests {
 
         let adapter = Arc::new(CollectionAdapter::new(collection));
         let preparer = Arc::new(TestContextPreparer);
-        let router: RouterEngine<MockStorageEngine> =
+        let router: RouterEngine =
             RouterEngine::new(adapter.clone(), adapter, preparer, vec![profile], None);
         assert_eq!(router.profiles().len(), 1);
         assert_eq!(router.profiles()[0].name, "mock-slm");

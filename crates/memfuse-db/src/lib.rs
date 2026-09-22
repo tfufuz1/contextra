@@ -355,10 +355,10 @@ mod tests {
 
         let router_arc: Arc<dyn DriftStatusProvider> = Arc::new(DummyRouter);
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
-            memfuse_calibration::IsotonicCalibrator::new(5, 100),
+            memfuse_rank::IsotonicCalibrator::new(5, 100),
         ));
         let pid_arc = Arc::new(parking_lot::Mutex::new(
-            memfuse_calibration::PidController::new(150.0, 50, 200, Some(100)),
+            memfuse_adapt::PidController::new(150.0, 50, 200, Some(100)),
         ));
 
         // Warmup calibrator so ECE is populated

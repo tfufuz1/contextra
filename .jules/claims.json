@@ -232,7 +232,7 @@
       "session_id": "1147642845825310961",
       "active": false,
       "expires_at": "2026-09-22T01:11:50.550778179+00:00",
-      "released_at": "2026-09-22T11:58:29.716708234+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-22T11:19:38.790984025+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "workspace-root",
@@ -243,12 +243,12 @@
       "expires_at": "2026-09-22T14:31:07.350525596+00:00"
     },
     {
-      "krate": "memfuse-db",
+      "krate": "memfuse-graph",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-22T11:57:37.771521421+00:00",
-      "session_id": "2876781701387684838",
+      "timestamp": "2026-09-22T11:30:57.527930367+00:00",
+      "session_id": "3456774550830234980",
       "active": true,
-      "expires_at": "2026-09-22T15:57:37.771512238+00:00"
+      "expires_at": "2026-09-22T15:30:57.527910898+00:00"
     }
   ]
 }

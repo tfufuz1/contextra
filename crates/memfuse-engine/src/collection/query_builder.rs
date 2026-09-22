@@ -160,7 +160,7 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     rerank_pool_multiplier: Option<usize>,
     rerank_pool_max: Option<usize>,
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
-    pid_controller: Option<Arc<parking_lot::Mutex<memfuse_calibration::PidController>>>,
+    pid_controller: Option<Arc<parking_lot::Mutex<memfuse_adapt::PidController>>>,
     seq: Option<u64>,
     as_of_timestamp: Option<u64>,
     query_timestamp: Option<u64>,
@@ -339,7 +339,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     #[cfg(feature = "adaptive-candidate-pool-sizing")]
     pub fn pid_controller(
         mut self,
-        pid: Arc<parking_lot::Mutex<memfuse_calibration::PidController>>,
+        pid: Arc<parking_lot::Mutex<memfuse_adapt::PidController>>,
     ) -> Self {
         self.pid_controller = Some(pid);
         self
@@ -947,7 +947,7 @@ mod tests {
 
         let reranker = memfuse_infer_onnx::CrossEncoderReranker::passthrough();
         let pid = Arc::new(parking_lot::Mutex::new(
-            memfuse_calibration::PidController::default(),
+            memfuse_adapt::PidController::default(),
         ));
 
         // First call: initial update
