@@ -372,6 +372,105 @@ impl McpServer {
                 }
             }
 
+            "memfuse_forget" => {
+                let col_name = match args.get("collection") {
+                    Some(col_val) => {
+                        let s = col_val.as_str().ok_or_else(|| {
+                            McpError::invalid_params(
+                                "Invalid params: 'collection' must be a string",
+                            )
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("collection cannot be empty"));
+                        }
+                        validate_collection_name(s)?;
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params(
+                            "collection fehlt: missing required field 'collection'",
+                        ));
+                    }
+                };
+
+                let confirm = match args.get("confirm") {
+                    Some(Value::Bool(b)) => *b,
+                    _ => false,
+                };
+                if !confirm {
+                    return Err(McpError::invalid_params(
+                        "confirm parameter must be explicitly set to true for memfuse_forget",
+                    ));
+                }
+
+                let id_opt = match args.get("id") {
+                    Some(v) if !v.is_null() => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'id' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("id cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "id length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        Some(s)
+                    }
+                    _ => None,
+                };
+
+                if let Some(id) = id_opt {
+                    let col = self.db.collection(col_name).await.map_err(McpError::from)?;
+                    col.delete(id).await.map_err(McpError::from)?;
+
+                    // Single document deletion in MemFuse does not generate a DeletionProof.
+                    // In accordance with honesty rules, we return proof: null and proof_scope: "collection_only".
+                    Ok(json!({
+                        "ok": true,
+                        "collection": col_name,
+                        "id": id,
+                        "proof": null,
+                        "proof_scope": "collection_only"
+                    }))
+                } else {
+                    let proof_key_str = std::env::var("MEMFUSE_DELETION_PROOF_KEY")
+                        .or_else(|_| std::env::var("MEMFUSE_PROOF_KEY"))
+                        .map_err(|_| {
+                            McpError::invalid_params("deletion proof key not configured")
+                        })?;
+                    let trimmed_key = proof_key_str.trim();
+                    if trimmed_key.is_empty() {
+                        return Err(McpError::invalid_params(
+                            "deletion proof key not configured",
+                        ));
+                    }
+
+                    let tenant_id = memfuse_core::TenantId::try_new(1)
+                        .unwrap_or(memfuse_core::TenantId::SYSTEM);
+
+                    let proof = self
+                        .db
+                        .drop_collection(col_name, tenant_id, trimmed_key.as_bytes())
+                        .await
+                        .map_err(McpError::from)?;
+
+                    let proof_json_str = proof
+                        .export_for_audit()
+                        .map_err(|e| McpError::internal_error(e.to_string()))?;
+                    let proof_val: Value = serde_json::from_str(&proof_json_str)
+                        .map_err(|e| McpError::internal_error(e.to_string()))?;
+
+                    Ok(json!({
+                        "ok": true,
+                        "collection": col_name,
+                        "proof": proof_val,
+                        "proof_scope": "collection"
+                    }))
+                }
+            }
+
             "memfuse_collections" => {
                 let names = self.db.list_collections().await.map_err(McpError::from)?;
                 Ok(json!({ "collections": names }))

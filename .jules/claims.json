@@ -194,24 +194,36 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T18:14:20.180368201+00:00",
       "session_id": "10672640857832740238",
-      "active": true,
-      "expires_at": "2026-09-21T22:14:20.180353482+00:00"
+      "active": false,
+      "expires_at": "2026-09-21T22:14:20.180353482+00:00",
+      "released_at": "2026-09-22T10:54:06.977358821+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-rank",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T20:00:37.526191799+00:00",
       "session_id": "2090223400654574052",
-      "active": true,
-      "expires_at": "2026-09-22T00:00:37.526179874+00:00"
+      "active": false,
+      "expires_at": "2026-09-22T00:00:37.526179874+00:00",
+      "released_at": "2026-09-22T10:54:06.977358821+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "docs-adr-n01-n05",
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T20:49:03.018199847+00:00",
       "session_id": "3736256039108358980",
-      "active": true,
-      "expires_at": "2026-09-22T00:49:03.018186895+00:00"
+      "active": false,
+      "expires_at": "2026-09-22T00:49:03.018186895+00:00",
+      "released_at": "2026-09-22T10:54:06.977358821+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-mcp",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-21T21:12:18.900044526+00:00",
+      "session_id": "1290132607432979554",
+      "active": false,
+      "expires_at": "2026-09-22T01:12:18.900033135+00:00",
+      "released_at": "2026-09-22T10:54:06.977358821+00:00 [TTL-EXPIRED]"
     }
   ]
 }
