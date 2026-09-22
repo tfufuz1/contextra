@@ -2707,6 +2707,7 @@ dependencies = [
  "memfuse-core",
  "memfuse-db",
  "memfuse-graph",
+ "memfuse-ports",
  "memfuse-privacy",
  "memfuse-store",
  "memfuse-text",
