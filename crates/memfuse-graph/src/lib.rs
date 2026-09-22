@@ -48,6 +48,7 @@ pub mod ppr;
 pub mod provenance;
 pub mod session_dag;
 
+pub use arc_slice::ArcSlice;
 pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
     CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket, DeletionProof,
@@ -72,10 +73,9 @@ pub use edge_reinforcement_buffer::edge_reinforcement_buffer::{
     CooccurrenceSignal, EdgeReinforcementBuffer, TraversalSignal,
 };
 pub use error::GraphMutationError;
-pub use arc_slice::ArcSlice;
 pub use hyperedge::{
-    sort_dedup_entities, star_weight, ConsolidationNodesGuard, HyperEdge, HyperEdgeId, HyperEdgeView,
-    RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
+    sort_dedup_entities, star_weight, ConsolidationNodesGuard, HyperEdge, HyperEdgeId,
+    HyperEdgeView, RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
 };
 pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
 #[cfg(feature = "graph-connectivity-health")]

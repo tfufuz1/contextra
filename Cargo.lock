@@ -2484,6 +2484,7 @@ dependencies = [
  "criterion",
  "futures",
  "memfuse-core",
+ "memfuse-rank",
  "memfuse-store",
  "memfuse-testkit",
  "parking_lot",

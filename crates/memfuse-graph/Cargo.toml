@@ -34,6 +34,7 @@ scc = "2"
 thiserror = { workspace = true }
 
 [dev-dependencies]
+memfuse-rank = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 memfuse-store = { workspace = true }
 memfuse-testkit = { workspace = true }
