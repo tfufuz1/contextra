@@ -90,7 +90,7 @@ impl SlidingWindowCounter {
         if !self.prune_and_sum(now, window) {
             // Clock anomaly fail-closed block
             return BulkExfiltrationOutcome::Block {
-                window_bytes: usize::MAX,
+                window_bytes: usize::MAX, // UNBOUNDED-OK: Fail-closed sentinel for clock anomaly
                 limit: max_bytes_per_window,
             };
         }
