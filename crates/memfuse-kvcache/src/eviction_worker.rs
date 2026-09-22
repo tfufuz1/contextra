@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall).
-// STAND: TS:2026-09-09T16:10:00Z (SESSION: dafac391)
+// STAND: TS:2026-09-15T00:00:00Z
 
 //! # Eviction-Architektur
 //!
@@ -21,12 +21,12 @@ use std::sync::Arc;
 
 enum EvictionCommand {
     EvictLru { target_free_bytes: usize },
+    BlockReleased { block_id: u64 },
     Shutdown,
 }
 
 /// Regelmäßiger Eviction-Pfad (VRAM > 80%-Trigger). NICHT im Async-Executor,
 /// da regelmäßige Zeroize-Operationen den Tokio-Scheduler blockieren würden.
-// AI-TAG[CONCURRENCY][MAJOR][RESOLVED] EvictionWorker is Sync via Mutex protection of sender and handle (ID: AGT-CRYPTO-edaee52e) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598)
 pub struct EvictionWorker {
     sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
     handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
@@ -46,6 +46,12 @@ impl EvictionWorker {
                             tracing::debug!(
                                 freed_bytes = freed,
                                 "KV eviction worker: LRU evict done"
+                            );
+                        }
+                        EvictionCommand::BlockReleased { block_id } => {
+                            tracing::debug!(
+                                block_id = block_id,
+                                "KV eviction worker: block released from active guard"
                             );
                         }
                         EvictionCommand::Shutdown => break,
@@ -72,6 +78,14 @@ impl EvictionWorker {
             .send(EvictionCommand::EvictLru { target_free_bytes });
     }
 
+    /// Benachrichtigt den EvictionWorker, dass eine Block-Referenz freigegeben wurde.
+    pub fn notify_block_released(&self, block_id: u64) {
+        let _ = self
+            .sender
+            .lock()
+            .send(EvictionCommand::BlockReleased { block_id });
+    }
+
     /// Beendet den Worker-Thread geordnet.
     pub fn shutdown(&self) {
         let _ = self.sender.lock().send(EvictionCommand::Shutdown);
@@ -88,8 +102,7 @@ impl Drop for EvictionWorker {
 }
 
 /// SEPARATER Pfad für Notfall-Löschung (z.B. Prozess-Shutdown, expliziter
-/// Sicherheits-Trigger). Synchron, blockierend, garantiert vor Rückkehr abgeschlossen --
-/// bewusst ANDERS als der reguläre Worker-Pfad.
+/// Sicherheits-Trigger). Synchron, blockierend, garantiert vor Rückkehr abgeschlossen.
 pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
     store.clear_all();
 }
@@ -110,18 +123,15 @@ mod tests {
 
         let worker = EvictionWorker::spawn(Arc::clone(&store));
 
-        // Trigger eviction of 500 bytes (should evict seg 1 at index 0)
         let start = std::time::Instant::now();
         worker.trigger_eviction(500);
         let elapsed = start.elapsed();
 
-        // Trigger must return immediately (non-blocking)
         assert!(
             elapsed < Duration::from_millis(50),
             "trigger_eviction must be non-blocking"
         );
 
-        // Wait for worker thread to process command
         let mut freed = false;
         for _ in 0..100 {
             std::thread::sleep(Duration::from_millis(10));
@@ -140,22 +150,18 @@ mod tests {
         let store = Arc::new(TenantIsolatedKvStore::new());
         let tenant = TenantId::try_new(1).unwrap();
 
-        // Insert A, B, C
         store.insert_segment(tenant, KvSegment::new(tenant, 10, vec![0x11; 512]));
         std::thread::sleep(Duration::from_millis(1));
         store.insert_segment(tenant, KvSegment::new(tenant, 20, vec![0x22; 512]));
         std::thread::sleep(Duration::from_millis(1));
         store.insert_segment(tenant, KvSegment::new(tenant, 30, vec![0x33; 512]));
 
-        // Touch A so it becomes most recently used
         let _ = store.get_segment_bytes(tenant, 10);
 
         let worker = EvictionWorker::spawn(Arc::clone(&store));
 
-        // Trigger eviction of 500 bytes (requires evicting 1 segment)
         worker.trigger_eviction(500);
 
-        // Wait for worker thread to process command
         let mut freed = false;
         for _ in 0..100 {
             std::thread::sleep(Duration::from_millis(10));
@@ -169,8 +175,6 @@ mod tests {
 
         let remaining_ids = store.get_segments(tenant);
 
-        // Under LRU: Segment B (clock 2, least recently used) was evicted.
-        // Segment A (clock 4, most recently used) MUST be retained.
         assert!(
             remaining_ids.contains(&10),
             "Segment A (most recently used) must NOT be evicted"
@@ -191,10 +195,8 @@ mod tests {
 
         assert_eq!(store.get_tenant_segment_len(tenant), 2);
 
-        // Synchronous emergency wipe
         emergency_wipe(&store);
 
-        // Immediately after return, all segments MUST be gone
         assert_eq!(
             store.get_tenant_segment_len(tenant),
             0,

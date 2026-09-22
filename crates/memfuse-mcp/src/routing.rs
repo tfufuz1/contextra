@@ -83,6 +83,32 @@ pub struct RoutingHandle {
 /// Conditionally sets up `RouterEngine`, `IsotonicCalibrator`, and `PidController` if routing profiles are configured.
 /// Attaches their `Weak` pointers to `db` via `set_router`, `set_calibrator`, and `set_pid_controller`.
 /// Returns `Some(RoutingHandle)` if profiles were present, or `None` if no profiles were configured.
+struct CollectionSearchAdapter(Arc<memfuse::Collection>);
+
+impl memfuse::router::ports_local::HybridSearchProvider for CollectionSearchAdapter {
+    fn search_hybrid<'a>(
+        &'a self,
+        query_text: &'a str,
+        query_embedding: &'a [f32],
+        top_k: usize,
+    ) -> memfuse_core::BoxFuture<'a, Result<Vec<memfuse_core::ContextChunk>, MemFuseError>> {
+        let col = self.0.clone();
+        Box::pin(async move {
+            let search_results = col
+                .query()
+                .text(query_text)
+                .vector(query_embedding)
+                .k(top_k)
+                .execute()
+                .await?;
+            search_results
+                .into_iter()
+                .map(memfuse_core::ContextChunk::try_from)
+                .collect()
+        })
+    }
+}
+
 pub async fn setup_routing(
     db: &Arc<MemFuse>,
     config: &RouterConfig,
@@ -106,7 +132,7 @@ pub async fn setup_routing(
     ));
 
     let calibrator = Arc::new(parking_lot::Mutex::new(
-        memfuse::calibration::IsotonicCalibrator::with_defaults(),
+        memfuse_rank::IsotonicCalibrator::with_defaults(),
     ));
 
     let pid_controller = Arc::new(parking_lot::Mutex::new(

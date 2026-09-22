@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// ZWECK: Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation).
-// STAND: TS:2026-09-13T00:00:00Z
+// ZWECK: Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation) mit Prefix-Radix & Guard-Schutz.
+// STAND: TS:2026-09-15T00:00:00Z
 
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -8,45 +8,62 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use lru::LruCache;
-use memfuse_core::TenantId;
+use memfuse_core::{MemFuseError, TenantId};
 use parking_lot::RwLock;
 
+use super::eviction_worker::EvictionWorker;
+use super::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 use super::segment::KvSegment;
 
 /// Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache.
 pub type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>;
 
-/// Kapselt den LRU-Cache aller KV-Segmente eines einzelnen Tenants.
-/// Ersetzt `Vec<KvSegment>` als innere Datenstruktur.
-/// O(1) für get/put/pop_lru via `lru::LruCache`.
+/// Kapselt den LRU-Cache und den Prefix-Radix-Baum aller KV-Segmente eines einzelnen Tenants.
 struct TenantState {
+    #[allow(dead_code)]
+    tenant_id: TenantId,
     cache: LruCache<u64, KvSegment>,
-    /// Byte-Budget-Tracking ohne Iteration — wird bei insert/remove gepflegt.
+    radix_tree: PrefixRadixTree,
     total_bytes: usize,
 }
 
 impl TenantState {
-    fn new(capacity: NonZeroUsize) -> Self {
+    fn new(tenant_id: TenantId, capacity: NonZeroUsize) -> Self {
         Self {
+            tenant_id,
             cache: LruCache::new(capacity),
+            radix_tree: PrefixRadixTree::new(tenant_id),
             total_bytes: 0,
         }
     }
 
-    /// O(1) insert. Gibt ein evicted Segment zurück, falls capacity überschritten.
-    /// Der Caller ist für Deferred-Drop zuständig (Phase 2).
+    /// O(1) insert. Evictiert das älteste unreferenzierte Segment, falls capacity überschritten.
+    /// Garantiert, dass aktive Blöcke (`active_refs > 0`) niemals verworfen werden.
     fn insert_returning_evicted(&mut self, segment: KvSegment) -> Option<KvSegment> {
         let id = segment.segment_id;
         let bytes = segment.len();
-        let evicted = self.cache.push(id, segment).map(|(_, old)| {
+
+        let evicted = if self.cache.len() >= self.cache.cap().get() {
+            self.pop_lru()
+        } else {
+            None
+        };
+
+        if self.cache.len() >= self.cache.cap().get() && evicted.is_none() {
+            // Alle Segmente im Cache sind aktuell durch aktive Guards geschützt.
+            // Erweitere die Kapazität vorübergehend, damit LruCache::push keine geschützten Blöcke verwirft.
+            let new_cap = NonZeroUsize::new(self.cache.cap().get() + 1).unwrap_or(NonZeroUsize::MIN);
+            self.cache.resize(new_cap);
+        }
+
+        if let Some((_, old)) = self.cache.push(id, segment) {
             self.total_bytes = self.total_bytes.saturating_sub(old.len());
-            old
-        });
+        }
         self.total_bytes = self.total_bytes.saturating_add(bytes);
         evicted
     }
 
-    /// O(1) get mit LRU-Update. Benötigt &mut wegen LruCache-Interna.
+    /// O(1) get mit LRU-Update.
     fn get_bytes(&mut self, id: u64) -> Option<Vec<u8>> {
         self.cache.get(&id).map(|s| s.as_bytes().to_vec())
     }
@@ -54,7 +71,17 @@ impl TenantState {
     /// O(1) get für Entschlüsselung — benötigt &mut wegen LRU-Update.
     #[allow(dead_code)]
     fn get_segment_ref_mut(&mut self, id: u64) -> Option<&KvSegment> {
-        self.cache.get(&id).map(|s| s as &KvSegment)
+        self.cache.get(&id)
+    }
+
+    /// Erstellt einen `KvBlockGuard` für ein Segment.
+    fn acquire_guard(
+        &mut self,
+        id: u64,
+        worker: Option<Arc<EvictionWorker>>,
+    ) -> Option<KvBlockGuard> {
+        let seg = self.cache.get(&id)?;
+        Some(seg.acquire_guard(worker))
     }
 
     /// O(1) entfernen. Gibt das Segment zurück (ZeroizeOnDrop beim Caller).
@@ -64,14 +91,42 @@ impl TenantState {
         Some(seg)
     }
 
-    /// O(1) LRU-Eviction. Gibt das am längsten nicht genutzte Segment zurück.
+    /// LRU-Eviction unter Schutz aktiver Referenzen (`active_refs == 0`).
+    /// Iteriert von LRU (Least Recently Used) zu MRU.
     fn pop_lru(&mut self) -> Option<KvSegment> {
-        let (_, seg) = self.cache.pop_lru()?;
-        self.total_bytes = self.total_bytes.saturating_sub(seg.len());
-        Some(seg)
+        let target_key = self
+            .cache
+            .iter()
+            .rev()
+            .find_map(|(&id, seg)| if seg.active_refs() == 0 { Some(id) } else { None });
+
+        if let Some(key) = target_key {
+            let seg = self.cache.pop(&key)?;
+            self.total_bytes = self.total_bytes.saturating_sub(seg.len());
+            Some(seg)
+        } else {
+            None
+        }
     }
 
-    /// Listet alle Segment-IDs OHNE LRU-Update (kein touch — behebt D5).
+    /// Fügt eine Token-Sequenz in den Radix-Baum ein.
+    fn insert_token_sequence(&mut self, tokens: &[u32], block_id: u64) -> Result<(), MemFuseError> {
+        self.radix_tree.insert(tokens, block_id)
+    }
+
+    /// Sucht ein Präfix-Match im Radix-Baum und erstellt einen Guard für das Caching-Segment.
+    fn find_prefix_match(
+        &mut self,
+        tokens: &[u32],
+        policy: KvReusePolicy,
+        worker: Option<Arc<EvictionWorker>>,
+    ) -> Option<(PrefixMatch, KvBlockGuard)> {
+        let pm = self.radix_tree.find_longest_prefix(tokens, policy)?;
+        let guard = self.acquire_guard(pm.block_id, worker)?;
+        Some((pm, guard))
+    }
+
+    /// Listet alle Segment-IDs OHNE LRU-Update.
     fn segment_ids(&self) -> impl Iterator<Item = u64> + '_ {
         self.cache.iter().map(|(&id, _)| id)
     }
@@ -86,7 +141,6 @@ impl TenantState {
 }
 
 /// Cache-Line-Padding verhindert False-Sharing auf 64-Byte-Cache-Lines.
-/// Keine externe Dependency nötig — `#[repr(align(64))]` ist stabile Safe-Rust-API.
 #[repr(align(64))]
 struct Shard {
     lock: RwLock<AHashMap<TenantId, TenantState>>,
@@ -101,21 +155,12 @@ impl Shard {
 }
 
 /// Tenant-isolierter KV-Segment-Store.
-///
-/// INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente
-/// eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps
-/// und Sharding.
 pub struct TenantIsolatedKvStore {
-    /// 32 cache-line-gepaddete RwLock-Shards. Box<[_]> für flexible Shard-Anzahl.
     shards: Box<[Shard]>,
     shard_count: usize,
-    /// Globaler Offset für Shard-Rotation über Eviction-Aufrufe hinweg.
     global_shard_offset: AtomicUsize,
-    /// Separater Eviction-Offset pro Shard für faire Round-Robin-Eviction.
     eviction_round_offsets: Box<[AtomicUsize]>,
-    /// Maximale Segment-Kapazität pro Tenant (übergeben an TenantState::new).
     segment_capacity: NonZeroUsize,
-    /// Optionaler Spill-Handler für LSM Tier-2 Persistierung bei Eviction.
     spill_handler: RwLock<Option<SpillHandler>>,
 }
 
@@ -123,13 +168,12 @@ impl TenantIsolatedKvStore {
     pub const DEFAULT_SHARD_COUNT: usize = 32;
     pub const DEFAULT_SEGMENT_CAPACITY_PER_TENANT: usize = 256;
 
-    /// Erstellt einen neuen tenant-isolierten KV-Store mit Standard-Shard-Anzahl (32).
+    /// Erstellt einen neuen tenant-isolierten KV-Store.
     pub fn new() -> Self {
         Self::with_shard_count(Self::DEFAULT_SHARD_COUNT)
     }
 
     /// Erstellt einen Store mit angegebener Shard-Anzahl.
-    /// Die Shard-Anzahl wird automatisch auf die nächste Zweierpotenz aufgerundet.
     pub fn with_shard_count(n: usize) -> Self {
         let shard_count = n.next_power_of_two().max(1);
         let shards = (0..shard_count)
@@ -164,7 +208,6 @@ impl TenantIsolatedKvStore {
         *self.spill_handler.write() = Some(handler);
     }
 
-    /// Deterministisches Shard-Mapping via Bitmask (Power-of-2).
     #[inline]
     fn shard_idx(&self, tenant: TenantId) -> usize {
         (tenant.inner() as usize) & (self.shard_count - 1)
@@ -178,9 +221,9 @@ impl TenantIsolatedKvStore {
             let mut shard = self.shards[idx].lock.write();
             let state = shard
                 .entry(tenant)
-                .or_insert_with(|| TenantState::new(capacity));
+                .or_insert_with(|| TenantState::new(tenant, capacity));
             state.insert_returning_evicted(segment)
-        }; // ← Lock freigegeben HIER, evicted wird ausserhalb des Locks gedroppt
+        };
 
         if let Some(ev) = evicted {
             let handler_opt = self.spill_handler.read().clone();
@@ -190,19 +233,55 @@ impl TenantIsolatedKvStore {
         }
     }
 
+    /// Fügt eine Token-Sequenz und deren assoziierte Block-ID in den Prefix-Radix-Baum ein.
+    pub fn insert_token_sequence(
+        &self,
+        tenant: TenantId,
+        tokens: &[u32],
+        block_id: u64,
+    ) -> Result<(), MemFuseError> {
+        let idx = self.shard_idx(tenant);
+        let capacity = self.segment_capacity;
+        let mut shard = self.shards[idx].lock.write();
+        let state = shard
+            .entry(tenant)
+            .or_insert_with(|| TenantState::new(tenant, capacity));
+        state.insert_token_sequence(tokens, block_id)
+    }
+
+    /// Sucht ein Präfix-Match für die angegebenen Tokens unter der gewünschten `KvReusePolicy`.
+    pub fn find_prefix_match(
+        &self,
+        tenant: TenantId,
+        tokens: &[u32],
+        policy: KvReusePolicy,
+        worker: Option<Arc<EvictionWorker>>,
+    ) -> Option<(PrefixMatch, KvBlockGuard)> {
+        let idx = self.shard_idx(tenant);
+        let mut shard = self.shards[idx].lock.write();
+        let state = shard.get_mut(&tenant)?;
+        state.find_prefix_match(tokens, policy, worker)
+    }
+
+    /// Erstellt einen `KvBlockGuard` für einen bestimmten Block.
+    pub fn acquire_block_guard(
+        &self,
+        tenant: TenantId,
+        block_id: u64,
+        worker: Option<Arc<EvictionWorker>>,
+    ) -> Option<KvBlockGuard> {
+        let idx = self.shard_idx(tenant);
+        let mut shard = self.shards[idx].lock.write();
+        let state = shard.get_mut(&tenant)?;
+        state.acquire_guard(block_id, worker)
+    }
+
     /// Bereinigt assoziierte KV-Segmente bei einem transaktionalen Rollback.
-    ///
-    /// Delegiert direkt an `remove_segments_for_rollback`, um verwaiste KV-Segmente
-    /// (Karteileichen/Memory-Leaks) nach fehlgeschlagenen Multi-Index-Commits zu verhindern.
     pub fn on_rollback(&self, tenant: TenantId, chunk_ids: &[u64]) {
         self.remove_segments_for_rollback(tenant, chunk_ids);
     }
 
-    /// Entfernt alle Segmente mit den angegebenen `segment_ids` für den gegebenen Tenant.
-    ///
-    /// Muss bei transaktionalem Rollback aufgerufen werden, wenn ein `DbTransaction::commit()`
-    /// fehlschlägt und `compensate_*()` ausgeführt wird, um verwaiste KV-Segmente zu
-    /// vermeiden (Memory-Leak-Prävention).
+    /// Entfernt Segmente mit den angegebenen `segment_ids` für einen Tenant.
     pub fn remove_segments_for_rollback(&self, tenant: TenantId, segment_ids: &[u64]) {
         if segment_ids.is_empty() {
             return;
@@ -222,7 +301,7 @@ impl TenantIsolatedKvStore {
             } else {
                 vec![]
             }
-        }; // ← Lock freigegeben HIER, _deferred ZeroizeOnDrop läuft ausserhalb des Locks
+        };
         tracing::debug!(
             tenant_id = ?tenant,
             removed_segment_ids = ?segment_ids,
@@ -230,12 +309,12 @@ impl TenantIsolatedKvStore {
         );
     }
 
-    /// Entfernt ein einzelnes Segment. Convenience-Wrapper um `remove_segments_for_rollback`.
+    /// Entfernt ein einzelnes Segment.
     pub fn remove_segment(&self, tenant: TenantId, segment_id: u64) {
         self.remove_segments_for_rollback(tenant, &[segment_id]);
     }
 
-    /// Liefert unverschlüsselte Segment-Bytes für einen Tenant (Klartext-Modus).
+    /// Liefert unverschlüsselte Segment-Bytes für einen Tenant.
     pub fn get_segment_bytes(&self, tenant: TenantId, segment_id: u64) -> Option<Vec<u8>> {
         let idx = self.shard_idx(tenant);
         self.shards[idx]
@@ -268,8 +347,7 @@ impl TenantIsolatedKvStore {
         Ok(())
     }
 
-    /// INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente
-    /// eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps.
+    /// Liefert alle gespeicherten Segment-IDs eines Tenants.
     pub fn get_segments(&self, tenant: TenantId) -> Vec<u64> {
         let idx = self.shard_idx(tenant);
         self.shards[idx]
@@ -280,7 +358,7 @@ impl TenantIsolatedKvStore {
             .unwrap_or_default()
     }
 
-    /// Liest ein bestimmtes Segment eines Mandanten und entschlüsselt es falls nötig.
+    /// Liest ein Segment und entschlüsselt es falls nötig.
     #[cfg(feature = "kv-encryption")]
     pub fn get_decrypted_segment(
         &self,
@@ -299,7 +377,7 @@ impl TenantIsolatedKvStore {
         Ok(None)
     }
 
-    /// Gibt die Anzahl der gespeicherten Segmente für einen bestimmten Tenant zurück.
+    /// Gibt die Anzahl der gespeicherten Segmente für einen Mandanten zurück.
     pub fn get_tenant_segment_len(&self, tenant: TenantId) -> usize {
         let idx = self.shard_idx(tenant);
         self.shards[idx]
@@ -310,7 +388,7 @@ impl TenantIsolatedKvStore {
             .unwrap_or(0)
     }
 
-    /// Dies ist GLOBALES LRU ohne Tenant-Fairness. Für faire Multi-Tenant-Eviction siehe `evict_lru_fair()`.
+    /// Globale LRU Eviction unter Schutz aktiver Referenzen.
     #[allow(dead_code)]
     pub(crate) fn evict_lru_global(&self, target_free_bytes: usize) -> usize {
         let mut freed = 0;
@@ -326,7 +404,6 @@ impl TenantIsolatedKvStore {
                 }
                 let shard_idx = (start_shard + s_idx) % self.shard_count;
 
-                // Phase 1: Evict unter Lock — nur pop_lru, kein Zeroize
                 let evicted_opt: Option<(TenantId, KvSegment)> = {
                     let mut shard = self.shards[shard_idx].lock.write();
                     let tenant_opt = shard.keys().copied().next();
@@ -346,9 +423,8 @@ impl TenantIsolatedKvStore {
                     } else {
                         None
                     }
-                }; // ← Shard-Lock freigegeben
+                };
 
-                // Phase 2: Zeroize AUSSERHALB des Locks (behebt D3)
                 if let Some((tenant, evicted)) = evicted_opt {
                     freed += evicted.len();
                     made_progress = true;
@@ -358,7 +434,7 @@ impl TenantIsolatedKvStore {
                         freed_bytes = evicted.len(),
                         "KV eviction worker: evicted segment"
                     );
-                    drop(evicted); // ZeroizeOnDrop läuft hier, Lock ist bereits freigegeben
+                    drop(evicted);
                 }
             }
 
@@ -370,15 +446,9 @@ impl TenantIsolatedKvStore {
         freed
     }
 
-    /// Maximale Anzahl an Eviction-Runden, die unter einem einzigen Lock-Erwerb
-    /// ausgeführt werden, bevor der Schreiblock kurzzeitig freigegeben wird, um
-    /// wartenden Lesezugriffen (get_segments/get_decrypted_segment) eine Chance zu geben.
     const MAX_ROUNDS_PER_LOCK_ACQUISITION: usize = 4;
 
-    /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness via Round-Robin über alle aktiven Tenants.
-    ///
-    /// Im Gegensatz zu `evict_lru_global()` verhindert diese Methode, dass sehr aktive
-    /// Tenants inaktive Tenants vollständig verdrängen (Prevent Cross-Tenant Starvation).
+    /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Guard-Schutz (`active_refs == 0`).
     pub fn evict_lru_fair(&self, target_free_bytes: usize) -> usize {
         #[cfg(test)]
         {
@@ -425,7 +495,6 @@ impl TenantIsolatedKvStore {
                     #[cfg(test)]
                     let mut evicted_in_shard = false;
 
-                    // Phase 1: Eviction unter Shard-Lock (1 Runde über Tenants des Shards)
                     {
                         let mut shard = self.shards[shard_idx].lock.write();
                         if !shard.is_empty() {
@@ -464,18 +533,16 @@ impl TenantIsolatedKvStore {
                                 }
                             }
                         }
-                    } // ← Shard-Lock freigegeben HIER
+                    }
 
-                    // Phase 2: Zeroize AUSSERHALB des Locks (behebt D3)
                     let handler_opt = self.spill_handler.read().clone();
                     if let Some(ref handler) = handler_opt {
                         for ev in &deferred_drop {
                             handler(ev.tenant_id, ev.segment_id, ev.to_spill_bytes());
                         }
                     }
-                    deferred_drop.clear(); // ZeroizeOnDrop für alle evicteten Segmente
+                    deferred_drop.clear();
 
-                    // Test-Hook: signalisiert, dass Lock nach Eviction-Batch freigegeben wurde
                     #[cfg(test)]
                     if evicted_in_shard && freed < target_free_bytes {
                         if let Some(ref mut hook) = batch_released_hook {
@@ -502,7 +569,7 @@ impl TenantIsolatedKvStore {
                     all_segments.push(seg);
                 }
             }
-        } // ← Alle Shard-Locks freigegeben HIER
+        }
         drop(all_segments);
         tracing::warn!("KV emergency_wipe: all segments zeroized synchronously");
     }
@@ -522,6 +589,32 @@ mod tests {
     use std::thread;
 
     #[test]
+    fn test_store_guarded_segments_never_force_evicted_on_overflow() {
+        let store = TenantIsolatedKvStore::with_capacity(2);
+        let tenant = TenantId::try_new(10).unwrap();
+
+        store.insert_segment(tenant, KvSegment::new(tenant, 1, vec![0x11; 256]));
+        store.insert_segment(tenant, KvSegment::new(tenant, 2, vec![0x22; 256]));
+
+        let guard1 = store.acquire_block_guard(tenant, 1, None).unwrap();
+        let guard2 = store.acquire_block_guard(tenant, 2, None).unwrap();
+
+        assert_eq!(guard1.active_refs(), 1);
+        assert_eq!(guard2.active_refs(), 1);
+
+        // Insert 3rd segment into full capacity store (2) where all items are guarded
+        store.insert_segment(tenant, KvSegment::new(tenant, 3, vec![0x33; 256]));
+
+        let current_ids = store.get_segments(tenant);
+        assert!(current_ids.contains(&1), "Guarded segment 1 must NOT be force-evicted!");
+        assert!(current_ids.contains(&2), "Guarded segment 2 must NOT be force-evicted!");
+        assert!(current_ids.contains(&3), "Newly inserted segment 3 must be present!");
+
+        drop(guard1);
+        drop(guard2);
+    }
+
+    #[test]
     fn test_tenant_isolation_no_cross_read() {
         let store = TenantIsolatedKvStore::new();
 
@@ -534,17 +627,14 @@ mod tests {
         store.insert_segment(tenant_a, seg_a);
         store.insert_segment(tenant_b, seg_b);
 
-        // Tenant A sees only its own segment
         let segs_a = store.get_segments(tenant_a);
         assert_eq!(segs_a, vec![101]);
         assert_eq!(store.get_tenant_segment_len(tenant_a), 1);
 
-        // Tenant B sees only its own segment
         let segs_b = store.get_segments(tenant_b);
         assert_eq!(segs_b, vec![202]);
         assert_eq!(store.get_tenant_segment_len(tenant_b), 1);
 
-        // Non-existent tenant C sees nothing
         let tenant_c = TenantId::try_new(3).unwrap();
         assert!(store.get_segments(tenant_c).is_empty());
         assert_eq!(store.get_tenant_segment_len(tenant_c), 0);
@@ -557,19 +647,16 @@ mod tests {
         let tenant_a = TenantId::try_new(1).unwrap();
         let tenant_b = TenantId::try_new(2).unwrap();
 
-        // Tenant B has 1 segment with the oldest timestamp (inserted first, untouched)
         let seg_b = KvSegment::new(tenant_b, 201, vec![0x22; 256]);
         store.insert_segment(tenant_b, seg_b);
 
         std::thread::sleep(std::time::Duration::from_millis(5));
 
-        // Tenant A has 10 segments that are active/touched
         for i in 1..=10 {
             let seg_a = KvSegment::new(tenant_a, i, vec![0x11; 256]);
             store.insert_segment(tenant_a, seg_a);
         }
 
-        // Touch Tenant A's segments so their last_accessed timestamps are fresh
         for i in 1..=10 {
             let _ = store.get_segment_bytes(tenant_a, i);
         }
@@ -577,14 +664,10 @@ mod tests {
         assert_eq!(store.get_tenant_segment_len(tenant_a), 10);
         assert_eq!(store.get_tenant_segment_len(tenant_b), 1);
 
-        // Evict 256 bytes using fair eviction
         let freed = store.evict_lru_fair(256);
         assert!(freed >= 256);
 
-        // Tenant A should lose 1 segment (leaving 9)
         assert_eq!(store.get_tenant_segment_len(tenant_a), 9);
-
-        // Tenant B's segment MUST NOT be evicted despite being globally oldest
         assert_eq!(
             store.get_tenant_segment_len(tenant_b),
             1,
@@ -607,14 +690,12 @@ mod tests {
         assert_eq!(store.get_tenant_segment_len(tenant_a), 3);
         assert_eq!(store.get_tenant_segment_len(tenant_b), 3);
 
-        // Target 1000 bytes: requires freeing 2 segments (1024 bytes) across tenants
         let freed = store.evict_lru_fair(1000);
         assert!(
             freed >= 1000,
             "freed bytes ({freed}) must be >= target_free_bytes (1000)"
         );
 
-        // Fair round-robin evicts 1 segment from Tenant A and 1 segment from Tenant B
         assert_eq!(store.get_tenant_segment_len(tenant_a), 2);
         assert_eq!(store.get_tenant_segment_len(tenant_b), 2);
     }
@@ -841,5 +922,43 @@ mod tests {
         store.insert_segment(tenant, KvSegment::new(tenant, 1, vec![0u8; 8]));
         store.remove_segments_for_rollback(tenant, &[]);
         assert_eq!(store.get_tenant_segment_len(tenant), 1);
+    }
+
+    #[test]
+    fn test_store_prefix_radix_and_block_guard_protection() {
+        let store = TenantIsolatedKvStore::new();
+        let tenant = TenantId::try_new(10).unwrap();
+
+        let seg = KvSegment::new(tenant, 501, vec![0xFF; 512]);
+        store.insert_segment(tenant, seg);
+
+        let tokens = vec![1, 2, 3, 4, 5, 6];
+        store.insert_token_sequence(tenant, &tokens, 501).unwrap();
+
+        let (pm, guard) = store
+            .find_prefix_match(
+                tenant,
+                &[1, 2, 3, 4, 5, 6, 7],
+                KvReusePolicy::CostBased { min_prefix_len: 4 },
+                None,
+            )
+            .expect("Should match prefix [1..6]");
+
+        assert_eq!(pm.matched_len, 6);
+        assert_eq!(pm.block_id, 501);
+        assert_eq!(guard.active_refs(), 1);
+
+        let freed_while_guarded = store.evict_lru_fair(512);
+        assert_eq!(
+            freed_while_guarded, 0,
+            "Active guard MUST protect segment from LRU eviction!"
+        );
+        assert_eq!(store.get_tenant_segment_len(tenant), 1);
+
+        drop(guard);
+
+        let freed_after_drop = store.evict_lru_fair(512);
+        assert!(freed_after_drop >= 512);
+        assert_eq!(store.get_tenant_segment_len(tenant), 0);
     }
 }

@@ -63,7 +63,7 @@ impl Ring {
             "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
             | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
             | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-            | "memfuse-core" => Some(Ring::Ring0),
+        | "memfuse-core" => Some(Ring::Ring0),
 
             // Ring 1: Storage & State Persistence
             "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),

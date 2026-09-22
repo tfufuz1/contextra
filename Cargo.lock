@@ -2266,8 +2266,12 @@ dependencies = [
  "memfuse-infer-onnx",
  "memfuse-rank",
  "memfuse-router",
+ "serde",
+ "serde_json",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -2505,8 +2509,10 @@ dependencies = [
  "candle-transformers",
  "criterion",
  "futures-util",
+ "half",
  "memfuse-core",
  "memfuse-crypto",
+ "memfuse-ports",
  "memfuse-rank",
  "memfuse-store",
  "proptest",
@@ -2591,6 +2597,7 @@ dependencies = [
  "memfuse-infer-candle",
  "memfuse-infer-onnx",
  "memfuse-privacy",
+ "memfuse-rank",
  "parking_lot",
  "rand 0.8.8",
  "scc",
@@ -2658,10 +2665,12 @@ name = "memfuse-py"
 version = "0.1.0"
 dependencies = [
  "flatbuffers",
+ "memfuse-adapt",
  "memfuse-core",
  "memfuse-db",
  "memfuse-rank",
  "memfuse-router",
+ "memfuse-store",
  "numpy",
  "parking_lot",
  "pyo3",
@@ -2698,7 +2707,6 @@ dependencies = [
  "memfuse-graph",
  "memfuse-ports",
  "memfuse-privacy",
- "memfuse-store",
  "memfuse-text",
  "memfuse-vector",
  "parking_lot",

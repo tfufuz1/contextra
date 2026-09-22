@@ -1,20 +1,28 @@
+use arc_swap::ArcSwap;
+use parking_lot::{Mutex, RwLock};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use parking_lot::{Mutex, RwLock};
-use arc_swap::ArcSwap;
-use serde::{Deserialize, Serialize};
 
+use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
+use crate::GraphIndexExt;
 use memfuse_core::{
     BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
     StorageEngine, TxId,
 };
 use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
+use crate::error::GraphMutationError;
 use crate::GraphIndexExt;
 
-use super::types::{CsrGraphConfig, Edge, EdgePayload, EdgeType, PersistedEdgePayload, GRAPH_COMMUNITY_PREFIX, GRAPH_EDGE_PREFIX, GRAPH_ENTITY_DELETED_PREFIX, GRAPH_ENTITY_PREFIX};
 use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard, MemoryEstimate};
-use super::visibility::{is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id};
+use super::types::{
+    CsrGraphConfig, Edge, EdgePayload, EdgeType, PersistedEdgePayload, GRAPH_COMMUNITY_PREFIX,
+    GRAPH_EDGE_PREFIX, GRAPH_ENTITY_DELETED_PREFIX, GRAPH_ENTITY_PREFIX,
+};
+use super::visibility::{
+    is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id,
+};
 
 /// Compressed Sparse Row graph for entity-relation traversal.
 ///
@@ -305,6 +313,52 @@ impl CsrGraph {
     }
 
     /// Directly inserts a hyperedge into memory.
+    /// Erstellt eine n-äre Hyperkante mit H2-Multi-Key-Locking unter Verwending von [`ConsolidationNodesGuard`].
+    ///
+    /// Sortiert alle beteiligten Entity-IDs deterministisch vor dem Erwerb/Mutation, um Deadlocks
+    /// bei überlappenden Knotenmengen zu verhindern (H2 / §5.1.2).
+    pub fn relate_n_ary(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+        predicate: crate::csr::EdgeType,
+        participants: Vec<crate::hyperedge::RoleBinding>,
+        weight: f32,
+        doc_id: Option<DocId>,
+    ) -> std::result::Result<crate::hyperedge::HyperEdge, GraphMutationError> {
+        let entity_ids: Vec<EntityId> = participants.iter().map(|p| p.entity).collect();
+        let guard = crate::hyperedge::ConsolidationNodesGuard::try_acquire(&entity_ids)?;
+
+        let hyperedge = crate::hyperedge::HyperEdge::new(id, predicate, participants, weight)
+            .with_source_doc_id(doc_id);
+        hyperedge.validate()?;
+
+        guard.with_entities(|_sorted_entities| {
+            self.insert_hyperedge_direct(hyperedge.clone());
+        });
+
+        Ok(hyperedge)
+    }
+
+    /// Persists a hyperedge to storage under `__graph:hyperedge:` and secondary index `__graph:hyperedge_by_entity:`.
+    pub async fn persist_hyperedge(&self, tx: TxId, hyperedge: &crate::hyperedge::HyperEdge) -> Result<()> {
+        if let Some(storage) = self.storage() {
+            let key = format!("{}{:016x}", crate::hyperedge::HYPEREDGE_PREFIX, hyperedge.id.inner());
+            let value = hyperedge.serialize()?;
+            storage.put(tx, key.as_bytes(), &value).await?;
+
+            for participant in hyperedge.participants.iter() {
+                let sec_key = format!(
+                    "{}{:016x}:{:016x}",
+                    crate::hyperedge::HYPEREDGE_BY_ENTITY_PREFIX,
+                    participant.entity.inner(),
+                    hyperedge.id.inner()
+                );
+                storage.put(tx, sec_key.as_bytes(), &[]).await?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn insert_hyperedge_direct(&self, hyperedge: crate::hyperedge::HyperEdge) {
         let hyperedge_arc = Arc::new(hyperedge);
         let mut inner = self.inner_write();
@@ -673,6 +727,4 @@ impl CsrGraph {
         inner.add_to_out_weight_sum(from_idx, weight);
         Ok(())
     }
-
-
 }

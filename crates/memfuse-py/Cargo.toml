@@ -29,8 +29,10 @@ tokio = { workspace = true }
 # vom Sovereign Core DAG, da Bindings per Definition an der Grenze zum Nutzer stehen.
 memfuse-router = { workspace = true }
 memfuse-rank = { workspace = true }
+memfuse-adapt = { workspace = true }
 parking_lot = { workspace = true }
 memfuse-core = { workspace = true }
+memfuse-store = { workspace = true }
 memfuse-db = { workspace = true }
 flatbuffers = { workspace = true }
 serde_json = { workspace = true }
