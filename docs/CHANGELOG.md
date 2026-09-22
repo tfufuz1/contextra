@@ -279,6 +279,8 @@
 | `` | `crates/memfuse-cognition/src/memory_consolidation.rs` | `AI-TAG` | `AGT-DB-660fbb5f` | `-` | `RESOLVED` | `0` | /// AI-TAG[SLEEP][MINOR] RESOLVED: AGT-DB-660fbb5f — Position im turns-Slice wird anstelle des |
 | `` | `crates/memfuse-crypto/src/deletion_proof.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-R3-1: DeletionProof signature_version 2 erweitert Signatur-Payload um covered_layers & excluded_scopes zur Vermeidung von Cross-Context-Fälschungen. |
 | `` | `crates/memfuse-crypto/src/egress_vault.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cloud-Egress-Vault mit Layer-1-Regex-Klassifikation und Fail-Closed-Semantik (Re-export from memfuse-privacy). |
+| `` | `crates/memfuse-crypto/src/kdf.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Versionierter Key Derivation Function (KDF) Header und Argon2id Schlüsselableitung für Passphrasen. |
+| `` | `crates/memfuse-crypto/tests/kdf_argon2id.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tests für Argon2id KDF Header, Parameter-Validierung, Parser-Robustheit und KeyManager Integration. |
 | `` | `crates/memfuse-db/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | MemFuse Database Strangler Shell / Re-export Facade (Layer 3). |
 | `` | `crates/memfuse-db/tests/cross_domain_chaos_matrix_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/memfuse-db/tests/diskann_collection_fallback.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Collection Integration Fallback Test (Pflichttest 3). |
