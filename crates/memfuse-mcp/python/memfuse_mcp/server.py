@@ -10,6 +10,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from memfuse_mcp import __version__
+from memfuse_mcp._download import get_cached_binary_path, download_release_binary
+
 def find_repo_root() -> Path:
     """Recursively search upward from current file to find repository root containing Cargo.toml."""
     curr = Path(__file__).resolve().parent
@@ -18,45 +21,81 @@ def find_repo_root() -> Path:
             return p
     return curr
 
+def is_executable(path: Path) -> bool:
+    """Check whether a path exists, is a file, and is executable."""
+    return path.is_file() and os.access(path, os.X_OK)
+
 def find_mcp_binary() -> str:
+    """
+    Locate or download the memfuse-mcp-server binary following strict priority:
+    1. MEMFUSE_MCP_BINARY environment variable (explicit binary path).
+    2. memfuse-mcp-server in system PATH.
+    3. Cached release binary (~/.cache/memfuse-mcp/<version>/ or %LOCALAPPDATA%).
+    4. Download GitHub release binary (SHA256 verified).
+    5. Repo tree & Cargo build fallback (ONLY if MEMFUSE_MCP_ALLOW_REPO_BUILD=1).
+    """
     # 1. Check explicit environment override
     env_bin = os.environ.get("MEMFUSE_MCP_BINARY")
-    if env_bin and os.path.isfile(env_bin) and os.access(env_bin, os.X_OK):
-        return env_bin
+    if env_bin:
+        env_path = Path(env_bin)
+        if is_executable(env_path):
+            return str(env_path)
+        sys.stderr.write(
+            f"[memfuse-mcp] Warning: MEMFUSE_MCP_BINARY set to '{env_bin}', but file is missing or not executable.\n"
+        )
+        sys.stderr.flush()
 
     # 2. Check system PATH
     which_bin = shutil.which("memfuse-mcp-server")
-    if which_bin:
+    if which_bin and is_executable(Path(which_bin)):
         return which_bin
 
-    # 3. Check target directory relative to repo root or current working dir
-    repo_root = find_repo_root()
-    candidates = [
-        repo_root / "target" / "release" / "memfuse-mcp-server",
-        repo_root / "target" / "debug" / "memfuse-mcp-server",
-        Path.cwd() / "target" / "release" / "memfuse-mcp-server",
-        Path.cwd() / "target" / "debug" / "memfuse-mcp-server",
-    ]
+    # 3. Check local cache directory
+    cached_bin = get_cached_binary_path(__version__)
+    if is_executable(cached_bin):
+        return str(cached_bin)
 
-    for candidate in candidates:
-        if candidate.exists() and os.access(candidate, os.X_OK):
-            return str(candidate)
-
-    # 4. Attempt auto-compilation via cargo if in source tree
-    if (repo_root / "Cargo.toml").exists():
-        sys.stderr.write("[memfuse-mcp] memfuse-mcp-server binary not found. Building release binary via Cargo...\n")
+    # 4. Download release binary from GitHub
+    try:
+        downloaded_bin = download_release_binary(__version__)
+        if is_executable(downloaded_bin):
+            return str(downloaded_bin)
+    except Exception as exc:
+        sys.stderr.write(f"[memfuse-mcp] Automatic binary download failed: {exc}\n")
         sys.stderr.flush()
-        cmd = ["cargo", "build", "--release", "-p", "memfuse-mcp", "--bin", "memfuse-mcp-server"]
-        res = subprocess.run(cmd, cwd=str(repo_root))
-        if res.returncode == 0:
-            target_bin = repo_root / "target" / "release" / "memfuse-mcp-server"
-            if target_bin.exists():
-                return str(target_bin)
+
+    # 5. Repo tree / Cargo build fallback ONLY IF MEMFUSE_MCP_ALLOW_REPO_BUILD=1
+    if os.environ.get("MEMFUSE_MCP_ALLOW_REPO_BUILD") == "1":
+        repo_root = find_repo_root()
+        candidates = [
+            repo_root / "target" / "release" / "memfuse-mcp-server",
+            repo_root / "target" / "debug" / "memfuse-mcp-server",
+            Path.cwd() / "target" / "release" / "memfuse-mcp-server",
+            Path.cwd() / "target" / "debug" / "memfuse-mcp-server",
+        ]
+
+        for candidate in candidates:
+            if is_executable(candidate):
+                return str(candidate)
+
+        if (repo_root / "Cargo.toml").exists():
+            sys.stderr.write(
+                "[memfuse-mcp] MEMFUSE_MCP_ALLOW_REPO_BUILD=1 is set. Building release binary via Cargo...\n"
+            )
+            sys.stderr.flush()
+            cmd = ["cargo", "build", "--release", "-p", "memfuse-mcp", "--bin", "memfuse-mcp-server"]
+            res = subprocess.run(cmd, cwd=str(repo_root))
+            if res.returncode == 0:
+                target_bin = repo_root / "target" / "release" / "memfuse-mcp-server"
+                if is_executable(target_bin):
+                    return str(target_bin)
 
     raise FileNotFoundError(
-        "Could not locate or build `memfuse-mcp-server` executable.\n"
-        "Please ensure `memfuse-mcp-server` is installed in system PATH, "
-        "or set `MEMFUSE_MCP_BINARY` environment variable pointing to the binary."
+        "Could not locate or download `memfuse-mcp-server` executable.\n"
+        "Options to resolve:\n"
+        "1. Set MEMFUSE_MCP_BINARY environment variable pointing to the precompiled binary.\n"
+        "2. Ensure memfuse-mcp-server is available in your system PATH.\n"
+        "3. Set MEMFUSE_MCP_ALLOW_REPO_BUILD=1 to allow building from source via Cargo in developer repositories."
     )
 
 def main():
