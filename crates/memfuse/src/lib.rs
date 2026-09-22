@@ -20,7 +20,7 @@ pub use memfuse_db::{
 pub use memfuse_router as router;
 
 #[cfg(feature = "router")]
-pub use memfuse_calibration as calibration;
+pub use memfuse_rank as rank;
 
 #[cfg(feature = "ollama")]
 pub use memfuse_infer_ollama as ollama;

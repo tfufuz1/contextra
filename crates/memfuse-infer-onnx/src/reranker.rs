@@ -14,11 +14,11 @@
 //! Aktivierung: Feature-Flag `onnx` erforderlich.
 //! Modell: bge-reranker-base oder ms-marco-MiniLM-L-6-v2 (ONNX-Export).
 
-use memfuse_calibration::PlattScaler;
 use memfuse_core::{ConfigFingerprint, MemFuseError};
+use memfuse_rank::PlattScaler;
 
 /// Alias für `PlattScaler` zur Rückwärtskompatibilität und ADR-070-Konformität.
-pub use memfuse_calibration::PlattScaler as PlattScaledSigmoid;
+pub use memfuse_rank::PlattScaler as PlattScaledSigmoid;
 
 /// Maximale Anzahl von Kandidaten pro Reranking-Aufruf zur Vermeidung unbegrenzter Allokationen.
 pub const MAX_CANDIDATES: usize = 10_000;
