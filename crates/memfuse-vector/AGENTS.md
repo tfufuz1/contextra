@@ -15,7 +15,7 @@ bzw. memory-mapped geladen (via `persistence::MmapIndex`).
 
 | Datei | Verantwortung |
 |---|---|
-| `lib.rs` | Modul-Deklaration, `#![deny(unsafe_code)]` mit strikten Ausnahmen |
+| `lib.rs` | Modul-Deklaration, `#![forbid(unsafe_code)]` |
 | `hnsw.rs` | `HnswIndex`, Graph-Traversal, Layer-Verwaltung, Heuristic Node Selection |
 | `distance.rs` | SIMD-Distanz-Intrinsics (Cosine, Euclidean, DotProduct), Hardware-Dispatch |
 | `quantize.rs` | `ScalarQuantizer` (SQ8), Asymmetrische/Symmetrische Distanz-Approximation |
@@ -32,11 +32,10 @@ Distanzberechnung in `distance.rs` wählt zur Laufzeit die besten verfügbaren I
 Hierarchie: **AVX-512 > AVX2 > NEON > Skalar**.
 Fallback auf Skalar muss immer exakt die gleichen mathematischen Ergebnisse liefern.
 
-### unsafe Scope & Mmap (ADR-017)
-- `distance.rs`: Darf `#![allow(unsafe_code)]` verwenden (für SIMD-Intrinsics).
-- `diskann.rs` & `persistence.rs`: Dürfen exakt ein `unsafe { Mmap::map(&file) }` enthalten.
-- **Pflicht:** Jedes `unsafe` MUSS von einem `// SAFETY:` Beweis-Kommentar begleitet sein.
-- Modul-weites `#![allow(unsafe_code)]` ist im gesamten Crate **VERBOTEN**.
+### Zero Unsafe Code & Invariants (ADR-017 / Spec §0.4)
+- `crates/memfuse-vector` erzwingt strikt `#![forbid(unsafe_code)]` am Crate-Root (`src/lib.rs`).
+- Sämtliche `unsafe`-Operationen (SIMD, Mmap) sind in dedizierte Low-Level Crates (`memfuse-simd`, `memfuse-sys`) ausgelagert.
+- Jegliches `unsafe` oder `#![allow(unsafe_code)]` innerhalb von `memfuse-vector` ist ausnahmslos verboten.
 
 ### Atomic Rename Pattern (File Writes)
 Wie in `memfuse-store` (aber hier für Index-Snapshots):
