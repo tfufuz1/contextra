@@ -2466,6 +2466,7 @@ dependencies = [
  "futures",
  "memfuse-core",
  "memfuse-store",
+ "memfuse-testkit",
  "parking_lot",
  "proptest",
  "scc",

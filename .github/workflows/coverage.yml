@@ -38,7 +38,7 @@ jobs:
         run: cargo xtask check-coverage-gate
         # Gate-Schwellwerte (in xtask/src/check_coverage_gate.rs):
         # memfuse-store:  75%
-        # memfuse-index:  70%
+        # memfuse-vector:  70%
         # memfuse-text:   70%
         # memfuse-graph:  65%
         # memfuse-db:     60%

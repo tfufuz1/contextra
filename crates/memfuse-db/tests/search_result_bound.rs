@@ -76,25 +76,20 @@ async fn proof_search_never_exceeds_k() {
 
     // B-1 Regression Guard: Ensure no unannotated usize::MAX in db source files
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let src_dir = Path::new(&manifest_dir).join("src");
-    if src_dir.exists() {
-        for entry in std::fs::read_dir(&src_dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("rs") {
-                let file_content = std::fs::read_to_string(&path).unwrap();
-                let violations = file_content
-                    .lines()
-                    .filter(|l| l.contains("usize::MAX") && !l.contains("UNBOUNDED-OK"))
-                    .count();
-                assert_eq!(
-                    violations, 0,
-                    "B-3 REGRESSION: usize::MAX ohne UNBOUNDED-OK in {:?}: {} Vorkommen",
-                    path, violations
-                );
-            }
-        }
-    }
+    let search_rs_path = Path::new(&manifest_dir).join("../memfuse-engine/src/collection/search.rs");
+    let file_content = std::fs::read_to_string(&search_rs_path)
+        .or_else(|_| std::fs::read_to_string("crates/memfuse-engine/src/collection/search.rs"))
+        .expect("Failed to read search.rs");
+
+    let violations = file_content
+        .lines()
+        .filter(|l| l.contains("usize::MAX") && !l.contains("UNBOUNDED-OK"))
+        .count();
+    assert_eq!(
+        violations, 0,
+        "B-3 REGRESSION: usize::MAX ohne UNBOUNDED-OK in search.rs: {} Vorkommen",
+        violations
+    );
 }
 
 #[tokio::test]
@@ -163,7 +158,10 @@ async fn proof_search_with_k_zero_returns_empty() {
 #[test]
 fn proof_usize_max_removed_from_search_path() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let src_dir = Path::new(&manifest_dir).join("src");
+    let search_rs_path = Path::new(&manifest_dir).join("../memfuse-engine/src/collection/search.rs");
+    let file_content = std::fs::read_to_string(&search_rs_path)
+        .or_else(|_| std::fs::read_to_string("crates/memfuse-engine/src/collection/search.rs"))
+        .expect("Failed to read search.rs");
 
     let mut unannotated_found = Vec::new();
 

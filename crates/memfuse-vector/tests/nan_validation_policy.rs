@@ -48,7 +48,7 @@ fn proof_compute_distance_trusted_never_scans_nan() {
         res
     );
 
-    // Structural check on distance.rs source code
+    // Structural check on re-exported distance module
     let source = include_str!("../src/distance.rs");
     let trusted_fn_start = source
         .find("compute_distance_trusted")
