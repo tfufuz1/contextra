@@ -22,10 +22,16 @@ pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> +
 pub mod checkpoint;
 /// Embedding provider and LLM generation traits.
 pub mod embedding;
+/// Graph mutation and CSR traversal port traits.
+pub mod graph;
 /// Graph index traits and CSR statistics.
 pub mod graph_index;
+/// Key-value prefix store traits and types.
+pub mod kv;
 /// Memory lifecycle, grounding validator, and distance calculator contracts.
 pub mod lifecycle;
+/// Metrics reporting port trait.
+pub mod metrics;
 /// Observability and lifecycle re-exports.
 pub mod observability;
 /// Key-value storage engine traits.
@@ -37,8 +43,11 @@ pub mod vector_index;
 
 pub use checkpoint::*;
 pub use embedding::*;
+pub use graph::*;
 pub use graph_index::*;
+pub use kv::*;
 pub use lifecycle::*;
+pub use metrics::*;
 pub use observability::*;
 pub use storage::*;
 pub use text_index::*;
@@ -59,6 +68,11 @@ mod dyn_safety {
     use super::*;
 
     fn _assert_dyn_storage(_: Option<&dyn StorageEngine>) {}
+    fn _assert_dyn_storage_read(_: Option<&dyn StorageRead>) {}
+    fn _assert_dyn_storage_write(_: Option<&dyn StorageWrite>) {}
+    fn _assert_dyn_metrics_sink(_: Option<&dyn MetricsSink>) {}
+    fn _assert_dyn_kv_prefix_store(_: Option<&dyn KvPrefixStore>) {}
+    fn _assert_dyn_graph_mutation(_: Option<&dyn GraphCollectionMutation>) {}
     fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
@@ -66,6 +80,11 @@ mod dyn_safety {
     #[test]
     fn test_dyn_safety_compiles() {
         _assert_dyn_storage(None);
+        _assert_dyn_storage_read(None);
+        _assert_dyn_storage_write(None);
+        _assert_dyn_metrics_sink(None);
+        _assert_dyn_kv_prefix_store(None);
+        _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
     }

@@ -30,7 +30,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-types` | 0 | 5951 | 🟢 Clean | Canonical domain types, IDs, budgets, filters, and error types for MemFuse |
 | `memfuse-wire` | 0 | 2019 | 🟢 Clean | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for MemFuse |
 | `memfuse-mvcc` | 1 | 1958 | 🟢 Clean | Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for MemFuse |
-| `memfuse-ports` | 1 | 2254 | 🟢 Clean | Canonical dyn-compatible port traits for MemFuse subsystems |
+| `memfuse-ports` | 1 | 2552 | 🟢 Clean | Canonical dyn-compatible port traits for MemFuse subsystems |
 | `memfuse-core` | 2 | 368 | 🟢 Clean | Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for MemFuse |
 | `memfuse-rank` | 2 | 1954 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
 | `memfuse-calibration` | 3 | 1550 | 🟢 Clean |  |
