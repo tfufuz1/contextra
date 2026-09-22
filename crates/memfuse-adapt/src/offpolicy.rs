@@ -17,6 +17,58 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Randomisierte Logging-Policy für unverzerrte Datensammlung zur Off-Policy-Evaluation (§B.5.2.4 & §8.5).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RandomizedLoggingPolicy {
+    /// Exploration-Wahrscheinlichkeit epsilon (ε in [0.0, 1.0]).
+    pub epsilon: f32,
+    /// Anzahl verfügbarer Aktionen K (K >= 1).
+    pub num_actions: u32,
+}
+
+impl RandomizedLoggingPolicy {
+    /// Erstellt eine neue `RandomizedLoggingPolicy`.
+    pub fn new(epsilon: f32, num_actions: u32) -> Self {
+        Self {
+            epsilon: epsilon.clamp(0.0, 1.0),
+            num_actions: num_actions.max(1),
+        }
+    }
+
+    /// Berechnet die Propensity P(a | x) für jede Aktion 0..K-1 bei gegebener greedy/target Aktion.
+    pub fn compute_propensities(&self, greedy_action: u32) -> Vec<f32> {
+        let k = self.num_actions as f32;
+        let uniform_p = self.epsilon / k;
+        let mut propensities = vec![uniform_p; self.num_actions as usize];
+
+        if (greedy_action as usize) < propensities.len() {
+            propensities[greedy_action as usize] += 1.0 - self.epsilon;
+        }
+
+        propensities
+    }
+
+    /// Wählt eine Aktion aus und gibt den (Aktionsindex, Propensity) Vektor/Tupel zurück.
+    /// `random_sample` muss im Intervall [0.0, 1.0) liegen.
+    pub fn select_action(&self, greedy_action: u32, random_sample: f32) -> (u32, f32) {
+        let sample = random_sample.clamp(0.0, 0.999_999_9);
+        let propensities = self.compute_propensities(greedy_action);
+
+        if sample >= self.epsilon {
+            let action = if (greedy_action as usize) < propensities.len() {
+                greedy_action
+            } else {
+                0
+            };
+            (action, propensities[action as usize])
+        } else {
+            let action = ((sample / self.epsilon) * self.num_actions as f32) as u32;
+            let clamped_action = action.min(self.num_actions - 1);
+            (clamped_action, propensities[clamped_action as usize])
+        }
+    }
+}
+
 /// Statistiken über verworrene/ungültige Samples der Off-Policy-Evaluation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct OffPolicyStats {
@@ -109,6 +161,39 @@ impl OffPolicyEvaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_randomized_logging_policy_propensities() {
+        let policy = RandomizedLoggingPolicy::new(0.2, 4);
+        let propensities = policy.compute_propensities(1);
+
+        assert_eq!(propensities.len(), 4);
+        // non-greedy actions get epsilon / 4 = 0.05
+        assert!((propensities[0] - 0.05).abs() < 1e-6);
+        // greedy action 1 gets 0.05 + 0.8 = 0.85
+        assert!((propensities[1] - 0.85).abs() < 1e-6);
+        assert!((propensities[2] - 0.05).abs() < 1e-6);
+        assert!((propensities[3] - 0.05).abs() < 1e-6);
+
+        // Sum of propensities must equal 1.0
+        let sum: f32 = propensities.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_randomized_logging_policy_select_action() {
+        let policy = RandomizedLoggingPolicy::new(0.2, 4);
+
+        // Exploitation sample (>= epsilon 0.2)
+        let (action_exp, p_exp) = policy.select_action(2, 0.5);
+        assert_eq!(action_exp, 2);
+        assert!((p_exp - 0.85).abs() < 1e-6);
+
+        // Exploration sample (< epsilon 0.2)
+        let (action_exp2, p_exp2) = policy.select_action(2, 0.05); // sample 0.05 / 0.2 * 4 = 1.0 -> action 1
+        assert_eq!(action_exp2, 1);
+        assert!((p_exp2 - 0.05).abs() < 1e-6);
+    }
 
     #[test]
     fn test_hit_case() {

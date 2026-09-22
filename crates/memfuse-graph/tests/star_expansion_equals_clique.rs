@@ -12,7 +12,6 @@ pub fn star_weight_convention_k(hyperedge_weight: f32, cardinality: usize) -> f3
 }
 
 #[test]
-#[ignore = "blocked on HE-13 star_weight fix"]
 fn test_star_expansion_equals_clique_schur_complement() {
     let participants = vec![
         RoleBinding::new(RoleId::new(1), EntityId::new(10)),

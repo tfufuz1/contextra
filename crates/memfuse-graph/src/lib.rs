@@ -30,6 +30,7 @@
 // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-10T19:23:40Z) (SESSION: bd6ff800)
 // PRÜFER-KONTEXT: FRESH - Verified zero-unsafe invariant, zero unhandled panics, AGT-GRAPH-001 TxId origin assertions, and 133/133 tests green.
 
+pub mod arc_slice;
 pub mod cascade;
 pub mod community;
 pub mod consistency_enforcement;
@@ -49,7 +50,8 @@ pub mod session_dag;
 
 pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
-    CascadeInvalidationReport, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
+    CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket, DeletionProof,
+    GraphGarbageCollection, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
 pub use community::{
     detect_communities, CommunityAssignment, CommunityDetectionConfig, StarExpansionIterator,
@@ -70,9 +72,10 @@ pub use edge_reinforcement_buffer::edge_reinforcement_buffer::{
     CooccurrenceSignal, EdgeReinforcementBuffer, TraversalSignal,
 };
 pub use error::GraphMutationError;
+pub use arc_slice::ArcSlice;
 pub use hyperedge::{
-    sort_dedup_entities, ConsolidationNodesGuard, HyperEdge, HyperEdgeId, RoleBinding, RoleId,
-    RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
+    sort_dedup_entities, star_weight, ConsolidationNodesGuard, HyperEdge, HyperEdgeId, HyperEdgeView,
+    RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
 };
 pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
 #[cfg(feature = "graph-connectivity-health")]

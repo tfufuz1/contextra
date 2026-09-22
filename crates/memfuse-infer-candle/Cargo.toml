@@ -21,7 +21,9 @@ futures-util = "0.3"
 serde = { workspace = true }
 tracing = { workspace = true }
 bincode = { workspace = true, optional = true }
+half = "2.4"
 memfuse-core = { workspace = true }
+memfuse-ports = { workspace = true, optional = true }
 memfuse-rank = { workspace = true }
 memfuse-crypto = { workspace = true, optional = true }
 memfuse-store = { workspace = true, optional = true }
@@ -43,6 +45,7 @@ default = []
 candle = []
 docid-128 = ["memfuse-core/docid-128"]
 kv-bridge = ["dep:memfuse-crypto", "memfuse-crypto/kv-encryption", "dep:bincode", "dep:memfuse-store", "memfuse-store"]
+kv-stage-b = ["dep:memfuse-ports", "dep:bincode"]
 memfuse-store = ["dep:memfuse-store"]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 
