@@ -18,7 +18,6 @@ members = [
     "crates/memfuse-agent",
     "crates/memfuse-infer-ollama",
     "crates/memfuse-router",
-    "crates/memfuse-calibration",
     "benchmarks/memfuse-bench",
     "crates/memfuse-infer-candle",
     "crates/memfuse-sandbox",
@@ -52,7 +51,6 @@ default-members = [
     "crates/memfuse-agent",
     "crates/memfuse-infer-ollama",
     "crates/memfuse-router",
-    "crates/memfuse-calibration",
     "crates/memfuse-infer-candle",
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
@@ -132,7 +130,6 @@ memfuse-agent = { path = "crates/memfuse-agent" }
 memfuse-infer-ollama = { path = "crates/memfuse-infer-ollama" }
 memfuse-ollama = { package = "memfuse-infer-ollama", path = "crates/memfuse-infer-ollama" }
 memfuse-router = { path = "crates/memfuse-router" }
-memfuse-calibration = { path = "crates/memfuse-calibration" }
 memfuse-infer-candle = { path = "crates/memfuse-infer-candle" }
 memfuse-candle = { package = "memfuse-infer-candle", path = "crates/memfuse-infer-candle" }
 memfuse-sandbox = { path = "crates/memfuse-sandbox" }
