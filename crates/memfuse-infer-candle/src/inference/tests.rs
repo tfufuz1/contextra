@@ -298,18 +298,78 @@ async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
     assert_eq!(second_res, first_res);
     assert_eq!(
         client_with_adapter.prefill_count(),
-        2,
-        "Prefill count must NOT increase on second call (prefill full path skipped!)"
+        4,
+        "Prefill count must be 4 after second call (2 segments * 2 calls)"
     );
     assert_eq!(
         client_with_adapter.prefill_skip_count(),
-        2,
-        "Second call must record 2 prefill skips via KV cache hits"
+        0,
+        "prefill_skip_count must remain 0 for placeholder KV-cache hits (§9.2)"
     );
     assert_eq!(
         adapter.consultation_count(),
         4,
         "Consultation counter must be 4 after 2 calls"
+    );
+}
+
+#[cfg(feature = "kv-bridge")]
+#[tokio::test]
+async fn test_generate_with_context_metrics_distinguishes_miss_and_placeholder_hit() {
+    use crate::kv_bridge::KvBridgeAdapter;
+    use memfuse_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+
+    let fingerprint = ModelFingerprint {
+        hash: [7u8; 32],
+        model_id: "metrics_test_model.gguf".to_string(),
+        quantization: "Q4_K_M".to_string(),
+    };
+    let tokenizer_bytes = r#"{
+            "version": "1.0",
+            "truncation": null,
+            "padding": null,
+            "added_tokens": [],
+            "normalizer": null,
+            "pre_tokenizer": null,
+            "post_processor": null,
+            "decoder": null,
+            "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
+        }"#;
+    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
+
+    let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
+    let store = Arc::new(TenantIsolatedKvStore::new());
+    let adapter = KvBridgeAdapter::new(store, cipher);
+
+    let mock_model = Box::new(MockCandleModel {
+        response: "Metrics Completion".to_string(),
+    });
+    let client = CandleLlmClient::new(Device::Cpu, mock_model, fingerprint.clone(), tokenizer)
+        .with_kv_bridge(adapter.clone());
+
+    let seg1 = ContextSegment::new(201, "Segment 1 text").with_fingerprint(&fingerprint);
+    let segments = vec![seg1];
+    let tenant = TenantId::try_new(88).unwrap();
+
+    // 1. Initial Call: Cache Miss -> stores placeholder in KV-store
+    let _ = client
+        .generate_with_context(tenant, &segments)
+        .await
+        .unwrap();
+    assert_eq!(client.prefill_count(), 1);
+    assert_eq!(client.prefill_skip_count(), 0);
+
+    // 2. Subsequent Call with same segment: Placeholder Cache Hit -> full prefill still executed, skip count remains 0
+    let _ = client
+        .generate_with_context(tenant, &segments)
+        .await
+        .unwrap();
+    assert_eq!(client.prefill_count(), 2);
+    assert_eq!(
+        client.prefill_skip_count(),
+        0,
+        "Placeholder hit must NOT increment prefill_skip_count"
     );
 }
 

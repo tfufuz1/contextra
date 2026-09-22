@@ -477,12 +477,7 @@ impl LlmTextGenerator for CandleLlmClient {
                         fp,
                         segment.rope_offset,
                     );
-                    if adapter.try_get_cached_segment(tenant, &key).is_some() {
-                        self.prefill_skip_count
-                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    } else {
-                        self.prefill_count
-                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    if adapter.try_get_cached_segment(tenant, &key).is_none() {
                         let fresh_bytes = format!(
                             "kv_cache_tensor:{}:{}:{}",
                             key.chunk_id, key.fingerprint.model_id, segment.text
@@ -490,6 +485,11 @@ impl LlmTextGenerator for CandleLlmClient {
                         .into_bytes();
                         adapter.store_segment(tenant, key, fresh_bytes);
                     }
+                    // Since full prompt text is processed during placeholder KV-Bridge execution,
+                    // full prefill is always executed; prefill_skip_count is strictly reserved for
+                    // actual KV-tensor reuse savings (§9.2).
+                    self.prefill_count
+                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 }
             } else {
                 self.prefill_count
