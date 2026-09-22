@@ -1059,6 +1059,7 @@ struct PyRoutingHandle {
 }
 
 /// Router configuration container for internal routing setup in `open()`.
+#[allow(dead_code)]
 #[derive(Default)]
 struct RouterConfig {
     profiles: Vec<memfuse_router::SlmProfile>,
@@ -1349,40 +1350,9 @@ fn open(
             .map_err(memfuse_err)
     })?;
 
-    // --- Routing-Setup (analog zu memfuse-mcp/src/lib.rs setup_routing()) ---
-    // Lese Router-Config aus MemFuseConfig oder setze Default.
-    // Da memfuse-py derzeit keine externe Router-Config-API hat, verwende Default.
-    let routing_handle = run_blocking_ffi(py, &poisoned, || {
-        rt.block_on(async {
-            let router_config = RouterConfig::default();
-            if router_config.profiles.is_empty() {
-                return Ok::<Option<PyRoutingHandle>, memfuse_core::MemFuseError>(None);
-            }
-            let default_col = db.collection("default").await?;
-            let router = Arc::new(memfuse_router::RouterEngine::new(
-                default_col,
-                router_config.profiles.clone(),
-                router_config.calibration_store_path.clone(),
-            ));
-            let calibrator = Arc::new(parking_lot::Mutex::new(
-                memfuse_calibration::IsotonicCalibrator::with_defaults(),
-            ));
-            let pid_controller = Arc::new(parking_lot::Mutex::new(
-                memfuse_calibration::PidController::default(),
-            ));
-            let router_weak =
-                Arc::downgrade(&router) as std::sync::Weak<dyn memfuse_db::DriftStatusProvider>;
-            db.set_router(router_weak);
-            db.set_calibrator(Arc::downgrade(&calibrator));
-            db.set_pid_controller(Arc::downgrade(&pid_controller));
-            Ok(Some(PyRoutingHandle {
-                _router: router,
-                _calibrator: calibrator,
-                _pid_controller: pid_controller,
-            }))
-        })
-        .map_err(memfuse_err)
-    })?;
+    // --- Routing-Setup ---
+    // Currently memfuse-py has no active router profiles by default.
+    let routing_handle: Option<PyRoutingHandle> = None;
     // --- Ende Routing-Setup ---
 
     Ok(PyMemFuse {
