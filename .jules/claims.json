@@ -230,8 +230,9 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-22T10:33:51.254536732+00:00",
       "session_id": "1147642845825310961",
-      "active": true,
-      "expires_at": "2026-09-22T01:11:50.550778179+00:00"
+      "active": false,
+      "expires_at": "2026-09-22T01:11:50.550778179+00:00",
+      "released_at": "2026-09-22T11:26:51.450285642+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "workspace-root",

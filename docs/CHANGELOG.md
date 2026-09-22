@@ -299,9 +299,13 @@
 | `` | `crates/memfuse-mcp/src/egress_guard.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 EgressGuard (Re-export from memfuse-privacy) |
 | `` | `crates/memfuse-mcp/src/routing.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-kv-bridge: Cipher-Integration wenn MemFuse::kv_cipher() API existiert |
 | `` | `crates/memfuse-mcp/src/server_dispatch.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-APM-38-mcp: Replay-Schutz für stdio-JSON-RPC |
+| `` | `crates/memfuse-ports/src/graph_index.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von memfuse-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md) |
+| `` | `crates/memfuse-ports/src/lifecycle.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von memfuse-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md) |
+| `` | `crates/memfuse-ports/src/vector_index.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von memfuse-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md) |
 | `` | `crates/memfuse-privacy/src/bulk_exfiltration_detector.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 Bulk-Exfiltration-Detektor (Volumen/Zeitfenster pro Session) |
 | `` | `crates/memfuse-privacy/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud Queries |
 | `` | `crates/memfuse-privacy/src/egress_vault.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cloud-Egress-Vault mit Layer-1-Regex-Klassifikation und Fail-Closed-Semantik. |
+| `` | `crates/memfuse-router/src/tests.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[CORRECTNESS][BLOCKER][RESOLVED]: Refactor commit 0f231376 decoupled memfuse-router from memfuse-db, |
 | `` | `crates/memfuse-simd/src/dispatch.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Runtime Hardware Feature Detection & Dispatcher. |
 | `` | `crates/memfuse-simd/src/kernels/avx2.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen. |
 | `` | `crates/memfuse-simd/src/kernels/avx512.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AVX-512 SIMD-Intrinsics für f32, f32_bytes und u8 VNNI Distanzberechnungen. |
@@ -336,3 +340,5 @@
 | `` | `crates/memfuse-vector/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/memfuse-vector/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/memfuse-vector/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/memfuse/src/builder.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | MemFuse Composition Root Builder (Ring 4). |
+| `` | `crates/memfuse/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | MemFuse Primary Facade & Composition Root (Ring 4). |
