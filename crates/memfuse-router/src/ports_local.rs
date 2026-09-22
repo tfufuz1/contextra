@@ -1,6 +1,5 @@
 //! Deprecated: temporary local port traits have moved to `memfuse-ports`.
 
-use memfuse_core::Result;
 #[deprecated(
     since = "0.1.0",
     note = "Moved to memfuse_ports as part of Ring-Modell Welle 2 (siehe docs/refactor/router-db-edge-audit.md)"

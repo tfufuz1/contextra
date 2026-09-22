@@ -86,10 +86,10 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-mvcc` | 1 | 1958 | 🟢 Clean | Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for MemFuse |
 | `memfuse-ports` | 1 | 2586 | 🟢 Clean | Canonical dyn-compatible port traits for MemFuse subsystems |
 | `memfuse-core` | 2 | 368 | 🟢 Clean | Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for MemFuse |
-| `memfuse-rank` | 2 | 2745 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
-| `memfuse-checkpoint` | 3 | 6112 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
-| `memfuse-graph` | 3 | 18089 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
-| `memfuse-infer-ollama` | 3 | 4599 | 🟢 Clean |  |
+| `memfuse-rank` | 2 | 2741 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
+| `memfuse-checkpoint` | 3 | 6113 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
+| `memfuse-graph` | 3 | 18101 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `memfuse-infer-ollama` | 3 | 4597 | 🟢 Clean |  |
 | `memfuse-infer-onnx` | 3 | 2219 | 🟢 Clean |  |
 | `memfuse-privacy` | 3 | 1865 | 🟢 Clean | Cloud Egress Security, DLP & Exfiltration Protection for MemFuse (Ring 3) |
 | `memfuse-sandbox` | 3 | 992 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
@@ -97,14 +97,14 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-testkit` | 3 | 537 | 🟢 Clean | Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for MemFuse |
 | `memfuse-text` | 3 | 8432 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-crypto` | 4 | 6964 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
-| `memfuse-router` | 4 | 6179 | 🟢 Clean |  |
-| `memfuse-kvcache` | 5 | 2129 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
-| `memfuse-store` | 5 | 28235 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
+| `memfuse-router` | 4 | 6298 | 🟢 Clean |  |
+| `memfuse-kvcache` | 5 | 2639 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
+| `memfuse-store` | 5 | 28248 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 15527 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
-| `memfuse-infer-candle` | 6 | 5809 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
+| `memfuse-infer-candle` | 6 | 5819 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-cognition` | 7 | 4510 | 🟢 Clean | MemFuse — Memory consolidation, compaction, and context management |
-| `memfuse-db` | 8 | 12529 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 8 | 12523 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse` | 9 | 494 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents (Facade) |
 | `memfuse-agent` | 9 | 6971 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
 | `memfuse-bench` | 9 | 5741 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
