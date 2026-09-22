@@ -185,6 +185,7 @@ impl McpSandbox {
             "memfuse_cloud_query" => ToolCategory::CloudEgress,
             "memfuse_insert"
             | "memfuse_delete"
+            | "memfuse_forget"
             | "memfuse_upsert"
             | "memfuse_relate"
             | "memfuse_create_collection"
@@ -331,6 +332,9 @@ mod tests {
             .validate_tool_call("memfuse_delete", &Value::Null)
             .is_err());
         assert!(sandbox
+            .validate_tool_call("memfuse_forget", &Value::Null)
+            .is_err());
+        assert!(sandbox
             .validate_tool_call("unknown_code_tool", &Value::Null)
             .is_err());
         assert!(sandbox
@@ -358,6 +362,9 @@ mod tests {
             .is_ok());
         assert!(sandbox
             .validate_tool_call("memfuse_delete", &Value::Null)
+            .is_ok());
+        assert!(sandbox
+            .validate_tool_call("memfuse_forget", &Value::Null)
             .is_ok());
         assert!(sandbox
             .validate_tool_call("some_custom_tool", &Value::Null)

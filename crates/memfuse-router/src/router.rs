@@ -9,14 +9,12 @@
 
 use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, RoutingOutcome};
-use crate::ports_local::{
-    CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
-    HybridSearchProvider,
-};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
-use memfuse_core::{
-    ContextChunk, ContextWindow, EntityId, MemFuseError, Result, StorageEngine,
+use memfuse_core::{ContextChunk, ContextWindow, EntityId, MemFuseError, Result, StorageEngine};
+use memfuse_ports::{
+    CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
+    HybridSearchProvider,
 };
 use memfuse_store::LsmStorage;
 use parking_lot::RwLock;

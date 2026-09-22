@@ -90,7 +90,7 @@ sind synchron und kurz.
 
 ## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
 
-- **Erlaubte Imports**: `memfuse-core` (L0), `memfuse-db` (L2)
+- **Erlaubte Imports**: `memfuse-core` (L0), `memfuse-ports` (L0), `memfuse-db` (L2, nur `dev-dependencies`)
 - **Verbotene Imports**: `memfuse-mcp` (L4)
 - **Genutzt von**: `memfuse-mcp`, ggf. `memfuse-agent` als Tool
 
