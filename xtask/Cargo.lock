@@ -937,7 +937,6 @@ dependencies = [
  "memfuse-core",
  "memfuse-ports",
  "memfuse-privacy",
- "memfuse-store",
  "parking_lot",
  "serde",
  "serde_json",

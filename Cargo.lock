@@ -2704,7 +2704,6 @@ dependencies = [
  "memfuse-graph",
  "memfuse-ports",
  "memfuse-privacy",
- "memfuse-store",
  "memfuse-text",
  "memfuse-vector",
  "parking_lot",

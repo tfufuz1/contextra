@@ -98,6 +98,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-crypto` | 4 | 6964 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
 | `memfuse-infer-ollama` | 4 | 4598 | 🟢 Clean |  |
 | `memfuse-infer-onnx` | 4 | 2219 | 🟢 Clean |  |
+| `memfuse-router` | 4 | 6128 | 🟢 Clean |  |
 | `memfuse-kvcache` | 5 | 1420 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
 | `memfuse-store` | 5 | 27482 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |

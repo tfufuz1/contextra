@@ -44,6 +44,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-crypto` | 4 | 6964 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
 | `memfuse-infer-ollama` | 4 | 4598 | 🟢 Clean |  |
 | `memfuse-infer-onnx` | 4 | 2219 | 🟢 Clean |  |
+| `memfuse-router` | 4 | 6128 | 🟢 Clean |  |
 | `memfuse-kvcache` | 5 | 1420 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
 | `memfuse-store` | 5 | 27482 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
@@ -81,6 +82,7 @@ Layer 3:  memfuse-calibration —  (deps: memfuse-adapt, memfuse-core)
 Layer 4:  memfuse-crypto — Encryption at Rest and KV-Cache Security utilities for MemFuse (deps: memfuse-core, memfuse-privacy)
           memfuse-infer-ollama —  (deps: memfuse-calibration, memfuse-core)
           memfuse-infer-onnx —  (deps: memfuse-calibration, memfuse-candle, memfuse-core)
+          memfuse-router —  (deps: memfuse-adapt, memfuse-core, memfuse-ports, memfuse-privacy)
 Layer 5:  memfuse-kvcache — Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse (deps: memfuse-core, memfuse-crypto)
           memfuse-store — LSM-Tree storage engine for MemFuse (deps: memfuse-core, memfuse-crypto, memfuse-sys)
           memfuse-vector — HNSW vector index with SIMD distance computation for MemFuse (deps: memfuse-core, memfuse-crypto, memfuse-simd, memfuse-sys)
