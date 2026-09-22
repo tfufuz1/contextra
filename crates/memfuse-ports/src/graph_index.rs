@@ -266,6 +266,13 @@ pub struct GraphIndexStats {
     pub memory_usage_bytes: usize,
 }
 
+// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von memfuse-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
+/// Contract for resolving graph community assignments for entities.
+pub trait CommunityResolver: Send + Sync {
+    /// Resolves the optional community ID for a given entity.
+    fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

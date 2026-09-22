@@ -16,6 +16,7 @@ egress-sherman-morrison = []
 [dependencies]
 shlex = "1"
 memfuse-core = { workspace = true }
+memfuse-ports = { workspace = true }
 memfuse-adapt = { workspace = true }
 memfuse-store = { workspace = true }
 memfuse-privacy = { workspace = true }

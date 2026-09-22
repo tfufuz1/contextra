@@ -120,6 +120,7 @@ async fn test_list_tools() {
     assert!(tool_names.contains(&"memfuse_search"));
     assert!(tool_names.contains(&"memfuse_get"));
     assert!(tool_names.contains(&"memfuse_insert"));
+    assert!(tool_names.contains(&"memfuse_forget"));
     assert!(tool_names.contains(&"memfuse_collections"));
 }
 

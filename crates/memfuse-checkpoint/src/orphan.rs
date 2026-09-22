@@ -8,12 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Type alias for sequence numbers managed as pinned checkpoint identifiers.
 pub type PinId = u64;
 
-#[deprecated(
-    since = "0.1.0",
-    note = "Use InstanceOrphanRegistry instead. Global statics are deprecated per ADR-053."
-)]
-#[allow(deprecated)]
-pub static ORPHAN_REGISTRY: std::sync::OnceLock<OrphanRegistry> = std::sync::OnceLock::new();
+static DUMMY_ORPHAN_REGISTRY: std::sync::OnceLock<OrphanRegistry> = std::sync::OnceLock::new();
 
 fn warn_deprecated_global_orphan_path() {
     static WARN_ONCE: std::sync::Once = std::sync::Once::new();
@@ -31,7 +26,7 @@ fn warn_deprecated_global_orphan_path() {
 #[allow(deprecated)]
 pub fn global_orphan_registry() -> &'static OrphanRegistry {
     warn_deprecated_global_orphan_path();
-    ORPHAN_REGISTRY.get_or_init(OrphanRegistry::default)
+    DUMMY_ORPHAN_REGISTRY.get_or_init(|| OrphanRegistry::new(""))
 }
 
 /// Returns the default directory for orphan state files when no environment variable is set.
@@ -150,13 +145,10 @@ pub struct PinnedSeqNoOrphan {
 )]
 #[allow(deprecated)]
 pub fn register_pinned_seq_no_orphan(orphan: PinnedSeqNoOrphan) {
-    if let Err(e) = global_orphan_registry().register_orphan(orphan.seq_no) {
-        tracing::error!(
-            ?e,
-            seq_no = orphan.seq_no,
-            "Failed to register pinned seq_no in global orphan registry (ADR-058)"
-        );
-    }
+    tracing::warn!(
+        seq_no = orphan.seq_no,
+        "register_pinned_seq_no_orphan is deprecated and no-op; use InstanceOrphanRegistry instead"
+    );
 }
 
 /// Instance-scoped orphan state for checkpoints and pinned sequence numbers.
@@ -405,7 +397,10 @@ impl InstanceOrphanRegistry {
 )]
 #[allow(deprecated)]
 pub fn register_orphaned_checkpoint(cp: StateCheckpoint) {
-    global_orphan_registry().inner.register_checkpoint_sync(cp);
+    tracing::warn!(
+        tx_id = ?cp.tx_id,
+        "register_orphaned_checkpoint is deprecated and no-op; use InstanceOrphanRegistry instead"
+    );
 }
 
 /// Retrieves all active registered orphaned checkpoints.
@@ -415,7 +410,7 @@ pub fn register_orphaned_checkpoint(cp: StateCheckpoint) {
 )]
 #[allow(deprecated)]
 pub fn get_orphaned_checkpoints() -> Vec<StateCheckpoint> {
-    global_orphan_registry().inner.get_orphaned_checkpoints()
+    Vec::new()
 }
 
 /// Retrieves orphaned checkpoints registered for a specific namespace.
@@ -433,11 +428,7 @@ pub fn get_orphaned_checkpoints_for_namespace(ns: &str) -> Vec<StateCheckpoint> 
     note = "Use PersistentCheckpointStore::clear_orphaned_checkpoint instead. Global functions are not safe in multi-instance environments."
 )]
 #[allow(deprecated)]
-pub fn clear_orphaned_checkpoint(tx_id: TxId) {
-    global_orphan_registry()
-        .inner
-        .clear_orphaned_checkpoint(tx_id);
-}
+pub fn clear_orphaned_checkpoint(_tx_id: TxId) {}
 
 /// Clears all registered orphaned checkpoints.
 #[deprecated(
@@ -445,9 +436,7 @@ pub fn clear_orphaned_checkpoint(tx_id: TxId) {
     note = "Use PersistentCheckpointStore::clear_all_orphaned_checkpoints instead. Global functions are not safe in multi-instance environments."
 )]
 #[allow(deprecated)]
-pub fn clear_all_orphaned_checkpoints() {
-    global_orphan_registry().inner.clear_all();
-}
+pub fn clear_all_orphaned_checkpoints() {}
 
 /// Retained for backward compatibility. No background tasks are spawned during drop.
 pub async fn await_pending_rollbacks() {}

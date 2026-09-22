@@ -1050,27 +1050,11 @@ macro_rules! memfuse_batch_methods {
 
 // ─── PyMemFuse (Database Facade) ────────────────────────────────────────────
 
-/// Hält starke Arc-Referenzen, damit die Weak-Pointer in `MemFuse.set_router()` etc.
-/// nicht sofort droppen. Analog zu `RoutingHandle` in memfuse-mcp.
-struct PyRoutingHandle {
-    _router: Arc<memfuse_router::DefaultRouterEngine>,
-    _calibrator: Arc<parking_lot::Mutex<memfuse_rank::IsotonicCalibrator>>,
-    _pid_controller: Arc<parking_lot::Mutex<memfuse_adapt::PidController>>,
-}
-
-/// Router configuration container for internal routing setup in `open()`.
-#[derive(Default)]
-struct RouterConfig {
-    profiles: Vec<memfuse_router::SlmProfile>,
-    calibration_store_path: Option<std::path::PathBuf>,
-}
-
 #[pyclass(name = "Db")]
 pub struct PyMemFuse {
     inner: Arc<MemFuse>,
     runtime: Arc<Runtime>,
     worker_threads: usize,
-    _routing: Option<PyRoutingHandle>,
     poisoned: Arc<AtomicBool>,
 }
 
@@ -1349,79 +1333,10 @@ fn open(
             .map_err(memfuse_err)
     })?;
 
-    // --- Routing-Setup (analog zu memfuse-mcp/src/lib.rs setup_routing()) ---
-    // Lese Router-Config aus MemFuseConfig oder setze Default.
-    // Da memfuse-py derzeit keine externe Router-Config-API hat, verwende Default.
-    let routing_handle = run_blocking_ffi(py, &poisoned, || {
-        rt.block_on(async {
-            let router_config = RouterConfig::default();
-            if router_config.profiles.is_empty() {
-                return Ok::<Option<PyRoutingHandle>, memfuse_core::MemFuseError>(None);
-            }
-            struct CollectionSearchAdapter(Arc<memfuse_db::Collection<memfuse_store::LsmStorage>>);
-
-            impl memfuse_router::ports_local::HybridSearchProvider for CollectionSearchAdapter {
-                fn search_hybrid<'a>(
-                    &'a self,
-                    query_text: &'a str,
-                    query_embedding: &'a [f32],
-                    top_k: usize,
-                ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<memfuse_core::ContextChunk>>> {
-                    let col = self.0.clone();
-                    Box::pin(async move {
-                        let search_results = col
-                            .query()
-                            .text(query_text)
-                            .vector(query_embedding)
-                            .k(top_k)
-                            .execute()
-                            .await?;
-                        search_results
-                            .into_iter()
-                            .map(memfuse_core::ContextChunk::try_from)
-                            .collect()
-                    })
-                }
-            }
-
-            let default_col = db.collection("default").await?;
-            let search_provider = Arc::new(CollectionSearchAdapter(default_col));
-            let community_resolver = Arc::new(memfuse_router::ports_local::NoopCommunityResolver);
-            let context_preparer = Arc::new(memfuse_router::ports_local::PassthroughContextPreparer);
-
-            let router = Arc::new(memfuse_router::RouterEngine::new(
-                search_provider,
-                community_resolver,
-                context_preparer,
-                router_config.profiles.clone(),
-                router_config.calibration_store_path.clone(),
-            ));
-            let calibrator = Arc::new(parking_lot::Mutex::new(
-                memfuse_rank::IsotonicCalibrator::with_defaults(),
-            ));
-            let pid_controller = Arc::new(parking_lot::Mutex::new(
-                memfuse_adapt::PidController::default(),
-            ));
-            let router_weak =
-                Arc::downgrade(&router) as std::sync::Weak<dyn memfuse_core::DriftStatusProvider>;
-            db.set_router(router_weak);
-            db.set_calibrator(Arc::downgrade(&calibrator));
-            db.set_pid_controller(Arc::downgrade(&pid_controller));
-            Ok(Some(PyRoutingHandle {
-                _router: router,
-                _calibrator: calibrator,
-                _pid_controller: pid_controller,
-            }))
-        })
-        .map_err(memfuse_err)
-    })?;
-    // --- Ende Routing-Setup ---
-
     Ok(PyMemFuse {
         inner: Arc::new(db),
         runtime: rt,
         worker_threads,
-        _routing: routing_handle,
         poisoned,
     })
 }

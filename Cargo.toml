@@ -22,8 +22,16 @@ members = [
     "crates/memfuse-infer-candle",
     "crates/memfuse-sandbox",
     "crates/memfuse-py",
-    "crates/memfuse-testkit", "crates/memfuse", "crates/memfuse-types", "crates/memfuse-ports", "crates/memfuse-mvcc", "crates/memfuse-adapt", "crates/memfuse-kvcache",
-    "crates/memfuse-engine", "crates/memfuse-cognition", "crates/memfuse-rank",
+    "crates/memfuse-testkit",
+    "crates/memfuse",
+    "crates/memfuse-types",
+    "crates/memfuse-ports",
+    "crates/memfuse-mvcc",
+    "crates/memfuse-adapt",
+    "crates/memfuse-kvcache",
+    "crates/memfuse-engine",
+    "crates/memfuse-cognition",
+    "crates/memfuse-rank",
 ]
 exclude = ["xtask"]
 default-members = [

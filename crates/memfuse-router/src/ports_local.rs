@@ -1,43 +1,24 @@
-// TODO(welle-3): nach memfuse-ports verschieben, sobald dieses Crate befüllt ist (siehe docs/refactor/router-db-edge-audit.md)
-//! Local temporary port traits for decoupling `memfuse-router` from `memfuse-db`.
+//! Deprecated: temporary local port traits have moved to `memfuse-ports`.
 
-use memfuse_core::{BoxFuture, ContextChunk, ContextWindow, EntityId, Result, TokenBudget};
+#[deprecated(
+    since = "0.1.0",
+    note = "Moved to memfuse_ports as part of Ring-Modell Welle 2 (siehe docs/refactor/router-db-edge-audit.md)"
+)]
+pub use memfuse_ports::{
+    CommunityResolver, ContextPreparer, DriftStatusProvider, HybridSearchProvider,
+};
 
-/// Contract for resolving graph community assignments for entities.
-pub trait CommunityResolver: Send + Sync {
-    /// Resolves the optional community ID for a given entity.
-    fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>>;
-}
+#[cfg(test)]
+mod tests {
+    #[allow(deprecated)]
+    use super::*;
 
-/// Contract for executing hybrid (vector + text) queries for profile routing.
-pub trait HybridSearchProvider: Send + Sync {
-    /// Executes a hybrid query returning matched context chunks with relevance scores.
-    fn search_hybrid<'a>(
-        &'a self,
-        query_text: &'a str,
-        query_embedding: &'a [f32],
-        top_k: usize,
-    ) -> BoxFuture<'a, Result<Vec<ContextChunk>>>;
-}
-
-/// Contract for trimming and preparing context windows tailored to token budgets.
-pub trait ContextPreparer: Send + Sync {
-    /// Prepares and trims context chunks according to the provided token budget and relevance threshold.
-    fn prepare_context(
-        &self,
-        chunks: Vec<ContextChunk>,
-        budget: &TokenBudget,
-        relevance_threshold: f32,
-    ) -> Result<ContextWindow>;
-}
-
-/// Default no-op implementation for `CommunityResolver`.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct NoopCommunityResolver;
-
-impl CommunityResolver for NoopCommunityResolver {
-    fn get_community<'a>(&'a self, _entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>> {
-        Box::pin(async move { Ok(None) })
+    #[test]
+    fn test_ports_local_reexports() {
+        fn _assert_community_resolver<T: CommunityResolver + ?Sized>() {}
+        fn _assert_context_preparer<T: ContextPreparer + ?Sized>() {}
+        fn _assert_hybrid_search_provider<T: HybridSearchProvider + ?Sized>() {}
+        fn _assert_drift_status_provider<T: DriftStatusProvider + ?Sized>() {}
     }
 }
 

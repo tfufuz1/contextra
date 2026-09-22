@@ -70,6 +70,7 @@ mod check_module_reachability;
 mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
+mod check_ring0_async_purity;
 mod check_ring_layering;
 mod check_placeholder_refs;
 mod check_recall_stability;
@@ -81,6 +82,7 @@ mod check_type_registry;
 mod check_vetoes;
 mod check_workflow_commands;
 mod claim;
+mod gen_feature_catalog;
 mod gen_prompter_data;
 mod generate_adr;
 mod init_audit_fix;
@@ -1230,7 +1232,7 @@ pub fn check_no_orphan_adr_files(root_dir: &Path) -> bool {
         return true;
     }
 
-    let adr_file_re = Regex::new(r"^ADR-\d+.*\.md$").unwrap();
+    let adr_file_re = Regex::new(r"^ADR-(?:\d+|N\d+).*\.md$").unwrap();
 
     let invalid_files: Vec<_> = match fs::read_dir(&decisions_dir) {
         Ok(dir) => dir
@@ -1985,6 +1987,12 @@ fn main() {
                 process::exit(1);
             }
         }
+        "gen-feature-catalog" => {
+            if let Err(e) = gen_feature_catalog::run_gen_feature_catalog() {
+                eprintln!("❌ gen-feature-catalog failed: {}", e);
+                process::exit(1);
+            }
+        }
         "check-unsafe-islands" => {
             let strict = args.iter().any(|arg| arg == "--strict");
             match check_unsafe_islands::run_check_unsafe_islands(strict) {
@@ -2009,6 +2017,19 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("❌ check-ring-layering failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-ring0-async-purity" => {
+            match check_ring0_async_purity::run_check_ring0_async_purity() {
+                Ok(passed) => {
+                    if !passed {
+                        process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-ring0-async-purity failed: {}", e);
                     process::exit(1);
                 }
             }
@@ -2518,7 +2539,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, gen-feature-catalog, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
             process::exit(1);
         }
     }

@@ -7,7 +7,7 @@ name = "memfuse-mcp"
 version = "0.1.0"
 description = "Model Context Protocol (MCP) stdio server for MemFuse Brain"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { text = "MIT OR Apache-2.0" }
 authors = [
     { name = "MemFuse Contributors" }
