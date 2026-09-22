@@ -70,6 +70,7 @@ mod check_module_reachability;
 mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
+mod check_ring0_async_purity;
 mod check_ring_layering;
 mod check_placeholder_refs;
 mod check_recall_stability;
@@ -2013,6 +2014,19 @@ fn main() {
                 }
             }
         }
+        "check-ring0-async-purity" => {
+            match check_ring0_async_purity::run_check_ring0_async_purity() {
+                Ok(passed) => {
+                    if !passed {
+                        process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-ring0-async-purity failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
         "check-module-reachability" | "check-orphan-modules" => {
             let root = find_root_dir();
             match check_module_reachability::run_check_module_reachability(&root) {
@@ -2518,7 +2532,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-ring0-async-purity, check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
             process::exit(1);
         }
     }
