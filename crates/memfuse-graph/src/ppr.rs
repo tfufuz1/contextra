@@ -668,6 +668,5 @@ pub(crate) fn compute_ppr_dense(
     results
 }
 
-
 #[cfg(test)]
 mod tests;

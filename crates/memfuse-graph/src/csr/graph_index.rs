@@ -1,22 +1,27 @@
+use arc_swap::ArcSwap;
+use parking_lot::{Mutex, RwLock};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use parking_lot::{Mutex, RwLock};
-use arc_swap::ArcSwap;
-use serde::{Deserialize, Serialize};
 
+use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
+use crate::GraphIndexExt;
 use memfuse_core::{
     BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
     StorageEngine, TxId,
 };
-use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
-use crate::GraphIndexExt;
 
-use super::types::{Edge, EdgePayload, EdgeType, InternalIndex, PersistedEdgePayload, StagedEdgePayload, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES, SCORE_DECAY, GRAPH_ENTITY_PREFIX, GRAPH_EDGE_PREFIX, GRAPH_ENTITY_DELETED_PREFIX, GRAPH_COMMUNITY_PREFIX};
-use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard};
-use super::visibility::{is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id};
 use super::graph_write::CsrGraph;
-
+use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard};
+use super::types::{
+    Edge, EdgePayload, EdgeType, InternalIndex, PersistedEdgePayload, StagedEdgePayload,
+    GRAPH_COMMUNITY_PREFIX, GRAPH_EDGE_PREFIX, GRAPH_ENTITY_DELETED_PREFIX, GRAPH_ENTITY_PREFIX,
+    MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES, SCORE_DECAY,
+};
+use super::visibility::{
+    is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id,
+};
 
 impl GraphIndexExt for CsrGraph {
     fn remove_entity<'a>(&'a self, tx: TxId, entity: EntityId) -> BoxFuture<'a, Result<()>> {

@@ -135,7 +135,8 @@ pub(crate) mod tests {
             query_text: &'a str,
             query_embedding: &'a [f32],
             top_k: usize,
-        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<memfuse_core::ContextChunk>>> {
+        ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<memfuse_core::ContextChunk>>>
+        {
             Box::pin(async move {
                 let search_results = self
                     .collection
