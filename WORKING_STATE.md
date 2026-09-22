@@ -30,7 +30,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-types` | 0 | 5951 | 🟢 Clean | Canonical domain types, IDs, budgets, filters, and error types for MemFuse |
 | `memfuse-wire` | 0 | 2019 | 🟢 Clean | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for MemFuse |
 | `memfuse-mvcc` | 1 | 1958 | 🟢 Clean | Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for MemFuse |
-| `memfuse-ports` | 1 | 2584 | 🟢 Clean | Canonical dyn-compatible port traits for MemFuse subsystems |
+| `memfuse-ports` | 1 | 2586 | 🟢 Clean | Canonical dyn-compatible port traits for MemFuse subsystems |
 | `memfuse-core` | 2 | 368 | 🟢 Clean | Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for MemFuse |
 | `memfuse-rank` | 2 | 2745 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
 | `memfuse-checkpoint` | 3 | 6112 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
@@ -48,9 +48,9 @@ Ergebnis: **0 offene Tags**
 | `memfuse-store` | 5 | 28208 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 15527 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
-| `memfuse-infer-candle` | 6 | 5809 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
+| `memfuse-infer-candle` | 6 | 5808 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-cognition` | 7 | 4510 | 🟢 Clean | MemFuse — Memory consolidation, compaction, and context management |
-| `memfuse-db` | 8 | 12529 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 8 | 12520 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse` | 9 | 494 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents (Facade) |
 | `memfuse-agent` | 9 | 6971 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
 | `memfuse-bench` | 9 | 5741 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |
