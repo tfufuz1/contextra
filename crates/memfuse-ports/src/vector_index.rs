@@ -5,7 +5,8 @@
 // ZWECK: VectorIndex Trait & VectorIndexStats für HNSW/Vektor-Indizes.
 // INVARIANTEN: Rebuild-Triggering & Filtered Search Fallback.
 
-use crate::types::{DocId, ScoredDocument, TxId};
+use super::BoxFuture;
+use crate::types::{ContextChunk, DocId, ScoredDocument, TxId};
 use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -153,6 +154,18 @@ pub trait VectorIndex: Send + Sync + 'static {
 
     /// Triggers an asynchronous background rebuild of the index if supported.
     fn trigger_rebuild_async(&self) {}
+}
+
+// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von memfuse-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
+/// Contract for executing hybrid (vector + text) queries for profile routing.
+pub trait HybridSearchProvider: Send + Sync {
+    /// Executes a hybrid query returning matched context chunks with relevance scores.
+    fn search_hybrid<'a>(
+        &'a self,
+        query_text: &'a str,
+        query_embedding: &'a [f32],
+        top_k: usize,
+    ) -> BoxFuture<'a, Result<Vec<ContextChunk>>>;
 }
 
 #[cfg(test)]
