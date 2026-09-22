@@ -85,5 +85,5 @@ jobs:
             -p memfuse-store --test toctou_put_if_absent \
             --target x86_64-unknown-linux-gnu -- --test-threads=1
           RUSTFLAGS="-Z sanitizer=thread" cargo +nightly test \
-            -p memfuse-index --test deleted_nodes_lock_contention \
+            -p memfuse-vector --test deleted_nodes_lock_contention \
             --target x86_64-unknown-linux-gnu -- --test-threads=1
