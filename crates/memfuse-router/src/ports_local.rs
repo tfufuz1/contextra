@@ -4,8 +4,10 @@
     since = "0.1.0",
     note = "Moved to memfuse_ports as part of Ring-Modell Welle 2 (siehe docs/refactor/router-db-edge-audit.md)"
 )]
+use memfuse_core::Result;
 pub use memfuse_ports::{
-    CommunityResolver, ContextPreparer, DriftStatusProvider, HybridSearchProvider,
+    CommunityResolver, ContextChunk, ContextPreparer, ContextWindow, DriftStatusProvider,
+    HybridSearchProvider, TokenBudget,
 };
 
 #[cfg(test)]
@@ -45,6 +47,3 @@ impl ContextPreparer for PassthroughContextPreparer {
         })
     }
 }
-
-/// Re-export contract for monitoring Lyapunov drift status across active profile watchers (ADR-080).
-pub use memfuse_core::DriftStatusProvider;

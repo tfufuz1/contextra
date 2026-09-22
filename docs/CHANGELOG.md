@@ -5,11 +5,17 @@
 | Zeitstempel | Crate/Datei | Typ | ID | Session | Status | Review-Pässe (unabhängig) | Beschreibung |
 |---|---|---|---|---|---|---|---|
 | `TS:2026-09-17T19:00:00Z (SESSION: jules-agent-budget)` | `crates/memfuse-agent/src/budget.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Token budget RAII reservation abstraction for agent workflow steps. |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/src/eviction_worker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall). |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/src/radix.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prefix-Radix-Baum über Token-Sequenzen, RAII-Guards & KvReusePolicy (§9.2). |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/src/segment.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvSegment mit Zeroize-Garantie, Tier-2 AEAD-Verschlüsselung & Crypto-Shredding. |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/src/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation) mit Prefix-Radix & Guard-Schutz. |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/tests/cancellation.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cancellation- & RAII-Guard-Tests für den KV-Cache (Task KV-06). |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/tests/golden_greedy_decode.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Golden-Test für identische Greedy-Tokenfolgen mit/ohne Prefix-Reuse (Spec §9.2 / Task 4-04). |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/tests/tenant_isolation.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-Isolations-Tests für den KV-Cache (Task KV-05 / INV-TENANT). |
 | `TS:2026-09-13T01:36:52Z (SESSION: c1c85419)` | `crates/memfuse-agent/tests/proptest_workflow_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-based testing for memfuse-agent structural invariants (StateGraph, AgentContext, BackgroundEvent). |
 | `TS:2026-09-13T00:00:00Z (SESSION: pid-regler-impl)` | `crates/memfuse-adapt/src/pid_latency_controller.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | PID Latency Controller & Latency Budget Guard für Multi-Step Retrieval. |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-cognition/src/consolidation_locks.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Guard-Konstrukt fuer typsicheres Locking und geordnete Kaskaden-Invalidierung in der Sleep-Cycle-Konsolidierung. |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-crypto/src/kv_segment/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation). |
-| `TS:2026-09-13T00:00:00Z` | `crates/memfuse-kvcache/src/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation). |
 | `TS:2026-09-12T00:00:00Z` | `crates/memfuse-db/tests/consolidation_double_trigger_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrierter Test zur Verifizierung des Double-Trigger-Schutzes zwischen ConsolidationEngine und MaintenanceScheduler. |
 | `TS:2026-09-12` | `crates/memfuse-engine/src/export.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Export-Funktionalität für Memory-Export-Format v1 (Schema Version "1.0"). |
 | `TS:2026-09-12` | `crates/memfuse-engine/src/import.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Import-Funktionalität & Zusammenfassung für Memory-Export-Format v1 (Schema Version "1.0"). |
@@ -21,13 +27,11 @@
 | `TS:2026-09-10T19:21:35Z (SESSION: 4dd1c98c)` | `crates/memfuse-text/src/morphology.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Umlaut-Normalisierung (ä->ae, ö->oe, ü->ue, ß->ss) und Zerlegung deutscher Zusammensetzungen. |
 | `TS:2026-09-09T16:15:00Z (SESSION: dafac391)` | `crates/memfuse-crypto/tests/kv_segment_concurrency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Concurrency Stress Test für TenantIsolatedKvStore und EvictionWorker unter hoher Parallellast. |
 | `TS:2026-09-09T16:10:00Z (SESSION: dafac391)` | `crates/memfuse-crypto/src/kv_segment/eviction_worker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall). |
-| `TS:2026-09-09T16:10:00Z (SESSION: dafac391)` | `crates/memfuse-kvcache/src/eviction_worker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall). |
 | `TS:2026-09-09T15:52:00Z (SESSION: 8fae2834)` | `crates/memfuse-vector/src/partial_rebuild.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen (F-02). |
 | `TS:2026-09-09T13:22:45Z (SESSION: dc71d70)` | `crates/memfuse-text/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Exportiert Bm25Scorer, InvertedIndex, Morphologie-Tools und BM25-Modelle für DB-Hybrid-Suche. |
 | `TS:2026-09-09T13:17:00Z (SESSION: a413a598)` | `crates/memfuse-crypto/tests/kv_segment_proptests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-based Tests für KvSegment, TenantIsolatedKvStore und LRU-Eviction. |
 | `TS:2026-09-08T00:00:00Z (SESSION: a413a598)` | `crates/memfuse-crypto/src/kv_segment/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KV-Cache-Bridge Sicherheitsschicht (KvSegment, Tenant-Isolation, Eviction-Worker, Segment-Verschlüsselung). |
 | `TS:2026-09-08T00:00:00Z (SESSION: a413a598)` | `crates/memfuse-crypto/src/kv_segment/segment.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvSegment mit Zeroize-Garantie (ZeroizeOnDrop, nie unverschlüsselt auf Disk). |
-| `TS:2026-09-08T00:00:00Z (SESSION: a413a598)` | `crates/memfuse-kvcache/src/segment.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvSegment mit Zeroize-Garantie (ZeroizeOnDrop, nie unverschlüsselt auf Disk). |
 | `TS:2026-09-08T00:00:00Z` | `crates/memfuse-crypto/src/kv_cipher.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Dedicated AEAD encryption and key isolation for KV-cache segments (memfuse-kv-bridge). |
 | `TS:2026-09-08T00:00:00Z` | `crates/memfuse-crypto/tests/kv_segment_integration.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstest für KvSegment-Verschlüsselung, Zeroize und Prozess-Speicherabbild-Prüfung (P9). |
 | `TS:2026-09-07T12:00:00Z` | `crates/memfuse-engine/src/temporal_filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Bi-temporaler Validity-Filter für Post-RRF Fusion-Ergebnisse in Retrieval-Pipelines. |
@@ -82,6 +86,10 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-engine/src/collection/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit-Tests für Collection-CRUD, Indizierung, Repair und Grenzwerte. |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-engine/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/memfuse-engine/src/transaction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
+| `2026-09-22T00:00:00Z` | `crates/memfuse-infer-candle/src/kv_state.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvState implementation for native Candle Llama model KV cache management (Spec §9.2 Stufe B). |
+| `2026-09-22T00:00:00Z` | `crates/memfuse-infer-candle/src/model/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Forked Llama model module with direct KvState access (Spec §9.2 Stufe B). |
+| `2026-09-22T00:00:00Z` | `crates/memfuse-infer-candle/src/model/quantized_llama.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Forked Candle Quantized Llama model with explicit KvState management (Spec §9.2 Stufe B). |
+| `2026-09-22T00:00:00Z` | `crates/memfuse-infer-candle/tests/kv_stage_b_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit and integration tests for Stage B KvState and forked Llama KV cache integration. |
 | `2026-09-19T20:12:00Z (SESSION: 01c5be8b)` | `crates/memfuse-testkit/src/fault_vfs.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Deterministic I/O error injector and Virtual File System test utility. |
 | `2026-09-19T20:12:00Z (SESSION: 01c5be8b)` | `crates/memfuse-testkit/src/in_memory_store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-Memory StorageEngine implementation for fast, lightweight testing. |
 | `2026-09-19T20:12:00Z (SESSION: 01c5be8b)` | `crates/memfuse-testkit/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs. |
@@ -172,8 +180,6 @@
 | `2026-09-09T13:22:45Z` | `crates/memfuse-text/src/morphology/tests.rs` | `REVIEW-PASS` | `TEST:TXT-001` | `dc71d70` | `PASS` | `8` | // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-09T13:22:45Z) (SESSION: dc71d70) |
 | `2026-09-09T13:17:00Z` | `crates/memfuse-crypto/src/kv_segment/eviction_worker.rs` | `AI-TAG` | `AGT-CRYPTO-edaee52e` | `a413a598` | `RESOLVED` | `0` | // AI-TAG[CONCURRENCY][MAJOR][RESOLVED] EvictionWorker is Sync via Mutex protection of sender and handle (ID: AGT-CRYPTO-edaee52e) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598) |
 | `2026-09-09T13:17:00Z` | `crates/memfuse-crypto/src/kv_segment/segment.rs` | `AI-TAG` | `AGT-CRYPTO-fae9dd56` | `a413a598` | `RESOLVED` | `0` | // AI-TAG[CRYPTO][MAJOR][RESOLVED] Fail fast on missing encrypted payload/nonce instead of dummy zero nonce (ID: AGT-CRYPTO-fae9dd56) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598) |
-| `2026-09-09T13:17:00Z` | `crates/memfuse-kvcache/src/eviction_worker.rs` | `AI-TAG` | `AGT-CRYPTO-edaee52e` | `a413a598` | `RESOLVED` | `0` | // AI-TAG[CONCURRENCY][MAJOR][RESOLVED] EvictionWorker is Sync via Mutex protection of sender and handle (ID: AGT-CRYPTO-edaee52e) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598) |
-| `2026-09-09T13:17:00Z` | `crates/memfuse-kvcache/src/segment.rs` | `AI-TAG` | `AGT-CRYPTO-fae9dd56` | `a413a598` | `RESOLVED` | `0` | // AI-TAG[CRYPTO][MAJOR][RESOLVED] Fail fast on missing encrypted payload/nonce instead of dummy zero nonce (ID: AGT-CRYPTO-fae9dd56) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598) |
 | `2026-09-09T12:44:49Z (SESSION: c74a1828)` | `crates/memfuse-infer-candle/tests/gasp_mutant_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Additional unit tests targeting mutants in GaspValidator and GaspConfig. |
 | `2026-09-09T12:44:49Z (SESSION: c74a1828)` | `crates/memfuse-infer-candle/tests/gguf_loader_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit tests for GGUF metadata parsing error paths. |
 | `2026-09-09T12:44:49Z (SESSION: c74a1828)` | `crates/memfuse-infer-candle/tests/proptest_candle.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-based tests for memfuse-candle components (fingerprinting, GaspValidator, and clients). |
@@ -331,5 +337,6 @@
 | `` | `crates/memfuse-vector/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/memfuse-vector/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/memfuse-vector/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/memfuse/src/agent_memory.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Agent Memory Facade (Ring 4) — Provides a clean remember/recall/forget/relate API for AI Agents. |
 | `` | `crates/memfuse/src/builder.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | MemFuse Composition Root Builder (Ring 4). |
 | `` | `crates/memfuse/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | MemFuse Primary Facade & Composition Root (Ring 4). |

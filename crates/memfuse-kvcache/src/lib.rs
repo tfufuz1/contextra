@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), forbid(unsafe_code))]
+#![forbid(unsafe_code)]
 
 //! MemFuse KV-Cache Crate (Ring 1).
 //!

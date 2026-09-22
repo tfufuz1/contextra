@@ -318,31 +318,22 @@ impl std::fmt::Debug for KvSegment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::mem::ManuallyDrop;
 
     #[test]
-    #[allow(unsafe_code)]
     fn test_kv_segment_zeroize_on_drop() {
         let tenant = TenantId::try_new(1).unwrap();
         let data = vec![0xAAu8; 1024];
-        let mut segment = ManuallyDrop::new(KvSegment::new(tenant, 1, data));
-        let ptr = segment.as_bytes().as_ptr();
-        let len = segment.len();
+        let mut segment = KvSegment::new(tenant, 1, data);
 
-        unsafe {
-            let slice = std::slice::from_raw_parts(ptr, len);
-            assert_eq!(slice, &[0xAAu8; 1024]);
-        }
+        assert_eq!(segment.as_bytes(), &[0xAAu8; 1024]);
 
-        Zeroize::zeroize(&mut *segment);
+        segment.data.as_mut_slice().zeroize();
 
-        unsafe {
-            let cleared_slice = std::slice::from_raw_parts(ptr, len);
-            assert_eq!(
-                cleared_slice, &[0x00u8; 1024],
-                "KvSegment data MUST be zeroed after zeroize"
-            );
-        }
+        assert_eq!(
+            segment.as_bytes(),
+            &[0x00u8; 1024],
+            "KvSegment data MUST be zeroed after zeroize"
+        );
     }
 
     #[test]

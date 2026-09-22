@@ -6,14 +6,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
+use crate::error::GraphMutationError;
 use crate::GraphIndexExt;
 use memfuse_core::{
     BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
     StorageEngine, TxId,
 };
-use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
-use crate::error::GraphMutationError;
-use crate::GraphIndexExt;
 
 use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::{
@@ -340,9 +338,17 @@ impl CsrGraph {
     }
 
     /// Persists a hyperedge to storage under `__graph:hyperedge:` and secondary index `__graph:hyperedge_by_entity:`.
-    pub async fn persist_hyperedge(&self, tx: TxId, hyperedge: &crate::hyperedge::HyperEdge) -> Result<()> {
+    pub async fn persist_hyperedge(
+        &self,
+        tx: TxId,
+        hyperedge: &crate::hyperedge::HyperEdge,
+    ) -> Result<()> {
         if let Some(storage) = self.storage() {
-            let key = format!("{}{:016x}", crate::hyperedge::HYPEREDGE_PREFIX, hyperedge.id.inner());
+            let key = format!(
+                "{}{:016x}",
+                crate::hyperedge::HYPEREDGE_PREFIX,
+                hyperedge.id.inner()
+            );
             let value = hyperedge.serialize()?;
             storage.put(tx, key.as_bytes(), &value).await?;
 

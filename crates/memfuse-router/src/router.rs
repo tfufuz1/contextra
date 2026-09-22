@@ -946,7 +946,8 @@ mod tests {
             0.8,
         );
 
-        let router = crate::tests::tests::create_test_router(collection, vec![profile1, profile2], None);
+        let router =
+            crate::tests::tests::create_test_router(collection, vec![profile1, profile2], None);
         let stats = router.calibration_stats();
         assert_eq!(stats.len(), 2);
         assert_eq!(stats["p1"].times_selected, 0);

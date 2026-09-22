@@ -337,10 +337,9 @@ impl LayerWeights {
                     .broadcast_as(att.shape())
                     .map_err(|e| MemFuseError::Internal(format!("mask broadcast error: {e}")))?;
                 att.where_cond(
-                    &self
-                        .neg_inf
-                        .broadcast_as(att.shape())
-                        .map_err(|e| MemFuseError::Internal(format!("neg_inf broadcast error: {e}")))?,
+                    &self.neg_inf.broadcast_as(att.shape()).map_err(|e| {
+                        MemFuseError::Internal(format!("neg_inf broadcast error: {e}"))
+                    })?,
                     &mask_broadcast,
                 )
                 .map_err(|e| MemFuseError::Internal(format!("mask where_cond error: {e}")))?
@@ -381,25 +380,31 @@ impl ModelWeights {
         device: &Device,
     ) -> Result<Self, MemFuseError> {
         let md_get = |key: &str| -> Result<&gguf_file::Value, MemFuseError> {
-            ct.metadata
-                .get(key)
-                .ok_or_else(|| MemFuseError::InvalidInput(format!("Missing GGUF metadata key: {key}")))
+            ct.metadata.get(key).ok_or_else(|| {
+                MemFuseError::InvalidInput(format!("Missing GGUF metadata key: {key}"))
+            })
         };
 
-        let head_count = md_get("llama.attention.head_count")
-            .and_then(|v| v.to_u32().map_err(|e| MemFuseError::InvalidInput(e.to_string())))?
-            as usize;
-        let head_count_kv = md_get("llama.attention.head_count_kv")
-            .and_then(|v| v.to_u32().map_err(|e| MemFuseError::InvalidInput(e.to_string())))?
-            as usize;
-        let block_count = md_get("llama.block_count")
-            .and_then(|v| v.to_u32().map_err(|e| MemFuseError::InvalidInput(e.to_string())))?
-            as usize;
-        let embedding_length = md_get("llama.embedding_length")
-            .and_then(|v| v.to_u32().map_err(|e| MemFuseError::InvalidInput(e.to_string())))?
-            as usize;
-        let rms_norm_eps = md_get("llama.attention.layer_norm_rms_epsilon")
-            .and_then(|v| v.to_f32().map_err(|e| MemFuseError::InvalidInput(e.to_string())))?;
+        let head_count = md_get("llama.attention.head_count").and_then(|v| {
+            v.to_u32()
+                .map_err(|e| MemFuseError::InvalidInput(e.to_string()))
+        })? as usize;
+        let head_count_kv = md_get("llama.attention.head_count_kv").and_then(|v| {
+            v.to_u32()
+                .map_err(|e| MemFuseError::InvalidInput(e.to_string()))
+        })? as usize;
+        let block_count = md_get("llama.block_count").and_then(|v| {
+            v.to_u32()
+                .map_err(|e| MemFuseError::InvalidInput(e.to_string()))
+        })? as usize;
+        let embedding_length = md_get("llama.embedding_length").and_then(|v| {
+            v.to_u32()
+                .map_err(|e| MemFuseError::InvalidInput(e.to_string()))
+        })? as usize;
+        let rms_norm_eps = md_get("llama.attention.layer_norm_rms_epsilon").and_then(|v| {
+            v.to_f32()
+                .map_err(|e| MemFuseError::InvalidInput(e.to_string()))
+        })?;
 
         let tok_embeddings = ct
             .tensor(reader, "token_embd.weight", device)
@@ -501,7 +506,12 @@ impl ModelWeights {
         })
     }
 
-    fn mask(&mut self, seq_len: usize, index_pos: usize, device: &Device) -> Result<Tensor, MemFuseError> {
+    fn mask(
+        &mut self,
+        seq_len: usize,
+        index_pos: usize,
+        device: &Device,
+    ) -> Result<Tensor, MemFuseError> {
         let kv_len = index_pos + seq_len;
         if let Some(mask) = self.masks.get(&(seq_len, kv_len)) {
             Ok(mask.clone())
