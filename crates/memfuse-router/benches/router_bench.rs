@@ -1,9 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use memfuse_core::{BoxFuture, ContextChunk, EntityId, Result, StorageEngine, TokenBudget};
 use memfuse_db::{Collection, MemFuse, MemFuseConfig};
-use memfuse_router::ports_local::{
-    CommunityResolver, HybridSearchProvider, PassthroughContextPreparer,
-};
+use memfuse_router::ports_local::{CommunityResolver, HybridSearchProvider};
 use memfuse_router::{RouterEngine, SlmProfile};
 use serde_json::json;
 use std::sync::Arc;
