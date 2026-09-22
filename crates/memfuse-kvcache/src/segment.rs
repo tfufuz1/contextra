@@ -1,9 +1,16 @@
 // FILE-CONTEXT
-// ZWECK: KvSegment mit Zeroize-Garantie (ZeroizeOnDrop, nie unverschlüsselt auf Disk).
-// STAND: TS:2026-09-08T00:00:00Z (SESSION: a413a598)
+// ZWECK: KvSegment mit Zeroize-Garantie, Tier-2 AEAD-Verschlüsselung & Crypto-Shredding.
+// STAND: TS:2026-09-15T00:00:00Z
 
-use memfuse_core::TenantId;
+use memfuse_core::{MemFuseError, TenantId};
+use memfuse_crypto::CryptoKey;
+use parking_lot::RwLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use super::eviction_worker::EvictionWorker;
+use super::radix::KvBlockGuard;
 
 #[cfg(feature = "kv-encryption")]
 use memfuse_crypto::{CryptoError, EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
@@ -11,6 +18,108 @@ use memfuse_crypto::{CryptoError, EncryptedKvLayer, KvSegmentCipher, ModelFinger
 /// Aktuelle Version der KV-Segment-Schlüsselableitung.
 /// Erhöhe diesen Wert, wenn sich der HKDF-Info-String oder der Salt-Aufbau ändert.
 pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1;
+
+/// Shred-fähiger Schlüssel für Tier-2 Segmentdateien (Crypto-Shredding).
+/// Durch Aufruf von `shred()` wird der Schlüssel im Speicher gezeroized und gelöscht.
+/// Ausgelagerte Segmentdateien auf Disk werden dadurch mathematisch dauerhaft unlesbar.
+#[derive(Clone)]
+pub struct ShreddableSegmentKey {
+    key_manager: Arc<RwLock<Option<CryptoKey>>>,
+}
+
+impl ShreddableSegmentKey {
+    /// Erstellt einen neuen shred-fähigen Schlüssel aus Passphrase und Salt.
+    pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self, MemFuseError> {
+        let km = CryptoKey::try_new(passphrase, salt)
+            .map_err(|e| MemFuseError::Crypto(e.to_string()))?;
+        Ok(Self {
+            key_manager: Arc::new(RwLock::new(Some(km))),
+        })
+    }
+
+    /// Erstellt einen neuen shred-fähigen Schlüssel mit zufälligem Salt.
+    pub fn try_new_random(passphrase: &str) -> Result<Self, MemFuseError> {
+        let (km, _) = CryptoKey::try_new_random_salt(passphrase)
+            .map_err(|e| MemFuseError::Crypto(e.to_string()))?;
+        Ok(Self {
+            key_manager: Arc::new(RwLock::new(Some(km))),
+        })
+    }
+
+    /// Verschlüsselt Daten mit AES-256-GCM-SIV und automatischem Nonce.
+    pub fn encrypt(&self, plaintext: &[u8]) -> Result<(Vec<u8>, [u8; 12]), MemFuseError> {
+        let guard = self.key_manager.read();
+        let km = guard.as_ref().ok_or_else(|| {
+            MemFuseError::Crypto("Segment key has been shredded: decryption impossible".to_string())
+        })?;
+        km.encrypt_auto_nonce(plaintext)
+            .map_err(|e| MemFuseError::Crypto(e.to_string()))
+    }
+
+    /// Entschlüsselt Daten mit AES-256-GCM-SIV.
+    pub fn decrypt(&self, ciphertext: &[u8], nonce: &[u8; 12]) -> Result<Vec<u8>, MemFuseError> {
+        let guard = self.key_manager.read();
+        let km = guard.as_ref().ok_or_else(|| {
+            MemFuseError::Crypto("Segment key has been shredded: decryption impossible".to_string())
+        })?;
+        km.decrypt_auto_nonce(ciphertext, nonce)
+            .map_err(|e| MemFuseError::Crypto(e.to_string()))
+    }
+
+    /// Crypto-Shredding: Vernichtet den Schlüssel im Speicher.
+    /// Alle mit diesem Schlüssel verschlüsselten Daten werden dauerhaft unlesbar.
+    pub fn shred(&self) {
+        if let Some(mut km) = self.key_manager.write().take() {
+            km.emergency_wipe();
+        }
+    }
+
+    /// Prüft, ob der Schlüssel ge-shredded wurde.
+    pub fn is_shredded(&self) -> bool {
+        self.key_manager.read().is_none()
+    }
+}
+
+impl std::fmt::Debug for ShreddableSegmentKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ShreddableSegmentKey")
+            .field("shredded", &self.is_shredded())
+            .finish()
+    }
+}
+
+/// Verschlüsselte Tier-2 Segmentdatei (ausgelagerter KV-Block auf Disk).
+pub struct Tier2EncryptedSegment {
+    pub tenant_id: TenantId,
+    pub segment_id: u64,
+    pub ciphertext: Vec<u8>,
+    pub nonce: [u8; 12],
+    pub key: ShreddableSegmentKey,
+}
+
+impl Tier2EncryptedSegment {
+    /// Verschlüsselt Klartext-Tensor-Bytes und erstellt ein neues Tier-2 Segment.
+    pub fn new(
+        tenant_id: TenantId,
+        segment_id: u64,
+        plaintext: &[u8],
+        key: ShreddableSegmentKey,
+    ) -> Result<Self, MemFuseError> {
+        let (ciphertext, nonce) = key.encrypt(plaintext)?;
+        Ok(Self {
+            tenant_id,
+            segment_id,
+            ciphertext,
+            nonce,
+            key,
+        })
+    }
+
+    /// Liest und entschlüsselt das Segment. Scheitert sofort, wenn der Key ge-shredded wurde.
+    pub fn read_and_decrypt(&self) -> Result<Vec<u8>, MemFuseError> {
+        self.key.decrypt(&self.ciphertext, &self.nonce)
+    }
+}
 
 /// Encrypted layer representation stored inside a KvSegment when encryption is active.
 #[cfg(feature = "kv-encryption")]
@@ -22,15 +131,6 @@ pub struct EncryptedSegmentPayload {
 
 /// Ein KV-Cache-Segment. P9-Pflicht: Zeroize-on-Drop, nie unverschlüsselt
 /// auf persistentem/auslagerbarem Speicher.
-///
-/// Gemäß Gesamtspezifikation v7.0 §7.3 enthält ein Segment:
-/// - `tenant_id`: Mandanten-Identifikator
-/// - `segment_id`: Segment-Identifikator
-/// - `model_fingerprint`: Optionaler Modell-Fingerprint zur Schlüsselableitung
-/// - `rope_offset`: Optionaler RoPE-Positions-Offset (bereits vorbereitet; falls memfuse-mcp
-///   diesen Wert noch nicht bereitstellt, ist `None` als offener Folgepunkt dokumentiert)
-/// - `encrypted`: Kennzeichen, ob die Tensor-Bytes verschlüsselt vorliegen
-/// - `data`: Rohe Tensor-Bytes oder Ciphertext-Bytes. WIRD gezeroized beim Drop.
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct KvSegment {
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
@@ -38,8 +138,6 @@ pub struct KvSegment {
     #[zeroize(skip)]
     pub segment_id: u64,
     /// Versionsnummer der HKDF-Schlüsselableitung.
-    /// 0 = Legacy (vor Versionierung, kein Versionsfeld in HKDF-Info)
-    /// 1 = Aktuell (HKDF-Info enthält "v1" als explizites Byte)
     #[zeroize(skip)]
     pub key_derivation_version: u8,
     #[zeroize(skip)]
@@ -49,6 +147,8 @@ pub struct KvSegment {
     pub model_fingerprint: Option<ModelFingerprint>,
     #[zeroize(skip)]
     pub rope_offset: Option<usize>,
+    #[zeroize(skip)]
+    pub active_refs: Arc<AtomicUsize>,
     /// Rohe Tensor-Bytes (Klartext oder Ciphertext). WIRD gezeroized beim Drop.
     data: Vec<u8>,
     #[cfg(feature = "kv-encryption")]
@@ -66,6 +166,7 @@ impl KvSegment {
             #[cfg(feature = "kv-encryption")]
             model_fingerprint: None,
             rope_offset: None,
+            active_refs: Arc::new(AtomicUsize::new(0)),
             data,
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
@@ -88,6 +189,7 @@ impl KvSegment {
             #[cfg(feature = "kv-encryption")]
             model_fingerprint,
             rope_offset,
+            active_refs: Arc::new(AtomicUsize::new(0)),
             data,
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
@@ -120,6 +222,7 @@ impl KvSegment {
             encrypted: true,
             model_fingerprint: Some(model_fingerprint),
             rope_offset,
+            active_refs: Arc::new(AtomicUsize::new(0)),
             data: ciphertext_copy,
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
@@ -127,8 +230,22 @@ impl KvSegment {
         })
     }
 
+    /// Gibt die aktuelle Anzahl aktiver Referenzen zurück.
+    pub fn active_refs(&self) -> usize {
+        self.active_refs.load(Ordering::SeqCst)
+    }
+
+    /// Erstellt einen `KvBlockGuard` für diesen Block und inkrementiert den Referenzzähler.
+    pub fn acquire_guard(&self, worker: Option<Arc<EvictionWorker>>) -> KvBlockGuard {
+        KvBlockGuard::new(
+            self.segment_id,
+            self.tenant_id,
+            Arc::clone(&self.active_refs),
+            worker,
+        )
+    }
+
     /// Entschlüsselt die Daten des Segments, falls es verschlüsselt ist.
-    /// Gibt bei Klartext-Segmenten direkt einen Klon der `data`-Bytes zurück.
     #[cfg(feature = "kv-encryption")]
     pub fn decrypt_data(&self, cipher: &KvSegmentCipher) -> Result<Vec<u8>, CryptoError> {
         if !self.encrypted {
@@ -149,7 +266,6 @@ impl KvSegment {
                 self.key_derivation_version,
             )
         } else if self.model_fingerprint.is_some() {
-            // AI-TAG[CRYPTO][MAJOR][RESOLVED] Fail fast on missing encrypted payload/nonce instead of dummy zero nonce (ID: AGT-CRYPTO-fae9dd56) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598)
             Err(CryptoError::Crypto(
                 "Missing encrypted payload nonce for encrypted segment decryption".into(),
             ))
@@ -193,6 +309,7 @@ impl std::fmt::Debug for KvSegment {
             .field("tenant_id", &self.tenant_id)
             .field("segment_id", &self.segment_id)
             .field("data_len", &self.data.len())
+            .field("active_refs", &self.active_refs())
             .field("data", &"*** REDACTED ***")
             .finish()
     }
@@ -212,18 +329,13 @@ mod tests {
         let ptr = segment.as_bytes().as_ptr();
         let len = segment.len();
 
-        // Precondition: check that memory contains original non-zero tensor bytes
-        // SAFETY: `segment` is alive in ManuallyDrop wrapper and `ptr` points directly to its buffer.
         unsafe {
             let slice = std::slice::from_raw_parts(ptr, len);
             assert_eq!(slice, &[0xAAu8; 1024]);
         }
 
-        // Action: Explicitly invoke zeroize without deallocating/dropping stack frame memory
         Zeroize::zeroize(&mut *segment);
 
-        // Postcondition: Check that memory was zeroed in place without UAF
-        // SAFETY: `segment` memory buffer is still allocated within ManuallyDrop wrapper in this frame.
         unsafe {
             let cleared_slice = std::slice::from_raw_parts(ptr, len);
             assert_eq!(
@@ -231,6 +343,29 @@ mod tests {
                 "KvSegment data MUST be zeroed after zeroize"
             );
         }
+    }
+
+    #[test]
+    fn test_shreddable_key_aead_roundtrip_and_shredding() {
+        let tenant = TenantId::try_new(10).unwrap();
+        let key = ShreddableSegmentKey::try_new_random("tenant-secret-passphrase").unwrap();
+        assert!(!key.is_shredded());
+
+        let plaintext = b"Sensibler Tensor-Inhalt fuer KV-Cache Tier-2";
+        let tier2 = Tier2EncryptedSegment::new(tenant, 1001, plaintext, key.clone()).unwrap();
+
+        let decrypted = tier2.read_and_decrypt().unwrap();
+        assert_eq!(decrypted, plaintext);
+
+        // Perform crypto-shredding
+        key.shred();
+        assert!(key.is_shredded());
+
+        // Decryption MUST fail immediately after shredding
+        let res = tier2.read_and_decrypt();
+        assert!(res.is_err());
+        let err = res.err().unwrap().to_string();
+        assert!(err.contains("shredded"));
     }
 
     #[test]
@@ -248,6 +383,7 @@ mod tests {
         assert_eq!(segment.rope_offset, Some(128));
         assert_eq!(segment.len(), 5);
         assert!(!segment.is_empty());
+        assert_eq!(segment.active_refs(), 0);
 
         let debug_str = format!("{:?}", segment);
         assert!(debug_str.contains("*** REDACTED ***"));
@@ -273,13 +409,12 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_v0_legacy_backward_compatibility() {
-        let km = memfuse_crypto::CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
+        let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"legacy version 0 plaintext payload";
 
-        // Encrypt specifically with version 0
         let encrypted_layer = cipher
             .encrypt_with_version(tenant, 1, 0, fp.clone(), plaintext)
             .unwrap();
@@ -292,13 +427,13 @@ mod tests {
             encrypted: true,
             model_fingerprint: Some(fp),
             rope_offset: None,
+            active_refs: Arc::new(AtomicUsize::new(0)),
             data: ciphertext_copy,
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
             }),
         };
 
-        // Version 0 segment should successfully decrypt with version 0 HKDF info
         let decrypted = segment.decrypt_data(&cipher).unwrap();
         assert_eq!(decrypted, plaintext);
     }
@@ -306,21 +441,18 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_v1_vs_v0_key_separation() {
-        let km = memfuse_crypto::CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
+        let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"version 1 plaintext payload";
 
-        // Create new_encrypted segment (defaults to version 1)
         let mut segment =
             KvSegment::new_encrypted(&cipher, tenant, 1, fp, None, plaintext).unwrap();
 
-        // Roundtrip with version 1 MUST succeed
         let decrypted = segment.decrypt_data(&cipher).unwrap();
         assert_eq!(decrypted, plaintext);
 
-        // Tampering version to 0 MUST fail decryption because key_v0 != key_v1
         segment.key_derivation_version = 0;
         let res = segment.decrypt_data(&cipher);
         assert!(
@@ -332,7 +464,7 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_unsupported_version_error() {
-        let km = memfuse_crypto::CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
+        let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
@@ -340,7 +472,6 @@ mod tests {
 
         let mut segment =
             KvSegment::new_encrypted(&cipher, tenant, 1, fp, None, plaintext).unwrap();
-        // Set an unknown future version
         segment.key_derivation_version = 99;
 
         let res = segment.decrypt_data(&cipher);
