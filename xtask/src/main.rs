@@ -70,6 +70,7 @@ mod check_module_reachability;
 mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
+mod check_ring0_async_purity;
 mod check_ring_layering;
 mod check_ring0_async_purity;
 mod check_placeholder_refs;
