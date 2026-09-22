@@ -24,61 +24,64 @@ pub fn consolidate_decisions(root: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    let adr_re = Regex::new(r"^ADR-(\d+)").unwrap();
-    let mut adr_files: Vec<(u32, PathBuf)> = Vec::new();
+    let mut current_decisions = if target_file.exists() {
+        fs::read_to_string(&target_file)
+            .map_err(|e| format!("Kann {} nicht lesen: {}", target_file.display(), e))?
+    } else {
+        let mut header = String::new();
+        header.push_str("# Architecture Decision Records (ADR)\n\n");
+        header.push_str("> **Kanonische Einzel-Quelle:** Gemäß ADR-060 ist `DECISIONS.md` die einzige maßgebliche\n");
+        header.push_str("> Quelle für Architecture Decision Records im MemFuse-Projekt. Neue Entscheidungen werden\n");
+        header.push_str("> ausschließlich append-only am Ende dieser Datei ergänzt (`cargo xtask generate-adr \"<Titel>\"`).\n\n");
+        header.push_str("## Dokumentierte Lücken & Umnummerierungen\n\n");
+        header.push_str("* ADR-057: Lücken-Dokumentation (Umnummerierung / Ausgelassen im Zuge paralleler Audit-Sessions)\n");
+        header.push_str("* ADR-067: Umnummeriert zu ADR-074 (Normative Kalibrierung des PathRAG Sufficiency-Gate Thresholds)\n");
+        header.push_str("* ADR-068: Umnummeriert zu ADR-076 (Studie zur DiskANN PENDING_FLUSH_THRESHOLD Write-Amplification)\n\n");
+        header.push_str("---\n\n");
+        header
+    };
 
     let entries = fs::read_dir(&decisions_dir)
         .map_err(|e| format!("Kann {} nicht lesen: {}", decisions_dir.display(), e))?;
 
+    let mut added_any = false;
+    let mut adr_files: Vec<PathBuf> = Vec::new();
+
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         if name.ends_with(".md") && name != "README.md" && name != "INDEX.md" {
-            if let Some(caps) = adr_re.captures(&name) {
-                if let Ok(num) = caps[1].parse::<u32>() {
-                    adr_files.push((num, entry.path()));
+            adr_files.push(entry.path());
+        }
+    }
+
+    adr_files.sort();
+
+    for path in adr_files {
+        let content = fs::read_to_string(&path)
+            .map_err(|e| format!("Kann {} nicht lesen: {}", path.display(), e))?;
+        let trimmed = content.trim();
+        if let Some(first_line) = trimmed.lines().next() {
+            let first_line_clean = first_line.trim_start_matches('#').trim();
+            let title_key = first_line_clean.split(':').next().unwrap_or(first_line_clean).trim();
+            if !current_decisions.contains(title_key) && !current_decisions.contains(first_line_clean) {
+                if !current_decisions.ends_with("\n\n") {
+                    if !current_decisions.ends_with('\n') {
+                        current_decisions.push('\n');
+                    }
+                    current_decisions.push('\n');
                 }
+                current_decisions.push_str("---\n\n");
+                current_decisions.push_str(trimmed);
+                current_decisions.push_str("\n\n");
+                added_any = true;
             }
         }
     }
 
-    adr_files.sort_by_key(|(num, _)| *num);
-
-    let mut output = String::new();
-    output.push_str("# Architecture Decision Records (ADR)\n\n");
-    output.push_str("> **Kanonische Einzel-Quelle:** Gemäß ADR-060 ist `DECISIONS.md` die einzige maßgebliche\n");
-    output.push_str("> Quelle für Architecture Decision Records im MemFuse-Projekt. Neue Entscheidungen werden\n");
-    output.push_str("> ausschließlich append-only am Ende dieser Datei ergänzt (`cargo xtask generate-adr \"<Titel>\"`).\n\n");
-
-    output.push_str("## Dokumentierte Lücken & Umnummerierungen\n\n");
-    output.push_str("* ADR-057: Lücken-Dokumentation (Umnummerierung / Ausgelassen im Zuge paralleler Audit-Sessions)\n");
-    output.push_str("* ADR-067: Umnummeriert zu ADR-074 (Normative Kalibrierung des PathRAG Sufficiency-Gate Thresholds)\n");
-    output.push_str("* ADR-068: Umnummeriert zu ADR-076 (Studie zur DiskANN PENDING_FLUSH_THRESHOLD Write-Amplification)\n\n");
-
-    output.push_str("---\n\n");
-
-    let header_re = Regex::new(r"^(#+)\s*ADR-\d+:\s*").unwrap();
-
-    for (num, path) in adr_files {
-        let content = fs::read_to_string(&path)
-            .map_err(|e| format!("Kann {} nicht lesen: {}", path.display(), e))?;
-        let trimmed = content.trim();
-        let normalized = if let Some(first_line_end) = trimmed.find('\n') {
-            let (first_line, rest) = trimmed.split_at(first_line_end);
-            if header_re.is_match(first_line) {
-                let title = header_re.replace(first_line, "");
-                format!("# ADR-{:03}: {}{}", num, title, rest)
-            } else {
-                trimmed.to_string()
-            }
-        } else {
-            trimmed.to_string()
-        };
-        output.push_str(&normalized);
-        output.push_str("\n\n---\n\n");
+    if added_any {
+        fs::write(&target_file, &current_decisions)
+            .map_err(|e| format!("Kann {} nicht schreiben: {}", target_file.display(), e))?;
     }
-
-    fs::write(&target_file, &output)
-        .map_err(|e| format!("Kann {} nicht schreiben: {}", target_file.display(), e))?;
 
     println!(
         "✅ DECISIONS.md erfolgreich konsolidiert: {}",

@@ -108,9 +108,76 @@ fn bench_router_engine(c: &mut Criterion) {
             ));
         }
 
-        let adapter = Arc::new(CollectionAdapter::new(collection.clone()));
-        let preparer = Arc::new(PassthroughContextPreparer);
-        let router = Arc::new(RouterEngine::new(adapter.clone(), adapter, preparer, profiles, None));
+        struct BenchCollectionAdapter<S: StorageEngine + 'static> {
+            collection: Arc<memfuse_db::Collection<S>>,
+        }
+
+        impl<S: StorageEngine + 'static> memfuse_ports::HybridSearchProvider for BenchCollectionAdapter<S> {
+            fn search_hybrid<'a>(
+                &'a self,
+                query_text: &'a str,
+                query_embedding: &'a [f32],
+                top_k: usize,
+            ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Vec<memfuse_core::ContextChunk>>>
+            {
+                Box::pin(async move {
+                    let search_results = self
+                        .collection
+                        .query()
+                        .text(query_text)
+                        .embedding(query_embedding)
+                        .k(top_k)
+                        .execute()
+                        .await?;
+
+                    let mut chunks = Vec::with_capacity(search_results.len());
+                    for res in search_results {
+                        if let Ok(mut chunk) = memfuse_core::ContextChunk::try_from(res) {
+                            chunk.content = chunk.combined_text_owned();
+                            chunks.push(chunk);
+                        }
+                    }
+                    Ok(chunks)
+                })
+            }
+        }
+
+        impl<S: StorageEngine + 'static> memfuse_ports::CommunityResolver for BenchCollectionAdapter<S> {
+            fn get_community<'a>(
+                &'a self,
+                entity_id: EntityId,
+            ) -> memfuse_core::BoxFuture<'a, memfuse_core::Result<Option<u64>>> {
+                Box::pin(async move { self.collection.get_community(entity_id).await })
+            }
+        }
+
+        struct BenchContextPreparer;
+
+        impl memfuse_ports::ContextPreparer for BenchContextPreparer {
+            fn prepare_context(
+                &self,
+                chunks: Vec<memfuse_core::ContextChunk>,
+                budget: &TokenBudget,
+                relevance_threshold: f32,
+            ) -> memfuse_core::Result<memfuse_core::ContextWindow> {
+                let mut manager = memfuse_db::context::ContextManager::new(budget.clone());
+                manager.set_relevance_threshold(relevance_threshold);
+                manager.prepare_context(chunks)
+            }
+        }
+
+        let adapter = Arc::new(BenchCollectionAdapter {
+            collection: collection.clone(),
+        });
+        let preparer = Arc::new(BenchContextPreparer);
+
+        let router = Arc::new(RouterEngine::new(
+            adapter.clone(),
+            adapter,
+            preparer,
+            profiles,
+            None,
+        ));
 
         c.bench_function(&format!("router_route_{}_profiles", profile_count), |b| {
             b.to_async(&rt).iter(|| {
