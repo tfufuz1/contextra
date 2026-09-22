@@ -37,6 +37,7 @@ thiserror = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 memfuse-store = { workspace = true }
+memfuse-testkit = { workspace = true }
 tempfile = { workspace = true }
 proptest = "1.4"
 tracing-subscriber = { workspace = true }

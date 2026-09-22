@@ -342,6 +342,9 @@ impl StorageEngine for LsmStorage {
                     return Ok(false);
                 }
             }
+            if self.tx_buffer.staged_status(key) == Some(true) {
+                return Ok(false);
+            }
 
             // 2. Intent Lock check and registration
             {
