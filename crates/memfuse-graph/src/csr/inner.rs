@@ -1,22 +1,10 @@
 use arc_swap::ArcSwap;
-use parking_lot::{Mutex, RwLock};
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
-use crate::GraphIndexExt;
-use memfuse_core::{
-    BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
-    StorageEngine, TxId,
-};
+use memfuse_core::{DocId, Entity, EntityId, TxId};
 
-use super::types::{Edge, EdgePayload, InternalIndex, PersistedEdgePayload, StagedEdgePayload};
-use super::visibility::{
-    is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business,
-    WALLCLOCK_TX_HEURISTIC_MIN,
-};
+use super::types::{EdgePayload, InternalIndex, StagedEdgePayload};
 
 /// Inner state of the CsrGraph to manage contiguous storage.
 #[derive(Clone)]
@@ -113,6 +101,12 @@ fn vec_bytes<T>(capacity: usize) -> usize {
 #[inline]
 pub(crate) fn sentinel_entity() -> Entity {
     Entity::new(EntityId::new(0), "", "")
+}
+
+impl Default for GraphInner {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GraphInner {

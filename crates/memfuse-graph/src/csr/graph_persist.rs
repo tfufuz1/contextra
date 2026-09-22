@@ -1,25 +1,13 @@
-use arc_swap::ArcSwap;
-use parking_lot::{Mutex, RwLock};
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use serde::Deserialize;
+use std::collections::HashSet;
+use std::sync::atomic::Ordering;
 
-use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
-use crate::GraphIndexExt;
-use memfuse_core::{
-    BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
-    StorageEngine, TxId,
-};
+use memfuse_core::{Entity, EntityId, MemFuseError, Result, StorageEngine, TxId};
 
 use super::graph_write::CsrGraph;
-use super::inner::{sentinel_entity, GraphInner};
 use super::types::{
-    Edge, EdgePayload, EdgeType, PersistedEdgePayload, GRAPH_COMMUNITY_PREFIX, GRAPH_EDGE_PREFIX,
-    GRAPH_ENTITY_DELETED_PREFIX, GRAPH_ENTITY_PREFIX,
-};
-use super::visibility::{
-    is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id,
+    PersistedEdgePayload, GRAPH_COMMUNITY_PREFIX, GRAPH_EDGE_PREFIX, GRAPH_ENTITY_DELETED_PREFIX,
+    GRAPH_ENTITY_PREFIX,
 };
 
 impl CsrGraph {

@@ -72,7 +72,6 @@ mod check_orphan_modules;
 mod check_phantom_files;
 mod check_ring0_async_purity;
 mod check_ring_layering;
-mod check_ring0_async_purity;
 mod check_placeholder_refs;
 mod check_recall_stability;
 mod check_result_dropped_on_io;
