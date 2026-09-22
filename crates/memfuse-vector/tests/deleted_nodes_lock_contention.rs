@@ -80,13 +80,13 @@ async fn proof_no_deadlock_concurrent_delete_search() {
 // BEWEIST: [Invariante] deleted_nodes.read() wird in search_layer_with_context() einmalig VOR der candidates.pop() Traversal-Schleife gehoistet und nicht pro Kandidat neu akquiriert.
 #[test]
 fn proof_deleted_nodes_lock_hoisted_before_loop() {
-    let source = include_str!("../src/hnsw.rs");
+    let source = include_str!("../src/hnsw/mod.rs");
 
     // Locate search_layer_with_context implementation
     let fn_marker = "fn search_layer_with_context";
     let fn_start = source
         .find(fn_marker)
-        .expect("search_layer_with_context function definition must exist in hnsw.rs");
+        .expect("search_layer_with_context function definition must exist in hnsw/mod.rs");
 
     let fn_body = &source[fn_start..];
 

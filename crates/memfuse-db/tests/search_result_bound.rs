@@ -43,6 +43,23 @@ async fn create_test_collection(
     (col, dir)
 }
 
+fn read_search_rs() -> String {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let paths = [
+        Path::new(&manifest_dir).join("src/collection/search.rs"),
+        Path::new(&manifest_dir).join("../../crates/memfuse-engine/src/collection/search.rs"),
+        Path::new("crates/memfuse-engine/src/collection/search.rs").to_path_buf(),
+        Path::new("crates/memfuse-db/src/collection/search.rs").to_path_buf(),
+    ];
+
+    for p in &paths {
+        if let Ok(content) = std::fs::read_to_string(p) {
+            return content;
+        }
+    }
+    panic!("Failed to read search.rs from candidate paths: {:?}", paths);
+}
+
 #[tokio::test]
 async fn proof_search_never_exceeds_k() {
     let (collection, _dir) = create_test_collection("test_bound_k", 4).await;
