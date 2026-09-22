@@ -33,6 +33,7 @@
 
 use crate::anti_tamper::VolatileEncryptionKey;
 use crate::error::{CryptoError, Result};
+use crate::kdf::{derive_key_argon2id, KdfHeader};
 use aes_gcm_siv::{
     aead::{Aead, KeyInit},
     Aes256GcmSiv, Nonce,
@@ -61,7 +62,12 @@ impl std::fmt::Debug for KeyManager {
 }
 
 impl KeyManager {
-    /// Creates a new KeyManager by deriving a key from a passphrase.
+    /// Creates a new KeyManager by deriving a key from a passphrase using HKDF-SHA256.
+    ///
+    /// # WARNHINWEIS
+    /// Diese Funktion nutzt HKDF-SHA256 und setzt voraus, dass `passphrase` hochentropisches
+    /// Schlüsselmaterial darstellt. Für menschliche Passphrasen MUSS [`KeyManager::try_new_with_kdf`]
+    /// mit Argon2id verwendet werden.
     pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self> {
         if passphrase.is_empty() {
             return Err(CryptoError::InvalidInput(
@@ -83,6 +89,30 @@ impl KeyManager {
         let mut key_raw = [0u8; 32];
         hk.expand(b"memfuse-aes-256-gcm-key", &mut key_raw)
             .map_err(|e| CryptoError::Crypto(format!("HKDF expansion failed: {}", e)))?;
+
+        let cipher = Aes256GcmSiv::new_from_slice(&key_raw)
+            .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
+        let cipher_cache = OnceLock::new();
+        let _ = cipher_cache.set(cipher);
+
+        let mut nonce_prefix = [0u8; 4];
+        rand::rngs::OsRng.fill_bytes(&mut nonce_prefix);
+
+        Ok(Self {
+            key: VolatileEncryptionKey::new(key_raw),
+            cipher_cache,
+            nonce_prefix,
+            nonce_counter: AtomicU64::new(1),
+        })
+    }
+
+    /// Creates a new KeyManager using Argon2id password-based key derivation.
+    ///
+    /// Nutzt Argon2id mit den im [`KdfHeader`] definierten Kostenparametern und Salt,
+    /// um eine sichere Schlüsselableitung für menschliche Passphrasen zu garantieren.
+    pub fn try_new_with_kdf(passphrase: &str, header: &KdfHeader) -> Result<Self> {
+        let derived = derive_key_argon2id(passphrase, header)?;
+        let key_raw = derived.0;
 
         let cipher = Aes256GcmSiv::new_from_slice(&key_raw)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
