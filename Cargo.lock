@@ -2266,8 +2266,12 @@ dependencies = [
  "memfuse-infer-ollama",
  "memfuse-infer-onnx",
  "memfuse-router",
+ "serde",
+ "serde_json",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -2707,6 +2711,7 @@ dependencies = [
  "memfuse-core",
  "memfuse-db",
  "memfuse-graph",
+ "memfuse-ports",
  "memfuse-privacy",
  "memfuse-store",
  "memfuse-text",

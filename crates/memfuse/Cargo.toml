@@ -9,6 +9,9 @@ description = "MemFuse — Embedded hybrid-search for AI agents (Facade)"
 [dependencies]
 memfuse-core = { workspace = true }
 memfuse-db = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
 memfuse-infer-candle = { workspace = true, optional = true }
 memfuse-infer-ollama = { workspace = true, optional = true }
 memfuse-infer-onnx = { workspace = true, optional = true }
@@ -16,6 +19,9 @@ memfuse-router = { workspace = true, optional = true }
 memfuse-calibration = { workspace = true, optional = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [features]
 default = []
