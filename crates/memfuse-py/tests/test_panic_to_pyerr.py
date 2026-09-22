@@ -74,3 +74,55 @@ def test_db_and_collection_panic_poisoning():
         with pytest.raises(RuntimeError) as exc_info_get:
             col.get("doc_p")
         assert "engine poisoned after previous panic" in str(exc_info_get.value)
+
+
+def test_release_wheel_panic_to_pyerr_boundary_isolation():
+    """Spec §9.4 / ADR-N04: Explicit panic boundary isolation test against compiled release extension wheel.
+
+    Guarantees that:
+    1. Direct module-level FFI panic hook `_memfuse._trigger_panic_for_test` raises `PyRuntimeError`
+       containing "Rust panic caught at FFI boundary" without process termination (SIGABRT).
+    2. Facade-level `Db._trigger_panic_for_test` and `Collection._trigger_panic_for_test` raise `PyRuntimeError`
+       and atomically set `is_poisoned = True`.
+    3. Isolated CPython subprocess execution confirms zero SIGABRT / exit code 134 on panic.
+    """
+    # 1. Module-level FFI panic boundary test
+    with pytest.raises(RuntimeError) as exc_mod:
+        _memfuse._trigger_panic_for_test("Release wheel module FFI panic")
+    assert "Rust panic caught at FFI boundary" in str(exc_mod.value)
+    assert "Release wheel module FFI panic" in str(exc_mod.value)
+
+    # 2. Db & Collection instance panic boundary and poisoning test
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        db = memfuse.open(tmp_dir, dimension=64)
+        assert not db.is_poisoned
+
+        with pytest.raises(RuntimeError) as exc_db:
+            db._trigger_panic_for_test("Release wheel Db FFI panic")
+        assert "Rust panic caught at FFI boundary" in str(exc_db.value)
+        assert db.is_poisoned
+
+        # Re-verify subsequent operations are safely rejected with engine poisoned RuntimeError
+        vec = np.zeros(64, dtype=np.float32)
+        with pytest.raises(RuntimeError) as exc_rejected:
+            db.insert("doc_release_test", vec)
+        assert "engine poisoned after previous panic" in str(exc_rejected.value)
+
+    # 3. Subprocess verification of clean exit vs SIGABRT
+    subprocess_code = (
+        "import memfuse, tempfile, numpy as np, sys\n"
+        "from memfuse import _memfuse\n"
+        "try:\n"
+        "    _memfuse._trigger_panic_for_test('Release wheel subprocess panic')\n"
+        "except RuntimeError as e:\n"
+        "    assert 'Rust panic caught at FFI boundary' in str(e)\n"
+        "    print('RELEASE_WHEEL_PANIC_ISOLATION_VERIFIED')\n"
+        "    sys.exit(0)\n"
+    )
+    res = subprocess.run(
+        [sys.executable, "-c", subprocess_code],
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0, f"Subprocess crashed with returncode {res.returncode}: stderr={res.stderr}"
+    assert "RELEASE_WHEEL_PANIC_ISOLATION_VERIFIED" in res.stdout

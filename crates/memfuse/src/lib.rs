@@ -1,14 +1,19 @@
-//! MemFuse — Embedded hybrid-search for AI agents (Facade)
-//!
-//! This crate provides the primary Composition Root for MemFuse.
+// FILE-CONTEXT
+// ZWECK: MemFuse Primary Facade & Composition Root (Ring 4).
+// INVARIANTEN: #![forbid(unsafe_code)]; <= 20 pub fn; zero direct dependencies on Ring 0/1 internal crates.
 
 #![forbid(unsafe_code)]
 
+pub mod builder;
+
+pub use builder::MemFuseBuilder;
 pub use memfuse_core::error::MemFuseError;
 pub use memfuse_core::types::domain::{DocId, ScoredDocument};
+pub use memfuse_core::DistanceMetric;
 pub use memfuse_db::{
     chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
-    DriftStatusProvider, MemFuse, MemFuseConfig,
+    DriftStatusProvider, EmbeddingBackend, MemFuse, MemFuseConfig, MemFuseStats, SearchResult,
+    TextEmbeddingEngine,
 };
 
 #[cfg(feature = "router")]
@@ -20,31 +25,59 @@ pub use memfuse_calibration as calibration;
 #[cfg(feature = "ollama")]
 pub use memfuse_infer_ollama as ollama;
 
-/// A builder for creating a `MemFuse` instance.
-pub struct MemFuseBuilder {
-    storage_path: std::path::PathBuf,
-    config: MemFuseConfig,
+#[cfg(feature = "candle")]
+pub use memfuse_infer_candle as candle;
+
+#[cfg(feature = "onnx")]
+pub use memfuse_infer_onnx as onnx;
+
+/// Creates a new `MemFuseBuilder` for configuring and instantiating `MemFuse`.
+pub fn builder(dimension: usize) -> MemFuseBuilder {
+    MemFuseBuilder::new(dimension)
 }
 
-impl MemFuseBuilder {
-    /// Creates a new builder for MemFuse with the given dimension.
-    pub fn new(dimension: usize) -> Self {
+/// Opens or creates a `MemFuse` instance at the given storage path using default configuration.
+pub async fn open(path: impl AsRef<std::path::Path>) -> Result<MemFuse, MemFuseError> {
+    MemFuse::open(path).await
+}
+
+/// Opens or creates a `MemFuse` instance at the given storage path with an explicit configuration.
+pub async fn open_with_config(
+    path: impl AsRef<std::path::Path>,
+    config: MemFuseConfig,
+) -> Result<MemFuse, MemFuseError> {
+    MemFuse::open_with_config(path, config).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_facade_open_and_builder_entrypoints() {
+        let base_tmp = std::env::temp_dir().join(format!("memfuse_facade_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base_tmp);
+
+        let db1_path = base_tmp.join("db1");
+        let db1 = open(&db1_path).await.expect("open db1");
+        assert_eq!(db1.len().await.expect("len"), 0);
+
         let mut config = MemFuseConfig::default();
-        config.dimension = dimension;
-        Self {
-            storage_path: std::path::PathBuf::from("./memfuse_data"),
-            config,
-        }
-    }
+        config.dimension = 16;
+        let db2_path = base_tmp.join("db2");
+        let db2 = open_with_config(&db2_path, config)
+            .await
+            .expect("open db2");
+        assert_eq!(db2.len().await.expect("len"), 0);
 
-    /// Sets the path for the underlying storage engine.
-    pub fn with_storage_path(mut self, path: impl Into<std::path::PathBuf>) -> Self {
-        self.storage_path = path.into();
-        self
-    }
+        let db3_path = base_tmp.join("db3");
+        let db3 = builder(32)
+            .with_storage_path(&db3_path)
+            .build()
+            .await
+            .expect("builder db3");
+        assert_eq!(db3.len().await.expect("len"), 0);
 
-    /// Builds the `MemFuse` instance.
-    pub async fn build(self) -> Result<MemFuse, MemFuseError> {
-        MemFuse::open_with_config(self.storage_path, self.config).await
+        let _ = std::fs::remove_dir_all(&base_tmp);
     }
 }
