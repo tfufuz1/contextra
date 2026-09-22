@@ -43,6 +43,23 @@ async fn create_test_collection(
     (col, dir)
 }
 
+fn read_search_rs() -> String {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let paths = [
+        Path::new(&manifest_dir).join("src/collection/search.rs"),
+        Path::new(&manifest_dir).join("../../crates/memfuse-engine/src/collection/search.rs"),
+        Path::new("crates/memfuse-engine/src/collection/search.rs").to_path_buf(),
+        Path::new("crates/memfuse-db/src/collection/search.rs").to_path_buf(),
+    ];
+
+    for p in &paths {
+        if let Ok(content) = std::fs::read_to_string(p) {
+            return content;
+        }
+    }
+    panic!("Failed to read search.rs from candidate paths: {:?}", paths);
+}
+
 #[tokio::test]
 async fn proof_search_never_exceeds_k() {
     let (collection, _dir) = create_test_collection("test_bound_k", 4).await;
@@ -75,11 +92,7 @@ async fn proof_search_never_exceeds_k() {
     );
 
     // B-1 Regression Guard: Ensure no unannotated usize::MAX in search.rs
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let search_rs_path = Path::new(&manifest_dir).join("src/collection/search.rs");
-    let file_content = std::fs::read_to_string(&search_rs_path)
-        .or_else(|_| std::fs::read_to_string("crates/memfuse-db/src/collection/search.rs"))
-        .expect("Failed to read search.rs");
+    let file_content = read_search_rs();
 
     let violations = file_content
         .lines()
@@ -157,11 +170,7 @@ async fn proof_search_with_k_zero_returns_empty() {
 
 #[test]
 fn proof_usize_max_removed_from_search_path() {
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let search_rs_path = Path::new(&manifest_dir).join("src/collection/search.rs");
-    let file_content = std::fs::read_to_string(&search_rs_path)
-        .or_else(|_| std::fs::read_to_string("crates/memfuse-db/src/collection/search.rs"))
-        .expect("Failed to read search.rs");
+    let file_content = read_search_rs();
 
     let mut unannotated_found = Vec::new();
 
