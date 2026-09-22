@@ -48,11 +48,11 @@ fn proof_compute_distance_trusted_never_scans_nan() {
         res
     );
 
-    // Structural check on distance.rs source code
-    let source = include_str!("../src/distance.rs");
+    // Structural check on memfuse-simd source code
+    let source = include_str!("../../memfuse-simd/src/lib.rs");
     let trusted_fn_start = source
         .find("fn compute_distance_trusted")
-        .expect("compute_distance_trusted definition found in distance.rs");
+        .expect("compute_distance_trusted definition found in memfuse-simd lib.rs");
 
     let trusted_fn_body = &source[trusted_fn_start..trusted_fn_start + 600];
     assert!(
