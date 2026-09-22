@@ -71,6 +71,7 @@ mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
 mod check_ring_layering;
+mod check_ring0_async_purity;
 mod check_placeholder_refs;
 mod check_recall_stability;
 mod check_result_dropped_on_io;
@@ -2016,6 +2017,19 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("❌ check-ring-layering failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-ring0-async-purity" => {
+            match check_ring0_async_purity::run_check_ring0_async_purity() {
+                Ok(passed) => {
+                    if !passed {
+                        process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-ring0-async-purity failed: {}", e);
                     process::exit(1);
                 }
             }
