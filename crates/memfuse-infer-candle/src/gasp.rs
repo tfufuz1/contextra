@@ -22,6 +22,7 @@ use memfuse_core::traits::{
     BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
 };
 use memfuse_core::{ConfigFingerprint, ContextChunk, MemFuseError, Result};
+use memfuse_rank::IsotonicCalibrator;
 use std::sync::Mutex;
 
 /// Standard-Schwellenwert für Grounding-Konfidenz (Default: 0.70).
