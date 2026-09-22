@@ -317,6 +317,18 @@ mod tests {
         let km_v1 = cipher.derive_key_for_segment(tenant_id, 42, 1).unwrap();
         let km_v2 = cipher.derive_key_for_segment(tenant_id, 42, 2).unwrap();
 
+        // Exact match check for version 0 info string (kills `version == 0` replaced with `!=` mutant)
+        let expected_info_v0 = format!("memfuse-kv-segment-{}-42", tenant_id);
+        let km_v0_direct = cipher
+            .key_manager
+            .derive_segment_key(&expected_info_v0)
+            .unwrap();
+        assert_eq!(
+            km_v0.inspect_key_bytes_for_test(),
+            km_v0_direct.inspect_key_bytes_for_test(),
+            "Version 0 MUST derive key using 'memfuse-kv-segment-tenant_id-42'"
+        );
+
         assert_ne!(
             km_v0.inspect_key_bytes_for_test(),
             km_v1.inspect_key_bytes_for_test(),

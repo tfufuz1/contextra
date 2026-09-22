@@ -105,8 +105,11 @@ fn test_kdf_header_parser_fuzz_and_corruptions() {
 }
 
 #[test]
-fn test_kdf_header_exact_22_bytes_boundary() {
-    // Exactly MIN_HEADER_LEN (22 bytes) with salt_len = 16
+fn test_kdf_header_exact_22_bytes_boundary_with_zero_salt_len() {
+    // Exactly MIN_HEADER_LEN (22 bytes) with salt_len = 0.
+    // If bytes.len() < MIN_HEADER_LEN is mutated to <= MIN_HEADER_LEN,
+    // a 22-byte slice returns "KdfHeader-Bytes zu kurz" instead of reaching the
+    // salt_len < MIN_SALT_LEN check which returns "unter Minimum".
     let mut header_22 = Vec::new();
     header_22.extend_from_slice(b"MFKD");
     header_22.push(1); // version
@@ -114,18 +117,18 @@ fn test_kdf_header_exact_22_bytes_boundary() {
     header_22.extend_from_slice(&65536u32.to_be_bytes());
     header_22.extend_from_slice(&3u32.to_be_bytes());
     header_22.extend_from_slice(&1u32.to_be_bytes());
-    header_22.extend_from_slice(&16u32.to_be_bytes()); // salt_len = 16
+    header_22.extend_from_slice(&0u32.to_be_bytes()); // salt_len = 0
     assert_eq!(header_22.len(), 22);
 
     let res = KdfHeader::from_bytes(&header_22);
     match res {
         Err(CryptoError::InvalidInput(msg)) => {
             assert!(
-                msg.contains("unvollständig"),
-                "Expected 'unvollständig', got: {msg}"
+                msg.contains("unter Minimum"),
+                "Expected 'unter Minimum' from salt_len check, got: {msg}"
             );
         }
-        other => panic!("Expected InvalidInput with unvollständig, got: {:?}", other),
+        other => panic!("Expected InvalidInput with unter Minimum, got: {:?}", other),
     }
 }
 
@@ -154,7 +157,7 @@ fn test_kdf_header_salt_len_boundaries() {
         other => panic!("Expected InvalidInput with unter Minimum, got: {:?}", other),
     }
 
-    // Below min salt_len (10 bytes)
+    // Below min salt_len (10 bytes) - Kills < with == mutant
     let mut bytes_10 = KdfHeader::generate_default().unwrap().to_bytes();
     bytes_10[18..22].copy_from_slice(&10u32.to_be_bytes());
     let res_10 = KdfHeader::from_bytes(&bytes_10);
@@ -196,7 +199,7 @@ fn test_kdf_header_salt_len_boundaries() {
         other => panic!("Expected InvalidInput with überschreitet Maximum, got: {:?}", other),
     }
 
-    // Above max salt_len (10,002 bytes)
+    // Above max salt_len (10,002 bytes) - Kills > with == mutant
     let mut bytes_10k2 = Vec::new();
     bytes_10k2.extend_from_slice(b"MFKD");
     bytes_10k2.push(1);
