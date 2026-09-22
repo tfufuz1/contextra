@@ -105,6 +105,120 @@ fn test_kdf_header_parser_fuzz_and_corruptions() {
 }
 
 #[test]
+fn test_kdf_header_exact_22_bytes_boundary() {
+    // Exactly MIN_HEADER_LEN (22 bytes) with salt_len = 16
+    let mut header_22 = Vec::new();
+    header_22.extend_from_slice(b"MFKD");
+    header_22.push(1); // version
+    header_22.push(1); // kdf_id
+    header_22.extend_from_slice(&65536u32.to_be_bytes());
+    header_22.extend_from_slice(&3u32.to_be_bytes());
+    header_22.extend_from_slice(&1u32.to_be_bytes());
+    header_22.extend_from_slice(&16u32.to_be_bytes()); // salt_len = 16
+    assert_eq!(header_22.len(), 22);
+
+    let res = KdfHeader::from_bytes(&header_22);
+    match res {
+        Err(CryptoError::InvalidInput(msg)) => {
+            assert!(
+                msg.contains("unvollständig"),
+                "Expected 'unvollständig', got: {msg}"
+            );
+        }
+        other => panic!("Expected InvalidInput with unvollständig, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_kdf_header_salt_len_boundaries() {
+    let params = KdfParams::new_for_test(19456, 2, 1);
+
+    // Exact min salt_len boundary (16 bytes)
+    let salt_16 = vec![0xABu8; 16];
+    let header_16 = KdfHeader::new(params.clone(), salt_16).expect("new 16B salt header");
+    let bytes_16 = header_16.to_bytes();
+    let parsed_16 = KdfHeader::from_bytes(&bytes_16).expect("from_bytes 16B salt header");
+    assert_eq!(parsed_16.salt.len(), 16);
+
+    // Below min salt_len (15 bytes)
+    let mut bytes_15 = KdfHeader::generate_default().unwrap().to_bytes();
+    bytes_15[18..22].copy_from_slice(&15u32.to_be_bytes());
+    let res_15 = KdfHeader::from_bytes(&bytes_15);
+    match res_15 {
+        Err(CryptoError::InvalidInput(msg)) => {
+            assert!(
+                msg.contains("unter Minimum"),
+                "Expected 'unter Minimum', got: {msg}"
+            );
+        }
+        other => panic!("Expected InvalidInput with unter Minimum, got: {:?}", other),
+    }
+
+    // Below min salt_len (10 bytes)
+    let mut bytes_10 = KdfHeader::generate_default().unwrap().to_bytes();
+    bytes_10[18..22].copy_from_slice(&10u32.to_be_bytes());
+    let res_10 = KdfHeader::from_bytes(&bytes_10);
+    match res_10 {
+        Err(CryptoError::InvalidInput(msg)) => {
+            assert!(
+                msg.contains("unter Minimum"),
+                "Expected 'unter Minimum', got: {msg}"
+            );
+        }
+        other => panic!("Expected InvalidInput with unter Minimum, got: {:?}", other),
+    }
+
+    // Exact max salt_len boundary (10,000 bytes)
+    let salt_10k = vec![0xCDu8; 10_000];
+    let header_10k = KdfHeader::new(params, salt_10k).expect("new 10k salt header");
+    let bytes_10k = header_10k.to_bytes();
+    let parsed_10k = KdfHeader::from_bytes(&bytes_10k).expect("from_bytes 10k salt header");
+    assert_eq!(parsed_10k.salt.len(), 10_000);
+
+    // Above max salt_len (10,001 bytes)
+    let mut bytes_10k1 = Vec::new();
+    bytes_10k1.extend_from_slice(b"MFKD");
+    bytes_10k1.push(1);
+    bytes_10k1.push(1);
+    bytes_10k1.extend_from_slice(&65536u32.to_be_bytes());
+    bytes_10k1.extend_from_slice(&3u32.to_be_bytes());
+    bytes_10k1.extend_from_slice(&1u32.to_be_bytes());
+    bytes_10k1.extend_from_slice(&10_001u32.to_be_bytes());
+    bytes_10k1.extend_from_slice(&vec![0xEEu8; 10_001]);
+    let res_10k1 = KdfHeader::from_bytes(&bytes_10k1);
+    match res_10k1 {
+        Err(CryptoError::InvalidInput(msg)) => {
+            assert!(
+                msg.contains("überschreitet Maximum"),
+                "Expected 'überschreitet Maximum', got: {msg}"
+            );
+        }
+        other => panic!("Expected InvalidInput with überschreitet Maximum, got: {:?}", other),
+    }
+
+    // Above max salt_len (10,002 bytes)
+    let mut bytes_10k2 = Vec::new();
+    bytes_10k2.extend_from_slice(b"MFKD");
+    bytes_10k2.push(1);
+    bytes_10k2.push(1);
+    bytes_10k2.extend_from_slice(&65536u32.to_be_bytes());
+    bytes_10k2.extend_from_slice(&3u32.to_be_bytes());
+    bytes_10k2.extend_from_slice(&1u32.to_be_bytes());
+    bytes_10k2.extend_from_slice(&10_002u32.to_be_bytes());
+    bytes_10k2.extend_from_slice(&vec![0xEEu8; 10_002]);
+    let res_10k2 = KdfHeader::from_bytes(&bytes_10k2);
+    match res_10k2 {
+        Err(CryptoError::InvalidInput(msg)) => {
+            assert!(
+                msg.contains("überschreitet Maximum"),
+                "Expected 'überschreitet Maximum', got: {msg}"
+            );
+        }
+        other => panic!("Expected InvalidInput with überschreitet Maximum, got: {:?}", other),
+    }
+}
+
+#[test]
 fn test_kdf_params_lower_bounds_validation() {
     // Untergrenzen: m_cost >= 19456, t_cost >= 2, p_cost >= 1
     assert!(KdfParams::new(MIN_M_COST_KIB - 1, MIN_T_COST, MIN_P_COST).is_err());
