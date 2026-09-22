@@ -271,7 +271,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 }
 
                 let loaded_list = if let Some(bytes) = storage.get_at_seq(&batch_key, seq).await? {
-                    bincode::deserialize::<PostingList>(&bytes).ok()
+                    PostingList::decode_compact(&bytes).ok()
                 } else {
                     None
                 };

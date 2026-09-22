@@ -164,7 +164,9 @@ impl Wal {
             })?;
 
             let slice_len = (file_size as usize).min(mmap.len());
-            let slice = &mmap[..slice_len];
+            let slice = mmap
+                .get(..slice_len)
+                .ok_or_else(|| MemFuseError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
             let mut buffered_entries = Vec::new();
             let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
                 buffered_entries.push((seq, entry, pos));

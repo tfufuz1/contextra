@@ -5,14 +5,9 @@
 // HOTSPOTS: persistence.rs (HnswHeader::try_from_bytes, MmapIndex::open)
 // STAND: TS:2026-08-30T18:53:53Z (SESSION: 37b1d991)
 
-// ANCHOR[DEBT:WP-0.0-ZEROPANIC] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Eradicate .unwrap() in persistence.rs // unwrap
-// TEST: grep -c ".unwrap()" crates/memfuse-index/src/persistence.rs // unwrap
-// DONE: Alle .unwrap() Aufrufe auf try_into() sind durch ? ersetzt. // unwrap
 //! HNSW Persistence Layer — Serialisierung und mmap-Mapping für Vektor-Indizes.
-//!
-//! Dieses Modul implementiert das `.hnsw` Dateiformat, das für das Offloading von
-//! Vektoren auf die Festplatte optimiert ist, um den RAM-Verbrauch auf 8GB-Systemen zu minimieren.
 
+use crate::hnsw::Sq8Bias;
 use memfuse_core::{MemFuseError, Result};
 
 /// Magic number for HNSW files (0x484E5357 = "HNSW").
@@ -29,8 +24,8 @@ pub struct HnswHeader {
     m: u32,
     metric: u8,
     quantized: u8,
-    q_min: f32, // Legacy v1 field (preserved for struct layout compatibility)
-    q_max: f32, // Legacy v1 field (preserved for struct layout compatibility)
+    q_min: f32, // Legacy v1 field
+    q_max: f32, // Legacy v1 field
     node_count: u64,
     entry_point: i64,
     nodes_offset: u64,
@@ -38,10 +33,12 @@ pub struct HnswHeader {
     last_tx_id: u64,               // Added for Repair-on-Open
     quant_calibration_offset: u64, // Added in v2 for per-dimension calibration
     quant_calibration_len: u32,    // Added in v2 for per-dimension calibration
+    sq8_bias_mean: f32,            // SQ8 quantization bias mean
+    sq8_bias_variance: f32,        // SQ8 quantization bias variance
 }
 
 impl HnswHeader {
-    pub const SIZE: usize = 80;
+    pub const SIZE: usize = 84;
 
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -90,6 +87,43 @@ impl HnswHeader {
         quant_calibration_offset: u64,
         quant_calibration_len: u32,
     ) -> Self {
+        Self::new_v2_with_bias(
+            dimension,
+            m,
+            metric,
+            quantized,
+            q_min,
+            q_max,
+            node_count,
+            entry_point,
+            nodes_offset,
+            connections_offset,
+            last_tx_id,
+            quant_calibration_offset,
+            quant_calibration_len,
+            0.0,
+            0.0,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_v2_with_bias(
+        dimension: u32,
+        m: u32,
+        metric: u8,
+        quantized: u8,
+        q_min: f32,
+        q_max: f32,
+        node_count: u64,
+        entry_point: i64,
+        nodes_offset: u64,
+        connections_offset: u64,
+        last_tx_id: u64,
+        quant_calibration_offset: u64,
+        quant_calibration_len: u32,
+        sq8_bias_mean: f32,
+        sq8_bias_variance: f32,
+    ) -> Self {
         Self {
             magic: HNSW_MAGIC,
             version: HNSW_VERSION,
@@ -106,6 +140,8 @@ impl HnswHeader {
             last_tx_id,
             quant_calibration_offset,
             quant_calibration_len,
+            sq8_bias_mean,
+            sq8_bias_variance,
         }
     }
 
@@ -163,6 +199,22 @@ impl HnswHeader {
 
     pub fn quant_calibration_len(&self) -> u32 {
         self.quant_calibration_len
+    }
+
+    pub fn sq8_bias_mean(&self) -> f32 {
+        self.sq8_bias_mean
+    }
+
+    pub fn sq8_bias_variance(&self) -> f32 {
+        self.sq8_bias_variance
+    }
+
+    pub fn sq8_bias(&self) -> Sq8Bias {
+        Sq8Bias {
+            mean_bias: self.sq8_bias_mean,
+            variance_bias: self.sq8_bias_variance,
+            sample_count: 0,
+        }
     }
 
     pub fn dimension(&self) -> u32 {
@@ -294,7 +346,7 @@ impl HnswHeader {
         );
 
         let (quant_calibration_offset, quant_calibration_len) = if version == 2 {
-            if bytes.len() < Self::SIZE {
+            if bytes.len() < 76 {
                 return Err(MemFuseError::Storage("Header too small for v2".into()));
             }
             let off = u64::from_le_bytes(
@@ -323,6 +375,26 @@ impl HnswHeader {
             (0, 0)
         };
 
+        let (sq8_bias_mean, sq8_bias_variance) = if bytes.len() >= Self::SIZE {
+            let mean = f32::from_le_bytes(
+                bytes
+                    .get(76..80)
+                    .ok_or_else(|| MemFuseError::Storage("Invalid sq8_bias_mean".into()))?
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("Invalid sq8_bias_mean bytes".into()))?,
+            );
+            let variance = f32::from_le_bytes(
+                bytes
+                    .get(80..84)
+                    .ok_or_else(|| MemFuseError::Storage("Invalid sq8_bias_variance".into()))?
+                    .try_into()
+                    .map_err(|_| MemFuseError::Storage("Invalid sq8_bias_variance bytes".into()))?,
+            );
+            (mean, variance)
+        } else {
+            (0.0, 0.0)
+        };
+
         Ok(Self {
             magic,
             version,
@@ -339,6 +411,8 @@ impl HnswHeader {
             last_tx_id,
             quant_calibration_offset,
             quant_calibration_len,
+            sq8_bias_mean,
+            sq8_bias_variance,
         })
     }
 
@@ -359,6 +433,8 @@ impl HnswHeader {
         buf[56..64].copy_from_slice(&self.last_tx_id.to_le_bytes());
         buf[64..72].copy_from_slice(&self.quant_calibration_offset.to_le_bytes());
         buf[72..76].copy_from_slice(&self.quant_calibration_len.to_le_bytes());
+        buf[76..80].copy_from_slice(&self.sq8_bias_mean.to_le_bytes());
+        buf[80..84].copy_from_slice(&self.sq8_bias_variance.to_le_bytes());
         buf
     }
 }
@@ -457,6 +533,8 @@ impl MmapIndex {
 
         let header_slice = mmap
             .get(0..HnswHeader::SIZE)
+            .or_else(|| mmap.get(0..76))
+            .or_else(|| mmap.get(0..64))
             .ok_or_else(|| MemFuseError::Storage("HNSW file too small for header".into()))?;
         let header = HnswHeader::try_from_bytes(header_slice)?;
 
@@ -655,19 +733,17 @@ mod tests {
 
     #[test]
     fn test_hnsw_header_roundtrip_and_errors() -> Result<()> {
-        let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 100, 5, 64, 256, 42);
+        let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 100, 5, 84, 256, 42);
 
         let bytes = header.to_bytes();
         assert_eq!(bytes.len(), HnswHeader::SIZE);
         let parsed = HnswHeader::try_from_bytes(&bytes)?;
         assert_eq!(header, parsed);
 
-        // Error path 1: header bytes too small
         let small_bytes = vec![0u8; 10];
         let err_small = HnswHeader::try_from_bytes(&small_bytes);
         assert!(matches!(err_small, Err(MemFuseError::Storage(_))));
 
-        // Error path 2: bad magic
         let mut bad_magic_bytes = bytes;
         bad_magic_bytes[0..4].copy_from_slice(&0xDEADBEEFu32.to_le_bytes());
         let err_magic = HnswHeader::try_from_bytes(&bad_magic_bytes);
@@ -693,7 +769,6 @@ mod tests {
         assert_eq!(record.vector_offset, parsed.vector_offset);
         assert_eq!(record.connections_offset, parsed.connections_offset);
 
-        // Error path: bytes too small
         let small_bytes = vec![0u8; 10];
         let err = NodeRecord::from_bytes(&small_bytes);
         assert!(matches!(err, Err(MemFuseError::Storage(_))));
@@ -725,17 +800,14 @@ mod tests {
 
         let mmap_index = MmapIndex::open(&path)?;
 
-        // Out of bounds node index -> Err
         assert!(mmap_index.get_node_record(99999).is_err());
 
-        // Out of bounds connection layer -> empty vector (not error)
         let rec = mmap_index.get_node_record(0)?;
         let connections = mmap_index.get_connections(&rec, 100)?;
         assert!(connections.is_empty());
 
-        // Valid vector retrieval
         let vec_bytes = mmap_index.get_vector(&rec)?;
-        assert_eq!(vec_bytes.len(), 4 * 4); // 4 f32s = 16 bytes
+        assert_eq!(vec_bytes.len(), 4 * 4);
 
         Ok(())
     }
@@ -748,7 +820,6 @@ mod tests {
         let temp_dir = tempfile::tempdir().map_err(|e| MemFuseError::Storage(e.to_string()))?;
         let path = temp_dir.path().join("test_async.hnsw");
 
-        // 1. Write an HNSW index with 100 vectors of dimension 4
         let config = HnswConfig {
             dimension: 4,
             m: 16,
@@ -768,19 +839,15 @@ mod tests {
         }
         index.commit(tx).await?;
 
-        // 2. Save to disk
         index.save(&path).await?;
 
-        // 3. Open via mmap
         let mmap_index = HnswIndex::try_new(config)?;
         mmap_index.load_mmap(&path).await?;
 
-        // 4. Search for 5 nearest neighbors of a query vector
         let query = vec![50.1, 100.2, 150.3, 200.4];
         let search_results = mmap_index.search(&query, 5).await?;
         assert_eq!(search_results.len(), 5);
 
-        // 5. Verify the returned doc_ids match expected nearest neighbors by brute force
         let mut brute_force: Vec<(DocId, f32)> = vectors
             .iter()
             .map(|(doc_id, v)| {
@@ -804,18 +871,15 @@ mod tests {
 
     #[test]
     fn test_mmap_index_error_paths() {
-        // Open non-existent path
         let res = MmapIndex::open("non_existent_path_memfuse_test.hnsw");
         assert!(res.is_err());
 
-        // Header parsing errors
         let short_bytes = vec![0u8; 10];
         assert!(HnswHeader::try_from_bytes(&short_bytes).is_err());
 
         let invalid_magic = vec![0u8; HnswHeader::SIZE];
         assert!(HnswHeader::try_from_bytes(&invalid_magic).is_err());
 
-        // NodeRecord parsing errors
         let short_node = vec![0u8; 10];
         assert!(NodeRecord::from_bytes(&short_node).is_err());
     }
@@ -874,7 +938,6 @@ mod tests {
         let temp_dir = tempfile::tempdir().map_err(|e| MemFuseError::Storage(e.to_string()))?;
         let path = temp_dir.path().join("legacy_v1.hnsw");
 
-        // Manually build a v1 header file with 64-byte header
         let v1_header_bytes = [
             0x57, 0x53, 0x4E, 0x48, // magic "HNSW"
             0x01, 0x00, // version 1
@@ -898,12 +961,10 @@ mod tests {
             vector_offset: 89 + 1 + 4 + 4,
             connections_offset: 89,
         };
-        file_bytes.extend_from_slice(&record.to_bytes()); // 25 bytes
-                                                          // Connections block: 1 layer, 1 conn = 0
+        file_bytes.extend_from_slice(&record.to_bytes());
         file_bytes.push(1);
         file_bytes.extend_from_slice(&1u32.to_le_bytes());
         file_bytes.extend_from_slice(&0u32.to_le_bytes());
-        // Vector block: 2 bytes u8 quantized
         file_bytes.push(127);
         file_bytes.push(127);
 
@@ -942,7 +1003,6 @@ mod tests {
         let index = HnswIndex::try_new(config.clone())?;
         let tx = TxId::new(1);
 
-        // Heterogeneous variance per dimension (>= 50 items to trigger lazy quantizer training)
         for i in 0..60u64 {
             let v0 = (i as f32) / 59.0;
             let v1 = (i as f32) * 1000.0 / 59.0;
