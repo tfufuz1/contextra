@@ -43,7 +43,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-testkit` | 3 | 537 | 🟢 Clean | Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for MemFuse |
 | `memfuse-text` | 3 | 8432 | 🟢 Clean | MemFuse — Text processing and BM25 search for Hybrid Search |
 | `memfuse-crypto` | 4 | 6964 | 🟢 Clean | Encryption at Rest and KV-Cache Security utilities for MemFuse |
-| `memfuse-router` | 4 | 6206 | 🟢 Clean |  |
+| `memfuse-router` | 4 | 6275 | 🟢 Clean |  |
 | `memfuse-kvcache` | 5 | 2129 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
 | `memfuse-store` | 5 | 28208 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
