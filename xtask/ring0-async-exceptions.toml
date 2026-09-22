@@ -1,15 +1,15 @@
-# Allow-list for Ring 0 async runtime dependencies
-# These Ring 0 crates currently violate async purity by depending on async runtime crates in [dependencies].
-# Refactoring to remove these dependencies is tracked under an upcoming ADR (marked as TODO).
+# Ring 0 Async Dependency Exceptions
+# Ring 0 crates are intended to be runtime-agnostic and synchronous.
+# Current violations are allowlisted until refactored under dedicated ADRs.
 
 [[exceptions]]
 crate = "memfuse-vector"
 dependency = "tokio"
-reason = "Legacy async usage in vector index background processing; refactoring planned."
-adr = "ADR-TODO"
+reason = "Legacy async background index rebuild mechanism in HNSW insertion path"
+adr_reference = "ADR-TODO"
 
 [[exceptions]]
 crate = "memfuse-graph"
 dependency = "tokio"
-reason = "Legacy async usage in graph CSR traversal / background tasks; refactoring planned."
-adr = "ADR-TODO"
+reason = "Async compaction and path graph traversal routines in CSR implementation"
+adr_reference = "ADR-TODO"
