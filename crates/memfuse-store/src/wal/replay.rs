@@ -389,7 +389,9 @@ impl Wal {
                     }
                 };
                 nonce.copy_from_slice(nonce_slice);
-                let ciphertext = entry_data_raw.get(12..).unwrap_or(&[]);
+                let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
+                    MemFuseError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
+                })?;
                 let decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                     Ok(data) => data,
                     Err(e) => {
@@ -530,7 +532,12 @@ impl Wal {
                         }
                     };
                     nonce.copy_from_slice(nonce_slice);
-                    let ciphertext = entry_data_raw.get(12..).unwrap_or(&[]);
+                    let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
+                        MemFuseError::wal_corruption(
+                            chunk_start_pos,
+                            "WAL entry missing ciphertext",
+                        )
+                    })?;
                     decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                         Ok(data) => data,
                         Err(e) => {
