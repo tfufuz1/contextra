@@ -166,3 +166,27 @@ fn test_kv_key_locks_different_keys_concurrency() {
         "Distinct shards should allow concurrent lock acquisition"
     );
 }
+
+#[test]
+fn test_kv_key_locks_acquire_multi_sorted_stability() {
+    let locks1 = KvKeyLocks::new(4);
+    let locks2 = KvKeyLocks::new(4);
+
+    let keys = vec!["entity:doc:100", "entity:doc:200", "user:session:300"];
+    let hashes1: Vec<u64> = keys.iter().map(|k| locks1.key_hash(k)).collect();
+    let hashes2: Vec<u64> = keys.iter().map(|k| locks2.key_hash(k)).collect();
+
+    assert_eq!(
+        hashes1, hashes2,
+        "Key hashes must be deterministic across KvKeyLocks instances"
+    );
+
+    // Verify multi-key acquisition succeeds on both instances without error or deadlock
+    let guard1 = locks1.acquire_multi_sorted(&hashes1);
+    assert!(guard1.is_ok(), "acquire_multi_sorted on locks1 failed");
+    drop(guard1);
+
+    let guard2 = locks2.acquire_multi_sorted(&hashes2);
+    assert!(guard2.is_ok(), "acquire_multi_sorted on locks2 failed");
+    drop(guard2);
+}

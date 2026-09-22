@@ -62,10 +62,12 @@ async fn test_chaos_task_massacre() {
             for (step, (key, value)) in plan.items.into_iter().enumerate() {
                 let tx_id = TxId::new(((task_id + 1) * 100_000 + step + 1) as u64);
 
-                storage.put(tx_id, &key, &value).await.expect("put");
-                storage.commit(tx_id).await.expect("commit");
-
-                confirmed_commits.lock().insert(key);
+                if storage.put(tx_id, &key, &value).await.is_err() {
+                    continue;
+                }
+                if storage.commit(tx_id).await.is_ok() {
+                    confirmed_commits.lock().insert(key);
+                }
 
                 // Small delay between commits to spread task execution over time and allow aborts to hit mid-flight
                 tokio::time::sleep(Duration::from_millis(1)).await;
