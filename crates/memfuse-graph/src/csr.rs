@@ -12,18 +12,13 @@ pub(crate) mod visibility;
 #[cfg(test)]
 mod tests;
 
-pub use graph_index::*;
+pub use graph_write::CsrGraph;
+pub use types::{EdgeType, Edge, PersistedEdgePayload, CsrGraphConfig, SCORE_DECAY, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES};
+pub(crate) use types::{EdgePayload, StagedEdgePayload, InternalIndex};
+pub use inner::{GraphInner, MemoryEstimate};
+pub(crate) use inner::InnerWriteGuard;
+pub use visibility::{is_suspicious_tx_id, is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business};
 pub use graph_persist::*;
 pub use graph_read::*;
-pub use graph_write::CsrGraph;
-pub(crate) use inner::InnerWriteGuard;
-pub use inner::{GraphInner, MemoryEstimate};
+pub use graph_index::*;
 pub use path_graph::*;
-pub use types::{
-    CsrGraphConfig, Edge, EdgeType, PersistedEdgePayload, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES,
-    SCORE_DECAY,
-};
-pub(crate) use types::{EdgePayload, InternalIndex, StagedEdgePayload};
-pub use visibility::{
-    is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id,
-};

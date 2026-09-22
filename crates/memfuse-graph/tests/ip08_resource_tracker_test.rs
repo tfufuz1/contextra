@@ -1,6 +1,6 @@
+use std::sync::Arc;
 use memfuse_core::{Entity, EntityId, ResourceBudget, ResourceTracker};
 use memfuse_graph::csr::{CsrGraph, CsrGraphConfig};
-use std::sync::Arc;
 
 #[tokio::test]
 async fn test_compact_async_resource_tracker_budget_exhaustion() {

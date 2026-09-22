@@ -1,22 +1,19 @@
-use arc_swap::ArcSwap;
-use parking_lot::{Mutex, RwLock};
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use parking_lot::{Mutex, RwLock};
+use arc_swap::ArcSwap;
+use serde::{Deserialize, Serialize};
 
-use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
-use crate::GraphIndexExt;
 use memfuse_core::{
     BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
     StorageEngine, TxId,
 };
+use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
+use crate::GraphIndexExt;
 
 use super::types::{Edge, EdgePayload, InternalIndex, PersistedEdgePayload, StagedEdgePayload};
-use super::visibility::{
-    is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business,
-    WALLCLOCK_TX_HEURISTIC_MIN,
-};
+use super::visibility::{is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, WALLCLOCK_TX_HEURISTIC_MIN};
 
 /// Inner state of the CsrGraph to manage contiguous storage.
 #[derive(Clone)]

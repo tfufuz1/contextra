@@ -1,5 +1,5 @@
-use memfuse_core::{DocId, EntityId, ResourceTracker, TxId};
 use serde::{Deserialize, Serialize};
+use memfuse_core::{DocId, EntityId, ResourceTracker, TxId};
 
 pub(crate) const GRAPH_ENTITY_PREFIX: &[u8] = b"__graph:entity:";
 pub(crate) const GRAPH_EDGE_PREFIX: &[u8] = b"__graph:edge:";
