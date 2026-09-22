@@ -99,7 +99,7 @@ Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.
 | `memfuse-infer-ollama` | 4 | 4598 | 🟢 Clean |  |
 | `memfuse-infer-onnx` | 4 | 2219 | 🟢 Clean |  |
 | `memfuse-kvcache` | 5 | 1420 | 🟢 Clean | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for MemFuse |
-| `memfuse-store` | 5 | 27296 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
+| `memfuse-store` | 5 | 27482 | 🟢 Clean | LSM-Tree storage engine for MemFuse |
 | `memfuse-vector` | 5 | 16035 | 🟢 Clean | HNSW vector index with SIMD distance computation for MemFuse |
 | `memfuse-engine` | 6 | 18984 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
 | `memfuse-infer-candle` | 6 | 4667 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
