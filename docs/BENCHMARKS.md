@@ -1,74 +1,105 @@
 # MemFuse Performance & Evaluation Benchmarks
 
-*Datum: 2026-08-29*
-*Hardware / Environment: Linux x86_64, 4 CPU Cores, 7.8 GiB RAM (Jules Sandbox VM)*
+*Datum der Erstaufnahme: 2026-08-29*
+*Letzte Audit-Prüfung: 2026-09-21*
+*Environment: Linux x86_64, 4 CPU Cores (Intel Xeon @ 2.30GHz), 7.8 GiB RAM (Jules Sandbox VM)*
 
 ---
 
-## 1. Realistic-Scale Throughput & Latenz (`benches/scale_bench.rs`)
+## 0. Status-Matrix aller Benchmark-Claims
 
-Die Messungen wurden mit synthetischen, 768-dimensionalen Vektoren und variierenden technischen Text-Chunks auf einem In-Memory/LSM hybrid storage engine setup durchgeführt.
+| Claim / Metrik | Quelle (Datei / Befehl) | Status | Befund / Anmerkung |
+|---|---|---|---|
+| **1k Chunks Search p50 = 88.03 ms** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Widerspricht §4 (29.91 ms) und neuem VM-Messlauf (2.61 ms). |
+| **5k Chunks Search p50 = 809.15 ms** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Erheblicher Ausreißer in historischem Run; VM-Messlauf 2026-09-21 zeigt 5.11 ms. |
+| **10k Chunks Search p50 = 337.77 ms** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Nicht-monotones Verhalten im historischen Log; VM-Messlauf 2026-09-21 zeigt 5.13 ms. |
+| **100k / 1M Chunks Extrapolationen** | `docs/BENCHMARKS.md` §1 | `nur dokumentiert, nicht reproduziert` | Mathematische Extrapolation ohne realen Benchmark-Lauf. |
+| **Recall@5 / @10 / @20 = 1.0000** | `crates/memfuse-db/tests/semantic_recall.rs` | `synthetisch` | Gemessen gegen synthetische Ground Truth (20 Themen-Cluster × 50 Dokumente). Test-Assert fordert `>= 0.80`. |
+| **Hybrid Search p50 = 29.91 ms** | `docs/BENCHMARKS.md` §4 (Commit `bd51c6f5...`, 2026-09-03) | `widersprüchlich` | Widerspricht §1 (88.03 ms) sowie VM-Messlauf (2.61 ms). |
+| **Wettbewerbsvergleich Mem0/Zep/MemOS** | `docs/BENCHMARKS.md` §4 | `nur dokumentiert, nicht reproduziert` | Keine öffentlichen Messungen vorhanden; Wettbewerberzeilen wurden gelöscht. |
+| **VM Re-Run 1k/5k/10k Chunks** | `MEMFUSE_SCALE_TIERS="1000,5000,10000" cargo bench -p memfuse-db --bench scale_bench -- --quick` | `reproduziert` | In VM ausgeführt am 2026-09-21 auf Commit `347ef6dd86d90fdbc8f6dc0fcfa54ab6bb0c8986`. |
+
+---
+
+## 1. Verifizierter VM-Messlauf (`benches/scale_bench.rs`)
+
+*Protokollierter Messlauf:*
+- **Commit:** `347ef6dd86d90fdbc8f6dc0fcfa54ab6bb0c8986`
+- **Datum:** 2026-09-21
+- **Hardware:** Intel(R) Xeon(R) Processor @ 2.30GHz (4 vCPUs), 7.8 GiB RAM, Linux x86_64
+- **Befehl:** `MEMFUSE_SCALE_TIERS="1000,5000,10000" cargo bench -p memfuse-db --bench scale_bench -- --quick`
+
+| Corpus-Größe (Chunks) | Insert-Durchsatz (docs/sec) | Search Latenz p50 | Search Latenz p95 | VmRSS Peak (MB) | Status |
+|---|---|---|---|---|---|
+| **1,000** | 409.7 docs/sec | 2.61 ms | 2.66 ms | 148.85 MB | `reproduziert` |
+| **5,000** | 126.9 docs/sec | 5.11 ms | 5.20 ms | 332.36 MB | `reproduziert` |
+| **10,000** | 72.0 docs/sec | 5.13 ms | 5.29 ms | 597.16 MB | `reproduziert` |
+| **100,000** *(extrapoliert)* | ~25 docs/sec | ~3,500 ms | ~4,200 ms | ~1,950 MB | `nur dokumentiert, nicht reproduziert` |
+| **1,000,000** *(extrapoliert)* | ~5 docs/sec | > 30 s | > 45 s | > 18.5 GB (exceeds RAM) | `nur dokumentiert, nicht reproduziert` |
+
+---
+
+## 2. Historische Dokumentierte Messwerte (Ungeprüfter Ist-Stand vom 2026-08-29)
+
+*Hinweis: Diese historischen Tabellenwerte sind im Repository als Baseline dokumentiert, weisen jedoch Widersprüche zu neueren Messungen und VM-Runs auf (siehe §0).*
 
 | Corpus-Größe (Chunks) | Insert-Durchsatz (docs/sec) | Search Latenz p50 | Search Latenz p95 | Search Latenz p99 | VmRSS Peak (MB) |
 |---|---|---|---|---|---|
 | **1,000** | ~117.3 docs/sec | 88.03 ms | 90.73 ms | 90.73 ms | 26.14 MB |
 | **5,000** | ~89.5 docs/sec | 809.15 ms | 825.68 ms | 825.68 ms | 121.14 MB |
 | **10,000** | ~75.2 docs/sec | 337.77 ms | 351.51 ms | 351.51 ms | 207.13 MB |
-| **100,000** *(extrapoliert)* | ~25 docs/sec | ~3,500 ms | ~4,200 ms | ~4,500 ms | ~1,950 MB |
-| **1,000,000** *(extrapoliert)* | ~5 docs/sec | > 30 s | > 45 s | > 60 s | > 18.5 GB (exceeds RAM) |
 
-*Rohdaten-Log für RSS-Messung:* `benches/results/scale_rss.csv`
+*Rohdaten-Log für historische RSS-Messung:* `benches/results/scale_rss.csv`
 
 ---
 
-## 2. Semantische Retrieval-Evaluierung (`Recall@k`)
+## 3. Semantische Retrieval-Evaluierung (`Recall@k` - Synthetisches Korpus)
 
-Verifizierte Messung gegen synthetische Ground Truth (20 Themen-Cluster × 50 Dokumente = 1.000 Dokumente, 100 Test-Queries):
+Verifizierte Messung gegen synthetische Ground Truth (`crates/memfuse-db/tests/semantic_recall.rs`):
+- **Korpus:** 20 Themen-Cluster × 50 Dokumente = 1.000 Dokumente, 100 Test-Queries (5 pro Cluster).
+- **Setup:** Synthetische Vektoren (Cluster-Phase + Gauß-Rauschen) und deterministische Schlüsselwörter.
 
-- **Recall@5**:  1.0000 (100.0 %)
-- **Recall@10**: 1.0000 (100.0 %)
-- **Recall@20**: 1.0000 (100.0 %)
-
-*Testergebnis:* `crates/memfuse-db/tests/semantic_recall.rs` bestanden (`assert!(mean_recall_at_10 >= 0.80)`).
-
----
-
-## 3. Was diese Zahlen NICHT zeigen (Explizite Messgrenzen)
-
-1. **Kein Cross-System-Vergleich**: Diese Benchmarks messen ausschließlich die interne Performance von MemFuse. Es wurden keine Messungen gegen Redis, ChromaDB, Qdrant oder Milvus durchgeführt.
-2. **Kein Real-World-Corpus**: Die Dokumente und Vektoren wurden deterministisch synthetisiert (Cluster-Phasenvektoren + Gaussian-Noise, vordefinierte Keyword-Familien). Real-World-Textkorpora (z.B. MS MARCO, BEIR) weisen abweichende Sparsity- und Cluster-Eigenschaften auf.
-3. **Keine echten Neural Model Embeddings**: Es wurden keine Embeddings durch ein lokales ONNX/Ollama-Modell während des Benchmarks berechnet (Embedding-Generierungszeit ist excluded).
-4. **Vollständiger In-Memory HNSW-Graph**: Bei 1M+ Chunks überschreitet der RAM-Bedarf von `HnswIndex` die physische RAM-Grenze typischer Developer-VMs (7.8 GiB). Dies unterstreicht die Notwendigkeit künftiger Vamana/DiskANN- und SQ8-Quantisierungsarchitekturen gemäß v2-Spezifikation R3/R6.
+| Metrik | Synthetisches Testergebnis | Test-Schwellenwert (Assert) | Status |
+|---|---|---|---|
+| **Recall@5** | 1.0000 (100.0 %) | N/A | `synthetisch` |
+| **Recall@10** | 1.0000 (100.0 %) | `>= 0.80` | `synthetisch` |
+| **Recall@20** | 1.0000 (100.0 %) | N/A | `synthetisch` |
 
 ---
 
-## §4 — Competitive Comparison
+## 4. Explizite Messgrenzen & Transparenz
 
-> Measurements taken on: Linux x86_64, Intel(R) Xeon(R) Processor @ 2.30GHz (4 CPU cores), 7.8 GiB RAM (Jules Sandbox VM)
-> MemFuse version: bd51c6f599e50682516393d2bdc8eb3a717197e1
-> Date: 2026-09-03
-
-| Operation | MemFuse | Mem0 | Zep | MemOS |
-|---|---|---|---|---|
-| Write throughput (docs/s) | ~117.3 docs/s (batch insert ~1,438.9 docs/s) | not publicly available | not publicly available | not publicly available |
-| Hybrid search p50 (ms) | 29.91 ms | not publicly available | not publicly available | not publicly available |
-| Hybrid search p99 (ms) | 30.45 ms | not publicly available | not publicly available | not publicly available |
-
-Sources for any competitor numbers must be cited with URL and access date.
+1. **Keine verifizierten Cross-System-Vergleiche**: Öffentliche, reproduzierbare Vergleichsmessungen mit standardisierten Datensätzen gegen externe Wettbewerber (z.B. Mem0, Zep, MemOS, ChromaDB, Qdrant) liegen für das aktuelle Release nicht vor.
+2. **Synthetisches Korpus**: Die Testdokumente und -vektoren in `semantic_recall.rs` und `scale_bench.rs` wurden deterministisch synthetisiert. Real-World-Textkorpora (z.B. LoCoMo, LongMemEval, BEIR) weisen abweichende Sparsity-, Rausch- und Cluster-Eigenschaften auf.
+3. **Excluded Embedding Latency**: Während der Benchmarks wurden keine Embeddings durch ein lokales ONNX/Ollama-Modell berechnet; gemessen wird rein die Speicher- und Indizierungs-Latenz.
+4. **Vollständiger In-Memory HNSW-Graph**: Bei 1M+ Chunks überschreitet der RAM-Bedarf von `HnswIndex` die physische RAM-Grenze typischer Developer-VMs (7.8 GiB).
 
 ---
 
-## 5. Zielmetriken & Neue Benchmark-Kategorien (Opus-Optimierungen)
+## 5. Interne Baseline-Latenzen
 
-Mit der Umsetzung der Opus-Optimierungen (Stufe 0–3) werden folgende neue Benchmark-Kategorien und architektonische Zielwerte eingeführt. Diese sind normativ für die Abnahme der jeweiligen Optimierungen:
+> **Messbedingungen:** Linux x86_64, Intel(R) Xeon(R) Processor @ 2.30GHz (4 CPU cores), 7.8 GiB RAM (Jules Sandbox VM)
+> **MemFuse Version:** `bd51c6f599e50682516393d2bdc8eb3a717197e1` (Dokumentiert am 2026-09-03)
 
-### 5.1 Neue Benchmark-Kategorien
+| Operation | MemFuse Latenz / Durchsatz | Status |
+|---|---|---|
+| Batch Write Throughput (docs/s) | ~117.3 docs/s (single-doc) / ~1,438.9 docs/s (batch insert) | `nur dokumentiert, nicht reproduziert` |
+| Hybrid Search p50 (ms) | 29.91 ms | `widersprüchlich` (widerspricht §1 und VM-Run) |
+| Hybrid Search p99 (ms) | 30.45 ms | `widersprüchlich` |
+
+---
+
+## 6. Zielmetriken & Neue Benchmark-Kategorien (Opus-Optimierungen)
+
+Mit der Umsetzung der Opus-Optimierungen (Stufe 0–3) werden folgende neue Benchmark-Kategorien und architektonische Zielwerte eingeführt:
+
+### 6.1 Neue Benchmark-Kategorien
 
 - **Bandit-Latenz-Budget (`check-bandit-latency-budget`)**: Messung der LinUCB-Bandit-Updates (Diagonal vs. Sherman-Morrison) auf Cache-Line-aligned SIMD-Vektoren. **Latenzziel**: Update-Overhead < 50 µs pro Query.
 - **Block-Cache Hit-Latenz (`SieveCacheBackend`)**: Vergleich der Leselatenz (Hit-Pfad) zwischen dem sperrenden `LruBlockCacheBackend` und dem lock-freien `SieveCacheBackend` unter hochgradig paralleler Thread-Last.
 - **WAL-Ring-Puffer-Durchsatz (`wal_ring_buffer`)**: Messung der Transaktionslatenz bei asynchronem Flusher-Task im Vergleich zum Mutex-geschützten synchronen `fsync`.
 
-### 5.2 Architektonische Zielwerte (Allokations- & Zero-Copy-Ziele)
+### 6.2 Architektonische Zielwerte (Allokations- & Zero-Copy-Ziele)
 
 - **HNSW-Allokationsreduktion**: Der Distanz- und Traversierungspfad im Vektorindex muss durch den Arena-Allocator (HNSW v2) so optimiert werden, dass die Anzahl der Heap-Allokationen pro `search_knn`-Query signifikant sinkt (Ziel: Zero-Allocation Traversal).
 - **SSTable-Zero-Copy**: Vermeidung des Kopierens kompletter SSTables in den Speicher (Nutzung von Mmap/Zero-Copy-Deserialisierung).

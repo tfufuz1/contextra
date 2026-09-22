@@ -183,9 +183,9 @@ where
                         "Truncated inner WAL entry length in batch",
                     ));
                 }
-                let inner_len_bytes: [u8; 4] = match inner_slice[0..4].try_into() {
-                    Ok(b) => b,
-                    Err(_) => {
+                let inner_len_bytes: [u8; 4] = match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
+                    Some(b) => b,
+                    None => {
                         return Err(MemFuseError::wal_corruption(
                             chunk_start_pos,
                             "Failed to extract inner WAL entry length",
@@ -206,8 +206,16 @@ where
                         "Truncated inner WAL entry in batch",
                     ));
                 }
-                let inner_entry_bytes = &inner_slice[4..4 + inner_len];
-                inner_slice = &inner_slice[4 + inner_len..];
+                let inner_entry_bytes = match inner_slice.get(4..4 + inner_len) {
+                    Some(b) => b,
+                    None => {
+                        return Err(MemFuseError::wal_corruption(
+                            chunk_start_pos,
+                            "Truncated inner WAL entry in batch",
+                        ));
+                    }
+                };
+                inner_slice = inner_slice.get(4 + inner_len..).unwrap_or(&[]);
 
                 let entry = match WalEntry::from_bytes(inner_entry_bytes) {
                     Ok(e) => e,

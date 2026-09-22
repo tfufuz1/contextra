@@ -21,19 +21,21 @@ pip install memfuse
 ## Quick Start
 
 ```python
+import numpy as np
 import memfuse
 
 # Initialize database
-db = memfuse.PyMemFuse("./data")
+db = memfuse.open("./data", dimension=128)
 collection = db.collection("documents")
 
-# Insert document
-collection.insert("doc_1", "MemFuse provides high-performance embedded vector search.")
+# Insert document with vector and metadata
+vector = np.random.rand(128).astype(np.float32)
+collection.insert("doc_1", vector, metadata={"text": "MemFuse provides high-performance embedded vector search."})
 
 # Perform hybrid search
-results = collection.hybrid_search("vector search")
+results = collection.hybrid_search("vector search", vector, k=5)
 for res in results:
-    print(res.id, res.score, res.text)
+    print(res.id, res.score, res.metadata)
 ```
 
 ## Öffentliche API-Übersicht

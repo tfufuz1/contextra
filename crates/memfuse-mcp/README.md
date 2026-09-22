@@ -1,6 +1,6 @@
 # MemFuse MCP Server (`memfuse-mcp`)
 
-Model Context Protocol (MCP) Server für **MemFuse Brain** — Ermöglicht es KI-Agenten (wie Claude Desktop, Cursor oder custom MCP-Clients), lokal über das standardisierte Model Context Protocol auf die 4-Signal RAG-Engine von MemFuse zuzugreifen.
+Model Context Protocol (MCP) Server für **MemFuse Brain** — Ermöglicht es KI-Agenten (wie Claude Desktop, Claude Code, Cursor oder custom MCP-Clients), lokal über das standardisierte Model Context Protocol auf die 4-Signal RAG-Engine von MemFuse zuzugreifen.
 
 ## Ring-Zugehörigkeit & Status
 
@@ -10,35 +10,27 @@ Model Context Protocol (MCP) Server für **MemFuse Brain** — Ermöglicht es KI
 
 ---
 
-## 1. Installation & Build-Anleitung
-
-### Voraussetzungen
-
-- Rust Toolchain (`cargo`, 1.80+)
-- Ein laufendes [Ollama](https://ollama.com) Instanz (Standard-URL: `http://localhost:11434`) mit installiertem Embedding-Modell (z. B. `nomic-embed-text`)
-
-### Binary bauen
-
-Bauen Sie den MCP-Server aus dem Root-Verzeichnis des Repositories:
-
-```bash
-cargo build -p memfuse-mcp --release --bin memfuse-mcp-server
-```
-
-Das kompilierte Executable befindet sich nach erfolgreichem Build unter:
-
-```
-target/release/memfuse-mcp-server
-```
-
-*(Auf Windows: `target\release\memfuse-mcp-server.exe`)*
+## 1. Installation & Ausführung
 
 ### Ausführung via `uvx` (empfohlen)
 
-Der MCP-Server kann ohne manuelle Kompilierung direkt über `uvx` ausgeführt werden:
+Der MCP-Server lädt automatisch das passende Release-Binary für Ihr Betriebssystem (SHA256-geprüft) herunter und erfordert keine vorinstallierte Rust-Toolchain:
 
 ```bash
 uvx memfuse-mcp --db-path ~/.memfuse --allow-write
+```
+
+### Voraussetzungen & Provider
+
+- Ein laufendes [Ollama](https://ollama.com) Instanz (Standard-URL: `http://localhost:11434`) mit installiertem Embedding-Modell (z. B. `nomic-embed-text`) oder ein alternativer Provider (ONNX / Mock).
+
+### Entwicklermodus (Kompilierung aus Quellcode)
+
+Wenn Sie den Server aus dem Quellcode im Repository bauen möchten, aktivieren Sie das Opt-in via `MEMFUSE_MCP_ALLOW_REPO_BUILD=1`:
+
+```bash
+export MEMFUSE_MCP_ALLOW_REPO_BUILD=1
+cargo build -p memfuse-mcp --release --bin memfuse-mcp-server
 ```
 
 ---
@@ -63,6 +55,8 @@ Der Server kommuniziert ausschließlich über Standard I/O (stdio) via JSON-RPC 
 
 | Variable | Werte | Beschreibung |
 |---|---|---|
+| `MEMFUSE_MCP_BINARY` | Absolute Path | Expliziter Pfad zum `memfuse-mcp-server` Binary (überschreibt PATH und Downloads) |
+| `MEMFUSE_MCP_ALLOW_REPO_BUILD` | `1` | Erlaubt automatischen `cargo build` Fallback im Repo-Baum (Entwicklermodus) |
 | `MEMFUSE_MCP_ALLOW_WRITE` | `1`, `true`, `yes` | Schreibende Operationen aktivieren (falls kein CLI-Flag angegeben) |
 | `MEMFUSE_OLLAMA_URL` | z. B. `http://localhost:11434` | Alternativer Ollama Endpoint |
 | `MEMFUSE_EMBED_MODEL` | z. B. `nomic-embed-text` | Alternativname für Embedding-Modell |
@@ -70,15 +64,16 @@ Der Server kommuniziert ausschließlich über Standard I/O (stdio) via JSON-RPC 
 
 ---
 
-## 3. Konfiguration für Claude Desktop
+## 3. Konfiguration für MCP-Clients (Claude Desktop, Claude Code, Cursor)
 
-Fügen Sie den Server in Ihre Claude Desktop Konfigurationsdatei ein:
+Fügen Sie den Server in Ihre Client-Konfigurationsdatei ein:
 
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+- **Claude Desktop / Claude Code (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Claude Desktop / Claude Code (Windows)**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Claude Desktop / Claude Code (Linux)**: `~/.config/Claude/claude_desktop_config.json`
+- **Cursor**: Settings -> MCP -> Add new MCP server (command: `uvx`, args: `memfuse-mcp`, `--db-path`, `...`)
 
-### Beispiel: `claude_desktop_config.json`
+### Beispiel: `mcpServers` JSON-Konfiguration
 
 Mit `uvx` (empfohlen):
 
@@ -101,23 +96,21 @@ Mit `uvx` (empfohlen):
 }
 ```
 
-Alternativ mit direktem Rust-Binary:
+Alternativ mit explizitem Binary-Pfad via `MEMFUSE_MCP_BINARY`:
 
 ```json
 {
   "mcpServers": {
     "memfuse": {
-      "command": "/ABSOLUTER/PFAD/ZU/target/release/memfuse-mcp-server",
+      "command": "uvx",
       "args": [
+        "memfuse-mcp",
         "--db-path",
         "/ABSOLUTER/PFAD/ZU/ihrem_datenbank_ordner",
-        "--allow-write",
-        "--ollama-url",
-        "http://localhost:11434",
-        "--embed-model",
-        "nomic-embed-text"
+        "--allow-write"
       ],
       "env": {
+        "MEMFUSE_MCP_BINARY": "/ABSOLUTER/PFAD/ZU/memfuse-mcp-server",
         "MEMFUSE_MCP_ALLOW_WRITE": "1"
       }
     }
@@ -136,7 +129,7 @@ Hier ist eine minimale Demonstration des MCP-Protokolls über stdio.
 ### 1. Server im schreibfähigen Modus starten
 
 ```bash
-target/release/memfuse-mcp-server --db-path ./demo_db --allow-write
+uvx memfuse-mcp --db-path ./demo_db --allow-write
 ```
 
 *(Der Server wartet nun auf JSON-RPC 2.0 Anfragen über stdin.)*
@@ -236,7 +229,7 @@ Senden Sie eine Suchanfrage an die Collection `hr_docs`:
 
 ## 5. Exponierte MCP-Tools
 
-Der Server exponiert 4 Kern-Tools:
+Der Server exponiert folgende Kern-Tools:
 
 1. **`memfuse_search`**
    - **Parameter:** `query` (string, required), `collection` (string, default: `"default"`), `k` (integer, default: 10)
@@ -254,6 +247,10 @@ Der Server exponiert 4 Kern-Tools:
    - **Parameter:** keine
    - **Funktion:** Listet alle vorhandenen Collections in der Datenbank auf.
 
+5. **`memfuse_forget`** *(ab Version 0.1.x, sobald veröffentlicht)*
+   - **Parameter:** `collection` (string, required), `id` (string, optional), `confirm` (boolean, required)
+   - **Funktion:** Löscht gezielt ein Dokument oder eine gesamte Collection aus dem Speicher.
+
 ---
 
 ## 6. Troubleshooting & Häufige Fehler
@@ -263,7 +260,7 @@ Der Server exponiert 4 Kern-Tools:
 - **Lösung:** Starten Sie das Binary mit dem Flag `--allow-write` oder setzen Sie die Umgebungsvariable `MEMFUSE_MCP_ALLOW_WRITE=1`.
 
 ### Fehler: Ollama-Verbindung fehlgeschlagen (`connection refused`)
-- **Ursache:** Ollama läuft nicht oder ist unter der angegebenen URL nicht erreibar.
+- **Ursache:** Ollama läuft nicht oder ist unter der angegebenen URL nicht erreichbar.
 - **Lösung:**
   1. Stellen Sie sicher, dass Ollama läuft (`ollama serve` oder Ollama App gestartet).
   2. Überprüfen Sie, ob das Embedding-Modell vorhanden ist: `ollama pull nomic-embed-text`.

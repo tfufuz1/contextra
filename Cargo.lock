@@ -2355,22 +2355,11 @@ dependencies = [
 name = "memfuse-core"
 version = "0.1.0"
 dependencies = [
- "ahash",
- "bincode",
- "blake3",
- "bytes",
- "flatbuffers",
- "futures-util",
  "memfuse-mvcc",
  "memfuse-ports",
  "memfuse-types",
  "memfuse-wire",
- "parking_lot",
  "proptest",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 2.0.20",
  "tokio",
 ]
 
@@ -2477,6 +2466,7 @@ dependencies = [
  "futures",
  "memfuse-core",
  "memfuse-store",
+ "memfuse-testkit",
  "parking_lot",
  "proptest",
  "scc",
@@ -2665,6 +2655,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "memfuse-rank"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "memfuse-ports",
+ "memfuse-types",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
 name = "memfuse-router"
 version = "0.1.0"
 dependencies = [
@@ -2813,6 +2817,7 @@ dependencies = [
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-simd",
+ "memfuse-sys",
  "memmap2",
  "parking_lot",
  "proptest",

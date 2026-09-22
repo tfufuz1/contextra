@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
 // INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
-// NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, unsafe Block benötigt 4-Punkt SAFETY-Kommentar.
+// NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an memfuse-sys::mmap_readonly.
 // HOTSPOTS: diskann.rs (DiskAnnIndex::search_internal, write_to_file, load_node)
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 
@@ -1582,12 +1582,7 @@ impl DiskAnnIndex {
 
                 let file =
                     std::fs::File::open(&inner.config.index_path).map_err(MemFuseError::Io)?;
-                // SAFETY: Invariant: `file` is a valid, read-only open handle to `index_path` and the underlying inode is immutable during read.
-                //         Guarantor: `std::fs::File::open` verifies file existence and access permissions prior to mapping.
-                //         Why: `write_to_file()` writes to `.tmp` then renames atomically; POSIX `rename()` guarantees existing readers see the old consistent inode while new loaders see the complete new file.
-                //         ADR-017: Memory mapping permitted in `diskann.rs`.
-                #[allow(unsafe_code)]
-                let mmap = unsafe { Mmap::map(&file).map_err(MemFuseError::Io)? }; // SAFETY: 1. Invariant: Valid file descriptor and immutable mapping. 2. Guarantor: std::fs::File & atomic rename. 3. Call-site verified. 4. ADR-017 mmap.
+                let mmap = memfuse_sys::mmap_readonly(&file).map_err(MemFuseError::Io)?;
 
                 if mmap.len() < DiskAnnHeader::SIZE + DiskAnnFooter::SIZE {
                     return Err(MemFuseError::Storage(

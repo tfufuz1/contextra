@@ -176,8 +176,9 @@
       "issue": "WELLE-2026-09-21-ONNX-DEFAULT-MEMBERS",
       "timestamp": "2026-09-21T13:09:31.259173+00:00",
       "session_id": "manual-jules-session",
-      "active": true,
-      "expires_at": "2026-09-21T17:09:31.259198+00:00"
+      "active": false,
+      "expires_at": "2026-09-21T17:09:31.259198+00:00",
+      "released_at": "2026-09-21T18:20:42.622397268+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "docs-decisions",
@@ -189,12 +190,29 @@
       "released_at": "2026-09-21T13:56:27.901083926+00:00 [RELEASED]"
     },
     {
-      "krate": "repo-hygiene-results",
+      "krate": "workspace-root",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-21T18:18:01.185974902+00:00",
-      "session_id": "4717674144223511530",
+      "timestamp": "2026-09-21T18:14:20.180368201+00:00",
+      "session_id": "10672640857832740238",
+      "active": false,
+      "expires_at": "2026-09-21T22:14:20.180353482+00:00",
+      "released_at": "2026-09-22T01:23:00.692039314+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "memfuse-rank",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-21T20:00:37.526191799+00:00",
+      "session_id": "2090223400654574052",
       "active": true,
-      "expires_at": "2026-09-21T22:18:01.185961767+00:00"
+      "expires_at": "2026-09-22T00:00:37.526179874+00:00"
+    },
+    {
+      "krate": "docs-adr-n01-n05",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-21T20:49:03.018199847+00:00",
+      "session_id": "3736256039108358980",
+      "active": true,
+      "expires_at": "2026-09-22T00:49:03.018186895+00:00"
     }
   ]
 }

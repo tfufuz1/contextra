@@ -8,10 +8,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
       - name: L1 — TOCTOU put_if_absent (S1-01)
         run: cargo test -p memfuse-store --test toctou_put_if_absent -- --nocapture
       - name: L1 — NaN Validation Policy (S1-11)
-        run: cargo test -p memfuse-index --test nan_validation_policy -- --nocapture
+        run: cargo test -p memfuse-vector --test nan_validation_policy -- --nocapture
       - name: L1 — Search Result Bound (S1-02)
         run: cargo test -p memfuse-db --test search_result_bound -- --nocapture
       - name: L1 — Manifest Corruption (S1-03)
@@ -23,7 +24,7 @@ jobs:
       - name: L1 — WAL Truncate Ordering (S1-05)
         run: cargo test -p memfuse-store --test wal_truncate_ordering -- --nocapture
       - name: L1 — HNSW deleted_nodes Lock Contention (S1-11)
-        run: cargo test -p memfuse-index --test deleted_nodes_lock_contention -- --nocapture
+        run: cargo test -p memfuse-vector --test deleted_nodes_lock_contention -- --nocapture
       - name: L0 — Static Audit Lints (S3-01)
         run: |
           cargo xtask check-max-results-unbound
