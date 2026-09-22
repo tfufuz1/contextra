@@ -1,8 +1,14 @@
-# AGENTS.md — memfuse-rank
+# MemFuse — AI-Assistenten-Kontext (`memfuse-rank`)
 
-## Crate Scope
-`memfuse-rank` is a Ring 0 crate implementing multi-signal rank fusion, score calibration (Platt/Isotonic), and drift monitoring.
+## Verifizierter Codestand · Ring 0 (Rank)
 
-## Guidelines
-- `#![forbid(unsafe_code)]` must be respected.
-- Ensure all tests pass with `cargo test -p memfuse-rank`.
+> **Für AI-Assistenten:** Diese Datei beschreibt den Crate `memfuse-rank`.
+> `memfuse-rank` definiert die Ranking- und Scoring-Funktionen für die Multi-Signal-Fusion (RRF, Reranking).
+> Er erzwingt `#![forbid(unsafe_code)]`.
+
+---
+
+## Crate-Topologie
+
+- **Ring 0 Rank**:
+  - Ranking- und Scoring-Algorithmen zur Signal-Fusion und Re-Rank-Kaskadierung.

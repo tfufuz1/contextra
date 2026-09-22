@@ -203,18 +203,16 @@
       "issue": "UNSPECIFIED",
       "timestamp": "2026-09-21T20:00:37.526191799+00:00",
       "session_id": "2090223400654574052",
-      "active": false,
-      "expires_at": "2026-09-22T00:00:37.526179874+00:00",
-      "released_at": "2026-09-22T01:23:00.692039314+00:00 [TTL-EXPIRED]"
+      "active": true,
+      "expires_at": "2026-09-22T00:00:37.526179874+00:00"
     },
     {
-      "krate": "docs-adr-n06-n10",
+      "krate": "docs-adr-n01-n05",
       "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-21T20:49:32.884084781+00:00",
-      "session_id": "11413449545486969785",
-      "active": false,
-      "expires_at": "2026-09-22T00:49:32.884072382+00:00",
-      "released_at": "2026-09-22T01:23:00.692039314+00:00 [TTL-EXPIRED]"
+      "timestamp": "2026-09-21T20:49:03.018199847+00:00",
+      "session_id": "3736256039108358980",
+      "active": true,
+      "expires_at": "2026-09-22T00:49:03.018186895+00:00"
     }
   ]
 }
