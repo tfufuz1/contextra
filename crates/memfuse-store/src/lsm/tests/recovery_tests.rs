@@ -925,3 +925,81 @@ async fn test_uncommitted_transaction_discarded_on_open_recovery() {
         "Uncommitted transaction entries must be discarded during recovery replay"
     );
 }
+
+#[tokio::test]
+async fn test_aborted_transaction_discarded_on_open_recovery() {
+    let tmp = TempDir::new().expect("temp dir");
+    let wal_path = tmp.path().join("wal.log");
+
+    {
+        let wal = Wal::open_with_key_manager(&wal_path, None)
+            .await
+            .expect("open wal");
+
+        let tx1 = TxId::new(1);
+        let tx2 = TxId::new(2);
+
+        // Transaction 1: committed
+        let (batch1, _) = wal
+            .prepare_batch(vec![
+                (
+                    WalOp::Put {
+                        tx_id: tx1,
+                        key: b"committed_key".to_vec(),
+                        value: b"committed_val".to_vec(),
+                    },
+                    1,
+                ),
+                (
+                    WalOp::TxEnd {
+                        tx_id: tx1,
+                        committed: true,
+                    },
+                    1,
+                ),
+            ])
+            .await
+            .expect("batch 1");
+        wal.append_batch(batch1).await.expect("append 1");
+
+        // Transaction 2: aborted (WalOp::TxEnd { committed: false })
+        let (batch2, _) = wal
+            .prepare_batch(vec![
+                (
+                    WalOp::Put {
+                        tx_id: tx2,
+                        key: b"aborted_key".to_vec(),
+                        value: b"aborted_val".to_vec(),
+                    },
+                    2,
+                ),
+                (
+                    WalOp::TxEnd {
+                        tx_id: tx2,
+                        committed: false,
+                    },
+                    2,
+                ),
+            ])
+            .await
+            .expect("batch 2");
+        wal.append_batch(batch2).await.expect("append 2");
+    }
+
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config)
+        .await
+        .expect("LsmStorage recovery startup");
+
+    let val1 = storage.get(b"committed_key").await.expect("get committed");
+    assert_eq!(val1, Some(bytes::Bytes::from_static(b"committed_val")));
+
+    let val2 = storage.get(b"aborted_key").await.expect("get aborted");
+    assert_eq!(
+        val2, None,
+        "Aborted transaction entries (committed=false) must be discarded during recovery replay"
+    );
+}
