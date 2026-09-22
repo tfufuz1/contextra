@@ -241,7 +241,7 @@
       "session_id": "7176791335467082323",
       "active": false,
       "expires_at": "2026-09-22T14:31:07.350525596+00:00",
-      "released_at": "2026-09-22T19:51:04.981451837+00:00 [TTL-EXPIRED]"
+      "released_at": "2026-09-22T20:25:09.316370497+00:00 [TTL-EXPIRED]"
     },
     {
       "krate": "memfuse-graph",
@@ -250,15 +250,7 @@
       "session_id": "3456774550830234980",
       "active": false,
       "expires_at": "2026-09-22T15:30:57.527910898+00:00",
-      "released_at": "2026-09-22T19:51:04.981451837+00:00 [TTL-EXPIRED]"
-    },
-    {
-      "krate": "docs/decisions",
-      "issue": "UNSPECIFIED",
-      "timestamp": "2026-09-22T19:54:06.044328421+00:00",
-      "session_id": "18374813887527552634",
-      "active": true,
-      "expires_at": "2026-09-22T23:54:06.044286196+00:00"
+      "released_at": "2026-09-22T20:25:09.316370497+00:00 [TTL-EXPIRED]"
     }
   ]
 }

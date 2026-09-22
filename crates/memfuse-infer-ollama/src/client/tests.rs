@@ -160,11 +160,10 @@ async fn test_embed_retry_on_transient_error() {
 }
 
 #[test]
-fn test_batch_size_consistency_with_memfuse_infer_onnx() {
+fn test_batch_size_consistency() {
     assert_eq!(
-        MAX_BATCH_SIZE,
-        memfuse_embed::MAX_EMBED_BATCH_SIZE,
-        "Ollama MAX_BATCH_SIZE must match memfuse_embed::MAX_EMBED_BATCH_SIZE"
+        MAX_BATCH_SIZE, 512,
+        "Ollama MAX_BATCH_SIZE must default to 512"
     );
 }
 

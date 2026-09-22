@@ -52,7 +52,8 @@ impl TenantState {
         if self.cache.len() >= self.cache.cap().get() && evicted.is_none() {
             // Alle Segmente im Cache sind aktuell durch aktive Guards geschützt.
             // Erweitere die Kapazität vorübergehend, damit LruCache::push keine geschützten Blöcke verwirft.
-            let new_cap = NonZeroUsize::new(self.cache.cap().get() + 1).unwrap_or(NonZeroUsize::MIN);
+            let new_cap =
+                NonZeroUsize::new(self.cache.cap().get() + 1).unwrap_or(NonZeroUsize::MIN);
             self.cache.resize(new_cap);
         }
 
@@ -94,11 +95,13 @@ impl TenantState {
     /// LRU-Eviction unter Schutz aktiver Referenzen (`active_refs == 0`).
     /// Iteriert von LRU (Least Recently Used) zu MRU.
     fn pop_lru(&mut self) -> Option<KvSegment> {
-        let target_key = self
-            .cache
-            .iter()
-            .rev()
-            .find_map(|(&id, seg)| if seg.active_refs() == 0 { Some(id) } else { None });
+        let target_key = self.cache.iter().rev().find_map(|(&id, seg)| {
+            if seg.active_refs() == 0 {
+                Some(id)
+            } else {
+                None
+            }
+        });
 
         if let Some(key) = target_key {
             let seg = self.cache.pop(&key)?;
@@ -606,9 +609,18 @@ mod tests {
         store.insert_segment(tenant, KvSegment::new(tenant, 3, vec![0x33; 256]));
 
         let current_ids = store.get_segments(tenant);
-        assert!(current_ids.contains(&1), "Guarded segment 1 must NOT be force-evicted!");
-        assert!(current_ids.contains(&2), "Guarded segment 2 must NOT be force-evicted!");
-        assert!(current_ids.contains(&3), "Newly inserted segment 3 must be present!");
+        assert!(
+            current_ids.contains(&1),
+            "Guarded segment 1 must NOT be force-evicted!"
+        );
+        assert!(
+            current_ids.contains(&2),
+            "Guarded segment 2 must NOT be force-evicted!"
+        );
+        assert!(
+            current_ids.contains(&3),
+            "Newly inserted segment 3 must be present!"
+        );
 
         drop(guard1);
         drop(guard2);

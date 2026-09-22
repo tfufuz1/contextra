@@ -5,4 +5,4 @@
 
 pub mod quantized_llama;
 
-pub use quantized_llama::{ModelWeights, LayerWeights};
+pub use quantized_llama::{LayerWeights, ModelWeights};

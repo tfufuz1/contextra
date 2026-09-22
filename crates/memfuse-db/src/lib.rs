@@ -8,16 +8,16 @@ pub use memfuse_cognition as cognition;
 pub use memfuse_engine as engine;
 
 // Re-exports from memfuse-engine
-pub use memfuse_engine::{
-    background_workers, chunker, collection, export, filter, import, temporal_filter, transaction,
-};
 #[allow(deprecated)]
 pub use memfuse_engine::MetadataFilter;
 pub use memfuse_engine::{
+    background_workers, chunker, collection, export, filter, import, temporal_filter, transaction,
+};
+pub use memfuse_engine::{
     CommunityDetectionConfig, DbStats, Document, EmbeddingBackend, ExportCollectionV1,
     ExportDocumentV1, ExportMemoryV1, ExportRelationV1, HybridQueryBuilder, ImportSummary,
-    Language, MemFuse, MemFuseConfig, MemFuseStats, ProvenanceRecord, SearchResult,
-    SearchStrategy, SignalContribution, SignalWeights, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
+    Language, MemFuse, MemFuseConfig, MemFuseStats, ProvenanceRecord, SearchResult, SearchStrategy,
+    SignalContribution, SignalWeights, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
 };
 
 #[cfg(feature = "graph-connectivity-health")]
@@ -31,11 +31,11 @@ pub use memfuse_cognition::execute_sleep_cycle;
 pub use memfuse_cognition::{
     cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
     compute_community_hash, detect_near_duplicates, execute_background_consolidation,
-    execute_consolidation_pass, group_turns_into_segments,
-    run_consolidation_pass, run_synthesis_pass, CommunityStabilityTracker, CompactedContext,
-    CompactionStrategy, ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard,
-    ConsolidationPhaseResult, ConsolidationSession, ContextCompactor, ContextManager,
-    MaintenanceConfig, MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken, SynthesisConfig,
+    execute_consolidation_pass, group_turns_into_segments, run_consolidation_pass,
+    run_synthesis_pass, CommunityStabilityTracker, CompactedContext, CompactionStrategy,
+    ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard, ConsolidationPhaseResult,
+    ConsolidationSession, ContextCompactor, ContextManager, MaintenanceConfig,
+    MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken, SynthesisConfig,
     SynthesisPhaseResult, TurnSegment,
 };
 
@@ -357,9 +357,12 @@ mod tests {
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
             memfuse_rank::IsotonicCalibrator::new(5, 100),
         ));
-        let pid_arc = Arc::new(parking_lot::Mutex::new(
-            memfuse_adapt::PidController::new(150.0, 50, 200, Some(100)),
-        ));
+        let pid_arc = Arc::new(parking_lot::Mutex::new(memfuse_adapt::PidController::new(
+            150.0,
+            50,
+            200,
+            Some(100),
+        )));
 
         // Warmup calibrator so ECE is populated
         {
