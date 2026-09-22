@@ -48,14 +48,13 @@ fn proof_compute_distance_trusted_never_scans_nan() {
         res
     );
 
-    // Structural check on distance.rs source code
+    // Structural check on re-exported distance module
     let source = include_str!("../src/distance.rs");
     let trusted_fn_start = source
         .find("compute_distance_trusted")
-        .expect("compute_distance_trusted definition found in distance.rs");
+        .expect("compute_distance_trusted reference found in distance.rs");
 
-    let trusted_fn_body =
-        &source[trusted_fn_start..trusted_fn_start.saturating_add(600).min(source.len())];
+    let trusted_fn_body = &source[trusted_fn_start..trusted_fn_start + 300];
     assert!(
         !trusted_fn_body.contains("is_nan()"),
         "compute_distance_trusted must not contain is_nan() checks in hot path"

@@ -1,6 +1,7 @@
 use memfuse_core::EntityId;
 use memfuse_graph::csr::{CsrGraph, EdgeType};
 use memfuse_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use std::sync::Arc;
 
 #[test]
 fn test_capacity_based_memory_budgeting() {
@@ -51,4 +52,56 @@ fn test_capacity_based_memory_budgeting() {
         peak_bytes > loaded_est.total_bytes(),
         "Compaction peak must exceed current residence bytes"
     );
+}
+
+#[test]
+fn test_hyperedge_role_bindings_payload_sharing() {
+    let graph = CsrGraph::new();
+
+    const ROLE_SRC: RoleId = RoleId::new(101);
+    const ROLE_DST: RoleId = RoleId::new(102);
+
+    // Create a shared Arc<[RoleBinding]> slice for role bindings payload
+    let shared_bindings: Arc<[RoleBinding]> = vec![
+        RoleBinding::new(ROLE_SRC, EntityId::new(500)),
+        RoleBinding::new(ROLE_DST, EntityId::new(600)),
+    ]
+    .into();
+
+    // Verify initial reference count
+    assert_eq!(Arc::strong_count(&shared_bindings), 1);
+
+    // Create multiple hyperedges sharing the same Arc<[RoleBinding]> slice
+    let he1 = HyperEdge::new(
+        HyperEdgeId::new(1001),
+        EdgeType::Default,
+        shared_bindings.clone(),
+        1.0,
+    );
+
+    let he2 = HyperEdge::new(
+        HyperEdgeId::new(1002),
+        EdgeType::Default,
+        shared_bindings.clone(),
+        1.5,
+    );
+
+    assert_eq!(Arc::strong_count(&shared_bindings), 3);
+
+    graph.insert_hyperedge_direct(he1);
+    graph.insert_hyperedge_direct(he2);
+
+    // Verify stored hyperedges reference identical shared participants slice
+    let fetched_he1 = graph
+        .get_hyperedge(HyperEdgeId::new(1001))
+        .expect("he1 must exist");
+    let fetched_he2 = graph
+        .get_hyperedge(HyperEdgeId::new(1002))
+        .expect("he2 must exist");
+
+    assert!(Arc::ptr_eq(
+        &fetched_he1.participants,
+        &fetched_he2.participants
+    ));
+    assert!(Arc::strong_count(&fetched_he1.participants) >= 3);
 }

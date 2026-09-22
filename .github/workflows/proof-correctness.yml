@@ -8,6 +8,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
       - name: L1 — TOCTOU put_if_absent (S1-01)
         run: cargo test -p memfuse-store --test toctou_put_if_absent -- --nocapture
       - name: L1 — NaN Validation Policy (S1-11)

@@ -10,8 +10,8 @@ on:
       - "crates/memfuse-store/tests/loom_group_commit.rs"
       - "crates/memfuse-crypto/src/**"
       - "crates/memfuse-crypto/tests/loom_kv_deferred_zeroize.rs"
-      - "crates/memfuse-index/src/**"
-      - "crates/memfuse-index/tests/loom_quantizer_race_test.rs"
+      - "crates/memfuse-vector/src/**"
+      - "crates/memfuse-vector/tests/loom_quantizer_race_test.rs"
 
 env:
   CARGO_TERM_COLOR: always
@@ -43,13 +43,13 @@ jobs:
           RUSTFLAGS="--cfg loom" cargo test -p memfuse-crypto --test loom_kv_deferred_zeroize --release
 
   loom-index:
-    name: Loom Concurrency Check — memfuse-index
+    name: Loom Concurrency Check — memfuse-vector
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Run Loom Test — memfuse-index (loom_quantizer_race_test)
+      - name: Run Loom Test — memfuse-vector (loom_quantizer_race_test)
         run: |
-          RUSTFLAGS="--cfg loom" cargo test -p memfuse-index --test loom_quantizer_race_test --release
+          RUSTFLAGS="--cfg loom" cargo test -p memfuse-vector --test loom_quantizer_race_test --release
