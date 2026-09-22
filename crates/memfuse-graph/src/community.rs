@@ -620,6 +620,5 @@ pub async fn detect_communities(
     Ok(assignments)
 }
 
-
 #[cfg(test)]
 mod tests;

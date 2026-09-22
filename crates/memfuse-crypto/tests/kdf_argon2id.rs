@@ -196,7 +196,10 @@ fn test_kdf_header_salt_len_boundaries() {
                 "Expected 'überschreitet Maximum', got: {msg}"
             );
         }
-        other => panic!("Expected InvalidInput with überschreitet Maximum, got: {:?}", other),
+        other => panic!(
+            "Expected InvalidInput with überschreitet Maximum, got: {:?}",
+            other
+        ),
     }
 
     // Above max salt_len (10,002 bytes) - Kills > with == mutant
@@ -217,7 +220,10 @@ fn test_kdf_header_salt_len_boundaries() {
                 "Expected 'überschreitet Maximum', got: {msg}"
             );
         }
-        other => panic!("Expected InvalidInput with überschreitet Maximum, got: {:?}", other),
+        other => panic!(
+            "Expected InvalidInput with überschreitet Maximum, got: {:?}",
+            other
+        ),
     }
 }
 
