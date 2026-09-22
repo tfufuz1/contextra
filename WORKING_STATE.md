@@ -34,8 +34,8 @@ Ergebnis: **0 offene Tags**
 | `memfuse-core` | 2 | 368 | 🟢 Clean | Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for MemFuse |
 | `memfuse-rank` | 2 | 2745 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
 | `memfuse-checkpoint` | 3 | 6112 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
-| `memfuse-graph` | 3 | 18246 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
-| `memfuse-infer-ollama` | 3 | 4598 | 🟢 Clean |  |
+| `memfuse-graph` | 3 | 18101 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `memfuse-infer-ollama` | 3 | 4597 | 🟢 Clean |  |
 | `memfuse-infer-onnx` | 3 | 2219 | 🟢 Clean |  |
 | `memfuse-privacy` | 3 | 1865 | 🟢 Clean | Cloud Egress Security, DLP & Exfiltration Protection for MemFuse (Ring 3) |
 | `memfuse-sandbox` | 3 | 992 | 🟢 Clean | WASM Execution Boundary for MemFuse MCP CodeExecution Permission |
@@ -50,7 +50,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-engine` | 6 | 15527 | 🟢 Clean | MemFuse — Core storage, index, and transaction orchestrator engine |
 | `memfuse-infer-candle` | 6 | 5819 | 🟢 Clean | Native Candle GGUF ML inference backend for MemFuse |
 | `memfuse-cognition` | 7 | 4510 | 🟢 Clean | MemFuse — Memory consolidation, compaction, and context management |
-| `memfuse-db` | 8 | 12430 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
+| `memfuse-db` | 8 | 12532 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents |
 | `memfuse` | 9 | 494 | 🟢 Clean | MemFuse — Embedded hybrid-search for AI agents (Facade) |
 | `memfuse-agent` | 9 | 6971 | 🟢 Clean | Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop |
 | `memfuse-bench` | 9 | 5741 | 🟢 Clean | MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy |

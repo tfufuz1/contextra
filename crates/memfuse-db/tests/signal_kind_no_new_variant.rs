@@ -10,6 +10,7 @@ fn test_signal_kind_has_no_hyperedge_variant_and_exact_variant_count() {
         SignalKind::Vector,
         SignalKind::Text,
         SignalKind::Graph,
+        #[cfg(feature = "edge-reinforcement-learning")]
         SignalKind::EdgeReinforcement,
     ];
 
@@ -28,6 +29,7 @@ fn test_signal_kind_has_no_hyperedge_variant_and_exact_variant_count() {
                 assert_eq!(variant.as_str(), "graph");
                 assert_eq!(SignalKind::from_name("graph"), Some(SignalKind::Graph));
             }
+            #[cfg(feature = "edge-reinforcement-learning")]
             SignalKind::EdgeReinforcement => {
                 assert_eq!(variant.as_str(), "edge-reinforcement");
                 assert_eq!(
@@ -39,9 +41,16 @@ fn test_signal_kind_has_no_hyperedge_variant_and_exact_variant_count() {
         count += 1;
     }
 
+    #[cfg(feature = "edge-reinforcement-learning")]
     assert_eq!(
         count, 4,
         "SignalKind must have exactly 4 variants (Vector, Text, Graph, EdgeReinforcement)"
+    );
+
+    #[cfg(not(feature = "edge-reinforcement-learning"))]
+    assert_eq!(
+        count, 3,
+        "SignalKind must have exactly 3 variants without feature edge-reinforcement-learning"
     );
 
     // Explicit contract verification: "hyperedge" is NOT a SignalKind variant
