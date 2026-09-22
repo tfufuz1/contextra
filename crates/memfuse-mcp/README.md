@@ -10,14 +10,16 @@ Model Context Protocol (MCP) Server für **MemFuse Brain** — Ermöglicht es KI
 
 ---
 
+> **Hinweis zur Distribution:** Eine gepackte `uvx`/PyPI-Distribution dieses Servers existiert aktuell noch nicht und wird nachgereicht, sobald die Namensfrage für das Gesamtprojekt geklärt ist. Der Server wird derzeit lokal über Cargo gestartet.
+
 ## 1. Installation & Ausführung
 
-### Ausführung via `uvx` (empfohlen)
+### Lokale Ausführung via Cargo
 
-Der MCP-Server lädt automatisch das passende Release-Binary für Ihr Betriebssystem (SHA256-geprüft) herunter und erfordert keine vorinstallierte Rust-Toolchain:
+Der MCP-Server wird aus dem Repository über Cargo ausgeführt:
 
 ```bash
-uvx memfuse-mcp --db-path ~/.memfuse --allow-write
+cargo run -p memfuse-mcp --bin memfuse-mcp-server -- --db-path ~/.memfuse --allow-write
 ```
 
 ### Voraussetzungen & Provider
@@ -71,19 +73,24 @@ Fügen Sie den Server in Ihre Client-Konfigurationsdatei ein:
 - **Claude Desktop / Claude Code (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Claude Desktop / Claude Code (Windows)**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Claude Desktop / Claude Code (Linux)**: `~/.config/Claude/claude_desktop_config.json`
-- **Cursor**: Settings -> MCP -> Add new MCP server (command: `uvx`, args: `memfuse-mcp`, `--db-path`, `...`)
+- **Cursor**: Settings -> MCP -> Add new MCP server (command: `cargo`, args: `run`, `-p`, `memfuse-mcp`, `--bin`, `memfuse-mcp-server`, `--`, `--db-path`, `...`)
 
 ### Beispiel: `mcpServers` JSON-Konfiguration
 
-Mit `uvx` (empfohlen):
+Mit Cargo (lokaler Aufruf):
 
 ```json
 {
   "mcpServers": {
     "memfuse": {
-      "command": "uvx",
+      "command": "cargo",
       "args": [
+        "run",
+        "-p",
         "memfuse-mcp",
+        "--bin",
+        "memfuse-mcp-server",
+        "--",
         "--db-path",
         "/ABSOLUTER/PFAD/ZU/ihrem_datenbank_ordner",
         "--allow-write"
@@ -96,21 +103,19 @@ Mit `uvx` (empfohlen):
 }
 ```
 
-Alternativ mit explizitem Binary-Pfad via `MEMFUSE_MCP_BINARY`:
+Alternativ mit direktem Binary-Aufruf:
 
 ```json
 {
   "mcpServers": {
     "memfuse": {
-      "command": "uvx",
+      "command": "/ABSOLUTER/PFAD/ZU/memfuse-mcp-server",
       "args": [
-        "memfuse-mcp",
         "--db-path",
         "/ABSOLUTER/PFAD/ZU/ihrem_datenbank_ordner",
         "--allow-write"
       ],
       "env": {
-        "MEMFUSE_MCP_BINARY": "/ABSOLUTER/PFAD/ZU/memfuse-mcp-server",
         "MEMFUSE_MCP_ALLOW_WRITE": "1"
       }
     }
@@ -129,7 +134,7 @@ Hier ist eine minimale Demonstration des MCP-Protokolls über stdio.
 ### 1. Server im schreibfähigen Modus starten
 
 ```bash
-uvx memfuse-mcp --db-path ./demo_db --allow-write
+cargo run -p memfuse-mcp --bin memfuse-mcp-server -- --db-path ./demo_db --allow-write
 ```
 
 *(Der Server wartet nun auf JSON-RPC 2.0 Anfragen über stdin.)*

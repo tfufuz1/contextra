@@ -69,10 +69,6 @@ risk = "proto"
 tier = "2"
 risk = "parse"
 
-[crate_overrides.memfuse-calibration]
-tier = "3"
-risk = "calib"
-
 [crate_overrides.memfuse-candle]
 tier = "3"
 risk = "candle"
@@ -87,7 +83,6 @@ risk = "candle"
 "memfuse-graph" = "memfuse-retrieval"
 "memfuse-text" = "memfuse-retrieval"
 "memfuse-db" = "memfuse-orchestrator"
-"memfuse-calibration" = "memfuse-inference"
 "memfuse-router" = "memfuse-inference"
 "memfuse-ollama" = "memfuse-inference"
 "memfuse-candle" = "memfuse-inference"

@@ -43,7 +43,7 @@ impl CsrGraph {
         }
     }
 
-    /// Asynchronously compacts the graph delta buffer, offloading heavy CPU rebuild work to `spawn_blocking` if necessary.
+    /// Asynchronously compacts the graph delta buffer.
     pub async fn compact_async(&self) -> Result<()> {
         let snapshot = self.inner.load();
         let num_nodes = snapshot.reverse_map.len();
@@ -81,24 +81,7 @@ impl CsrGraph {
             }
         }
 
-        let write_state = self.write_state.clone();
-        let arc_swap = self.inner.clone();
-
-        tokio::task::spawn_blocking(move || {
-            let mut inner_writer = write_state.lock();
-            let num_nodes = inner_writer.reverse_map.len();
-            if inner_writer.is_dirty
-                || !inner_writer.pending_edges.is_empty()
-                || !inner_writer.tombstoned_edges.is_empty()
-                || inner_writer.offsets.len() != num_nodes + 1
-            {
-                inner_writer.compact();
-                arc_swap.store(Arc::new(inner_writer.clone()));
-            }
-        })
-        .await
-        .map_err(|e| MemFuseError::Internal(format!("compact_async spawn_blocking error: {e}")))?;
-
+        self.compact();
         Ok(())
     }
 

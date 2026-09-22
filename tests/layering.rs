@@ -34,33 +34,15 @@ pub const LAYER_ALLOWLIST: &[AllowlistEntry] = &[
     },
     AllowlistEntry {
         from_crate: "memfuse-infer-onnx",
-        to_crate: "memfuse-calibration",
-        target_phase: "Phase 1b",
-        reason: "Embed depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
-    },
-    AllowlistEntry {
-        from_crate: "memfuse-infer-onnx",
         to_crate: "memfuse-infer-candle",
         target_phase: "Phase 1b",
         reason: "Embed depends on candle provider; execution provider abstraction in Phase 1b",
     },
     AllowlistEntry {
         from_crate: "memfuse-infer-candle",
-        to_crate: "memfuse-calibration",
-        target_phase: "Phase 1b",
-        reason: "Candle provider depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
-    },
-    AllowlistEntry {
-        from_crate: "memfuse-infer-candle",
         to_crate: "memfuse-store",
         target_phase: "Phase 1b",
         reason: "Candle provider uses store directly; store traits abstraction in Phase 1b",
-    },
-    AllowlistEntry {
-        from_crate: "memfuse-infer-ollama",
-        to_crate: "memfuse-calibration",
-        target_phase: "Phase 1b",
-        reason: "Ollama provider depends on calibration; calibration port interfaces to be decoupled in Phase 1b",
     },
     AllowlistEntry {
         from_crate: "memfuse-infer-ollama",
@@ -81,7 +63,7 @@ impl Ring {
             "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
             | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
             | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-            | "memfuse-core" | "memfuse-vector" | "memfuse-calibration" => Some(Ring::Ring0),
+        | "memfuse-core" => Some(Ring::Ring0),
 
             // Ring 1: Storage & State Persistence
             "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),
