@@ -714,17 +714,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-calibration"
-version = "0.1.0"
-dependencies = [
- "memfuse-adapt",
- "memfuse-core",
- "parking_lot",
- "serde",
- "tracing",
-]
-
-[[package]]
 name = "memfuse-checkpoint"
 version = "0.1.0"
 dependencies = [
@@ -806,13 +795,13 @@ dependencies = [
  "blake3",
  "bytes",
  "memfuse-adapt",
- "memfuse-calibration",
  "memfuse-checkpoint",
  "memfuse-cognition",
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-engine",
  "memfuse-graph",
+ "memfuse-rank",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
@@ -835,11 +824,11 @@ dependencies = [
  "blake3",
  "bytes",
  "memfuse-adapt",
- "memfuse-calibration",
  "memfuse-checkpoint",
  "memfuse-core",
  "memfuse-crypto",
  "memfuse-graph",
+ "memfuse-rank",
  "memfuse-store",
  "memfuse-sys",
  "memfuse-text",
@@ -875,8 +864,8 @@ dependencies = [
 name = "memfuse-infer-onnx"
 version = "0.1.0"
 dependencies = [
- "memfuse-calibration",
  "memfuse-core",
+ "memfuse-rank",
  "parking_lot",
  "serde",
  "tokio",
@@ -924,6 +913,19 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "memfuse-rank"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "memfuse-ports",
+ "memfuse-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]

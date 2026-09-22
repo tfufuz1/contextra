@@ -22,7 +22,7 @@ serde = { workspace = true }
 tracing = { workspace = true }
 bincode = { workspace = true, optional = true }
 memfuse-core = { workspace = true }
-memfuse-calibration = { workspace = true }
+memfuse-rank = { workspace = true }
 memfuse-crypto = { workspace = true, optional = true }
 memfuse-store = { workspace = true, optional = true }
 
