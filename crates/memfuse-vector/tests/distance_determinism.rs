@@ -17,7 +17,7 @@ proptest! {
         let b = &v2[..len];
 
         let scalar = dot_product_scalar(a, b);
-        let simd = -compute_distance(a, b, DistanceMetric::DotProduct).unwrap();
+        let simd = compute_distance(a, b, DistanceMetric::DotProduct).unwrap();
 
         // Accumulation error can be up to EPSILON * len in worst case (though usually much less)
         // Using a more robust relative check for large sums.
