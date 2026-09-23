@@ -58,6 +58,7 @@ mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
 mod check_commit_messages;
 mod check_compile;
+mod gates;
 mod check_coverage_gate;
 mod check_doc_references;
 mod check_duplicate_intent;
@@ -1987,6 +1988,12 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-crate-references" => {
+            if let Err(e) = gates::check_crate_references::run_check_crate_references() {
+                eprintln!("❌ check-crate-references failed: {}", e);
+                process::exit(1);
+            }
+        }
         "gen-feature-catalog" => {
             if let Err(e) = gen_feature_catalog::run_gen_feature_catalog() {
                 eprintln!("❌ gen-feature-catalog failed: {}", e);
@@ -2539,7 +2546,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, gen-feature-catalog, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, gen-feature-catalog, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-crate-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
             process::exit(1);
         }
     }
