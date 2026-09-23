@@ -1924,6 +1924,7 @@ dependencies = [
  "chrono",
  "memfuse-bench",
  "memfuse-router",
+ "memfuse-types",
  "proc-macro2",
  "quote",
  "regex",

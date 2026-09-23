@@ -40,3 +40,6 @@ benchmarks/memfuse-bench/tests/data/
 
 # Generierte Benchmark-/Test-Ergebnisse
 results/
+
+# Jules Session History Log
+.jules/session_history.jsonl*
