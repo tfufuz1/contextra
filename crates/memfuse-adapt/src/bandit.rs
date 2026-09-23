@@ -450,6 +450,24 @@ mod tests {
         assert_eq!(state.implementation, BanditImplementation::ShermanMorrison);
     }
 
+    struct TestMockPolicy {
+        penalties: Vec<(f32, f32, f32)>,
+    }
+
+    impl BanditPolicy for TestMockPolicy {
+        fn apply_drift_penalty(&mut self, k_drift: f32, alpha_max: f32, gamma: f32) {
+            self.penalties.push((k_drift, alpha_max, gamma));
+        }
+    }
+
+    #[test]
+    fn test_custom_bandit_policy_implementation() {
+        let mut mock = TestMockPolicy { penalties: vec![] };
+        mock.apply_drift_penalty(2.5, 5.0, 0.90);
+        assert_eq!(mock.penalties.len(), 1);
+        assert_eq!(mock.penalties[0], (2.5, 5.0, 0.90));
+    }
+
     #[test]
     fn test_bandit_policy_drift_penalty() {
         let mut state = BanditProfileState::cold_start(2, 0.5);

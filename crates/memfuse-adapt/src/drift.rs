@@ -83,4 +83,42 @@ mod tests {
         assert!(bandit.alpha > alpha_before);
         assert_eq!(bandit.drift_steps_remaining, bandit.drift_decay_window);
     }
+
+    #[test]
+    #[cfg(feature = "bandit-routing")]
+    fn test_drift_policy_bridge_dispatches_exact_penalty_parameters() {
+        use crate::bandit::BanditPolicy;
+
+        struct RecordingPolicy {
+            calls: Vec<(f32, f32, f32)>,
+        }
+
+        impl BanditPolicy for RecordingPolicy {
+            fn apply_drift_penalty(&mut self, k_drift: f32, alpha_max: f32, gamma: f32) {
+                self.calls.push((k_drift, alpha_max, gamma));
+            }
+        }
+
+        let mut bridge = DriftPolicyBridge::new(5, 2.5, 5.0, 0.92);
+        let baseline: Vec<f32> = (0..50).map(|i| (i as f32 / 50.0) * 0.1).collect();
+        bridge.watcher.set_baseline(&baseline);
+
+        let mut policy = RecordingPolicy { calls: vec![] };
+
+        for i in 0..15 {
+            let shift = (i as f32 / 15.0) * 0.9;
+            let current: Vec<f32> = (0..30)
+                .map(|j| ((j as f32 / 30.0) * 0.1 + shift).clamp(0.0, 1.0))
+                .collect();
+            let _ = bridge.observe_and_react(&current, &mut policy);
+        }
+
+        assert!(
+            !policy.calls.is_empty(),
+            "apply_drift_penalty must be called on DriftDetected"
+        );
+        for call in &policy.calls {
+            assert_eq!(*call, (2.5, 5.0, 0.92));
+        }
+    }
 }

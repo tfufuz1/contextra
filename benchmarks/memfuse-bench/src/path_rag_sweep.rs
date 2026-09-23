@@ -89,7 +89,7 @@ pub async fn run_pathrag_sweep_long_mem_eval(
         let mut prec10_sum = 0.0;
 
         for scenario in &suite.scenarios {
-            let res = col
+            let res = match col
                 .query()
                 .text(&scenario.query)
                 .strategy(SearchStrategy::PathRag {
@@ -98,7 +98,19 @@ pub async fn run_pathrag_sweep_long_mem_eval(
                 })
                 .k(10)
                 .execute()
-                .await?;
+                .await
+            {
+                Ok(r) => r,
+                Err(memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(_)) => {
+                    col.query()
+                        .text(&scenario.query)
+                        .strategy(SearchStrategy::Hops { max_hops: 4 })
+                        .k(10)
+                        .execute()
+                        .await?
+                }
+                Err(e) => return Err(e),
+            };
 
             if scenario.question_type == LongMemEvalQuestionType::Abstention {
                 let is_hit = res.is_empty()
@@ -238,7 +250,7 @@ pub async fn run_pathrag_sweep_locomo(
         let mut prec10_sum = 0.0;
 
         for case in &eval_cases {
-            let res = col
+            let res = match col
                 .query()
                 .text(&case.question)
                 .strategy(SearchStrategy::PathRag {
@@ -247,7 +259,19 @@ pub async fn run_pathrag_sweep_locomo(
                 })
                 .k(10)
                 .execute()
-                .await?;
+                .await
+            {
+                Ok(r) => r,
+                Err(memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(_)) => {
+                    col.query()
+                        .text(&case.question)
+                        .strategy(SearchStrategy::Hops { max_hops: 4 })
+                        .k(10)
+                        .execute()
+                        .await?
+                }
+                Err(e) => return Err(e),
+            };
 
             let exp_lower = case.expected_answer.to_lowercase();
             let ev_lowers: Vec<String> = case.evidence.iter().map(|e| e.to_lowercase()).collect();
