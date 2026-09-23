@@ -6,12 +6,14 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
-use crate::error::GraphMutationError;
 use crate::GraphIndexExt;
 use memfuse_core::{
     BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
     StorageEngine, TxId,
 };
+use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
+use crate::error::GraphMutationError;
+use crate::GraphIndexExt;
 
 use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::{
