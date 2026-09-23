@@ -18,7 +18,7 @@ Um Halluzinationen und veraltete Fakten zu vermeiden, gilt für jede Jules-Sessi
 3. **Offene Schulden & Tags**: `WORKING_STATE.md` (Autogenerierter Tag-Bericht)
 4. **Verbindliche Architektur-Vorgaben**: `DECISIONS.md` (ADR-Zusammenfassungen)
 
-> 📌 **Hinweis für Prompt-Erstellung**: Prüfe vor Formulierung neuer Prompts, ob offene GitHub-Issues mit Label 'post-merge-regression' existieren — diese haben Vorrang.
+> 📌 **Hinweis für Prompt-Erstellung**: Die automatische Erstellung von GitHub-Issues durch Workflows/Gates ist deaktiviert.
 
 ---
 
