@@ -96,10 +96,10 @@ fn test_simd_vs_scalar_vs_f64_all_metrics() {
             "Euclidean SIMD vs f64 divergence > 1e-4 at dim {dim}: simd={euc_simd}, f64={euc_f64}"
         );
 
-        // 3. Dot Product Distance (compute_distance returns -dot)
+        // 3. Dot Product Distance
         let dot_f64 = dot_product_f64_ref(&a, &b);
         let dot_scalar = dot_product_scalar(&a, &b) as f64;
-        let dot_simd = -compute_distance(&a, &b, DistanceMetric::DotProduct).unwrap() as f64;
+        let dot_simd = compute_distance(&a, &b, DistanceMetric::DotProduct).unwrap() as f64;
 
         let dot_diff_scalar = (dot_scalar - dot_f64).abs();
         let dot_diff_simd = (dot_simd - dot_f64).abs();

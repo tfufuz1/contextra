@@ -12,6 +12,7 @@
 #![doc(hidden)]
 
 use crate::distance::{compute_distance_trusted, validate_vector};
+use crate::ComputePool;
 use ahash::AHashMap;
 use memfuse_core::{
     DistanceMetric, DocId, MemFuseError, Result, ScoredDocument, TxId, VectorIndex,
@@ -264,6 +265,8 @@ pub struct DiskAnnConfig {
     /// Optionaler Override für den Pending-Flush-Threshold (für Benchmarks/Tests).
     /// None: adaptiver Threshold gemäß ADR-068 (max(50, min(1000, floor(N × 0.05)))).
     pub pending_flush_threshold: Option<u64>,
+    /// Optional compute pool for background operations.
+    pub compute_pool: Option<ComputePool>,
 }
 
 impl Default for DiskAnnConfig {
@@ -279,6 +282,7 @@ impl Default for DiskAnnConfig {
             quantize: false,
             fallback_policy: DiskAnnFallbackPolicy::default(),
             pending_flush_threshold: None,
+            compute_pool: None,
         }
     }
 }
@@ -302,7 +306,7 @@ enum VectorData {
 /// This index uses `memmap2` to offload vector data and graph edges to disk.
 /// Note that mmap operations and page faults can cause the current thread to block
 /// while data is being loaded from the disk. For high-concurrency environments,
-/// consider using `tokio::task::spawn_blocking` when calling methods on this index
+/// consider using `ComputePool` or a background thread pool when calling methods on this index
 /// if latency spikes are a concern.
 pub struct DiskAnnIndex {
     inner: Arc<DiskAnnIndexInner>,
@@ -326,6 +330,7 @@ struct DiskAnnIndexInner {
     flushing_in_progress: AtomicBool,
     hnsw_fallback: RwLock<Option<Arc<crate::hnsw::HnswIndex>>>,
     tombstones: RwLock<RoaringTreemap>,
+    compute_pool: ComputePool,
 }
 
 impl DiskAnnIndex {
@@ -336,6 +341,8 @@ impl DiskAnnIndex {
                 "Sector size must be a power of 2".to_string(),
             ));
         }
+
+        let compute_pool = config.compute_pool.clone().unwrap_or_default();
 
         let vector_size = if config.quantize {
             config.dimension
@@ -362,16 +369,21 @@ impl DiskAnnIndex {
                 flushing_in_progress: AtomicBool::new(false),
                 hnsw_fallback: RwLock::new(None),
                 tombstones: RwLock::new(RoaringTreemap::new()),
+                compute_pool,
             }),
         })
     }
 
     /// Stößt `persist_delta()` asynchron im Tokio-Hintergrund-Task an,
     /// falls nicht bereits ein persist_delta-Lauf aktiv ist.
+    pub fn len_sync(&self) -> usize {
+        self.inner.doc_ids.read().len()
+    }
+
     pub fn trigger_background_persist_delta(&self) {
         if !self.inner.flushing_in_progress.swap(true, Ordering::AcqRel) {
             let index_clone = self.clone();
-            tokio::spawn(async move {
+            self.inner.compute_pool.execute(move || {
                 struct FlushGuard(Arc<DiskAnnIndexInner>);
                 impl Drop for FlushGuard {
                     fn drop(&mut self) {
@@ -379,7 +391,7 @@ impl DiskAnnIndex {
                     }
                 }
                 let _guard = FlushGuard(Arc::clone(&index_clone.inner));
-                if let Err(e) = index_clone.persist_delta().await {
+                if let Err(e) = index_clone.persist_delta_sync() {
                     tracing::error!(error = %e, "DiskANN Hintergrund-persist_delta fehlgeschlagen");
                 }
             });
@@ -549,26 +561,23 @@ impl DiskAnnIndex {
     ///   - `id`: `u64` LE (8 bytes)
     ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes`)
     async fn append_to_tombstone_wal(path: &std::path::Path, id: DocId) -> Result<()> {
-        use tokio::io::AsyncWriteExt;
+        use std::io::Write;
 
-        let is_new = match tokio::fs::metadata(path).await {
+        let is_new = match std::fs::metadata(path) {
             Ok(meta) => meta.len() == 0,
             Err(_) => true,
         };
 
-        let mut file = tokio::fs::OpenOptions::new()
+        let mut file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path)
-            .await
             .map_err(MemFuseError::Io)?;
 
         if is_new {
             file.write_all(TOMBSTONE_WAL_MAGIC)
-                .await
                 .map_err(MemFuseError::Io)?;
             file.write_all(&[TOMBSTONE_WAL_VERSION])
-                .await
                 .map_err(MemFuseError::Io)?;
         }
 
@@ -577,11 +586,9 @@ impl DiskAnnIndex {
         hmac.update(&id_bytes);
         let computed_hmac = hmac.finalize();
 
-        file.write_all(&id_bytes).await.map_err(MemFuseError::Io)?;
-        file.write_all(&computed_hmac)
-            .await
-            .map_err(MemFuseError::Io)?;
-        file.sync_all().await.map_err(MemFuseError::Io)?;
+        file.write_all(&id_bytes).map_err(MemFuseError::Io)?;
+        file.write_all(&computed_hmac).map_err(MemFuseError::Io)?;
+        file.sync_all().map_err(MemFuseError::Io)?;
         Ok(())
     }
 
@@ -690,26 +697,23 @@ impl DiskAnnIndex {
         id: DocId,
         embedding: &[f32],
     ) -> Result<()> {
-        use tokio::io::AsyncWriteExt;
+        use std::io::Write;
 
-        let is_new = match tokio::fs::metadata(path).await {
+        let is_new = match std::fs::metadata(path) {
             Ok(meta) => meta.len() == 0,
             Err(_) => true,
         };
 
-        let mut file = tokio::fs::OpenOptions::new()
+        let mut file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path)
-            .await
             .map_err(MemFuseError::Io)?;
 
         if is_new {
             file.write_all(PENDING_WAL_MAGIC)
-                .await
                 .map_err(MemFuseError::Io)?;
             file.write_all(&[PENDING_WAL_VERSION])
-                .await
                 .map_err(MemFuseError::Io)?;
         }
 
@@ -728,13 +732,9 @@ impl DiskAnnIndex {
         hmac.update(&entry_bytes);
         let computed_hmac = hmac.finalize();
 
-        file.write_all(&entry_bytes)
-            .await
-            .map_err(MemFuseError::Io)?;
-        file.write_all(&computed_hmac)
-            .await
-            .map_err(MemFuseError::Io)?;
-        file.sync_all().await.map_err(MemFuseError::Io)?;
+        file.write_all(&entry_bytes).map_err(MemFuseError::Io)?;
+        file.write_all(&computed_hmac).map_err(MemFuseError::Io)?;
+        file.sync_all().map_err(MemFuseError::Io)?;
         Ok(())
     }
 
@@ -866,35 +866,29 @@ impl DiskAnnIndex {
     pub fn recover_pending_delta(
         &self,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize>> + Send + '_>> {
-        Box::pin(async move {
-            let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-            if !pending_wal.exists() {
-                return Ok(0);
+        Box::pin(async move { self.recover_pending_delta_sync() })
+    }
+
+    pub fn recover_pending_delta_sync(&self) -> Result<usize> {
+        let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
+        if !pending_wal.exists() {
+            return Ok(0);
+        }
+        let recovered = Self::read_pending_wal(&pending_wal)?;
+        let count = recovered.len();
+        if count > 0 {
+            {
+                let mut guard = self.inner.pending_inserts.write();
+                self.inner
+                    .pending_count
+                    .store(count as u64, Ordering::Relaxed);
+                *guard = recovered;
             }
-            let path_clone = pending_wal.clone();
-            let recovered =
-                tokio::task::spawn_blocking(move || Self::read_pending_wal(&path_clone))
-                    .await
-                    .map_err(|e| {
-                        MemFuseError::Storage(format!(
-                            "Join error during pending.wal recovery: {e}"
-                        ))
-                    })??;
-            let count = recovered.len();
-            if count > 0 {
-                {
-                    let mut guard = self.inner.pending_inserts.write();
-                    self.inner
-                        .pending_count
-                        .store(count as u64, Ordering::Relaxed);
-                    *guard = recovered;
-                }
-                self.persist_delta().await?;
-            } else {
-                let _ = tokio::fs::remove_file(&pending_wal).await;
-            }
-            Ok(count)
-        })
+            self.persist_delta_sync()?;
+        } else {
+            let _ = std::fs::remove_file(&pending_wal);
+        }
+        Ok(count)
     }
 
     /// Mergt pending inserts in den On-Disk-Graphen.
@@ -906,6 +900,10 @@ impl DiskAnnIndex {
     /// ATOMARES WRITE: Tmp → fsync → Rename → Parent-fsync (P3-konform).
     /// INVARIANTE INV-DISKANN-1: Atomares Rename-Muster immer eingehalten.
     pub async fn persist_delta(&self) -> Result<()> {
+        self.persist_delta_sync()
+    }
+
+    pub fn persist_delta_sync(&self) -> Result<()> {
         let pending = {
             let mut guard = self.inner.pending_inserts.write();
             self.inner.pending_count.store(0, Ordering::Relaxed);
@@ -915,63 +913,55 @@ impl DiskAnnIndex {
         if pending.is_empty() {
             let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
             if pending_wal.exists() {
-                let _ = tokio::fs::remove_file(&pending_wal).await;
+                let _ = std::fs::remove_file(&pending_wal);
             }
             return Ok(());
         }
 
-        let existing_count = self.len().await;
+        let existing_count = self.len_sync();
         let total = existing_count + pending.len();
         let pending_ratio = pending.len() as f64 / total.max(1) as f64;
 
         if pending_ratio > 0.10 || existing_count == 0 {
             // Vollrebuild: bestehende + pending
-            let (mut all_vecs, mut all_ids) = self.load_all_vectors_from_mmap().await?;
+            let (mut all_vecs, mut all_ids) = self.load_all_vectors_from_mmap()?;
             for (id, vec) in &pending {
                 all_vecs.push(vec.clone());
                 all_ids.push(*id);
             }
-            return self.build(&all_vecs, &all_ids).await;
+            return self.build_sync(&all_vecs, &all_ids);
         }
 
         // Inkrementeller Pfad
         let tmp_path = self.inner.config.index_path.with_extension("delta.tmp");
-        self.write_incremental_to_file(&tmp_path, &pending).await?;
+        self.write_incremental_to_file_sync(&tmp_path, &pending)?;
 
         // Atomares Rename + Parent-fsync (INV-DISKANN-1, P3)
         let index_path = self.inner.config.index_path.clone();
-        tokio::task::spawn_blocking({
-            let tmp = tmp_path.clone();
-            let dst = index_path;
-            move || -> Result<()> {
-                let tmp_file = std::fs::File::open(&tmp)?;
-                tmp_file
-                    .sync_all()
-                    .map_err(|e| MemFuseError::Storage(format!("fsync tmp: {e}")))?;
-                drop(tmp_file);
-                std::fs::rename(&tmp, &dst)
-                    .map_err(|e| MemFuseError::Storage(format!("rename: {e}")))?;
-                if let Some(parent) = dst.parent() {
-                    let dir = std::fs::File::open(parent)?;
-                    dir.sync_all()
-                        .map_err(|e| MemFuseError::Storage(format!("parent fsync: {e}")))?;
-                }
-                Ok(())
+        let tmp_file = std::fs::File::open(&tmp_path)?;
+        tmp_file
+            .sync_all()
+            .map_err(|e| MemFuseError::Storage(format!("fsync tmp: {e}")))?;
+        drop(tmp_file);
+        std::fs::rename(&tmp_path, &index_path)
+            .map_err(|e| MemFuseError::Storage(format!("rename: {e}")))?;
+        if let Some(parent) = index_path.parent() {
+            if let Ok(dir) = std::fs::File::open(parent) {
+                dir.sync_all()
+                    .map_err(|e| MemFuseError::Storage(format!("parent fsync: {e}")))?;
             }
-        })
-        .await
-        .map_err(|e| MemFuseError::Storage(format!("spawn_blocking: {e}")))??;
+        }
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         if pending_wal.exists() {
-            let _ = tokio::fs::remove_file(&pending_wal).await;
+            let _ = std::fs::remove_file(&pending_wal);
         }
 
-        self.load().await // Mmap neu laden
+        self.load_sync() // Mmap neu laden
     }
 
     #[allow(clippy::unnecessary_cast)]
-    async fn load_all_vectors_from_mmap(&self) -> Result<(Vec<Vec<f32>>, Vec<DocId>)> {
+    fn load_all_vectors_from_mmap(&self) -> Result<(Vec<Vec<f32>>, Vec<DocId>)> {
         let disk_count = {
             let guard = self.inner.header.read();
             guard.as_ref().map(|h| h.node_count as usize).unwrap_or(0)
@@ -1174,7 +1164,7 @@ impl DiskAnnIndex {
     /// Phase 5: Geänderte Graph-Struktur und neue Knoten atomar auf Disk schreiben.
     ///
     /// AI-TAG[RESOLVED] Echte inkrementelle Streaming-DiskANN Implementierung mit Beam-Search, RNG-Pruning und Rückwärts-Kanten-Kompression. (TS:2026-09-07T06:15:00Z) (SESSION: f04imm01)
-    async fn write_incremental_to_file(
+    fn write_incremental_to_file_sync(
         &self,
         tmp_path: &std::path::Path,
         new_vecs: &[(DocId, Vec<f32>)],
@@ -1183,7 +1173,7 @@ impl DiskAnnIndex {
             return Ok(());
         }
 
-        let existing_count = self.len().await;
+        let existing_count = self.len_sync();
         if existing_count == 0 {
             let mut all_vecs = Vec::with_capacity(new_vecs.len());
             let mut all_ids = Vec::with_capacity(new_vecs.len());
@@ -1191,7 +1181,7 @@ impl DiskAnnIndex {
                 all_vecs.push(vec.clone());
                 all_ids.push(*id);
             }
-            return self.build_to_path(tmp_path, &all_vecs, &all_ids).await;
+            return self.build_to_path_sync(tmp_path, &all_vecs, &all_ids);
         }
 
         let total_nodes = existing_count + new_vecs.len();
@@ -1272,16 +1262,15 @@ impl DiskAnnIndex {
         }
 
         // Phase 5: Vektoren für alle Knoten zusammenstellen und in tmp_path serialisieren
-        let (mut all_vecs, _) = self.load_all_vectors_from_mmap().await?;
+        let (mut all_vecs, _) = self.load_all_vectors_from_mmap()?;
         for (_, vec) in new_vecs {
             all_vecs.push(vec.clone());
         }
 
-        self.write_to_path(tmp_path, &graph, &all_vecs, &all_ids)
-            .await
+        self.write_to_path_sync(tmp_path, &graph, &all_vecs, &all_ids)
     }
 
-    pub async fn build_to_path(
+    pub fn build_to_path_sync(
         &self,
         target_path: &std::path::Path,
         vectors: &[Vec<f32>],
@@ -1359,38 +1348,38 @@ impl DiskAnnIndex {
         }
 
         // 3. Final Write
-        self.write_to_path(target_path, &graph, vectors, ids).await
+        self.write_to_path_sync(target_path, &graph, vectors, ids)
     }
 
     /// Builds the index from a set of vectors.
     pub async fn build(&self, vectors: &[Vec<f32>], ids: &[DocId]) -> Result<()> {
-        let tmp_path = self.inner.config.index_path.with_extension("idx.tmp");
-        self.build_to_path(&tmp_path, vectors, ids).await?;
+        self.build_sync(vectors, ids)
+    }
 
-        tokio::fs::rename(&tmp_path, &self.inner.config.index_path)
-            .await
-            .map_err(MemFuseError::Io)?;
+    pub fn build_sync(&self, vectors: &[Vec<f32>], ids: &[DocId]) -> Result<()> {
+        let tmp_path = self.inner.config.index_path.with_extension("idx.tmp");
+        self.build_to_path_sync(&tmp_path, vectors, ids)?;
+
+        std::fs::rename(&tmp_path, &self.inner.config.index_path).map_err(MemFuseError::Io)?;
 
         // Fsync parent directory after rename for POSIX atomic directory entry durability
         if let Some(parent) = self.inner.config.index_path.parent() {
-            let parent_dir = tokio::fs::File::open(parent)
-                .await
-                .map_err(MemFuseError::Io)?;
-            parent_dir.sync_all().await.map_err(MemFuseError::Io)?;
+            let parent_dir = std::fs::File::open(parent).map_err(MemFuseError::Io)?;
+            parent_dir.sync_all().map_err(MemFuseError::Io)?;
         }
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         if pending_wal.exists() {
-            let _ = tokio::fs::remove_file(&pending_wal).await;
+            let _ = std::fs::remove_file(&pending_wal);
         }
 
         let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
         if tombstone_wal.exists() {
-            let _ = tokio::fs::remove_file(&tombstone_wal).await;
+            let _ = std::fs::remove_file(&tombstone_wal);
         }
         self.inner.tombstones.write().clear();
 
-        self.load().await?;
+        self.load_sync()?;
         self.verify_graph_integrity_debug()?;
 
         Ok(())
@@ -1420,16 +1409,16 @@ impl DiskAnnIndex {
         Ok(())
     }
 
-    async fn write_to_path(
+    fn write_to_path_sync(
         &self,
         path: &std::path::Path,
         graph: &[Vec<u32>],
         vectors: &[Vec<f32>],
         ids: &[DocId],
     ) -> Result<()> {
+        use std::fs::OpenOptions;
+        use std::io::Write;
         use std::sync::atomic::Ordering;
-        use tokio::fs::OpenOptions;
-        use tokio::io::AsyncWriteExt;
 
         let n = vectors.len();
         let mut file = OpenOptions::new()
@@ -1437,7 +1426,6 @@ impl DiskAnnIndex {
             .create(true)
             .truncate(true)
             .open(path)
-            .await
             .map_err(MemFuseError::Io)?;
 
         let quantizer_opt = {
@@ -1472,16 +1460,14 @@ impl DiskAnnIndex {
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
-        file.write_all(&header_bytes)
-            .await
-            .map_err(MemFuseError::Io)?;
+        file.write_all(&header_bytes).map_err(MemFuseError::Io)?;
         let padding = vec![
             0u8;
             self.inner.config.sector_size
                 - (DiskAnnHeader::SIZE % self.inner.config.sector_size)
         ];
         hmac.update(&padding);
-        file.write_all(&padding).await.map_err(MemFuseError::Io)?;
+        file.write_all(&padding).map_err(MemFuseError::Io)?;
 
         for i in 0..n {
             let mut node_buf = Vec::new();
@@ -1511,7 +1497,7 @@ impl DiskAnnIndex {
             }
 
             hmac.update(&node_buf);
-            file.write_all(&node_buf).await.map_err(MemFuseError::Io)?;
+            file.write_all(&node_buf).map_err(MemFuseError::Io)?;
         }
 
         let computed_hmac = hmac.finalize();
@@ -1520,10 +1506,9 @@ impl DiskAnnIndex {
             hmac: computed_hmac,
         };
         file.write_all(&footer.to_bytes())
-            .await
             .map_err(MemFuseError::Io)?;
 
-        file.sync_all().await.map_err(MemFuseError::Io)?;
+        file.sync_all().map_err(MemFuseError::Io)?;
         Ok(())
     }
 
@@ -1541,6 +1526,10 @@ impl DiskAnnIndex {
 
     /// Loads the index from the configured path.
     pub async fn load(&self) -> Result<()> {
+        self.load_sync()
+    }
+
+    pub fn load_sync(&self) -> Result<()> {
         let index_exists = self.inner.config.index_path.exists();
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         let wal_exists = pending_wal.exists();
@@ -1557,7 +1546,7 @@ impl DiskAnnIndex {
 
         if index_exists {
             let inner = Arc::clone(&self.inner);
-            let load_handle = tokio::task::spawn_blocking(move || {
+            let load_closure = move || {
                 use std::sync::atomic::Ordering;
 
                 // Clean up any orphaned temporary files from interrupted persist_delta or build calls
@@ -1717,14 +1706,9 @@ impl DiskAnnIndex {
                 }
                 *inner.doc_ids.write() = ids;
                 Ok(())
-            });
+            };
 
-            let load_res = load_handle
-                .await
-                .map_err(|e| {
-                    MemFuseError::Storage(format!("Join error during DiskANN load: {}", e))
-                })
-                .and_then(|res| res);
+            let load_res = load_closure();
 
             if let Err(err) = load_res {
                 if self.inner.config.fallback_policy == DiskAnnFallbackPolicy::UseHnswOnFailure {
@@ -1742,21 +1726,13 @@ impl DiskAnnIndex {
         }
 
         if wal_exists {
-            self.recover_pending_delta().await?;
+            self.recover_pending_delta_sync()?;
         }
 
         // Recover tombstones from tombstone.wal
         let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
         if tombstone_wal.exists() {
-            let path_clone = tombstone_wal.clone();
-            let recovered_tombstones =
-                tokio::task::spawn_blocking(move || Self::read_tombstone_wal(&path_clone))
-                    .await
-                    .map_err(|e| {
-                        MemFuseError::Storage(format!(
-                            "Join error during tombstone.wal recovery: {e}"
-                        ))
-                    })??;
+            let recovered_tombstones = Self::read_tombstone_wal(&tombstone_wal)?;
             *self.inner.tombstones.write() = recovered_tombstones;
         }
 
@@ -1960,13 +1936,7 @@ impl DiskAnnIndex {
 
         self.check_quantizer_drift(query);
 
-        let query_vec = query.to_vec();
-        let self_clone = self.clone();
-
-        let search_res =
-            tokio::task::spawn_blocking(move || self_clone.search_blocking(&query_vec, k, header))
-                .await
-                .map_err(|e| MemFuseError::Index(format!("Join error: {}", e)))?;
+        let search_res = self.search_blocking(query, k, header);
 
         match search_res {
             Ok(res) => Ok(res),

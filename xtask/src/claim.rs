@@ -154,6 +154,51 @@ pub fn expire_stale_claims(root: &Path) -> usize {
     expired_count
 }
 
+/// Erstellt oder überschreibt den Session-Snapshot in `.jules/SESSION.md`.
+///
+/// Schema per Spezifikation (Abschnitt 4.2):
+/// - Crate Scope
+/// - Issue / Task ID
+/// - Startzeit (ISO-8601 UTC)
+/// - Letzte bekannte Phase (Phase 1–5 aus AGENTS.md §3)
+/// - Notizen
+pub fn write_session_snapshot(
+    root: &Path,
+    krate: &str,
+    issue: &str,
+    phase: &str,
+    notes: Option<&str>,
+) -> Result<(), String> {
+    let session_path = root.join(".jules/SESSION.md");
+    if let Some(parent) = session_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "Kann Verzeichnis {} nicht erstellen: {}",
+                parent.display(),
+                e
+            )
+        })?;
+    }
+
+    let timestamp = Utc::now().to_rfc3339();
+    let notes_str = notes.unwrap_or("Keine Notizen.");
+
+    let content = format!(
+        "# Jules Session Snapshot\n\n\
+        - **Crate Scope:** {}\n\
+        - **Issue / Task ID:** {}\n\
+        - **Startzeit:** {}\n\
+        - **Letzte bekannte Phase:** {}\n\
+        - **Notizen:** {}\n",
+        krate, issue, timestamp, phase, notes_str
+    );
+
+    fs::write(&session_path, content)
+        .map_err(|e| format!("Kann {} nicht schreiben: {}", session_path.display(), e))?;
+
+    Ok(())
+}
+
 /// Gibt einen aktiven Claim frei: setzt active=false und released_at.
 pub fn run_release_local(args: &[String]) -> bool {
     let mut krate = String::new();
@@ -305,6 +350,16 @@ fn run_claim_local(args: &[String]) -> bool {
     if let Err(e) = db.save(&claims_path) {
         eprintln!("❌ Fehler beim Speichern des Claims: {}", e);
         return false;
+    }
+
+    if let Err(e) = write_session_snapshot(
+        &root,
+        &krate,
+        &issue,
+        "Phase 1: Exploration & Claim",
+        None,
+    ) {
+        eprintln!("⚠️ Fehler beim Schreiben des Session-Snapshots: {}", e);
     }
 
     println!(
@@ -765,5 +820,27 @@ mod tests {
         assert_eq!(get_max_active_claims(), 2);
 
         std::env::remove_var("MEMFUSE_MAX_ACTIVE_CLAIMS");
+    }
+
+    #[test]
+    fn test_write_session_snapshot() {
+        let dir = tempdir().unwrap();
+        let res = write_session_snapshot(
+            dir.path(),
+            "xtask",
+            "TEST-100",
+            "Phase 1: Exploration & Claim",
+            Some("Testing snapshot writing"),
+        );
+        assert!(res.is_ok());
+
+        let session_file = dir.path().join(".jules/SESSION.md");
+        assert!(session_file.is_file());
+        let content = fs::read_to_string(&session_file).unwrap();
+
+        assert!(content.contains("- **Crate Scope:** xtask"));
+        assert!(content.contains("- **Issue / Task ID:** TEST-100"));
+        assert!(content.contains("- **Letzte bekannte Phase:** Phase 1: Exploration & Claim"));
+        assert!(content.contains("- **Notizen:** Testing snapshot writing"));
     }
 }

@@ -234,6 +234,24 @@ pub fn run_jules_preflight(fast_only: bool) -> bool {
         });
     }
 
+    // Gate: Check Crate References
+    {
+        let start = Instant::now();
+        let check_res = crate::gates::check_crate_references::run_check_crate_references();
+        let (passed, detail) = match check_res {
+            Ok(()) => (true, None),
+            Err(e) => (false, Some(e)),
+        };
+        results.push(GateResult {
+            name: format!(
+                "Check Crate References ({:.1}s)",
+                start.elapsed().as_secs_f64()
+            ),
+            passed,
+            detail,
+        });
+    }
+
     // Module Reachability Check
     {
         let start = Instant::now();

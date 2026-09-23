@@ -591,12 +591,9 @@ impl MmapIndex {
         Ok(index_obj)
     }
 
-    /// Asynchronously opens an HNSW file using `spawn_blocking`.
+    /// Opens an HNSW file without requiring external runtime blocking task spawns.
     pub async fn open_async(path: impl AsRef<std::path::Path> + Send) -> Result<Self> {
-        let path_buf = path.as_ref().to_path_buf();
-        tokio::task::spawn_blocking(move || Self::open(path_buf))
-            .await
-            .map_err(|e| MemFuseError::Storage(format!("Join error: {}", e)))?
+        Self::open(path)
     }
 
     pub fn get_node_record(&self, index: usize) -> Result<NodeRecord> {

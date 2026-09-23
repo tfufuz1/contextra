@@ -330,6 +330,7 @@
 | `` | `crates/memfuse-text/tests/bm25f_field_weighting.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prüft Formel-Korrektheit, Degeneration zu einfeldigem BM25 und Zero-Panic Invarianten. |
 | `` | `crates/memfuse-vector/benches/hnsw_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/memfuse-vector/benches/partial_rebuild_recall_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/memfuse-vector/src/compute_pool.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Begrenzter ComputePool für CPU-intensive Tasks (z. B. HNSW-Index-Rebuild). |
 | `` | `crates/memfuse-vector/src/distance.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Distanzberechnungen und Vektor-Dequantisierung via memfuse-simd. |
 | `` | `crates/memfuse-vector/src/hnsw/arena.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Arena-Allocator (HnswArena) für HNSW-Nachbarlisten mit 64-Byte-Alignment, Slot-Freilisten und CAS-Relinking. |
 | `` | `crates/memfuse-vector/src/hnsw/sq8_bias.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Quantisierungs-Bias-Kalibrierung (Sq8Bias) für SQ8-Quantisierung im HNSW Index Header. |

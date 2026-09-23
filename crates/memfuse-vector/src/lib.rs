@@ -25,11 +25,13 @@ pub mod hnsw;
 pub mod persistence;
 pub mod quantize;
 
+pub mod compute_pool;
 pub mod partial_rebuild;
 
 #[cfg(feature = "experimental-rabitq")]
 pub mod quantize_rabitq;
 
+pub use compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 pub use hnsw::{HnswConfig, HnswIndex, RebuildStatus};
