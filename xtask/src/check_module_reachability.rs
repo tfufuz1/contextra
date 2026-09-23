@@ -52,7 +52,11 @@ fn strip_comments_and_strings(source: &str) -> String {
 
     while i < len {
         let c = chars[i];
-        let next = if i + 1 < len { Some(chars[i + 1]) } else { None };
+        let next = if i + 1 < len {
+            Some(chars[i + 1])
+        } else {
+            None
+        };
 
         if in_line_comment {
             if c == '\n' {
@@ -230,11 +234,15 @@ fn resolve_mod_file(decl: &ModDecl, src_dir: &Path) -> Option<PathBuf> {
         return None;
     }
 
-    let is_root_or_mod_rs = if let Some(stem) = decl.declaring_file.file_stem().and_then(|s| s.to_str()) {
-        stem == "lib" || stem == "main" || stem == "mod" || decl.declaring_file.parent() == Some(src_dir)
-    } else {
-        false
-    };
+    let is_root_or_mod_rs =
+        if let Some(stem) = decl.declaring_file.file_stem().and_then(|s| s.to_str()) {
+            stem == "lib"
+                || stem == "main"
+                || stem == "mod"
+                || decl.declaring_file.parent() == Some(src_dir)
+        } else {
+            false
+        };
 
     let base_dir = if decl.declaring_file.file_name().and_then(|s| s.to_str()) == Some("mod.rs")
         || decl.declaring_file == src_dir.join("lib.rs")
@@ -328,11 +336,16 @@ pub fn check_crate_reachability(crate_root: &Path, repo_root: &Path) -> ModuleRe
     let mut target_decl_map: HashMap<PathBuf, Vec<ModDecl>> = HashMap::new();
     for decl in &all_declarations {
         if let Some(target) = resolve_mod_file(decl, &src_dir) {
-            target_decl_map.entry(target).or_default().push(decl.clone());
+            target_decl_map
+                .entry(target)
+                .or_default()
+                .push(decl.clone());
         }
     }
 
-    let repo_root_canon = repo_root.canonicalize().unwrap_or_else(|_| repo_root.to_path_buf());
+    let repo_root_canon = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.to_path_buf());
 
     for file in &all_rs_files {
         let rel_to_repo = file
@@ -475,7 +488,10 @@ mod tests {
         .unwrap();
 
         let res = check_crate_reachability(&crate_dir, repo_root);
-        assert!(res.errors.is_empty(), "Transition files must not produce hard errors");
+        assert!(
+            res.errors.is_empty(),
+            "Transition files must not produce hard errors"
+        );
         assert_eq!(res.warnings.len(), 1);
         assert!(res.warnings[0].contains("graph_index.rs"));
         assert!(res.warnings[0].contains("TRANSITION"));

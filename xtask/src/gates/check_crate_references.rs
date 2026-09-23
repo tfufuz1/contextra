@@ -69,7 +69,9 @@ pub fn extract_crate_references(line: &str) -> Vec<String> {
         .map(|m| {
             let mut s = m.as_str();
             // Trim trailing punctuation if any (e.g., period, comma, colon, slash)
-            s = s.trim_end_matches(|c: char| c == '.' || c == ',' || c == ':' || c == '/' || c == '\'' || c == '"' || c == '`');
+            s = s.trim_end_matches(|c: char| {
+                c == '.' || c == ',' || c == ':' || c == '/' || c == '\'' || c == '"' || c == '`'
+            });
             s.to_string()
         })
         .collect();
@@ -182,7 +184,12 @@ pub fn run_check_crate_references() -> Result<(), String> {
     println!("=== Running xtask check-crate-references ===");
     let root = match std::env::current_dir() {
         Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to determine current working directory: {}", e)),
+        Err(e) => {
+            return Err(format!(
+                "Failed to determine current working directory: {}",
+                e
+            ))
+        }
     };
 
     let violations = scan_and_check_workspace(&root)?;
@@ -200,7 +207,9 @@ pub fn run_check_crate_references() -> Result<(), String> {
         ));
     }
 
-    println!("✅ Alle Crate-Referenzen (*.md, *.toml, justfile) verweisen auf aktive Workspace-Member.");
+    println!(
+        "✅ Alle Crate-Referenzen (*.md, *.toml, justfile) verweisen auf aktive Workspace-Member."
+    );
     Ok(())
 }
 
@@ -215,7 +224,8 @@ mod tests {
 
     #[test]
     fn test_extract_crate_references() {
-        let line = "Referenz auf `memfuse-core` und `memfuse-store` sowie `memfuse-nonexistent-123`.";
+        let line =
+            "Referenz auf `memfuse-core` und `memfuse-store` sowie `memfuse-nonexistent-123`.";
         let refs = extract_crate_references(line);
         assert_eq!(
             refs,

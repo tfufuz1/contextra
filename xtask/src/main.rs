@@ -71,15 +71,15 @@ mod check_module_reachability;
 mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
-mod check_ring0_async_purity;
-mod check_ring_layering;
 mod check_placeholder_refs;
 mod check_recall_stability;
 mod check_result_dropped_on_io;
+mod check_ring0_async_purity;
+mod check_ring_layering;
 mod check_stale_tags;
 mod check_toctou_trait_defaults;
-mod check_unsafe_islands;
 mod check_type_registry;
+mod check_unsafe_islands;
 mod check_vetoes;
 mod check_workflow_commands;
 mod claim;
@@ -127,6 +127,33 @@ pub struct TagItem {
     pub is_resolved: bool,
 }
 
+#[derive(Debug, serde::Deserialize, Default)]
+pub struct CapabilitiesManifest {
+    #[serde(default)]
+    pub crates: BTreeMap<String, CapabilityCrateEntry>,
+}
+
+#[derive(Debug, serde::Deserialize, Clone, Default)]
+pub struct CapabilityCrateEntry {
+    pub ring: Option<String>,
+    pub maturity: Option<String>,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+}
+
+pub fn load_capabilities_manifest(root_dir: &Path) -> CapabilitiesManifest {
+    let path = root_dir.join("capabilities.toml");
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(manifest) = toml::from_str::<CapabilitiesManifest>(&content) {
+                return manifest;
+            }
+        }
+    }
+    CapabilitiesManifest::default()
+}
+
 #[derive(Debug, Clone)]
 pub struct CrateInfo {
     pub name: String,
@@ -136,6 +163,8 @@ pub struct CrateInfo {
     pub status: String,
     pub description: String,
     pub dependencies: Vec<String>,
+    pub ring: String,
+    pub maturity: String,
 }
 
 pub fn scan_tags<P: AsRef<Path>>(root: P) -> Vec<TagItem> {
@@ -467,32 +496,36 @@ pub fn compute_crate_layers(crates: &mut [CrateInfo]) -> Result<(), String> {
 }
 
 pub fn get_workspace_crates() -> Vec<CrateInfo> {
-    let cargo_path = if Path::new("Cargo.toml").exists()
-        && fs::read_to_string("Cargo.toml")
-            .unwrap_or_default()
-            .contains("[workspace]")
-    {
-        PathBuf::from("Cargo.toml")
-    } else if Path::new("../Cargo.toml").exists() {
-        PathBuf::from("../Cargo.toml")
-    } else {
-        PathBuf::from("Cargo.toml")
-    };
-    let root_dir = cargo_path.parent().unwrap_or_else(|| Path::new("."));
+    let root_dir = find_root_dir();
+    let capabilities = load_capabilities_manifest(&root_dir);
+    get_workspace_crates_from_root(&root_dir, &capabilities)
+}
+
+pub fn get_workspace_crates_from_root(
+    root_dir: &Path,
+    capabilities: &CapabilitiesManifest,
+) -> Vec<CrateInfo> {
+    let cargo_path = root_dir.join("Cargo.toml");
     let root_cargo = fs::read_to_string(&cargo_path).unwrap_or_default();
     let toml_val: toml::Value =
         toml::from_str(&root_cargo).expect("Failed to parse root Cargo.toml");
 
-    let members = toml_val
+    let members = match toml_val
         .get("workspace")
         .and_then(|w| w.get("members"))
         .and_then(|m| m.as_array())
-        .expect("Workspace members not found");
+    {
+        Some(m) => m,
+        None => return Vec::new(),
+    };
 
     let mut crates = Vec::new();
 
     for member in members {
-        let path_str = member.as_str().unwrap();
+        let path_str = match member.as_str() {
+            Some(s) => s,
+            None => continue,
+        };
         if path_str == "xtask" {
             continue;
         }
@@ -513,7 +546,7 @@ pub fn get_workspace_crates() -> Vec<CrateInfo> {
             .unwrap_or_default()
             .to_string();
 
-        let description = crate_toml
+        let cargo_desc = crate_toml
             .get("package")
             .and_then(|p| p.get("description"))
             .and_then(|d| d.as_str())
@@ -538,10 +571,46 @@ pub fn get_workspace_crates() -> Vec<CrateInfo> {
         let crate_dir = root_dir.join(path_str);
         let loc = calculate_crate_loc(&crate_dir);
 
-        let status = if name == "memfuse-embed" {
-            "🧊 Optional".to_string()
-        } else {
-            "🟢 Clean".to_string()
+        let cap_entry = capabilities.crates.get(&name);
+
+        let (ring, maturity, status, description) = match cap_entry {
+            Some(entry) => {
+                let ring_str = entry
+                    .ring
+                    .as_deref()
+                    .unwrap_or("unklassifiziert")
+                    .to_string();
+                let maturity_str = entry
+                    .maturity
+                    .as_deref()
+                    .unwrap_or("unklassifiziert")
+                    .to_string();
+                let status_str = match entry.maturity.as_deref() {
+                    Some("stable") => "🟢 stable".to_string(),
+                    Some("experimental") => "🟡 experimental".to_string(),
+                    Some(other) => format!("🔴 {}", other),
+                    None => "🔴 unklassifiziert".to_string(),
+                };
+                let desc_str = match &entry.description {
+                    Some(d) if !d.trim().is_empty() => d.trim().to_string(),
+                    _ if !cargo_desc.trim().is_empty() => cargo_desc,
+                    _ => "unklassifiziert".to_string(),
+                };
+                (ring_str, maturity_str, status_str, desc_str)
+            }
+            None => {
+                let desc_str = if cargo_desc.trim().is_empty() {
+                    "unklassifiziert".to_string()
+                } else {
+                    cargo_desc
+                };
+                (
+                    "unklassifiziert".to_string(),
+                    "unklassifiziert".to_string(),
+                    "🔴 unklassifiziert".to_string(),
+                    desc_str,
+                )
+            }
         };
 
         crates.push(CrateInfo {
@@ -552,6 +621,8 @@ pub fn get_workspace_crates() -> Vec<CrateInfo> {
             status,
             description,
             dependencies,
+            ring,
+            maturity,
         });
     }
 
@@ -599,7 +670,13 @@ pub fn update_markdown_section(
 }
 
 // NOTE: Konsolidierung mit check-duplicate-intent geprüft (TS: 2026-09-08T00:00:00Z) — unterschiedliche Datenmodelle (Session-Kontinuität-Markdown-Abschnittsgenerierung vs. PR-Commit-Duplikatsprüfungs-Gate), keine sinnvolle Code-Wiederverwendung identifiziert.
+#[allow(dead_code)]
 fn generate_session_continuity_section(tags: &[TagItem]) -> String {
+    let root_path = find_root_dir();
+    generate_session_continuity_section_from_root(&root_path, tags)
+}
+
+fn generate_session_continuity_section_from_root(root_path: &Path, tags: &[TagItem]) -> String {
     let mut out = String::new();
     out.push_str("<!-- AUTOGENERATED:START:SESSION_CONTINUITY -->\n");
     let stand_date = chrono_or_today_with_tags(tags);
@@ -608,7 +685,6 @@ fn generate_session_continuity_section(tags: &[TagItem]) -> String {
         stand_date
     ));
 
-    let root_path = find_root_dir();
     let git_root_str = root_path.to_str().unwrap_or(".");
 
     // 1. Letzter Commit (git log --oneline -1)
@@ -785,6 +861,15 @@ fn extract_scope(title: &str) -> String {
 }
 
 fn generate_full_working_state(tags: &[TagItem], crates: &[CrateInfo]) -> String {
+    let root_path = find_root_dir();
+    generate_full_working_state_from_root(&root_path, tags, crates)
+}
+
+fn generate_full_working_state_from_root(
+    root_path: &Path,
+    tags: &[TagItem],
+    crates: &[CrateInfo],
+) -> String {
     let date_from_tags = tags
         .iter()
         .filter_map(|t| {
@@ -814,7 +899,9 @@ fn generate_full_working_state(tags: &[TagItem], crates: &[CrateInfo]) -> String
     ));
     out.push_str("> **Hinweis**: Diese Datei ist zu 100 % autogeneriert durch `cargo xtask sync-docs` aus Inline-Code-Tags. Keinen Text manuell editieren. Bei Git-Merge-Konflikten stets `just sync-docs` ausführen.\n\n");
 
-    out.push_str(&generate_session_continuity_section(tags));
+    out.push_str(&generate_session_continuity_section_from_root(
+        root_path, tags,
+    ));
     out.push('\n');
 
     out.push_str("## Offene AI-TAGs & ANCHORs\n\n");
@@ -1183,10 +1270,42 @@ pub fn run_sync_docs(check_only: bool) -> bool {
 }
 
 pub fn find_root_dir() -> PathBuf {
+    if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+        let mut dir = PathBuf::from(manifest_dir);
+        loop {
+            let cargo_path = dir.join("Cargo.toml");
+            if cargo_path.exists() {
+                if let Ok(content) = fs::read_to_string(&cargo_path) {
+                    if content.contains("[workspace]") && content.contains("members") {
+                        return dir;
+                    }
+                }
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
+    }
+    if let Ok(curr) = env::current_dir() {
+        let mut dir = curr;
+        loop {
+            let cargo_path = dir.join("Cargo.toml");
+            if cargo_path.exists() {
+                if let Ok(content) = fs::read_to_string(&cargo_path) {
+                    if content.contains("[workspace]") && content.contains("members") {
+                        return dir;
+                    }
+                }
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
+    }
     if Path::new("Cargo.toml").exists()
         && fs::read_to_string("Cargo.toml")
             .unwrap_or_default()
-            .contains("[workspace]")
+            .contains("members")
     {
         PathBuf::from(".")
     } else if Path::new("../Cargo.toml").exists() {
@@ -2859,17 +2978,13 @@ description = "Core crate"
         run_git(&["commit", "-m", "feat(memfuse-core): initial setup (#100)"]);
 
         let tags = scan_tags(root.join("crates"));
-        // Temporarily change directory to temp root for sync-docs workspace operations
-        let orig_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(root).unwrap();
+        let capabilities = load_capabilities_manifest(root);
 
         let crates_res = std::panic::catch_unwind(|| {
-            let crates = get_workspace_crates();
-            let full_ws = generate_full_working_state(&tags, &crates);
+            let crates = get_workspace_crates_from_root(root, &capabilities);
+            let full_ws = generate_full_working_state_from_root(root, &tags, &crates);
             (crates, full_ws)
         });
-
-        let _ = std::env::set_current_dir(orig_dir);
 
         let (_crates, full_ws) = crates_res.expect("sync-docs generation panicked in test");
 
@@ -3204,9 +3319,11 @@ description = "Core crate"
             path: "crates/memfuse-fake".to_string(),
             layer: 1,
             loc: 10,
-            status: "Clean".to_string(),
+            status: "🟢 stable".to_string(),
             description: "Fake Crate".to_string(),
             dependencies: vec![],
+            ring: "Ring 0".to_string(),
+            maturity: "stable".to_string(),
         }];
 
         assert!(!check_crate_agents(&crates, dir.path()));
@@ -3234,9 +3351,11 @@ description = "Core crate"
             path: "crates/memfuse-fake".to_string(),
             layer: 1,
             loc: 10,
-            status: "Clean".to_string(),
+            status: "🟢 stable".to_string(),
             description: "Fake Crate".to_string(),
             dependencies: vec![],
+            ring: "Ring 0".to_string(),
+            maturity: "stable".to_string(),
         }];
 
         assert!(check_crate_agents(&crates, dir.path()));
@@ -3345,8 +3464,6 @@ description = "Core crate"
         assert_eq!(res[0].id, Some("AGT-STORE-111"));
     }
 
-
-
     #[test]
     fn test_check_dag_layer_violations_no_violations() {
         let crates = vec![
@@ -3355,18 +3472,22 @@ description = "Core crate"
                 path: "crates/memfuse-core".to_string(),
                 layer: 0,
                 loc: 100,
-                status: "Clean".to_string(),
+                status: "🟢 stable".to_string(),
                 description: "Core".to_string(),
                 dependencies: vec![],
+                ring: "Ring 0".to_string(),
+                maturity: "stable".to_string(),
             },
             CrateInfo {
                 name: "memfuse-store".to_string(),
                 path: "crates/memfuse-store".to_string(),
                 layer: 1,
                 loc: 100,
-                status: "Clean".to_string(),
+                status: "🟢 stable".to_string(),
                 description: "Store".to_string(),
                 dependencies: vec!["memfuse-core".to_string()],
+                ring: "Ring 1".to_string(),
+                maturity: "stable".to_string(),
             },
         ];
         let violations = check_dag_layer_violations(&crates);
@@ -3381,18 +3502,22 @@ description = "Core crate"
                 path: "crates/memfuse-db".to_string(),
                 layer: 2,
                 loc: 100,
-                status: "Clean".to_string(),
+                status: "🟢 stable".to_string(),
                 description: "DB".to_string(),
                 dependencies: vec!["memfuse-ollama".to_string()],
+                ring: "Ring 3".to_string(),
+                maturity: "stable".to_string(),
             },
             CrateInfo {
                 name: "memfuse-ollama".to_string(),
                 path: "crates/memfuse-ollama".to_string(),
                 layer: 3,
                 loc: 100,
-                status: "Clean".to_string(),
+                status: "🟢 stable".to_string(),
                 description: "Ollama".to_string(),
                 dependencies: vec!["memfuse-core".to_string()],
+                ring: "Ring 2".to_string(),
+                maturity: "stable".to_string(),
             },
         ];
         let violations = check_dag_layer_violations(&crates);
@@ -3436,6 +3561,8 @@ description = "Core crate"
                 status: "".to_string(),
                 description: "".to_string(),
                 dependencies: vec![],
+                ring: "".to_string(),
+                maturity: "".to_string(),
             },
             CrateInfo {
                 name: "crate-b".to_string(),
@@ -3445,6 +3572,8 @@ description = "Core crate"
                 status: "".to_string(),
                 description: "".to_string(),
                 dependencies: vec!["crate-a".to_string()],
+                ring: "".to_string(),
+                maturity: "".to_string(),
             },
             CrateInfo {
                 name: "crate-c".to_string(),
@@ -3454,6 +3583,8 @@ description = "Core crate"
                 status: "".to_string(),
                 description: "".to_string(),
                 dependencies: vec!["crate-a".to_string()],
+                ring: "".to_string(),
+                maturity: "".to_string(),
             },
             CrateInfo {
                 name: "crate-d".to_string(),
@@ -3463,6 +3594,8 @@ description = "Core crate"
                 status: "".to_string(),
                 description: "".to_string(),
                 dependencies: vec!["crate-b".to_string(), "crate-c".to_string()],
+                ring: "".to_string(),
+                maturity: "".to_string(),
             },
             CrateInfo {
                 name: "crate-e".to_string(),
@@ -3472,6 +3605,8 @@ description = "Core crate"
                 status: "".to_string(),
                 description: "".to_string(),
                 dependencies: vec!["crate-d".to_string()],
+                ring: "".to_string(),
+                maturity: "".to_string(),
             },
         ];
 
@@ -3499,6 +3634,8 @@ description = "Core crate"
                 status: "".to_string(),
                 description: "".to_string(),
                 dependencies: vec!["crate-y".to_string()],
+                ring: "".to_string(),
+                maturity: "".to_string(),
             },
             CrateInfo {
                 name: "crate-y".to_string(),
@@ -3508,6 +3645,8 @@ description = "Core crate"
                 status: "".to_string(),
                 description: "".to_string(),
                 dependencies: vec!["crate-z".to_string()],
+                ring: "".to_string(),
+                maturity: "".to_string(),
             },
             CrateInfo {
                 name: "crate-z".to_string(),
@@ -3517,6 +3656,8 @@ description = "Core crate"
                 status: "".to_string(),
                 description: "".to_string(),
                 dependencies: vec!["crate-x".to_string()],
+                ring: "".to_string(),
+                maturity: "".to_string(),
             },
         ];
 
@@ -3530,7 +3671,7 @@ description = "Core crate"
     fn test_workspace_crate_layers_regression() {
         let _guard = TEST_DIR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let crates = get_workspace_crates();
-        assert_eq!(crates.len(), 23, "Expected 23 workspace crates");
+        assert_eq!(crates.len(), 31, "Expected 31 workspace crates");
     }
 
     #[test]
@@ -3598,5 +3739,123 @@ Always ensure all unit tests pass cleanly.
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].status, Some("OPEN"));
         assert_eq!(res[0].id, Some("AGT-INDEX-222"));
+    }
+
+    #[test]
+    fn test_golden_file_capabilities_vs_legacy_comparison() {
+        let _guard = TEST_DIR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let root = find_root_dir();
+
+        // 1. Compute legacy crates (empty capabilities)
+        let empty_caps = CapabilitiesManifest::default();
+        let legacy_crates = get_workspace_crates_from_root(&root, &empty_caps);
+
+        // 2. Compute capabilities.toml-based crates
+        let cap_manifest = load_capabilities_manifest(&root);
+        let capabilities_crates = get_workspace_crates_from_root(&root, &cap_manifest);
+
+        assert_eq!(legacy_crates.len(), capabilities_crates.len());
+        assert_eq!(capabilities_crates.len(), 31);
+
+        println!("=== GOLDEN-FILE COMPARISON: Legacy vs Capabilities.toml ===");
+
+        let mut status_changes = Vec::new();
+        let mut desc_enrichments = Vec::new();
+
+        for (legacy, cap) in legacy_crates.iter().zip(capabilities_crates.iter()) {
+            assert_eq!(legacy.name, cap.name);
+            if legacy.status != cap.status {
+                status_changes.push(format!(
+                    "  - `{}`: status changed from '{}' to '{}' (Ring: {}, Maturity: {})",
+                    cap.name, legacy.status, cap.status, cap.ring, cap.maturity
+                ));
+            }
+            if legacy.description != cap.description {
+                desc_enrichments.push(format!(
+                    "  - `{}`: description enriched from '{}' to '{}'",
+                    cap.name, legacy.description, cap.description
+                ));
+            }
+        }
+
+        println!(
+            "Detected {} status changes from legacy static tags to capabilities.toml:",
+            status_changes.len()
+        );
+        for change in &status_changes {
+            println!("{}", change);
+        }
+
+        println!(
+            "Detected {} description enrichments from capabilities.toml:",
+            desc_enrichments.len()
+        );
+        for enrich in &desc_enrichments {
+            println!("{}", enrich);
+        }
+
+        // Verify experimental crates
+        let experimental_crates: Vec<_> = capabilities_crates
+            .iter()
+            .filter(|c| c.maturity == "experimental")
+            .map(|c| c.name.as_str())
+            .collect();
+        assert!(experimental_crates.contains(&"memfuse-adapt"));
+        assert!(experimental_crates.contains(&"memfuse-infer-onnx"));
+
+        for c in &capabilities_crates {
+            if c.maturity == "experimental" {
+                assert_eq!(
+                    c.status, "🟡 experimental",
+                    "Crate {} should have status '🟡 experimental'",
+                    c.name
+                );
+            } else if c.maturity == "stable" {
+                assert_eq!(
+                    c.status, "🟢 stable",
+                    "Crate {} should have status '🟢 stable'",
+                    c.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_fail_safe_unclassified_crate() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root = temp_dir.path();
+
+        fs::write(
+            root.join("Cargo.toml"),
+            r#"[workspace]
+members = ["crates/memfuse-unclassified"]
+"#,
+        )
+        .unwrap();
+
+        let crate_dir = root.join("crates/memfuse-unclassified");
+        fs::create_dir_all(crate_dir.join("src")).unwrap();
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            r#"[package]
+name = "memfuse-unclassified"
+version = "0.1.0"
+edition = "2021"
+description = ""
+"#,
+        )
+        .unwrap();
+        fs::write(crate_dir.join("src/lib.rs"), "// lib\n").unwrap();
+
+        let empty_caps = CapabilitiesManifest::default();
+        let crates = get_workspace_crates_from_root(root, &empty_caps);
+
+        assert_eq!(crates.len(), 1);
+        let unclass_crate = &crates[0];
+        assert_eq!(unclass_crate.name, "memfuse-unclassified");
+        assert_eq!(unclass_crate.status, "🔴 unklassifiziert");
+        assert_eq!(unclass_crate.ring, "unklassifiziert");
+        assert_eq!(unclass_crate.maturity, "unklassifiziert");
+        assert_eq!(unclass_crate.description, "unklassifiziert");
     }
 }
