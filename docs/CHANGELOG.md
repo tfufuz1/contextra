@@ -9,6 +9,9 @@
 | `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/src/radix.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prefix-Radix-Baum über Token-Sequenzen, RAII-Guards & KvReusePolicy (§9.2). |
 | `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/src/segment.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvSegment mit Zeroize-Garantie, Tier-2 AEAD-Verschlüsselung & Crypto-Shredding. |
 | `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/src/store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation) mit Prefix-Radix & Guard-Schutz. |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/tests/cancellation.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cancellation- & RAII-Guard-Tests für den KV-Cache (Task KV-06). |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/tests/golden_greedy_decode.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Golden-Test für identische Greedy-Tokenfolgen mit/ohne Prefix-Reuse (Spec §9.2 / Task 4-04). |
+| `TS:2026-09-15T00:00:00Z` | `crates/memfuse-kvcache/tests/tenant_isolation.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tenant-Isolations-Tests für den KV-Cache (Task KV-05 / INV-TENANT). |
 | `TS:2026-09-13T01:36:52Z (SESSION: c1c85419)` | `crates/memfuse-agent/tests/proptest_workflow_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-based testing for memfuse-agent structural invariants (StateGraph, AgentContext, BackgroundEvent). |
 | `TS:2026-09-13T00:00:00Z (SESSION: pid-regler-impl)` | `crates/memfuse-adapt/src/pid_latency_controller.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | PID Latency Controller & Latency Budget Guard für Multi-Step Retrieval. |
 | `TS:2026-09-13T00:00:00Z` | `crates/memfuse-cognition/src/consolidation_locks.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Guard-Konstrukt fuer typsicheres Locking und geordnete Kaskaden-Invalidierung in der Sleep-Cycle-Konsolidierung. |
@@ -327,6 +330,7 @@
 | `` | `crates/memfuse-text/tests/bm25f_field_weighting.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prüft Formel-Korrektheit, Degeneration zu einfeldigem BM25 und Zero-Panic Invarianten. |
 | `` | `crates/memfuse-vector/benches/hnsw_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/memfuse-vector/benches/partial_rebuild_recall_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/memfuse-vector/src/compute_pool.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Begrenzter ComputePool für CPU-intensive Tasks (z. B. HNSW-Index-Rebuild). |
 | `` | `crates/memfuse-vector/src/distance.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Distanzberechnungen und Vektor-Dequantisierung via memfuse-simd. |
 | `` | `crates/memfuse-vector/src/hnsw/arena.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Arena-Allocator (HnswArena) für HNSW-Nachbarlisten mit 64-Byte-Alignment, Slot-Freilisten und CAS-Relinking. |
 | `` | `crates/memfuse-vector/src/hnsw/sq8_bias.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Quantisierungs-Bias-Kalibrierung (Sq8Bias) für SQ8-Quantisierung im HNSW Index Header. |

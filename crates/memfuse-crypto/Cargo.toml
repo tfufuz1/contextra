@@ -27,7 +27,6 @@ rand = { workspace = true }
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 parking_lot = { workspace = true }
-tokio = { workspace = true }
 ahash = { workspace = true }
 lru = "0.16.4"
 regex = { workspace = true }

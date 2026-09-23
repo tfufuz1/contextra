@@ -782,7 +782,6 @@ dependencies = [
  "sha2",
  "subtle",
  "thiserror",
- "tokio",
  "tracing",
  "zeroize",
 ]
@@ -1035,7 +1034,6 @@ dependencies = [
  "roaring",
  "serde",
  "subtle",
- "tokio",
  "tracing",
 ]
 
