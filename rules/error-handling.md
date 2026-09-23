@@ -2,7 +2,7 @@
 
 ## Single Error Type
 
-All crates use `memfuse_core::MemFuseError`. No crate-local error enums.
+All crates use `contextra_core::ContextraError`. No crate-local error enums.
 
 ## Variant Policy
 
@@ -13,12 +13,12 @@ All crates use `memfuse_core::MemFuseError`. No crate-local error enums.
 ## Real Examples (from this repo)
 
 ```rust
-// ✅ Storage error with context (crates/memfuse-store/src/lsm.rs:289)
+// ✅ Storage error with context (crates/contextra-store/src/lsm.rs:289)
 let file = File::create(path_ref).await
-    .map_err(|e| MemFuseError::Storage(format!("Failed to create SSTable: {}", e)))?;
+    .map_err(|e| ContextraError::Storage(format!("Failed to create SSTable: {}", e)))?;
 
-// ✅ Structured error (crates/memfuse-store/src/sstable.rs:712)
-return Err(MemFuseError::ChecksumMismatch {
+// ✅ Structured error (crates/contextra-store/src/sstable.rs:712)
+return Err(ContextraError::ChecksumMismatch {
     path: path_buf.to_string_lossy().to_string(),
     block_id: bloom_offset,
 });

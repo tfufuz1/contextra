@@ -17,7 +17,7 @@
 | Crate | Version | Risiko | Anmerkung |
 |---|---|---|---|
 | `bincode` | 1.3.3 | MINOR | Veraltetes Format — v2 bricht Serde-Kompatibilität. Pinning intentional. |
-| `uuid` | 1.23.1 | OK | Nur in `memfuse-store` für WAL-UUID. Korrekte Nutzung. |
+| `uuid` | 1.23.1 | OK | Nur in `contextra-store` für WAL-UUID. Korrekte Nutzung. |
 | `aes-gcm-siv` | 0.11.1 | OK | Letzte v0.11.x — v0.12 existiert noch nicht. Lizenz: Apache/MIT. |
-| `tokio-util` | 0.7.18 | MINOR | Nur für `TaskTracker` in `memfuse-store`. Evaluieren ob `tokio::task::JoinSet` reicht. |
-| `flatbuffers` | 24.12.23 | MINOR | Nur in `memfuse-core` für IPC. Generierter Code (`memfuse_generated.rs`) enthält `unwrap()` — nicht manuell editieren. |
+| `tokio-util` | 0.7.18 | MINOR | Nur für `TaskTracker` in `contextra-store`. Evaluieren ob `tokio::task::JoinSet` reicht. |
+| `flatbuffers` | 24.12.23 | MINOR | Nur in `contextra-core` für IPC. Generierter Code (`contextra_generated.rs`) enthält `unwrap()` — nicht manuell editieren. |

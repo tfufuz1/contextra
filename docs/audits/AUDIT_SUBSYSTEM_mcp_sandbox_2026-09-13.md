@@ -1,8 +1,8 @@
-# Subsystem-Audit: MCP Sandbox (memfuse-mcp/src/sandbox.rs)
+# Subsystem-Audit: MCP Sandbox (contextra-mcp/src/sandbox.rs)
 
 ## Overview
-- **Crate**: `memfuse-mcp`
-- **File**: `crates/memfuse-mcp/src/sandbox.rs`
+- **Crate**: `contextra-mcp`
+- **File**: `crates/contextra-mcp/src/sandbox.rs`
 - **Scope**: Zero-Trust Tool-Isolation Layer (`McpSandbox`)
 - **Date**: 2026-09-13
 

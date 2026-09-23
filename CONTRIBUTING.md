@@ -1,6 +1,6 @@
-# Contributing to MemFuse
+# Contributing to Contextra
 
-Thank you for your interest in contributing to MemFuse! This document outlines the guidelines and development workflow for contributing code, documentation, and bug fixes to the repository.
+Thank you for your interest in contributing to Contextra! This document outlines the guidelines and development workflow for contributing code, documentation, and bug fixes to the repository.
 
 ## Development Workflow & Preflight Checks
 
@@ -32,7 +32,7 @@ cargo xtask jules-preflight
 
 ## Repository Guidelines & Architecture Standards
 
-MemFuse follows strict architectural invariants and safety principles:
+Contextra follows strict architectural invariants and safety principles:
 
 1. **Zero-Panic Policy:** Production code strictly avoids `.unwrap()` and `.expect()`. All errors must propagate using `?` or return explicit `Result` types.
 2. **Unsafe Code:** Production crates enforce `#![forbid(unsafe_code)]`. Any necessary low-level optimizations (SIMD/mmap) are strictly isolated in designated Ring 0/Ring 1 crates with proof invariants.
@@ -46,4 +46,4 @@ For detailed developer instructions, architecture references, and agent guidelin
 
 ## License
 
-By contributing to MemFuse, you agree that your contributions will be licensed under both the [MIT License](LICENSE-MIT) and the [Apache License 2.0](LICENSE-APACHE).
+By contributing to Contextra, you agree that your contributions will be licensed under both the [MIT License](LICENSE-MIT) and the [Apache License 2.0](LICENSE-APACHE).

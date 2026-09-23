@@ -120,7 +120,7 @@ EOF
         uses: actions/github-script@v7
         with:
           script: |
-            const crates = ["memfuse-graph", "memfuse-vector", "memfuse-agent", "memfuse-db"];
+            const crates = ["contextra-graph", "contextra-vector", "contextra-agent", "contextra-db"];
 
             // Berechne ISO-Kalenderwoche fuer konsistente woechentliche Rotation
             const d = new Date();

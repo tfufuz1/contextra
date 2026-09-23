@@ -5,11 +5,11 @@ VERDICT: APPROVED (ID: AGT-STORE-20260914-isolation) (TS: 2026-09-14T00:00:00Z) 
 ## 1. EXECUTIONS- & METHODIK-ZUSAMMENFASSUNG
 * **Prüfer:** Jules (Unabhängige Zweitprüfung / Pilot-Session)
 * **Ziel-Crates:**
-  * `memfuse-core` (Tier 1, Risk: none)
-  * `memfuse-store` (Tier 1, Risk: crash)
+  * `contextra-core` (Tier 1, Risk: none)
+  * `contextra-store` (Tier 1, Risk: crash)
 * **Prüfumfang:**
-  * `crates/memfuse-core/src/tx_buffer.rs`
-  * `crates/memfuse-store/src/lsm.rs`
+  * `crates/contextra-core/src/tx_buffer.rs`
+  * `crates/contextra-store/src/lsm.rs`
 * **Methodik:**
   * Code-Read & Invarianten-Analyse der Sharded-Locking-Mechanismen.
   * Nebenläufigkeits- und TOCTOU-Analyse aller Aufrufstellen in `lsm.rs`.
@@ -90,7 +90,7 @@ VERDICT: APPROVED (ID: AGT-STORE-20260914-isolation) (TS: 2026-09-14T00:00:00Z) 
 ---
 
 ## 4. CONCURRENCY-STRESSTEST PROTOKOLL
-* **Befehl:** `cargo test -p memfuse-store --lib lsm -- --test-threads=8`
+* **Befehl:** `cargo test -p contextra-store --lib lsm -- --test-threads=8`
 * **Wiederholungen:** 10 aufeinanderfolgende Durchläufe.
 * **Ergebnis:**
   * Durchlauf 1: PASSED (60/60 Tests ok)

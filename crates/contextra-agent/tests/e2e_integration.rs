@@ -1,0 +1,202 @@
+// E2E integration tests for contextra-agent.
+//
+// Validates the full stack: Contextra DB → Collection → OrchestratorEngine → Graph walk.
+
+use contextra_agent::step::StepResult;
+use contextra_agent::{AgentContext, NodeType, OrchestratorEngine, StateGraph};
+use contextra_core::BoxFuture;
+use contextra_core::TokenBudget;
+use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
+use serde_json::json;
+use std::sync::Arc;
+use tempfile::TempDir;
+
+/// A trivial tool that echoes its input and consumes 5 tokens.
+struct EchoTool;
+
+impl contextra_agent::AgentTool for EchoTool {
+    fn name(&self) -> &str {
+        "echo_tool"
+    }
+
+    fn execute<'a>(
+        &'a self,
+        _ctx: &'a AgentContext,
+        input: serde_json::Value,
+    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+        Box::pin(async move {
+            Ok(StepResult {
+                node_id: "echo".to_string(),
+                output: json!({"echo": input}),
+                tokens_consumed: 5,
+                next_edge: None,
+            })
+        })
+    }
+}
+
+/// Helper: creates a Contextra DB + state collection + OrchestratorEngine.
+async fn setup_engine(dim: usize) -> (OrchestratorEngine, Arc<Contextra>, TempDir) {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = ContextraConfig {
+        dimension: dim,
+        max_elements: 10_000,
+        distance_metric: DistanceMetric::Cosine,
+        ..Default::default()
+    };
+    let db = Arc::new(
+        Contextra::open_with_config(tmp.path(), config)
+            .await
+            .expect("open db"),
+    );
+
+    let storage = db.inner_storage();
+    let mut engine = OrchestratorEngine::try_new(storage).expect("engine try_new");
+    engine.try_register_tool(Box::new(EchoTool)).unwrap();
+
+    (engine, db, tmp)
+}
+
+#[tokio::test]
+async fn test_e2e_agent_workflow() {
+    let (engine, db, _tmp) = setup_engine(3).await;
+
+    // Build a simple Start → Task → End graph
+    let mut graph = StateGraph::new();
+    graph
+        .try_add_node(
+            "start",
+            "Begin workflow",
+            NodeType::Start,
+            Some("echo_tool"),
+        )
+        .unwrap();
+    graph
+        .try_add_node("process", "Process data", NodeType::Task, Some("echo_tool"))
+        .unwrap();
+    graph
+        .try_add_node("done", "Finished", NodeType::End, None)
+        .unwrap();
+
+    graph.try_add_edge("start", "process", None, 1).unwrap();
+    graph.try_add_edge("process", "done", None, 1).unwrap();
+
+    let state_col = db.collection("agent-state").await.expect("collection");
+    let budget = TokenBudget::new(100, 0);
+    let mut ctx =
+        AgentContext::try_new("test-task-1", "start", db.clone(), state_col, budget).unwrap();
+
+    engine.run(&mut ctx, &graph).await.expect("workflow run");
+
+    // Engine should have terminated at "done" node
+    assert_eq!(ctx.current_node, "done");
+    assert_eq!(ctx.step_count, 2); // start + process = 2 steps
+}
+
+#[tokio::test]
+async fn test_e2e_db_crud_roundtrip() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = ContextraConfig {
+        dimension: 3,
+        max_elements: 1000,
+        distance_metric: DistanceMetric::Cosine,
+        ..Default::default()
+    };
+    let db = Contextra::open_with_config(tmp.path(), config)
+        .await
+        .expect("open db");
+
+    // Insert
+    db.insert("doc-1", &[1.0, 0.0, 0.0], Some(json!({"text": "Rust"})))
+        .await
+        .expect("insert");
+
+    // Search
+    let results = db.search(&[1.0, 0.0, 0.0], 1).await.expect("search");
+    assert_eq!(results[0].id, "doc-1");
+
+    // Update
+    db.update("doc-1", &[1.0, 0.0, 0.0], Some(json!({"text": "Updated"})))
+        .await
+        .expect("update");
+    let doc = db.get("doc-1").await.expect("get").expect("exists");
+    assert_eq!(doc.metadata.expect("meta")["text"], "Updated");
+
+    // Delete
+    db.delete("doc-1").await.expect("delete");
+    assert!(db.get("doc-1").await.expect("get").is_none());
+
+    // Collection isolation
+    let col_a = db.collection("isolated-a").await.expect("col a");
+    let col_b = db.collection("isolated-b").await.expect("col b");
+
+    col_a
+        .insert("key", &[0.1, 0.2, 0.3], Some(json!({"val": "A"})))
+        .await
+        .expect("ins a");
+    col_b
+        .insert("key", &[0.1, 0.2, 0.3], Some(json!({"val": "B"})))
+        .await
+        .expect("ins b");
+
+    let va = col_a.get("key").await.expect("get a").expect("exists");
+    let vb = col_b.get("key").await.expect("get b").expect("exists");
+    assert_eq!(va.metadata.expect("meta")["val"], "A");
+    assert_eq!(vb.metadata.expect("meta")["val"], "B");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stress_concurrent_agent_ops() {
+    let tmp = TempDir::new().expect("temp dir");
+    let db = Arc::new(
+        Contextra::open_with_config(
+            tmp.path(),
+            ContextraConfig {
+                dimension: 4,
+                max_elements: 10000,
+                distance_metric: DistanceMetric::Cosine,
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("open db"),
+    );
+
+    let num_tasks = 10;
+    let ops_per_task = 10;
+    let mut handles = Vec::new();
+
+    for t in 0..num_tasks {
+        let db = db.clone();
+        handles.push(tokio::spawn(async move {
+            let col_name = format!("stress-{}", t);
+            let col = db.collection(&col_name).await.expect("collection");
+
+            for i in 0..ops_per_task {
+                let id = format!("task-{}-doc-{}", t, i);
+                let vec = vec![(t + 1) as f32, (i + 1) as f32, (t + i + 1) as f32, 1.0];
+
+                col.insert(&id, &vec, Some(json!({"t": t, "i": i})))
+                    .await
+                    .expect("insert");
+
+                let res = col
+                    .query()
+                    .vector(&vec)
+                    .k(1)
+                    .execute()
+                    .await
+                    .expect("query");
+                assert_eq!(res[0].id, id);
+
+                col.delete(&id).await.expect("delete");
+                let doc = col.get(&id).await.expect("get");
+                assert!(doc.is_none());
+            }
+        }));
+    }
+
+    for h in handles {
+        h.await.expect("task failed");
+    }
+}

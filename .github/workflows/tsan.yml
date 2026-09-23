@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'crates/memfuse-store/**'
-      - 'crates/memfuse-vector/**'
-      - 'crates/memfuse-graph/**'
+      - 'crates/contextra-store/**'
+      - 'crates/contextra-vector/**'
+      - 'crates/contextra-graph/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,7 +32,7 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
-          cargo +nightly test -p memfuse-store \
+          cargo +nightly test -p contextra-store \
             --test toctou_put_if_absent \
             --target x86_64-unknown-linux-gnu \
             -- --test-threads=1 --nocapture
@@ -42,7 +42,7 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
-          cargo +nightly test -p memfuse-vector \
+          cargo +nightly test -p contextra-vector \
             --test deleted_nodes_lock_contention \
             --target x86_64-unknown-linux-gnu \
             -- --test-threads=1 --nocapture
@@ -52,7 +52,7 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
-          cargo +nightly test -p memfuse-store \
+          cargo +nightly test -p contextra-store \
             --test wal_truncate_ordering \
             --target x86_64-unknown-linux-gnu \
             -- --test-threads=1 --nocapture
@@ -62,7 +62,7 @@ jobs:
         env:
           RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
-          cargo +nightly test -p memfuse-graph \
+          cargo +nightly test -p contextra-graph \
             --test stress_dag \
             --target x86_64-unknown-linux-gnu \
             -- --test-threads=1 --nocapture

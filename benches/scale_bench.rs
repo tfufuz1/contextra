@@ -3,7 +3,7 @@
 // AGENT:09 DATE:2026-08-29 STATUS:DONE
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use memfuse_db::MemFuse;
+use contextra_db::Contextra;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
@@ -97,8 +97,8 @@ fn bench_scale_inserts_and_search(c: &mut Criterion) {
     let rt = Runtime::new().unwrap(); // unwrap allowed
 
     // Scale tiers: 10_000, 100_000, 1_000_000 (1M) by default.
-    // Can be overridden via MEMFUSE_SCALE_TIERS env var (e.g. "100,1000,5000" for fast test runs).
-    let scale_levels: Vec<usize> = match std::env::var("MEMFUSE_SCALE_TIERS") {
+    // Can be overridden via CONTEXTRA_SCALE_TIERS env var (e.g. "100,1000,5000" for fast test runs).
+    let scale_levels: Vec<usize> = match std::env::var("CONTEXTRA_SCALE_TIERS") {
         Ok(val) => val
             .split(',')
             .filter_map(|s| s.trim().parse::<usize>().ok())
@@ -113,7 +113,7 @@ fn bench_scale_inserts_and_search(c: &mut Criterion) {
         group.throughput(Throughput::Elements(num_chunks as u64));
 
         let tmp = TempDir::new().unwrap(); // unwrap allowed
-        let db = rt.block_on(MemFuse::open(tmp.path())).unwrap(); // unwrap allowed
+        let db = rt.block_on(Contextra::open(tmp.path())).unwrap(); // unwrap allowed
 
         if let Some(rss_kb) = get_vm_rss_kb() {
             log_rss_measurement("before_insert", num_chunks, rss_kb);

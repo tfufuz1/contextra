@@ -14,14 +14,14 @@
 
 ### Kalibrierungs-Dimension (P8, wenn Konfiguration geändert)
 - [ ] Änderung an SlmProfile/Prompt-Template/Modell-Config → Kalibrierungs-Reset-Test vorhanden
-- [ ] Keine neue Ad-hoc-Sigmoid-Logik — stattdessen `memfuse-calibration` verwendet
+- [ ] Keine neue Ad-hoc-Sigmoid-Logik — stattdessen `contextra-calibration` verwendet
 
 ### Provenienz-Dimension (wenn Graph-Code geändert)
 - [ ] Neue CSR-Kante hat `EdgeProvenance`-Eintrag (INV-GRAPH-PROV-1)
 - [ ] RRF-Fusion mit Kohärenz-Bonus: INV-PROV-2 eingehalten
 
 ### Quantitative Aussagen (P7)
-- [ ] Keine neuen quantitativen Claims ohne Nachweis in `memfuse-bench` oder ArXiv-Kennzeichnung
+- [ ] Keine neuen quantitativen Claims ohne Nachweis in `contextra-bench` oder ArXiv-Kennzeichnung
 
 ### Chaos-Dimension (nur bei Storage-Änderungen)
 - [ ] Power-Cut-Simulation für WAL/Compaction
@@ -36,7 +36,7 @@
 ## Beschreibung der Änderung
 
 ### Claim-Deklaration (Pflicht für alle Code-PRs)
-Claim-Crate: <!-- Pflicht: Crate-Name, den dieser PR primär ändert, z.B. memfuse-router -->
+Claim-Crate: <!-- Pflicht: Crate-Name, den dieser PR primär ändert, z.B. contextra-router -->
 Claim-Issue: <!-- Aufgaben-ID oder ADR-Nummer, z.B. P8/ADR-063 -->
 
 ### Was wurde geändert?

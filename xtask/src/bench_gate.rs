@@ -3,14 +3,14 @@
 // ZWECK: Subcommand cargo xtask bench-gate for benchmark regression evaluation
 // INVARIANTEN: Zero Panic, clear exit codes for CI governance.
 
-use memfuse_bench::regression_gate::{run_regression_gate, DEFAULT_TOLERANCE_THRESHOLD};
+use contextra_bench::regression_gate::{run_regression_gate, DEFAULT_TOLERANCE_THRESHOLD};
 use std::path::PathBuf;
 
 pub fn run_bench_gate(args: &[String]) -> bool {
     println!("=== Running xtask bench-gate ===");
 
     let mut results_path = PathBuf::from("benchmarks/results/current_metrics.json");
-    let mut baseline_path = PathBuf::from("benchmarks/memfuse-bench/baseline_metrics.json");
+    let mut baseline_path = PathBuf::from("benchmarks/contextra-bench/baseline_metrics.json");
     let mut threshold = DEFAULT_TOLERANCE_THRESHOLD;
     let mut update_baseline = false;
 

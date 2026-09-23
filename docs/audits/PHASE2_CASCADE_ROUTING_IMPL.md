@@ -1,7 +1,7 @@
-# Audit-Report: Phase 2 Kalibriertes Kaskaden-Routing in `memfuse-router`
+# Audit-Report: Phase 2 Kalibriertes Kaskaden-Routing in `contextra-router`
 
 **Datum:** 2026-09-03
-**Crate:** `crates/memfuse-router`
+**Crate:** `crates/contextra-router`
 **Auditor:** Jules (Senior Software Engineer)
 
 ---
@@ -11,7 +11,7 @@
 ### Vorher (Score-Aggregation & Emergency Fallback)
 1. **Aggregierte Score-Berechnung:** Es wurden effekive Profile anhand von `calibrated_min_score` erstellt.
 2. **Auswahl via `select_profile_from_chunks`:** Evaluierte `aggregated_score >= profile.min_relevance_score || max_score >= profile.min_relevance_score` über ungeordnete Kandidaten.
-3. **Emergency Fallback:** Falls kein Profil die Relevanzschwelle erreichte, wurde über einen `Err(MemFuseError::NotFound)` abgefangen und das Profil mit dem global niedrigsten `min_relevance_score` gewählt.
+3. **Emergency Fallback:** Falls kein Profil die Relevanzschwelle erreichte, wurde über einen `Err(ContextraError::NotFound)` abgefangen und das Profil mit dem global niedrigsten `min_relevance_score` gewählt.
 4. **Schwächen:** Das war ein primitiver Notfall-Fallback bei Schwellenwert-Unterschreitung und kein strukturierter, kalibrierter Mehrstufen-Kaskaden-Entscheidungsprozess.
 
 ### Nachher (Kalibriertes Multi-Stage Kaskaden-Routing)
@@ -62,10 +62,10 @@ Call 15: window_total=15, quantile_threshold=0.14349999, calibrated=true
 ## 4. Testabdeckung & Verifikation Gesamtsuite
 
 ```text
-cargo test -p memfuse-router --all-features
+cargo test -p contextra-router --all-features
 test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
 
-cargo clippy -p memfuse-router --no-deps -- -D warnings
+cargo clippy -p contextra-router --no-deps -- -D warnings
 Finished dev profile [unoptimized + debuginfo] target(s) in 0.79s
 ```
 

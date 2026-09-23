@@ -1,0 +1,3606 @@
+// FILE-CONTEXT
+// STAND: 2026-09-15T16:15:00Z (SESSION: 1a43706f)
+// ZWECK: Unit- und Integrationstest-Suite für contextra-router.
+// INVARIANTEN: Determinismus, NaN-Safety, Hot-Reload Concurrent Safety.
+// SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md, rules/tag_taxonomy.md
+
+//! Unit tests for contextra-router.
+
+#[cfg(test)]
+#[allow(clippy::module_inception)]
+pub(crate) mod tests {
+    use crate::{
+        dispatch_to_slm, DecisionId, RouterEngine, RoutingDecision, RoutingOutcome, SlmProfile,
+    };
+    use contextra_core::{EntityId, ContextraError, StorageEngine, TokenBudget};
+    use contextra_db::{Contextra, ContextraConfig};
+    use serde_json::json;
+    use std::sync::Arc;
+
+    struct MockStorageEngine;
+
+    impl StorageEngine for MockStorageEngine {
+        fn get<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn put<'a>(
+            &'a self,
+            _: contextra_core::TxId,
+            _: &'a [u8],
+            _: &'a [u8],
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn delete<'a>(
+            &'a self,
+            _: contextra_core::TxId,
+            _: &'a [u8],
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn commit<'a>(
+            &'a self,
+            _: contextra_core::TxId,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback<'a>(
+            &'a self,
+            _: contextra_core::TxId,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback_to_tx<'a>(
+            &'a self,
+            _: contextra_core::TxId,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn flush<'a>(&'a self) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(
+            &'a self,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<contextra_core::StorageStats>> {
+            Box::pin(async move {
+                Ok(contextra_core::StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn last_seq_no<'a>(&'a self) -> contextra_core::BoxFuture<'a, contextra_core::Result<u64>> {
+            Box::pin(async move { Ok(0) })
+        }
+        fn last_tx_id<'a>(
+            &'a self,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<contextra_core::TxId>> {
+            Box::pin(async move { Ok(contextra_core::TxId(0)) })
+        }
+        fn pin_checkpoint<'a>(
+            &'a self,
+            _: u64,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(
+            &'a self,
+            _: u64,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan_prefix<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+    }
+
+    // AI-TAG[CORRECTNESS][BLOCKER][RESOLVED]: Refactor commit 0f231376 decoupled contextra-router from contextra-db,
+    // requiring CollectionAdapter, TestContextPreparer, create_test_router, and try_create_test_router helper adapters for unit tests.
+
+    pub(crate) struct CollectionAdapter<S: StorageEngine + 'static> {
+        collection: Arc<contextra_db::Collection<S>>,
+    }
+
+    impl<S: StorageEngine + 'static> CollectionAdapter<S> {
+        pub(crate) fn new(collection: Arc<contextra_db::Collection<S>>) -> Self {
+            Self { collection }
+        }
+    }
+
+    impl<S: StorageEngine + 'static> crate::ports_local::HybridSearchProvider for CollectionAdapter<S> {
+        fn search_hybrid<'a>(
+            &'a self,
+            query_text: &'a str,
+            query_embedding: &'a [f32],
+            top_k: usize,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<contextra_core::ContextChunk>>>
+        {
+            Box::pin(async move {
+                let search_results = self
+                    .collection
+                    .query()
+                    .text(query_text)
+                    .embedding(query_embedding)
+                    .k(top_k)
+                    .execute()
+                    .await?;
+
+                let mut chunks = Vec::with_capacity(search_results.len());
+                for res in search_results {
+                    if let Ok(mut chunk) = contextra_core::ContextChunk::try_from(res) {
+                        chunk.content = chunk.combined_text_owned();
+                        chunks.push(chunk);
+                    }
+                }
+                Ok(chunks)
+            })
+        }
+    }
+
+    impl<S: StorageEngine + 'static> crate::ports_local::CommunityResolver for CollectionAdapter<S> {
+        fn get_community<'a>(
+            &'a self,
+            entity_id: EntityId,
+        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<u64>>> {
+            Box::pin(async move { self.collection.get_community(entity_id).await })
+        }
+    }
+
+    pub(crate) struct TestContextPreparer;
+
+    impl crate::ports_local::ContextPreparer for TestContextPreparer {
+        fn prepare_context(
+            &self,
+            chunks: Vec<contextra_core::ContextChunk>,
+            budget: &TokenBudget,
+            relevance_threshold: f32,
+        ) -> contextra_core::Result<contextra_core::ContextWindow> {
+            let mut manager = contextra_db::context::ContextManager::new(budget.clone());
+            manager.set_relevance_threshold(relevance_threshold);
+            manager.prepare_context(chunks)
+        }
+    }
+
+    pub(crate) fn create_test_router<S: StorageEngine + 'static>(
+        collection: Arc<contextra_db::Collection<S>>,
+        profiles: Vec<SlmProfile>,
+        calibration_store_path: Option<std::path::PathBuf>,
+    ) -> RouterEngine {
+        let adapter = Arc::new(CollectionAdapter::new(collection));
+        let preparer = Arc::new(TestContextPreparer);
+        RouterEngine::new(
+            adapter.clone(),
+            adapter,
+            preparer,
+            profiles,
+            calibration_store_path,
+        )
+    }
+
+    pub(crate) fn try_create_test_router<S: StorageEngine + 'static>(
+        collection: Arc<contextra_db::Collection<S>>,
+        profiles: Vec<SlmProfile>,
+        calibration_store_path: Option<std::path::PathBuf>,
+    ) -> contextra_core::Result<RouterEngine> {
+        let adapter = Arc::new(CollectionAdapter::new(collection));
+        let preparer = Arc::new(TestContextPreparer);
+        RouterEngine::try_new(
+            adapter.clone(),
+            adapter,
+            preparer,
+            profiles,
+            calibration_store_path,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_instantiation_with_mock_storage() {
+        let storage = Arc::new(MockStorageEngine);
+        let mut hnsw_config = contextra_index::HnswConfig::default();
+        hnsw_config.dimension = 4;
+        let hnsw = Arc::new(contextra_index::HnswIndex::try_new(hnsw_config).unwrap());
+        let graph = Arc::new(contextra_graph::CsrGraph::new());
+        let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
+        let collection = Arc::new(contextra_db::Collection::new(
+            "test_collection".to_string(),
+            storage,
+            hnsw,
+            graph,
+            next_tx,
+            4,
+            contextra_text::Language::English,
+        ));
+
+        let profile = SlmProfile::new(
+            "mock-slm",
+            "http://localhost:8000",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.5,
+        );
+
+        let adapter = Arc::new(CollectionAdapter::new(collection));
+        let preparer = Arc::new(TestContextPreparer);
+        let router: RouterEngine =
+            RouterEngine::new(adapter.clone(), adapter, preparer, vec![profile], None);
+        assert_eq!(router.profiles().len(), 1);
+        assert_eq!(router.profiles()[0].name, "mock-slm");
+    }
+
+    #[tokio::test]
+    async fn test_route_deterministic_community_assignment() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        // Insert documents for two distinct domains/communities
+        let vec_coding = vec![1.0, 0.0, 0.0, 0.0];
+        let vec_docs = vec![0.0, 1.0, 0.0, 0.0];
+
+        let coding_key = "coding_entity_1";
+        let docs_key = "docs_entity_1";
+
+        collection
+            .insert(
+                coding_key,
+                &vec_coding,
+                Some(json!({"text": "function rust_code() { return 42; }"})),
+            )
+            .await
+            .unwrap(); // unwrap
+
+        collection
+            .insert(
+                docs_key,
+                &vec_docs,
+                Some(json!({"text": "Dokumentation über Unternehmensrichtlinien."})),
+            )
+            .await
+            .unwrap(); // unwrap
+
+        // Relate entities to assign/update graph state and test get_community persistence
+        let eid_coding = EntityId::from_key(coding_key).unwrap(); // unwrap
+        let eid_docs = EntityId::from_key(docs_key).unwrap(); // unwrap
+
+        collection
+            .relate(coding_key, docs_key, "references")
+            .await
+            .unwrap(); // unwrap
+
+        // Manually persist synthetic community IDs in storage for testing get_community:
+        // 100 for coding, 200 for docs
+        let tx = db.allocate_tx().unwrap(); // unwrap
+
+        let comm_key_coding = format!("__graph:community:{}", eid_coding.inner()).into_bytes();
+        let comm_key_docs = format!("__graph:community:{}", eid_docs.inner()).into_bytes();
+
+        db.inner_storage()
+            .put(tx, &comm_key_coding, &serde_json::to_vec(&100u64).unwrap()) // unwrap
+            .await
+            .unwrap(); // unwrap
+        db.inner_storage()
+            .put(tx, &comm_key_docs, &serde_json::to_vec(&200u64).unwrap()) // unwrap
+            .await
+            .unwrap(); // unwrap
+        db.inner_storage().commit(tx).await.unwrap(); // unwrap
+
+        let coding_profile = SlmProfile::new(
+            "coding-slm",
+            "http://localhost:9999/mcp",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.01,
+        );
+
+        let docs_profile = SlmProfile::new(
+            "docs-slm",
+            "http://localhost:9999/mcp",
+            vec![200],
+            TokenBudget::new(1000, 100),
+            0.01,
+        );
+
+        let router = create_test_router(
+            collection.clone(),
+            vec![coding_profile.clone(), docs_profile.clone()],
+            None,
+        );
+
+        // Query coding
+        let decision_coding = router
+            .route(&vec_coding, "rust_code")
+            .await
+            .expect("Routing coding"); // expect
+
+        assert_eq!(decision_coding.profile.name, "coding-slm");
+        assert!(!decision_coding.context.chunks.is_empty());
+
+        // Query docs
+        let decision_docs = router
+            .route(&vec_docs, "Unternehmensrichtlinien")
+            .await
+            .expect("Routing docs"); // expect
+
+        assert_eq!(decision_docs.profile.name, "docs-slm");
+        assert!(!decision_docs.context.chunks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_route_fallback_error_on_low_relevance() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let vec_unrelated = vec![0.0, 0.0, 0.0, 1.0];
+        collection
+            .insert(
+                "unrelated_doc",
+                &vec_unrelated,
+                Some(json!({"text": "unrelated content"})),
+            )
+            .await
+            .unwrap(); // unwrap
+
+        // High threshold profile that won't be met
+        let strict_profile = SlmProfile::new(
+            "strict-slm",
+            "http://localhost:9999/mcp",
+            vec![999], // non-existent community
+            TokenBudget::new(1000, 100),
+            0.99, // unreachable score threshold
+        );
+
+        let router = create_test_router(collection.clone(), vec![strict_profile], None);
+
+        let result = router.route(&[0.1, 0.1, 0.1, 0.1], "search").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ContextraError::NotFound(msg) => {
+                assert!(msg.contains("min_relevance_score") || msg.contains("Community-Zuordnung"));
+            }
+            other => panic!("Expected NotFound error, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_to_slm_mock_server_receives_trimmed_context_only() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let captured_req_path = temp_dir.path().join("request.json");
+        let script_path = temp_dir.path().join("mock_slm.sh");
+        std::fs::write(
+            &script_path,
+            format!(
+                "#!/bin/sh\nread line\necho \"$line\" > {}\necho '{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{{\"answer\":\"SLM successfully processed context\"}}}}'\n",
+                captured_req_path.display()
+            ),
+        )
+        .unwrap();
+
+        let endpoint = format!("sh {}", script_path.display());
+        let profile = SlmProfile::new("mock-slm", endpoint, vec![1], TokenBudget::new(50, 0), 0.1);
+
+        let chunk = contextra_core::ContextChunk {
+            doc_id: contextra_core::DocId::new(1),
+            content: "Minimal context content for SLM".to_string(),
+            relevance: 0.95,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+
+        let context_window = contextra_core::ContextWindow {
+            chunks: vec![chunk],
+            total_tokens: 5,
+            truncated: false,
+        };
+
+        let decision = RoutingDecision {
+            profile,
+            context: context_window,
+            confidence: None,
+            decision_id: DecisionId::new(),
+            drift_status: None,
+        };
+
+        let answer = dispatch_to_slm(&decision).await.expect("dispatch ok"); // expect
+        assert_eq!(answer, "SLM successfully processed context");
+
+        let captured_str =
+            std::fs::read_to_string(&captured_req_path).expect("read captured request");
+        let received_json: serde_json::Value =
+            serde_json::from_str(&captured_str).expect("parse captured request");
+        assert_eq!(received_json["method"], "slm_process_context");
+        let params = &received_json["params"];
+        assert_eq!(params["profile_name"], "mock-slm");
+        assert!(params.get("context").is_some());
+        // Verify that raw full search results are NOT present, only context window
+        assert!(params.get("search_results").is_none());
+        assert_eq!(
+            params["context"]["chunks"][0]["content"],
+            "Minimal context content for SLM"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_route_hot_reload_concurrent_safety() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        let key = "entity_1";
+        collection
+            .insert(key, &vec_data, Some(json!({"text": "sample text content"})))
+            .await
+            .unwrap(); // unwrap
+
+        let eid = EntityId::from_key(key).unwrap(); // unwrap
+        let tx = db.allocate_tx().unwrap(); // unwrap
+        let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
+        db.inner_storage()
+            .put(tx, &comm_key, &serde_json::to_vec(&10u64).unwrap()) // unwrap
+            .await
+            .unwrap(); // unwrap
+        db.inner_storage().commit(tx).await.unwrap(); // unwrap
+
+        let profile_v1 = SlmProfile::new(
+            "slm-v1",
+            "http://localhost:8001/mcp",
+            vec![10],
+            TokenBudget::new(1000, 100),
+            0.01,
+        );
+
+        let router = Arc::new(create_test_router(collection, vec![profile_v1], None));
+
+        // Spawn 20 reader tasks continuously calling route()
+        let mut handles = Vec::new();
+        for _ in 0..20 {
+            let r = router.clone();
+            let vec_c = vec_data.clone();
+            handles.push(tokio::spawn(async move {
+                for _ in 0..50 {
+                    let res = r.route(&vec_c, "sample text content").await;
+                    assert!(res.is_ok());
+                    let decision = res.unwrap(); // unwrap
+                    assert!(
+                        decision.profile.name == "slm-v1" || decision.profile.name == "slm-v2",
+                        "Unexpected profile name: {}",
+                        decision.profile.name
+                    );
+                }
+            }));
+        }
+
+        // Spawn background writer updating profiles dynamically
+        let r_writer = router.clone();
+        let writer_handle = tokio::spawn(async move {
+            for i in 0..50 {
+                let name = if i % 2 == 0 { "slm-v1" } else { "slm-v2" };
+                let p = SlmProfile::new(
+                    name,
+                    "http://localhost:8001/mcp",
+                    vec![10],
+                    TokenBudget::new(1000, 100),
+                    0.01,
+                );
+                r_writer.update_profiles(vec![p]);
+                tokio::task::yield_now().await;
+            }
+        });
+
+        for h in handles {
+            h.await.unwrap(); // unwrap
+        }
+        writer_handle.await.unwrap(); // unwrap
+    }
+
+    #[tokio::test]
+    async fn test_route_hot_reload_atomic_snapshot_determinism() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        let key = "entity_1";
+        collection
+            .insert(key, &vec_data, Some(json!({"text": "test content"})))
+            .await
+            .unwrap(); // unwrap
+
+        let eid = EntityId::from_key(key).unwrap(); // unwrap
+        let tx = db.allocate_tx().unwrap(); // unwrap
+        let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
+        db.inner_storage()
+            .put(tx, &comm_key, &serde_json::to_vec(&42u64).unwrap()) // unwrap
+            .await
+            .unwrap(); // unwrap
+        db.inner_storage().commit(tx).await.unwrap(); // unwrap
+
+        let initial_profiles = vec![
+            SlmProfile::new(
+                "profile-a",
+                "http://localhost/a",
+                vec![42],
+                TokenBudget::new(500, 50),
+                0.01,
+            ),
+            SlmProfile::new(
+                "profile-b",
+                "http://localhost/b",
+                vec![42],
+                TokenBudget::new(500, 50),
+                0.01,
+            ),
+        ];
+
+        let router = create_test_router(collection, initial_profiles, None);
+
+        // Pre-reload decision: deterministic tie-breaking picks profile-a (lower index 0)
+        let d1 = router.route(&vec_data, "test content").await.unwrap(); // unwrap
+        assert_eq!(d1.profile.name, "profile-a");
+
+        // Hot reload profile configuration with new single profile
+        let updated_profiles = vec![SlmProfile::new(
+            "profile-c",
+            "http://localhost/c",
+            vec![42],
+            TokenBudget::new(500, 50),
+            0.01,
+        )];
+        router.update_profiles(updated_profiles);
+
+        let d2 = router.route(&vec_data, "test content").await.unwrap(); // unwrap
+        assert_eq!(d2.profile.name, "profile-c");
+    }
+
+    #[derive(Clone)]
+    struct LogCaptureLayer(Arc<std::sync::Mutex<Vec<String>>>);
+
+    impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogCaptureLayer {
+        fn on_event(
+            &self,
+            event: &tracing::Event<'_>,
+            _ctx: tracing_subscriber::layer::Context<'_, S>,
+        ) {
+            let mut visitor = StringVisitor(String::new());
+            event.record(&mut visitor);
+            if let Ok(mut guard) = self.0.lock() {
+                guard.push(visitor.0);
+            }
+        }
+    }
+
+    struct StringVisitor(String);
+    impl tracing::field::Visit for StringVisitor {
+        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+            use std::fmt::Write;
+            write!(self.0, "{}={:?} ", field.name(), value).ok();
+        }
+    }
+
+    #[test]
+    fn test_nan_single_chunk_ignored_in_max_score() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::router::{compute_max_score, select_profile_from_chunks};
+        use contextra_core::{ContextChunk, DocId};
+
+        let profile = SlmProfile::new(
+            "test-slm",
+            "http://localhost/mcp",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let chunk_valid_1 = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "valid 1".to_string(),
+            relevance: 0.5,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+
+        let chunk_nan = ContextChunk {
+            doc_id: DocId::new(2),
+            content: "corrupted nan".to_string(),
+            relevance: f32::NAN,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+
+        let chunk_valid_2 = ContextChunk {
+            doc_id: DocId::new(3),
+            content: "valid 2".to_string(),
+            relevance: 0.8,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+
+        let chunks = vec![
+            (chunk_valid_1, Some(100)),
+            (chunk_nan, Some(100)),
+            (chunk_valid_2, Some(100)),
+        ];
+
+        let max_score = compute_max_score(&profile, &chunks);
+        assert!(!max_score.is_nan(), "max_score must not be NaN");
+
+        // Expected max score = 0.8 * 1.2 (community boost for community 100) = 0.96
+        let expected = 0.8f32 * 1.2f32;
+        assert!(
+            (max_score - expected).abs() < 1e-5,
+            "Expected max score {}, got {}",
+            expected,
+            max_score
+        );
+
+        let selected_idx = select_profile_from_chunks(&[profile], &chunks)?;
+        assert_eq!(selected_idx, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_all_chunks_fallback_and_tracing_error() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::router::select_profile_from_chunks;
+        use contextra_core::{ContextChunk, DocId};
+        use tracing_subscriber::layer::SubscriberExt;
+
+        let logs = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let capture_layer = LogCaptureLayer(logs.clone());
+        let subscriber = tracing_subscriber::registry().with(capture_layer);
+        let _guard = tracing::subscriber::set_default(subscriber);
+
+        let profile = SlmProfile::new(
+            "test-slm",
+            "http://localhost/mcp",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let chunk_nan_1 = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "nan 1".to_string(),
+            relevance: f32::NAN,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+
+        let chunk_nan_2 = ContextChunk {
+            doc_id: DocId::new(2),
+            content: "nan 2".to_string(),
+            relevance: f32::NAN,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+
+        let chunks = vec![(chunk_nan_1, Some(100)), (chunk_nan_2, Some(100))];
+
+        let result = select_profile_from_chunks(&[profile], &chunks);
+        assert!(result.is_err(), "Expected error when all chunks are NaN");
+
+        match result {
+            Err(ContextraError::NotFound(msg)) => {
+                assert!(msg.contains("NaN/Inf"));
+            }
+            other => panic!("Expected NotFound error, got {:?}", other),
+        }
+
+        let captured = logs.lock().map_err(|e| e.to_string())?;
+        let found_log = captured.iter().any(|msg| {
+            msg.contains("Alle Chunk-Relevanzwerte sind NaN/Inf — mögliche Upstream-Korruption in der Distanzberechnung")
+        });
+
+        assert!(
+            found_log,
+            "Expected tracing::error! message in logs, got: {:?}",
+            *captured
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_routing_determinism_repeats() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::router::select_profile_from_chunks;
+        use contextra_core::{ContextChunk, DocId};
+
+        let profile_a = SlmProfile::new(
+            "slm-a",
+            "http://localhost/a",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let profile_b = SlmProfile::new(
+            "slm-b",
+            "http://localhost/b",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let profiles = vec![profile_a, profile_b];
+
+        let chunks = vec![
+            (
+                ContextChunk {
+                    doc_id: DocId::new(1),
+                    content: "corrupted nan".to_string(),
+                    relevance: f32::NAN,
+                    token_count: 5,
+                    metadata: None,
+                    contextual_prefix: None,
+                    links: Vec::new(),
+                },
+                Some(100),
+            ),
+            (
+                ContextChunk {
+                    doc_id: DocId::new(2),
+                    content: "valid chunk".to_string(),
+                    relevance: 0.7,
+                    token_count: 5,
+                    metadata: None,
+                    contextual_prefix: None,
+                    links: Vec::new(),
+                },
+                Some(100),
+            ),
+        ];
+
+        let first_result = select_profile_from_chunks(&profiles, &chunks)?;
+
+        for i in 0..100 {
+            let res = select_profile_from_chunks(&profiles, &chunks)?;
+            assert_eq!(
+                res, first_result,
+                "Routing selection must be bit-identical across runs (iteration {})",
+                i
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_slm_profile_validation() {
+        // Valid profile
+        let valid = SlmProfile::try_new(
+            "coding",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+        assert!(valid.is_ok());
+
+        // Empty name
+        let empty_name = SlmProfile::try_new(
+            "   ",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+        assert!(
+            matches!(empty_name, Err(ContextraError::InvalidInput(msg)) if msg.contains("name cannot be empty"))
+        );
+
+        // Empty endpoint
+        let empty_ep =
+            SlmProfile::try_new("coding", "   ", vec![1], TokenBudget::new(1000, 100), 0.1);
+        assert!(
+            matches!(empty_ep, Err(ContextraError::InvalidInput(msg)) if msg.contains("endpoint cannot be empty"))
+        );
+
+        // NaN relevance score
+        let nan_score = SlmProfile::try_new(
+            "coding",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            f32::NAN,
+        );
+        assert!(
+            matches!(nan_score, Err(ContextraError::InvalidInput(msg)) if msg.contains("must be finite and non-negative"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_route_empty_profiles_err() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let router = create_test_router(collection, vec![], None);
+        let err = router.route(&[1.0, 0.0, 0.0, 0.0], "test").await;
+        assert!(
+            matches!(err, Err(ContextraError::NotFound(msg)) if msg.contains("Keine SLM-Profile"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_route_empty_search_results_err() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let profile = SlmProfile::new(
+            "slm",
+            "http://localhost:9999/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.01,
+        );
+        let router = create_test_router(collection, vec![profile], None);
+
+        let err = router.route(&[1.0, 0.0, 0.0, 0.0], "test").await;
+        assert!(
+            matches!(err, Err(ContextraError::NotFound(msg)) if msg.contains("Keine relevanten Suchergebnisse"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_route_unparseable_entity_id() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        // Key that does not conform to EntityId format
+        collection
+            .insert(
+                "plain_document_without_entity_id_prefix",
+                &[1.0, 0.0, 0.0, 0.0],
+                Some(json!({"text": "plain doc text"})),
+            )
+            .await
+            .unwrap(); // unwrap
+
+        let profile = SlmProfile::new(
+            "slm",
+            "http://localhost:9999/mcp",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.0,
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+        let result = router.route(&[1.0, 0.0, 0.0, 0.0], "plain doc").await;
+        // Unparseable entity ID results in comm_id = None, which fails community matching for profile
+        assert!(matches!(result, Err(ContextraError::NotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_route_threshold_boundaries() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let coding_key = "coding_entity_1";
+        collection
+            .insert(
+                coding_key,
+                &[1.0, 0.0, 0.0, 0.0],
+                Some(json!({"text": "rust code text"})),
+            )
+            .await
+            .unwrap(); // unwrap
+
+        let eid = EntityId::from_key(coding_key).unwrap(); // unwrap
+        let tx = db.allocate_tx().unwrap(); // unwrap
+        let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
+        db.inner_storage()
+            .put(tx, &comm_key, &serde_json::to_vec(&100u64).unwrap()) // unwrap
+            .await
+            .unwrap(); // unwrap
+        db.inner_storage().commit(tx).await.unwrap(); // unwrap
+
+        let profile = SlmProfile::new(
+            "slm-threshold",
+            "http://localhost:9999/mcp",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.0, // Low min threshold to guarantee selection
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+        let res = router.route(&[1.0, 0.0, 0.0, 0.0], "rust code").await;
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_route_determinism_and_tie_breaking() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::router::select_profile_from_chunks;
+        use contextra_core::{ContextChunk, DocId};
+
+        let profile_0 = SlmProfile::new(
+            "profile-0",
+            "http://localhost/0",
+            vec![10],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let profile_1 = SlmProfile::new(
+            "profile-1",
+            "http://localhost/1",
+            vec![10],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let profile_2 = SlmProfile::new(
+            "profile-2",
+            "http://localhost/2",
+            vec![10],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let profiles = vec![profile_0, profile_1, profile_2];
+        let chunks = vec![(
+            ContextChunk {
+                doc_id: DocId::new(1),
+                content: "identical score chunk".to_string(),
+                relevance: 0.5,
+                token_count: 5,
+                metadata: None,
+                contextual_prefix: None,
+                links: Vec::new(),
+            },
+            Some(10),
+        )];
+
+        for _ in 0..100 {
+            let selected_idx = select_profile_from_chunks(&profiles, &chunks)?;
+            // Lower profile index (0) must always win tie-breaks
+            assert_eq!(selected_idx, 0);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_error_paths() {
+        // 1. Process spawn error / bad command
+        let bad_profile = SlmProfile::new(
+            "bad-slm",
+            "/nonexistent/binary/path/12345",
+            vec![1],
+            TokenBudget::new(50, 0),
+            0.1,
+        );
+        let chunk = contextra_core::ContextChunk {
+            doc_id: contextra_core::DocId::new(1),
+            content: "test content".to_string(),
+            relevance: 0.9,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+        let decision = RoutingDecision {
+            profile: bad_profile,
+            context: contextra_core::ContextWindow {
+                chunks: vec![chunk.clone()],
+                total_tokens: 5,
+                truncated: false,
+            },
+            confidence: None,
+            decision_id: DecisionId::new(),
+            drift_status: None,
+        };
+        let res_err = dispatch_to_slm(&decision).await;
+        assert!(
+            matches!(res_err, Err(ContextraError::Internal(msg)) if msg.contains("Fehler bei MCP-Dispatch"))
+        );
+
+        // 2. Closed stdout without JSON-RPC response
+        let profile_closed =
+            SlmProfile::new("slm-closed", "true", vec![1], TokenBudget::new(50, 0), 0.1);
+        let decision_closed = RoutingDecision {
+            profile: profile_closed,
+            context: decision.context.clone(),
+            confidence: None,
+            decision_id: DecisionId::new(),
+            drift_status: None,
+        };
+        let res_closed = dispatch_to_slm(&decision_closed).await;
+        assert!(
+            matches!(res_closed, Err(ContextraError::Internal(msg)) if msg.contains("Fehler bei MCP-Dispatch"))
+        );
+
+        // 3. RPC Error response
+        let profile_rpc_err = SlmProfile::new(
+            "slm-rpc-err",
+            "sh -c 'cat > /dev/null; echo \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"error\\\":{\\\"code\\\":-32601,\\\"message\\\":\\\"Method not found\\\"}}\"'",
+            vec![1],
+            TokenBudget::new(50, 0),
+            0.1,
+        );
+        let decision_rpc_err = RoutingDecision {
+            profile: profile_rpc_err,
+            context: decision.context.clone(),
+            confidence: None,
+            decision_id: DecisionId::new(),
+            drift_status: None,
+        };
+        let res_rpc_err = dispatch_to_slm(&decision_rpc_err).await;
+        assert!(
+            matches!(res_rpc_err, Err(ContextraError::Internal(ref msg)) if msg.contains("MCP RPC Fehler [-32601]: Method not found")),
+            "res_rpc_err was: {:?}",
+            res_rpc_err
+        );
+
+        // 4. Custom JSON object result (no "answer" key)
+        let profile_obj = SlmProfile::new(
+            "slm-obj",
+            "sh -c 'cat > /dev/null; echo \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"result\\\":{\\\"custom_data\\\":42}}\"'",
+            vec![1],
+            TokenBudget::new(50, 0),
+            0.1,
+        );
+        let decision_obj = RoutingDecision {
+            profile: profile_obj,
+            context: decision.context.clone(),
+            confidence: None,
+            decision_id: DecisionId::new(),
+            drift_status: None,
+        };
+        let res_obj = dispatch_to_slm(&decision_obj).await.unwrap(); // unwrap
+        assert_eq!(res_obj, "{\"custom_data\":42}");
+
+        // 5. Neither result nor error present
+        let profile_empty = SlmProfile::new(
+            "slm-empty",
+            "sh -c 'cat > /dev/null; echo \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1}\"'",
+            vec![1],
+            TokenBudget::new(50, 0),
+            0.1,
+        );
+        let decision_empty = RoutingDecision {
+            profile: profile_empty,
+            context: decision.context.clone(),
+            confidence: None,
+            decision_id: DecisionId::new(),
+            drift_status: None,
+        };
+        let res_empty = dispatch_to_slm(&decision_empty).await;
+        assert!(
+            matches!(res_empty, Err(ContextraError::Internal(msg)) if msg.contains("weder result noch error"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_route_1_and_50_profiles() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        let key = "entity_1";
+        collection
+            .insert(key, &vec_data, Some(json!({"text": "sample text"})))
+            .await
+            .unwrap(); // unwrap
+
+        let eid = EntityId::from_key(key).unwrap(); // unwrap
+        let tx = db.allocate_tx().unwrap(); // unwrap
+        let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
+        db.inner_storage()
+            .put(tx, &comm_key, &serde_json::to_vec(&100u64).unwrap()) // unwrap
+            .await
+            .unwrap(); // unwrap
+        db.inner_storage().commit(tx).await.unwrap(); // unwrap
+
+        let profiles_50: Vec<_> = (0..50)
+            .map(|i| {
+                SlmProfile::new(
+                    format!("profile-{}", i),
+                    format!("http://localhost:8000/mcp/{}", i),
+                    vec![100],
+                    TokenBudget::new(1000, 100),
+                    0.0,
+                )
+            })
+            .collect();
+
+        let router = try_create_test_router(collection, profiles_50, None).unwrap(); // unwrap
+        let decision = router.route(&vec_data, "sample text").await.unwrap(); // unwrap
+        assert_eq!(decision.profile.name, "profile-0");
+
+        let update_res = router.try_update_profiles(vec![SlmProfile::new(
+            "profile-single",
+            "http://localhost/single",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.0,
+        )]);
+        assert!(update_res.is_ok());
+
+        let decision_single = router.route(&vec_data, "sample text").await.unwrap(); // unwrap
+        assert_eq!(decision_single.profile.name, "profile-single");
+    }
+
+    #[test]
+    fn prop_slm_profile_equality() {
+        use proptest::prelude::*;
+
+        proptest!(|(
+            name in "[a-z0-9_-]{1,20}",
+            endpoint in "http://[a-z0-9_-]{1,20}",
+            community in 0u64..10000,
+            score in 0.0f32..1.0f32,
+        )| {
+            let p1 = SlmProfile::new(&name, &endpoint, vec![community], TokenBudget::new(1000, 100), score);
+            let p2 = SlmProfile::new(&name, &endpoint, vec![community], TokenBudget::new(1000, 100), score);
+            prop_assert_eq!(p1, p2);
+        });
+    }
+
+    #[test]
+    fn prop_slm_profile_serde() {
+        use proptest::prelude::*;
+
+        proptest!(|(
+            name in "[a-z0-9_-]{1,20}",
+            endpoint in "http://[a-z0-9_-]{1,20}",
+            community in 0u64..10000,
+            score in 0.0f32..1.0f32,
+        )| {
+            let p1 = SlmProfile::new(&name, &endpoint, vec![community], TokenBudget::new(1000, 100), score);
+            let serialized = serde_json::to_string(&p1).unwrap(); // unwrap
+            let p2: SlmProfile = serde_json::from_str(&serialized).unwrap(); // unwrap
+            prop_assert_eq!(p1, p2);
+        });
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_profiles_accessor() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let profile = SlmProfile::new(
+            "p-acc",
+            "http://localhost/mcp",
+            vec![1],
+            TokenBudget::new(100, 10),
+            0.1,
+        );
+        let router = create_test_router(collection, vec![profile.clone()], None);
+        let profiles = router.profiles();
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].name, "p-acc");
+    }
+
+    #[test]
+    fn test_select_profile_from_chunks_empty_chunks() {
+        use crate::router::select_profile_from_chunks;
+        let profile = SlmProfile::new(
+            "p-empty",
+            "http://localhost/mcp",
+            vec![1],
+            TokenBudget::new(100, 10),
+            0.1,
+        );
+        let res = select_profile_from_chunks(&[profile], &[]);
+        assert!(
+            matches!(res, Err(ContextraError::NotFound(msg)) if msg.contains("Keine gültigen Chunks"))
+        );
+    }
+
+    #[test]
+    fn test_select_profile_max_score_meets_threshold_when_aggregated_does_not() {
+        use crate::router::select_profile_from_chunks;
+        use contextra_core::{ContextChunk, DocId};
+
+        // Profile requires min_relevance_score = 0.8
+        let profile = SlmProfile::new(
+            "p-max-score",
+            "http://localhost/mcp",
+            vec![10],
+            TokenBudget::new(1000, 100),
+            0.8,
+        );
+
+        let chunk_pos = ContextChunk {
+            doc_id: DocId::new(2),
+            content: "pos".to_string(),
+            relevance: 0.8,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+        // Aggregated score = 0.8 * 1.2 = 0.96 >= 0.8
+        let chunks = vec![(chunk_pos, Some(10))];
+        let idx = select_profile_from_chunks(&[profile], &chunks).unwrap(); // unwrap
+        assert_eq!(idx, 0);
+    }
+
+    #[test]
+    fn prop_routing_decision_profile_in_input() {
+        use crate::router::select_profile_from_chunks;
+        use contextra_core::{ContextChunk, DocId};
+        use proptest::prelude::*;
+
+        proptest!(|(
+            score_a in 0.01f32..1.0f32,
+            _score_b in 0.01f32..1.0f32,
+        )| {
+            let p0 = SlmProfile::new("p0", "http://ep0", vec![1], TokenBudget::new(1000, 100), 0.0);
+            let p1 = SlmProfile::new("p1", "http://ep1", vec![1], TokenBudget::new(1000, 100), 0.0);
+            let profiles = vec![p0, p1];
+
+            let chunks = vec![(
+                ContextChunk {
+                    doc_id: DocId::new(1),
+                    content: "test content".to_string(),
+                    relevance: score_a,
+                    token_count: 5,
+                    metadata: None,
+                    contextual_prefix: None,
+                    links: Vec::new(),
+                },
+                Some(1),
+            )];
+
+            if let Ok(idx) = select_profile_from_chunks(&profiles, &chunks) {
+                prop_assert!(idx < profiles.len());
+            }
+        });
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_try_new_and_try_update_profiles_validation_error() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let invalid_profile = SlmProfile::new(
+            "",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let valid_profile = SlmProfile::new(
+            "valid",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let res_try_new = try_create_test_router(
+            collection.clone(),
+            vec![valid_profile.clone(), invalid_profile.clone()],
+            None,
+        );
+        assert!(matches!(res_try_new, Err(ContextraError::InvalidInput(_))));
+
+        let router = create_test_router(collection, vec![valid_profile.clone()], None);
+        let res_try_update = router.try_update_profiles(vec![valid_profile, invalid_profile]);
+        assert!(matches!(res_try_update, Err(ContextraError::InvalidInput(_))));
+    }
+
+    #[test]
+    fn test_select_profile_from_chunks_empty_chunks_and_unmatched_community() {
+        use crate::router::select_profile_from_chunks;
+        use contextra_core::{ContextChunk, DocId};
+
+        let profile = SlmProfile::new(
+            "slm-test",
+            "http://localhost/mcp",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.5,
+        );
+
+        let err_empty = select_profile_from_chunks(std::slice::from_ref(&profile), &[]);
+        assert!(
+            matches!(err_empty, Err(ContextraError::NotFound(msg)) if msg.contains("Keine gültigen Chunks"))
+        );
+
+        let chunk_unmatched = (
+            ContextChunk {
+                doc_id: DocId::new(1),
+                content: "unmatched community chunk".to_string(),
+                relevance: 0.9,
+                token_count: 5,
+                metadata: None,
+                contextual_prefix: None,
+                links: Vec::new(),
+            },
+            Some(999),
+        );
+
+        let err_unmatched =
+            select_profile_from_chunks(std::slice::from_ref(&profile), &[chunk_unmatched]);
+        assert!(
+            matches!(err_unmatched, Err(ContextraError::NotFound(msg)) if msg.contains("Kein SLM-Profil"))
+        );
+
+        let chunk_low_score = (
+            ContextChunk {
+                doc_id: DocId::new(2),
+                content: "matched community low score".to_string(),
+                relevance: 0.01,
+                token_count: 5,
+                metadata: None,
+                contextual_prefix: None,
+                links: Vec::new(),
+            },
+            Some(100),
+        );
+
+        let err_low =
+            select_profile_from_chunks(std::slice::from_ref(&profile), &[chunk_low_score]);
+        assert!(
+            matches!(err_low, Err(ContextraError::NotFound(msg)) if msg.contains("Kein SLM-Profil"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_invalid_json_response() {
+        let profile = SlmProfile::new(
+            "bad-json-slm",
+            "sh -c 'cat > /dev/null; echo {invalid json'",
+            vec![1],
+            TokenBudget::new(50, 0),
+            0.1,
+        );
+
+        let chunk = contextra_core::ContextChunk {
+            doc_id: contextra_core::DocId::new(1),
+            content: "test content".to_string(),
+            relevance: 0.9,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+
+        let decision = RoutingDecision {
+            profile,
+            context: contextra_core::ContextWindow {
+                chunks: vec![chunk],
+                total_tokens: 5,
+                truncated: false,
+            },
+            confidence: None,
+            decision_id: DecisionId::new(),
+            drift_status: None,
+        };
+
+        let res = dispatch_to_slm(&decision).await;
+        assert!(
+            matches!(res, Err(ContextraError::Internal(msg)) if msg.contains("Ungültige MCP JSON-RPC Antwort"))
+        );
+    }
+
+    #[test]
+    fn test_slm_profile_validation_extended() {
+        let inf_score = SlmProfile::try_new(
+            "coding",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            f32::INFINITY,
+        );
+        assert!(
+            matches!(inf_score, Err(ContextraError::InvalidInput(msg)) if msg.contains("must be finite and non-negative"))
+        );
+
+        let neg_inf_score = SlmProfile::try_new(
+            "coding",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            f32::NEG_INFINITY,
+        );
+        assert!(
+            matches!(neg_inf_score, Err(ContextraError::InvalidInput(msg)) if msg.contains("must be finite and non-negative"))
+        );
+
+        let neg_score = SlmProfile::try_new(
+            "coding",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            -0.1,
+        );
+        assert!(
+            matches!(neg_score, Err(ContextraError::InvalidInput(msg)) if msg.contains("must be finite and non-negative"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_route_with_missing_community_or_corrupt_result() {
+        let dir = tempfile::tempdir().unwrap(); // unwrap
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap(); // unwrap
+        let collection = db.collection("default").await.unwrap(); // unwrap
+
+        let key = "entity_no_community";
+        collection
+            .insert(
+                key,
+                &[1.0, 0.0, 0.0, 0.0],
+                Some(json!({"text": "sample text"})),
+            )
+            .await
+            .unwrap(); // unwrap
+
+        let profile = SlmProfile::new(
+            "slm-no-comm",
+            "http://localhost:9999/mcp",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.0,
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+        let res = router.route(&[1.0, 0.0, 0.0, 0.0], "sample text").await;
+        assert!(matches!(res, Err(ContextraError::NotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_route_invalid_search_result_skips_chunk() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        // Insert valid doc and corrupt/invalid doc directly into storage/index or test search result handling
+        let valid_key = "valid_entity_1";
+        collection
+            .insert(
+                valid_key,
+                &[1.0, 0.0, 0.0, 0.0],
+                Some(json!({"text": "valid content"})),
+            )
+            .await?;
+
+        let eid = EntityId::from_key(valid_key)?;
+        let tx = db.allocate_tx()?;
+        let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
+        let comm_val = serde_json::to_vec(&100u64)?;
+        db.inner_storage().put(tx, &comm_key, &comm_val).await?;
+        db.inner_storage().commit(tx).await?;
+
+        let profile = SlmProfile::new(
+            "slm-valid",
+            "http://localhost:9999/mcp",
+            vec![100],
+            TokenBudget::new(1000, 100),
+            0.0,
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+        let res = router.route(&[1.0, 0.0, 0.0, 0.0], "valid content").await;
+        assert!(res.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_cascade_hit() {
+        use crate::profile::ProfileCalibrationState;
+        use contextra_core::{ContextChunk, DocId};
+        use std::collections::HashMap;
+
+        let profile_high = SlmProfile::new(
+            "high-slm",
+            "http://localhost/high",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.8,
+        );
+        let profile_mid = SlmProfile::new(
+            "mid-slm",
+            "http://localhost/mid",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.5,
+        );
+        let profile_low = SlmProfile::new(
+            "low-slm",
+            "http://localhost/low",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.2,
+        );
+
+        let profiles = vec![
+            profile_mid.clone(),
+            profile_high.clone(),
+            profile_low.clone(),
+        ];
+
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let db = rt
+            .block_on(Contextra::open_with_config(dir.path(), config))
+            .unwrap();
+        let collection = rt.block_on(db.collection("default")).unwrap();
+
+        let router = create_test_router(collection, profiles.clone(), None);
+        let calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+
+        // Chunk score: 0.5 (with community 1 match: 0.5 * 1.2 = 0.6)
+        // 0.6 >= mid threshold (0.5), but < high threshold (0.8)
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "cascade hit text".to_string(),
+            relevance: 0.5,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+        let chunks = vec![(chunk, Some(1))];
+
+        let mut calibration = calibration;
+        let (idx, selected, metrics) = router
+            .select_profile_cascade(&chunks, &profiles, &mut calibration)
+            .expect("Cascade selection succeeds");
+
+        assert_eq!(selected.name, "mid-slm");
+        assert_eq!(idx, 0); // profile_mid was at original index 0
+        assert!(!metrics.calibrated);
+    }
+
+    #[test]
+    fn test_cascade_fallthrough() {
+        use crate::profile::ProfileCalibrationState;
+        use contextra_core::{ContextChunk, DocId};
+        use std::collections::HashMap;
+
+        let profile_high = SlmProfile::new(
+            "high-slm",
+            "http://localhost/high",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.9,
+        );
+        let profile_mid = SlmProfile::new(
+            "mid-slm",
+            "http://localhost/mid",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.7,
+        );
+        let profile_low = SlmProfile::new(
+            "low-slm",
+            "http://localhost/low",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.5,
+        );
+
+        let profiles = vec![profile_high, profile_mid, profile_low.clone()];
+
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let db = rt
+            .block_on(Contextra::open_with_config(dir.path(), config))
+            .unwrap();
+        let collection = rt.block_on(db.collection("default")).unwrap();
+
+        let router = create_test_router(collection, profiles.clone(), None);
+        let calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+
+        // Chunk score = 0.1 (0.1 * 1.2 = 0.12) < low threshold (0.5) -> falls through to last profile
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "low score content".to_string(),
+            relevance: 0.1,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+        let chunks = vec![(chunk, Some(1))];
+
+        let mut calibration = calibration;
+        let (idx, selected, metrics) = router
+            .select_profile_cascade(&chunks, &profiles, &mut calibration)
+            .expect("Cascade fallthrough succeeds");
+
+        assert_eq!(selected.name, "low-slm");
+        assert_eq!(idx, 2);
+        assert!(!metrics.calibrated);
+    }
+
+    #[tokio::test]
+    async fn test_calibrated_threshold_convergence() {
+        use contextra_core::ConfigFingerprint;
+
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        let key = "convergence_entity";
+        collection
+            .insert(
+                key,
+                &vec_data,
+                Some(json!({"text": "convergence test content"})),
+            )
+            .await
+            .unwrap();
+
+        let eid = EntityId::from_doc_id(contextra_core::DocId::new(1));
+        let tx = db.allocate_tx().unwrap();
+        let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
+        db.inner_storage()
+            .put(tx, &comm_key, &serde_json::to_vec(&100u64).unwrap())
+            .await
+            .unwrap();
+        db.inner_storage().commit(tx).await.unwrap();
+
+        let fp = ConfigFingerprint::new("llama-3b", "F16", "template", 0.1);
+        let profile = SlmProfile::new(
+            "conv-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.001,
+        )
+        .with_fingerprint(fp.clone());
+
+        let router = create_test_router(collection, vec![profile], None);
+
+        // Perform 105 routing calls and record outcomes
+        let mut last_calibrated = false;
+        for i in 0..105 {
+            let decision = router
+                .route(&vec_data, "convergence test content")
+                .await
+                .unwrap();
+            router.record_outcome(decision.decision_id, RoutingOutcome::Success);
+            let cal_stats = router.calibration_stats();
+            let st = &cal_stats["conv-slm"];
+            last_calibrated = st.is_calibrated(Some(&fp));
+            println!(
+                "Call {}: window_total={}, quantile_threshold={}, calibrated={}",
+                i + 1,
+                st.conformal.window_total,
+                st.conformal.quantile_threshold,
+                last_calibrated
+            );
+        }
+
+        assert!(
+            last_calibrated,
+            "After 105 decisions with record_outcome (>= 100 samples) and unchanged fingerprint, decision must be calibrated (calibrated = true)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_calibration_invalidation_on_temperature_change() {
+        use contextra_core::ConfigFingerprint;
+
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc_temp",
+                &vec_data,
+                Some(json!({"text": "temperature shift content"})),
+            )
+            .await
+            .unwrap();
+
+        let fp1 = ConfigFingerprint::new("llama-3b", "F16", "template", 0.1);
+        let profile1 = SlmProfile::new(
+            "temp-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.001,
+        )
+        .with_fingerprint(fp1.clone());
+
+        let router = create_test_router(collection, vec![profile1], None);
+
+        // Warm up with 105 successful outcomes under fp1
+        for _ in 0..105 {
+            let decision = router
+                .route(&vec_data, "temperature shift content")
+                .await
+                .unwrap();
+            router.record_outcome(decision.decision_id, RoutingOutcome::Success);
+        }
+
+        let cal_stats = router.calibration_stats();
+        assert!(
+            cal_stats["temp-slm"].is_calibrated(Some(&fp1)),
+            "Profile should be calibrated under initial fp1"
+        );
+
+        // Update profile with new temperature (0.7 -> different temperature bits)
+        let fp2 = ConfigFingerprint::new("llama-3b", "F16", "template", 0.7);
+        assert_ne!(
+            fp1.temperature_bits, fp2.temperature_bits,
+            "Bits must differ for 0.1 vs 0.7"
+        );
+
+        let profile2 = SlmProfile::new(
+            "temp-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.001,
+        )
+        .with_fingerprint(fp2.clone());
+
+        router.update_profiles(vec![profile2]);
+
+        // Next route call must observe calibrated = false due to configuration shift
+        let decision_after_shift = router
+            .route(&vec_data, "temperature shift content")
+            .await
+            .unwrap();
+        assert!(
+            !decision_after_shift.confidence.as_ref().unwrap().calibrated,
+            "Decision after temperature shift must be uncalibrated"
+        );
+
+        let stats_after_shift = router.calibration_stats();
+        assert!(
+            !stats_after_shift["temp-slm"].is_calibrated(Some(&fp2)),
+            "Calibration state must report is_calibrated = false immediately after shift"
+        );
+
+        // Warm up again with 105 decisions under fp2
+        for _ in 0..105 {
+            let d = router
+                .route(&vec_data, "temperature shift content")
+                .await
+                .unwrap();
+            router.record_outcome(d.decision_id, RoutingOutcome::Success);
+        }
+
+        let stats_recalibrated = router.calibration_stats();
+        assert!(
+            stats_recalibrated["temp-slm"].is_calibrated(Some(&fp2)),
+            "Profile should become calibrated again under fp2 after re-warmup window"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_calibration_invalidation_on_prompt_template_hash_change() {
+        use contextra_core::ConfigFingerprint;
+
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc_prompt",
+                &vec_data,
+                Some(json!({"text": "prompt shift content"})),
+            )
+            .await
+            .unwrap();
+
+        let fp_hash1 = ConfigFingerprint::new("llama-3b", "Q8_0", "Template A", 0.2);
+        let profile1 = SlmProfile::new(
+            "prompt-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.001,
+        )
+        .with_fingerprint(fp_hash1.clone());
+
+        let router = create_test_router(collection, vec![profile1], None);
+
+        for _ in 0..105 {
+            let decision = router
+                .route(&vec_data, "prompt shift content")
+                .await
+                .unwrap();
+            router.record_outcome(decision.decision_id, RoutingOutcome::Success);
+        }
+
+        assert!(
+            router.calibration_stats()["prompt-slm"].is_calibrated(Some(&fp_hash1)),
+            "Profile should be calibrated under prompt hash 1"
+        );
+
+        // Shift prompt template hash
+        let fp_hash2 = ConfigFingerprint::new("llama-3b", "Q8_0", "Template B", 0.2);
+        let profile2 = SlmProfile::new(
+            "prompt-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.001,
+        )
+        .with_fingerprint(fp_hash2.clone());
+
+        router.update_profiles(vec![profile2]);
+
+        let decision_after_shift = router
+            .route(&vec_data, "prompt shift content")
+            .await
+            .unwrap();
+        assert!(
+            !decision_after_shift.confidence.as_ref().unwrap().calibrated,
+            "Decision after prompt template hash shift must be uncalibrated"
+        );
+        assert!(
+            !router.calibration_stats()["prompt-slm"].is_calibrated(Some(&fp_hash2)),
+            "State must report is_calibrated = false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_calibration_invalidation_on_quantization_change() {
+        use contextra_core::ConfigFingerprint;
+
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc_quant",
+                &vec_data,
+                Some(json!({"text": "quantization shift content"})),
+            )
+            .await
+            .unwrap();
+
+        let fp_q8 = ConfigFingerprint::new("llama-3b", "Q8_0", "template", 0.0);
+        let profile1 = SlmProfile::new(
+            "quant-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.001,
+        )
+        .with_fingerprint(fp_q8.clone());
+
+        let router = create_test_router(collection, vec![profile1], None);
+
+        for _ in 0..105 {
+            let decision = router
+                .route(&vec_data, "quantization shift content")
+                .await
+                .unwrap();
+            router.record_outcome(decision.decision_id, RoutingOutcome::Success);
+        }
+
+        assert!(
+            router.calibration_stats()["quant-slm"].is_calibrated(Some(&fp_q8)),
+            "Profile should be calibrated under Q8_0 quantization"
+        );
+
+        // Shift quantization level from Q8_0 to Q4_K_M
+        let fp_q4 = ConfigFingerprint::new("llama-3b", "Q4_K_M", "template", 0.0);
+        let profile2 = SlmProfile::new(
+            "quant-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.001,
+        )
+        .with_fingerprint(fp_q4.clone());
+
+        router.update_profiles(vec![profile2]);
+
+        let decision_after_shift = router
+            .route(&vec_data, "quantization shift content")
+            .await
+            .unwrap();
+        assert!(
+            !decision_after_shift.confidence.as_ref().unwrap().calibrated,
+            "Decision after quantization level shift must be uncalibrated"
+        );
+        assert!(
+            !router.calibration_stats()["quant-slm"].is_calibrated(Some(&fp_q4)),
+            "State must report is_calibrated = false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_calibration_failsafe_on_unknown_quantization() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc_unknown",
+                &vec_data,
+                Some(json!({"text": "unknown quantization content"})),
+            )
+            .await
+            .unwrap();
+
+        // Profile without fingerprint set (fingerprint: None)
+        let profile = SlmProfile::new(
+            "unknown-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.001,
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+
+        // Perform 50 decisions with record_outcome without fingerprint set
+        for _ in 0..50 {
+            let decision = router
+                .route(&vec_data, "unknown quantization content")
+                .await
+                .unwrap();
+            router.record_outcome(decision.decision_id, RoutingOutcome::Success);
+        }
+
+        let stats = router.calibration_stats();
+        assert!(
+            !stats["unknown-slm"].is_calibrated(None),
+            "Unfingerprinted profile must fail-safe and never yield is_calibrated = true"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cascade_determinism() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        let key = "det_entity";
+        collection
+            .insert(
+                key,
+                &vec_data,
+                Some(json!({"text": "deterministic content"})),
+            )
+            .await
+            .unwrap();
+
+        let eid = EntityId::from_doc_id(contextra_core::DocId::new(1));
+        let tx = db.allocate_tx().unwrap();
+        let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
+        db.inner_storage()
+            .put(tx, &comm_key, &serde_json::to_vec(&100u64).unwrap())
+            .await
+            .unwrap();
+        db.inner_storage().commit(tx).await.unwrap();
+
+        let p1 = SlmProfile::new(
+            "slm-1",
+            "http://localhost/1",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.0,
+        );
+        let p2 = SlmProfile::new(
+            "slm-2",
+            "http://localhost/2",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.0,
+        );
+
+        let router = create_test_router(collection, vec![p1, p2], None);
+
+        let first_decision = router
+            .route(&vec_data, "deterministic content")
+            .await
+            .unwrap();
+
+        for i in 0..50 {
+            let next_decision = router
+                .route(&vec_data, "deterministic content")
+                .await
+                .unwrap();
+            assert_eq!(
+                next_decision.profile.name, first_decision.profile.name,
+                "Inconsistent profile selected at iteration {}",
+                i
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_parallel_route_conformal_calibration_monotonic_convergence() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        let key = "parallel_conv_entity";
+        collection
+            .insert(
+                key,
+                &vec_data,
+                Some(json!({"text": "parallel convergence content"})),
+            )
+            .await
+            .unwrap();
+
+        let eid = EntityId::from_doc_id(contextra_core::DocId::new(1));
+        let tx = db.allocate_tx().unwrap();
+        let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
+        db.inner_storage()
+            .put(tx, &comm_key, &serde_json::to_vec(&100u64).unwrap())
+            .await
+            .unwrap();
+        db.inner_storage().commit(tx).await.unwrap();
+
+        use contextra_core::ConfigFingerprint;
+        let fp = ConfigFingerprint::new("llama-3b", "F16", "template", 0.5);
+        let profile = SlmProfile::new(
+            "parallel-conv-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.5,
+        )
+        .with_fingerprint(fp);
+
+        let router = Arc::new(create_test_router(collection, vec![profile], None));
+
+        // Spawn 100 parallel route() tasks and record outcome
+        let mut handles = Vec::new();
+        for _ in 0..100 {
+            let r = router.clone();
+            let vec_c = vec_data.clone();
+            handles.push(tokio::spawn(async move {
+                let decision = r.route(&vec_c, "parallel convergence content").await?;
+                r.record_outcome(decision.decision_id, RoutingOutcome::Success);
+                Ok::<(), ContextraError>(())
+            }));
+        }
+
+        for h in handles {
+            let res = h.await.unwrap();
+            assert!(res.is_ok(), "route() failed in parallel task: {:?}", res);
+        }
+
+        let stats = router.calibration_stats();
+        let st = &stats["parallel-conv-slm"];
+
+        // Verify exact selected counts and total window
+        assert_eq!(st.times_selected, 100);
+        assert_eq!(st.conformal.window_total, 100);
+
+        // Verify calibrated_min_score stays strictly bounded and non-oscillating
+        let lower_bound = st.original_min_score * 0.5;
+        let upper_bound = st.original_min_score * 2.0;
+        assert!(
+            st.calibrated_min_score >= lower_bound && st.calibrated_min_score <= upper_bound,
+            "calibrated_min_score {} out of bounds [{}, {}]",
+            st.calibrated_min_score,
+            lower_bound,
+            upper_bound
+        );
+    }
+
+    #[test]
+    fn test_conformal_calibrator_default_and_reset_window() {
+        use crate::profile::ConformalCalibrator;
+        let mut cal = ConformalCalibrator::default();
+        assert_eq!(cal.alpha, 0.05);
+        assert_eq!(cal.gamma, 0.01);
+        assert_eq!(cal.quantile_threshold, 0.5);
+        assert_eq!(cal.empirical_error_rate(), 0.0);
+
+        cal.update(0.8);
+        assert_eq!(cal.window_total, 1);
+        assert_eq!(cal.window_errors, 1);
+
+        cal.reset_window();
+        assert_eq!(cal.window_total, 0);
+        assert_eq!(cal.window_errors, 0);
+        assert_eq!(cal.empirical_error_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_profile_calibration_state_default_and_average_confidence() {
+        use crate::profile::ProfileCalibrationState;
+        let default_st = ProfileCalibrationState::default();
+        assert_eq!(default_st.times_selected, 0);
+        assert_eq!(default_st.average_confidence(), 1.0);
+
+        let mut st = ProfileCalibrationState::new(0.5);
+        st.times_selected = 2;
+        st.cumulative_confidence = 3.0;
+        assert_eq!(st.average_confidence(), 1.5);
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_reset_all_calibration() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let p1 = SlmProfile::new("p1", "http://ep1", vec![1], TokenBudget::default(), 0.1);
+        let p2 = SlmProfile::new("p2", "http://ep2", vec![2], TokenBudget::default(), 0.2);
+
+        let router = create_test_router(collection, vec![p1, p2], None);
+        {
+            let cal = router.calibration_stats();
+            assert_eq!(cal["p1"].times_selected, 0);
+        }
+
+        // Simulate selected counts
+        {
+            let current = router.state.load_full();
+            let mut new_state = (*current).clone();
+            if let Some(st1) = new_state.calibration.get_mut("p1") {
+                st1.times_selected = 10;
+            }
+            if let Some(st2) = new_state.calibration.get_mut("p2") {
+                st2.times_selected = 20;
+            }
+            router.state.store(Arc::new(new_state));
+        }
+
+        assert_eq!(router.calibration_stats()["p1"].times_selected, 10);
+        assert_eq!(router.calibration_stats()["p2"].times_selected, 20);
+
+        router.reset_all_calibration();
+        assert_eq!(router.calibration_stats()["p1"].times_selected, 0);
+        assert_eq!(router.calibration_stats()["p2"].times_selected, 0);
+    }
+
+    #[tokio::test]
+    async fn test_route_non_finite_query_embedding_err() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let p = SlmProfile::new("p", "http://ep", vec![1], TokenBudget::default(), 0.1);
+        let router = create_test_router(collection, vec![p], None);
+
+        let res_nan = router.route(&[f32::NAN, 0.0, 0.0, 0.0], "query").await;
+        assert!(
+            matches!(res_nan, Err(ContextraError::InvalidInput(msg)) if msg.contains("non-finite"))
+        );
+
+        let res_inf = router.route(&[f32::INFINITY, 0.0, 0.0, 0.0], "query").await;
+        assert!(
+            matches!(res_inf, Err(ContextraError::InvalidInput(msg)) if msg.contains("non-finite"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_empty_endpoint_err() {
+        let profile = SlmProfile::new("empty-ep", "  ", vec![1], TokenBudget::default(), 0.1);
+        let decision = RoutingDecision {
+            profile,
+            context: contextra_core::ContextWindow {
+                chunks: vec![],
+                total_tokens: 0,
+                truncated: false,
+            },
+            confidence: None,
+            decision_id: DecisionId::new(),
+            drift_status: None,
+        };
+
+        let res = dispatch_to_slm(&decision).await;
+        assert!(
+            matches!(res, Err(ContextraError::InvalidInput(msg)) if msg.contains("Empty MCP endpoint"))
+        );
+    }
+
+    #[test]
+    fn test_confidence_metrics_serde() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::router::ConfidenceMetrics;
+
+        let uncal = ConfidenceMetrics {
+            score_lower: None,
+            score_upper: None,
+            calibrated: false,
+            quantile_threshold: 0.5,
+            non_conformity_score: 0.2,
+            selection_margin: 1.5,
+        };
+
+        let json_uncal = serde_json::to_string(&uncal)?;
+        let val_uncal: serde_json::Value = serde_json::from_str(&json_uncal)?;
+        assert_eq!(val_uncal["calibrated"], false);
+        assert_eq!(val_uncal["non_conformity_score"], 0.2);
+        assert_eq!(val_uncal["selection_margin"], 1.5);
+        assert_eq!(val_uncal["quantile_threshold"], 0.5);
+
+        let deserialized_uncal: ConfidenceMetrics = serde_json::from_str(&json_uncal)?;
+        assert_eq!(deserialized_uncal, uncal);
+
+        let cal = ConfidenceMetrics {
+            score_lower: Some(0.4),
+            score_upper: Some(0.8),
+            calibrated: true,
+            quantile_threshold: 0.6,
+            non_conformity_score: 0.1,
+            selection_margin: 2.0,
+        };
+
+        let json_cal = serde_json::to_string(&cal)?;
+        let val_cal: serde_json::Value = serde_json::from_str(&json_cal)?;
+        assert_eq!(val_cal["calibrated"], true);
+        assert_eq!(val_cal["score_lower"], 0.4);
+        assert_eq!(val_cal["score_upper"], 0.8);
+        assert_eq!(val_cal["quantile_threshold"], 0.6);
+        assert_eq!(val_cal["non_conformity_score"], 0.1);
+        assert_eq!(val_cal["selection_margin"], 2.0);
+
+        let deserialized_cal: ConfidenceMetrics = serde_json::from_str(&json_cal)?;
+        assert_eq!(deserialized_cal, cal);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_serde_helpers_sorted_u64_set() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::serde_helpers::sorted_u64_set;
+        use std::collections::HashSet;
+
+        #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
+        struct TestContainer {
+            #[serde(with = "sorted_u64_set")]
+            set: HashSet<u64>,
+        }
+
+        let container = TestContainer {
+            set: [42, 10, 5, 100].into_iter().collect(),
+        };
+
+        let json = serde_json::to_string(&container)?;
+        assert_eq!(json, r#"{"set":[5,10,42,100]}"#);
+
+        let deserialized: TestContainer = serde_json::from_str(&json)?;
+        assert_eq!(deserialized, container);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_record_outcome_trains_calibration() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_coding = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "coding_doc",
+                &vec_coding,
+                Some(json!({"text": "function test() {}"})),
+            )
+            .await
+            .unwrap();
+
+        use contextra_core::ConfigFingerprint;
+        let fp = ConfigFingerprint::new("llama-3b", "F16", "template", 0.1);
+        let profile = SlmProfile::new(
+            "default",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.01,
+        )
+        .with_fingerprint(fp);
+
+        let router = create_test_router(collection, vec![profile], None);
+        let decision = router.route(&vec_coding, "function test").await.unwrap();
+
+        let cal_before = router.calibration_stats();
+
+        let recorded = router.record_outcome(decision.decision_id, RoutingOutcome::Success);
+        assert!(recorded);
+
+        let cal_after = router.calibration_stats();
+        assert!(
+            cal_after["default"].conformal.window_total
+                > cal_before["default"].conformal.window_total,
+            "window_total should increase after record_outcome"
+        );
+    }
+
+    #[test]
+    fn test_decision_id_and_routing_outcome_methods() {
+        let default_id = DecisionId::default();
+        let new_id = DecisionId::new();
+        assert_ne!(default_id.inner(), new_id.inner());
+
+        let success = RoutingOutcome::Success;
+        let escalated = RoutingOutcome::Escalated {
+            escalated_to: "large-slm".to_string(),
+        };
+        let rejected = RoutingOutcome::Rejected {
+            reason: Some("incorrect answer".to_string()),
+        };
+
+        assert_eq!(success.non_conformity_score(), 0.0);
+        assert_eq!(escalated.non_conformity_score(), 0.7);
+        assert_eq!(rejected.non_conformity_score(), 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_persisted_calibration_loading() {
+        let dir = tempfile::tempdir().unwrap();
+        let cal_path = dir.path().join("calibration.json");
+
+        let p1 = SlmProfile::new("p1", "http://ep1", vec![1], TokenBudget::default(), 0.5);
+
+        let mut initial_map = std::collections::HashMap::new();
+        let mut p1_state = crate::profile::ProfileCalibrationState::new(0.5);
+        p1_state.times_selected = 42;
+        initial_map.insert("p1".to_string(), p1_state);
+
+        std::fs::write(&cal_path, serde_json::to_vec(&initial_map).unwrap()).unwrap();
+
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path().join("db"), config)
+            .await
+            .unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let router = create_test_router(collection, vec![p1], Some(cal_path));
+        let stats = router.calibration_stats();
+        assert_eq!(stats["p1"].times_selected, 42);
+
+        let count = router.pending_decision_count();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_record_outcome_unknown_id_returns_false() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let profile = SlmProfile::new(
+            "default",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.01,
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+        let unknown_id = DecisionId::new();
+
+        assert!(!router.record_outcome(unknown_id, RoutingOutcome::Success));
+    }
+
+    #[tokio::test]
+    async fn test_lyapunov_drift_status_integration() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let profile = SlmProfile::new(
+            "test-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.01,
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+
+        // Initial status for unknown profile should be None
+        assert_eq!(router.drift_status("unknown-slm"), None);
+
+        // Set baseline distribution for test-slm
+        let baseline: Vec<f32> = (0..100).map(|i| (i as f32) / 100.0).collect();
+        assert!(router.set_lyapunov_baseline("test-slm", &baseline));
+
+        // Status before route call
+        assert_eq!(router.drift_status("test-slm"), None);
+        Ok(())
+    }
+
+    #[test]
+    fn test_lyapunov_observe_score_and_analyze_drift_detection() {
+        use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+
+        let mut watcher = LyapunovDriftWatcher::new(20);
+        let baseline: Vec<f32> = (0..100).map(|i| (i as f32) / 100.0 * 0.2).collect();
+        watcher.set_baseline(&baseline);
+
+        // Feed 50 stable scores close to baseline
+        for i in 0..50 {
+            let score = (i % 20) as f32 / 100.0;
+            watcher.observe_score(score);
+        }
+
+        match watcher.analyze() {
+            LyapunovResult::Stable { lyapunov_exponent } => {
+                assert!(
+                    lyapunov_exponent <= 0.05,
+                    "Expected lyapunov_exponent <= 0.05, got {}",
+                    lyapunov_exponent
+                );
+            }
+            other => panic!("Expected Stable after 50 stable scores, got {:?}", other),
+        }
+
+        // Feed 10 outlier scores (scores = 0.95)
+        let mut last_res = LyapunovResult::InsufficientData;
+        for _ in 0..10 {
+            last_res = watcher.observe_score(0.95);
+        }
+
+        assert_eq!(watcher.analyze(), last_res);
+        match last_res {
+            LyapunovResult::DriftDetected {
+                lyapunov_exponent,
+                reason,
+            } => {
+                assert!(lyapunov_exponent > 0.0);
+                assert!(reason.kl_divergence > 0.0);
+            }
+            other => panic!(
+                "Expected DriftDetected after 10 outlier scores, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn test_lyapunov_update_empty_scores_or_uninitialized_baseline() {
+        use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+
+        let mut watcher = LyapunovDriftWatcher::new(10);
+        // Empty update without baseline returns InsufficientData
+        let res_empty = watcher.update(&[]);
+        assert_eq!(res_empty, LyapunovResult::InsufficientData);
+
+        // Update with less than 30 auto-baseline scores returns InsufficientData
+        let res_small = watcher.update(&[0.1, 0.2]);
+        assert_eq!(res_small, LyapunovResult::InsufficientData);
+        assert_eq!(watcher.baseline_distribution.len(), 2);
+
+        // Score boundary clamping in histogram bins
+        let mut watcher_clamped = LyapunovDriftWatcher::new(5);
+        watcher_clamped.set_baseline(&vec![0.5; 50]);
+        // Scores out of [0.0, 1.0] bound (-0.5, 1.5, NaN) clamped safely without panic
+        let res_clamped = watcher_clamped.update(&[-0.5, 1.5, f32::NAN]);
+        assert_eq!(res_clamped, LyapunovResult::InsufficientData);
+    }
+
+    #[tokio::test]
+    async fn test_route_populates_drift_status_after_sufficient_data(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc_lyapunov",
+                &vec_data,
+                Some(json!({"text": "lyapunov test content"})),
+            )
+            .await?;
+
+        #[allow(unused_mut)]
+        let mut profile = SlmProfile::new(
+            "lyapunov-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.01,
+        );
+
+        #[cfg(feature = "bandit-routing")]
+        {
+            profile.bandit_state = Some(crate::bandit::BanditProfileState::cold_start(4, 0.5));
+        }
+
+        let router = create_test_router(collection, vec![profile], None);
+
+        // Perform 25 routing decisions
+        let mut last_decision = None;
+        for _ in 0..25 {
+            let decision = router.route(&vec_data, "lyapunov test content").await?;
+            last_decision = Some(decision);
+        }
+
+        let decision = last_decision.expect("decision present");
+        assert!(
+            decision.drift_status.is_some(),
+            "drift_status should be populated (Some) after 20+ routing decisions"
+        );
+        let status = decision.drift_status.unwrap();
+        assert!(
+            matches!(
+                status,
+                crate::lyapunov::LyapunovResult::Stable { .. }
+                    | crate::lyapunov::LyapunovResult::DriftDetected { .. }
+            ),
+            "Expected Stable or DriftDetected, got {:?}",
+            status
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "bandit-routing")]
+    async fn test_route_triggers_bandit_drift_reaction() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc_drift",
+                &vec_data,
+                Some(json!({"text": "drift reaction content"})),
+            )
+            .await?;
+
+        let mut profile = SlmProfile::new(
+            "drift-slm",
+            "http://localhost:9999/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.01,
+        );
+        profile.bandit_state = Some(crate::bandit::BanditProfileState::cold_start(4, 0.5));
+
+        let router = create_test_router(collection, vec![profile], None);
+
+        // Baseline setzen damit Lyapunov Watcher sofort analysieren kann
+        let baseline: Vec<f32> = (0..50).map(|i| (i as f32) / 100.0 * 0.1).collect();
+        router.set_lyapunov_baseline("drift-slm", &baseline);
+
+        // Generiere synthetisch Outlier-Scores um DriftDetected auszulösen
+        let current_state = router.state.load_full();
+        let mut new_state = (*current_state).clone();
+        if let Some(watcher) = new_state.lyapunov_watchers.get_mut("drift-slm") {
+            for _ in 0..20 {
+                watcher.observe_score(0.95);
+            }
+        }
+        router.state.store(Arc::new(new_state));
+
+        // Nächster Aufruf löst DriftDetected aus und verdrahtet on_drift_detected
+        let decision = router.route(&vec_data, "drift reaction content").await?;
+        assert!(matches!(
+            decision.drift_status,
+            Some(crate::lyapunov::LyapunovResult::DriftDetected { .. })
+        ));
+
+        // Verifiziere, dass drift_steps_remaining im Bandit-Zustand des Profils aktiviert wurde
+        let active_profiles = router.profiles();
+        let bstate = active_profiles[0]
+            .bandit_state
+            .as_ref()
+            .expect("bandit state exists");
+        assert!(
+            bstate.drift_steps_remaining > 0,
+            "drift_steps_remaining muss nach erkannter Drift > 0 sein"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pending_decisions_evicted_after_ttl() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::router::{MAX_PENDING_DECISIONS, PENDING_DECISION_TTL};
+
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc1",
+                &vec_data,
+                Some(json!({"text": "eviction test content"})),
+            )
+            .await?;
+
+        let profile = SlmProfile::new(
+            "p1",
+            "http://localhost:8000/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+
+        // Fill pending_decisions with MAX_PENDING_DECISIONS stale entries older than TTL (300s)
+        let stale_timestamp =
+            std::time::Instant::now() - (PENDING_DECISION_TTL + std::time::Duration::from_secs(10));
+        {
+            let mut map = router.pending_decisions.write();
+            for _ in 0..MAX_PENDING_DECISIONS {
+                map.insert(DecisionId::new(), ("p1".to_string(), stale_timestamp));
+            }
+        }
+
+        assert_eq!(router.pending_decision_count(), MAX_PENDING_DECISIONS);
+
+        // Calling route() triggers evict_stale_decisions()
+        let decision = router.route(&vec_data, "eviction test content").await?;
+
+        // Stale entries should be evicted, leaving only the new decision
+        assert_eq!(router.pending_decision_count(), 1);
+        assert!(router.record_outcome(decision.decision_id, RoutingOutcome::Success));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_pending_decisions_max_capacity_enforced() -> Result<(), Box<dyn std::error::Error>>
+    {
+        use crate::router::{MAX_PENDING_DECISIONS, PENDING_DECISION_TTL};
+
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc1",
+                &vec_data,
+                Some(json!({"text": "capacity test content"})),
+            )
+            .await?;
+
+        let profile = SlmProfile::new(
+            "p1",
+            "http://localhost:8000/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let router = create_test_router(collection, vec![profile], None);
+
+        // Fill pending_decisions with MAX_PENDING_DECISIONS + 1 stale entries without record_outcome
+        let stale_timestamp =
+            std::time::Instant::now() - (PENDING_DECISION_TTL + std::time::Duration::from_secs(10));
+        {
+            let mut map = router.pending_decisions.write();
+            for _ in 0..=(MAX_PENDING_DECISIONS) {
+                map.insert(DecisionId::new(), ("p1".to_string(), stale_timestamp));
+            }
+        }
+
+        assert!(router.pending_decision_count() > MAX_PENDING_DECISIONS);
+
+        // Call route()
+        let _decision = router.route(&vec_data, "capacity test content").await?;
+
+        // Verify map size is <= MAX_PENDING_DECISIONS
+        assert!(router.pending_decision_count() <= MAX_PENDING_DECISIONS);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cascade_confidence_uses_conformal_alpha() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::profile::ProfileCalibrationState;
+        use crate::router::COMMUNITY_RELEVANCE_BOOST;
+        use contextra_core::{ConfigFingerprint, ContextChunk, DocId};
+        use std::collections::HashMap;
+
+        let fp = ConfigFingerprint::new("model1", "Q4_K_M", "prompt", 0.7);
+        let profile = SlmProfile::new(
+            "alpha-slm",
+            "http://localhost/alpha",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.4,
+        )
+        .with_fingerprint(fp.clone());
+
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let rt = tokio::runtime::Runtime::new()?;
+        let db = rt.block_on(Contextra::open_with_config(dir.path(), config))?;
+        let collection = rt.block_on(db.collection("default"))?;
+
+        let router = create_test_router(collection, vec![profile.clone()], None);
+
+        let mut cal_state = ProfileCalibrationState::new(0.4);
+        cal_state.conformal.alpha = 0.15;
+        cal_state.conformal.window_total = 100; // calibrated
+        cal_state.last_calibrated_fingerprint = Some(fp);
+
+        let mut calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+        calibration.insert("alpha-slm".to_string(), cal_state);
+
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "alpha test".to_string(),
+            relevance: 0.5,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+        let chunks = vec![(chunk, Some(1))];
+
+        let (_, _, metrics) =
+            router.select_profile_cascade(&chunks, &[profile], &mut calibration)?;
+
+        let score = 0.5 * COMMUNITY_RELEVANCE_BOOST;
+        assert!(metrics.calibrated);
+        let expected_lower = score * (1.0 - 0.15); // score * 0.85
+        let expected_upper = score * (1.0 + 0.15); // score * 1.15
+
+        let lower = metrics.score_lower.ok_or("score_lower missing")?;
+        let upper = metrics.score_upper.ok_or("score_upper missing")?;
+
+        assert!(
+            (lower - expected_lower).abs() < 1e-5,
+            "Expected {expected_lower}, got {lower}"
+        );
+        assert!(
+            (upper - expected_upper).abs() < 1e-5,
+            "Expected {expected_upper}, got {upper}"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cascade_non_conformity_score_not_zero() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::profile::ProfileCalibrationState;
+        use contextra_core::{ContextChunk, DocId};
+        use std::collections::HashMap;
+
+        let profile = SlmProfile::new(
+            "nc-slm",
+            "http://localhost/nc",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let rt = tokio::runtime::Runtime::new()?;
+        let db = rt.block_on(Contextra::open_with_config(dir.path(), config))?;
+        let collection = rt.block_on(db.collection("default"))?;
+
+        let router = create_test_router(collection, vec![profile.clone()], None);
+
+        let mut cal_state = ProfileCalibrationState::new(0.1);
+        cal_state.conformal.quantile_threshold = 0.8; // higher than score
+        let mut calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+        calibration.insert("nc-slm".to_string(), cal_state);
+
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "nc test".to_string(),
+            relevance: 0.4,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        };
+        let chunks = vec![(chunk, Some(1))];
+
+        let (_, _, metrics) =
+            router.select_profile_cascade(&chunks, &[profile], &mut calibration)?;
+
+        assert!(
+            metrics.non_conformity_score != 0.0,
+            "non_conformity_score should not be 0.0"
+        );
+        let expected_nc = (1.0 - (0.48 / 0.8f32)).clamp(0.0, 1.0);
+        assert!(
+            (metrics.non_conformity_score - expected_nc).abs() < 1e-5,
+            "Expected {expected_nc}, got {}",
+            metrics.non_conformity_score
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_quantization_level_default_and_try_new() {
+        use crate::profile::QuantizationLevel;
+
+        assert_eq!(QuantizationLevel::default(), QuantizationLevel::Unknown);
+
+        let valid = SlmProfile::try_new(
+            "valid",
+            "http://localhost:8000",
+            vec![1],
+            TokenBudget::default(),
+            0.5,
+        );
+        assert!(valid.is_ok());
+
+        let invalid_name = SlmProfile::try_new(
+            "   ",
+            "http://localhost:8000",
+            vec![1],
+            TokenBudget::default(),
+            0.5,
+        );
+        assert!(invalid_name.is_err());
+
+        let invalid_endpoint =
+            SlmProfile::try_new("valid", "   ", vec![1], TokenBudget::default(), 0.5);
+        assert!(invalid_endpoint.is_err());
+
+        let invalid_score = SlmProfile::try_new(
+            "valid",
+            "http://localhost:8000",
+            vec![1],
+            TokenBudget::default(),
+            f32::NAN,
+        );
+        assert!(invalid_score.is_err());
+
+        let invalid_neg_score = SlmProfile::try_new(
+            "valid",
+            "http://localhost:8000",
+            vec![1],
+            TokenBudget::default(),
+            -0.1,
+        );
+        assert!(invalid_neg_score.is_err());
+    }
+
+    #[test]
+    fn test_conformal_calibrator_empirical_rate_and_reset() {
+        use crate::profile::ConformalCalibrator;
+
+        let mut cal = ConformalCalibrator::default();
+        assert_eq!(cal.empirical_error_rate(), 0.0);
+
+        cal.update(0.9);
+        assert_eq!(cal.empirical_error_rate(), 1.0);
+
+        cal.update(0.1);
+        assert_eq!(cal.empirical_error_rate(), 0.5);
+
+        cal.reset_window();
+        assert_eq!(cal.window_errors, 0);
+        assert_eq!(cal.window_total, 0);
+        assert_eq!(cal.empirical_error_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_profile_calibration_state_edge_cases() {
+        use crate::profile::ProfileCalibrationState;
+        use contextra_core::ConfigFingerprint;
+
+        let mut state = ProfileCalibrationState::new(0.5);
+        assert_eq!(state.average_confidence(), 1.0);
+
+        assert!(!state.is_calibrated(None));
+
+        let fp = ConfigFingerprint::new("model", "F16", "hash", 0.7);
+        assert!(!state.is_calibrated(Some(&fp)));
+
+        state.conformal.window_total = 100;
+        state.last_calibrated_fingerprint = Some(fp.clone());
+        assert!(state.is_calibrated(Some(&fp)));
+
+        state.check_and_invalidate_fingerprint(None);
+        assert_eq!(state.last_calibrated_fingerprint, None);
+        assert_eq!(state.conformal.window_total, 0);
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_try_new_and_try_update_profiles_error_paths(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let invalid_profile =
+            SlmProfile::new("", "http://localhost", vec![1], TokenBudget::default(), 0.5);
+
+        let try_new_res =
+            try_create_test_router(collection.clone(), vec![invalid_profile.clone()], None);
+        assert!(try_new_res.is_err());
+
+        let valid_profile = SlmProfile::new(
+            "valid",
+            "http://localhost",
+            vec![1],
+            TokenBudget::default(),
+            0.5,
+        );
+        let router = create_test_router(collection, vec![valid_profile], None);
+
+        let try_update_res = router.try_update_profiles(vec![invalid_profile]);
+        assert!(try_update_res.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_drift_status_and_baseline_helpers(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let profile = SlmProfile::new(
+            "p1",
+            "http://localhost",
+            vec![1],
+            TokenBudget::default(),
+            0.5,
+        );
+        let router = create_test_router(collection, vec![profile], None);
+
+        assert!(router.drift_status("nonexistent").is_none());
+        assert!(!router.set_lyapunov_baseline("nonexistent", &[0.1, 0.2]));
+        assert!(router.set_lyapunov_baseline("p1", &[0.1, 0.2]));
+
+        assert_eq!(router.pending_decision_count(), 0);
+
+        router.reset_all_calibration();
+        assert_eq!(router.calibration_stats()["p1"].times_selected, 0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_select_profile_cascade_error_branches_and_fallback(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::profile::ProfileCalibrationState;
+        use contextra_core::{ContextChunk, DocId};
+        use std::collections::HashMap;
+
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let profile1 = SlmProfile::new(
+            "p1",
+            "http://localhost/1",
+            vec![1],
+            TokenBudget::default(),
+            0.9,
+        );
+        let profile2 = SlmProfile::new(
+            "p2",
+            "http://localhost/2",
+            vec![1],
+            TokenBudget::default(),
+            0.8,
+        );
+        let profiles = vec![profile1.clone(), profile2.clone()];
+        let router = create_test_router(collection, profiles.clone(), None);
+
+        let mut calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+        calibration.insert("p1".to_string(), ProfileCalibrationState::new(0.9));
+        calibration.insert("p2".to_string(), ProfileCalibrationState::new(0.8));
+
+        // 1. Empty chunks
+        let err_empty_chunks = router.select_profile_cascade(&[], &profiles, &mut calibration);
+        assert!(err_empty_chunks.is_err());
+
+        // 2. All NaN chunks
+        let nan_chunk = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "nan test".to_string(),
+            relevance: f32::NAN,
+            token_count: 2,
+            metadata: None,
+            contextual_prefix: None,
+            links: vec![],
+        };
+        let err_nan_chunks =
+            router.select_profile_cascade(&[(nan_chunk, Some(1))], &profiles, &mut calibration);
+        assert!(err_nan_chunks.is_err());
+
+        // 3. Empty profiles
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "test".to_string(),
+            relevance: 0.5,
+            token_count: 2,
+            metadata: None,
+            contextual_prefix: None,
+            links: vec![],
+        };
+        let err_empty_profiles =
+            router.select_profile_cascade(&[(chunk.clone(), Some(1))], &[], &mut calibration);
+        assert!(err_empty_profiles.is_err());
+
+        // 4. No matching communities
+        let err_no_comm = router.select_profile_cascade(
+            &[(chunk.clone(), Some(999))],
+            &profiles,
+            &mut calibration,
+        );
+        assert!(err_no_comm.is_err());
+
+        // 5. Cascade fallback path: relevance (0.1) is below both p1 (0.9) and p2 (0.8) thresholds
+        let low_chunk = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "low relevance".to_string(),
+            relevance: 0.1,
+            token_count: 2,
+            metadata: None,
+            contextual_prefix: None,
+            links: vec![],
+        };
+        let (fallback_idx, fallback_p, metrics) =
+            router.select_profile_cascade(&[(low_chunk, Some(1))], &profiles, &mut calibration)?;
+        assert_eq!(fallback_p.name, "p2");
+        assert_eq!(fallback_idx, 1);
+        assert!(!metrics.calibrated);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_additional_error_and_format_paths() {
+        use crate::dispatch_to_slm;
+        use contextra_core::{ContextWindow, TokenBudget};
+
+        let profile_exit = SlmProfile::new(
+            "test-exit",
+            "true", // exits immediately without writing
+            vec![],
+            TokenBudget::default(),
+            0.5,
+        );
+        let decision_exit = RoutingDecision {
+            profile: profile_exit,
+            context: ContextWindow {
+                chunks: vec![],
+                total_tokens: 0,
+                truncated: false,
+            },
+            confidence: None,
+            decision_id: crate::DecisionId::new(),
+            drift_status: None,
+        };
+
+        let res_exit = dispatch_to_slm(&decision_exit).await;
+        assert!(res_exit.is_err());
+        let err_msg = res_exit.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Fehler bei MCP-Dispatch")
+                || err_msg.contains("Process closed stdout"),
+            "Unexpected error message: {err_msg}"
+        );
+
+        // Test response returning result object without "answer" key
+        let profile_json_obj = SlmProfile::new(
+            "test-json-obj",
+            "sh -c 'cat > /dev/null; echo \"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":1,\\\"result\\\":{\\\"custom_key\\\":\\\"val\\\"}}\"'",
+            vec![],
+            TokenBudget::default(),
+            0.5,
+        );
+        let decision_json_obj = RoutingDecision {
+            profile: profile_json_obj,
+            context: ContextWindow {
+                chunks: vec![],
+                total_tokens: 0,
+                truncated: false,
+            },
+            confidence: None,
+            decision_id: crate::DecisionId::new(),
+            drift_status: None,
+        };
+
+        let res_obj = dispatch_to_slm(&decision_json_obj).await;
+        assert!(res_obj.is_ok());
+        assert!(res_obj.unwrap_or_default().contains("custom_key"));
+    }
+
+    #[test]
+    fn test_lyapunov_uncovered_branch_paths() {
+        use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+
+        let mut watcher = LyapunovDriftWatcher::new(10);
+        // 1. update with empty baseline and empty current_scores -> InsufficientData
+        let res = watcher.update(&[]);
+        assert_eq!(res, LyapunovResult::InsufficientData);
+
+        // 2. update with empty baseline and small current_scores (< 30) -> InsufficientData
+        let res = watcher.update(&[0.1, 0.2]);
+        assert_eq!(res, LyapunovResult::InsufficientData);
+
+        // 3. update with baseline populated, but current_scores empty -> returns latest_result or InsufficientData
+        watcher.set_baseline(&(0..35).map(|i| i as f32 / 35.0).collect::<Vec<_>>());
+        let res = watcher.update(&[]);
+        assert_eq!(res, LyapunovResult::InsufficientData);
+    }
+
+    #[tokio::test]
+    async fn test_router_engine_additional_coverage_paths() -> contextra_core::Result<()> {
+        use contextra_core::{ContextChunk, DocId, TokenBudget};
+
+        let dir = tempfile::tempdir()?;
+        let config = contextra_db::ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        // 1. Corrupt calibration_store_path
+        let corrupt_file = dir.path().join("corrupt_calibration.json");
+        std::fs::write(&corrupt_file, b"invalid json content")?;
+        let profile = SlmProfile::new(
+            "p1",
+            "http://localhost:1111",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.5,
+        );
+
+        let router = create_test_router(
+            collection.clone(),
+            vec![profile.clone()],
+            Some(corrupt_file),
+        );
+        assert_eq!(router.profiles().len(), 1);
+
+        // 2. Evict stale decisions map capacity overflow test
+        for _ in 0..(crate::router::MAX_PENDING_DECISIONS + 10) {
+            let id = crate::DecisionId::new();
+            router.pending_decisions.write().insert(
+                id,
+                (
+                    "p1".to_string(),
+                    std::time::Instant::now() - std::time::Duration::from_secs(600),
+                ),
+            );
+        }
+        assert!(router.pending_decision_count() > crate::router::MAX_PENDING_DECISIONS);
+        // Call route with invalid embedding to trigger evict_stale_decisions
+        let _ = router.route(&[f32::NAN], "query").await;
+        assert!(router.pending_decision_count() <= crate::router::MAX_PENDING_DECISIONS);
+
+        // 3. record_outcome without active fingerprint (or unknown profile fingerprint)
+        let dec_id = crate::DecisionId::new();
+        router
+            .pending_decisions
+            .write()
+            .insert(dec_id, ("p1".to_string(), std::time::Instant::now()));
+        assert!(router.record_outcome(dec_id, crate::RoutingOutcome::Success));
+
+        // 4. Cascade selection margin with 0 quantile_threshold
+        let mut cal_map = std::collections::HashMap::new();
+        let mut p_zero = SlmProfile::new(
+            "p_zero",
+            "http://localhost:0000",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.0,
+        );
+        p_zero.min_relevance_score = 0.0;
+        let mut state = crate::profile::ProfileCalibrationState::new(0.0);
+        state.conformal.quantile_threshold = 0.0;
+        cal_map.insert("p_zero".to_string(), state);
+
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
+            content: "zero thresh".to_string(),
+            relevance: 0.1,
+            token_count: 2,
+            metadata: None,
+            contextual_prefix: None,
+            links: vec![],
+        };
+        let (idx, prof, metrics) =
+            router.select_profile_cascade(&[(chunk, Some(1))], &[p_zero], &mut cal_map)?;
+        assert_eq!(idx, 0);
+        assert_eq!(prof.name, "p_zero");
+        assert_eq!(metrics.selection_margin, 1.0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_router_uses_cheapest_profile_during_warmup() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let vec_data = vec![1.0, 0.0, 0.0, 0.0];
+        collection
+            .insert(
+                "doc_warmup",
+                &vec_data,
+                Some(json!({"text": "warmup fallback content"})),
+            )
+            .await
+            .unwrap();
+
+        // Create 3 profiles in arbitrary configuration order (expensive first)
+        let expensive_profile = SlmProfile::new(
+            "expensive-slm",
+            "http://localhost:8001/mcp",
+            vec![],
+            TokenBudget::new(200_000, 100),
+            0.8,
+        )
+        .with_resource_cost_estimate(100.0);
+
+        let mid_profile = SlmProfile::new(
+            "mid-slm",
+            "http://localhost:8002/mcp",
+            vec![],
+            TokenBudget::new(32_768, 100),
+            0.5,
+        )
+        .with_resource_cost_estimate(50.0);
+
+        let cheapest_profile = SlmProfile::new(
+            "cheapest-slm",
+            "http://localhost:8003/mcp",
+            vec![],
+            TokenBudget::new(8_192, 100),
+            0.2,
+        )
+        .with_resource_cost_estimate(10.0);
+
+        // Input configuration order: expensive, cheapest, mid
+        let profiles = vec![expensive_profile, cheapest_profile, mid_profile];
+
+        let router = create_test_router(collection, profiles, None);
+
+        // Before reaching CALIBRATION_WARMUP_WINDOW samples (calibrated == false)
+        let decision = router
+            .route(&vec_data, "warmup fallback content")
+            .await
+            .expect("routing during warmup succeeds");
+
+        assert_eq!(
+            decision.profile.name, "cheapest-slm",
+            "During warmup (calibrated == false), router must deterministically select the profile with lowest cost"
+        );
+        assert!(!decision.confidence.as_ref().unwrap().calibrated);
+    }
+
+    #[test]
+    fn test_slm_profile_nan_and_negative_validation_bounds() {
+        // min_relevance_score NaN validation
+        let res_nan_score = SlmProfile::try_new(
+            "nan-score-slm",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            f32::NAN,
+        );
+        assert!(res_nan_score.is_err());
+        assert!(res_nan_score
+            .unwrap_err()
+            .to_string()
+            .contains("min_relevance_score"));
+
+        // min_relevance_score negative validation
+        let res_neg_score = SlmProfile::try_new(
+            "neg-score-slm",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            -0.5,
+        );
+        assert!(res_neg_score.is_err());
+        assert!(res_neg_score
+            .unwrap_err()
+            .to_string()
+            .contains("min_relevance_score"));
+
+        // resource_cost_estimate NaN validation
+        let profile_nan_cost = SlmProfile::new(
+            "nan-cost-slm",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.5,
+        )
+        .with_resource_cost_estimate(f32::NAN);
+        assert!(profile_nan_cost.validate().is_err());
+
+        // resource_cost_estimate negative validation
+        let profile_neg_cost = SlmProfile::new(
+            "neg-cost-slm",
+            "http://localhost:8000/mcp",
+            vec![1],
+            TokenBudget::new(1000, 100),
+            0.5,
+        )
+        .with_resource_cost_estimate(-10.0);
+        assert!(profile_neg_cost.validate().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_overall_drift_status_aggregation() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let config = ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        let collection = db.collection("default").await?;
+
+        let p1 = SlmProfile::new("p1", "http://ep1", vec![1], TokenBudget::default(), 0.1);
+        let p2 = SlmProfile::new("p2", "http://ep2", vec![2], TokenBudget::default(), 0.1);
+
+        let router = create_test_router(collection, vec![p1, p2], None);
+
+        // Initial state before score observation -> "unbekannt"
+        assert_eq!(router.overall_drift_status(), "unbekannt");
+
+        // Force stable result on p1 -> "stabil"
+        {
+            let current = router.state.load_full();
+            let mut new_state = (*current).clone();
+            if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p1") {
+                watcher.latest_result = Some(crate::lyapunov::LyapunovResult::Stable {
+                    lyapunov_exponent: -0.1,
+                });
+            }
+            router.state.store(Arc::new(new_state));
+        }
+
+        assert_eq!(router.overall_drift_status(), "stabil");
+
+        // Set baseline for p1 and observe scores that trigger warning or critical
+        let baseline: Vec<f32> = (0..100).map(|i| (i as f32 / 100.0) * 0.1).collect();
+        router.set_lyapunov_baseline("p1", &baseline);
+
+        {
+            let current = router.state.load_full();
+            let mut new_state = (*current).clone();
+            if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p1") {
+                // Force a warning level drift
+                watcher.latest_result = Some(crate::lyapunov::LyapunovResult::DriftDetected {
+                    lyapunov_exponent: 0.1,
+                    reason: crate::lyapunov::DriftReason {
+                        kl_divergence: 0.5,
+                        lyapunov_exponent: 0.1,
+                    },
+                });
+            }
+            router.state.store(Arc::new(new_state));
+        }
+
+        assert_eq!(router.overall_drift_status(), "warnung");
+
+        {
+            let current = router.state.load_full();
+            let mut new_state = (*current).clone();
+            if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p2") {
+                // Force a critical level drift (> 0.2)
+                watcher.latest_result = Some(crate::lyapunov::LyapunovResult::DriftDetected {
+                    lyapunov_exponent: 0.3,
+                    reason: crate::lyapunov::DriftReason {
+                        kl_divergence: 1.5,
+                        lyapunov_exponent: 0.3,
+                    },
+                });
+            }
+            router.state.store(Arc::new(new_state));
+        }
+
+        assert_eq!(router.overall_drift_status(), "kritisch");
+        Ok(())
+    }
+
+    #[test]
+    fn test_slm_profile_estimated_cost_fallback() {
+        let budget = TokenBudget::new(4096, 512);
+        let profile_default =
+            SlmProfile::new("default-cost", "http://mcp", vec![], budget.clone(), 0.1);
+        assert_eq!(profile_default.estimated_cost(), 4096.0);
+
+        let profile_explicit = SlmProfile::new("explicit-cost", "http://mcp", vec![], budget, 0.1)
+            .with_resource_cost_estimate(12.5);
+        assert_eq!(profile_explicit.estimated_cost(), 12.5);
+    }
+}

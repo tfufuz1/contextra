@@ -94,7 +94,7 @@ test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 ✅ Alle Tags haben gültige TS: und SESSION: Felder
 ```
 
-### `cargo check --workspace --exclude memfuse-tauri`
+### `cargo check --workspace --exclude contextra-tauri`
 ```text
     Checking xtask v0.1.0 (/app/xtask)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.84s

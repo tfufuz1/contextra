@@ -63,30 +63,30 @@
   ],
   "p0_findings": [
     {
-      "crate": "memfuse-db",
-      "file": "crates/memfuse-db/src/background_workers.rs",
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/background_workers.rs",
       "line": 272,
       "error": "E0061: tombstone_hyperedge requires 2 arguments (id, wal_tx) following commit 6d5025d",
       "action": "Needs signature update in Welle 8 / IP-20 integration prompt"
     },
     {
-      "crate": "memfuse-db",
-      "file": "crates/memfuse-db/src/homeostat.rs",
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/homeostat.rs",
       "line": 90,
       "error": "E0308: PidController::update requires Duration as first argument",
       "action": "Needs argument mapping update in Welle 8 / IP-20 integration prompt"
     }
   ],
   "crates": [
-    {"name":"memfuse-core-ipc-gen","check":"pass","clippy":"pass","test":"pass","result":"pass"},
-    {"name":"memfuse-core","check":"pass","clippy":"pass","test":"pass","result":"pass"},
-    {"name":"memfuse-store","check":"pass","clippy":"pass","test":"pass","result":"pass"},
-    {"name":"memfuse-index","check":"pass","clippy":"pass","test":"pass","result":"pass"},
-    {"name":"memfuse-graph","check":"pass","clippy":"pass","test":"pass","result":"pass"},
-    {"name":"memfuse-db","check":"fail","clippy":"fail","test":"fail","result":"fail_p0_compilation"},
-    {"name":"memfuse-checkpoint","check":"pass","clippy":"pass","test":"pass","result":"pass"},
-    {"name":"memfuse-crypto","check":"pass","clippy":"pass","test":"pass","result":"pass"},
-    {"name":"memfuse-embed","check":"pass","clippy":"pass","test":"pass","result":"pass"},
-    {"name":"memfuse-mcp","check":"pass","clippy":"pass","test":"pass","result":"pass"}
+    {"name":"contextra-core-ipc-gen","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"contextra-core","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"contextra-store","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"contextra-index","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"contextra-graph","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"contextra-db","check":"fail","clippy":"fail","test":"fail","result":"fail_p0_compilation"},
+    {"name":"contextra-checkpoint","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"contextra-crypto","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"contextra-embed","check":"pass","clippy":"pass","test":"pass","result":"pass"},
+    {"name":"contextra-mcp","check":"pass","clippy":"pass","test":"pass","result":"pass"}
   ]
 }

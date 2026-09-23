@@ -1,0 +1,53 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Contextra — Core storage, index, and transaction orchestrator engine"
+
+[dependencies]
+contextra-sys = { workspace = true }
+contextra-core = { workspace = true }
+bytes = { workspace = true }
+contextra-crypto = { workspace = true }
+contextra-store = { workspace = true }
+blake3 = { workspace = true }
+contextra-vector = { workspace = true }
+contextra-text = { workspace = true }
+contextra-checkpoint = { workspace = true }
+contextra-graph = { workspace = true }
+contextra-rank = { workspace = true }
+contextra-adapt = { workspace = true }
+ahash = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+tokio-util = { version = "0.7.18", features = ["rt"] }
+zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+tempfile = { workspace = true }
+proptest = "1.4"
+contextra-vector = { workspace = true, features = ["experimental-diskann"] }
+
+[features]
+default = []
+bench = []
+sandbox = []
+reranking = []
+onnx = []
+experimental-diskann = ["contextra-vector/experimental-diskann"]
+background-maintenance = []
+graph-connectivity-health = ["contextra-graph/physio-percolation"]
+docid-128 = ["contextra-core/docid-128"]
+edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
+coherence-bonus-fusion = []
+adaptive-candidate-pool-sizing = []

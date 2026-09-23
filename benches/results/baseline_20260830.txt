@@ -1,5 +1,5 @@
-warning: memfuse-core@0.1.0: flatc not found, using existing generated code.
-   Compiling memfuse-index v0.1.0 (/app/crates/memfuse-index)
+warning: contextra-core@0.1.0: flatc not found, using existing generated code.
+   Compiling contextra-index v0.1.0 (/app/crates/contextra-index)
     Finished `bench` profile [optimized] target(s) in 40.48s
      Running benches/distance_bench.rs (target/release/deps/distance_bench-631b1de1fed8d66c)
 Gnuplot not found, using plotters backend

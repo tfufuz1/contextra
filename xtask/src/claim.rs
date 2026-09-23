@@ -1,4 +1,4 @@
-// MemFuse — Claim / Reservation Mechanism Gate
+// Contextra — Claim / Reservation Mechanism Gate
 //
 // Koordiniert parallele Agenten-Sessions, um Mehrfach-Implementierungen (z.B. ConfigFingerprint #1627, #1634, #1645)
 // zu verhindern.
@@ -17,9 +17,9 @@ use crate::find_root_dir;
 /// Globales Standard-Parallelitäts-Limit für gleichzeitig aktive Claims.
 pub const MAX_ACTIVE_CLAIMS: usize = 3;
 
-/// Ermittelt das globale Parallelitäts-Limit (konfigurierbar über MEMFUSE_MAX_ACTIVE_CLAIMS).
+/// Ermittelt das globale Parallelitäts-Limit (konfigurierbar über CONTEXTRA_MAX_ACTIVE_CLAIMS).
 pub fn get_max_active_claims() -> usize {
-    std::env::var("MEMFUSE_MAX_ACTIVE_CLAIMS")
+    std::env::var("CONTEXTRA_MAX_ACTIVE_CLAIMS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(MAX_ACTIVE_CLAIMS)
@@ -362,14 +362,14 @@ pub fn run_claim_github(args: &[String]) -> bool {
         issue = "UNSPECIFIED".to_string();
     }
     if session_hash.is_empty() {
-        session_hash = std::env::var("MEMFUSE_SESSION_HASH")
+        session_hash = std::env::var("CONTEXTRA_SESSION_HASH")
             .or_else(|_| std::env::var("JULES_SESSION_ID"))
             .unwrap_or_else(|_| "local".to_string());
     }
 
     // Step c: Check existing issues with label "claim:<crate>" via GitHub REST API
     let check_url = format!(
-        "https://api.github.com/repos/tfufuz1/memfuse/issues?labels=claim:{}&state=open",
+        "https://api.github.com/repos/tfufuz1/contextra/issues?labels=claim:{}&state=open",
         krate
     );
     let output = std::process::Command::new("curl")
@@ -378,7 +378,7 @@ pub fn run_claim_github(args: &[String]) -> bool {
             "-H",
             &format!("Authorization: Bearer {}", token),
             "-H",
-            "User-Agent: memfuse-xtask",
+            "User-Agent: contextra-xtask",
             "-H",
             "Accept: application/vnd.github+json",
             &check_url,
@@ -413,7 +413,7 @@ pub fn run_claim_github(args: &[String]) -> bool {
     }
 
     // Step b: Create GitHub issue via REST API
-    let create_url = "https://api.github.com/repos/tfufuz1/memfuse/issues";
+    let create_url = "https://api.github.com/repos/tfufuz1/contextra/issues";
     let title = format!("CLAIM: {} — {}", krate, issue);
     let payload = serde_json::json!({
         "title": title,
@@ -440,7 +440,7 @@ pub fn run_claim_github(args: &[String]) -> bool {
             "-H",
             &format!("Authorization: Bearer {}", token),
             "-H",
-            "User-Agent: memfuse-xtask",
+            "User-Agent: contextra-xtask",
             "-H",
             "Accept: application/vnd.github+json",
             "-d",
@@ -493,7 +493,7 @@ mod tests {
 
         let mut db = ClaimsDatabase::default();
         db.claims.push(ClaimEntry {
-            krate: "memfuse-router".to_string(),
+            krate: "contextra-router".to_string(),
             issue: "ADR-063".to_string(),
             timestamp: "2026-09-08T18:00:00Z".to_string(),
             session_id: "s1".to_string(),
@@ -507,10 +507,10 @@ mod tests {
         let loaded = ClaimsDatabase::load(&path);
         assert_eq!(loaded.claims.len(), 1);
         assert_eq!(
-            loaded.find_active_claim("memfuse-router").unwrap().issue,
+            loaded.find_active_claim("contextra-router").unwrap().issue,
             "ADR-063"
         );
-        assert!(loaded.find_active_claim("memfuse-core").is_none());
+        assert!(loaded.find_active_claim("contextra-core").is_none());
     }
 
     #[test]
@@ -518,7 +518,7 @@ mod tests {
         let mut db = ClaimsDatabase::default();
         let past_exp = (Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
         db.claims.push(ClaimEntry {
-            krate: "memfuse-store".to_string(),
+            krate: "contextra-store".to_string(),
             issue: "EXP-1".to_string(),
             timestamp: "2026-09-08T18:00:00Z".to_string(),
             session_id: "s1".to_string(),
@@ -527,11 +527,11 @@ mod tests {
             released_at: None,
         });
 
-        assert!(db.find_active_claim("memfuse-store").is_none());
+        assert!(db.find_active_claim("contextra-store").is_none());
 
         let future_exp = (Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
         db.claims.push(ClaimEntry {
-            krate: "memfuse-embed".to_string(),
+            krate: "contextra-embed".to_string(),
             issue: "EXP-2".to_string(),
             timestamp: Utc::now().to_rfc3339(),
             session_id: "s2".to_string(),
@@ -541,7 +541,7 @@ mod tests {
         });
 
         assert_eq!(
-            db.find_active_claim("memfuse-embed").unwrap().issue,
+            db.find_active_claim("contextra-embed").unwrap().issue,
             "EXP-2"
         );
     }
@@ -552,7 +552,7 @@ mod tests {
         let claims_path = dir.path().join(".jules/claims.json");
         let mut db = ClaimsDatabase::default();
         db.claims.push(ClaimEntry {
-            krate: "memfuse-test-release".to_string(),
+            krate: "contextra-test-release".to_string(),
             issue: "REL-1".to_string(),
             timestamp: Utc::now().to_rfc3339(),
             session_id: "s1".to_string(),
@@ -563,11 +563,11 @@ mod tests {
         db.save(&claims_path).unwrap();
 
         // Check active claim initially
-        assert!(db.find_active_claim("memfuse-test-release").is_some());
+        assert!(db.find_active_claim("contextra-test-release").is_some());
 
         // Run release logic directly on the db
         for entry in db.claims.iter_mut() {
-            if entry.krate == "memfuse-test-release" && entry.active {
+            if entry.krate == "contextra-test-release" && entry.active {
                 entry.active = false;
                 entry.released_at = Some(Utc::now().to_rfc3339());
             }
@@ -575,7 +575,7 @@ mod tests {
         db.save(&claims_path).unwrap();
 
         let loaded = ClaimsDatabase::load(&claims_path);
-        assert!(loaded.find_active_claim("memfuse-test-release").is_none());
+        assert!(loaded.find_active_claim("contextra-test-release").is_none());
         assert!(!loaded.claims[0].active);
         assert!(loaded.claims[0].released_at.is_some());
     }
@@ -593,7 +593,7 @@ mod tests {
         std::env::remove_var("GITHUB_TOKEN");
         let args = vec![
             "--crate".to_string(),
-            "memfuse-test-fallback".to_string(),
+            "contextra-test-fallback".to_string(),
             "--issue".to_string(),
             "TEST-FB".to_string(),
             "--dry-run".to_string(),
@@ -613,7 +613,7 @@ mod tests {
 
         let mut db = ClaimsDatabase::default();
         db.claims.push(ClaimEntry {
-            krate: "memfuse-stale".to_string(),
+            krate: "contextra-stale".to_string(),
             issue: "STALE-1".to_string(),
             timestamp: "2026-09-08T18:00:00Z".to_string(),
             session_id: "s1".to_string(),
@@ -622,7 +622,7 @@ mod tests {
             released_at: None,
         });
         db.claims.push(ClaimEntry {
-            krate: "memfuse-active".to_string(),
+            krate: "contextra-active".to_string(),
             issue: "ACTIVE-1".to_string(),
             timestamp: Utc::now().to_rfc3339(),
             session_id: "s2".to_string(),
@@ -639,7 +639,7 @@ mod tests {
         assert_eq!(reloaded.claims.len(), 2);
 
         let stale = &reloaded.claims[0];
-        assert_eq!(stale.krate, "memfuse-stale");
+        assert_eq!(stale.krate, "contextra-stale");
         assert!(!stale.active);
         assert!(stale.released_at.is_some());
         assert!(stale
@@ -651,7 +651,7 @@ mod tests {
         assert_eq!(stale.session_id, "s1");
 
         let active = &reloaded.claims[1];
-        assert_eq!(active.krate, "memfuse-active");
+        assert_eq!(active.krate, "contextra-active");
         assert!(active.active);
         assert!(active.released_at.is_none());
     }
@@ -708,7 +708,7 @@ mod tests {
         let claims_path = dir.path().join(".jules/claims.json");
         let mut db = ClaimsDatabase::default();
         db.claims.push(ClaimEntry {
-            krate: "memfuse-test-explicit-release".to_string(),
+            krate: "contextra-test-explicit-release".to_string(),
             issue: "REL-2".to_string(),
             timestamp: Utc::now().to_rfc3339(),
             session_id: "s1".to_string(),
@@ -721,7 +721,7 @@ mod tests {
         let now_str = Utc::now().to_rfc3339();
         let released_str = format!("{} [RELEASED]", now_str);
         for entry in db.claims.iter_mut() {
-            if entry.krate == "memfuse-test-explicit-release" && entry.active {
+            if entry.krate == "contextra-test-explicit-release" && entry.active {
                 entry.active = false;
                 entry.released_at = Some(released_str.clone());
             }
@@ -739,7 +739,7 @@ mod tests {
 
     #[test]
     fn test_run_claim_local_concurrency_limit_exceeded() {
-        std::env::set_var("MEMFUSE_MAX_ACTIVE_CLAIMS", "2");
+        std::env::set_var("CONTEXTRA_MAX_ACTIVE_CLAIMS", "2");
         let future_exp = (Utc::now() + chrono::Duration::hours(2)).to_rfc3339();
         let mut db = ClaimsDatabase::default();
         db.claims.push(ClaimEntry {
@@ -764,6 +764,6 @@ mod tests {
         assert_eq!(db.count_active_claims(), 2);
         assert_eq!(get_max_active_claims(), 2);
 
-        std::env::remove_var("MEMFUSE_MAX_ACTIVE_CLAIMS");
+        std::env::remove_var("CONTEXTRA_MAX_ACTIVE_CLAIMS");
     }
 }

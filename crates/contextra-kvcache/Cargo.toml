@@ -1,0 +1,30 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-kvcache"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra"
+
+[dependencies]
+contextra-core = { workspace = true }
+contextra-crypto = { workspace = true }
+ahash = { workspace = true }
+lru = "0.16.4"
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+
+[features]
+default = []
+kv-encryption = ["contextra-crypto/kv-encryption"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+proptest = "1.4"

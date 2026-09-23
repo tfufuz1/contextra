@@ -310,7 +310,7 @@ pub fn run() -> bool {
                 if !extracted.is_empty() {
                     last_merge = extracted;
                 }
-            } else if trimmed.starts_with("| `memfuse-") {
+            } else if trimmed.starts_with("| `contextra-") {
                 let parts: Vec<&str> = trimmed.split('|').collect();
                 if parts.len() >= 5 {
                     let name = parts[1].trim().trim_matches('`').to_string();
@@ -403,31 +403,31 @@ mod tests {
 
 | Crate | Layer | LOC | Status | Beschreibung / Hauptaufgabe |
 | :--- | :---: | :---: | :--- | :--- |
-| `memfuse-core` | 1 | 9364 | 🟢 Clean | Core types |
-| `memfuse-embed` | 4 | 2033 | 🧊 Optional | Embedder |
-| `memfuse-custom` | 5 | 1000 | 🟡 Warning | Custom |
-| `memfuse-broken` | 6 | 500 | 🔴 Critical | Broken |
-| `memfuse-unknown-status` | 7 | 100 | ⚪ Unknown | Unknown |
+| `contextra-core` | 1 | 9364 | 🟢 Clean | Core types |
+| `contextra-embed` | 4 | 2033 | 🧊 Optional | Embedder |
+| `contextra-custom` | 5 | 1000 | 🟡 Warning | Custom |
+| `contextra-broken` | 6 | 500 | 🔴 Critical | Broken |
+| `contextra-unknown-status` | 7 | 100 | ⚪ Unknown | Unknown |
 "#;
 
         assert_eq!(
-            derive_status_from_working_state("memfuse-core", sample_ws),
+            derive_status_from_working_state("contextra-core", sample_ws),
             "✅"
         );
         assert_eq!(
-            derive_status_from_working_state("memfuse-embed", sample_ws),
+            derive_status_from_working_state("contextra-embed", sample_ws),
             "🧊"
         );
         assert_eq!(
-            derive_status_from_working_state("memfuse-custom", sample_ws),
+            derive_status_from_working_state("contextra-custom", sample_ws),
             "🟡"
         );
         assert_eq!(
-            derive_status_from_working_state("memfuse-broken", sample_ws),
+            derive_status_from_working_state("contextra-broken", sample_ws),
             "🔴"
         );
         assert_eq!(
-            derive_status_from_working_state("memfuse-unknown-status", sample_ws),
+            derive_status_from_working_state("contextra-unknown-status", sample_ws),
             "❓"
         );
         assert_eq!(

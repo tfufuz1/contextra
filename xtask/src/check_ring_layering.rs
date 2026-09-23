@@ -5,7 +5,7 @@
 //!   Ring 2 → types, ports, crypto
 //!   Ring 3 → Ring 0, Ring 1, Ports von Ring 2
 //!   Ring 4 → alle
-//!   Tooling → memfuse-testkit + gleiches/tieferes Ring
+//!   Tooling → contextra-testkit + gleiches/tieferes Ring
 
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -38,27 +38,27 @@ impl Ring {
 pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
     match crate_name {
         // Ring 0
-        "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
-        | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
-        | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-        | "memfuse-core" => Some(Ring::Ring0),
+        "contextra-types" | "contextra-ports" | "contextra-mvcc" | "contextra-vector"
+        | "contextra-rank" | "contextra-adapt" | "contextra-text" | "contextra-graph"
+        | "contextra-crypto" | "contextra-simd" | "contextra-sys" | "contextra-wire"
+        | "contextra-core" => Some(Ring::Ring0),
 
         // Ring 1
-        "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),
+        "contextra-store" | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
 
         // Ring 2
-        "memfuse-sandbox" | "memfuse-infer-onnx" | "memfuse-infer-candle"
-        | "memfuse-infer-ollama" => Some(Ring::Ring2),
+        "contextra-sandbox" | "contextra-infer-onnx" | "contextra-infer-candle"
+        | "contextra-infer-ollama" => Some(Ring::Ring2),
 
         // Ring 3
-        "memfuse-engine" | "memfuse-cognition" | "memfuse-privacy"
-        | "memfuse-router" | "memfuse-agent" | "memfuse-db" => Some(Ring::Ring3),
+        "contextra-engine" | "contextra-cognition" | "contextra-privacy"
+        | "contextra-router" | "contextra-agent" | "contextra-db" => Some(Ring::Ring3),
 
         // Ring 4
-        "memfuse" | "memfuse-mcp" | "memfuse-py" => Some(Ring::Ring4),
+        "contextra" | "contextra-mcp" | "contextra-py" => Some(Ring::Ring4),
 
         // Tooling
-        "memfuse-testkit" | "xtask" | "memfuse-bench" => Some(Ring::Tooling),
+        "contextra-testkit" | "xtask" | "contextra-bench" => Some(Ring::Tooling),
 
         _ => None,
     }
@@ -74,26 +74,26 @@ pub struct AllowlistEntry {
 
 pub const LAYER_ALLOWLIST: &[AllowlistEntry] = &[
     AllowlistEntry {
-        from_crate: "memfuse-graph",
-        to_crate: "memfuse-store",
+        from_crate: "contextra-graph",
+        to_crate: "contextra-store",
         target_phase: "Phase 1a",
-        reason: "Dev-dependency on store for graph integration tests; to be isolated into memfuse-testkit in Phase 1a",
+        reason: "Dev-dependency on store for graph integration tests; to be isolated into contextra-testkit in Phase 1a",
     },
     AllowlistEntry {
-        from_crate: "memfuse-infer-onnx",
-        to_crate: "memfuse-infer-candle",
+        from_crate: "contextra-infer-onnx",
+        to_crate: "contextra-infer-candle",
         target_phase: "Phase 1b",
         reason: "Embed depends on candle provider; execution provider abstraction in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-infer-candle",
-        to_crate: "memfuse-store",
+        from_crate: "contextra-infer-candle",
+        to_crate: "contextra-store",
         target_phase: "Phase 1b",
         reason: "Candle provider uses store directly; store traits abstraction in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-infer-ollama",
-        to_crate: "memfuse-infer-onnx",
+        from_crate: "contextra-infer-ollama",
+        to_crate: "contextra-infer-onnx",
         target_phase: "Phase 1b",
         reason: "Ollama provider dev-dependency on embed for benchmarks/tests; to be isolated in Phase 1b",
     },
@@ -193,7 +193,7 @@ pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<Ring
                 (Ring::Ring2, Ring::Ring0, _) => {
                     let allowed_ring0 = matches!(
                         dep_name.as_str(),
-                        "memfuse-types" | "memfuse-ports" | "memfuse-crypto" | "memfuse-core" | "memfuse-simd" | "memfuse-rank"
+                        "contextra-types" | "contextra-ports" | "contextra-crypto" | "contextra-core" | "contextra-simd" | "contextra-rank"
                     );
                     if allowed_ring0 {
                         None
@@ -313,11 +313,11 @@ mod tests {
 
     #[test]
     fn test_ring_mapping_all_crates_covered() {
-        assert_eq!(get_crate_ring("memfuse-core"), Some(Ring::Ring0));
-        assert_eq!(get_crate_ring("memfuse-store"), Some(Ring::Ring1));
-        assert_eq!(get_crate_ring("memfuse-infer-candle"), Some(Ring::Ring2));
-        assert_eq!(get_crate_ring("memfuse-db"), Some(Ring::Ring3));
-        assert_eq!(get_crate_ring("memfuse-mcp"), Some(Ring::Ring4));
+        assert_eq!(get_crate_ring("contextra-core"), Some(Ring::Ring0));
+        assert_eq!(get_crate_ring("contextra-store"), Some(Ring::Ring1));
+        assert_eq!(get_crate_ring("contextra-infer-candle"), Some(Ring::Ring2));
+        assert_eq!(get_crate_ring("contextra-db"), Some(Ring::Ring3));
+        assert_eq!(get_crate_ring("contextra-mcp"), Some(Ring::Ring4));
         assert_eq!(get_crate_ring("xtask"), Some(Ring::Tooling));
         assert_eq!(get_crate_ring("nonexistent"), None);
     }
@@ -327,17 +327,17 @@ mod tests {
         let mock_json = r#"{
             "packages": [
                 {
-                    "name": "memfuse-core",
+                    "name": "contextra-core",
                     "dependencies": []
                 },
                 {
-                    "name": "memfuse-store",
+                    "name": "contextra-store",
                     "dependencies": [
-                        { "name": "memfuse-core", "kind": null }
+                        { "name": "contextra-core", "kind": null }
                     ]
                 }
             ],
-            "workspace_members": ["memfuse-core", "memfuse-store"]
+            "workspace_members": ["contextra-core", "contextra-store"]
         }"#;
 
         let res = check_ring_layering_from_metadata_json(mock_json).unwrap();
@@ -349,23 +349,23 @@ mod tests {
         let mock_json = r#"{
             "packages": [
                 {
-                    "name": "memfuse-core",
+                    "name": "contextra-core",
                     "dependencies": [
-                        { "name": "memfuse-store", "kind": null }
+                        { "name": "contextra-store", "kind": null }
                     ]
                 },
                 {
-                    "name": "memfuse-store",
+                    "name": "contextra-store",
                     "dependencies": []
                 }
             ],
-            "workspace_members": ["memfuse-core", "memfuse-store"]
+            "workspace_members": ["contextra-core", "contextra-store"]
         }"#;
 
         let res = check_ring_layering_from_metadata_json(mock_json).unwrap();
         assert_eq!(res.len(), 1);
-        assert_eq!(res[0].from_crate, "memfuse-core");
-        assert_eq!(res[0].to_crate, "memfuse-store");
+        assert_eq!(res[0].from_crate, "contextra-core");
+        assert_eq!(res[0].to_crate, "contextra-store");
     }
 
     #[test]
@@ -373,11 +373,11 @@ mod tests {
         let mock_json = r#"{
             "packages": [
                 {
-                    "name": "memfuse-unknown-new-crate",
+                    "name": "contextra-unknown-new-crate",
                     "dependencies": []
                 }
             ],
-            "workspace_members": ["memfuse-unknown-new-crate"]
+            "workspace_members": ["contextra-unknown-new-crate"]
         }"#;
 
         let res = check_ring_layering_from_metadata_json(mock_json);

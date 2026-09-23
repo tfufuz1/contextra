@@ -1,4 +1,4 @@
-// MemFuse — Commit-Message Validation & CI Gate (Gate 16)
+// Contextra — Commit-Message Validation & CI Gate (Gate 16)
 //
 // Prüft, ob neue Commits im aktuellen Branch/PR gegenüber dem Base-Branch
 // aussagekräftige Commit-Messages gemäß Conventional Commits enthalten.
@@ -64,7 +64,7 @@ pub fn validate_commit_message(msg: &str) -> Result<(), String> {
 pub fn check_commit_messages() -> Result<(), String> {
     println!("=== Running xtask check-commit-messages ===");
 
-    let base_ref = env::var("MEMFUSE_CI_BASE_REF")
+    let base_ref = env::var("CONTEXTRA_CI_BASE_REF")
         .ok()
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "origin/main".to_string());

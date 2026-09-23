@@ -1,16 +1,16 @@
-# MemFuse — Betriebsanleitung für Autonome AI-Agenten (AGENTS.md)
+# Contextra — Betriebsanleitung für Autonome AI-Agenten (AGENTS.md)
 
 ## Stand 2026-09-20 · HEAD `6eb0c782145c65989718e86c058d6e859028933d`
 
 ---
 
 ## 1. Zweck
-Diese `AGENTS.md` ist die maßgebliche, operative Betriebsanleitung für autonome Coding-Agenten (insbesondere Google-Jules) im **MemFuse Cognitive OS** Repository. Bei Konflikten zwischen Prompt-Texten, Spezifikationen und Code gilt stets: **Code-Befund > `AGENTS.md` > Spezifikationen**.
+Diese `AGENTS.md` ist die maßgebliche, operative Betriebsanleitung für autonome Coding-Agenten (insbesondere Google-Jules) im **Contextra Cognitive OS** Repository. Bei Konflikten zwischen Prompt-Texten, Spezifikationen und Code gilt stets: **Code-Befund > `AGENTS.md` > Spezifikationen**.
 
 ---
 
 ## 2. Crate-Claiming & Session-Zustand (Single-Agent-Modus)
-Im Standardbetrieb läuft das MemFuse Cognitive OS im **Single-Agent-Modus** (`MEMFUSE_SINGLE_AGENT_MODE=1`, Default).
+Im Standardbetrieb läuft das Contextra Cognitive OS im **Single-Agent-Modus** (`CONTEXTRA_SINGLE_AGENT_MODE=1`, Default).
 * **Crate-Claiming:** Der bisher verpflichtende Claim-Schritt via `cargo xtask claim --crate <crate-name>` entfällt im Single-Agent-Modus. Der Session-Zustand wird stattdessen in `.jules/SESSION.md` gehalten.
 * **Multi-Agent-Reversibilität & `check-duplicate-intent`:** Der Claim-Mechanismus und das `check-duplicate-intent`-Gate bleiben inaktiv bzw. optional erhalten und können jederzeit reaktiviert werden, falls künftig wieder mehrere Agenten parallel an unterschiedlichen Crates arbeiten.
 
@@ -18,7 +18,7 @@ Im Standardbetrieb läuft das MemFuse Cognitive OS im **Single-Agent-Modus** (`M
 
 ## 3. Pflicht-Workflow
 Jeder Agent befolgt strikt den iterativen 5-Phasen-Workflow. Die detaillierten Phasen-Templates sind in [`docs/refactor/`](docs/refactor/) dokumentiert und einzusehen:
-1. **Phase 1: Exploration & Session:** Session-Zustand in `.jules/SESSION.md` prüfen/führen (Claim-Schritt entfällt im Single-Agent-Modus `MEMFUSE_SINGLE_AGENT_MODE=1`), Workspace-Status via `git status`, `read_file` und `bash` erforschen.
+1. **Phase 1: Exploration & Session:** Session-Zustand in `.jules/SESSION.md` prüfen/führen (Claim-Schritt entfällt im Single-Agent-Modus `CONTEXTRA_SINGLE_AGENT_MODE=1`), Workspace-Status via `git status`, `read_file` und `bash` erforschen.
 2. **Phase 2: Plan & Review:** Gliederung/Plan verfassen, `set_plan` setzen, Review via `request_plan_review` einholen.
 3. **Phase 3: Act:** Code/Dokumentation präzise und ununterbrochen bearbeiten, dabei ausschließlich den erlaubten Scope anfassen.
 4. **Phase 4: Verify:** Qualitätssicherung durchführen (siehe Verify-Pflichtbefehle unten).
@@ -43,12 +43,12 @@ Vor jedem Commit und Submit müssen folgende Verifikationsschritte in der Sandbo
 
 ## 6. Architektur-Invarianten (Kurzreferenz)
 Detaillierte Spezifikationen siehe [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-* **Zero-Panic-Doctrine:** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden. Fehler werden über `Result<T, MemFuseError>` propagiert.
+* **Zero-Panic-Doctrine:** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden. Fehler werden über `Result<T, ContextraError>` propagiert.
 * **Security & Shell Execution:** Prozessaufrufe dürfen niemals über Shell-Wrapper (`sh -c`) erfolgen; Parameter MUSS `shlex`-geparsed und als explizites Argumenten-Array übergeben werden.
-* **Zero-Copy & SIMD Alignment:** Zero-Copy Read-Pfade nutzen `bytes::Bytes`. SIMD-Puffer (`memfuse-simd`) erfordern 16/32-Byte-Ausrichtung; Bounds-Checks vor Unsafe-SIMD-Loads sind zwingend.
+* **Zero-Copy & SIMD Alignment:** Zero-Copy Read-Pfade nutzen `bytes::Bytes`. SIMD-Puffer (`contextra-simd`) erfordern 16/32-Byte-Ausrichtung; Bounds-Checks vor Unsafe-SIMD-Loads sind zwingend.
 * **Locking-Disziplin:** Hierarchie beachten (z. B. `NodesGuard` vor `ConsolidationNodesGuard`), um Deadlocks zu verhindern. Mutex/RwLock-Guards dürfen nicht über `.await`-Punkte gehalten werden.
 * **Ring-Modell & DAG-Regel:** Abweichungsfreie Einhaltung der Ring-0–4-Schichten. Kerne derselben Schicht dürfen sich nicht untereinander referenzieren.
-* **Unsafe-Inseln:** `unsafe` Code ist streng isoliert auf `memfuse-simd`, `memfuse-sys` und `memfuse-wire`. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
+* **Unsafe-Inseln:** `unsafe` Code ist streng isoliert auf `contextra-simd`, `contextra-sys` und `contextra-wire`. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
 
 ---
 
@@ -56,23 +56,23 @@ Detaillierte Spezifikationen siehe [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md
 
 | Crate | Ring | Status | Kurzbeschreibung |
 |---|---|---|---|
-| `memfuse-wire` | Ring 0 | ✅ vorhanden | FlatBuffers-Generat (`memfuse.fbs`) + IPC-Adapter (Unsafe-Insel) |
-| `memfuse-sys` | Ring 0 | ✅ vorhanden | Unsafe-Insel: `ReadOnlyMap` (mmap), Win32-ACL |
-| `memfuse-simd` | Ring 0 | ✅ vorhanden | Unsafe-Insel: SIMD-Distanzkernel, Laufzeit-Dispatch |
-| `memfuse-crypto` | Ring 0 | ✅ vorhanden | Package `memfuse-security`: Encryption-at-Rest, Zeroize |
-| `memfuse-text` | Ring 0 | ✅ vorhanden | BM25 Volltextsuche, deutsche Morphologie & Komposita |
-| `memfuse-graph` | Ring 0 | ✅ vorhanden | CSR-Graph, PPR, Leiden, Hyperkanten |
-| `memfuse-adapt` | Ring 0 | ✅ vorhanden | LinUCB-Bandit, Lyapunov, PID Controller |
-| `memfuse-store` | Ring 1 | ✅ vorhanden | LSM-Tree, WAL (Group Commit, HMAC), MVCC-Pin |
-| `memfuse-kvcache` | Ring 1 | ✅ vorhanden | In-Memory LRU-Cache, Eviction-Worker, Tenant-Isolation |
-| `memfuse-checkpoint` | Ring 1 | ✅ vorhanden | RAII-Checkpoint & Persistent Store Management |
-| `memfuse-sandbox` | Ring 2 | ✅ vorhanden | WASM Execution Boundary, Fuel + Wall-Clock Budgets |
-| `memfuse-router` | Ring 3 | ✅ vorhanden | SLM-Profil-Routing, MCP-Dispatch |
-| `memfuse-agent` | Ring 3 | ✅ vorhanden | Multi-Step Persistent Agent Workflow Loop |
-| `memfuse-mcp` | Ring 4 | ✅ vorhanden | Model Context Protocol stdio JSON-RPC 2.0 Server |
-| `memfuse-py` | Ring 4 | ✅ vorhanden | PyO3 Python-Bindings, FFI catch_unwind |
-| `memfuse-testkit` | Tooling | ✅ vorhanden | Fault-VFS, `ManualClock`, In-Memory-`StorageEngine` |
-| `memfuse-bench` | Tooling | ✅ vorhanden | Reproduzierbare Benchmark-Harness |
+| `contextra-wire` | Ring 0 | ✅ vorhanden | FlatBuffers-Generat (`contextra.fbs`) + IPC-Adapter (Unsafe-Insel) |
+| `contextra-sys` | Ring 0 | ✅ vorhanden | Unsafe-Insel: `ReadOnlyMap` (mmap), Win32-ACL |
+| `contextra-simd` | Ring 0 | ✅ vorhanden | Unsafe-Insel: SIMD-Distanzkernel, Laufzeit-Dispatch |
+| `contextra-crypto` | Ring 0 | ✅ vorhanden | Package `contextra-security`: Encryption-at-Rest, Zeroize |
+| `contextra-text` | Ring 0 | ✅ vorhanden | BM25 Volltextsuche, deutsche Morphologie & Komposita |
+| `contextra-graph` | Ring 0 | ✅ vorhanden | CSR-Graph, PPR, Leiden, Hyperkanten |
+| `contextra-adapt` | Ring 0 | ✅ vorhanden | LinUCB-Bandit, Lyapunov, PID Controller |
+| `contextra-store` | Ring 1 | ✅ vorhanden | LSM-Tree, WAL (Group Commit, HMAC), MVCC-Pin |
+| `contextra-kvcache` | Ring 1 | ✅ vorhanden | In-Memory LRU-Cache, Eviction-Worker, Tenant-Isolation |
+| `contextra-checkpoint` | Ring 1 | ✅ vorhanden | RAII-Checkpoint & Persistent Store Management |
+| `contextra-sandbox` | Ring 2 | ✅ vorhanden | WASM Execution Boundary, Fuel + Wall-Clock Budgets |
+| `contextra-router` | Ring 3 | ✅ vorhanden | SLM-Profil-Routing, MCP-Dispatch |
+| `contextra-agent` | Ring 3 | ✅ vorhanden | Multi-Step Persistent Agent Workflow Loop |
+| `contextra-mcp` | Ring 4 | ✅ vorhanden | Model Context Protocol stdio JSON-RPC 2.0 Server |
+| `contextra-py` | Ring 4 | ✅ vorhanden | PyO3 Python-Bindings, FFI catch_unwind |
+| `contextra-testkit` | Tooling | ✅ vorhanden | Fault-VFS, `ManualClock`, In-Memory-`StorageEngine` |
+| `contextra-bench` | Tooling | ✅ vorhanden | Reproduzierbare Benchmark-Harness |
 | `xtask` | Tooling | ✅ vorhanden | CI/CD Tasks, Preflight, Drift Gates, Layering Checks |
 
 ---

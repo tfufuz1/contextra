@@ -1,12 +1,12 @@
-# AUDIT: memfuse-graph — csr.rs compact() Lock-Pfad & Kontention
+# AUDIT: contextra-graph — csr.rs compact() Lock-Pfad & Kontention
 
 ## 1. Executive Summary & Audit-Kontext
 * **Datum:** 2026-08-30
 * **Audit-Typ:** READ-ONLY LOCK & KONTENTIONS-ANALYSE
-* **Ziel-Crate:** `crates/memfuse-graph` (Layer 2)
-* **Analysierter Bereich:** `crates/memfuse-graph/src/csr.rs` (insbesondere `GraphInner::compact()`, `CsrGraph::compact()`, `CsrGraph::compact_async()`, `InnerWriteGuard`, sowie Einbindung in `personalized_page_rank`)
+* **Ziel-Crate:** `crates/contextra-graph` (Layer 2)
+* **Analysierter Bereich:** `crates/contextra-graph/src/csr.rs` (insbesondere `GraphInner::compact()`, `CsrGraph::compact()`, `CsrGraph::compact_async()`, `InnerWriteGuard`, sowie Einbindung in `personalized_page_rank`)
 * **Status:** AUDIT COMPLETED — KEIN PRODUKTIONSCODE GEÄNDERT.
-* **Parallelitäts-Hinweis:** Claim `cargo xtask claim --crate memfuse-graph --mode audit-readonly` registriert. J3 (Welle 1) analysiert parallel `ppr.rs`/`csr.rs` mit Fokus auf die Fusion-Grenze. Da beide Vorgänge ausschließlich lesend operieren, bestehen keine Schreibkonflikte.
+* **Parallelitäts-Hinweis:** Claim `cargo xtask claim --crate contextra-graph --mode audit-readonly` registriert. J3 (Welle 1) analysiert parallel `ppr.rs`/`csr.rs` mit Fokus auf die Fusion-Grenze. Da beide Vorgänge ausschließlich lesend operieren, bestehen keine Schreibkonflikte.
 
 ---
 
@@ -91,7 +91,7 @@
 ## 3. Strict Invariants & APM Matrix Cross-Check
 
 ### Locking & Deadlock-Prävention
-* In `crates/memfuse-graph/src/csr.rs` werden weder `NodesGuard` (spezifisch für `session_dag.rs`) noch `ConsolidationNodesGuard` (spezifisch für `memfuse-db`) verwendet.
+* In `crates/contextra-graph/src/csr.rs` werden weder `NodesGuard` (spezifisch für `session_dag.rs`) noch `ConsolidationNodesGuard` (spezifisch für `contextra-db`) verwendet.
 * `CsrGraph` nutzt eine klare Trennung:
   - **Read-Path (RCU):** `ArcSwap<GraphInner>` via `inner_read()` — garantiert lock-freien Zugriff für Leser (einschließlich PPR).
   - **Write/Compaction-Path:** `parking_lot::Mutex<GraphInner>` (`write_state`) — serialisiert alle Modifikationen und Kompaktierungen.

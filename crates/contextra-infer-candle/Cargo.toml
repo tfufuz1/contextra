@@ -1,0 +1,55 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-infer-candle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Native Candle GGUF ML inference backend for Contextra"
+
+[dependencies]
+candle-core = "0.11"
+candle-nn = "0.11"
+candle-transformers = "0.11"
+tokenizers = "0.21"
+bytes = { workspace = true }
+sha2 = "0.10"
+tokio = { workspace = true }
+futures-util = "0.3"
+serde = { workspace = true }
+tracing = { workspace = true }
+bincode = { workspace = true, optional = true }
+half = "2.4"
+contextra-core = { workspace = true }
+contextra-ports = { workspace = true, optional = true }
+contextra-rank = { workspace = true }
+contextra-crypto = { workspace = true, optional = true }
+contextra-store = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = "1.4"
+criterion = { workspace = true }
+contextra-core = { workspace = true }
+contextra-crypto = { workspace = true }
+
+[[bench]]
+name = "kv_bridge_bench"
+harness = false
+required-features = ["kv-bridge"]
+
+[features]
+default = []
+candle = []
+docid-128 = ["contextra-core/docid-128"]
+kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode", "dep:contextra-store", "contextra-store"]
+kv-stage-b = ["dep:contextra-ports", "dep:bincode"]
+contextra-store = ["dep:contextra-store"]
+cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { version = "0.11", features = ["metal"] }
+candle-nn = { version = "0.11", features = ["metal"] }
+candle-transformers = { version = "0.11", features = ["metal"] }

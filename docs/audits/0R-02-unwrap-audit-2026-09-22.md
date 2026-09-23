@@ -14,7 +14,7 @@ In accordance with **Spec §0.4 (Zero-Panic Doctrine)** and workspace lint polic
 ### Summary Statistics
 * **Total Production Rust Files Checked:** 339 files across 27 workspace crates.
 * **Total Hits in Production Code Paths:** 82 occurrences.
-* **Real Production Risk (P0) Hits:** **1** occurrence in `crates/memfuse-store`.
+* **Real Production Risk (P0) Hits:** **1** occurrence in `crates/contextra-store`.
 * **Justified / Internal / Generated / Dev Tooling (P1) Hits:** **81** occurrences.
 
 ---
@@ -26,7 +26,7 @@ Each hit is classified according to the following risk taxonomy:
 * **P1 — Justified / Unreachable / Const / Internal Tooling:**
   * **P1-A (Unreachable):** Exhaustive match fallback where previous guard/match guarantees non-None/Ok or enum variant exhaustiveness.
   * **P1-B (Non-Unix Fallback):** Platform fallback code for non-Unix operating systems (`#[cfg(not(unix))]`).
-  * **P1-C (Generated Code):** Auto-generated FlatBuffers / Protobuf bindings (`memfuse_generated.rs`).
+  * **P1-C (Generated Code):** Auto-generated FlatBuffers / Protobuf bindings (`contextra_generated.rs`).
   * **P1-D (Internal Test Helper / FFI Panic Rig):** Explicit PyO3 helper methods designed specifically to test FFI panic isolation.
   * **P1-E (Xtask / Build Tooling):** Developer CLI utilities (`xtask/src/*.rs`) executed outside the engine runtime.
   * **P1-F (Fuzz Targets):** Specialized fuzzing driver files.
@@ -35,7 +35,7 @@ Each hit is classified according to the following risk taxonomy:
 
 ## 3. Crate-by-Crate Audit Findings
 
-### 3.1 `crates/memfuse-store` (4 hits) — **Contains 1 P0 Blocker**
+### 3.1 `crates/contextra-store` (4 hits) — **Contains 1 P0 Blocker**
 
 | File | Line | Kind | Context / Statement | Risk Class | Justification / Remedy |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -46,7 +46,7 @@ Each hit is classified according to the following risk taxonomy:
 
 ---
 
-### 3.2 `crates/memfuse-text` (1 hit)
+### 3.2 `crates/contextra-text` (1 hit)
 
 | File | Line | Kind | Context / Statement | Risk Class | Justification / Remedy |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -54,7 +54,7 @@ Each hit is classified according to the following risk taxonomy:
 
 ---
 
-### 3.3 `crates/memfuse-graph` (1 hit)
+### 3.3 `crates/contextra-graph` (1 hit)
 
 | File | Line | Kind | Context / Statement | Risk Class | Justification / Remedy |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -62,7 +62,7 @@ Each hit is classified according to the following risk taxonomy:
 
 ---
 
-### 3.4 `crates/memfuse-vector` (3 hits)
+### 3.4 `crates/contextra-vector` (3 hits)
 
 | File | Line | Kind | Context / Statement | Risk Class | Justification / Remedy |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -72,7 +72,7 @@ Each hit is classified according to the following risk taxonomy:
 
 ---
 
-### 3.5 `crates/memfuse-py` (3 hits)
+### 3.5 `crates/contextra-py` (3 hits)
 
 | File | Line | Kind | Context / Statement | Risk Class | Justification / Remedy |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -82,11 +82,11 @@ Each hit is classified according to the following risk taxonomy:
 
 ---
 
-### 3.6 `crates/memfuse-wire` (16 hits)
+### 3.6 `crates/contextra-wire` (16 hits)
 
 | File | Line | Kind | Context / Statement | Risk Class | Justification / Remedy |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `src/memfuse_generated.rs` | 106, 268, 463, 474, 791, 895, 1001, 1011, 1142, 1152, 1177, 1188, 1199, 1210, 1221, 1232 | `unwrap` | FlatBuffers generated table field accessors (`self._tab.get::<...>(...).unwrap()`) | **P1-C** | Auto-generated code produced by `flatc` compiler. Schema guarantees field presence or default fallback. |
+| `src/contextra_generated.rs` | 106, 268, 463, 474, 791, 895, 1001, 1011, 1142, 1152, 1177, 1188, 1199, 1210, 1221, 1232 | `unwrap` | FlatBuffers generated table field accessors (`self._tab.get::<...>(...).unwrap()`) | **P1-C** | Auto-generated code produced by `flatc` compiler. Schema guarantees field presence or default fallback. |
 
 ---
 
@@ -100,7 +100,7 @@ Each hit is classified according to the following risk taxonomy:
 
 ## 4. Verification and Compliance Status
 
-All 21 Tier-1 production crates (`memfuse-core`, `memfuse-store`, `memfuse-vector`, `memfuse-db`, `memfuse-text`, `memfuse-checkpoint`, `memfuse-crypto`, `memfuse-privacy`, `memfuse-graph`, `memfuse-mcp`, `memfuse-agent`, `memfuse-router`, `memfuse-calibration`, `memfuse-infer-candle`, `memfuse-sandbox`, `memfuse-py`, `memfuse-wire`, `memfuse-sys`, `memfuse-simd`, `memfuse-ports`, `memfuse-mvcc`) were verified against workspace lints and preflight gates:
+All 21 Tier-1 production crates (`contextra-core`, `contextra-store`, `contextra-vector`, `contextra-db`, `contextra-text`, `contextra-checkpoint`, `contextra-crypto`, `contextra-privacy`, `contextra-graph`, `contextra-mcp`, `contextra-agent`, `contextra-router`, `contextra-calibration`, `contextra-infer-candle`, `contextra-sandbox`, `contextra-py`, `contextra-wire`, `contextra-sys`, `contextra-simd`, `contextra-ports`, `contextra-mvcc`) were verified against workspace lints and preflight gates:
 
 1. **`just check`**: PASS — Workspace compiles cleanly.
 2. **`just dag-check`**: PASS — Ring layering invariants strictly preserved (no upward edges).
@@ -110,7 +110,7 @@ All 21 Tier-1 production crates (`memfuse-core`, `memfuse-store`, `memfuse-vecto
 
 ## 5. Recommended Action Items for FIX Tasks
 
-1. **Fix P0 Blocker in `crates/memfuse-store/src/wal/mod.rs` (Line 81):**
+1. **Fix P0 Blocker in `crates/contextra-store/src/wal/mod.rs` (Line 81):**
    - Replace `.unwrap()` with fallback `Permissions::from_mode(0o644)` or non-panicking `Permissions` construction under `#[cfg(not(unix))]`.
 2. **Maintenance / Refactoring (Optional):**
    - Convert `unreachable!()` statements in `quantize.rs` and `ppr.rs` into explicit error returns or exhaustive enum match arms where applicable.

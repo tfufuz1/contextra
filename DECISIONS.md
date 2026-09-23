@@ -1,7 +1,7 @@
 # Architecture Decision Records (ADR)
 
 > **Kanonische Einzel-Quelle:** Gemäß ADR-060 ist `DECISIONS.md` die einzige maßgebliche
-> Quelle für Architecture Decision Records im MemFuse-Projekt. Neue Entscheidungen werden
+> Quelle für Architecture Decision Records im Contextra-Projekt. Neue Entscheidungen werden
 > ausschließlich append-only am Ende dieser Datei ergänzt (`cargo xtask generate-adr "<Titel>"`).
 
 ## Dokumentierte Lücken & Umnummerierungen
@@ -52,7 +52,7 @@
 
 *   **Datum**: 2026-06-01
 *   **Status**: ✅ Final (Refactored)
-*   **Entscheidung**: Striktes `#![forbid(unsafe_code)]` in Layer 0-2 (ausgenommen SIMD in `memfuse-index`). Keine C-Bibliotheken im Default-Profil.
+*   **Entscheidung**: Striktes `#![forbid(unsafe_code)]` in Layer 0-2 (ausgenommen SIMD in `contextra-index`). Keine C-Bibliotheken im Default-Profil.
 *   **Alternativen**: Einbindung von C++ Vektorbibliotheken oder OpenSSL.
 *   **Begründung**: Gewährleistet maximale Speichersicherheit, deterministisches Cross-Compiling und unkomplizierten Betrieb in isolierten Systemen.
 
@@ -88,47 +88,47 @@
 
 *   **Datum**: 2026-07-19
 *   **Status**: ✅ Final
-*   **Entscheidung**: MemFuse wird als **eingebettete 4-Signal-Memory-Engine für lokale AI-Agenten** positioniert — kein Server, kein Docker, kein Cloud-Account. Primäre Vertriebskanäle: `pip install memfuse` (PyPI) und `cargo add memfuse-db` (crates.io). Richtung A (Sovereign Edge-DB) ist der langfristige Erweiterungspfad auf derselben Codebasis, nicht ein separater Pivot.
+*   **Entscheidung**: Contextra wird als **eingebettete 4-Signal-Memory-Engine für lokale AI-Agenten** positioniert — kein Server, kein Docker, kein Cloud-Account. Primäre Vertriebskanäle: `pip install contextra` (PyPI) und `cargo add contextra-db` (crates.io). Richtung A (Sovereign Edge-DB) ist der langfristige Erweiterungspfad auf derselben Codebasis, nicht ein separater Pivot.
 *   **Alternativen**:
     - (A) Air-Gapped / Sovereign Edge-DB — strategisch wertvoll, aber Enterprise-Vertrieb als Solo-Entwickler aktuell nicht realisierbar.
     - (B) DACH Enterprise-Search (Morphologie-Fokus) — das Morphologie-Merkmal ist zu schmal für ein eigenständiges Produkt, aber wertvoll als Differenzierungsfeature innerhalb von C.
 *   **Begründung**: Option C erfordert den geringsten Pivot (80% des Codes existiert bereits), liefert in 4–8 Wochen überprüfbares Feedback (Benchmarks, PyPI-Downloads statt 12+ Monate Enterprise-Verkaufszyklen), und schließt Richtung A nicht aus — im Gegenteil: Zero-C-Deps und ACID-Garantien sind der Vorbereitungsschritt für Sovereign Edge. Die Sovereign-Core-Eigenschaften bleiben vollständig erhalten.
 *   **Konsequenzen**:
-    - `memfuse-graph` und `memfuse-py` werden in den aktiven Workspace reaktiviert (höchste Priorität).
-    - `memfuse-cluster`, `memfuse-sandbox`, `memfuse-saos-agent` wurden physisch aus dem Repo entfernt (ausgelagert).
+    - `contextra-graph` und `contextra-py` werden in den aktiven Workspace reaktiviert (höchste Priorität).
+    - `contextra-cluster`, `contextra-sandbox`, `contextra-saos-agent` wurden physisch aus dem Repo entfernt (ausgelagert).
     - README und alle Governance-Dokumente werden auf "eingebettete Agent-Memory-Library" ausgerichtet.
 
 ---
 
 ---
 
-# ADR-008: Embedding-Backend — ONNX (memfuse-embed) → Ollama HTTP (memfuse-ollama)
+# ADR-008: Embedding-Backend — ONNX (contextra-embed) → Ollama HTTP (contextra-ollama)
 
 *   **Datum**: 2026-08-22
 *   **Status**: ✅ Final (Ersetzt ADR-007 bzgl. lokaler ONNX-Inferenz)
-*   **Entscheidung**: Ollama via `memfuse-ollama` als primäres Embedding-Backend. `memfuse-embed` wird vollständig aus Workspace-Dependencies und Features entfernt.
-*   **Alternativen**: ONNX In-Process Embeddings (`memfuse-embed`).
+*   **Entscheidung**: Ollama via `contextra-ollama` als primäres Embedding-Backend. `contextra-embed` wird vollständig aus Workspace-Dependencies und Features entfernt.
+*   **Alternativen**: ONNX In-Process Embeddings (`contextra-embed`).
 *   **Begründung**:
     - Ollama dient im KMU-Desktop-Szenario bereits als LLM-Runtime.
     - Modell-Tausch ohne Code-Änderung (Ollama-Modell-Name konfigurierbar).
     - Apple-Silicon ARM-Optimierung durch Ollama nativ vorhanden.
     - Reduziert C++ Native Build-Komplexität (kein ONNX-Runtime-Vendoring).
 *   **Kosten & Konsequenzen**:
-    - Höhere Latenz pro Embedding vs. In-Process-ONNX (mitigiert durch parallele Embedding-Batch-Requests in `memfuse-ollama`).
+    - Höhere Latenz pro Embedding vs. In-Process-ONNX (mitigiert durch parallele Embedding-Batch-Requests in `contextra-ollama`).
     - Harte Laufzeit-Abhängigkeit von lokalem Ollama-Prozess.
-    - `memfuse-ollama` als shared Crate bereitgestellt für `memfuse-tauri`, `memfuse-mcp` und `memfuse-py`.
+    - `contextra-ollama` als shared Crate bereitgestellt für `contextra-tauri`, `contextra-mcp` und `contextra-py`.
 
 ---
 
 ---
 
-# ADR-009: Crate `memfuse-tauri` als Grundgerüst für Desktop-App ("MemFuse Brain")
+# ADR-009: Crate `contextra-tauri` als Grundgerüst für Desktop-App ("Contextra Brain")
 
 *   **Datum**: 2026-07-20
 *   **Status**: ✅ Final
-*   **Entscheidung**: Anlegen des Crates `crates/memfuse-tauri` als Tauri-Desktop-Applikation ("MemFuse Brain") und Einbindung als Workspace-Mitglied.
+*   **Entscheidung**: Anlegen des Crates `crates/contextra-tauri` als Tauri-Desktop-Applikation ("Contextra Brain") und Einbindung als Workspace-Mitglied.
 *   **Alternativen**: Reine CLI- oder HTTP-Server-Applikation.
-*   **Begründung**: Strategische Neuausrichtung hin zu einer benutzerfreundlichen Desktop-Anwendungs-Shell mit GUI und direkter Anbindung an die MemFuse Storage & Graph DB-Kern-Crates.
+*   **Begründung**: Strategische Neuausrichtung hin zu einer benutzerfreundlichen Desktop-Anwendungs-Shell mit GUI und direkter Anbindung an die Contextra Storage & Graph DB-Kern-Crates.
 
 ---
 
@@ -138,16 +138,16 @@
 
 *   **Datum**: 2026-08-23
 *   **Status**: ✅ Final
-*   **Entscheidung**: `memfuse-mcp` implementiert den stdio-Transport des Model Context Protocol (MCP Spec v2024-11-05) anstelle eines HTTP-REST-Stubs. Alle JSON-RPC-Nachrichten werden zeilenweise über stdin/stdout ausgetauscht.
+*   **Entscheidung**: `contextra-mcp` implementiert den stdio-Transport des Model Context Protocol (MCP Spec v2024-11-05) anstelle eines HTTP-REST-Stubs. Alle JSON-RPC-Nachrichten werden zeilenweise über stdin/stdout ausgetauscht.
 *   **Alternativen**: SSE+HTTP-Transport (ebenfalls MCP-konform, aber komplexer für lokale Clients).
 *   **Begründung**:
     - Claude Desktop, Cursor und andere MCP-Clients erwarten für lokale Server den stdio-Transport per Definition.
     - stdio ist zero-config (kein Port-Binding, keine Firewall-Regeln, kein TLS).
     - Logging wird auf stderr beschränkt, damit stdout ausschließlich dem Protokoll gehört.
-    - axum/tower-Abhängigkeiten aus `memfuse-mcp` entfernt; das Crate verwendet nur tokio-util + futures-util als zusätzliche Dependencies (bereits transitiv im Workspace vorhanden).
+    - axum/tower-Abhängigkeiten aus `contextra-mcp` entfernt; das Crate verwendet nur tokio-util + futures-util als zusätzliche Dependencies (bereits transitiv im Workspace vorhanden).
 *   **Konsequenzen**:
     - `mcp.json` im Repo-Root enthält das `mcpServers`-Format für Claude Desktop.
-    - Kein HTTP-Listener mehr — der Server kann nicht via curl/Postman direkt getestet werden; stattdessen via `echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | cargo run --bin memfuse-mcp-server`.
+    - Kein HTTP-Listener mehr — der Server kann nicht via curl/Postman direkt getestet werden; stattdessen via `echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | cargo run --bin contextra-mcp-server`.
 
 ---
 
@@ -157,9 +157,9 @@
 
 *   **Datum**: 2026-08-23
 *   **Status**: ✅ Final
-*   **Entscheidung**: Einführung des Trait `CheckpointCoordinator` in `memfuse-core::traits` zur Harmonisierung der Checkpoint-Architektur. `PersistentCheckpointStore` (in `memfuse-checkpoint`) implementiert `CheckpointCoordinator`. `Checkpointer`/`CheckpointGuard` in `memfuse-store` verbleiben als interne RAII-Guards für transaktionale WAL-Rollbacks.
-*   **Alternativen**: Physische Löschung von `memfuse-checkpoint` und Migration aller Typen in `memfuse-store`.
-*   **Begründung**: Klare Rollentrennung: `CheckpointCoordinator` stellt die öffentliche, benannte API für persistenten State bereit (verwendet in `memfuse-db`), während `Checkpointer`/`CheckpointGuard` RAII-Abstraktionen für WAL-Level Rollbacks innerhalb der LSM-Engine sind. Behebt Befund AGT-STORE-002 [DUPLICATION][MAJOR].
+*   **Entscheidung**: Einführung des Trait `CheckpointCoordinator` in `contextra-core::traits` zur Harmonisierung der Checkpoint-Architektur. `PersistentCheckpointStore` (in `contextra-checkpoint`) implementiert `CheckpointCoordinator`. `Checkpointer`/`CheckpointGuard` in `contextra-store` verbleiben als interne RAII-Guards für transaktionale WAL-Rollbacks.
+*   **Alternativen**: Physische Löschung von `contextra-checkpoint` und Migration aller Typen in `contextra-store`.
+*   **Begründung**: Klare Rollentrennung: `CheckpointCoordinator` stellt die öffentliche, benannte API für persistenten State bereit (verwendet in `contextra-db`), während `Checkpointer`/`CheckpointGuard` RAII-Abstraktionen für WAL-Level Rollbacks innerhalb der LSM-Engine sind. Behebt Befund AGT-STORE-002 [DUPLICATION][MAJOR].
 
 ---
 
@@ -169,7 +169,7 @@
 
 *   **Datum**: 2026-08-23
 *   **Status**: ✅ Final
-*   **Entscheidung**: Die Modul-Dokumentation von `memfuse-store/src/lib.rs` behauptet "Alle Disk-I/O via tokio::fs (zero std::fs imports)". Jedoch verwenden `SstableReader` und `SstableBuilder` `std::fs::File` innerhalb von `tokio::task::spawn_blocking`.
+*   **Entscheidung**: Die Modul-Dokumentation von `contextra-store/src/lib.rs` behauptet "Alle Disk-I/O via tokio::fs (zero std::fs imports)". Jedoch verwenden `SstableReader` und `SstableBuilder` `std::fs::File` innerhalb von `tokio::task::spawn_blocking`.
 *   **Alternativen**:
     - **Option A (Empfohlen)**: Doku und `docs/ARCHITECTURE.md` anpassen zu: *"tokio::fs für alle Metadaten- und Lifecycle-Operationen; std::fs::File ausschließlich innerhalb von spawn_blocking für Performanz-kritische Block-Level Random-Access Reads/Writes."*
     - **Option B**: Code vollständig auf `tokio::fs::File` refactoren (bringt Wrapper-Overhead bei wahlfreien Block-Zugriffen mit sich).
@@ -180,16 +180,16 @@
 
 ---
 
-# ADR-013: Gestuftes Vektorindex-Modell — HNSW Default + DiskANN Tier (memfuse-index)
+# ADR-013: Gestuftes Vektorindex-Modell — HNSW Default + DiskANN Tier (contextra-index)
 
 *   **Datum**: 2026-08-23 (Revidiert 2026-09-16 via ADR-083 / ADR §16.2)
 *   **Status**: ✅ Final (Formalisiert & Erweitert durch ADR-083)
 *   **Entscheidung**: HNSW bleibt Default-Index für mutable Kollektionen. DiskANN wird als offizieller Tier für große, leselastige Kollektionen verabschiedet. Die detaillierte Formalisierung, Gate-Bedingungen (Prompt 1.6 Tombstone-Fix & Prompt 1.7 SQ8-Drift-Fix) und der 4-Stufen-Migrationspfad werden normativ in **ADR-083 (ADR §16.2)** geregelt.
 *   **Alternativen**:
-    - **Option A**: Volle Integration durch Refactoring der `VectorIndex`-Abstraktion und Anpassung der `memfuse-db::Collection`, um dynamisch zwischen HNSW und DiskANN zu wechseln.
-*   **Begründung**: `memfuse-db::Collection` und `HnswIndex` sind aktuell extrem eng verzahnt (z.B. direkte Nutzung von `all_doc_ids_from_map()` in der Collection). Eine überhastete Integration würde die Architektur-Integrität und Snapshot-Isolation gefährden, da DiskANN derzeit `insert()` und `delete()` nicht vollständig (oder nur mit `Err`) implementiert. Option A hätte gravierende Umbauten am Kern-Datenfluss der Collection zur Folge gehabt. Das Verbergen von DiskANN schützt die Produktionspfade, lässt aber den Code für zukünftige Entwicklungen im Baum.
+    - **Option A**: Volle Integration durch Refactoring der `VectorIndex`-Abstraktion und Anpassung der `contextra-db::Collection`, um dynamisch zwischen HNSW und DiskANN zu wechseln.
+*   **Begründung**: `contextra-db::Collection` und `HnswIndex` sind aktuell extrem eng verzahnt (z.B. direkte Nutzung von `all_doc_ids_from_map()` in der Collection). Eine überhastete Integration würde die Architektur-Integrität und Snapshot-Isolation gefährden, da DiskANN derzeit `insert()` und `delete()` nicht vollständig (oder nur mit `Err`) implementiert. Option A hätte gravierende Umbauten am Kern-Datenfluss der Collection zur Folge gehabt. Das Verbergen von DiskANN schützt die Produktionspfade, lässt aber den Code für zukünftige Entwicklungen im Baum.
 *   **Konsequenzen**:
-    - `memfuse-db` nutzt HNSW weiterhin hartcodiert.
+    - `contextra-db` nutzt HNSW weiterhin hartcodiert.
     - Endnutzer sehen die DiskANN-Funktionalität nicht in der öffentlichen API.
 
 ---
@@ -200,7 +200,7 @@
 
 *   **Datum**: 2026-08-24
 *   **Status**: ✅ Final
-*   **Entscheidung**: `run_regex_transformation` (in `crates/memfuse-tauri/src/commands/transform.rs`) verwendet die `regex`-Crate v1.13.1 (NFA/DFA-basiert, kein Backtracking). Der `spawn_blocking` + `tokio::time::timeout`-Ansatz wird als defensives Sicherheitsnetz beibehalten, nicht als primärer ReDoS-Schutz. Ein `Arc<Semaphore>` in `AppState` begrenzt gleichzeitige Blocking-Thread-Belegungen auf `MAX_CONCURRENT_REGEX_OPS = 8`. <!-- doc-ref-ignore -->
+*   **Entscheidung**: `run_regex_transformation` (in `crates/contextra-tauri/src/commands/transform.rs`) verwendet die `regex`-Crate v1.13.1 (NFA/DFA-basiert, kein Backtracking). Der `spawn_blocking` + `tokio::time::timeout`-Ansatz wird als defensives Sicherheitsnetz beibehalten, nicht als primärer ReDoS-Schutz. Ein `Arc<Semaphore>` in `AppState` begrenzt gleichzeitige Blocking-Thread-Belegungen auf `MAX_CONCURRENT_REGEX_OPS = 8`. <!-- doc-ref-ignore -->
 *   **Alternativen**:
     - **Option A (verworfen)**: Kooperativer Abbruch via `Arc<AtomicBool>` + Iterator-Pattern über alle Matches. Nicht nötig, da die `regex`-Crate keine pathologischen Laufzeiten erzeugen kann (NFA garantiert lineare Zeit).
     - **Option B (verworfen)**: Wechsel auf `regex` mit PCRE-Syntax-Erweiterungen (Lookahead, Backreferences). Bricht die Linearitätsgarantie — explizit abgelehnt.
@@ -219,24 +219,24 @@
 
 ---
 
-# ADR-015: RAII CheckpointGuard Integration & Konsolidierung in `memfuse-checkpoint` (AGT-CKPT-001 / AGT-STORE-002)
+# ADR-015: RAII CheckpointGuard Integration & Konsolidierung in `contextra-checkpoint` (AGT-CKPT-001 / AGT-STORE-002)
 
 *   **Datum**: 2026-08-24
 *   **Status**: ✅ Final
 *   **Entscheidung**:
-    1. Das RAII-Guard-Muster für transaktionales Auto-Rollback bei Drop (`CheckpointGuard`) wird aus `memfuse-store::checkpoint` abstrahiert und als generischer Guard `CheckpointGuard<S: StorageEngine>` in `memfuse-checkpoint` (Layer 1) implementiert.
+    1. Das RAII-Guard-Muster für transaktionales Auto-Rollback bei Drop (`CheckpointGuard`) wird aus `contextra-store::checkpoint` abstrahiert und als generischer Guard `CheckpointGuard<S: StorageEngine>` in `contextra-checkpoint` (Layer 1) implementiert.
     2. `PersistentCheckpointStore` wird um ein optionales RAII-Guard-Verfahren ergänzt (`begin_guarded_checkpoint(...) -> Result<CheckpointGuard<S>>`), welches `StorageEngine::rollback_to_tx` im `Drop`-Handler ausführt, sofern der Guard nicht vorab via `.commit()` explizit konsumiert wurde.
-    3. `memfuse-store::checkpoint::Checkpointer` entfällt als redundantes Duplikat bzw. delegiert fortan intern an `PersistentCheckpointStore<LsmStorage>`.
+    3. `contextra-store::checkpoint::Checkpointer` entfällt als redundantes Duplikat bzw. delegiert fortan intern an `PersistentCheckpointStore<LsmStorage>`.
 *   **Alternativen**:
     - **Option A (Entkoppelt lassen)**: Führt zu dauerhafter Code-Duplizierung und zwei verschiedenen Checkpoint-Konzepten (`StateCheckpoint` vs `CheckpointMeta`), was gegen AGT-STORE-002 und AGT-CKPT-001 verstößt.
     - **Option B (Entfernen von CheckpointGuard)**: Entfernt die RAII-Garantie gegen Transaktions-Leaks bei Unhandled Panics oder unvollständigen Operationen.
 *   **Begründung**:
-    - `memfuse-checkpoint` ist Layer 1 und die in ADR-011 definierte Zielarchitektur für Checkpointing.
-    - `CheckpointGuard` hängt funktional nur vom Trait `memfuse_core::StorageEngine` ab (Layer 0), nicht von `LsmStorage` (Layer 1). Daher kann `CheckpointGuard<S: StorageEngine>` ohne DAG-Zyklen sauber in Layer 1 (`memfuse-checkpoint`) beheimatet werden.
+    - `contextra-checkpoint` ist Layer 1 und die in ADR-011 definierte Zielarchitektur für Checkpointing.
+    - `CheckpointGuard` hängt funktional nur vom Trait `contextra_core::StorageEngine` ab (Layer 0), nicht von `LsmStorage` (Layer 1). Daher kann `CheckpointGuard<S: StorageEngine>` ohne DAG-Zyklen sauber in Layer 1 (`contextra-checkpoint`) beheimatet werden.
     - Die bestehende öffentliche API von `PersistentCheckpointStore` und `CheckpointRegistry` bleibt zu 100% abwärtskompatibel erhalten.
 *   **Konsequenzen**:
-    - Verlinkung mit `AGT-STORE-002` in `memfuse-store`.
-    - Sobald der Entwurf vom Entwickler freigegeben ist, erfolgt die Migration in `memfuse-checkpoint` und `memfuse-store` ohne API-Bruch.
+    - Verlinkung mit `AGT-STORE-002` in `contextra-store`.
+    - Sobald der Entwurf vom Entwickler freigegeben ist, erfolgt die Migration in `contextra-checkpoint` und `contextra-store` ohne API-Bruch.
 
 ---
 
@@ -246,7 +246,7 @@
 
 *   **Datum**: 2026-08-25
 *   **Status**: ✅ Final
-*   **Entscheidung**: `DocId::from_key()` behält den 64-Bit-u64-Wrapper (BLAKE3 8-Byte Trunkierung) zur Kompatibilität mit HNSW- / Index-Knoten-IDs bei. In Layer 2 (`Collection::insert_op` / `Collection::update_op`) wird vor Indexierungs- / Schreiboperationen eine Kollisionsprüfung über den `doc_key` (Metadaten-Reverse-Lookup) durchgeführt. Im Falle einer Kollision für zwei unterschiedliche Quellschlüssel wird ein expliziter Fehler `MemFuseError::Internal("DocId-Kollision erkannt für Schlüssel '{id}' — bitte Support kontaktieren")` zurückgegeben (Fail-Safe).
+*   **Entscheidung**: `DocId::from_key()` behält den 64-Bit-u64-Wrapper (BLAKE3 8-Byte Trunkierung) zur Kompatibilität mit HNSW- / Index-Knoten-IDs bei. In Layer 2 (`Collection::insert_op` / `Collection::update_op`) wird vor Indexierungs- / Schreiboperationen eine Kollisionsprüfung über den `doc_key` (Metadaten-Reverse-Lookup) durchgeführt. Im Falle einer Kollision für zwei unterschiedliche Quellschlüssel wird ein expliziter Fehler `ContextraError::Internal("DocId-Kollision erkannt für Schlüssel '{id}' — bitte Support kontaktieren")` zurückgegeben (Fail-Safe).
 *   **Alternativen**:
     - **Option A**: Umstellung von `DocId` auf 128 Bit / 256 Bit UUID/Hash. Verworfen, da dies alle Vektor-Index-Anbindungen (HNSW-Knoten-IDs) und Speicherstrukturen grundlegend verändern würde.
     - **Option B (Bisheriger Status - verworfen)**: Stilles Überschreiben im Kollisionsfall (Fail-Silent). Verworfen, da dies zu inkonsistenter Datenkorruption zwischen Vektorsuche und Direktzugriff führt.
@@ -263,7 +263,7 @@
 
 *   **Datum**: 2026-08-24
 *   **Status**: ✅ Final
-*   **Entscheidung**: Die generelle Architekturregel ("`unsafe` ist ausschließlich in `memfuse-index/src/distance.rs` erlaubt") wird für `memfuse-index/src/diskann.rs` und `memfuse-index/src/persistence.rs` erweitert. Ein expliziter `unsafe { Mmap::map(...) }`-Aufruf ist dort zulässig, MUSS aber zwingend durch einen `// SAFETY:`-Kommentar begründet sein, der die Validität des File-Deskriptors und der Längenprüfung belegt. Modulweite `#![allow(unsafe_code)]`-Attribute bleiben strengstens verboten.
+*   **Entscheidung**: Die generelle Architekturregel ("`unsafe` ist ausschließlich in `contextra-index/src/distance.rs` erlaubt") wird für `contextra-index/src/diskann.rs` und `contextra-index/src/persistence.rs` erweitert. Ein expliziter `unsafe { Mmap::map(...) }`-Aufruf ist dort zulässig, MUSS aber zwingend durch einen `// SAFETY:`-Kommentar begründet sein, der die Validität des File-Deskriptors und der Längenprüfung belegt. Modulweite `#![allow(unsafe_code)]`-Attribute bleiben strengstens verboten.
 *   **Alternativen**:
     - **Option A**: Refactoring auf sichere I/O-Methoden (z. B. pread) ohne Mmap. Verworfen, da DiskANN (Out-of-Core) für maximale Lese-Performance und Memory-Sharing zwingend auf direktes Memory-Mapping großer Vektor-Graphen angewiesen ist. Die Latenzeinbußen wären inakzeptabel.
 *   **Begründung**: Mmap ist ein inhärent unsafer OS-Call, aber für High-Performance Vektor-Indizes unabdingbar. Die explizite Ausnahme legitimiert die Nutzung transparent und erzwingt gleichzeitig die Einhaltung lokaler `// SAFETY:`-Beweise, statt die generelle Code-Hygiene durch `#![allow(unsafe_code)]` auszuhebeln.
@@ -277,17 +277,17 @@
 
 *   **Datum**: 2026-08-24
 *   **Status**: ✅ Final
-*   **Kontext**: ADR-007 (2026-07-19) erklärt PyPI als primären Vertriebskanal und verwirft Desktop-App. ADR-009 (2026-07-20, einen Tag später) beschloss den Aufbau von memfuse-tauri. Heute ist memfuse-tauri das größte Feature-Investment. Kein ADR hat ADR-007 formal revidiert — beide galten gleichzeitig als "final".
-*   **Entscheidung**: MemFuse verfolgt eine bewusste Doppelstrategie:
-    - **Kanal 1 — Desktop-App** (memfuse-tauri / "MemFuse Brain"): Zielgruppe DACH-Unternehmensanwender, nicht-technische Nutzer. Positionierung als lokaler, air-gapped Unternehmensassistent. Aktiv in Entwicklung, primäres UI-Investment.
-    - **Kanal 2 — Library** (memfuse-py / memfuse-core): Zielgruppe Python-KI-Entwickler, Rust-Entwickler. Technisch fertig (maturin-Build, mcp-Dependencies), noch nicht in README dokumentiert. Nächster Schritt: `pip install`-Anleitung in README ergänzen.
+*   **Kontext**: ADR-007 (2026-07-19) erklärt PyPI als primären Vertriebskanal und verwirft Desktop-App. ADR-009 (2026-07-20, einen Tag später) beschloss den Aufbau von contextra-tauri. Heute ist contextra-tauri das größte Feature-Investment. Kein ADR hat ADR-007 formal revidiert — beide galten gleichzeitig als "final".
+*   **Entscheidung**: Contextra verfolgt eine bewusste Doppelstrategie:
+    - **Kanal 1 — Desktop-App** (contextra-tauri / "Contextra Brain"): Zielgruppe DACH-Unternehmensanwender, nicht-technische Nutzer. Positionierung als lokaler, air-gapped Unternehmensassistent. Aktiv in Entwicklung, primäres UI-Investment.
+    - **Kanal 2 — Library** (contextra-py / contextra-core): Zielgruppe Python-KI-Entwickler, Rust-Entwickler. Technisch fertig (maturin-Build, mcp-Dependencies), noch nicht in README dokumentiert. Nächster Schritt: `pip install`-Anleitung in README ergänzen.
 *   **Alternativen**: Einer der beiden Kanäle wird aufgegeben. Verworfen — beide adressieren komplementäre Zielgruppen ohne Kannibalisierung.
-*   **Begründung**: Die Desktop-App erreicht nicht-technische Nutzer über GUI-First-Erfahrung. Die Library erreicht KI-Entwickler über programmatische Integration. Beide teilen denselben Kern (memfuse-db, Layer 0–2). Die bisherige Inkohärenz lag nicht an der Strategie, sondern am fehlenden ADR der die Koexistenz formal legitimiert.
+*   **Begründung**: Die Desktop-App erreicht nicht-technische Nutzer über GUI-First-Erfahrung. Die Library erreicht KI-Entwickler über programmatische Integration. Beide teilen denselben Kern (contextra-db, Layer 0–2). Die bisherige Inkohärenz lag nicht an der Strategie, sondern am fehlenden ADR der die Koexistenz formal legitimiert.
 *   **Ersetzt**: ADR-007 bzgl. Vertriebskanal-Priorisierung (nicht bzgl. technischer Entscheidungen wie Zero-C-Deps, kein Docker).
 *   **Ergänzt**: ADR-009 (Desktop-App-Grundstein).
 *   **Konsequenzen**:
     - README-Aktualisierung (`pip install`-Anleitung) ist priorisierte Tech-Debt.
-    - Bis dahin: memfuse-tauri als primäres User-facing Produkt behandeln.
+    - Bis dahin: contextra-tauri als primäres User-facing Produkt behandeln.
 
 ---
 
@@ -300,9 +300,9 @@
 *   **Status**: ✅ Final
 *   **Kontext**: Anthropic Contextual Retrieval erfordert ein LLM-generiertes Dokument-Kontextpräfix vor der BM25- und Embedding-Indexierung von Chunks, um Vector & BM25-Verluste bei isolierten Text-Passagen zu verhindern.
 *   **Entscheidung**:
-    - `ContextChunk` in `memfuse-core` wird um das optionale Feld `contextual_prefix: Option<String>` (`#[serde(default, skip_serializing_if = "Option::is_none")]`) erweitert.
+    - `ContextChunk` in `contextra-core` wird um das optionale Feld `contextual_prefix: Option<String>` (`#[serde(default, skip_serializing_if = "Option::is_none")]`) erweitert.
     - Das Präfix wird NICHT im Originalinhalt des Chunks persistent überschrieben, sondern bei Bedarf synthetisiert und über `combined_text_owned()` ("prefix\n\ncontent") bereitgestellt.
-    - `OllamaClient` in `memfuse-ollama` wird um `ContextPrefixer` erweitert, welcher das Prompt-Caching-Muster durch Wiederverwendung des gekürzten `whole_doc`-Kontexts nutzt.
+    - `OllamaClient` in `contextra-ollama` wird um `ContextPrefixer` erweitert, welcher das Prompt-Caching-Muster durch Wiederverwendung des gekürzten `whole_doc`-Kontexts nutzt.
 *   **Alternativen**:
     - **Option A**: Erstellung eines separaten `ContextualDocumentChunk`-Typs außerhalb von `ContextChunk`. Verworfen, um Typ-Explosion und Inkonsistenzen in bestehenden Pipeline-Ketten zu vermeiden.
     - **Option B**: Festes Mutieren von `content` mit vorangestelltem Präfix. Verworfen, da Nutzer beim Retrieval den unveränderten Originaltext zurückerhalten sollen.
@@ -319,9 +319,9 @@
 *   **Status**: ✅ Final
 *   **Kontext**: Der strategische Forschungsbericht 2026-08-26 zeigt:
     Der Wettbewerb (Mem0 ECAI-2025, Zep/Graphiti, MemOS) hat sich zu
-    kognitiven Gedächtnisarchitekturen entwickelt. MemFuse als reiner
+    kognitiven Gedächtnisarchitekturen entwickelt. Contextra als reiner
     "4-Signal RAG-Engine" ist 2026/2027 nicht SOTA.
-*   **Entscheidung**: MemFuse positioniert sich als **Cognitive Operating
+*   **Entscheidung**: Contextra positioniert sich als **Cognitive Operating
     System für LLM-Agenten**. Das bedeutet:
     - Explizite Differenzierung von Gedächtnistypen (Episodic/Semantic/
       Procedural/Working) als Roadmap-Ziel ab Phase 2
@@ -340,7 +340,7 @@
 *   **Konsequenzen**:
     - README, SOURCE_OF_TRUTH, ARCHITECTURE werden auf "Cognitive OS"
       umformuliert (nicht nur "Memory Engine")
-    - docs/memfuse_strategic_roadmap.md wird auf 4-Phasen-Plan aktualisiert <!-- doc-ref-ignore -->
+    - docs/contextra_strategic_roadmap.md wird auf 4-Phasen-Plan aktualisiert <!-- doc-ref-ignore -->
     - Phase-2-Features (Gedächtnistypen, temporaler Graph) als ADR-geplant
 
 ---
@@ -355,18 +355,18 @@
 *   **Kontext**: Die RAG-Sprints (RAG-01 bis RAG-05) haben die Ingestion-
     und Retrieval-Pipeline mit mehreren Schichten erweitert. Diese
     Entscheidung kodifiziert die Gesamtarchitektur.
-*   **Entscheidung**: MemFuse implementiert eine mehrstufige RAG-Pipeline:
-    1. **Contextual Ingestion**: ContextPrefixEngine (memfuse-ollama)
+*   **Entscheidung**: Contextra implementiert eine mehrstufige RAG-Pipeline:
+    1. **Contextual Ingestion**: ContextPrefixEngine (contextra-ollama)
        generiert 50–100 Token LLM-Präfixe vor BM25/HNSW-Indexierung
     2. **4-Signal Indexierung**: HNSW + Contextual-BM25 + CSR-Graph +
        Metadaten parallel indexiert
     3. **Hybrid Retrieval via RRF**: Alle Signale über reciprocal_rank_fusion()
-       fusioniert (memfuse-db/fusion.rs) <!-- doc-ref-ignore -->
-    4. **Multi-Step Expansion**: MultiStepEngine (memfuse-db/multistep.rs) <!-- doc-ref-ignore -->
+       fusioniert (contextra-db/fusion.rs) <!-- doc-ref-ignore -->
+    4. **Multi-Step Expansion**: MultiStepEngine (contextra-db/multistep.rs) <!-- doc-ref-ignore -->
        führt bis zu 3 iterative Retrieval-Schleifen aus
-    5. **Cross-Encoder Reranking**: CrossEncoderReranker (memfuse-embed,
+    5. **Cross-Encoder Reranking**: CrossEncoderReranker (contextra-embed,
        --features onnx) reordnet Top-K Kandidaten (optionaler Schritt)
-    6. **Context Compaction**: ContextCompactor (memfuse-db/compaction.rs) <!-- doc-ref-ignore -->
+    6. **Context Compaction**: ContextCompactor (contextra-db/compaction.rs) <!-- doc-ref-ignore -->
        ersetzt alte Tool-Outputs durch StatusToken
 *   **Alternativen**: Jeder Schritt einzeln opt-in — zu komplex für Nutzer
 *   **Begründung**: Empirisch (Anthropic, 2024): Contextual Embeddings →
@@ -416,9 +416,9 @@
 *   **Kontext**: `Collection::relate()` führt Operationen über heterogene Storage-Backends (`LsmStorage` und `CsrGraph`) aus. Nachdem `storage.commit(tx)` aufgerufen wurde, ist der `TxBuffer`-Eintrag für `tx` geleert und im WAL dauerhaft persistiert. Ein nachfolgender Fehler in `graph_index.commit(tx)` führte dazu, dass `rollback_relate(tx)` aufgerufen wurde, was wiederum `storage.rollback(tx)` aufrief. Da `storage.rollback(tx)` jedoch nur uncommittete `TxBuffer`-Einträge verwirft (`tx_buffer.discard(tx)`), war der Rollback für den Storage-Teil ein wirkungsloser No-Op. Dies führte zu inkonsistentem Zustand zwischen Storage und Graph-Index.
 *   **Entscheidung**: Implementierung von Option A: Kompensierende Transaktion. Falls `storage.commit(tx)` erfolgreich ist, aber `graph_index.commit(tx)` fehlschlägt, wird eine kompensierende Löschtransaktion (`storage.delete()` + `storage.commit()`) mit einer neu allokierten `TxId` ausgeführt, um den bereits committeten Relations-Key wieder aus dem LSM-Storage zu entfernen (Tombstone-Eintrag schreiben).
 *   **Alternativen**:
-    - **Option B (2-Phase Commit Protocol)**: Einführung einer `prepare()`-Methode auf `GraphIndex`. Verworfen, da dies Trait-Verträge in `memfuse-core` und allen Implementierungen anpassen müsste und höhere API-Komplexität mit sich bringt.
+    - **Option B (2-Phase Commit Protocol)**: Einführung einer `prepare()`-Methode auf `GraphIndex`. Verworfen, da dies Trait-Verträge in `contextra-core` und allen Implementierungen anpassen müsste und höhere API-Komplexität mit sich bringt.
     - **Option C (Vereinheitlichung der Commit-Klammer)**: `CsrGraph` und `LsmStorage` in eine gemeinsame Transaktionsklammer verschmelzen. Verworfen, da `CsrGraph` in-memory eigene CSR-Strukturen und Delta-Buffer verwaltet und eine Zusammenlegung die Layer-Architektur aufbrechen würde.
-*   **Begründung**: Option A benötigt keine breaking API-Änderungen an den Trait-Schnittstellen (`memfuse-core`), hat vernachlässigbaren Performance-Overhead im Fehlerfall und ist vollständig konsistent mit bestehenden Tombstone- und Kompensationsmustern im Repo (wie `DbTransaction::commit()` in `transaction.rs`).
+*   **Begründung**: Option A benötigt keine breaking API-Änderungen an den Trait-Schnittstellen (`contextra-core`), hat vernachlässigbaren Performance-Overhead im Fehlerfall und ist vollständig konsistent mit bestehenden Tombstone- und Kompensationsmustern im Repo (wie `DbTransaction::commit()` in `transaction.rs`).
 *   **Konsequenzen**:
     - `Collection::relate()` führt bei Fehlschlag von `graph_index.commit(tx)` nach erfolgreichem `storage.commit(tx)` einen kompensierenden Delete-Commit aus.
     - Doc-Kommentare in `LsmStorage` und `StorageEngine` beschreiben die exakte Garantie: `rollback()` verwirft nur uncommittete `TxBuffer`-Einträge; ein Undo nach physischem Commit erfordert einen Compensating-Write.
@@ -432,9 +432,9 @@
 
 *   **Datum**: 2026-08-28
 *   **Status**: ✅ Final
-*   **Kontext**: Das Trait-Design in `memfuse-core::traits` definiert snapshot-isolierte Methoden `search_at` (`VectorIndex`, `TextIndex`, `StorageEngine`) und `traverse_at` (`GraphIndex`). Eine Quellcode-Analyse ergab, dass `scan_prefix_at` (`LsmStorage`) und `search_at` (`InvertedIndex`) voll snapshot-isoliert implementiert sind. `HnswIndex::search_at`, `DiskAnnIndex::search_at` und `CsrGraph::traverse_at` sind aktuell nicht überschrieben und liefern standardmäßig `Err(MemFuseError::PolicyViolation(...))` zurück. `Collection::hybrid_search()` verwendet für Vektor- und Graph-Signale die aktuellen in-memory Suchmethoden `search()` und `traverse()`, während Storage-Dokumenthydration und Textsuche über `snapshot_seq()` isoliert werden.
+*   **Kontext**: Das Trait-Design in `contextra-core::traits` definiert snapshot-isolierte Methoden `search_at` (`VectorIndex`, `TextIndex`, `StorageEngine`) und `traverse_at` (`GraphIndex`). Eine Quellcode-Analyse ergab, dass `scan_prefix_at` (`LsmStorage`) und `search_at` (`InvertedIndex`) voll snapshot-isoliert implementiert sind. `HnswIndex::search_at`, `DiskAnnIndex::search_at` und `CsrGraph::traverse_at` sind aktuell nicht überschrieben und liefern standardmäßig `Err(ContextraError::PolicyViolation(...))` zurück. `Collection::hybrid_search()` verwendet für Vektor- und Graph-Signale die aktuellen in-memory Suchmethoden `search()` und `traverse()`, während Storage-Dokumenthydration und Textsuche über `snapshot_seq()` isoliert werden.
 *   **Entscheidung**:
-    - Es wird explizit dokumentiert, dass Snapshot-Isolation in MemFuse aktuell auf Storage- (LSM-Tree) und Text-Signale (BM25) beschränkt ist. Vektorsuche (`HnswIndex`, `DiskAnnIndex`) und Graph-Traversal (`CsrGraph`) operieren auf dem jeweils aktuellen In-Memory-Zustand.
+    - Es wird explizit dokumentiert, dass Snapshot-Isolation in Contextra aktuell auf Storage- (LSM-Tree) und Text-Signale (BM25) beschränkt ist. Vektorsuche (`HnswIndex`, `DiskAnnIndex`) und Graph-Traversal (`CsrGraph`) operieren auf dem jeweils aktuellen In-Memory-Zustand.
     - Die Default-Fehlermeldungen in `VectorIndex::search_at` und `GraphIndex::traverse_at` werden präzisiert, um transparent auf ADR-024 zu verweisen: `"Snapshot isolation for vector/graph search is not yet implemented — tracked in ADR-024"`.
     - Sobald Snapshot-Isolation für In-Memory Vektor- und Graph-Strukturen implementiert wird, werden `HnswIndex::search_at`, `DiskAnnIndex::search_at` und `CsrGraph::traverse_at` überschrieben und in `Collection::hybrid_search()` angebunden.
 *   **Alternativen**:
@@ -443,7 +443,7 @@
 *   **Begründung**: Option B bzw. Klärung via ADR-024 stellt sicher, dass Entwickler und Nutzer exakt wissen, welche Signale snapshot-isoliert sind (Storage + Text) und welche auf dem aktuellen In-Memory-Stand arbeiten (Vektor + Graph), ohne falsche API-Versprechungen zu machen.
 *   **Konsequenzen**:
     - Aktualisierung der Invariantentabelle in `docs/ARCHITECTURE.md`.
-    - Aktualisierung der Trait-Default-Fehlermeldungen in `crates/memfuse-core/src/traits.rs`. <!-- doc-ref-ignore -->
+    - Aktualisierung der Trait-Default-Fehlermeldungen in `crates/contextra-core/src/traits.rs`. <!-- doc-ref-ignore -->
     - Hinzufügen expliziter Integrationstests, die das dokumentierte Verhalten absichern.
 
 ---
@@ -477,9 +477,9 @@
 *   **Datum**: 2026-08-28
 *   **Status**: ✅ Final
 *   **Entscheidung**:
-    1. Implementierung von Personalized PageRank (PPR) als eigenständige, deterministische Power-Iterations-Methode auf der bestehenden CSR-Struktur (`CsrGraph`) in `crates/memfuse-graph/src/ppr.rs` ohne externe Bibliotheken (wie `petgraph`).
-    2. Ergänzung von `PprConfig` und des Trait-Methoden-Contracts `personalized_page_rank` an `GraphIndex` in `memfuse-core`.
-    3. Integration von PPR in `HybridQuery` (`memfuse-core`) und `Collection::hybrid_search_with_strategy` (`memfuse-db`) über die additiv wählbare `GraphTraversalStrategy` (`Hops` vs `PersonalizedPageRank`). Standardverhalten bleibt unverändert `GraphTraversalStrategy::Hops` (3 Hops BFS decay).
+    1. Implementierung von Personalized PageRank (PPR) als eigenständige, deterministische Power-Iterations-Methode auf der bestehenden CSR-Struktur (`CsrGraph`) in `crates/contextra-graph/src/ppr.rs` ohne externe Bibliotheken (wie `petgraph`).
+    2. Ergänzung von `PprConfig` und des Trait-Methoden-Contracts `personalized_page_rank` an `GraphIndex` in `contextra-core`.
+    3. Integration von PPR in `HybridQuery` (`contextra-core`) und `Collection::hybrid_search_with_strategy` (`contextra-db`) über die additiv wählbare `GraphTraversalStrategy` (`Hops` vs `PersonalizedPageRank`). Standardverhalten bleibt unverändert `GraphTraversalStrategy::Hops` (3 Hops BFS decay).
 *   **Alternativen**:
     - **Option A (In-Tree `petgraph` Dependency)**: Verwendung von `petgraph` für PageRank. Verworfen, da `petgraph` eine Konvertierung/Kopie des CSR-Graphen erzwingen würde (Speicher- & Latenz-Overhead) und unkontrollierte Nicht-Determinismen einbringen könnte.
     - **Option B (`traverse` überschreiben)**: Ersetzung von BFS-Traversierung in `traverse()`. Verworfen, da BFS-Hop-Traversierung und PPR grundlegend unterschiedliche Retrieval-Semantiken besitzen (Hop-Distanz vs. Stationärverteilung eines Random-Walk-mit-Restart).
@@ -501,7 +501,7 @@
 *   **Entscheidung**:
     - Wahl des **Leiden-Algorithmus** anstelle von LPA/Louvain für deterministische, wohlverbundene Community-Erstellung.
     - Vollständig deterministische Ausführung durch fixierten RNG-Seed für Knoten-Shuffling und ein striktes Tie-Breaking: Bei relativer oder absoluter Gleichheit von Label-Gewichten gewinnt das kleinstmögliche `EntityId` (numerischer `u64`-Wert).
-    - Implementierung direkt auf der bestehenden `CsrGraph`-Struktur in `memfuse-graph::community` ohne zusätzliche externe Abhängigkeiten.
+    - Implementierung direkt auf der bestehenden `CsrGraph`-Struktur in `contextra-graph::community` ohne zusätzliche externe Abhängigkeiten.
     - Persolidierung im LSM-Storage über `Collection::run_community_detection()` mit strenger TxId-Allokation (`self.allocate_tx()`).
     - Anbindung an das Retrieval über `HybridQuery::same_community_as`, welches Kandidaten derselben Community vor der RRF-Fusion filtert bzw. verstärkt.
 *   **Alternativen**:
@@ -509,7 +509,7 @@
     - **Louvain-Algorithmus**: Louvain erzeugt nachweislich schwach verbundene oder isolierte Communities innerhalb zusammengefasster Cluster (Louvain-Dilemma).
 *   **Begründung**: Der Leiden-Algorithmus behebt das Louvain-Dilemma durch eine explizite *Refinement Phase* zwischen lokaler Knotenverschiebung und Graph-Aggregation. Leiden garantiert mathematisch wohlverbundene Communities bei O(N log N) / O(M) Ausführungsgeschwindigkeit und bitidentischem Determinismus.
 *   **Konsequenzen**:
-    - Modul `crates/memfuse-graph/src/community.rs` auf Leiden-Algorithmus umgestellt.
+    - Modul `crates/contextra-graph/src/community.rs` auf Leiden-Algorithmus umgestellt.
     - Öffentliche API (`detect_communities`, `CommunityDetectionConfig`, `CommunityAssignment`) bleibt 100% abwärtskompatibel.
 
 ---
@@ -533,7 +533,7 @@
     4. **Verpflichtendes Mehrfach-Session-Review (`REVIEW-PASS`)**: Einführung der Grammatik `REVIEW-PASS[N/M] STATUS:PASS|FAIL|CONDITIONAL` mit Pflichtfeld `PRÜFER-KONTEXT: FRESH`. Jede `STATUS:DONE`-Markierung eines `ANCHOR` erfordert 2 (Standard) bzw. 3 (`ASK`/security/unsafe) `REVIEW-PASS`-Einträge mit unterschiedlichen `SESSION:`-Hashes.
     5. **CI Gate 8**: Unterbefehl `cargo xtask check-review-coverage` erzwingt die Mindestanzahl unabhängiger Review-Pässe in CI (`context-gates.yml`).
 *   **Alternativen**:
-    - Einbindung externer Go/Python Task-Management-Tools (z.B. Beads). Verworfen, um MemFuse sovereigntiesicher und ohne Netzwerk/neue Fremdabhängigkeiten nativ über Rust/`xtask` zu betreiben.
+    - Einbindung externer Go/Python Task-Management-Tools (z.B. Beads). Verworfen, um Contextra sovereigntiesicher und ohne Netzwerk/neue Fremdabhängigkeiten nativ über Rust/`xtask` zu betreiben.
 *   **Begründung**: Beseitigt Merge-Konflikte strukturell durch Konstruktion, stellt sekundengenaue Rückverfolgbarkeit her und eliminiert Bestätigungs-Bias bei Reviews durch das Unabhängigkeitsgebot.
 *   **Konsequences**:
     - `rules/tag_taxonomy.md`, `rules/llm_protocol.md` (Schleife 8), `AGENTS.md §6` und `environment_script.sh` aktualisiert.
@@ -556,7 +556,7 @@
     3. `Wal::try_new` und `append_batch` erzeugen ausnahmslos WAL V3 Dateien.
     4. Version-aware `replay()` validiert V1, V2 und V3 Formate abwärtskompatibel. Beim Öffnen einer V1/V2-Datei wird nach erfolgreichem Replay automatisch eine transparente Migration/Rewrite zu V3 durchgeführt.
 *   **Alternativen**:
-    - Belassen von V2 und Vertrauen auf Dateisystem-Rechte: Verworfen, da dies das Zero-Trust/Cryptographic-Integrity-Gebot von MemFuse verletzt.
+    - Belassen von V2 und Vertrauen auf Dateisystem-Rechte: Verworfen, da dies das Zero-Trust/Cryptographic-Integrity-Gebot von Contextra verletzt.
 *   **Begründung**:
     Stellt sicher, dass WAL-Einträge nicht nur bzgl. `seq_no` und Key/Value fälschungssicher sind, sondern auch die Kausalordnung der Transaktions-IDs (`tx_id`) kryptographisch authentifiziert ist.
 *   **Konsequenzen**:
@@ -590,7 +590,7 @@
 
 *   **Datum**: 2026-08-29
 *   **Status**: ✅ Final
-*   **Entscheidung**: Einführung einer reproduzierbaren, skalierbaren Benchmark-Suite (`benches/scale_bench.rs`), RSS-Speicherprofilierung (`/proc/self/status` logging nach `benches/results/scale_rss.csv`), semantischer Retrieval-Evaluierung (`crates/memfuse-db/tests/semantic_recall.rs` Recall@k) und eines CI-Baseline-Jobs (`.github/workflows/bench.yml`).
+*   **Entscheidung**: Einführung einer reproduzierbaren, skalierbaren Benchmark-Suite (`benches/scale_bench.rs`), RSS-Speicherprofilierung (`/proc/self/status` logging nach `benches/results/scale_rss.csv`), semantischer Retrieval-Evaluierung (`crates/contextra-db/tests/semantic_recall.rs` Recall@k) und eines CI-Baseline-Jobs (`.github/workflows/bench.yml`).
 *   **Alternativen**: Weiterhin Verlass auf Micro-Benchmarks (1–1000 Chunks) und Quantisierungs-Konsistenz-Tests. Verworfen, da diese keine empirische Grundlage für künftige Architekturentscheidungen bzgl. Vamana/DiskANN und Quantisierung (v2-Spezifikation R3/R6) bieten.
 *   **Begründung**: Bietet empirisch gemessene Durchsatz-, Latenz-Perzentil- (p50/p95/p99) und Speicher-Baselines (VmRSS) auf In-Memory HNSW & LSM-Storage sowie automatisierte Qualitäts-Gates für `hybrid_search()`.
 
@@ -603,7 +603,7 @@
 
 *   **Datum**: 2026-08-28
 *   **Status**: ✅ Final
-*   **Kontext**: Der bisherige `ContextCompactor` in `memfuse-db/src/compaction.rs` ersetzte veraltete Tool-Outputs durch Status-Token (ADR-021). Dies entsprach einer Kürzung/Löschung ohne kognitiven Wissenserhalt. Für Phase 3 der Roadmap ("Memory Consolidation") wird die Zusammenfassung alter Chunks via LLM unter Erhaltung der Provenienz benötigt. <!-- doc-ref-ignore -->
+*   **Kontext**: Der bisherige `ContextCompactor` in `contextra-db/src/compaction.rs` ersetzte veraltete Tool-Outputs durch Status-Token (ADR-021). Dies entsprach einer Kürzung/Löschung ohne kognitiven Wissenserhalt. Für Phase 3 der Roadmap ("Memory Consolidation") wird die Zusammenfassung alter Chunks via LLM unter Erhaltung der Provenienz benötigt. <!-- doc-ref-ignore -->
 *   **Entscheidung**:
     - Erweiterung der `CompactionStrategy` Enum um die additive Variante `LlmSummarize { max_input_chunks: usize }`.
     - Implementierung der asynchronen Methode `consolidate_via_llm(&self, chunks: &[ContextChunk], ollama: &OllamaClient) -> Result<CompactedContext>` in `compaction.rs`.
@@ -625,10 +625,10 @@
 *   **Datum**: 2026-08-28
 *   **Status**: ✅ Final
 *   **Entscheidung**:
-    - Der öffentliche Edge-Typ in `memfuse-core` (`pub struct Edge`) wird additiv um `valid_from: Option<TxId>` und `valid_to: Option<TxId>` mit `#[serde(default)]` erweitert.
+    - Der öffentliche Edge-Typ in `contextra-core` (`pub struct Edge`) wird additiv um `valid_from: Option<TxId>` und `valid_to: Option<TxId>` mit `#[serde(default)]` erweitert.
     - `valid_from = None` signalisiert "seit jeher gültig", `valid_to = None` signalisiert "weiterhin gültig".
     - `TxId` wird ausnahmslos als Träger der fachlichen Zeitachsen verwendet (Einhaltung des `SystemTime`-Verbots gemäß AGENTS.md Abschnitt 4).
-    - Der `GraphIndex`-Trait erhält die Methode `traverse_at_time(&self, start: EntityId, max_hops: usize, as_of: TxId) -> Result<Vec<(EntityId, f32)>>` mit Fail-Safe Default-Implementierung `Err(MemFuseError::PolicyViolation(...))`.
+    - Der `GraphIndex`-Trait erhält die Methode `traverse_at_time(&self, start: EntityId, max_hops: usize, as_of: TxId) -> Result<Vec<(EntityId, f32)>>` mit Fail-Safe Default-Implementierung `Err(ContextraError::PolicyViolation(...))`.
     - `CsrGraph` implementiert `traverse_at_time` konkret: Traversierung filtert Kanten heraus, für die `as_of < valid_from` oder `valid_to.is_some_and(|t| as_of >= t)` gilt.
 *   **Alternativen**:
     - Verwendung von Wall-Clock timestamps (`SystemTime` / Unix Nanos). Verworfen, da `SystemTime` im gesamten Workspace für Sequenzierung strikt verboten ist (AGENTS.md).
@@ -643,19 +643,19 @@
 
 ---
 
-# ADR-034: Runtime-Precondition Assertions in öffentlichen Low-Level-Distanzfunktionen (`memfuse-index`)
+# ADR-034: Runtime-Precondition Assertions in öffentlichen Low-Level-Distanzfunktionen (`contextra-index`)
 
 
 *   **Datum**: 2026-08-28
 *   **Status**: ✅ Final
-*   **Kontext**: Behebung von Befund F-08 (`AGT-INDEX-005`). Die low-level Distanzfunktionen `cosine_distance`, `euclidean_distance` und `dot_product_distance` in `memfuse-index/src/distance.rs` sind `pub` exportiert. Bisher schützten sie Slice-Längengleichheiten nur via `debug_assert_eq!`, was in Release-Builds (`opt-level = 3`, LTO) entfernt wurde. Bei fehlerhaften Aufrufen mit ungleichen Slice-Längen drohte in den nachfolgenden `unsafe`-SIMD-Blöcken (AVX2/AVX512/NEON) ein stummer Out-of-Bounds Buffer-Overread (Undefined Behavior).
+*   **Kontext**: Behebung von Befund F-08 (`AGT-INDEX-005`). Die low-level Distanzfunktionen `cosine_distance`, `euclidean_distance` und `dot_product_distance` in `contextra-index/src/distance.rs` sind `pub` exportiert. Bisher schützten sie Slice-Längengleichheiten nur via `debug_assert_eq!`, was in Release-Builds (`opt-level = 3`, LTO) entfernt wurde. Bei fehlerhaften Aufrufen mit ungleichen Slice-Längen drohte in den nachfolgenden `unsafe`-SIMD-Blöcken (AVX2/AVX512/NEON) ein stummer Out-of-Bounds Buffer-Overread (Undefined Behavior).
 *   **Entscheidung**:
     - Ersetzung von `debug_assert_eq!(a.len(), b.len())` durch eine release-aktive Laufzeitprüfung `assert_eq!(a.len(), b.len(), "Vector lengths must match")` in allen drei öffentlichen Distanzfunktionen.
     - Dokumentation der Vorbedingung und des Panic-Vertrags in einer expliziten Rustdoc `/// # Panics` Sektion an jeder Funktion.
     - Autorisierung dieser Panic-Prüfung als explizit dokumentierte Ausnahme von der "No Panics in libraries"-Doktrin (CONSTITUTION.md), da es sich um die Durchsetzung von Verträgen bei low-level SIMD-Funktionen handelt, deren Signatur (`-> f32`) für Hot-Path-Performance erhalten bleiben muss.
 *   **Alternativen**:
     - **Option A (Signaturänderung zu `-> Result<f32, ...>`)**: Verworfen, da dies signifikanten Overhead auf dem Hot-Path erzeugen und alle Aufrufer sowie Benchmarks brechen würde.
-    - **Option B (Sichtbarkeit auf `pub(crate)` reduzieren)**: Verworfen/abgewogen gegen Option 1, da `cosine_distance`, `euclidean_distance` und `dot_product_distance` als public Utility-API des `memfuse-index`-Crates etabliert sind und in Benchmarks/Tests genutzt werden.
+    - **Option B (Sichtbarkeit auf `pub(crate)` reduzieren)**: Verworfen/abgewogen gegen Option 1, da `cosine_distance`, `euclidean_distance` und `dot_product_distance` als public Utility-API des `contextra-index`-Crates etabliert sind und in Benchmarks/Tests genutzt werden.
 *   **Begründung**: Der O(1) Längen-Check ist gegenüber der O(n) SIMD-Berechnung vernachlässigbar. Die explizite Panic bei Vorbedingungsverletzung schützt zu 100% vor Undefined Behavior und Memory-Safety-Verstößen an den `unsafe` SIMD-Grenzen.
 
 ---
@@ -689,7 +689,7 @@
 
 *   **Datum**: 2026-08-29
 *   **Status**: ✅ Final
-*   **Entscheidung**: AGENTS.md §4 wird um den test-only unsafe-Ausnahmefall in `memfuse-crypto/src/anti_tamper.rs` ergänzt (Zeroize-Drop-Semantik-Verifikation). Im Produktionsbuild bleibt `memfuse-crypto` vollständig unsafe-frei (`#![cfg_attr(not(test), forbid(unsafe_code))]`).
+*   **Entscheidung**: AGENTS.md §4 wird um den test-only unsafe-Ausnahmefall in `contextra-crypto/src/anti_tamper.rs` ergänzt (Zeroize-Drop-Semantik-Verifikation). Im Produktionsbuild bleibt `contextra-crypto` vollständig unsafe-frei (`#![cfg_attr(not(test), forbid(unsafe_code))]`).
 *   **Begründung**: AUD-01 aus Audit 2026-08-28 dokumentierte Doku-Drift zwischen tatsächlichem Code und AGENTS.md. Governance-Dokumente müssen Realität abbilden, nicht verbergen.
 
 ---
@@ -701,11 +701,11 @@
 
 *   **Datum**: 2026-08-29
 *   **Status**: ✅ Implementiert (2026-09-03)
-*   **Entscheidung**: Die Datenstruktur `Collection<S: StorageEngine = LsmStorage>` in `crates/memfuse-db/src/collection.rs` wird generisch über den `VectorIndex`-Trait-Implementor erweitert: `Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>`. Dadurch wird die starre Kopplung an `Arc<HnswIndex>` aufgehoben und die Nutzung alternativer Vektor-Indizes (wie z. B. `DiskAnnIndex` aus `memfuse-index`) ermöglicht. <!-- doc-ref-ignore -->
+*   **Entscheidung**: Die Datenstruktur `Collection<S: StorageEngine = LsmStorage>` in `crates/contextra-db/src/collection.rs` wird generisch über den `VectorIndex`-Trait-Implementor erweitert: `Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>`. Dadurch wird die starre Kopplung an `Arc<HnswIndex>` aufgehoben und die Nutzung alternativer Vektor-Indizes (wie z. B. `DiskAnnIndex` aus `contextra-index`) ermöglicht. <!-- doc-ref-ignore -->
 *   **Alternativen**:
     - **Option A (Dynamischer Trait-Object Trait-Dispatch `Arc<dyn VectorIndex>)`**: Verworfen, da `VectorIndex` in manchen Pfaden dynamischen Trait-Funktions-Dispatch mit Performance-Overhead auf dem Hot-Path verbindet und die Typensicherheit bei konkreter Vektorindex-Instanziierung einbüßt.
     - **Option B (Status Quo belassen)**: Verworfen, da `DiskAnnIndex` als out-of-core Vektorindex vollständig implementiert ist, aber wegen der harten `Arc<HnswIndex>`-Typisierung in `Collection` ungenutzte technische Schuld darstellte.
-*   **Begründung**: Die Verwendung eines generischen Typparameters mit Standard-Typ `V = HnswIndex` garantiert 100%ige Abwärtskompatibilität für alle bestehenden Aufrufer und Typ-Signaturen (wie `Collection<LsmStorage>`). Gleichzeitig wird die Entkopplung von der konkreten HNSW-Implementierung im `memfuse-db`-Crate vollzogen.
+*   **Begründung**: Die Verwendung eines generischen Typparameters mit Standard-Typ `V = HnswIndex` garantiert 100%ige Abwärtskompatibilität für alle bestehenden Aufrufer und Typ-Signaturen (wie `Collection<LsmStorage>`). Gleichzeitig wird die Entkopplung von der konkreten HNSW-Implementierung im `contextra-db`-Crate vollzogen.
 *   **Konsequenzen**:
     - `Collection` kann jetzt auch mit `DiskAnnIndex` instanziiert und betrieben werden (`Collection<LsmStorage, DiskAnnIndex>`).
     - `Collection::new` nimmt `index: Arc<V>` als Parameter auf; die Convenience-Funktion `Collection::with_hnsw` kapselt die bisherige HNSW-Konstruktion.
@@ -720,7 +720,7 @@
 *   **Datum**: 2026-08-29
 *   **Status**: ✅ Final
 *   **Entscheidung**:
-    1. Erweiterung von `ContextChunk` (`memfuse-core`) um `links: Vec<MemoryLink>` mit `#[serde(default)]`.
+    1. Erweiterung von `ContextChunk` (`contextra-core`) um `links: Vec<MemoryLink>` mit `#[serde(default)]`.
     2. Einführung von `LinkRelation` (`Elaborates`, `Contradicts`, `Supersedes`, `References`) und `MemoryLink` (`target: DocId`, `relation: LinkRelation`, `created_at_tx: TxId`).
     3. Implementierung der Methode `Collection::link_memories` (idempotent, interne `TxId` via `allocate_tx()`) und `Collection::traverse_links` (iterativer BFS mit `VecDeque`, zyklen-sicher, max `MAX_SEARCH_K`).
     4. Implementierung der Supersedes-Verdrängungslogik in `hybrid_search_with_query()`: Wenn `include_superseded = false` (Default), werden Chunks verdrängt, auf die ein anderes Treffer-Dokument einen `MemoryLink` der Relation `Supersedes` trägt.
@@ -734,13 +734,13 @@
 
 ---
 
-# ADR-039: reqwest als Workspace-Dependency für memfuse-router
+# ADR-039: reqwest als Workspace-Dependency für contextra-router
 
 *   **Datum**: 2026-08-29
 *   **Status**: ✅ Final
-*   **Entscheidung**: `reqwest` wird als zentrale Workspace-Dependency in `[workspace.dependencies]` im Root-`Cargo.toml` aufgenommen und für `memfuse-router` explizit freigegeben.
-*   **Alternativen**: Ersetzung durch `memfuse-ollama`.
-*   **Begründung**: `memfuse-router` nutzt `reqwest` in `dispatch_to_slm` für generische HTTP JSON-RPC 2.0 Aufrufe (`slm_process_context`) an frei konfigurierbare MCP-Endpunkte von Small Language Models (SLMs). `memfuse-ollama` deckt ausschließlich Ollama REST-API-Endpunkte ab und kann diese generische JSON-RPC-MCP-Dispatch-Funktionalität nicht bereitstellen.
+*   **Entscheidung**: `reqwest` wird als zentrale Workspace-Dependency in `[workspace.dependencies]` im Root-`Cargo.toml` aufgenommen und für `contextra-router` explizit freigegeben.
+*   **Alternativen**: Ersetzung durch `contextra-ollama`.
+*   **Begründung**: `contextra-router` nutzt `reqwest` in `dispatch_to_slm` für generische HTTP JSON-RPC 2.0 Aufrufe (`slm_process_context`) an frei konfigurierbare MCP-Endpunkte von Small Language Models (SLMs). `contextra-ollama` deckt ausschließlich Ollama REST-API-Endpunkte ab und kann diese generische JSON-RPC-MCP-Dispatch-Funktionalität nicht bereitstellen.
 *   **Sicherheitsbewertung**: Nutzung mit `default-features = false` und `rustls-tls` (kein `native-tls` / OpenSSL C-Dependency-Overhead, vollständig konform mit der Sovereign Core Policy aus ADR-004).
 *   **Konsequenz**: `reqwest` ist fortan eine explizit genehmigte Workspace-Dependency ohne Version Drift zwischen Crates.
 
@@ -752,9 +752,9 @@
 
 *   **Datum**: 2026-08-29
 *   **Status**: ✅ Final
-*   **Entscheidung**: `collection.rs` wird in Submodule unter `crates/memfuse-db/src/collection/` aufgeteilt. <!-- doc-ref-ignore -->
+*   **Entscheidung**: `collection.rs` wird in Submodule unter `crates/contextra-db/src/collection/` aufgeteilt. <!-- doc-ref-ignore -->
 *   **Alternativen**: Belassen von `collection.rs` als monolithischer ~2.900 LOC Crate-Teil. <!-- doc-ref-ignore -->
-*   **Begründung**: Beseitigt AUD-08 ("God Object") und verbessert Lesbarkeit sowie Wartbarkeit. Öffentliche API und alle Typnamen bleiben exakt unverändert. Alle Re-Exports werden über `crates/memfuse-db/src/collection/mod.rs` bereitgestellt (identische öffentliche Oberfläche wie bisher).
+*   **Begründung**: Beseitigt AUD-08 ("God Object") und verbessert Lesbarkeit sowie Wartbarkeit. Öffentliche API und alle Typnamen bleiben exakt unverändert. Alle Re-Exports werden über `crates/contextra-db/src/collection/mod.rs` bereitgestellt (identische öffentliche Oberfläche wie bisher).
 
 ---
 
@@ -774,11 +774,11 @@
 
 ---
 
-# ADR-042: Re-Integration von `memfuse-saos-agent`
+# ADR-042: Re-Integration von `contextra-saos-agent`
 
 *   **Datum**: 2026-08-29
 *   **Status**: ✅ Final
-*   **Entscheidung**: Re-Integration der Funktionalitäten aus dem archivierten `memfuse-saos-agent` in das Hauptcrate `memfuse-agent`.
+*   **Entscheidung**: Re-Integration der Funktionalitäten aus dem archivierten `contextra-saos-agent` in das Hauptcrate `contextra-agent`.
 *   **Begründung**: Konsolidierung des Agenten-Loops und Vereinfachung der Crate-Struktur im Workspace.
 
 ---
@@ -803,7 +803,7 @@
 
 *   **Datum**: 2026-08-30
 *   **Status**: ✅ Final
-*   **Entscheidung**: `memfuse-mcp` erzwingt eine strikte Sandbox-Policy für alle MCP Tool-Aufrufe. Datenbank-Schreibzugriffe (`DatabaseWrite` Tools wie `memfuse_insert`, `memfuse_delete`, `memfuse_upsert`, `memfuse_relate`, `memfuse_create_collection`, `memfuse_drop_collection`) sind standardmäßig GESPERRT (`allow_db_writes = false`). Schreibberechtigungen können ausschließlich explizit per Aufruf-Parameter/Server-Initialisierung (`McpServer::with_write_permission()`) bzw. Umgebungsvariable `MEMFUSE_MCP_ALLOW_WRITE=true` aktiviert werden. Vor jedem Tool-Dispatch prüft `call_tool` zentral `McpSandbox::validate_tool_call()`.
+*   **Entscheidung**: `contextra-mcp` erzwingt eine strikte Sandbox-Policy für alle MCP Tool-Aufrufe. Datenbank-Schreibzugriffe (`DatabaseWrite` Tools wie `contextra_insert`, `contextra_delete`, `contextra_upsert`, `contextra_relate`, `contextra_create_collection`, `contextra_drop_collection`) sind standardmäßig GESPERRT (`allow_db_writes = false`). Schreibberechtigungen können ausschließlich explizit per Aufruf-Parameter/Server-Initialisierung (`McpServer::with_write_permission()`) bzw. Umgebungsvariable `CONTEXTRA_MCP_ALLOW_WRITE=true` aktiviert werden. Vor jedem Tool-Dispatch prüft `call_tool` zentral `McpSandbox::validate_tool_call()`.
 *   **Alternativen**:
     - Uneingeschränkter Schreibzugriff im Default: Verworfen aus Sicherheitsgründen (Zero-Trust/Least-Privilege Prinzipsschutz für LLM-MCP-Integrationen).
     - Einzelne Tool-Gefahrenstufen ohne zentrale Sandbox-Validierung: Verworfen, da dezentrale Prüfungen fehleranfällig und schwer zu auditieren sind.
@@ -813,29 +813,29 @@
 
 ---
 
-# ADR-045: Entkopplung von `memfuse-router` und `memfuse-mcp` durch IPC JSON-RPC Typverschiebung
+# ADR-045: Entkopplung von `contextra-router` und `contextra-mcp` durch IPC JSON-RPC Typverschiebung
 
 *   **Datum**: 2026-08-31
 *   **Status**: ✅ Final
-*   **Entscheidung**: Die generischen JSON-RPC 2.0 Protokolltypen (`JsonRpcRequest`, `JsonRpcResponse`, `JsonRpcError`) werden aus `memfuse-mcp` nach `memfuse-core::ipc::jsonrpc` verschoben und in `memfuse-mcp::protocol` re-exportiert. `memfuse-router` importiert diese Typen fortan direkt aus `memfuse-core::ipc`. Die Abhängigkeit `memfuse-mcp` wird aus `crates/memfuse-router/Cargo.toml` sowie aus den Ausnahmeregeln in `.github/workflows/dag-check.yml` entfernt.
+*   **Entscheidung**: Die generischen JSON-RPC 2.0 Protokolltypen (`JsonRpcRequest`, `JsonRpcResponse`, `JsonRpcError`) werden aus `contextra-mcp` nach `contextra-core::ipc::jsonrpc` verschoben und in `contextra-mcp::protocol` re-exportiert. `contextra-router` importiert diese Typen fortan direkt aus `contextra-core::ipc`. Die Abhängigkeit `contextra-mcp` wird aus `crates/contextra-router/Cargo.toml` sowie aus den Ausnahmeregeln in `.github/workflows/dag-check.yml` entfernt.
 *   **Alternativen**:
-    - Erstellung eines separaten `memfuse-jsonrpc`-Crates in Layer 1: Verworfen, um Crate-Explosion zu vermeiden; `memfuse-core::ipc` existiert bereits als zentrales IPC-Typ-Modul in Layer 0.
+    - Erstellung eines separaten `contextra-jsonrpc`-Crates in Layer 1: Verworfen, um Crate-Explosion zu vermeiden; `contextra-core::ipc` existiert bereits als zentrales IPC-Typ-Modul in Layer 0.
     - Beibehaltung der Layer-4-Dependency in Layer 3: Verworfen, da dies das 5-Layer-DAG-Modell verletzt und Zirkelbezüge zwischen Router und MCP verhindert.
-*   **Begründung**: Beseitigt die Schichtgrenzenverletzung (Layer 3 → Layer 4) ohne Verhaltensänderung oder Breaking Changes für externe Konsumenten von `memfuse_mcp::protocol::*`.
+*   **Begründung**: Beseitigt die Schichtgrenzenverletzung (Layer 3 → Layer 4) ohne Verhaltensänderung oder Breaking Changes für externe Konsumenten von `contextra_mcp::protocol::*`.
 
 ---
 
 ---
 
-# ADR-046: Wiederherstellung von `memfuse-agent` aus dem Archiv
+# ADR-046: Wiederherstellung von `contextra-agent` aus dem Archiv
 
 
 - **Datum**: 2026-08-27
 - **Status**: ✅ Final
-- **Entscheidung**: Kernkomponenten aus `memfuse-saos-agent` (gelöscht in Commit 55a3464)
-  werden als `memfuse-agent` wiederhergestellt: `AgentTool` Trait, `OrchestratorEngine`,
+- **Entscheidung**: Kernkomponenten aus `contextra-saos-agent` (gelöscht in Commit 55a3464)
+  werden als `contextra-agent` wiederhergestellt: `AgentTool` Trait, `OrchestratorEngine`,
   `StateGraph`, `AuditLog`.
-- **Was NICHT zurückgeholt wird**: `memfuse-cluster` (Raft — bleibt in ADR-005 Frozen Zone).
+- **Was NICHT zurückgeholt wird**: `contextra-cluster` (Raft — bleibt in ADR-005 Frozen Zone).
 - **Begründung**: Die MCP-Sandbox ist zustandslos. Multi-Step Agent-Workflows über MCP
   verlieren bei Crash ihren State. Der `checkpoint → execute → commit → audit`-Loop aus dem
   alten Crate ist genau die fehlende Persistenzschicht.
@@ -853,7 +853,7 @@
 *   **Datum**: 2026-09-03
 *   **Status**: ✅ Entschieden
 *   **Kontext**: AGT-INDEX-002 dokumentierte, dass `std::simd` (portable_simd, Issue #86656) per
-    September 2026 noch nicht auf stable Rust verfügbar ist. `memfuse-index/src/distance.rs` nutzt
+    September 2026 noch nicht auf stable Rust verfügbar ist. `contextra-index/src/distance.rs` nutzt
     bereits korrekt `std::arch::x86_64` Intrinsics mit Runtime-Feature-Detection via
     `is_x86_feature_detected!` (AVX-512, AVX2, SSE4) und `is_aarch64_feature_detected!` (NEON).
 *   **Entscheidung**: Status quo (`std::arch` + Runtime-Detection) ist der korrekte, stabile Pfad.
@@ -871,7 +871,7 @@
 
 *   **Datum**: 2026-09-03
 *   **Status**: ✅ Final
-*   **Entscheidung**: Die automatische Fallback-Entschlüsselung / Integritätsprüfung alter Write-Ahead-Logs mittels hartkodiertem `LEGACY_INTEGRITY_KEY` wird hinter das explizite Konfigurations-Flag `allow_legacy_integrity_key_fallback: bool` (Default: `false`) in `WalConfig` gestellt. Der Standardpfad in `Wal::open()` weist alte WAL-Dateien ohne explizites Opt-In als fehlerhaft zurück (`MemFuseError::wal_corruption`).
+*   **Entscheidung**: Die automatische Fallback-Entschlüsselung / Integritätsprüfung alter Write-Ahead-Logs mittels hartkodiertem `LEGACY_INTEGRITY_KEY` wird hinter das explizite Konfigurations-Flag `allow_legacy_integrity_key_fallback: bool` (Default: `false`) in `WalConfig` gestellt. Der Standardpfad in `Wal::open()` weist alte WAL-Dateien ohne explizites Opt-In als fehlerhaft zurück (`ContextraError::wal_corruption`).
 *   **Alternativen**:
     - Beibehaltung des automatischen Fallbacks: Verworfen, da ein Angreifer alte WAL-Dateien unterschieben und einen Silent Downgrade herbeiführen könnte.
     - Vollständiges Entfernen von `LEGACY_INTEGRITY_KEY`: Verworfen, um Migrationstools das Auslesen alter Logdateien weiterhin zu ermöglichen.
@@ -885,7 +885,7 @@
 
 *   **Datum**: 2026-09-03
 *   **Status**: ✅ Final
-*   **Entscheidung**: `Collection` wird um die atomare Methode `put_kv_if_absent(&self, id: &str, value: &serde_json::Value)` erweitert, die vor dem Schreiben eine tx-scoped Existenzprüfung durchführt und bei Treffer `MemFuseError::Conflict` zurückgibt. `AuditLog::append()` nutzt ausschließlich `put_kv_if_absent()`.
+*   **Entscheidung**: `Collection` wird um die atomare Methode `put_kv_if_absent(&self, id: &str, value: &serde_json::Value)` erweitert, die vor dem Schreiben eine tx-scoped Existenzprüfung durchführt und bei Treffer `ContextraError::Conflict` zurückgibt. `AuditLog::append()` nutzt ausschließlich `put_kv_if_absent()`.
 *   **Alternativen**:
     - Nutzung von `put_kv()` mit clientseitigem `get_kv()`-Check: Verworfen, da race-condition-anfällig bei parallelen `append()`-Aufrufen.
     - Schreibsperre auf Tabellenebene: Verworfen wegen unötigem Performance-Overhead für nicht-kollidierende Steps.
@@ -915,7 +915,7 @@
 
 *   **Datum**: 2026-09-03
 *   **Status**: ✅ Final
-*   **Entscheidung**: In `ConsolidationSession::commit()` MUSS das Ergebnis der Quelldokument-Löschung (`delete_op`) zwingend mit `?` propagiert werden. Deserialisierungsfehler beim Lesen der Quelldokument-Metadaten geben `MemFuseError::Serialization` zurück. Nicht mehr auffindbare Quelldokumente werden geloggt und als Idempotenz-OK übergangen.
+*   **Entscheidung**: In `ConsolidationSession::commit()` MUSS das Ergebnis der Quelldokument-Löschung (`delete_op`) zwingend mit `?` propagiert werden. Deserialisierungsfehler beim Lesen der Quelldokument-Metadaten geben `ContextraError::Serialization` zurück. Nicht mehr auffindbare Quelldokumente werden geloggt und als Idempotenz-OK übergangen.
 *   **Begründung**: Verhindert Datenverlust und stille Discards im Konsolidierungspfad.
 
 ---
@@ -938,7 +938,7 @@
 *   **Datum**: 2026-09-03
 *   **Status**: ✅ Final
 *   **Entscheidung**: Verwaiste Checkpoint- und Pin-Zustände werden instanzspezifisch in `PersistentCheckpointStore` verwaltet anstatt über prozessglobale statische Variablen (`ORPHANED_CHECKPOINTS`). Globale Hilfsfunktionen werden als `#[deprecated]` markiert.
-*   **Begründung**: Stellt die Korrektheit in Multi-Session-Servern (MCP, Tauri) sicher, in denen mehrere unabhängige MemFuse-Instanzen parallel existieren.
+*   **Begründung**: Stellt die Korrektheit in Multi-Session-Servern (MCP, Tauri) sicher, in denen mehrere unabhängige Contextra-Instanzen parallel existieren.
 
 ---
 
@@ -974,7 +974,7 @@
 
 *   **Datum**: 2026-09-03
 *   **Status**: ✅ Final
-*   **Entscheidung**: Ersetzung aller `panic!()` Aufrufe in Nicht-Test-Quellcode von `memfuse-py` durch strukturierte PyO3 Exception-Returns (`PyValueError`, `PyRuntimeError`). Blockierende Aufrufe werden durch `run_blocking_ffi` mit `std::panic::catch_unwind` geschützt.
+*   **Entscheidung**: Ersetzung aller `panic!()` Aufrufe in Nicht-Test-Quellcode von `contextra-py` durch strukturierte PyO3 Exception-Returns (`PyValueError`, `PyRuntimeError`). Blockierende Aufrufe werden durch `run_blocking_ffi` mit `std::panic::catch_unwind` geschützt.
 *   **Begründung**: Verhindert CPython-Prozessabstürze über die PyO3 FFI-Grenze hinweg.
 
 ---
@@ -995,7 +995,7 @@
 
 *   **Datum**: 2026-09-04
 *   **Status**: ✅ Final
-*   **Entscheidung**: In `InstanceOrphanRegistry` und `register_pinned_seq_no_orphan` (`crates/memfuse-checkpoint/src/lib.rs`) werden Schreibfehler beim synchronen Persistieren des Orphan-Zustands (`persist_sync()`) nicht mehr mit `let _ =` verworfen, sondern explizit über `if let Err(e) = ... { tracing::error!(?e, "..."); }` kontextspezifisch geloggt.
+*   **Entscheidung**: In `InstanceOrphanRegistry` und `register_pinned_seq_no_orphan` (`crates/contextra-checkpoint/src/lib.rs`) werden Schreibfehler beim synchronen Persistieren des Orphan-Zustands (`persist_sync()`) nicht mehr mit `let _ =` verworfen, sondern explizit über `if let Err(e) = ... { tracing::error!(?e, "..."); }` kontextspezifisch geloggt.
 *   **Alternativen**:
     - Ändern der Rückgabetypen auf `Result<()>`: Verworfen, da Aufrufer in `Drop`-Implementierungen und synchronen Legacy-Funktionen keinen `?`-Kontext besitzen und dies zu kaskadierenden API-Breaks führen würde.
 *   **Begründung**: Erfüllt CONSTITUTION.md §2 (kein stilles Verwerfen von E/A-Fehlern auf Recovery-Persistenzpfaden) ohne API-Signaturen zu brechen.
@@ -1008,7 +1008,7 @@
 
 *   **Datum**: 2026-09-03
 *   **Status**: ✅ Final
-*   **Entscheidung**: Alle `panic!()`-Aufrufe in `memfuse-py` außerhalb von `#[cfg(test)]` werden durch `Err(PyErr)` ersetzt.
+*   **Entscheidung**: Alle `panic!()`-Aufrufe in `contextra-py` außerhalb von `#[cfg(test)]` werden durch `Err(PyErr)` ersetzt.
 *   **Begründung**: Ein Rust-Panic über die PyO3 FFI-Grenze hinweg führt zum Absturz von CPython. `catch_unwind` ist kein Ersatz für korrekte Fehlerbehandlung an Aufrufstellen.
 
 ---
@@ -1047,12 +1047,12 @@
 *   **Datum**: 2026-09-05
 *   **Status**: ✅ Final
 *   **Entscheidung**:
-    - Die Fault-Injection-Testsuite wird ausschließlich als Test-only Integrationstests (`tests/`) sowie ein Hilfsbinary (`examples/chaos_writer.rs`) in `crates/memfuse-store` umgesetzt. <!-- doc-ref-ignore -->
-    - Es wird KEIN neues Workspace-Crate angelegt und KEINE Änderung an Quellcode unter `crates/memfuse-store/src/**` vorgenommen.
+    - Die Fault-Injection-Testsuite wird ausschließlich als Test-only Integrationstests (`tests/`) sowie ein Hilfsbinary (`examples/chaos_writer.rs`) in `crates/contextra-store` umgesetzt. <!-- doc-ref-ignore -->
+    - Es wird KEIN neues Workspace-Crate angelegt und KEINE Änderung an Quellcode unter `crates/contextra-store/src/**` vorgenommen.
 - **Alternativen**:
     - *Eigenes `chimera-chaos`-artiges Crate mit Produktions-Hooks (`FaultInjector::inject_sync`)*: Verworfen, da dies ASK-pflichtige API- und Hot-Path-Änderungen erfordert hätte, ohne dass dafür ein belegter Bedarf existierte.
 - **Explizit verworfene Szenarien**:
-    - `IOLatency` und `NetworkDegradation`: Verworfen, da MemFuse keine Netzwerkschicht besitzt (ADR-010: stdio-only JSON-RPC) und kein belegter Slow-Disk-Use-Case vorliegt, der Hooks im Hot-Path rechtfertigen würde.
+    - `IOLatency` und `NetworkDegradation`: Verworfen, da Contextra keine Netzwerkschicht besitzt (ADR-010: stdio-only JSON-RPC) und kein belegter Slow-Disk-Use-Case vorliegt, der Hooks im Hot-Path rechtfertigen würde.
 - **CI-Kadenz**:
     - Einzelne Fault-Injection-Tests laufen als reguläre Integrationstests in `cargo test --workspace`.
     - Die kombinierte Fault-Matrix (`chaos_matrix.rs`) läuft ausschließlich nightly, ist `#[ignore]`-gated und blockiert keine Pull Requests.
@@ -1086,23 +1086,23 @@ Die Tombstone-Pruning-Variante wird NICHT als generelles Veto-Verstoß behandelt
 
 ---
 
-# ADR-064: memfuse-py als separater Cargo-Workspace (Panic-Strategie-Isolation)
+# ADR-064: contextra-py als separater Cargo-Workspace (Panic-Strategie-Isolation)
 
 * **Datum**: 2026-09-07
 * **Status**: ✅ Angenommen (bereits implementiert, dieser ADR dokumentiert nachträglich eine bestehende, korrekte Entscheidung — siehe P6-Nachpflegepflicht).
 
 ## Kontext
-Der Haupt-Workspace von MemFuse setzt im Release-Profil `panic = "abort"` (Begründung: Performance-Optimierung, binäre Minimalität und deterministischer Abbruch im Server-/DB-Engine-Betrieb).
-`memfuse-py` exponiert PyO3-Bindings, die an der FFI-Grenze zu CPython `catch_unwind()` nutzen müssen, um Rust-Panics als Python-Exceptions abzubilden statt den gesamten Python-Interpreter per `SIGABRT` abstürzen zu lassen (siehe Kommentar in `crates/memfuse-py/src/lib.rs`, Zeilen 219–222).
+Der Haupt-Workspace von Contextra setzt im Release-Profil `panic = "abort"` (Begründung: Performance-Optimierung, binäre Minimalität und deterministischer Abbruch im Server-/DB-Engine-Betrieb).
+`contextra-py` exponiert PyO3-Bindings, die an der FFI-Grenze zu CPython `catch_unwind()` nutzen müssen, um Rust-Panics als Python-Exceptions abzubilden statt den gesamten Python-Interpreter per `SIGABRT` abstürzen zu lassen (siehe Kommentar in `crates/contextra-py/src/lib.rs`, Zeilen 219–222).
 Die Panic-Strategie ist in Cargo eine Workspace-weite Einstellung — sie kann nicht pro Crate innerhalb desselben Workspace überschrieben werden.
 
 ## Entscheidung
-`crates/memfuse-py/Cargo.toml` definiert ein eigenständiges `[workspace]`-Manifest und wird dadurch bewusst NICHT Mitglied des Haupt-Workspace. Dies ist kein Versehen und keine technische Schuld.
+`crates/contextra-py/Cargo.toml` definiert ein eigenständiges `[workspace]`-Manifest und wird dadurch bewusst NICHT Mitglied des Haupt-Workspace. Dies ist kein Versehen und keine technische Schuld.
 
 ## Konsequenzen
-- `cargo build --workspace` im Wurzelverzeichnis baut `memfuse-py` NICHT mit. Dies ist beabsichtigt.
-- CI deckt `memfuse-py` über separate `--manifest-path`-Aufrufe ab (`cargo clippy --manifest-path crates/memfuse-py/Cargo.toml`, `cargo test --manifest-path crates/memfuse-py/Cargo.toml`, `maturin build --manifest-path crates/memfuse-py/Cargo.toml`).
-- Zukünftige Bearbeiter dürfen `memfuse-py` NICHT in die `members`-Liste der Root-`Cargo.toml` aufnehmen, ohne diesen ADR explizit zu widerrufen (P6).
+- `cargo build --workspace` im Wurzelverzeichnis baut `contextra-py` NICHT mit. Dies ist beabsichtigt.
+- CI deckt `contextra-py` über separate `--manifest-path`-Aufrufe ab (`cargo clippy --manifest-path crates/contextra-py/Cargo.toml`, `cargo test --manifest-path crates/contextra-py/Cargo.toml`, `maturin build --manifest-path crates/contextra-py/Cargo.toml`).
+- Zukünftige Bearbeiter dürfen `contextra-py` NICHT in die `members`-Liste der Root-`Cargo.toml` aufnehmen, ohne diesen ADR explizit zu widerrufen (P6).
 
 ## Alternativen (verworfen)
 - Cargo-Profil-Override pro Crate: nicht möglich, Panic-Strategie ist workspace-weit in Cargo, nicht crate-weit überschreibbar.
@@ -1114,7 +1114,7 @@ Die Panic-Strategie ist in Cargo eine Workspace-weite Einstellung — sie kann n
 
 * **Status:** Akzeptiert
 * **Datum:** 2026-09-07
-* **Kontext / Auslöser:** P0-Build-Blocker nach parallelen Commits (`307df50` und `eb0e3ef`), bei denen zwei unabhängige Branches dieselben Top-Level-Konstanten (`DISKANN_FOOTER_MAGIC`, `DISKANN_INTEGRITY_KEY`) in `crates/memfuse-index/src/diskann.rs` einfügten. Da die Diffs nicht überlappten, erzeugte Git keinen Merge-Konflikt, führte jedoch zu E0428-Kompilierfehlern.
+* **Kontext / Auslöser:** P0-Build-Blocker nach parallelen Commits (`307df50` und `eb0e3ef`), bei denen zwei unabhängige Branches dieselben Top-Level-Konstanten (`DISKANN_FOOTER_MAGIC`, `DISKANN_INTEGRITY_KEY`) in `crates/contextra-index/src/diskann.rs` einfügten. Da die Diffs nicht überlappten, erzeugte Git keinen Merge-Konflikt, führte jedoch zu E0428-Kompilierfehlern.
 
 ## Entscheidung
 Es wird ein leichtgewichtiges, regex-basiertes Pre-Build Gate `cargo run -p xtask -- check-duplicate-symbols` eingeführt und in die CI-Pipeline (`.github/workflows/rust-ci.yml` und `.github/workflows/context-gates.yml`) integriert.
@@ -1135,15 +1135,15 @@ Es wird ein leichtgewichtiges, regex-basiertes Pre-Build Gate `cargo run -p xtas
 
 * **Status:** Akzeptiert
 * **Datum:** 2026-09-07
-* **Kontext / Auslöser:** In `crates/memfuse-db/src/fusion.rs` war der Resonanz-Kohärenz-Bonus (Feature F-09) vollständig hinter `#[cfg(feature = "physio-resonance-fusion")]` implementiert (`apply_resonance_bonus`, `ResonanceConfig` und zugehörige Unit-Tests). Das Feature-Flag `physio-resonance-fusion` fehlte jedoch im `[features]`-Block von `crates/memfuse-db/Cargo.toml`. Der Code war somit in allen Feature-Kombinationen unerreichbar (toter Code aufgrund einer Governance-Lücke).
+* **Kontext / Auslöser:** In `crates/contextra-db/src/fusion.rs` war der Resonanz-Kohärenz-Bonus (Feature F-09) vollständig hinter `#[cfg(feature = "physio-resonance-fusion")]` implementiert (`apply_resonance_bonus`, `ResonanceConfig` und zugehörige Unit-Tests). Das Feature-Flag `physio-resonance-fusion` fehlte jedoch im `[features]`-Block von `crates/contextra-db/Cargo.toml`. Der Code war somit in allen Feature-Kombinationen unerreichbar (toter Code aufgrund einer Governance-Lücke).
 
 ## Entscheidung
-1. Das Feature-Flag `physio-resonance-fusion = []` wird in `crates/memfuse-db/Cargo.toml` unter `[features]` ergänzt.
+1. Das Feature-Flag `physio-resonance-fusion = []` wird in `crates/contextra-db/Cargo.toml` unter `[features]` ergänzt.
 2. Gemäß Invariante P12 ("Physio-Feature-Default-Unsichtbarkeit") verbleibt `physio-resonance-fusion` standardmäßig inaktiv (Zero-Config-Setup).
 3. F-09 gilt nach der Deklaration und verifizierten grünen Unit-Tests als **aktivierbar**, jedoch **nicht automatisch als produktiv kalibriert** (Kalibrierung von Exponent β und Gamma γ erfolgt in nachgelagerten Experimenten).
 
 ## Konsequenzen
-- **Kompilierung & Verifikation:** `cargo check -p memfuse-db --features physio-resonance-fusion` und die Test-Suite laufen unter dem aktivierten Flag vollständig grün ab.
+- **Kompilierung & Verifikation:** `cargo check -p contextra-db --features physio-resonance-fusion` und die Test-Suite laufen unter dem aktivierten Flag vollständig grün ab.
 - **Default-Verhalten:** Ohne das Flag bleibt das Verhalten der Reciprocal Rank Fusion (RRF) exakt unverändert.
 - **Governance:** Behebt die Governance-Lücke durch konsistente Deklaration in `Cargo.toml`.
 
@@ -1166,24 +1166,24 @@ Im Rahmen der Refactoring-Phasen P1–P5 wurden diese Bezeichnungen systematisch
 
 ## Entscheidung
 
-Sämtliche zukünftige Beiträge im MemFuse-Workspace müssen sich an die nachfolgenden Normen für Typen, Feature-Flags und Architektur-Labels halten.
+Sämtliche zukünftige Beiträge im Contextra-Workspace müssen sich an die nachfolgenden Normen für Typen, Feature-Flags und Architektur-Labels halten.
 
 ### 2.1 Typen & Schnittstellen
 
-| Vorher (Metapher / Branding) | Nachher (MemFuse Norm) | Beschreibung / Funktion |
+| Vorher (Metapher / Branding) | Nachher (Contextra Norm) | Beschreibung / Funktion |
 |---|---|---|
 | `SynapticEdge` | `WeightedEdge` | Gewichtete Graph-Kante mit Vertraulichkeits- und Relevanz-Scores |
 | `ThermostatDecay` / `FreeEnergyThermostat` | `AdaptiveDecay` | Dynamischer Abklingmechanismus für Speicherpunkte basierend auf Zugriffsintervallen |
 | `ImmuneSuppression` / `ImmunMemory` | `GraphEdgeFilter` / `NodeSuppression` | Filterung und temporäre Unterdrückung widersprüchlicher Wissensgraphen-Kanten |
 | `SleepCycleEngine` | `ConsolidationEngine` | Periodische Hintergrund-Konsolidierung, Index-Schnitt und Community-Synthese |
-| `CognitiveOS` | `MemFuse Agentic Memory Engine` | Orchestrierung von Kontext, Langzeitspeicher und Werkzeugschnittstellen |
+| `CognitiveOS` | `Contextra Agentic Memory Engine` | Orchestrierung von Kontext, Langzeitspeicher und Werkzeugschnittstellen |
 | `NucleationPruning` | `TombstonePruning` | Bereinigung gelöschter HNSW-Vektorknoten während Index-Rebuilds |
 
 ### 2.2 Feature-Flags
 
 | Alt / Veraltet (`physio-*`) | Neues Norm-Feature-Flag | Verwendungsbereich |
 |---|---|---|
-| `physio-features` | `adaptive-decay-control` / `adaptive-decay` | Steuerung dynamischer Abklingungsfunktionen in `memfuse-db` |
+| `physio-features` | `adaptive-decay-control` / `adaptive-decay` | Steuerung dynamischer Abklingungsfunktionen in `contextra-db` |
 | `physio-replicator-weights` | `adaptive-rrf-weights` | Kalibrierung von Multiplicative-Weights für RRF Fusion |
 | `physio-synaptic-edges` | `weighted-graph-edges` | Aktivierung gewichteter Kanten im Wissensgraphen |
 | `physio-percolation` | `graph-percolation` | Aktivierung von Graph-Perkolations-Algorithmen |
@@ -1192,23 +1192,23 @@ Sämtliche zukünftige Beiträge im MemFuse-Workspace müssen sich an die nachfo
 
 ### 2.3 Architektur-Labels & Muster
 
-| Anbieter-Branded / Metaphorisches Label | MemFuse Norm-Bezeichnung | Anwendungsfall |
+| Anbieter-Branded / Metaphorisches Label | Contextra Norm-Bezeichnung | Anwendungsfall |
 |---|---|---|
-| Provider-Branded Retrieval / Anthropic Contextual Retrieval | MemFuse Context-Prefix Retrieval Pattern | Anreicherung von Dokumentenchunks mit Kontext-Präfixen vor Embedding |
-| Provider-Branded Routing / Conformal Cascade | MemFuse Conformal SLM Routing Pattern | Kalibrierte Modell-Auswahl und Kaskaden-Routing basierend auf Konfidenzen |
-| Cognitive Memory Architecture | MemFuse Agentic Memory Engine | Multi-Layer-Architektur für lokale KI-Agenten-Speicherverwaltung |
-| Bi-Temporal Knowledge Graph | MemFuse Bi-Temporal Graph Pattern | Zeitreihen- und Erfassungszeit-Tracking in Wissensgraphen |
-| Unlearning / Deletion Proof | MemFuse Deletion Proof Pattern | GDPR Art. 17 konforme, kryptographisch nachweisbare Datenlöschung |
+| Provider-Branded Retrieval / Anthropic Contextual Retrieval | Contextra Context-Prefix Retrieval Pattern | Anreicherung von Dokumentenchunks mit Kontext-Präfixen vor Embedding |
+| Provider-Branded Routing / Conformal Cascade | Contextra Conformal SLM Routing Pattern | Kalibrierte Modell-Auswahl und Kaskaden-Routing basierend auf Konfidenzen |
+| Cognitive Memory Architecture | Contextra Agentic Memory Engine | Multi-Layer-Architektur für lokale KI-Agenten-Speicherverwaltung |
+| Bi-Temporal Knowledge Graph | Contextra Bi-Temporal Graph Pattern | Zeitreihen- und Erfassungszeit-Tracking in Wissensgraphen |
+| Unlearning / Deletion Proof | Contextra Deletion Proof Pattern | GDPR Art. 17 konforme, kryptographisch nachweisbare Datenlöschung |
 
 ## Konsequenzen
 
 1. **Verbot neuer `physio-*`-Feature-Flags:** Neue Beiträge dürfen unter keinen Umständen neue `physio-*`-Feature-Flags in `Cargo.toml`-Dateien oder bedingten Kompilierungsattributen (`#[cfg(feature = "...")]`) einführen. Bestehende historische Flags werden schrittweise gemäß Deprecation-Prozess migriert.
-2. **Standardisierte Musterbezeichnungen:** Neue Architektur-Patterns, Dokumentationsabschnitte und Entwurfsmuster werden ausschließlich in der Form `"MemFuse [Funktion] Pattern"` bezeichnet. Anbieter-Namen oder vergleichendes Provider-Branding dürfen nicht als Namenspräfix für Repositorium-eigene Muster verwendet werden.
+2. **Standardisierte Musterbezeichnungen:** Neue Architektur-Patterns, Dokumentationsabschnitte und Entwurfsmuster werden ausschließlich in der Form `"Contextra [Funktion] Pattern"` bezeichnet. Anbieter-Namen oder vergleichendes Provider-Branding dürfen nicht als Namenspräfix für Repositorium-eigene Muster verwendet werden.
 3. **Ausnahme für faktische Integrationsreferenzen:** Ausdrücklich von dieser Norm ausgenommen sind faktische, technisch erforderliche Schnittstellen- und Integrationsbezeichner. Dazu zählen:
    - Reale MCP-Client-Identifikatoren (z. B. `"Claude Desktop"`, `"VS Code MCP Host"`),
    - Reale Modell-IDs und Gewichts-Referenzen (z. B. `"bge-reranker-base"`, `"nomic-embed-text"`),
    - Protokoll-Standard-Spezifikationen (z. B. Model Context Protocol / MCP, JSON-RPC 2.0).
-   Diese stellen keine herstellerbezogene Attribution von MemFuse-Architektur-Mustern dar, sondern sind funktionale Notwendigkeiten für Interoperabilität.
+   Diese stellen keine herstellerbezogene Attribution von Contextra-Architektur-Mustern dar, sondern sind funktionale Notwendigkeiten für Interoperabilität.
 
 ---
 
@@ -1222,7 +1222,7 @@ Im Feature-Veto-Register (`VETOES.md`) verbietet VETO-F02 das partielle Rebuildi
 1. **Recall-Kollaps durch aktives Re-Wiring:** Die algorithmische Neuverdrahtung von Nachbarschaftskanten in einem lokalen Teilgraphen ohne globale Delaunay-Neukalibrierung zerstört die Navigierbarkeit zu entfernten Randknoten.
 2. **RwLock-Contention:** Aktive Graphmodifikationen (Hinzufügen neuer Kanten, Kanten-Heuristiken) unter hoher Last führen zu Sperrkonflikten auf Knotenebene.
 
-In `crates/memfuse-index/src/hnsw.rs` existiert die Funktion `rebuild_region()`. Es bestand eine offene Prozesslücke bezüglich der Frage, ob `rebuild_region()` gegen VETO-F02 verstößt. Eine genaue Code-Analyse zeigt:
+In `crates/contextra-index/src/hnsw.rs` existiert die Funktion `rebuild_region()`. Es bestand eine offene Prozesslücke bezüglich der Frage, ob `rebuild_region()` gegen VETO-F02 verstößt. Eine genaue Code-Analyse zeigt:
 `rebuild_region()` (Zeilen 1812–1865) führt **ausschließlich reines Tombstone-Pruning** durch:
 - Es werden lediglich existierende Referenzen auf als gelöscht markierte Knoten aus den Kantenlisten aktiver Nachbarn entfernt (`conns.retain(|neighbor_id| !tombstoned_set.contains(neighbor_id))`).
 - Es findet **keinerlei aktives Re-Wiring** (Suche neuer Ersatznachbarn oder Einfügen neuer Delaunay-Kanten) statt.
@@ -1232,16 +1232,16 @@ In `crates/memfuse-index/src/hnsw.rs` existiert die Funktion `rebuild_region()`.
 2. **Feature-Gating & Safety-Guard:** Obwohl reines Tombstone-Pruning algorithmisch sicher bezüglich RwLock-Mutationen ist, birgt das Entfernen von Kanten ohne Ersatz das verbleibende Risiko eines Grad-Verlusts (Reduzierung der Kantenanzahl pro Knoten). Daher bleibt das Feature `partial-index-rebuild` (sowie die Nucleation-Steuerung `partial-rebuild-pruning`) **non-default** und darf erst für den Produktionseinsatz freigegeben werden, wenn die Stabilität der Recall-Werte nachgewiesen ist.
 
 ## Konsequenzen
-- **Technischer Nachweis der Recall-Stabilität:** Der Nachweis, dass `rebuild_region()` den Recall nicht unzulässig degradiert, wird automatisiert über den Regressionstest `crates/memfuse-index/tests/partial_rebuild_recall_regression.rs` (`test_nucleation_recall_regression`) geführt.
+- **Technischer Nachweis der Recall-Stabilität:** Der Nachweis, dass `rebuild_region()` den Recall nicht unzulässig degradiert, wird automatisiert über den Regressionstest `crates/contextra-index/tests/partial_rebuild_recall_regression.rs` (`test_nucleation_recall_regression`) geführt.
 - Der Test verifiziert, dass:
   1. `rebuild_region()` den Recall@10 gegenüber reinem Tombstone-Markieren um nicht mehr als 5 Prozentpunkte (5pp) verschlechtert.
   2. Der absolute Recall-Verlust gegenüber dem unveränderten Index unter 15 Prozentpunkten (15pp) bleibt.
 - Das Feature bleibt hinter dem Cargo-Feature-Gate `partial-index-rebuild` isoliert.
 
 ## enforced_by
-- `crates/memfuse-index/src/hnsw.rs:1812` (`pub async fn rebuild_region`)
-- `crates/memfuse-index/Cargo.toml` (`[features] partial-index-rebuild = []`)
-- `crates/memfuse-index/tests/partial_rebuild_recall_regression.rs` (`test_nucleation_recall_regression`)
+- `crates/contextra-index/src/hnsw.rs:1812` (`pub async fn rebuild_region`)
+- `crates/contextra-index/Cargo.toml` (`[features] partial-index-rebuild = []`)
+- `crates/contextra-index/tests/partial_rebuild_recall_regression.rs` (`test_nucleation_recall_regression`)
 
 ---
 
@@ -1252,8 +1252,8 @@ In `crates/memfuse-index/src/hnsw.rs` existiert die Funktion `rebuild_region()`.
 * **Anforderung / Referenz:** K12 aus Gesamtspezifikation v7.0 (Sicherheitsinvariante INV-TENANT-1)
 
 ## Kontext & Problemstellung
-In `crates/memfuse-core/src/types/domain.rs` ist die Invariante **INV-TENANT-1** definiert:
-> `TenantId(0)` ist ausschließlich für `TenantId::SYSTEM` reserviert. `TenantId::try_new(0)` liefert `Err(MemFuseError::InvalidInput)`.
+In `crates/contextra-core/src/types/domain.rs` ist die Invariante **INV-TENANT-1** definiert:
+> `TenantId(0)` ist ausschließlich für `TenantId::SYSTEM` reserviert. `TenantId::try_new(0)` liefert `Err(ContextraError::InvalidInput)`.
 
 Bisher existierten jedoch die ungeschützte `const fn` `TenantId::new(id: u64)` sowie `impl From<u64> for TenantId`, die den Parameter `id` direkt in `Self(id)` verpackten ohne den Guard aus `try_new()` auszuführen. Dadurch konnten Aufrufer im Workspace `TenantId::new(0)` oder `TenantId::from(0u64)` nutzen und so die Sicherheitsinvariante INV-TENANT-1 unterlaufen (K12). Zudem bestanden `TenantId::DEFAULT` und `TenantId::INVALID` als Aliase für `Self(0)`, was zu semantischer Mehrdeutigkeit führte.
 
@@ -1288,24 +1288,24 @@ In einem separaten Task werden alle inventarisierten Aufrufer im Workspace auf `
 
 ## Kontext und Problemstellung
 
-In Increment 1 der `memfuse-kv-bridge` (Prompt 3) wurde das In-Memory-Zeroize-Sicherheitsfundament gelegt (`KvSegment` mit `ZeroizeOnDrop`, atomare Logical-Clock für echtes LRU, dedizierter `EvictionWorker`). Segmente wurden jedoch rein als Klartext-Tensorbytes (`data: Vec<u8>`) im RAM gehalten.
+In Increment 1 der `contextra-kv-bridge` (Prompt 3) wurde das In-Memory-Zeroize-Sicherheitsfundament gelegt (`KvSegment` mit `ZeroizeOnDrop`, atomare Logical-Clock für echtes LRU, dedizierter `EvictionWorker`). Segmente wurden jedoch rein als Klartext-Tensorbytes (`data: Vec<u8>`) im RAM gehalten.
 
-Gemäß Gesamtspezifikation v7.0 (K14 / §7.3) erfordert Increment 2 die Möglichkeit, KV-Cache-Segmente optional mittels AES-256-GCM-SIV (`memfuse_crypto::KvSegmentCipher`) zu verschlüsseln, ohne die bestehende öffentliche API im Zero-Config-Default zu brechen (P12). Zusätzlich sollen `model_fingerprint: Option<ModelFingerprint>` und `rope_offset: Option<usize>` strukturell in `KvSegment` verankert werden.
+Gemäß Gesamtspezifikation v7.0 (K14 / §7.3) erfordert Increment 2 die Möglichkeit, KV-Cache-Segmente optional mittels AES-256-GCM-SIV (`contextra_crypto::KvSegmentCipher`) zu verschlüsseln, ohne die bestehende öffentliche API im Zero-Config-Default zu brechen (P12). Zusätzlich sollen `model_fingerprint: Option<ModelFingerprint>` und `rope_offset: Option<usize>` strukturell in `KvSegment` verankert werden.
 
 ## Entscheidungen
 
 1. **Feature-Flag `kv-encryption` & Zero-Config-Default (P12):**
-   - Das Crate `memfuse-kv-bridge` führt ein Feature-Flag `kv-encryption = ["dep:memfuse-crypto"]` ein.
+   - Das Crate `contextra-kv-bridge` führt ein Feature-Flag `kv-encryption = ["dep:contextra-crypto"]` ein.
    - Im Zero-Config-Default (Feature inaktiv) verhält sich `KvSegment` exakt wie bisher (Klartext-Speicherung, Zeroize-on-Drop, keine zusätzliche Laufzeit-Crypto-Overheads).
 
 2. **Kryptographische Mandanten- und Modell-Isolation (K14 / P9):**
    - Bei aktivem Feature `kv-encryption` bietet `KvSegment` Konstruktoren `new_encrypted()` sowie `TenantIsolatedKvStore::insert_encrypted_segment()` und `get_decrypted_segment()`.
-   - Die Verschlüsselung nutzt `KvSegmentCipher` aus `memfuse-crypto` mit AES-256-GCM-SIV und frischen `OsRng`-Nonces.
+   - Die Verschlüsselung nutzt `KvSegmentCipher` aus `contextra-crypto` mit AES-256-GCM-SIV und frischen `OsRng`-Nonces.
    - In die Sub-Schlüsselableitung (HKDF-SHA256 via `KeyManager`) fließen `tenant_id` und `model_fingerprint` ein, womit Vertraulichkeit und strikte Isolation auf Modell- und Mandantenebene durchgesetzt werden.
 
 3. **Einbindung von `rope_offset`:**
    - `KvSegment` erhält das Feld `rope_offset: Option<usize>`.
-   - Sofern ein Aufrufer (z.B. `memfuse-mcp`) diesen Offset noch nicht liefert, wird `None` übergeben. Dies wird als expliziter Folgepunkt dokumentiert, anstatt einen erfundenen Platzhalterwert vorzutäuschen.
+   - Sofern ein Aufrufer (z.B. `contextra-mcp`) diesen Offset noch nicht liefert, wird `None` übergeben. Dies wird als expliziter Folgepunkt dokumentiert, anstatt einen erfundenen Platzhalterwert vorzutäuschen.
 
 4. **Kombinierte Zeroize- und Speicherabbild-Garantie (Integrationstest):**
    - Ein Integrationstest (`tests/kv_encryption_integration.rs`) simuliert eine In-Memory-Prozessabbild-Inspektion und weist nach, dass der Rohspeicher des Segments zu keinem Zeitpunkt den Klartext-Tensor enthält. <!-- doc-ref-ignore -->
@@ -1320,7 +1320,7 @@ Gemäß Gesamtspezifikation v7.0 (K14 / §7.3) erfordert Increment 2 die Möglic
 - Sämtliche Tests aus Prompt 3 (LRU-Eviction, Zeroize-on-Drop, Tenant-Isolation) bleiben zu 100 % grün.
 
 ### Folgepunkte
-- Sobald `memfuse-mcp` RoPE-Positioning verarbeitet, kann der übergebene `rope_offset`-Wert direkt an `KvSegment::new_with_metadata()` bzw. `new_encrypted()` durchgeschleift werden.
+- Sobald `contextra-mcp` RoPE-Positioning verarbeitet, kann der übergebene `rope_offset`-Wert direkt an `KvSegment::new_with_metadata()` bzw. `new_encrypted()` durchgeschleift werden.
 
 ---
 
@@ -1332,42 +1332,42 @@ Gemäß Gesamtspezifikation v7.0 (K14 / §7.3) erfordert Increment 2 die Möglic
 
 ## Kontext & Problemstellung
 GASP (Grounding-Aware Sensitivity by Perturbation / Post-Hoc-Validator) wurde in der Produktvision und der Gesamtspezifikation (K19) als essenzielle Verteidigungslinie gegen LLM-Halluzinationen konzipiert.
-Bisher existierte im Workspace nur ein präventiver Halluzinations-Guard in `crates/memfuse-ollama/src/client.rs`, der das Sprachmodell vorab via Prompt-Constraints zur Kontexttreue instruiert.
+Bisher existierte im Workspace nur ein präventiver Halluzinations-Guard in `crates/contextra-ollama/src/client.rs`, der das Sprachmodell vorab via Prompt-Constraints zur Kontexttreue instruiert.
 
 Ein präventiver Guard kann jedoch nicht post-hoc verifizieren, ob eine bereits generierte LLM-Antwort tatsächlich durch die abgerufenen Kontext-Chunks belegt ist. Es fehlte ein eigenständiges Modul `gasp.rs`, das nachgelagert Antworten auf Tatsachenbehauptungen (insbesondere Zahlen und Fakten) prüft und bei unzureichender Belegung kontrolliert absteniert.
 
 ## Entscheidung
-Wir implementieren das neue Modul `crates/memfuse-candle/src/gasp.rs` mit der Struktur `GaspValidator` unter folgenden Architektur- und Entwurfsentscheidungen:
+Wir implementieren das neue Modul `crates/contextra-candle/src/gasp.rs` mit der Struktur `GaspValidator` unter folgenden Architektur- und Entwurfsentscheidungen:
 
 1. **Klare Trennung der Verteidigungslinien (Prevention vs. Post-Hoc):**
-   - Der bestehende präventive Guard in `memfuse-ollama` bleibt unverändert bestehen.
+   - Der bestehende präventive Guard in `contextra-ollama` bleibt unverändert bestehen.
    - `GaspValidator` ergänzt die Pipeline als unabhängiger, nachgelagerter Post-Hoc-Check.
 
-2. **Entkoppelte Trait-Grenze in `memfuse-core`:**
-   - In `crates/memfuse-core/src/traits/mod.rs` wird der Trait `GroundingValidator` sowie die Datenstruktur `GroundingAssessment` definiert.
-   - `GaspValidator` implementiert `GroundingValidator` und hat keine direkte Abhängigkeit von Layer-2/3-Fachcode (`memfuse-db`).
+2. **Entkoppelte Trait-Grenze in `contextra-core`:**
+   - In `crates/contextra-core/src/traits/mod.rs` wird der Trait `GroundingValidator` sowie die Datenstruktur `GroundingAssessment` definiert.
+   - `GaspValidator` implementiert `GroundingValidator` und hat keine direkte Abhängigkeit von Layer-2/3-Fachcode (`contextra-db`).
 
 3. **P8-Konforme Kalibrierung & Wiederverwendung:**
-   - `GaspValidator` nutzt den bestehenden `IsotonicCalibrator` und `ConfigFingerprint` aus `memfuse-calibration` (P8/P10).
+   - `GaspValidator` nutzt den bestehenden `IsotonicCalibrator` und `ConfigFingerprint` aus `contextra-calibration` (P8/P10).
    - Bei Konfigurationsänderungen (z.B. Modell- oder Quantisierungswechsel) wird die Kalibrierung via `invalidate_on_config_change` zurückgesetzt.
 
 4. **Explizites Abstention-Muster:**
-   - Fällt der Konfidenz-Score unter den Schwellenwert (`threshold`, Default: 0.70), löst `GaspValidator` einen Abstention-Pfad aus (`Err(MemFuseError::PolicyViolation(...))` mit `LowConfidenceGrounding`).
-   - Leerer Kontext (Zero-Shot) liefert ein definiertes Fehlersignal (`Err(MemFuseError::InvalidInput(...))`) ohne Panic.
+   - Fällt der Konfidenz-Score unter den Schwellenwert (`threshold`, Default: 0.70), löst `GaspValidator` einen Abstention-Pfad aus (`Err(ContextraError::PolicyViolation(...))` mit `LowConfidenceGrounding`).
+   - Leerer Kontext (Zero-Shot) liefert ein definiertes Fehlersignal (`Err(ContextraError::InvalidInput(...))`) ohne Panic.
 
 5. **P12-Feature-Gating:**
-   - `gasp.rs` wird in `crates/memfuse-candle/Cargo.toml` hinter das Feature `candle` ge-gated (`#[cfg(feature = "candle")]`). Ohne Opt-in bleibt das Modul unsichtbar.
+   - `gasp.rs` wird in `crates/contextra-candle/Cargo.toml` hinter das Feature `candle` ge-gated (`#[cfg(feature = "candle")]`). Ohne Opt-in bleibt das Modul unsichtbar.
 
 ## Verbleibender Weg zur vollen Produktionsreife
 Mit dieser Implementierung wird **K19 als "H2 — initiale Implementierung"** geschlossen. Für die vollständige Produktionsreife (H3 / Produktionsstufe) sind folgende weitere Schritte erforderlich:
 
 1. **Benchmark-Validierung:** Evaluation des `GaspValidator` gegen reale Halluzinations-Benchmark-Datensätze (z.B. LongMemEval, HaluEval).
 2. **Log-Likelihood Integration:** Erweiterung um direkte Token-Logit / Perplexitäts-Vergleiche, sobald Candle KV-Cache / Log-Likelihood Expose-APIs vollständig angebunden sind.
-3. **End-to-End Orchestrierung:** Anbindung an `memfuse-mcp` Serving-Pipelines als konfigurierbare Post-Processing Middleware.
+3. **End-to-End Orchestrierung:** Anbindung an `contextra-mcp` Serving-Pipelines als konfigurierbare Post-Processing Middleware.
 
 ## Konsequenzen & Garantien
 - **K19 geschlossen:** Das Fehlen von `gasp.rs` ist behoben.
-- **Null-Regression:** Keine Änderungen an `memfuse-ollama` oder bestehenden Inferenzpfaden.
+- **Null-Regression:** Keine Änderungen an `contextra-ollama` oder bestehenden Inferenzpfaden.
 - **Typen-Integrität:** Vollständige Testabdeckung für unterstützte, halluzinierte und leere Kontext-Szenarien.
 
 ---
@@ -1377,11 +1377,11 @@ Mit dieser Implementierung wird **K19 als "H2 — initiale Implementierung"** ge
 * **Status:** Akzeptiert
 * **Datum:** 2026-09-07
 * **Kontext / Auslöser:**
-  Ein Codebase-Audit deckte eine ungeklärte Diskrepanz des PathRAG Sufficiency-Gate-Schwellenwerts (`sufficiency_threshold`) auf. In `crates/memfuse-graph/src/path_rag.rs:52` war der Default-Preset in `PathRAGEngine::with_defaults()` auf `0.01` gesetzt, während im Typen-Modul `crates/memfuse-core/src/types/saos.rs:29` sowie in mehreren Testfixtures in `memfuse-db` Werte von `0.1` bzw. `0.5` angegeben waren. Anerschwert wurde die Lage dadurch, dass ein zu niedriger Schwellenwert (z.B. 0.01) laut Forschungsergebnissen zu MemGraphRAG (arXiv:2506.00610) das Risiko birgt, dass minderwertige Multi-Hop-Pfade ungefiltert in die RRF-Signal-Fusion einfließen und einen Precision-Kollaps auslösen.
+  Ein Codebase-Audit deckte eine ungeklärte Diskrepanz des PathRAG Sufficiency-Gate-Schwellenwerts (`sufficiency_threshold`) auf. In `crates/contextra-graph/src/path_rag.rs:52` war der Default-Preset in `PathRAGEngine::with_defaults()` auf `0.01` gesetzt, während im Typen-Modul `crates/contextra-core/src/types/saos.rs:29` sowie in mehreren Testfixtures in `contextra-db` Werte von `0.1` bzw. `0.5` angegeben waren. Anerschwert wurde die Lage dadurch, dass ein zu niedriger Schwellenwert (z.B. 0.01) laut Forschungsergebnissen zu MemGraphRAG (arXiv:2506.00610) das Risiko birgt, dass minderwertige Multi-Hop-Pfade ungefiltert in die RRF-Signal-Fusion einfließen und einen Precision-Kollaps auslösen.
 
-## Empirische Messergebnisse (Parameter-Sweep via `memfuse-bench`)
+## Empirische Messergebnisse (Parameter-Sweep via `contextra-bench`)
 
-Zur fundierten Entscheidung wurde mit `cargo run -p memfuse-bench -- pathrag-sweep` ein Parameter-Sweep über `sufficiency_threshold ∈ {0.01, 0.1, 0.3, 0.6}` auf den Benchmark-Suiten LongMemEval (31 Szenarien) und LoCoMo gefahren.
+Zur fundierten Entscheidung wurde mit `cargo run -p contextra-bench -- pathrag-sweep` ein Parameter-Sweep über `sufficiency_threshold ∈ {0.01, 0.1, 0.3, 0.6}` auf den Benchmark-Suiten LongMemEval (31 Szenarien) und LoCoMo gefahren.
 
 ### LongMemEval Results (31 Szenarien)
 | Threshold | Recall@5 | Recall@10 | Precision@5 | Precision@10 |
@@ -1400,7 +1400,7 @@ Zur fundierten Entscheidung wurde mit `cargo run -p memfuse-bench -- pathrag-swe
 | **0.60**  | 100.0%   | 100.0%    | 100.0%      | 100.0%       |
 
 ## Entscheidung
-1. **Normativer Default-Wert:** `DEFAULT_SUFFICIENCY_THRESHOLD` wird normativ auf **`0.1`** (10% minimale Pfad-Konfidenz) in `crates/memfuse-graph/src/path_rag.rs` festgelegt.
+1. **Normativer Default-Wert:** `DEFAULT_SUFFICIENCY_THRESHOLD` wird normativ auf **`0.1`** (10% minimale Pfad-Konfidenz) in `crates/contextra-graph/src/path_rag.rs` festgelegt.
 2. **Konstruktor-Preset:** `PathRAGEngine::with_defaults()` verwendet `DEFAULT_SUFFICIENCY_THRESHOLD` (0.1) statt bisher `0.01`.
 3. **Risikovermeidung:** Obwohl in synthetischen Testkorpora hohe Kantengewichte den Recall über alle Thresholds konstant halten, schützt der Wert `0.1` im Realeinsatz auf dichten Graphen wirksam vor Rauschen und Precision-Einbußen durch schwache Multi-Hop-Pfade (arXiv:2506.00610).
 4. **Regressionstest:** Ein automatisierter Invarianten-Test (`test_default_sufficiency_threshold_meets_minimum_bound`) garantiert, dass `DEFAULT_SUFFICIENCY_THRESHOLD` künftig nicht unter 0.10 fällt.
@@ -1419,7 +1419,7 @@ Zur fundierten Entscheidung wurde mit `cargo run -p memfuse-bench -- pathrag-swe
 
 ## Kontext & Problemstellung
 
-In `crates/memfuse-calibration/src/pid.rs` steuert `PidController` dynamisch die Kandidatenpool-Größe für das Reranking zur Einhaltung des Latenzbudgets. Das Feld `min_pool_size` besaß im Quellcode unvollständig dokumentierte Werte und eine Inkonsistenz:
+In `crates/contextra-calibration/src/pid.rs` steuert `PidController` dynamisch die Kandidatenpool-Größe für das Reranking zur Einhaltung des Latenzbudgets. Das Feld `min_pool_size` besaß im Quellcode unvollständig dokumentierte Werte und eine Inkonsistenz:
 
 1. `PidController::default()` definierte `min_pool_size: 10`.
 2. In Teststrukturen und partiellen Overrides existierten unbegründete Magic Numbers (`min_pool_size: 20`).
@@ -1432,15 +1432,15 @@ Keiner dieser Werte verfügte über eine dokumentierte empirische Grundlage. Die
    Wir setzen den Default-Wert für `min_pool_size` in `PidController::default()` auf einen konservativen Mittelwert von 50 über die explizit publizierte Konstante `pub const PID_MIN_POOL_SIZE_DEFAULT: usize = 50;`.
 2. **Begründung für den Übergangswert 50:**
    - **Verbesserung gegenüber 10/20:** Der Wert 50 liegt deutlich näher an der Literatur-Empfehlung ($\ge 100$) und verhindert drastische Recall-Einbrüche bei niedrigen Latenzen.
-   - **Latenz-Schutz:** Der Wert bleibt vorerst unter 100, um eine Überlastung der p95-Reranking-Latenz auf ressourcenbeschränkten Systemen zu vermeiden, bis empirische Messungen auf MemFuse-Korpora vorliegen.
-   - **Geltung bis Benchmark-Sweep (B.6):** Dieser ADR fixiert den Übergangsdefault. Ein anstehender Benchmark-Sweep via `memfuse-bench` (LongMemEval) über $min\_pool\_size \in \{10, 20, 50, 100\}$ wird die finale Pareto-Front zwischen Recall@5 und p95-Latenz ermitteln und den Default bei Bedarf via Folge-ADR anpassen.
+   - **Latenz-Schutz:** Der Wert bleibt vorerst unter 100, um eine Überlastung der p95-Reranking-Latenz auf ressourcenbeschränkten Systemen zu vermeiden, bis empirische Messungen auf Contextra-Korpora vorliegen.
+   - **Geltung bis Benchmark-Sweep (B.6):** Dieser ADR fixiert den Übergangsdefault. Ein anstehender Benchmark-Sweep via `contextra-bench` (LongMemEval) über $min\_pool\_size \in \{10, 20, 50, 100\}$ wird die finale Pareto-Front zwischen Recall@5 und p95-Latenz ermitteln und den Default bei Bedarf via Folge-ADR anpassen.
 3. **Beseitigung von Magic-Number-Literalen:**
    Der Default in `PidController::default()` nutzt ausschließlich `PID_MIN_POOL_SIZE_DEFAULT` und `PID_MAX_POOL_SIZE_DEFAULT`. Test-Overrides in Unit-Tests wurden explizit als solche kommentiert.
 
 ## Konsequenzen
 
 - `PidController::default().min_pool_size` ist nun einheitlich 50.
-- Im Crate `crates/memfuse-calibration` existieren keine undokumentierten Magic-Number-Produktions-Defaults für `min_pool_size`.
+- Im Crate `crates/contextra-calibration` existieren keine undokumentierten Magic-Number-Produktions-Defaults für `min_pool_size`.
 - **Follow-up (B.6):** Ein empirischer LongMemEval-Benchmark-Sweep zur Bestimmung des exakten Pareto-Optimums ($min\_pool\_size \in \{10, 20, 50, 100\}$) ist für das nächste Ingestion/Retrieval-Release einzuplanen.
 
 ---
@@ -1453,13 +1453,13 @@ Keiner dieser Werte verfügte über eine dokumentierte empirische Grundlage. Die
 
 ## Kontext & Problemstellung
 
-In `crates/memfuse-index/src/diskann.rs` legt die Konstante `PENDING_FLUSH_THRESHOLD: u64 = 50` fest, nach wie vielen uncommitted Vektoreinfügungen im WAL/RAM automatisch ein DiskANN `persist_delta()` ausgelöst wird. Dieser Wert wurde ohne begleitenden ADR von einem früheren Wert (1.000) auf 50 gesenkt (Faktor 20 häufigeres Background-Persist bei kleinen Collections).
+In `crates/contextra-index/src/diskann.rs` legt die Konstante `PENDING_FLUSH_THRESHOLD: u64 = 50` fest, nach wie vielen uncommitted Vektoreinfügungen im WAL/RAM automatisch ein DiskANN `persist_delta()` ausgelöst wird. Dieser Wert wurde ohne begleitenden ADR von einem früheren Wert (1.000) auf 50 gesenkt (Faktor 20 häufigeres Background-Persist bei kleinen Collections).
 
 Die Auswirkung dieser Frequenzänderung auf die Schreibverstärkung (Write-Amplification) und die I/O-Belastung von NVMe/SSD-Speichermedien war bislang undokumentiert und unquantifiziert, was eine Dokumentationslücke gemäß v7.0 §4.2 und Technischen Schulden A.9 darstellte.
 
 ## Messmethodik & Empirische Ergebnisse
 
-Über den dedizierten Benchmark `crates/memfuse-index/benches/flush_threshold_amplification.rs` wurden DiskANN-Collections der Größen $N \in \{100, 1.000, 10.000, 100.000\}$ mit Insert-Workloads unter Schwellenwerten $T \in \{50, 200, 1.000\}$ vermessen. Die Ergebnisse sind in `crates/memfuse-index/benches/results/flush_threshold_amplification.md` abgelegt.
+Über den dedizierten Benchmark `crates/contextra-index/benches/flush_threshold_amplification.rs` wurden DiskANN-Collections der Größen $N \in \{100, 1.000, 10.000, 100.000\}$ mit Insert-Workloads unter Schwellenwerten $T \in \{50, 200, 1.000\}$ vermessen. Die Ergebnisse sind in `crates/contextra-index/benches/results/flush_threshold_amplification.md` abgelegt.
 
 ### Wichtigste Messergebnisse:
 1. **Write Amplification (WA) skaliert direkt proportional zur Collection-Größe $N$ und umgekehrt proportional zum Threshold $T$:**
@@ -1483,12 +1483,12 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
 3. **Große Collections ($N \ge 20.000$):** Threshold = **1.000**
    - Deckelt die Write-Amplification bei großen Vektormengen und schont SSD-/NVMe-Speichermedien vor I/O-Sättigung.
 
-*Hinweis:* Die eigentliche Implementierung der adaptiven Funktion in `crates/memfuse-index/src/diskann.rs` ist bewusst Gegenstand eines separaten Folge-Tasks mit eigenem Code-Review.
+*Hinweis:* Die eigentliche Implementierung der adaptiven Funktion in `crates/contextra-index/src/diskann.rs` ist bewusst Gegenstand eines separaten Folge-Tasks mit eigenem Code-Review.
 
 ## Konsequenzen & Dokumentationsabschluss
 
 - **Schließung der Dokumentationslücke:** Erfüllt die Anforderungen aus Gesamtspezifikation v7.0 §4.2 und beseitigt Technische Schulden A.9.
-- **Nachvollziehbarkeit:** Der Benchmark `cargo bench -p memfuse-index --bench flush_threshold_amplification --features experimental-diskann` steht als reproduzierbare Messgrundlage im Repository bereit.
+- **Nachvollziehbarkeit:** Der Benchmark `cargo bench -p contextra-index --bench flush_threshold_amplification --features experimental-diskann` steht als reproduzierbare Messgrundlage im Repository bereit.
 
 ---
 
@@ -1496,21 +1496,21 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
 
 * **Status:** Umgesetzt (physisch entfernt am 2026-09-12)
 * **Datum:** 2026-09-08 (Umsetzung: 2026-09-12)
-* **Target Path:** crates/memfuse-tauri
+* **Target Path:** crates/contextra-tauri
 * **Kontext / Auslöser:** Zielarchitektur v8.0 §6 & Entscheidungsdokumentation v1.0. Das Projekt führte zuvor drei unentschiedene Produktvisionen parallel (PyPI-Library, Desktop-Enterprise-App, Voice-Assistant).
 
 ## Entscheidung
-1. **Verbindliche Fokussierung auf Option 1: PyPI-Library (Position A/B, ADR-007-Richtung)**. MemFuse wird primär als hochperformante, kryptographisch isolierte Embedded AI Memory Library für Python (`memfuse-py`) und Rust entwickelt.
+1. **Verbindliche Fokussierung auf Option 1: PyPI-Library (Position A/B, ADR-007-Richtung)**. Contextra wird primär als hochperformante, kryptographisch isolierte Embedded AI Memory Library für Python (`contextra-py`) und Rust entwickelt.
 2. **ADR-018 (Doppelstrategie) wird explizit durch diese ADR abgelöst (`superseded`)**.
-3. **`memfuse-tauri` wird als `deprecated` eingestuft** und im Rahmen des Crate-Konsolidierungs-Fahrplans physisch aus dem Repository entfernt.
+3. **`contextra-tauri` wird als `deprecated` eingestuft** und im Rahmen des Crate-Konsolidierungs-Fahrplans physisch aus dem Repository entfernt.
 
 ## Begründung
 - Die Entwicklungsdynamik (Schwarm-Entwicklung, Solo-Architekt) erfordert maximale Fokussierung auf die Kernstärke: kaskadierende Retrieval-Qualität und kryptographische Mandantenisolation.
 - Eine Desktop-Enterprise-App bindet erhebliche Ressourcen in UI/Desktop-Packaging (Tauri/GTK), ohne direkten Beitrag zur Inferenz- und Gedächtnisleistung.
 
 ## Konsequenzen
-- `memfuse-py` bildet die primäre FFI-Grenzschicht.
-- `memfuse-tauri` wird in Folgeschritten aus der Cargo-Workspace-Topologie entfernt.
+- `contextra-py` bildet die primäre FFI-Grenzschicht.
+- `contextra-tauri` wird in Folgeschritten aus der Cargo-Workspace-Topologie entfernt.
 - Doku-Artefakte und README/Architecture-Guides werden entsprechend aktualisiert.
 
 ---
@@ -1534,9 +1534,9 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
 
 * **Datum:** 2026-09-12
 * **Status:** ✅ Final
-* **Target Path:** crates/memfuse-db/src/maintenance_scheduler.rs, crates/memfuse-router/src/router.rs
+* **Target Path:** crates/contextra-db/src/maintenance_scheduler.rs, crates/contextra-router/src/router.rs
 * **Kontext / Auslöser:** F-11 (`LyapunovDriftWatcher.update()`) schützt vor unbemerktem Verfall der Routing-Kalibrierung. Ursprüngliche Spezifikationsentwürfe deuten auf eine periodische Taktung hin.
-* **Entscheidung:** F-11 (`LyapunovDriftWatcher.update()`) ist bewusst NICHT im periodischen 60s-Tick des `MaintenanceScheduler` enthalten. F-11 wird stattdessen reaktionsschnell & event-driven direkt nach jeder Routing-Entscheidung in `crates/memfuse-router/src/router.rs` aufgerufen.
+* **Entscheidung:** F-11 (`LyapunovDriftWatcher.update()`) ist bewusst NICHT im periodischen 60s-Tick des `MaintenanceScheduler` enthalten. F-11 wird stattdessen reaktionsschnell & event-driven direkt nach jeder Routing-Entscheidung in `crates/contextra-router/src/router.rs` aufgerufen.
 * **Begründung:** Eine Auslagerung der Drift-Erkennung in ein periodisches Intervall (z. B. 60s) würde zu verzögerten Reaktionen bei rascher Drift führen. Die direkte event-getriebene Auswertung sichert minimale Reaktionszeiten.
 * **Konsequenzen:**
   - `MaintenanceScheduler` ruft F-11 im Hintergrund-Tick nicht auf.
@@ -1544,17 +1544,17 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
 
 ---
 
-# ADR-080: Weak<RouterEngine>-Injection in MemFuse für H-17 Stats Live-Daten
+# ADR-080: Weak<RouterEngine>-Injection in Contextra für H-17 Stats Live-Daten
 
 * **Datum:** 2026-09-12
 * **Status:** Akzeptiert
-* **Target Path:** crates/memfuse-db/src/lib.rs, crates/memfuse-router/src/router.rs
-* **Kontext / Auslöser:** Problem H-17: `MemFuse::stats()` / `PyDbStats` liefert die Felder `drift_status`, `calibration_ece`, `last_calibration_at` und `pid_pool_size` derzeit als Platzhalterwerte, weil `memfuse-db` (Layer 5) keine Referenz auf `RouterEngine` (Layer 6) hält. Eine direkte starke Referenz (`Arc<RouterEngine>`) würde die DAG-Schichtung (P1) verletzen und einen zirkulären Bezug erzeugen.
+* **Target Path:** crates/contextra-db/src/lib.rs, crates/contextra-router/src/router.rs
+* **Kontext / Auslöser:** Problem H-17: `Contextra::stats()` / `PyDbStats` liefert die Felder `drift_status`, `calibration_ece`, `last_calibration_at` und `pid_pool_size` derzeit als Platzhalterwerte, weil `contextra-db` (Layer 5) keine Referenz auf `RouterEngine` (Layer 6) hält. Eine direkte starke Referenz (`Arc<RouterEngine>`) würde die DAG-Schichtung (P1) verletzen und einen zirkulären Bezug erzeugen.
 
 ## Entscheidung
-1. `MemFuse` (Layer 5) erhält ein optionales Feld `router: Option<Weak<RouterEngine>>`.
-2. Aufrufer auf Integrationsebene (z. B. Orchestrierung / `memfuse-py` / Bootstrap) injizieren nach der Initialisierung von `RouterEngine` eine schwache Referenz (`Weak<RouterEngine>`) in die `MemFuse`-Instanz.
-3. Bei Aufruf von `MemFuse::stats()` wird versucht, die schwache Referenz via `Weak::upgrade()` hochzustufen:
+1. `Contextra` (Layer 5) erhält ein optionales Feld `router: Option<Weak<RouterEngine>>`.
+2. Aufrufer auf Integrationsebene (z. B. Orchestrierung / `contextra-py` / Bootstrap) injizieren nach der Initialisierung von `RouterEngine` eine schwache Referenz (`Weak<RouterEngine>`) in die `Contextra`-Instanz.
+3. Bei Aufruf von `Contextra::stats()` wird versucht, die schwache Referenz via `Weak::upgrade()` hochzustufen:
    - Bei erfolgreichem Upgrade fragt `stats()` die Live-Daten über die bestehenden Getter-Funktionen ab:
      - `LyapunovDriftWatcher::status_str()` → `drift_status`
      - `IsotonicCalibrator::last_calibration_at()` → `last_calibration_at`
@@ -1562,11 +1562,11 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
    - Bei fehlgeschlagenem Upgrade (`None` oder RouterEngine bereits dropped) werden weiterhin saubere Platzhalterwerte zurückgegeben — ohne Panic oder Error-Rückgabe.
 
 ## Begründung
-- **DAG-Integrität (P1):** `memfuse-db` (Layer 5) übernimmt keine Eigentümerschaft oder starke Referenz auf `memfuse-router` (Layer 6). Es entsteht kein Kreisschluss zwischen Layer 5 und Layer 6.
+- **DAG-Integrität (P1):** `contextra-db` (Layer 5) übernimmt keine Eigentümerschaft oder starke Referenz auf `contextra-router` (Layer 6). Es entsteht kein Kreisschluss zwischen Layer 5 und Layer 6.
 - **Robustheit & Resilienz:** Das Fehlschlagen von `Weak::upgrade()` wird gracefully abgefangen. Das Verhalten im Unconnected State bleibt unverändert stabil.
 
 ## Konsequenzen
-- Die tatsächliche physische Verdrahtung (Implementieren des `Weak`-Feldes in `MemFuse`, Aufrufen der Getter in `stats()` sowie Setzen des `Weak`-Felds beim MemFuse-Bootstrap) ist im Woche-3–4-Implementierungstask (H-17 Vollimplementierung) zu erledigen — dieser ADR dokumentiert ausschließlich die Architekturentscheidung.
+- Die tatsächliche physische Verdrahtung (Implementieren des `Weak`-Feldes in `Contextra`, Aufrufen der Getter in `stats()` sowie Setzen des `Weak`-Felds beim Contextra-Bootstrap) ist im Woche-3–4-Implementierungstask (H-17 Vollimplementierung) zu erledigen — dieser ADR dokumentiert ausschließlich die Architekturentscheidung.
 
 ---
 
@@ -1574,7 +1574,7 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
 
 * **Datum:** 2026-09-12
 * **Status:** ✅ Final
-* **Target Path:** crates/memfuse-db/src/collection/mod.rs, crates/memfuse-db/src/consolidation_executor.rs, crates/memfuse-db/src/maintenance_scheduler.rs
+* **Target Path:** crates/contextra-db/src/collection/mod.rs, crates/contextra-db/src/consolidation_executor.rs, crates/contextra-db/src/maintenance_scheduler.rs
 * **Kontext / Auslöser:** Problem H-19: Bei künftiger oder paralleler Aktivierung von `MaintenanceScheduler` und `ConsolidationEngine` besteht das Risiko, dass beide Background-Pfade gleichzeitig einen `execute_consolidation_pass`-Aufruf auf derselben `Collection`-Instanz ausführen.
 
 ## Entscheidung
@@ -1606,7 +1606,7 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
 6. **Quantisierung & Block-Cache:** IP-17 (SQ8-Perzentil-Clipping) hat Vorrang vor RaBitQ/PQ-Evaluierung; CLOCK / S3-FIFO als Eviction-Strategie für BlockCache (IP-18).
 
 ## Begründung
-Wahrt die Zero-Panic-, Predictable-Performance- und Determinismus-Garantien von MemFuse, während Skalierung und Retrieval-Präzision gezielt verbessert werden.
+Wahrt die Zero-Panic-, Predictable-Performance- und Determinismus-Garantien von Contextra, während Skalierung und Retrieval-Präzision gezielt verbessert werden.
 
 ## Alternativen
 Pauschale Umstellung auf DiskANN oder UUIDv7 wurden wegen Mutabilitäts- bzw. Determinisierungsbrüchen explizit zurückgewiesen.
@@ -1620,8 +1620,8 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 
 * **Status:** ✅ Final
 * **Datum:** 2026-09-17
-* **Target Path:** xtask/src/check_flatbuffers_drift.rs, schemas/memfuse.fbs, crates/memfuse-core-ipc-gen/src/memfuse_generated.rs
-* **Kontext / Auslöser:** Implementierung des CI-Drift-Gates IP-16 zwischen `schemas/memfuse.fbs` und `crates/memfuse-core-ipc-gen/src/memfuse_generated.rs`. Evaluierung der beiden FlatBuffers-Typen `VectorIndexUpdate` und `Embedding` bezüglich workspace-weiter Konsumption.
+* **Target Path:** xtask/src/check_flatbuffers_drift.rs, schemas/contextra.fbs, crates/contextra-core-ipc-gen/src/contextra_generated.rs
+* **Kontext / Auslöser:** Implementierung des CI-Drift-Gates IP-16 zwischen `schemas/contextra.fbs` und `crates/contextra-core-ipc-gen/src/contextra_generated.rs`. Evaluierung der beiden FlatBuffers-Typen `VectorIndexUpdate` und `Embedding` bezüglich workspace-weiter Konsumption.
 
 ## Entscheidung
 1. **CI Drift-Gate & Developer Subcommands:**
@@ -1630,10 +1630,10 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
    - Das Gate prüft das Vorhandensein des `flatc`-Compilers. Fehlt `flatc`, liefert das Gate eine klare `Err`-Meldung ohne Rust-Panic oder Silent-Skip.
 2. **Umgang mit toten FlatBuffers-Typen (`VectorIndexUpdate` und `Embedding`):**
    - Ein Codebase-Audit ergab, dass `VectorIndexUpdate` und `Embedding` im generierten IPC-Code von keinen externen Workspace-Crates konsumiert werden.
-   - **Empfehlung:** Die Typen werden vorerst NICHT aus `schemas/memfuse.fbs` entfernt, um Breaking Changes an der IPC-Schnittstellenspezifikation vor dem formellen v1.0 Interface-Freeze zu vermeiden. Eine finale Entfernung oder Anbindung an Konsumenten erfolgt in einer gesonderten IPC-Grooming-Phase.
+   - **Empfehlung:** Die Typen werden vorerst NICHT aus `schemas/contextra.fbs` entfernt, um Breaking Changes an der IPC-Schnittstellenspezifikation vor dem formellen v1.0 Interface-Freeze zu vermeiden. Eine finale Entfernung oder Anbindung an Konsumenten erfolgt in einer gesonderten IPC-Grooming-Phase.
 
 ## Begründung
-- **Drift-Sicherheit:** Garantiert, dass Schema-Änderungen an `schemas/memfuse.fbs` nicht unbemerkt zu Drift im generierten Rust-Code führen.
+- **Drift-Sicherheit:** Garantiert, dass Schema-Änderungen an `schemas/contextra.fbs` nicht unbemerkt zu Drift im generierten Rust-Code führen.
 - **Zero-Panic & Fail-Closed:** Stellt sicher, dass fehlende Build-Tools (`flatc`) in CI-Subcommands sauber abgefangen und gemeldet werden.
 - **API-Stabilität:** Verhindert voreilige Breaking Changes an der IPC-Spezifikation vor der v1.0-Stabilisierung.
 
@@ -1651,7 +1651,7 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
   In verteilten Entwicklungsumgebungen und bei der Zusammenarbeit mit automatisierten KI-Agenten reicht eine reine Freitext-Dokumentation von Architektur- und Schichtgrenzen (z. B. in `ARCHITECTURE.md` oder `README.md`) nicht aus, um architektonische Regelverstöße zuverlässig zu verhindern.
   Ohne maschinelle Sperren entstehen schleichend unzulässige Aufwärts-Abhängigkeiten (z. B. Ring-0-Domänenkerne, die auf höhergestellte Service- oder Engine-Crates zugreifen) oder unzulässige Laufzeit-Kopplungen (z. B. direkte `tokio`-Importe in synchronen Ring-0-Kernmodulen).
 
-  Zur Vermeidung von Architektur-Drift und zur Einhaltung der DAG-Matrix (GESAMTSPEZIFIKATION §0.3, §1.1, §4.3) erfordert das MemFuse Cognitive OS ein automatisiertes, maschinell erzwungenes Gate.
+  Zur Vermeidung von Architektur-Drift und zur Einhaltung der DAG-Matrix (GESAMTSPEZIFIKATION §0.3, §1.1, §4.3) erfordert das Contextra Cognitive OS ein automatisiertes, maschinell erzwungenes Gate.
 
 ## Entscheidungen
 
@@ -1660,15 +1660,15 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 
 2. **Ring-Schichtenmodell (Ring 0 bis 4):**
    Das Repository unterliegt einer Fünf-Ring-Topologie:
-   * **Ring 0 (Foundation & Core Domain Logic):** `memfuse-types`, `memfuse-ports`, `memfuse-mvcc`, `memfuse-vector`, `memfuse-rank`, `memfuse-adapt`, `memfuse-text`, `memfuse-graph`, `memfuse-crypto`, `memfuse-simd`, `memfuse-sys`, `memfuse-wire`, `memfuse-core`, `memfuse-calibration`.
-     * *Invariante:* **Keine Aufwärts-Abhängigkeiten** und **keine `tokio`-Abhängigkeit** (ausgenommen `memfuse-core` als zentrales Trait-Definitions-Modul). Ring-0-Kerne operieren streng synchron.
-   * **Ring 1 (Storage & Persistence):** `memfuse-store`, `memfuse-checkpoint`, `memfuse-kvcache`.
+   * **Ring 0 (Foundation & Core Domain Logic):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-vector`, `contextra-rank`, `contextra-adapt`, `contextra-text`, `contextra-graph`, `contextra-crypto`, `contextra-simd`, `contextra-sys`, `contextra-wire`, `contextra-core`, `contextra-calibration`.
+     * *Invariante:* **Keine Aufwärts-Abhängigkeiten** und **keine `tokio`-Abhängigkeit** (ausgenommen `contextra-core` als zentrales Trait-Definitions-Modul). Ring-0-Kerne operieren streng synchron.
+   * **Ring 1 (Storage & Persistence):** `contextra-store`, `contextra-checkpoint`, `contextra-kvcache`.
      * *Invariante:* Dürfen nur von Ring 0 abhängen; keine gegenseitigen Querverweise untereinander.
-   * **Ring 2 (External Integrations & Execution Sandboxes):** `memfuse-sandbox`, `memfuse-infer-onnx`, `memfuse-infer-candle`, `memfuse-infer-ollama`.
+   * **Ring 2 (External Integrations & Execution Sandboxes):** `contextra-sandbox`, `contextra-infer-onnx`, `contextra-infer-candle`, `contextra-infer-ollama`.
      * *Invariante:* Nur Abhängigkeiten auf freigegebene Ring-0-Basismodule (`types`, `ports`, `crypto`, `core`, `simd`).
-   * **Ring 3 (Engine, Reasoning & Cognition):** `memfuse-engine`, `memfuse-cognition`, `memfuse-privacy`, `memfuse-router`, `memfuse-agent`, `memfuse-db`.
+   * **Ring 3 (Engine, Reasoning & Cognition):** `contextra-engine`, `contextra-cognition`, `contextra-privacy`, `contextra-router`, `contextra-agent`, `contextra-db`.
      * *Invariante:* Dürfen auf Ring 0 und Ring 1 zugreifen, jedoch **nicht** auf konkrete Ring-2-Integrations-Crates.
-   * **Ring 4 (Public Facade & Protocols):** `memfuse`, `memfuse-mcp`, `memfuse-py`.
+   * **Ring 4 (Public Facade & Protocols):** `contextra`, `contextra-mcp`, `contextra-py`.
      * *Invariante:* Konsumieren die darunterliegenden Schichten als öffentliche Schnittstelle.
 
 3. **Gesteuerte Ausnahmen über `LAYER_ALLOWLIST`:**
@@ -1690,7 +1690,7 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 * **Status:** Final
 * **Datum:** 2026-09-22
 * **Kontext / Auslöser:**
-  Die Ring-0-Speicherkerne (`memfuse-vector`, `memfuse-text`, `memfuse-graph`) bilden das fundamentale Hochleistungs-Fundament für In-Memory Lookups und Traversierungen im Hot-Path.
+  Die Ring-0-Speicherkerne (`contextra-vector`, `contextra-text`, `contextra-graph`) bilden das fundamentale Hochleistungs-Fundament für In-Memory Lookups und Traversierungen im Hot-Path.
   Das direkte Mischen von Asynchronitäts-Laufzeiten (`tokio`) in reinen In-Memory-Suchalgorithmen erzeugt unnötigen Runtime-Overhead, erschwert die formale Korrektheitsanalyse und birgt die Gefahr von Thread-Explosionen durch unbegrenzte `spawn_blocking`-Aufrufe bei hoher paralleler Leselast.
 
   Gleichzeitig erfordern Disk-Persistierungs- und Schreiboperationen (`StorageWrite`, SSTable-/WAL-Flushes) asynchrone I/O-Orchestrierung. Es bedarf einer klaren Trennung zwischen synchronen Kern-Lese-Zugriffen und asynchronen Schreib-Workflows.
@@ -1701,15 +1701,15 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
    Lese-Operationen über die Schnittstelle `StorageRead` innerhalb von Ring 0 werden streng synchron ausgeführt. Die Kern-Suchindizes (`csr.rs`, `inverted.rs`, `diskann.rs`) enthalten keine direkten `tokio`-Abhängigkeiten.
 
 2. **Verlagerung von Persistenz-Aufrufen (`StorageWrite`):**
-   Schreib-, Mutations- und Persistierungsoperationen (`StorageWrite`, z. B. `persist_delta()`, SSTable- / WAL-Flushes) werden aus den Ring-0-Modulen heraus gelöst und in die übergeordnete Orchestrierungsschicht (`memfuse-engine`, Ring 3) verlagert.
+   Schreib-, Mutations- und Persistierungsoperationen (`StorageWrite`, z. B. `persist_delta()`, SSTable- / WAL-Flushes) werden aus den Ring-0-Modulen heraus gelöst und in die übergeordnete Orchestrierungsschicht (`contextra-engine`, Ring 3) verlagert.
 
 3. **Begrenzter `ComputePool` für CPU-intensive Tasks:**
-   Unbegrenzte `tokio::task::spawn_blocking`-Aufrufe bei parallelen Lese- und Indexierungs-Workloads werden durch einen kapazitätsbegrenzten, dedizierten `ComputePool` in `memfuse-engine` ersetzt. Dies garantiert harte Obergrenzen für zeitgleiche Thread-Belegungen.
+   Unbegrenzte `tokio::task::spawn_blocking`-Aufrufe bei parallelen Lese- und Indexierungs-Workloads werden durch einen kapazitätsbegrenzten, dedizierten `ComputePool` in `contextra-engine` ersetzt. Dies garantiert harte Obergrenzen für zeitgleiche Thread-Belegungen.
 
 ## Konsequenzen
 
 * **Hot-Path Lese-Performanz:** In-Memory-Lese-Pfade in Ring 0 laufen ohne Async-Context-Switches ab und bieten vorhersehbare Microsecond-Latenzen (p99-Budget $\le +3\%$ vs. Frozen Baseline).
-* **Zero-`tokio`-Invariante in Ring 0:** `cargo tree -e normal -p memfuse-vector`, `-p memfuse-text` und `-p memfuse-graph` zeigen keine `tokio`-Laufzeitabhängigkeit.
+* **Zero-`tokio`-Invariante in Ring 0:** `cargo tree -e normal -p contextra-vector`, `-p contextra-text` und `-p contextra-graph` zeigen keine `tokio`-Laufzeitabhängigkeit.
 * **Resilienter Ressourcen-Schutz:** Der begrenzte ComputePool schützt den Server vor Thread-Contention und Memory-Pressure bei hoher paralleler Last.
 
 ---
@@ -1719,7 +1719,7 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 * **Status:** Final
 * **Datum:** 2026-09-22
 * **Kontext / Auslöser:**
-  MemFuse folgt dem Grundsatz der maximalen Speichersicherheit (Pure Rust Policy / Sovereign Core, ADR-004). Jedoch verlangen plattform- und hardwarenahe Optimierungen (wie Zero-Copy Mmap-I/O oder SIMD-Vector-Math) nach der Nutzung von `unsafe` Rust-Blöcken.
+  Contextra folgt dem Grundsatz der maximalen Speichersicherheit (Pure Rust Policy / Sovereign Core, ADR-004). Jedoch verlangen plattform- und hardwarenahe Optimierungen (wie Zero-Copy Mmap-I/O oder SIMD-Vector-Math) nach der Nutzung von `unsafe` Rust-Blöcken.
   Wildwuchs von `unsafe`-Code über verschiedene Domänen- und Datenbank-Crates hinweg würde die Auditierbarkeit zerstören und Memory-Safety-Bugs wie Undefined Behavior, Out-of-Bounds-Reads oder Use-After-Free riskieren.
 
 ## Entscheidungen
@@ -1729,21 +1729,21 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 
 2. **Drei explizit genehmigte Unsafe-Inseln:**
    `unsafe`-Code ist ausschließlich in drei isolierten Kapseln erlaubt:
-   * **`memfuse-sys`:** Systemnahe OS-Schnittstellen (wie FFI, Mmap-Dateizugriffe). Stellt sichere Fassaden (z. B. `memfuse_sys::mmap_readonly`) bereit.
-   * **`memfuse-simd`:** Vektor-Distanzberechnungen und Hardware-Intrinsics (AVX2, AVX-512, NEON) mit strenger Runtime-Feature-Detection (`is_x86_feature_detected!`).
-   * **Übergangs-Whitelists (`memfuse-vector`, `memfuse-store` / `memfuse-crypto` Test-Only):** Temporäre `unsafe`-Nutzung auf dem Migrationspfad MUSS zwingend in einer lokalen `UNSAFE_TRANSITION.md`-Datei nachverfolgt werden.
+   * **`contextra-sys`:** Systemnahe OS-Schnittstellen (wie FFI, Mmap-Dateizugriffe). Stellt sichere Fassaden (z. B. `contextra_sys::mmap_readonly`) bereit.
+   * **`contextra-simd`:** Vektor-Distanzberechnungen und Hardware-Intrinsics (AVX2, AVX-512, NEON) mit strenger Runtime-Feature-Detection (`is_x86_feature_detected!`).
+   * **Übergangs-Whitelists (`contextra-vector`, `contextra-store` / `contextra-crypto` Test-Only):** Temporäre `unsafe`-Nutzung auf dem Migrationspfad MUSS zwingend in einer lokalen `UNSAFE_TRANSITION.md`-Datei nachverfolgt werden.
 
 3. **Verpflichtendes `UNSAFE_TRANSITION.md`-Tracking:**
    Tritt aus historischen Gründen `unsafe`-Code in Whitelist-Crates auf, MUSS jede Fundstelle mit einer Tracking-ID (z. B. `TRANS-VEC-001`), Quellpfad, Begründung, Ziel-Crate und Migrationsstatus in `UNSAFE_TRANSITION.md` dokumentiert sein.
-   Nach erfolgreicher Migration in `memfuse-sys` oder `memfuse-simd` wird das Crate unverzüglich auf `#![forbid(unsafe_code)]` zurückgestellt.
+   Nach erfolgreicher Migration in `contextra-sys` oder `contextra-simd` wird das Crate unverzüglich auf `#![forbid(unsafe_code)]` zurückgestellt.
 
 4. **Verpflichtende `// SAFETY:`-Dokumentationsregel:**
    Jeder verbleibende `unsafe`-Block erfordert ausnahmslos einen vorangestellten `// SAFETY:`-Kommentar, der die mathematischen oder speicherbezogenen Preconditions und Invarianten belegt. Word-identische Copy-Paste-Kommentare sind unzulässig (ADR-035).
 
 ## Konsequenzen
 
-* **Maximale Auditsicherheit:** Sicherheitsaudits müssen nur die isolierten Inseln (`memfuse-sys`, `memfuse-simd`) und aktive `UNSAFE_TRANSITION.md`-Whitelists prüfen.
-* **Keine Korruption im Fachcode:** 95%+ des Gesamtrepositories (inklusive `memfuse-db`, `memfuse-agent`, `memfuse-mcp`, `memfuse-py`) bleiben garantiert frei von Unsafe-Code.
+* **Maximale Auditsicherheit:** Sicherheitsaudits müssen nur die isolierten Inseln (`contextra-sys`, `contextra-simd`) und aktive `UNSAFE_TRANSITION.md`-Whitelists prüfen.
+* **Keine Korruption im Fachcode:** 95%+ des Gesamtrepositories (inklusive `contextra-db`, `contextra-agent`, `contextra-mcp`, `contextra-py`) bleiben garantiert frei von Unsafe-Code.
 * **Maschinelles Enforcement:** Compiler und Linter schlagen bei unautorisierten `unsafe`-Blöcken in geschützten Crates sofort mit E0133/Linter-Error fehl.
 
 ---
@@ -1753,7 +1753,7 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 * **Status:** Final
 * **Datum:** 2026-09-22
 * **Kontext / Auslöser:**
-  In Rust-Projekten, die C- oder Python-FFI-Schnittstellen exponieren (wie `memfuse-py` via PyO3), führt eine unbedachte Verwendung von `panic = "abort"` im Release-Profil dazu, dass Unhandled Panics im CPython-Interpreter-Prozess direkt zu unkontrollierten Prozessabstürzen via `SIGABRT` (exit code 134) führen.
+  In Rust-Projekten, die C- oder Python-FFI-Schnittstellen exponieren (wie `contextra-py` via PyO3), führt eine unbedachte Verwendung von `panic = "abort"` im Release-Profil dazu, dass Unhandled Panics im CPython-Interpreter-Prozess direkt zu unkontrollierten Prozessabstürzen via `SIGABRT` (exit code 134) führen.
   Dies verletzt die Stabilitätsanforderungen von FFI-Grenzschichten. Gleichzeitig benötigen eigenständige Server- und CLI-Binaries ohne FFI-Anbindung maximale Binärgrößen-Optimierungen und deterministischen Abbruch.
 
 ## Entscheidungen
@@ -1762,20 +1762,20 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
    * **Standard Release-Profil (`[profile.release]`):** Verwendet ausnahmslos `panic = "unwind"`, um Stack-Unwinding über FFI-Grenzen hinweg sowie geordnetes `catch_unwind` zu ermöglichen.
    * **`release-abort` Profil (`[profile.release-abort]`):** Erbt von `release` und setzt explizit `panic = "abort"`. Dieses Profil gilt ausschließlich für reine Standalone-Binaries ohne FFI/PyO3-Grenzen.
 
-2. **FFI Panic Isolation in `memfuse-py`:**
-   * Sämtliche FFI-Aufrufe in `memfuse-py` fangen Rust-Panics an der FFI-Schnittstellen-Grenze mittels `std::panic::catch_unwind` (über die Hilfsfunktion `run_blocking_ffi`) ab.
+2. **FFI Panic Isolation in `contextra-py`:**
+   * Sämtliche FFI-Aufrufe in `contextra-py` fangen Rust-Panics an der FFI-Schnittstellen-Grenze mittels `std::panic::catch_unwind` (über die Hilfsfunktion `run_blocking_ffi`) ab.
    * Abgefangene Panics werden kontrolliert in strukturierte Python `PyRuntimeError`-Exceptions ("Rust panic caught at FFI boundary") übersetzt (ADR-056 / ADR-059).
    * Bei einem Panic-Ereignis werden betroffene `Db`- und `Collection`-Instanzen atomar als vergiftet (`is_poisoned = true`) markiert. Nachfolgende Operationen auf vergifteten Instanzen werden geordnet mit einem Poison-Fehler abgelehnt.
 
 3. **Verifikation durch FFI-Panic-Testsuite:**
-   Die Korrektheit der Panic-Isolation wird automatisiert über die Testsuite `crates/memfuse-py/tests/test_panic_to_pyerr.py` verifiziert. Sie prüft:
+   Die Korrektheit der Panic-Isolation wird automatisiert über die Testsuite `crates/contextra-py/tests/test_panic_to_pyerr.py` verifiziert. Sie prüft:
    * Übersetzung von Rust-Panics in `PyRuntimeError`.
    * Subprozess-Prozessüberleben ohne SIGABRT-Absturz.
    * Atomare Poisoning-Sperre nach Panics.
 
 ## Konsequenzen
 
-* **Interpreter-Stabilität:** Python-Anwendungen und Jupyter-Notebooks, die `memfuse-py` nutzen, stürzen bei internen Rust-Fehlern nicht ab, sondern erhalten behandelbare Python-Exceptions.
+* **Interpreter-Stabilität:** Python-Anwendungen und Jupyter-Notebooks, die `contextra-py` nutzen, stürzen bei internen Rust-Fehlern nicht ab, sondern erhalten behandelbare Python-Exceptions.
 * **Prozess-Sicherheit:** Vergiftete Datenbank-Instanzen verhindern nach einem Panic folgenschwere Folgeinkonsistenzen auf SSTable-/WAL-Ebene.
 
 ---
@@ -1785,7 +1785,7 @@ Verbindliche Ausrichtung aller Dokumente, Spezifikationen, ADRs und Roadmap-Plä
 * **Status:** Proposed / Pending Product-Owner-Entscheidung (gemäß §A2.4 Nr. 3)
 * **Datum:** 2026-09-22
 * **Kontext / Auslöser:**
-  Im MemFuse Cognitive OS besteht eine architektonische Spannung zwischen der externen, benutzerseitigen Dokumenten-Identifikation (`DocId`, 128-Bit BLAKE3-Truncation oder String-Key; siehe ADR-082) und dem internen Kompakt-Index (`DocIdx`, `u32` / 32-Bit In-Memory Slot-Index):
+  Im Contextra Cognitive OS besteht eine architektonische Spannung zwischen der externen, benutzerseitigen Dokumenten-Identifikation (`DocId`, 128-Bit BLAKE3-Truncation oder String-Key; siehe ADR-082) und dem internen Kompakt-Index (`DocIdx`, `u32` / 32-Bit In-Memory Slot-Index):
 
   1. **Externes `DocId` (128-Bit BLAKE3 / String):**
      * Deterministische Hash-Derivierung aus dem Quellschlüssel (`key`).
@@ -1821,7 +1821,7 @@ Zur finalen Entscheidung durch den Product Owner (PO) stehen folgende drei Archi
 ## Konsequenzen
 
 * **Status-Sperre:** Der Status bleibt explizit auf **Proposed / Pending Product-Owner-Entscheidung** gesetzt.
-* **Keine Code-Invasivität:** Es erfolgen keine Änderungen an `memfuse-core`, `memfuse-db` oder Index-Crates bis zur formellen Beschlussfassung durch den Product Owner.
+* **Keine Code-Invasivität:** Es erfolgen keine Änderungen an `contextra-core`, `contextra-db` oder Index-Crates bis zur formellen Beschlussfassung durch den Product Owner.
 
 ---
 
@@ -1830,7 +1830,7 @@ Zur finalen Entscheidung durch den Product Owner (PO) stehen folgende drei Archi
 * **Status:** Proposed / Pending Product-Owner-Entscheidung (offen, Gesamtspezifikation §A2.4 Nr. 1)
 * **Datum:** 2026-09-17
 * **Kontext / Auslöser:**
-  In heterogenen verteilten und mehrkomponentigen Speichersystemen wie MemFuse Cognitive OS stellt sich bei Multi-Engine-Transaktionen (LSM-Store, HNSW/DiskANN-Vektorindizes, CSR-Wissensgraph, BM25-Textindizes) die Frage nach dem primären Konsistenz- und Recovery-Modell.
+  In heterogenen verteilten und mehrkomponentigen Speichersystemen wie Contextra Cognitive OS stellt sich bei Multi-Engine-Transaktionen (LSM-Store, HNSW/DiskANN-Vektorindizes, CSR-Wissensgraph, BM25-Textindizes) die Frage nach dem primären Konsistenz- und Recovery-Modell.
 
   Bisher existiert ein zweiphasiges Commit-Protokoll (2PC) mit unvollständiger Intent-Key-Pessimisierung, das bei plötzlichen Prozess-Crashes oder I/O-Teilausfällen komplexe Invarianten-Verletzungen zwischen primärem Storage und Indizes auslösen kann.
 
@@ -1853,7 +1853,7 @@ Zur finalen Entscheidung durch den Product Owner (PO) stehen folgende drei Archi
 
 ### Option B: WAL als einzige Wahrheit (Derived State via `applied_lsn`) — *Spezifikations-Empfehlung*
 * **Funktionsweise:**
-  Nur das Write-Ahead Log (`memfuse-store::wal`) gilt als unumstößliche primäre Datenquelle ("Single Source of Truth"). Transaktionen schreiben ausschließlich einen sequentiellen, HMAC-gesicherten WAL-Record mit `WalOp::TxEnd { committed: true }`.
+  Nur das Write-Ahead Log (`contextra-store::wal`) gilt als unumstößliche primäre Datenquelle ("Single Source of Truth"). Transaktionen schreiben ausschließlich einen sequentiellen, HMAC-gesicherten WAL-Record mit `WalOp::TxEnd { committed: true }`.
   Secondary Indizes (HNSW, CSR-Graph, BM25) sind reine abgeleitete Sichten ("Derived State"), die Änderungen asynchron oder synchron-gepuffert konsumieren und ihren Fortschritt über eine monotonically steigende `applied_lsn` nachhalten. Bei einem Crash wird der abgeleitete Zustand ausgehend vom letzten validen `applied_lsn`-Checkpoint aus dem WAL deterministisch replayed und rekonstruiert.
 * **Vorteile:**
   - Drastische Vereinfachung des Recovery-Pfads und Vermeidung verteilter Transaktionszustände.
@@ -1870,8 +1870,8 @@ Zur finalen Entscheidung durch den Product Owner (PO) stehen folgende drei Archi
 Gemäß **Gesamtspezifikation §A2.4 Nr. 1** darf diese Entscheidung nicht durch Entwicklungsarbeiten präjudiziert werden. Die Entscheidung obliegt dem Product Owner basierend auf folgenden Grundlagen:
 
 1. **PO Recovery-Zeit-Ziel (RTO / Recovery Time Objective):** Der Product Owner muss das akzeptable Zeitfenster für das Wiederanlaufen des Systems nach einem harten Crash (z.B. < 500 ms vs. < 5 s) definieren.
-2. **Phase 3a Crash-Injektions-Spike (`memfuse-testkit` / Fault-VFS):**
-   Als Entscheidungsgrundlage dient ein empirischer Benchmark und Crash-Simulationstest unter Verwendung der `Fault-VFS`-Infrastruktur im `memfuse-testkit` (Phase 3a der Migration). Der Spike misst:
+2. **Phase 3a Crash-Injektions-Spike (`contextra-testkit` / Fault-VFS):**
+   Als Entscheidungsgrundlage dient ein empirischer Benchmark und Crash-Simulationstest unter Verwendung der `Fault-VFS`-Infrastruktur im `contextra-testkit` (Phase 3a der Migration). Der Spike misst:
    - Durchsatz- und Latenzunterschiede zwischen 2PC und WAL-Only im Regelbetrieb.
    - Replay-Dauer und Speicherverbrauch bei der WAL-Rekonstruktion nach simulierten Systemabstürzen.
 
@@ -1881,7 +1881,7 @@ Gemäß **Gesamtspezifikation §A2.4 Nr. 1** darf diese Entscheidung nicht durch
 
 * **Aktueller Status:** `Proposed / Pending Product-Owner-Entscheidung`
 * **Exit-Kriterium für Statusübergang zu "Beschlossen":**
-  1. Durchführung des Phase 3a Crash-Injektions-Spikes mit `memfuse-testkit` (Fault-VFS).
+  1. Durchführung des Phase 3a Crash-Injektions-Spikes mit `contextra-testkit` (Fault-VFS).
   2. Vorgelegter Evaluierungsbericht zur Recovery-Zeit und Durchsatz-Metriken.
   3. Formeller Beschluss des Product Owners zur Festlegung von Option A oder Option B.
 
@@ -1890,7 +1890,7 @@ Gemäß **Gesamtspezifikation §A2.4 Nr. 1** darf diese Entscheidung nicht durch
 ## 4. Konsequenzen
 
 * Der Produktionscode darf vor dem PO-Beschluss keine Annahmen treffen, die eine der Optionen unmöglich machen.
-* Das `memfuse-testkit` bereitet in Phase 0R/3a die Testwerkzeuge für die Fault-VFS Simulation vor.
+* Das `contextra-testkit` bereitet in Phase 0R/3a die Testwerkzeuge für die Fault-VFS Simulation vor.
 
 ---
 
@@ -1909,7 +1909,7 @@ Gemäß **Gesamtspezifikation §A2.4 Nr. 1** darf diese Entscheidung nicht durch
 
 ### Stufe A: In-RAM Prefix-Reuse (Fork-Free Default) — *Beschlossen*
 * **Konzept:**
-  Wiederverwendung von In-RAM KV-Cache-Blöcken auf Basis von Radix-Tree-Prefix-Matching (`memfuse-kvcache`) unter Nutzung der unveränderten Upstream-Abstraktionen (`ModelWeights::clone()`).
+  Wiederverwendung von In-RAM KV-Cache-Blöcken auf Basis von Radix-Tree-Prefix-Matching (`contextra-kvcache`) unter Nutzung der unveränderten Upstream-Abstraktionen (`ModelWeights::clone()`).
 * **Eigenschaften:**
   - Kein Upstream-Fork von Candle/Ort-Modell-Backends erforderlich.
   - Zero-Copy In-Memory Prefix-Lookup.
@@ -1918,7 +1918,7 @@ Gemäß **Gesamtspezifikation §A2.4 Nr. 1** darf diese Entscheidung nicht durch
 
 ### Stufe B: Eigenes Llama-Modell mit direkter `KvState`-Kopplung — *In Evaluation / Offen*
 * **Konzept:**
-  Tiefe Integration in die Transformer-Inferenzschleife durch Modikation/Forking der Tensor-Generierung, sodass `KvState` direkt aus dem MemFuse-KV-Cache in die Attention-Matrizen injiziert wird.
+  Tiefe Integration in die Transformer-Inferenzschleife durch Modikation/Forking der Tensor-Generierung, sodass `KvState` direkt aus dem Contextra-KV-Cache in die Attention-Matrizen injiziert wird.
 * **Eigenschaften:**
   - Fein-granulares Token-Level Paging und Swapping.
   - Höhere Speicher-Effizienz bei stark fragmentierten Caches.
@@ -1926,7 +1926,7 @@ Gemäß **Gesamtspezifikation §A2.4 Nr. 1** darf diese Entscheidung nicht durch
 
 ### Stufe C: Verschlüsselte Segmentdateien / Platten-Spill — *In Evaluation / Offen*
 * **Konzept:**
-  Auslagerung nicht aktiver KV-Cache-Segmente auf sekundäre Speichermedien (NVMe/SSD) in Form verschlüsselter Segmentdateien (`memfuse-security/kv-encryption`), um RAM-Engpässe bei extrem großen Kontextfenstern zu vermeiden.
+  Auslagerung nicht aktiver KV-Cache-Segmente auf sekundäre Speichermedien (NVMe/SSD) in Form verschlüsselter Segmentdateien (`contextra-security/kv-encryption`), um RAM-Engpässe bei extrem großen Kontextfenstern zu vermeiden.
 * **Eigenschaften:**
   - Nahezu unbegrenzte Kontext-Größe bei moderater I/O-Latenz.
   - Strenge Mandatentrennung via AEAD-AES-256-GCM Verschlüsselung pro Tenant und Segment.
@@ -1959,7 +1959,7 @@ Gemäß **Gesamtspezifikation §A2.4 Nr. 2** wird die finale Ambitionsstufe (nur
 
 ## 4. Konsequenzen
 
-* Derzeitige Arbeiten beschränken sich auf die isolierte Implementierung von Stufe A in `memfuse-kvcache`.
+* Derzeitige Arbeiten beschränken sich auf die isolierte Implementierung von Stufe A in `contextra-kvcache`.
 * Code für Stufe B/C bleibt hinter entsprechenden Feature-Flags (`kv-bridge`) isoliert.
 
 ---
@@ -2012,7 +2012,7 @@ Die Datei `capabilities.toml` erfasst deklarativ:
 * **Status:** Beschlossen / Final (Prinzip P30, Gesamtspezifikation §4.2, §20.3)
 * **Datum:** 2026-09-17
 * **Kontext / Auslöser:**
-  Im Zuge der Entwicklung neigte das MemFuse Cognitive OS Repository zu einer unkontrollierten Crate-Zersplitterung ("Crate Sprawl"). Ohne ein klares, objektives Regelwerk führen zu viele feingliedrige Crates zu unnötigem Build-Overhead, komplexen Pass-Through-Abstraktionen und unübersichtlichen Monorepo-Abhängigkeiten.
+  Im Zuge der Entwicklung neigte das Contextra Cognitive OS Repository zu einer unkontrollierten Crate-Zersplitterung ("Crate Sprawl"). Ohne ein klares, objektives Regelwerk führen zu viele feingliedrige Crates zu unnötigem Build-Overhead, komplexen Pass-Through-Abstraktionen und unübersichtlichen Monorepo-Abhängigkeiten.
 
   Um den Crate-Zuschnitt im Workspace streng zu reglementieren, führt Prinzip **P30** eine verbindliche Entscheidungsheuristik basierend auf fünf Kriterien (**I/U/C/S/D**) ein.
 
@@ -2024,22 +2024,22 @@ Ein Modul oder eine Komponente darf nur dann als **eigenes Crate** im Workspace 
 
 1. **I — Isolation flüchtiger/schwerer Abhängigkeiten (Isolation):**
    Isolation externer, schwerer oder plattformspezifischer C-Bindings/Bibliotheken (z.B. `candle`, `ort`, `wasmtime`, `pyo3`, `reqwest`), um Build-Zeiten zu kapseln und optionale Feature-Gates sauber abzugrenzen.
-   *Beispiele:* `memfuse-infer-onnx`, `memfuse-sandbox`, `memfuse-py`.
+   *Beispiele:* `contextra-infer-onnx`, `contextra-sandbox`, `contextra-py`.
 
 2. **U — Unsafe-Insel (Unsafe Island):**
    Kapselung von `unsafe`-Code-Blöcken in eine dedizierte, auditierte System-Insel, damit alle abhängigen Crates `#![forbid(unsafe_code)]` erzwingen können.
-   *Beispiele:* `memfuse-sys`, `memfuse-simd`, `memfuse-wire`.
+   *Beispiele:* `contextra-sys`, `contextra-simd`, `contextra-wire`.
 
 3. **C — Eigenes Änderungsrhythmus / Cohesion (Bounded Context):**
    Starke fachliche Kohäsion mit eigenständiger Fach-Domäne und unabhängiger Weiterentwicklung.
-   *Beispiele:* `memfuse-graph` (CSR/PPR), `memfuse-vector` (HNSW/DiskANN), `memfuse-text` (BM25).
+   *Beispiele:* `contextra-graph` (CSR/PPR), `contextra-vector` (HNSW/DiskANN), `contextra-text` (BM25).
 
 4. **S — Stabilität & Skalierung / Größe > 8.000 LOC (Size/Compile Parallelism):**
    Crates, deren Quellcode-Umfang 8.000 Zeilen Code überschreitet, um die parallele Kompilierung der Rust-Compiler-Pipeline optimal auszulasten.
 
 5. **D — Richtungserzwingung / Architektur-Ebenen (Dependencies / Composition Root):**
    Erzwingung von unidirektionalen Modul-Abhängigkeiten zur Vermeidung zyklischer Crate-Graph-Beziehungen oder als explizite Composition Root (z.B. Ports vs. Implementierung).
-   *Beispiele:* `memfuse-ports` (Ring 0 Abstraktionen), `memfuse-types` (Ring 0 Fundament).
+   *Beispiele:* `contextra-ports` (Ring 0 Abstraktionen), `contextra-types` (Ring 0 Fundament).
 
 ---
 
@@ -2048,10 +2048,10 @@ Ein Modul oder eine Komponente darf nur dann als **eigenes Crate** im Workspace 
 Crates, die **keines** dieser fünf Kriterien (I, U, C, S, D) nachweisbar erfüllen, **dürfen nicht als eigenständiges Crate fortbestehen**. Sie müssen mit dem nächstgelegenen logischen Crate verschmolzen werden.
 
 ### Anwendungsbeispiel: Zerlegung & Konsolidierung
-* `memfuse-core` wurde im Zuge der Ring-Reorganisation aufgeteilt:
-  - `unsafe` System-Teile → `memfuse-sys` / `memfuse-simd` (Kriterium U)
-  - Interne IPC-Generate → `memfuse-wire` (Kriterium U)
-  - Reine Domain-Typen → `memfuse-types` (Kriterium D)
+* `contextra-core` wurde im Zuge der Ring-Reorganisation aufgeteilt:
+  - `unsafe` System-Teile → `contextra-sys` / `contextra-simd` (Kriterium U)
+  - Interne IPC-Generate → `contextra-wire` (Kriterium U)
+  - Reine Domain-Typen → `contextra-types` (Kriterium D)
 * Sollten sich zwei kleine Hilfs-Crates ohne schwere Dep oder Unsafe identifizieren lassen, werden diese gemäß §A2.4 Nr. 4 zusammengelegt (z.B. `adapt` + `rank`).
 
 ---
@@ -2087,14 +2087,14 @@ Crates, die **keines** dieser fünf Kriterien (I, U, C, S, D) nachweisbar erfül
 
 ## 2. Fallbeispiele & Refactoring-Analyse
 
-### Fallbeispiel 1: `ORPHAN_REGISTRY` in `memfuse-checkpoint`
+### Fallbeispiel 1: `ORPHAN_REGISTRY` in `contextra-checkpoint`
 * **Problem-Analyse:**
-  In `crates/memfuse-checkpoint/src/orphan.rs` existierte ein globaler statischer Singleton `static ORPHAN_REGISTRY: OnceLock<OrphanRegistry>`.
-  In parallelen Unit-Tests (`cargo test`) führte der simultane Zugriff auf dieses Singleton zu sporadischen Flaky Tests und Lock-Kontention (dokumentiert als Race-Condition in `AUDIT_memfuse-checkpoint.md`).
+  In `crates/contextra-checkpoint/src/orphan.rs` existierte ein globaler statischer Singleton `static ORPHAN_REGISTRY: OnceLock<OrphanRegistry>`.
+  In parallelen Unit-Tests (`cargo test`) führte der simultane Zugriff auf dieses Singleton zu sporadischen Flaky Tests und Lock-Kontention (dokumentiert als Race-Condition in `AUDIT_contextra-checkpoint.md`).
 * **Soll-Zustand / Refactoring:**
   Entfernung des globalen `ORPHAN_REGISTRY` Singletons. Die Waisen-Registrierung (`OrphanRegistry`) wird direkt als Instanzfeld in den `PersistentCheckpointStore` bzw. die jeweilige `StorageEngine`-Instanz eingebettet. Lebensdauer und State-Tracking sind somit strikt an die jeweilige Store-Instanz gebunden.
 
-### Fallbeispiel 2: `CIPHER_INSTANCE` & Nonce-Counter in `memfuse-crypto` / Security
+### Fallbeispiel 2: `CIPHER_INSTANCE` & Nonce-Counter in `contextra-crypto` / Security
 * **Problem-Analyse:**
   Entwürfe mit globalen `static CIPHER_INSTANCE` oder globalen RAM-basierten `AtomicU64`-Nonce-Zählern verstoßen ebenfalls gegen P29. Ein RAM-basierter Nonce-Zähler beginnt nach einem Prozess-Neustart wieder bei 0, was bei Wiederverwendung desselben Schlüssels zum kryptographischen Kollaps führen würde.
 * **Soll-Zustand / Refactoring:**
@@ -2110,17 +2110,17 @@ Crates, die **keines** dieser fünf Kriterien (I, U, C, S, D) nachweisbar erfül
 
 ---
 
-# ADR-0XX: memfuse-sandbox — WASM Execution Boundary
+# ADR-0XX: contextra-sandbox — WASM Execution Boundary
 
 **Status:** Proposed
 **Datum:** 2026-09-13
 **Blocker für Merge:** Dieses ADR MUSS auf "Accepted" gesetzt werden vor dem Merge in main.
 
 ## Kontext
-`memfuse-mcp` benötigt eine sichere WASM-Ausführungsgrenze für die `CodeExecution`-Permission.
+`contextra-mcp` benötigt eine sichere WASM-Ausführungsgrenze für die `CodeExecution`-Permission.
 
 ## Entscheidung
-Neues Crate `memfuse-sandbox` (Layer 6.5) mit `wasmtime` als Backend.
+Neues Crate `contextra-sandbox` (Layer 6.5) mit `wasmtime` als Backend.
 `#![forbid(unsafe_code)]`. Fuel + Wall-Clock-Timeout beide aktiv.
 
 ## Konsequenzen

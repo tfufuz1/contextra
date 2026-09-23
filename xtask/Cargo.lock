@@ -682,7 +682,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
-name = "memfuse-adapt"
+name = "contextra-adapt"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -692,18 +692,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-bench"
+name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "hdrhistogram",
- "memfuse-core",
- "memfuse-db",
- "memfuse-graph",
- "memfuse-infer-onnx",
- "memfuse-store",
- "memfuse-text",
- "memfuse-vector",
+ "contextra-core",
+ "contextra-db",
+ "contextra-graph",
+ "contextra-infer-onnx",
+ "contextra-store",
+ "contextra-text",
+ "contextra-vector",
  "rand",
  "serde",
  "serde_json",
@@ -714,14 +714,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-checkpoint"
+name = "contextra-checkpoint"
 version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
  "dirs",
  "futures-executor",
- "memfuse-core",
+ "contextra-core",
  "parking_lot",
  "serde",
  "serde_json",
@@ -730,17 +730,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-cognition"
+name = "contextra-cognition"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
  "bytes",
- "memfuse-core",
- "memfuse-engine",
- "memfuse-graph",
- "memfuse-store",
- "memfuse-vector",
+ "contextra-core",
+ "contextra-engine",
+ "contextra-graph",
+ "contextra-store",
+ "contextra-vector",
  "parking_lot",
  "serde",
  "serde_json",
@@ -751,17 +751,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-core"
+name = "contextra-core"
 version = "0.1.0"
 dependencies = [
- "memfuse-mvcc",
- "memfuse-ports",
- "memfuse-types",
- "memfuse-wire",
+ "contextra-mvcc",
+ "contextra-ports",
+ "contextra-types",
+ "contextra-wire",
 ]
 
 [[package]]
-name = "memfuse-crypto"
+name = "contextra-crypto"
 version = "0.1.0"
 dependencies = [
  "aes-gcm-siv",
@@ -772,8 +772,8 @@ dependencies = [
  "hkdf",
  "hmac",
  "lru",
- "memfuse-core",
- "memfuse-privacy",
+ "contextra-core",
+ "contextra-privacy",
  "parking_lot",
  "rand",
  "regex",
@@ -787,24 +787,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-db"
+name = "contextra-db"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
  "bytes",
- "memfuse-adapt",
- "memfuse-checkpoint",
- "memfuse-cognition",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-engine",
- "memfuse-graph",
- "memfuse-rank",
- "memfuse-store",
- "memfuse-sys",
- "memfuse-text",
- "memfuse-vector",
+ "contextra-adapt",
+ "contextra-checkpoint",
+ "contextra-cognition",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-engine",
+ "contextra-graph",
+ "contextra-rank",
+ "contextra-store",
+ "contextra-sys",
+ "contextra-text",
+ "contextra-vector",
  "parking_lot",
  "serde",
  "serde_json",
@@ -816,22 +816,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-engine"
+name = "contextra-engine"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
  "bytes",
- "memfuse-adapt",
- "memfuse-checkpoint",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-graph",
- "memfuse-rank",
- "memfuse-store",
- "memfuse-sys",
- "memfuse-text",
- "memfuse-vector",
+ "contextra-adapt",
+ "contextra-checkpoint",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-graph",
+ "contextra-rank",
+ "contextra-store",
+ "contextra-sys",
+ "contextra-text",
+ "contextra-vector",
  "parking_lot",
  "serde",
  "serde_json",
@@ -843,14 +843,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-graph"
+name = "contextra-graph"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "arc-swap",
  "bincode",
  "blake3",
- "memfuse-core",
+ "contextra-core",
  "parking_lot",
  "scc",
  "serde",
@@ -860,11 +860,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-infer-onnx"
+name = "contextra-infer-onnx"
 version = "0.1.0"
 dependencies = [
- "memfuse-core",
- "memfuse-rank",
+ "contextra-core",
+ "contextra-rank",
  "parking_lot",
  "serde",
  "tokio",
@@ -872,36 +872,36 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-mvcc"
+name = "contextra-mvcc"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "bytes",
- "memfuse-types",
+ "contextra-types",
  "parking_lot",
  "serde",
  "thiserror",
 ]
 
 [[package]]
-name = "memfuse-ports"
+name = "contextra-ports"
 version = "0.1.0"
 dependencies = [
  "ahash",
  "bytes",
  "futures-util",
- "memfuse-types",
+ "contextra-types",
  "serde",
  "serde_json",
  "thiserror",
 ]
 
 [[package]]
-name = "memfuse-privacy"
+name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "memfuse-core",
+ "contextra-core",
  "parking_lot",
  "rand",
  "regex",
@@ -915,12 +915,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-rank"
+name = "contextra-rank"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "memfuse-ports",
- "memfuse-types",
+ "contextra-ports",
+ "contextra-types",
  "serde",
  "serde_json",
  "thiserror",
@@ -928,14 +928,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-router"
+name = "contextra-router"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
- "memfuse-adapt",
- "memfuse-core",
- "memfuse-ports",
- "memfuse-privacy",
+ "contextra-adapt",
+ "contextra-core",
+ "contextra-ports",
+ "contextra-privacy",
  "parking_lot",
  "serde",
  "serde_json",
@@ -946,17 +946,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-simd"
+name = "contextra-simd"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "memfuse-core",
+ "contextra-core",
  "thiserror",
  "tracing",
 ]
 
 [[package]]
-name = "memfuse-store"
+name = "contextra-store"
 version = "0.1.0"
 dependencies = [
  "ahash",
@@ -964,9 +964,9 @@ dependencies = [
  "bytes",
  "crc32fast",
  "lru",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-sys",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-sys",
  "memmap2",
  "parking_lot",
  "rand",
@@ -979,7 +979,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-sys"
+name = "contextra-sys"
 version = "0.1.0"
 dependencies = [
  "libc",
@@ -989,13 +989,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-text"
+name = "contextra-text"
 version = "0.1.0"
 dependencies = [
  "bincode",
  "bytes",
  "itoa",
- "memfuse-core",
+ "contextra-core",
  "parking_lot",
  "regex",
  "serde",
@@ -1006,7 +1006,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-types"
+name = "contextra-types"
 version = "0.1.0"
 dependencies = [
  "ahash",
@@ -1020,14 +1020,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-vector"
+name = "contextra-vector"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-simd",
- "memfuse-sys",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-simd",
+ "contextra-sys",
  "memmap2",
  "parking_lot",
  "rand",
@@ -1038,7 +1038,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "memfuse-wire"
+name = "contextra-wire"
 version = "0.1.0"
 dependencies = [
  "bytes",
@@ -1920,9 +1920,9 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "chrono",
- "memfuse-bench",
- "memfuse-router",
- "memfuse-types",
+ "contextra-bench",
+ "contextra-router",
+ "contextra-types",
  "proc-macro2",
  "quote",
  "regex",

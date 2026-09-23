@@ -1,6 +1,6 @@
 # Jules System & Context Diagnostics Log (`.jules/JULES_LOG.md`)
 
-Dieses Dokument bietet eine vollständige, präzise und transparente Analyse der Funktionsweise von Google-Jules (Google Gemini-basierter Software Engineering Agent) in diesem Repository (`memfuse`), die Umgebungs- und Git-Kapazitäten innerhalb der VM Sandbox, eine vollständige Checkliste aller Git-Befehle, eine Analyse der Repository-Analyseskripte (`/docs/GITHUB_ANALYSE.md`, `/docs/GITHUB_HISTORY.md`, `.jules/JULES_LOG_2.md`) sowie einen umfassenden Optimierungsplan für die MemFuse-Entwicklung mit Google-Jules.
+Dieses Dokument bietet eine vollständige, präzise und transparente Analyse der Funktionsweise von Google-Jules (Google Gemini-basierter Software Engineering Agent) in diesem Repository (`contextra`), die Umgebungs- und Git-Kapazitäten innerhalb der VM Sandbox, eine vollständige Checkliste aller Git-Befehle, eine Analyse der Repository-Analyseskripte (`/docs/GITHUB_ANALYSE.md`, `/docs/GITHUB_HISTORY.md`, `.jules/JULES_LOG_2.md`) sowie einen umfassenden Optimierungsplan für die Contextra-Entwicklung mit Google-Jules.
 
 ---
 
@@ -19,10 +19,10 @@ Hier ist die exakte, chronologische Abfolge der Einlesevorgänge und Systeminjek
 
 2. **Persistent Memory Block (`## Memory`)**
    - Das System injiziert automatisch alle projektspezifischen Langzeit-Erinnerungen (Memory Items) aus vorherigen Iterationen.
-   - *Beispiele im Kontext:* Speicherstrukturen von `memfuse-db`, `AGENTS.md`-Hierarchie, `ScalarQuantizer`-Sichtbarkeiten, `TxId`-Grenzwerte, Lock-Hierarchien, CI-Gate 10 (`check-jules-context-freshness`), `.unwrap-baseline.json` Regeln, etc.
+   - *Beispiele im Kontext:* Speicherstrukturen von `contextra-db`, `AGENTS.md`-Hierarchie, `ScalarQuantizer`-Sichtbarkeiten, `TxId`-Grenzwerte, Lock-Hierarchien, CI-Gate 10 (`check-jules-context-freshness`), `.unwrap-baseline.json` Regeln, etc.
 
 3. **Benutzer-Nachricht (User Prompt)**
-   - Die ursprüngliche Benutzernachricht („Als Google-Jules musst du einen Optimierungsplan für die Entwicklung des Memfuse Codes...“) wird direkt im Haupt-Thread übergeben.
+   - Die ursprüngliche Benutzernachricht („Als Google-Jules musst du einen Optimierungsplan für die Entwicklung des contextra Codes...“) wird direkt im Haupt-Thread übergeben.
    - *Reihenfolge-Klarstellung:* Zu diesem Zeitpunkt ist im Kontext **noch keine einzige Quellcode-Datei** geladen.
 
 4. **1. Tool-Aufruf: `list_files` (`path: "docs"`)**
@@ -119,7 +119,7 @@ Die Analyse der Dokumente zeigt deutliche Schwachstellen in Multi-Agenten-Workfl
    - *Branch Proliferation:* >81 offene Remote-Branches ohne zentrales Claiming.
 
 2. **Skript-Unterstützung durch `xtask` (`xtask/src/`)**:
-   MemFuse besitzt bereits hochentwickelte Rust-Skripte zur Repository-Analyse:
+   Contextra besitzt bereits hochentwickelte Rust-Skripte zur Repository-Analyse:
    - `jules_preflight.rs`: Führt `check_no_active_claim_conflict`, `check-consistency`, `check-vetoes` und DAG-Checks aus.
    - `check_commit_messages.rs`: Verhindert `Shell-Commit` und ungültige/leere Commit-Nachrichten.
    - `check_duplicate_intent.rs` (Gate 12): Erkennt doppelte PR-Intents und verhindert parallele Arbeit an demselben Feature.
@@ -128,9 +128,9 @@ Die Analyse der Dokumente zeigt deutliche Schwachstellen in Multi-Agenten-Workfl
 
 ---
 
-## 5. Optimierungsplan für die MemFuse-Entwicklung mit Google-Jules
+## 5. Optimierungsplan für die Contextra-Entwicklung mit Google-Jules
 
-Um die Entwicklung in MemFuse zu optimieren, werden folgende 5 Säulen durchgesetzt:
+Um die Entwicklung in Contextra zu optimieren, werden folgende 5 Säulen durchgesetzt:
 
 ### Säule 1: Strikte Pre-Submit Pipeline & Context Verification
 - Vor jedem Commit/Submit führt Jules `git status` und `cargo xtask jules-preflight` aus.

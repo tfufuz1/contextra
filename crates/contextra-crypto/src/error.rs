@@ -1,0 +1,118 @@
+//! Error types for `contextra-crypto`.
+
+use thiserror::Error;
+
+/// Result type alias for cryptographic operations in `contextra-crypto`.
+pub type Result<T> = std::result::Result<T, CryptoError>;
+
+/// Standalone error type for all operations within `contextra-crypto`.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum CryptoError {
+    #[error("key derivation failed: {0}")]
+    KeyDerivation(String),
+
+    #[error("encryption failed: {0}")]
+    Encryption(String),
+
+    #[error("decryption failed: {0}")]
+    Decryption(String),
+
+    #[error("invalid nonce or key length: {0}")]
+    InvalidLength(String),
+
+    #[error("integrity check failed: authentication tag mismatch")]
+    IntegrityViolation,
+
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
+
+    #[error("crypto error: {0}")]
+    Crypto(String),
+
+    #[error("KV cache format version mismatch: expected {expected}, found {found}")]
+    KvFormatVersionMismatch {
+        /// Expected format version number.
+        expected: u8,
+        /// Format version number found in payload.
+        found: u8,
+    },
+
+    #[error("WAL corruption detected at offset {offset}: {reason}")]
+    WalCorruption {
+        /// Byte offset in WAL file where corruption occurred.
+        offset: u64,
+        /// Detail text describing corruption cause.
+        reason: String,
+    },
+}
+
+impl CryptoError {
+    /// Helper to construct a `WalCorruption` error.
+    pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self {
+        Self::WalCorruption {
+            offset,
+            reason: reason.into(),
+        }
+    }
+}
+
+impl From<CryptoError> for contextra_core::ContextraError {
+    fn from(e: CryptoError) -> Self {
+        match e {
+            CryptoError::WalCorruption { offset, reason } => Self::wal_corruption(offset, reason),
+            CryptoError::InvalidInput(msg) => Self::InvalidInput(msg),
+            CryptoError::KvFormatVersionMismatch { expected, found } => Self::InvalidInput(
+                format!("KV cache format version mismatch: expected {expected}, found {found}"),
+            ),
+            other => Self::Crypto(other.to_string()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use contextra_core::ContextraError;
+
+    #[test]
+    fn test_from_crypto_error() {
+        let crypto_err = CryptoError::WalCorruption {
+            offset: 42,
+            reason: "bad hmac".to_string(),
+        };
+        let mf_err: ContextraError = crypto_err.into();
+        assert!(matches!(
+            mf_err,
+            ContextraError::WalCorruption {
+                offset: 42,
+                ref reason,
+                ..
+            } if reason == "bad hmac"
+        ));
+
+        let invalid_input = CryptoError::InvalidInput("bad key".to_string());
+        let mf_err_inv: ContextraError = invalid_input.into();
+        assert!(matches!(
+            mf_err_inv,
+            ContextraError::InvalidInput(ref msg) if msg == "bad key"
+        ));
+
+        let gen_crypto = CryptoError::Encryption("failed".to_string());
+        let mf_err_gen: ContextraError = gen_crypto.into();
+        assert!(matches!(
+            mf_err_gen,
+            ContextraError::Crypto(ref msg) if msg.contains("encryption failed")
+        ));
+
+        let version_mismatch = CryptoError::KvFormatVersionMismatch {
+            expected: 2,
+            found: 1,
+        };
+        let mf_err_version: ContextraError = version_mismatch.into();
+        assert!(matches!(
+            mf_err_version,
+            ContextraError::InvalidInput(ref msg) if msg.contains("expected 2, found 1")
+        ));
+    }
+}

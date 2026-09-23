@@ -31,10 +31,10 @@ Er besteht aus zwei unabhängigen Jobs:
 ### Job 2: `trigger-mutation-testing`
 - Berechnet die ISO-Kalenderwoche (`KW % 4`).
 - Rotiert wöchentlich durch die 4 Fokus-Crates:
-  - **Woche 0**: `memfuse-graph`
-  - **Woche 1**: `memfuse-index`
-  - **Woche 2**: `memfuse-agent`
-  - **Woche 3**: `memfuse-db`
+  - **Woche 0**: `contextra-graph`
+  - **Woche 1**: `contextra-index`
+  - **Woche 2**: `contextra-agent`
+  - **Woche 3**: `contextra-db`
 - Löst für den berechneten Fokus-Crate den `mutation-testing.yml`-Workflow via `workflow_dispatch` aus.
 
 ---

@@ -1,0 +1,45 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-mcp"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+agent-workflows = ["contextra-agent"]
+onnx = ["contextra-infer-onnx", "contextra-infer-onnx/onnx"]
+candle = ["dep:contextra-infer-candle"]
+kv-bridge = ["contextra-infer-candle/kv-bridge", "dep:contextra-infer-candle"]
+test-utils = ["contextra-core/test-utils"]
+docid-128 = ["contextra-core/docid-128"]
+
+[dependencies]
+contextra = { workspace = true, features = ["ollama", "router"] }
+contextra-core = { workspace = true }
+contextra-rank = { workspace = true }
+contextra-adapt = { workspace = true }
+contextra-crypto = { workspace = true }
+contextra-privacy = { workspace = true }
+contextra-infer-onnx = { workspace = true, optional = true }
+contextra-agent = { workspace = true, optional = true }
+contextra-infer-candle = { workspace = true, optional = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+rand = { workspace = true }
+parking_lot = { workspace = true }
+scc = "2"
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+unicode-normalization = "0.1"
+# NO Axum — MCP transport is stdio only (ADR-010). Adding HTTP here is an architecture violation.
+# MCP stdio transport helpers (already transitively present via tokio)
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = "0.3"
+
+[dev-dependencies]
+tempfile = "3"

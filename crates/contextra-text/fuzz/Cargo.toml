@@ -1,0 +1,20 @@
+[package]
+name = "contextra-text-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+contextra-text = { path = ".." }
+
+[[bin]]
+name = "fuzz_bm25_tokenize"
+path = "fuzz_targets/fuzz_bm25_tokenize.rs"
+test = false
+doc = false

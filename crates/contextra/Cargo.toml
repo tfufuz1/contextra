@@ -1,0 +1,34 @@
+[package]
+name = "contextra"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
+
+[dependencies]
+contextra-core = { workspace = true }
+contextra-db = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
+contextra-infer-candle = { workspace = true, optional = true }
+contextra-infer-ollama = { workspace = true, optional = true }
+contextra-infer-onnx = { workspace = true, optional = true }
+contextra-router = { workspace = true, optional = true }
+contextra-rank = { workspace = true, optional = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[features]
+default = []
+onnx = ["contextra-infer-onnx/onnx", "contextra-db/onnx"]
+candle = ["contextra-infer-candle"]
+ollama = ["contextra-infer-ollama"]
+router = ["contextra-router", "contextra-rank"]
+
+[lints]
+workspace = true

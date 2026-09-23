@@ -1,15 +1,15 @@
-# MemFuse Retrieval Evaluation Benchmark Protocol Specification
+# Contextra Retrieval Evaluation Benchmark Protocol Specification
 
 *Document Version:* 1.0.0
 *Status:* Draft Specification
 *Target Frameworks:* LoCoMo, LongMemEval, BEAM Retrieval Suites
-*Scope:* Standardized evaluation harness for long-context memory retrieval and multi-signal fusion in MemFuse.
+*Scope:* Standardized evaluation harness for long-context memory retrieval and multi-signal fusion in Contextra.
 
 ---
 
 ## 1. Overview & Objective
 
-This document defines the evaluation protocol and execution parameters for benchmarking MemFuse's cognitive retrieval capabilities against standard external long-context benchmarks:
+This document defines the evaluation protocol and execution parameters for benchmarking Contextra's cognitive retrieval capabilities against standard external long-context benchmarks:
 1. **LoCoMo**: Long-Context Memory Benchmark evaluating factual recall, temporal reasoning, and multi-turn context retention.
 2. **LongMemEval**: Long-Term Memory Evaluation suite assessing dynamic knowledge state changes, including the **Knowledge Update** category (superseded facts and memory invalidation).
 3. **BEAM**: Multi-hop associative reasoning benchmark evaluating graph traversal and vector-text-graph signal fusion.
@@ -46,7 +46,7 @@ Retrieval quality MUST be evaluated across four distinct signal configuration ti
    - Standard Fusion Weights: Vector = 0.45, BM25 = 0.35, Graph = 0.20.
 
 3. **Tier C: 4-Signal Hybrid (`Vector + BM25 + Graph PPR + Temporal/Context`)**
-   - Full MemFuse cognitive fusion incorporating temporal decay and document versioning provenance.
+   - Full Contextra cognitive fusion incorporating temporal decay and document versioning provenance.
    - Fusion Weights: Vector = 0.40, BM25 = 0.30, Graph = 0.20, Temporal Decay = 0.10.
 
 ---
@@ -56,13 +56,13 @@ Retrieval quality MUST be evaluated across four distinct signal configuration ti
 ### 4.1 LoCoMo Evaluation Protocol
 - **Dataset Focus:** Long conversational dialogs with multi-session factual queries.
 - **Metrics:** F1 Score, ROUGE-L, Exact Match (EM), Recall@k ($k \in \{5, 10, 20\}$).
-- **Execution Script:** `cargo test -p memfuse-bench --test external_benchmarks_test -- test_locomo_suite`
+- **Execution Script:** `cargo test -p contextra-bench --test external_benchmarks_test -- test_locomo_suite`
 
 ### 4.2 LongMemEval Protocol (Including Knowledge Update)
 - **Dataset Focus:** Long-term user interaction logs requiring handling of memory updates, fact overrides, and tombstones.
 - **Key Test Category - Knowledge Update:** Evaluates whether retrieved context correctly prioritizes updated facts over stale historical statements without returning invalidated tombstones.
 - **Metrics:** Update Accuracy (percentage of queries returning only active facts), Invalidation Precision, Recall@10.
-- **Execution Script:** `cargo test -p memfuse-bench --test external_benchmarks_test -- test_long_mem_eval_suite`
+- **Execution Script:** `cargo test -p contextra-bench --test external_benchmarks_test -- test_long_mem_eval_suite`
 
 ### 4.3 BEAM Protocol
 - **Dataset Focus:** Multi-hop graph traversal and associative entity linking.
@@ -111,9 +111,9 @@ Example:
 
 ### Status & Root Cause Analysis
 During benchmark harness validation, tests utilizing `PathRag` graph retrieval or Personalized PageRank (PPR) under active MVCC snapshot isolation currently encounter a runtime limitation:
-- **Error:** `MemFuseError::SnapshotUnsupportedForSignal("PathRag strategy does not support snapshot-isolated retrieval")`
-- **Location:** `crates/memfuse-db/src/collection/search.rs`
-- **Architectural Reason:** PPR graph traversal operates on the live unversioned CSR graph structure (`memfuse-graph`), which does not yet maintain sequence-number-aware edge visibility slices for historical MVCC snapshots. Consequently, snapshot isolation explicitly rejects PPR/PathRag queries to prevent stale data leakage.
+- **Error:** `ContextraError::SnapshotUnsupportedForSignal("PathRag strategy does not support snapshot-isolated retrieval")`
+- **Location:** `crates/contextra-db/src/collection/search.rs`
+- **Architectural Reason:** PPR graph traversal operates on the live unversioned CSR graph structure (`contextra-graph`), which does not yet maintain sequence-number-aware edge visibility slices for historical MVCC snapshots. Consequently, snapshot isolation explicitly rejects PPR/PathRag queries to prevent stale data leakage.
 
 ### Impact on Protocol Execution
 Multi-signal benchmark sweeps (Tier B and Tier C) that request snapshot-isolated PathRag retrieval will return `SnapshotUnsupportedForSignal` until graph MVCC edge versioning is implemented. Benchmark execution scripts MUST handle this error gracefully or run graph sweeps in live read mode where snapshot isolation is disengaged.
@@ -126,13 +126,13 @@ To run the evaluation harness locally within the workspace environment, execute 
 
 ```bash
 # 1. Run all external benchmark harness integration tests
-cargo test -p memfuse-bench --test external_benchmarks_test -- --nocapture
+cargo test -p contextra-bench --test external_benchmarks_test -- --nocapture
 
 # 2. Run LoCoMo benchmark sweep (standalone)
-cargo test -p memfuse-bench --test external_benchmarks_test -- test_locomo_sweep --nocapture
+cargo test -p contextra-bench --test external_benchmarks_test -- test_locomo_sweep --nocapture
 
 # 3. Run LongMemEval benchmark sweep (standalone)
-cargo test -p memfuse-bench --test external_benchmarks_test -- test_long_mem_eval_sweep --nocapture
+cargo test -p contextra-bench --test external_benchmarks_test -- test_long_mem_eval_sweep --nocapture
 ```
 
 ---

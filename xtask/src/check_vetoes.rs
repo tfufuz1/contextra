@@ -1,4 +1,4 @@
-// MemFuse — Feature-Veto-Register & CI Gate
+// Contextra — Feature-Veto-Register & CI Gate
 //
 // Modul zur Überprüfung von `VETOES.md` im CI-Workflow.
 //
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn test_parse_vetoes() {
         let content = r#"
-# MemFuse — Feature-Veto-Register
+# Contextra — Feature-Veto-Register
 
 ## VETO-F02
 

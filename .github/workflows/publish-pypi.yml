@@ -1,6 +1,6 @@
-name: Publish memfuse-py to PyPI
+name: Publish contextra-py to PyPI
 
-# Automatischer Tag-Trigger wurde wegen Namenskollision auf PyPI (Paketname 'memfuse' gehört externem Autor) entfernt.
+# Automatischer Tag-Trigger wurde wegen Namenskollision auf PyPI (Paketname 'contextra' gehört externem Autor) entfernt.
 on:
   workflow_dispatch:
     inputs:
@@ -40,7 +40,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --manifest-path crates/memfuse-py/Cargo.toml --release --out dist
+          args: --manifest-path crates/contextra-py/Cargo.toml --release --out dist
           sccache: 'true'
 
       - name: Set up Python
@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           pip install dist/*.whl
-          python -c "import memfuse"
+          python -c "import contextra"
 
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
@@ -70,7 +70,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --manifest-path crates/memfuse-py/Cargo.toml --out dist
+          args: --manifest-path crates/contextra-py/Cargo.toml --out dist
 
       - name: Upload sdist as artifact
         uses: actions/upload-artifact@v4

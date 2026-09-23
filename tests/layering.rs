@@ -27,26 +27,26 @@ pub struct AllowlistEntry {
 
 pub const LAYER_ALLOWLIST: &[AllowlistEntry] = &[
     AllowlistEntry {
-        from_crate: "memfuse-graph",
-        to_crate: "memfuse-store",
+        from_crate: "contextra-graph",
+        to_crate: "contextra-store",
         target_phase: "Phase 1a",
-        reason: "Dev-dependency on store for graph integration tests; to be isolated into memfuse-testkit in Phase 1a",
+        reason: "Dev-dependency on store for graph integration tests; to be isolated into contextra-testkit in Phase 1a",
     },
     AllowlistEntry {
-        from_crate: "memfuse-infer-onnx",
-        to_crate: "memfuse-infer-candle",
+        from_crate: "contextra-infer-onnx",
+        to_crate: "contextra-infer-candle",
         target_phase: "Phase 1b",
         reason: "Embed depends on candle provider; execution provider abstraction in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-infer-candle",
-        to_crate: "memfuse-store",
+        from_crate: "contextra-infer-candle",
+        to_crate: "contextra-store",
         target_phase: "Phase 1b",
         reason: "Candle provider uses store directly; store traits abstraction in Phase 1b",
     },
     AllowlistEntry {
-        from_crate: "memfuse-infer-ollama",
-        to_crate: "memfuse-infer-onnx",
+        from_crate: "contextra-infer-ollama",
+        to_crate: "contextra-infer-onnx",
         target_phase: "Phase 1b",
         reason: "Ollama provider dev-dependency on embed for benchmarks/tests; to be isolated in Phase 1b",
     },
@@ -60,27 +60,27 @@ impl Ring {
     pub fn for_crate(name: &str) -> Option<Ring> {
         match name {
             // Ring 0: Foundation & Core Domain Logic
-            "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
-            | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
-            | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-        | "memfuse-core" => Some(Ring::Ring0),
+            "contextra-types" | "contextra-ports" | "contextra-mvcc" | "contextra-vector"
+            | "contextra-rank" | "contextra-adapt" | "contextra-text" | "contextra-graph"
+            | "contextra-crypto" | "contextra-simd" | "contextra-sys" | "contextra-wire"
+        | "contextra-core" => Some(Ring::Ring0),
 
             // Ring 1: Storage & State Persistence
-            "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),
+            "contextra-store" | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
 
             // Ring 2: External Integrations & Execution Sandboxes
-            "memfuse-sandbox" | "memfuse-infer-onnx" | "memfuse-infer-candle"
-            | "memfuse-infer-ollama" => Some(Ring::Ring2),
+            "contextra-sandbox" | "contextra-infer-onnx" | "contextra-infer-candle"
+            | "contextra-infer-ollama" => Some(Ring::Ring2),
 
             // Ring 3: Engine, Reasoning & Cognition
-            "memfuse-engine" | "memfuse-cognition" | "memfuse-privacy"
-            | "memfuse-router" | "memfuse-agent" | "memfuse-db" => Some(Ring::Ring3),
+            "contextra-engine" | "contextra-cognition" | "contextra-privacy"
+            | "contextra-router" | "contextra-agent" | "contextra-db" => Some(Ring::Ring3),
 
             // Ring 4: Public Facade & Protocol Servers
-            "memfuse" | "memfuse-mcp" | "memfuse-py" => Some(Ring::Ring4),
+            "contextra" | "contextra-mcp" | "contextra-py" => Some(Ring::Ring4),
 
             // Tooling
-            "memfuse-testkit" | "xtask" | "memfuse-bench" => Some(Ring::Tooling),
+            "contextra-testkit" | "xtask" | "contextra-bench" => Some(Ring::Tooling),
 
             _ => None,
         }
@@ -159,7 +159,7 @@ pub fn check_layering_matrix(root: &Path, strict_ring3: bool) -> (bool, Vec<Stri
             let kind = dep.kind.as_deref().unwrap_or("normal");
 
             // Check tokio prohibition in Ring 0
-            if my_ring == Ring::Ring0 && dep_name == "tokio" && pkg_name.as_str() != "memfuse-core" {
+            if my_ring == Ring::Ring0 && dep_name == "tokio" && pkg_name.as_str() != "contextra-core" {
                 violations.push(format!(
                     "Ring 0 violation: {} ({}) depends on tokio via {}",
                     pkg_name, my_ring.name(), kind
@@ -193,7 +193,7 @@ pub fn check_layering_matrix(root: &Path, strict_ring3: bool) -> (bool, Vec<Stri
                 (Ring::Ring2, Ring::Ring0, _) => {
                     let allowed = matches!(
                         dep_name.as_str(),
-                        "memfuse-types" | "memfuse-ports" | "memfuse-crypto" | "memfuse-core" | "memfuse-simd" | "memfuse-rank"
+                        "contextra-types" | "contextra-ports" | "contextra-crypto" | "contextra-core" | "contextra-simd" | "contextra-rank"
                     );
                     if allowed {
                         None
@@ -246,7 +246,7 @@ pub fn check_layering_matrix(root: &Path, strict_ring3: bool) -> (bool, Vec<Stri
         }
     }
 
-    println!("=== MemFuse Ring-Layering Verification ===");
+    println!("=== Contextra Ring-Layering Verification ===");
     for w in &warnings {
         println!("{}", w);
     }

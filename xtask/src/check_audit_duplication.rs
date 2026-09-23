@@ -258,7 +258,7 @@ Inventory line 1.
 
 - Property-Based Tests (`proptest`): 11/11 proptests green in test harness.
 - Concurrency Stress Runs: 10/10 iterations with test-threads=8 passed without panics.
-- TxId Boundary Exhaustion Simulation: verified controlled MemFuseError Transaction returns.
+- TxId Boundary Exhaustion Simulation: verified controlled ContextraError Transaction returns.
 - SnapshotRegistry GC Race Stress: verified zero race conditions under concurrent access.
 - Quality Gate Stack: 156 unit + 2 integration + 5 robustness tests passing green.
 
@@ -266,7 +266,7 @@ Inventory line 1.
 
 - Property-Based Tests (`proptest`): 11/11 proptests green in test harness.
 - Concurrency Stress Runs: 10/10 iterations with test-threads=8 passed without panics.
-- TxId Boundary Exhaustion Simulation: verified controlled MemFuseError Transaction returns.
+- TxId Boundary Exhaustion Simulation: verified controlled ContextraError Transaction returns.
 - SnapshotRegistry GC Race Stress: verified zero race conditions under concurrent access.
 - Quality Gate Stack: 156 unit + 2 integration + 5 robustness tests passing green.
 "#;
@@ -291,7 +291,7 @@ Inventory line 1.
 
 - Property-Based Tests (`proptest`): 11/11 proptests green in test harness.
 - Concurrency Stress Runs: 10/10 iterations in Session 96e5c38b sowie 5/5 in Session 4b5ed819.
-- TxId Boundary Exhaustion Simulation: verified controlled MemFuseError Transaction returns.
+- TxId Boundary Exhaustion Simulation: verified controlled ContextraError Transaction returns.
 - SnapshotRegistry GC Race Stress: verified zero race conditions under concurrent access.
 
 ## 14. [Konsolidiert in §11 — keine neue Prüftiefe gegenüber Session 96e5c38b identifiziert]

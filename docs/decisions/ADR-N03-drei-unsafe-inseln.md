@@ -3,7 +3,7 @@
 * **Status:** Final
 * **Datum:** 2026-09-22
 * **Kontext / Auslöser:**
-  MemFuse folgt dem Grundsatz der maximalen Speichersicherheit (Pure Rust Policy / Sovereign Core, ADR-004). Jedoch verlangen plattform- und hardwarenahe Optimierungen (wie Zero-Copy Mmap-I/O oder SIMD-Vector-Math) nach der Nutzung von `unsafe` Rust-Blöcken.
+  Contextra folgt dem Grundsatz der maximalen Speichersicherheit (Pure Rust Policy / Sovereign Core, ADR-004). Jedoch verlangen plattform- und hardwarenahe Optimierungen (wie Zero-Copy Mmap-I/O oder SIMD-Vector-Math) nach der Nutzung von `unsafe` Rust-Blöcken.
   Wildwuchs von `unsafe`-Code über verschiedene Domänen- und Datenbank-Crates hinweg würde die Auditierbarkeit zerstören und Memory-Safety-Bugs wie Undefined Behavior, Out-of-Bounds-Reads oder Use-After-Free riskieren.
 
 ## Entscheidungen
@@ -13,19 +13,19 @@
 
 2. **Drei explizit genehmigte Unsafe-Inseln:**
    `unsafe`-Code ist ausschließlich in drei isolierten Kapseln erlaubt:
-   * **`memfuse-sys`:** Systemnahe OS-Schnittstellen (wie FFI, Mmap-Dateizugriffe). Stellt sichere Fassaden (z. B. `memfuse_sys::mmap_readonly`) bereit.
-   * **`memfuse-simd`:** Vektor-Distanzberechnungen und Hardware-Intrinsics (AVX2, AVX-512, NEON) mit strenger Runtime-Feature-Detection (`is_x86_feature_detected!`).
-   * **Übergangs-Whitelists (`memfuse-vector`, `memfuse-store` / `memfuse-crypto` Test-Only):** Temporäre `unsafe`-Nutzung auf dem Migrationspfad MUSS zwingend in einer lokalen `UNSAFE_TRANSITION.md`-Datei nachverfolgt werden.
+   * **`contextra-sys`:** Systemnahe OS-Schnittstellen (wie FFI, Mmap-Dateizugriffe). Stellt sichere Fassaden (z. B. `contextra_sys::mmap_readonly`) bereit.
+   * **`contextra-simd`:** Vektor-Distanzberechnungen und Hardware-Intrinsics (AVX2, AVX-512, NEON) mit strenger Runtime-Feature-Detection (`is_x86_feature_detected!`).
+   * **Übergangs-Whitelists (`contextra-vector`, `contextra-store` / `contextra-crypto` Test-Only):** Temporäre `unsafe`-Nutzung auf dem Migrationspfad MUSS zwingend in einer lokalen `UNSAFE_TRANSITION.md`-Datei nachverfolgt werden.
 
 3. **Verpflichtendes `UNSAFE_TRANSITION.md`-Tracking:**
    Tritt aus historischen Gründen `unsafe`-Code in Whitelist-Crates auf, MUSS jede Fundstelle mit einer Tracking-ID (z. B. `TRANS-VEC-001`), Quellpfad, Begründung, Ziel-Crate und Migrationsstatus in `UNSAFE_TRANSITION.md` dokumentiert sein.
-   Nach erfolgreicher Migration in `memfuse-sys` oder `memfuse-simd` wird das Crate unverzüglich auf `#![forbid(unsafe_code)]` zurückgestellt.
+   Nach erfolgreicher Migration in `contextra-sys` oder `contextra-simd` wird das Crate unverzüglich auf `#![forbid(unsafe_code)]` zurückgestellt.
 
 4. **Verpflichtende `// SAFETY:`-Dokumentationsregel:**
    Jeder verbleibende `unsafe`-Block erfordert ausnahmslos einen vorangestellten `// SAFETY:`-Kommentar, der die mathematischen oder speicherbezogenen Preconditions und Invarianten belegt. Word-identische Copy-Paste-Kommentare sind unzulässig (ADR-035).
 
 ## Konsequenzen
 
-* **Maximale Auditsicherheit:** Sicherheitsaudits müssen nur die isolierten Inseln (`memfuse-sys`, `memfuse-simd`) und aktive `UNSAFE_TRANSITION.md`-Whitelists prüfen.
-* **Keine Korruption im Fachcode:** 95%+ des Gesamtrepositories (inklusive `memfuse-db`, `memfuse-agent`, `memfuse-mcp`, `memfuse-py`) bleiben garantiert frei von Unsafe-Code.
+* **Maximale Auditsicherheit:** Sicherheitsaudits müssen nur die isolierten Inseln (`contextra-sys`, `contextra-simd`) und aktive `UNSAFE_TRANSITION.md`-Whitelists prüfen.
+* **Keine Korruption im Fachcode:** 95%+ des Gesamtrepositories (inklusive `contextra-db`, `contextra-agent`, `contextra-mcp`, `contextra-py`) bleiben garantiert frei von Unsafe-Code.
 * **Maschinelles Enforcement:** Compiler und Linter schlagen bei unautorisierten `unsafe`-Blöcken in geschützten Crates sofort mit E0133/Linter-Error fehl.

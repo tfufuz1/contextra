@@ -1,0 +1,3718 @@
+// FILE-CONTEXT
+// ZWECK: Unit-Tests für Collection-CRUD, Indizierung, Repair und Grenzwerte.
+// INVARIANTEN: Keine Tautologien; Anti-Mirroring gewahrt; Unabhängig berechnete Erwartungswerte.
+// NICHT-OFFENSICHTLICH: Tests laufen isoliert in temporären Verzeichnissen.
+// STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
+
+#[tokio::test]
+async fn test_collection_scan_prefix_batches_via_mock_storage() {
+    use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+    use contextra_graph::csr::CsrGraph;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    struct BoundedScanMockStorage {
+        bounded_call_count: AtomicUsize,
+    }
+
+    impl StorageEngine for BoundedScanMockStorage {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+            Box::pin(async move {
+                Ok(StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+            Box::pin(async move { Ok(0) })
+        }
+        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+            Box::pin(async move { Ok(TxId(0)) })
+        }
+        fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan_prefix<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move {
+                panic!("scan_prefix should not be called directly when batching!");
+            })
+        }
+        fn scan_prefix_bounded<'a>(
+            &'a self,
+            _prefix: &'a [u8],
+            limit: usize,
+            cursor: Option<&'a [u8]>,
+        ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
+            Box::pin(async move {
+                self.bounded_call_count.fetch_add(1, Ordering::SeqCst);
+                let start = if let Some(cur) = cursor {
+                    let s = String::from_utf8_lossy(cur);
+                    let idx: usize = s["item_".len()..].parse().unwrap();
+                    idx + 1
+                } else {
+                    0
+                };
+
+                let total_items = 5000;
+                let end = (start + limit).min(total_items);
+
+                let val_bytes = serde_json::to_vec(&serde_json::json!({"test": "data"})).unwrap();
+                let mut batch = Vec::new();
+                for i in start..end {
+                    let k = format!("item_{:05}", i).into_bytes();
+                    batch.push((k, val_bytes.clone()));
+                }
+
+                let next_cursor = if end < total_items {
+                    batch.last().map(|(k, _)| k.clone())
+                } else {
+                    None
+                };
+
+                Ok((batch, next_cursor))
+            })
+        }
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+    }
+
+    let mock_storage = Arc::new(BoundedScanMockStorage {
+        bounded_call_count: AtomicUsize::new(0),
+    });
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        mock_storage.clone(),
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(std::sync::atomic::AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let items = col.scan_prefix("item_", None).await.unwrap();
+    assert_eq!(items.len(), 5000);
+    // With 5000 items and BATCH_SIZE = 1000, scan_prefix_bounded should be called 5 times
+    assert_eq!(mock_storage.bounded_call_count.load(Ordering::SeqCst), 5);
+}
+
+#[tokio::test]
+async fn test_maintenance_pagination_over_10k_documents() {
+    use contextra_core::EXPIRY_METADATA_KEY;
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use serde_json::json;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let total_docs = 10_500;
+    // Insert 10,500 synthetic documents
+    for i in 0..total_docs {
+        let key = format!("doc_{:05}", i);
+        // Put expired TTL/sequence metadata on document at index 10,250
+        if i == 10_250 {
+            col.put_kv(
+                &key,
+                &json!({
+                    "created_at_ms": 1_000_000,
+                    "ttl_ms": 100,
+                    EXPIRY_METADATA_KEY: 0
+                }),
+            )
+            .await
+            .unwrap();
+        } else {
+            col.put_kv(&key, &json!({ "v": i })).await.unwrap();
+        }
+    }
+
+    let expired_key = "doc_10250";
+    assert!(
+        col.get_kv(expired_key).await.unwrap().is_some(),
+        "Document past 10,000 threshold must exist before cleanup"
+    );
+
+    // Call reap_expired_documents and verify document at index 10,250 is reaped
+    let reaped = col.reap_expired_documents(100).await.unwrap();
+    assert_eq!(
+        reaped, 1,
+        "reap_expired_documents must find and reap the expired document at index > 10,000"
+    );
+    assert!(
+        col.get_kv(expired_key).await.unwrap().is_none(),
+        "Reaped document past 10,000 threshold must be deleted"
+    );
+
+    // Now re-insert document at 10,250 with wall-clock expired TTL and test trigger_expiry_cleanup
+    col.put_kv(
+        expired_key,
+        &json!({
+            "created_at_ms": 1_000_000,
+            "ttl_ms": 100
+        }),
+    )
+    .await
+    .unwrap();
+
+    let cleaned = col.trigger_expiry_cleanup().await.unwrap();
+    assert_eq!(
+        cleaned, 1,
+        "trigger_expiry_cleanup must find and clean the expired document at index > 10,000"
+    );
+    assert!(
+        col.get_kv(expired_key).await.unwrap().is_none(),
+        "Cleaned document past 10,000 threshold must be deleted"
+    );
+
+    // Test evict_decayed_chunks with decayed importance at index 10,300
+    let decay_key = "doc_10300";
+    let decay_controller = crate::decay_controller::AdaptiveDecayController::with_defaults();
+
+    let imp = contextra_core::MemoryImportance::new(
+        contextra_core::ImportanceScore::new(1.0),
+        contextra_core::DecayFunction::Exponential { half_life_tx: 10 },
+        contextra_core::TxId::new(0),
+    );
+
+    col.insert(
+        decay_key,
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(json!({
+            "importance": imp,
+            "created_at_tx": 0
+        })),
+    )
+    .await
+    .unwrap();
+
+    col.next_tx
+        .store(1_000_000, std::sync::atomic::Ordering::SeqCst);
+
+    let evicted = col
+        .evict_decayed_chunks(&decay_controller, 100)
+        .await
+        .unwrap();
+    assert_eq!(
+        evicted, 1,
+        "evict_decayed_chunks must find and evict the decayed document at index > 10,000"
+    );
+    assert!(
+        col.get_kv(decay_key).await.unwrap().is_none(),
+        "Evicted decayed document past 10,000 threshold must be deleted"
+    );
+}
+
+#[tokio::test]
+async fn test_insert_with_ttl_and_reap_expired_documents() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+
+    // Insert document with TTL = 5 committed ops
+    col.insert_with_ttl("temp_doc", &vec, None, 5)
+        .await
+        .unwrap(); // unwrap
+
+    // 1. Immediately after insert, document should be retrievable
+    let doc = col.get("temp_doc").await.unwrap(); // unwrap
+    assert!(doc.is_some(), "Document must exist before TTL expiration");
+
+    // 2. Perform 5 dummy commits (inserts)
+    for i in 0..5 {
+        col.insert(&format!("dummy_{i}"), &vec, None).await.unwrap(); // unwrap
+    }
+
+    // 3. Trigger expiry cleanup
+    let reaped = col.reap_expired_documents(100).await.unwrap(); // unwrap
+    assert_eq!(reaped, 1, "Expired document should be reaped");
+
+    // 4. Verify document is gone from storage and search
+    let doc_after = col.get("temp_doc").await.unwrap(); // unwrap
+    assert!(
+        doc_after.is_none(),
+        "Document must be deleted after TTL expiry"
+    );
+
+    let search_res = col.search(&vec, 10).await.unwrap(); // unwrap
+    assert!(
+        search_res.iter().all(|r| r.id != "temp_doc"),
+        "Expired document must not appear in search results"
+    );
+}
+
+#[tokio::test]
+async fn test_relate_success_visible_in_storage_and_graph() {
+    use contextra_core::EntityId;
+    use contextra_graph::csr::CsrGraph;
+    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph = Arc::new(CsrGraph::new());
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage.clone(),
+        index,
+        graph.clone(),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.relate("doc1", "doc2", "references").await.unwrap(); // unwrap
+
+    // 1. Storage check
+    let rels = col.scan_prefix("__rel:", None).await.unwrap(); // unwrap
+    assert_eq!(rels.len(), 1);
+    assert!(rels[0].0.contains("doc1:references:doc2"));
+
+    // 2. Graph check
+    let id1 = EntityId::from_key("doc1").unwrap(); // unwrap
+    let id2 = EntityId::from_key("doc2").unwrap(); // unwrap
+    let neighbors = graph.neighbors(id1).await.unwrap(); // unwrap
+    assert!(neighbors.contains(&id2));
+}
+
+#[tokio::test]
+async fn test_relate_rollback_semantics_on_storage_commit_failure() {
+    use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+    use contextra_graph::csr::CsrGraph;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    struct FailOnStorageCommit;
+
+    impl StorageEngine for FailOnStorageCommit {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move {
+                Err(contextra_core::ContextraError::Storage(
+                    "Simulated Storage Commit Failure".into(),
+                ))
+            })
+        }
+        fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+            Box::pin(async move {
+                Ok(StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+            Box::pin(async move { Ok(0) })
+        }
+        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+            Box::pin(async move { Ok(TxId(0)) })
+        }
+        fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan_prefix<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+    }
+
+    let storage = Arc::new(FailOnStorageCommit);
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph = Arc::new(CsrGraph::new());
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph.clone(),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let res = col.relate("node_x", "node_y", "links").await;
+    assert!(
+        res.is_err(),
+        "relate() must fail when storage.commit() fails"
+    );
+
+    // Graph index should remain empty since relate failed before graph commit
+    assert_eq!(graph.entity_count(), 0);
+}
+
+// REGRESSION TEST für F-01: beweist gebrochene Rollback-Semantik in relate()
+#[tokio::test]
+async fn test_relate_rollback_semantics_on_graph_commit_failure() {
+    use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+    use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
+    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    struct FailOnPutStorage {
+        should_fail: AtomicBool,
+    }
+
+    impl StorageEngine for FailOnPutStorage {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move {
+                if self.should_fail.load(Ordering::SeqCst) {
+                    Err(contextra_core::ContextraError::Storage(
+                        "Simulated Graph Storage Commit Failure".into(),
+                    ))
+                } else {
+                    Ok(())
+                }
+            })
+        }
+        fn delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+            Box::pin(async move {
+                Ok(StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+            Box::pin(async move { Ok(0) })
+        }
+        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+            Box::pin(async move { Ok(TxId(0)) })
+        }
+        fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan_prefix<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+    }
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+
+    let fail_storage = Arc::new(FailOnPutStorage {
+        should_fail: AtomicBool::new(true),
+    });
+    let graph = Arc::new(CsrGraph::with_config_and_storage(
+        CsrGraphConfig::default(),
+        fail_storage,
+    ));
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage.clone(),
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    // relate() should fail when graph_index.commit() fails
+    let res = col.relate("entity_a", "entity_b", "connects").await;
+    assert!(
+        res.is_err(),
+        "relate() must return Err when graph commit fails"
+    );
+
+    // Verification: storage MUST NOT contain the relation key after failed relate()
+    let rel_prefix = col.namespaced_key(b"", 2);
+    let remaining_rels = storage.scan_prefix(&rel_prefix).await.unwrap(); // unwrap
+    assert!(
+        remaining_rels.is_empty(),
+        "Storage layer MUST NOT contain relation keys after relate() failure! Found: {:?}",
+        remaining_rels
+    );
+}
+
+#[tokio::test]
+async fn test_collection_embedder_async_embed() {
+    use contextra_core::TextEmbeddingEngine;
+    use std::sync::Arc;
+
+    use contextra_core::BoxFuture;
+
+    struct FakeEmbedder;
+
+    impl TextEmbeddingEngine for FakeEmbedder {
+        fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, contextra_core::Result<Vec<f32>>> {
+            Box::pin(async move { Ok(vec![text.len() as f32 / 100.0; 4]) })
+        }
+    }
+
+    // Verify: compile-time proof that the method signature is async and
+    // accepts Arc<dyn TextEmbeddingEngine>.
+    let embedder: Arc<dyn TextEmbeddingEngine> = Arc::new(FakeEmbedder);
+    let result = embedder.embed("hello").await.unwrap(); // unwrap
+    assert_eq!(result.len(), 4);
+}
+
+#[tokio::test]
+async fn hybrid_search_caps_k_at_max_search_k() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let hnsw_config = contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap()); // unwrap
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    let res = col
+        .hybrid_search("test", &[0.1, 0.2, 0.3, 0.4], 100_000, None)
+        .await
+        .unwrap(); // unwrap
+
+    assert!(
+        res.len() <= contextra_core::MAX_SEARCH_K,
+        "Results length {} should be <= MAX_SEARCH_K ({})",
+        res.len(),
+        contextra_core::MAX_SEARCH_K
+    );
+}
+
+#[tokio::test]
+async fn test_input_guards_boundary_validation() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let hnsw_config = contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap()); // unwrap
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+
+    // 0. Empty inputs in relate()
+    let err_relate_empty_from = col.relate("", "doc2", "knows").await;
+    assert!(matches!(
+        err_relate_empty_from,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    let err_relate_empty_to = col.relate("doc1", "", "knows").await;
+    assert!(matches!(
+        err_relate_empty_to,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    // 1. Empty ID guard on insert / upsert
+    let err_empty_id = col.insert("", &vec, None).await;
+    assert!(matches!(
+        err_empty_id,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    let err_empty_id_upsert = col.upsert("", &vec, None).await;
+    assert!(matches!(
+        err_empty_id_upsert,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    // 2. Oversized ID guard (>1024 bytes)
+    let long_id = "a".repeat(1025);
+    let err_long_id = col.insert(&long_id, &vec, None).await;
+    assert!(matches!(
+        err_long_id,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    // 3. insert_many / upsert_many empty batch guard
+    let err_empty_batch = col.insert_many(&[]).await;
+    assert!(matches!(
+        err_empty_batch,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    let err_empty_batch_upsert = col.upsert_many(&[]).await;
+    assert!(matches!(
+        err_empty_batch_upsert,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    // 4. insert_many / upsert_many oversized batch guard (>10,000)
+    let huge_batch: Vec<_> = (0..10_001)
+        .map(|i| (format!("d_{i}"), vec.clone(), None))
+        .collect();
+    let err_huge_batch = col.insert_many(&huge_batch).await;
+    assert!(matches!(
+        err_huge_batch,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    let err_huge_batch_upsert = col.upsert_many(&huge_batch).await;
+    assert!(matches!(
+        err_huge_batch_upsert,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    // 5. search / search_with_filter_expr k = 0 guard
+    let err_search_k_zero = col.search(&vec, 0).await;
+    assert!(matches!(
+        err_search_k_zero,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+}
+
+#[tokio::test]
+async fn test_hybrid_search_k_clamping_boundaries() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let hnsw_config = contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap()); // unwrap
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    // 1. k = 0 boundary check (must short-circuit to empty results without panic)
+    let res_zero = col
+        .hybrid_search("test", &[0.1, 0.2, 0.3, 0.4], 0, None)
+        .await
+        .unwrap(); // unwrap
+    assert!(res_zero.is_empty(), "k=0 must return empty result list");
+
+    // 2. k = usize::MAX boundary check (must clamp to MAX_SEARCH_K without panic/overflow)
+    let res_max = col
+        .hybrid_search("test", &[0.0, 0.0, 0.0, 0.0], usize::MAX, None)
+        .await
+        .unwrap(); // unwrap
+    assert!(
+        res_max.is_empty(),
+        "k=usize::MAX on empty DB must return empty without overflow panic"
+    );
+}
+
+#[tokio::test]
+async fn test_doc_id_collision_rejected() {
+    use contextra_core::{DocId, ContextraError, StorageEngine, TxId};
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx.clone(),
+        4,
+        contextra_text::Language::English,
+    );
+
+    // 1. Insert first document normally
+    let id1 = "key_alpha";
+    let emb1 = vec![1.0, 0.0, 0.0, 0.0];
+    col.insert(id1, &emb1, None).await.unwrap(); // unwrap
+
+    // Verify key_alpha exists
+    let doc1 = col.get(id1).await.unwrap(); // unwrap
+    assert!(doc1.is_some());
+
+    // 2. Synthetically inject a mapping for a fixed DocId (e.g. DocId::new(42)) pointing to "key_existing"
+    let synthetic_doc_id = DocId::new(42);
+    let tx = TxId::new(next_tx.fetch_add(1, Ordering::SeqCst));
+    let doc_key = col.namespaced_key(&synthetic_doc_id.inner().to_le_bytes(), 1);
+    let existing_meta = super::StoredDocumentMeta {
+        id: "key_existing".to_string(),
+        metadata: None,
+    };
+    let meta_bytes = serde_json::to_vec(&existing_meta).unwrap(); // unwrap
+    col.storage.put(tx, &doc_key, &meta_bytes).await.unwrap(); // unwrap
+    col.storage.commit(tx).await.unwrap(); // unwrap
+
+    // 3. Directly test check_doc_id_collision with a different string key (e.g., "key_new")
+    let collision_res = col
+        .check_doc_id_collision(synthetic_doc_id, "key_new")
+        .await;
+    assert!(collision_res.is_err());
+    match collision_res {
+        Err(ContextraError::Internal(msg)) => {
+            assert!(
+                msg.contains("DocId-Kollision erkannt für Schlüssel 'key_new'"),
+                "Unexpected error message: {}",
+                msg
+            );
+        }
+        res => panic!("Expected ContextraError::Internal, got {:?}", res),
+    }
+
+    // 4. Same key string should NOT be treated as a collision
+    let same_key_res = col
+        .check_doc_id_collision(synthetic_doc_id, "key_existing")
+        .await;
+    assert!(same_key_res.is_ok());
+}
+
+#[tokio::test]
+#[allow(deprecated)]
+async fn test_collection_next_tx_sequence() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    let tx1 = col.next_tx().unwrap(); // unwrap allowed
+    let tx2 = col.next_tx().unwrap(); // unwrap allowed
+    let tx3 = col.next_tx().unwrap(); // unwrap allowed
+
+    assert_eq!(tx1.inner(), 1);
+    assert_eq!(tx2.inner(), 2);
+    assert_eq!(tx3.inner(), 3);
+}
+
+#[tokio::test]
+async fn test_collection_allocate_tx_sequence() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(100));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    let tx1 = col.allocate_tx().unwrap(); // unwrap allowed
+    let tx2 = col.allocate_tx().unwrap(); // unwrap allowed
+    let tx3 = col.allocate_tx().unwrap(); // unwrap allowed
+
+    assert_eq!(tx1.inner(), 100);
+    assert_eq!(tx2.inner(), 101);
+    assert_eq!(tx3.inner(), 102);
+}
+
+#[tokio::test]
+async fn test_concurrent_insert_and_write_ops_lock_safety() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = Arc::new(super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    ));
+
+    let mut handles = Vec::new();
+
+    // Task 1: Single inserts
+    {
+        let c = col.clone();
+        handles.push(tokio::spawn(async move {
+            for i in 0..10 {
+                let id = format!("single_doc_{i}");
+                c.insert(&id, &[1.0, 0.0, 0.0, 0.0], None).await.unwrap(); // unwrap
+            }
+        }));
+    }
+
+    // Task 2: Insert many
+    {
+        let c = col.clone();
+        handles.push(tokio::spawn(async move {
+            let docs: Vec<_> = (0..5)
+                .map(|i| (format!("batch_doc_{i}"), vec![0.0, 1.0, 0.0, 0.0], None))
+                .collect();
+            c.insert_many(&docs).await.unwrap(); // unwrap
+        }));
+    }
+
+    // Task 3: Upsert & Update
+    {
+        let c = col.clone();
+        handles.push(tokio::spawn(async move {
+            for i in 0..5 {
+                let id = format!("upsert_doc_{i}");
+                c.upsert(&id, &[0.0, 0.0, 1.0, 0.0], None).await.unwrap(); // unwrap
+                c.update(&id, &[0.0, 0.0, 1.0, 1.0], None).await.unwrap(); // unwrap
+            }
+        }));
+    }
+
+    // Task 4: Upsert many
+    {
+        let c = col.clone();
+        handles.push(tokio::spawn(async move {
+            let docs: Vec<_> = (0..5)
+                .map(|i| (format!("upsert_batch_{i}"), vec![0.5, 0.5, 0.0, 0.0], None))
+                .collect();
+            c.upsert_many(&docs).await.unwrap(); // unwrap
+        }));
+    }
+
+    for h in handles {
+        h.await.unwrap(); // unwrap
+    }
+
+    assert!(col.len().await > 0);
+}
+
+#[tokio::test]
+async fn test_ttl_missing_created_at_does_not_expire() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use serde_json::json;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "doc_no_created_at",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(json!({"ttl_ms": 10})),
+    )
+    .await
+    .unwrap(); // unwrap
+    let reaped = col.trigger_expiry_cleanup().await.unwrap(); // unwrap
+    assert_eq!(reaped, 0);
+    assert!(col.get("doc_no_created_at").await.unwrap().is_some()); // unwrap
+}
+
+#[tokio::test]
+async fn test_ttl_zero_does_not_expire() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use serde_json::json;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "doc_zero_ttl",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(json!({"created_at_ms": 100, "ttl_ms": 0})),
+    )
+    .await
+    .unwrap(); // unwrap
+    let reaped = col.trigger_expiry_cleanup().await.unwrap(); // unwrap
+    assert_eq!(reaped, 0);
+    assert!(col.get("doc_zero_ttl").await.unwrap().is_some()); // unwrap
+}
+
+#[tokio::test]
+async fn test_extract_text_with_contextual_prefix() {
+    use serde_json::json;
+
+    let meta = Some(json!({
+        "contextual_prefix": "Dokumenten-Kontext-Präfix",
+        "text": "Chunk Haupttext"
+    }));
+
+    let extracted = super::extract_text(&meta);
+    assert!(extracted.is_some());
+    let text = extracted.unwrap(); // unwrap
+    assert!(text.contains("Dokumenten-Kontext-Präfix"));
+    assert!(text.contains("Chunk Haupttext"));
+    assert_eq!(text, "Dokumenten-Kontext-Präfix\n\nChunk Haupttext");
+}
+
+#[tokio::test]
+async fn test_ttl_overflow_does_not_expire() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use serde_json::json;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "doc_overflow",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(json!({"created_at_ms": u64::MAX - 10, "ttl_ms": 100})),
+    )
+    .await
+    .unwrap(); // unwrap
+    let reaped = col.trigger_expiry_cleanup().await.unwrap(); // unwrap
+    assert_eq!(reaped, 0);
+    assert!(col.get("doc_overflow").await.unwrap().is_some()); // unwrap
+}
+
+#[tokio::test]
+async fn test_migrate_doc_keys_v1() {
+    use contextra_core::{DocId, StorageEngine, TxId};
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use serde_json::json;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap allowed (AGENT:04)
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap allowed (AGENT:04)
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap allowed (AGENT:04)
+    );
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage.clone(),
+        index,
+        Arc::new(CsrGraph::new()),
+        next_tx.clone(),
+        4,
+        contextra_text::Language::English,
+    );
+
+    // Inject legacy doc_key (containing embedding in StoredDocument)
+    let doc_id = DocId::from_key("legacy_doc_1").unwrap(); // unwrap allowed (AGENT:04)
+    let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+    let legacy_doc = super::StoredDocument {
+        id: "legacy_doc_1".to_string(),
+        embedding: vec![1.0, 0.0, 0.0, 0.0],
+        metadata: Some(json!({"topic": "legacy"})),
+    };
+    let legacy_bytes = serde_json::to_vec(&legacy_doc).unwrap(); // unwrap allowed (AGENT:04)
+
+    // Put user_key and legacy doc_key in storage
+    let tx = TxId::new(next_tx.fetch_add(1, Ordering::SeqCst));
+    let user_key = col.namespaced_key(b"legacy_doc_1", 0);
+    storage.put(tx, &user_key, &legacy_bytes).await.unwrap(); // unwrap allowed (AGENT:04)
+    storage.put(tx, &doc_key, &legacy_bytes).await.unwrap(); // unwrap allowed (AGENT:04)
+    storage.commit(tx).await.unwrap(); // unwrap allowed (AGENT:04)
+
+    // Verify doc_key currently contains full StoredDocument
+    let raw_before = storage.get(&doc_key).await.unwrap().unwrap(); // unwrap allowed (AGENT:04)
+    assert!(serde_json::from_slice::<super::StoredDocument>(&raw_before).is_ok());
+
+    // Run migration
+    let count = col.migrate_doc_keys_v1().await.unwrap(); // unwrap allowed (AGENT:04)
+    assert_eq!(count, 1);
+
+    // Verify doc_key now contains StoredDocumentMeta (and fails parsing as StoredDocument due to missing embedding)
+    let raw_after = storage.get(&doc_key).await.unwrap().unwrap(); // unwrap allowed (AGENT:04)
+    let meta: super::StoredDocumentMeta = serde_json::from_slice(&raw_after).unwrap(); // unwrap allowed (AGENT:04)
+    assert_eq!(meta.id, "legacy_doc_1");
+    assert_eq!(meta.metadata.unwrap()["topic"], "legacy"); // unwrap allowed (AGENT:04)
+    assert!(serde_json::from_slice::<super::StoredDocument>(&raw_after).is_err());
+
+    // Idempotency check: running migration again returns 0
+    let count_again = col.migrate_doc_keys_v1().await.unwrap(); // unwrap allowed (AGENT:04)
+    assert_eq!(count_again, 0);
+}
+
+#[tokio::test]
+#[cfg(feature = "reranking")]
+async fn test_hybrid_search_reranked_none() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "d1",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "rust language"})),
+    )
+    .await
+    .unwrap(); // unwrap
+    col.insert(
+        "d2",
+        &[0.9, 0.1, 0.0, 0.0],
+        Some(serde_json::json!({"text": "python language"})),
+    )
+    .await
+    .unwrap(); // unwrap
+
+    let res = col
+        .hybrid_search_reranked("rust", &[1.0, 0.0, 0.0, 0.0], 1, None, None)
+        .await
+        .unwrap(); // unwrap
+
+    assert_eq!(res.len(), 1);
+    assert_eq!(res[0].id, "d1");
+}
+
+#[test]
+fn test_importance_score_parser_robust() {
+    assert_eq!(super::parse_importance_score("0.8"), 0.8);
+    assert_eq!(super::parse_importance_score("0.8\n"), 0.8);
+    assert_eq!(super::parse_importance_score("Score: 0.8"), 0.8);
+    assert_eq!(super::parse_importance_score("0.8 (high importance)"), 0.8);
+    assert_eq!(super::parse_importance_score("1.5"), 1.0);
+    assert_eq!(super::parse_importance_score("-0.2"), 0.0);
+    assert_eq!(super::parse_importance_score("invalid text"), 0.5);
+}
+
+#[tokio::test]
+async fn test_update_document_importance_persists_model_id_provenance() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+    col.insert("doc_test_prov", &vec, None).await.unwrap(); // unwrap
+
+    col.update_document_importance("doc_test_prov", 0.92, "llama3:latest")
+        .await
+        .unwrap(); // unwrap
+
+    let doc = col.get("doc_test_prov").await.unwrap().unwrap(); // unwrap
+    let meta = doc.metadata.unwrap(); // unwrap
+
+    let imp = meta.get("importance").unwrap();
+    let imp_score: contextra_core::MemoryImportance = serde_json::from_value(imp.clone()).unwrap();
+    assert_eq!(imp_score.base_score.value(), 0.92);
+    assert_eq!(
+        meta.get("model_id").and_then(|v| v.as_str()),
+        Some("llama3:latest")
+    );
+}
+
+#[test]
+fn test_compute_default_importance_entropy_and_clamping() {
+    let score_empty = super::compute_default_importance(None);
+    assert_eq!(score_empty.value(), 0.5);
+
+    let score_simple = super::compute_default_importance(Some("aaaaa"));
+    assert!(score_simple.value() >= 0.0 && score_simple.value() <= 1.0);
+
+    let score_rich = super::compute_default_importance(Some(
+        "The quick brown fox jumps over the lazy dog with high entropy and long text.",
+    ));
+    assert!(score_rich.value() > score_simple.value());
+}
+
+#[test]
+fn test_extract_effective_importance_defaults() {
+    use contextra_core::types::TxId;
+
+    let none_meta = None;
+    assert_eq!(
+        super::extract_effective_importance(&none_meta, TxId::new(10)),
+        1.0
+    );
+
+    let meta_with_imp = Some(serde_json::json!({
+        "importance": 0.85
+    }));
+    assert_eq!(
+        super::extract_effective_importance(&meta_with_imp, TxId::new(10)),
+        0.85
+    );
+}
+
+#[tokio::test]
+async fn test_begin_transaction_returns_active_db_transaction() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    let tx = col.begin_transaction();
+    assert!(tx.is_ok());
+}
+
+#[tokio::test]
+async fn test_expiry_cleanup_deletes_decayed_working_memory() {
+    use contextra_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use serde_json::json;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        next_tx.clone(),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let created_tx = TxId::new(10);
+    let imp = MemoryImportance::new(
+        ImportanceScore::new(0.5),
+        DecayFunction::Exponential { half_life_tx: 5 },
+        created_tx,
+    );
+
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+    col.insert(
+        "doc_decayed",
+        &vec,
+        Some(json!({
+            "importance": imp
+        })),
+    )
+    .await
+    .unwrap(); // unwrap
+
+    // Advance TxId far enough so effective_score < 0.05
+    // At created_tx=10, half_life=5:
+    // Tx 10: 0.5 * 1.0 = 0.5
+    // Tx 15: 0.5 * 0.5 = 0.25
+    // Tx 20: 0.5 * 0.25 = 0.125
+    // Tx 25: 0.5 * 0.125 = 0.0625
+    // Tx 30: 0.5 * 0.0625 = 0.03125 (< 0.05)
+    next_tx.store(35, Ordering::SeqCst);
+
+    let count = col.trigger_expiry_cleanup().await.unwrap(); // unwrap
+    assert_eq!(count, 1, "Decayed working memory document should be reaped");
+    assert!(col.get("doc_decayed").await.unwrap().is_none()); // unwrap
+}
+
+#[tokio::test]
+async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
+    use contextra_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use serde_json::json;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        next_tx.clone(),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let created_tx = TxId::new(10);
+    let imp = MemoryImportance::new(
+        ImportanceScore::new(0.01), // even with base score < 0.05!
+        DecayFunction::None,
+        created_tx,
+    );
+
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+    col.insert(
+        "doc_semantic",
+        &vec,
+        Some(json!({
+            "importance": imp
+        })),
+    )
+    .await
+    .unwrap(); // unwrap
+
+    // Advance TxId very far
+    next_tx.store(100_000, Ordering::SeqCst);
+
+    let count = col.trigger_expiry_cleanup().await.unwrap(); // unwrap
+    assert_eq!(
+        count, 0,
+        "Semantic document with DecayFunction::None must never be deleted"
+    );
+    assert!(col.get("doc_semantic").await.unwrap().is_some()); // unwrap
+}
+
+#[test]
+fn test_importance_metadata_integration_and_filtering() {
+    use contextra_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
+    use serde_json::json;
+
+    let created_tx = TxId::new(10);
+    let now_tx = TxId::new(30);
+
+    let mut meta1 = Some(json!({"text": "Important factual doc"}));
+    super::ensure_importance_metadata(&mut meta1, created_tx, Some("Important factual doc"));
+
+    // Override with explicit exponential decay
+    let imp1 = MemoryImportance::new(
+        ImportanceScore::new(0.9),
+        DecayFunction::Exponential { half_life_tx: 10 },
+        created_tx,
+    );
+    meta1.as_mut().unwrap().as_object_mut().unwrap().insert(
+        // unwrap
+        "importance".to_string(),
+        serde_json::to_value(imp1).unwrap(), // unwrap
+    );
+
+    // Effective score at now_tx (2 half-lives elapsed) -> 0.9 * 0.25 = 0.225
+    let eff1 = super::extract_effective_importance(&meta1, now_tx);
+    assert!((eff1 - 0.225).abs() < 1e-4);
+
+    let mut meta2 = Some(json!({"text": "Critical doc"}));
+    let imp2 = MemoryImportance::new(ImportanceScore::new(1.0), DecayFunction::None, created_tx);
+    meta2.as_mut().unwrap().as_object_mut().unwrap().insert(
+        // unwrap
+        "importance".to_string(),
+        serde_json::to_value(imp2).unwrap(), // unwrap
+    );
+
+    let results = vec![
+        crate::SearchResult {
+            id: "doc1".to_string(),
+            score: 0.95,
+            metadata: meta1,
+            matched_signals: vec!["vector".to_string()],
+            provenance: None,
+        },
+        crate::SearchResult {
+            id: "doc2".to_string(),
+            score: 0.85,
+            metadata: meta2,
+            matched_signals: vec!["vector".to_string()],
+            provenance: None,
+        },
+    ];
+
+    // Filter out results with effective importance < 0.5
+    let filtered =
+        super::Collection::<contextra_store::LsmStorage>::filter_by_importance(results, 0.5, now_tx);
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].id, "doc2");
+    assert_eq!(filtered[0].score, 0.85); // Order and original RRF/CE score preserved
+}
+
+#[tokio::test]
+async fn test_insert_typed_episodic_has_decay_metadata() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph_index = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "test".to_string(),
+        storage,
+        index,
+        graph_index,
+        next_tx,
+        4,
+        contextra_text::Language::German,
+    );
+
+    col.insert_typed(
+        "ep1",
+        &[1.0, 0.0, 0.0, 0.0],
+        contextra_core::MemoryType::Episodic,
+        None,
+    )
+    .await
+    .unwrap(); // unwrap
+
+    let doc = col.get("ep1").await.unwrap().unwrap(); // unwrap
+    let meta = doc.metadata.unwrap(); // unwrap
+    assert_eq!(meta.get("memory_type").unwrap(), "episodic"); // unwrap
+    assert!(meta.get("decay_function").is_some());
+}
+
+#[tokio::test]
+async fn test_insert_typed_working_has_ttl_metadata() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph_index = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "test".to_string(),
+        storage,
+        index,
+        graph_index,
+        next_tx,
+        4,
+        contextra_text::Language::German,
+    );
+
+    col.insert_typed(
+        "wk1",
+        &[1.0, 0.0, 0.0, 0.0],
+        contextra_core::MemoryType::Working,
+        None,
+    )
+    .await
+    .unwrap(); // unwrap
+
+    let doc = col.get("wk1").await.unwrap().unwrap(); // unwrap
+    let meta = doc.metadata.unwrap(); // unwrap
+    assert_eq!(meta.get("memory_type").unwrap(), "working"); // unwrap
+    assert_eq!(meta.get("ttl_tx").unwrap(), 50_000); // unwrap
+}
+
+#[tokio::test]
+#[cfg(feature = "experimental-diskann")]
+async fn test_collection_with_diskann_index_hybrid_search() {
+    use contextra_core::{DocId, StorageEngine, TextIndex};
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_text::Language;
+    use contextra_vector::{DiskAnnConfig, DiskAnnIndex};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_path = dir.path().join("lsm");
+    let diskann_path = dir.path().join("diskann.idx");
+
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: lsm_path,
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+
+    let diskann_config = DiskAnnConfig {
+        index_path: diskann_path,
+        dimension: 4,
+        max_degree: 8,
+        beam_width: 8,
+        sector_size: 4096,
+        ..DiskAnnConfig::default()
+    };
+
+    let diskann = Arc::new(DiskAnnIndex::try_new(diskann_config).unwrap()); // unwrap
+
+    let doc1_id = DocId::from_key("doc1").unwrap(); // unwrap
+    let doc2_id = DocId::from_key("doc2").unwrap(); // unwrap
+
+    let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 1.0, 0.0, 0.0]];
+    let ids = vec![doc1_id, doc2_id];
+
+    diskann.build(&vectors, &ids).await.unwrap(); // unwrap
+
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::<LsmStorage, DiskAnnIndex>::new(
+        "diskann_test".to_string(),
+        storage.clone(),
+        diskann,
+        graph,
+        next_tx,
+        4,
+        Language::English,
+    );
+
+    let tx = col.allocate_tx().unwrap(); // unwrap
+
+    let doc1_user_key = col.namespaced_key(b"doc1", 0);
+    let doc1_meta_key = col.namespaced_key(&doc1_id.inner().to_le_bytes(), 1);
+
+    let doc2_user_key = col.namespaced_key(b"doc2", 0);
+    let doc2_meta_key = col.namespaced_key(&doc2_id.inner().to_le_bytes(), 1);
+
+    let doc1_data = super::StoredDocument {
+        id: "doc1".to_string(),
+        embedding: vec![1.0, 0.0, 0.0, 0.0],
+        metadata: Some(serde_json::json!({ "text": "rust database systems" })),
+    };
+    let doc1_meta = super::StoredDocumentMeta::from(&doc1_data);
+
+    let doc2_data = super::StoredDocument {
+        id: "doc2".to_string(),
+        embedding: vec![0.0, 1.0, 0.0, 0.0],
+        metadata: Some(serde_json::json!({ "text": "python scripting language" })),
+    };
+    let doc2_meta = super::StoredDocumentMeta::from(&doc2_data);
+
+    storage
+        .put(tx, &doc1_user_key, &serde_json::to_vec(&doc1_data).unwrap()) // unwrap
+        .await
+        .unwrap(); // unwrap
+    storage
+        .put(tx, &doc1_meta_key, &serde_json::to_vec(&doc1_meta).unwrap()) // unwrap
+        .await
+        .unwrap(); // unwrap
+
+    storage
+        .put(tx, &doc2_user_key, &serde_json::to_vec(&doc2_data).unwrap()) // unwrap
+        .await
+        .unwrap(); // unwrap
+    storage
+        .put(tx, &doc2_meta_key, &serde_json::to_vec(&doc2_meta).unwrap()) // unwrap
+        .await
+        .unwrap(); // unwrap
+
+    col.text_index
+        .upsert_document(tx, doc1_id, "rust database systems")
+        .await
+        .unwrap(); // unwrap
+    col.text_index
+        .upsert_document(tx, doc2_id, "python scripting language")
+        .await
+        .unwrap(); // unwrap
+
+    storage.commit(tx).await.unwrap(); // unwrap
+    col.text_index.commit(tx).await.unwrap(); // unwrap
+
+    let query_vector = vec![1.0, 0.0, 0.0, 0.0];
+    let results = col
+        .hybrid_search("rust", &query_vector, 5, None)
+        .await
+        .unwrap(); // unwrap
+
+    assert!(
+        !results.is_empty(),
+        "Hybrid search with DiskANN should return results"
+    );
+    assert_eq!(
+        results[0].id, "doc1",
+        "Doc1 should be top result for rust & vector [1,0,0,0]"
+    );
+}
+
+#[tokio::test]
+async fn test_insert_backward_compatible_has_semantic_default() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let graph_index = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "test".to_string(),
+        storage,
+        index,
+        graph_index,
+        next_tx,
+        4,
+        contextra_text::Language::German,
+    );
+
+    col.insert(
+        "plain1",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "hello"})),
+    )
+    .await
+    .unwrap(); // unwrap
+
+    let doc = col.get("plain1").await.unwrap().unwrap(); // unwrap
+    assert_eq!(
+        crate::filter::extract_memory_type(&doc.metadata),
+        contextra_core::MemoryType::Semantic
+    );
+}
+
+#[tokio::test]
+async fn test_hybrid_search_with_query_memory_type_filter() {
+    use contextra_core::{HybridQuery, MemoryType};
+    use contextra_graph::CsrGraph;
+    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_vector::HnswIndex;
+    use serde_json::json;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "test_filter".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert_typed(
+        "ep1",
+        &[1.0, 0.0, 0.0, 0.0],
+        MemoryType::Episodic,
+        Some(json!({"text": "episode meeting alpha"})),
+    )
+    .await
+    .unwrap(); // unwrap
+
+    col.insert_typed(
+        "ep2",
+        &[0.9, 0.1, 0.0, 0.0],
+        MemoryType::Episodic,
+        Some(json!({"text": "episode meeting beta"})),
+    )
+    .await
+    .unwrap(); // unwrap
+
+    col.insert_typed(
+        "sem1",
+        &[0.95, 0.05, 0.0, 0.0],
+        MemoryType::Semantic,
+        Some(json!({"text": "episode definition gamma"})),
+    )
+    .await
+    .unwrap(); // unwrap
+
+    col.insert_typed(
+        "sem2",
+        &[0.85, 0.15, 0.0, 0.0],
+        MemoryType::Semantic,
+        Some(json!({"text": "episode theory delta"})),
+    )
+    .await
+    .unwrap(); // unwrap
+
+    // Query with memory_type_filter = Episodic
+    let query_ep = HybridQuery::builder()
+        .with_text_query("episode")
+        .with_vector_query(vec![1.0, 0.0, 0.0, 0.0])
+        .with_memory_type_filter(vec![MemoryType::Episodic])
+        .with_k(10)
+        .build()
+        .unwrap(); // unwrap
+
+    let results_ep = col.hybrid_search_with_query(&query_ep).await.unwrap(); // unwrap
+    assert_eq!(
+        results_ep.len(),
+        2,
+        "Must return exactly 2 episodic results"
+    );
+    for res in &results_ep {
+        assert!(
+            res.id == "ep1" || res.id == "ep2",
+            "Returned result {} is not Episodic!",
+            res.id
+        );
+    }
+
+    // Query with memory_type_filter = Semantic
+    let query_sem = HybridQuery::builder()
+        .with_text_query("episode")
+        .with_vector_query(vec![1.0, 0.0, 0.0, 0.0])
+        .with_memory_type_filter(vec![MemoryType::Semantic])
+        .with_k(10)
+        .build()
+        .unwrap(); // unwrap
+
+    let results_sem = col.hybrid_search_with_query(&query_sem).await.unwrap(); // unwrap
+    assert_eq!(
+        results_sem.len(),
+        2,
+        "Must return exactly 2 semantic results"
+    );
+    for res in &results_sem {
+        assert!(
+            res.id == "sem1" || res.id == "sem2",
+            "Returned result {} is not Semantic!",
+            res.id
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_invalid_doc_ids_rejected() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+
+    // Empty ID
+    assert!(col.insert("", &vec, None).await.is_err());
+    assert!(col.get("").await.is_err());
+    assert!(col.delete("").await.is_err());
+
+    // Null byte in ID
+    assert!(col.insert("doc\0invalid", &vec, None).await.is_err());
+    assert!(col.get("doc\0invalid").await.is_err());
+
+    // Too long ID (>256 bytes)
+    let long_id = "a".repeat(257);
+    assert!(col.insert(&long_id, &vec, None).await.is_err());
+    assert!(col.get(&long_id).await.is_err());
+}
+
+#[tokio::test]
+async fn test_search_dimension_mismatch_rejected() {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+    let wrong_dim_vec = vec![1.0, 0.0];
+
+    let search_res = col.search(&wrong_dim_vec, 10).await;
+    assert!(search_res.is_err());
+
+    let hybrid_res = col.hybrid_search("query", &wrong_dim_vec, 10, None).await;
+    assert!(hybrid_res.is_err());
+}
+
+#[tokio::test]
+async fn test_concurrent_insert_many_collision_safety() {
+    use contextra_core::{DocId, ContextraError, StorageEngine, TxId};
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let lsm_config = contextra_store::LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap()); // unwrap
+    let hnsw_config = contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap()); // unwrap
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = Arc::new(super::Collection::new(
+        "default".to_string(),
+        storage.clone(),
+        index,
+        graph,
+        next_tx.clone(),
+        4,
+        contextra_text::Language::English,
+    ));
+
+    // 1. Parallel insert_many calls with overlapping document keys across tasks
+    let mut tasks = Vec::new();
+    for task_idx in 0..8 {
+        let col_clone = col.clone();
+        tasks.push(tokio::spawn(async move {
+            let docs: Vec<(String, Vec<f32>, Option<serde_json::Value>)> = (0..20)
+                .map(|i| {
+                    let key = format!("batch_doc_{i}");
+                    let val = (task_idx * 100 + i + 1) as f32;
+                    (
+                        key,
+                        vec![val, 0.0, 0.0, 0.0],
+                        Some(serde_json::json!({ "task": task_idx, "i": i })),
+                    )
+                })
+                .collect();
+            col_clone.insert_many(&docs).await.unwrap(); // unwrap
+        }));
+    }
+
+    for task in tasks {
+        task.await.unwrap(); // unwrap
+    }
+
+    // All 20 document keys must exist and be valid
+    for i in 0..20 {
+        let key = format!("batch_doc_{i}");
+        let doc = col.get(&key).await.unwrap(); // unwrap
+        assert!(
+            doc.is_some(),
+            "Document {key} must exist after concurrent insert_many"
+        );
+    }
+
+    // 2. Synthetically test DocId collision rejection within insert_many
+    // Seed an initial document key "existing_key"
+    col.insert("existing_key", &[1.0, 0.0, 0.0, 0.0], None)
+        .await
+        .unwrap(); // unwrap
+
+    // Map fixed synthetic DocId (e.g. 999) to "existing_key"
+    let synthetic_doc_id = DocId::from_key("colliding_target_key").unwrap(); // unwrap
+    let tx = TxId::new(next_tx.fetch_add(1, Ordering::SeqCst));
+    let doc_key = col.namespaced_key(&synthetic_doc_id.inner().to_le_bytes(), 1);
+    let existing_meta = super::StoredDocumentMeta {
+        id: "existing_key".to_string(),
+        metadata: None,
+    };
+    let meta_bytes = serde_json::to_vec(&existing_meta).unwrap(); // unwrap
+    storage.put(tx, &doc_key, &meta_bytes).await.unwrap(); // unwrap
+    storage.commit(tx).await.unwrap(); // unwrap
+
+    // Attempt insert_many with a batch containing "colliding_target_key"
+    let batch_with_collision = vec![
+        ("safe_doc_1".to_string(), vec![1.0, 0.0, 0.0, 0.0], None),
+        (
+            "colliding_target_key".to_string(),
+            vec![2.0, 0.0, 0.0, 0.0],
+            None,
+        ),
+        ("safe_doc_2".to_string(), vec![3.0, 0.0, 0.0, 0.0], None),
+    ];
+
+    let err_res = col.insert_many(&batch_with_collision).await;
+    assert!(
+        err_res.is_err(),
+        "insert_many must fail when DocId collision is detected"
+    );
+    assert!(matches!(err_res, Err(ContextraError::Internal(_))));
+
+    // Verify all-or-nothing rollback (Option a): safe_doc_1 and safe_doc_2 must NOT exist
+    assert!(
+        col.get("safe_doc_1").await.unwrap().is_none(), // unwrap
+        "safe_doc_1 must be rolled back on collision error in insert_many"
+    );
+    assert!(
+        col.get("safe_doc_2").await.unwrap().is_none(), // unwrap
+        "safe_doc_2 must be rolled back on collision error in insert_many"
+    );
+}
+
+#[tokio::test]
+async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use contextra_core::EntityId;
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir()?;
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    // Insert doc_a (community member) and doc_b (non-community member)
+    col.insert(
+        "doc_a",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "alpha topic"})),
+    )
+    .await?;
+    col.insert(
+        "doc_b",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "alpha topic"})),
+    )
+    .await?;
+
+    let eid_a = EntityId::from_key("doc_a")?;
+
+    // Relate doc_a to doc_c and run community detection so get_community(eid_a) finds target_community_id
+    col.relate("doc_a", "doc_c", "knows").await?;
+    col.run_community_detection().await?;
+    assert!(col.get_community(eid_a).await?.is_some());
+
+    // Perform hybrid search with same_community_as = doc_a
+    let results_boosted = col
+        .hybrid_search_with_strategy(
+            "alpha",
+            &[1.0, 0.0, 0.0, 0.0],
+            10,
+            None,
+            None,
+            None,
+            Some(eid_a),
+        )
+        .await?;
+
+    // Verification 1: Non-community doc_b is NOT eliminated and remains in results!
+    assert_eq!(
+        results_boosted.len(),
+        2,
+        "Non-community doc_b must not be filtered out"
+    );
+    let ids: Vec<&str> = results_boosted.iter().map(|r| r.id.as_str()).collect();
+    assert!(
+        ids.contains(&"doc_b"),
+        "doc_b must remain in search results"
+    );
+
+    // Verification 2: Community doc_a gets boosted post-RRF and ranks #1 ahead of doc_b
+    assert_eq!(
+        results_boosted[0].id, "doc_a",
+        "Community member doc_a must rank ahead after boost"
+    );
+    assert!(
+        results_boosted[0].score > results_boosted[1].score,
+        "Boosted community doc score ({}) must exceed non-community score ({})",
+        results_boosted[0].score,
+        results_boosted[1].score
+    );
+    Ok(())
+}
+
+#[cfg(feature = "graph-connectivity-health")]
+#[tokio::test]
+async fn test_run_percolation_check_rebonding() -> contextra_core::Result<()> {
+    use crate::{Contextra, ContextraConfig};
+    use contextra_core::EntityId;
+
+    let dir = tempfile::tempdir().unwrap();
+    let db = Contextra::open_with_config(
+        dir.path(),
+        ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        },
+    )
+    .await?;
+
+    let col = db.collection("percolation_test").await?;
+
+    // Insert documents with high similarity between doc_0 and doc_1 (at index > 10,000), but no edge
+    // To ensure doc_1 is beyond the DEFAULT_SCAN_LIMIT (10,000) boundary, insert filler items
+    for i in 0..10_010 {
+        let id = if i == 0 {
+            "doc_0".to_string()
+        } else if i == 10_005 {
+            "doc_1".to_string()
+        } else {
+            format!("doc_{i}")
+        };
+        let emb = if id == "doc_0" {
+            vec![1.0, 0.0, 0.0, 0.0]
+        } else if id == "doc_1" {
+            vec![0.98, 0.02, 0.0, 0.0]
+        } else {
+            let val = ((i % 100) as f32) / 100.0;
+            vec![0.0, 0.0, val, 1.0 - val]
+        };
+        col.insert(&id, &emb, None).await?;
+    }
+
+    let config = contextra_graph::percolation::PercolationConfig {
+        critical_threshold: 0.9,
+        rebonding_similarity: 0.85,
+        max_new_edges_per_pass: 10,
+    };
+
+    let result = col.run_percolation_check(&config).await?;
+    assert!(result.health.is_some());
+    assert!(result.rebonding_triggered);
+    assert!(result.new_edges_added > 0);
+
+    // Verify rebonded relationship now exists in graph
+    let neighbors = col
+        .graph_index
+        .neighbors(EntityId::from_key("doc_0")?)
+        .await?;
+    assert!(neighbors.contains(&EntityId::from_key("doc_1")?));
+
+    Ok(())
+}
+
+// ============================================================================
+// MANDATORY TEST MATRIX, APM EDGE CASES & PROPERTY TESTS
+// ============================================================================
+
+#[tokio::test]
+async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contextra_core::Result<()> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "matrix_happy".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let doc_id = "doc_matrix_1";
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+    let meta = serde_json::json!({ "title": "hand_calculated_constant", "value": 42 });
+
+    col.insert(doc_id, &vec, Some(meta.clone())).await?;
+
+    let retrieved = col.get(doc_id).await?;
+    assert!(retrieved.is_some());
+    let doc = retrieved.unwrap();
+    assert_eq!(doc.id, doc_id);
+    let meta_obj = doc.metadata.as_ref().unwrap().as_object().unwrap();
+    assert_eq!(meta_obj.get("title").unwrap(), "hand_calculated_constant");
+    assert_eq!(meta_obj.get("value").unwrap(), 42);
+
+    let search_res = col.search(&vec, 1).await?;
+    assert_eq!(search_res.len(), 1);
+    assert_eq!(search_res[0].id, doc_id);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_core::Result<()> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "matrix_empty".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    // Empty collection search must return Ok(Vec::new()) without error
+    let res = col.search(&[1.0, 0.0, 0.0, 0.0], 10).await?;
+    assert!(res.is_empty());
+
+    // Empty text query in builder must return Ok(Vec::new())
+    let builder_res = col.query().k(5).execute().await?;
+    assert!(builder_res.is_empty());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_collection_mandatory_matrix_error_paths() -> contextra_core::Result<()> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "matrix_errors".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    // Dimension mismatch
+    let err_dim = col.insert("d1", &[1.0, 0.0], None).await;
+    assert!(matches!(
+        err_dim,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    // Empty string ID
+    let err_id = col.insert("", &[1.0, 0.0, 0.0, 0.0], None).await;
+    assert!(matches!(
+        err_id,
+        Err(contextra_core::ContextraError::InvalidInput(_))
+    ));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_apm3_lock_contention_fallback() -> contextra_core::Result<()> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Arc::new(super::Collection::new(
+        "apm3_lock".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    ));
+
+    // Acquire key lock on "d_blocked"
+    let lock_guard = col.kv_locks.lock_for("d_blocked").await;
+
+    // Concurrent insert attempt while key lock is held
+    let col_clone = col.clone();
+    let handle = tokio::spawn(async move {
+        col_clone
+            .insert("d_blocked", &[1.0, 0.0, 0.0, 0.0], None)
+            .await
+    });
+
+    // Release key lock and verify task completes cleanly
+    drop(lock_guard);
+    let res = handle.await.unwrap();
+    assert!(
+        res.is_ok(),
+        "Insert task must complete cleanly after lock release"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_core::Result<()> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Arc::new(super::Collection::new(
+        "parallel_locks".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    ));
+
+    // Find two keys that map to different shards
+    let _locks = super::kv_lock::KvKeyLocks::new();
+    let key_a = "key_0".to_string();
+    let mut key_b = "key_1".to_string();
+    let mut i = 0;
+    while col.kv_locks.shard_idx(&key_a) == col.kv_locks.shard_idx(&key_b) {
+        i += 1;
+        key_b = format!("key_{i}");
+    }
+
+    // Acquire lock on key_a's shard
+    let guard_a = col.kv_locks.lock_for(&key_a).await;
+
+    // Concurrent insert for key_b (different shard) must NOT block
+    let col_clone = col.clone();
+    let key_b_clone = key_b.clone();
+    let handle = tokio::spawn(async move {
+        col_clone
+            .insert(&key_b_clone, &[1.0, 0.0, 0.0, 0.0], None)
+            .await
+    });
+
+    let res = tokio::time::timeout(std::time::Duration::from_millis(500), handle).await;
+    assert!(
+        res.is_ok(),
+        "Insert for key_b on different shard must not block when key_a is locked"
+    );
+    assert!(res.unwrap().unwrap().is_ok());
+
+    drop(guard_a);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> contextra_core::Result<()> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = Arc::new(super::Collection::new(
+        "batch_order_no_deadlock".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    ));
+
+    let k1 = "key_alpha".to_string();
+    let k2 = "key_beta".to_string();
+    let k3 = "key_gamma".to_string();
+
+    let batch_1 = vec![
+        (k3.clone(), vec![1.0, 0.0, 0.0, 0.0], None),
+        (k1.clone(), vec![0.0, 1.0, 0.0, 0.0], None),
+        (k2.clone(), vec![0.0, 0.0, 1.0, 0.0], None),
+    ];
+
+    let batch_2 = vec![
+        (k2.clone(), vec![0.5, 0.0, 0.0, 0.0], None),
+        (k3.clone(), vec![0.0, 0.5, 0.0, 0.0], None),
+        (k1.clone(), vec![0.0, 0.0, 0.5, 0.0], None),
+    ];
+
+    let col_1 = col.clone();
+    let h1 = tokio::spawn(async move { col_1.insert_many(&batch_1).await });
+
+    let col_2 = col.clone();
+    let h2 = tokio::spawn(async move { col_2.insert_many(&batch_2).await });
+
+    let (r1, r2) = tokio::join!(h1, h2);
+    assert!(r1.unwrap().is_ok());
+    assert!(r2.unwrap().is_ok());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_core::Result<()> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "apm7_utf8".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::German,
+    );
+
+    // Document keys and content containing German umlauts, CJK characters, and Emojis
+    let doc_id = "doc_üöä_🦀_中文";
+    let text_content = "Spezielle Retrieval-Engine mit Übereinstimmung & Emojis 🚀";
+    let vec = vec![0.5, 0.5, 0.0, 0.0];
+
+    col.insert(
+        doc_id,
+        &vec,
+        Some(serde_json::json!({ "text": text_content })),
+    )
+    .await?;
+
+    let retrieved = col.get(doc_id).await?;
+    assert!(retrieved.is_some());
+    assert_eq!(retrieved.unwrap().id, doc_id);
+
+    let search_res = col.query().text("Übereinstimmung").k(5).execute().await?;
+    assert!(!search_res.is_empty());
+    assert_eq!(search_res[0].id, doc_id);
+
+    Ok(())
+}
+
+proptest::proptest! {
+    #[test]
+    fn prop_markdown_chunker_never_panics_on_arbitrary_utf8(
+        input in proptest::prelude::any::<String>()
+    ) {
+        let chunker = crate::chunker::MarkdownChunker::with_defaults();
+        let doc_id = contextra_core::DocId::new(1);
+        let _ = chunker.chunk(doc_id, &input);
+    }
+}
+
+#[tokio::test]
+async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_core::Result<()> {
+    use contextra_graph::csr::CsrGraph;
+    use contextra_store::lsm::{LsmConfig, LsmStorage};
+    use contextra_vector::{HnswConfig, HnswIndex};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::TempDir::new().map_err(contextra_core::ContextraError::from)?;
+    let lsm_config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await?);
+    let hnsw_config = HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let index = Arc::new(HnswIndex::try_new(hnsw_config)?);
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "test_fusion_capping".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    // Insert documents
+    col.insert(
+        "doc_valid_1",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "rust vector search", "type": "semantic"})),
+    )
+    .await?;
+    col.insert(
+        "doc_valid_2",
+        &[0.9, 0.1, 0.0, 0.0],
+        Some(serde_json::json!({"text": "rust text search", "type": "semantic"})),
+    )
+    .await?;
+
+    // Call hybrid_search with k=1
+    let results = col
+        .hybrid_search("rust", &[1.0, 0.0, 0.0, 0.0], 1, None)
+        .await?;
+
+    assert_eq!(results.len(), 1, "Fusion result must be capped to k=1");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_core::Result<()> {
+    use contextra_graph::csr::CsrGraph;
+    use contextra_store::lsm::{LsmConfig, LsmStorage};
+    use contextra_vector::{HnswConfig, HnswIndex};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    let dir = tempfile::TempDir::new().map_err(contextra_core::ContextraError::from)?;
+    let lsm_config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(lsm_config).await?);
+    let hnsw_config = HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let index = Arc::new(HnswIndex::try_new(hnsw_config)?);
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+    let col = super::Collection::new(
+        "test_snapshot_unsupported".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "doc_1",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "graph node 1"})),
+    )
+    .await?;
+
+    let ppr_strat = contextra_core::GraphTraversalStrategy::PersonalizedPageRank(
+        contextra_core::PprConfig::default(),
+    );
+    let ppr_res = col
+        .hybrid_search_with_strategy(
+            "graph",
+            &[1.0, 0.0, 0.0, 0.0],
+            5,
+            None,
+            None,
+            Some(&ppr_strat),
+            None,
+        )
+        .await;
+
+    assert!(ppr_res.is_err(), "PPR under snapshot isolation must fail");
+    match ppr_res.unwrap_err() {
+        contextra_core::ContextraError::SnapshotUnsupportedForSignal(msg) => {
+            assert!(msg.contains("PersonalizedPageRank"));
+        }
+        other => panic!("Expected SnapshotUnsupportedForSignal, got: {:?}", other),
+    }
+
+    let eid_1 = contextra_core::EntityId::from_key("doc_1")?;
+    let anchors = vec![eid_1];
+    let path_rag_strat = contextra_core::GraphTraversalStrategy::PathRag {
+        max_hops: 2,
+        sufficiency_threshold: 0.5,
+    };
+    let path_res = col
+        .hybrid_search_with_strategy(
+            "graph",
+            &[1.0, 0.0, 0.0, 0.0],
+            5,
+            Some(&anchors),
+            None,
+            Some(&path_rag_strat),
+            None,
+        )
+        .await;
+
+    assert!(
+        path_res.is_err(),
+        "PathRag under snapshot isolation must fail"
+    );
+    match path_res.unwrap_err() {
+        contextra_core::ContextraError::SnapshotUnsupportedForSignal(msg) => {
+            assert!(msg.contains("PathRag"));
+        }
+        other => panic!("Expected SnapshotUnsupportedForSignal, got: {:?}", other),
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_single_pid_controller_instantiation_in_query_builder() {
+    // Regression test: verify that exactly one PID controller type (contextra_adapt::PidController)
+    // is instantiated across production collection search and query_builder modules.
+    let mut pid = contextra_adapt::PidController::default();
+    assert_eq!(pid.kp, 0.5);
+    assert_eq!(pid.ki, 0.05);
+    assert_eq!(pid.kd, 0.1);
+    assert_eq!(pid.target_latency_ms, 150.0);
+    assert_eq!(pid.min_pool_size, 50);
+    assert_eq!(pid.max_pool_size, 200);
+
+    let updated = pid.update(std::time::Duration::from_millis(100), 300.0);
+    assert!(updated < 100);
+    assert!(updated >= 50);
+}
+
+#[tokio::test]
+async fn test_checkpoint_unpin_on_search_error_path() {
+    use contextra_core::{BoxFuture, FilterExpr, Result, StorageEngine, StorageStats, TxId};
+    use contextra_graph::csr::CsrGraph;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+    use std::sync::Arc;
+
+    struct PinTrackingFailingStorage {
+        active_pins: AtomicI64,
+        total_pins: AtomicU64,
+        total_unpins: AtomicU64,
+    }
+
+    impl StorageEngine for PinTrackingFailingStorage {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+            Box::pin(async move {
+                Ok(StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+            Box::pin(async move { Ok(10) })
+        }
+        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+            Box::pin(async move { Ok(TxId::new(1)) })
+        }
+        fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move {
+                self.active_pins.fetch_add(1, Ordering::SeqCst);
+                self.total_pins.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            })
+        }
+        fn unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move {
+                self.active_pins.fetch_sub(1, Ordering::SeqCst);
+                self.total_unpins.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            })
+        }
+        fn scan_prefix<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+        fn scan_prefix_at<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move {
+                Err(contextra_core::ContextraError::Storage(
+                    "Simulated storage failure during scan_prefix_at".into(),
+                ))
+            })
+        }
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+    }
+
+    let storage = Arc::new(PinTrackingFailingStorage {
+        active_pins: AtomicI64::new(0),
+        total_pins: AtomicU64::new(0),
+        total_unpins: AtomicU64::new(0),
+    });
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage.clone(),
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let filter_expr = FilterExpr::Eq {
+        field: "category".to_string(),
+        value: serde_json::json!("books"),
+    };
+    let res = col
+        .search_with_filter_expr(&[1.0, 0.0, 0.0, 0.0], 5, Some(filter_expr))
+        .await;
+
+    assert!(res.is_err(), "Search must return error when scan fails");
+    assert_eq!(
+        storage.total_pins.load(Ordering::SeqCst),
+        1,
+        "pin_checkpoint should have been called once"
+    );
+    assert_eq!(
+        storage.total_unpins.load(Ordering::SeqCst),
+        1,
+        "unpin_checkpoint must be called despite inner search error"
+    );
+    assert_eq!(
+        storage.active_pins.load(Ordering::SeqCst),
+        0,
+        "Active pins must return to 0 after search error"
+    );
+}
+
+#[tokio::test]
+async fn test_search_k_zero_returns_canonical_error_message(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir()?;
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    let query_vec = vec![1.0, 0.0, 0.0, 0.0];
+
+    let err_search = col.search(&query_vec, 0).await;
+    assert!(err_search.is_err());
+    let err_msg_1 = match err_search {
+        Err(e) => e.to_string(),
+        Ok(_) => unreachable!(),
+    };
+    assert!(
+        err_msg_1.contains("Search k must be greater than 0"),
+        "Expected 'Search k must be greater than 0', got: {err_msg_1}"
+    );
+
+    let err_expr = col.search_with_filter_expr(&query_vec, 0, None).await;
+    assert!(err_expr.is_err());
+    let err_msg_2 = match err_expr {
+        Err(e) => e.to_string(),
+        Ok(_) => unreachable!(),
+    };
+    assert!(
+        err_msg_2.contains("Search k must be greater than 0"),
+        "Expected 'Search k must be greater than 0', got: {err_msg_2}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir()?;
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await?,
+    );
+    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
+        dimension: 4,
+        ..Default::default()
+    })?);
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    // Insert text document "doc_text_only" without creating any graph entities
+    col.insert(
+        "doc_text_only",
+        &[0.5, 0.5, 0.0, 0.0],
+        Some(serde_json::json!({"text": "specialized retrieval architecture"})),
+    )
+    .await?;
+
+    // Perform hybrid search where text signal finds "doc_text_only", but graph index has no node for it.
+    // The graph signal will become empty, but the overall search must succeed using vector and text signals.
+    let results = col
+        .hybrid_search_with_strategy(
+            "retrieval",
+            &[0.5, 0.5, 0.0, 0.0],
+            10,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await?;
+
+    assert!(
+        !results.is_empty(),
+        "Hybrid search must return results from remaining signals"
+    );
+    assert_eq!(results[0].id, "doc_text_only");
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_post_rrf_supersedes_displacement_truncation_preserves_k() -> contextra_core::Result<()>
+{
+    use contextra_core::DocId;
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    // Insert 4 docs: doc1, doc2, doc3, doc4
+    col.insert(
+        "doc1",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "alpha"})),
+    )
+    .await?;
+    col.insert(
+        "doc2",
+        &[0.9, 0.1, 0.0, 0.0],
+        Some(serde_json::json!({"text": "beta"})),
+    )
+    .await?;
+    col.insert(
+        "doc3",
+        &[0.8, 0.2, 0.0, 0.0],
+        Some(serde_json::json!({"text": "gamma"})),
+    )
+    .await?;
+    col.insert(
+        "doc4",
+        &[0.7, 0.3, 0.0, 0.0],
+        Some(serde_json::json!({"text": "delta"})),
+    )
+    .await?;
+
+    // doc2 supersedes doc1
+    col.link_memories(
+        DocId::from_key("doc2")?,
+        DocId::from_key("doc1")?,
+        contextra_core::types::domain::LinkRelation::Supersedes,
+    )
+    .await?;
+
+    // When searching with k = 2 and include_superseded = false,
+    // doc1 is displaced by doc2.
+    // With 3*k candidate pool, doc3 advances into top-2 so we still get 2 results!
+    let query = contextra_core::HybridQuery::builder()
+        .with_vector_query(vec![1.0, 0.0, 0.0, 0.0])
+        .with_k(2)
+        .with_include_superseded(false)
+        .build()
+        .unwrap();
+    let results = col.hybrid_search_with_query(&query).await?;
+
+    assert_eq!(
+        results.len(),
+        2,
+        "Must return full requested k=2 even after supersedes displacement"
+    );
+    assert!(
+        !results.iter().any(|r| r.id == "doc1"),
+        "doc1 must be displaced"
+    );
+    assert!(
+        results.iter().any(|r| r.id == "doc2"),
+        "doc2 must be retained"
+    );
+    assert!(
+        results.iter().any(|r| r.id == "doc3"),
+        "doc3 must move up into top-2"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
+    use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+    use contextra_graph::csr::CsrGraph;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+
+    struct FailingRollbackMockStorage;
+
+    impl StorageEngine for FailingRollbackMockStorage {
+        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: u64,
+        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+            Box::pin(async move { Ok(None) })
+        }
+        fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn put_if_absent<'a>(
+            &'a self,
+            _: TxId,
+            _: &'a [u8],
+            _: &'a [u8],
+        ) -> BoxFuture<'a, Result<bool>> {
+            Box::pin(async move { Ok(false) })
+        }
+        fn delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move {
+                Err(contextra_core::ContextraError::Internal(
+                    "Simulated rollback failure".into(),
+                ))
+            })
+        }
+        fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
+            Box::pin(async move {
+                Ok(StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+            Box::pin(async move { Ok(0) })
+        }
+        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+            Box::pin(async move { Ok(TxId::new(0)) })
+        }
+        fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+        fn scan_prefix<'a>(
+            &'a self,
+            _: &'a [u8],
+        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+            Box::pin(async move { Ok(vec![]) })
+        }
+        fn scan_prefix_bounded<'a>(
+            &'a self,
+            _: &'a [u8],
+            _: usize,
+            _: Option<&'a [u8]>,
+        ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
+            Box::pin(async move { Ok((vec![], None)) })
+        }
+    }
+
+    let storage = Arc::new(FailingRollbackMockStorage);
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let graph = Arc::new(CsrGraph::new());
+    let next_tx = Arc::new(AtomicU64::new(1));
+
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        graph,
+        next_tx,
+        4,
+        contextra_text::Language::English,
+    );
+
+    let res = col
+        .put_kv_if_absent("existing_key", &serde_json::json!({"test": "data"}))
+        .await;
+
+    assert!(res.is_err(), "put_kv_if_absent must fail");
+    match res.unwrap_err() {
+        contextra_core::ContextraError::Conflict(msg) => {
+            assert!(
+                msg.contains("existing_key"),
+                "Conflict message must reference key, got: {}",
+                msg
+            );
+        }
+        other => panic!("Expected ContextraError::Conflict, got: {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_query_builder_query_config_include_superseded_displacement(
+) -> contextra_core::Result<()> {
+    use contextra_core::{DocId, HybridQuery};
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert(
+        "old_doc",
+        &[1.0, 0.0, 0.0, 0.0],
+        Some(serde_json::json!({"text": "outdated information"})),
+    )
+    .await?;
+
+    col.insert(
+        "new_doc",
+        &[0.95, 0.05, 0.0, 0.0],
+        Some(serde_json::json!({"text": "updated information"})),
+    )
+    .await?;
+
+    col.link_memories(
+        DocId::from_key("new_doc")?,
+        DocId::from_key("old_doc")?,
+        contextra_core::types::domain::LinkRelation::Supersedes,
+    )
+    .await?;
+
+    let hybrid_query = HybridQuery::builder()
+        .with_vector_query(vec![1.0, 0.0, 0.0, 0.0])
+        .with_include_superseded(false)
+        .with_k(10)
+        .build()
+        .unwrap(); // unwrap
+
+    let results = col.query().query_config(&hybrid_query).execute().await?;
+
+    assert!(
+        !results.iter().any(|r| r.id == "old_doc"),
+        "old_doc must be displaced when executed via QueryBuilder with include_superseded=false"
+    );
+    assert!(
+        results.iter().any(|r| r.id == "new_doc"),
+        "new_doc must be included in results"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_core::Result<()> {
+    use contextra_core::DocId;
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let col = super::Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    );
+
+    col.insert("node_a", &[1.0, 0.0, 0.0, 0.0], None).await?;
+    col.insert("node_b", &[0.0, 1.0, 0.0, 0.0], None).await?;
+    col.insert("node_c", &[0.0, 0.0, 1.0, 0.0], None).await?;
+
+    let a = DocId::from_key("node_a")?;
+    let b = DocId::from_key("node_b")?;
+    let c = DocId::from_key("node_c")?;
+
+    let rel = contextra_core::types::domain::LinkRelation::Elaborates;
+
+    // A -> B
+    col.link_memories(a, b, rel).await?;
+    // B -> C
+    col.link_memories(b, c, rel).await?;
+
+    // C -> A should fail with cycle detection error!
+    let cycle_res = col.link_memories(c, a, rel).await;
+    assert!(cycle_res.is_err(), "Cyclic link must be rejected");
+    let err_str = cycle_res.unwrap_err().to_string();
+    assert!(err_str.contains("Cyclic Elaborates relation detected"));
+
+    Ok(())
+}

@@ -1,5 +1,5 @@
 //! CI Gate: FlatBuffers Schema Drift Checker & Code Regenerator.
-//! Validates whether `schemas/memfuse.fbs` matches `crates/memfuse-wire/src/memfuse_generated.rs`.
+//! Validates whether `schemas/contextra.fbs` matches `crates/contextra-wire/src/contextra_generated.rs`.
 
 use std::fs;
 use std::path::PathBuf;
@@ -74,13 +74,13 @@ fn find_or_fetch_flatc() -> Result<PathBuf, String> {
     Err("❌ Gate failed: 'flatc' binary not found in PATH and auto-download failed. Please install FlatBuffers compiler (flatc) to run the flatbuffers drift gate.".to_string())
 }
 
-/// Checks if the generated FlatBuffers code matches the schema in `schemas/memfuse.fbs`.
+/// Checks if the generated FlatBuffers code matches the schema in `schemas/contextra.fbs`.
 pub fn check_flatbuffers_drift() -> Result<(), String> {
     println!("=== Gate: Check FlatBuffers Schema Drift ===");
 
     let root = find_root_dir();
-    let schema_path = root.join("schemas/memfuse.fbs");
-    let existing_generated_path = root.join("crates/memfuse-wire/src/memfuse_generated.rs");
+    let schema_path = root.join("schemas/contextra.fbs");
+    let existing_generated_path = root.join("crates/contextra-wire/src/contextra_generated.rs");
 
     if !schema_path.exists() {
         return Err(format!(
@@ -119,10 +119,10 @@ pub fn check_flatbuffers_drift() -> Result<(), String> {
         ));
     }
 
-    let newly_generated_path = temp_out_dir.join("memfuse_generated.rs");
+    let newly_generated_path = temp_out_dir.join("contextra_generated.rs");
     if !newly_generated_path.exists() {
         return Err(
-            "❌ Gate failed: 'flatc' completed successfully but output 'memfuse_generated.rs' was not found.".to_string(),
+            "❌ Gate failed: 'flatc' completed successfully but output 'contextra_generated.rs' was not found.".to_string(),
         );
     }
 
@@ -140,24 +140,24 @@ pub fn check_flatbuffers_drift() -> Result<(), String> {
     let norm_existing = normalize_code(&existing_content);
 
     if norm_new == norm_existing {
-        println!("✅ Gate passed: FlatBuffers generated Rust code is in sync with 'schemas/memfuse.fbs'.");
+        println!("✅ Gate passed: FlatBuffers generated Rust code is in sync with 'schemas/contextra.fbs'.");
         Ok(())
     } else {
-        let err_msg = "❌ Gate failed: FlatBuffers schema drift detected! 'schemas/memfuse.fbs' does not match 'crates/memfuse-wire/src/memfuse_generated.rs'.\n💡 Run 'cargo xtask regenerate-flatbuffers' to update the generated Rust code.".to_string();
+        let err_msg = "❌ Gate failed: FlatBuffers schema drift detected! 'schemas/contextra.fbs' does not match 'crates/contextra-wire/src/contextra_generated.rs'.\n💡 Run 'cargo xtask regenerate-flatbuffers' to update the generated Rust code.".to_string();
         eprintln!("{}", err_msg);
         Err(err_msg)
     }
 }
 
-/// Regenerates `crates/memfuse-wire/src/memfuse_generated.rs` directly from `schemas/memfuse.fbs`.
+/// Regenerates `crates/contextra-wire/src/contextra_generated.rs` directly from `schemas/contextra.fbs`.
 pub fn regenerate_flatbuffers() -> Result<(), String> {
     println!("=== XTask: Regenerate FlatBuffers Rust Code ===");
 
     let flatc_bin = find_or_fetch_flatc()?;
 
     let root = find_root_dir();
-    let schema_path = root.join("schemas/memfuse.fbs");
-    let out_dir = root.join("crates/memfuse-wire/src");
+    let schema_path = root.join("schemas/contextra.fbs");
+    let out_dir = root.join("crates/contextra-wire/src");
 
     if !schema_path.exists() {
         return Err(format!(
@@ -186,7 +186,7 @@ pub fn regenerate_flatbuffers() -> Result<(), String> {
 
     println!(
         "✅ FlatBuffers Rust code successfully regenerated at '{}'.",
-        out_dir.join("memfuse_generated.rs").display()
+        out_dir.join("contextra_generated.rs").display()
     );
     Ok(())
 }

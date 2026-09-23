@@ -10,7 +10,7 @@ use std::path::Path;
 
 /// Dateien, die FFI-Boundaries implementieren und auf catch_unwind geprüft werden.
 /// ERWEITERBAR: Füge hier neue FFI-Crates hinzu, wenn sie py.allow_threads verwenden.
-const FFI_BOUNDARY_FILES: &[&str] = &["crates/memfuse-py/src/lib.rs"];
+const FFI_BOUNDARY_FILES: &[&str] = &["crates/contextra-py/src/lib.rs"];
 
 /// Gibt `true` zurück, wenn das Root-Cargo.toml im `[profile.release]`-Block `panic = "abort"` enthält.
 pub fn panic_abort_active(workspace_root: &Path) -> bool {

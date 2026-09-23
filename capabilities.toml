@@ -1,191 +1,191 @@
-# capabilities.toml — MemFuse Capabilities & Feature Maturity Manifest (ADR-N08 / P12)
+# capabilities.toml — Contextra Capabilities & Feature Maturity Manifest (ADR-N08 / P12)
 # Single Source of Truth for Crate Maturity Levels, Architecture Rings, and Capability Guarantees.
 
 [version]
 schema = "1.0"
 spec = "v6"
 
-[crates.memfuse-types]
+[crates.contextra-types]
 ring = "Ring 0"
 maturity = "stable"
 description = "Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)"
 capabilities = ["zero-copy-types", "type-safety"]
 
-[crates.memfuse-ports]
+[crates.contextra-ports]
 ring = "Ring 0"
 maturity = "stable"
 description = "Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung"
 capabilities = ["trait-interfaces", "ring0-decoupling"]
 
-[crates.memfuse-mvcc]
+[crates.contextra-mvcc]
 ring = "Ring 0"
 maturity = "stable"
 description = "Multi-Version Concurrency Control und Isolation-Mechanismen"
 capabilities = ["snapshot-isolation", "lockless-read"]
 
-[crates.memfuse-vector]
+[crates.contextra-vector]
 ring = "Ring 0"
 maturity = "stable"
 description = "Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung)"
 capabilities = ["hnsw-index", "diskann-index", "scalar-quantization"]
 
-[crates.memfuse-rank]
+[crates.contextra-rank]
 ring = "Ring 0"
 maturity = "stable"
 description = "Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers)"
 capabilities = ["rrf-fusion", "coherence-bonus", "platt-scaler", "isotonic-calibrator"]
 
-[crates.memfuse-adapt]
+[crates.contextra-adapt]
 ring = "Ring 0"
 maturity = "experimental"
 description = "Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller)"
 capabilities = ["model-adaption", "pid-latency-controller"]
 
-[crates.memfuse-text]
+[crates.contextra-text]
 ring = "Ring 0"
 maturity = "stable"
 description = "Volltextsuche und Inverted-Index (BM25 Engine)"
 capabilities = ["bm25-search", "inverted-index"]
 
-[crates.memfuse-graph]
+[crates.contextra-graph]
 ring = "Ring 0"
 maturity = "stable"
 description = "CSR Graph-Engine, Path Graphing und GraphRAG Community Detection"
 capabilities = ["csr-traversal", "label-propagation", "deadlock-free-dag"]
 
-[crates.memfuse-crypto]
+[crates.contextra-crypto]
 ring = "Ring 0"
 maturity = "stable"
 description = "Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC"
 capabilities = ["aes-256-gcm", "hmac-sha256", "zeroize-on-drop"]
 
-[crates.memfuse-simd]
+[crates.contextra-simd]
 ring = "Ring 0"
 maturity = "stable"
 description = "SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen"
 capabilities = ["simd-distance", "zero-panic-simd"]
 
-[crates.memfuse-sys]
+[crates.contextra-sys]
 ring = "Ring 0"
 maturity = "stable"
 description = "Systemnahe Bindings, Low-Level I/O und Memory-Mapping"
 capabilities = ["mmap-io", "direct-file-access"]
 
-[crates.memfuse-wire]
+[crates.contextra-wire]
 ring = "Ring 0"
 maturity = "stable"
 description = "FlatBuffers Wire-Protokolle und Serialisierungs-Formate"
 capabilities = ["flatbuffers-wire", "zero-copy-deserialization"]
 
-[crates.memfuse-core]
+[crates.contextra-core]
 ring = "Ring 0"
 maturity = "stable"
 description = "Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer"
 capabilities = ["tombstone-semantics", "tx-buffer"]
 
-[crates.memfuse-store]
+[crates.contextra-store]
 ring = "Ring 1"
 maturity = "stable"
 description = "LSM-Tree Storage Engine, WAL Durability und Compaction Engine"
 capabilities = ["wal-v3-hmac", "lsm-compaction", "crash-consistency"]
 
-[crates.memfuse-checkpoint]
+[crates.contextra-checkpoint]
 ring = "Ring 1"
 maturity = "stable"
 description = "Persistent Checkpoint Engine und Blake3 Manifest-Verifikation"
 capabilities = ["blake3-checkpoints", "orphan-recovery"]
 
-[crates.memfuse-kvcache]
+[crates.contextra-kvcache]
 ring = "Ring 1"
 maturity = "stable"
 description = "Stufenmodell KV-Cache Storage & Offloading"
 capabilities = ["kv-tiered-cache", "kv-bridge-storage"]
 
-[crates.memfuse-sandbox]
+[crates.contextra-sandbox]
 ring = "Ring 2"
 maturity = "stable"
 description = "WASM Execution Boundary und Isolations-Sandbox"
 capabilities = ["wasmtime-isolation", "cpu-fuel-budget", "wall-clock-timeout"]
 
-[crates.memfuse-infer-onnx]
+[crates.contextra-infer-onnx]
 ring = "Ring 2"
 maturity = "experimental"
 description = "ONNX Embeddings und Cross-Encoder Reranking Execution Provider"
 capabilities = ["onnx-embeddings", "cross-encoder-reranking"]
 
-[crates.memfuse-infer-candle]
+[crates.contextra-infer-candle]
 ring = "Ring 2"
 maturity = "stable"
 description = "Candle LLM Inference Client und KV-Bridge Adapter"
 capabilities = ["candle-llm", "kv-cache-bridge"]
 
-[crates.memfuse-infer-ollama]
+[crates.contextra-infer-ollama]
 ring = "Ring 2"
 maturity = "stable"
 description = "Ollama External Provider Client und Embeddings Integration"
 capabilities = ["ollama-client", "remote-embeddings"]
 
-[crates.memfuse-engine]
+[crates.contextra-engine]
 ring = "Ring 3"
 maturity = "stable"
 description = "Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02)"
 capabilities = ["bounded-compute-pool", "ring0-async-wrapper"]
 
-[crates.memfuse-cognition]
+[crates.contextra-cognition]
 ring = "Ring 3"
 maturity = "stable"
 description = "Konsolidierungs- und Background Sleep Passes"
 capabilities = ["sleep-cycle-consolidation", "session-grouping"]
 
-[crates.memfuse-privacy]
+[crates.contextra-privacy]
 ring = "Ring 3"
 maturity = "stable"
 description = "Egress Filtering, Anonymisierung und Privacy Compliance Rules"
 capabilities = ["egress-vault", "regex-classification"]
 
-[crates.memfuse-router]
+[crates.contextra-router]
 ring = "Ring 3"
 maturity = "stable"
 description = "Lyapunov Drift Control und Multi-Candidate Search Routing Engine"
 capabilities = ["lyapunov-drift-watcher", "cascade-routing"]
 
-[crates.memfuse-agent]
+[crates.contextra-agent]
 ring = "Ring 3"
 maturity = "stable"
 description = "Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline"
 capabilities = ["in-memory-audit", "agent-pipeline"]
 
-[crates.memfuse-db]
+[crates.contextra-db]
 ring = "Ring 3"
 maturity = "stable"
-description = "MemFuse Main Database Abstraction, Hybrid Search & Collections"
+description = "Contextra Main Database Abstraction, Hybrid Search & Collections"
 capabilities = ["hybrid-search", "collection-manager", "volatile-vault"]
 
-[crates.memfuse]
+[crates.contextra]
 ring = "Ring 4"
 maturity = "stable"
 description = "Haupt-Library Facade für Endanwender"
 capabilities = ["public-api", "facade"]
 
-[crates.memfuse-mcp]
+[crates.contextra-mcp]
 ring = "Ring 4"
 maturity = "stable"
 description = "Model Context Protocol Server & Cloud Egress Gateway"
 capabilities = ["mcp-protocol", "cloud-egress-gateway"]
 
-[crates.memfuse-py]
+[crates.contextra-py]
 ring = "Ring 4"
 maturity = "stable"
 description = "PyO3 Python Bindings"
 capabilities = ["python-bindings", "ffi-safe"]
 
-[crates.memfuse-testkit]
+[crates.contextra-testkit]
 ring = "Tooling"
 maturity = "stable"
 description = "Test Fixtures, Mock Engines und Chaos Matrix Harness"
 capabilities = ["chaos-testing", "mock-storage"]
 
-[crates.memfuse-bench]
+[crates.contextra-bench]
 ring = "Tooling"
 maturity = "stable"
 description = "Benchmark Runner & Latency Criterion Test Suites"

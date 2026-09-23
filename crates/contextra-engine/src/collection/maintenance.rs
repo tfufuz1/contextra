@@ -1,0 +1,872 @@
+// FILE-CONTEXT
+// ZWECK: Wartungs-, Reparatur- und Bereinigungsoperationen (Index repair, Expiry cleanup, Community detection).
+// INVARIANTEN: repair() stellt LSM<->Index Synchronität nach Crash sicher; Reaping stützt sich auf Snapshot-Sequenzen.
+// NICHT-OFFENSICHTLICH: Pending TxIntents werden beim Start via Forward-Commit repariert und markiert.
+// STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
+
+use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
+use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
+use contextra_core::{
+    DocId, EntityId, GraphIndex, ContextraError, Result, StorageEngine, TextIndex, TxId, VectorIndex,
+    EXPIRY_METADATA_KEY,
+};
+use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
+impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
+    /// Führt einen Importance-Score-Sweep via Adaptive Decay Controller durch.
+    /// Evictet Chunks deren effective_score unter eviction_threshold liegt.
+    /// Gibt Anzahl der evictierten Dokumente zurück.
+    #[tracing::instrument(level = "trace", skip(self, decay_controller))]
+    pub async fn evict_decayed_chunks(
+        &self,
+        decay_controller: &AdaptiveDecayController,
+        max_per_tick: usize,
+    ) -> Result<usize> {
+        let tombstone_ratio = self
+            .index
+            .stats()
+            .await
+            .map(|s| s.deleted_ratio as f32)
+            .unwrap_or(0.0);
+
+        let inputs = DecaySignalInputs {
+            tombstone_ratio,
+            ..DecaySignalInputs::default()
+        };
+
+        let current_tx = self.next_tx.load(Ordering::SeqCst);
+        let user_prefix = self.namespaced_key(b"", 0);
+        let mut evicted_ids = Vec::new();
+        let mut cursor: Option<Vec<u8>> = None;
+        const BATCH_SIZE: usize = 1000;
+
+        'outer: loop {
+            let (batch, next_cursor) = self
+                .storage
+                .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
+                .await?;
+
+            if batch.is_empty() {
+                break;
+            }
+
+            for (k, v) in batch {
+                let key_str = String::from_utf8_lossy(&k).to_string();
+                let user_key = if self.name == "default" {
+                    key_str
+                } else {
+                    let prefix_len = self.prefix.len() + 1;
+                    if key_str.len() >= prefix_len {
+                        key_str[prefix_len..].to_string()
+                    } else {
+                        key_str
+                    }
+                };
+
+                if self.name == "default" && user_key.starts_with("__") {
+                    continue;
+                }
+
+                let Ok(val) = serde_json::from_slice::<serde_json::Value>(&v) else {
+                    continue;
+                };
+
+                let meta_obj = val
+                    .get("metadata")
+                    .and_then(|m| m.as_object())
+                    .or_else(|| val.as_object());
+
+                if let Some(obj) = meta_obj {
+                    if let Some(imp_val) = obj.get("importance") {
+                        let (base_score, created_tx) = if let Ok(imp) =
+                            serde_json::from_value::<contextra_core::MemoryImportance>(
+                                imp_val.clone(),
+                            ) {
+                            (imp.base_score.value(), imp.created_at_tx.inner())
+                        } else if let Some(raw_f64) = imp_val.as_f64() {
+                            let created = obj
+                                .get("created_at_tx")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            (raw_f64 as f32, created)
+                        } else {
+                            continue;
+                        };
+
+                        let elapsed_tx = current_tx.saturating_sub(created_tx);
+
+                        if decay_controller.should_evict(base_score, elapsed_tx, &inputs) {
+                            evicted_ids.push(user_key);
+                            if evicted_ids.len() >= max_per_tick {
+                                break 'outer;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Some(next) = next_cursor {
+                cursor = Some(next);
+                tokio::task::yield_now().await;
+            } else {
+                break;
+            }
+        }
+
+        let count = evicted_ids.len();
+        for id in &evicted_ids {
+            tracing::info!(
+                collection = %self.name,
+                id = %id,
+                "Decay controller evicting document"
+            );
+            if let Err(e) = self.delete(id).await {
+                tracing::error!(
+                    collection = %self.name,
+                    id = %id,
+                    error = %e,
+                    "Decay controller failed to delete document"
+                );
+            }
+        }
+
+        Ok(count)
+    }
+
+    /// Veraltete Alias-Methode für `evict_decayed_chunks`.
+    #[deprecated(note = "use evict_decayed_chunks instead")]
+    pub async fn reap_by_thermostat(
+        &self,
+        decay_controller: &AdaptiveDecayController,
+        max_per_tick: usize,
+    ) -> Result<usize> {
+        self.evict_decayed_chunks(decay_controller, max_per_tick)
+            .await
+    }
+
+    /// Repairs the index by re-syncing with the storage.
+    ///
+    /// Scans the storage for any documents that are missing from the index
+    /// and reconciles them. This is critical for crash recovery.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn repair(&self) -> Result<()> {
+        let _guard = self.consolidation_guard.lock().await;
+        let mut repair_count = 0;
+        let docs = self.storage.scan_prefix(&self.prefix).await?;
+        // FIND-DB-004: Use doc_to_node map directly for O(1) lookup per DocId,
+        // instead of iterating all nodes via all_doc_ids() which is O(N).
+        let indexed_ids: std::collections::HashSet<DocId> =
+            self.index.all_doc_ids().await?.into_iter().collect();
+
+        tracing::info!("Starting integrity repair for collection '{}'", self.name);
+        let start_time = std::time::Instant::now();
+
+        // 1. Scan for pending transaction intents (2-Phase Commit Recovery — FIND-DB-005)
+        let intent_prefix = self.namespaced_key(&[], 3);
+        let intents = self.storage.scan_prefix(&intent_prefix).await?;
+        let recovery_tx = self.allocate_tx()?;
+        let mut recovered_any = false;
+        let mut recovered_text = false;
+        let mut recovered_graph = false;
+
+        for (intent_key, intent_val) in intents {
+            use crate::transaction::CommitIntent;
+            if let Ok(intent_variant) = serde_json::from_slice::<CommitIntent>(&intent_val) {
+                let (doc_ids, has_text, has_graph) = match intent_variant {
+                    CommitIntent::Pending {
+                        doc_ids,
+                        has_text,
+                        has_graph,
+                        ..
+                    } => (doc_ids, has_text, has_graph),
+                    CommitIntent::Consolidation {
+                        source_docs: _,
+                        target_id,
+                        base_tx: _,
+                    } => {
+                        // Crash Recovery during Consolidation Pass (INV-CONSOLIDATE-2)
+                        // If target_id was committed to storage, ensure it is re-synced to index.
+                        // If target_id was not yet committed, consolidation aborted; delete the intent.
+                        let target_doc_key =
+                            self.namespaced_key(&target_id.inner().to_le_bytes(), 1);
+                        if self.storage.get(&target_doc_key).await?.is_some() {
+                            (Arc::new(vec![target_id]), true, false)
+                        } else {
+                            if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
+                                tracing::warn!(key = ?intent_key, "Failed to delete interrupted consolidation intent: {e}");
+                            }
+                            continue;
+                        }
+                    }
+                    _ => continue,
+                };
+
+                tracing::info!(
+                    "Found pending transaction intent, recovering {} documents (has_text={}, has_graph={})",
+                    doc_ids.len(),
+                    has_text,
+                    has_graph
+                );
+
+                for &doc_id in doc_ids.iter() {
+                    let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+                    if let Some(val) = self.storage.get(&doc_key).await? {
+                        let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
+                            .map(|m| m.id)
+                            .ok();
+
+                        let mut stored_doc = None;
+                        if let Some(ref id_str) = meta_id {
+                            let user_key = self.namespaced_key(id_str.as_bytes(), 0);
+                            if let Some(user_val) = self.storage.get(&user_key).await? {
+                                if let Ok(stored) =
+                                    serde_json::from_slice::<StoredDocument>(&user_val)
+                                {
+                                    stored_doc = Some(stored);
+                                }
+                            }
+                        }
+
+                        if stored_doc.is_none() {
+                            if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
+                                stored_doc = Some(full);
+                            }
+                        }
+
+                        if let Some(stored) = stored_doc {
+                            if !indexed_ids.contains(&doc_id) {
+                                self.index
+                                    .insert(recovery_tx, doc_id, &stored.embedding)
+                                    .await?;
+                                repair_count += 1;
+                                recovered_any = true;
+                            }
+
+                            if has_text {
+                                if let Some(text) = extract_text(&stored.metadata) {
+                                    self.text_index
+                                        .upsert_document(recovery_tx, doc_id, &text)
+                                        .await?;
+                                    recovered_text = true;
+                                }
+                            }
+
+                            if has_graph {
+                                if let Ok(eid) = EntityId::from_key(&stored.id) {
+                                    let entity =
+                                        contextra_core::Entity::new(eid, &stored.id, "Document");
+                                    if let Err(e) =
+                                        self.graph_index.add_entity(recovery_tx, entity).await
+                                    {
+                                        tracing::warn!(
+                                            doc_id = %stored.id,
+                                            error = %e,
+                                            "Konnte Entity bei Graph-Integritäts-Wiederherstellung nicht hinzufügen"
+                                        );
+                                    } else {
+                                        recovered_graph = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Cleanup recovered intent
+                if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
+                    tracing::warn!(key = ?intent_key, "Konnte wiederhergestellte TxIntent nicht löschen: {e}");
+                }
+            }
+        }
+        if recovered_any {
+            self.index.commit(recovery_tx).await?;
+        }
+        if recovered_text {
+            self.text_index.commit(recovery_tx).await?;
+        }
+        if recovered_graph {
+            self.graph_index.commit(recovery_tx).await?;
+        }
+
+        // 2. Fallback: Full scan for documents missing from index (FIND-DB-004: Parallel Batching)
+        let fallback_tx = self.allocate_tx()?;
+        let fallback_any = false;
+        let mut fallback_text = false;
+
+        for (namespaced_key, value) in docs {
+            // Only process user data (key_type 0)
+            if self.name != "default" {
+                if namespaced_key.get(self.prefix.len()) != Some(&0) {
+                    continue;
+                }
+            } else if namespaced_key.starts_with(b"__") {
+                continue;
+            }
+
+            let stored: StoredDocument = match serde_json::from_slice(&value) {
+                Ok(d) => d,
+                Err(e) => {
+                    tracing::debug!(
+                        key = ?namespaced_key,
+                        error = %e,
+                        "Überspringe nicht-deserialisierbare Einträge bei repair (erwartet für Metadaten-Keys)"
+                    );
+                    continue;
+                }
+            };
+
+            let doc_id = DocId::from_key(&stored.id)?;
+
+            // Ensure text index coverage
+            if let Some(text) = extract_text(&stored.metadata) {
+                if let Ok(bm25_res) = self.text_index.search_bm25(&text, 1, None).await {
+                    if !bm25_res.iter().any(|(id, _)| *id == doc_id) {
+                        self.text_index
+                            .upsert_document(fallback_tx, doc_id, &text)
+                            .await?;
+                        fallback_text = true;
+                    }
+                }
+            }
+        }
+
+        if fallback_any {
+            self.index.commit(fallback_tx).await?;
+        }
+        if fallback_text {
+            self.text_index.commit(fallback_tx).await?;
+        }
+
+        if repair_count > 0 {
+            tracing::info!(
+                "Repaired {} missing documents in collection '{}' in {:?}",
+                repair_count,
+                self.name,
+                start_time.elapsed()
+            );
+        } else {
+            tracing::debug!(
+                "Integrity check passed for collection '{}' in {:?}",
+                self.name,
+                start_time.elapsed()
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Returns statistics for the collection's vector index.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn stats(&self) -> Result<contextra_core::VectorIndexStats> {
+        self.index.stats().await
+    }
+
+    /// Rebuilds the HNSW index from storage.
+    /// Scans the collection for documents with expired sequence-based TTLs and deletes them in batches.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn reap_expired_documents(&self, max_expired: usize) -> Result<usize> {
+        let current_seq = self.snapshot_seq().await?;
+        // AI-TAG[SMELL][MAJOR] RESOLVED: AGT-DB-f18d79a2 — reap_expired_documents uses cursor-based batch pagination to avoid 10k silent truncation limit (TS: 2026-09-12T18:43:13Z)
+        let user_prefix = self.namespaced_key(b"", 0);
+        let mut expired_ids = Vec::new();
+        let mut cursor: Option<Vec<u8>> = None;
+        const BATCH_SIZE: usize = 1000;
+
+        'outer: loop {
+            let (batch, next_cursor) = self
+                .storage
+                .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
+                .await?;
+
+            if batch.is_empty() {
+                break;
+            }
+
+            for (k, v) in batch {
+                let key_str = String::from_utf8_lossy(&k).to_string();
+                let user_key = if self.name == "default" {
+                    key_str
+                } else {
+                    let prefix_len = self.prefix.len() + 1;
+                    if key_str.len() >= prefix_len {
+                        key_str[prefix_len..].to_string()
+                    } else {
+                        key_str
+                    }
+                };
+
+                if self.name == "default" && user_key.starts_with("__") {
+                    continue;
+                }
+
+                let Ok(val) = serde_json::from_slice::<serde_json::Value>(&v) else {
+                    continue;
+                };
+
+                let meta_obj = val
+                    .get("metadata")
+                    .and_then(|m| m.as_object())
+                    .or_else(|| val.as_object());
+
+                if let Some(obj) = meta_obj {
+                    if let Some(expiry_seq) = obj.get(EXPIRY_METADATA_KEY).and_then(|v| v.as_u64())
+                    {
+                        if current_seq >= expiry_seq {
+                            expired_ids.push(user_key);
+                            if expired_ids.len() >= max_expired {
+                                break 'outer;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Some(next) = next_cursor {
+                cursor = Some(next);
+                tokio::task::yield_now().await;
+            } else {
+                break;
+            }
+        }
+
+        let count = expired_ids.len();
+        for id in &expired_ids {
+            tracing::info!(collection = %self.name, id = %id, "Reaping expired document");
+            if let Err(e) = self.delete(id).await {
+                tracing::error!(
+                    collection = %self.name,
+                    id = %id,
+                    error = %e,
+                    "Expiry cleanup failed to delete document"
+                );
+            }
+        }
+
+        if count > 0 && self.index.is_rebuild_required() {
+            tracing::info!(
+                collection = %self.name,
+                "HNSW tombstone threshold reached after expiry reaping; triggering async rebuild"
+            );
+            self.index.trigger_rebuild_async();
+        }
+
+        Ok(count)
+    }
+
+    /// Scans the collection for documents with expired TTLs or decayed importance scores and deletes them.
+    ///
+    /// Reads `created_at_ms` (or `timestamp_ms`) and `ttl_ms` from document metadata for wall-clock TTL,
+    /// and `importance` metadata for TxId-based decay sweep (`effective_score < DECAY_DELETION_THRESHOLD`).
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn trigger_expiry_cleanup(&self) -> Result<usize> {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?
+            .as_millis() as u64;
+
+        let now_tx = self.next_tx.load(Ordering::SeqCst);
+        let user_prefix = self.namespaced_key(b"", 0);
+        let mut expired_ids = Vec::new();
+        let mut cursor: Option<Vec<u8>> = None;
+        const BATCH_SIZE: usize = 1000;
+
+        loop {
+            let (batch, next_cursor) = self
+                .storage
+                .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
+                .await?;
+
+            if batch.is_empty() {
+                break;
+            }
+
+            for (k, v) in batch {
+                let key_str = String::from_utf8_lossy(&k).to_string();
+                let user_key = if self.name == "default" {
+                    key_str
+                } else {
+                    let prefix_len = self.prefix.len() + 1;
+                    if key_str.len() >= prefix_len {
+                        key_str[prefix_len..].to_string()
+                    } else {
+                        key_str
+                    }
+                };
+
+                if self.name == "default" && user_key.starts_with("__") {
+                    continue;
+                }
+
+                let Ok(val) = serde_json::from_slice::<serde_json::Value>(&v) else {
+                    continue;
+                };
+
+                let meta_obj = val
+                    .get("metadata")
+                    .and_then(|m| m.as_object())
+                    .or_else(|| val.as_object());
+
+                let mut marked_for_deletion = false;
+
+                if let Some(obj) = meta_obj {
+                    // 1. Working-Memory wall-clock TTL check ZUERST
+                    if let Some(ttl_val) = obj.get("ttl_ms").and_then(|v| v.as_u64()) {
+                        if ttl_val > 0 {
+                            if let Some(created_at) = obj
+                                .get("created_at_ms")
+                                .or_else(|| obj.get("timestamp_ms"))
+                                .and_then(|v| v.as_u64())
+                            {
+                                if let Some(expire_at) = created_at.checked_add(ttl_val) {
+                                    if now_ms >= expire_at {
+                                        expired_ids.push(user_key.clone());
+                                        marked_for_deletion = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. TxId-basierter Decay-Sweep (nur wenn decay != None)
+                    if !marked_for_deletion {
+                        if let Some(imp_val) = obj.get("importance") {
+                            if let Ok(imp) = serde_json::from_value::<contextra_core::MemoryImportance>(
+                                imp_val.clone(),
+                            ) {
+                                if imp.decay != contextra_core::DecayFunction::None {
+                                    let effective = imp.effective_score(TxId::new(now_tx));
+                                    if effective < Self::DECAY_DELETION_THRESHOLD {
+                                        expired_ids.push(user_key);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let Some(next) = next_cursor {
+                cursor = Some(next);
+                tokio::task::yield_now().await;
+            } else {
+                break;
+            }
+        }
+
+        let count = expired_ids.len();
+        for id in expired_ids {
+            match self.delete(&id).await {
+                Ok(_) => {
+                    tracing::debug!(
+                        collection = %self.name,
+                        doc_id = %id,
+                        "Reaped expired TTL / decayed document"
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        collection = %self.name,
+                        id = %id,
+                        error = %e,
+                        "Expiry cleanup failed to delete expired document"
+                    );
+                }
+            }
+        }
+
+        Ok(count)
+    }
+
+    /// Deprecated legacy alias for `trigger_expiry_cleanup`.
+    #[deprecated(note = "use trigger_expiry_cleanup instead")]
+    pub async fn trigger_reaper(&self) -> Result<usize> {
+        self.trigger_expiry_cleanup().await
+    }
+
+    /// Aktualisiert den Importance-Score sowie die Provenance (Modell-ID) in den Metadaten.
+    ///
+    /// Diese Funktion entkoppelt die LLM-Bewertung (die z.B. über Ollama geschieht)
+    /// von der reinen Datenbank-Operation.
+    pub async fn update_document_importance(
+        &self,
+        doc_id: &str,
+        importance_score: f32,
+        model_id: &str,
+    ) -> Result<()> {
+        let user_key = self.namespaced_key(doc_id.as_bytes(), 0);
+        let Some(data) = self.storage.get(&user_key).await? else {
+            return Err(contextra_core::ContextraError::NotFound(format!(
+                "Document not found: {doc_id}"
+            )));
+        };
+        let mut stored: StoredDocument = serde_json::from_slice(&data)?;
+
+        let tx = self.allocate_tx()?;
+        let doc_id_typed = DocId::from_key(doc_id)?;
+        let doc_key = self.namespaced_key(&doc_id_typed.inner().to_le_bytes(), 1);
+
+        let meta_obj = match stored.metadata {
+            Some(serde_json::Value::Object(ref mut map)) => map,
+            _ => {
+                stored.metadata = Some(serde_json::json!({}));
+                match stored.metadata {
+                    Some(serde_json::Value::Object(ref mut map)) => map,
+                    _ => {
+                        return Err(ContextraError::Serialization(
+                            "Failed to initialize document metadata map".to_string(),
+                        ))
+                    }
+                }
+            }
+        };
+
+        let imp = if let Some(imp_val) = meta_obj.get("importance") {
+            if let Ok(mut existing_imp) =
+                serde_json::from_value::<contextra_core::MemoryImportance>(imp_val.clone())
+            {
+                existing_imp.base_score = contextra_core::ImportanceScore::new(importance_score);
+                existing_imp
+            } else {
+                contextra_core::MemoryImportance::new(
+                    contextra_core::ImportanceScore::new(importance_score),
+                    contextra_core::DecayFunction::None,
+                    tx,
+                )
+            }
+        } else {
+            contextra_core::MemoryImportance::new(
+                contextra_core::ImportanceScore::new(importance_score),
+                contextra_core::DecayFunction::None,
+                tx,
+            )
+        };
+
+        if let Ok(val) = serde_json::to_value(imp) {
+            meta_obj.insert("importance".to_string(), val);
+        }
+
+        meta_obj.insert("model_id".to_string(), serde_json::json!(model_id));
+
+        let meta_only = StoredDocumentMeta::from(&stored);
+        let user_bytes = serde_json::to_vec(&stored)?;
+        let doc_bytes = serde_json::to_vec(&meta_only)?;
+
+        let _guard = self.kv_locks.lock_for(doc_id).await;
+        self.storage.put(tx, &user_key, &user_bytes).await?;
+        self.storage.put(tx, &doc_key, &doc_bytes).await?;
+        self.storage.commit(tx).await?;
+
+        Ok(())
+    }
+
+    /// Runs Leiden Community Detection on the collection's graph index
+    /// and persists the resulting assignments in storage using TxId allocation.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn run_community_detection(&self) -> Result<Vec<CommunityAssignment>> {
+        self.run_community_detection_with_config(&CommunityDetectionConfig::default())
+            .await
+    }
+
+    /// Runs Leiden Community Detection with custom configuration
+    /// and persists the resulting assignments in storage using TxId allocation.
+    #[tracing::instrument(level = "trace", skip(self, config))]
+    pub async fn run_community_detection_with_config(
+        &self,
+        config: &CommunityDetectionConfig,
+    ) -> Result<Vec<CommunityAssignment>> {
+        let assignments = detect_communities(&self.graph_index, config).await?;
+        if assignments.is_empty() {
+            return Ok(assignments);
+        }
+
+        let tx = self.allocate_tx()?;
+
+        for assignment in &assignments {
+            let key = self.namespaced_key(
+                format!("__graph:community:{}", assignment.entity_id.inner()).as_bytes(),
+                4,
+            );
+            let val = serde_json::to_vec(&assignment.community_id)?;
+            self.storage.put(tx, &key, &val).await?;
+        }
+
+        self.storage.commit(tx).await?;
+        self.graph_index.set_communities_batch(&assignments);
+        Ok(assignments)
+    }
+
+    /// Retrieves the persisted community ID for a given entity.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn get_community(&self, entity_id: EntityId) -> Result<Option<u64>> {
+        let key = self.namespaced_key(
+            format!("__graph:community:{}", entity_id.inner()).as_bytes(),
+            4,
+        );
+        if let Some(bytes) = self.storage.get(&key).await? {
+            let comm_id: u64 = serde_json::from_slice(&bytes).map_err(|e| {
+                contextra_core::ContextraError::Internal(format!("community deserialize: {e}"))
+            })?;
+            Ok(Some(comm_id))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Retrieves community assignments for a batch of entity IDs in a single operation.
+    #[tracing::instrument(level = "trace", skip(self, entity_ids))]
+    pub async fn get_communities_batch(
+        &self,
+        entity_ids: &[EntityId],
+    ) -> Result<std::collections::HashMap<EntityId, u64>> {
+        if entity_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        // 1. First try graph_index in-memory batch lookup
+        let graph_map = self.graph_index.get_communities_batch(entity_ids).await?;
+        if !graph_map.is_empty() {
+            return Ok(graph_map);
+        }
+
+        // 2. Fallback: single batch scan over collection's community prefix in storage
+        let prefix = self.namespaced_key(b"__graph:community:", 4);
+        let entries = self.storage.scan_prefix(&prefix).await?;
+        let target_set: std::collections::HashSet<&EntityId> = entity_ids.iter().collect();
+        let mut map = std::collections::HashMap::new();
+
+        for (k, v) in entries {
+            let id_bytes = match k.strip_prefix(prefix.as_slice()) {
+                Some(b) => b,
+                None => continue,
+            };
+            if let Ok(id_str) = std::str::from_utf8(id_bytes) {
+                let eid = EntityId::from(id_str);
+                if target_set.contains(&eid) {
+                    if let Ok(comm_id) = serde_json::from_slice::<u64>(&v) {
+                        map.insert(eid, comm_id);
+                    }
+                }
+            }
+        }
+        Ok(map)
+    }
+
+    /// Removes all data belonging to this collection from storage.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn drop_collection(&self) -> Result<()> {
+        let _guard = self.consolidation_guard.lock().await;
+        let prefix = if self.name == "default" {
+            return Err(contextra_core::ContextraError::invalid_input(
+                "Cannot drop default collection",
+            ));
+        } else {
+            self.prefix.clone()
+        };
+
+        let tx = self.allocate_tx()?;
+
+        // 1. Clean collection data (user keys, docs, rels, intents)
+        self.storage.delete_prefix(tx, &prefix).await?;
+
+        // 2. Clean text index namespace (FIND-DB-002)
+        let txt_prefix = format!("__txt:{}:", self.name).into_bytes();
+        self.storage.delete_prefix(tx, &txt_prefix).await?;
+
+        self.storage.commit(tx).await?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "graph-connectivity-health")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PercolationResult {
+    pub health: Option<f32>,
+    pub rebonding_triggered: bool,
+    pub new_edges_added: usize,
+}
+
+#[cfg(feature = "graph-connectivity-health")]
+impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
+    /// Überprüft die Perkolations-Gesundheit des Wissensgraphen und löst bei Unterschreitung
+    /// des Schwellenwerts automatisch einen Re-Bonding-Pass aus.
+    #[tracing::instrument(level = "trace", skip(self, config))]
+    pub async fn run_percolation_check(
+        &self,
+        config: &contextra_graph::percolation::PercolationConfig,
+    ) -> Result<PercolationResult> {
+        let stats = self.graph_index.stats().await?;
+        let health = contextra_graph::percolation::compute_percolation_health(
+            stats.num_entities,
+            stats.num_edges,
+        );
+
+        let rebonding_triggered = if let Some(phi) = health {
+            contextra_graph::percolation::should_trigger_rebonding(phi, config)
+        } else {
+            false
+        };
+
+        let mut new_edges_added = 0;
+
+        if rebonding_triggered {
+            let user_prefix = self.namespaced_key(b"", 0);
+            let mut embeddings = std::collections::HashMap::new();
+            let mut id_map = std::collections::HashMap::new();
+            let mut cursor: Option<Vec<u8>> = None;
+            const BATCH_SIZE: usize = 1000;
+
+            loop {
+                let (batch, next_cursor) = self
+                    .storage
+                    .scan_prefix_bounded(&user_prefix, BATCH_SIZE, cursor.as_deref())
+                    .await?;
+
+                if batch.is_empty() {
+                    break;
+                }
+
+                for (_k, v) in batch {
+                    if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
+                        if let Ok(eid) = EntityId::from_key(&stored.id) {
+                            id_map.insert(eid, stored.id.clone());
+                            embeddings.insert(eid, stored.embedding);
+                        }
+                    }
+                }
+
+                if let Some(next) = next_cursor {
+                    cursor = Some(next);
+                    tokio::task::yield_now().await;
+                } else {
+                    break;
+                }
+            }
+
+            let candidate_pairs = contextra_graph::percolation::find_rebonding_candidates(
+                self.graph_index.as_ref(),
+                &embeddings,
+                config,
+            )
+            .await;
+
+            for (from_id, to_id, _sim) in candidate_pairs {
+                if let (Some(from_str), Some(to_str)) = (id_map.get(&from_id), id_map.get(&to_id)) {
+                    if self
+                        .relate_bidirectional(from_str, to_str, "rebonded")
+                        .await
+                        .is_ok()
+                    {
+                        new_edges_added += 2;
+                    }
+                }
+            }
+        }
+
+        Ok(PercolationResult {
+            health,
+            rebonding_triggered,
+            new_edges_added,
+        })
+    }
+}

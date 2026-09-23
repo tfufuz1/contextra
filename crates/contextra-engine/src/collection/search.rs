@@ -1,0 +1,1346 @@
+// FILE-CONTEXT
+// ZWECK: Suchoperationen (Vector-, Text-, Graph- & Hybrid-Retrieval) für Collection.
+// INVARIANTEN: Snapshot-Pinning garantiert Isolation während gefilterter Suche; MAX_SEARCH_K Obergrenze.
+// NICHT-OFFENSICHTLICH: Multi-Signal RRF vereint Ergebnisse ohne inkompatible Score-Skalen. Collection::query() ist der empfohlene Einstiegspunkt.
+// STAND: TS:2026-08-30T21:15:00Z (SESSION: 0dcb9f3b)
+
+//! Search operations for `Collection`.
+//!
+//! **Empfohlener Einstiegspunkt**: [`Collection::query()`] liefert einen [`HybridQueryBuilder`](crate::HybridQueryBuilder)
+//! als Fluent-API für Vektor-, Text-, Graph- und Hybrid-Suchen. Die direkten `search_*`-Methoden sind deprecated.
+
+use super::{extract_effective_importance, Collection, StoredDocument, StoredDocumentMeta};
+#[allow(deprecated)]
+use crate::filter::MetadataFilter;
+pub use crate::temporal_filter::{
+    apply_temporal_validity_filter, apply_temporal_validity_filter_at, FusionResult,
+};
+use contextra_core::{
+    DocId, EntityId, FilterExpr, GraphIndex, Result, StorageEngine, TextIndex, TxId, VectorIndex,
+};
+
+/// RAII Guard for pinning snapshot checkpoints during search/scan operations.
+///
+/// # Note on async Drop
+/// Rust does not support native `async Drop`. Therefore, callers MUST explicitly call
+/// [`release`](Self::release) to unpin the checkpoint. The `Drop` implementation serves as a
+/// fallback safety net: if `release` was not invoked before dropping (e.g. due to early `?`
+/// return or panic), `Drop` emits an `error!` log warning that a checkpoint pin may have leaked.
+pub(super) struct CheckpointPinGuard<'a, S: StorageEngine + ?Sized> {
+    storage: &'a S,
+    seq: u64,
+    unpinned: bool,
+}
+
+impl<'a, S: StorageEngine + ?Sized> CheckpointPinGuard<'a, S> {
+    /// Creates a new guard and pins the checkpoint at sequence `seq`.
+    pub async fn new(storage: &'a S, seq: u64) -> Result<Self> {
+        storage.pin_checkpoint(seq).await?;
+        Ok(Self {
+            storage,
+            seq,
+            unpinned: false,
+        })
+    }
+
+    /// Pin-first, read-after: the seq is read under the protection of the pin,
+    /// eliminating the TOCTOU window between snapshot_seq() and pin activation.
+    pub async fn new_at_latest(storage: &'a S) -> Result<(Self, u64)> {
+        let seq = storage.last_seq_no().await?;
+        storage.pin_checkpoint(seq).await?;
+        Ok((
+            Self {
+                storage,
+                seq,
+                unpinned: false,
+            },
+            seq,
+        ))
+    }
+
+    /// Pin-first, read-after alias for `new_at_latest`.
+    #[allow(dead_code)]
+    pub async fn new_pinning_latest(storage: &'a S) -> Result<(Self, u64)> {
+        Self::new_at_latest(storage).await
+    }
+
+    /// Explicitly unpins the checkpoint and consumes the guard, preventing the fallback `Drop` warning.
+    pub async fn release(mut self) -> Result<()> {
+        self.unpinned = true;
+        self.storage.unpin_checkpoint(self.seq).await
+    }
+
+    /// Returns the sequence number protected by this pin guard.
+    #[allow(dead_code)]
+    pub fn seq(&self) -> u64 {
+        self.seq
+    }
+}
+
+// Drop impl is a safety net only — always use with_pinned_checkpoint() to guarantee release() is called.
+impl<'a, S: StorageEngine + ?Sized> Drop for CheckpointPinGuard<'a, S> {
+    fn drop(&mut self) {
+        if !self.unpinned {
+            tracing::error!(
+                seq_no = self.seq,
+                "CheckpointPinGuard dropped without explicit release! Checkpoint pin seq={} may have leaked.",
+                self.seq
+            );
+        }
+    }
+}
+
+/// Higher-order function wrapping an async block with a pinned checkpoint guard,
+/// ensuring `release()` is ALWAYS called even on error paths.
+pub(super) async fn with_pinned_checkpoint<S, F, Fut, T>(storage: &S, seq: u64, f: F) -> Result<T>
+where
+    S: StorageEngine + ?Sized,
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<T>>,
+{
+    let pin_guard = CheckpointPinGuard::new(storage, seq).await?;
+    let result = f().await;
+    if let Err(e) = pin_guard.release().await {
+        tracing::warn!(error = %e, seq_no = seq, "CheckpointPinGuard release failed");
+    }
+    result
+}
+
+/// Higher-order function providing pin-first, read-after semantics with automatic release on completion/error.
+///
+/// Pin-first, read-after: the seq is read under the protection of the pin,
+/// eliminating the TOCTOU window between snapshot_seq() and pin activation.
+pub(super) async fn with_pinned_checkpoint_at_latest<S, F, Fut, T>(storage: &S, f: F) -> Result<T>
+where
+    S: StorageEngine + ?Sized,
+    F: FnOnce(u64) -> Fut,
+    Fut: std::future::Future<Output = Result<T>>,
+{
+    let (pin_guard, seq) = CheckpointPinGuard::new_at_latest(storage).await?;
+    let result = f(seq).await;
+    if let Err(e) = pin_guard.release().await {
+        tracing::warn!(error = %e, seq_no = seq, "CheckpointPinGuard release failed");
+    }
+    result
+}
+
+/// Higher-order function passing the guard reference to the closure, ensuring `release()` is ALWAYS called.
+#[allow(dead_code)]
+pub(super) async fn with_pinned_checkpoint_and_guard<S, F, Fut, T>(
+    storage: &S,
+    seq: u64,
+    f: F,
+) -> Result<T>
+where
+    S: StorageEngine + ?Sized,
+    F: FnOnce(&CheckpointPinGuard<S>, u64) -> Fut,
+    Fut: std::future::Future<Output = Result<T>>,
+{
+    let pin_guard = CheckpointPinGuard::new(storage, seq).await?;
+    let result = f(&pin_guard, seq).await;
+    if let Err(e) = pin_guard.release().await {
+        tracing::warn!(error = %e, seq_no = seq, "CheckpointPinGuard release failed");
+    }
+    result
+}
+
+impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
+    /// Performs semantic k-NN search over stored embeddings.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, query_embedding))]
+    pub async fn search(
+        &self,
+        query_embedding: &[f32],
+        k: usize,
+    ) -> Result<Vec<crate::SearchResult>> {
+        if k == 0 {
+            return Err(contextra_core::ContextraError::invalid_input(
+                "Search k must be greater than 0",
+            ));
+        }
+        let k = k.min(contextra_core::MAX_SEARCH_K);
+        self.search_with_filter_expr(query_embedding, k, None).await
+    }
+
+    /// Performs semantic search with an advanced metadata filter.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, query, filter))]
+    pub async fn search_with_filter(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<MetadataFilter>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        let expr = match filter {
+            Some(f) => Some(FilterExpr::try_from(f)?),
+            None => None,
+        };
+        self.search_with_filter_expr(query, k, expr).await
+    }
+
+    /// Performs semantic search with an advanced metadata filter expression (`FilterExpr`).
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, query, filter))]
+    pub async fn search_with_filter_expr(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<FilterExpr>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        if k == 0 {
+            return Err(contextra_core::ContextraError::invalid_input(
+                "Search k must be greater than 0",
+            ));
+        }
+        if query.len() != self.dimension {
+            return Err(contextra_core::ContextraError::invalid_input(format!(
+                "Dimension mismatch: expected {}, got {}",
+                self.dimension,
+                query.len()
+            )));
+        }
+        let k = k.min(contextra_core::MAX_SEARCH_K);
+        // 🛡️ SICHERUNG: Snapshot-Isolation (FIND-DB-003)
+        // Pin-first, read-after: the seq is read under the protection of the pin,
+        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
+        with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
+            let filter = match filter {
+                Some(f) => f,
+                None => return self.search_filtered_at(query, k, None, seq).await,
+            };
+
+            let matched_ids = self.get_matching_doc_ids_at(&filter, seq).await?;
+
+            // If no docs match the filter, return early
+            if matched_ids.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            let filter_fn = move |id: DocId| matched_ids.contains(&id);
+            self.search_filtered_at(query, k, Some(&filter_fn), seq)
+                .await
+        })
+        .await
+    }
+
+    /// Performs semantic search using a raw text query (automatically embedded).
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, query_text))]
+    pub async fn search_text(
+        &self,
+        query_text: &str,
+        k: usize,
+    ) -> Result<Vec<crate::SearchResult>> {
+        let k = k.min(contextra_core::MAX_SEARCH_K);
+        let embedding = {
+            let embedder = {
+                let guard = self.embedder.read();
+                guard
+                    .as_ref()
+                    .ok_or_else(|| {
+                        contextra_core::ContextraError::Internal(
+                            "No embedder configured for this collection".into(),
+                        )
+                    })?
+                    .clone()
+            };
+            embedder.embed(query_text).await?
+        };
+        self.search(&embedding, k).await
+    }
+
+    /// Estimates the selectivity (fraction of documents matching `filter`) over the collection metadata.
+    ///
+    /// For collections under 1,000 documents, this performs an exact metadata evaluation.
+    /// For larger collections, it samples up to 200 document metadata entries to derive an estimate `s in (0.0, 1.0]`.
+    pub(super) async fn estimate_filter_selectivity(
+        &self,
+        filter: &FilterExpr,
+        seq: u64,
+        total_docs: usize,
+    ) -> Result<f64> {
+        if total_docs == 0 {
+            return Ok(1.0);
+        }
+        if total_docs < 1000 {
+            let matched = self.get_matching_doc_ids_at(filter, seq).await?;
+            return Ok(matched.len() as f64 / total_docs as f64);
+        }
+
+        const SAMPLE_SIZE: usize = 200;
+        let prefix = if self.name == "default" {
+            b"__docid:".to_vec()
+        } else {
+            let mut p = self.prefix.clone();
+            p.push(1); // docid mapping type
+            p
+        };
+
+        let entries = self.storage.scan_prefix_at(&prefix, seq).await?;
+        if entries.is_empty() {
+            return Ok(1.0);
+        }
+
+        let mut total_sampled = 0;
+        let mut matched_sampled = 0;
+
+        for (_, v) in entries.iter().take(SAMPLE_SIZE) {
+            total_sampled += 1;
+            let doc_metadata = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(v) {
+                meta.metadata
+            } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(v) {
+                full.metadata
+            } else {
+                None
+            };
+            let metadata = doc_metadata.as_ref().unwrap_or(&serde_json::Value::Null);
+            if filter.evaluate(metadata) {
+                matched_sampled += 1;
+            }
+        }
+
+        if total_sampled == 0 {
+            return Ok(1.0);
+        }
+
+        let selectivity = matched_sampled as f64 / total_sampled as f64;
+        if selectivity == 0.0 {
+            Ok((1.0 / total_docs as f64).max(0.0005))
+        } else {
+            Ok(selectivity)
+        }
+    }
+
+    pub(super) async fn get_matching_doc_ids_at(
+        &self,
+        filter: &FilterExpr,
+        seq: u64,
+    ) -> Result<std::collections::HashSet<DocId>> {
+        let prefix = if self.name == "default" {
+            b"__docid:".to_vec()
+        } else {
+            let mut p = self.prefix.clone();
+            p.push(1); // docid mapping type
+            p
+        };
+
+        let entries = self.storage.scan_prefix_at(&prefix, seq).await?;
+        let mut matched = std::collections::HashSet::new();
+
+        for (_, v) in entries {
+            let (id, doc_metadata) =
+                if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&v) {
+                    (meta.id, meta.metadata)
+                } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&v) {
+                    (full.id, full.metadata)
+                } else {
+                    continue;
+                };
+            let metadata = doc_metadata.as_ref().unwrap_or(&serde_json::Value::Null);
+            if filter.evaluate(metadata) {
+                matched.insert(DocId::from_key(&id)?);
+            }
+        }
+
+        Ok(matched)
+    }
+
+    pub(super) async fn get_matching_doc_ids_for_query_at(
+        &self,
+        query: &contextra_core::HybridQuery,
+        seq: u64,
+    ) -> Result<Option<std::collections::HashSet<DocId>>> {
+        if query.filter.is_none() && query.memory_type_filter.is_none() {
+            return Ok(None);
+        }
+
+        let prefix = if self.name == "default" {
+            b"__docid:".to_vec()
+        } else {
+            let mut p = self.prefix.clone();
+            p.push(1); // docid mapping type
+            p
+        };
+
+        let entries = self.storage.scan_prefix_at(&prefix, seq).await?;
+        let mut matched = std::collections::HashSet::new();
+
+        for (_, v) in entries {
+            let (id_str, doc_metadata) =
+                if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&v) {
+                    (meta.id, meta.metadata)
+                } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&v) {
+                    (full.id, full.metadata)
+                } else {
+                    continue;
+                };
+
+            if let Some(ref filter_expr) = query.filter {
+                let metadata = doc_metadata.as_ref().unwrap_or(&serde_json::Value::Null);
+                if !filter_expr.evaluate(metadata) {
+                    continue;
+                }
+            }
+
+            if let Some(ref type_filter) = query.memory_type_filter {
+                let memory_type = crate::filter::extract_memory_type(&doc_metadata);
+                if !type_filter.contains(&memory_type) {
+                    continue;
+                }
+            }
+
+            if let Ok(doc_id) = DocId::from_key(&id_str) {
+                matched.insert(doc_id);
+            }
+        }
+
+        Ok(Some(matched))
+    }
+
+    /// Performs filtered semantic vector search in the collection.
+    // AI-TAG[SMELL][RESOLVED] audit-5.1: Vector-Suche clampt k stets auf k.min(contextra_core::MAX_SEARCH_K) über alle Einstiegspunkte hinweg.
+    // AI-TAG[SMELL][RESOLVED] audit-M-7: CheckpointPinGuard handles unpinning safely across all error return paths.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, query, filter))]
+    pub async fn search_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        let k = k.min(contextra_core::MAX_SEARCH_K);
+        // Pin-first, read-after: the seq is read under the protection of the pin,
+        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
+        with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
+            self.search_filtered_at(query, k, filter, seq).await
+        })
+        .await
+    }
+
+    /// Performs filtered semantic vector search at a specific MVCC sequence number.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    pub async fn search_filtered_at(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
+        seq: u64,
+    ) -> Result<Vec<crate::SearchResult>> {
+        if query.len() != self.dimension {
+            return Err(contextra_core::ContextraError::invalid_input(format!(
+                "Dimension mismatch: expected {}, got {}",
+                self.dimension,
+                query.len()
+            )));
+        }
+        if k == 0 {
+            return Err(contextra_core::ContextraError::invalid_input(
+                "Search k must be greater than 0",
+            ));
+        }
+        let target_k = k.min(contextra_core::MAX_SEARCH_K);
+        let mut fetch_k = target_k;
+
+        loop {
+            let scored_docs = self.index.search_filtered(query, fetch_k, filter).await?;
+            let scored_count = scored_docs.len();
+
+            let (results, skipped) = self.hydrate_from_scored_at(scored_docs, seq).await?;
+
+            if results.len() >= target_k || scored_count < fetch_k {
+                if skipped > 0 {
+                    tracing::debug!(
+                        skipped_tombstones = skipped,
+                        target_k = target_k,
+                        hydrated_count = results.len(),
+                        "Tombstones skipped during vector search hydration"
+                    );
+                }
+                let mut final_results = results;
+                final_results.truncate(target_k);
+                return Ok(final_results);
+            }
+
+            // Backfill: we need more candidates because tombstones reduced the valid result count below target_k.
+            let next_fetch_k = (fetch_k * 2)
+                .max(target_k + skipped * 2)
+                .min(contextra_core::MAX_SEARCH_K);
+
+            if next_fetch_k <= fetch_k {
+                if skipped > 0 {
+                    tracing::debug!(
+                        skipped_tombstones = skipped,
+                        target_k = target_k,
+                        hydrated_count = results.len(),
+                        "Tombstones skipped during vector search hydration (max search k reached)"
+                    );
+                }
+                let mut final_results = results;
+                final_results.truncate(target_k);
+                return Ok(final_results);
+            }
+
+            fetch_k = next_fetch_k;
+        }
+    }
+
+    pub(super) async fn hydrate_from_scored_at(
+        &self,
+        scored_docs: Vec<contextra_core::ScoredDocument>,
+        seq: u64,
+    ) -> Result<(Vec<crate::SearchResult>, usize)> {
+        if scored_docs.is_empty() {
+            return Ok((Vec::new(), 0));
+        }
+
+        let mut results = Vec::with_capacity(scored_docs.len());
+        let mut skipped_tombstones = 0usize;
+        for sd in scored_docs {
+            let doc_key = self.namespaced_key(&sd.doc_id.inner().to_le_bytes(), 1);
+            if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {
+                let (id, metadata) =
+                    if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
+                        (meta.id, meta.metadata)
+                    } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&bytes) {
+                        (full.id, full.metadata)
+                    } else {
+                        tracing::warn!(doc_id = ?sd.doc_id, "Could not deserialize doc_key");
+                        skipped_tombstones += 1;
+                        continue;
+                    };
+                let rank = (results.len() + 1) as u32;
+                let rrf_contrib = 1.0 / (60.0 + rank as f32);
+                let prov = crate::fusion::ProvenanceBuilder::new(60.0)
+                    .vector(sd.score, rank, 1.0)
+                    .source_collection(self.name.clone())
+                    .index_type("hnsw")
+                    .expected_total(rrf_contrib)
+                    .build();
+                results.push(crate::SearchResult {
+                    id,
+                    score: sd.score,
+                    metadata,
+                    matched_signals: vec!["vector".to_string()],
+                    provenance: Some(prov),
+                });
+            } else {
+                skipped_tombstones += 1;
+            }
+        }
+        Ok((results, skipped_tombstones))
+    }
+
+    pub(super) async fn hydrate_from_tuples_at(
+        &self,
+        scored_tuples: Vec<(DocId, f32)>,
+        seq: u64,
+    ) -> Result<Vec<crate::SearchResult>> {
+        if scored_tuples.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut results = Vec::with_capacity(scored_tuples.len());
+        let mut skipped_tombstones = 0usize;
+        for (doc_id, score) in scored_tuples {
+            let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+            if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {
+                let (id, metadata) =
+                    if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
+                        (meta.id, meta.metadata)
+                    } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&bytes) {
+                        (full.id, full.metadata)
+                    } else {
+                        tracing::warn!(doc_id = ?doc_id, "Could not deserialize doc_key");
+                        skipped_tombstones += 1;
+                        continue;
+                    };
+                let prov = crate::ProvenanceRecord {
+                    source_collection: Some(self.name.clone()),
+                    ..Default::default()
+                };
+                results.push(crate::SearchResult {
+                    id,
+                    score,
+                    metadata,
+                    matched_signals: vec![],
+                    provenance: Some(prov),
+                });
+            } else {
+                skipped_tombstones += 1;
+            }
+        }
+        if skipped_tombstones > 0 {
+            tracing::debug!(
+                skipped_tombstones = skipped_tombstones,
+                hydrated_count = results.len(),
+                "Tombstones skipped during tuple search hydration"
+            );
+        }
+        Ok(results)
+    }
+
+    /// Performs hybrid search combining BM25, vector search, and graph traversal results via RRF.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, text, vector))]
+    pub async fn hybrid_search(
+        &self,
+        text: &str,
+        vector: &[f32],
+        k: usize,
+        anchor_entities: Option<&[contextra_core::EntityId]>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        self.hybrid_search_with_weights(text, vector, k, anchor_entities, None)
+            .await
+    }
+
+    /// Performs hybrid search combining BM25, vector search, and graph traversal, followed by optional Cross-Encoder reranking.
+    /// Mindest-Kandidatenpool für Cross-Encoder-Reranking.
+    /// Wissenschaftliche Basis: arXiv:2604.01733 (T2-RAGBench).
+    /// k_pool=20 → Recall@5=0.458; k_pool=100 → Recall@5=0.888 (Qualitätsknie).
+    pub const DEFAULT_MIN_RERANK_CANDIDATES: usize = 100;
+
+    #[cfg(feature = "reranking")]
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, text, vector, reranker, anchor_entities))]
+    pub async fn hybrid_search_reranked(
+        &self,
+        text: &str,
+        vector: &[f32],
+        k: usize,
+        reranker: Option<&contextra_infer_onnx::CrossEncoderReranker>,
+        anchor_entities: Option<&[contextra_core::EntityId]>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        let mut builder = self.query().text(text).vector(vector).k(k);
+        if let Some(r) = reranker {
+            builder = builder.reranker(r);
+        }
+        if let Some(anchors) = anchor_entities {
+            builder = builder.anchors(anchors.iter().copied());
+        }
+        builder.execute().await
+    }
+
+    /// Performs hybrid search with custom fusion weights for vector, text, and graph signals,
+    /// and optional community filtering/boosting.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, text, vector))]
+    pub async fn hybrid_search_with_weights(
+        &self,
+        text: &str,
+        vector: &[f32],
+        k: usize,
+        anchor_entities: Option<&[contextra_core::EntityId]>,
+        weights: Option<&contextra_core::FusionWeights>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        self.hybrid_search_with_strategy(text, vector, k, anchor_entities, weights, None, None)
+            .await
+    }
+
+    /// Performs hybrid search with custom signal fusion weights and graph traversal strategy.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, text, vector, strategy))]
+    #[allow(clippy::too_many_arguments)]
+    pub async fn hybrid_search_with_strategy(
+        &self,
+        text: &str,
+        vector: &[f32],
+        k: usize,
+        anchor_entities: Option<&[contextra_core::EntityId]>,
+        weights: Option<&contextra_core::FusionWeights>,
+        strategy: Option<&contextra_core::GraphTraversalStrategy>,
+        same_community_as: Option<EntityId>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        if k == 0 {
+            return Ok(Vec::new());
+        }
+        if !vector.is_empty() && vector.len() != self.dimension {
+            return Err(contextra_core::ContextraError::invalid_input(format!(
+                "Dimension mismatch: expected {}, got {}",
+                self.dimension,
+                vector.len()
+            )));
+        }
+        let k = k.min(contextra_core::MAX_SEARCH_K);
+
+        // Pin-first, read-after: the seq is read under the protection of the pin,
+        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
+        with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
+            let is_vector_zero = vector.iter().all(|&v| v == 0.0);
+            let is_text_empty = text.trim().is_empty();
+
+            let default_strategy = contextra_core::GraphTraversalStrategy::default();
+            let graph_strat = strategy.unwrap_or(&default_strategy);
+
+            // 1. Vector Signal (Candidate overfetching for RRF fusion)
+            let vector_results = if is_vector_zero {
+                Vec::new()
+            } else {
+                self.search_filtered_at(
+                    vector,
+                    k.saturating_mul(Self::OVERFETCH_FACTOR),
+                    None,
+                    seq,
+                )
+                .await?
+            };
+
+            // 2. Text Signal (Candidate overfetching for RRF fusion)
+            let text_results = if is_text_empty {
+                Vec::new()
+            } else {
+                let bm25_results = self
+                    .text_index
+                    .search_at(text, k.saturating_mul(Self::OVERFETCH_FACTOR), seq)
+                    .await?;
+                self.hydrate_from_tuples_at(
+                    bm25_results
+                        .into_iter()
+                        .map(|sd| (sd.doc_id, sd.score))
+                        .collect(),
+                    seq,
+                )
+                .await?
+            };
+
+            // 3. Graph Signal
+            // AI-TAG[RESOLVED][MINOR] graph_search snapshot isolation via multi_traverse_at for Hops; PARTIAL with warning for PPR/PathRag. (ID: AGT-DB-6d724b1a)
+            let implicit_anchors: Vec<contextra_core::EntityId>;
+            let anchors_ref: Option<&[contextra_core::EntityId]> = if let Some(anchors) = anchor_entities
+            {
+                if anchors.is_empty() {
+                    None
+                } else {
+                    Some(anchors)
+                }
+            } else if !text_results.is_empty() {
+                // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
+                implicit_anchors = text_results
+                    .iter()
+                    .filter_map(|r| contextra_core::EntityId::from_key(r.id.as_str()).ok())
+                    .collect();
+                Some(&implicit_anchors)
+            } else {
+                None
+            };
+
+            let graph_results = if let Some(anchors) = anchors_ref {
+                let tuples = match graph_strat {
+                    contextra_core::GraphTraversalStrategy::Hops { max_hops } => {
+                        let mut raw_tuples = self
+                            .graph_index
+                            .multi_traverse_at(anchors, *max_hops, seq)
+                            .await?;
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(k);
+                        raw_tuples
+                    }
+                    contextra_core::GraphTraversalStrategy::PersonalizedPageRank(_) => {
+                        return Err(contextra_core::ContextraError::snapshot_unsupported_for_signal(
+                            "PersonalizedPageRank strategy does not support snapshot-isolated retrieval",
+                        ));
+                    }
+                    contextra_core::GraphTraversalStrategy::PathRag { .. } => {
+                        return Err(contextra_core::ContextraError::snapshot_unsupported_for_signal(
+                            "PathRag strategy does not support snapshot-isolated retrieval",
+                        ));
+                    }
+                };
+                let doc_tuples = tuples
+                    .into_iter()
+                    .map(|(eid, score)| (contextra_core::DocId::new(eid.inner()), score))
+                    .collect();
+                self.hydrate_from_tuples_at(doc_tuples, seq).await?
+            } else {
+                Vec::new()
+            };
+
+            if !text_results.is_empty() && graph_results.is_empty() && anchor_entities.is_none() {
+                tracing::warn!(
+                    text_count = text_results.len(),
+                    "Implicit graph anchors derived from text results produced empty graph signal. Verify mapping invariant: graph nodes must share string keys with text documents (EntityId::from_key)."
+                );
+            }
+
+            if vector_results.is_empty() && text_results.is_empty() && graph_results.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            let (vw, tw, gw) = crate::fusion::weights_to_signal_factors(weights);
+
+            let target_community_id: Option<u64> = if let Some(same_comm_entity) = same_community_as {
+                self.get_community(same_comm_entity).await?
+            } else {
+                None
+            };
+
+            let mut signal_sets = Vec::new();
+            if !vector_results.is_empty() {
+                signal_sets.push(("vector".to_string(), vector_results, vw));
+            }
+            if !text_results.is_empty() {
+                signal_sets.push(("text".to_string(), text_results, tw));
+            }
+            if !graph_results.is_empty() {
+                signal_sets.push(("graph".to_string(), graph_results, gw));
+            }
+
+            let mut fused = crate::fusion::fuse_search_results_with_strategy(
+                signal_sets,
+                k.saturating_mul(Self::OVERFETCH_FACTOR),
+                crate::fusion::MetadataMergePriority::default(),
+                true,
+                None,
+                contextra_core::FusionStrategy::Rrf,
+            );
+            fused.truncate(k);
+
+            let boosted = self
+                .apply_community_boost_post_rrf(
+                    fused,
+                    target_community_id,
+                    Self::DEFAULT_COMMUNITY_BOOST,
+                )
+                .await?;
+            Ok(boosted)
+        })
+        .await
+    }
+
+    /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery`.
+    ///
+    /// Applies `memory_type_filter` and metadata `FilterExpr` as Pre-RRF filters to preserve
+    /// Reciprocal Rank Fusion properties (ADR-024).
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, query))]
+    pub async fn hybrid_search_with_query(
+        &self,
+        query: &contextra_core::HybridQuery,
+    ) -> Result<Vec<crate::SearchResult>> {
+        // Pin-first, read-after: the seq is read under the protection of the pin,
+        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
+        with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
+            self.hybrid_search_with_query_at(query, seq).await
+        })
+        .await
+    }
+
+    /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery` at a specific snapshot sequence.
+    #[allow(deprecated)]
+    pub async fn hybrid_search_with_query_at(
+        &self,
+        query: &contextra_core::HybridQuery,
+        seq: u64,
+    ) -> Result<Vec<crate::SearchResult>> {
+        if query.k == 0 {
+            return Ok(Vec::new());
+        }
+        let k = query.k.min(contextra_core::MAX_SEARCH_K);
+
+        let text = query.text_query.as_deref().unwrap_or("");
+        let vector = query.vector_query.as_deref().unwrap_or(&[]);
+
+        // S-1 FIX: Fail-fast is_finite() check at the API boundary (Fail-Fast before HNSW).
+        // Even though search_filtered_internal() now also validates, checking here provides:
+        // (a) earlier, more informative error attribution (caller context still on stack)
+        // (b) prevents redundant HNSW dispatch overhead for malformed inputs
+        if !vector.is_empty() {
+            for (i, &val) in vector.iter().enumerate() {
+                if !val.is_finite() {
+                    return Err(contextra_core::ContextraError::invalid_input(format!(
+                        "hybrid_search: query vector element at index {i} is not finite (value: {val}). \
+                         Check embedding model output for NaN/Inf before querying."
+                    )));
+                }
+            }
+        }
+
+        with_pinned_checkpoint(self.storage.as_ref(), seq, || async move {
+            let is_vector_zero = vector.is_empty() || vector.iter().all(|&v| v == 0.0);
+            let is_text_empty = text.trim().is_empty();
+
+            // Candidate pool calculation considering pre-reranking multiplier/max bounds and supersedes displacement requirements
+            let (mult, max_pool) = if query.has_reranker {
+                (
+                    query
+                        .rerank_pool_multiplier
+                        .unwrap_or(crate::collection::query_builder::DEFAULT_RERANK_POOL_MULTIPLIER),
+                    query
+                        .rerank_pool_max
+                        .unwrap_or(crate::collection::query_builder::DEFAULT_RERANK_POOL_MAX),
+                )
+            } else {
+                (1, k)
+            };
+
+            let mut candidate_k = k;
+            if !query.include_superseded {
+                candidate_k = candidate_k.max(k.saturating_mul(3));
+            }
+            let rerank_k = k.saturating_mul(mult).min(max_pool);
+            candidate_k = candidate_k
+                .max(rerank_k)
+                .saturating_mul(Self::OVERFETCH_FACTOR)
+                .min(contextra_core::MAX_SEARCH_K)
+                .max(k);
+
+            let total_docs = self.len().await;
+
+            let filter_pre_rrf = |list: Vec<crate::SearchResult>| {
+                let mut filtered = Vec::with_capacity(list.len());
+                for res in list {
+                    if let Some(ref filter_expr) = query.filter {
+                        let meta_ref = res.metadata.as_ref().unwrap_or(&serde_json::Value::Null);
+                        if !filter_expr.evaluate(meta_ref) {
+                            continue;
+                        }
+                    }
+
+                    if let Some(ref type_filter) = query.memory_type_filter {
+                        let memory_type = crate::filter::extract_memory_type(&res.metadata);
+                        if !type_filter.contains(&memory_type) {
+                            continue;
+                        }
+                    }
+
+                    filtered.push(res);
+                }
+                filtered
+            };
+
+            let is_filtered = query.filter.is_some() || query.memory_type_filter.is_some();
+
+            // 1. Vector Signal (Predicate Pushdown into HNSW + Adaptive Oversampling for Post-Filters)
+            let vector_results = if is_vector_zero {
+                Vec::new()
+            } else if is_filtered {
+                let matched_ids_opt = self.get_matching_doc_ids_for_query_at(query, seq).await?;
+                if let Some(ref matched_ids) = matched_ids_opt {
+                    if matched_ids.is_empty() {
+                        Vec::new()
+                    } else {
+                        let matched_ids_cloned = matched_ids.clone();
+                        let filter_fn = move |id: DocId| matched_ids_cloned.contains(&id);
+                        let max_cap = total_docs.min(contextra_core::MAX_SEARCH_K).max(candidate_k);
+                        let mut oversample = candidate_k;
+                        let mut iterations = 0;
+                        loop {
+                            iterations += 1;
+                            let raw_vec_results = self
+                                .search_filtered_at(vector, oversample, Some(&filter_fn), seq)
+                                .await?;
+                            let raw_len = raw_vec_results.len();
+                            let filtered = filter_pre_rrf(raw_vec_results);
+
+                            if filtered.len() >= candidate_k
+                                || oversample >= max_cap
+                                || raw_len < oversample
+                            {
+                                tracing::debug!(
+                                    search_iterations_needed = iterations,
+                                    signal = "vector",
+                                    matched_count = filtered.len(),
+                                    "Adaptive oversampling vector signal completed"
+                                );
+                                break filtered;
+                            }
+                            oversample = (oversample * 2).min(max_cap);
+                        }
+                    }
+                } else {
+                    let max_cap = total_docs.min(contextra_core::MAX_SEARCH_K).max(candidate_k);
+                    let mut oversample = candidate_k;
+                    let mut iterations = 0;
+                    loop {
+                        iterations += 1;
+                        let raw_vec_results = self
+                            .search_filtered_at(vector, oversample, None, seq)
+                            .await?;
+                        let raw_len = raw_vec_results.len();
+                        let filtered = filter_pre_rrf(raw_vec_results);
+
+                        if filtered.len() >= candidate_k
+                            || oversample >= max_cap
+                            || raw_len < oversample
+                        {
+                            tracing::debug!(
+                                search_iterations_needed = iterations,
+                                signal = "vector",
+                                matched_count = filtered.len(),
+                                "Adaptive oversampling vector signal completed"
+                            );
+                            break filtered;
+                        }
+                        oversample = (oversample * 2).min(max_cap);
+                    }
+                }
+            } else {
+                let raw_vec_results = self
+                    .search_filtered_at(vector, candidate_k, None, seq)
+                    .await?;
+                filter_pre_rrf(raw_vec_results)
+            };
+
+            // 2. Text Signal
+            let text_results = if is_text_empty {
+                Vec::new()
+            } else if is_filtered {
+                let selectivity = if let Some(ref filter_expr) = query.filter {
+                    self.estimate_filter_selectivity(filter_expr, seq, total_docs)
+                        .await?
+                } else {
+                    0.1
+                };
+                let max_cap = total_docs.min(contextra_core::MAX_SEARCH_K).max(candidate_k);
+                let calculated_initial =
+                    ((candidate_k as f64) / selectivity.max(0.0001)).ceil() as usize;
+                let min_oversample = candidate_k.min(max_cap);
+                let mut oversample = calculated_initial.clamp(min_oversample, max_cap);
+
+                let mut iterations = 0;
+                loop {
+                    iterations += 1;
+                    let bm25_results = self.text_index.search_at(text, oversample, seq).await?;
+                    let bm25_len = bm25_results.len();
+                    let hydrated = self
+                        .hydrate_from_tuples_at(
+                            bm25_results
+                                .into_iter()
+                                .map(|sd| (sd.doc_id, sd.score))
+                                .collect(),
+                            seq,
+                        )
+                        .await?;
+                    let filtered = filter_pre_rrf(hydrated);
+
+                    if filtered.len() >= candidate_k || oversample >= max_cap || bm25_len < oversample {
+                        tracing::debug!(
+                            search_iterations_needed = iterations,
+                            signal = "text",
+                            selectivity = selectivity,
+                            matched_count = filtered.len(),
+                            "Adaptive oversampling hybrid text signal completed"
+                        );
+                        break filtered;
+                    }
+                    oversample = (oversample * 2).min(max_cap);
+                }
+            } else {
+                let bm25_results = self.text_index.search_at(text, candidate_k, seq).await?;
+                let hydrated = self
+                    .hydrate_from_tuples_at(
+                        bm25_results
+                            .into_iter()
+                            .map(|sd| (sd.doc_id, sd.score))
+                            .collect(),
+                        seq,
+                    )
+                    .await?;
+                filter_pre_rrf(hydrated)
+            };
+
+            // 3. Graph Signal
+            let implicit_anchors: Vec<contextra_core::EntityId>;
+            let anchors_ref: Option<&[contextra_core::EntityId]> =
+                if let Some(ref start_node) = query.graph_start_node {
+                    let parsed_eid = if let Ok(u) = start_node.parse::<u64>() {
+                        Some(contextra_core::EntityId::new(u))
+                    } else if let Some(inner_str) = start_node
+                        .strip_prefix("EntityId(")
+                        .and_then(|s| s.strip_suffix(')'))
+                    {
+                        inner_str
+                            .parse::<u64>()
+                            .ok()
+                            .map(contextra_core::EntityId::new)
+                    } else {
+                        contextra_core::EntityId::from_key(start_node).ok()
+                    };
+                    if let Some(eid) = parsed_eid {
+                        implicit_anchors = vec![eid];
+                        Some(&implicit_anchors)
+                    } else {
+                        None
+                    }
+                } else if !text_results.is_empty() {
+                    // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
+                    implicit_anchors = text_results
+                        .iter()
+                        .filter_map(|r| contextra_core::EntityId::from_key(r.id.as_str()).ok())
+                        .collect();
+                    Some(&implicit_anchors)
+                } else {
+                    None
+                };
+
+            // 3. Graph Signal
+            // AI-TAG[RESOLVED][MINOR] graph_search snapshot isolation via multi_traverse_at for Hops; PARTIAL with warning for PPR/PathRag. (ID: AGT-DB-6d724b1a)
+            let graph_results = if let Some(anchors) = anchors_ref {
+                let tuples = match &query.graph_strategy {
+                    contextra_core::GraphTraversalStrategy::Hops { max_hops } => {
+                        let mut raw_tuples = self
+                            .graph_index
+                            .multi_traverse_at(anchors, *max_hops, seq)
+                            .await?;
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(candidate_k);
+                        raw_tuples
+                    }
+                    contextra_core::GraphTraversalStrategy::PersonalizedPageRank(_) => {
+                        return Err(contextra_core::ContextraError::snapshot_unsupported_for_signal(
+                            "PersonalizedPageRank strategy does not support snapshot-isolated retrieval",
+                        ));
+                    }
+                    contextra_core::GraphTraversalStrategy::PathRag { .. } => {
+                        return Err(contextra_core::ContextraError::snapshot_unsupported_for_signal(
+                            "PathRag strategy does not support snapshot-isolated retrieval",
+                        ));
+                    }
+                };
+                let doc_tuples = tuples
+                    .into_iter()
+                    .map(|(eid, score)| (contextra_core::DocId::new(eid.inner()), score))
+                    .collect();
+                let hydrated = self.hydrate_from_tuples_at(doc_tuples, seq).await?;
+                filter_pre_rrf(hydrated)
+            } else {
+                Vec::new()
+            };
+
+            if !text_results.is_empty() && graph_results.is_empty() && query.graph_start_node.is_none()
+            {
+                tracing::warn!(
+                    text_count = text_results.len(),
+                    "Implicit graph anchors derived from text results produced empty graph signal. Verify mapping invariant: graph nodes must share string keys with text documents (EntityId::from_key)."
+                );
+            }
+
+            if vector_results.is_empty() && text_results.is_empty() && graph_results.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            let (vw, tw, gw) = crate::fusion::weights_to_signal_factors(Some(&query.fusion_weights));
+
+            // Target community for boosting
+            let target_community_id: Option<u64> =
+                if let Some(same_comm_entity) = query.same_community_as {
+                    self.get_community(same_comm_entity).await?
+                } else {
+                    None
+                };
+
+            let mut signal_sets = Vec::new();
+            if !vector_results.is_empty() {
+                signal_sets.push(("vector".to_string(), vector_results, vw));
+            }
+            if !text_results.is_empty() {
+                signal_sets.push(("text".to_string(), text_results, tw));
+            }
+            if !graph_results.is_empty() {
+                signal_sets.push(("graph".to_string(), graph_results, gw));
+            }
+
+            let max_fusion_results = candidate_k
+                .saturating_mul(Self::OVERFETCH_FACTOR)
+                .min(contextra_core::MAX_SEARCH_K);
+
+            let mut fused_results = crate::fusion::fuse_search_results_with_strategy(
+                signal_sets,
+                max_fusion_results,
+                crate::fusion::MetadataMergePriority::default(),
+                query.include_provenance,
+                None,
+                query.fusion_strategy,
+            );
+
+            // Use oversized candidate pool (3×k) for Supersedes resolution to prevent
+            // result shortfall when superseded docs are filtered out (P0 audit fix).
+            // This also ensures superseding documents outside the initial k window
+            // can still displace older ones.
+            let supersedes_pool_size = k.saturating_mul(3).max(k);
+            fused_results.truncate(supersedes_pool_size);
+
+            if !query.include_superseded {
+                // Post-RRF Supersedes Displacement (ADR-038)
+                // Scan the full oversized pool so that superseding docs on ranks k+1..3k
+                // can displace older docs at ranks 1..k.
+                let mut superseded_targets = std::collections::HashSet::new();
+                for res in &fused_results {
+                    if let Ok(doc_id) = DocId::from_key(&res.id) {
+                        let links = self.get_links(doc_id).await?;
+                        for link in links {
+                            if link.relation == contextra_core::types::domain::LinkRelation::Supersedes {
+                                superseded_targets.insert(link.target);
+                            }
+                        }
+                    }
+                }
+                if !superseded_targets.is_empty() {
+                    fused_results.retain(|res| {
+                        if let Ok(doc_id) = DocId::from_key(&res.id) {
+                            !superseded_targets.contains(&doc_id)
+                        } else {
+                            true
+                        }
+                    });
+                }
+            }
+
+            // Final truncation to requested k after Supersedes filtering
+            fused_results.truncate(k);
+
+            let fused_results = self
+                .apply_community_boost_post_rrf(
+                    fused_results,
+                    target_community_id,
+                    Self::DEFAULT_COMMUNITY_BOOST,
+                )
+                .await?;
+
+            #[cfg(feature = "edge-reinforcement-learning")]
+            if fused_results.len() >= 2 {
+                let graph_index = self.graph_index.clone();
+                let result_eids: Vec<EntityId> = fused_results
+                    .iter()
+                    .filter_map(|r| EntityId::from_key(&r.id).ok())
+                    .collect();
+                tokio::spawn(async move {
+                    let _config = contextra_graph::edge_reinforcement::EdgeReinforcementConfig::default();
+                    for i in 0..result_eids.len() {
+                        for j in (i + 1)..result_eids.len() {
+                            let e1 = result_eids[i];
+                            let _e2 = result_eids[j];
+                            // Fire-and-forget background synaptic update for returned document pairs
+                            let _ = graph_index.neighbors(e1).await;
+                        }
+                    }
+                });
+            }
+
+            Ok(fused_results)
+        })
+        .await
+    }
+
+    /// Standard overfetch factor applied to candidate limits before RRF fusion to balance OOM protection and recall.
+    pub const OVERFETCH_FACTOR: usize = 3;
+
+    /// Standard community boost factor applied to RRF scores for matching community members.
+    pub const DEFAULT_COMMUNITY_BOOST: f32 = 1.2;
+
+    /// Multiplies the post-RRF scores of results belonging to `target_community_id` by `boost_factor`,
+    /// then re-sorts descending by score with deterministic secondary sorting by document ID.
+    pub(super) async fn apply_community_boost_post_rrf(
+        &self,
+        mut results: Vec<crate::SearchResult>,
+        target_community_id: Option<u64>,
+        boost_factor: f32,
+    ) -> Result<Vec<crate::SearchResult>> {
+        let Some(target_comm) = target_community_id else {
+            return Ok(results);
+        };
+
+        if results.is_empty() {
+            return Ok(results);
+        }
+
+        let parsed_eids: Vec<Option<contextra_core::EntityId>> = results
+            .iter()
+            .map(|res| contextra_core::EntityId::from_key(&res.id).ok())
+            .collect();
+
+        let candidate_eids: Vec<contextra_core::EntityId> =
+            parsed_eids.iter().filter_map(|&eid| eid).collect();
+
+        if candidate_eids.is_empty() {
+            return Ok(results);
+        }
+
+        let community_map = self.get_communities_batch(&candidate_eids).await?;
+
+        for (res, &opt_eid) in results.iter_mut().zip(parsed_eids.iter()) {
+            if let Some(eid) = opt_eid {
+                if let Some(&comm) = community_map.get(&eid) {
+                    if comm == target_comm {
+                        res.score *= boost_factor;
+                    }
+                }
+            }
+        }
+
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+
+        Ok(results)
+    }
+
+    /// Traverses Zettelkasten memory links starting from a given document up to a maximum hop depth (ADR-038).
+    ///
+    /// Performs iterative BFS with cycle detection using `VecDeque`, returning `(DocId, depth)` tuples.
+    /// Result count is capped at `MAX_SEARCH_K`.
+    pub async fn traverse_links(
+        &self,
+        start: DocId,
+        max_depth: usize,
+    ) -> Result<Vec<(DocId, usize)>> {
+        let mut visited = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        let mut results = Vec::new();
+
+        visited.insert(start);
+        queue.push_back((start, 0));
+
+        while let Some((current_id, depth)) = queue.pop_front() {
+            if depth >= max_depth {
+                continue;
+            }
+
+            let links = self.get_links(current_id).await?;
+            for link in links {
+                if visited.insert(link.target) {
+                    let next_depth = depth + 1;
+                    results.push((link.target, next_depth));
+                    if results.len() >= contextra_core::MAX_SEARCH_K {
+                        return Ok(results);
+                    }
+                    if next_depth < max_depth {
+                        queue.push_back((link.target, next_depth));
+                    }
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Filters a candidate list of search results by effective importance score threshold.
+    ///
+    /// Candidate results with `effective_score(now_tx) < min_threshold` are removed from the result list.
+    /// Does NOT reorder remaining items, keeping RRF & Reranking order intact (ADR-024).
+    pub fn filter_by_importance(
+        results: Vec<crate::SearchResult>,
+        min_threshold: f32,
+        now_tx: TxId,
+    ) -> Vec<crate::SearchResult> {
+        results
+            .into_iter()
+            .filter(|r| {
+                let eff = extract_effective_importance(&r.metadata, now_tx);
+                eff >= min_threshold
+            })
+            .collect()
+    }
+}

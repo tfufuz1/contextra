@@ -163,7 +163,7 @@ pub fn check_type_registry(root: &Path, type_name: &str) -> TypeCheckResult {
     result
 }
 
-/// Extrahiert den Crate-Namen aus einem relativen Pfad wie `crates/memfuse-core/src/types.rs`.
+/// Extrahiert den Crate-Namen aus einem relativen Pfad wie `crates/contextra-core/src/types.rs`.
 fn extract_crate_from_path(path: &str) -> String {
     let parts: Vec<&str> = path.split('/').collect();
     if parts.len() >= 2 && parts[0] == "crates" {
@@ -180,12 +180,12 @@ mod tests {
     #[test]
     fn test_extract_crate_from_path() {
         assert_eq!(
-            extract_crate_from_path("crates/memfuse-core/src/types.rs"),
-            "memfuse-core"
+            extract_crate_from_path("crates/contextra-core/src/types.rs"),
+            "contextra-core"
         );
         assert_eq!(
-            extract_crate_from_path("crates/memfuse-db/src/collection/search.rs"),
-            "memfuse-db"
+            extract_crate_from_path("crates/contextra-db/src/collection/search.rs"),
+            "contextra-db"
         );
         assert_eq!(extract_crate_from_path("src/main.rs"), "");
     }
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn test_check_type_registry_known_type() {
         let root = crate::find_root_dir();
-        // TenantId ist bekanntermaßen in memfuse-core definiert
+        // TenantId ist bekanntermaßen in contextra-core definiert
         let result = check_type_registry(&root, "TenantId");
         // Sollte mindestens im Code gefunden werden
         assert!(

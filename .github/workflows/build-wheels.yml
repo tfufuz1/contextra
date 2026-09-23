@@ -1,4 +1,4 @@
-name: Build memfuse-py Binary Wheels
+name: Build contextra-py Binary Wheels
 
 "on":
   workflow_dispatch:
@@ -38,7 +38,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --manifest-path crates/memfuse-py/Cargo.toml --release --out dist
+          args: --manifest-path crates/contextra-py/Cargo.toml --release --out dist
           sccache: 'true'
 
       - name: Set up Python
@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           pip install dist/*.whl
-          python -c "import memfuse"
+          python -c "import contextra"
 
       - name: Upload wheels as artifact
         uses: actions/upload-artifact@v4
@@ -68,7 +68,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --manifest-path crates/memfuse-py/Cargo.toml --out dist
+          args: --manifest-path crates/contextra-py/Cargo.toml --out dist
 
       - name: Upload sdist as artifact
         uses: actions/upload-artifact@v4

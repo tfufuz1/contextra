@@ -163,14 +163,14 @@ pub fn get_current_head_sha() -> String {
 }
 
 pub fn fetch_open_prs_from_github(token: &str) -> Result<Vec<CommitEntry>, String> {
-    let url = "https://api.github.com/repos/tfufuz1/memfuse/pulls?state=open&per_page=100";
+    let url = "https://api.github.com/repos/tfufuz1/contextra/pulls?state=open&per_page=100";
     let output = Command::new("curl")
         .args([
             "-s",
             "-H",
             &format!("Authorization: Bearer {}", token),
             "-H",
-            "User-Agent: memfuse-xtask",
+            "User-Agent: contextra-xtask",
             "-H",
             "Accept: application/vnd.github+json",
             url,
@@ -489,14 +489,14 @@ pub fn get_remote_branch_diffs() -> Vec<BranchDiffEntry> {
 }
 
 pub fn fetch_open_pr_diffs_from_github(token: &str) -> Result<Vec<BranchDiffEntry>, String> {
-    let url = "https://api.github.com/repos/tfufuz1/memfuse/pulls?state=open&per_page=100";
+    let url = "https://api.github.com/repos/tfufuz1/contextra/pulls?state=open&per_page=100";
     let output = Command::new("curl")
         .args([
             "-s",
             "-H",
             &format!("Authorization: Bearer {}", token),
             "-H",
-            "User-Agent: memfuse-xtask",
+            "User-Agent: contextra-xtask",
             "-H",
             "Accept: application/vnd.github+json",
             url,
@@ -539,7 +539,7 @@ pub fn fetch_open_pr_diffs_from_github(token: &str) -> Result<Vec<BranchDiffEntr
         attempt_count += 1;
         let title = pr["title"].as_str().unwrap_or_default();
         let pr_url = format!(
-            "https://api.github.com/repos/tfufuz1/memfuse/pulls/{}",
+            "https://api.github.com/repos/tfufuz1/contextra/pulls/{}",
             pr_number
         );
 
@@ -549,7 +549,7 @@ pub fn fetch_open_pr_diffs_from_github(token: &str) -> Result<Vec<BranchDiffEntr
                 "-H",
                 &format!("Authorization: Bearer {}", token),
                 "-H",
-                "User-Agent: memfuse-xtask",
+                "User-Agent: contextra-xtask",
                 "-H",
                 "Accept: application/vnd.github.v3.diff",
                 &pr_url,
@@ -644,7 +644,7 @@ pub fn check_duplicate_intent() -> Result<(), String> {
     let remote_commits = get_remote_branch_commits();
     candidate_commits.extend(remote_commits);
 
-    let is_ci = env::var("MEMFUSE_CI").map(|v| v == "true").unwrap_or(false)
+    let is_ci = env::var("CONTEXTRA_CI").map(|v| v == "true").unwrap_or(false)
         || env::var("GITHUB_ACTIONS").is_ok();
     let token = env::var("GITHUB_TOKEN")
         .ok()
@@ -693,7 +693,7 @@ pub fn check_duplicate_intent() -> Result<(), String> {
     pr_diff_candidates.extend(remote_diffs);
 
     let new_commits = get_new_commits()?;
-    let pr_body = env::var("MEMFUSE_PR_BODY").unwrap_or_default();
+    let pr_body = env::var("CONTEXTRA_PR_BODY").unwrap_or_default();
     let override_hash = parse_override_exception(&pr_body);
 
     let hits = evaluate_duplicate_hits(&new_commits, &candidate_commits);
@@ -870,9 +870,9 @@ mod tests {
 
     #[test]
     fn test_parse_conventional_commit() {
-        let msg = "feat(memfuse-core): add new vector index";
+        let msg = "feat(contextra-core): add new vector index";
         let (scope, subject) = parse_conventional_commit(msg);
-        assert_eq!(scope, "memfuse-core");
+        assert_eq!(scope, "contextra-core");
         assert_eq!(subject, "add new vector index");
 
         let msg_no_scope = "fix: resolve deadlock in store";
@@ -967,8 +967,8 @@ mod tests {
     #[test]
     fn test_symbol_overlap_same_file_same_symbol_detected() {
         let diff_a = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -100,6 +100,12 @@
 +fn binary_search_in_block(data: &[u8]) -> usize {
 +    // implementation A
@@ -977,8 +977,8 @@ mod tests {
 "#;
 
         let diff_b = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -100,6 +100,12 @@
 +pub fn binary_search_in_block(block_data: &[u8], key: &[u8]) -> Option<usize> {
 +    // implementation B with different body
@@ -992,15 +992,15 @@ mod tests {
         let overlaps = compute_symbol_overlap(&map_a, &map_b);
         assert_eq!(overlaps.len(), 1, "Expected 1 colliding file");
         let (file, symbols) = &overlaps[0];
-        assert_eq!(file, &PathBuf::from("crates/memfuse-store/src/sstable.rs"));
+        assert_eq!(file, &PathBuf::from("crates/contextra-store/src/sstable.rs"));
         assert!(symbols.contains("binary_search_in_block"));
     }
 
     #[test]
     fn test_symbol_overlap_same_file_different_symbols_no_collision() {
         let diff_a = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -100,6 +100,10 @@
 +fn binary_search_in_block(data: &[u8]) -> usize {
 +    42
@@ -1008,8 +1008,8 @@ mod tests {
 "#;
 
         let diff_b = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -200,6 +200,10 @@
 +pub fn linear_scan_block(data: &[u8]) -> usize {
 +    0
@@ -1029,8 +1029,8 @@ mod tests {
     #[test]
     fn test_symbol_overlap_different_files_same_symbol_no_collision() {
         let diff_a = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -100,6 +100,10 @@
 +fn helper_fn() -> bool {
 +    true
@@ -1038,8 +1038,8 @@ mod tests {
 "#;
 
         let diff_b = r#"
---- a/crates/memfuse-store/src/wal.rs
-+++ b/crates/memfuse-store/src/wal.rs
+--- a/crates/contextra-store/src/wal.rs
++++ b/crates/contextra-store/src/wal.rs
 @@ -100,6 +100,10 @@
 +fn helper_fn() -> bool {
 +    false
@@ -1059,8 +1059,8 @@ mod tests {
     #[test]
     fn test_symbol_overlap_different_fns_same_file_not_detected() {
         let diff_a = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -100,6 +100,10 @@
 +fn foo() -> u32 {
 +    1
@@ -1068,8 +1068,8 @@ mod tests {
 "#;
 
         let diff_b = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -200,6 +200,10 @@
 +fn bar() -> u32 {
 +    2
@@ -1089,16 +1089,16 @@ mod tests {
     #[test]
     fn test_symbol_overlap_same_fn_different_files_not_detected() {
         let diff_a = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -100,6 +100,10 @@
 +fn process_entry(id: u64) {
 +}
 "#;
 
         let diff_b = r#"
---- a/crates/memfuse-store/src/wal.rs
-+++ b/crates/memfuse-store/src/wal.rs
+--- a/crates/contextra-store/src/wal.rs
++++ b/crates/contextra-store/src/wal.rs
 @@ -100,6 +100,10 @@
 +fn process_entry(id: u64) {
 +}
@@ -1117,8 +1117,8 @@ mod tests {
     #[test]
     fn test_symbol_overlap_regression_binary_search_in_block() {
         let diff_a = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -100,6 +100,10 @@
 +fn binary_search_in_block(data: &[u8]) -> usize {
 +    0
@@ -1126,8 +1126,8 @@ mod tests {
 "#;
 
         let diff_b = r#"
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -100,6 +100,10 @@
 +pub fn binary_search_in_block(block: &[u8], key: &[u8]) -> Option<usize> {
 +    None
@@ -1140,7 +1140,7 @@ mod tests {
         let overlaps = compute_symbol_overlap(&map_a, &map_b);
         assert_eq!(overlaps.len(), 1, "Expected 1 overlapping file");
         let (file, symbols) = &overlaps[0];
-        assert_eq!(file, &PathBuf::from("crates/memfuse-store/src/sstable.rs"));
+        assert_eq!(file, &PathBuf::from("crates/contextra-store/src/sstable.rs"));
         assert!(
             symbols.contains("binary_search_in_block"),
             "Expected binary_search_in_block symbol overlap"
@@ -1150,9 +1150,9 @@ mod tests {
     #[test]
     fn test_regression_incident_sstable_symbol_overlap_detected() {
         let diff_pr1 = r#"
-diff --git a/crates/memfuse-store/src/sstable.rs b/crates/memfuse-store/src/sstable.rs
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+diff --git a/crates/contextra-store/src/sstable.rs b/crates/contextra-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -540,6 +540,15 @@ impl SstableReader {
 +pub struct BlockCache {
 +    shards: Vec<RwLock<LruCache<(u64, u64), Bytes>>>,
@@ -1169,9 +1169,9 @@ diff --git a/crates/memfuse-store/src/sstable.rs b/crates/memfuse-store/src/ssta
 "#;
 
         let diff_pr2 = r#"
-diff --git a/crates/memfuse-store/src/sstable.rs b/crates/memfuse-store/src/sstable.rs
---- a/crates/memfuse-store/src/sstable.rs
-+++ b/crates/memfuse-store/src/sstable.rs
+diff --git a/crates/contextra-store/src/sstable.rs b/crates/contextra-store/src/sstable.rs
+--- a/crates/contextra-store/src/sstable.rs
++++ b/crates/contextra-store/src/sstable.rs
 @@ -180,6 +180,15 @@ impl SstableReader {
 +pub struct BlockCache {
 +    shards: [BlockCacheShard; BLOCK_CACHE_SHARDS],
@@ -1198,7 +1198,7 @@ diff --git a/crates/memfuse-store/src/sstable.rs b/crates/memfuse-store/src/ssta
             "Must detect symbol overlap in sstable.rs"
         );
         let (file, symbols) = &overlaps[0];
-        assert_eq!(file, &PathBuf::from("crates/memfuse-store/src/sstable.rs"));
+        assert_eq!(file, &PathBuf::from("crates/contextra-store/src/sstable.rs"));
         assert!(symbols.contains("BlockCache"), "Must contain BlockCache");
         assert!(
             symbols.contains("binary_search_in_block"),

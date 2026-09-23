@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # verify_workspace.sh — Bottom-up, Crate-für-Crate Kompilierungs-, Test-, Feature-,
-# Gate-, Loom- und Benchmark-Verifikation für MemFuse Cognitive OS.
+# Gate-, Loom- und Benchmark-Verifikation für Contextra Cognitive OS.
 # Version 3 — ausgerichtet an der finalen konsolidierten Gesamtspezifikation (§0.3, §15, §17).
 #
 # Zweck: EIN Skript, das systematisch das gesamte Repo prüft und dabei jeden Fund
@@ -26,9 +26,9 @@
 #   chmod +x verify_workspace.sh
 #   ./verify_workspace.sh                              # Standard: check+clippy+test, bottom-up
 #   ./verify_workspace.sh --fast                        # nur cargo check
-#   ./verify_workspace.sh --resume memfuse-index         # ab Crate X weitermachen
+#   ./verify_workspace.sh --resume contextra-index         # ab Crate X weitermachen
 #   ./verify_workspace.sh --all-crates                  # nicht beim ersten Fehler stoppen
-#   ./verify_workspace.sh --only memfuse-db,memfuse-graph
+#   ./verify_workspace.sh --only contextra-db,contextra-graph
 #   ./verify_workspace.sh --no-clippy
 #   ./verify_workspace.sh --dag-check
 #   ./verify_workspace.sh --feature-matrix              # §0.3 Feature-Katalog einzeln bauen
@@ -61,48 +61,48 @@ set -uo pipefail
 
 # --- DAG-Reihenfolge exakt aus §0.1/§4 der finalen Spezifikation (Layer 0 -> höchste) ---
 CRATES_ALL=(
-  memfuse-core-ipc-gen   # Layer 0
-  memfuse-core           # Layer 0
-  memfuse-store          # Layer 1
-  memfuse-crypto         # Layer 1
-  memfuse-text           # Layer 1
-  memfuse-index          # Layer 1
-  memfuse-graph          # Layer 1
-  memfuse-rank           # Layer 0
-  memfuse-checkpoint     # Layer 1
-  memfuse-sandbox        # Layer 6.5 (aber Blattabhängigkeit, früh prüfbar)
-  memfuse-db             # Layer 2
-  memfuse-router         # Layer 3
-  memfuse-candle         # Layer 3
-  memfuse-ollama         # Layer 3
-  memfuse-embed          # Layer 3 (optional)
-  memfuse-agent          # Layer 3
-  memfuse-mcp            # Layer 4
-  memfuse-bench          # Layer 5 (Pfad: benchmarks/memfuse-bench)
+  contextra-core-ipc-gen   # Layer 0
+  contextra-core           # Layer 0
+  contextra-store          # Layer 1
+  contextra-crypto         # Layer 1
+  contextra-text           # Layer 1
+  contextra-index          # Layer 1
+  contextra-graph          # Layer 1
+  contextra-rank           # Layer 0
+  contextra-checkpoint     # Layer 1
+  contextra-sandbox        # Layer 6.5 (aber Blattabhängigkeit, früh prüfbar)
+  contextra-db             # Layer 2
+  contextra-router         # Layer 3
+  contextra-candle         # Layer 3
+  contextra-ollama         # Layer 3
+  contextra-embed          # Layer 3 (optional)
+  contextra-agent          # Layer 3
+  contextra-mcp            # Layer 4
+  contextra-bench          # Layer 5 (Pfad: benchmarks/contextra-bench)
 )
 
 # --- §0.3 Feature-Katalog: welches Crate, welches Feature, Default-Zustand ---
 # Format: "crate:feature:default(on|off|dev)"
 FEATURE_CATALOG=(
-  "memfuse-core:docid-128:off"
-  "memfuse-store:block-cache-v2:off"
-  "memfuse-router:egress-sherman-morrison:off"
-  "memfuse-index:experimental-diskann:off"
-  "memfuse-graph:edge-reinforcement-learning:off"
-  "memfuse-router:bandit-routing:on"
-  "memfuse-mcp:cloud-egress-guard:on"
-  "memfuse-mcp:wasm-sandbox:on"
-  "memfuse-candle:kv-bridge:on"
-  "memfuse-store:fault-injection:dev"
-  "memfuse-store:loom:dev"
-  "memfuse-graph:loom:dev"
+  "contextra-core:docid-128:off"
+  "contextra-store:block-cache-v2:off"
+  "contextra-router:egress-sherman-morrison:off"
+  "contextra-index:experimental-diskann:off"
+  "contextra-graph:edge-reinforcement-learning:off"
+  "contextra-router:bandit-routing:on"
+  "contextra-mcp:cloud-egress-guard:on"
+  "contextra-mcp:wasm-sandbox:on"
+  "contextra-candle:kv-bridge:on"
+  "contextra-store:fault-injection:dev"
+  "contextra-store:loom:dev"
+  "contextra-graph:loom:dev"
 )
 
 # --- §15.4 Pflicht-CI-Gates (best-effort; werden übersprungen, falls das xtask-Subcommand
 #     im aktuellen Code-Stand noch nicht implementiert ist — das ist selbst ein Befund) ---
 XTASK_GATES=(
   "check-flatbuffers-drift"
-  "check-bandit-latency-budget|--features memfuse-router/egress-sherman-morrison"
+  "check-bandit-latency-budget|--features contextra-router/egress-sherman-morrison"
   "check-module-reachability"
 )
 
@@ -173,7 +173,7 @@ LOOM_FILE="${OUTDIR}/LOOM_REPORT.md"
 : > "$DIAG_JSONL"
 : > "$DUP_FILE"
 
-echo "# MemFuse Bottom-Up Verification — $(date -Iseconds)" > "$SUMMARY"
+echo "# Contextra Bottom-Up Verification — $(date -Iseconds)" > "$SUMMARY"
 echo "# Modus: $MODE | stop_on_fail=$STOP_ON_FAIL | clippy=$RUN_CLIPPY" >> "$SUMMARY"
 printf "%-22s %-8s %-8s %-8s %-8s %-10s\n" "CRATE" "CHECK" "CLIPPY" "TEST" "ERRORS" "DAUER(s)" >> "$SUMMARY"
 
@@ -434,9 +434,9 @@ if $RUN_LOOM; then
   {
     echo ""
     echo "Erwartete Testpfade (§15.3):"
-    echo "- crates/memfuse-store/tests/loom_group_commit.rs"
-    echo "- crates/memfuse-store/tests/loom_multi_key_lock.rs"
-    echo "- crates/memfuse-graph/tests/loom_relate_n_ary.rs"
+    echo "- crates/contextra-store/tests/loom_group_commit.rs"
+    echo "- crates/contextra-store/tests/loom_multi_key_lock.rs"
+    echo "- crates/contextra-graph/tests/loom_relate_n_ary.rs"
     echo ""
     for t in loom_group_commit loom_multi_key_lock loom_relate_n_ary; do
       if grep -q "$t" "$loom_out"; then

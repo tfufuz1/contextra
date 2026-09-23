@@ -1,5 +1,5 @@
 {
-  description = "Memfuse Development Environment";
+  description = "contextra Development Environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -72,7 +72,7 @@
             export OPENSSL_INCLUDE_DIR="${pkgs.openssl.dev}/include"
             export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.glib.dev}/lib/pkgconfig:${pkgs.gtk3.dev}/lib/pkgconfig:${pkgs.webkitgtk_4_1.dev}/lib/pkgconfig:${pkgs.libsoup_3.dev}/lib/pkgconfig"
 
-            echo "Memfuse Development Environment Loaded 🦀🐍"
+            echo "contextra Development Environment Loaded 🦀🐍"
           '';
         };
       }

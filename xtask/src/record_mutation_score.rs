@@ -182,7 +182,7 @@ mod tests {
 
         let args1 = vec![
             "--crate".to_string(),
-            "memfuse-test".to_string(),
+            "contextra-test".to_string(),
             "--total".to_string(),
             "100".to_string(),
             "--caught".to_string(),
@@ -199,7 +199,7 @@ mod tests {
         assert_eq!(lines.len(), 1);
 
         let parsed: MutationScoreEntry = serde_json::from_str(lines[0]).unwrap();
-        assert_eq!(parsed.crate_name, "memfuse-test");
+        assert_eq!(parsed.crate_name, "contextra-test");
         assert_eq!(parsed.total_mutants, 100);
         assert_eq!(parsed.caught, 85);
         assert_eq!(parsed.missed, 15);
@@ -208,7 +208,7 @@ mod tests {
         // Run again with updated counts for the same commit/crate -> should update the existing entry (idempotent)
         let args2 = vec![
             "--crate".to_string(),
-            "memfuse-test".to_string(),
+            "contextra-test".to_string(),
             "--total".to_string(),
             "100".to_string(),
             "--caught".to_string(),
@@ -234,7 +234,7 @@ mod tests {
         // Caught > Total
         let args = vec![
             "--crate".to_string(),
-            "memfuse-test".to_string(),
+            "contextra-test".to_string(),
             "--total".to_string(),
             "10".to_string(),
             "--caught".to_string(),
@@ -245,7 +245,7 @@ mod tests {
         // Missing total
         let args_no_total = vec![
             "--crate".to_string(),
-            "memfuse-test".to_string(),
+            "contextra-test".to_string(),
             "--caught".to_string(),
             "5".to_string(),
         ];

@@ -13,10 +13,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run Criterion Benchmarks
         run: |
-          cargo bench -p memfuse-vector --bench distance_nan_impact_bench -- --save-baseline current
-          cargo bench -p memfuse-vector --bench hnsw_delete_search_bench -- --save-baseline current
-          cargo bench -p memfuse-db --bench rrf_allocation_bench -- --save-baseline current
-          cargo bench -p memfuse-store --bench wal_throughput_bench -- --save-baseline current
+          cargo bench -p contextra-vector --bench distance_nan_impact_bench -- --save-baseline current
+          cargo bench -p contextra-vector --bench hnsw_delete_search_bench -- --save-baseline current
+          cargo bench -p contextra-db --bench rrf_allocation_bench -- --save-baseline current
+          cargo bench -p contextra-store --bench wal_throughput_bench -- --save-baseline current
       - name: Assert No Regression (±5%)
         run: cargo xtask bench-gate --tolerance 0.05
       - name: Upload Benchmark Results

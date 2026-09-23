@@ -1,4 +1,4 @@
-name: Release memfuse-mcp-server Binary
+name: Release contextra-mcp-server Binary
 
 on:
   push:
@@ -46,7 +46,7 @@ jobs:
 
       - name: Build release binary
         shell: bash
-        run: cargo build --release --locked -p memfuse-mcp --bin memfuse-mcp-server --target ${{ matrix.target }}
+        run: cargo build --release --locked -p contextra-mcp --bin contextra-mcp-server --target ${{ matrix.target }}
 
       - name: Package release artifact
         shell: bash
@@ -54,20 +54,20 @@ jobs:
           STAGE_DIR="staging_${{ matrix.target }}"
           mkdir -p "$STAGE_DIR"
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp "target/${{ matrix.target }}/release/memfuse-mcp-server.exe" "$STAGE_DIR/"
+            cp "target/${{ matrix.target }}/release/contextra-mcp-server.exe" "$STAGE_DIR/"
             cd "$STAGE_DIR"
-            7z a "../memfuse-mcp-server-${{ matrix.target }}.zip" memfuse-mcp-server.exe
+            7z a "../contextra-mcp-server-${{ matrix.target }}.zip" contextra-mcp-server.exe
           else
-            cp "target/${{ matrix.target }}/release/memfuse-mcp-server" "$STAGE_DIR/"
+            cp "target/${{ matrix.target }}/release/contextra-mcp-server" "$STAGE_DIR/"
             cd "$STAGE_DIR"
-            tar -czvf "../memfuse-mcp-server-${{ matrix.target }}.tar.gz" memfuse-mcp-server
+            tar -czvf "../contextra-mcp-server-${{ matrix.target }}.tar.gz" contextra-mcp-server
           fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.target }}
-          path: memfuse-mcp-server-${{ matrix.target }}.${{ matrix.archive_ext }}
+          path: contextra-mcp-server-${{ matrix.target }}.${{ matrix.archive_ext }}
 
   release:
     name: Publish GitHub Release
@@ -86,12 +86,12 @@ jobs:
         shell: bash
         run: |
           cd release-artifacts
-          sha256sum memfuse-mcp-server-* > SHA256SUMS
+          sha256sum contextra-mcp-server-* > SHA256SUMS
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-artifacts/memfuse-mcp-server-*
+            release-artifacts/contextra-mcp-server-*
             release-artifacts/SHA256SUMS
           generate_release_notes: true

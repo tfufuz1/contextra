@@ -1,19 +1,19 @@
 {
   "mcpServers": {
-    "memfuse": {
+    "contextra": {
       "command": "cargo",
       "args": [
         "run",
         "--release",
         "--bin",
-        "memfuse-mcp-server",
+        "contextra-mcp-server",
         "--",
         "--db-path",
-        "./memfuse_data"
+        "./contextra_data"
       ],
       "env": {
-        "MEMFUSE_OLLAMA_URL": "http://localhost:11434",
-        "MEMFUSE_EMBED_MODEL": "nomic-embed-text"
+        "CONTEXTRA_OLLAMA_URL": "http://localhost:11434",
+        "CONTEXTRA_EMBED_MODEL": "nomic-embed-text"
       }
     }
   }

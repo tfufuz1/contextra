@@ -1,4 +1,4 @@
-# MemFuse — Source of Truth (SOT)
+# Contextra — Source of Truth (SOT)
 
 > **Hinweis:** Dieses Dokument wurde als Teil der Governance-Konsolidierung aufgelöst und dient nur noch als Weiterleitungs-Stub.
 

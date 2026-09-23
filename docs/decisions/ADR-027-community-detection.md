@@ -4,12 +4,12 @@
 * **Datum der Erstfassung:** 2026-08-27
 * **Datum der Revision:** 2026-08-30
 * **Kontext / Auslöser:**
-  Für die GraphRAG-Suchkomponente in `memfuse-graph` (Signal 3 der 4-Signal-Fusion) ist eine automatisierte Community-Erkennung (Clustering) auf dem Wissensgraphen (`CsrGraph`) erforderlich.
+  Für die GraphRAG-Suchkomponente in `contextra-graph` (Signal 3 der 4-Signal-Fusion) ist eine automatisierte Community-Erkennung (Clustering) auf dem Wissensgraphen (`CsrGraph`) erforderlich.
 
   In der ursprünglichen Fassung von ADR-027 wurde der Label Propagation Algorithm (LPA) als Zielarchitektur gewählt, da er hohe Ausführungsgeschwindigkeit und einfachen Determinismus bot. In der Praxis und bei fortgeschrittener GraphRAG-Evaluierung zeigte sich jedoch eine strukturelle Schwäche von LPA: LPA garantiert keine wohlverbundenen Communities. Bei schwach verbundenen Brücken-Kanten oder ungleichmäßig dicht verteilten Entitäten neigt LPA dazu, zusammenhanglose oder schwach verbundene Teilgraphen in dieselbe Community zu gruppieren.
 
 ## Entscheidungs-Revision (2026-08-30)
-Der Clustering-Algorithmus für Community Detection in `crates/memfuse-graph/src/community.rs` wird verbindlich von **Label Propagation (LPA)** auf den **Leiden-Algorithmus (Traag et al., 2019)** umgestellt.
+Der Clustering-Algorithmus für Community Detection in `crates/contextra-graph/src/community.rs` wird verbindlich von **Label Propagation (LPA)** auf den **Leiden-Algorithmus (Traag et al., 2019)** umgestellt.
 
 **Beibehaltene Kriterien der ursprünglichen Begründung:**
 1. **Ausführungsgeschwindigkeit:** Leiden bietet O(N log N) / O(M) nahezu lineare Laufzeitkomplexität und eignet sich hervorragend für In-Memory CSR-Graphen.
@@ -37,7 +37,7 @@ Der Clustering-Algorithmus für Community Detection in `crates/memfuse-graph/src
 
 ## Konsequenzen & Integration
 * Öffentliche Schnittstelle `detect_communities(graph, config)` und Typen (`CommunityDetectionConfig`, `CommunityAssignment`) bleiben abwärtskompatibel.
-* Moduldokumentation in `crates/memfuse-graph/src/community.rs` und System-Dokumentation (`SOURCE_OF_TRUTH.md`, `AGENTS.md`, `DECISIONS.md`) wurden auf den Leiden-Algorithmus aktualisiert.
+* Moduldokumentation in `crates/contextra-graph/src/community.rs` und System-Dokumentation (`SOURCE_OF_TRUTH.md`, `AGENTS.md`, `DECISIONS.md`) wurden auf den Leiden-Algorithmus aktualisiert.
 
 <!--
 Referenzen auf ADRs in DECISIONS.md (Lücken-Prüfer-Kompatibilität für docs/decisions):

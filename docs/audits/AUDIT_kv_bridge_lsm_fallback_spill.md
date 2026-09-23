@@ -1,19 +1,19 @@
-# AUDIT REPORT: KV-Cache-Bridge LSM-Fallback-Spill Reifegrad-Klärung (`memfuse-candle`)
+# AUDIT REPORT: KV-Cache-Bridge LSM-Fallback-Spill Reifegrad-Klärung (`contextra-candle`)
 
 **Audit Date:** September 2026
 **Auditor:** Jules (Principal Rust Systems Engineer)
 **Task Claim:** `WELLE5-AUDIT-KVBRIDGE-SPILL`
-**Target Crate:** `crates/memfuse-candle` (Layer 3)
-**Primary Source Under Audit:** `crates/memfuse-candle/src/kv_bridge.rs`
-**Secondary Source Under Audit:** `crates/memfuse-crypto/src/kv_segment/store.rs`
+**Target Crate:** `crates/contextra-candle` (Layer 3)
+**Primary Source Under Audit:** `crates/contextra-candle/src/kv_bridge.rs`
+**Secondary Source Under Audit:** `crates/contextra-crypto/src/kv_segment/store.rs`
 
 ---
 
 ## 1. Executive Summary & Audit Baseline
 
 ### 1.1 Scope & Purpose
-This audit clarifies the maturity status ("Reifegrad") of the **LSM-Fallback-Spill** mechanism for the KV-Cache Bridge in `crates/memfuse-candle`.
-As noted in `MEMFUSE_ENDPRODUKT_SPEZIFIKATION_FINAL_9.md` §4.8 / §5.3:
+This audit clarifies the maturity status ("Reifegrad") of the **LSM-Fallback-Spill** mechanism for the KV-Cache Bridge in `crates/contextra-candle`.
+As noted in `CONTEXTRA_ENDPRODUKT_SPEZIFIKATION_FINAL_9.md` §4.8 / §5.3:
 > `[REIFEGRAD UNGEPRÜFT]`: LSM-Fallback-Spill (Paged Encrypted mit Fallback in LSM aus LLM-SLM-Spec §2.2) im Code nicht sichtbar — `kv_bridge.rs` nutzt dedizierten `store`, nicht LSM-Fallback.
 
 The purpose of this audit is to:
@@ -24,7 +24,7 @@ The purpose of this audit is to:
 
 ### 1.2 Final Determination
 * **Status:** **(a) VOLLSTÄNDIG FEHLEND (Completely Missing)**.
-* **Explanation:** `KvBridgeAdapter` in `crates/memfuse-candle/src/kv_bridge.rs` interacts exclusively with an in-memory `TenantIsolatedKvStore` (`crates/memfuse-crypto/src/kv_segment/store.rs`). When the in-memory store reaches capacity or undergoes LRU eviction, evicted KV segments are immediately dropped and zeroized (`ZeroizeOnDrop`). There is currently **zero code connection** between `KvBridgeAdapter` and `LsmStorage` (`memfuse-store`).
+* **Explanation:** `KvBridgeAdapter` in `crates/contextra-candle/src/kv_bridge.rs` interacts exclusively with an in-memory `TenantIsolatedKvStore` (`crates/contextra-crypto/src/kv_segment/store.rs`). When the in-memory store reaches capacity or undergoes LRU eviction, evicted KV segments are immediately dropped and zeroized (`ZeroizeOnDrop`). There is currently **zero code connection** between `KvBridgeAdapter` and `LsmStorage` (`contextra-store`).
 
 ---
 
@@ -34,13 +34,13 @@ The purpose of this audit is to:
 According to `FINAL_9.md` §4.8/§5.3 and the Air-Gap Sovereign LLM-SLM specification:
 * The KV-Cache Bridge should provide a two-tier hierarchy:
   1. **Tier 1 (Fast Path / RAM):** In-memory encrypted LRU cache (`TenantIsolatedKvStore`).
-  2. **Tier 2 (Slow Path / LSM Spill):** Encrypted fall-back disk persistence in the `LsmStorage` engine (`memfuse-store`) when RAM capacity or memory pressure triggers eviction.
+  2. **Tier 2 (Slow Path / LSM Spill):** Encrypted fall-back disk persistence in the `LsmStorage` engine (`contextra-store`) when RAM capacity or memory pressure triggers eviction.
 * Upon cache lookup (`try_get_cached_segment`), if a segment is absent from RAM, the system should check Tier 2 (LSM) before declaring a cache miss and falling back to full prompt prefill.
 * Security requirements: KV segments written to disk/LSM must maintain strict AES-256-GCM-SIV encryption with HKDF key derivation per `TenantId`, preserving tenant boundary isolation and verifying `model_fingerprint` and `rope_offset` upon retrieval.
 
 ### 2.2 Ist-Zustand (Repository Code State)
 
-#### `crates/memfuse-candle/src/kv_bridge.rs`
+#### `crates/contextra-candle/src/kv_bridge.rs`
 * **Adapter Structure:**
   ```rust
   #[derive(Clone)]
@@ -60,7 +60,7 @@ According to `FINAL_9.md` §4.8/§5.3 and the Air-Gap Sovereign LLM-SLM specific
   - Validates `payload.fingerprint == key.fingerprint` and `payload.rope_offset == key.rope_offset`.
   - Returns `Some(payload.data)` on success or `None` on any lookup/decryption/validation error.
 
-#### `crates/memfuse-crypto/src/kv_segment/store.rs`
+#### `crates/contextra-crypto/src/kv_segment/store.rs`
 * **Eviction Behavior (`evict_lru_fair_internal`, lines 393–469 & `TenantState::insert_returning_evicted`, lines 26–36):**
   - Managed per-tenant via `lru::LruCache<u64, KvSegment>` with default `segment_capacity` of 256 segments per tenant.
   - When capacity is exceeded during `insert_segment`, `TenantState::insert_returning_evicted` pops the LRU segment.
@@ -77,7 +77,7 @@ According to `FINAL_9.md` §4.8/§5.3 and the Air-Gap Sovereign LLM-SLM specific
 | **Fail-Safe / Fail-Open** | 🟢 **100% Compliant** | Any error (decryption failure, corrupt bincode, fingerprint mismatch, RoPE offset mismatch) in `try_get_cached_segment` gracefully logs a warning and returns `None` (full prefill fallback). |
 | **Cryptographic Protection** | 🟢 **100% Compliant** | In-memory segments use `KvSegmentCipher` (AES-256-GCM-SIV + HKDF key derivation per `TenantId`). Plaintext KV activations are never stored unencrypted. |
 | **Metadata Integrity** | 🟢 **100% Compliant** | `CachedKvPayload` strictly checks `model_fingerprint` (prevents cross-quantization state pollution) and `rope_offset` (prevents positional sequence corruption). |
-| **LSM Spill Path** | 🔴 **Missing** | No reference or dependency on `memfuse-store` (`LsmStorage`) in `memfuse-candle`. Eviction purges segments permanently. |
+| **LSM Spill Path** | 🔴 **Missing** | No reference or dependency on `contextra-store` (`LsmStorage`) in `contextra-candle`. Eviction purges segments permanently. |
 
 ---
 
@@ -140,11 +140,11 @@ To bridge this gap in a future implementation task, the following architecture s
 ### 5.3 Proposed Target Signature Adjustments (For Folge-Prompt)
 
 ```rust
-// Proposed extension in memfuse-candle/src/kv_bridge.rs
+// Proposed extension in contextra-candle/src/kv_bridge.rs
 
 pub struct KvBridgeAdapter {
     pub store: Arc<TenantIsolatedKvStore>,
-    pub lsm_store: Option<Arc<memfuse_store::LsmStorage>>, // Added optional LSM fallback tier
+    pub lsm_store: Option<Arc<contextra_store::LsmStorage>>, // Added optional LSM fallback tier
     pub cipher: Arc<KvSegmentCipher>,
     pub consultations: Arc<std::sync::atomic::AtomicU64>,
 }
@@ -152,7 +152,7 @@ pub struct KvBridgeAdapter {
 impl KvBridgeAdapter {
     pub fn with_lsm_fallback(
         store: Arc<TenantIsolatedKvStore>,
-        lsm_store: Arc<memfuse_store::LsmStorage>,
+        lsm_store: Arc<contextra_store::LsmStorage>,
         cipher: Arc<KvSegmentCipher>,
     ) -> Self {
         Self {
@@ -197,4 +197,4 @@ impl KvBridgeAdapter {
 
 1. **Reifegrad Statement:** The KV-Cache Bridge currently functions as a **single-tier encrypted in-memory cache**. The LSM-Fallback-Spill is **completely missing**.
 2. **Safety Statement:** The missing spill path is **safe** due to transparent fail-open semantics returning `None` to trigger full prefill.
-3. **Recommendation for Folge-Prompt:** Create a separate FIX prompt targeting `crates/memfuse-candle` and `crates/memfuse-store` to implement `KvBridgeAdapter::with_lsm_fallback` and eviction spill hooks as outlined in Section 5.
+3. **Recommendation for Folge-Prompt:** Create a separate FIX prompt targeting `crates/contextra-candle` and `crates/contextra-store` to implement `KvBridgeAdapter::with_lsm_fallback` and eviction spill hooks as outlined in Section 5.

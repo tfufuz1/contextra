@@ -33,18 +33,18 @@ jobs:
       - name: Fixture Evaluation & Benchmark Unit Tests
         run: |
           # Execute fixture-based evaluation tests and harness verification
-          cargo test --locked -p memfuse-bench
+          cargo test --locked -p contextra-bench
 
       - name: Benchmark Harness Dry-Run Test
         run: |
           # Verify benchmark compilation and harness functionality without long running timings
-          MEMFUSE_SCALE_TIERS=10,50 cargo bench --locked -p memfuse-db -- --test
+          CONTEXTRA_SCALE_TIERS=10,50 cargo bench --locked -p contextra-db -- --test
 
       - name: Run Benchmark Group Baseline (Informative)
         run: |
           # Criterion baseline generation for PR artifacts
           # Note: A future session will add comparison gates against main branch baseline with tolerance bands
-          MEMFUSE_SCALE_TIERS=100,500 cargo bench --locked -p memfuse-db --bench scale_bench -- --save-baseline pr-${{ github.event.number || github.sha }}
+          CONTEXTRA_SCALE_TIERS=100,500 cargo bench --locked -p contextra-db --bench scale_bench -- --save-baseline pr-${{ github.event.number || github.sha }}
 
       - name: Upload Benchmark Results Artifact
         uses: actions/upload-artifact@v4
@@ -55,7 +55,7 @@ jobs:
             benches/results/scale_rss.csv
 
   retrieval-accuracy-bench:
-    name: Retrieval Accuracy Benchmark (memfuse-bench)
+    name: Retrieval Accuracy Benchmark (contextra-bench)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,15 +70,15 @@ jobs:
         id: cache-longmemeval
         uses: actions/cache@v4
         with:
-          path: benchmarks/memfuse-bench/tests/data/
-          key: longmemeval-dataset-v1-${{ hashFiles('benchmarks/memfuse-bench/src/long_mem_eval.rs') }}
+          path: benchmarks/contextra-bench/tests/data/
+          key: longmemeval-dataset-v1-${{ hashFiles('benchmarks/contextra-bench/src/long_mem_eval.rs') }}
           restore-keys: |
             longmemeval-dataset-v1-
 
       - name: Download LongMemEval & LoCoMo Datasets (if cache miss)
         if: steps.cache-longmemeval.outputs.cache-hit != 'true'
         run: |
-          mkdir -p benchmarks/memfuse-bench/tests/data/
+          mkdir -p benchmarks/contextra-bench/tests/data/
           pip install huggingface_hub --quiet
           python3 -c "
           from huggingface_hub import hf_hub_download
@@ -88,7 +88,7 @@ jobs:
               filename='longmemeval_s',
               repo_type='dataset'
           )
-          shutil.copy(path, 'benchmarks/memfuse-bench/tests/data/longmemeval_s.jsonl')
+          shutil.copy(path, 'benchmarks/contextra-bench/tests/data/longmemeval_s.jsonl')
           print(f'LongMemEval-S downloaded successfully: {os.path.getsize(path)} Bytes')
           " || echo "⚠️ HuggingFace download failed — fixture fallback active"
 
@@ -100,41 +100,41 @@ jobs:
               filename='locomo10.json',
               repo_type='dataset'
           )
-          shutil.copy(path, 'benchmarks/memfuse-bench/tests/data/locomo_test.json')
+          shutil.copy(path, 'benchmarks/contextra-bench/tests/data/locomo_test.json')
           print(f'LoCoMo downloaded successfully: {os.path.getsize(path)} Bytes')
           " || echo "⚠️ LoCoMo download failed — fixture fallback active"
 
       - name: Run LongMemEval Benchmark Execution
         run: |
-          DATASET="benchmarks/memfuse-bench/tests/data/longmemeval_s.jsonl"
-          FIXTURE="benchmarks/memfuse-bench/tests/fixtures/long_mem_eval_fixture.json"
+          DATASET="benchmarks/contextra-bench/tests/data/longmemeval_s.jsonl"
+          FIXTURE="benchmarks/contextra-bench/tests/fixtures/long_mem_eval_fixture.json"
           [ -f "$DATASET" ] && ACTUAL="$DATASET" || ACTUAL="$FIXTURE"
           echo "Using Dataset: $ACTUAL ($(wc -c < $ACTUAL) Bytes)"
-          cargo run --locked -p memfuse-bench --release -- long-mem-eval \
+          cargo run --locked -p contextra-bench --release -- long-mem-eval \
             --dataset "$ACTUAL" \
             --output benchmarks/results/long_mem_eval_results.json
 
       - name: Run LoCoMo Benchmark Execution
         run: |
-          DATASET="benchmarks/memfuse-bench/tests/data/locomo_test.json"
-          FIXTURE="benchmarks/memfuse-bench/tests/fixtures/locomo_fixture.json"
+          DATASET="benchmarks/contextra-bench/tests/data/locomo_test.json"
+          FIXTURE="benchmarks/contextra-bench/tests/fixtures/locomo_fixture.json"
           [ -f "$DATASET" ] && ACTUAL="$DATASET" || ACTUAL="$FIXTURE"
           echo "Using Dataset: $ACTUAL ($(wc -c < $ACTUAL) Bytes)"
-          cargo run --locked -p memfuse-bench --release -- locomo \
+          cargo run --locked -p contextra-bench --release -- locomo \
             --dataset "$ACTUAL" \
             --output benchmarks/results/locomo_results.json
 
       - name: Run Synthetic Retrieval Accuracy Benchmark Harness
-        run: cargo run --locked -p memfuse-bench --release
+        run: cargo run --locked -p contextra-bench --release
 
       - name: Evaluate Benchmark Regression Gate (xtask)
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "Updating baseline on main branch..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --update
+            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/contextra-bench/baseline_metrics.json --update
           else
             echo "Evaluating regression gate against main baseline..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json
+            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/contextra-bench/baseline_metrics.json
           fi
 
       - name: Upload Retrieval Accuracy Benchmark Results
@@ -144,8 +144,8 @@ jobs:
           name: retrieval-accuracy-benchmark-results
           path: |
             benchmarks/results/
-            benchmarks/memfuse-bench/baseline_metrics.json
-            benchmarks/memfuse-bench/baseline_recall.json
+            benchmarks/contextra-bench/baseline_metrics.json
+            benchmarks/contextra-bench/baseline_recall.json
 
   benchmark-regression:
     name: Retrieval Quality Regression Gate (LongMemEval & LoCoMo)
@@ -160,14 +160,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build Benchmark Harness and Comparison Tooling
-        run: cargo build --locked -p memfuse-bench --release
+        run: cargo build --locked -p contextra-bench --release
 
       - name: Cache Benchmark Datasets
         id: cache-datasets
         uses: actions/cache@v4
         with:
-          path: benchmarks/memfuse-bench/tests/data/
-          key: benchmark-datasets-v1-${{ hashFiles('benchmarks/memfuse-bench/src/long_mem_eval.rs', 'benchmarks/memfuse-bench/src/locomo.rs') }}
+          path: benchmarks/contextra-bench/tests/data/
+          key: benchmark-datasets-v1-${{ hashFiles('benchmarks/contextra-bench/src/long_mem_eval.rs', 'benchmarks/contextra-bench/src/locomo.rs') }}
           restore-keys: |
             benchmark-datasets-v1-
 
@@ -176,7 +176,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          mkdir -p benchmarks/memfuse-bench/tests/data/
+          mkdir -p benchmarks/contextra-bench/tests/data/
 
           pip install huggingface_hub --quiet
 
@@ -191,7 +191,7 @@ jobs:
                   repo_type='dataset',
                   token=os.environ.get('HF_TOKEN') or None
               )
-              shutil.copy(path, 'benchmarks/memfuse-bench/tests/data/longmemeval_s.jsonl')
+              shutil.copy(path, 'benchmarks/contextra-bench/tests/data/longmemeval_s.jsonl')
               print(f'LongMemEval-S heruntergeladen: {os.path.getsize(path)} Bytes')
           except Exception as e:
               print(f'Error downloading LongMemEval-S: {e}', file=sys.stderr)
@@ -212,7 +212,7 @@ jobs:
                   repo_type='dataset',
                   token=os.environ.get('HF_TOKEN') or None
               )
-              shutil.copy(path, 'benchmarks/memfuse-bench/tests/data/locomo_test.json')
+              shutil.copy(path, 'benchmarks/contextra-bench/tests/data/locomo_test.json')
               print(f'LoCoMo heruntergeladen: {os.path.getsize(path)} Bytes')
           except Exception as e:
               print(f'Error downloading LoCoMo: {e}', file=sys.stderr)
@@ -224,8 +224,8 @@ jobs:
 
       - name: Verify Dataset Existence Before Execution
         run: |
-          LME="benchmarks/memfuse-bench/tests/data/longmemeval_s.jsonl"
-          LOCOMO="benchmarks/memfuse-bench/tests/data/locomo_test.json"
+          LME="benchmarks/contextra-bench/tests/data/longmemeval_s.jsonl"
+          LOCOMO="benchmarks/contextra-bench/tests/data/locomo_test.json"
           if [ ! -s "$LME" ] || [ ! -s "$LOCOMO" ]; then
             echo "LongMemEval/LoCoMo-Datensatz-Download fehlgeschlagen — Regressionsgate kann nicht verlässlich ausgeführt werden"
             exit 1
@@ -234,17 +234,17 @@ jobs:
 
       - name: Run LongMemEval Benchmark Execution
         run: |
-          DATASET="benchmarks/memfuse-bench/tests/data/longmemeval_s.jsonl"
+          DATASET="benchmarks/contextra-bench/tests/data/longmemeval_s.jsonl"
           echo "Verwende Dataset: $DATASET ($(wc -c < "$DATASET") Bytes)"
-          cargo run --locked -p memfuse-bench --release -- long-mem-eval \
+          cargo run --locked -p contextra-bench --release -- long-mem-eval \
             --dataset "$DATASET" \
             --output benchmarks/results/long_mem_eval_results.json
 
       - name: Run LoCoMo Benchmark Execution
         run: |
-          DATASET="benchmarks/memfuse-bench/tests/data/locomo_test.json"
+          DATASET="benchmarks/contextra-bench/tests/data/locomo_test.json"
           echo "Verwende Dataset: $DATASET ($(wc -c < "$DATASET") Bytes)"
-          cargo run --locked -p memfuse-bench --release -- locomo \
+          cargo run --locked -p contextra-bench --release -- locomo \
             --dataset "$DATASET" \
             --output benchmarks/results/locomo_results.json
 
@@ -252,10 +252,10 @@ jobs:
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "Updating baseline on main branch..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --threshold 0.05 --update
+            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/contextra-bench/baseline_metrics.json --threshold 0.05 --update
           else
             echo "Evaluating regression gate against main baseline..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --threshold 0.05
+            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/contextra-bench/baseline_metrics.json --threshold 0.05
           fi
 
       - name: Update Baseline Metrics (when explicitly requested via workflow_dispatch)
@@ -274,7 +274,7 @@ jobs:
           metrics['_locomo_source'] = 'LoCoMo-Dataset/LoCoMo (test.json)'
           metrics['_generated_at'] = now
           metrics['_commit_hash'] = commit_hash
-          with open('benchmarks/memfuse-bench/baseline_metrics.json', 'w') as f:
+          with open('benchmarks/contextra-bench/baseline_metrics.json', 'w') as f:
               json.dump(metrics, f, indent=2)
               f.write('\n')
           print('baseline_metrics.json erfolgreich aktualisiert.')
@@ -287,4 +287,4 @@ jobs:
           name: benchmark-regression-metrics
           path: |
             benchmarks/results/
-            benchmarks/memfuse-bench/baseline_metrics.json
+            benchmarks/contextra-bench/baseline_metrics.json

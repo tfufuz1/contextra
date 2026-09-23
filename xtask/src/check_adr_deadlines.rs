@@ -1,4 +1,4 @@
-// MemFuse — ADR Deprecation & Removal Deadline CI Gate
+// Contextra — ADR Deprecation & Removal Deadline CI Gate
 //
 // Überprüft `DECISIONS.md` auf ADRs mit definierten Deprecation-/Removal-Fristen.
 //
@@ -7,7 +7,7 @@
 // 2. Prüft das Zieldatum gegen das aktuelle Systemdatum.
 // 3. Frist in der Zukunft (0 <= Resttage <= 14): Warnung zur rechtzeitigen Vorbereitung.
 // 4. Frist in der Vergangenheit (< 0 Tage):
-//    - Falls das Ziel-Crate / die Ziel-Datei (z. B. `crates/memfuse-tauri`) weiterhin existiert:
+//    - Falls das Ziel-Crate / die Ziel-Datei (z. B. `crates/contextra-tauri`) weiterhin existiert:
 //      Harter CI-Fehler (Exit-Code != 0) mit klarer Handlungsaufforderung (physisch entfernen oder Frist per neuem ADR verlängern).
 //    - Falls der Zielpfad bereits entfernt wurde: Kein Fehler (Aufgabe bereits erledigt).
 
@@ -228,7 +228,7 @@ mod tests {
 * **Status:** Akzeptiert
 * **Datum:** 2026-09-08
 * **Removal Deadline:** 2026-11-07
-* **Target Path:** crates/memfuse-tauri
+* **Target Path:** crates/contextra-tauri
 * **Kontext / Auslöser:** Zielarchitektur v8.0 §6
 "#;
         let entries = parse_adr_deadlines(content).unwrap();
@@ -241,14 +241,14 @@ mod tests {
         assert_eq!(entries[0].deadline.as_deref(), Some("2026-11-07"));
         assert_eq!(
             entries[0].target_path.as_deref(),
-            Some("crates/memfuse-tauri")
+            Some("crates/contextra-tauri")
         );
     }
 
     #[test]
     fn test_adr_deadline_far_future_no_warning_no_error() {
         let temp = tempdir().unwrap();
-        let target = temp.path().join("crates/memfuse-tauri");
+        let target = temp.path().join("crates/contextra-tauri");
         fs::create_dir_all(&target).unwrap();
 
         let entries = vec![AdrDeadlineEntry {
@@ -256,7 +256,7 @@ mod tests {
             title: "Tauri Deprecation".to_string(),
             status: "Akzeptiert".to_string(),
             deadline: Some("2026-11-07".to_string()),
-            target_path: Some("crates/memfuse-tauri".to_string()),
+            target_path: Some("crates/contextra-tauri".to_string()),
         }];
 
         // Current date: 2026-09-09 (59 days left -> far future)
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn test_adr_deadline_warning_window() {
         let temp = tempdir().unwrap();
-        let target = temp.path().join("crates/memfuse-tauri");
+        let target = temp.path().join("crates/contextra-tauri");
         fs::create_dir_all(&target).unwrap();
 
         let entries = vec![AdrDeadlineEntry {
@@ -276,7 +276,7 @@ mod tests {
             title: "Tauri Deprecation".to_string(),
             status: "Akzeptiert".to_string(),
             deadline: Some("2026-11-07".to_string()),
-            target_path: Some("crates/memfuse-tauri".to_string()),
+            target_path: Some("crates/contextra-tauri".to_string()),
         }];
 
         // Current date: 2026-10-30 (8 days left -> warning window)
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn test_adr_deadline_expired_hard_error_when_target_exists() {
         let temp = tempdir().unwrap();
-        let target = temp.path().join("crates/memfuse-tauri");
+        let target = temp.path().join("crates/contextra-tauri");
         fs::create_dir_all(&target).unwrap();
 
         let entries = vec![AdrDeadlineEntry {
@@ -298,7 +298,7 @@ mod tests {
             title: "Tauri Deprecation".to_string(),
             status: "Akzeptiert".to_string(),
             deadline: Some("2026-11-07".to_string()),
-            target_path: Some("crates/memfuse-tauri".to_string()),
+            target_path: Some("crates/contextra-tauri".to_string()),
         }];
 
         // Current date: 2026-11-08 (deadline expired, target exists)
@@ -319,7 +319,7 @@ mod tests {
             title: "Tauri Deprecation".to_string(),
             status: "Akzeptiert".to_string(),
             deadline: Some("2026-11-07".to_string()),
-            target_path: Some("crates/memfuse-tauri".to_string()),
+            target_path: Some("crates/contextra-tauri".to_string()),
         }];
 
         // Current date: 2026-11-08 (deadline expired, but target removed -> OK)
