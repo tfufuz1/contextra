@@ -267,6 +267,14 @@
       "session_id": "3960929584497528942",
       "active": true,
       "expires_at": "2026-09-23T18:40:55.720062796+00:00"
+    },
+    {
+      "krate": "docs-decisions",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-23T15:49:08.897220419+00:00",
+      "session_id": "12526564930458928200",
+      "active": true,
+      "expires_at": "2026-09-23T19:49:08.897209584+00:00"
     }
   ]
 }
