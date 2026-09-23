@@ -7,8 +7,16 @@ pub mod calibration;
 pub mod drift;
 pub mod fusion;
 
+#[cfg(feature = "dibud")]
+pub mod dibud;
+
 pub use calibration::{IsotonicCalibrator, PlattScaler};
 pub use drift::{DriftDetector, DriftStatus};
+#[cfg(feature = "dibud")]
+pub use dibud::{
+    fuse_exact_prefix, fuse_exact_prefix_async, BudgetedChannel, DiBudFusionState, DiBudOutcome,
+    DiBudStep, FusionBudget,
+};
 pub use fusion::{
     apply_resonance_bonus, fuse_search_results_with_strategy, reciprocal_rank_fusion,
     score_normalized_fusion_with_options, weighted_reciprocal_rank_fusion,
