@@ -6,29 +6,29 @@ set -euo pipefail
 echo "🔍 Pre-Commit Gate..."
 
 # 1. Format-Check (schnell, < 2s)
-cargo fmt --all -- --check 2>/dev/null || {
+cargo fmt --all -- --check || {
     echo "❌ Formatierung fehlerhaft. Führe 'cargo fmt --all' aus."
     exit 1
 }
 
 # 2. Clippy (schnell bei warmem Cache, < 10s)
-cargo clippy --all-targets -- -D warnings 2>/dev/null || {
+cargo clippy --workspace --all-targets --locked -- -D warnings || {
     echo "❌ Clippy-Fehler. Behebe alle Warnungen."
     exit 1
 }
 
 # 3. Statische Audit-Lints (< 3s)
-cargo xtask check-max-results-unbound 2>/dev/null || {
+cargo xtask check-max-results-unbound || {
     echo "❌ Unbegrenzter max_results-Parameter gefunden. Füge 'UNBOUNDED-OK'-Kommentar oder begrenze."
     exit 1
 }
 
-cargo xtask check-toctou-defaults 2>/dev/null || {
+cargo xtask check-toctou-defaults || {
     echo "❌ TOCTOU-Default in Trait gefunden. Default-Impl entfernen oder atomic implementieren."
     exit 1
 }
 
-cargo xtask check-result-dropped-io 2>/dev/null || {
+cargo xtask check-result-dropped-io || {
     echo "❌ let _ = <IO-Operation> gefunden. Fehler propagieren oder explizit als INTENTIONAL-DROP markieren."
     exit 1
 }
@@ -38,7 +38,7 @@ CHANGED_CRATES=$( (git diff --cached --name-only || true) | (grep "^crates/" || 
 for crate_path in $CHANGED_CRATES; do
     if [ -n "$crate_path" ]; then
         crate_name=$(basename "$crate_path")
-        cargo check -p "$crate_name" 2>/dev/null || {
+        cargo check -p "$crate_name" || {
             echo "❌ Kompilierungsfehler in $crate_name."
             exit 1
         }
