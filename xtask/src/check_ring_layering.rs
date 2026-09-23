@@ -38,21 +38,22 @@ impl Ring {
 pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
     match crate_name {
         // Ring 0
-        "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector"
-        | "memfuse-rank" | "memfuse-adapt" | "memfuse-text" | "memfuse-graph"
-        | "memfuse-crypto" | "memfuse-simd" | "memfuse-sys" | "memfuse-wire"
-        | "memfuse-core" => Some(Ring::Ring0),
+        "memfuse-types" | "memfuse-ports" | "memfuse-mvcc" | "memfuse-vector" | "memfuse-rank"
+        | "memfuse-adapt" | "memfuse-text" | "memfuse-graph" | "memfuse-crypto"
+        | "memfuse-simd" | "memfuse-sys" | "memfuse-wire" | "memfuse-core" => Some(Ring::Ring0),
 
         // Ring 1
         "memfuse-store" | "memfuse-checkpoint" | "memfuse-kvcache" => Some(Ring::Ring1),
 
         // Ring 2
-        "memfuse-sandbox" | "memfuse-infer-onnx" | "memfuse-infer-candle"
+        "memfuse-sandbox"
+        | "memfuse-infer-onnx"
+        | "memfuse-infer-candle"
         | "memfuse-infer-ollama" => Some(Ring::Ring2),
 
         // Ring 3
-        "memfuse-engine" | "memfuse-cognition" | "memfuse-privacy"
-        | "memfuse-router" | "memfuse-agent" | "memfuse-db" => Some(Ring::Ring3),
+        "memfuse-engine" | "memfuse-cognition" | "memfuse-privacy" | "memfuse-router"
+        | "memfuse-agent" | "memfuse-db" => Some(Ring::Ring3),
 
         // Ring 4
         "memfuse" | "memfuse-mcp" | "memfuse-py" => Some(Ring::Ring4),
@@ -100,7 +101,9 @@ pub const LAYER_ALLOWLIST: &[AllowlistEntry] = &[
 ];
 
 pub fn find_allowlist_entry(from_crate: &str, to_crate: &str) -> Option<&'static AllowlistEntry> {
-    LAYER_ALLOWLIST.iter().find(|e| e.from_crate == from_crate && e.to_crate == to_crate)
+    LAYER_ALLOWLIST
+        .iter()
+        .find(|e| e.from_crate == from_crate && e.to_crate == to_crate)
 }
 
 #[derive(Debug, Clone)]
@@ -135,16 +138,22 @@ struct CargoMetadata {
     workspace_members: HashSet<String>,
 }
 
-pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<RingViolation>, String> {
-    let metadata: CargoMetadata =
-        serde_json::from_str(json_str).map_err(|e| format!("Failed to parse cargo metadata: {}", e))?;
+pub fn check_ring_layering_from_metadata_json(
+    json_str: &str,
+) -> Result<Vec<RingViolation>, String> {
+    let metadata: CargoMetadata = serde_json::from_str(json_str)
+        .map_err(|e| format!("Failed to parse cargo metadata: {}", e))?;
 
     let workspace_packages: HashMap<String, &MetadataPackage> = metadata
         .packages
         .iter()
         .filter(|p| {
             // Check if package is a workspace member (either by id or package name matching workspace_members)
-            metadata.workspace_members.iter().any(|m| m.contains(&p.name)) || metadata.workspace_members.contains(&p.name)
+            metadata
+                .workspace_members
+                .iter()
+                .any(|m| m.contains(&p.name))
+                || metadata.workspace_members.contains(&p.name)
         })
         .map(|p| (p.name.clone(), p))
         .collect();
@@ -166,7 +175,10 @@ pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<Ring
             let dep_name = &dep.name;
 
             // Only inspect workspace-internal dependencies
-            if !workspace_packages.contains_key(dep_name) && dep.path.is_none() && get_crate_ring(dep_name).is_none() {
+            if !workspace_packages.contains_key(dep_name)
+                && dep.path.is_none()
+                && get_crate_ring(dep_name).is_none()
+            {
                 continue;
             }
 
@@ -181,19 +193,35 @@ pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<Ring
             let violation_reason = match (from_ring, to_ring, kind) {
                 // Ring 0
                 (Ring::Ring0, Ring::Ring0, _) => None,
-                (Ring::Ring0, other, _) => Some(format!("Ring 0 crate cannot depend on {} ({})", other.name(), dep_name)),
+                (Ring::Ring0, other, _) => Some(format!(
+                    "Ring 0 crate cannot depend on {} ({})",
+                    other.name(),
+                    dep_name
+                )),
 
                 // Ring 1
                 (Ring::Ring1, Ring::Ring0, _) => None,
                 (Ring::Ring1, Ring::Ring1, "dev") => None,
-                (Ring::Ring1, Ring::Ring1, _) => Some(format!("Ring 1 crate cannot depend on another Ring 1 crate ({})", dep_name)),
-                (Ring::Ring1, other, _) => Some(format!("Ring 1 crate cannot depend on {} ({})", other.name(), dep_name)),
+                (Ring::Ring1, Ring::Ring1, _) => Some(format!(
+                    "Ring 1 crate cannot depend on another Ring 1 crate ({})",
+                    dep_name
+                )),
+                (Ring::Ring1, other, _) => Some(format!(
+                    "Ring 1 crate cannot depend on {} ({})",
+                    other.name(),
+                    dep_name
+                )),
 
                 // Ring 2
                 (Ring::Ring2, Ring::Ring0, _) => {
                     let allowed_ring0 = matches!(
                         dep_name.as_str(),
-                        "memfuse-types" | "memfuse-ports" | "memfuse-crypto" | "memfuse-core" | "memfuse-simd" | "memfuse-rank"
+                        "memfuse-types"
+                            | "memfuse-ports"
+                            | "memfuse-crypto"
+                            | "memfuse-core"
+                            | "memfuse-simd"
+                            | "memfuse-rank"
                     );
                     if allowed_ring0 {
                         None
@@ -201,14 +229,25 @@ pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<Ring
                         Some(format!("Ring 2 crate can only depend on types/ports/crypto in Ring 0 (violator: {})", dep_name))
                     }
                 }
-                (Ring::Ring2, other, _) => Some(format!("Ring 2 crate cannot depend on {} ({})", other.name(), dep_name)),
+                (Ring::Ring2, other, _) => Some(format!(
+                    "Ring 2 crate cannot depend on {} ({})",
+                    other.name(),
+                    dep_name
+                )),
 
                 // Ring 3
                 (Ring::Ring3, Ring::Ring0, _) => None,
                 (Ring::Ring3, Ring::Ring1, _) => None,
-                (Ring::Ring3, Ring::Ring2, _) => Some(format!("Ring 3 crate cannot depend on concrete Ring 2 crate ({})", dep_name)),
+                (Ring::Ring3, Ring::Ring2, _) => Some(format!(
+                    "Ring 3 crate cannot depend on concrete Ring 2 crate ({})",
+                    dep_name
+                )),
                 (Ring::Ring3, Ring::Ring3, _) => None,
-                (Ring::Ring3, other, _) => Some(format!("Ring 3 crate cannot depend on {} ({})", other.name(), dep_name)),
+                (Ring::Ring3, other, _) => Some(format!(
+                    "Ring 3 crate cannot depend on {} ({})",
+                    other.name(),
+                    dep_name
+                )),
 
                 // Ring 4
                 (Ring::Ring4, _, _) => None,
@@ -237,7 +276,10 @@ pub fn check_ring_layering_from_metadata_json(json_str: &str) -> Result<Vec<Ring
 }
 
 pub fn run_check_ring_layering(strict: bool) -> Result<bool, String> {
-    println!("=== Running xtask check-ring-layering (strict={}) ===", strict);
+    println!(
+        "=== Running xtask check-ring-layering (strict={}) ===",
+        strict
+    );
 
     let output = Command::new("cargo")
         .args(["metadata", "--format-version", "1", "--no-deps"])
@@ -263,7 +305,10 @@ pub fn run_check_ring_layering(strict: bool) -> Result<bool, String> {
     let unallowlisted: Vec<_> = violations.iter().filter(|v| !v.is_allowlisted).collect();
 
     if !allowlisted.is_empty() {
-        println!("⚠️ check-ring-layering: {} dokumentierte Allowlist-Ausnahme(n) gefunden:", allowlisted.len());
+        println!(
+            "⚠️ check-ring-layering: {} dokumentierte Allowlist-Ausnahme(n) gefunden:",
+            allowlisted.len()
+        );
         for v in &allowlisted {
             println!(
                 "  ALLOWLISTED [{}] {} ({}) -> {} ({}) [kind={}]: {}",
@@ -279,7 +324,10 @@ pub fn run_check_ring_layering(strict: bool) -> Result<bool, String> {
     }
 
     if !unallowlisted.is_empty() {
-        println!("❌ check-ring-layering: {} UNDOKUMENTIERTE Ring-Verstöße gefunden:", unallowlisted.len());
+        println!(
+            "❌ check-ring-layering: {} UNDOKUMENTIERTE Ring-Verstöße gefunden:",
+            unallowlisted.len()
+        );
         for v in &unallowlisted {
             println!(
                 "  RING-VIOLATION: {} ({}) -> {} ({}) [kind={}]: {}",

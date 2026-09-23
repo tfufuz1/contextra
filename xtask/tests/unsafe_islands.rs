@@ -13,7 +13,13 @@ fn test_unsafe_islands_subcommand_default_exit_zero() {
     };
 
     let output = Command::new("cargo")
-        .args(["run", "--manifest-path", manifest_path, "--", "check-unsafe-islands"])
+        .args([
+            "run",
+            "--manifest-path",
+            manifest_path,
+            "--",
+            "check-unsafe-islands",
+        ])
         .output()
         .expect("Failed to execute check-unsafe-islands");
 
