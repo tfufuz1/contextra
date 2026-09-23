@@ -10,7 +10,7 @@ extern crate flatbuffers;
 use self::flatbuffers::{EndianScalar, Follow};
 
 #[allow(unused_imports, dead_code)]
-pub mod mem_fuse {
+pub mod contextra {
 
   use core::mem;
   use core::cmp::Ordering;
@@ -900,6 +900,7 @@ impl<'a> HyperEdge<'a> {
   pub const VT_BUSINESS_VALID_FROM: flatbuffers::VOffsetT = 16;
   pub const VT_BUSINESS_VALID_TO: flatbuffers::VOffsetT = 18;
   pub const VT_SOURCE_DOC_ID: flatbuffers::VOffsetT = 20;
+  pub const VT_CHILD_EDGE_IDS: flatbuffers::VOffsetT = 22;
 
   #[inline]
   pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -917,6 +918,7 @@ impl<'a> HyperEdge<'a> {
     builder.add_tx_valid_to(args.tx_valid_to);
     builder.add_tx_valid_from(args.tx_valid_from);
     builder.add_id(args.id);
+    if let Some(x) = args.child_edge_ids { builder.add_child_edge_ids(x); }
     builder.add_weight(args.weight);
     if let Some(x) = args.participants { builder.add_participants(x); }
     builder.add_predicate(args.predicate);
@@ -987,6 +989,13 @@ impl<'a> HyperEdge<'a> {
     // which contains a valid value in this slot
     unsafe { self._tab.get::<u64>(HyperEdge::VT_SOURCE_DOC_ID, Some(0)).unwrap()}
   }
+  #[inline]
+  pub fn child_edge_ids(&self) -> Option<flatbuffers::Vector<'a, u64>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u64>>>(HyperEdge::VT_CHILD_EDGE_IDS, None)}
+  }
 }
 
 impl flatbuffers::Verifiable for HyperEdge<'_> {
@@ -1005,6 +1014,7 @@ impl flatbuffers::Verifiable for HyperEdge<'_> {
      .visit_field::<i64>("business_valid_from", Self::VT_BUSINESS_VALID_FROM, false)?
      .visit_field::<i64>("business_valid_to", Self::VT_BUSINESS_VALID_TO, false)?
      .visit_field::<u64>("source_doc_id", Self::VT_SOURCE_DOC_ID, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u64>>>("child_edge_ids", Self::VT_CHILD_EDGE_IDS, false)?
      .finish();
     Ok(())
   }
@@ -1019,6 +1029,7 @@ pub struct HyperEdgeArgs<'a> {
     pub business_valid_from: i64,
     pub business_valid_to: i64,
     pub source_doc_id: u64,
+    pub child_edge_ids: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u64>>>,
 }
 impl<'a> Default for HyperEdgeArgs<'a> {
   #[inline]
@@ -1033,6 +1044,7 @@ impl<'a> Default for HyperEdgeArgs<'a> {
       business_valid_from: 0,
       business_valid_to: 0,
       source_doc_id: 0,
+      child_edge_ids: None,
     }
   }
 }
@@ -1079,6 +1091,10 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> HyperEdgeBuilder<'a, 'b, A> {
     self.fbb_.push_slot::<u64>(HyperEdge::VT_SOURCE_DOC_ID, source_doc_id, 0);
   }
   #[inline]
+  pub fn add_child_edge_ids(&mut self, child_edge_ids: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u64>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(HyperEdge::VT_CHILD_EDGE_IDS, child_edge_ids);
+  }
+  #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> HyperEdgeBuilder<'a, 'b, A> {
     let start = _fbb.start_table();
     HyperEdgeBuilder {
@@ -1105,6 +1121,7 @@ impl core::fmt::Debug for HyperEdge<'_> {
       ds.field("business_valid_from", &self.business_valid_from());
       ds.field("business_valid_to", &self.business_valid_to());
       ds.field("source_doc_id", &self.source_doc_id());
+      ds.field("child_edge_ids", &self.child_edge_ids());
       ds.finish()
   }
 }

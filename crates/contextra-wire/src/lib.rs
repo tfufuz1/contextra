@@ -19,4 +19,4 @@ pub mod adapter;
 pub mod jsonrpc;
 
 pub use jsonrpc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
-pub use contextra_generated::mem_fuse::ipc::*;
+pub use contextra_generated::contextra::ipc::*;

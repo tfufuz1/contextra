@@ -69,6 +69,8 @@ pub struct GraphInner {
     pub(crate) doc_to_hyperedges: ahash::AHashMap<DocId, HashSet<crate::hyperedge::HyperEdgeId>>,
     /// Index mapping EntityId -> Set of HyperEdgeIds.
     pub(crate) hyperedge_index: ahash::AHashMap<EntityId, HashSet<crate::hyperedge::HyperEdgeId>>,
+    /// Reverse index mapping child HyperEdgeId -> Set of parent HyperEdgeIds.
+    pub(crate) child_to_parents: ahash::AHashMap<crate::hyperedge::HyperEdgeId, HashSet<crate::hyperedge::HyperEdgeId>>,
 }
 
 /// Detailed memory estimate separating shared payloads from private structural allocations (§6.3).
@@ -139,6 +141,7 @@ impl GraphInner {
             hyperedges: HashMap::new(),
             doc_to_hyperedges: ahash::AHashMap::new(),
             hyperedge_index: ahash::AHashMap::new(),
+            child_to_parents: ahash::AHashMap::new(),
         }
     }
 
@@ -352,6 +355,20 @@ impl GraphInner {
             private += table_bytes::<crate::hyperedge::HyperEdgeId, ()>(set_cap);
         }
 
+        let child_to_parents_map_cap = if presized {
+            self.child_to_parents.len()
+        } else {
+            self.child_to_parents.capacity()
+        };
+        private += table_bytes::<
+            crate::hyperedge::HyperEdgeId,
+            HashSet<crate::hyperedge::HyperEdgeId>,
+        >(child_to_parents_map_cap);
+        for set in self.child_to_parents.values() {
+            let set_cap = if presized { set.len() } else { set.capacity() };
+            private += table_bytes::<crate::hyperedge::HyperEdgeId, ()>(set_cap);
+        }
+
         let hyperedge_index_map_cap = if presized {
             self.hyperedge_index.len()
         } else {
@@ -410,6 +427,12 @@ impl GraphInner {
         for participant in edge.participants.iter() {
             self.hyperedge_index
                 .entry(participant.entity)
+                .or_default()
+                .insert(edge_id);
+        }
+        for &child_id in edge.child_edge_ids.iter() {
+            self.child_to_parents
+                .entry(child_id)
                 .or_default()
                 .insert(edge_id);
         }

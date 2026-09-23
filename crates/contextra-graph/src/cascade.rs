@@ -158,13 +158,92 @@ pub type CascadeReport = HyperedgeCascadeReport;
 ///
 /// INVARIANTE: Jede hier tombstonierte Hyperkante erhält einen Provenienz-Eintrag
 /// mit der WAL-Sequenznummer dieses Aufrufs (INV-GRAPH-PROV-1).
+/// Topologically sorts a set of hyperedge IDs in the parent-to-child DAG closure.
+///
+/// Every parent edge comes BEFORE its children.
+/// Tie-breaking is done by `HyperEdgeId` in ascending order for deterministic execution.
+///
+/// # Crash Recovery Rationale
+/// Nach einem Absturz darf nie ein Kind tombstoniert, aber sein Vorfahre noch lebendig sein,
+/// weil der Vorfahre danach nicht mehr auffindbar wäre.
+pub fn topological_sort_hyperedge_closure(
+    graph: &CsrGraph,
+    closure_nodes: &[crate::hyperedge::HyperEdgeId],
+) -> Vec<crate::hyperedge::HyperEdgeId> {
+    if closure_nodes.is_empty() {
+        return Vec::new();
+    }
+
+    let node_set: std::collections::HashSet<_> = closure_nodes.iter().copied().collect();
+
+    let mut in_degree = std::collections::HashMap::new();
+    let mut children_map: std::collections::HashMap<_, Vec<_>> = std::collections::HashMap::new();
+
+    for &node in &node_set {
+        in_degree.entry(node).or_insert(0usize);
+        let parents = graph.parent_hyperedges_of(node);
+        let mut parents_in_closure = 0usize;
+        for parent in parents {
+            if node_set.contains(&parent) {
+                parents_in_closure += 1;
+                children_map.entry(parent).or_default().push(node);
+            }
+        }
+        *in_degree.entry(node).or_default() = parents_in_closure;
+    }
+
+    let mut ready = std::collections::BinaryHeap::new();
+    for (&node, &deg) in &in_degree {
+        if deg == 0 {
+            ready.push(std::cmp::Reverse(node));
+        }
+    }
+
+    let mut topo_order = Vec::with_capacity(node_set.len());
+
+    while let Some(std::cmp::Reverse(node)) = ready.pop() {
+        topo_order.push(node);
+        if let Some(children) = children_map.get(&node) {
+            for &child in children {
+                if let Some(deg) = in_degree.get_mut(&child) {
+                    if *deg > 0 {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            ready.push(std::cmp::Reverse(child));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if topo_order.len() < node_set.len() {
+        let placed: std::collections::HashSet<_> = topo_order.iter().copied().collect();
+        let mut remaining: Vec<_> = node_set.into_iter().filter(|n| !placed.contains(n)).collect();
+        remaining.sort_unstable();
+        topo_order.extend(remaining);
+    }
+
+    topo_order
+}
+
+/// Cascade invalidates hyperedges derived from `superseded_doc_id` with fan-out protection
+/// and recursive super-edge ancestor invalidation.
+///
+/// Up to `MAX_HYPEREDGE_CASCADE_FANOUT` hyperedges (ancestors and document hyperedges combined)
+/// are tombstoned synchronously in topological order (parents before children).
+/// Any excess hyperedges are persisted to LSM storage under `__graph:cascade_queue:...`
+/// and queued in `CsrGraph`'s cascade queue for deferred background processing.
+///
+/// INVARIANTE: Jede hier tombstonierte Hyperkante erhält einen Provenienz-Eintrag
+/// mit der WAL-Sequenznummer dieses Aufrufs (INV-GRAPH-PROV-1).
 pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     graph: &CsrGraph,
     superseded_doc_id: DocId,
     wal_seq: u64,
 ) -> Result<HyperedgeCascadeReport> {
     let wal_tx = TxId::new(wal_seq);
-    let candidate_ids = graph.hyperedges_for_doc(superseded_doc_id);
+    let mut candidate_ids = graph.hyperedges_for_doc(superseded_doc_id);
     if candidate_ids.is_empty() {
         return Ok(HyperedgeCascadeReport {
             invalidated: Vec::new(),
@@ -172,11 +251,54 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
             queued_for_background: 0,
         });
     }
+    candidate_ids.sort_unstable();
+    candidate_ids.dedup();
 
-    let mut invalidated = Vec::with_capacity(candidate_ids.len().min(MAX_HYPEREDGE_CASCADE_FANOUT));
+    // 1. Upward closure search via DFS to collect doc hyperedges and all their non-tombstoned ancestors.
+    let mut closure_nodes = Vec::new();
+    let mut visited = std::collections::HashSet::new();
+    let mut on_stack = std::collections::HashSet::new();
+
+    fn dfs_upward(
+        graph: &CsrGraph,
+        node: crate::hyperedge::HyperEdgeId,
+        visited: &mut std::collections::HashSet<crate::hyperedge::HyperEdgeId>,
+        on_stack: &mut std::collections::HashSet<crate::hyperedge::HyperEdgeId>,
+        closure_nodes: &mut Vec<crate::hyperedge::HyperEdgeId>,
+    ) {
+        if !visited.insert(node) {
+            return;
+        }
+        on_stack.insert(node);
+        closure_nodes.push(node);
+
+        for parent in graph.parent_hyperedges_of(node) {
+            if on_stack.contains(&parent) {
+                tracing::warn!(
+                    child = %node.inner(),
+                    parent = %parent.inner(),
+                    "Cycle detected in hyperedge child-parent graph during cascade invalidation"
+                );
+            } else {
+                dfs_upward(graph, parent, visited, on_stack, closure_nodes);
+            }
+        }
+
+        on_stack.remove(&node);
+    }
+
+    for &doc_hid in &candidate_ids {
+        dfs_upward(graph, doc_hid, &mut visited, &mut on_stack, &mut closure_nodes);
+    }
+
+    // 2. Topological sort: ensure parents come before children.
+    let topo_order = topological_sort_hyperedge_closure(graph, &closure_nodes);
+
+    // 3. Process up to MAX_HYPEREDGE_CASCADE_FANOUT synchronously; remaining excess goes to deferred queue.
+    let mut invalidated = Vec::with_capacity(topo_order.len().min(MAX_HYPEREDGE_CASCADE_FANOUT));
     let mut deferred = Vec::new();
 
-    for (idx, hyperedge_id) in candidate_ids.into_iter().enumerate() {
+    for (idx, hyperedge_id) in topo_order.into_iter().enumerate() {
         if idx < MAX_HYPEREDGE_CASCADE_FANOUT {
             if graph.tombstone_hyperedge(hyperedge_id, wal_tx) {
                 invalidated.push(hyperedge_id);

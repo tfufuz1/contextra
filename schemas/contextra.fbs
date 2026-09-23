@@ -48,6 +48,7 @@ table HyperEdge {
   business_valid_from: long;
   business_valid_to: long;
   source_doc_id: ulong;
+  child_edge_ids: [ulong];
 }
 
 root_type SearchResponse;
