@@ -85,4 +85,4 @@ jobs:
 
       - name: Status Gate Check
         continue-on-error: true
-        run: cargo run -p xtask -- check-recall-stability
+        run: cargo xtask check-recall-stability

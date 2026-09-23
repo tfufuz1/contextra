@@ -20,7 +20,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Generate Prompter Data
-        run: cargo run -p xtask -- gen-prompter-data
+        run: cargo xtask gen-prompter-data
 
       - name: Check for changes and commit
         run: |

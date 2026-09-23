@@ -58,5 +58,5 @@ jobs:
           command: check advisories bans licenses sources
 
       - name: FFI Panic Boundary Check
-        run: cargo run -p xtask -- check-ffi-panic-boundary
+        run: cargo xtask check-ffi-panic-boundary
 

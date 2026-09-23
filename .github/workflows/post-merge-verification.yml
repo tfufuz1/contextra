@@ -21,7 +21,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run Post-Merge Report
-        run: cargo run -p xtask -- post-merge-report
+        run: cargo xtask post-merge-report
 
       - name: Commit and push report changes
         run: |
@@ -37,7 +37,7 @@ jobs:
           fi
 
       - name: Run Full Jules Preflight
-        run: cargo run -p xtask -- jules-preflight
+        run: cargo xtask jules-preflight
 
       - name: Report Post-Merge Regression Failure
         if: failure()

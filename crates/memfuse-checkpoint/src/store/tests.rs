@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use super::*;
 use crate::orphan::pending_rollback_count;
 use memfuse_core::{BoxFuture, StorageEngine, StorageStats};
@@ -848,8 +850,8 @@ async fn test_concurrent_checkpoint_index_atomicity() {
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     stop_flag.store(true, Ordering::Relaxed);
 
-    let _ = writer_handle.await.expect("// expect #[cfg(test)]");
+    writer_handle.await.expect("// expect #[cfg(test)]");
     for handle in reader_handles {
-        let _ = handle.await.expect("// expect #[cfg(test)]");
+        handle.await.expect("// expect #[cfg(test)]");
     }
 }

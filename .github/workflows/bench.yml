@@ -131,10 +131,10 @@ jobs:
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "Updating baseline on main branch..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --update
+            cargo xtask bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --update
           else
             echo "Evaluating regression gate against main baseline..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json
+            cargo xtask bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json
           fi
 
       - name: Upload Retrieval Accuracy Benchmark Results
@@ -252,10 +252,10 @@ jobs:
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "Updating baseline on main branch..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --threshold 0.05 --update
+            cargo xtask bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --threshold 0.05 --update
           else
             echo "Evaluating regression gate against main baseline..."
-            cargo run -p xtask -- bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --threshold 0.05
+            cargo xtask bench-gate --results benchmarks/results/current_metrics.json --baseline benchmarks/memfuse-bench/baseline_metrics.json --threshold 0.05
           fi
 
       - name: Update Baseline Metrics (when explicitly requested via workflow_dispatch)
