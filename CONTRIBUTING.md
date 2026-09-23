@@ -1,49 +1,51 @@
 # Contributing to Contextra
 
-Thank you for your interest in contributing to Contextra! This document outlines the guidelines and development workflow for contributing code, documentation, and bug fixes to the repository.
+Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bündelt alle Richtlinien für menschliche Entwickler.
 
-## Development Workflow & Preflight Checks
+## 1. Kurzeinstieg (Setup & Build)
 
-Before submitting a pull request, please ensure that your environment is properly set up and that all verification gates pass locally.
+### Voraussetzungen
+- **Rust Toolchain:** Stable Rust (1.80+) mit `cargo` und `rustfmt`.
+- **Just Task Runner:** `just` für Entwicklungsbefehle.
 
-### Prerequisites
+### Grundprinzipien & Invarianten
+- **Souveränität & Air-Gap:** Keine Laufzeit-Annahmen über Cloud-Dienste; lokale Inferenz via Ollama (`contextra-ollama`).
+- **Zero-Panic-Gesetz:** Produktionscode darf niemals `panic!`, `.unwrap()` oder `.expect()` enthalten (`Result<T, E>` nutzen).
+- **Safe Rust & Schichtenreinheit:** `#![forbid(unsafe_code)]` in Produktions-Crates. Abhängigkeiten fließen strikt unidirektional von Layer 4/3 nach Layer 0 (`contextra-core`). Minimal-Diff-Prinzip einhalten.
 
-- **Rust Toolchain:** Stable Rust (1.80+) with `cargo` and `rustfmt`.
-- **Just Task Runner:** `just` installed for shorthand development commands.
-
-### Verification Steps
-
-Run the following commands locally before submitting changes:
-
+### Local Build & Verification Commands
 ```bash
-# 1. Format and check compilation
-cargo fmt --all -- --check
-just check
-
-# 2. Check examples
-cargo check --examples
-
-# 3. Verify architecture DAG layering
-just dag-check
-
-# 4. Run the complete preflight check gate
-cargo xtask jules-preflight
+cargo check --workspace --exclude contextra-tauri  # Kompilierbarkeit
+just check                                         # Clippy-Warnungen als Fehler
+cargo check --examples                             # Examples prüfen
+just dag-check                                     # Schichtenarchitektur (DAG) verifizieren
+cargo xtask jules-preflight                        # Preflight Verification Gate
 ```
 
-## Repository Guidelines & Architecture Standards
+## 2. Wie beigetragen wird (PR-Ablauf & Branching)
 
-Contextra follows strict architectural invariants and safety principles:
+1. **Branching & Arbeitsablauf:** Erstelle einen Feature-Branch für deine Änderungen. Halte Diffs minimal und fokussiert (Minimal-Diff-Prinzip).
+2. **Preflight Checks:** Führe vor jedem PR `cargo xtask jules-preflight` aus. Alle Gates müssen lokal grün sein.
+3. **Pull Request:** Reiche den PR ein. Stelle sicher, dass die Commit-Nachrichten präzise sind und Invarianten nicht verletzt werden.
+4. **Lizenzierung:** Beiträge stehen unter der [MIT License](LICENSE-MIT) und der [Apache License 2.0](LICENSE-APACHE).
 
-1. **Zero-Panic Policy:** Production code strictly avoids `.unwrap()` and `.expect()`. All errors must propagate using `?` or return explicit `Result` types.
-2. **Unsafe Code:** Production crates enforce `#![forbid(unsafe_code)]`. Any necessary low-level optimizations (SIMD/mmap) are strictly isolated in designated Ring 0/Ring 1 crates with proof invariants.
-3. **Layering & Ring Model:** Code dependencies flow unidirectionally from higher rings (e.g., FFI/protocol adapters) down to Ring 0 (core types/traits). Do not introduce upward or circular dependencies.
+## 3. Testregeln & Qualitätssicherung
 
-For detailed developer instructions, architecture references, and agent guidelines, please consult:
+### Testregeln & -kategorien
+- **Anti-Mirroring-Prinzip:** Assertions müssen mit unabhängig ermittelten Referenzwerten arbeiten (kein Wiederholen der Formel im Test).
+- **Pflichtabdeckung:** Jeder PR muss Tests für folgende Szenarien enthalten:
+  1. *Happy Path*, 2. *Leere Eingaben*, 3. *Einzelne Elemente*, 4. *Grenzwerte* (`u64::MAX`, `f32::INFINITY`), 5. *Fehlerpfade* (Dimension-Mismatches, korrupte Bytes), 6. *Concurrency* (Sperren & Atomics).
+- **Proptests & Mutation-Check:** Proptests für SIMD/Skalar-Gegenüberstellungen. Vor Freigabe prüfen: *Schlägt ein Test fehl, wenn ein Operator im Produktionscode umgekehrt wird?*
+- **Hermetic Feature Gate Check:** `cargo check -p <crate> --no-default-features` prüft fehlende Default-Feature-Lecks.
+- **Allowances:** `.unwrap()` und `.expect()` sind ausschließlich in Test-Code (`#[cfg(test)]`) erlaubt.
 
-- [`AGENTS.md`](AGENTS.md) — Agent rules, architectural invariants, and project constraints.
-- [`DEVELOPERS.md`](DEVELOPERS.md) — Detailed setup, debugging, and testing guide for human developers.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — System architecture description and ring layout.
+### Tests ausführen
+```bash
+cargo test --workspace --exclude contextra-tauri   # Alle Workspace-Tests
+```
+Für vertiefende Testregeln und Beispiele siehe [rules/testing.md](rules/testing.md) und [rules/test_quality.md](rules/test_quality.md).
 
-## License
+## 4. Agenten-Regeln & Weiterführende Dokumente
 
-By contributing to Contextra, you agree that your contributions will be licensed under both the [MIT License](LICENSE-MIT) and the [Apache License 2.0](LICENSE-APACHE).
+- **Für AI-Agenten:** [`AGENTS.md`](AGENTS.md) definiert verbindliche Regeln, Invarianten und Werkzeuge für automatisierte Agenten.
+- **Architektur:** Systemlayout und Ring-Modell sind in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) beschrieben.
