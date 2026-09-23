@@ -43,3 +43,8 @@ results/
 
 # Jules Session History Log
 .jules/session_history.jsonl*
+
+.jules/claims.json
+.jules/SESSION.md
+.jules/verify/claim_precheck.sh
+.jules/context/
