@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_agent::context::{AgentContext, AgentStatus};
 use memfuse_agent::engine::OrchestratorEngine;
 use memfuse_agent::graph::{NodeType, StateGraph};

@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_agent::{
     AgentContext, AgentTool, DeadLetterReason, NodeType, OrchestratorEngine, StateGraph, StepResult,
 };

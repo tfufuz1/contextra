@@ -52,7 +52,6 @@ pub async fn open_with_config(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -66,10 +65,8 @@ mod tests {
         let db1 = open(&db1_path).await.expect("open db1");
         assert_eq!(db1.len().await.expect("len"), 0);
 
-        let config = MemFuseConfig {
-            dimension: 16,
-            ..Default::default()
-        };
+        let mut config = MemFuseConfig::default();
+        config.dimension = 16;
         let db2_path = base_tmp.join("db2");
         let db2 = open_with_config(&db2_path, config).await.expect("open db2");
         assert_eq!(db2.len().await.expect("len"), 0);

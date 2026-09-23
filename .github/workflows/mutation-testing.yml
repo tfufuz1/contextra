@@ -94,7 +94,7 @@ jobs:
             fi
 
             echo "Recording mutation score for $crate: total=$TOTAL, caught=$CAUGHT"
-            cargo xtask mutation-score-record --crate "$crate" --total "$TOTAL" --caught "$CAUGHT"
+            cargo run -p xtask -- mutation-score-record --crate "$crate" --total "$TOTAL" --caught "$CAUGHT"
           done
 
       - name: Report Failure

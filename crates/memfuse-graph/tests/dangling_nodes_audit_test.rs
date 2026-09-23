@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_core::{Edge, Entity, EntityId, GraphIndex, PprConfig, TxId};
 use memfuse_graph::CsrGraph;
 use std::collections::HashMap;

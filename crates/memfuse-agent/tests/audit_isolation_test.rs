@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_agent::audit::{migrate_legacy_audit_entries, AuditEntry, AuditLog};
 use memfuse_core::{
     DocId, MemFuseError, Result, ScoredDocument, StorageEngine, TxId, VectorIndex, VectorIndexStats,

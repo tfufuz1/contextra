@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_core::{DocId, EntityId};
 use memfuse_graph::path_rag::{GraphPath, PathGraph, PathRAGEngine};
 use std::collections::HashMap;

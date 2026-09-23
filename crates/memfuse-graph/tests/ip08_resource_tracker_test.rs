@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_core::{Entity, EntityId, ResourceBudget, ResourceTracker};
 use memfuse_graph::csr::{CsrGraph, CsrGraphConfig};
 use std::sync::Arc;

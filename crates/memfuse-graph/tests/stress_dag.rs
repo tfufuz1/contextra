@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Stress Test: Session-DAG Deadlock-Freiheit (§10 Krit. #15, P7).
 //!
 //! Verifikation: NodesGuard-Compile-Zeit-Garantie + Laufzeit-Deadlock-Freiheit

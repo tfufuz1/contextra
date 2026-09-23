@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse::{builder, AgentMemory, TextEmbeddingEngine};
 use memfuse_core::{BoxFuture, Result};
 use serde_json::json;

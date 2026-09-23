@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // Integration tests for continuous event loop and event sources.
 
 use memfuse_agent::event_source::{

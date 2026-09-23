@@ -1,7 +1,7 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-22T00:00:00Z
 // ZWECK: Unit and integration tests for Stage B KvState and forked Llama KV cache integration.
+
 #![cfg(feature = "kv-stage-b")]
 
 use candle_core::{DType, Device, Tensor};

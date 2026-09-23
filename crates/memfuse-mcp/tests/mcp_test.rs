@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse::MemFuse;
 use memfuse_core::BoxFuture;
 use memfuse_mcp::{

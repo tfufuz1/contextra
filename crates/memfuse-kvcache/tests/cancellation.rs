@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // ZWECK: Cancellation- & RAII-Guard-Tests für den KV-Cache (Task KV-06).
 // STAND: TS:2026-09-15T00:00:00Z

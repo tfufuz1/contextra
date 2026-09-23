@@ -2425,14 +2425,26 @@ impl HnswIndexCore {
     fn rebuild_phase1_snapshot_and_build(&self) -> Result<(HnswIndex, u64)> {
         let (all_nodes, config, snapshot_tx) = {
             let nodes = self.hot.nodes.read();
+            let mmap_count = self
+                .cold
+                .mmap_index
+                .read()
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            let deleted_nodes = self.cold.deleted_nodes.read();
             let seq_log = self.cold.seq_log.read();
             let min_retention_seq = seq_log.min_retention_seq();
             let snapshot_tx = self.hot.last_tx_id.load(Ordering::SeqCst);
             let mut all = Vec::with_capacity(nodes.len());
-            for node in nodes.iter() {
+            for (i, node) in nodes.iter().enumerate() {
+                let global_idx = mmap_count + i;
                 if node.committed_tx <= snapshot_tx {
-                    let is_visible = seq_log.is_visible(node.doc_id, snapshot_tx);
-                    if is_visible {
+                    let is_deleted = deleted_nodes.contains(global_idx as u64)
+                        && seq_log
+                            .deletion_seq(node.doc_id)
+                            .map_or(true, |del_seq| del_seq <= snapshot_tx);
+                    if !is_deleted {
                         all.push((node.doc_id, node.vector.clone(), node.committed_tx, false));
                     } else if let Some(min_ret_seq) = min_retention_seq {
                         if let Some(del_seq) = seq_log.deletion_seq(node.doc_id) {

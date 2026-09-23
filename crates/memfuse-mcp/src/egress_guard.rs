@@ -122,11 +122,12 @@ impl EgressGuard {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    use memfuse_core::traits::{BoxFuture, EmbeddingError, EmbeddingProvider};
+    use super::*;
+    use memfuse::MemFuse;
+    use memfuse_core::traits::{BoxFuture, EmbeddingError, EmbeddingProvider, TextEmbeddingEngine};
+    use tempfile::TempDir;
 
-    #[allow(dead_code)]
     #[derive(Clone, Debug)]
     struct DummyEmbedder {
         dim: usize,

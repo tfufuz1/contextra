@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // Contract tests for WP-5.3 Acceptance Criteria.
 //
 // AC-1: Checkpoint before every step
