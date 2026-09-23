@@ -33,7 +33,7 @@ Ergebnis: **0 offene Tags**
 | `memfuse-ports` | 1 | 2586 | 🟢 Clean | Canonical dyn-compatible port traits for MemFuse subsystems |
 | `memfuse-core` | 2 | 368 | 🟢 Clean | Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for MemFuse |
 | `memfuse-rank` | 2 | 2741 | 🟢 Clean | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for MemFuse Cognitive OS |
-| `memfuse-checkpoint` | 3 | 6139 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
+| `memfuse-checkpoint` | 3 | 6141 | 🟢 Clean | Backup and snapshot management for MemFuse storage |
 | `memfuse-graph` | 3 | 18312 | 🟢 Clean | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
 | `memfuse-infer-ollama` | 3 | 4602 | 🟢 Clean |  |
 | `memfuse-infer-onnx` | 3 | 2219 | 🟢 Clean |  |
