@@ -251,6 +251,14 @@
       "active": false,
       "expires_at": "2026-09-22T15:30:57.527910898+00:00",
       "released_at": "2026-09-22T20:25:09.316370497+00:00 [TTL-EXPIRED]"
+    },
+    {
+      "krate": "docs-agents",
+      "issue": "rename-inventory",
+      "timestamp": "2026-09-23T14:19:58.421702078+00:00",
+      "session_id": "4335006634530788867",
+      "active": true,
+      "expires_at": "2026-09-23T18:19:58.421687276+00:00"
     }
   ]
 }
