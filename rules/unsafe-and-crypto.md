@@ -1,8 +1,14 @@
-# SIMD & Unsafe Safety Rules
+# SIMD, Unsafe & Crypto Rules
 
-> Referenziert aus `AGENTS.md`
+This document consolidates safety rules for SIMD/unsafe operations and WAL/crypto invariants.
 
-## SAFETY-Kommentar-Pflicht
+---
+
+## SIMD & Unsafe Safety Rules
+
+> Origin: `rules/simd_safety.md`
+
+### SAFETY-Kommentar-Pflicht
 
 Jeder `unsafe`-Block in `contextra-index/src/distance.rs` braucht:
 
@@ -28,11 +34,11 @@ Ein SAFETY-Kommentar, der wortgleich in mehr als einer Funktion vorkommt, gilt a
 grep -rn "// SAFETY:" crates/ | sort | uniq -c | grep -v " 1 "
 ```
 
-## Pflicht-Fallback
+### Pflicht-Fallback
 
 Für jede SIMD-Funktion existiert ein skalarer Fallback mit **identischem numerischen Ergebnis** (Epsilon ≤ 1e-4 relativ, §4 Determinismus-Gesetz).
 
-## Runtime Feature Detection
+### Runtime Feature Detection
 
 ```rust
 #[cfg(target_arch = "x86_64")]
@@ -43,7 +49,38 @@ else { scalar_fallback(...) }
 
 Kein unconditional `target_feature`-Aufruf ohne `cfg`-Gate.
 
-## Aktueller Status
+### Aktueller Status
 
 - 42 unsafe-Blöcke in `distance.rs` (AVX2 + AVX-512) — SAFETY-Kommentare sind Voraussetzung für Merge.
 - `#![deny(unsafe_op_in_unsafe_fn)]` ist gesetzt — compliant.
+
+---
+
+## WAL & Crypto Invarianten
+
+> Origin: `rules/wal_crypto.md`
+
+### WAL-First Regel
+
+Kein Speicherzustand wird modifiziert, bevor der WAL-Eintrag physisch committed + synced ist.
+Reihenfolge: `WAL::append()` → `fsync()` → `MemTable::apply()`.
+
+### HMAC-Chaining
+
+```
+Entry_N.checksum = HMAC(key, prev_hmac_N-1 || seq_N || op_type || payload)
+```
+
+`prev_hmac` der ersten Entry = `[0u8; 32]`.
+Bei Replay: Chain von Entry 0 bis letzte Entry validieren. Abbruch bei erstem Mismatch → `ContextraError::WalCorruption`.
+
+### Crypto-Isolation
+
+- `contextra-crypto` ist die **einzige** Stelle für Krypto-Primitiven (AES-GCM-SIV).
+- Jede WAL-Datei hat ein eigenes Key (HKDF-Ableitung aus UUID-Sidecar).
+- UUID-Sidecar: `<wal_path>.uuid` (16 Byte, raw). Muss vor erster WAL-Nutzung existieren.
+
+### Was niemals passieren darf
+
+- `bincode::deserialize(...).unwrap_or_default()` auf WAL-Einträge — Korruption wird zu Datenverlust.
+- Krypto-Code außerhalb von `contextra-crypto` (auch nicht „nur für diesen einen Fall").
