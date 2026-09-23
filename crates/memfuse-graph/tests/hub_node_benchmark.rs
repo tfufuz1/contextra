@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Synthetic Hub-Node BFS Traversal Benchmark
 //!
 //! Evaluates peak intermediate memory consumption and CPU latency of `CsrGraph`

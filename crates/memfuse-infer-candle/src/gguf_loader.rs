@@ -58,6 +58,7 @@ pub fn parse_gguf_metadata(model_path: &Path) -> Result<GgufMetadata, MemFuseErr
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use std::io::Write;

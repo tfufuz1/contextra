@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_core::{DocId, Edge, Entity, EntityId, GraphIndex, TxId};
 use memfuse_graph::CsrGraph;
 use std::sync::Arc;

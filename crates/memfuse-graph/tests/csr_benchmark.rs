@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_core::{Edge, Entity, EntityId, GraphIndex, TxId};
 use memfuse_graph::csr::{CsrGraph, CsrGraphConfig};
 use std::time::Instant;

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-11T16:00:00Z
 // ZWECK: Property-based tests for numerical normalization, finite outputs, and empty/whitespace input edge cases.

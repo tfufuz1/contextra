@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-09T12:44:49Z (SESSION: c74a1828)
 // ZWECK: Property-based tests for memfuse-candle components (fingerprinting, GaspValidator, and clients).

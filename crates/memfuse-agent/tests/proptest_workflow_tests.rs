@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT Header (Format v3)
 // ZWECK: Property-based testing for memfuse-agent structural invariants (StateGraph, AgentContext, BackgroundEvent).
 // INVARIANTEN: Property tests verify boundary constraints and state consistency independently without mirroring production validation formulas.

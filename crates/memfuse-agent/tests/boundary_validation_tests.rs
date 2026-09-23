@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // Comprehensive tests verifying boundary input validations and resource limits.
 
 use memfuse_core::BoxFuture;

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // E2E integration tests for memfuse-agent.
 //
 // Validates the full stack: MemFuse DB → Collection → OrchestratorEngine → Graph walk.

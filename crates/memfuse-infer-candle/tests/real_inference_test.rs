@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-11
 // ZWECK: Integration tests for Candle real forward-pass GGUF LLM and Bert embedding inference.

@@ -27,12 +27,14 @@ pub struct SieveCacheBackend {
     state: RwLock<SieveCacheState>,
 }
 
+#[allow(dead_code)]
 struct SieveNode {
     key: (u64, u64),
     value: Bytes,
     visited: bool,
 }
 
+#[allow(dead_code)]
 struct SieveCacheState {
     map: ahash::AHashMap<(u64, u64), usize>, // key -> node index in queue
     nodes: Vec<Option<SieveNode>>,

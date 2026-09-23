@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT Header (Format v3)
 // ZWECK: Test token budget concurrency and RMW race condition in memfuse-agent workflow steps.
 // INVARIANTEN: Verifies sequential vs concurrent TokenBudget consumption limits.

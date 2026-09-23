@@ -16,6 +16,7 @@ pub mod server_tools;
 pub mod validation;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests;
 
 pub use bulk_exfiltration_detector::{

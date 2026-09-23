@@ -55,6 +55,7 @@ use memfuse_core::FilterExpr;
 pub use memfuse_graph::percolation::PercolationConfig;
 pub use memfuse_text::Language;
 
+#[allow(clippy::type_complexity)]
 static CONSOLIDATION_LAUNCHER: parking_lot::RwLock<
     Option<
         Arc<

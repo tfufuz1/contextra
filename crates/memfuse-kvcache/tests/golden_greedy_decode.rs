@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::useless_vec
+)]
 // FILE-CONTEXT
 // ZWECK: Golden-Test für identische Greedy-Tokenfolgen mit/ohne Prefix-Reuse (Spec §9.2 / Task 4-04).
 // STAND: TS:2026-09-15T00:00:00Z

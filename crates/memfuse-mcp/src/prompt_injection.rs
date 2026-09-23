@@ -785,6 +785,7 @@ fn chrono_or_simple_timestamp() -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;

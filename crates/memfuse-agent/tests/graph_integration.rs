@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_agent::{NodeType, StateGraph};
 
 #[test]

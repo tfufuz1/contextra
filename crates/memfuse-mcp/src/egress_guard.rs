@@ -2,9 +2,7 @@
 // ZWECK: Layer-4 EgressGuard (Re-export from memfuse-privacy)
 
 use memfuse::Collection;
-use memfuse_crypto::egress_vault::{
-    BlockReason, BoxFuture, EgressClassification, EgressClassifier,
-};
+use memfuse_crypto::egress_vault::{BlockReason, EgressClassification};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -124,12 +122,11 @@ impl EgressGuard {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    use super::*;
-    use memfuse::MemFuse;
-    use memfuse_core::traits::{BoxFuture, EmbeddingError, EmbeddingProvider, TextEmbeddingEngine};
-    use tempfile::TempDir;
+    use memfuse_core::traits::{BoxFuture, EmbeddingError, EmbeddingProvider};
 
+    #[allow(dead_code)]
     #[derive(Clone, Debug)]
     struct DummyEmbedder {
         dim: usize,

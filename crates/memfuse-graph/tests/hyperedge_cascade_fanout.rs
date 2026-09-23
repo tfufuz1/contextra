@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use memfuse_core::{DocId, EntityId};
 use memfuse_graph::cascade::{
     cascade_invalidate_hyperedges_for_superseded_doc, MAX_HYPEREDGE_CASCADE_FANOUT,
