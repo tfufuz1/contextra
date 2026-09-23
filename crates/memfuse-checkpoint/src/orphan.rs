@@ -8,6 +8,22 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Type alias for sequence numbers managed as pinned checkpoint identifiers.
 pub type PinId = u64;
 
+/// R-07 AUDIT BEFUND: `DUMMY_ORPHAN_REGISTRY` & Deprecated Global State
+///
+/// **Befund-Zusammenfassung:**
+/// `DUMMY_ORPHAN_REGISTRY` ist ein träger `OnceLock<OrphanRegistry>`-Platzhalter mit leerem Persistierungspfad (`""`),
+/// der ausschließlich zur Abwärtskompatibilität für als `#[deprecated]` markierte legacy Freifunktionen
+/// (`global_orphan_registry`, `register_pinned_seq_no_orphan`, etc.) existiert.
+///
+/// **P29 / Global-State Bewertung:**
+/// 1. Im Produktionsbetrieb (`MemFuse::open`, `PersistentCheckpointStore::open`) kommt KEIN globaler Zustand zum Einsatz.
+///    Jede Instanz initialisiert eine isolierte `Arc<InstanceOrphanRegistry>` mit eigenem Dateipfad (ADR-053).
+/// 2. `DUMMY_ORPHAN_REGISTRY` wird im regulären MemFuse Cognitive OS Runtime-Betrieb weder gelesen noch geschrieben.
+/// 3. Da `DUMMY_ORPHAN_REGISTRY` mit dem leeren Pfad `""` initialisiert ist, führt ein versehentlicher Aufruf von
+///    Legacy-Methoden zu keinen Dateisystem-Seiteneffekten oder mandantenübergreifenden Zustandskollisionen.
+///
+/// Fazit: Es liegt KEIN echter/aktiver globaler Mutable State im Produktionscode vor; eine refactoringbedingte
+/// Ersetzung ist im Produktionspfad bereits durch `InstanceOrphanRegistry` vollzogen.
 #[allow(deprecated)]
 static DUMMY_ORPHAN_REGISTRY: std::sync::OnceLock<OrphanRegistry> = std::sync::OnceLock::new();
 

@@ -55,6 +55,10 @@ impl VirtualHyperedgeNode {
 /// Stern-Expansion: Jede Hyperkante wird als künstlicher bipartiter Knoten
 /// (`VirtualHyperedgeNode`) repräsentiert. Der Iterator gaukelt dem Leiden-Solver die
 /// Inzidenzmatrix H vor, ohne zusätzlichen Speicher für die volle Expansion zu allozieren.
+///
+/// # Ring-0 Zero-Copy Invariante (HK-05)
+/// `StarExpansionIterator` klont keine `HyperEdge`-Instanzen, sondern iteriert
+/// referenzbasiert über die in `Arc<GraphInner>` gespeicherten Hyperkanten.
 pub struct StarExpansionIterator {
     inner: arc_swap::Guard<std::sync::Arc<crate::csr::inner::GraphInner>>,
     hyperedge_keys: Vec<crate::hyperedge::HyperEdgeId>,
