@@ -43,3 +43,7 @@ results/
 
 # Jules Session History Log
 .jules/session_history.jsonl*
+.jules/SESSION.md
+.jules/claims.json
+.jules/context/*
+!.jules/context/.gitkeep
