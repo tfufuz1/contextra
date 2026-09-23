@@ -15,6 +15,7 @@ tracing = { workspace = true }
 default = ["bandit-routing"]
 bandit-routing = []
 egress-sherman-morrison = ["bandit-routing"]
+flow-corrected-thompson = ["bandit-routing"]
 
 [lints]
 workspace = true

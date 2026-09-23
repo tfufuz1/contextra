@@ -64,6 +64,12 @@ pub enum BanditImplementation {
     ShermanMorrison,
     /// Diagonal-Approximation O(d): Opt-in-Variante.
     DiagonalApproximation,
+    /// Flow-Corrected Thompson Sampling (§21.3).
+    ///
+    /// Hinweissystem: Im `BanditProfileState` verhält sich dieser Arm bezüglich UCB/Linear-Regression
+    /// wie `ShermanMorrison`. Die eigentliche FC-TS-Anpassung mit Transport und konfidenzgewichtetem
+    /// Drift-Update lebt isoliert in `flow_thompson::FlowCorrectedThompsonBandit`.
+    FlowCorrectedThompson,
 }
 
 /// Trait für Bandit-Routing Policies mit Konzeptdrift-Anpassung (§5.2.3).
@@ -321,7 +327,7 @@ impl BanditProfileState {
                 .map(|(s, xi)| xi * xi / s.max(1e-8))
                 .sum::<f32>()
                 .sqrt(),
-            BanditImplementation::ShermanMorrison => {
+            BanditImplementation::ShermanMorrison | BanditImplementation::FlowCorrectedThompson => {
                 let d = self.theta.len();
                 if self.inv_a.len() == d * d {
                     let var_sum: f32 = self
@@ -386,7 +392,7 @@ impl BanditProfileState {
                     self.sigma_sq[i] += xi * xi;
                 }
             }
-            BanditImplementation::ShermanMorrison => {
+            BanditImplementation::ShermanMorrison | BanditImplementation::FlowCorrectedThompson => {
                 let d = self.theta.len();
                 self.ensure_inv_a();
                 self.ensure_work_buf();
