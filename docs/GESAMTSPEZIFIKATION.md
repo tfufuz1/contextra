@@ -1,4 +1,14 @@
-# Contextra Cognitive OS — Finale Konsolidierte Gesamtspezifikation (Zielarchitektur-v2-Edition)
+# Contextra — Finale Konsolidierte Gesamtspezifikation (Fassung 4 · SOTA-Algorithmen-Integration & Architekten-Review)
+
+> **Namenshinweis:** Dieses Dokument bezeichnete das Projekt bis Fassung 2.1 als „MemFuse". Mit Fassung 3
+> ist der Produktname verbindlich **Contextra**. Die Umbenennung wurde mechanisch (Suchen/Ersetzen über den
+> gesamten Dokumenttext, keine Handarbeit) durchgeführt: `MemFuse` → `Contextra`, `memfuse-*`-Crate-Präfixe →
+> `contextra-*`. Grund für den Namenswechsel und Prüfung der Registry-Verfügbarkeit (crates.io, PyPI, npm):
+> siehe Gespräch/Beratungsprotokoll; der bisherige Name kollidierte mit einem fremd belegten PyPI-Paket
+> (`memfuse`, Autor Calvin Ku) sowie mit mehreren gleichnamigen GitHub-Projekten. Frühere Bezeichnung „MemFuse
+> Cognitive OS" wird nicht fortgeführt; siehe §2 zur aktualisierten Positionierung als eingebettete,
+> air-gapped-fähige Gedächtnisschicht statt „Cognitive OS"/„LLM OS" (Empfehlung der strategischen
+> Tiefenberatung, §3.3 dieses Beratungsdokuments — dort auch als Begründung archiviert).
 
 > **Status:** Normativ · Einzige maßgebliche Quelle für Produkt, Architektur, Algorithmen,
 > Implementierungsvorgaben, Sicherheitsmodell, Schnittstellenspezifikation, Stabilisierungsphasen und
@@ -76,10 +86,49 @@
 >   (§A.3) für den betroffenen Crate durchlaufen ist.
 >
 > **Korrektur durch Teil A2, verbindlich:** Der bisherige Marker 🟢 für die KV-Cache-Bridge (§9.2) war
-> **falsch** — die verifizierte Implementierung speichert nur einen Platzhalter-String und zählt einen
-> Zähler hoch, ohne echten Prefill einzusparen (§9.2, „Vorher/Jetzt"). Ab dieser Fassung gilt jeder 🟢-Marker
-> zusätzlich als widerrufen, sobald Teil A2 für den betroffenen Bereich einen belegten Gegenbefund („D#"
-> in Teil A2 §2) nennt; maßgeblich ist die D#-Tabelle in §A2.1.
+> **falsch** — die verifizierte Implementierung speicherte in einer früheren Prüfung nur einen
+> Platzhalter-String und zählte einen Zähler hoch, ohne echten Prefill einzusparen (§9.2, „Vorher/Jetzt").
+> Ab dieser Fassung gilt jeder 🟢-Marker zusätzlich als widerrufen, sobald Teil A2 für den betroffenen Bereich
+> einen belegten Gegenbefund („D#" in Teil A2 §2) nennt; maßgeblich ist die D#-Tabelle in §A2.1. **Teil A3
+> (neu, Fassung 3) korrigiert diesen Befund für den aktuellen HEAD erneut** — die KV-Cache-Bridge ist laut
+> Commit-Historie (`a16fd650`, `d37a70b6`) inzwischen über den reinen Platzhalter hinaus ausgebaut (Prefix-Radix-Baum,
+> RAII-Guards, Tier-2-AEAD-Verschlüsselung, `KvState` für Stufe B); Teil A3 §A3.1 führt die verifizierte
+> Einzelbewertung.
+>
+> **Leitentscheidung dieser Fassung (5) — Fassung 3 (Rename + Status-Konsolidierung, ranghöchste Ergänzung):**
+> Fassung 3 fügt **Teil A3 — Aktueller Umsetzungsstand & priorisierte Restarbeit** direkt im Anschluss an
+> Teil A2 ein und macht dieses Gesamtdokument damit zur einzigen Quelle der Wahrheit, die (a) den
+> Produktnamen auf Contextra aktualisiert, (b) den Status jedes in Teil A2/§17/§18/§20 als offen markierten
+> Punktes gegen den tatsächlichen Repository-Zustand zum Zeitpunkt dieser Fassung nachführt, und (c) die
+> Ergebnisse der externen strategischen Tiefenberatung (Scope-Einfrierung, Prozess- vor Feature-Risiko,
+> Positionierung) als normative Priorisierung übernimmt. **Teil A3 ist ranghöher als Teil A2, soweit es um
+> Priorisierung und Statusaussagen geht** (Teil A2 bleibt maßgeblich für die technische Zielarchitektur selbst
+> — das Ring-Modell, Crate-Zuschnitt und Abhängigkeitsrichtung ändern sich durch Fassung 3 nicht). Im
+> Konfliktfall zwischen einem Reifegrad-Marker in §5–§20 und einer Statusaussage in Teil A3 gilt Teil A3, da
+> es der zuletzt gegen den Code geprüfte Stand ist.
+>
+> **Leitentscheidung dieser Fassung (6) — Fassung 4 (SOTA-Algorithmen-Integration, Architekten-Review):**
+> Fassung 4 verarbeitet zwei extern zugelieferte Dokumente — einen Deep-Research-Bericht zu vier
+> algorithmischen State-of-the-Art-Verfahren aus 2025/2026 (`Deep-Research-Bericht_Contextra_erweitert.md`,
+> inkl. dessen eigenem Teil C, einem bereits vorab durchgeführten Quellcode-Abgleich gegen Repo-Stand
+> `4b9387d6`) sowie diese Spezifikation selbst in der Fassung 3 — und führt sie zusammen. Die Rolle dieser
+> Fassung ist die eines **Principal-Architect-Reviews**: Sie prüft Umsetzbarkeit und Optimierungspotenzial der
+> vier Verfahren gegen den tatsächlichen, frisch geklonten Workspace-Zustand (identischer Commit `4b9387d6`,
+> Repository `github.com/tfufuz1/contextra`, geprüft am 23.09.2026) und integriert nur das, was diese Prüfung
+> bestätigt. Fassung 4 ergänzt **Teil A4 — Architekten-Review: Machbarkeit und Optimierungspotenzial der
+> SOTA-Algorithmen** direkt im Anschluss an Teil A3 sowie **§21 — Normative SOTA-Algorithmen-Erweiterung**
+> direkt im Anschluss an §20, korrigiert das FlatBuffers-Schema in §12 (`child_edge_ids`), ergänzt
+> Abnahmekriterien AK-16 bis AK-19 in §16.2 und trägt die vier Verfahren in die Roadmap (§17, §18) mit
+> revidierter Priorität ein. **Teil A4 ist wie Teil A3 ranghöher als §5–§20, soweit es um Priorisierung und
+> Statusaussagen zu den vier SOTA-Verfahren geht; im Konfliktfall zwischen einer Aussage in §21 und einer
+> Aussage in Teil A4 gilt Teil A4**, da dort die Beleglage und der Ist-Abgleich geführt werden — §21 ist die
+> daraus abgeleitete normative Schnittstellen- und Algorithmusspezifikation. Diese Fassung ändert an Teil
+> A/A2/A3 und §0–§20 inhaltlich nichts außer den in diesem Absatz genannten punktuellen Ergänzungen (§12,
+> §16.2, §17, §18); alle übrigen Aussagen der Fassung 3 bleiben unverändert normativ. Entsprechend der eigenen
+> Regel dieses Dokuments („Künftige Änderungen erfolgen als direkte Überarbeitung dieses Dokuments, nicht als
+> weiteres Delta-Dokument", vormals Fassung-3-Schlussvermerk vor Anhang B) ist Fassung 4 **eine einzige,
+> in sich geschlossene Datei** und kein separat geführtes Zusatzdokument. Änderungsprotokoll und
+> Prüfnachweise dieser Fassung: **Anhang D**.
 
 ---
 
@@ -87,6 +136,8 @@
 
 **A.** [Stabilisierungsauftrag: Ground Truth, Reifegrade, Gates](#teil-a)
 **A2.** [Zielarchitektur v2 — Ring-Modell, verbindlich ab sofort](#a2-zielarchitektur-v2)
+**A3.** [Aktueller Umsetzungsstand & priorisierte Restarbeit (Fassung 3, Quelle der Wahrheit)](#a3-status)
+**A4.** [Architekten-Review: Machbarkeit & Optimierungspotenzial der SOTA-Algorithmen (Fassung 4)](#a4-review)
 0. [Meta: Workspace-Layout und Build-Konfiguration](#0-meta)
 1. [Kernthese und Leitprinzip](#1-kernthese)
 2. [Produktvision, Alleinstellungsmerkmale und Nicht-Ziele](#2-vision)
@@ -108,9 +159,11 @@
 18. [Gesamtroadmap](#18-roadmap)
 19. [Rückverfolgbarkeitsmatrix](#19-matrix)
 20. [Migrationsplan v2 und ADR-Übersicht (neu)](#20-migration-v2)
+21. [Normative SOTA-Algorithmen-Erweiterung: TL-HFD, DiBud, FC-TS, LeanRAG](#21-sota)
 
 **B.** [Anhang B — Begründungen, Ist-Zustand, Literatur (nachrangig)](#anhang-b)
 **C.** [Anhang C — Änderungsprotokoll Fassung 2.1 und Prüfnachweise](#anhang-c)
+**D.** [Anhang D — Änderungsprotokoll Fassung 4 und Prüfnachweise](#anhang-d)
 
 ---
 
@@ -272,6 +325,321 @@ jeweiligen Migrationsschritt (§20) einen Product-Owner-Beschluss oder einen Spi
 Diese sechs Punkte dürfen **nicht** durch Weiterarbeit am Code stillschweigend entschieden werden; jede
 Umsetzung, die eine dieser Fragen präjudiziert, braucht vorab die zugehörige ADR (§20.3) im Status
 „beschlossen".
+
+---
+
+<a id="a3-status"></a>
+## Teil A3 — Aktueller Umsetzungsstand & priorisierte Restarbeit (Fassung 3, Quelle der Wahrheit)
+
+> **Geltung:** Dieser Teil führt jeden in Teil A2/§17/§18/§20 als offen (🔴), unverifiziert (🔍) oder als
+> Bridge/Stub markierten Punkt gegen den zum Prüfzeitpunkt tatsächlichen Repository-Zustand nach
+> (`github.com/tfufuz1/memfuse`, HEAD `d37a70b6`, 2.436 Commits Historie) und übernimmt die Priorisierung der
+> externen strategischen Tiefenberatung. Geprüft wurde durch Live-Klon und direkte Verifikation
+> (Datei-Existenz, `wc -l`, `grep` auf Funktions-/Typnamen, `git log`-Commit-Nachrichten und Cargo.toml-Inhalte)
+> — **nicht** aus Sekundärquellen übernommen, sofern nicht ausdrücklich als „laut Commit-Historie, nicht im
+> Detail nachvollzogen" gekennzeichnet. Reifegrad-Marker in §5–§20 sind bei Widerspruch **nachrangig** zu den
+> Aussagen dieses Teils (siehe Leitentscheidung 5).
+
+### A3.1 Was seit Fassung 2.1 tatsächlich fertiggestellt wurde (verifiziert 🟢)
+
+| Bereich | Referenz in dieser Spec | Status Fassung 2.1 | Status Fassung 3 (verifiziert) |
+|---|---|---|---|
+| Produkt-Fassade `remember/recall/forget/relate` | §2, §A2 | 🔴 nicht vorhanden, 50-Zeilen-Skelett | 🟢 `crates/contextra/src/agent_memory.rs` implementiert und über `lib.rs` re-exportiert; `AgentMemory` mit allen vier Methoden |
+| `contextra-rank`-Crate (vormals `memfuse-rank`) | §4, §A2.1 | 🔴 existiert nicht | 🟢 eigenes Crate, ~2.012 LOC, im Workspace registriert |
+| `contextra-db`-Strangler-Shell | §A2.1 (D#-Tabelle) | 🔴 16.221 LOC, kein reines Re-Export | 🟢 auf 1.849 LOC reduziert (`lib.rs` allein 882 Zeilen), expliziter Commit „reduce contextra-db to pure re-export strangler shell" |
+| `contextra-core`-Deprecation | §A2.1 | 🔴 kein `#[deprecated]` | 🟢 20 `#[deprecated]`-Attribute, Crate ist reine Deprecation-Shell (136 Zeilen) |
+| MCP-Tool `contextra_forget` (vormals `memfuse_forget`) | §11, §16 (Abnahmekriterien MCP) | 🔴 fehlte | 🟢 implementiert, inkl. Pflichtparameter `confirm: true` als bewusste Sicherheitshürde |
+| PyPI-Publish-Workflow-Risiko | §10 (Sicherheitsmodell, Supply Chain) | 🔴 aktiver Tag-Trigger auf `v*.*.*`, höchstes Einzelrisiko laut Vorberichten | 🟢 Trigger entfernt; nur noch `workflow_dispatch` mit Pflichtfeld `confirm_package_name`, geprüft gegen den im Paket deklarierten Namen |
+| `default-members` (Workspace) | §0 (Meta) | 🔴 `contextra-infer-onnx` fälschlich enthalten, `contextra-sys`/`contextra-privacy` fehlten | 🟢 bereinigt: `infer-onnx` entfernt, `sys`/`privacy` ergänzt |
+| Pflicht-Integrationstests AK-4, AK-14, AK-15 | §15 (Test-Spezifikation) | 🔴 drei von vier AK-Tests fehlten | 🟢 `signal_kind_no_new_variant.rs`, `kv_locks_stable_shard.rs`, `ips_requires_propensity.rs` vorhanden |
+| `xtask check-module-reachability` | §15, §A.3 (Gate 0) | 🔴 fehlte | 🟢 implementiert (409+ Zeilen), inkl. Alias `check-orphan-modules` |
+| `capabilities.toml` | §14 (Feature-Flag-Politik) | 🔴 fehlte | 🟢 vorhanden im Repo-Root |
+| ADRs N01–N10 | §20.3 | 🔴 0 von 10 als Dokument | 🟢 alle 10 unter `docs/decisions/`, plus fünf weitere (insgesamt 15 ADR-Dateien) |
+| N-äre Hyperkanten: `HyperEdgeView`, `ArcSlice<T>` (§6.6 H2ff.) | §6, Anhang B §B.6.1.1/H2 | 🔴 spezifiziert, nicht gebaut | 🟢 beide implementiert (`arc_slice.rs`, `hyperedge.rs`), 9 dedizierte Testdateien (Persistenz, Compact-Race, Cascade-Fanout/-Recovery, Memory-Budget, Payload-Sharing, Queue-Persistenz) — Commit „implement n-ary hyperedges, ArcSlice, and Convention K star weight" deutet auf einen gebündelten Umsetzungsschritt für §6.6 H2–H6 hin |
+| KV-Cache §9.2 (Prefix-Radix-Baum, RAII-Guards, Tier-2-AEAD, `KvState` Stufe B) | §9.2 | 🔴 nur Platzhalter-String + Zähler (korrigierter 🟢-Widerruf aus Fassung 2) | 🟢 laut Commit-Historie umgesetzt (`a16fd650`, `d37a70b6`); `radix.rs`, `kv_state.rs` (Kommentar referenziert explizit „Spec §9.2 Stufe B"), AEAD-Bezug in `segment.rs` verifiziert vorhanden — **Prefill-Skip-Wirksamkeit selbst nicht nachgemessen, nur Struktur-Existenz verifiziert** |
+| `contextra-vector` `forbid`/`allow(unsafe_code)`-Widerspruch (§A2, D#-Tabelle) | §A2.1 | 🔴 E0453, nicht kompilierbar laut Zielarchitektur-Prüfung | 🟡 Datei-Header zeigt keinen offensichtlichen Widerspruch mehr — **Detailprüfung der tatsächlichen `unsafe`-Migration nach `contextra-sys` steht noch aus, daher 🟡 statt 🟢** |
+| Layering-Test-Schärfe (§4, P5) | §4, §15 | 🔍 Modus unklar | 🟢 Test läuft im „0 unallowlisted violations"-Modus mit dokumentierten Allowlist-Warnungen, schärfer als ein reiner Warnmodus |
+| `results/`-Verzeichnis (~25 MB Altlast) | — | 🔴 im Repo | 🟢 nicht mehr auffindbar |
+
+**Einordnung:** Von den in Fassung 2.1 als offen markierten Punkten sind die überwiegende Mehrheit der
+strukturellen Refactorings (Strangler-Shell, Deprecation, Crate-Zerlegung) und mehrere Ring-0/Ring-1-nahe
+Features (Hyperkanten-Kernstruktur, KV-Cache Stufe B/C) inzwischen umgesetzt — das bestätigt, dass der in §A.2
+verlangte Ground-Truth-Zyklus tatsächlich funktioniert, wenn er durchlaufen wird.
+
+### A3.2 Was weiterhin offen ist (verifiziert, unverändert seit Fassung 2.1)
+
+| # | Punkt | Referenz | Status |
+|---|---|---|---|
+| 1 | **Namensentscheidung final vollzogen im Code** | Kopf, §2 | Diese Fassung 3 löst diesen Punkt im **Dokument** auf (Contextra). Der mechanische Rename im **Repository selbst** (Cargo.toml-Namen, Crate-Verzeichnisse, README, CI-Workflows, PyPI-Namensprüfung im Publish-Gate) ist als eigener P0-Arbeitsschritt separat durchzuführen — siehe §A3.3, Punkt 1 |
+| 2 | **P26-Verstoß:** `tokio` als reguläre Dependency in `contextra-vector`, `contextra-text`, `contextra-graph` (Ring 0) | §3 (P26), §4 | 🔴 unverändert Verstoß — weder entkoppelt noch die Spezifikation revidiert |
+| 3 | **`wal_backpressure.rs`** (AK-13) | §15 | 🔴 einziger der ursprünglich vier kritischen Pflichttests, der weiterhin nicht auffindbar ist |
+| 4 | **Benchmark-Belastbarkeit** (§17, Optimierungs-Roadmap) | §17, Anhang B §B.7 | 🟡 verbessert gegenüber Fassung 2.1 (Messgrenzen jetzt selbst dokumentiert, u. a. „keine verifizierten Cross-System-Vergleiche", einzelne Zahlen selbst als „nicht reproduziert" gekennzeichnet), aber weiterhin **kein** methodisch belastbarer Lauf mit realistischer Stichprobe gegen einen Standard wie BEIR/LongMemEval |
+| 5 | **God-Files** (§3, Wartbarkeitsprinzip) | §3 | `contextra-vector/src/hnsw/mod.rs` (3.382 Zeilen), `diskann.rs` (3.369), `contextra-engine/src/collection/tests.rs` (3.718), `crud.rs` (1.656), `search.rs` (1.346), `lib.rs` (1.310) — mehrere Dateien deutlich über der 1.000-Zeilen-Zielmarke |
+| 6 | **`xtask`-Umfang** | §A.3, §15 | 16.564 LOC — deutlich über dem in Vorberichten genannten Zielwert „< 3.000 LOC" |
+| 7 | **Phantom-Commit-Schutz** | neu, siehe Beratung Abschnitt 2.1 | 🔴 kein CI-Gate gefunden, das Commit-Message-Umfang gegen `git diff --stat` prüft — trotz eines dokumentierten, belegten Falls eines leeren Commits mit erfundener fünf Punkte umfassender Message |
+| 8 | Sechs Product-Owner-Entscheidungen (§0.4 oben: Ring-Konsolidierung, Nonce-Strategie, Clique-Konvention u. a.) | §0.4 | ⚖️ unverändert offen, siehe Liste oben in Teil A2 |
+
+### A3.3 Priorisierte Restarbeit — konsolidiert aus Teil A3.2 und externer Beratung
+
+Diese Reihenfolge ersetzt für den aktuellen Stand die frühere P0-Liste in §17/§18 dort, wo sie sich
+überschneiden; §17/§18 bleiben für alle übrigen (Performance-/Architektur-)Punkte gültig.
+
+**P0 — vor jeder weiteren Feature-Arbeit (Stunden bis 1 Tag):**
+1. Namens-Rename mechanisch im gesamten Repository durchziehen (Cargo.toml-Paketnamen `contextra*`, Crate-Verzeichnisse, README, GitHub-Org/Repo-Name, PyPI/crates.io/npm-Reservierung, Namensprüfung im `publish-pypi.yml`-Gate anpassen) — Skript, keine Handarbeit; danach keine weitere Revision.
+2. Phantom-Commit-Gate einbauen (CI-Check `git diff --stat` gegen Commit-Message-Länge/Schlüsselwörter; < 1 Stunde Aufwand laut Beratung).
+
+**P1 — vor öffentlichem v0.1-Launch (1–3 Wochen):**
+3. Governance-Redundanz abbauen (Status-Dateien von Git-Historie entkoppeln, `.jules/claims.json`-Claim-Infrastruktur für Solo-Betrieb zurückbauen, doppelte Crate-Inventartabelle konsolidieren).
+4. `wal_backpressure.rs` nachziehen (letzter fehlender Pflichttest).
+5. Einen methodisch sauberen, kleinen Benchmark fahren (realistische Stichprobe, mindestens ein etablierter Referenzpunkt wie BEIR/LongMemEval-Subset), Ergebnis so veröffentlichen wie es ausfällt.
+6. README/Installationsanweisungen final an „Contextra" anpassen, inklusive funktionierendem Installationspfad für den MCP-Server.
+
+**P2 — nach erstem echten Nutzerfeedback, nicht vorher:**
+7. `.unwrap()`-Reduktion (~1.047 Aufrufe außerhalb Tests) gegen die Zero-Panic-Doktrin — entweder konsequent fortsetzen oder Zielwert in §20.3/ADRs ehrlich revidieren.
+8. P26-Verstoß entscheiden: echte `tokio`-Entkopplung in Ring 0 (Wochenaufwand) oder Prinzip formal revidieren (Stunde) — die billige Option zuerst ziehen, damit Spezifikation und Code nicht länger widersprüchlich sind.
+9. God-Files zerlegen (§A3.2 Nr. 5) — Hygiene, nicht blockierend.
+10. Die sechs Product-Owner-Entscheidungen aus §0.4 (DocId-Migration, 2PC-Härtung vs. WAL-als-Wahrheit, Ring-Konsolidierung, Nonce-Strategie, Clique-Konvention) bewusst zurückstellen, bis reale Lastmuster vorliegen — jede vorzeitige Festlegung ist Spekulation ohne Messgrundlage.
+
+**Bewusst nicht tun (Scope-Einfrierung, siehe Beratung Abschnitt 4.3 und 9):**
+- Keine neuen Crates/Subsysteme vor v0.1.
+- Kein Enterprise-Ausbau (Multi-Tenancy-Admin, SLA, Compliance-Zertifizierung) vor einem konkreten Interessenten — die Architektur (Ring-Modell, MVCC, Verschlüsselung, Audit-Trail) trägt ein Enterprise-Produkt bereits strukturell, siehe §10.
+- Kein Managed-Cloud-Angebot vor belegtem Self-Hosting-Interesse — widerspricht sonst dem Kern-Differenzierungsmerkmal Air-Gapped-Betrieb (§2).
+- Keine Benchmark-Zahlen veröffentlichen, die methodisch nicht standhalten (§A3.2 Nr. 4).
+- Keine weitere Tiefenanalyse-Runde vor Abarbeitung der P0-Liste — dieses Dokument ist ab jetzt die einzige fortzuschreibende Quelle der Wahrheit, nicht ein weiterer Bericht daneben.
+
+### A3.4 Positionierung (aktualisiert, ersetzt Teilaussagen aus §2)
+
+Für §2 (Produktvision) gilt ergänzend die aus der externen Beratung übernommene, geschärfte Positionierung:
+*„Die eingebettete, air-gapped-fähige Gedächtnisschicht für Rust- und Lokal-KI-Entwickler, die Datenhoheit
+brauchen — nicht noch eine Cloud-Memory-API."* Nicht als „Cognitive OS" oder generisches Agenten-Framework
+positionieren (das ist Letta/MemGPT-Territorium); nicht auf Benchmark-Leaderboards gegen Hindsight/Zep
+antreten, solange kein methodisch sauberer Wert vorliegt (§A3.2 Nr. 4); nicht gegen die Netzwerkeffekt-Breite
+von Mem0 antreten. Strukturell differenzierbar und einzigartig im Vergleich zu Mem0, Zep/Graphiti, Letta,
+Cognee, LangMem, Hindsight sowie zu embedded Rust-Bausteinen wie LanceDB/Qdrant embedded/tantivy: die
+Kombination aus (a) echtem Embedded/Air-Gapped-Betrieb ohne externe Datenbank-Abhängigkeit, (b)
+architektonisch verankerter DLP/Egress-Kontrolle (`egress_guard.rs`, `prompt_injection.rs`, fail-closed) statt
+nachgerüsteter Compliance, (c) Rust-nativer Performance ohne Python-GC-Pausen, und (d) einer bereits
+vorhandenen, mit Graphiti/Zep konzeptionell konkurrenzfähigen generativen Synthese-Pipeline mit
+Grounding-Validierung (§6, Konsolidierung) — die bislang unveröffentlicht und unbenannt ist.
+
+---
+
+<a id="a4-review"></a>
+## Teil A4 — Architekten-Review: Machbarkeit & Optimierungspotenzial der SOTA-Algorithmen (Fassung 4)
+
+> **Rolle dieses Teils:** Ich (Principal Senior Rust Architect für Contextra) habe für diese Fassung das
+> Repository `github.com/tfufuz1/contextra` live geklont (`git clone`, `HEAD 4b9387d6119be17180de21a0ea5b2be98121357a`,
+> Commit-Message „refactor(rename): memfuse -> contextra (mechanical, script-driven) (#3494)") — **derselbe
+> Commit**, gegen den bereits Teil C des Deep-Research-Berichts geprüft wurde. Das erlaubt einen direkten,
+> reproduzierbaren Zweitabgleich statt einer bloßen Übernahme fremder Befunde. Methodik: `grep`/`wc -l` auf
+> Datei-, Funktions- und Typnamen, `view` auf vollständige Modulinhalte, keine Ausführung von `cargo build`
+> (Sandbox ohne Zugriff auf crates.io für alle workspace-internen Dependencies außer den in
+> `<network_configuration>` freigegebenen Registries — ausreichend für Lesezugriff, nicht für einen vollen
+> Build). Wo eine Aussage aus Teil C durch meine eigene Prüfung bestätigt wird, übernehme ich sie ohne
+> erneuten Beleg; wo sie abweicht, ist das unten ausdrücklich als Korrektur markiert.
+
+### A4.1 Ergebnis in einem Satz
+
+Von den vier untersuchten Verfahren ist **keines** direkt copy-paste-fähig: Alle vier setzen auf Typen,
+Traits oder Streaming-Fähigkeiten auf, die im jeweiligen Ziel-Crate entweder in anderer Form existieren
+(→ Anpassung der normativen Schnittstellen nötig, siehe §21) oder schlicht fehlen (→ eigener Vorarbeits-Schritt
+vor der eigentlichen Algorithmus-Implementierung); die Priorisierung des Deep-Research-Berichts (§6 dort)
+gewichtet ausschließlich nach P24-Nutzen und ignoriert Beleglage und Implementierungsreife — Teil C hat das
+bereits korrigiert (C.7), meine eigene Prüfung bestätigt C.7 im Kern und verschärft sie für DiBud um einen
+zusätzlichen, bisher nicht benannten Blocker (A4.4.2).
+
+### A4.2 Zweitverifikation der Teil-C-Befunde — Bestätigungen und Korrekturen
+
+Alle in Teil C des Deep-Research-Berichts zitierten Datei-/Symbolbefunde wurden nachvollzogen:
+
+| Teil-C-Befund | Meine Zweitprüfung | Ergebnis |
+|---|---|---|
+| `ppr.rs`: `forward_push_ppr`, `DensePowerIteration`, `PprAlgorithm::ShadowMode` | `grep -n` bestätigt alle drei Symbole exakt (`ppr.rs:124,132,134,137,177`) | **bestätigt** |
+| `fusion.rs` (1332 Zeilen), `BoundedTopK<T>` (Z. 222), `rrf_k`-Parameter (Z. 419ff.) | `wc -l` = 1332, `grep` bestätigt Zeilenlage exakt | **bestätigt** |
+| `lyapunov.rs` (552 Zeilen), `drift.rs`: `DriftPolicyBridge`, `bandit.rs`: `gamma_inv` (Korrektur der Discount-Richtung) | `wc -l` = 552 bestätigt; `DriftPolicyBridge` in `drift.rs:10`; `gamma_inv` in `bandit.rs:239,394` bestätigt | **bestätigt** |
+| `memory_consolidation.rs` (972 Zeilen), Structural Pass, `group_turns_into_segments`, `detect_near_duplicates`, `ConsolidationConfig` (Z. 28) | `wc -l` = 972 bestätigt; alle vier Symbole und die Zeilenposition von `ConsolidationConfig` exakt bestätigt | **bestätigt** |
+| `synthesis_phase.rs`: Generative Pass mit `max_llm_calls_per_cycle`, `CommunityStabilityTracker` | Datei existiert; zusätzlich `SynthesisConfig` und ein **zweites** `SynthesisPhaseResult` in `memory_consolidation.rs` selbst gefunden (Teil C nennt nur eines) | **bestätigt, ergänzt** — es gibt zwei mit dem Compiler eindeutig auflösbare, aber verwirrend gleichnamige `SynthesisPhaseResult`-Definitionen in unterschiedlichen Modulen; vor jeder Erweiterung um eine dritte Stufe muss dies vereinheitlicht werden (siehe §21.4) |
+| `cascade.rs` (733 Zeilen), `MAX_HYPEREDGE_CASCADE_FANOUT`, `CASCADE_QUEUE_PREFIX`, `enqueue_cascade_deferred`, `cascade_invalidate_hyperedges_for_superseded_doc` | `wc -l` = 733 bestätigt, alle vier Symbole exakt an den genannten Stellen | **bestätigt** |
+| `schemas/contextra.fbs`: `HyperEdge`-Tabelle mit `source_doc_id: ulong`, **kein** `child_edge_ids` | Volltext des Schemas gelesen — Tabelle heißt tatsächlich `HyperEdge` (nicht `HyperEdgeFb`, wie auch Teil C bereits anmerkt und wie **§12 dieser Spezifikation selbst** sie nennt, siehe A4.2.3 unten), `source_doc_id: ulong` vorhanden, kein `child_edge_ids` | **bestätigt** |
+| „`grep` über den gesamten Workspace nach `estimate_compaction_peak_bytes` … liefert keine Treffer" | **Widerlegt.** `grep -rn "estimate_compaction_peak_bytes" --include="*.rs" .` liefert drei Treffer: `crates/contextra-graph/src/csr/graph_write.rs:205,207` (öffentliche Methode auf `CsrGraph`, delegiert an Snapshot) und `crates/contextra-graph/src/csr/inner.rs:387` (die eigentliche Implementierung), plus ein dedizierter Test `crates/contextra-graph/tests/hyperedge_memory_budget.rs:46`, der bereits gegen AK-2 (§16.2) prüft | **Korrektur, siehe A4.2.1** |
+| „`grep` … nach … `consolidate_semantic_hyperedges` liefert keine Treffer" | Bestätigt — keine Treffer, die Ring-3-Orchestrierungsfunktion existiert tatsächlich nicht | **bestätigt** |
+
+#### A4.2.1 Korrektur: Der Ring-0-Budget-Check für die Kompaktierung existiert bereits
+
+Die im Bericht als fehlend angenommene Methode `estimate_compaction_peak_bytes()` ist **bereits produktiv
+implementiert** — nicht als Stub, sondern mit eigenem Regressionstest (`hyperedge_memory_budget.rs`), der
+laut AK-2 (§16.2) bereits prüft, dass die Schätzung den mit Zählallokator gemessenen Spitzenwert nie
+unterschätzt und höchstens um Faktor 1,5 überschätzt. Das ändert die Aufwandsschätzung für LeanRAG
+(§5.4 des Berichts, §21.4 dieser Spezifikation) spürbar: Der im Bericht als Kernbestandteil des neuen
+`ConsolidationConfig`/`consolidate_semantic_hyperedges`-Entwurfs vorgesehene Budget-Vorprüfungs-Aufruf
+(`self.graph.estimate_compaction_peak_bytes()`) ist kein neu zu bauender Baustein, sondern ein reiner
+**Wiederverwendungs-Aufruf** einer bereits getesteten Ring-0-Primitive. Das senkt das in Teil C (C.6)
+beschriebene Restrisiko für den Speicherbudget-Teil der LeanRAG-Integration von „zu bauen" auf „zu verdrahten".
+
+#### A4.2.2 Korrektur: DiBuds Kanalmodell passt nicht auf das tatsächliche `SignalKind`
+
+Der Bericht (§5.2) und Teil C (C.3) gehen von vier Fusionskanälen `{Vektor, Text, Graph, Metadaten}` mit
+Tie-Breaker-Priorität „1. Graph, 2. Text, 3. Vektor, 4. Filter" aus. Das tatsächliche, laut §6.6 H3 dieser
+Spezifikation **geschlossene** Enum in `crates/contextra-rank/src/fusion.rs:316` lautet:
+
+```rust
+pub enum SignalKind {
+    Vector,
+    Text,
+    Graph,
+    EdgeReinforcement, // Bandit-Rückkopplungssignal, kein "Filter"/"Metadaten"-Kanal
+}
+```
+
+Der vierte Kanal ist `EdgeReinforcement` (Bandit-Recency-Gewicht), kein Metadaten-/Filter-Kanal. Das ist mehr
+als eine Umbenennung: Ein Filter-Kanal ist per Definition ein zusätzliches, unabhängig auslesbares
+Ranking-Signal; `EdgeReinforcement` ist dagegen ein **rückgekoppeltes** Signal aus dem Bandit-Subsystem
+(§8) — sein Zugriffsmuster (Lesen aus `contextra-adapt`-Zustand, nicht aus einem eigenen Postings-Index) ist
+grundlegend anders als das der drei Retrieval-Kanäle. Die normative `DiBudFusionState`-Schnittstelle aus dem
+Bericht muss entsprechend korrigiert werden (§21.2); insbesondere ist unklar, ob ein Budget-limitierter
+Iterator für `EdgeReinforcement` überhaupt sinnvoll ist, da dieses Signal nicht paginiert aus einem Index
+gelesen, sondern pro Dokument direkt berechnet wird. **Empfehlung:** DiBud zunächst nur auf die drei echten
+Retrieval-Kanäle (Vector, Text, Graph) anwenden; `EdgeReinforcement` bleibt ein vierter, stets vollständig
+ausgewerteter additiver Term außerhalb des Budgets — das ist zugleich die konservativere, P24-konformere
+Wahl, weil sie das Budget nicht künstlich auf ein Signal ausdehnt, das strukturell kein Zugriffsbudget hat.
+
+#### A4.2.3 Korrektur/Ergänzung: `fuse_signals` ist bereits vollständig materialisiert, kein Iterator vorhanden
+
+Eigene Prüfung von `crates/contextra-rank/src/fusion.rs`, Zeile 155–160:
+
+```rust
+pub fn fuse_signals(
+    result_sets: Vec<(String, Vec<SearchResult>, f32)>,
+    max_results: usize,
+) -> Vec<FusedScore> {
+    weighted_reciprocal_rank_fusion(result_sets, max_results)
+}
+```
+
+Das bestätigt Teil C (C.3) exakt: `fuse_signals` erhält bereits vollständig gefüllte `Vec<SearchResult>` pro
+Kanal — es gibt keinerlei Iterator-, Generator- oder Lazy-Loading-Grenze an dieser Schnittstelle, durch die
+ein `DiBudFusionState` streambasiert „hindurchgreifen" könnte. Zusätzlich zur bereits in Teil C (Restrisiken
+§5.2) benannten Sorge, dass `contextra-vector` (DiskANN) und `contextra-text` (BM25/Block-Max-WAND) intern
+Block-optimierte Heaps statt echter `Next()`-Iteratoren verwenden, habe ich geprüft, **ob** dort überhaupt
+eine Iterator-Implementierung vorhanden ist, die sich wiederverwenden ließe: In
+`crates/contextra-vector/src/diskann.rs` und `crates/contextra-text/src/wand.rs` finden sich keine
+`impl Iterator`-Blöcke, die einzelne `DocId`s auf Anfrage nachliefern — beide Module sind auf vollständige
+Ergebnismengen pro Aufruf ausgelegt. **Das ist eine dreifache, nicht nur einfache Bruchstelle** (fehlender
+Iterator in DiskANN, fehlender Iterator in WAND, vollständig materialisierende Signatur von `fuse_signals`
+selbst) — die Aufwandsschätzung „Gering-Mittel" aus §17 Punkt 1.8 dieser Spezifikation (die sich nur auf die
+`build_provenance`-Parameterstruktur bezieht) darf nicht mit dem Aufwand für DiBud verwechselt werden; DiBud
+ist strukturell näher an „Hoch" (vgl. §17-Einstufung von 1.9 „Text: Posting-Format umstellen") einzuordnen,
+siehe A4.4.2.
+
+### A4.3 Konsolidierte Vertrauens-/Beleglage
+
+Ich übernehme die von Teil C (C.1) erstmals eingeführte, im Originalbericht fehlende Tier-Einordnung
+unverändert — meine Prüfung der Repo-Fakten liefert keinen Anlass, eine der dort getroffenen
+Autoren-/Reviewer-Aussagen zu revidieren (arXiv-Metadaten wurden nicht Teil dieser Zweitprüfung; das bleibt
+laut Teil C C.8 ein offener Prüfpunkt für einen Menschen):
+
+| Verfahren | arXiv-ID | Tier (Teil C) | Ziel-Crate |
+|---|---|---|---|
+| LeanRAG Path Extraction | 2508.10391 | **A — peer-adjacent, breit rezipiert** | `contextra-cognition` |
+| Type-Info-Denoising | 2503.09916 | **A — peer-reviewed (AISTATS 2025)** | `contextra-cognition` |
+| TL-HFD | 2606.09340 | **B — solide, nicht begutachtet** | `contextra-graph` |
+| Flow-Corrected Thompson Sampling | 2606.23933 | **C — Workshop-Status** | `contextra-adapt` |
+| DiBud | 2609.15143 | **D — frisch (7 Tage), unrepliziert, Einzelautor** | `contextra-rank` |
+| Motif Conductance / Robust Rank Aggregation | 2507.10570 / 2609.19491 | **ungeprüft** | (Zusatzverfahren zu TL-HFD/DiBud) |
+
+### A4.4 Invarianten-Konformität je Verfahren (Zero-Panic P4(1), Determinismus P4(3), Lokalität P24/P4(6), injizierter RNG P28)
+
+| Verfahren | P4(1) Zero-Panic | P4(3) Determinismus | P24 Lokalität | P28 Injizierter RNG | Sync/Async-Grenze |
+|---|---|---|---|---|---|
+| TL-HFD | ✅ erreichbar — Top-k-Aktivierung und Präallokation nach bekanntem Maximum sind mit dem in `ppr.rs` bereits etablierten Muster kompatibel | ✅ erreichbar — Tie-Breaker über totale `EntityId`-Ordnung ist derselbe Mechanismus wie in H2/H6 dieser Spezifikation bereits gefordert | ✅ mathematisch strenger als der bestehende ε-Schwellen-Forward-Push, da `k` hart statt statistisch begrenzt ist | nicht benötigt (kein Zufallsschritt im Kernalgorithmus) | rein synchron, Ring 0 — passend |
+| DiBud | ✅ erreichbar bei fester Kapazitäts-Vorabreservierung | ✅ erreichbar, aber **abhängig von A4.2.2**: der Tie-Breaker aus dem Bericht setzt eine Kanalpriorität voraus, die erst nach Korrektur des Kanalmodells eindeutig ist | ✅ das eigentliche Ziel des Verfahrens — aber nur wirksam, sobald die in A4.2.3 beschriebene Streaming-Lücke geschlossen ist; **bis dahin liefert eine Implementierung gegen die heutige `fuse_signals`-Signatur keinen echten P24-Gewinn**, weil das Budget den bereits vollständig geladenen Listen nachträglich aufgeprägt würde | nicht benötigt | rein synchron, Ring 0 — passend, aber siehe Sperre oben |
+| FC-TS | ✅ erreichbar — Sherman-Morrison-Update ist bereits als Safe-Rust-Muster im Repo vorhanden (`bandit.rs`) | ✅ **nur** wenn der Transport-/Drift-Vektor $\hat\delta_t$ ausschließlich im Ring-3-Hintergrund aktualisiert und im Ring-0-Hot-Path nur gelesen wird (Bericht selbst fordert das in den Restrisiken) | ✅ wenn wie gefordert entkoppelt | ✅ Bericht sieht `contextra_ports::Rng`-Injektion explizit vor — konsistent mit P28 | Hot-Path synchron (Ring 0), Drift-Schätzung asynchron (Ring 3) — Trennung ist im Repo durch `DriftPolicyBridge` bereits vorgezeichnet |
+| LeanRAG | ✅ solange `estimate_compaction_peak_bytes()` (bereits vorhanden, A4.2.1) **vor** jeder Allokation der GMM-Cluster-Strukturen aufgerufen wird | ✅ GMM-Seed und Community-Hashing sind bereits etablierte Muster (`gmm_deterministic_seed`, `CommunityStabilityTracker`) | ✅ per Definition — reiner Ring-3-Batch-Job, kein Hot-Path-Einfluss | nicht im Kernpfad benötigt (nur GMM-Initialisierung, per festem Seed bereits deterministisch) | rein asynchron, Ring 3 — passend, **aber siehe H5-Blocker in A4.4.1** |
+
+#### A4.4.1 Bestätigter Hard-Blocker: Cascade-Invalidierung kann Super-Hyperkanten nicht durchqueren
+
+Ich bestätige den in Teil C (C.6) beschriebenen Befund eigenständig: `cascade_invalidate_hyperedges_for_superseded_doc`
+(`crates/contextra-graph/src/cascade.rs:161`) arbeitet über `source_doc_id`-Ketten mit hartem Fan-out-Limit
+(`MAX_HYPEREDGE_CASCADE_FANOUT = 1_000`, `cascade.rs:11`) und einer persistenten Deferred-Queue
+(`CASCADE_QUEUE_PREFIX`, `cascade.rs:67`). Ohne ein `child_edge_ids`-Feld (§12, §21.4) kann diese Funktion
+einen von LeanRAG erzeugten abstrakten Super-Knoten nicht bis zu den Original-Tripeln durchqueren — ein
+Löschauftrag (Art.-17-DSGVO-Pfad, §10) für ein Quelldokument, dessen Fakten in einen $\alpha_j$-Knoten
+abstrahiert wurden, würde diesen Knoten **nicht** invalidieren. Ich übernehme die Einstufung aus Teil C
+unverändert: **das ist ein Blocker, keine offene Frage** — LeanRAG darf nicht produktiv (auch nicht hinter
+einem reinen Opt-in-Feature-Flag mit realen Nutzerdaten) aktiviert werden, bevor H5 (§6.6) um die
+rekursive `child_edge_ids`-Traversierung erweitert ist. Diese Reihenfolge ist in §21.4 normativ festgeschrieben.
+
+#### A4.4.2 Neu identifizierter Blocker: DiBud erfordert Vorarbeit in drei fremden Crates, bevor der Algorithmus selbst beginnen kann
+
+Über C.1 (Tier D, unreplizierter Einzelautor) hinaus zeigt A4.2.3, dass DiBud — anders als TL-HFD, das
+lediglich einen bestehenden Algorithmus innerhalb desselben Crates (`contextra-graph`) ersetzt — **drei**
+Crate-Grenzen gleichzeitig berührt: `contextra-vector` (DiskANN müsste einen `Iterator<Item = DocId>`
+exponieren), `contextra-text` (BM25/WAND ebenso) und `contextra-rank` selbst (`fuse_signals`-Signatur ändert
+sich von `Vec<...>` auf generische Iteratoren, was laut Bericht selbst ein Batching-Intervall von z. B. 16
+Kandidaten pro Kanalzugriff braucht, um die Cache-Lokalität P25 nicht zu verletzen). Das ist eine
+Mehr-Crate-Schnittstellenänderung, keine lokale Algorithmus-Ersetzung — der Aufwand liegt strukturell näher
+an §17 Punkt 1.9 (Text-Posting-Format, „Hoch") als an einem reinen RRF-Austausch. **Empfehlung:** DiBud in
+zwei Schritten umsetzen — zuerst die Streaming-Iterator-Grenzen in `contextra-vector`/`contextra-text` als
+eigenständige, algorithmusunabhängige Vorarbeit (§21.2, Schritt 1), erst danach den eigentlichen
+Budget-Fusions-Algorithmus (§21.2, Schritt 2), mit einer eigenen Klein-Implementierung + Benchmark gegen den
+im Paper beschriebenen Aufbau (Empfehlung aus Teil C C.1), bevor produktiv umgestellt wird.
+
+### A4.5 Revidierte Priorisierung (erweitert C.7)
+
+Ich übernehme die Rangfolge aus Teil C C.7 im Kern, verschärfe aber den DiBud-Rang um die in A4.4.2
+identifizierte Mehr-Crate-Abhängigkeit und mache das ShadowMode-Wiederverwendungsmuster (bereits in
+`ppr.rs` vorhanden, C.2) zur verbindlichen Einführungsstrategie für **alle vier** Verfahren, nicht nur für
+TL-HFD:
+
+| Rang | Verfahren | Δ ggü. Teil C | Begründung (Fassung 4) |
+|---|---|---|---|
+| 1 | **LeanRAG Semantic Aggregation** (§21.4, dritte Pipeline-Stufe) | unverändert Rang 1 | Höchstes Beleg-Tier, größter Teil der Infrastruktur bereits vorhanden — **und durch A4.2.1 sogar noch mehr als von Teil C angenommen** (Budget-Check bereits fertig). Einziger echter Blocker ist H5/`child_edge_ids` (A4.4.1) — technisch klar umrissen, kein Forschungsrisiko. |
+| 2 | **TL-HFD** | unverändert Rang 2 | Solide Beweislage (Tier B), Shadow-Mode-Infrastruktur bereits vorhanden und **exakt** für einen Vergleichslauf gegen Forward-Push nutzbar (A4.2, bestätigt). Reine Ring-0-Algorithmus-Ersetzung innerhalb eines Crates — geringste Schnittstellen-Reichweite aller vier Verfahren. |
+| 3 | **DiBud** | inhaltlich verschärft, Rang unverändert bei 3 | Tier D bleibt bestehen (C.1); zusätzlich durch A4.4.2 bestätigt: DiBud ist **keine** lokale Algorithmus-Ersetzung, sondern erfordert Streaming-Iterator-Vorarbeit in zwei fremden Crates, bevor der eigentliche Budget-Algorithmus überhaupt getestet werden kann. **Bedingung für Beginn:** eigene Kleinst-Implementierung + Benchmark (Teil C C.1) UND die Vorarbeit aus A4.4.2 Schritt 1 — beides vor jeder produktiven Aktivierung. |
+| 4 | **Flow-Corrected Thompson Sampling** | unverändert Rang 4 | Ersetzt eine bereits funktionierende Komponente (Lyapunov-Watcher + `DriftPolicyBridge`, bestätigt A4.2) durch eine feinere Variante; Tier C (Workshop), zusätzlicher Speicherbedarf für das gleitende Fenster. Keine Korrektheitslücke, nur eine Verfeinerung — niedrigste Dringlichkeit. |
+
+### A4.6 Zusätzliches, im Deep-Research-Bericht nicht behandeltes Optimierungspotenzial
+
+Aus eigener Lektüre des Workspace über die vier untersuchten Bereiche hinaus, mit direktem Bezug zu den
+SOTA-Verfahren dieser Fassung (rein bereichsfremde Befunde bleiben außerhalb des Auftrags dieser Fassung
+und sind bereits in §17/§18/Teil A3.2 dieser Spezifikation erfasst):
+
+1. **P26-Spannung wird durch TL-HFD/DiBud nicht gelöst, aber auch nicht verschärft.** Teil A3.2 Punkt 2
+   dieser Spezifikation dokumentiert bereits, dass `tokio` als reguläre Dependency in `contextra-vector`,
+   `contextra-text` und `contextra-graph` (alle Ring 0) gegen P26 verstößt. TL-HFD und DiBud sind beide als
+   rein synchrone Algorithmen spezifiziert (§21.1, §21.2) und führen daher keine neue `async`-Fläche in
+   Ring 0 ein — sie verschieben die bestehende P26-Entscheidung (Teil A3.3 Punkt 8) nicht, lösen sie aber
+   auch nicht. Das sollte in der P0/P2-Priorisierung aus Teil A3.3 unabhängig von dieser Fassung entschieden
+   werden.
+2. **Der `ShadowMode`-Mechanismus in `ppr.rs` ist ein wiederverwendbares Muster, nicht nur ein
+   TL-HFD-spezifisches Werkzeug.** Ich übernehme die Empfehlung aus C.2 und erweitere sie: Sowohl FC-TS
+   (Vergleich gegen bestehenden `ShermanMorrisonBandit`-Pfad über `BanditImplementation::FlowCorrectedThompson`
+   als neue Variante, §21.3) als auch eine künftige DiBud-Erprobung sollten denselben
+   Parallel-Berechnung-und-Diskrepanz-Logging-Ansatz nutzen, statt für jedes Verfahren einen eigenen
+   A/B-Mechanismus zu entwerfen. Das senkt den Prüfaufwand für alle vier Verfahren gleichermaßen.
+3. **`ConsolidationConfig`/`SynthesisPhaseResult`-Namensraum ist bereits heute intern doppelt belegt**
+   (A4.2, Zeile zu `synthesis_phase.rs`), unabhängig von einer LeanRAG-Erweiterung. Das sollte als eigener,
+   kleiner Aufräum-Schritt **vor** §21.4 erledigt werden, da eine dritte, ähnlich benannte Konfigurationsstruktur
+   die Verwirrung sonst vergrößert statt sie zu beheben.
+4. **Die vier Verfahren sind unterschiedlich weit von einem produktiven Feature-Flag entfernt** — TL-HFD und
+   FC-TS können als reine Cargo-Feature-Alternativen neben dem bestehenden Code stehen (wie bereits
+   `BanditImplementation::ShermanMorrison` vs. `DiagonalApproximation` es vormachen, §16.1 K-16); DiBud kann
+   das strukturell **nicht**, bevor die Streaming-Vorarbeit steht (A4.4.2); LeanRAG kann es, weil es eine reine
+   Ring-3-Zusatzfunktion ist, die den Lesepfad nicht berührt.
+
+### A4.7 Offene Prüfpunkte für einen Menschen (erweitert C.8)
+
+- Motif Conductance (2507.10570) und Robust Rank Aggregation (2609.19491) wurden auch in dieser Fassung
+  nicht gegen die arXiv-Originalseiten verifiziert (außerhalb des Sandbox-Netzwerkzugriffs dieser Sitzung
+  auf `arxiv.org`) — vor Aufnahme in eine verbindliche Roadmap nachholen.
+- Vor DiBud-Beginn: unabhängige Kleinst-Implementierung + Benchmark gegen den im Paper beschriebenen Aufbau
+  (Teil C C.1), **zusätzlich** zur in A4.4.2 geforderten Streaming-Vorarbeit — beides, nicht nur eines.
+  Human-Freigabe für den erhöhten Aufwand gegenüber der ursprünglichen Bericht-Schätzung einholen.
+- Vor jeder produktiven LeanRAG-Aktivierung: H5-Erweiterung (A4.4.1) muss laut eigenem CI-Drift-Gate (H4,
+  §6.6) grün sein — dies ist kein Soft-Gate, sondern eine harte Merge-Voraussetzung gemäß §12/§21.4.
+- Empirische Auswertung der bereits laufenden `ShadowMode`-Diskrepanz-Logs (C.2) sollte der TL-HFD-Einführung
+  vorausgehen; ich hatte in dieser Sitzung keinen Zugriff auf produktive Log-Daten und kann diese Auswertung
+  nicht selbst liefern.
 
 ---
 
@@ -2681,6 +3049,21 @@ verlassen — ausschließlich auf explizite Anforderung, nie als Hintergrundtele
 <a id="12-schema"></a>
 ## 12. FlatBuffers-Schema (vollständig, `schemas/contextra.fbs`)
 
+> **Namenshinweis (Fassung 4, verifiziert A4.2):** Das reale Schema im Repository benennt die Tabelle schlicht
+> `HyperEdge` (Namespace `Contextra.IPC`), nicht `HyperEdgeFb`. Die Bezeichnung `HyperEdgeFb` in diesem
+> Abschnitt ist als **logischer** Name für die IPC-Repräsentation zu verstehen (in Abgrenzung zum
+> In-Memory-Typ `HyperEdge` aus §6.4); bei der tatsächlichen Schema-Pflege in `schemas/contextra.fbs` gilt der
+> im Repo vorhandene Tabellenname. Diese Diskrepanz existierte bereits vor Fassung 4 und wird hier nur
+> dokumentiert, nicht aufgelöst — eine Umbenennung im Schema selbst wäre eine eigene, vom H4-Gate erfasste
+> Breaking-Change-Entscheidung und liegt außerhalb des Auftrags dieser Fassung.
+
+> **Erweiterung `child_edge_ids` (Fassung 4, §21.4, Voraussetzung für LeanRAG/H5, siehe A4.4.1):** Ohne diese
+> rekursive Referenz kann `cascade_invalidate_hyperedges_for_superseded_doc` (§6.6 H5) einen durch LeanRAG
+> abstrahierten Super-Knoten nicht bis zu den Original-Tripeln durchqueren — ein Löschauftrag (Art.-17-DSGVO,
+> §10) für ein Quelldokument würde dann bei einer bereits konsolidierten Hyperkante silently fehlschlagen.
+> **Diese Erweiterung MUSS durch das CI-Drift-Gate (H4, unten) laufen und grün sein, bevor LeanRAG (§21.4)
+> produktiv aktiviert wird — unabhängig davon, ob LeanRAG selbst schon gemerged ist.**
+
 ```fbs
 namespace contextra.ipc;
 
@@ -2699,6 +3082,11 @@ table HyperEdgeFb {
   business_valid_from: int64;
   business_valid_to: int64;       // i64::MIN = None (Sentinel)
   source_doc_id: uint64;          // oder uint128-Encoding bei docid-128
+  child_edge_ids: [uint64];       // NEU (Fassung 4, §21.4): IDs der subsumierten Original-/Sub-Hyperkanten
+                                   // einer LeanRAG-Super-Hyperkante. Leer/fehlend = Blatt-Hyperkante (kein
+                                   // LeanRAG-Abstraktionsprodukt). Rekursiv: ein Kind kann selbst wieder
+                                   // Kinder tragen, falls mehrstufige Aggregation je entschieden wird
+                                   // (aktuell nicht spezifiziert, §21.4 sieht nur eine Aggregationsstufe vor).
 }
 
 table EdgeFb {
@@ -2717,7 +3105,8 @@ root_type HyperEdgeFb;
 
 **CI-Drift-Gate (`xtask check-flatbuffers-drift`):** Vergleicht Hash des generierten Codes gegen committeten
 Referenz-Hash. Jede Schema-Änderung ohne begleitende Regenerierung schlägt den Merge-Gate-Job fehl. **Dieses
-Gate MUSS grün sein, bevor `HyperEdgeFb` gemerged wird (H4).**
+Gate MUSS grün sein, bevor `HyperEdgeFb` gemerged wird (H4), und erneut grün sein, bevor die
+`child_edge_ids`-Erweiterung gemerged wird (AK-19, §16.2).**
 
 ---
 
@@ -2893,6 +3282,10 @@ Gate nur für `src/` (ohne Tests/Benchmarks), harte sinkende Obergrenze.
 | AK-13 | WAL-Queue ist begrenzt: `Backpressure`/Warten bei voller Queue, `append` kehrt erst nach `fsync` zurück | `wal_backpressure.rs` |
 | AK-14 | Shard-Zuordnung ist je `KvKeyLocks`-Instanz stabil; gleiche Entität ⇒ gleicher Shard | `kv_locks_stable_shard.rs` |
 | AK-15 | Jeder Routing-Datensatz trägt `propensity ≥ 0,01` (randomisierte Logging-Policy) | `ips_requires_propensity.rs` |
+| AK-16 *(Fassung 4, §21.1)* | `thresholded_local_hfd` läuft im selben `ShadowMode`-Pfad wie `forward_push_ppr` und `DensePowerIteration`; Diskrepanz-Logging über dieselbe Mechanik wie `PprAlgorithm::ShadowMode`; Top-k-Tie-Breaker nutzt totale `EntityId`-Ordnung | `tlhfd_shadow_mode_parity.rs` |
+| AK-17 *(Fassung 4, §21.2)* | DiBud wird **nicht** gegen die heutige `fuse_signals(Vec<...>, usize)`-Signatur gemerged; ein PR, der `DiBudFusionState` einführt, ohne zuvor `Iterator<Item = DocId>`-Grenzen in `contextra-vector` und `contextra-text` bereitzustellen, schlägt das Gate fehl | `dibud_requires_streaming_channels.rs` |
+| AK-18 *(Fassung 4, §21.3)* | `update_with_flow` aktualisiert `drift_rate` (Transport-Vektor $\hat\delta_t$) ausschließlich aus einem Ring-3-Kontext; ein Aufruf aus einem synchronen Ring-0-Hot-Path-Test schlägt fehl (Architektur-Lint, kein Laufzeit-Panic) | `fcts_drift_update_ring3_only.rs` |
+| AK-19 *(Fassung 4, §21.4)* | `cascade_invalidate_hyperedges_for_superseded_doc` traversiert `child_edge_ids` rekursiv bis `MAX_HYPEREDGE_CASCADE_FANOUT`; ein gelöschtes Quelldokument, dessen Fakten in einen LeanRAG-Super-Knoten abstrahiert wurden, ist nach Cascade-Lauf nicht mehr auffindbar; FlatBuffers-Drift-Gate für `child_edge_ids` grün **vor** Merge (H4) | `leanrag_cascade_through_superedge.rs`, CI-Job-Abhängigkeit `leanrag-schema-merge: needs: [flatbuffers-drift-gate]` |
 
 ---
 
@@ -2957,6 +3350,19 @@ größte Hebel für Latenz/Durchsatz, Stufe 2 betrifft Speicherverbrauch und Str
 | 2.5 contextra-py in Workspace | 2.4 Manifest-Batch-Fsync | |
 | 3.1 / 3.2 Governance-Gates | 0.5 Transaktions-Intent-Status | |
 
+### SOTA-Algorithmen-Roadmap (Fassung 4, §21, Priorisierung siehe Teil A4.5)
+
+Diese vier Punkte sind **zusätzlich** zur obigen Opus-Analyse und laufen parallel zu ihr; sie sind nicht in
+die Stufen 0–3 oben einsortiert, weil sie fachlich vier verschiedene Crates betreffen, methodisch aber
+denselben Reifegrad-Prozess (Teil A.2/A.3) durchlaufen müssen wie jede andere Änderung.
+
+| ID | Verfahren | Ziel-Crate | Priorität (A4.5) | Voraussetzung / Gate | Aufwand |
+|---|---|---|---|---|---|
+| **S.1** | LeanRAG Semantic Aggregation (dritte Pipeline-Stufe) | `contextra-cognition` (+ `contextra-graph`, `schemas/`) | 1 | `child_edge_ids`-Schema-Erweiterung + H5-Cascade-Rekursion (A4.4.1) MUSS zuerst grün sein; `ConsolidationConfig`/`SynthesisPhaseResult`-Namensraumbereinigung (A4.6 Punkt 3) davor | Mittel — Infrastruktur größtenteils vorhanden (A4.2.1) |
+| **S.2** | TL-HFD | `contextra-graph` | 2 | Läuft zunächst nur im bestehenden `ShadowMode`-Pfad (AK-16); Default-Umstellung erst nach Auswertung der Diskrepanz-Logs (Teil A4.7) | Mittel — reine Ring-0-Algorithmus-Ersetzung in einem Crate |
+| **S.3** | DiBud | `contextra-rank` (+ `contextra-vector`, `contextra-text`) | 3 | **Zweistufig:** zuerst Streaming-`Iterator<Item = DocId>`-Grenzen in DiskANN/BM25 (AK-17, A4.4.2), danach unabhängiger Benchmark gegen das Paper (Teil C C.1), erst danach der Fusions-Algorithmus selbst | Hoch — Mehr-Crate-Schnittstellenänderung, nicht lokal |
+| **S.4** | Flow-Corrected Thompson Sampling | `contextra-adapt` | 4 | Als neue `BanditImplementation::FlowCorrectedThompson`-Variante neben bestehendem `ShermanMorrison` (nicht als Ersatz); Drift-Update nur aus Ring 3 (AK-18) | Mittel — zusätzlicher Speicherbedarf für Rolling-Window |
+
 ---
 
 <a id="18-roadmap"></a>
@@ -2974,6 +3380,24 @@ größte Hebel für Latenz/Durchsatz, Stufe 2 betrifft Speicherverbrauch und Str
 5. **N-äre Hyperkanten** (§6), vollständig spezifiziert, Reihenfolge: H4-Nachweis → Datenmodell (§6.4) → H2 → H1 → H3 → H5 → H6 → Stern-Expansion.
 6. HNSW-Dateiformat v2 (Arena + CSR + allokationsfreie Traversierung).
 
+### Stufe 1½ — SOTA-Algorithmen (Fassung 4, §21, §17 SOTA-Roadmap, Priorisierung Teil A4.5)
+
+6a. **TL-HFD** (S.2) im `ShadowMode` neben `forward_push_ppr` (§21.1) — Default-Umstellung erst nach
+    Log-Auswertung, siehe Teil A4.7.
+6b. **`child_edge_ids`-Schema-Erweiterung** (§12) + rekursive H5-Cascade-Traversierung (§6.6 H5, AK-19) —
+    **Pflicht-Vorarbeit** für 6c, unabhängig davon vorziehbar.
+6c. **LeanRAG Semantic Aggregation** (S.1) als dritte Stufe der bestehenden Konsolidierungs-Pipeline
+    (§21.4) — ersetzt und zieht Punkt 14 aus der bisherigen Stufe 4 (unten) nach vorn; Voraussetzung: 6b
+    abgeschlossen, Namensraumbereinigung `ConsolidationConfig`/`SynthesisPhaseResult` (Teil A4.6 Punkt 3)
+    erledigt.
+6d. **DiBud-Vorarbeit** (S.3, Schritt 1): Streaming-`Iterator<Item = DocId>`-Grenzen in `contextra-vector`
+    und `contextra-text` (AK-17) — eigenständig wertvoll unabhängig vom weiteren DiBud-Fortschritt, da sie
+    auch anderen Lazy-Loading-Anwendungsfällen nutzt.
+6e. **DiBud-Algorithmus** (S.3, Schritt 2): erst nach 6d und nach unabhängigem Benchmark gegen das Paper
+    (Teil A4.7).
+6f. **Flow-Corrected Thompson Sampling** (S.4) als neue `BanditImplementation`-Variante (§21.3) — niedrigste
+    Dringlichkeit dieser Stufe, aber ohne strukturelle Abhängigkeit von 6a–6e und daher parallelisierbar.
+
 ### Stufe 2 — Speicher, Struktur und Produktions-Default-Entscheidungen
 
 7. **Opus-Optimierungen Stufe 2** (§17): Graph-Kompaktierung, CSR-Sentinel, Checkpoint, Manifest, contextra-py.
@@ -2989,7 +3413,11 @@ größte Hebel für Latenz/Durchsatz, Stufe 2 betrifft Speicherverbrauch und Str
 
 ### Stufe 4 — Fernziele
 
-14. Memory Consolidation (`consolidate_via_llm()`)
+14. ~~Memory Consolidation (`consolidate_via_llm()`)~~ — **vorgezogen nach Stufe 1½, Punkt 6c** (Fassung 4,
+    Teil A4.5 Rang 1: höchstes Beleg-Tier, größter Teil der Infrastruktur bereits vorhanden). An dieser Stelle
+    verbleibt nur noch eine mögliche **vierte** Pipeline-Stufe (mehrstufige rekursive Aggregation über
+    Super-Hyperkanten hinweg), die §21.4 bewusst nicht spezifiziert, da sie ohne produktive Erfahrung mit der
+    dritten Stufe reine Spekulation wäre.
 15. CausalEdge
 16. Passives WAL-Shipping
 17. Vollständige `ProvenanceRecord`-API-Exposition
@@ -3112,13 +3540,479 @@ erzwungen, was diese Fassung nachholt.
 ---
 
 
-*Diese finale konsolidierte Gesamtspezifikation vereinigt Produktvision, Zielarchitektur (jetzt: Ring-Modell,
-Teil A2/§4.2), normative Implementierungsvorgaben, algorithmische Spezifikationen, mikrofeingranulare
-Schnittstellendefinitionen, die priorisierte Optimierungs-Roadmap und den Migrationsplan v2 (§20) des Contextra
-Cognitive OS. Sie ist in sich geschlossen und ersetzt alle vorherigen Einzeldokumente — einschließlich
-`CONTEXTRA_ZIELARCHITEKTUR.md` und `CONTEXTRA_ZIELARCHITEKTUR_v2.md`, deren Inhalt hiermit in Teil A2, §0, §3, §4
-und §9 aufgegangen ist — als maßgebliche Quelle. Künftige Änderungen erfolgen als direkte Überarbeitung dieses
-Dokuments, nicht als weiteres Delta-Dokument.*
+---
+
+<a id="21-sota"></a>
+## 21. Normative SOTA-Algorithmen-Erweiterung: TL-HFD, DiBud, FC-TS, LeanRAG
+
+> **Rang und Herkunft:** Dieser Abschnitt ist normativ auf derselben Ebene wie §5–§10; er unterliegt jedoch
+> Teil A4, soweit es um Priorität und Aktivierungsreihenfolge geht (Leitentscheidung (6), Kopf des Dokuments).
+> Er führt die vier in Teil A4 geprüften SOTA-Verfahren aus dem Deep-Research-Bericht (§5.1–§5.4 dort) in die
+> normative Form dieser Spezifikation über — **korrigiert** um die in Teil A4 dokumentierten Abweichungen
+> gegenüber dem tatsächlichen Code (falsche Kanal-Enums, materialisierte statt Stream-Signaturen,
+> Namenskollisionen, bereits vorhandene statt fehlende Bausteine). Wo ein Codeblock unten von einem Codeblock
+> im Deep-Research-Bericht abweicht, **gilt dieser Abschnitt**, nicht der Bericht. Jeder Unterabschnitt trägt
+> eine Phasen-Kennzeichnung nach §A.3; alle vier sind `[Phase 2]` (Hot-Path/Struktur-Stufe), da sie Stufe 1½
+> der Gesamtroadmap (§18) zugeordnet sind — keines darf vor erfolgreichem Gate 0/1 für den jeweiligen Crate
+> begonnen werden.
+
+### 21.1 TL-HFD — Thresholded Local Hyper-Flow Diffusion (`contextra-graph`) **[Phase 2]**
+
+**Ziel:** Ersetzt den heuristischen, ε-schwellenwertbasierten `forward_push_ppr` (Andersen-Chung-Lang) für
+n-äre Hyperkanten durch einen formal exakten, projizierten Subgradientenabstieg auf der Lovász-Erweiterung
+der Hyperkanten-Schnittkosten — mit einer durch Top-$k$-Randaktivierung **hart** (nicht nur statistisch)
+begrenzten Lokalität, was P24 (§4(6)) strenger erfüllt als das bestehende ε-Konvergenzkriterium.
+
+**Mathematische Spezifikation (unverändert gegenüber dem Bericht, hier normativ übernommen):**
+
+Minimierung der stetigen konvexen Relaxation des Hyper-Flow-Diffusion-Dual-Objektivs über $x \in \mathbb{R}^{|V|}_+$:
+
+$$\min_{x} F(x) := \frac{1}{2} \sum_{e \in E} \theta_e f_e(x)^2 + \frac{\sigma}{2} x^\top D x - \langle \Delta - d, x \rangle$$
+
+mit Knotengrad $d_v = \sum_{e \ni v} \theta_e$, $D = \mathrm{diag}(d)$, Seed-Injektionsvektor $\Delta(v) = \delta d_v$
+($\delta \ge 2$) für $v \in S$ und $0$ sonst, sowie der Lovász-Erweiterung $f_e(x) := \max_{\rho \in B_e} \langle \rho, x \rangle$
+für Hyperkante $e$. Der Algorithmus hält eine aktive Region $A(t) = \mathrm{supp}(x^{(t)}) \cup S$ und eine
+Ein-Hop-Grenze $\partial A(t)$; der Subgradient wird ausschließlich auf $A(t) \cup \partial A(t)$ ausgewertet
+(kein $O(|V|)$-Schritt). Drei Phasen pro Iteration: (1) Update aktiver Knoten
+$x^{(t+1)}_u \leftarrow \max\{0, x^{(t)}_u - \eta_{t+1} [g^{(t)}]_u / d_u\}$ mit $\eta_{t+1} = 1/\sigma(t+1)$;
+(2) Boundary-Scoring $s^{(t)}(u) = \kappa^{(t)}(u) \cdot c^{(t)}(u)$ mit Motif-Conductance-Gewichtung
+$c^{(t)}(u) = (d_\mathrm{in}^{(t)}(u)/d_u)^\gamma$; (3) Thresholded Top-$k$-Aktivierung der Grenzknoten mit
+höchstem Score. Laufzeit pro Iteration: $O\!\left(\sum_{e: e \cap (A(t) \cup \partial A(t)) \neq \emptyset} |e|\right)$
+— unabhängig von der Graph-Makrostruktur.
+
+**Rust-Schnittstelle (normativ, korrigiert gegenüber dem Bericht: integriert in den bestehenden `PprAlgorithm`-Enum
+statt als isolierte neue Methode):**
+
+```rust
+use crate::csr::{CsrGraph, GraphInner};
+use crate::error::GraphError;
+use contextra_types::{EntityId, HyperEdgeId};
+use ahash::AHashMap;
+
+/// Konfiguration für Thresholded Local Hyper-Flow Diffusion (TL-HFD).
+/// Erzwingt deterministische Schranken gemäß P24 (§4(6)).
+#[derive(Debug, Clone)]
+pub struct TlHfdParams {
+    pub sigma: f32,                 // Regularisierungsstärke
+    pub delta: f32,                 // Seed-Masse-Injektionsrate, MUSS >= 2.0 sein (Result-Validierung, nicht debug_assert! — vgl. §17 Punkt 0.2)
+    pub gamma: f32,                 // struktureller Gewichtungsfaktor (Motif Conductance)
+    pub max_iterations: u32,        // harte Obergrenze
+    pub max_top_k_expansion: usize, // Hard-Cap für Randaktivierung pro Schritt (P24)
+    pub max_hyperedge_sort_size: usize, // NEU (Fassung 4, siehe Restrisiken unten): deterministischer Cutoff
+                                         // für die Lovász-Subgradienten-Sortierung; Kanten mit |e| über diesem
+                                         // Wert nutzen eine deterministische Top-Gewicht-Kürzung statt
+                                         // Stochastik — kein RNG-Port nötig, kein P28-Bezug.
+}
+
+/// Zustand der aktiven Traversierung. Präallozierte Kapazität garantiert Zero-Panic (§4(1)) bei OOM.
+pub struct ActiveRegion {
+    pub x_values: AHashMap<EntityId, f32>,
+    pub boundary_scores: Vec<(EntityId, f32)>,
+}
+
+/// Erweiterung des bestehenden `PprAlgorithm`-Enums aus `ppr.rs` (nicht neu einführen — anhängen).
+/// `ShadowMode` vergleicht künftig wahlweise Forward-Push↔DensePowerIteration ODER
+/// Forward-Push↔TlHfd, gesteuert über ein zweites Feld, um die bestehende Diskrepanz-Logging-Mechanik
+/// unverändert weiterzunutzen (AK-16).
+pub enum PprAlgorithm {
+    ForwardPush,
+    DensePowerIteration,
+    TlHfd(TlHfdParams),             // NEU (Fassung 4)
+    ShadowMode { compare_against: Box<PprAlgorithm> }, // Feld ergänzt, Rückwärtskompatibilität: Default bleibt DensePowerIteration
+}
+
+impl CsrGraph {
+    /// Lokaler, subgradienten-basierter Submodularitäts-Clustering-Lauf.
+    /// Läuft zunächst NUR über `PprAlgorithm::ShadowMode { compare_against: TlHfd(..) }` (AK-16);
+    /// wird erst nach Auswertung der Diskrepanz-Logs (Teil A4.7) zum Default.
+    pub fn thresholded_local_hfd(
+        &self,
+        seeds: &[EntityId],
+        params: &TlHfdParams,
+    ) -> Result<AHashMap<EntityId, f32>, GraphError> {
+        let snapshot = self.inner.load();
+        let max_capacity = seeds.len().saturating_add(
+            (params.max_iterations as usize).saturating_mul(params.max_top_k_expansion)
+        );
+        let mut active = ActiveRegion {
+            x_values: AHashMap::with_capacity(max_capacity),
+            boundary_scores: Vec::with_capacity(params.max_top_k_expansion.saturating_mul(4)),
+        };
+        // Implementierung gemäß den drei Phasen oben; jeder Schritt prüft `f32::is_finite`
+        // auf NaN-Kontamination vor der nächsten Iteration (§4(1)).
+        unimplemented!()
+    }
+
+    /// Lovász-Erweiterung für eine Hyperkante, zero-copy über `HyperEdgeView`.
+    /// Für `|e| > max_hyperedge_sort_size`: deterministische Top-Gewicht-Kürzung statt Vollsortierung
+    /// (siehe Restrisiken) — KEIN Pseudo-RNG, um P28-Injektionspflicht zu vermeiden.
+    #[inline(always)]
+    fn compute_lovasz_extension<'a>(
+        &self,
+        edge_view: &'a crate::hyperedge::HyperEdgeView,
+        x_values: &AHashMap<EntityId, f32>,
+        max_sort_size: usize,
+    ) -> f32 {
+        unimplemented!()
+    }
+}
+```
+
+**Invarianten-Nachweis:** P24 wird strenger als durch das bestehende ε-Konvergenzkriterium erfüllt, da
+`TOPK(s, k)` die Netzwerkexpansion pro Iteration exakt auf $k$ neue Knoten begrenzt; Gesamtlaufzeit
+$O(\text{Iterations} \times k \times |\text{Seed}|)$, unabhängig von der Gesamtgraphgröße. Zero-Panic (§4(1))
+über Präallokation nach bekanntem theoretischem Maximum sowie `f32::is_finite`-Prüfung. Determinismus (§4(3))
+über einen strikten Tie-Breaker (totale `EntityId`-Ordnung bei Score-Gleichstand) — identisch zu dem bereits
+in §6.6 H2/H6 geforderten Muster, kein neuer Mechanismus.
+
+**Restrisiken (korrigiert gegenüber dem Bericht, siehe A4.5/S.2):** Die Lovász-Subgradienten-Berechnung
+erfordert eine Sortierung der Komponentenwerte $x_u$ je aktiver Hyperkante ($O(|e| \log |e|)$). Der Bericht
+schlägt für sehr dichte Kanten ($|e| > 1000$) eine **stochastische** Stichprobe vor — das würde einen
+dedizierten `contextra_ports::Rng`-Port (P28) in einen bislang RNG-freien Algorithmus einführen und damit
+Determinismus-Prüfpfad und Test-Oberfläche unnötig vergrößern. **Korrektur dieser Fassung:** stattdessen
+`max_hyperedge_sort_size` als harten, deterministischen Cutoff verwenden (Top-Gewicht-Kürzung statt
+Zufallsstichprobe) — liefert schwächere, aber reproduzierbare Approximationsgarantien ohne neue P28-Fläche.
+Migrationspfad: `ShadowMode` (AK-16) → Log-Auswertung (Teil A4.7) → Default-Flip als eigene ⚖️-Entscheidung
+analog K-16/K-17 (§16.1).
+
+---
+
+### 21.2 DiBud — Direct Budgeting für deterministische RRF-Präfixe (`contextra-rank`) **[Phase 2, zweistufig gegatet]**
+
+**Ziel:** Ersetzt den blockierenden Vollabruf fester Top-$k$-Kandidatenmengen durch einen inkrementellen,
+budget-gesteuerten Fusionsprozess mit beweisbar exaktem RRF-Präfix. **Bedingung laut Teil A4.4.2/A4.5:** Kein
+Merge dieses Abschnitts, bevor die in Schritt 1 geforderte Streaming-Iterator-Vorarbeit abgeschlossen ist
+(AK-17).
+
+**Korrigiertes Kanalmodell (Fassung 4, siehe A4.2.2):** Das tatsächliche `SignalKind`-Enum
+(`crates/contextra-rank/src/fusion.rs:316`) ist `{Vector, Text, Graph, EdgeReinforcement}` — **kein**
+generischer Metadaten-/Filter-Kanal. `EdgeReinforcement` ist ein aus dem Bandit-Subsystem (§8)
+rückgekoppeltes Signal ohne eigenen paginierbaren Index und wird **außerhalb** des DiBud-Budgets als stets
+vollständig ausgewerteter additiver Term behandelt. Das Budget gilt ausschließlich für die drei echten
+Retrieval-Kanäle Vector, Text, Graph.
+
+**Mathematische Spezifikation (Kanalzahl auf 3 korrigiert):** Fusionsscore
+$F(x) = \sum_{i \in \{V,T,G\}} g(r_i(x)) + w_{\mathrm{er}} \cdot \mathrm{er}(x)$, mit Dämpfung $g(r) = 1/(c+r)$
+($c = 60$) und dem stets vollständig ausgewerteten `EdgeReinforcement`-Term $\mathrm{er}(x)$. Für jeden der
+drei budgetierten Kanäle wird ein Lesetiefe-Zeiger $d_i$ geführt, $\sum_{i \in \{V,T,G\}} d_i \le B$. Für ein
+beobachtetes, noch nicht zertifiziertes Dokument $x$: obere Schranke
+$F^+(x) = \sum_{i \in \mathrm{obs}(x)} g(r_i(x)) + \sum_{j \notin \mathrm{obs}(x)} g(d_j+1) + w_{\mathrm{er}} \cdot \mathrm{er}(x)$,
+untere Schranke $F^-(x) = \sum_{i \in \mathrm{obs}(x)} g(r_i(x)) + w_{\mathrm{er}} \cdot \mathrm{er}(x)$. Ein
+Dokument ist zertifiziert, sobald $F^-(x)$ über $F^+(y)$ aller noch unzertifizierten $y$ liegt.
+
+**Rust-Schnittstelle (normativ, korrigiert: 3-Kanal-Budget + Provenance-Anbindung, siehe unten):**
+
+```rust
+use contextra_types::{DocId, ErrorClass};
+
+/// Nur drei budgetierte Retrieval-Kanäle (Fassung 4, A4.2.2) — EdgeReinforcement bewusst NICHT hier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BudgetedChannel { Vector, Text, Graph }
+
+#[derive(Debug, Clone)]
+pub struct FusionBudget {
+    pub max_total_accesses: usize,   // gilt nur für {Vector, Text, Graph}
+    pub min_certified_results: usize,
+    pub edge_reinforcement_weight: f32, // additiver Term, außerhalb des Budgets ausgewertet
+}
+
+/// Verwaltet Schranken und Zustand des inkrementellen RRF-Lösers.
+/// Trägt — anders als im ursprünglichen Berichtsentwurf — von Anfang an eine Anbindung an die
+/// bestehende `ProvenanceRecord`/`SignalContribution`-Infrastruktur (`fusion.rs`), damit die
+/// Herkunfts-Nachvollziehbarkeit pro Score-Beitrag nicht nachträglich verheiratet werden muss
+/// (der Bericht selbst benennt diese Lücke im eigenen Entwurf, Teil C §"Einordnung, die im Bericht fehlt").
+pub struct DiBudFusionState {
+    pub current_accesses: usize,
+    partial_scores: ahash::AHashMap<DocId, PartialScoreBounds>,
+    channel_depths: [usize; 3],                          // NUR die drei budgetierten Kanäle
+    provenance: ahash::AHashMap<DocId, crate::fusion::ProvenanceRecord>, // wiederverwendet, nicht neu erfunden
+}
+
+#[derive(Debug, Clone, Default)]
+struct PartialScoreBounds {
+    pub known_score: f32,
+    pub unobserved_channels_mask: u8, // Bitmaske über die 3 budgetierten Kanäle (nicht 4)
+}
+
+impl DiBudFusionState {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            current_accesses: 0,
+            partial_scores: ahash::AHashMap::with_capacity(capacity),
+            channel_depths: [0; 3],
+            provenance: ahash::AHashMap::with_capacity(capacity),
+        }
+    }
+
+    /// Nimmt Iterator-Streams der DREI budgetierten Signalquellen entgegen; `edge_reinforcement`
+    /// wird als vollständig materialisierte Lookup-Funktion übergeben (kein Iterator — es gibt
+    /// strukturell keine "unerreichten" EdgeReinforcement-Kandidaten).
+    ///
+    /// VORAUSSETZUNG (AK-17, hart geprüft): `vector_stream`/`text_stream`/`graph_stream` MÜSSEN echte,
+    /// on-demand nachliefernde Iteratoren sein (aus `contextra-vector`/`contextra-text`/`contextra-graph`),
+    /// keine `.iter()`-Adapter über bereits vollständig materialisierte `Vec<DocId>` — sonst entfällt der
+    /// P24-Gewinn vollständig (Teil A4.4, DiBud-Zeile).
+    pub fn fuse_exact_prefix<I1, I2, I3>(
+        &mut self,
+        vector_stream: &mut I1,
+        text_stream: &mut I2,
+        graph_stream: &mut I3,
+        edge_reinforcement: impl Fn(DocId) -> f32,
+        budget: &FusionBudget,
+    ) -> Result<Vec<DocId>, ErrorClass>
+    where
+        I1: Iterator<Item = DocId>,
+        I2: Iterator<Item = DocId>,
+        I3: Iterator<Item = DocId>,
+    {
+        // Polling-Schleife evaluiert F^-(x) > F^+(y) kontinuierlich; bricht garantiert bei
+        // `current_accesses >= max_total_accesses` ab (P24). Kanal-Priorität bei gleicher oberer
+        // Schranke: 1. Graph, 2. Text, 3. Vector (EdgeReinforcement ist kein Streaming-Kanal und
+        // entfällt aus dem Tie-Breaker), in letzter Instanz totale `DocId`-Ordnung.
+        unimplemented!()
+    }
+}
+```
+
+**Schritt 1 (Vorbedingung, AK-17):** Bevor `fuse_exact_prefix` implementiert wird, müssen
+`contextra-vector` (DiskANN) und `contextra-text` (BM25/Block-Max-WAND) je einen
+`impl Iterator<Item = DocId>` exponieren, der Kandidaten batchweise (Vorschlag: 16 pro Kanalzugriff, wie im
+Bericht selbst zur Wahrung der Cache-Lokalität P25 vorgeschlagen) nachliefert, statt intern vollständige
+Ergebnismengen zu berechnen. Dies ist unabhängig von DiBud selbst wertvoll (A4.4.2) und sollte als eigener
+PR vor Schritt 2 gemerged werden.
+
+**Invarianten-Nachweis:** P24 über die harte Abbruchbedingung `current_accesses >= max_total_accesses` in der
+Polling-Schleife — deterministischer Stopp unabhängig von der Dichte der zugrundeliegenden Indexlisten. Zero-Panic
+(§4(1)) über kapazitätsvorallozierte `AHashMap`s (Budget-Größe bekannt). Determinismus (§4(3)) über
+präzise Fließkommaarithmetik plus hartkodierten, jetzt auf drei Kanäle korrigierten Tie-Breaker.
+
+**Restrisiken (verschärft gegenüber dem Bericht, siehe A4.4.2):** Ohne Schritt 1 liefert eine Implementierung
+gegen die heutige `fuse_signals`-Signatur **keinen** P24-Gewinn — das Budget würde nachträglich auf bereits
+vollständig geladene Listen angewendet. Vor produktiver Default-Umstellung: eigene Kleinst-Implementierung +
+Benchmark gegen den Paper-Aufbau (Teil C C.1) — Tier D, Einzelautor, sieben Tage alt, unrepliziert.
+
+---
+
+### 21.3 FC-TS — Flow-Corrected Thompson Sampling (`contextra-adapt`) **[Phase 2]**
+
+**Ziel:** Ersetzt nicht den Lyapunov-Drift-Wächter, sondern erweitert die bestehende
+Drift-Bandit-Kopplung (`LyapunovDriftWatcher` + `DriftPolicyBridge`, bestätigt A4.2) um eine **richtungsbewusste**
+Korrektur: statt pauschal die gesamte Präzisionsmatrix zu diskontieren (`drift_gamma = 0.95` bei erkannter
+Drift, siehe `drift.rs`), werden historische Beobachtungen über einen expliziten Transport-Operator in die
+Gegenwart korrigiert und selektiv gewichtet.
+
+**Mathematische Spezifikation (unverändert gegenüber dem Bericht):** Bayesianisches Modell je Arm $a$:
+$w_t^{(a)} \mid \mathcal{H}_t \sim \mathcal{N}(\mu_t^{(a)}, (\Lambda_t^{(a)})^{-1})$. Transport einer
+vergangenen Belohnung: $\hat r_{s \to t} = r_s + (t-s)\langle \hat\delta_t^{(a)}, x_s \rangle$. Der
+Drift-Vektor $\hat\delta_t^{(a)}$ wird periodisch per Online-Ridge-Regression über ein lokales Fenster
+vergangener Beobachtungen geschätzt. Konfidenz-gewichtetes Präzisionsmatrix-Update:
+$\Lambda_t^{(a)} = \lambda I_d + \sigma^{-2}\sum_{s<t}\omega_{s,t}x_s x_s^\top$, inkrementell in $O(d^2)$ ohne
+Allokation über eine modifizierte Sherman-Morrison-Formel. Informationsvektor
+$\eta_t^{(a)} = \lambda m_t^{(a)} + \sigma^{-2}\sum_{s<t}\omega_{s,t}\hat r_{s\to t}x_s$, Posterior-Mean
+$\mu_t^{(a)} = (\Lambda_t^{(a)})^{-1}\eta_t^{(a)}$.
+
+**Rust-Schnittstelle (normativ, korrigiert: als neue Variante von `BanditImplementation` statt als isolierter
+neuer Typ, damit die bestehende Off-Policy-Evaluation aus §8.5 unverändert weiterverwendet werden kann):**
+
+```rust
+use contextra_types::ErrorClass;
+use contextra_ports::Rng; // injizierter Determinismus, P28
+
+/// Erweiterung des bestehenden `BanditImplementation`-Enums (`bandit.rs`) um eine dritte Variante,
+/// NEBEN `ShermanMorrison` und `DiagonalApproximation` (bandit.rs:605) — kein Ersatz.
+pub enum BanditImplementation {
+    ShermanMorrison,
+    DiagonalApproximation,
+    FlowCorrectedThompson, // NEU (Fassung 4)
+}
+
+/// Feste Kapazität für das Rolling-Window der Drift-Schätzung — kein `Vec::push` mit Reallokation,
+/// um §4(1) auch für den Ring-3-Hintergrund-Task einzuhalten (dort gilt Zero-Panic ebenso, nur nicht
+/// die Latenzgarantie von Ring 0).
+pub struct FlowCorrectedThompsonBandit {
+    dim: usize,
+    inv_a: Vec<f32>,           // A^-1, row-major, analog zu ShermanMorrisonBandit
+    eta: Vec<f32>,
+    mu: Vec<f32>,
+    drift_rate: Vec<f32>,      // Transport-Vektor \hat{\delta}, NUR aus Ring 3 geschrieben (AK-18)
+    drift_window: Box<[(Vec<f32>, f32, u64)]>, // fixe Kapazität, z. B. 200 Einträge (Kontext, Reward, Zeit)
+    drift_window_len: usize,
+    time_step: u64,
+}
+
+impl FlowCorrectedThompsonBandit {
+    /// O(d²)-Update der Präzisionsmatrix mit konfidenz-gewichtetem Transport.
+    /// Ring-0-Hot-Path: liest `drift_rate` nur (read-only), schreibt es NIE (AK-18).
+    pub fn update_with_flow(
+        &mut self,
+        context: &[f32],
+        reward: f32,
+        observation_time: u64,
+        confidence_weight: f32,
+    ) -> Result<(), ErrorClass> {
+        if context.len() != self.dim {
+            return Err(ErrorClass::DimensionMismatch { expected: self.dim, actual: context.len() });
+        }
+        let delta_t = (self.time_step.saturating_sub(observation_time)) as f32;
+        let drift_correction: f32 = context.iter().zip(&self.drift_rate).map(|(x, d)| x * d).sum();
+        let transported_reward = reward + (delta_t * drift_correction);
+        // Sherman-Morrison-Update für A^-1 mit confidence_weight, analog ShermanMorrisonBandit::discount_once
+        unimplemented!()
+    }
+
+    /// Zieht ein Parameter-Sample zur Exploration; nutzt zwingend den injizierten `Rng`-Port (P28).
+    pub fn select_arm(&self, context: &[f32], rng: &mut dyn Rng) -> Result<u32, ErrorClass> {
+        unimplemented!()
+    }
+
+    /// NUR aus dem Ring-3-Hintergrund-Task aufrufbar (AK-18 prüft das als Architektur-Lint, nicht als
+    /// Laufzeit-Panic — ein Aufruf aus Ring 0 wäre ein P26/P24-Verstoß, kein Safety-Verstoß).
+    /// Aktualisiert `drift_rate` per Online-Ridge-Regression über `drift_window`.
+    pub fn recompute_drift_rate_from_window(&mut self) {
+        unimplemented!()
+    }
+}
+```
+
+**Invarianten-Nachweis:** Zero-Panic (§4(1)) und P24 (§4(6)) über die feste $O(d^2)$-Operationszahl je
+Sherman-Morrison-Schritt; keine $O(d^3)$-Neuinvertierung. Harte Dimensionsprüfung mit `Result` (nicht
+`debug_assert!`, konsistent mit der bereits in §17 Punkt 0.2 geforderten Korrektur für den bestehenden
+Bandit). Determinismus (§4(3), P28) über injizierten `Rng`-Port — identische Seeds erzeugen bitgleiche
+Routing-Entscheidungen.
+
+**Restrisiken:** Das gleitende Fenster (z. B. 200 Beobachtungen je Arm) kostet zusätzlichen Speicher
+gegenüber dem bestehenden Lyapunov-Watcher; `drift_window` MUSS als Ringpuffer fester Kapazität implementiert
+werden (kein dynamisches Wachstum), sowohl aus Zero-Panic-Gründen als auch weil variable Kapazität die
+Speicherbudget-Transparenz (§4(5)) unterläuft. Die Rekalkulation von $\hat\delta_t^{(a)}$ darf ausschließlich
+im asynchronen Ring-3-Hintergrund-Task laufen (AK-18) — der Ring-0-Hot-Path wendet `drift_rate` nur lesend an.
+
+---
+
+### 21.4 LeanRAG Semantic Aggregation — dritte Pipeline-Stufe (`contextra-cognition`) **[Phase 2, hart gegatet auf H5]**
+
+**Ziel:** Ergänzt die bereits bestehende, zweistufige Konsolidierungs-Pipeline
+(`memory_consolidation.rs` — deterministischer, LLM-freier Structural Pass; `synthesis_phase.rs` — Generative
+Synthesis Pass mit LLM-Kostenschutz) um eine **dritte** Stufe: Semantic Aggregation über Gaussian-Mixture-Clustering
+mit Self-Supervised Type-Denoising, wie in LeanRAG (2508.10391, Tier A) und Type-Info-Denoising (2503.09916,
+Tier A, AISTATS 2025 peer-reviewed) beschrieben. **Dies ist laut Teil A4.5 das am höchsten priorisierte der
+vier Verfahren** — sowohl wegen der Beleglage als auch weil der größte Teil der benötigten Infrastruktur
+bereits vorhanden ist (A4.2.1).
+
+**Vorbedingung 0 (blockierend, AK-19, A4.4.1):** `child_edge_ids` im FlatBuffers-Schema (§12) und die
+rekursive Erweiterung von `cascade_invalidate_hyperedges_for_superseded_doc` (§6.6 H5) MÜSSEN gemerged und
+CI-grün sein, **bevor** irgendein Teil dieses Abschnitts produktiv (auch nicht hinter einem reinen
+Opt-in-Feature-Flag mit realen Nutzerdaten) aktiviert wird. Ohne diese Erweiterung kann ein
+Art.-17-DSGVO-Löschauftrag (§10) einen bereits konsolidierten Super-Knoten nicht erreichen.
+
+**Vorbedingung 1 (Namensraum-Bereinigung, A4.2/A4.6 Punkt 3):** `contextra-cognition` enthält bereits
+`memory_consolidation::ConsolidationConfig` (Zeile 28), `memory_consolidation::ConsolidationPhaseResult`,
+`memory_consolidation::SynthesisConfig`, sowie je ein `SynthesisPhaseResult` in `memory_consolidation.rs`
+**und** in `synthesis_phase.rs`. Die neue dritte Stufe **darf keinen dritten, kollidierenden
+`ConsolidationConfig`-Typ einführen** (wie es der ursprüngliche Berichtsentwurf täte) — stattdessen werden die
+bestehenden Typen um die neuen Felder erweitert bzw. ein klar unterscheidbar benannter dritter Typ nach
+demselben Muster (`AggregationConfig`/`AggregationPhaseResult`) eingeführt, und die beiden gleichnamigen
+`SynthesisPhaseResult`-Definitionen werden vor Beginn dieser Arbeit vereinheitlicht (ein Typ, re-exportiert).
+
+**Mathematische Spezifikation (unverändert gegenüber dem Bericht, als kontrollierter Map-Reduce-Job in Ring 3):**
+
+1. **Denoising:** Kanten einer Kohorte werden gegen ein Typen-Kompatibilitäts-Scoring evaluiert; logisch
+   inkonsistente Kanten erzeugen einen asynchronen WAL-Tombstone-Eintrag.
+2. **Gaussian Mixture Clustering:** hochdimensionale Entitäts-Embeddings der validen Knoten werden in $m$
+   disjunkte Cluster $C_j$ unterteilt; EM-Konvergenz wird über einen festen RNG-Seed (`gmm_deterministic_seed`)
+   deterministisch forciert.
+3. **Abstraktion & Synthese:** je Cluster $C_j$ generiert der LLM-Synthetisierer (Port `TextGenerator`) einen
+   abstrakten Meta-Knoten $\alpha_j$ — wiederverwendet denselben `max_llm_calls_per_cycle`-Kostenschutz
+   (P12) und `CommunityStabilityTracker`/`compute_community_hash`-Mechanismus wie der bestehende Generative
+   Synthesis Pass, statt einen eigenen Kostenschutz-Mechanismus neu zu bauen.
+4. **Super-Hyperkante:** übersteigt die Konnektivität $\lambda_{j,k}$ zwischen Clustern $j,k$ einen
+   Schwellenwert $\tau$, wird eine Super-Hyperkante mit `child_edge_ids` gesetzt auf die subsumierten
+   Original-/Sub-Hyperkanten-IDs eingefügt.
+5. **Atomic Replace:** deterministischer Transaktions-Commit über dasselbe Manifest-Batch-Fsync-Muster wie
+   die bestehende Kompaktierung (§17 Punkt 2.4).
+
+**Rust-Schnittstelle (normativ, korrigiert: erweitert bestehende Typen statt neue zu duplizieren, ruft die
+bereits vorhandene Budget-Primitive auf statt sie neu zu spezifizieren):**
+
+```rust
+use contextra_types::{TxId, DocId, ErrorClass};
+use contextra_ports::{Embedder, TextGenerator};
+use contextra_engine::Collection;
+// Wiederverwendung, nicht Neuerfindung:
+use crate::memory_consolidation::{ConsolidationConfig, ConsolidationPhaseResult};
+
+/// Konfiguration der dritten Pipeline-Stufe. Eigener Typ (nicht `ConsolidationConfig`, um die
+/// Namenskollision aus A4.2 nicht zu wiederholen), aber im selben Namensmuster wie
+/// `SynthesisConfig` für die zweite Stufe.
+pub struct AggregationConfig {
+    pub max_compaction_peak_memory_mb: usize,
+    pub clustering_tau_threshold: f32,   // Schwellenwert lambda_{j,k} für Super-Kanten
+    pub gmm_deterministic_seed: u64,
+    pub max_llm_calls_per_cycle: usize,  // wiederverwendet dasselbe P12-Kostenschutz-Feld wie SynthesisConfig
+}
+
+/// Transparenter Report; folgt demselben Namensmuster wie `ConsolidationPhaseResult`/`SynthesisPhaseResult`.
+pub struct AggregationPhaseResult {
+    pub raw_edges_tombstoned: usize,
+    pub abstract_hyperedges_created: usize,
+    pub peak_memory_used_mb: usize,
+    pub child_edge_ids_written: usize,   // NEU: Nachweis, dass H5-Traversierbarkeit hergestellt wurde
+}
+
+/// Gesamtergebnis der dreistufigen Pipeline (Struktur → Synthese → Aggregation), damit Aufrufer
+/// nicht drei separate Report-Typen manuell zusammenführen müssen.
+pub struct ConsolidationPipelineResult {
+    pub structural: ConsolidationPhaseResult,
+    pub synthesis: crate::synthesis_phase::SynthesisPhaseResult, // vereinheitlichter Typ, Vorbedingung 1
+    pub aggregation: Option<AggregationPhaseResult>,             // None, falls Stufe 3 deaktiviert/nicht erreicht
+}
+
+impl Collection {
+    /// Führt die semantische Abstraktion (dritte Pipeline-Stufe) als asynchronen Ring-3-Task aus.
+    /// Darf den Ring-0-Lese-Pfad nicht blockieren (P26).
+    pub async fn consolidate_semantic_hyperedges(
+        &self,
+        embedder: &dyn Embedder,
+        llm: &dyn TextGenerator,
+        config: &AggregationConfig,
+    ) -> Result<AggregationPhaseResult, ErrorClass> {
+        // 1. Budget-Vorprüfung — RUFT DIE BEREITS VORHANDENE RING-0-PRIMITIVE AUF (A4.2.1),
+        //    baut sie NICHT neu:
+        let estimated_peak = self.graph.estimate_compaction_peak_bytes() / (1024 * 1024);
+        if estimated_peak > config.max_compaction_peak_memory_mb {
+            return Err(ErrorClass::CompactionBudgetExceeded {
+                budget_mb: config.max_compaction_peak_memory_mb,
+                estimated_mb: estimated_peak,
+            });
+        }
+        // 2. Self-Supervised Type-Denoising + deterministisches GMM-Clustering
+        // 3. Batched TextGenerator-Aufruf zur Synthese der Alpha-Knoten (max_llm_calls_per_cycle,
+        //    CommunityStabilityTracker wiederverwendet)
+        // 4. Super-Hyperkanten mit `child_edge_ids` schreiben (NUR wenn Vorbedingung 0 erfüllt —
+        //    Aufrufer MUSS vorab per CI-Gate sicherstellen, dass das Schema die Erweiterung trägt)
+        // 5. Atomarer Transaktions-Commit über bestehendes Manifest-Batch-Fsync-Muster
+        unimplemented!()
+    }
+}
+```
+
+**Invarianten-Nachweis:** Speicherbudget-Transparenz (§4(5)) ist durch Wiederverwendung der bereits
+getesteten `estimate_compaction_peak_bytes()`-Primitive (A4.2.1) **stärker** abgesichert als im
+ursprünglichen Berichtsentwurf, der diesen Aufruf als neu zu bauenden Baustein annahm. Determinismus (§4(3))
+über festen `gmm_deterministic_seed` für die GMM-Initialisierung; die LLM-Synthese selbst bleibt inhärent
+stochastisch, das nachfolgende Topologie-Update läuft jedoch WAL-first und deterministisch ein. P26
+(Sync-Kern) bleibt gewahrt, da der Task als `async`-Operation in `contextra-cognition` (Ring 3) läuft,
+während die aufgerufenen `contextra-graph`-Operationen (Ring 0) synchron und blockierungsfrei bleiben.
+
+**Restrisiken (verschärft gegenüber dem Bericht, siehe A4.4.1):** Ohne Vorbedingung 0 (`child_edge_ids` +
+H5-Rekursion) ist dieser Abschnitt **nicht produktionsreif**, unabhängig davon, wie vollständig die
+Aggregations-Logik selbst implementiert ist — ein Löschauftrag für ein Quelldokument, dessen Fakten in einen
+$\alpha_j$-Knoten abstrahiert wurden, würde sonst silently fehlschlagen und damit eine Datenschutzzusage
+(§10) brechen. Diese Reihenfolge ist nicht verhandelbar und MUSS im CI-Gate erzwungen werden (AK-19).
+
+---
+
+*Ende §21. Zusammen mit §0–§20 und Teil A/A2/A3/A4 bildet dieser Abschnitt die vollständige, in sich
+geschlossene Gesamtspezifikation der Fassung 4. Änderungsprotokoll und Prüfnachweise dieser Fassung: Anhang D.*
 
 ---
 
@@ -3126,13 +4020,13 @@ Dokuments, nicht als weiteres Delta-Dokument.*
 # Anhang B — Begründungen, Ist-Zustand, Literatur und Restrisiken je Maßnahme (nachrangig)
 
 > **Rang:** nachrangig zu §0–§20. Dieser Block war in Fassung 2 als eigener Abschnitt „Mikrofeingranulare
-> Schnittstellenspezifikation & Systemoptimierung für contextra Cognitive OS" zwischen §19 und §20 eingebettet und
+> Schnittstellenspezifikation & Systemoptimierung für Contextra Cognitive OS" zwischen §19 und §20 eingebettet und
 > trug Nummern (5.1, 6.3.1, …), die mit dem Hauptteil kollidierten. Ab Fassung 2.1 tragen sie das Präfix `B.`.
 > Der Anhang liefert Ist-Zustand, Literatur, Migrationspfad und Restrisiken. **Rust-Skizzen in diesem Anhang sind
 > nicht normativ**, wo sie von §5–§10 abweichen; dort gelten §5–§10. Korrigierte Stellen sind mit „[v2.1]"
 > markiert. Verweise „§4(n)" und „Invariante n" bezeichnen die Invarianten aus §4.i.
 
-Die vorliegende Spezifikation definiert die mikrofeingranulare Architektur für das contextra Cognitive OS. Die Analyse adressiert die Beseitigung struktureller Flaschenhälse in den Bereichen Wissensgraph-Modellierung, Contextual-Bandit-Routing, Cache-Kontention, Vektorindex-Traversierung, LSM-Storage-Engine, Inferenz-Brücken und kryptographischer Sicherheit. Die Lösungsarchitekturen sind so konzipiert, dass sie direkt in deterministischen, threadsicheren Rust-Code überführt werden können, ohne die systemweiten Invarianten zu verletzen.
+Die vorliegende Spezifikation definiert die mikrofeingranulare Architektur für das Contextra Cognitive OS. Die Analyse adressiert die Beseitigung struktureller Flaschenhälse in den Bereichen Wissensgraph-Modellierung, Contextual-Bandit-Routing, Cache-Kontention, Vektorindex-Traversierung, LSM-Storage-Engine, Inferenz-Brücken und kryptographischer Sicherheit. Die Lösungsarchitekturen sind so konzipiert, dass sie direkt in deterministischen, threadsicheren Rust-Code überführt werden können, ohne die systemweiten Invarianten zu verletzen.
 
 ## B.5.1 N-äre Hyperkanten im Wissensgraphen (`crates/contextra-graph`)
 
@@ -3328,7 +4222,7 @@ pub fn cascade_invalidate_hyperedges_for_superseded_doc(
 
 **Invarianten-Nachweis:** §4(6) Die Ausführungszeit der synchronen Funktion ist strikt durch das Fan-out-Limit $\theta$ nach oben beschränkt, was System-Latenz-Spikes verhindert.
 
-**Migrationspfad:** Default-Aktivierung des Background-Workers beim Hochfahren der contextra-Engine.
+**Migrationspfad:** Default-Aktivierung des Background-Workers beim Hochfahren der Contextra-Engine.
 
 **Restrisiken/offene Fragen:** Abstürze während der asynchronen Verarbeitung können verwaiste Hyperkanten hinterlassen. [v2.1] Die Delete-Queue ist persistent und idempotent, normativ in §6.6 H5. Zur DLQ-Replay-Logik siehe §B.6.3.1.
 
@@ -3840,7 +4734,7 @@ pub const SENTINEL_NULL_ID: u32 = u32::MAX;
 
 #### B.6.2.3 — Zero-Copy-Deserialisierung im IPC-Generator
 
-**Spezifikation:** FlatBuffers wird genutzt, um IPC-Nachrichten vom contextra-Prozess zum MCP-Client (Python/Node) als direkte Referenz in Memory-Mapped Slices bereitzustellen, ohne Deserialisierungs-Kopien (zero-copy).
+**Spezifikation:** FlatBuffers wird genutzt, um IPC-Nachrichten vom Contextra-Prozess zum MCP-Client (Python/Node) als direkte Referenz in Memory-Mapped Slices bereitzustellen, ohne Deserialisierungs-Kopien (zero-copy).
 
 ### B.6.3 Agenten-State, Crypto & MCP
 
@@ -3958,3 +4852,113 @@ als Panic-Schutz im `release-abort`-Profil, Ring-Puffer für die WAL-Queue.
 - SQ8-Zahlen beruhen auf synthetischen Daten; die Nachmessung auf echten Embeddings steht aus.
 - Der O(H)-Klon je Veröffentlichung bleibt (§6.3, Restkosten).
 - Nicht geändert, aber aufgefallen: `quick_cache = "0.5"` in §0.2 gegen `0.6` im Repo; `unreachable!()` in `quantize.rs` des Repos widerspricht §4(1).
+
+---
+
+<a id="anhang-d"></a>
+# Anhang D — Änderungsprotokoll Fassung 4 und Prüfnachweise
+
+## D.1 Herkunft und Auftrag
+
+Fassung 4 wurde erstellt, um zwei zugelieferte Dokumente zu einer einzigen Gesamtspezifikation
+zusammenzuführen: `Deep-Research-Bericht_Contextra_erweitert.md` (Teile 1–6: SOTA-Literaturrecherche zu vier
+Algorithmen; Teil C: bereits vorab von einer früheren Claude-Sitzung durchgeführter Quellcode-Abgleich gegen
+`github.com/tfufuz1/contextra`, Commit `4b9387d6`) sowie `CONTEXTRA_SPEC_v3.md` selbst (identisch mit dem in
+dieser Fassung integrierten Fassung-3-Inhalt). Auftrag: Umsetzbarkeit und Optimierungspotenzial beider
+Dokumente prüfen und daraus eine einzige, hochleistungsfähige Gesamtspezifikation für Contextra entwickeln.
+
+## D.2 Geändert oder ergänzt (Fassung 3 → Fassung 4)
+
+| Bereich | Änderung | Grund |
+|---|---|---|
+| Kopf, ToC | Titel auf Fassung 4; Leitentscheidung (6); TOC-Einträge für Teil A4, §21, Anhang D | neue Inhalte müssen auffindbar sein |
+| Teil A4 (neu) | Architekten-Review: Zweitverifikation von Teil C gegen denselben Commit, zwei Korrekturen (A4.2.1 `estimate_compaction_peak_bytes` existiert bereits; A4.2.2/A4.2.3 DiBud-Kanalmodell und fehlende Streaming-Iteratoren), Invarianten-Matrix, revidierte Priorisierung (A4.5), zusätzliches Optimierungspotenzial (A4.6) | Bericht wurde ohne Code-Zugriff erstellt (Teil C selbst); eigene, unabhängige Zweitprüfung erhöht die Verlässlichkeit vor Umsetzungsentscheidungen |
+| §12 | `child_edge_ids: [uint64]` in `HyperEdge`-Tabelle ergänzt, Namenshinweis `HyperEdgeFb` vs. `HyperEdge` dokumentiert | Vorbedingung für LeanRAG-Cascade-Traversierung (H5, A4.4.1) |
+| §16.2 | AK-16 bis AK-19 ergänzt | Testbare Abnahmekriterien für alle vier SOTA-Verfahren, insbesondere die in Fassung 4 neu eingeführten Gates (Shadow-Mode-Pflicht, Streaming-Vorbedingung, Ring-3-only-Drift-Update, Cascade-Rekursion) |
+| §17 | Neue Tabelle „SOTA-Algorithmen-Roadmap" nach der bestehenden Kurzübersicht | vier neue Maßnahmen brauchen dieselbe Aufwand-/Prioritäts-Transparenz wie die bestehende Opus-Analyse |
+| §18 | Neue „Stufe 1½"; Stufe-4-Punkt 14 als vorgezogen markiert und auf Stufe 1½ verwiesen | LeanRAG war fälschlich als Fernziel (Stufe 4) einsortiert, obwohl die Infrastruktur größtenteils vorhanden ist (A4.2.1) |
+| §21 (neu) | Vollständige normative Spezifikation aller vier SOTA-Verfahren, korrigiert gegenüber dem Berichtsentwurf (Kanal-Enum, Iterator-Signaturen, Typnamen, Enum-Integration statt Neubau) | Kernauftrag dieser Fassung |
+| Anhang D (neu) | dieser Abschnitt | Nachvollziehbarkeit gemäß dem eigenen Dokumentationsmodell (Constitution.md, Abschnitt „Status Indicators — CI-Verified Only") |
+
+Alle übrigen Abschnitte (Teil A, A2, A3, §0–§11, §13–§15, §19, §20, Anhang B, Anhang C) sind gegenüber
+Fassung 3 **inhaltlich unverändert** in diese Datei übernommen.
+
+## D.3 Prüfnachweise (Sandbox, Live-Klon, Repo-Stand `4b9387d6119be17180de21a0ea5b2be98121357a`)
+
+Alle Befunde durch direkten `git clone https://github.com/tfufuz1/contextra.git` plus `grep -n`/`wc -l`/`view`
+erhoben, nicht aus Sekundärquellen übernommen, sofern nicht ausdrücklich als Übernahme aus Teil C gekennzeichnet:
+
+- `git log -1`: `4b9387d6 … refactor(rename): memfuse -> contextra (mechanical, script-driven) (#3494)` —
+  identischer Commit wie in Teil C zitiert.
+- `ppr.rs`: `forward_push_ppr` (Z. 177), `DensePowerIteration` (Z. 124), `PprAlgorithm::ShadowMode` (Z. 137) — bestätigt.
+- `fusion.rs`: 1332 Zeilen; `BoundedTopK<T>` Z. 222; `rrf_k`-Parameter Z. 419–439; `SignalKind`-Enum Z. 316–325
+  mit exakt vier Varianten `{Vector, Text, Graph, EdgeReinforcement}` — **kein** Metadaten-/Filter-Kanal;
+  `fuse_signals(result_sets: Vec<(String, Vec<SearchResult>, f32)>, max_results: usize)` Z. 155–160, vollständig
+  materialisierte Signatur, kein Iterator; `ProvenanceRecord` Z. 52, `SignalContribution` Z. 107.
+- `lyapunov.rs`: 552 Zeilen. `drift.rs`: `DriftPolicyBridge` Z. 10. `bandit.rs`: `gamma_inv` Z. 239 und Z. 394
+  (Korrektur der Discount-Richtung, konsistent mit Teil C).
+- `memory_consolidation.rs`: 972 Zeilen; `ConsolidationConfig` Z. 28, `ConsolidationPhaseResult` Z. 67,
+  `SynthesisConfig` Z. 313, ein weiteres `SynthesisPhaseResult` Z. 379 **innerhalb derselben Datei** —
+  zusätzlich zu dem von Teil C genannten `SynthesisPhaseResult` in `synthesis_phase.rs` Z. 12: zwei
+  gleichnamige Typen in zwei Modulen, von Teil C nicht erwähnt.
+- `estimate_compaction_peak_bytes`: **drei** Fundstellen — `csr/graph_write.rs:205,207`,
+  `csr/inner.rs:387`, Test `tests/hyperedge_memory_budget.rs:46` — **widerlegt** die Teil-C-Aussage
+  „liefert keine Treffer".
+- `consolidate_semantic_hyperedges`: keine Fundstellen — Teil-C-Aussage bestätigt.
+- `schemas/contextra.fbs`: Tabelle `HyperEdge` (nicht `HyperEdgeFb`), Feld `source_doc_id: ulong` vorhanden,
+  kein `child_edge_ids` — Teil-C-Aussage bestätigt.
+- `cascade.rs`: 733 Zeilen; `MAX_HYPEREDGE_CASCADE_FANOUT = 1_000` Z. 11; `CASCADE_QUEUE_PREFIX` Z. 67;
+  `enqueue_cascade_deferred` Z. 200; `cascade_invalidate_hyperedges_for_superseded_doc` Z. 161 — bestätigt.
+- `crates/contextra-vector/src/diskann.rs`, `crates/contextra-text/src/wand.rs`: kein `impl Iterator`-Block
+  gefunden, der `DocId`s on-demand nachliefert — eigener, über Teil C hinausgehender Befund (A4.2.3).
+- `bandit.rs`: `BanditPolicy`-Trait Z. 70; `BanditProfileState` Z. 192 mit Feld `implementation:
+  BanditImplementation`; Testfälle setzen `BanditImplementation::ShermanMorrison`/`DiagonalApproximation`
+  explizit — bestätigt die Enum-basierte Variantenauswahl, auf der §21.3 aufbaut.
+- `EntityId`: `crates/contextra-types/src/types/domain.rs:355`, `pub struct EntityId(pub u64)`.
+- `ahash`-Abhängigkeit: im Root-`Cargo.toml` (Z. 91, Version 0.8, Feature `serde`) sowie in
+  `contextra-graph/Cargo.toml` und `contextra-rank/Cargo.toml` als Workspace-Dependency eingebunden —
+  bestätigt, dass die in §21.1/§21.2 verwendeten `ahash::AHashMap`-Typen ohne neue Dependency auskommen.
+- `tokio` als reguläre (nicht dev-only) Dependency in `contextra-vector/Cargo.toml` und
+  `contextra-graph/Cargo.toml` bestätigt den in Teil A3.2 Punkt 2 dokumentierten P26-Verstoß — unverändert
+  durch diese Fassung, siehe A4.6 Punkt 1.
+- `WORKING_STATE.md` (autogeneriert, Stand 2026-09-23) zeigt ein tatsächliches DAG mit Layern 0–10 und 29
+  Fach-Crates — abweichend von der in Teil A2/§4.2 beschriebenen Ring-0–4-Zählung mit „27 Fach-Crates + 3
+  Tooling-Crates". Diese Diskrepanz liegt außerhalb des Auftrags dieser Fassung (Teil A2 bleibt laut
+  Leitentscheidung (3) für die Zielarchitektur selbst maßgeblich) und wird hier nur als Beobachtung notiert,
+  nicht aufgelöst.
+- `docs/GESAMTSPEZIFIKATION.md` existiert bereits im Repository (3960 Zeilen) als die dort bisher aktuell
+  committete Gesamtspezifikation — sie entspricht inhaltlich einer **älteren** Fassung (ohne Teil A3, Titel
+  noch „Contextra Cognitive OS — Zielarchitektur-v2-Edition") als die hier als `CONTEXTRA_SPEC_v3.md`
+  zugelieferte Fassung 3. Das bestätigt exemplarisch genau das Problem, das Teil A dieser Spezifikation
+  adressiert (Diagnose-Artefakte/Dokumente laufen dem Code- bzw. Dokumentenstand nachweislich davon, wenn sie
+  nicht mechanisch an einen Commit gebunden neu erzeugt werden). **Empfehlung:** Diese Fassung 4 sollte nach
+  Freigabe als `docs/GESAMTSPEZIFIKATION.md` committet werden, um die im Repository selbst dokumentierte
+  MECE-Regel („Jede Information lebt an exakt einem Ort", `CONSTITUTION.md`) wieder herzustellen.
+
+## D.4 Bewusst nicht übernommen bzw. bewusst nicht entschieden
+
+- Die stochastische Sub-Sampling-Option des Berichts für Lovász-Subgradienten bei sehr großen Hyperkanten
+  (§21.1, Restrisiken) — durch einen deterministischen Cutoff ersetzt, um keine neue P28-RNG-Fläche in einen
+  bislang RNG-freien Algorithmus einzuführen.
+- Eine vierte, generische Metadaten-/Filter-Kanal-Variante für DiBud — es gibt in `contextra-rank` keinen
+  solchen Kanal; `EdgeReinforcement` wurde stattdessen korrekt als rückgekoppeltes, nicht-budgetiertes Signal
+  modelliert (§21.2).
+- Eine eigene, vom Berichtsentwurf vorgeschlagene zweite `ConsolidationConfig`-Struktur für LeanRAG — durch
+  `AggregationConfig` im bestehenden Namensmuster ersetzt, um die in A4.2 dokumentierte Kollision nicht zu
+  wiederholen.
+- Eine Entscheidung über die arXiv-Reife von Motif Conductance (2507.10570) und Robust Rank Aggregation
+  (2609.19491) — außerhalb des Netzwerkzugriffs dieser Sitzung auf `arxiv.org`, bleibt laut Teil A4.7 offener
+  Prüfpunkt für einen Menschen.
+
+## D.5 Offen und nicht geprüft
+
+- Diese Fassung enthält keinen `cargo build`/`cargo test`-Lauf gegen den geklonten Workspace (die Sandbox
+  dieser Sitzung erlaubt Netzwerkzugriff nur auf die in `<network_configuration>` freigegebenen
+  Registries/Hosts, was für Lesezugriff auf den Quellcode ausreicht, nicht aber für einen vollständigen,
+  Dependency-vollständigen Workspace-Build). Alle Aussagen in Teil A4 und §21 beruhen auf statischer
+  Quelltext-Prüfung (`grep`, `view`, `wc -l`), nicht auf Compiler- oder Testlauf-Bestätigung — sie sind daher
+  nach der eigenen Konvention dieses Dokuments (§A.2) als 🔍 („Nachverifikation ausstehend") und nicht als 🟢
+  zu behandeln, bis ein frischer, commit-gebundener CI-Lauf sie bestätigt.
+- Die empirische Auswertung der laufenden `ShadowMode`-Diskrepanz-Logs (Teil A4.7) erfordert Zugriff auf
+  produktive Log-Daten, der in dieser Sitzung nicht bestand.
+- Die arXiv-Metadaten-Prüfung für Motif Conductance und Robust Rank Aggregation (D.4) wurde nicht nachgeholt.
