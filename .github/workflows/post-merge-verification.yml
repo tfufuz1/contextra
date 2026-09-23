@@ -32,7 +32,7 @@ jobs:
             echo "ℹ️ Keine Änderungen in results/ oder docs/unwrap_baseline_history.jsonl — kein Commit erforderlich."
           else
             git commit -m "chore(report): auto-update post-merge report and unwrap history [skip ci]"
-            git push origin HEAD:main
+            git push origin HEAD:gate-status
             echo "✅ Post-merge report und unwrap history erfolgreich ge-pusht."
           fi
 
