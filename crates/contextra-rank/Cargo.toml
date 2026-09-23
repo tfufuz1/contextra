@@ -1,0 +1,20 @@
+[package]
+name = "contextra-rank"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS"
+
+[dependencies]
+contextra-types.workspace = true
+contextra-ports.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ahash.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+contextra-adapt.workspace = true
+proptest = "1"

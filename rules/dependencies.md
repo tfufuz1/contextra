@@ -19,7 +19,7 @@ Check docs.rs/[crate]/[exact-version] — not from memory.
 
 ```toml
 # Verified essential — used extensively
-thiserror = "2"          # MemFuseError derive
+thiserror = "2"          # ContextraError derive
 tokio = "1"              # async runtime (full features)
 bytes = "1"              # zero-copy buffer management
 blake3 = "1"             # hashing (keys, bloom, HMAC)

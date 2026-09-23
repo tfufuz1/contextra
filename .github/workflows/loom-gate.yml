@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "crates/memfuse-store/src/**"
-      - "crates/memfuse-store/tests/loom_group_commit.rs"
-      - "crates/memfuse-crypto/src/**"
-      - "crates/memfuse-crypto/tests/loom_kv_deferred_zeroize.rs"
-      - "crates/memfuse-vector/src/**"
-      - "crates/memfuse-vector/tests/loom_quantizer_race_test.rs"
+      - "crates/contextra-store/src/**"
+      - "crates/contextra-store/tests/loom_group_commit.rs"
+      - "crates/contextra-crypto/src/**"
+      - "crates/contextra-crypto/tests/loom_kv_deferred_zeroize.rs"
+      - "crates/contextra-vector/src/**"
+      - "crates/contextra-vector/tests/loom_quantizer_race_test.rs"
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,37 +19,37 @@ env:
 
 jobs:
   loom-store:
-    name: Loom Concurrency Check — memfuse-store
+    name: Loom Concurrency Check — contextra-store
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Run Loom Test — memfuse-store (loom_group_commit)
+      - name: Run Loom Test — contextra-store (loom_group_commit)
         run: |
-          RUSTFLAGS="--cfg loom" cargo test -p memfuse-store --test loom_group_commit --release
+          RUSTFLAGS="--cfg loom" cargo test -p contextra-store --test loom_group_commit --release
 
   loom-crypto:
-    name: Loom Concurrency Check — memfuse-crypto
+    name: Loom Concurrency Check — contextra-crypto
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Run Loom Test — memfuse-crypto (loom_kv_deferred_zeroize)
+      - name: Run Loom Test — contextra-crypto (loom_kv_deferred_zeroize)
         run: |
-          RUSTFLAGS="--cfg loom" cargo test -p memfuse-crypto --test loom_kv_deferred_zeroize --release
+          RUSTFLAGS="--cfg loom" cargo test -p contextra-crypto --test loom_kv_deferred_zeroize --release
 
   loom-index:
-    name: Loom Concurrency Check — memfuse-vector
+    name: Loom Concurrency Check — contextra-vector
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Run Loom Test — memfuse-vector (loom_quantizer_race_test)
+      - name: Run Loom Test — contextra-vector (loom_quantizer_race_test)
         run: |
-          RUSTFLAGS="--cfg loom" cargo test -p memfuse-vector --test loom_quantizer_race_test --release
+          RUSTFLAGS="--cfg loom" cargo test -p contextra-vector --test loom_quantizer_race_test --release

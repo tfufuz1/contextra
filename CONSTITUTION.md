@@ -1,4 +1,4 @@
-# MemFuse — Project Constitution
+# Contextra — Project Constitution
 > **On-Demand Governance — nicht ambient laden!**
 > Lesen wenn: ADR-Entscheidung, API-Design, Security-Änderung, Exit-Kriterien-Beurteilung.
 >
@@ -11,12 +11,12 @@
 
 ### 1. Safety First (Sovereign Core Doctrine)
 -   **Memory Safety**: We prefer Safe Rust. `unsafe` code is strictly prohibited by default. It is only permitted for documented, hardware-/OS-level or FFI integrations in specific files, accompanied by rigorous `// SAFETY:` proof comments:
-    -   `memfuse-simd`: SIMD hardware distance kernels (AVX2, AVX-512, NEON) and runtime dispatch in `dispatch.rs`.
-    -   `memfuse-sys`: OS-level primitives for memory-mapped I/O (`mmap.rs`), RAM buffer locking (`mlock.rs`), and Win32 DACL/ACL permissions (`acl_win32.rs`).
-    -   `memfuse-wire`: Auto-generated FlatBuffers IPC bindings (`memfuse_generated.rs`) and IPC wire adapters.
-    -   `memfuse-infer-onnx`: C-FFI interactions with ONNX Runtime backend (feature-gated via `onnx`).
+    -   `contextra-simd`: SIMD hardware distance kernels (AVX2, AVX-512, NEON) and runtime dispatch in `dispatch.rs`.
+    -   `contextra-sys`: OS-level primitives for memory-mapped I/O (`mmap.rs`), RAM buffer locking (`mlock.rs`), and Win32 DACL/ACL permissions (`acl_win32.rs`).
+    -   `contextra-wire`: Auto-generated FlatBuffers IPC bindings (`contextra_generated.rs`) and IPC wire adapters.
+    -   `contextra-infer-onnx`: C-FFI interactions with ONNX Runtime backend (feature-gated via `onnx`).
 
-    All crates outside this exception list MUST enforce `#![forbid(unsafe_code)]`. Crates with justified, documented exceptions MUST enforce `#![deny(unsafe_code)]` accompanied by an inline comment explaining the rationale (following the pattern in `memfuse-simd/src/lib.rs`, `memfuse-sys/src/lib.rs`, `memfuse-wire/src/lib.rs`, and `memfuse-infer-onnx/src/lib.rs`).
+    All crates outside this exception list MUST enforce `#![forbid(unsafe_code)]`. Crates with justified, documented exceptions MUST enforce `#![deny(unsafe_code)]` accompanied by an inline comment explaining the rationale (following the pattern in `contextra-simd/src/lib.rs`, `contextra-sys/src/lib.rs`, `contextra-wire/src/lib.rs`, and `contextra-infer-onnx/src/lib.rs`).
 -   **No Panics**: Libraries must never crash their host. Explicit error handling (`Result`) is mandatory.
 
 ### 2. Reliability & Durability
@@ -38,7 +38,7 @@
 ## 🚦 Quality Philosophy
 
 ### 1. Error Handling
--   All errors must be categorizable in `memfuse_core::MemFuseError`.
+-   All errors must be categorizable in `contextra_core::ContextraError`.
 -   Errors crossing the FFI boundary (e.g., to Python) must be mapped to native types.
 
 ### 2. Testing (The Triple-Test-Gate)

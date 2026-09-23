@@ -1,6 +1,6 @@
-# AUDIT: SnapshotPinGuard / pin_snapshot Lebenszyklus in memfuse-index
+# AUDIT: SnapshotPinGuard / pin_snapshot Lebenszyklus in contextra-index
 
-**Crate:** `crates/memfuse-index` (Layer 3)
+**Crate:** `crates/contextra-index` (Layer 3)
 **Status / Modus:** AUDIT (read-only)
 **Datum:** 2026-09-17
 **Auditor:** Google-Jules (Principal Rust Systems Engineer)
@@ -10,9 +10,9 @@
 
 ## 1. HINWEIS ZUR DATEI-LOKALISIERUNG & CRATE-STRUKTUR
 
-Die Aufgabenstellung nennt als Ziel-Datei `crates/memfuse-index/src/snapshot.rs`.
-Eine Analyse des Dateibaums zeigt, dass eine Datei `snapshot.rs` in `crates/memfuse-index/src/` **nicht existiert**.
-Der gesamte Lebenszyklus von `SnapshotPinGuard`, `pin_snapshot` und `unpin_snapshot` ist in `crates/memfuse-index/src/hnsw.rs` implementiert und stützt sich auf die Datenstruktur `SequenceLog` in `crates/memfuse-core/src/seq_log.rs`.
+Die Aufgabenstellung nennt als Ziel-Datei `crates/contextra-index/src/snapshot.rs`.
+Eine Analyse des Dateibaums zeigt, dass eine Datei `snapshot.rs` in `crates/contextra-index/src/` **nicht existiert**.
+Der gesamte Lebenszyklus von `SnapshotPinGuard`, `pin_snapshot` und `unpin_snapshot` ist in `crates/contextra-index/src/hnsw.rs` implementiert und stützt sich auf die Datenstruktur `SequenceLog` in `crates/contextra-core/src/seq_log.rs`.
 
 ---
 
@@ -21,9 +21,9 @@ Der gesamte Lebenszyklus von `SnapshotPinGuard`, `pin_snapshot` und `unpin_snaps
 ### Frage 1: RAII-Implementierung & Panic-Unwind-Verhalten
 **Status:** **BELEGT**
 
-`SnapshotPinGuard` ist in `crates/memfuse-index/src/hnsw.rs:335-348` als RAII-Typ realisiert. Die `Drop`-Implementierung ruft bedingungslos (`unconditional`) `unpin_snapshot` auf, was auch bei Panic-Unwinding im gepinnten Scope garantiert ausgeführt wird.
+`SnapshotPinGuard` ist in `crates/contextra-index/src/hnsw.rs:335-348` als RAII-Typ realisiert. Die `Drop`-Implementierung ruft bedingungslos (`unconditional`) `unpin_snapshot` auf, was auch bei Panic-Unwinding im gepinnten Scope garantiert ausgeführt wird.
 
-*Fundstelle (`crates/memfuse-index/src/hnsw.rs:335-348`):*
+*Fundstelle (`crates/contextra-index/src/hnsw.rs:335-348`):*
 ```rust
 struct SnapshotPinGuard<'a>(&'a HnswIndexCore, u64);
 
@@ -46,11 +46,11 @@ impl<'a> Drop for SnapshotPinGuard<'a> {
 ### Frage 2: Refcount-Atomarität, Locking & TOCTOU-Fenster
 **Status:** **BELEGT**
 
-* **Schutzmechanismus:** Der Pin-Zähler (Refcount) ist als Hash-Map (`pinned_snapshots: ahash::AHashMap<u64, usize>`) innerhalb von `SequenceLog` realisiert (`crates/memfuse-core/src/seq_log.rs:66`).
-* **Lock-Schutz:** `SequenceLog` ist in `HnswColdCore.seq_log` als `parking_lot::RwLock<SequenceLog>` gekapselt (`crates/memfuse-index/src/hnsw.rs:378`).
+* **Schutzmechanismus:** Der Pin-Zähler (Refcount) ist als Hash-Map (`pinned_snapshots: ahash::AHashMap<u64, usize>`) innerhalb von `SequenceLog` realisiert (`crates/contextra-core/src/seq_log.rs:66`).
+* **Lock-Schutz:** `SequenceLog` ist in `HnswColdCore.seq_log` als `parking_lot::RwLock<SequenceLog>` gekapselt (`crates/contextra-index/src/hnsw.rs:378`).
 * **TOCTOU-Bewertung:** Bei `SnapshotPinGuard::new` wird das `RwLock` im Schreibmodus erworben (`seq_log.write()`), um den Refcount in `pinned_snapshots` zu erhöhen (`hnsw.rs:339`). Es existiert kein TOCTOU-Fenster zwischen Existenzprüfung und Pin-Erhöhung im Guard selbst, da `pin_snapshot` die Sequenznummer direkt eintragen bzw. hochzählen lässt. Allerdings prüft `SequenceLog::pin_snapshot` nicht, ob die Sequenznummer bereits kompaktiert wurde (siehe Frage 4).
 
-*Fundstelle (`crates/memfuse-core/src/seq_log.rs:83-98`):*
+*Fundstelle (`crates/contextra-core/src/seq_log.rs:83-98`):*
 ```rust
     /// Pins a historical sequence number to prevent rebuild from purging soft-deleted nodes active at this snapshot.
     pub fn pin_snapshot(&mut self, seq_no: u64) {
@@ -87,7 +87,7 @@ In allen Pfaden wird das `seq_log` RwLock kurzzeitig (transient) erworben und so
 
 Die Lock-Erwerbsreihenfolge ist konsistent und frei von zirkulären Abhängigkeiten.
 
-*Code-Beleg (`crates/memfuse-index/src/hnsw.rs:3560-3567`):*
+*Code-Beleg (`crates/contextra-index/src/hnsw.rs:3560-3567`):*
 ```rust
     /// Searches for nearest neighbors at a specific snapshot sequence number.
     async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
@@ -120,7 +120,7 @@ Die Lock-Erwerbsreihenfolge ist konsistent und frei von zirkulären Abhängigkei
 ### Frage 6: `.unwrap()` / `.expect()`-Scan im Scope von `hnsw.rs`
 **Status:** **BELEGT**
 
-Ein vollständiger Scan des Produktionscodes in `crates/memfuse-index/src/hnsw.rs` ergab:
+Ein vollständiger Scan des Produktionscodes in `crates/contextra-index/src/hnsw.rs` ergab:
 
 * **Produktionspfad (`SnapshotPinGuard`, `pin_snapshot`, `unpin_snapshot`, `search_at`):**
   **0 Vorkommen** von `.unwrap()` oder `.expect()`.

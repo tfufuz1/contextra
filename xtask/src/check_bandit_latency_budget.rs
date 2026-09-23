@@ -1,7 +1,7 @@
 //! CI Gate Modul: Prüft das Latenzbudget des Bandit-Routers.
 //! Definiertes Budget: 1.0ms (1000 µs) P95 Decision + Update Berechnung.
 
-use memfuse_router::BanditProfileState;
+use contextra_router::BanditProfileState;
 use std::time::Instant;
 
 /// Maximale zugelassene P95 Decision + Update Latenz in Microsekunden (1.0 ms = 1000 µs).
@@ -18,7 +18,7 @@ pub fn check_bandit_latency_budget() -> Result<(), String> {
     println!("=== Gate: Check Bandit Latency Budget ===");
 
     let mut profile_state = BanditProfileState::cold_start(FEATURE_DIM, 0.5);
-    profile_state.implementation = memfuse_router::BanditImplementation::DiagonalApproximation;
+    profile_state.implementation = contextra_router::BanditImplementation::DiagonalApproximation;
     let x = vec![0.5f32; FEATURE_DIM];
     let cost = 0.2f32;
     let is_cloud = false;

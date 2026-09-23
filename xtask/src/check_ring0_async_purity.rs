@@ -123,8 +123,8 @@ pub fn run_check_ring0_async_purity() -> Result<bool, String> {
     let mut all_violations = Vec::new();
 
     for crate_name in &ring0_crates {
-        let crate_path = if crate_name == "memfuse-vector" {
-            root_dir.join("crates/memfuse-vector/Cargo.toml")
+        let crate_path = if crate_name == "contextra-vector" {
+            root_dir.join("crates/contextra-vector/Cargo.toml")
         } else {
             root_dir.join("crates").join(crate_name).join("Cargo.toml")
         };
@@ -201,7 +201,7 @@ mod tests {
     fn test_unallowed_tokio_dependency_fails() {
         let cargo_toml = r#"
 [package]
-name = "memfuse-test-ring0"
+name = "contextra-test-ring0"
 version = "0.1.0"
 
 [dependencies]
@@ -214,10 +214,10 @@ proptest = "1"
 
         let allowlist: Vec<AsyncException> = Vec::new();
         let violations =
-            check_cargo_toml_dependencies("memfuse-test-ring0", cargo_toml, &allowlist).unwrap();
+            check_cargo_toml_dependencies("contextra-test-ring0", cargo_toml, &allowlist).unwrap();
 
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].crate_name, "memfuse-test-ring0");
+        assert_eq!(violations[0].crate_name, "contextra-test-ring0");
         assert_eq!(violations[0].dependency, "tokio");
         assert!(!violations[0].is_allowlisted);
     }
@@ -226,7 +226,7 @@ proptest = "1"
     fn test_clean_cargo_toml_passes() {
         let cargo_toml = r#"
 [package]
-name = "memfuse-clean-ring0"
+name = "contextra-clean-ring0"
 version = "0.1.0"
 
 [dependencies]
@@ -240,7 +240,7 @@ criterion = "0.5"
 
         let allowlist: Vec<AsyncException> = Vec::new();
         let violations =
-            check_cargo_toml_dependencies("memfuse-clean-ring0", cargo_toml, &allowlist).unwrap();
+            check_cargo_toml_dependencies("contextra-clean-ring0", cargo_toml, &allowlist).unwrap();
 
         assert!(
             violations.is_empty(),

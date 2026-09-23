@@ -60,7 +60,7 @@ pub fn run_post_merge_report(root: &Path) -> bool {
     let report_path = results_dir.join(&report_filename);
 
     let summary_content = format!(
-        "# MemFuse Post-Merge Report — {}\n\
+        "# Contextra Post-Merge Report — {}\n\
          Commit: {}\n\
          Timestamp: {}\n\
          \n\

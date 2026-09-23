@@ -1,6 +1,6 @@
 # Jules Entwicklungsumgebung & System-Kontext Analyse
 
-Dieses Dokument dient als umfassende Protokollierung und Analyse der Funktionsweise, Kontextrepräsentation, Datei-Einlesemechanismen und Qualitätsstandards von Jules (Google-Jules) im Repository **MemFuse**.
+Dieses Dokument dient als umfassende Protokollierung und Analyse der Funktionsweise, Kontextrepräsentation, Datei-Einlesemechanismen und Qualitätsstandards von Jules (Google-Jules) im Repository **Contextra**.
 
 ---
 
@@ -60,7 +60,7 @@ Der Kontext für das Modell besteht aus mehreren klar getrennten Abschnitten:
 - Es gibt keine starre technische Reihenfolge der Umgebung, sondern eine **methodische Standard-Reihenfolge**:
   1. **Root-Level Exploration**: `list_files` im Root, Lesen von `README.md` oder `AGENTS.md`.
   2. **Session Bootstrap & Context**: Einlesen von `.jules/SESSION_BOOTSTRAP.md` und `.jules/JULES_CONTEXT.md` (falls vorhanden).
-  3. **Aufgabenspezifische Sub-Crates**: Wenn Code in `crates/memfuse-db` bearbeitet wird, liest Jules die dateinahe `crates/memfuse-db/AGENTS.md`.
+  3. **Aufgabenspezifische Sub-Crates**: Wenn Code in `crates/contextra-db` bearbeitet wird, liest Jules die dateinahe `crates/contextra-db/AGENTS.md`.
   4. **Quellcodedateien**: Punktuelles Einlesen der betroffenen `.rs`-Dateien vor der Bearbeitung.
 
 ### Wird `.jules/SESSION_BOOTSTRAP.md` automatisch geladen?
@@ -86,12 +86,12 @@ Aus der Analyse der bisherigen Commits, Audits und PRs lassen sich folgende hist
    - *Lösung*: Einführung des CI Gate 10 (`cargo run -p xtask -- check-jules-context-freshness`) und automatische Generierung via `just sync-docs`.
 2. **Panic-Risiken durch `.unwrap()` / `.expect()`**:
    - *Problem*: In Production-Code führten `.unwrap()` Aufrufe zu FFI- oder Thread-Panics.
-   - *Lösung*: Die `.unwrap-baseline.json` Überwachung stellt sicher, dass kein neuer Production-Code `.unwrap()` verwendet. Fehler werden strikt über `MemFuseError` und `?` propagiert.
+   - *Lösung*: Die `.unwrap-baseline.json` Überwachung stellt sicher, dass kein neuer Production-Code `.unwrap()` verwendet. Fehler werden strikt über `ContextraError` und `?` propagiert.
 3. **Kollisionen bei ADR-Nummern durch parallele Agenten-Sessions**:
    - *Problem*: Mehrmaliges Vergeben derselben ADR-Nummer bei paralleler Bearbeitung.
    - *Lösung*: Dynamisches Ermitteln der höchsten vergebenen ADR-Nummer via `ls docs/decisions/ | grep -oP '(?<=ADR-)\d+' | sort -n | tail -1` vor Neuerstellung.
 4. **Schichtenverletzungen im Crate-DAG (Layer 0–6)**:
-   - *Problem*: Niedrige Layer (z. B. `memfuse-core`) importierten versehentlich Typen aus höheren Layern.
+   - *Problem*: Niedrige Layer (z. B. `contextra-core`) importierten versehentlich Typen aus höheren Layern.
    - *Lösung*: Automatischer DAG-Check via `just dag-check` und `check_type_registry`.
 
 ---
@@ -101,7 +101,7 @@ Aus der Analyse der bisherigen Commits, Audits und PRs lassen sich folgende hist
 Um künftig doppelte Arbeiten, Prompt-Thrashing und unnötige Kontext-Aufblähung zu vermeiden, sollte die Arbeitsumgebung wie folgt strukturiert sein:
 
 ### A. Single Source of Truth (SSOT) & Redundanzvermeidung
-- **Modulare AGENTS.md**: Statt einer riesigen monolitischen Datei sollten Crate-spezifische Regeln ausschließlich in den jeweiligen Subdirectories liegen (z. B. `crates/memfuse-db/AGENTS.md`). Jules liest nur die `AGENTS.md`, die für die aktuelle Aufgabe relevant ist.
+- **Modulare AGENTS.md**: Statt einer riesigen monolitischen Datei sollten Crate-spezifische Regeln ausschließlich in den jeweiligen Subdirectories liegen (z. B. `crates/contextra-db/AGENTS.md`). Jules liest nur die `AGENTS.md`, die für die aktuelle Aufgabe relevant ist.
 - **Autogenerierte Zustandsdateien**: `WORKING_STATE.md` und `CHANGELOG.md` sollten immer per `just sync-docs` generiert werden, um manuelle Doku-Abweichungen zu verhindern.
 
 ### B. Klare, maschinenlesbare CI-Gates & Commands

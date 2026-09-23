@@ -11,22 +11,22 @@ use walkdir::WalkDir;
 /// Übergangsliste für unverdrahtete Dateien (z. B. unfertige Traits/Module in Phase 0R).
 /// Diese Funde erzeugen eine WARN-Ausgabe statt eines Fehlers (Exit 0).
 pub const KNOWN_TRANSITION_UNREACHABLE: &[&str] = &[
-    "crates/memfuse-core/src/traits/graph_index.rs",
-    "crates/memfuse-core/src/traits/vector_index.rs",
-    "crates/memfuse-core/src/traits/text_index.rs",
-    "crates/memfuse-core/src/traits/lifecycle.rs",
-    "crates/memfuse-db/src/decay_controller.rs",
-    "crates/memfuse-db/src/filter.rs",
-    "crates/memfuse-db/src/fusion.rs",
-    "crates/memfuse-db/src/homeostat.rs",
-    "crates/memfuse-db/src/maintenance_config.rs",
-    "crates/memfuse-db/src/maintenance_scheduler.rs",
-    "crates/memfuse-db/src/multistep.rs",
-    "crates/memfuse-db/src/pid_latency_controller.rs",
-    "crates/memfuse-db/src/transaction.rs",
-    "crates/memfuse-db/src/volatile_vault.rs",
-    "benchmarks/memfuse-bench/src/bin/compare_baseline.rs",
-    "crates/memfuse-mcp/src/bin/memfuse-mcp-server.rs",
+    "crates/contextra-core/src/traits/graph_index.rs",
+    "crates/contextra-core/src/traits/vector_index.rs",
+    "crates/contextra-core/src/traits/text_index.rs",
+    "crates/contextra-core/src/traits/lifecycle.rs",
+    "crates/contextra-db/src/decay_controller.rs",
+    "crates/contextra-db/src/filter.rs",
+    "crates/contextra-db/src/fusion.rs",
+    "crates/contextra-db/src/homeostat.rs",
+    "crates/contextra-db/src/maintenance_config.rs",
+    "crates/contextra-db/src/maintenance_scheduler.rs",
+    "crates/contextra-db/src/multistep.rs",
+    "crates/contextra-db/src/pid_latency_controller.rs",
+    "crates/contextra-db/src/transaction.rs",
+    "crates/contextra-db/src/volatile_vault.rs",
+    "benchmarks/contextra-bench/src/bin/compare_baseline.rs",
+    "crates/contextra-mcp/src/bin/contextra-mcp-server.rs",
 ];
 
 #[derive(Debug, Clone)]
@@ -468,14 +468,14 @@ mod tests {
     fn test_transition_unreachable_gives_warning() {
         let dir = tempdir().unwrap();
         let repo_root = dir.path();
-        let crate_dir = repo_root.join("crates/memfuse-core");
+        let crate_dir = repo_root.join("crates/contextra-core");
         let src_dir = crate_dir.join("src");
         let traits_dir = src_dir.join("traits");
         fs::create_dir_all(&traits_dir).unwrap();
 
         fs::write(
             crate_dir.join("Cargo.toml"),
-            "[package]\nname = \"memfuse-core\"\nversion = \"0.1.0\"\n",
+            "[package]\nname = \"contextra-core\"\nversion = \"0.1.0\"\n",
         )
         .unwrap();
 

@@ -1,4 +1,4 @@
-# MemFuse Performance & Evaluation Benchmarks
+# Contextra Performance & Evaluation Benchmarks
 
 *Datum der Erstaufnahme: 2026-08-29*
 *Letzte Audit-Prüfung: 2026-09-21*
@@ -14,10 +14,10 @@
 | **5k Chunks Search p50 = 809.15 ms** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Erheblicher Ausreißer in historischem Run; VM-Messlauf 2026-09-21 zeigt 5.11 ms. |
 | **10k Chunks Search p50 = 337.77 ms** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Nicht-monotones Verhalten im historischen Log; VM-Messlauf 2026-09-21 zeigt 5.13 ms. |
 | **100k / 1M Chunks Extrapolationen** | `docs/BENCHMARKS.md` §1 | `nur dokumentiert, nicht reproduziert` | Mathematische Extrapolation ohne realen Benchmark-Lauf. |
-| **Recall@5 / @10 / @20 = 1.0000** | `crates/memfuse-db/tests/semantic_recall.rs` | `synthetisch` | Gemessen gegen synthetische Ground Truth (20 Themen-Cluster × 50 Dokumente). Test-Assert fordert `>= 0.80`. |
+| **Recall@5 / @10 / @20 = 1.0000** | `crates/contextra-db/tests/semantic_recall.rs` | `synthetisch` | Gemessen gegen synthetische Ground Truth (20 Themen-Cluster × 50 Dokumente). Test-Assert fordert `>= 0.80`. |
 | **Hybrid Search p50 = 29.91 ms** | `docs/BENCHMARKS.md` §4 (Commit `bd51c6f5...`, 2026-09-03) | `widersprüchlich` | Widerspricht §1 (88.03 ms) sowie VM-Messlauf (2.61 ms). |
 | **Wettbewerbsvergleich Mem0/Zep/MemOS** | `docs/BENCHMARKS.md` §4 | `nur dokumentiert, nicht reproduziert` | Keine öffentlichen Messungen vorhanden; Wettbewerberzeilen wurden gelöscht. |
-| **VM Re-Run 1k/5k/10k Chunks** | `MEMFUSE_SCALE_TIERS="1000,5000,10000" cargo bench -p memfuse-db --bench scale_bench -- --quick` | `reproduziert` | In VM ausgeführt am 2026-09-21 auf Commit `347ef6dd86d90fdbc8f6dc0fcfa54ab6bb0c8986`. |
+| **VM Re-Run 1k/5k/10k Chunks** | `CONTEXTRA_SCALE_TIERS="1000,5000,10000" cargo bench -p contextra-db --bench scale_bench -- --quick` | `reproduziert` | In VM ausgeführt am 2026-09-21 auf Commit `347ef6dd86d90fdbc8f6dc0fcfa54ab6bb0c8986`. |
 
 ---
 
@@ -27,7 +27,7 @@
 - **Commit:** `347ef6dd86d90fdbc8f6dc0fcfa54ab6bb0c8986`
 - **Datum:** 2026-09-21
 - **Hardware:** Intel(R) Xeon(R) Processor @ 2.30GHz (4 vCPUs), 7.8 GiB RAM, Linux x86_64
-- **Befehl:** `MEMFUSE_SCALE_TIERS="1000,5000,10000" cargo bench -p memfuse-db --bench scale_bench -- --quick`
+- **Befehl:** `CONTEXTRA_SCALE_TIERS="1000,5000,10000" cargo bench -p contextra-db --bench scale_bench -- --quick`
 
 | Corpus-Größe (Chunks) | Insert-Durchsatz (docs/sec) | Search Latenz p50 | Search Latenz p95 | VmRSS Peak (MB) | Status |
 |---|---|---|---|---|---|
@@ -55,7 +55,7 @@
 
 ## 3. Semantische Retrieval-Evaluierung (`Recall@k` - Synthetisches Korpus)
 
-Verifizierte Messung gegen synthetische Ground Truth (`crates/memfuse-db/tests/semantic_recall.rs`):
+Verifizierte Messung gegen synthetische Ground Truth (`crates/contextra-db/tests/semantic_recall.rs`):
 - **Korpus:** 20 Themen-Cluster × 50 Dokumente = 1.000 Dokumente, 100 Test-Queries (5 pro Cluster).
 - **Setup:** Synthetische Vektoren (Cluster-Phase + Gauß-Rauschen) und deterministische Schlüsselwörter.
 
@@ -79,9 +79,9 @@ Verifizierte Messung gegen synthetische Ground Truth (`crates/memfuse-db/tests/s
 ## 5. Interne Baseline-Latenzen
 
 > **Messbedingungen:** Linux x86_64, Intel(R) Xeon(R) Processor @ 2.30GHz (4 CPU cores), 7.8 GiB RAM (Jules Sandbox VM)
-> **MemFuse Version:** `bd51c6f599e50682516393d2bdc8eb3a717197e1` (Dokumentiert am 2026-09-03)
+> **Contextra Version:** `bd51c6f599e50682516393d2bdc8eb3a717197e1` (Dokumentiert am 2026-09-03)
 
-| Operation | MemFuse Latenz / Durchsatz | Status |
+| Operation | Contextra Latenz / Durchsatz | Status |
 |---|---|---|
 | Batch Write Throughput (docs/s) | ~117.3 docs/s (single-doc) / ~1,438.9 docs/s (batch insert) | `nur dokumentiert, nicht reproduziert` |
 | Hybrid Search p50 (ms) | 29.91 ms | `widersprüchlich` (widerspricht §1 und VM-Run) |

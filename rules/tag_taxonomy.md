@@ -1,4 +1,4 @@
-# Tag-Taxonomie — MemFuse Kommentarsystem
+# Tag-Taxonomie — Contextra Kommentarsystem
 > Einzige kanonische Definition aller Tag-Typen. Verstöße = SMELL[CRITICAL].
 
 ## Übersicht der drei Systeme

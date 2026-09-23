@@ -559,6 +559,617 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
+name = "contextra"
+version = "0.1.0"
+dependencies = [
+ "contextra-core",
+ "contextra-db",
+ "contextra-infer-candle",
+ "contextra-infer-ollama",
+ "contextra-infer-onnx",
+ "contextra-rank",
+ "contextra-router",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "contextra-adapt"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-agent"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "contextra-checkpoint",
+ "contextra-core",
+ "contextra-db",
+ "contextra-graph",
+ "contextra-router",
+ "contextra-store",
+ "contextra-text",
+ "contextra-vector",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "contextra-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "contextra-core",
+ "contextra-db",
+ "contextra-graph",
+ "contextra-infer-onnx",
+ "contextra-store",
+ "contextra-text",
+ "contextra-vector",
+ "hdrhistogram",
+ "rand 0.8.8",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "contextra-checkpoint"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "bytes",
+ "contextra-core",
+ "criterion",
+ "dirs",
+ "futures-executor",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-cognition"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "blake3",
+ "bytes",
+ "contextra-core",
+ "contextra-engine",
+ "contextra-graph",
+ "contextra-store",
+ "contextra-vector",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-core"
+version = "0.1.0"
+dependencies = [
+ "contextra-mvcc",
+ "contextra-ports",
+ "contextra-types",
+ "contextra-wire",
+ "proptest",
+ "tokio",
+]
+
+[[package]]
+name = "contextra-crypto"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm-siv",
+ "ahash",
+ "argon2",
+ "bincode",
+ "blake3",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-privacy",
+ "criterion",
+ "hkdf",
+ "hmac",
+ "loom",
+ "lru",
+ "parking_lot",
+ "proptest",
+ "rand 0.8.8",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
+name = "contextra-db"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "blake3",
+ "bytes",
+ "contextra-adapt",
+ "contextra-checkpoint",
+ "contextra-cognition",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-engine",
+ "contextra-graph",
+ "contextra-rank",
+ "contextra-store",
+ "contextra-sys",
+ "contextra-text",
+ "contextra-vector",
+ "criterion",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
+name = "contextra-engine"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "blake3",
+ "bytes",
+ "contextra-adapt",
+ "contextra-checkpoint",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-graph",
+ "contextra-rank",
+ "contextra-store",
+ "contextra-sys",
+ "contextra-text",
+ "contextra-vector",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
+name = "contextra-graph"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "arc-swap",
+ "bincode",
+ "blake3",
+ "contextra-core",
+ "contextra-store",
+ "contextra-testkit",
+ "criterion",
+ "futures",
+ "parking_lot",
+ "proptest",
+ "scc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "contextra-infer-candle"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "bytes",
+ "candle-core",
+ "candle-nn",
+ "candle-transformers",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-ports",
+ "contextra-rank",
+ "contextra-store",
+ "criterion",
+ "futures-util",
+ "half",
+ "proptest",
+ "serde",
+ "sha2",
+ "tempfile",
+ "tokenizers 0.21.4",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-infer-ollama"
+version = "0.1.0"
+dependencies = [
+ "contextra-core",
+ "contextra-infer-onnx",
+ "contextra-rank",
+ "futures",
+ "futures-util",
+ "parking_lot",
+ "proptest",
+ "quick-xml",
+ "rand 0.8.8",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-test",
+]
+
+[[package]]
+name = "contextra-infer-onnx"
+version = "0.1.0"
+dependencies = [
+ "contextra-core",
+ "contextra-infer-candle",
+ "contextra-rank",
+ "criterion",
+ "ndarray 0.15.6",
+ "ort",
+ "parking_lot",
+ "proptest",
+ "reqwest",
+ "serde",
+ "tempfile",
+ "tokenizers 0.19.1",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-kvcache"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bincode",
+ "contextra-core",
+ "contextra-crypto",
+ "lru",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
+name = "contextra-mcp"
+version = "0.1.0"
+dependencies = [
+ "contextra",
+ "contextra-adapt",
+ "contextra-agent",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-infer-candle",
+ "contextra-infer-onnx",
+ "contextra-privacy",
+ "contextra-rank",
+ "futures-util",
+ "parking_lot",
+ "rand 0.8.8",
+ "scc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-normalization",
+ "zeroize",
+]
+
+[[package]]
+name = "contextra-mvcc"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bytes",
+ "contextra-types",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "contextra-ports"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bytes",
+ "contextra-types",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "contextra-privacy"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "contextra-core",
+ "parking_lot",
+ "rand 0.8.8",
+ "regex",
+ "scc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
+name = "contextra-py"
+version = "0.1.0"
+dependencies = [
+ "contextra-adapt",
+ "contextra-core",
+ "contextra-db",
+ "contextra-rank",
+ "contextra-router",
+ "contextra-store",
+ "flatbuffers",
+ "numpy",
+ "parking_lot",
+ "pyo3",
+ "pythonize",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "contextra-rank"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "contextra-adapt",
+ "contextra-ports",
+ "contextra-types",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-router"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "bytes",
+ "contextra-adapt",
+ "contextra-core",
+ "contextra-db",
+ "contextra-graph",
+ "contextra-ports",
+ "contextra-privacy",
+ "contextra-text",
+ "contextra-vector",
+ "criterion",
+ "parking_lot",
+ "proptest",
+ "serde",
+ "serde_json",
+ "shlex 1.3.0",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "contextra-sandbox"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "contextra-core",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "wasmtime",
+ "wat",
+ "zeroize",
+]
+
+[[package]]
+name = "contextra-simd"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "contextra-core",
+ "proptest",
+ "thiserror 2.0.20",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-store"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "blake3",
+ "bytes",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-sys",
+ "crc32fast",
+ "criterion",
+ "futures",
+ "loom",
+ "lru",
+ "memmap2",
+ "parking_lot",
+ "proptest",
+ "quick_cache",
+ "rand 0.8.8",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "contextra-sys"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "memmap2",
+ "tracing",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "contextra-testkit"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "contextra-core",
+ "parking_lot",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-text"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "bytes",
+ "contextra-core",
+ "itoa",
+ "parking_lot",
+ "proptest",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "contextra-types"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bincode",
+ "blake3",
+ "bytes",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "contextra-vector"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "bincode",
+ "contextra-core",
+ "contextra-crypto",
+ "contextra-simd",
+ "contextra-sys",
+ "criterion",
+ "loom",
+ "memmap2",
+ "parking_lot",
+ "proptest",
+ "rand 0.8.8",
+ "roaring",
+ "serde",
+ "subtle",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "contextra-wire"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "flatbuffers",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2253,617 +2864,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57804b2c9b69967f1536a56f86297e367a33b19e98852ed624b84551cdbc0d90"
 dependencies = [
  "rustix 1.1.4",
-]
-
-[[package]]
-name = "memfuse"
-version = "0.1.0"
-dependencies = [
- "memfuse-core",
- "memfuse-db",
- "memfuse-infer-candle",
- "memfuse-infer-ollama",
- "memfuse-infer-onnx",
- "memfuse-rank",
- "memfuse-router",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "memfuse-adapt"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-agent"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "memfuse-checkpoint",
- "memfuse-core",
- "memfuse-db",
- "memfuse-graph",
- "memfuse-router",
- "memfuse-store",
- "memfuse-text",
- "memfuse-vector",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "memfuse-bench"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "hdrhistogram",
- "memfuse-core",
- "memfuse-db",
- "memfuse-graph",
- "memfuse-infer-onnx",
- "memfuse-store",
- "memfuse-text",
- "memfuse-vector",
- "rand 0.8.8",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "memfuse-checkpoint"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "bytes",
- "criterion",
- "dirs",
- "futures-executor",
- "memfuse-core",
- "parking_lot",
- "proptest",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-cognition"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "blake3",
- "bytes",
- "memfuse-core",
- "memfuse-engine",
- "memfuse-graph",
- "memfuse-store",
- "memfuse-vector",
- "parking_lot",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-core"
-version = "0.1.0"
-dependencies = [
- "memfuse-mvcc",
- "memfuse-ports",
- "memfuse-types",
- "memfuse-wire",
- "proptest",
- "tokio",
-]
-
-[[package]]
-name = "memfuse-crypto"
-version = "0.1.0"
-dependencies = [
- "aes-gcm-siv",
- "ahash",
- "argon2",
- "bincode",
- "blake3",
- "criterion",
- "hkdf",
- "hmac",
- "loom",
- "lru",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-privacy",
- "parking_lot",
- "proptest",
- "rand 0.8.8",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "subtle",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "memfuse-db"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "blake3",
- "bytes",
- "criterion",
- "memfuse-adapt",
- "memfuse-checkpoint",
- "memfuse-cognition",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-engine",
- "memfuse-graph",
- "memfuse-rank",
- "memfuse-store",
- "memfuse-sys",
- "memfuse-text",
- "memfuse-vector",
- "parking_lot",
- "proptest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "memfuse-engine"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "blake3",
- "bytes",
- "memfuse-adapt",
- "memfuse-checkpoint",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-graph",
- "memfuse-rank",
- "memfuse-store",
- "memfuse-sys",
- "memfuse-text",
- "memfuse-vector",
- "parking_lot",
- "proptest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "memfuse-graph"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "arc-swap",
- "bincode",
- "blake3",
- "criterion",
- "futures",
- "memfuse-core",
- "memfuse-store",
- "memfuse-testkit",
- "parking_lot",
- "proptest",
- "scc",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "memfuse-infer-candle"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "bytes",
- "candle-core",
- "candle-nn",
- "candle-transformers",
- "criterion",
- "futures-util",
- "half",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-ports",
- "memfuse-rank",
- "memfuse-store",
- "proptest",
- "serde",
- "sha2",
- "tempfile",
- "tokenizers 0.21.4",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-infer-ollama"
-version = "0.1.0"
-dependencies = [
- "futures",
- "futures-util",
- "memfuse-core",
- "memfuse-infer-onnx",
- "memfuse-rank",
- "parking_lot",
- "proptest",
- "quick-xml",
- "rand 0.8.8",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-test",
-]
-
-[[package]]
-name = "memfuse-infer-onnx"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "memfuse-core",
- "memfuse-infer-candle",
- "memfuse-rank",
- "ndarray 0.15.6",
- "ort",
- "parking_lot",
- "proptest",
- "reqwest",
- "serde",
- "tempfile",
- "tokenizers 0.19.1",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-kvcache"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "bincode",
- "lru",
- "memfuse-core",
- "memfuse-crypto",
- "parking_lot",
- "proptest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "memfuse-mcp"
-version = "0.1.0"
-dependencies = [
- "futures-util",
- "memfuse",
- "memfuse-adapt",
- "memfuse-agent",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-infer-candle",
- "memfuse-infer-onnx",
- "memfuse-privacy",
- "memfuse-rank",
- "parking_lot",
- "rand 0.8.8",
- "scc",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "unicode-normalization",
- "zeroize",
-]
-
-[[package]]
-name = "memfuse-mvcc"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "bytes",
- "memfuse-types",
- "parking_lot",
- "proptest",
- "serde",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "memfuse-ports"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "bytes",
- "futures-util",
- "memfuse-types",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "memfuse-privacy"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "memfuse-core",
- "parking_lot",
- "rand 0.8.8",
- "regex",
- "scc",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
-name = "memfuse-py"
-version = "0.1.0"
-dependencies = [
- "flatbuffers",
- "memfuse-adapt",
- "memfuse-core",
- "memfuse-db",
- "memfuse-rank",
- "memfuse-router",
- "memfuse-store",
- "numpy",
- "parking_lot",
- "pyo3",
- "pythonize",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "memfuse-rank"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "memfuse-adapt",
- "memfuse-ports",
- "memfuse-types",
- "proptest",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-router"
-version = "0.1.0"
-dependencies = [
- "arc-swap",
- "bytes",
- "criterion",
- "memfuse-adapt",
- "memfuse-core",
- "memfuse-db",
- "memfuse-graph",
- "memfuse-ports",
- "memfuse-privacy",
- "memfuse-text",
- "memfuse-vector",
- "parking_lot",
- "proptest",
- "serde",
- "serde_json",
- "shlex 1.3.0",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "memfuse-sandbox"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "memfuse-core",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "wasmtime",
- "wat",
- "zeroize",
-]
-
-[[package]]
-name = "memfuse-simd"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "memfuse-core",
- "proptest",
- "thiserror 2.0.20",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-store"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "blake3",
- "bytes",
- "crc32fast",
- "criterion",
- "futures",
- "loom",
- "lru",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-sys",
- "memmap2",
- "parking_lot",
- "proptest",
- "quick_cache",
- "rand 0.8.8",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "memfuse-sys"
-version = "0.1.0"
-dependencies = [
- "libc",
- "memmap2",
- "tracing",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "memfuse-testkit"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "memfuse-core",
- "parking_lot",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-text"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "bytes",
- "itoa",
- "memfuse-core",
- "parking_lot",
- "proptest",
- "regex",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "memfuse-types"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "bincode",
- "blake3",
- "bytes",
- "proptest",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "memfuse-vector"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "bincode",
- "criterion",
- "loom",
- "memfuse-core",
- "memfuse-crypto",
- "memfuse-simd",
- "memfuse-sys",
- "memmap2",
- "parking_lot",
- "proptest",
- "rand 0.8.8",
- "roaring",
- "serde",
- "subtle",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "memfuse-wire"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "flatbuffers",
- "serde",
- "serde_json",
 ]
 
 [[package]]

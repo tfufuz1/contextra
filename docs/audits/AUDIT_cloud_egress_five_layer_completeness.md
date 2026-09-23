@@ -2,9 +2,9 @@
 
 **Datum:** 2026-09-17
 **Auditor:** Google-Jules (Principal Rust Systems Engineer)
-**Ziel-Crate:** `crates/memfuse-crypto` (Layer 2) & Orchestrierung in `crates/memfuse-mcp` (Layer 8)
-**Prüfobjekt:** `crates/memfuse-crypto/src/egress_vault.rs` (448 Zeilen, Stand FINAL_11)
-**Referenz-Spezifikation:** `docs/MEMFUSE_ENDPRODUKT_SPEZIFIKATION.md` §2.3 Pkt 7, §12.2.1–§12.2.5
+**Ziel-Crate:** `crates/contextra-crypto` (Layer 2) & Orchestrierung in `crates/contextra-mcp` (Layer 8)
+**Prüfobjekt:** `crates/contextra-crypto/src/egress_vault.rs` (448 Zeilen, Stand FINAL_11)
+**Referenz-Spezifikation:** `docs/CONTEXTRA_ENDPRODUKT_SPEZIFIKATION.md` §2.3 Pkt 7, §12.2.1–§12.2.5
 **Issue / Claim:** `WELLE5-AUDIT-EGRESS-FIVELAYER`
 
 ---
@@ -19,10 +19,10 @@ Gemäß Spezifikation §12 ist für Cloud-Egress-Anfragen ein **fünfschichtiges
 5. **Layer 5:** Inbound Re-Hydration mit bidirektionalem Zero-Trust (Rücksubstitution + Prompt-Injection-Guard).
 
 ### Hauptbefund
-Die aktuelle Implementierung in `crates/memfuse-crypto/src/egress_vault.rs` und `crates/memfuse-mcp/src/egress_gateway.rs` deckt **ausschließlich eine vereinfachte Teilmenge von Layer 1** (Regex-Pattern-Matching mit harten Timeouts und Fail-Closed-Semantik) ab.
+Die aktuelle Implementierung in `crates/contextra-crypto/src/egress_vault.rs` und `crates/contextra-mcp/src/egress_gateway.rs` deckt **ausschließlich eine vereinfachte Teilmenge von Layer 1** (Regex-Pattern-Matching mit harten Timeouts und Fail-Closed-Semantik) ab.
 * **Layer 1:** Teilweise vorhanden (Regex-Pattern-Set, Timeout, Fail-Closed), aber Aho-Corasick-Pre-Filter, ONNX-NER und Surrogat-Tokenisierung fehlen.
 * **Layer 2 bis Layer 5:** **Vollständig fehlend**.
-* **Symbol `EgressGuard`:** **Fehlt komplett** in `crates/memfuse-crypto` und `crates/memfuse-mcp`.
+* **Symbol `EgressGuard`:** **Fehlt komplett** in `crates/contextra-crypto` und `crates/contextra-mcp`.
 
 ---
 
@@ -32,7 +32,7 @@ Die aktuelle Implementierung in `crates/memfuse-crypto/src/egress_vault.rs` und 
 |---|---|---|---|---|---|
 | **Layer 1** | Deterministisches Token-Vaulting | **Teilweise** | `egress_vault.rs:78-202` | Vorhanden: Regex-Pattern-Set (`RegexSet`), `spawn_blocking` Timeout, Payload-Größenlimit, Fail-Closed.<br>Fehlt: Aho-Corasick O(n) Pre-Filter, ONNX-NER-Entitätserkennung, Surrogat-Generierung (`[USER_ENTITY_<blake3>]`), Vault-Ersetzungstabelle. | **Sicher (Fail-Closed):** Treffer blockieren die Anfrage vollständig. Unstrukturierte PII ohne Regex-Muster wird jedoch mangels NER durchgelassen. |
 | **Layer 2** | Lokale Vorabstraktion | **Fehlend** | N/A (`egress_vault.rs` / `egress_gateway.rs`) | Keine Anbindung an `SegmentSynthesizer` (`SynthesisMode::PrivacyAbstraction`) oder `PidLatencyController`. | **Risiko (Fail-Open bypassed):** Semantische Vorabstraktion findet nicht statt; Payload fließt unkorrigiert weiter. |
-| **Layer 3** | Graph-Generalisierung | **Fehlend** | N/A (`egress_vault.rs` / `egress_gateway.rs`) | Keine $k$-Anonymitäts-Generalisierung von Graph-Entitäten oder Community-Zugehörigkeiten (`memfuse-graph::community`). | **Risiko:** Subgraphen und Kantenbeziehungen werden unskaliert im Egress-Payload übertragen. |
+| **Layer 3** | Graph-Generalisierung | **Fehlend** | N/A (`egress_vault.rs` / `egress_gateway.rs`) | Keine $k$-Anonymitäts-Generalisierung von Graph-Entitäten oder Community-Zugehörigkeiten (`contextra-graph::community`). | **Risiko:** Subgraphen und Kantenbeziehungen werden unskaliert im Egress-Payload übertragen. |
 | **Layer 4** | Bulk-Exfiltrations-Erkennung (`EgressGuard`) | **Fehlend** | N/A (Symbol `EgressGuard` existiert nicht) | Kein HNSW-k-NN-Ähnlichkeits-Scan gegen gespeicherte Memory-Chunks; Schwellenwert- & Mindestlängenprüfung fehlt. | **HOCHRISIKO (Stiller Fail-Open):** Nahezu 1:1 kopierte vertrauliche Memory-Chunks werden unbemerkt an Cloud-LLMs gesendet! |
 | **Layer 5** | Inbound Re-Hydration & Zero-Trust | **Fehlend** | `egress_gateway.rs:64-70` | Inbound Cloud-Antworten werden als unmodifizierter Text durchgereicht; keine Surrogat-Rücksubstitution, kein Prompt-Injection-Guard. | **Risiko:** Cloud-Antworten enthalten Platzhalter un-hydriert; schädliche Cloud-Antworten umgehen Inbound-Sicherheitsprüfungen. |
 
@@ -43,7 +43,7 @@ Die aktuelle Implementierung in `crates/memfuse-crypto/src/egress_vault.rs` und 
 ### 3.1 Layer 1 — Deterministisches Token-Vaulting (§12.2.1)
 * **Soll:**
   1. Strukturierte PII: Aho-Corasick-Automat ($O(n)$) mit anschließender Regex-Nachvalidierung.
-  2. Unstrukturierte PII: ONNX-NER-Modell aus `memfuse-embed` (Reuse P10).
+  2. Unstrukturierte PII: ONNX-NER-Modell aus `contextra-embed` (Reuse P10).
   3. Sitzungsstabiles Surrogat: Ersetzung von Entitäten durch `[USER_ENTITY_<blake3(entity_text ‖ session_salt)[..4]>]` und sichere Speicherung im `EgressVault` (`ZeroizeOnDrop`).
 * **Ist:**
   * In `egress_vault.rs` existiert ein `EgressVault` mit standardmäßigen 5 Regex-Mustern (`sk-`, `AKIA`, `api_key`, `password`, E-Mail).
@@ -53,17 +53,17 @@ Die aktuelle Implementierung in `crates/memfuse-crypto/src/egress_vault.rs` und 
 
 ### 3.2 Layer 2 — Lokale Vorabstraktion (§12.2.2)
 * **Soll:** Integration des `SegmentSynthesizer`-Traits im Modus `SynthesisMode::PrivacyAbstraction`. Kopplung an den `PidLatencyController`: Bei Latenzüberschreitung Fail-Open (Schicht wird übersprungen, da PII bereits in Layer 1 maskiert wurde).
-* **Ist:** Weder in `memfuse-crypto` noch in `memfuse-mcp::egress_gateway` ist Code zur Abstraktion oder Latenz-Budgetierung für Egress vorhanden.
+* **Ist:** Weder in `contextra-crypto` noch in `contextra-mcp::egress_gateway` ist Code zur Abstraktion oder Latenz-Budgetierung für Egress vorhanden.
 
 ### 3.3 Layer 3 — Graph-Generalisierung (§12.2.3)
-* **Soll:** $k$-Anonymitäts-Generalisierung für Graph-Strukturen (Kantenlabels → Community-Zugehörigkeit via `memfuse-graph::community.rs`).
+* **Soll:** $k$-Anonymitäts-Generalisierung für Graph-Strukturen (Kantenlabels → Community-Zugehörigkeit via `contextra-graph::community.rs`).
 * **Ist:** Keine Implementierung vorhanden. Subgraphen-Informationen im Payload bleiben ungeneralisiert.
 
 ### 3.4 Layer 4 — Bulk-Exfiltrations-Erkennung via `EgressGuard` (§12.2.4)
 * **Soll:**
   * Eigenständige Komponente `EgressGuard`.
-  * Wandelt ausgehenden Payload via `memfuse-embed` in Vektoren um.
-  * k-NN-Abfrage gegen den lokalen HNSW-Index (`memfuse-index`).
+  * Wandelt ausgehenden Payload via `contextra-embed` in Vektoren um.
+  * k-NN-Abfrage gegen den lokalen HNSW-Index (`contextra-index`).
   * Blockiert Egress, falls `max(cosine_similarity) ≥ threshold` **und** `payload_length ≥ min_payload_bytes`.
   * **Fail-Closed bei Index-Fehlern oder Timeouts**.
 * **Ist:**
@@ -81,7 +81,7 @@ Die aktuelle Implementierung in `crates/memfuse-crypto/src/egress_vault.rs` und 
 
 ## 4. Analysis of Existing Tests (§4.6 / FINAL_9)
 
-In `crates/memfuse-crypto/src/egress_vault.rs` sind 12 Modultests im `mod tests` definiert:
+In `crates/contextra-crypto/src/egress_vault.rs` sind 12 Modultests im `mod tests` definiert:
 1. `test_allow_happy_path`: Prüft `Allow` bei unverdächtigem Text.
 2. `test_payload_with_abstract_and_sensitive_pattern_is_blocked`: Prüft Blockieren bei `sk-` Key.
 3. `test_block_sensitive_pattern`: Prüft Blockieren bei E-Mail-Adresse.
@@ -101,7 +101,7 @@ In `crates/memfuse-crypto/src/egress_vault.rs` sind 12 Modultests im `mod tests`
 
 ## 5. Code-Qualität & Zero-Panic Audit
 
-* **`#![cfg_attr(not(test), forbid(unsafe_code))]`:** Compliant in `crates/memfuse-crypto/src/lib.rs`.
+* **`#![cfg_attr(not(test), forbid(unsafe_code))]`:** Compliant in `crates/contextra-crypto/src/lib.rs`.
 * **Zero-Panic-Doctrine in Production Code (`egress_vault.rs`):**
   * `unwrap()` / `expect()` kommen in Produktionscode in `EgressVault::default()` vor:
     * Zeile 219: `Self::try_default().unwrap_or_else(...)` — Abgefangen via Fallback, paniziert nicht.
@@ -128,7 +128,7 @@ In `crates/memfuse-crypto/src/egress_vault.rs` sind 12 Modultests im `mod tests`
 Da in diesem Audit-Prompt gemäß **ROLE-LOCK REGEL** kein Produktionscode verändert werden darf, werden die notwendigen Erweiterungen hier als konkrete, architekturell isolierte Folge-Aufgaben spezifiziert:
 
 ### Empfehlung 1: Implementierung `EgressGuard` (Layer 4)
-* **Ziel-Datei:** `crates/memfuse-crypto/src/egress_guard.rs` (oder `crates/memfuse-index/src/egress_guard.rs`).
+* **Ziel-Datei:** `crates/contextra-crypto/src/egress_guard.rs` (oder `crates/contextra-index/src/egress_guard.rs`).
 * **Inhalt:**
   ```rust
   pub struct EgressGuard {
@@ -141,20 +141,20 @@ Da in diesem Audit-Prompt gemäß **ROLE-LOCK REGEL** kein Produktionscode verä
 * **Verhalten:** Erstellt Vektor-Embedding des Outbound-Payloads, führt k-NN Search ($k=1$) aus, blockiert mit `BlockReason::SensitivePattern("Bulk exfiltration detected")`, falls `sim >= threshold` && `len >= min_bytes`. Bei Fehler/Timeout strictly **Fail-Closed**.
 
 ### Empfehlung 2: Ergänzung Layer 1 Surrogat-Tokenisierung & NER
-* **Ziel-Datei:** `crates/memfuse-crypto/src/egress_vault.rs`
+* **Ziel-Datei:** `crates/contextra-crypto/src/egress_vault.rs`
 * **Inhalt:**
   * Erweiterung von `EgressVault` um eine In-Memory-Surrogat-Map (`HashMap<String, String>`) mit `session_salt`.
   * Methode `sanitize_and_vault(&self, payload: &str) -> Result<(String, VaultMap), EgressVaultError>`.
-  * Anbindung von `memfuse-embed` ONNX-NER für unstrukturierte PII.
+  * Anbindung von `contextra-embed` ONNX-NER für unstrukturierte PII.
 
-### Empfehlung 3: Pipeline-Orchestrierung aller 5 Layer in `memfuse-mcp` / `memfuse-router`
-* **Ziel-Datei:** `crates/memfuse-mcp/src/egress_gateway.rs`
+### Empfehlung 3: Pipeline-Orchestrierung aller 5 Layer in `contextra-mcp` / `contextra-router`
+* **Ziel-Datei:** `crates/contextra-mcp/src/egress_gateway.rs`
 * **Inhalt:**
   * Verkettung aller 5 Layer im `handle_cloud_query`-Pfad:
     $$\text{Payload} \xrightarrow{\text{L1}} \text{Vaulted} \xrightarrow{\text{L2}} \text{Abstracted} \xrightarrow{\text{L3}} \text{Generalized} \xrightarrow{\text{L4}} \text{Guarded} \rightarrow \text{Cloud Egress}$$
   * Inbound-Pfad:
     $$\text{Cloud Response} \xrightarrow{\text{Prompt Injection Guard}} \xrightarrow{\text{L5 Re-Hydration}} \text{Client}$$
-  * Verwendung des bereitstehenden Typ-State-Protektors `GuardedPayload<Sanitized>` aus `memfuse-router::guarded_payload`.
+  * Verwendung des bereitstehenden Typ-State-Protektors `GuardedPayload<Sanitized>` aus `contextra-router::guarded_payload`.
 
 ---
 

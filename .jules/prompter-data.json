@@ -2,49 +2,49 @@
   "generated_at": "2026-09-12T11:19:38Z",
   "head": "b61fbb2",
   "target_architecture": {
-    "memfuse-agent": "memfuse-agentic",
-    "memfuse-calibration": "memfuse-inference",
-    "memfuse-candle": "memfuse-inference",
-    "memfuse-checkpoint": "memfuse-persistence",
-    "memfuse-core": "memfuse-foundation",
-    "memfuse-db": "memfuse-orchestrator",
-    "memfuse-embed": "memfuse-inference",
-    "memfuse-graph": "memfuse-retrieval",
-    "memfuse-index": "memfuse-retrieval",
-    "memfuse-mcp": "memfuse-mcp",
-    "memfuse-ollama": "memfuse-inference",
-    "memfuse-py": "memfuse-bindings",
-    "memfuse-router": "memfuse-inference",
-    "memfuse-security": "memfuse-security",
-    "memfuse-store": "memfuse-persistence",
-    "memfuse-tauri": "memfuse-bindings",
-    "memfuse-text": "memfuse-retrieval"
+    "contextra-agent": "contextra-agentic",
+    "contextra-calibration": "contextra-inference",
+    "contextra-candle": "contextra-inference",
+    "contextra-checkpoint": "contextra-persistence",
+    "contextra-core": "contextra-foundation",
+    "contextra-db": "contextra-orchestrator",
+    "contextra-embed": "contextra-inference",
+    "contextra-graph": "contextra-retrieval",
+    "contextra-index": "contextra-retrieval",
+    "contextra-mcp": "contextra-mcp",
+    "contextra-ollama": "contextra-inference",
+    "contextra-py": "contextra-bindings",
+    "contextra-router": "contextra-inference",
+    "contextra-security": "contextra-security",
+    "contextra-store": "contextra-persistence",
+    "contextra-tauri": "contextra-bindings",
+    "contextra-text": "contextra-retrieval"
   },
   "crates": [
     {
-      "id": "memfuse-core-ipc-gen",
+      "id": "contextra-core-ipc-gen",
       "layer": 0,
       "order": 1,
       "loc": 858,
       "tests": "0+",
-      "desc": "Auto-generated FlatBuffers IPC code for MemFuse Core",
+      "desc": "Auto-generated FlatBuffers IPC code for Contextra Core",
       "status": "✅",
       "risk": "none",
       "tier": "2"
     },
     {
-      "id": "memfuse-core",
+      "id": "contextra-core",
       "layer": 1,
       "order": 2,
       "loc": 9364,
       "tests": "166+",
-      "desc": "Core types, traits, and error handling for MemFuse",
+      "desc": "Core types, traits, and error handling for Contextra",
       "status": "✅",
       "risk": "none",
       "tier": "1"
     },
     {
-      "id": "memfuse-calibration",
+      "id": "contextra-calibration",
       "layer": 2,
       "order": 3,
       "loc": 2225,
@@ -55,18 +55,18 @@
       "tier": "3"
     },
     {
-      "id": "memfuse-checkpoint",
+      "id": "contextra-checkpoint",
       "layer": 2,
       "order": 4,
       "loc": 5707,
       "tests": "82+",
-      "desc": "Backup and snapshot management for MemFuse storage",
+      "desc": "Backup and snapshot management for Contextra storage",
       "status": "✅",
       "risk": "none",
       "tier": "2"
     },
     {
-      "id": "memfuse-graph",
+      "id": "contextra-graph",
       "layer": 2,
       "order": 5,
       "loc": 10627,
@@ -77,51 +77,51 @@
       "tier": "2"
     },
     {
-      "id": "memfuse-security",
+      "id": "contextra-security",
       "layer": 2,
       "order": 6,
       "loc": 5068,
       "tests": "132+",
-      "desc": "Encryption at Rest and KV-Cache Security utilities for MemFuse",
+      "desc": "Encryption at Rest and KV-Cache Security utilities for Contextra",
       "status": "✅",
       "risk": "sec",
       "tier": "1"
     },
     {
-      "id": "memfuse-text",
+      "id": "contextra-text",
       "layer": 2,
       "order": 7,
       "loc": 5433,
       "tests": "94+",
-      "desc": "MemFuse — Text processing and BM25 search for Hybrid Search",
+      "desc": "Contextra — Text processing and BM25 search for Hybrid Search",
       "status": "✅",
       "risk": "utf8",
       "tier": "2"
     },
     {
-      "id": "memfuse-candle",
+      "id": "contextra-candle",
       "layer": 3,
       "order": 8,
       "loc": 2686,
       "tests": "43+",
-      "desc": "Native Candle GGUF ML inference backend for MemFuse",
+      "desc": "Native Candle GGUF ML inference backend for Contextra",
       "status": "✅",
       "risk": "candle",
       "tier": "3"
     },
     {
-      "id": "memfuse-index",
+      "id": "contextra-index",
       "layer": 3,
       "order": 9,
       "loc": 15865,
       "tests": "183+",
-      "desc": "HNSW vector index with SIMD distance computation for MemFuse",
+      "desc": "HNSW vector index with SIMD distance computation for Contextra",
       "status": "✅",
       "risk": "simd",
       "tier": "1"
     },
     {
-      "id": "memfuse-ollama",
+      "id": "contextra-ollama",
       "layer": 3,
       "order": 10,
       "loc": 3990,
@@ -132,18 +132,18 @@
       "tier": "3"
     },
     {
-      "id": "memfuse-store",
+      "id": "contextra-store",
       "layer": 3,
       "order": 11,
       "loc": 20231,
       "tests": "230+",
-      "desc": "LSM-Tree storage engine for MemFuse",
+      "desc": "LSM-Tree storage engine for Contextra",
       "status": "✅",
       "risk": "crash",
       "tier": "1"
     },
     {
-      "id": "memfuse-embed",
+      "id": "contextra-embed",
       "layer": 4,
       "order": 12,
       "loc": 2033,
@@ -154,29 +154,29 @@
       "tier": "3"
     },
     {
-      "id": "memfuse-db",
+      "id": "contextra-db",
       "layer": 5,
       "order": 13,
       "loc": 31208,
       "tests": "367+",
-      "desc": "MemFuse — Embedded hybrid-search for AI agents",
+      "desc": "Contextra — Embedded hybrid-search for AI agents",
       "status": "✅",
       "risk": "fusion",
       "tier": "1"
     },
     {
-      "id": "memfuse-bench",
+      "id": "contextra-bench",
       "layer": 6,
       "order": 14,
       "loc": 4641,
       "tests": "26+",
-      "desc": "MemFuse — Reproducible Benchmark Harness for Retrieval Accuracy",
+      "desc": "Contextra — Reproducible Benchmark Harness for Retrieval Accuracy",
       "status": "✅",
       "risk": "none",
       "tier": "2"
     },
     {
-      "id": "memfuse-router",
+      "id": "contextra-router",
       "layer": 6,
       "order": 15,
       "loc": 5456,
@@ -187,29 +187,29 @@
       "tier": "3"
     },
     {
-      "id": "memfuse-tauri",
+      "id": "contextra-tauri",
       "layer": 6,
       "order": 16,
       "loc": 6209,
       "tests": "118+",
-      "desc": "DEPRECATED (ADR-077): Desktop-App 'MemFuse Brain'. Wird am 2026-11-07 entfernt. Bitte auf memfuse-py migrieren.",
+      "desc": "DEPRECATED (ADR-077): Desktop-App 'Contextra Brain'. Wird am 2026-11-07 entfernt. Bitte auf contextra-py migrieren.",
       "status": "✅",
       "risk": "parse",
       "tier": "2"
     },
     {
-      "id": "memfuse-agent",
+      "id": "contextra-agent",
       "layer": 7,
       "order": 17,
       "loc": 5935,
       "tests": "59+",
-      "desc": "Persistent agent workflow engine for MemFuse — checkpoint/execute/audit loop",
+      "desc": "Persistent agent workflow engine for Contextra — checkpoint/execute/audit loop",
       "status": "✅",
       "risk": "budget",
       "tier": "2"
     },
     {
-      "id": "memfuse-mcp",
+      "id": "contextra-mcp",
       "layer": 8,
       "order": 18,
       "loc": 4406,
@@ -221,7 +221,7 @@
     }
   ],
   "components": {
-    "memfuse-agent": [
+    "contextra-agent": [
       {
         "file": "audit.rs",
         "size": "L",
@@ -287,7 +287,7 @@
         "focus": "Neu ergänzt in v22 — noch keine vertiefte Fokus-Analyse hinterlegt; bei erster Bearbeitung dieser Dateien vollständige Lektüre vor Änderung durchführen und Fokus-Notiz hier nachtragen."
       }
     ],
-    "memfuse-bench": [
+    "contextra-bench": [
       {
         "file": "bin/compare_baseline.rs",
         "size": "S",
@@ -353,7 +353,7 @@
         "focus": ""
       }
     ],
-    "memfuse-calibration": [
+    "contextra-calibration": [
       {
         "file": "isotonic.rs",
         "size": "M",
@@ -395,7 +395,7 @@
         "focus": ""
       }
     ],
-    "memfuse-candle": [
+    "contextra-candle": [
       {
         "file": "embedding.rs",
         "size": "M",
@@ -453,7 +453,7 @@
         "focus": ""
       }
     ],
-    "memfuse-checkpoint": [
+    "contextra-checkpoint": [
       {
         "file": "lib.rs",
         "size": "XL",
@@ -463,22 +463,22 @@
         "focus": "APM-8 kritisch: niemals tokio::spawn() im Drop-Handler — das bricht die RAII-Garantie (Task kann vor Completion gecancelled werden). Pin-before-Save-Reihenfolge (ADR-011) ist bindend: Snapshot muss gepinnt sein, BEVOR der Checkpoint gespeichert wird. Rollback zu Checkpoint X muss bytegenau den State nach X wiederherstellen — verifiziere dies mit einem Byte-Vergleich, nicht nur mit einem Existenz-Check. [KORR v22: Es gibt keine separate registry.rs — der komplette Crate (inkl. Registry/Time-Travel) ist eine einzige Datei; Größenklasse deshalb XL statt L, höchste Sorgfaltspflicht bei jeder Änderung.]"
       }
     ],
-    "memfuse-core": [
+    "contextra-core": [
       {
         "file": "error.rs",
         "size": "L",
         "loc": 888,
         "risk": "FFI",
-        "desc": "MemFuseError-Enum + serialisierbares FFI-DTO-Mapping",
-        "focus": "JEDE MemFuseError-Variante muss eine korrespondierende MemFuseErrorDto-Variante besitzen — fehlende Zuordnung bricht memfuse-py und memfuse-mcp stillschweigend an der FFI-Grenze."
+        "desc": "ContextraError-Enum + serialisierbares FFI-DTO-Mapping",
+        "focus": "JEDE ContextraError-Variante muss eine korrespondierende ContextraErrorDto-Variante besitzen — fehlende Zuordnung bricht contextra-py und contextra-mcp stillschweigend an der FFI-Grenze."
       },
       {
         "file": "error_dto.rs",
         "size": "M",
         "loc": 476,
         "risk": "FFI",
-        "desc": "MemFuseError-Enum + serialisierbares FFI-DTO-Mapping",
-        "focus": "JEDE MemFuseError-Variante muss eine korrespondierende MemFuseErrorDto-Variante besitzen — fehlende Zuordnung bricht memfuse-py und memfuse-mcp stillschweigend an der FFI-Grenze."
+        "desc": "ContextraError-Enum + serialisierbares FFI-DTO-Mapping",
+        "focus": "JEDE ContextraError-Variante muss eine korrespondierende ContextraErrorDto-Variante besitzen — fehlende Zuordnung bricht contextra-py und contextra-mcp stillschweigend an der FFI-Grenze."
       },
       {
         "file": "ipc/jsonrpc.rs",
@@ -502,7 +502,7 @@
         "loc": 53,
         "risk": "—",
         "desc": "Modulstruktur, pub-Exports, Re-Exports der Kern-Traits",
-        "focus": "Prüfe bei jeder Änderung, ob neue pub-Exports das DAG-Prinzip verletzen (memfuse-core darf keine memfuse-*-Abhängigkeit referenzieren)."
+        "focus": "Prüfe bei jeder Änderung, ob neue pub-Exports das DAG-Prinzip verletzen (contextra-core darf keine contextra-*-Abhängigkeit referenzieren)."
       },
       {
         "file": "seq_log.rs",
@@ -593,7 +593,7 @@
         "focus": ""
       }
     ],
-    "memfuse-core-ipc-gen": [
+    "contextra-core-ipc-gen": [
       {
         "file": "lib.rs",
         "size": "S",
@@ -603,7 +603,7 @@
         "focus": ""
       },
       {
-        "file": "memfuse_generated.rs",
+        "file": "contextra_generated.rs",
         "size": "L",
         "loc": 815,
         "risk": "—",
@@ -611,7 +611,7 @@
         "focus": ""
       }
     ],
-    "memfuse-db": [
+    "contextra-db": [
       {
         "file": "background_workers.rs",
         "size": "L",
@@ -761,7 +761,7 @@
         "size": "XL",
         "loc": 2318,
         "risk": "—",
-        "desc": "MemFuse-Orchestrator-Einstiegspunkt",
+        "desc": "Contextra-Orchestrator-Einstiegspunkt",
         "focus": "Prüfe die öffentliche API auf Konsistenz mit README.md-Beispielen."
       },
       {
@@ -829,7 +829,7 @@
         "focus": ""
       }
     ],
-    "memfuse-embed": [
+    "contextra-embed": [
       {
         "file": "lib.rs",
         "size": "L",
@@ -847,7 +847,7 @@
         "focus": "ONNX-Inferenz blockiert den Thread — spawn_blocking ist Pflicht, sonst Stall des Tokio-Executors. Score-Ties müssen stabil sortiert werden, Richtung höher=besser verifizieren. Für Modul-externe Nutzung des SessionPool einen eigenen Pool halten statt Sichtbarkeit zu erweitern (Planungsdokument-Blueprint-Korrektur #1). [KORR v22: Es gibt keine eigene session_pool.rs — der Crate besteht nur aus lib.rs + reranker.rs, OnnxSessionPool ist Teil von reranker.rs.]"
       }
     ],
-    "memfuse-graph": [
+    "contextra-graph": [
       {
         "file": "cascade.rs",
         "size": "M",
@@ -945,7 +945,7 @@
         "focus": "Kein Lock darf über einen .await-Punkt gehalten werden — Lock-Scopes methodenlokal und minimal halten."
       }
     ],
-    "memfuse-index": [
+    "contextra-index": [
       {
         "file": "diskann.rs",
         "size": "XL",
@@ -1003,9 +1003,9 @@
         "focus": "Prüfe Rundungsverhalten an den Quantisierungsgrenzen — Bound-Expansion in hnsw.rs hängt direkt von der hier definierten Skalierung ab. [KORR v22: Datei hieß zuvor quantization.rs — tatsächlicher Dateiname ist quantize.rs.]"
       }
     ],
-    "memfuse-mcp": [
+    "contextra-mcp": [
       {
-        "file": "bin/memfuse-mcp-server.rs",
+        "file": "bin/contextra-mcp-server.rs",
         "size": "S",
         "loc": 70,
         "risk": "—",
@@ -1025,7 +1025,7 @@
         "size": "L",
         "loc": 824,
         "risk": "Protokoll/DoS/Injection",
-        "desc": "McpServer — stdio JSON-RPC 2.0 Server-Loop UND memfuse_search/insert/get/collections-Tool-Dispatch in EINER Datei (größte Datei des Crates)",
+        "desc": "McpServer — stdio JSON-RPC 2.0 Server-Loop UND contextra_search/insert/get/collections-Tool-Dispatch in EINER Datei (größte Datei des Crates)",
         "focus": "ADR-010: AUSSCHLIESSLICH stdio — kein axum/TcpListener/HTTP, jeder Rest davon ist ein kritischer Architektur-Befund. Grenzwerte MAX_RPC_BYTES=16MB / MAX_SEARCH_QUERY=64KB an n-1/n/n+1 Bytes testen. Prüfe Inaktivitäts-Timeout (Slowloris-Schutz) für sehr langsame Clients. Prüfe zusätzlich, dass interne Pfade/Stacktraces niemals in Fehlermeldungen an den Client durchsickern (Informations-Leck-Risiko). [KORR v22: Es gibt keine separaten server.rs/tools.rs — Server-Loop UND Tool-Dispatch liegen beide in lib.rs; Größenklasse deshalb XL statt S/L.]"
       },
       {
@@ -1034,7 +1034,7 @@
         "loc": 789,
         "risk": "Injection",
         "desc": "Prompt-Injection-Erkennung/-Abwehr für Tool-Outputs",
-        "focus": "Neu ergänzt in v22 — diese Datei fehlte bisher VOLLSTÄNDIG im Komponenten-Inventar, obwohl sie mit direktem Injection-Bezug zu den sicherheitskritischsten Dateien des gesamten Crates zählt. Bei jeder Änderung: keine Denylist-basierte Erkennung als alleinige Verteidigungslinie akzeptieren (gleiche Grundregel wie bei memfuse-ollama::client.rs)."
+        "focus": "Neu ergänzt in v22 — diese Datei fehlte bisher VOLLSTÄNDIG im Komponenten-Inventar, obwohl sie mit direktem Injection-Bezug zu den sicherheitskritischsten Dateien des gesamten Crates zählt. Bei jeder Änderung: keine Denylist-basierte Erkennung als alleinige Verteidigungslinie akzeptieren (gleiche Grundregel wie bei contextra-ollama::client.rs)."
       },
       {
         "file": "protocol.rs",
@@ -1061,7 +1061,7 @@
         "focus": ""
       }
     ],
-    "memfuse-ollama": [
+    "contextra-ollama": [
       {
         "file": "client.rs",
         "size": "XL",
@@ -1111,7 +1111,7 @@
         "focus": "Neu ergänzt in v22 — noch keine vertiefte Fokus-Analyse hinterlegt; bei erster Bearbeitung dieser Dateien vollständige Lektüre vor Änderung durchführen und Fokus-Notiz hier nachtragen."
       }
     ],
-    "memfuse-router": [
+    "contextra-router": [
       {
         "file": "dispatch.rs",
         "size": "S",
@@ -1126,7 +1126,7 @@
         "loc": 17,
         "risk": "—",
         "desc": "Modul-Exports der Routing-Engine",
-        "focus": "Prüfe, dass memfuse-mcp (Layer 4) hier nicht importiert wird (DAG-Verletzung, ADR-045-Kontext)."
+        "focus": "Prüfe, dass contextra-mcp (Layer 4) hier nicht importiert wird (DAG-Verletzung, ADR-045-Kontext)."
       },
       {
         "file": "lyapunov.rs",
@@ -1177,7 +1177,7 @@
         "focus": ""
       }
     ],
-    "memfuse-security": [
+    "contextra-security": [
       {
         "file": "anti_tamper.rs",
         "size": "S",
@@ -1267,14 +1267,14 @@
         "focus": "Byte-Reihenfolge ist bindend: domain-separator → prev_hmac → seq_no → tx_id → op_type+kv. Jede Abweichung bricht die Chain rückwirkend. Änderungen hier erfordern Regressionstests gegen die bestehende v3-Testvektor-Suite UND explizite Versionierung (nie v3 stillschweigend überschreiben)."
       }
     ],
-    "memfuse-store": [
+    "contextra-store": [
       {
         "file": "checkpoint.rs",
         "size": "S",
         "loc": 114,
         "risk": "DAG",
         "desc": "pub(crate)-Checkpoint-Interna der Storage-Engine",
-        "focus": "Diese Datei ist bewusst pub(crate) — memfuse-checkpoint (eigenes Crate, Layer 1) darf sie NICHT importieren. Jede Sichtbarkeitsänderung hier ist ein Architektur-Vorfall."
+        "focus": "Diese Datei ist bewusst pub(crate) — contextra-checkpoint (eigenes Crate, Layer 1) darf sie NICHT importieren. Jede Sichtbarkeitsänderung hier ist ein Architektur-Vorfall."
       },
       {
         "file": "compaction.rs",
@@ -1365,7 +1365,7 @@
         "focus": "sync_all() MUSS vor jeder Ok-Rückgabe aus append() erfolgen. Sequenznummer UND Datei-ID müssen in die HMAC-Berechnung eingebunden sein (nicht nur Payload). Jede Änderung braucht einen begleitenden Crash-Mid-Write-Fault-Injection-Test."
       }
     ],
-    "memfuse-tauri": [
+    "contextra-tauri": [
       {
         "file": "commands/chat.rs",
         "size": "M",
@@ -1428,7 +1428,7 @@
         "loc": 372,
         "risk": "Sicherheit/Parser",
         "desc": "DOCX-Parser für externe Nutzerdateien",
-        "focus": "Gleiche Robustheitsanforderungen wie pdf.rs: leere/trunkierte Datei → Err, kein Panic. Geparste Inhalte landen später im RAG-Kontext — Prompt-Injection-Bewusstsein wie bei memfuse-ollama."
+        "focus": "Gleiche Robustheitsanforderungen wie pdf.rs: leere/trunkierte Datei → Err, kein Panic. Geparste Inhalte landen später im RAG-Kontext — Prompt-Injection-Bewusstsein wie bei contextra-ollama."
       },
       {
         "file": "ingestion/email.rs",
@@ -1500,7 +1500,7 @@
         "loc": 89,
         "risk": "Duplikation",
         "desc": "OllamaBridge — Desktop-App-seitige Ollama-Anbindung",
-        "focus": "Prüfe auf Logik-Duplikation gegenüber memfuse-ollama::client.rs — jede Abweichung im Verhalten zwischen Bridge und Client ist ein Wartungsrisiko und potenzielle Inkonsistenzquelle. [KORR v22: Datei hieß zuvor ollama_bridge.rs — tatsächlicher Dateiname ist ollama.rs.]"
+        "focus": "Prüfe auf Logik-Duplikation gegenüber contextra-ollama::client.rs — jede Abweichung im Verhalten zwischen Bridge und Client ist ein Wartungsrisiko und potenzielle Inkonsistenzquelle. [KORR v22: Datei hieß zuvor ollama_bridge.rs — tatsächlicher Dateiname ist ollama.rs.]"
       },
       {
         "file": "state.rs",
@@ -1511,7 +1511,7 @@
         "focus": "Tauri-Commands laufen parallel — jeder Zugriff auf AppState braucht korrekte Synchronisation (RwLock/Arc/Mutex); prüfe explizit auf Data-Races bei gleichzeitigen Commands."
       }
     ],
-    "memfuse-text": [
+    "contextra-text": [
       {
         "file": "bm25.rs",
         "size": "M",
@@ -1559,75 +1559,75 @@
     "crate_count": 18,
     "crates": [
       {
-        "name": "memfuse-core-ipc-gen",
+        "name": "contextra-core-ipc-gen",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-core",
+        "name": "contextra-core",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-calibration",
+        "name": "contextra-calibration",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-checkpoint",
+        "name": "contextra-checkpoint",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-graph",
+        "name": "contextra-graph",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-security",
+        "name": "contextra-security",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-text",
+        "name": "contextra-text",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-candle",
+        "name": "contextra-candle",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-index",
+        "name": "contextra-index",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-ollama",
+        "name": "contextra-ollama",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-store",
+        "name": "contextra-store",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-embed",
+        "name": "contextra-embed",
         "status": "🧊 Optional"
       },
       {
-        "name": "memfuse-db",
+        "name": "contextra-db",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-bench",
+        "name": "contextra-bench",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-router",
+        "name": "contextra-router",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-tauri",
+        "name": "contextra-tauri",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-agent",
+        "name": "contextra-agent",
         "status": "🟢 Clean"
       },
       {
-        "name": "memfuse-mcp",
+        "name": "contextra-mcp",
         "status": "🟢 Clean"
       }
     ],

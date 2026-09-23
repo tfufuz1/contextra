@@ -1,0 +1,62 @@
+# GOV-G / PY-4: Dedicated CI Workflow for contextra-py
+#
+# Context (PY-4 / GOV-G & ADR-064):
+# `contextra-py` is excluded from the main cargo workspace due to `panic = "unwind"`
+# requirements for PyO3 FFI boundaries. Because `--workspace` flag commands skip `contextra-py`,
+# this workflow provides a standalone, blocking CI gate stack enforcing:
+# 1. Compilation & Check (`cargo check`)
+# 2. Test Suite (`cargo test`)
+# 3. Linting (`cargo clippy -D warnings`)
+# 4. Dependency Security & Licenses (`cargo deny`)
+# 5. FFI Panic Boundary Gate (`xtask check-ffi-panic-boundary`)
+
+name: contextra-py CI (Full Gate Stack)
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  contextra-py-ci:
+    name: contextra-py Gate Stack (PY-4 / GOV-G)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check Gate (contextra-py)
+        run: cargo check --manifest-path crates/contextra-py/Cargo.toml --all-targets
+
+      - name: Test Suite (contextra-py)
+        run: cargo test --manifest-path crates/contextra-py/Cargo.toml
+
+      - name: Clippy Gate (contextra-py)
+        run: cargo clippy --manifest-path crates/contextra-py/Cargo.toml --all-targets -- -D warnings
+
+      - name: Dependency & License Gate (cargo deny)
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: crates/contextra-py/Cargo.toml
+          command: check advisories bans licenses sources
+
+      - name: FFI Panic Boundary Check
+        run: cargo run -p xtask -- check-ffi-panic-boundary
+

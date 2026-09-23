@@ -267,7 +267,7 @@ mod tests {
         run_git(&["config", "user.name", "Test User"]);
         run_git(&["config", "user.email", "test@example.com"]);
 
-        let crate_dir = root.join("crates/memfuse-test/src");
+        let crate_dir = root.join("crates/contextra-test/src");
         fs::create_dir_all(&crate_dir).unwrap();
 
         let file_path = crate_dir.join("lib.rs");

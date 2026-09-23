@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# forensic_test.sh — Granularer, beweispflichtiger Cargo-Test-Runner für memfuse.
+# forensic_test.sh — Granularer, beweispflichtiger Cargo-Test-Runner für contextra.
 #
 # ZWECK (siehe PROMPTER_OPTIMIERUNG_TAGESEINSATZ.md / PROOF_OF_WORK_BLOCK-Doktrin):
 #   "Der Code sieht korrekt aus" ist kein Nachweis. Dieses Skript erzeugt für JEDEN
@@ -10,8 +10,8 @@
 # NUTZUNG:
 #   ./scripts/forensic_test.sh                      # alle Crates, Standard-Tiefe
 #   ./scripts/forensic_test.sh --changed             # nur Crates mit uncommitted/staged Diff
-#   ./scripts/forensic_test.sh -p memfuse-store       # ein einzelner Crate
-#   ./scripts/forensic_test.sh -p memfuse-store --triple   # 3x hintereinander (Flakiness/Race-Nachweis)
+#   ./scripts/forensic_test.sh -p contextra-store       # ein einzelner Crate
+#   ./scripts/forensic_test.sh -p contextra-store --triple   # 3x hintereinander (Flakiness/Race-Nachweis)
 #   ./scripts/forensic_test.sh --fast                # nur check+clippy, keine Tests (Pre-Commit-Tempo)
 #   ./scripts/forensic_test.sh --strict-tools        # bricht ab statt zu skippen, wenn ein Tool fehlt
 #

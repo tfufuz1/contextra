@@ -13,7 +13,7 @@
 |---|---|---|---|---|
 | `cargo check --workspace --all-targets` | Workspace Root (19 Workspace-Members, alle Targets) | `0` | **GRÜN** | 0 Blocker, nur Standard-Compiler-Warnungen (z. B. `deprecated`, `unused_variables`) |
 | `cargo test --workspace --no-run` | Workspace Root (alle Unit-, Integrations- & Test-Targets) | `0` | **GRÜN** | 0 Blocker, Test-Artefakte vollständig und fehlerfrei gebaut |
-| `cargo check --manifest-path crates/memfuse-py/Cargo.toml` | Standalone Python Binding Crate (ADR-064) | `0` | **GRÜN** | 0 Blocker, PyO3-Bindings & FFI-Schnittstelle vollständig kompilierbar |
+| `cargo check --manifest-path crates/contextra-py/Cargo.toml` | Standalone Python Binding Crate (ADR-064) | `0` | **GRÜN** | 0 Blocker, PyO3-Bindings & FFI-Schnittstelle vollständig kompilierbar |
 
 ---
 
@@ -31,26 +31,26 @@ Zum Zeitpunkt der Audit-Durchführung lagen **keine aktiven Claims** durch ander
 - **Klassifikation der erfassten Meldungen:**
   - **P0-Blocker:** `0`
   - **Warnungen (`#[warn(...)]`):**
-    - `memfuse-store`: Unused import `std::os::unix::fs::OpenOptionsExt`, unused import `AsyncWriteExt`, dead field `simulate_append_failure`, unused function `set_restrictive_file_acl`.
-    - `memfuse-agent`: Deprecated use of `OrchestratorEngine::from_db` and `OrchestratorEngine::new` in test files.
-    - `memfuse-db`: Deprecated function `start_consolidation_worker`, unused variables in `deletion_proof_integration.rs`.
-    - `memfuse-core`: Deprecated use of `TenantId::new` and `TenantId::DEFAULT` in unit tests.
+    - `contextra-store`: Unused import `std::os::unix::fs::OpenOptionsExt`, unused import `AsyncWriteExt`, dead field `simulate_append_failure`, unused function `set_restrictive_file_acl`.
+    - `contextra-agent`: Deprecated use of `OrchestratorEngine::from_db` and `OrchestratorEngine::new` in test files.
+    - `contextra-db`: Deprecated function `start_consolidation_worker`, unused variables in `deletion_proof_integration.rs`.
+    - `contextra-core`: Deprecated use of `TenantId::new` and `TenantId::DEFAULT` in unit tests.
 
 ### 3.2 Test-Kompilierbarkeit (`cargo test --workspace --no-run`)
 - **Exit-Code:** `0` (Success)
 - **Ergebnis:** Sämtliche Unit-Test-Executables und Integrations-Test-Suiten (u. a. LSM, WAL, HNSW, Graph, MCP, Checkpoint, Router, Text) wurden erfolgreich gebaut und für die Testausführung vorbereitet.
 
-### 3.3 Standalone Python Bindings (`crates/memfuse-py`)
+### 3.3 Standalone Python Bindings (`crates/contextra-py`)
 - **Exit-Code:** `0` (Success)
-- **Ergebnis:** Die PyO3- und NumPy-Schnittstelle in `crates/memfuse-py` baut fehlerfrei gegen den Workspace-Kern.
+- **Ergebnis:** Die PyO3- und NumPy-Schnittstelle in `crates/contextra-py` baut fehlerfrei gegen den Workspace-Kern.
 
 ---
 
 ## 4. Invarianten- & Governance-Abgleich
 
 1. **Zero-Panic Policy & Safety Invarianten:** Keinerlei Build-Unterbrechungen durch Typ- oder Makro-Panic-Konstrukte.
-2. **ADR-064 Compliance:** `memfuse-py` ist strikt außerhalb der Workspace-`members` isoliert und baut via dediziertem Manifest fehlerfrei.
-3. **Crate-Mitglieder-Abdeckung:** Alle 19 Workspace-Mitglieder (`memfuse-core`, `memfuse-crypto`, `memfuse-store`, `memfuse-checkpoint`, `memfuse-index`, `memfuse-graph`, `memfuse-text`, `memfuse-db`, `memfuse-embed`, `memfuse-candle`, `memfuse-ollama`, `memfuse-router`, `memfuse-calibration`, `memfuse-mcp`, `memfuse-agent`, `memfuse-sandbox`, `memfuse-bench`, `memfuse-core-ipc-gen`, `xtask`) wurden erfolgreich geprüft.
+2. **ADR-064 Compliance:** `contextra-py` ist strikt außerhalb der Workspace-`members` isoliert und baut via dediziertem Manifest fehlerfrei.
+3. **Crate-Mitglieder-Abdeckung:** Alle 19 Workspace-Mitglieder (`contextra-core`, `contextra-crypto`, `contextra-store`, `contextra-checkpoint`, `contextra-index`, `contextra-graph`, `contextra-text`, `contextra-db`, `contextra-embed`, `contextra-candle`, `contextra-ollama`, `contextra-router`, `contextra-calibration`, `contextra-mcp`, `contextra-agent`, `contextra-sandbox`, `contextra-bench`, `contextra-core-ipc-gen`, `xtask`) wurden erfolgreich geprüft.
 
 ---
 

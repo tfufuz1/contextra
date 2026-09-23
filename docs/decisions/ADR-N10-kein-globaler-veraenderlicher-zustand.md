@@ -22,14 +22,14 @@
 
 ## 2. Fallbeispiele & Refactoring-Analyse
 
-### Fallbeispiel 1: `ORPHAN_REGISTRY` in `memfuse-checkpoint`
+### Fallbeispiel 1: `ORPHAN_REGISTRY` in `contextra-checkpoint`
 * **Problem-Analyse:**
-  In `crates/memfuse-checkpoint/src/orphan.rs` existierte ein globaler statischer Singleton `static ORPHAN_REGISTRY: OnceLock<OrphanRegistry>`.
-  In parallelen Unit-Tests (`cargo test`) führte der simultane Zugriff auf dieses Singleton zu sporadischen Flaky Tests und Lock-Kontention (dokumentiert als Race-Condition in `AUDIT_memfuse-checkpoint.md`).
+  In `crates/contextra-checkpoint/src/orphan.rs` existierte ein globaler statischer Singleton `static ORPHAN_REGISTRY: OnceLock<OrphanRegistry>`.
+  In parallelen Unit-Tests (`cargo test`) führte der simultane Zugriff auf dieses Singleton zu sporadischen Flaky Tests und Lock-Kontention (dokumentiert als Race-Condition in `AUDIT_contextra-checkpoint.md`).
 * **Soll-Zustand / Refactoring:**
   Entfernung des globalen `ORPHAN_REGISTRY` Singletons. Die Waisen-Registrierung (`OrphanRegistry`) wird direkt als Instanzfeld in den `PersistentCheckpointStore` bzw. die jeweilige `StorageEngine`-Instanz eingebettet. Lebensdauer und State-Tracking sind somit strikt an die jeweilige Store-Instanz gebunden.
 
-### Fallbeispiel 2: `CIPHER_INSTANCE` & Nonce-Counter in `memfuse-crypto` / Security
+### Fallbeispiel 2: `CIPHER_INSTANCE` & Nonce-Counter in `contextra-crypto` / Security
 * **Problem-Analyse:**
   Entwürfe mit globalen `static CIPHER_INSTANCE` oder globalen RAM-basierten `AtomicU64`-Nonce-Zählern verstoßen ebenfalls gegen P29. Ein RAM-basierter Nonce-Zähler beginnt nach einem Prozess-Neustart wieder bei 0, was bei Wiederverwendung desselben Schlüssels zum kryptographischen Kollaps führen würde.
 * **Soll-Zustand / Refactoring:**

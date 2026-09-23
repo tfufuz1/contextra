@@ -1,10 +1,10 @@
-// ANCHOR[PERF:BENCH-003] STATUS:DONE (TS:2026-09-03T00:00:00Z) — MemFuse Competitive Benchmark Suite
+// ANCHOR[PERF:BENCH-003] STATUS:DONE (TS:2026-09-03T00:00:00Z) — Contextra Competitive Benchmark Suite
 // ZIEL: Criterion-basierte Messung von Write-Durchsatz, Hybrid-Search-Latenz und Context-Compaction-Durchsatz
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use memfuse_core::{ContextChunk, DocId, TokenBudget};
-use memfuse_db::context_compaction::{CompactionStrategy, ContextCompactor};
-use memfuse_db::MemFuse;
+use contextra_core::{ContextChunk, DocId, TokenBudget};
+use contextra_db::context_compaction::{CompactionStrategy, ContextCompactor};
+use contextra_db::Contextra;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
@@ -54,7 +54,7 @@ fn bench_write_throughput(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("insert_batch", n), &n, |b, _| {
             b.to_async(&rt).iter(|| async {
                 let tmp = TempDir::new().unwrap();
-                let db = MemFuse::open(tmp.path()).await.unwrap();
+                let db = Contextra::open(tmp.path()).await.unwrap();
 
                 // Insert in batches of 100 to stay safely within max_ops_per_tx capacity
                 let batch_size = 100;
@@ -73,7 +73,7 @@ fn bench_hybrid_search_latency(c: &mut Criterion) {
     let num_docs = 1_000;
 
     let tmp = TempDir::new().unwrap();
-    let db = rt.block_on(MemFuse::open(tmp.path())).unwrap();
+    let db = rt.block_on(Contextra::open(tmp.path())).unwrap();
 
     let batch_size = 100;
     let mut current_batch = Vec::with_capacity(batch_size);

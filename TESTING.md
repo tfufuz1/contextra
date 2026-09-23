@@ -1,6 +1,6 @@
 # TESTING.md — Testphilosophie & Qualitätskriterien
 
-Dieses Dokument definiert die Standards für die Qualitätssicherung und Testabdeckung im MemFuse-Projekt.
+Dieses Dokument definiert die Standards für die Qualitätssicherung und Testabdeckung im Contextra-Projekt.
 
 ---
 
@@ -45,9 +45,9 @@ Ist dies nicht der Fall, existiert eine Testlücke im entsprechenden Zweig.
 ---
 
 ## 5. Hermetic Feature Gate Check
-Feature-gated crates (such as `memfuse-embed` with the `onnx` feature) must build cleanly when default features are disabled:
+Feature-gated crates (such as `contextra-embed` with the `onnx` feature) must build cleanly when default features are disabled:
 ```bash
-cargo check -p memfuse-embed --no-default-features
+cargo check -p contextra-embed --no-default-features
 ```
 This check verifies zero leakage of optional dependencies or types into non-feature-gated modules.
 

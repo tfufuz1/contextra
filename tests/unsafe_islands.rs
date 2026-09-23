@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-09-19T20:22:00Z (SESSION: 01c5be8b)
 // ZWECK: Unsafe Islands inventory verification (GESAMTSPEZIFIKATION §0.2, §0.4).
-// INVARIANTEN: Exactly 3 Unsafe Islands (memfuse-simd, memfuse-sys, memfuse-wire).
+// INVARIANTEN: Exactly 3 Unsafe Islands (contextra-simd, contextra-sys, contextra-wire).
 // Temporary transition allowance until Phase 1c for legacy store, index, db, and crypto test.
 
 use std::collections::HashSet;
@@ -10,16 +10,16 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 pub const ALLOWED_UNSAFE_ISLANDS: &[&str] = &[
-    "memfuse-simd",
-    "memfuse-sys",
-    "memfuse-wire",
+    "contextra-simd",
+    "contextra-sys",
+    "contextra-wire",
 ];
 
 pub const TRANSITION_ALLOWED_CRATES: &[&str] = &[
-    "memfuse-vector",        // SIMD + Mmap, being moved to memfuse-simd / memfuse-sys in Phase 1c
-    "memfuse-store",        // Win32 ACL, being moved to memfuse-sys in Phase 1c
-    "memfuse-db",           // volatile-vault mlock, being moved to memfuse-sys in Phase 1c
-    "memfuse-crypto",       // test-only Zeroize drop semantics verification
+    "contextra-vector",        // SIMD + Mmap, being moved to contextra-simd / contextra-sys in Phase 1c
+    "contextra-store",        // Win32 ACL, being moved to contextra-sys in Phase 1c
+    "contextra-db",           // volatile-vault mlock, being moved to contextra-sys in Phase 1c
+    "contextra-crypto",       // test-only Zeroize drop semantics verification
 ];
 
 pub fn check_unsafe_islands(root: &Path) -> (bool, Vec<String>) {
@@ -91,7 +91,7 @@ pub fn check_unsafe_islands(root: &Path) -> (bool, Vec<String>) {
         }
     }
 
-    println!("=== MemFuse Unsafe Islands Inventory Verification ===");
+    println!("=== Contextra Unsafe Islands Inventory Verification ===");
     println!("Approved Islands: {:?}", ALLOWED_UNSAFE_ISLANDS);
     println!("Transition Crates (Phase 0R..1c): {:?}", TRANSITION_ALLOWED_CRATES);
 

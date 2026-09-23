@@ -1,6 +1,6 @@
-# SECURITY.md — Bedrohungsmodell & Sicherheitsschicht für MemFuse & Agenten
+# SECURITY.md — Bedrohungsmodell & Sicherheitsschicht für Contextra & Agenten
 
-Dieses Dokument definiert das Bedrohungsmodell und die Sicherheitsarchitektur für MemFuse Brain (Desktop-App, Local LLM/Ollama Integration, MCP Server) sowie die agentische Entwicklungsumgebung. Es ist Pflicht-Lektüre (siehe `AGENTS.md`).
+Dieses Dokument definiert das Bedrohungsmodell und die Sicherheitsarchitektur für Contextra Brain (Desktop-App, Local LLM/Ollama Integration, MCP Server) sowie die agentische Entwicklungsumgebung. Es ist Pflicht-Lektüre (siehe `AGENTS.md`).
 
 ---
 
@@ -11,7 +11,7 @@ Dieses Dokument definiert das Bedrohungsmodell und die Sicherheitsarchitektur f�
 ### Angriffsvektoren
 *   **Malicious Document Ingestion**: Ingestierte Dokumente enthalten Prompt-Injections, die darauf abzielen, das lokale Sprachmodell (Ollama) zur Ausführung unerwünschter Aktionen oder zur Offenlegung anderer Dokumente zu bewegen.
 *   **Fremdcode & Third-Party Crates**: Ein manipuliertes Crate oder ein Kommentar in einer Third-Party-Abhängigkeit enthält Anweisungen, die ein Entwickler-Agent als Projektregel interpretiert.
-*   **MCP Protocol Abuse**: Unbekannte Client-Anfragen über den MCP-Server (`memfuse-mcp`) versuchen unberechtigte Collection-Modifikationen oder DoS-Angriffe.
+*   **MCP Protocol Abuse**: Unbekannte Client-Anfragen über den MCP-Server (`contextra-mcp`) versuchen unberechtigte Collection-Modifikationen oder DoS-Angriffe.
 
 ---
 
@@ -22,9 +22,9 @@ Dieses Dokument definiert das Bedrohungsmodell und die Sicherheitsarchitektur f�
 ---
 
 ## 3. Sandboxing, Network Boundaries & Ollama HTTP Safety
-*   **Air-Gapped & Local-First**: Keine Daten verlassen das lokale Gerät. Die Kommunikation mit Ollama (`memfuse-ollama`) erfolgt ausschließlich über das lokale Loopback-Netzwerk (`http://127.0.0.1:11434`).
-*   **MCP Server Boundaries**: Der MCP Server (`memfuse-mcp`) bindet lokal und stellt ausschließlich vorgegebene Tools (`memfuse_search`, `memfuse_insert`, `memfuse_get`, `memfuse_collections`) bereit.
-*   **Disk Encryption**: Crypt-at-Rest via AES-256-GCM in `memfuse-crypto` schützt persistierte SSTables. HMAC-Chaining schützt WAL-Einträge vor Tampering. Ohne Encryption-at-Rest schützt das WAL-HMAC-Chaining nur vor zufälliger Korruption, nicht vor einem Angreifer mit Schreibzugriff auf den Integritätsschlüssel selbst — dieser liegt im Klartext neben der Datenbank.
+*   **Air-Gapped & Local-First**: Keine Daten verlassen das lokale Gerät. Die Kommunikation mit Ollama (`contextra-ollama`) erfolgt ausschließlich über das lokale Loopback-Netzwerk (`http://127.0.0.1:11434`).
+*   **MCP Server Boundaries**: Der MCP Server (`contextra-mcp`) bindet lokal und stellt ausschließlich vorgegebene Tools (`contextra_search`, `contextra_insert`, `contextra_get`, `contextra_collections`) bereit.
+*   **Disk Encryption**: Crypt-at-Rest via AES-256-GCM in `contextra-crypto` schützt persistierte SSTables. HMAC-Chaining schützt WAL-Einträge vor Tampering. Ohne Encryption-at-Rest schützt das WAL-HMAC-Chaining nur vor zufälliger Korruption, nicht vor einem Angreifer mit Schreibzugriff auf den Integritätsschlüssel selbst — dieser liegt im Klartext neben der Datenbank.
 
 ---
 

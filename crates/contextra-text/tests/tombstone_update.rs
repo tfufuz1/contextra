@@ -1,0 +1,248 @@
+//! SD-05-TEXT-001 — Tombstone update path integration tests.
+//!
+//! Verifies that `upsert_document` no longer eagerly deletes old posting-list
+//! entries on updates (tombstone path) while maintaining full BM25 correctness.
+
+use contextra_core::{BoxFuture, DocId, Result, StorageEngine, TxId};
+use contextra_text::InvertedIndex;
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+// ---------------------------------------------------------------------------
+// Shared MockStorage (mirrors the one in inverted.rs tests)
+// ---------------------------------------------------------------------------
+
+struct MockStorage {
+    store: RwLock<HashMap<Vec<u8>, Vec<u8>>>,
+    delete_calls: std::sync::atomic::AtomicU64,
+}
+
+impl MockStorage {
+    fn new() -> Self {
+        Self {
+            store: RwLock::new(HashMap::new()),
+            delete_calls: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    fn delete_call_count(&self) -> u64 {
+        self.delete_calls.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+impl StorageEngine for MockStorage {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { Ok(self.store.read().get(key).cloned().map(bytes::Bytes::from)) })
+    }
+    fn put<'a>(&'a self, _tx: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            self.store.write().insert(key.to_vec(), value.to_vec());
+            Ok(())
+        })
+    }
+    fn delete<'a>(&'a self, _tx: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            self.delete_calls
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.store.write().remove(key);
+            Ok(())
+        })
+    }
+    fn commit<'a>(&'a self, _tx: TxId) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
+    fn rollback<'a>(&'a self, _tx: TxId) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
+    fn rollback_to_tx<'a>(&'a self, _tx: TxId) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
+    fn get_at_seq<'a>(
+        &'a self,
+        key: &'a [u8],
+        _seq: u64,
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        Box::pin(async move { self.get(key).await })
+    }
+    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+        Box::pin(async move { Ok(0) })
+    }
+    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+        Box::pin(async move { Ok(TxId::new(0)) })
+    }
+    fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::StorageStats>> {
+        Box::pin(async move {
+            Ok(contextra_core::StorageStats {
+                num_segments: 0,
+                total_size_bytes: 0,
+                memtable_size_bytes: 0,
+            })
+        })
+    }
+    fn pin_checkpoint<'a>(&'a self, _id: u64) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
+    fn unpin_checkpoint<'a>(&'a self, _id: u64) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
+    fn scan<'a>(
+        &'a self,
+        _start: std::ops::Bound<&'a [u8]>,
+        _end: std::ops::Bound<&'a [u8]>,
+        _: Option<usize>,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { Ok(Vec::new()) })
+    }
+    fn scan_prefix<'a>(
+        &'a self,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move {
+            let store = self.store.read();
+            Ok(store
+                .iter()
+                .filter(|(k, _)| k.starts_with(prefix))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
+        })
+    }
+    fn scan_prefix_at<'a>(
+        &'a self,
+        prefix: &'a [u8],
+        _seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move { self.scan_prefix(prefix).await })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+/// On update the tombstone path must NOT call `storage.delete` for old
+/// posting-list entries — those are overwritten lazily by LSM semantics.
+/// Only `resolve_tombstones()` should trigger deletions.
+#[tokio::test]
+async fn test_tombstone_update_no_eager_delete(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let storage = Arc::new(MockStorage::new());
+    let index = InvertedIndex::new(storage.clone(), "default");
+
+    let d1 = DocId::new(1);
+
+    // First insert — no prior state, zero deletes expected.
+    let tx1 = TxId::new(1);
+    index.upsert_document(tx1, d1, "rust programming").await?;
+    storage.commit(tx1).await?;
+    let deletes_after_insert = storage.delete_call_count();
+    assert_eq!(deletes_after_insert, 0, "First insert must not call delete");
+
+    // Update — tombstone path: still zero eager deletes.
+    let tx2 = TxId::new(2);
+    index.upsert_document(tx2, d1, "python coding").await?;
+    storage.commit(tx2).await?;
+    let deletes_after_update = storage.delete_call_count();
+    assert_eq!(
+        deletes_after_update, 0,
+        "Update must not eagerly delete old posting-list entries (tombstone path)"
+    );
+
+    // A tombstone key tbs:1 should now exist.
+    let tbs_prefix = b"__txt:default:tbs:";
+    let tbs_entries = storage.scan_prefix(tbs_prefix).await?;
+    assert_eq!(
+        tbs_entries.len(),
+        2,
+        "Exactly two tombstones expected (one per term)"
+    );
+
+    Ok(())
+}
+
+/// After `resolve_tombstones()` the stale entries from the old document version
+/// should be removed and the BM25 index should reflect only the new terms.
+#[tokio::test]
+async fn test_bm25_correct_after_tombstone_update(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let storage = Arc::new(MockStorage::new());
+    let index = InvertedIndex::new(storage.clone(), "resolve");
+
+    let d1 = DocId::new(1);
+    let d2 = DocId::new(2);
+
+    // Insert two docs
+    let tx1 = TxId::new(1);
+    index.upsert_document(tx1, d1, "rust programming").await?;
+    index.upsert_document(tx1, d2, "python coding").await?;
+    storage.commit(tx1).await?;
+
+    // Update d1: "rust programming" → "python coding"
+    let tx2 = TxId::new(2);
+    index.upsert_document(tx2, d1, "python coding").await?;
+    storage.commit(tx2).await?;
+
+    // Before resolve_tombstones: "rust" may still appear for d1 (stale entry)
+    // After resolve_tombstones: "rust" must NOT appear for d1.
+
+    let tx3 = TxId::new(3);
+    let resolved = index.resolve_tombstones(tx3).await?;
+    storage.commit(tx3).await?;
+    assert_eq!(resolved, 2, "Two tombstones should be resolved");
+
+    // "rust" should now have zero results (stale d1 entry removed)
+    let rust_results = index.search_bm25("rust", 10, None).await?;
+    assert_eq!(
+        rust_results.len(),
+        0,
+        "After resolve_tombstones 'rust' entry for d1 must be removed"
+    );
+
+    // "python" should return both d1 and d2
+    let python_results = index.search_bm25("python", 10, None).await?;
+    assert_eq!(python_results.len(), 2);
+
+    // "coding" should return both d1 and d2
+    let coding_results = index.search_bm25("coding", 10, None).await?;
+    assert_eq!(coding_results.len(), 2);
+
+    Ok(())
+}
+
+/// Multiple sequential updates of the same document should accumulate only
+/// ONE tombstone (because the same key is overwritten each time).
+#[tokio::test]
+async fn test_multiple_updates_single_tombstone(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let storage = Arc::new(MockStorage::new());
+    let index = InvertedIndex::new(storage.clone(), "multi");
+
+    let d1 = DocId::new(1);
+    let tbs_prefix = b"__txt:multi:tbs:";
+
+    let tx1 = TxId::new(1);
+    index.upsert_document(tx1, d1, "first version").await?;
+    storage.commit(tx1).await?;
+
+    for (i, text) in ["second version", "third version", "fourth version"]
+        .iter()
+        .enumerate()
+    {
+        let tx = TxId::new(2 + i as u64);
+        index.upsert_document(tx, d1, text).await?;
+        storage.commit(tx).await?;
+    }
+
+    // Should still be exactly four tombstones for d1 (first, second, third, version).
+    let tbs_entries = storage.scan_prefix(tbs_prefix).await?;
+    assert_eq!(
+        tbs_entries.len(),
+        4,
+        "Multiple updates should yield exactly four tombstones (first, second, third, version)"
+    );
+
+    Ok(())
+}

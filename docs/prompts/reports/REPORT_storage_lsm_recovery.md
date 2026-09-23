@@ -1,21 +1,21 @@
-# Audit Report: LSM Engine Recovery & Fault Tolerance (`memfuse-store`)
+# Audit Report: LSM Engine Recovery & Fault Tolerance (`contextra-store`)
 
 **Role**: Principal Senior Rust Storage Engine Architect
 **Date**: 2026-09-10
 **Scope Crates & Files**:
-- `crates/memfuse-store/src/wal.rs`
-- `crates/memfuse-store/src/memtable.rs`
-- `crates/memfuse-store/src/sstable.rs`
-- `crates/memfuse-store/src/compaction.rs`
-- `crates/memfuse-store/src/lsm.rs`
+- `crates/contextra-store/src/wal.rs`
+- `crates/contextra-store/src/memtable.rs`
+- `crates/contextra-store/src/sstable.rs`
+- `crates/contextra-store/src/compaction.rs`
+- `crates/contextra-store/src/lsm.rs`
 
 ---
 
 ## Executive Summary
 
-An architectural and implementation audit was conducted across the `memfuse-store` LSM-Tree engine focusing on Write-Ahead Log (WAL) durability, `fsync` discipline, crash-recovery mechanisms, atomic commit guarantees, and Tombstone Garbage Collection during compaction.
+An architectural and implementation audit was conducted across the `contextra-store` LSM-Tree engine focusing on Write-Ahead Log (WAL) durability, `fsync` discipline, crash-recovery mechanisms, atomic commit guarantees, and Tombstone Garbage Collection during compaction.
 
-Fault injection integration tests were implemented and verified in `crates/memfuse-store/tests/fault_injection_recovery.rs`. All unit and integration test suites pass cleanly (`cargo test -p memfuse-store --all-features`).
+Fault injection integration tests were implemented and verified in `crates/contextra-store/tests/fault_injection_recovery.rs`. All unit and integration test suites pass cleanly (`cargo test -p contextra-store --all-features`).
 
 ---
 
@@ -39,7 +39,7 @@ Fault injection integration tests were implemented and verified in `crates/memfu
   - WAL records use length-prefixed framing: `u32` payload size, `u32` CRC32 checksum, `u64` `seq_no`, 32-byte HMAC checksum, 32-byte `prev_hmac` (chain link), and operation payload (`tx_id`, `key`, `value`).
   - During `replay()`:
     - CRC32 mismatches or deserialization errors at file end (when `pos >= file_size`) are safely recognized as truncated tail writes from abrupt process termination and cleanly ignored.
-    - Any payload corruption or bit-flip prior to the file tail raises an explicit `MemFuseError::WalCorruption`.
+    - Any payload corruption or bit-flip prior to the file tail raises an explicit `ContextraError::WalCorruption`.
     - Every entry's HMAC is verified against the derived per-file integrity key and `prev_hmac` link, guaranteeing cryptographic tamper-detection.
 
 ### 4. Write / Read / Space Amplification
@@ -67,7 +67,7 @@ Fault injection integration tests were implemented and verified in `crates/memfu
 
 ## Fault Injection Test Results
 
-All fault injection scenarios were executed via `cargo test -p memfuse-store --test fault_injection_recovery`:
+All fault injection scenarios were executed via `cargo test -p contextra-store --test fault_injection_recovery`:
 
 | Test Case | Scenario | Result |
 |---|---|---|
@@ -79,6 +79,6 @@ All fault injection scenarios were executed via `cargo test -p memfuse-store --t
 
 ## Verification Summary
 
-- `cargo test -p memfuse-store --all-features`: **135 passed, 0 failed**.
-- `cargo clippy -p memfuse-store --all-features -- -D warnings`: **0 errors, 0 warnings**.
+- `cargo test -p contextra-store --all-features`: **135 passed, 0 failed**.
+- `cargo clippy -p contextra-store --all-features -- -D warnings`: **0 errors, 0 warnings**.
 - `cargo fmt --check`: **0 formatting issues**.

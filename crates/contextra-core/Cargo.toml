@@ -1,0 +1,26 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for Contextra"
+
+[features]
+test-utils = []
+docid-128 = ["contextra-types/docid-128"]
+
+[dependencies]
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-mvcc = { workspace = true }
+contextra-wire = { workspace = true }
+
+[dev-dependencies]
+# Async runtime for executing async unit tests.
+tokio = { workspace = true, features = ["rt", "macros"] }
+# Property-based testing framework for invariant validation.
+proptest = "1.4"

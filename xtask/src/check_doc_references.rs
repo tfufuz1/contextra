@@ -1,4 +1,4 @@
-// MemFuse — Check Documentation Path References Gate
+// Contextra — Check Documentation Path References Gate
 //
 // Subkommando `cargo xtask check-doc-references`
 // Durchsucht Markdown-Dateien nach Datei-/Modul-Pfad-Referenzen und prüft,
@@ -244,13 +244,13 @@ mod tests {
 
     #[test]
     fn test_extract_path_candidates() {
-        let line = "Referenz auf `crates/memfuse-core/src/lib.rs` und `physio_scheduler.rs` sowie `Cargo.toml`. Ignoriere eine .rs-Datei.";
+        let line = "Referenz auf `crates/contextra-core/src/lib.rs` und `physio_scheduler.rs` sowie `Cargo.toml`. Ignoriere eine .rs-Datei.";
         let candidates = extract_path_candidates(line);
         assert_eq!(
             candidates,
             vec![
                 "Cargo.toml",
-                "crates/memfuse-core/src/lib.rs",
+                "crates/contextra-core/src/lib.rs",
                 "physio_scheduler.rs"
             ]
         );
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_ignore_comment_convention() {
-        let line = "| OFFEN-11 | `memfuse-db` | `physio_scheduler.rs` | <!-- doc-ref-ignore -->";
+        let line = "| OFFEN-11 | `contextra-db` | `physio_scheduler.rs` | <!-- doc-ref-ignore -->";
         let candidates = extract_path_candidates(line);
         assert!(candidates.is_empty());
     }

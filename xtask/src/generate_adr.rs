@@ -31,7 +31,7 @@ pub fn consolidate_decisions(root: &Path) -> Result<(), String> {
         let mut header = String::new();
         header.push_str("# Architecture Decision Records (ADR)\n\n");
         header.push_str("> **Kanonische Einzel-Quelle:** Gemäß ADR-060 ist `DECISIONS.md` die einzige maßgebliche\n");
-        header.push_str("> Quelle für Architecture Decision Records im MemFuse-Projekt. Neue Entscheidungen werden\n");
+        header.push_str("> Quelle für Architecture Decision Records im Contextra-Projekt. Neue Entscheidungen werden\n");
         header.push_str("> ausschließlich append-only am Ende dieser Datei ergänzt (`cargo xtask generate-adr \"<Titel>\"`).\n\n");
         header.push_str("## Dokumentierte Lücken & Umnummerierungen\n\n");
         header.push_str("* ADR-057: Lücken-Dokumentation (Umnummerierung / Ausgelassen im Zuge paralleler Audit-Sessions)\n");

@@ -1,16 +1,16 @@
 # AUDIT REPORT: H1 CsrGraph RCU-Konsistenz vs. geplanter Hyperkanten-Sekundärindex
 
 **Stand:** 2026-09-16
-**Crate:** `crates/memfuse-graph` (Layer 2)
-**Datei:** `crates/memfuse-graph/src/csr.rs`
+**Crate:** `crates/contextra-graph` (Layer 2)
+**Datei:** `crates/contextra-graph/src/csr.rs`
 **Modus:** AUDIT (Read-Only Analysis)
-**Claim-ID:** `memfuse-graph` audit-readonly
+**Claim-ID:** `contextra-graph` audit-readonly
 
 ---
 
 ## Executive Summary
 
-Dieser Audit untersucht die RCU-Architektur von `CsrGraph` (`GraphInner` / `ArcSwap<GraphInner>`) in `crates/memfuse-graph/src/csr.rs` bezüglich der Vorbereitung und Bereitschaft für einen künftigen Hyperkanten-Sekundärindex (Architektur-Review v11.2 §H1).
+Dieser Audit untersucht die RCU-Architektur von `CsrGraph` (`GraphInner` / `ArcSwap<GraphInner>`) in `crates/contextra-graph/src/csr.rs` bezüglich der Vorbereitung und Bereitschaft für einen künftigen Hyperkanten-Sekundärindex (Architektur-Review v11.2 §H1).
 
 **Ergebnis:** Die zentralen Annahmen aus §H1 bezüglich RCU-Snapshot-Konsistenz und der Einbettung sekundärer Indizes direkt in `GraphInner` wurden **BELEGT**. Es gibt exakt ein zentrales `ArcSwap<GraphInner>`-Handle für atomare Publikationen. Der vorgeschlagene Hyperkanten-Sekundärindex *muss* zwingend als Feld innerhalb von `GraphInner` platziert werden, um Snapshot-Inversionen und Split-Brain-Zustände bei Leser-Queries zu verhindern. Allerdings offenbaren die Details bezüglich `#[derive(Clone)]` und `estimate_memory_bytes()` konkrete Skalierungs- und Budgetierungs-Invarianten, die bei der Erweiterung berücksichtigt werden müssen.
 
@@ -21,7 +21,7 @@ Dieser Audit untersucht die RCU-Architektur von `CsrGraph` (`GraphInner` / `ArcS
 ### 1. Feldstruktur von `GraphInner` & `Clone`-Semantik bei Hyperkanten-Erweiterung
 
 * **Status:** **BELEGT**
-* **Fundstelle:** `crates/memfuse-graph/src/csr.rs:223–279`
+* **Fundstelle:** `crates/contextra-graph/src/csr.rs:223–279`
 
 `GraphInner` leitet in Zeile 223 explizit `#[derive(Clone)]` ab. Die Struktur umfasst im aktuellen Codebase 22 Felder (bzw. 23 bei aktiviertem Feature-Flag `edge-reinforcement-learning`):
 
@@ -71,7 +71,7 @@ Ein zusätzliches Feld `hyperedge_index: AHashMap<EntityId, Vec<HyperEdgeId>>` b
 ### 2. Atomarität & Publikation über `ArcSwap<GraphInner>`
 
 * **Status:** **BELEGT**
-* **Fundstelle:** `crates/memfuse-graph/src/csr.rs:688, 701, 789–791, 1461`
+* **Fundstelle:** `crates/contextra-graph/src/csr.rs:688, 701, 789–791, 1461`
 
 Die H1-Grundannahme ist **vollständig korrekt**: Es existiert genau eine einzige `ArcSwap`-Instanz für den gesamten Graphzustand auf der `CsrGraph`-Struktur:
 
@@ -100,7 +100,7 @@ Das Publishing eines neuen `GraphInner`-Zustands an Leser erfolgt an exakt zwei 
 ### 3. Analyse des Marker-Kommentars `TODO(IP-08-BUDGET-COUPLING)`
 
 * **Status:** **BELEGT**
-* **Fundstelle:** `crates/memfuse-graph/src/csr.rs:1445`
+* **Fundstelle:** `crates/contextra-graph/src/csr.rs:1445`
 
 Der Marker existiert exakt an Zeile 1445 in `compact_async()`:
 
@@ -124,7 +124,7 @@ if let Some(max_mb) = self.config.max_compaction_peak_memory_mb {
 
 **Analyse des TODOs:**
 1. Die Kopplung zwischen der lokalen Speicherschätzung `estimate_memory_bytes()` und dem lokalen Schwellenwert `max_compaction_peak_memory_mb` **ist im Code bereits vorhanden und aktiv** (Z. 1436–1443).
-2. Was laut TODO fehlt, ist die Anbindung an den **globalen, cross-crate `ResourceTracker`**, damit Compactions auch dann aufgeschoben werden, wenn systemweit (z.B. durch HNSW-Index-Rebuilds in `memfuse-index` oder LSM-MemTable Flushes in `memfuse-store`) der Speicher knapp wird.
+2. Was laut TODO fehlt, ist die Anbindung an den **globalen, cross-crate `ResourceTracker`**, damit Compactions auch dann aufgeschoben werden, wenn systemweit (z.B. durch HNSW-Index-Rebuilds in `contextra-index` oder LSM-MemTable Flushes in `contextra-store`) der Speicher knapp wird.
 3. **Unterschätzungs-Risiko:** `estimate_memory_bytes()` berücksichtigt aktuell nur die flachen Vektor- und Delta-Puffer-Längen, ignoriert jedoch die Kapazitäten und Hash-Overheads von `id_map`, `communities`, `doc_to_edges`, `staged_entities`, `staged_edges`, `staged_removals` und `tombstoned_edges`. Bei Hinzufügen eines Hyperkanten-Sekundärindex (`AHashMap`) würde diese Unterschätzung noch deutlicher wiegen, falls der Hyperkanten-Index nicht explizit in `estimate_memory_bytes()` eingerechnet wird.
 
 ---
@@ -132,7 +132,7 @@ if let Some(max_mb) = self.config.max_compaction_peak_memory_mb {
 ### 4. Aufrufpfade von `estimate_memory_bytes()`
 
 * **Status:** **BELEGT**
-* **Fundstelle:** `crates/memfuse-graph/src/csr.rs:310, 1436`
+* **Fundstelle:** `crates/contextra-graph/src/csr.rs:310, 1436`
 
 `estimate_memory_bytes()` ist eine Methode auf `GraphInner` (Z. 310) und wird **ausschließlich an einer einzigen Stelle** im gesamten Crate bzw. Workspace aufgerufen:
 
@@ -146,7 +146,7 @@ An keiner anderen Stelle (z.B. Metriken, Monitoring oder `stats()`) wird diese M
 ### 5. Granularität & Aufbau von `estimate_memory_bytes()`
 
 * **Status:** **BELEGT**
-* **Fundstelle:** `crates/memfuse-graph/src/csr.rs:310–323`
+* **Fundstelle:** `crates/contextra-graph/src/csr.rs:310–323`
 
 Die Methode ist per-Feld additiv aufgebaut, was die isolierte Erweiterung um weitere Felder sehr einfach macht:
 
@@ -174,7 +174,7 @@ Eine künftige Erweiterung um einen Hyperkanten-Term kann als isolierter Summand
 ### 6. Bestehender Sekundärindex in `GraphInner` als Architektur-Vorbild
 
 * **Status:** **BELEGT**
-* **Fundstelle:** `crates/memfuse-graph/src/csr.rs:257, 601–605, 831–836, 1269–1274`
+* **Fundstelle:** `crates/contextra-graph/src/csr.rs:257, 601–605, 831–836, 1269–1274`
 
 In `GraphInner` existiert bereits heute ein sekundärer, snapshot-konsistenter Index neben den reinen CSR-Arrays:
 

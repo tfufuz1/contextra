@@ -167,7 +167,7 @@ pub fn run_validate_pr_checklist() -> bool {
 
     // ── Provenienz-Dimension ───────────────────────────────────────────────
 
-    let graph_changes = diff_files.iter().any(|f| f.contains("memfuse-graph/"));
+    let graph_changes = diff_files.iter().any(|f| f.contains("contextra-graph/"));
     if graph_changes {
         let has_provenance = diff.contains("EdgeProvenance");
         let mut prov_checks = Vec::new();
@@ -200,7 +200,7 @@ pub fn run_validate_pr_checklist() -> bool {
     // VETO-01: Partieller HNSW-Rebuild
     let hnsw_changes = diff_files
         .iter()
-        .any(|f| f.contains("memfuse-index/") && (f.contains("hnsw") || f.contains("rebuild")));
+        .any(|f| f.contains("contextra-index/") && (f.contains("hnsw") || f.contains("rebuild")));
     if hnsw_changes {
         let has_rebuild_region = diff.contains("rebuild_region");
         veto_checks.push(CheckItem {
@@ -254,7 +254,7 @@ pub fn run_validate_pr_checklist() -> bool {
 
     let storage_changes = diff_files
         .iter()
-        .any(|f| f.contains("memfuse-store/") || f.contains("wal") || f.contains("compaction"));
+        .any(|f| f.contains("contextra-store/") || f.contains("wal") || f.contains("compaction"));
     if storage_changes {
         let mut chaos_checks = Vec::new();
         chaos_checks.push(CheckItem {

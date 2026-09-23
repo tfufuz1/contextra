@@ -3,48 +3,48 @@ Runner: nix develop -c | Test-Backend: cargo test | Crates: 18 | Modus: full
 Evidenz-Verzeichnis: target/forensic/20260916T114830Z
 
 ─────────────────────────────────────────────
-▶ memfuse-core-ipc-gen  (crates/memfuse-core-ipc-gen)
-  [A] cargo check -p memfuse-core-ipc-gen
+▶ contextra-core-ipc-gen  (crates/contextra-core-ipc-gen)
+  [A] cargo check -p contextra-core-ipc-gen
       ✅ check OK
-  [B] cargo clippy -p memfuse-core-ipc-gen -- -D warnings
+  [B] cargo clippy -p contextra-core-ipc-gen -- -D warnings
       ✅ clippy OK
-  [C] Testlauf 1/1 (cargo test) -p memfuse-core-ipc-gen
-      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/memfuse-core-ipc-gen/03_test_run1.log
+  [C] Testlauf 1/1 (cargo test) -p contextra-core-ipc-gen
+      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/contextra-core-ipc-gen/03_test_run1.log
 ─────────────────────────────────────────────
-▶ memfuse-core  (crates/memfuse-core)
-  [A] cargo check -p memfuse-core
+▶ contextra-core  (crates/contextra-core)
+  [A] cargo check -p contextra-core
       ✅ check OK
-  [B] cargo clippy -p memfuse-core -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-core/02_clippy.log
+  [B] cargo clippy -p contextra-core -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-core/02_clippy.log
         | 
         | error: use of deprecated associated function `types::domain::TenantId::new`: Nutze TenantId::try_new() oder TenantId::SYSTEM — new() umgeht INV-TENANT-1 und wird in einer künftigen Version entfernt.
-        |     --> crates/memfuse-core/src/types/domain.rs:1108:28
+        |     --> crates/contextra-core/src/types/domain.rs:1108:28
         |      |
         | 1108 |         let t2 = TenantId::new(2);
         |      |                            ^^^
         | 
         | error: use of deprecated associated function `types::domain::TenantId::new`: Nutze TenantId::try_new() oder TenantId::SYSTEM — new() umgeht INV-TENANT-1 und wird in einer künftigen Version entfernt.
-        |     --> crates/memfuse-core/src/types/domain.rs:1130:32
+        |     --> crates/contextra-core/src/types/domain.rs:1130:32
         |      |
         | 1130 |         let tenant = TenantId::new(987654321);
         |      |                                ^^^
         | 
         | error: use of deprecated associated function `types::domain::TenantId::new`: Nutze TenantId::try_new() oder TenantId::SYSTEM — new() umgeht INV-TENANT-1 und wird in einer künftigen Version entfernt.
-        |     --> crates/memfuse-core/src/types/domain.rs:1190:27
+        |     --> crates/contextra-core/src/types/domain.rs:1190:27
         |      |
         | 1190 |         let t = TenantId::new(10);
         |      |                           ^^^
         | 
-        | error: could not compile `memfuse-core` (lib test) due to 8 previous errors
+        | error: could not compile `contextra-core` (lib test) due to 8 previous errors
 ─────────────────────────────────────────────
-▶ memfuse-store  (crates/memfuse-store)
-  [A] cargo check -p memfuse-store
+▶ contextra-store  (crates/contextra-store)
+  [A] cargo check -p contextra-store
       ✅ check OK
-  [B] cargo clippy -p memfuse-store -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-store/02_clippy.log
+  [B] cargo clippy -p contextra-store -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-store/02_clippy.log
         | 
         | error: useless use of `vec!`
-        |     --> crates/memfuse-store/src/compaction.rs:1659:29
+        |     --> crates/contextra-store/src/compaction.rs:1659:29
         |      |
         | 1659 |         let unsorted_ssts = vec![sst_m, sst_c];
         |      |                             ^^^^^^^^^^^^^^^^^^ help: you can use an array directly: `[sst_m, sst_c]`
@@ -54,29 +54,29 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |      = help: to override `-D warnings` add `#[allow(clippy::useless_vec)]`
         | 
         | error: useless use of `vec!`
-        |     --> crates/memfuse-store/src/compaction.rs:1909:26
+        |     --> crates/contextra-store/src/compaction.rs:1909:26
         |      |
         | 1909 |         let input_ssts = vec![sst_a, sst_b];
         |      |                          ^^^^^^^^^^^^^^^^^^ help: you can use an array directly: `[sst_a, sst_b]`
         |      |
         |      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
         | 
-        | error: could not compile `memfuse-store` (lib test) due to 5 previous errors
+        | error: could not compile `contextra-store` (lib test) due to 5 previous errors
 ─────────────────────────────────────────────
-▶ memfuse-index  (crates/memfuse-index)
-  [A] cargo check -p memfuse-index
+▶ contextra-index  (crates/contextra-index)
+  [A] cargo check -p contextra-index
       ✅ check OK
-  [B] cargo clippy -p memfuse-index -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-index/02_clippy.log
-        | 137 -         println!("Befehl: cargo bench -p memfuse-index --bench flush_threshold_amplification --features experimental-diskann");
+  [B] cargo clippy -p contextra-index -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-index/02_clippy.log
+        | 137 -         println!("Befehl: cargo bench -p contextra-index --bench flush_threshold_amplification --features experimental-diskann");
         | 138 -         return;
-        | 137 +         println!("Befehl: cargo bench -p memfuse-index --bench flush_threshold_amplification --features experimental-diskann");
+        | 137 +         println!("Befehl: cargo bench -p contextra-index --bench flush_threshold_amplification --features experimental-diskann");
         |     |
         | 
-        | error: could not compile `memfuse-index` (bench "flush_threshold_amplification") due to 4 previous errors
+        | error: could not compile `contextra-index` (bench "flush_threshold_amplification") due to 4 previous errors
         | warning: build failed, waiting for other jobs to finish...
         | error: method `is_rebuild_required` is never used
-        |    --> crates/memfuse-index/tests/../src/quantize.rs:195:12
+        |    --> crates/contextra-index/tests/../src/quantize.rs:195:12
         |     |
         |  47 | impl ScalarQuantizer {
         |     | -------------------- method in this implementation
@@ -87,13 +87,13 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |     = note: `-D dead-code` implied by `-D warnings`
         |     = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
         | 
-        | error: could not compile `memfuse-index` (test "proptest_distance_quantize") due to 1 previous error
+        | error: could not compile `contextra-index` (test "proptest_distance_quantize") due to 1 previous error
 ─────────────────────────────────────────────
-▶ memfuse-db  (crates/memfuse-db)
-  [A] cargo check -p memfuse-db
+▶ contextra-db  (crates/contextra-db)
+  [A] cargo check -p contextra-db
       ✅ check OK
-  [B] cargo clippy -p memfuse-db -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-db/02_clippy.log
+  [B] cargo clippy -p contextra-db -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-db/02_clippy.log
         |     = help: to override `-D warnings` add `#[allow(clippy::useless_vec)]`
         | help: you can use an array directly
         |     |
@@ -113,13 +113,13 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         | 981 ~             }];
         |     |
         | 
-        | error: could not compile `memfuse-db` (lib test) due to 3 previous errors
+        | error: could not compile `contextra-db` (lib test) due to 3 previous errors
 ─────────────────────────────────────────────
-▶ memfuse-text  (crates/memfuse-text)
-  [A] cargo check -p memfuse-text
+▶ contextra-text  (crates/contextra-text)
+  [A] cargo check -p contextra-text
       ✅ check OK
-  [B] cargo clippy -p memfuse-text -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-text/02_clippy.log
+  [B] cargo clippy -p contextra-text -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-text/02_clippy.log
         | 1960 | |                 .collect::<String>();
         |      | |____________________________________^ help: try: `"performance ".repeat(i)`
         |      |
@@ -128,7 +128,7 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |      = help: to override `-D warnings` add `#[allow(clippy::manual_str_repeat)]`
         | 
         | error: this `repeat().take()` can be written more concisely
-        |     --> crates/memfuse-text/src/inverted.rs:1958:24
+        |     --> crates/contextra-text/src/inverted.rs:1958:24
         |      |
         | 1958 |               let text = std::iter::repeat("performance ")
         |      |  ________________________^
@@ -139,86 +139,86 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |      = note: `-D clippy::manual-repeat-n` implied by `-D warnings`
         |      = help: to override `-D warnings` add `#[allow(clippy::manual_repeat_n)]`
         | 
-        | error: could not compile `memfuse-text` (lib test) due to 2 previous errors
+        | error: could not compile `contextra-text` (lib test) due to 2 previous errors
 ─────────────────────────────────────────────
-▶ memfuse-checkpoint  (crates/memfuse-checkpoint)
-  [A] cargo check -p memfuse-checkpoint
+▶ contextra-checkpoint  (crates/contextra-checkpoint)
+  [A] cargo check -p contextra-checkpoint
       ✅ check OK
-  [B] cargo clippy -p memfuse-checkpoint -- -D warnings
+  [B] cargo clippy -p contextra-checkpoint -- -D warnings
       ✅ clippy OK
-  [C] Testlauf 1/1 (cargo test) -p memfuse-checkpoint
-      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/memfuse-checkpoint/03_test_run1.log
+  [C] Testlauf 1/1 (cargo test) -p contextra-checkpoint
+      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/contextra-checkpoint/03_test_run1.log
 ─────────────────────────────────────────────
-▶ memfuse-crypto  (crates/memfuse-crypto)
-  [A] cargo check -p memfuse-crypto
+▶ contextra-crypto  (crates/contextra-crypto)
+  [A] cargo check -p contextra-crypto
       ✅ check OK
-  [B] cargo clippy -p memfuse-crypto -- -D warnings
+  [B] cargo clippy -p contextra-crypto -- -D warnings
       ✅ clippy OK
-  [C] Testlauf 1/1 (cargo test) -p memfuse-crypto
-      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/memfuse-crypto/03_test_run1.log
+  [C] Testlauf 1/1 (cargo test) -p contextra-crypto
+      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/contextra-crypto/03_test_run1.log
 ─────────────────────────────────────────────
-▶ memfuse-graph  (crates/memfuse-graph)
-  [A] cargo check -p memfuse-graph
+▶ contextra-graph  (crates/contextra-graph)
+  [A] cargo check -p contextra-graph
       ✅ check OK
-  [B] cargo clippy -p memfuse-graph -- -D warnings
+  [B] cargo clippy -p contextra-graph -- -D warnings
       ✅ clippy OK
-  [C] Testlauf 1/1 (cargo test) -p memfuse-graph
-      ✅ Run 1: exit=0 passed=2 failed=0 — Log: target/forensic/20260916T114830Z/memfuse-graph/03_test_run1.log
+  [C] Testlauf 1/1 (cargo test) -p contextra-graph
+      ✅ Run 1: exit=0 passed=2 failed=0 — Log: target/forensic/20260916T114830Z/contextra-graph/03_test_run1.log
 ─────────────────────────────────────────────
-▶ memfuse-embed  (crates/memfuse-embed)
-  [A] cargo check -p memfuse-embed
+▶ contextra-embed  (crates/contextra-embed)
+  [A] cargo check -p contextra-embed
       ✅ check OK
-  [B] cargo clippy -p memfuse-embed -- -D warnings
+  [B] cargo clippy -p contextra-embed -- -D warnings
       ✅ clippy OK
-  [C] Testlauf 1/1 (cargo test) -p memfuse-embed
-      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/memfuse-embed/03_test_run1.log
+  [C] Testlauf 1/1 (cargo test) -p contextra-embed
+      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/contextra-embed/03_test_run1.log
 ─────────────────────────────────────────────
-▶ memfuse-mcp  (crates/memfuse-mcp)
-  [A] cargo check -p memfuse-mcp
+▶ contextra-mcp  (crates/contextra-mcp)
+  [A] cargo check -p contextra-mcp
       ✅ check OK
-  [B] cargo clippy -p memfuse-mcp -- -D warnings
+  [B] cargo clippy -p contextra-mcp -- -D warnings
       ✅ clippy OK
-  [C] Testlauf 1/1 (cargo test) -p memfuse-mcp
-      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/memfuse-mcp/03_test_run1.log
+  [C] Testlauf 1/1 (cargo test) -p contextra-mcp
+      ✅ Run 1: exit=0 passed=0 failed=0 — Log: target/forensic/20260916T114830Z/contextra-mcp/03_test_run1.log
 ─────────────────────────────────────────────
-▶ memfuse-agent  (crates/memfuse-agent)
-  [A] cargo check -p memfuse-agent
+▶ contextra-agent  (crates/contextra-agent)
+  [A] cargo check -p contextra-agent
       ✅ check OK
-  [B] cargo clippy -p memfuse-agent -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-agent/02_clippy.log
-        |     --> crates/memfuse-agent/src/engine.rs:1027:48
+  [B] cargo clippy -p contextra-agent -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-agent/02_clippy.log
+        |     --> crates/contextra-agent/src/engine.rs:1027:48
         |      |
         | 1027 |         let orchestrator = OrchestratorEngine::from_db(&ctx.db);
         |      |                                                ^^^^^^^
         | 
         | error: use of deprecated associated function `engine::OrchestratorEngine::from_db`: Use try_from_db instead to handle initialization errors without panicking
-        |     --> crates/memfuse-agent/src/engine.rs:1093:52
+        |     --> crates/contextra-agent/src/engine.rs:1093:52
         |      |
         | 1093 |         let mut orchestrator = OrchestratorEngine::from_db(&ctx.db);
         |      |                                                    ^^^^^^^
         | 
         | error: use of deprecated associated function `engine::OrchestratorEngine::from_db`: Use try_from_db instead to handle initialization errors without panicking
-        |     --> crates/memfuse-agent/src/engine.rs:1132:48
+        |     --> crates/contextra-agent/src/engine.rs:1132:48
         |      |
         | 1132 |         let orchestrator = OrchestratorEngine::from_db(&ctx.db);
         |      |                                                ^^^^^^^
         | 
-        | error: could not compile `memfuse-agent` (lib) due to 1 previous error
+        | error: could not compile `contextra-agent` (lib) due to 1 previous error
         | warning: build failed, waiting for other jobs to finish...
-        | error: could not compile `memfuse-agent` (lib test) due to 4 previous errors
+        | error: could not compile `contextra-agent` (lib test) due to 4 previous errors
 ─────────────────────────────────────────────
-▶ memfuse-ollama  (crates/memfuse-ollama)
-  [A] cargo check -p memfuse-ollama
+▶ contextra-ollama  (crates/contextra-ollama)
+  [A] cargo check -p contextra-ollama
       ✅ check OK
-  [B] cargo clippy -p memfuse-ollama -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-ollama/02_clippy.log
-        | Memfuse Development Environment Loaded 🦀🐍
-        |     Checking memfuse-core v0.1.0 (/home/freddy/Projekte/memfuse/crates/memfuse-core)
-        |     Checking memfuse-calibration v0.1.0 (/home/freddy/Projekte/memfuse/crates/memfuse-calibration)
-        |     Checking memfuse-embed v0.1.0 (/home/freddy/Projekte/memfuse/crates/memfuse-embed)
-        |     Checking memfuse-ollama v0.1.0 (/home/freddy/Projekte/memfuse/crates/memfuse-ollama)
+  [B] cargo clippy -p contextra-ollama -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-ollama/02_clippy.log
+        | contextra Development Environment Loaded 🦀🐍
+        |     Checking contextra-core v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-core)
+        |     Checking contextra-calibration v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-calibration)
+        |     Checking contextra-embed v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-embed)
+        |     Checking contextra-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ollama)
         | error: match can be simplified with `.unwrap_or_default()`
-        |     --> crates/memfuse-ollama/src/client.rs:2695:25
+        |     --> crates/contextra-ollama/src/client.rs:2695:25
         |      |
         | 2695 |                   let n = match socket.read(&mut buf).await {
         |      |  _________________________^
@@ -231,24 +231,24 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |      = note: `-D clippy::manual-unwrap-or-default` implied by `-D warnings`
         |      = help: to override `-D warnings` add `#[allow(clippy::manual_unwrap_or_default)]`
         | 
-        | error: could not compile `memfuse-ollama` (lib test) due to 1 previous error
+        | error: could not compile `contextra-ollama` (lib test) due to 1 previous error
 ─────────────────────────────────────────────
-▶ memfuse-router  (crates/memfuse-router)
-  [A] cargo check -p memfuse-router
+▶ contextra-router  (crates/contextra-router)
+  [A] cargo check -p contextra-router
       ✅ check OK
-  [B] cargo clippy -p memfuse-router -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-router/02_clippy.log
-        | note: consider initializing the variable with `memfuse_index::HnswConfig { dimension: 4, ..Default::default() }` and removing relevant reassignments
-        |    --> crates/memfuse-router/src/tests.rs:122:9
+  [B] cargo clippy -p contextra-router -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-router/02_clippy.log
+        | note: consider initializing the variable with `contextra_index::HnswConfig { dimension: 4, ..Default::default() }` and removing relevant reassignments
+        |    --> crates/contextra-router/src/tests.rs:122:9
         |     |
-        | 122 |         let mut hnsw_config = memfuse_index::HnswConfig::default();
+        | 122 |         let mut hnsw_config = contextra_index::HnswConfig::default();
         |     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         |     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
         |     = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
         |     = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
         | 
         | error: useless use of `vec!`
-        |     --> crates/memfuse-router/src/tests.rs:2521:38
+        |     --> crates/contextra-router/src/tests.rs:2521:38
         |      |
         | 2521 |         watcher_clamped.set_baseline(&vec![0.5; 50]);
         |      |                                      ^^^^^^^^^^^^^^ help: you can use a slice directly: `&[0.5; 50]`
@@ -257,16 +257,16 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |      = note: `-D clippy::useless-vec` implied by `-D warnings`
         |      = help: to override `-D warnings` add `#[allow(clippy::useless_vec)]`
         | 
-        | error: could not compile `memfuse-router` (lib test) due to 4 previous errors
+        | error: could not compile `contextra-router` (lib test) due to 4 previous errors
 ─────────────────────────────────────────────
-▶ memfuse-calibration  (crates/memfuse-calibration)
-  [A] cargo check -p memfuse-calibration
+▶ contextra-calibration  (crates/contextra-calibration)
+  [A] cargo check -p contextra-calibration
       ✅ check OK
-  [B] cargo clippy -p memfuse-calibration -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-calibration/02_clippy.log
-        | error: could not compile `memfuse-calibration` (test "isotonic_mutation_hardening_test") due to 1 previous error
+  [B] cargo clippy -p contextra-calibration -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-calibration/02_clippy.log
+        | error: could not compile `contextra-calibration` (test "isotonic_mutation_hardening_test") due to 1 previous error
         | error: manual `RangeInclusive::contains` implementation
-        |   --> crates/memfuse-calibration/tests/calibration_deep_tests.rs:80:13
+        |   --> crates/contextra-calibration/tests/calibration_deep_tests.rs:80:13
         |    |
         | 80 |             prob >= 0.0 && prob <= 1.0,
         |    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0.0..=1.0).contains(&prob)`
@@ -276,23 +276,23 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |    = help: to override `-D warnings` add `#[allow(clippy::manual_range_contains)]`
         | 
         | error: manual `RangeInclusive::contains` implementation
-        |    --> crates/memfuse-calibration/tests/calibration_deep_tests.rs:356:22
+        |    --> crates/contextra-calibration/tests/calibration_deep_tests.rs:356:22
         |     |
         | 356 |         prop_assert!(prob >= 0.0 && prob <= 1.0, "Probability out of bounds: {}", prob);
         |     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0.0..=1.0).contains(&prob)`
         |     |
         |     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_range_contains
         | 
-        | error: could not compile `memfuse-calibration` (test "calibration_deep_tests") due to 2 previous errors
+        | error: could not compile `contextra-calibration` (test "calibration_deep_tests") due to 2 previous errors
 ─────────────────────────────────────────────
-▶ memfuse-bench  (benchmarks/memfuse-bench)
-  [A] cargo check -p memfuse-bench
+▶ contextra-bench  (benchmarks/contextra-bench)
+  [A] cargo check -p contextra-bench
       ✅ check OK
-  [B] cargo clippy -p memfuse-bench -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-bench/02_clippy.log
-        |     Checking memfuse-bench v0.1.0 (/home/freddy/Projekte/memfuse/benchmarks/memfuse-bench)
+  [B] cargo clippy -p contextra-bench -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-bench/02_clippy.log
+        |     Checking contextra-bench v0.1.0 (/home/freddy/Projekte/contextra/benchmarks/contextra-bench)
         | error: items after a test module
-        |    --> benchmarks/memfuse-bench/src/path_rag_sweep.rs:194:1
+        |    --> benchmarks/contextra-bench/src/path_rag_sweep.rs:194:1
         |     |
         | 194 |   mod tests {
         |     |   ^^^^^^^^^
@@ -308,21 +308,21 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |     = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`
         |     = help: move the items to before the test module was defined
         | 
-        | error: could not compile `memfuse-bench` (lib test) due to 1 previous error
+        | error: could not compile `contextra-bench` (lib test) due to 1 previous error
         | warning: build failed, waiting for other jobs to finish...
 ─────────────────────────────────────────────
-▶ memfuse-candle  (crates/memfuse-candle)
-  [A] cargo check -p memfuse-candle
+▶ contextra-candle  (crates/contextra-candle)
+  [A] cargo check -p contextra-candle
       ✅ check OK
-  [B] cargo clippy -p memfuse-candle -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-candle/02_clippy.log
-        | Memfuse Development Environment Loaded 🦀🐍
-        |     Checking memfuse-core v0.1.0 (/home/freddy/Projekte/memfuse/crates/memfuse-core)
-        |     Checking memfuse-calibration v0.1.0 (/home/freddy/Projekte/memfuse/crates/memfuse-calibration)
-        |     Checking memfuse-crypto v0.1.0 (/home/freddy/Projekte/memfuse/crates/memfuse-crypto)
-        |     Checking memfuse-candle v0.1.0 (/home/freddy/Projekte/memfuse/crates/memfuse-candle)
+  [B] cargo clippy -p contextra-candle -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-candle/02_clippy.log
+        | contextra Development Environment Loaded 🦀🐍
+        |     Checking contextra-core v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-core)
+        |     Checking contextra-calibration v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-calibration)
+        |     Checking contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto)
+        |     Checking contextra-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-candle)
         | error: manual `RangeInclusive::contains` implementation
-        |    --> crates/memfuse-candle/src/gasp.rs:474:17
+        |    --> crates/contextra-candle/src/gasp.rs:474:17
         |     |
         | 474 |         assert!(score >= 0.0 && score <= 1.0);
         |     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0.0..=1.0).contains(&score)`
@@ -331,48 +331,48 @@ Evidenz-Verzeichnis: target/forensic/20260916T114830Z
         |     = note: `-D clippy::manual-range-contains` implied by `-D warnings`
         |     = help: to override `-D warnings` add `#[allow(clippy::manual_range_contains)]`
         | 
-        | error: could not compile `memfuse-candle` (lib test) due to 1 previous error
+        | error: could not compile `contextra-candle` (lib test) due to 1 previous error
 ─────────────────────────────────────────────
-▶ memfuse-sandbox  (crates/memfuse-sandbox)
-  [A] cargo check -p memfuse-sandbox
+▶ contextra-sandbox  (crates/contextra-sandbox)
+  [A] cargo check -p contextra-sandbox
       ✅ check OK
-  [B] cargo clippy -p memfuse-sandbox -- -D warnings
-      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/memfuse-sandbox/02_clippy.log
-        |   --> crates/memfuse-sandbox/tests/wasm_boundary_tests.rs:95:5
+  [B] cargo clippy -p contextra-sandbox -- -D warnings
+      ❌ clippy FAILED — Details: target/forensic/20260916T114830Z/contextra-sandbox/02_clippy.log
+        |   --> crates/contextra-sandbox/tests/wasm_boundary_tests.rs:95:5
         |    |
         | 95 |     let mut caps_denied = WasmCapabilities::default();
         |    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         |    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
         | 
         | error: field assignment outside of initializer for an instance created with Default::default()
-        |    --> crates/memfuse-sandbox/tests/wasm_boundary_tests.rs:112:5
+        |    --> crates/contextra-sandbox/tests/wasm_boundary_tests.rs:112:5
         |     |
         | 112 |     caps_allowed.allow_cloud_egress = true;
         |     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         |     |
-        | note: consider initializing the variable with `memfuse_sandbox::WasmCapabilities { allow_cloud_egress: true, ..Default::default() }` and removing relevant reassignments
-        |    --> crates/memfuse-sandbox/tests/wasm_boundary_tests.rs:111:5
+        | note: consider initializing the variable with `contextra_sandbox::WasmCapabilities { allow_cloud_egress: true, ..Default::default() }` and removing relevant reassignments
+        |    --> crates/contextra-sandbox/tests/wasm_boundary_tests.rs:111:5
         |     |
         | 111 |     let mut caps_allowed = WasmCapabilities::default();
         |     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         |     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
         | 
-        | error: could not compile `memfuse-sandbox` (test "wasm_boundary_tests") due to 4 previous errors
+        | error: could not compile `contextra-sandbox` (test "wasm_boundary_tests") due to 4 previous errors
 
 ═══════════════════════════════════════════════
 ❌ FORENSIC-TEST-GATE FEHLGESCHLAGEN — betroffene Crates:
-   - memfuse-store (siehe target/forensic/20260916T114830Z/memfuse-store)
-   - memfuse-text (siehe target/forensic/20260916T114830Z/memfuse-text)
-   - memfuse-candle (siehe target/forensic/20260916T114830Z/memfuse-candle)
-   - memfuse-ollama (siehe target/forensic/20260916T114830Z/memfuse-ollama)
-   - memfuse-agent (siehe target/forensic/20260916T114830Z/memfuse-agent)
-   - memfuse-core (siehe target/forensic/20260916T114830Z/memfuse-core)
-   - memfuse-bench (siehe target/forensic/20260916T114830Z/memfuse-bench)
-   - memfuse-calibration (siehe target/forensic/20260916T114830Z/memfuse-calibration)
-   - memfuse-sandbox (siehe target/forensic/20260916T114830Z/memfuse-sandbox)
-   - memfuse-router (siehe target/forensic/20260916T114830Z/memfuse-router)
-   - memfuse-index (siehe target/forensic/20260916T114830Z/memfuse-index)
-   - memfuse-db (siehe target/forensic/20260916T114830Z/memfuse-db)
+   - contextra-store (siehe target/forensic/20260916T114830Z/contextra-store)
+   - contextra-text (siehe target/forensic/20260916T114830Z/contextra-text)
+   - contextra-candle (siehe target/forensic/20260916T114830Z/contextra-candle)
+   - contextra-ollama (siehe target/forensic/20260916T114830Z/contextra-ollama)
+   - contextra-agent (siehe target/forensic/20260916T114830Z/contextra-agent)
+   - contextra-core (siehe target/forensic/20260916T114830Z/contextra-core)
+   - contextra-bench (siehe target/forensic/20260916T114830Z/contextra-bench)
+   - contextra-calibration (siehe target/forensic/20260916T114830Z/contextra-calibration)
+   - contextra-sandbox (siehe target/forensic/20260916T114830Z/contextra-sandbox)
+   - contextra-router (siehe target/forensic/20260916T114830Z/contextra-router)
+   - contextra-index (siehe target/forensic/20260916T114830Z/contextra-index)
+   - contextra-db (siehe target/forensic/20260916T114830Z/contextra-db)
 Report: target/forensic/20260916T114830Z/report.json
 Diesen Report NIEMALS aus dem Gedächtnis zusammenfassen — bei jeder Zusammenfassung
 gegen die Datei zurückverweisen, nicht gegen die eigene Erinnerung an den Lauf.

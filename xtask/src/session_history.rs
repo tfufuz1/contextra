@@ -1,5 +1,5 @@
 // TODO: weekly digest, separater Auftrag
-//! Lokales, rotierendes Session-History-Log für MemFuse.
+//! Lokales, rotierendes Session-History-Log für Contextra.
 //!
 //! Dieses Modul verwaltet ein chronologisches, git-ignoriertes Protokoll
 //! aller Agenten-Aktionen unter `.jules/session_history.jsonl`.
@@ -10,7 +10,7 @@
 //! - **Metadata-based Rotation**: Rotationsprüfung nutzt reine Metadaten-Abfragen (`fs::metadata`).
 
 use chrono::Utc;
-use memfuse_types::MemFuseError;
+use contextra_types::ContextraError;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -111,7 +111,7 @@ pub fn default_session_history_path() -> PathBuf {
 
 /// Hängt einen Eintrag an das globale Session-History-Log `.jules/session_history.jsonl` an.
 /// Führt bei Überschreitung der Standardgrößenschwelle (5 MB) eine automatische Rotation durch.
-pub fn append_entry(entry: &SessionHistoryEntry) -> Result<(), MemFuseError> {
+pub fn append_entry(entry: &SessionHistoryEntry) -> Result<(), ContextraError> {
     let path = default_session_history_path();
     let config = RotationConfig::default();
     append_entry_with_config(entry, &config, &path)
@@ -122,7 +122,7 @@ pub fn append_entry_with_config(
     entry: &SessionHistoryEntry,
     config: &RotationConfig,
     path: &Path,
-) -> Result<(), MemFuseError> {
+) -> Result<(), ContextraError> {
     if let Some(parent) = path.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent)?;
@@ -148,7 +148,7 @@ pub fn append_entry_with_config(
 }
 
 /// Führt die Dateirotation durch: benennt `path` zu `path.1` um (und ältere Backups entsprechend `max_backups`).
-fn rotate_logs(path: &Path, max_backups: usize) -> Result<(), MemFuseError> {
+fn rotate_logs(path: &Path, max_backups: usize) -> Result<(), ContextraError> {
     for i in (1..max_backups).rev() {
         let src = path.with_extension(format!("jsonl.{}", i));
         let dst = path.with_extension(format!("jsonl.{}", i + 1));
@@ -173,13 +173,13 @@ mod tests {
     #[test]
     fn test_entry_builder_and_serialization() {
         let entry = SessionHistoryEntry::new("session-123", "claim")
-            .with_crate("memfuse-core")
+            .with_crate("contextra-core")
             .with_issue("ISSUE-42")
             .with_details(serde_json::json!({ "status": "ok" }));
 
         assert_eq!(entry.session_id, "session-123");
         assert_eq!(entry.action, "claim");
-        assert_eq!(entry.krate.as_deref(), Some("memfuse-core"));
+        assert_eq!(entry.krate.as_deref(), Some("contextra-core"));
         assert_eq!(entry.issue.as_deref(), Some("ISSUE-42"));
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -215,8 +215,8 @@ mod tests {
         let log_path = dir.path().join("session_history.jsonl");
         let config = RotationConfig::default();
 
-        let e1 = SessionHistoryEntry::new("sess-1", "claim").with_crate("memfuse-store");
-        let e2 = SessionHistoryEntry::new("sess-1", "preflight").with_crate("memfuse-store");
+        let e1 = SessionHistoryEntry::new("sess-1", "claim").with_crate("contextra-store");
+        let e2 = SessionHistoryEntry::new("sess-1", "preflight").with_crate("contextra-store");
 
         append_entry_with_config(&e1, &config, &log_path).unwrap();
         append_entry_with_config(&e2, &config, &log_path).unwrap();

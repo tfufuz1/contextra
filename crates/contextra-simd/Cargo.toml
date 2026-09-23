@@ -1,0 +1,19 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-simd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island)"
+
+[dependencies]
+contextra-core = { workspace = true }
+thiserror = { workspace = true }
+bytemuck = "1.25"
+tracing = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.4"

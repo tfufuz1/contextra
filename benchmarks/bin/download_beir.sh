@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# BEIR Dataset Downloader for MemFuse Benchmarks
+# BEIR Dataset Downloader for Contextra Benchmarks
 # APM-3 Compliance: Supports --ci-only to skip download in CI environments
 
 if [[ "${1:-}" == "--ci-only" ]]; then

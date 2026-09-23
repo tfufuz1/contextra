@@ -54,13 +54,9 @@ pub fn run_gen_feature_catalog() -> Result<(), String> {
     }
 
     let mut markdown = String::new();
-    markdown.push_str("# MemFuse — Feature Catalog\n\n");
-    markdown.push_str(
-        "> **Hinweis**: Diese Datei ist autogeneriert durch `cargo xtask gen-feature-catalog`.\n",
-    );
-    markdown.push_str(
-        "> Sie listet alle verfuegbaren Cargo Feature Flags aller Workspace-Crates auf.\n\n",
-    );
+    markdown.push_str("# Contextra — Feature Catalog\n\n");
+    markdown.push_str("> **Hinweis**: Diese Datei ist autogeneriert durch `cargo xtask gen-feature-catalog`.\n");
+    markdown.push_str("> Sie listet alle verfuegbaren Cargo Feature Flags aller Workspace-Crates auf.\n\n");
 
     for (crate_name, features) in &catalog {
         markdown.push_str(&format!("## Crate `{}`\n\n", crate_name));

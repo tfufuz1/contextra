@@ -1,4 +1,4 @@
-# MemFuse — Jules Session Bootstrap
+# Contextra — Jules Session Bootstrap
 > Maschinenausführbare Checkliste. Jede Session MUSS mit dieser
 > Sequenz beginnen, bevor Code geschrieben oder Dateien geändert werden.
 
@@ -61,10 +61,10 @@ head -50 WORKING_STATE.md
 
 ```bash
 # Verifiziere Build-Grundlage (ohne Nix-Shell zuerst probieren)
-cargo check --workspace --exclude memfuse-tauri 2>&1 | tail -5
+cargo check --workspace --exclude contextra-tauri 2>&1 | tail -5
 
 # Falls cargo nicht im PATH: Rust-Toolchain aktivieren
-# source "$HOME/.cargo/env" && cargo check --workspace --exclude memfuse-tauri
+# source "$HOME/.cargo/env" && cargo check --workspace --exclude contextra-tauri
 ```
 
 ## Phase 3 — Aufgaben-spezifischen Kontext laden
@@ -73,9 +73,9 @@ Lade basierend auf der Aufgabe:
 
 | Aufgabe-Typ | Zu lesende Dateien |
 |-------------|-------------------|
-| Code in `memfuse-store/*` | `crates/memfuse-store/AGENTS.md`, `rules/wal_crypto.md`, `rules/async-io.md` |
-| Code in `memfuse-index/*` | `crates/memfuse-index/AGENTS.md`, `rules/simd_safety.md` |
-| Code in `memfuse-db/*` | `crates/memfuse-db/AGENTS.md` |
+| Code in `contextra-store/*` | `crates/contextra-store/AGENTS.md`, `rules/wal_crypto.md`, `rules/async-io.md` |
+| Code in `contextra-index/*` | `crates/contextra-index/AGENTS.md`, `rules/simd_safety.md` |
+| Code in `contextra-db/*` | `crates/contextra-db/AGENTS.md` |
 | Neue Dependency | `rules/dependencies.md` → Cargo.lock prüfen → crates.io verifizieren |
 | Neue API-Oberfläche | `CONSTITUTION.md`, `docs/TYPE_REGISTRY.md` |
 | ADR schreiben | `docs/decisions/` (letzte 5 ADRs lesen), `CONSTITUTION.md §Governance` |
@@ -88,7 +88,7 @@ Lade basierend auf der Aufgabe:
 ```bash
 # API-Halluzinations-Schutz: Signatur vor Nutzung verifizieren
 # Beispiel: Bevor du eine Methode auf Collection aufrufst:
-grep -n "pub fn <METHODE>" crates/memfuse-db/src/collection.rs
+grep -n "pub fn <METHODE>" crates/contextra-db/src/collection.rs
 
 # Typ-Dopplungs-Schutz: Typ-Register prüfen
 grep "<TYPNAME>" docs/TYPE_REGISTRY.md

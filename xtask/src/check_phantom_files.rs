@@ -50,7 +50,7 @@ fn get_recent_commit_messages(n: usize) -> Vec<(String, String)> {
 
 pub fn run_check_phantom_files() -> bool {
     let base_ref =
-        std::env::var("MEMFUSE_CI_BASE_REF").unwrap_or_else(|_| "origin/main".to_string());
+        std::env::var("CONTEXTRA_CI_BASE_REF").unwrap_or_else(|_| "origin/main".to_string());
 
     println!("=== Gate: check-phantom-files (Basis: {}) ===", base_ref);
 
@@ -67,7 +67,7 @@ pub fn run_check_phantom_files() -> bool {
         .collect();
 
     // PR-Body aus Env (gesetzt durch CI)
-    let pr_body = std::env::var("MEMFUSE_PR_BODY").unwrap_or_default();
+    let pr_body = std::env::var("CONTEXTRA_PR_BODY").unwrap_or_default();
 
     // Letzte 3 Commit-Messages
     let commits = get_recent_commit_messages(3);

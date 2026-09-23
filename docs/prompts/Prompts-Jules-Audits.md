@@ -1,6 +1,6 @@
-# MemFuse — Google-Jules Crate-Audit-Prompts
+# Contextra — Google-Jules Crate-Audit-Prompts
 
-**Repository:** `https://github.com/tfufuz1/memfuse`
+**Repository:** `https://github.com/tfufuz1/contextra`
 **Zweck dieses Dokuments:** Für jedes der 15 aktiven Workspace-Crates einen eigenständigen, maximal ausführlichen Experten-Prompt bereitzustellen, den Google-Jules in seiner Cloud-VM ausführt, um das jeweilige Crate vollständig zu bauen, zu testen, zu verifizieren, zu benchmarken und darüber einen extrem detaillierten Audit-Report zu erzeugen.
 
 **Basis der Analyse:** Klon des Repos, Auswertung von `Cargo.toml` (Workspace mit 15 Crates + `xtask`), `README.md`, `DECISIONS.md` (ADR-001 bis ADR-018+), `TESTING.md` (Anti-Mirroring-Prinzip, Pflicht-Testkategorien, Mutation-Testing-Pflicht), sowie der Modulstruktur und `lib.rs`-Header (FILE-CONTEXT-Blöcke) jedes Crates.
@@ -18,29 +18,29 @@
 
 ## Globaler Kontext, der in JEDEN Prompt eingebettet ist
 
-MemFuse Brain ist ein **Pure-Rust, air-gapped Cognitive Operating System** für lokale KI-Agenten: eine 4-Signal-Hybridsuche-Engine (Vektor/HNSW + Volltext/BM25 + Wissensgraph/CSR + Metadaten-Filter, fusioniert via Reciprocal Rank Fusion), mit LSM-Tree-Persistenz, AES-256-GCM-SIV-Verschlüsselung, Contextual-Retrieval-Chunking, Cross-Encoder-Reranking, einer Multi-Step-Query-Engine, einem MCP-Server (stdio JSON-RPC), einer Tauri-Desktop-App und einer persistenten Agent-Workflow-Engine (checkpoint → execute → commit → audit). Das Projekt folgt einem strikten 5-Schichten-DAG (Layer 0–4) ohne Aufwärts-Importe, verfolgt eine "Sovereign Core Doctrine" (kein `unsafe` außer explizit dokumentierten Ausnahmen), und hat ein eigenes Test-Manifest (`TESTING.md`) mit einem **Anti-Mirroring-Prinzip**: Testerwartungswerte dürfen niemals mit derselben Formel wie die Implementierung berechnet werden, sondern müssen unabhängig (handberechnet, extern verifiziert, oder aus einer Referenzimplementierung) stammen.
+Contextra Brain ist ein **Pure-Rust, air-gapped Cognitive Operating System** für lokale KI-Agenten: eine 4-Signal-Hybridsuche-Engine (Vektor/HNSW + Volltext/BM25 + Wissensgraph/CSR + Metadaten-Filter, fusioniert via Reciprocal Rank Fusion), mit LSM-Tree-Persistenz, AES-256-GCM-SIV-Verschlüsselung, Contextual-Retrieval-Chunking, Cross-Encoder-Reranking, einer Multi-Step-Query-Engine, einem MCP-Server (stdio JSON-RPC), einer Tauri-Desktop-App und einer persistenten Agent-Workflow-Engine (checkpoint → execute → commit → audit). Das Projekt folgt einem strikten 5-Schichten-DAG (Layer 0–4) ohne Aufwärts-Importe, verfolgt eine "Sovereign Core Doctrine" (kein `unsafe` außer explizit dokumentierten Ausnahmen), und hat ein eigenes Test-Manifest (`TESTING.md`) mit einem **Anti-Mirroring-Prinzip**: Testerwartungswerte dürfen niemals mit derselben Formel wie die Implementierung berechnet werden, sondern müssen unabhängig (handberechnet, extern verifiziert, oder aus einer Referenzimplementierung) stammen.
 
 ---
 
-# 1. `memfuse-core` (Layer 0 — Fundament)
+# 1. `contextra-core` (Layer 0 — Fundament)
 
 ```
 ROLLE
 Du bist ein Senior Rust Systems Engineer mit 20+ Jahren Erfahrung in Low-Level-Systemprogrammierung,
 Concurrency-Modellen und Type-System-Design, sowie ein spezialisierter Auditor für sicherheitskritische
-Rust-Bibliotheken. Du wurdest von einem Weltkonzern beauftragt, das Fundament-Crate `memfuse-core` des
-Open-Source-Projekts MemFuse (https://github.com/tfufuz1/memfuse) einer erschöpfenden technischen Prüfung
+Rust-Bibliotheken. Du wurdest von einem Weltkonzern beauftragt, das Fundament-Crate `contextra-core` des
+Open-Source-Projekts Contextra (https://github.com/tfufuz1/contextra) einer erschöpfenden technischen Prüfung
 zu unterziehen, bevor produktive Abhängigkeiten anderer Teams darauf aufbauen dürfen.
 
 MISSION
-`memfuse-core` ist der Dependency-Root des gesamten 15-Crate-Workspace — JEDES andere Crate hängt
+`contextra-core` ist der Dependency-Root des gesamten 15-Crate-Workspace — JEDES andere Crate hängt
 transitiv davon ab. Ein einziger unentdeckter Fehler in Typen, Traits oder Fehlerbehandlung hier
 pflanzt sich in das gesamte System fort. Deine Mission ist es, dieses Crate bis auf Bit-Ebene zu
 verifizieren: jede Typ-Invariante, jede Trait-Kontraktdefinition, jede Fehlerpfad-Verzweigung, jede
 Snapshot-/MVCC-Isolationsgarantie und jeden Concurrency-Mechanismus im Sharded-TxBuffer.
 
 KONTEXT & ZIELKOMPONENTEN (aus Repository-Analyse)
-Klone https://github.com/tfufuz1/memfuse und arbeite ausschließlich im Pfad `crates/memfuse-core/`.
+Klone https://github.com/tfufuz1/contextra und arbeite ausschließlich im Pfad `crates/contextra-core/`.
 Analysiere eigenständig folgende Module, bevor du Tests schreibst — leite aus dem tatsächlichen Code
 (nicht aus Annahmen) die Geschäftslogik ab:
   - `src/types.rs` + `src/types/{saos,importance,filter,domain,budget}.rs` — DocId, EntityId, TxId als
@@ -48,15 +48,15 @@ Analysiere eigenständig folgende Module, bevor du Tests schreibst — leite aus
     (u.a. ContextChunk mit Contextual-Prefix); Token-/Kosten-Budget-Typen.
   - `src/traits.rs` — StorageEngine, VectorIndex, TextIndex, GraphIndex, CheckpointCoordinator (async traits,
     die die Vertragsgrundlage für ALLE Layer-1-Engines bilden).
-  - `src/error.rs` + `src/error_dto.rs` — MemFuseError Enum; Zero-Panic-via-`?`-Propagation-Invariante;
+  - `src/error.rs` + `src/error_dto.rs` — ContextraError Enum; Zero-Panic-via-`?`-Propagation-Invariante;
     Serialisierung von Fehlern über FFI/IPC-Grenzen (error_dto).
   - `src/tx_buffer.rs` — Sharded Transaction Staging mit "Orphan Reaper" (verwaiste Transaktionen erkennen
     und aufräumen). Analysiere die Sharding-Strategie, Lock-Granularität und Reaper-Trigger-Bedingungen.
   - `src/seq_log.rs` — Sequenzielles Log/Ordering-Primitive.
   - `src/snapshot.rs` — SnapshotRegistry für MVCC-Read-Isolation. Analysiere exakt, wie Snapshots erzeugt,
     gepinnt, freigegeben werden und wie Race Conditions zwischen Snapshot-Erzeugung und GC verhindert werden.
-  - `src/ipc/{mod.rs,jsonrpc.rs,memfuse_generated.rs}` — IPC-Schicht inkl. generiertem FlatBuffers-Code
-    (memfuse_generated.rs). Prüfe Schema-Kompatibilität und Serialisierungs-Roundtrips.
+  - `src/ipc/{mod.rs,jsonrpc.rs,contextra_generated.rs}` — IPC-Schicht inkl. generiertem FlatBuffers-Code
+    (contextra_generated.rs). Prüfe Schema-Kompatibilität und Serialisierungs-Roundtrips.
 Beachte ADR-016 (DocId 64-Bit BLAKE3-Trunkierung und Kollisionsschutz) und ADR-028 (TxId-Allocation-
 Base-Ranges für System- vs. Collection-Transaktionen) aus `DECISIONS.md` — verifiziere beide Invarianten
 explizit gegen den Code.
@@ -64,11 +64,11 @@ explizit gegen den Code.
 AUFGABENUMFANG (verpflichtend, alle Punkte abarbeiten)
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check -p memfuse-core --all-features` und ohne Features; dokumentiere jede Warnung.
-   - `cargo clippy -p memfuse-core --all-targets --all-features -- -D warnings`; klassifiziere jeden
+   - `cargo check -p contextra-core --all-features` und ohne Features; dokumentiere jede Warnung.
+   - `cargo clippy -p contextra-core --all-targets --all-features -- -D warnings`; klassifiziere jeden
      Lint-Fund nach Schweregrad (Correctness/Suspicious/Complexity/Perf/Style) und begründe, ob es sich
      um einen echten Bug oder ein akzeptables Stilproblem handelt.
-   - `cargo fmt --check -p memfuse-core`.
+   - `cargo fmt --check -p contextra-core`.
    - Verifiziere `#![deny(unsafe_code)]`/`#![forbid(unsafe_code)]`-Direktiven: durchsuche das Crate nach
      jedem `unsafe`-Block, dokumentiere Fundstelle, Zweck und ob eine Ausnahme laut ADR dokumentiert ist.
    - Prüfe alle `.unwrap()`/`.expect()`/`panic!()`-Vorkommen in Nicht-Test-Code — jedes einzelne ist eine
@@ -76,12 +76,12 @@ AUFGABENUMFANG (verpflichtend, alle Punkte abarbeiten)
      (Datei, Zeile, Kontext, Risikoeinschätzung).
 
 2. UNIT- UND INTEGRATIONSTESTS (bestehende + selbst geschriebene)
-   - Führe alle vorhandenen Tests aus: `cargo test -p memfuse-core --all-features -- --nocapture` und
+   - Führe alle vorhandenen Tests aus: `cargo test -p contextra-core --all-features -- --nocapture` und
      protokolliere JEDEN Testnamen mit Ergebnis, Laufzeit und Assertion-Details.
    - Ergänze fehlende Tests gemäß der Pflicht-Testmatrix aus `TESTING.md` für JEDE öffentliche Funktion/
      jeden öffentlichen Typ in obigen Modulen:
      a) Happy Path, b) leere Eingabe, c) Einzelelement, d) Grenzwerte (u64::MAX, TxId-Überlauf,
-     leere DocId-Batches), e) Fehlerpfade (jeder MemFuseError-Varianten-Konstruktionspfad muss mindestens
+     leere DocId-Batches), e) Fehlerpfade (jeder ContextraError-Varianten-Konstruktionspfad muss mindestens
      einmal getestet werden), f) Concurrency-Stresstests für TxBuffer (paralleles Staging/Commit/Abort
      über mehrere Tokio-Tasks, Nachweis der Abwesenheit von Deadlocks/Race Conditions via Loom oder
      wiederholten Stress-Läufen mit `--test-threads` Variation).
@@ -97,14 +97,14 @@ AUFGABENUMFANG (verpflichtend, alle Punkte abarbeiten)
      zufälliger Interleaving-Reihenfolge von Pin/Unpin/GC-Operationen), Filter-DSL-Kombinatorik.
 
 4. MUTATION-TESTING (gemäß TESTING.md Abschnitt 4)
-   - Führe, wenn im Sandbox verfügbar, `cargo mutants -p memfuse-core` aus. Falls das Tool nicht
+   - Führe, wenn im Sandbox verfügbar, `cargo mutants -p contextra-core` aus. Falls das Tool nicht
      installierbar ist, führe das im Testmanifest beschriebene "Mutation-Gedankenexperiment" manuell für
      mindestens 15 kritische Codepfade durch (Operator-Inversion `<`→`<=`, Off-by-one `+1`→`+0`,
      Boolean-Negation) und dokumentiere für jeden, ob ein bestehender Test ihn fängt. Bericht als Tabelle:
      Mutation | betroffene Zeile | gefangen (ja/nein) | welcher Test fängt ihn.
 
 5. CODE-COVERAGE
-   - `cargo llvm-cov -p memfuse-core --all-features --html` (oder `cargo tarpaulin` als Fallback).
+   - `cargo llvm-cov -p contextra-core --all-features --html` (oder `cargo tarpaulin` als Fallback).
      Liefere Coverage% pro Datei UND Line-Coverage-Lücken als konkrete Zeilennummern-Listen.
 
 6. BENCHMARKS
@@ -112,16 +112,16 @@ AUFGABENUMFANG (verpflichtend, alle Punkte abarbeiten)
      Erzeugung & Vergleich (Throughput), TxBuffer Stage/Commit/Reaper-Zyklus unter 1/10/100/1000
      gleichzeitigen Transaktionen, SnapshotRegistry Pin/Unpin-Latenz unter steigender Snapshot-Anzahl,
      IPC-Serialisierungs-/Deserialisierungs-Durchsatz für kleine/mittlere/große Payloads (1KB/64KB/1MB).
-   - Führe jeden Benchmark mit `cargo bench -p memfuse-core` real aus, erfasse Mittelwert, Median,
+   - Führe jeden Benchmark mit `cargo bench -p contextra-core` real aus, erfasse Mittelwert, Median,
      Standardabweichung, p95/p99-Latenz aus dem Criterion-Output.
 
 7. DOKUMENTATIONS-AUDIT
-   - `cargo doc -p memfuse-core --no-deps`; prüfe auf fehlende Doc-Kommentare bei öffentlichen Items
+   - `cargo doc -p contextra-core --no-deps`; prüfe auf fehlende Doc-Kommentare bei öffentlichen Items
      (`#![warn(missing_docs)]`-Check falls nicht gesetzt, manuell nachrüsten in der Analyse).
    - Vergleiche FILE-CONTEXT-Kommentare (STAND/ZWECK/INVARIANTEN/HOTSPOTS) im Quellcode mit dem
      tatsächlichen Codeverhalten — melde jede Diskrepanz zwischen Dokumentation und Implementierung.
 
-REPORT-STRUKTUR (verpflichtend, als Markdown-Datei `AUDIT_memfuse-core.md`)
+REPORT-STRUKTUR (verpflichtend, als Markdown-Datei `AUDIT_contextra-core.md`)
 1. Executive Summary (Reifegrad-Einschätzung 1-10, Top-5-Risiken, Top-5-Stärken)
 2. Build- & Lint-Ergebnisse (vollständige Rohausgaben in Codeblöcken)
 3. Unsafe-Code-Inventar (Tabelle)
@@ -146,17 +146,17 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 2. `memfuse-store` (Layer 1 — LSM-Tree Storage Engine)
+# 2. `contextra-store` (Layer 1 — LSM-Tree Storage Engine)
 
 ```
 ROLLE
 Du bist ein Senior Rust Storage-Engine-Entwickler mit 20+ Jahren Erfahrung im Bau von LSM-Tree-basierten
 Datenbanken (vergleichbar RocksDB/LevelDB-Internas) und ein Experte für Crash-Consistency-Verifikation.
-Du auditierst im Auftrag eines Weltkonzerns das Crate `memfuse-store` aus dem MemFuse-Projekt
-(https://github.com/tfufuz1/memfuse), das die persistente Speicherschicht des gesamten Systems bildet.
+Du auditierst im Auftrag eines Weltkonzerns das Crate `contextra-store` aus dem Contextra-Projekt
+(https://github.com/tfufuz1/contextra), das die persistente Speicherschicht des gesamten Systems bildet.
 
 MISSION
-`memfuse-store` implementiert eine vollständige LSM-Tree-Speicher-Engine (WAL → MemTable → SSTable →
+`contextra-store` implementiert eine vollständige LSM-Tree-Speicher-Engine (WAL → MemTable → SSTable →
 Compaction) auf Basis von `tokio::fs` für Metadaten und `std::fs::File` innerhalb `spawn_blocking` für
 Block-Level-Random-Access (siehe ADR-012-Spannungsfeld). Datenverlust oder stille Korruption in dieser
 Schicht wäre für ein produktives Agentic-Memory-System katastrophal. Deine Mission: beweise unter realer
@@ -164,7 +164,7 @@ Last, Prozessabbrüchen und Byte-Korruption, dass die Engine Crash-Consistency, 
 und korrekte Compaction-Semantik garantiert.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository und arbeite in `crates/memfuse-store/`. Analysiere eigenständig:
+Klone das Repository und arbeite in `crates/contextra-store/`. Analysiere eigenständig:
   - `src/wal.rs` — Write-Ahead-Log: Append-Format, Checksum-Schema (crc32fast laut Workspace-Deps),
     Recovery-Logik bei Programmstart, Verhalten bei trunkiertem/korruptem WAL-Tail.
   - `src/memtable.rs` — In-Memory sortierte Struktur, Flush-Trigger-Schwellwerte, Konsistenz zwischen
@@ -176,8 +176,8 @@ Klone das Repository und arbeite in `crates/memfuse-store/`. Analysiere eigenst�
   - `src/lsm.rs` — Orchestrierungs-Schicht, die WAL/MemTable/SSTable/Compaction verbindet (laut
     FILE-CONTEXT der zentrale Datenpfad: Client → TxBuffer → WAL → MemTable → SSTable → Compaction).
   - `src/checkpoint.rs` — crate-internes `pub(crate)` Checkpoint-Modul für MVCC-Snapshot-Pinning
-    (gekoppelt an `SnapshotRegistry` aus memfuse-core) — NICHT zu verwechseln mit der öffentlichen
-    Checkpoint-API in `memfuse-checkpoint` (ADR-011). Verifiziere diese Abgrenzung explizit im Code:
+    (gekoppelt an `SnapshotRegistry` aus contextra-core) — NICHT zu verwechseln mit der öffentlichen
+    Checkpoint-API in `contextra-checkpoint` (ADR-011). Verifiziere diese Abgrenzung explizit im Code:
     darf `checkpoint.rs` wirklich nirgends `pub` exportiert werden?
   - `src/mmap.rs` — Memory-Mapped-File-Zugriff (memmap2), Sicherheitsimplikationen, Lifetime-Handling.
   - `src/util.rs` — Hilfsfunktionen, die von mehreren Modulen genutzt werden.
@@ -187,7 +187,7 @@ Nutze die vorhandenen Benchmarks als Ausgangspunkt: `benches/wal_bench.rs`, `ben
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`cargo clippy -- -D warnings`/`cargo fmt --check` für `-p memfuse-store`.
+   - `cargo check`/`cargo clippy -- -D warnings`/`cargo fmt --check` für `-p contextra-store`.
    - Verifiziere `#![deny(unsafe_code)]` — dokumentiere JEDEN unsafe-Block (insbesondere im mmap.rs und
      ggf. Windows-ACL-Pfad laut FILE-CONTEXT-Ausnahme) mit Zweck und Risikoanalyse.
 
@@ -220,11 +220,11 @@ AUFGABENUMFANG
      Zeitbudget) gegen den SSTable-Parser bzw. WAL-Parser aus und dokumentiere Crashes/Panics.
 
 5. VERSCHLÜSSELUNGS-/INTEGRATIONS-SCHNITTSTELLE
-   - Prüfe, wie `memfuse-store` optional mit `memfuse-crypto` zusammenspielt (WAL-Verschlüsselung/
+   - Prüfe, wie `contextra-store` optional mit `contextra-crypto` zusammenspielt (WAL-Verschlüsselung/
      Anti-Tamper) — falls Feature-gated, teste beide Kombinationen (mit/ohne Crypto).
 
 6. BENCHMARKS (führe vorhandene aus + ergänze)
-   - `cargo bench -p memfuse-store`. Erfasse für WAL: Append-Durchsatz (Ops/s) bei 64B/1KB/16KB
+   - `cargo bench -p contextra-store`. Erfasse für WAL: Append-Durchsatz (Ops/s) bei 64B/1KB/16KB
      Payload-Größe, fsync-Overhead separat gemessen (mit vs. ohne fsync-Flag falls vorhanden).
    - Für MemTable: Insert/Lookup-Latenz bei 1K/100K/1M Einträgen.
    - Für SSTable: Sequenzieller Scan-Durchsatz, Random-Point-Lookup-Latenz (p50/p95/p99), Bloom-Filter-
@@ -237,7 +237,7 @@ AUFGABENUMFANG
    - Prüfe File-Handle-Leaks bei wiederholtem Open/Close-Zyklus (1000 Iterationen), Speicherverbrauch
      über Zeit bei Dauerlast (grobes RSS-Tracking via `/proc` in der Linux-VM).
 
-REPORT-STRUKTUR (`AUDIT_memfuse-store.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-store.md`)
 1. Executive Summary inkl. Crash-Consistency-Verdikt (GO/NO-GO mit Begründung)
 2. Build/Lint/Unsafe-Inventar
 3. WAL-Recovery-Testmatrix (Szenario | Ergebnis | Datenverlust ja/nein | Details)
@@ -259,17 +259,17 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 3. `memfuse-index` (Layer 1 — HNSW Vektor-Index, SIMD)
+# 3. `contextra-index` (Layer 1 — HNSW Vektor-Index, SIMD)
 
 ```
 ROLLE
 Du bist ein Senior Rust Performance Engineer mit 20+ Jahren Erfahrung in numerischen Algorithmen,
 SIMD-Optimierung und Approximate-Nearest-Neighbor-Suchstrukturen (HNSW, IVF, DiskANN). Du wurdest von
-einem Weltkonzern beauftragt, das Crate `memfuse-index` des MemFuse-Projekts
-(https://github.com/tfufuz1/memfuse) auf Korrektheit, numerische Stabilität und Performance zu auditieren.
+einem Weltkonzern beauftragt, das Crate `contextra-index` des Contextra-Projekts
+(https://github.com/tfufuz1/contextra) auf Korrektheit, numerische Stabilität und Performance zu auditieren.
 
 MISSION
-`memfuse-index` ist die einzige Stelle im gesamten Workspace, die absichtlich `unsafe` Code für
+`contextra-index` ist die einzige Stelle im gesamten Workspace, die absichtlich `unsafe` Code für
 SIMD-Intrinsics verwendet (`#![deny(unsafe_code)]` statt `forbid`) und zur Laufzeit zwischen
 AVX-512/AVX2/skalaren Implementierungen dispatcht. Ein Fehler in der SIMD-Distanzberechnung oder im
 HNSW-Graphaufbau führt zu stillen, schwer diagnostizierbaren Suchqualitätsverlusten in der gesamten
@@ -278,7 +278,7 @@ innerhalb der Toleranz, verifiziere die Graph-Konstruktions- und Such-Korrekthei
 Brute-Force-Referenz, und quantifiziere Recall/Latenz/Speicher-Trade-offs empirisch.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-index/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-index/`. Analysiere eigenständig:
   - `src/distance.rs` — SIMD-beschleunigte Distanzfunktionen (vermutlich Kosinus/L2/Dot-Product) mit
     Hardware-Dispatch (AVX-512 > AVX2 > Skalar-Fallback laut FILE-CONTEXT). Identifiziere JEDE
     Distanzmetrik und JEDEN `unsafe`-Intrinsic-Block einzeln.
@@ -291,8 +291,8 @@ Klone das Repository, arbeite in `crates/memfuse-index/`. Analysiere eigenständ
     in DiskANN, BEFUND AGT-AUDIT-002) — verifiziere, dass der dort dokumentierte unsafe-Mmap-Einsatz
     exakt den im ADR beschriebenen Grenzen entspricht.
   - `src/persistence.rs` — Serialisierung/Deserialisierung des HNSW-Graphen zur Kopplung mit
-    `memfuse-store` (LsmStorage) — HNSW-Graphen liegen laut Doku exklusiv im RAM, Disk-Storage läuft
-    über memfuse-store. Verifiziere Roundtrip-Korrektheit (Graph speichern → laden → identische
+    `contextra-store` (LsmStorage) — HNSW-Graphen liegen laut Doku exklusiv im RAM, Disk-Storage läuft
+    über contextra-store. Verifiziere Roundtrip-Korrektheit (Graph speichern → laden → identische
     Topologie/Suchergebnisse).
 Nutze und erweitere die vorhandenen Benchmarks: `benches/hnsw_bench.rs`, `benches/distance_bench.rs`,
 `benches/sq8_bench.rs`.
@@ -352,7 +352,7 @@ AUFGABENUMFANG
      Test-Query-Satz vor/nach Reload.
 
 7. BENCHMARKS (ausführen + erweitern)
-   - `cargo bench -p memfuse-index --all-features`.
+   - `cargo bench -p contextra-index --all-features`.
    - Distanzfunktionen: Durchsatz (Vergleiche/Sekunde) SIMD vs. Skalar, Speedup-Faktor pro Metrik,
      getrennt für AVX-512/AVX2 (falls die VM-CPU dies unterstützt — CPU-Features der Jules-VM im Report
      dokumentieren via `lscpu`/`/proc/cpuinfo`).
@@ -361,7 +361,7 @@ AUFGABENUMFANG
    - Speicherverbrauch: RSS-Messung pro 10.000 indizierte Vektoren bei verschiedenen Dimensionen.
    - SQ8-Quantisierung: Speicherersparnis-Faktor vs. Recall-Verlust (Tabelle).
 
-REPORT-STRUKTUR (`AUDIT_memfuse-index.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-index.md`)
 1. Executive Summary (numerische Korrektheits-Verdikt, Recall-Zusammenfassung, Top-Risiken)
 2. CPU-Feature-Erkennung der Test-VM (welcher SIMD-Pfad wurde tatsächlich getestet)
 3. Unsafe-Code-Inventar mit ADR-017-Abgleich
@@ -382,18 +382,18 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 4. `memfuse-db` (Layer 2 — Orchestrator & 4-Signal Fusion)
+# 4. `contextra-db` (Layer 2 — Orchestrator & 4-Signal Fusion)
 
 ```
 ROLLE
 Du bist ein Senior Rust Datenbank-Architekt mit 20+ Jahren Erfahrung im Design von Multi-Modal-
 Retrieval-Systemen und Transaktionsorchestrierung. Du auditierst im Auftrag eines Weltkonzerns das
-zentrale Orchestrator-Crate `memfuse-db` des MemFuse-Projekts (https://github.com/tfufuz1/memfuse) —
+zentrale Orchestrator-Crate `contextra-db` des Contextra-Projekts (https://github.com/tfufuz1/contextra) —
 die Fassade, die Vektor-, Text-, Graph- und Metadatensuche zu einem einheitlichen Hybrid-Retrieval
 kombiniert.
 
 MISSION
-`memfuse-db` ist das Herzstück der gesamten Suchqualität: hier laufen die 4 Signale (HNSW-Vektor, BM25-
+`contextra-db` ist das Herzstück der gesamten Suchqualität: hier laufen die 4 Signale (HNSW-Vektor, BM25-
 Text, CSR-Graph, Metadaten-Filter) über Reciprocal Rank Fusion (RRF) zusammen (ADR-003), hier läuft die
 Multi-Step-Query-Engine (iteratives Query-Rewriting, bis zu 3 Runden, OpenAI-o-series-Pattern), hier
 läuft die Context-Compaction, und hier gilt eine strikte Lock-Hierarchie
@@ -402,8 +402,8 @@ würde. Deine Mission: verifiziere Transaktionskorrektheit, Fusion-Algorithmus-K
 Hierarchie-Einhaltung und End-to-End-Suchqualität unter realistischen Multi-Tenant-Lasten.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-db/`. Analysiere eigenständig:
-  - `src/lib.rs` — MemFuse Facade, Öffnungslogik inkl. `repair_on_open`-Reparaturgarantie (verifizieren:
+Klone das Repository, arbeite in `crates/contextra-db/`. Analysiere eigenständig:
+  - `src/lib.rs` — Contextra Facade, Öffnungslogik inkl. `repair_on_open`-Reparaturgarantie (verifizieren:
     was genau wird bei Öffnen eines beschädigten Stores repariert?), Namespace-Isolation.
   - `src/fusion.rs` — Reciprocal Rank Fusion-Implementierung (Kernalgorithmus für Signalkombination) —
     dies ist der geschäftskritischste Algorithmus des gesamten Projekts.
@@ -415,8 +415,8 @@ Klone das Repository, arbeite in `crates/memfuse-db/`. Analysiere eigenständig:
     (Reduktion des Retrieval-Kontexts für LLM-Prompt-Budgets).
   - `src/multistep.rs` — Multi-Step Query Engine (iteratives Rewriting, max. 3 Runden laut README).
   - `src/transaction.rs` — Transaktionslogik über Collections hinweg.
-  - `src/reaper.rs` — vermutlich Aufräum-/GC-Mechanismus (Zusammenspiel mit TxBuffer-Reaper aus memfuse-core prüfen).
-  - `src/chunker.rs` — Markdown-Chunking (wird laut memfuse-mcp auch dort direkt verwendet:
+  - `src/reaper.rs` — vermutlich Aufräum-/GC-Mechanismus (Zusammenspiel mit TxBuffer-Reaper aus contextra-core prüfen).
+  - `src/chunker.rs` — Markdown-Chunking (wird laut contextra-mcp auch dort direkt verwendet:
     `MarkdownChunker`, `ChunkerConfig`) — analysiere Chunking-Grenzfälle (sehr lange/kurze Dokumente,
     Code-Blöcke, verschachtelte Markdown-Strukturen).
 Verifiziere EXPLIZIT die dokumentierte Lock-Hierarchie (`collections` → `embedder` → `insert_lock`) durch
@@ -425,8 +425,8 @@ Code-Review jeder Stelle, an der mehrere dieser Locks gleichzeitig gehalten werd
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-db` (alle Feature-Kombinationen, die mit
-     `memfuse-embed`'s optionalem `onnx`-Feature interagieren, falls über Feature-Flags durchgereicht).
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-db` (alle Feature-Kombinationen, die mit
+     `contextra-embed`'s optionalem `onnx`-Feature interagieren, falls über Feature-Flags durchgereicht).
    - Deadlock-Statische-Analyse: durchsuche den Code nach jeder Stelle mit verschachtelten Lock-Acquires
      und verifiziere manuell die Einhaltung der dokumentierten Reihenfolge. Liste jede Fundstelle mit
      Datei/Zeile auf.
@@ -467,7 +467,7 @@ AUFGABENUMFANG
      Chunk-Grenz-relevanten Zeichen darin, Unicode/Multi-Byte-Zeichen an Chunk-Grenzen (kein Aufbrechen
      mitten in einem Grapheme-Cluster).
    - context_compaction.rs: verifiziere, dass Token-Budget-Grenzen eingehalten werden (Zusammenspiel mit
-     Budget-Typen aus memfuse-core), und dass Kompaktion die inhaltlich relevantesten Chunks priorisiert
+     Budget-Typen aus contextra-core), und dass Kompaktion die inhaltlich relevantesten Chunks priorisiert
      (falls Scoring-basiert — Testfall mit klar unterscheidbarer Relevanz konstruieren).
 
 6. NEBENLÄUFIGKEIT & LOCK-HIERARCHIE
@@ -478,11 +478,11 @@ AUFGABENUMFANG
      Interleaving-Verifikation der dokumentierten Lock-Reihenfolge.
 
 7. BENCHMARKS
-   - `cargo bench -p memfuse-db` (erstelle Criterion-Benchmarks falls nicht vorhanden) für: End-to-End
+   - `cargo bench -p contextra-db` (erstelle Criterion-Benchmarks falls nicht vorhanden) für: End-to-End
      4-Signal-Hybridsuche-Latenz bei 1K/10K/100K Dokumenten, RRF-Fusion-Overhead isoliert gemessen,
      Insert-Durchsatz (Dokumente/Sekunde) bei steigender Collection-Größe, Multi-Step-Query-Latenz pro Runde.
 
-REPORT-STRUKTUR (`AUDIT_memfuse-db.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-db.md`)
 1. Executive Summary (Transaktions-Integritäts-Verdikt, Fusion-Korrektheits-Verdikt)
 2. Lock-Hierarchie-Audit (Tabelle: Codestelle | gehaltene Locks | Reihenfolge-konform ja/nein)
 3. Fusion-Algorithmus-Korrektheitsmatrix (Testfall | erwartet (unabhängig berechnet) | tatsächlich | Match)
@@ -502,18 +502,18 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 5. `memfuse-text` (Layer 1 — BM25 & deutsche Morphologie)
+# 5. `contextra-text` (Layer 1 — BM25 & deutsche Morphologie)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in Information Retrieval, Textverarbeitung
 und computerlinguistischen Algorithmen (Stemming, Kompositazerlegung). Du auditierst im Auftrag eines
-Weltkonzerns das Crate `memfuse-text` des MemFuse-Projekts (https://github.com/tfufuz1/memfuse), das
+Weltkonzerns das Crate `contextra-text` des Contextra-Projekts (https://github.com/tfufuz1/contextra), das
 das Volltextsuche-Signal (Signal 2 der 4-Signal-Fusion) inklusive spezialisierter deutscher Morphologie
 bereitstellt.
 
 MISSION
-`memfuse-text` implementiert BM25-Scoring, einen invertierten Index, und — als differenzierendes Feature
+`contextra-text` implementiert BM25-Scoring, einen invertierten Index, und — als differenzierendes Feature
 des Produkts — eine deutsche Morphologie-Engine, die z.B. "Urlaubsantragsprozess" korrekt in "Urlaub",
 "Antrag", "Prozess" zerlegt, um Trefferqualität bei deutschsprachigen Unternehmensdokumenten drastisch
 zu verbessern. Ein Fehler in der BM25-Formel verzerrt die Rangfolge aller Textsuchergebnisse; ein Fehler
@@ -522,7 +522,7 @@ verifiziere BM25 gegen die publizierte Formel, verifiziere die Morphologie-Engin
 linguistisch fundiertes Test-Corpus, und quantifiziere Tokenisierungs-Robustheit.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-text/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-text/`. Analysiere eigenständig:
   - `src/bm25.rs` — BM25-Scoring (Parameter k1, b — identifiziere die konkret verwendeten Default-Werte
     und ob sie konfigurierbar sind). Prüfe Interaktion mit `InvertedIndex`.
   - `src/inverted.rs` — InvertedIndex, BM25MorphIndex, Language-Enum. Analysiere Postings-List-Struktur,
@@ -540,7 +540,7 @@ Beachte: `#![forbid(unsafe_code)]` — striktester Unsafe-Modus im gesamten Work
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-text`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-text`.
    - Verifiziere `#![forbid(unsafe_code)]` durch vollständige Grep-Suche — MUSS zu 0 Treffern führen.
 
 2. BM25-KORREKTHEIT — HÖCHSTE PRIORITÄT
@@ -561,7 +561,7 @@ AUFGABENUMFANG
      müssen vollständig entfernt werden, kein "Geist-Term"-Leck), Delete (Dokument komplett aus allen
      Postings-Listen entfernt, DF-Zähler korrekt dekrementiert).
    - Transaktions-Awareness: teste, dass laufende/nicht committete Änderungen bei paralleler Suche nicht
-     sichtbar sind (MVCC-Isolation gemäß memfuse-core SnapshotRegistry-Integration).
+     sichtbar sind (MVCC-Isolation gemäß contextra-core SnapshotRegistry-Integration).
    - Nebenläufigkeit: parallele Inserts + parallele Suchen, Stress-Test mit Konsistenzprüfung (DF-Summe
      über alle Postings muss nach Stress-Test mit dem tatsächlichen Dokumentbestand übereinstimmen).
 
@@ -592,12 +592,12 @@ AUFGABENUMFANG
      unabhängig verifizierbar).
 
 7. BENCHMARKS
-   - `cargo bench -p memfuse-text` (erstellen falls nicht vorhanden): Tokenisierungsdurchsatz
+   - `cargo bench -p contextra-text` (erstellen falls nicht vorhanden): Tokenisierungsdurchsatz
      (Wörter/Sekunde) DefaultTokenizer vs. GermanMorphTokenizer, Kompositazerlegungs-Latenz pro Wort
      nach Wortlänge/Komplexität, BM25-Score-Berechnungslatenz bei steigender Corpus-Größe (1K/10K/100K
      Dokumente), InvertedIndex Insert-Durchsatz, Query-Latenz p50/p95/p99 bei steigender Query-Term-Anzahl.
 
-REPORT-STRUKTUR (`AUDIT_memfuse-text.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-text.md`)
 1. Executive Summary
 2. BM25-Korrektheitsmatrix (Testfall | Handberechnung | Implementierung | Match) inkl. IDF-Edge-Cases
 3. InvertedIndex CRUD- & Konsistenz-Testergebnisse
@@ -615,18 +615,18 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 6. `memfuse-graph` (Layer 1 — CSR-Graph & Session-DAG)
+# 6. `contextra-graph` (Layer 1 — CSR-Graph & Session-DAG)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in Graphalgorithmen, speichereffizienten
 Graphdatenstrukturen (Compressed Sparse Row) und Concurrency-Design. Du auditierst im Auftrag eines
-Weltkonzerns das Crate `memfuse-graph` des MemFuse-Projekts (https://github.com/tfufuz1/memfuse), das
+Weltkonzerns das Crate `contextra-graph` des Contextra-Projekts (https://github.com/tfufuz1/contextra), das
 sowohl das Wissensgraph-Suchsignal (Signal 3) als auch die Konversationsverzweigung (Session-DAG, Grok-
 Pattern) bereitstellt.
 
 MISSION
-`memfuse-graph` implementiert einen Compressed-Sparse-Row-Graphen für speichereffiziente BFS-Traversierung
+`contextra-graph` implementiert einen Compressed-Sparse-Row-Graphen für speichereffiziente BFS-Traversierung
 mit Score-Decay, Personalized-PageRank (ppr.rs), Community-Detection (community.rs) und einen separaten
 Session-DAG für Agenten-Zustandsverzweigung. Die dokumentierte Lock-Hierarchie ist strikt: in `CsrGraph`
 minimale, methodenlokale Lock-Scopes ohne Halten über `.await`-Punkte hinweg; in `SessionBranchTree`
@@ -635,7 +635,7 @@ Korrektheit gegen Referenzimplementierungen, beweise Lock-Hierarchie-Einhaltung,
 Korrektheit von PPR/Score-Decay sicher.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-graph/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-graph/`. Analysiere eigenständig:
   - `src/csr.rs` — Compressed-Sparse-Row-Graphrepräsentation: offsets, targets, weights, Adjazenzmaps,
     Pending-Edges-Pufferung vor Kompaktierung in das CSR-Format. Analysiere BFS-Traversierung mit
     Score-Decay (Decay-Formel identifizieren).
@@ -652,7 +652,7 @@ Methode, die mehr als einen internen Lock erwirbt.
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-graph`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-graph`.
    - Vollständiges Lock-Acquisition-Audit: liste JEDE Methode in CsrGraph und SessionBranchTree auf, die
      `parking_lot::RwLock` erwirbt, mit Scope-Beginn/-Ende und Nachweis, dass kein Lock über einen
      `.await`-Punkt gehalten wird (falls async-Methoden Locks nutzen).
@@ -704,12 +704,12 @@ AUFGABENUMFANG
      CSR-Struktur-Konsistenz — z.B. `offsets`-Array muss immer streng monoton nicht-fallend sein).
 
 7. BENCHMARKS
-   - Nutze/erweitere `tests/csr_benchmark.rs` und erstelle `cargo bench -p memfuse-graph`-Suiten für:
+   - Nutze/erweitere `tests/csr_benchmark.rs` und erstelle `cargo bench -p contextra-graph`-Suiten für:
      BFS-Traversierungslatenz vs. Graphgröße (1K/10K/100K Knoten, verschiedene Dichten), PPR-Konvergenz-
      Laufzeit vs. Graphgröße, Community-Detection-Laufzeit vs. Graphgröße, Edge-Insert-Durchsatz vor/nach
      CSR-Kompaktierung, Session-DAG Branch-Operations-Latenz bei steigender Branch-Tiefe/-Breite.
 
-REPORT-STRUKTUR (`AUDIT_memfuse-graph.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-graph.md`)
 1. Executive Summary
 2. Lock-Hierarchie-Audit (beide Strukturen, vollständige Tabelle)
 3. CSR-Graph-Korrektheitsmatrix (BFS/Score-Decay gegen Referenz)
@@ -728,17 +728,17 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 7. `memfuse-crypto` (Layer 1 — Kryptographischer Kern)
+# 7. `contextra-crypto` (Layer 1 — Kryptographischer Kern)
 
 ```
 ROLLE
 Du bist ein Senior Rust Security Engineer mit 20+ Jahren Erfahrung in angewandter Kryptographie,
 Seitenkanal-resistenter Implementierung und Sicherheitsaudits kryptographischer Primitiven. Du wurdest
-von einem Weltkonzern beauftragt, das sicherheitskritischste Crate `memfuse-crypto` des MemFuse-Projekts
-(https://github.com/tfufuz1/memfuse) einer Sicherheitsprüfung nach Industriestandard zu unterziehen.
+von einem Weltkonzern beauftragt, das sicherheitskritischste Crate `contextra-crypto` des Contextra-Projekts
+(https://github.com/tfufuz1/contextra) einer Sicherheitsprüfung nach Industriestandard zu unterziehen.
 
 MISSION
-`memfuse-crypto` schützt ALLE auf Disk liegenden Daten (AES-256-GCM-SIV) und die Integrität des WAL
+`contextra-crypto` schützt ALLE auf Disk liegenden Daten (AES-256-GCM-SIV) und die Integrität des WAL
 (HMAC-basierter Anti-Tamper-Schutz). Die dokumentierte Kern-Invariante lautet: pro Datei wird ein
 eindeutiger Schlüssel via HKDF abgeleitet, mit OsRng 8-Byte-Zufalls-Suffix + 4-Byte-Präfix zur
 Verhinderung von Nonce-Reuse-Key-Leakage. Ein einziger Fehler hier (Nonce-Wiederverwendung, schwache
@@ -747,11 +747,11 @@ Nutzerdaten im air-gapped System. Deine Mission: verifiziere jede kryptographisc
 NIST/RFC-Referenzvektoren, beweise Nonce-Eindeutigkeit unter Last, und prüfe auf Seitenkanal-Risiken.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-crypto/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-crypto/`. Analysiere eigenständig:
   - `src/crypto.rs` — `KeyManager` (exportiert als `CryptoKey`): AES-256-GCM-SIV-Implementierung,
     Nonce-Konstruktion (8-Byte OsRng-Suffix + 4-Byte-Präfix — verifiziere exakte Bit-Anordnung und
     Gesamtlänge gegen den GCM-SIV-Nonce-Standard von 96 Bit / 12 Byte), HKDF-Schlüsselexpansion aus Passwort.
-  - `src/wal_crypto.rs` — WAL-spezifische Verschlüsselungsanbindung (Integration mit memfuse-store).
+  - `src/wal_crypto.rs` — WAL-spezifische Verschlüsselungsanbindung (Integration mit contextra-store).
   - `src/anti_tamper.rs` — HMAC-SHA256-basierter Integritätsschutz — analysiere HMAC-Key-Ableitung
     getrennt vom Verschlüsselungsschlüssel (kritische Kryptographie-Best-Practice: Key-Separation
     zwischen Encryption- und MAC-Key MUSS eingehalten werden — verifiziere dies explizit im Code).
@@ -762,10 +762,10 @@ Produktionscode dieses Crates.
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-crypto`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-crypto`.
    - Verifiziere `forbid(unsafe_code)` in Nicht-Test-Code vollständig (0 Treffer erwartet außerhalb
      `#[cfg(test)]`).
-   - Dependency-Audit: `cargo audit -p memfuse-crypto` (RUSTSEC-Datenbank) — dokumentiere jede
+   - Dependency-Audit: `cargo audit -p contextra-crypto` (RUSTSEC-Datenbank) — dokumentiere jede
      Sicherheitswarnung zu verwendeten Krypto-Bibliotheken (z.B. blake3, AES-GCM-SIV-Crate) mit CVE-ID
      falls vorhanden.
    - Verifiziere, dass sensible Schlüsselmaterial-Typen `Zeroize`/`ZeroizeOnDrop` implementieren
@@ -779,7 +779,7 @@ AUFGABENUMFANG
      exakt den bekannten Ciphertext + Tag aus dem RFC liefern.
    - Teste HKDF gegen RFC-5869-Testvektoren (offizielle IETF-Testvektoren für HKDF-SHA256).
    - Teste HMAC-SHA256 gegen RFC-4231-Testvektoren.
-   - Teste BLAKE3 (falls direkt hier verwendet, sonst nur in memfuse-core relevant) gegen offizielle
+   - Teste BLAKE3 (falls direkt hier verwendet, sonst nur in contextra-core relevant) gegen offizielle
      BLAKE3-Testvektoren aus dem Referenz-Repository.
 
 3. NONCE-EINDEUTIGKEIT UNTER LAST
@@ -823,11 +823,11 @@ AUFGABENUMFANG
    - proptest: für beliebige 1-Bit-Flips im Ciphertext MUSS decrypt fehlschlagen (Authentizitäts-Invariante).
 
 8. BENCHMARKS
-   - `cargo bench -p memfuse-crypto` (erstellen falls nicht vorhanden): AES-256-GCM-SIV Encrypt/Decrypt-
+   - `cargo bench -p contextra-crypto` (erstellen falls nicht vorhanden): AES-256-GCM-SIV Encrypt/Decrypt-
      Durchsatz (MB/s) bei 1KB/64KB/1MB/16MB Payload-Größen, HKDF-Key-Derivation-Latenz, HMAC-Berechnungs-
      durchsatz, Nonce-Generierungs-Overhead.
 
-REPORT-STRUKTUR (`AUDIT_memfuse-crypto.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-crypto.md`)
 1. Executive Summary mit explizitem Sicherheits-Verdikt (GO/NO-GO für Produktionseinsatz)
 2. `cargo audit`-Ergebnisse (Dependency-CVEs)
 3. RFC-Testvektor-Konformitätsmatrix (AES-GCM-SIV/HKDF/HMAC/BLAKE3 — jeweils PASS/FAIL pro Vektor)
@@ -850,30 +850,30 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 8. `memfuse-checkpoint` (Layer 1 — Checkpoint-Registry)
+# 8. `contextra-checkpoint` (Layer 1 — Checkpoint-Registry)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in Transaktionssystemen, Time-Travel-
 Datenbankarchitekturen und RAII-basierter Ressourcenverwaltung. Du auditierst im Auftrag eines
-Weltkonzerns das Crate `memfuse-checkpoint` des MemFuse-Projekts (https://github.com/tfufuz1/memfuse),
+Weltkonzerns das Crate `contextra-checkpoint` des Contextra-Projekts (https://github.com/tfufuz1/contextra),
 den gemäß ADR-011 EINZIGEN öffentlich sichtbaren Einstiegspunkt für das Checkpoint-Konzept im gesamten
 Workspace.
 
 MISSION
-`memfuse-checkpoint` stellt den Trait `CheckpointCoordinator`, die `PersistentCheckpointStore`-Registry
+`contextra-checkpoint` stellt den Trait `CheckpointCoordinator`, die `PersistentCheckpointStore`-Registry
 und den RAII-Guard `CheckpointGuard` für automatisches Rollback bei Fehlern bereit. Es ist essenziell für
 Time-Travel-Funktionalität und den `checkpoint → execute → commit → audit`-Loop der Agent-Engine
-(memfuse-agent). Ein Fehler in der RAII-Rollback-Logik (z.B. Guard wird nicht bei Panic ausgelöst) kann
+(contextra-agent). Ein Fehler in der RAII-Rollback-Logik (z.B. Guard wird nicht bei Panic ausgelöst) kann
 zu inkonsistenten Zuständen führen, die stillschweigend persistiert werden. Deine Mission: beweise, dass
 `CheckpointGuard` unter JEDER Exit-Bedingung (normaler Drop, Panic-Unwind, expliziter Commit/Rollback)
 korrekt funktioniert, und verifiziere die klare architektonische Abgrenzung zum internen
-`memfuse-store::checkpoint`-Modul (ADR-011/ADR-015).
+`contextra-store::checkpoint`-Modul (ADR-011/ADR-015).
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-checkpoint/`. Analysiere eigenständig `src/lib.rs`
+Klone das Repository, arbeite in `crates/contextra-checkpoint/`. Analysiere eigenständig `src/lib.rs`
 (einzige Quelldatei, 1235 Zeilen laut Repo-Scan — daher vermutlich hohe Funktionsdichte):
-  - `PersistentCheckpointStore` — delegiert Persistenz an ein `memfuse_core::StorageEngine`-Objekt,
+  - `PersistentCheckpointStore` — delegiert Persistenz an ein `contextra_core::StorageEngine`-Objekt,
     cacht aktive Checkpoints in einem thread-sicheren In-Memory-Store (`parking_lot::RwLock`).
     Analysiere Cache-Invalidierungs-/Synchronisationslogik zwischen In-Memory-Cache und persistenter
     Storage-Schicht — was passiert bei Cache-Miss? Bei gleichzeitigem Schreiben durch zwei Prozesse
@@ -882,7 +882,7 @@ Klone das Repository, arbeite in `crates/memfuse-checkpoint/`. Analysiere eigens
     exakt: was passiert im `Drop`-Implementierung, wenn der Guard OHNE expliziten Commit fallengelassen
     wird (z.B. durch `?`-Fehlerpropagation oder Panic)? Ist das Standardverhalten Commit oder Rollback
     ("commit-on-success" vs. "rollback-unless-committed" — sicherheitskritischer Designentscheid)?
-  - `CheckpointCoordinator`-Trait (definiert in memfuse_core, hier implementiert) — analysiere alle
+  - `CheckpointCoordinator`-Trait (definiert in contextra_core, hier implementiert) — analysiere alle
     Methoden und deren Vertrags-Semantik.
 Beachte ADR-011 (Consolidated Checkpoint Subsystem Architecture) und ADR-015 (RAII CheckpointGuard
 Integration & Konsolidierung, BEFUND AGT-CKPT-001/AGT-STORE-002) — lies beide vollständig aus
@@ -892,7 +892,7 @@ widerspiegelt (nicht nur zum Zeitpunkt der ADR-Erstellung, sondern JETZT im gekl
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-checkpoint`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-checkpoint`.
    - Verifiziere `#![forbid(unsafe_code)]`.
    - ADR-Konformitäts-Check: lies ADR-011 und ADR-015 vollständig, erstelle eine Checkliste jeder dort
      getroffenen architektonischen Entscheidung, und verifiziere jede einzeln gegen den tatsächlichen Code.
@@ -919,7 +919,7 @@ AUFGABENUMFANG
      Test mit Konsistenzprüfung (jeder gelesene Checkpoint muss vollständig und nicht korrupt sein — kein
      "Torn Read" durch RwLock-Verletzung).
    - Teste GC/Ablauf von Checkpoints (falls TTL oder explizite Lösch-API existiert) — Zusammenspiel mit
-     Snapshot-Pinning aus memfuse-core (SnapshotRegistry) explizit verifizieren: ein aktiv referenzierter
+     Snapshot-Pinning aus contextra-core (SnapshotRegistry) explizit verifizieren: ein aktiv referenzierter
      Checkpoint darf NICHT physisch gelöscht werden, solange er gepinnt ist.
 
 4. TIME-TRAVEL-KORREKTHEIT
@@ -935,8 +935,8 @@ AUFGABENUMFANG
    - Doppelte Checkpoint-Erstellung mit identischer ID (falls IDs nicht auto-generiert werden).
 
 6. ABGRENZUNGS-VERIFIKATION (ADR-011)
-   - Verifiziere durch Code-Grep, dass `memfuse-store::checkpoint` (das `pub(crate)`-Modul) NIRGENDS
-     außerhalb von `memfuse-store` direkt importiert wird — insbesondere NICHT von `memfuse-checkpoint`
+   - Verifiziere durch Code-Grep, dass `contextra-store::checkpoint` (das `pub(crate)`-Modul) NIRGENDS
+     außerhalb von `contextra-store` direkt importiert wird — insbesondere NICHT von `contextra-checkpoint`
      selbst (dies wäre ein architektonischer Bruch, da beide Konzepte laut Doku strikt getrennt sein
      müssen). Dokumentiere das Ergebnis explizit als PASS/FAIL.
 
@@ -945,11 +945,11 @@ AUFGABENUMFANG
      aber gültiger Reihenfolge) mit Invarianten-Check: Systemzustand muss nach jeder Sequenz konsistent sein.
 
 8. BENCHMARKS
-   - `cargo bench -p memfuse-checkpoint` (erstellen): Checkpoint-Erstellungs-Latenz vs. Zustandsgröße,
+   - `cargo bench -p contextra-checkpoint` (erstellen): Checkpoint-Erstellungs-Latenz vs. Zustandsgröße,
      Rollback-Latenz vs. Anzahl zwischenzeitlicher Änderungen, Cache-Hit- vs. Cache-Miss-Lesepfad-Latenz,
      Durchsatz bei paralleler Checkpoint-Erstellung (1/10/100 gleichzeitige Tasks).
 
-REPORT-STRUKTUR (`AUDIT_memfuse-checkpoint.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-checkpoint.md`)
 1. Executive Summary
 2. ADR-011/ADR-015-Konformitäts-Checkliste (Entscheidung | Code-Stelle | konform ja/nein)
 3. RAII-Guard-Exit-Pfad-Testmatrix (alle 5 Szenarien, inkl. Panic-Unwind-Nachweis)
@@ -969,17 +969,17 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 9. `memfuse-embed` (Layer 3 — ONNX Embedding Engine, optional)
+# 9. `contextra-embed` (Layer 3 — ONNX Embedding Engine, optional)
 
 ```
 ROLLE
 Du bist ein Senior Rust ML-Infrastructure-Engineer mit 20+ Jahren Erfahrung (davon substanzieller Anteil
 in ML-Systemen) in der Integration von Inferenz-Runtimes (ONNX Runtime), Feature-Flag-Architektur und
-FFI-Grenzen. Du auditierst im Auftrag eines Weltkonzerns das Crate `memfuse-embed` des MemFuse-Projekts
-(https://github.com/tfufuz1/memfuse), das In-Process-Text-Embeddings ohne externe API-Aufrufe bereitstellt.
+FFI-Grenzen. Du auditierst im Auftrag eines Weltkonzerns das Crate `contextra-embed` des Contextra-Projekts
+(https://github.com/tfufuz1/contextra), das In-Process-Text-Embeddings ohne externe API-Aufrufe bereitstellt.
 
 MISSION
-`memfuse-embed` ist gemäß ADR-005 (Feature-Based Scaling) und dem Pure-Rust-USP der "Sovereign Core
+`contextra-embed` ist gemäß ADR-005 (Feature-Based Scaling) und dem Pure-Rust-USP der "Sovereign Core
 Doctrine" so konzipiert, dass der Default-Build OHNE ONNX-Abhängigkeiten baut (`default=[]`). Das gesamte
 ONNX-/Tokenizer-Funktionalität ist hinter dem `onnx`-Feature-Flag verborgen. Ein Leck von ONNX-Typen oder
 -Abhängigkeiten in den Default-Build würde die Kernaussage "Pure Rust, keine schwergewichtigen
@@ -988,7 +988,7 @@ Isolation (TESTING.md Abschnitt 5), verifiziere Embedding- und Reranking-Korrekt
 Thread-Safety des `spawn_blocking`-basierten Inferenzpfads sicher.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-embed/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-embed/`. Analysiere eigenständig:
   - `src/lib.rs` — High-Level-API für Embedding-Generierung via `ort`-Crate (ONNX Runtime) und
     `tokenizers`-Crate für Preprocessing. Analysiere Threading via `tokio::task::spawn_blocking` (laut
     FILE-CONTEXT explizit zur Vermeidung von Executor-Starvation gewählt).
@@ -998,21 +998,21 @@ Klone das Repository, arbeite in `crates/memfuse-embed/`. Analysiere eigenständ
     führe eigene Messung durch).
 Beachte ADR-005 (Feature-Based Scaling) und ADR-008 (Embedding-Backend ONNX → Ollama HTTP, Status: Final,
 ersetzt ADR-007 bzgl. lokaler ONNX-Inferenz — verstehe die Historie: warum wurde von ONNX auf Ollama-HTTP
-als primärer Pfad umgestellt, und in welcher Rolle existiert memfuse-embed jetzt noch — optionales
+als primärer Pfad umgestellt, und in welcher Rolle existiert contextra-embed jetzt noch — optionales
 Zusatzfeature statt Kernabhängigkeit?). `#![deny(unsafe_code)]` bewusst statt `forbid`, um C-FFI/ONNX-
 Runtime-Interaktionen im `onnx`-Feature zu erlauben — im Default-Build (ohne onnx) MUSS 0 unsafe existieren.
 
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE — HERMETIC FEATURE GATE CHECK (TESTING.md Abschnitt 5, VERPFLICHTEND)
-   - `cargo check -p memfuse-embed --no-default-features` MUSS sauber bauen — führe dies als ERSTEN
+   - `cargo check -p contextra-embed --no-default-features` MUSS sauber bauen — führe dies als ERSTEN
      Schritt aus und dokumentiere das vollständige Ergebnis.
    - Verifiziere Zero-Leakage: durchsuche nach jedem `#[cfg(feature = "onnx")]`-Gate im Code und prüfe,
      dass wirklich JEDER ONNX-bezogene Import/Typ/Funktion korrekt gegated ist — kompiliere testweise
-     einen minimalen Downstream-Consumer-Crate-Stub, der nur `memfuse-embed` ohne Features einbindet, und
+     einen minimalen Downstream-Consumer-Crate-Stub, der nur `contextra-embed` ohne Features einbindet, und
      verifiziere, dass keine ONNX-Symbole im öffentlichen API-Oberfläche sichtbar sind (`cargo doc
      --no-default-features --no-deps` durchsuchen).
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-embed --features onnx` (voller Featureumfang).
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-embed --features onnx` (voller Featureumfang).
    - Verifiziere `#![deny(unsafe_code)]`: im Default-Build 0 unsafe-Vorkommen (hartes Kriterium); im
      `onnx`-Feature dokumentiere jeden unsafe-Block mit Zweck (ONNX-C-FFI-Grenze).
 
@@ -1059,7 +1059,7 @@ AUFGABENUMFANG
    - Falls KEIN Modell verfügbar: benchmarke ausschließlich Tokenisierungs-/Preprocessing-Durchsatz und
      dokumentiere transparent, welche Benchmarks aus Umgebungsgründen nicht ausführbar waren.
 
-REPORT-STRUKTUR (`AUDIT_memfuse-embed.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-embed.md`)
 1. Executive Summary — inkl. explizitem Abschnitt "Testbarkeitseinschränkungen dieser VM-Umgebung"
 2. Hermetic-Feature-Gate-Check-Ergebnis (PASS/FAIL, vollständiger Log)
 3. Unsafe-Code-Inventar (Default-Build: MUSS 0 sein — explizit verifizieren; onnx-Feature: Inventar)
@@ -1079,20 +1079,20 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 10. `memfuse-agent` (Layer 3 — Persistente Agent-Workflow-Engine)
+# 10. `contextra-agent` (Layer 3 — Persistente Agent-Workflow-Engine)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in State-Machine-Design, verteilten
 Workflow-Engines (vergleichbar Temporal/LangGraph-Internas) und Audit-Log-Systemen. Du auditierst im
-Auftrag eines Weltkonzerns das Crate `memfuse-agent` des MemFuse-Projekts
-(https://github.com/tfufuz1/memfuse), die "souveräne Alternative zu LangGraph/AutoGen" — eine reine
+Auftrag eines Weltkonzerns das Crate `contextra-agent` des Contextra-Projekts
+(https://github.com/tfufuz1/contextra), die "souveräne Alternative zu LangGraph/AutoGen" — eine reine
 Rust-Workflow-Engine ohne externe Abhängigkeiten.
 
 MISSION
-`memfuse-agent` implementiert den deterministischen `checkpoint → execute → commit → audit`-Loop für
-Multi-Step-Agenten-Ausführung, aufbauend auf `memfuse-db` (Collections), `memfuse-checkpoint` (RAII
-Guards), `memfuse-graph` (deklarativer StateGraph) und `memfuse-store` (LSM-Persistenz). Es verwaltet
+`contextra-agent` implementiert den deterministischen `checkpoint → execute → commit → audit`-Loop für
+Multi-Step-Agenten-Ausführung, aufbauend auf `contextra-db` (Collections), `contextra-checkpoint` (RAII
+Guards), `contextra-graph` (deklarativer StateGraph) und `contextra-store` (LSM-Persistenz). Es verwaltet
 Workflow-Zustand, Token-Budget-Durchsetzung und unveränderliches Audit-Logging über LSM-persistierte
 Keys. Ein Fehler in der State-Machine (unerlaubter Zustandsübergang, doppelte Ausführung eines Schritts,
 nicht durchgesetztes Token-Budget) kann in einem produktiven Agentensystem zu Kostenexplosion oder
@@ -1101,7 +1101,7 @@ das dokumentierte Diagramm, beweise Exactly-Once-Ausführungssemantik pro Schrit
 Audit-Log-Unveränderlichkeit sicher.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-agent/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-agent/`. Analysiere eigenständig:
   - `src/lib.rs` — enthält das State-Machine-Diagramm als Doc-Kommentar (Idle → ... , durch `run()`
     ausgelöst). Extrahiere das VOLLSTÄNDIGE Diagramm aus dem Quellcode und leite daraus die exakte
     Zustandsübergangstabelle ab (alle Zustände, alle erlaubten/verbotenen Übergänge).
@@ -1109,8 +1109,8 @@ Klone das Repository, arbeite in `crates/memfuse-agent/`. Analysiere eigenständ
     audit-Zyklus.
   - `src/step.rs` — Einzelschritt-Abstraktion innerhalb eines Workflows.
   - `src/context.rs` — Workflow-Ausführungskontext (Token-Budget-Tracking? Zusammenspiel mit
-    `memfuse-core::types::budget`).
-  - `src/graph.rs` — deklarativer StateGraph (Zusammenspiel mit `memfuse-graph`? oder eigenständige
+    `contextra-core::types::budget`).
+  - `src/graph.rs` — deklarativer StateGraph (Zusammenspiel mit `contextra-graph`? oder eigenständige
     Workflow-Graph-Definition — analysiere die tatsächliche Abhängigkeit).
   - `src/audit.rs` — unveränderliches Audit-Logging über LSM-persistierte Keys. Analysiere: wie wird
     Unveränderlichkeit erzwungen (Append-Only-Schema? Keine Update/Delete-API für Audit-Einträge?).
@@ -1119,7 +1119,7 @@ Klone das Repository, arbeite in `crates/memfuse-agent/`. Analysiere eigenständ
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-agent`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-agent`.
    - Extrahiere das State-Machine-Diagramm aus dem lib.rs-Doc-Kommentar wörtlich in den Report und
      erstelle eine formale Zustandsübergangstabelle daraus.
 
@@ -1131,7 +1131,7 @@ AUFGABENUMFANG
      1-Schritt-Workflow.
    - Teste Fehlerpfad-Übergänge: was passiert, wenn `execute` innerhalb eines Schritts fehlschlägt?
      Landet die State-Machine in einem klar definierten Fehlerzustand mit Rollback (via CheckpointGuard-
-     Integration) oder in einem undefinierten Zwischenzustand? Verifiziere gegen memfuse-checkpoint-
+     Integration) oder in einem undefinierten Zwischenzustand? Verifiziere gegen contextra-checkpoint-
      Integration.
    - Property-Test: zufällige Sequenzen von Übergangsversuchen (auch ungültige) — die State-Machine darf
      NIEMALS in einen im Diagramm nicht vorgesehenen Zustand gelangen (Invarianten-Check nach jeder
@@ -1171,12 +1171,12 @@ AUFGABENUMFANG
      teste explizit, dass dies verhindert wird.
 
 8. BENCHMARKS
-   - `cargo bench -p memfuse-agent` (erstellen): Latenz pro checkpoint→execute→commit→audit-Zyklus,
+   - `cargo bench -p contextra-agent` (erstellen): Latenz pro checkpoint→execute→commit→audit-Zyklus,
      Overhead der Audit-Log-Schreibung isoliert gemessen, Durchsatz bei N parallelen Workflow-Instanzen,
      Skalierung der State-Machine-Übergangs-Latenz vs. Workflow-Historie-Länge (falls relevant für
      Event-Sourcing-Replay-Kosten).
 
-REPORT-STRUKTUR (`AUDIT_memfuse-agent.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-agent.md`)
 1. Executive Summary
 2. Formale Zustandsübergangstabelle (aus Doc-Kommentar extrahiert) + vollständige Testabdeckungsmatrix
    (jeder Übergang: getestet ja/nein, Ergebnis)
@@ -1198,17 +1198,17 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 11. `memfuse-mcp` (Layer 4 — MCP Server, stdio JSON-RPC)
+# 11. `contextra-mcp` (Layer 4 — MCP Server, stdio JSON-RPC)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in Protokoll-Implementierungen, sicherer
 Sandboxing-Architektur und stdio-basierten IPC-Systemen. Du auditierst im Auftrag eines Weltkonzerns das
-Crate `memfuse-mcp` des MemFuse-Projekts (https://github.com/tfufuz1/memfuse) — den Model-Context-
-Protocol-Server, über den externe KI-Agenten (z.B. Claude Desktop) auf die MemFuse-Datenbank zugreifen.
+Crate `contextra-mcp` des Contextra-Projekts (https://github.com/tfufuz1/contextra) — den Model-Context-
+Protocol-Server, über den externe KI-Agenten (z.B. Claude Desktop) auf die Contextra-Datenbank zugreifen.
 
 MISSION
-`memfuse-mcp` implementiert JSON-RPC 2.0 EXKLUSIV über stdio (ADR-010 — bewusst KEIN HTTP/axum/TCP, um
+`contextra-mcp` implementiert JSON-RPC 2.0 EXKLUSIV über stdio (ADR-010 — bewusst KEIN HTTP/axum/TCP, um
 die Air-Gapped-Sicherheitsgarantie zu erhalten). Es enthält eine `McpSandbox` mit `VolatileToolResult`-
 Zeroize-Encryption für flüchtige Tool-Ausgaben (Anthropic Containment Pattern). Da dieser Server externe,
 potenziell nicht vertrauenswürdige Eingaben über stdin verarbeitet, ist er die Hauptangriffsfläche des
@@ -1218,7 +1218,7 @@ Sandbox-Isolation, und stelle sicher, dass die dokumentierten Bounds (16MB RPC-N
 Suchquery) tatsächlich hart durchgesetzt werden.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-mcp/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-mcp/`. Analysiere eigenständig:
   - `src/lib.rs` — `MAX_RPC_BYTES` (16MB), `MAX_SEARCH_QUERY_BYTES` (64KB), Hotspots laut FILE-CONTEXT:
     `run_stdio_loop()`, `handle_request()`, `read_line_bounded()`. Analysiere den kompletten Request-
     Verarbeitungs-Loop.
@@ -1226,16 +1226,16 @@ Klone das Repository, arbeite in `crates/memfuse-mcp/`. Analysiere eigenständig
     Analysiere JSON-RPC-2.0-Konformität (id-Handling, error-Codes, batch-Requests falls unterstützt).
   - `src/sandbox.rs` — `McpSandbox`, `SandboxPolicy`. Analysiere, welche Operationen die Sandbox erlaubt/
     verbietet, und wie `VolatileToolResult` mit Zeroize-Encryption implementiert ist.
-  - `src/bin/memfuse-mcp-server.rs` — Binary-Entry-Point.
+  - `src/bin/contextra-mcp-server.rs` — Binary-Entry-Point.
   - `src/tests.rs` — vorhandene Testsuite als Ausgangspunkt.
-  - Integration mit `memfuse-db::chunker::{ChunkerConfig, MarkdownChunker}` und `memfuse-db::MemFuse`.
+  - Integration mit `contextra-db::chunker::{ChunkerConfig, MarkdownChunker}` und `contextra-db::Contextra`.
 Beachte ADR-010 (MCP-Transport: HTTP-REST-Stub → stdio JSON-RPC 2.0) — verifiziere, dass WIRKLICH keine
 TCP/HTTP-Listener-Reste im Code existieren.
 
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-mcp`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-mcp`.
    - Grep-Verifikation: keine `axum`/`tokio::net::TcpListener`/HTTP-Server-Symbole im Produktionscode
      (ADR-010-Konformität).
 
@@ -1269,7 +1269,7 @@ AUFGABENUMFANG
      verifiziere sowohl erlaubte als auch verbotene Operationen exakt gegen die Policy.
    - Teste `VolatileToolResult`-Zeroize-Encryption: verifiziere, dass nach Ablauf/Verwerfen eines
      volatilen Ergebnisses der zugrunde liegende Speicher tatsächlich genullt wird (analog zum
-     Zeroize-Test-Ansatz aus dem memfuse-crypto-Audit — Cross-Referenz).
+     Zeroize-Test-Ansatz aus dem contextra-crypto-Audit — Cross-Referenz).
 
 5. FUNKTIONALE MCP-TOOL-ENDPUNKTE
    - Identifiziere alle über `handle_request()` exponierten MCP-Tools/Methoden (z.B. Search, Ingest via
@@ -1277,7 +1277,7 @@ AUFGABENUMFANG
      Pflichtparameter, Parameter mit falschem Typ, Parameter an den dokumentierten Grenzen
      (MAX_SEARCH_QUERY_BYTES).
    - Teste Chunker-Integration (MarkdownChunker über MCP getriggert) mit Grenzfall-Dokumenten (Cross-
-     Referenz zu memfuse-db-Chunking-Tests, hier speziell End-to-End über das Protokoll).
+     Referenz zu contextra-db-Chunking-Tests, hier speziell End-to-End über das Protokoll).
 
 6. FEHLERBEHANDLUNG & INFORMATIONSLECKS
    - Verifiziere, dass Fehlermeldungen an den Client KEINE internen Implementierungsdetails leaken, die
@@ -1289,11 +1289,11 @@ AUFGABENUMFANG
      Requests, Verifikation korrekter Antwort-Zuordnung (id-Matching) unter Last.
 
 8. BENCHMARKS
-   - `cargo bench -p memfuse-mcp` (erstellen): Request-Verarbeitungs-Durchsatz (Requests/Sekunde) bei
+   - `cargo bench -p contextra-mcp` (erstellen): Request-Verarbeitungs-Durchsatz (Requests/Sekunde) bei
      minimaler/durchschnittlicher/maximaler (16MB) Nachrichtengröße, `read_line_bounded()`-Latenz-
      Overhead, End-to-End-Latenz für einen typischen Such-Request via MCP.
 
-REPORT-STRUKTUR (`AUDIT_memfuse-mcp.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-mcp.md`)
 1. Executive Summary — inkl. explizitem Sicherheits-Verdikt zur stdio-Angriffsfläche
 2. ADR-010-Konformitätsnachweis (kein HTTP/TCP)
 3. JSON-RPC-2.0-Konformitätsmatrix (Spec-Regel | Testergebnis)
@@ -1314,18 +1314,18 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 12. `memfuse-ollama` (Layer 3 — Ollama Client & Embeddings)
+# 12. `contextra-ollama` (Layer 3 — Ollama Client & Embeddings)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in HTTP-Client-Robustheit, LLM-Integrations-
 schichten und Prompt-Engineering-Sicherheit (Injection-Resistenz). Du auditierst im Auftrag eines
-Weltkonzerns das Crate `memfuse-ollama` des MemFuse-Projekts (https://github.com/tfufuz1/memfuse), das
+Weltkonzerns das Crate `contextra-ollama` des Contextra-Projekts (https://github.com/tfufuz1/contextra), das
 gemäß ADR-008 das primäre LLM-/Embedding-Backend darstellt (ersetzt die ursprünglich geplante reine
 ONNX-In-Process-Lösung als Hauptpfad).
 
 MISSION
-`memfuse-ollama` verbindet MemFuse mit einem lokal laufenden Ollama-Server für Text-Generierung und
+`contextra-ollama` verbindet Contextra mit einem lokal laufenden Ollama-Server für Text-Generierung und
 Embeddings — die einzige Stelle im System, an der Netzwerk-I/O zu einem (wenn auch lokalen) externen
 Prozess stattfindet. Es enthält den `ContextPrefixEngine` (Contextual-Retrieval-Pattern: LLM-generiertes
 Kontext-Präfix vor Chunks, laut README "49% weniger Retrieval-Fehler" — Anthropic-Pattern) und
@@ -1335,7 +1335,7 @@ Mission: verifiziere HTTP-Client-Robustheit gegen Netzwerkfehler/Timeouts, bewei
 von `xml_escape`/`build_rag_prompt`, und stelle Korrektheit des Kontext-Präfix-Mechanismus sicher.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-ollama/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-ollama/`. Analysiere eigenständig:
   - `src/client.rs` — `OllamaClient`, `OllamaConfig`, `DEFAULT_BASE_URL`, `DEFAULT_EMBED_MODEL`,
     `build_rag_prompt()`, `xml_escape()`. Analysiere HTTP-Request-Konstruktion, Timeout-Konfiguration,
     Retry-Verhalten (falls vorhanden), Streaming vs. Non-Streaming-Response-Handling.
@@ -1348,12 +1348,12 @@ Klone das Repository, arbeite in `crates/memfuse-ollama/`. Analysiere eigenstän
   - `src/model_info.rs` — `ModelInfo`. Modell-Metadaten-Handling (Kontext-Fenster-Größe, Kapabilitäten).
   - `src/lib.rs` — Re-Export-Oberfläche.
 Beachte ADR-008 (Embedding-Backend-Wechsel ONNX → Ollama HTTP) — verstehe, warum HTTP-Robustheit hier
-kritischer ist als in memfuse-embed.
+kritischer ist als in contextra-embed.
 
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-ollama`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-ollama`.
 
 2. `xml_escape()` / `build_rag_prompt()` — INJECTION-SICHERHEIT, HÖCHSTE PRIORITÄT
    - Teste `xml_escape()` gegen ALLE XML-Sonderzeichen (`<`, `>`, `&`, `"`, `'`) einzeln und in
@@ -1405,7 +1405,7 @@ AUFGABENUMFANG
 6. EMBEDDER (OllamaEmbedder)
    - Teste Vektordimensions-Konsistenz: alle von einem Modell zurückgegebenen Embeddings müssen dieselbe
      Dimension haben (Konsistenz-Check über mehrere Aufrufe mit Mock-Backend).
-   - Teste Batch- vs. Einzel-Embedding-Konsistenz (analog zum memfuse-embed-Audit).
+   - Teste Batch- vs. Einzel-Embedding-Konsistenz (analog zum contextra-embed-Audit).
 
 7. PROPERTY-BASED TESTING
    - proptest für `xml_escape()`: für beliebige Strings darf das Ergebnis nach dem Escaping niemals ein
@@ -1413,11 +1413,11 @@ AUFGABENUMFANG
      (strukturelle Invariante).
 
 8. BENCHMARKS
-   - `cargo bench -p memfuse-ollama` (erstellen, mit Mock-Backend um Netzwerklatenz zu isolieren):
+   - `cargo bench -p contextra-ollama` (erstellen, mit Mock-Backend um Netzwerklatenz zu isolieren):
      `xml_escape()`-Durchsatz bei steigender String-Länge, `build_rag_prompt()`-Konstruktions-Overhead,
      Context-Prefix-Kombinations-Latenz (ohne LLM-Aufruf-Anteil, nur String-Verarbeitung isoliert).
 
-REPORT-STRUKTUR (`AUDIT_memfuse-ollama.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-ollama.md`)
 1. Executive Summary — inkl. Prompt-Injection-Sicherheits-Verdikt
 2. `xml_escape()`-Korrektheitsmatrix (Zeichen | erwartetes Escaping | tatsächliches Ergebnis)
 3. Prompt-Injection-Testmatrix (Angriffsvektor | Ergebnis: erfolgreich abgewehrt ja/nein)
@@ -1437,24 +1437,24 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 13. `memfuse-router` (Layer 3 — SLM Routing & Dispatch)
+# 13. `contextra-router` (Layer 3 — SLM Routing & Dispatch)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in Entscheidungslogik-Systemen, Routing-
 Algorithmen und Konfigurationsmanagement. Du auditierst im Auftrag eines Weltkonzerns das kompakte, aber
-geschäftslogisch wichtige Crate `memfuse-router` des MemFuse-Projekts (https://github.com/tfufuz1/memfuse),
+geschäftslogisch wichtige Crate `contextra-router` des Contextra-Projekts (https://github.com/tfufuz1/contextra),
 das Routing-Entscheidungen zu Small-Language-Models (SLM) trifft.
 
 MISSION
-`memfuse-router` ist mit nur 511 Codezeilen das kompakteste Crate im Workspace, aber jede
+`contextra-router` ist mit nur 511 Codezeilen das kompakteste Crate im Workspace, aber jede
 Routing-Fehlentscheidung hat direkten Einfluss auf Antwortqualität und Kosten des gesamten Systems (z.B.
 falsches Modell für eine Aufgabe gewählt). Deine Mission: verifiziere JEDE Verzweigung der
 Routing-Entscheidungslogik erschöpfend (bei dieser Codegröße ist 100%-Branch-Coverage ein realistisches
 und einzufordendes Ziel), und stelle Konsistenz der `SlmProfile`-Konfiguration sicher.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-router/`. Analysiere eigenständig (bei dieser
+Klone das Repository, arbeite in `crates/contextra-router/`. Analysiere eigenständig (bei dieser
 Codegröße: lies JEDE Zeile aller vier Quelldateien vor Testbeginn):
   - `src/router.rs` — `RouterEngine`, `RoutingDecision`. Analysiere exakt: welche Eingabesignale
     fließen in die Routing-Entscheidung ein (Query-Komplexität? Token-Länge? explizite Nutzer-Präferenz?
@@ -1462,13 +1462,13 @@ Codegröße: lies JEDE Zeile aller vier Quelldateien vor Testbeginn):
   - `src/profile.rs` — `SlmProfile`. Analysiere Struktur (Modellname, Kapazitätsgrenzen, Kosten-/Latenz-
     Charakteristik?) und wie Profile verglichen/priorisiert werden.
   - `src/dispatch.rs` — `dispatch_to_slm()`. Analysiere den tatsächlichen Dispatch-Mechanismus (ruft
-    dies memfuse-ollama auf? Ist es Backend-agnostisch?).
+    dies contextra-ollama auf? Ist es Backend-agnostisch?).
   - `src/tests.rs` — vorhandene Tests als Ausgangsbasis, identifiziere Lücken.
 
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-router`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-router`.
    - Erstelle einen manuellen Kontrollflussgraphen (Control Flow Graph) für JEDE Funktion in `router.rs`
      und `dispatch.rs` — dies ist bei der geringen Codegröße machbar und für vollständige Branch-Coverage
      notwendig. Dokumentiere den Graphen im Report.
@@ -1493,7 +1493,7 @@ AUFGABENUMFANG
      Profil-Paare muss die Vergleichsrelation konsistent (transitiv, falls eine Ordnung definiert ist) sein.
 
 4. DISPATCH-KORREKTHEIT
-   - Teste `dispatch_to_slm()` mit einem Mock-Backend (falls es tatsächlich memfuse-ollama oder einen
+   - Teste `dispatch_to_slm()` mit einem Mock-Backend (falls es tatsächlich contextra-ollama oder einen
      HTTP-Endpunkt aufruft) — verifiziere korrekte Parameterweitergabe (das richtige Modell aus der
      Routing-Entscheidung wird auch tatsächlich im Dispatch-Aufruf verwendet — End-to-End-Konsistenz
      zwischen Entscheidung und Ausführung).
@@ -1511,11 +1511,11 @@ AUFGABENUMFANG
      Dokumentiere JEDE Mutation mit Ergebnis in einer vollständigen Tabelle.
 
 7. BENCHMARKS
-   - `cargo bench -p memfuse-router` (erstellen): Routing-Entscheidungs-Latenz bei 1/10/50/500 verfügbaren
+   - `cargo bench -p contextra-router` (erstellen): Routing-Entscheidungs-Latenz bei 1/10/50/500 verfügbaren
      Profilen (Skalierungsverhalten der Auswahllogik — linear? Es sollte bei dieser Größenordnung sub-
      Millisekunden-Latenz sein, jede Abweichung ist auffällig und zu kommentieren).
 
-REPORT-STRUKTUR (`AUDIT_memfuse-router.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-router.md`)
 1. Executive Summary
 2. Vollständiger Kontrollflussgraph aller Kernfunktionen
 3. Branch-Coverage-Matrix (JEDER Zweig | auslösender Test | Ergebnis) — Ziel 100%
@@ -1537,17 +1537,17 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 14. `memfuse-tauri` (Layer 4 — Desktop-App Shell)
+# 14. `contextra-tauri` (Layer 4 — Desktop-App Shell)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in Desktop-Anwendungsarchitektur, sicherer
 IPC zwischen Frontend/Backend (Tauri-Command-Pattern) und Dateiformat-Parsing (PDF/DOCX/E-Mail). Du
-auditierst im Auftrag eines Weltkonzerns das Crate `memfuse-tauri` des MemFuse-Projekts
-(https://github.com/tfufuz1/memfuse), die Desktop-Applikations-Shell "MemFuse Brain".
+auditierst im Auftrag eines Weltkonzerns das Crate `contextra-tauri` des Contextra-Projekts
+(https://github.com/tfufuz1/contextra), die Desktop-Applikations-Shell "Contextra Brain".
 
 MISSION
-`memfuse-tauri` ist die einzige direkte Nutzerschnittstelle des Systems: Chat-UI, Dokumenten-Import
+`contextra-tauri` ist die einzige direkte Nutzerschnittstelle des Systems: Chat-UI, Dokumenten-Import
 (PDF, Word/DOCX, Markdown, E-Mails), und MCP-Server-Einbindung. Da diese Schicht Dateien aus potenziell
 nicht vertrauenswürdigen Quellen (vom Nutzer importierte Dokumente) parst, ist Parser-Robustheit
 sicherheitskritisch (Parser sind eine klassische Angriffsfläche für Speicherkorruption/DoS über
@@ -1556,12 +1556,12 @@ verifiziere alle Tauri-Commands auf korrekte Fehlerbehandlung über die Frontend
 die Ingestion-Pipeline End-to-End.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-tauri/`. Analysiere eigenständig:
+Klone das Repository, arbeite in `crates/contextra-tauri/`. Analysiere eigenständig:
   - `src/main.rs` / `src/lib.rs` — App-Bootstrap, Plugin-Registrierung (`tauri_plugin_dialog`,
     `tauri_plugin_fs`), `AppState`-Management, Ollama-Erreichbarkeits-Check beim Start.
   - `src/state.rs` — `AppState` — analysiere geteilten mutable State zwischen Tauri-Commands (Thread-
     Safety-Anforderungen: Tauri-Commands laufen potenziell parallel).
-  - `src/ollama.rs` — `OllamaBridge` — Tauri-seitige Anbindung an Ollama (Abgrenzung zu memfuse-ollama
+  - `src/ollama.rs` — `OllamaBridge` — Tauri-seitige Anbindung an Ollama (Abgrenzung zu contextra-ollama
     prüfen: Duplikation oder Delegation?).
   - `src/ingestion/{mod,pipeline,docx,pdf,email,entities}.rs` — Dokumenten-Import-Pipeline. JEDER
     Parser (docx.rs, pdf.rs, email.rs) muss einzeln auf Robustheit gegen malformte Dateien geprüft
@@ -1569,13 +1569,13 @@ Klone das Repository, arbeite in `crates/memfuse-tauri/`. Analysiere eigenständ
   - `src/commands/{mod,transform,search,collections,chat,ingest}.rs` — alle Tauri-Commands (die
     Frontend-Backend-API-Oberfläche). Analysiere JEDEN Command auf Input-Validierung und Fehler-
     Serialisierung zurück ans Frontend.
-Beachte ADR-009 (memfuse-tauri als Desktop-App-Grundgerüst) und ADR-018 (Doppelstrategie PyPI-Library
+Beachte ADR-009 (contextra-tauri als Desktop-App-Grundgerüst) und ADR-018 (Doppelstrategie PyPI-Library
 UND Desktop-App).
 
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-tauri`.
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-tauri`.
    - Analysiere `AppState`-Zugriffsmuster auf Thread-Safety (Tauri-Commands sind async und potenziell
      parallel aufrufbar) — dokumentiere Synchronisationsmechanismus und verifiziere Abwesenheit von
      Data-Races durch Code-Review + Stress-Test.
@@ -1605,7 +1605,7 @@ AUFGABENUMFANG
 
 3. INGESTION-PIPELINE END-TO-END (pipeline.rs)
    - Teste vollständigen Fluss: Datei-Import → Parsing → Entity-Extraktion → Chunking (Integration mit
-     memfuse-db::chunker) → Indexierung. Verifiziere, dass ein Fehler in einer frühen Pipeline-Stufe
+     contextra-db::chunker) → Indexierung. Verifiziere, dass ein Fehler in einer frühen Pipeline-Stufe
      (z.B. Parser-Fehler) korrekt propagiert wird und NICHT zu einem Teil-Import (inkonsistenter
      Datenbankzustand) führt.
    - Teste Batch-Import mehrerer Dokumente, wobei eines davon fehlerhaft ist — Rest der Batch muss
@@ -1624,23 +1624,23 @@ AUFGABENUMFANG
 5. OLLAMA-BRIDGE
    - Teste Verhalten bei nicht erreichbarem Ollama beim App-Start (dokumentierter Status-Check) — App
      darf nicht abstürzen, muss klaren Status an Frontend kommunizieren.
-   - Vergleiche `OllamaBridge` (hier) mit `OllamaClient` (memfuse-ollama) — dokumentiere im Report, ob
+   - Vergleiche `OllamaBridge` (hier) mit `OllamaClient` (contextra-ollama) — dokumentiere im Report, ob
      hier unnötige Logik-Duplikation vorliegt, die ein Wartungsrisiko darstellt.
 
 6. BENCHMARKS
-   - `cargo bench -p memfuse-tauri` (erstellen, soweit Tauri-Kontext dies zulässt — ggf. isolierte
+   - `cargo bench -p contextra-tauri` (erstellen, soweit Tauri-Kontext dies zulässt — ggf. isolierte
      Benchmarks nur für ingestion/-Module ohne vollen Tauri-Runtime-Kontext): Parser-Durchsatz
      (Seiten/Sekunde für PDF, Dokumentgröße/Sekunde für DOCX/E-Mail) für kleine/mittlere/große
      Testdokumente, Pipeline-End-to-End-Latenz pro importiertem Dokument.
 
-REPORT-STRUKTUR (`AUDIT_memfuse-tauri.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-tauri.md`)
 1. Executive Summary — inkl. explizitem Parser-Sicherheits-Verdikt
 2. AppState Thread-Safety-Analyse
 3. Parser-Robustheits-Testmatrix (pro Format: docx/pdf/email — alle 8 Szenarien a-h)
 4. PDF-JavaScript-Sicherheitstest-Ergebnis (explizit hervorgehoben)
 5. Ingestion-Pipeline End-to-End- & Batch-Semantik-Ergebnisse
 6. Tauri-Command-Testmatrix (pro Command: Happy Path/Fehlerpfade)
-7. Ollama-Bridge-Testergebnisse + Duplikations-Befund vs. memfuse-ollama
+7. Ollama-Bridge-Testergebnisse + Duplikations-Befund vs. contextra-ollama
 8. Benchmark-Tabellen
 9. Priorisierte Sicherheits-/Bugliste
 10. Anhang: Rohlogs, Test-Dokumente-Inventar (welche synthetischen Testdateien wurden erstellt)
@@ -1652,28 +1652,28 @@ ABNAHMEKRITERIEN
 
 ---
 
-# 15. `memfuse-py` (Layer 3 — Python PyO3 Bindings)
+# 15. `contextra-py` (Layer 3 — Python PyO3 Bindings)
 
 ```
 ROLLE
 Du bist ein Senior Rust Entwickler mit 20+ Jahren Erfahrung in FFI-Grenzschichten, PyO3-basierten
 Python-Bindings und der Absicherung von Cross-Language-Fehlerbehandlung. Du auditierst im Auftrag eines
-Weltkonzerns das Crate `memfuse-py` des MemFuse-Projekts (https://github.com/tfufuz1/memfuse), die
+Weltkonzerns das Crate `contextra-py` des Contextra-Projekts (https://github.com/tfufuz1/contextra), die
 Python-Brücke der eingebetteten Hybrid-Search-Datenbank.
 
 MISSION
-`memfuse-py` exponiert MemFuse als PyPI-Bibliothek (ADR-018) über PyO3, mit gemeinsam genutztem
+`contextra-py` exponiert Contextra als PyPI-Bibliothek (ADR-018) über PyO3, mit gemeinsam genutztem
 Multi-Thread-Tokio-Runtime (`OnceLock`) über Python-Worker-Threads hinweg. Die dokumentierte Kern-
 Invariante lautet: "Zero Rust panics cross FFI boundary" — JEDER Rust-Panic, der über die FFI-Grenze in
 Python durchschlägt, führt zu einem Python-Prozessabsturz (Segfault-artiges Verhalten) statt einer
 kontrollierten Python-Exception. Deine Mission: beweise diese Zero-Panic-Garantie exhaustiv, verifiziere
-korrekte `MemFuseError` → `PyErr`-Konvertierung für JEDE Fehlervariante, und stelle GIL-Handling-
+korrekte `ContextraError` → `PyErr`-Konvertierung für JEDE Fehlervariante, und stelle GIL-Handling-
 Korrektheit während async `block_on`-Aufrufen sicher.
 
 KONTEXT & ZIELKOMPONENTEN
-Klone das Repository, arbeite in `crates/memfuse-py/`. Analysiere eigenständig `src/lib.rs` (einzige
+Klone das Repository, arbeite in `crates/contextra-py/`. Analysiere eigenständig `src/lib.rs` (einzige
 Quelldatei, 1298 Zeilen laut Repo-Scan):
-  - Hotspots laut FILE-CONTEXT: Zeilen 160-205 (memfuse_err Mapping — MemFuseError → PyErr-Konvertierung),
+  - Hotspots laut FILE-CONTEXT: Zeilen 160-205 (contextra_err Mapping — ContextraError → PyErr-Konvertierung),
     Zeilen 270-650 (CRUD & Search-Methoden FFI-Grenzvalidierung). Lies diese Bereiche vollständig.
   - `OnceLock`-basierte geteilte Multi-Thread-Tokio-Runtime — analysiere Initialisierungs-Race-Condition-
     Sicherheit (was passiert, wenn zwei Python-Threads gleichzeitig zum ersten Mal auf die Runtime
@@ -1688,7 +1688,7 @@ Quelldatei, 1298 Zeilen laut Repo-Scan):
 AUFGABENUMFANG
 
 1. BUILD & STATISCHE ANALYSE
-   - `cargo check`/`clippy -D warnings`/`fmt --check -p memfuse-py` (PyO3-Feature-Kompilierung erfordert
+   - `cargo check`/`clippy -D warnings`/`fmt --check -p contextra-py` (PyO3-Feature-Kompilierung erfordert
      ggf. eine Python-Entwicklungsumgebung in der VM — dokumentiere, falls Python-Header/`python3-dev`
      fehlen und installiere sie, falls das Netzwerk-Sandbox dies erlaubt, oder dokumentiere die
      Einschränkung transparent).
@@ -1708,20 +1708,20 @@ AUFGABENUMFANG
      Python-Interpreters, soweit die Funktionssignaturen dies erlauben), und dokumentiere diese
      Einschränkung explizit und transparent im Report.
 
-3. `MemFuseError` → `PyErr` KONVERTIERUNGSMATRIX
-   - Für JEDE Variante von `MemFuseError` (aus memfuse-core, cross-referenzieren): verifiziere, dass eine
+3. `ContextraError` → `PyErr` KONVERTIERUNGSMATRIX
+   - Für JEDE Variante von `ContextraError` (aus contextra-core, cross-referenzieren): verifiziere, dass eine
      Konvertierung nach `PyErr` existiert und der resultierende Python-Exception-Typ sinnvoll gewählt ist
      (z.B. `ValueError` für Validierungsfehler, `IOError` für Storage-Fehler, ein spezifischer
-     MemFuse-Exception-Typ falls definiert). Dokumentiere als vollständige Tabelle: Rust-Error-Variante →
+     Contextra-Exception-Typ falls definiert). Dokumentiere als vollständige Tabelle: Rust-Error-Variante →
      Python-Exception-Typ → Nachrichtentext-Erhaltung (wird die ursprüngliche Fehlermeldung korrekt
      durchgereicht?).
 
 4. RUNTIME-INITIALISIERUNG & GIL-HANDLING
    - Teste `OnceLock`-Runtime-Initialisierung unter simulierter Nebenläufigkeit: mehrere Python-Threads
      (via Python `threading`-Modul im Testskript) rufen gleichzeitig zum allerersten Mal eine
-     MemFuse-Methode auf — verifiziere exakt EINE Runtime-Instanz wird erstellt (kein Double-Init, keine
+     Contextra-Methode auf — verifiziere exakt EINE Runtime-Instanz wird erstellt (kein Double-Init, keine
      Race Condition).
-   - Teste GIL-Freigabe während `block_on()`: starte eine langlaufende MemFuse-Operation in einem Python-
+   - Teste GIL-Freigabe während `block_on()`: starte eine langlaufende Contextra-Operation in einem Python-
      Thread, verifiziere in einem PARALLELEN Python-Thread, dass reiner Python-Code währenddessen
      weiterhin ausführbar ist (Nachweis über Zeitmessung: der parallele Python-Thread darf nicht durch
      die Rust-Operation blockiert werden, wenn GIL korrekt freigegeben wird).
@@ -1737,20 +1737,20 @@ AUFGABENUMFANG
 6. VOLLSTÄNDIGE CRUD-/SEARCH-API-TESTMATRIX AUS PYTHON
    - Teste die komplette öffentliche Python-API end-to-end aus einem Python-Testskript: Collection
      erstellen, Dokumente einfügen, suchen, aktualisieren, löschen — inkl. aller Grenzfälle analog zu den
-     Rust-seitigen Tests in memfuse-db (Cross-Referenz), diesmal aber explizit über die FFI-Grenze
+     Rust-seitigen Tests in contextra-db (Cross-Referenz), diesmal aber explizit über die FFI-Grenze
      verifiziert.
 
 7. BENCHMARKS
    - FFI-Overhead isoliert messen: Vergleiche Latenz eines identischen Suchvorgangs rein in Rust
-     (Baseline aus memfuse-db-Benchmarks) vs. über die Python-FFI-Grenze aufgerufen — quantifiziere den
+     (Baseline aus contextra-db-Benchmarks) vs. über die Python-FFI-Grenze aufgerufen — quantifiziere den
      FFI-Overhead in absoluten und prozentualen Zahlen.
    - NumPy-Array-Transfer-Durchsatz bei steigender Vektordimension/Batch-Größe.
 
-REPORT-STRUKTUR (`AUDIT_memfuse-py.md`)
+REPORT-STRUKTUR (`AUDIT_contextra-py.md`)
 1. Executive Summary — inkl. explizitem Zero-Panic-Verdikt und Testbarkeits-Einschränkungen der VM
 2. Python-Build-Vorgehen & Umgebungsdokumentation (maturin/Toolchain-Details)
 3. Zero-Panic-FFI-Testmatrix (Methode | invalider Input | Ergebnis: Exception ja/Crash nein)
-4. MemFuseError→PyErr-Konvertierungstabelle (vollständig, jede Variante)
+4. ContextraError→PyErr-Konvertierungstabelle (vollständig, jede Variante)
 5. Runtime-Initialisierungs- & GIL-Handling-Nachweis
 6. NumPy/Zero-Copy-Verifikationsergebnis (bestätigt oder widerlegt, mit Belegen)
 7. Vollständige Python-API-CRUD-Testmatrix
@@ -1761,7 +1761,7 @@ REPORT-STRUKTUR (`AUDIT_memfuse-py.md`)
 ABNAHMEKRITERIEN
 - Der Zero-Panic-Claim ist die zentrale Sicherheitsaussage dieses Crates und muss entweder vollständig
   über echte Python-Aufrufe verifiziert oder die Einschränkung explizit und begründet dokumentiert sein.
-- Die MemFuseError→PyErr-Tabelle muss VOLLSTÄNDIG sein (jede Enum-Variante aus memfuse-core abgedeckt).
+- Die ContextraError→PyErr-Tabelle muss VOLLSTÄNDIG sein (jede Enum-Variante aus contextra-core abgedeckt).
 ```
 
 ---
@@ -1772,11 +1772,11 @@ Das 16. Workspace-Mitglied `xtask` ist kein Bibliotheks-Crate, sondern ein inter
 
 ## Empfohlene Ausführungsreihenfolge für Google-Jules
 
-1. `memfuse-core` (Fundament — muss zuerst verifiziert sein)
-2. `memfuse-store`, `memfuse-crypto` (parallel möglich, beide Layer 1, unabhängig)
-3. `memfuse-index`, `memfuse-text`, `memfuse-graph`, `memfuse-checkpoint` (parallel möglich, Layer 1)
-4. `memfuse-db` (hängt von allen Layer-1-Crates ab)
-5. `memfuse-embed`, `memfuse-ollama`, `memfuse-router`, `memfuse-agent`, `memfuse-py` (Layer 3, teilweise parallel möglich)
-6. `memfuse-mcp`, `memfuse-tauri` (Layer 4, hängen von Layer-3-Crates ab)
+1. `contextra-core` (Fundament — muss zuerst verifiziert sein)
+2. `contextra-store`, `contextra-crypto` (parallel möglich, beide Layer 1, unabhängig)
+3. `contextra-index`, `contextra-text`, `contextra-graph`, `contextra-checkpoint` (parallel möglich, Layer 1)
+4. `contextra-db` (hängt von allen Layer-1-Crates ab)
+5. `contextra-embed`, `contextra-ollama`, `contextra-router`, `contextra-agent`, `contextra-py` (Layer 3, teilweise parallel möglich)
+6. `contextra-mcp`, `contextra-tauri` (Layer 4, hängen von Layer-3-Crates ab)
 
 Jeder Prompt ist so geschrieben, dass er **eigenständig als vollständiger Jules-Task** übergeben werden kann; bei sequenzieller Abarbeitung in obiger Reihenfolge kann der jeweils vorherige Audit-Report als zusätzlicher Kontext mitgegeben werden, ist aber nicht Voraussetzung für die Ausführbarkeit des jeweiligen Prompts.

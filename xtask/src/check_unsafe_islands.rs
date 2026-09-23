@@ -1,30 +1,30 @@
 //! Gate: check-unsafe-islands
 //! Validiert die 3-Insel-Invarianten für `unsafe`-Code (§0.4, ADR-N03):
 //! 1. Keyword `unsafe` ist nur in den definierten Inseln zulässig:
-//!    `memfuse-sys`, `memfuse-simd`, `memfuse-wire`
-//!    (Phase 0R Übergangsliste: `memfuse-vector`, `memfuse-store`, `memfuse-db`).
+//!    `contextra-sys`, `contextra-simd`, `contextra-wire`
+//!    (Phase 0R Übergangsliste: `contextra-vector`, `contextra-store`, `contextra-db`).
 //! 2. Jede Nicht-Insel-`lib.rs` enthält `#![forbid(unsafe_code)]`.
 //! 3. `#![allow(unsafe_code)]` ist NUR in den 3 Inseln zulässig.
 //!
-//! Note: `memfuse-py` (isolierter PyO3 Workspace) ist vom Scan ausgenommen.
+//! Note: `contextra-py` (isolierter PyO3 Workspace) ist vom Scan ausgenommen.
 
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
 /// Die 3 zulässigen Unsafe-Inseln
-pub const ALLOWED_ISLANDS: &[&str] = &["memfuse-sys", "memfuse-simd", "memfuse-wire"];
+pub const ALLOWED_ISLANDS: &[&str] = &["contextra-sys", "contextra-simd", "contextra-wire"];
 
 /// Phase 0R Übergangsliste für Bestands-`unsafe` Vorkommen
 pub const PHASE_0R_TRANSITION_ISLANDS: &[&str] = &[
-    "memfuse-vector",
-    "memfuse-store",
-    "memfuse-db",
+    "contextra-vector",
+    "contextra-store",
+    "contextra-db",
     // TRANSITION-EXTRA: test allocators, benchmark fixtures
-    "memfuse-crypto",
-    "memfuse-graph",
-    "memfuse-text",
-    "memfuse-bench",
+    "contextra-crypto",
+    "contextra-graph",
+    "contextra-text",
+    "contextra-bench",
     "xtask",
 ];
 
@@ -180,7 +180,7 @@ fn strip_comments_and_strings(source: &str) -> String {
     result
 }
 
-/// Ermittelt den Crate-Namen aus dem Pfad (z. B. `crates/memfuse-core/src/lib.rs` -> `memfuse-core`).
+/// Ermittelt den Crate-Namen aus dem Pfad (z. B. `crates/contextra-core/src/lib.rs` -> `contextra-core`).
 pub fn extract_crate_name_from_path(rel_path: &str) -> Option<String> {
     let p = Path::new(rel_path);
     let components: Vec<&str> = p.iter().filter_map(|c| c.to_str()).collect();
@@ -211,8 +211,8 @@ pub fn scan_file_for_unsafe(file_path: &Path, repo_root: &Path) -> Vec<UnsafeOcc
         None => return occurrences,
     };
 
-    // Exclude memfuse-py from scan (PyO3 C-FFI macros, isolated Cargo workspace)
-    if crate_name == "memfuse-py" {
+    // Exclude contextra-py from scan (PyO3 C-FFI macros, isolated Cargo workspace)
+    if crate_name == "contextra-py" {
         return occurrences;
     }
 
@@ -390,7 +390,7 @@ mod tests {
     fn test_allowed_island_keyword_permitted() {
         let dir = tempdir().unwrap();
         let repo_root = dir.path();
-        let crate_dir = repo_root.join("crates/memfuse-sys/src");
+        let crate_dir = repo_root.join("crates/contextra-sys/src");
         fs::create_dir_all(&crate_dir).unwrap();
         let file = crate_dir.join("lib.rs");
 
@@ -398,7 +398,7 @@ mod tests {
 
         let occs = scan_file_for_unsafe(&file, repo_root);
         assert_eq!(occs.len(), 1);
-        assert_eq!(occs[0].crate_name, "memfuse-sys");
+        assert_eq!(occs[0].crate_name, "contextra-sys");
         assert_eq!(occs[0].kind, UnsafeKind::Keyword);
 
         let res = run_check_unsafe_islands_at(repo_root, true).unwrap();
@@ -409,7 +409,7 @@ mod tests {
     fn test_non_island_keyword_detected() {
         let dir = tempdir().unwrap();
         let repo_root = dir.path();
-        let crate_dir = repo_root.join("crates/memfuse-core/src");
+        let crate_dir = repo_root.join("crates/contextra-core/src");
         fs::create_dir_all(&crate_dir).unwrap();
         let file = crate_dir.join("lib.rs");
 
@@ -417,14 +417,14 @@ mod tests {
 
         let res = run_check_unsafe_islands_at(repo_root, true).unwrap();
         assert_eq!(res.errors.len(), 1);
-        assert!(res.errors[0].contains("memfuse-core"));
+        assert!(res.errors[0].contains("contextra-core"));
     }
 
     #[test]
     fn test_transition_island_warns_in_default_fails_in_strict() {
         let dir = tempdir().unwrap();
         let repo_root = dir.path();
-        let crate_dir = repo_root.join("crates/memfuse-store/src");
+        let crate_dir = repo_root.join("crates/contextra-store/src");
         fs::create_dir_all(&crate_dir).unwrap();
         let file = crate_dir.join("lib.rs");
 

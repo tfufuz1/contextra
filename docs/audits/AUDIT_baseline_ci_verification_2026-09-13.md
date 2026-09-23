@@ -1,6 +1,6 @@
 # Baseline CI Verifikation — Erste Verifikation der Entwicklungs-Baseline
 
-**Auditor:** Jules (MemFuse CI Verification System)
+**Auditor:** Jules (Contextra CI Verification System)
 **Timestamp:** 2026-09-13T20:37:44+02:00
 **HEAD Commit:** `8a38910de683702497aa5bf7053c9a2547764755`
 **Session:** c9414271
@@ -13,9 +13,9 @@
 
 | Kommando | Exit-Code | Status | Grund |
 |---|---|---|---|
-| `cargo build --workspace` | `101` | **ROT** | Kompilierungsfehler in `memfuse-store` (`E0428`, `E0308`, `E0592`) |
-| `cargo test --workspace` | `101` | **ROT** | Kompilierungsfehler in `memfuse-store` verhindert Testausführung |
-| `cargo clippy --workspace -- -D warnings` | `101` | **ROT** | Check-Abbruch wegen Kompilierungsfehlern in `memfuse-store` |
+| `cargo build --workspace` | `101` | **ROT** | Kompilierungsfehler in `contextra-store` (`E0428`, `E0308`, `E0592`) |
+| `cargo test --workspace` | `101` | **ROT** | Kompilierungsfehler in `contextra-store` verhindert Testausführung |
+| `cargo clippy --workspace -- -D warnings` | `101` | **ROT** | Check-Abbruch wegen Kompilierungsfehlern in `contextra-store` |
 
 ---
 
@@ -23,15 +23,15 @@
 
 ### 2.1 `cargo build --workspace` (Exit-Code: 101)
 
-Die Workspace-Kompilierung schlägt beim Build der Crate `memfuse-store` fehl mit folgenden 3 spezifischen Rust-Kompilierungsfehlern:
+Die Workspace-Kompilierung schlägt beim Build der Crate `contextra-store` fehl mit folgenden 3 spezifischen Rust-Kompilierungsfehlern:
 
 1. **`E0428` — Doppelte Funktionsdefinition `binary_search_in_block`**
-   - **Datei:** `crates/memfuse-store/src/sstable.rs:548:1`
-   - **Erste Definition:** `crates/memfuse-store/src/sstable.rs:180:1`
+   - **Datei:** `crates/contextra-store/src/sstable.rs:548:1`
+   - **Erste Definition:** `crates/contextra-store/src/sstable.rs:180:1`
    - **Fehlermeldung:**
      ```text
      error[E0428]: the name `binary_search_in_block` is defined multiple times
-        --> crates/memfuse-store/src/sstable.rs:548:1
+        --> crates/contextra-store/src/sstable.rs:548:1
          |
      180 | / fn binary_search_in_block(
      181 | |     block_data: &[u8],
@@ -53,11 +53,11 @@ Die Workspace-Kompilierung schlägt beim Build der Crate `memfuse-store` fehl mi
      ```
 
 2. **`E0308` — Typen-Inkompatibilität in `wal.rs`**
-   - **Datei:** `crates/memfuse-store/src/wal.rs:1435:27`
+   - **Datei:** `crates/contextra-store/src/wal.rs:1435:27`
    - **Fehlermeldung:**
      ```text
      error[E0308]: mismatched types
-         --> crates/memfuse-store/src/wal.rs:1435:27
+         --> crates/contextra-store/src/wal.rs:1435:27
           |
      1435 |             Ok(res) => Ok(res),
           |                        -- ^^^ expected `(Vec<(u64, WalEntry, u64)>, WalVersion)`, found `Vec<(u64, WalEntry, u64)>`
@@ -69,12 +69,12 @@ Die Workspace-Kompilierung schlägt beim Build der Crate `memfuse-store` fehl mi
      ```
 
 3. **`E0592` — Doppelte Methodendefinition `replay_mmap`**
-   - **Datei:** `crates/memfuse-store/src/wal.rs:1457:5`
-   - **Erste Definition:** `crates/memfuse-store/src/wal.rs:1387:5`
+   - **Datei:** `crates/contextra-store/src/wal.rs:1457:5`
+   - **Erste Definition:** `crates/contextra-store/src/wal.rs:1387:5`
    - **Fehlermeldung:**
      ```text
      error[E0592]: duplicate definitions with name `replay_mmap`
-         --> crates/memfuse-store/src/wal.rs:1457:5
+         --> crates/contextra-store/src/wal.rs:1457:5
           |
      1387 |     pub async fn replay_mmap(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
           |     -------------------------------------------------------------------- other definition for `replay_mmap`
@@ -87,41 +87,41 @@ Die Workspace-Kompilierung schlägt beim Build der Crate `memfuse-store` fehl mi
 
 ### 2.2 `cargo test --workspace` (Exit-Code: 101)
 
-Aufgrund der oben stehenden Kompilierungsfehler in `memfuse-store` bricht `cargo test` bereits in der Build-Phase ab. Es wurden 0 Tests ausgeführt.
+Aufgrund der oben stehenden Kompilierungsfehler in `contextra-store` bricht `cargo test` bereits in der Build-Phase ab. Es wurden 0 Tests ausgeführt.
 
 Exakter Fehler-Output:
 ```text
 error[E0428]: the name `binary_search_in_block` is defined multiple times
-   --> crates/memfuse-store/src/sstable.rs:548:1
+   --> crates/contextra-store/src/sstable.rs:548:1
 error[E0308]: mismatched types
-    --> crates/memfuse-store/src/wal.rs:1435:27
+    --> crates/contextra-store/src/wal.rs:1435:27
 error[E0592]: duplicate definitions with name `replay_mmap`
-    --> crates/memfuse-store/src/wal.rs:1457:5
-error: could not compile `memfuse-store` (lib) due to 3 previous errors
+    --> crates/contextra-store/src/wal.rs:1457:5
+error: could not compile `contextra-store` (lib) due to 3 previous errors
 ```
 
 ---
 
 ### 2.3 `cargo clippy --workspace -- -D warnings` (Exit-Code: 101)
 
-Clippy bricht während des Type-Checkings von `memfuse-store` mit denselben 3 Kompilierungsfehlern ab.
+Clippy bricht während des Type-Checkings von `contextra-store` mit denselben 3 Kompilierungsfehlern ab.
 
 Exakter Fehler-Output:
 ```text
 error[E0428]: the name `binary_search_in_block` is defined multiple times
-   --> crates/memfuse-store/src/sstable.rs:548:1
+   --> crates/contextra-store/src/sstable.rs:548:1
 error[E0308]: mismatched types
-    --> crates/memfuse-store/src/wal.rs:1435:27
+    --> crates/contextra-store/src/wal.rs:1435:27
 error[E0592]: duplicate definitions with name `replay_mmap`
-    --> crates/memfuse-store/src/wal.rs:1457:5
-error: could not compile `memfuse-store` (lib) due to 3 previous errors
+    --> crates/contextra-store/src/wal.rs:1457:5
+error: could not compile `contextra-store` (lib) due to 3 previous errors
 ```
 
 ---
 
 ## 3. Zuordnung & Behebung
 
-Die identifizierten Kompilierungsfehler in `crates/memfuse-store/src/sstable.rs` und `crates/memfuse-store/src/wal.rs` sind Gegenstand des Fix-Tasks **"Prompt 1 — BUILD-FIX"**.
+Die identifizierten Kompilierungsfehler in `crates/contextra-store/src/sstable.rs` und `crates/contextra-store/src/wal.rs` sind Gegenstand des Fix-Tasks **"Prompt 1 — BUILD-FIX"**.
 Gemäß Verifikations-Role-Lock wurden im Rahmen dieser Verifikations-Sitzung keine Code-Änderungen vorgenommen.
 
 ---

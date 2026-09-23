@@ -1,0 +1,53 @@
+namespace Contextra.IPC;
+
+table Embedding {
+  data: [float];
+  quantized_u8: [ubyte];
+  metric: byte; // 0: Cosine, 1: Euclidean, 2: DotProduct
+}
+
+table ScoredDocument {
+  id: string;
+  score: float;
+  metadata: string; // JSON encoded for flexibility
+  embedding: Embedding;
+}
+
+table SearchResponse {
+  results: [ScoredDocument];
+  total_hits: uint;
+  processing_time_ms: float;
+}
+
+table VectorIndexUpdate {
+  id: string;
+  embedding: Embedding;
+  metadata: string;
+}
+
+table RoleId {
+  id: uint;
+}
+
+table HyperEdgeId {
+  id: ulong;
+}
+
+table RoleBinding {
+  role: uint;
+  entity: ulong;
+}
+
+table HyperEdge {
+  id: ulong;
+  predicate: ubyte;
+  participants: [RoleBinding];
+  weight: float;
+  tx_valid_from: ulong;
+  tx_valid_to: ulong;
+  business_valid_from: long;
+  business_valid_to: long;
+  source_doc_id: ulong;
+}
+
+root_type SearchResponse;

@@ -26,54 +26,54 @@ multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
 deny = [
-    # §4.2 Ring-Modell: tokio-Nutzung ist in Ring-0-Kernen (memfuse-vector, memfuse-text, memfuse-graph) verboten und nur in Höher-Ring-Fassaden sowie erlaubter Peripherie gestattet
+    # §4.2 Ring-Modell: tokio-Nutzung ist in Ring-0-Kernen (contextra-vector, contextra-text, contextra-graph) verboten und nur in Höher-Ring-Fassaden sowie erlaubter Peripherie gestattet
     { crate = "tokio", wrappers = [
         "criterion",
         "hyper",
         "hyper-rustls",
         "hyper-util",
-        "memfuse",
-        "memfuse-adapt",
-        "memfuse-agent",
-        "memfuse-bench",
-        "memfuse-checkpoint",
-        "memfuse-cognition",
-        "memfuse-core",
-        "memfuse-crypto",
-        "memfuse-db",
-        "memfuse-engine",
-        "memfuse-graph",
-        "memfuse-infer-candle",
-        "memfuse-infer-ollama",
-        "memfuse-infer-onnx",
-        "memfuse-kvcache",
-        "memfuse-mcp",
-        "memfuse-mvcc",
-        "memfuse-ports",
-        "memfuse-privacy",
-        "memfuse-py",
-        "memfuse-rank",
-        "memfuse-router",
-        "memfuse-sandbox",
-        "memfuse-store",
-        "memfuse-testkit",
-        "memfuse-text",
-        "memfuse-vector",
+        "contextra",
+        "contextra-adapt",
+        "contextra-agent",
+        "contextra-bench",
+        "contextra-checkpoint",
+        "contextra-cognition",
+        "contextra-core",
+        "contextra-crypto",
+        "contextra-db",
+        "contextra-engine",
+        "contextra-graph",
+        "contextra-infer-candle",
+        "contextra-infer-ollama",
+        "contextra-infer-onnx",
+        "contextra-kvcache",
+        "contextra-mcp",
+        "contextra-mvcc",
+        "contextra-ports",
+        "contextra-privacy",
+        "contextra-py",
+        "contextra-rank",
+        "contextra-router",
+        "contextra-sandbox",
+        "contextra-store",
+        "contextra-testkit",
+        "contextra-text",
+        "contextra-vector",
         "reqwest",
         "tokio-rustls",
         "tokio-util",
         "tower",
     ] },
-    # §4.2 Ring-Modell: Candle-Inferenz nur in memfuse-candle (TRANSITION; künftig memfuse-infer-candle) sowie Candle-Eigencrates
-    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "memfuse-candle", "memfuse-infer-candle"] },
-    # §4.2 Ring-Modell: ONNX/ort nur in memfuse-embed (TRANSITION; künftig memfuse-infer-onnx)
-    { crate = "ort", wrappers = ["memfuse-embed", "memfuse-infer-onnx"] },
-    # §4.2 Ring-Modell: PyO3 nur in memfuse-py (isoliertes Workspace-Crate) und Interop-Crates
-    { crate = "pyo3", wrappers = ["memfuse-py", "numpy", "pythonize"] },
-    # §4.2 Ring-Modell: reqwest nur in memfuse-ollama (TRANSITION; künftig memfuse-infer-ollama)
-    { crate = "reqwest", wrappers = ["memfuse-ollama", "memfuse-infer-ollama"] },
-    # §4.2 Ring-Modell: Wasmtime-Sandbox nur in memfuse-sandbox
-    { crate = "wasmtime", wrappers = ["memfuse-sandbox", "memfuse-privacy"] },
+    # §4.2 Ring-Modell: Candle-Inferenz nur in contextra-candle (TRANSITION; künftig contextra-infer-candle) sowie Candle-Eigencrates
+    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-candle", "contextra-infer-candle"] },
+    # §4.2 Ring-Modell: ONNX/ort nur in contextra-embed (TRANSITION; künftig contextra-infer-onnx)
+    { crate = "ort", wrappers = ["contextra-embed", "contextra-infer-onnx"] },
+    # §4.2 Ring-Modell: PyO3 nur in contextra-py (isoliertes Workspace-Crate) und Interop-Crates
+    { crate = "pyo3", wrappers = ["contextra-py", "numpy", "pythonize"] },
+    # §4.2 Ring-Modell: reqwest nur in contextra-ollama (TRANSITION; künftig contextra-infer-ollama)
+    { crate = "reqwest", wrappers = ["contextra-ollama", "contextra-infer-ollama"] },
+    # §4.2 Ring-Modell: Wasmtime-Sandbox nur in contextra-sandbox
+    { crate = "wasmtime", wrappers = ["contextra-sandbox", "contextra-privacy"] },
 ]
 
 [sources]

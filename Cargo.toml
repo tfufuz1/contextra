@@ -1,69 +1,69 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/memfuse-wire",
-    "crates/memfuse-sys",
-    "crates/memfuse-simd",
-    "crates/memfuse-core",
-    "crates/memfuse-store",
-    "crates/memfuse-vector",
-    "crates/memfuse-db",
-    "crates/memfuse-text",
-    "crates/memfuse-checkpoint",
-    "crates/memfuse-crypto",
-    "crates/memfuse-privacy",
-    "crates/memfuse-graph",
-    "crates/memfuse-infer-onnx",
-    "crates/memfuse-mcp",
-    "crates/memfuse-agent",
-    "crates/memfuse-infer-ollama",
-    "crates/memfuse-router",
-    "benchmarks/memfuse-bench",
-    "crates/memfuse-infer-candle",
-    "crates/memfuse-sandbox",
-    "crates/memfuse-py",
-    "crates/memfuse-testkit",
-    "crates/memfuse",
-    "crates/memfuse-types",
-    "crates/memfuse-ports",
-    "crates/memfuse-mvcc",
-    "crates/memfuse-adapt",
-    "crates/memfuse-kvcache",
-    "crates/memfuse-engine",
-    "crates/memfuse-cognition",
-    "crates/memfuse-rank",
+    "crates/contextra-wire",
+    "crates/contextra-sys",
+    "crates/contextra-simd",
+    "crates/contextra-core",
+    "crates/contextra-store",
+    "crates/contextra-vector",
+    "crates/contextra-db",
+    "crates/contextra-text",
+    "crates/contextra-checkpoint",
+    "crates/contextra-crypto",
+    "crates/contextra-privacy",
+    "crates/contextra-graph",
+    "crates/contextra-infer-onnx",
+    "crates/contextra-mcp",
+    "crates/contextra-agent",
+    "crates/contextra-infer-ollama",
+    "crates/contextra-router",
+    "benchmarks/contextra-bench",
+    "crates/contextra-infer-candle",
+    "crates/contextra-sandbox",
+    "crates/contextra-py",
+    "crates/contextra-testkit",
+    "crates/contextra",
+    "crates/contextra-types",
+    "crates/contextra-ports",
+    "crates/contextra-mvcc",
+    "crates/contextra-adapt",
+    "crates/contextra-kvcache",
+    "crates/contextra-engine",
+    "crates/contextra-cognition",
+    "crates/contextra-rank",
 ]
 exclude = ["xtask"]
 default-members = [
-    "crates/memfuse-wire",
-    "crates/memfuse-sys",
-    "crates/memfuse-simd",
-    "crates/memfuse-core",
-    "crates/memfuse-store",
-    "crates/memfuse-vector",
-    "crates/memfuse-db",
-    "crates/memfuse-text",
-    "crates/memfuse-checkpoint",
-    "crates/memfuse-crypto",
-    "crates/memfuse-privacy",
-    "crates/memfuse-graph",
-    "crates/memfuse-mcp",
-    "crates/memfuse-agent",
-    "crates/memfuse-infer-ollama",
-    "crates/memfuse-router",
-    "crates/memfuse-infer-candle",
-    "crates/memfuse-sandbox",
-    "crates/memfuse-py",
-    "crates/memfuse-testkit",
-    "crates/memfuse",
-    "crates/memfuse-types",
-    "crates/memfuse-ports",
-    "crates/memfuse-mvcc",
-    "crates/memfuse-adapt",
-    "crates/memfuse-kvcache",
-    "crates/memfuse-engine",
-    "crates/memfuse-cognition",
-    "crates/memfuse-rank",
+    "crates/contextra-wire",
+    "crates/contextra-sys",
+    "crates/contextra-simd",
+    "crates/contextra-core",
+    "crates/contextra-store",
+    "crates/contextra-vector",
+    "crates/contextra-db",
+    "crates/contextra-text",
+    "crates/contextra-checkpoint",
+    "crates/contextra-crypto",
+    "crates/contextra-privacy",
+    "crates/contextra-graph",
+    "crates/contextra-mcp",
+    "crates/contextra-agent",
+    "crates/contextra-infer-ollama",
+    "crates/contextra-router",
+    "crates/contextra-infer-candle",
+    "crates/contextra-sandbox",
+    "crates/contextra-py",
+    "crates/contextra-testkit",
+    "crates/contextra",
+    "crates/contextra-types",
+    "crates/contextra-ports",
+    "crates/contextra-mvcc",
+    "crates/contextra-adapt",
+    "crates/contextra-kvcache",
+    "crates/contextra-engine",
+    "crates/contextra-cognition",
+    "crates/contextra-rank",
 ]
 
 [workspace.package]
@@ -110,51 +110,51 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Workspace crates
-memfuse-wire = { path = "crates/memfuse-wire" }
-memfuse-sys = { path = "crates/memfuse-sys" }
-memfuse-simd = { path = "crates/memfuse-simd" }
-memfuse-core = { path = "crates/memfuse-core" }
-memfuse-store = { path = "crates/memfuse-store" }
-memfuse-vector = { path = "crates/memfuse-vector" }
-memfuse-index = { package = "memfuse-vector", path = "crates/memfuse-vector" }
-memfuse-db = { path = "crates/memfuse-db" }
-memfuse-text = { path = "crates/memfuse-text" }
-memfuse-checkpoint = { path = "crates/memfuse-checkpoint" }
-memfuse-crypto = { path = "crates/memfuse-crypto" }
-memfuse-privacy = { path = "crates/memfuse-privacy" }
-memfuse-graph = { path = "crates/memfuse-graph" }
-memfuse-infer-onnx = { path = "crates/memfuse-infer-onnx" }
-memfuse-embed = { package = "memfuse-infer-onnx", path = "crates/memfuse-infer-onnx" }
-memfuse-mcp   = { path = "crates/memfuse-mcp" }
-memfuse-agent = { path = "crates/memfuse-agent" }
-memfuse-infer-ollama = { path = "crates/memfuse-infer-ollama" }
-memfuse-ollama = { package = "memfuse-infer-ollama", path = "crates/memfuse-infer-ollama" }
-memfuse-router = { path = "crates/memfuse-router" }
-memfuse-infer-candle = { path = "crates/memfuse-infer-candle" }
-memfuse-candle = { package = "memfuse-infer-candle", path = "crates/memfuse-infer-candle" }
-memfuse-sandbox = { path = "crates/memfuse-sandbox" }
-memfuse-py = { path = "crates/memfuse-py" }
-memfuse-testkit = { path = "crates/memfuse-testkit" }
-memfuse = { path = "crates/memfuse" }
-memfuse-types = { path = "crates/memfuse-types" }
-memfuse-ports = { path = "crates/memfuse-ports" }
-memfuse-mvcc = { path = "crates/memfuse-mvcc" }
-memfuse-adapt = { path = "crates/memfuse-adapt" }
-memfuse-kvcache = { path = "crates/memfuse-kvcache" }
-memfuse-engine = { path = "crates/memfuse-engine" }
-memfuse-cognition = { path = "crates/memfuse-cognition" }
-memfuse-rank = { path = "crates/memfuse-rank" }
+contextra-wire = { path = "crates/contextra-wire" }
+contextra-sys = { path = "crates/contextra-sys" }
+contextra-simd = { path = "crates/contextra-simd" }
+contextra-core = { path = "crates/contextra-core" }
+contextra-store = { path = "crates/contextra-store" }
+contextra-vector = { path = "crates/contextra-vector" }
+contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" }
+contextra-db = { path = "crates/contextra-db" }
+contextra-text = { path = "crates/contextra-text" }
+contextra-checkpoint = { path = "crates/contextra-checkpoint" }
+contextra-crypto = { path = "crates/contextra-crypto" }
+contextra-privacy = { path = "crates/contextra-privacy" }
+contextra-graph = { path = "crates/contextra-graph" }
+contextra-infer-onnx = { path = "crates/contextra-infer-onnx" }
+contextra-embed = { package = "contextra-infer-onnx", path = "crates/contextra-infer-onnx" }
+contextra-mcp   = { path = "crates/contextra-mcp" }
+contextra-agent = { path = "crates/contextra-agent" }
+contextra-infer-ollama = { path = "crates/contextra-infer-ollama" }
+contextra-ollama = { package = "contextra-infer-ollama", path = "crates/contextra-infer-ollama" }
+contextra-router = { path = "crates/contextra-router" }
+contextra-infer-candle = { path = "crates/contextra-infer-candle" }
+contextra-candle = { package = "contextra-infer-candle", path = "crates/contextra-infer-candle" }
+contextra-sandbox = { path = "crates/contextra-sandbox" }
+contextra-py = { path = "crates/contextra-py" }
+contextra-testkit = { path = "crates/contextra-testkit" }
+contextra = { path = "crates/contextra" }
+contextra-types = { path = "crates/contextra-types" }
+contextra-ports = { path = "crates/contextra-ports" }
+contextra-mvcc = { path = "crates/contextra-mvcc" }
+contextra-adapt = { path = "crates/contextra-adapt" }
+contextra-kvcache = { path = "crates/contextra-kvcache" }
+contextra-engine = { path = "crates/contextra-engine" }
+contextra-cognition = { path = "crates/contextra-cognition" }
+contextra-rank = { path = "crates/contextra-rank" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
-# memfuse-cluster, memfuse-sandbox, memfuse-saos-agent wurden in Phase 0 ausgelagert.
-# memfuse-embed    → ONNX-Embeddings (wird via Feature-Flag optional)
+# contextra-cluster, contextra-sandbox, contextra-saos-agent wurden in Phase 0 ausgelagert.
+# contextra-embed    → ONNX-Embeddings (wird via Feature-Flag optional)
 
 # 🧊 Frozen Zone — external deps for future reactivation
 # openraft = { version = "0.9", features = ["storage-v2", "serde"] }
 # tonic = { version = "0.12", features = ["tls"] }
 # prost = "0.13"
 #
-# Embedding & ML (activate with memfuse-embed feature)
+# Embedding & ML (activate with contextra-embed feature)
 # ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"] }
 # hf-hub = { version = "0.3", default-features = false }
 # tokenizers = "0.19"

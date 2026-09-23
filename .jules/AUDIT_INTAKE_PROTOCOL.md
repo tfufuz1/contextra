@@ -1,4 +1,4 @@
-# MemFuse — Audit Intake Verification Protocol (`AUDIT_INTAKE_PROTOCOL.md`)
+# Contextra — Audit Intake Verification Protocol (`AUDIT_INTAKE_PROTOCOL.md`)
 
 > **Regel (AGENTS.md §4)**: Jeder Befund ("Finding") aus einem extern zugelieferten Audit-Dokument, Prompt oder Review-Bericht MUSS vor der Implementierung am AKTUELLEN Quellcode verifiziert werden.
 

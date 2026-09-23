@@ -1,0 +1,42 @@
+[package]
+name = "contextra-store-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1.4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+tempfile = "3"
+contextra-core = { path = "../../contextra-core" }
+contextra-store = { path = ".." }
+
+[[bin]]
+name = "wal_roundtrip"
+path = "fuzz_targets/wal_roundtrip.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "wal_mutation_chaos"
+path = "fuzz_targets/wal_mutation_chaos.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_sstable_binary_search"
+path = "fuzz_targets/fuzz_sstable_binary_search.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_manifest_load"
+path = "fuzz_targets/fuzz_manifest_load.rs"
+test = false
+doc = false

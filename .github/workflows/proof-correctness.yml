@@ -10,21 +10,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-llvm-cov
       - name: L1 — TOCTOU put_if_absent (S1-01)
-        run: cargo test -p memfuse-store --test toctou_put_if_absent -- --nocapture
+        run: cargo test -p contextra-store --test toctou_put_if_absent -- --nocapture
       - name: L1 — NaN Validation Policy (S1-11)
-        run: cargo test -p memfuse-vector --test nan_validation_policy -- --nocapture
+        run: cargo test -p contextra-vector --test nan_validation_policy -- --nocapture
       - name: L1 — Search Result Bound (S1-02)
-        run: cargo test -p memfuse-db --test search_result_bound -- --nocapture
+        run: cargo test -p contextra-db --test search_result_bound -- --nocapture
       - name: L1 — Manifest Corruption (S1-03)
-        run: cargo test -p memfuse-store --test manifest_corruption -- --nocapture
+        run: cargo test -p contextra-store --test manifest_corruption -- --nocapture
       - name: L1 — BM25 Tombstone Read-Your-Writes (S1-04)
-        run: cargo test -p memfuse-text --test tombstone_read_your_writes -- --nocapture
+        run: cargo test -p contextra-text --test tombstone_read_your_writes -- --nocapture
       - name: L1 — source_doc_ids Populated (S1-10)
-        run: cargo test -p memfuse-graph --test source_doc_ids_populated -- --nocapture
+        run: cargo test -p contextra-graph --test source_doc_ids_populated -- --nocapture
       - name: L1 — WAL Truncate Ordering (S1-05)
-        run: cargo test -p memfuse-store --test wal_truncate_ordering -- --nocapture
+        run: cargo test -p contextra-store --test wal_truncate_ordering -- --nocapture
       - name: L1 — HNSW deleted_nodes Lock Contention (S1-11)
-        run: cargo test -p memfuse-vector --test deleted_nodes_lock_contention -- --nocapture
+        run: cargo test -p contextra-vector --test deleted_nodes_lock_contention -- --nocapture
       - name: L0 — Static Audit Lints (S3-01)
         run: |
           cargo xtask check-max-results-unbound
@@ -33,5 +33,5 @@ jobs:
           cargo xtask check-result-dropped-io
       - name: Coverage Gate
         run: |
-          cargo llvm-cov --workspace --exclude memfuse-py --json --output-path coverage.json
+          cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
           cargo xtask check-coverage-gate coverage.json

@@ -1,4 +1,4 @@
-# MemFuse — Feature-Veto-Register
+# Contextra — Feature-Veto-Register
 > Maschinenlesbar. Wird von `.jules/`-Bootstrap-Sequenz eingelesen und von
 > `xtask check-vetoes` gegen neue Commits geprüft (siehe Aufgabe 2).
 > Fristen in `review_date` (bzw. `conditional_review_due`) werden aktiv im CI überwacht (Warnung 14 Tage vor Ablauf, harter Fehler bei Fristüberschreitung).

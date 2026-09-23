@@ -1,8 +1,8 @@
-// MemFuse — Check Workspace Crate References Gate
+// Contextra — Check Workspace Crate References Gate
 //
 // Subkommando `cargo xtask check-crate-references`
 // Durchsucht `*.md`-, `*.toml`-Dateien und `justfile` (ausgenommen `docs/decisions/` und
-// `docs/GESAMTSPEZIFIKATION.md`) nach Crate-Referenzen des Musters `memfuse-[a-z0-9-]+` und
+// `docs/GESAMTSPEZIFIKATION.md`) nach Crate-Referenzen des Musters `contextra-[a-z0-9-]+` und
 // prüft, ob die Treffer aktive Workspace-Member aus `cargo metadata` sind.
 
 use regex::Regex;
@@ -59,7 +59,7 @@ pub fn extract_crate_references(line: &str) -> Vec<String> {
         return Vec::new();
     }
 
-    let re = match Regex::new(r"memfuse-[a-z0-9-]+") {
+    let re = match Regex::new(r"contextra-[a-z0-9-]+") {
         Ok(r) => r,
         Err(_) => return Vec::new(),
     };
@@ -224,18 +224,17 @@ mod tests {
 
     #[test]
     fn test_extract_crate_references() {
-        let line =
-            "Referenz auf `memfuse-core` und `memfuse-store` sowie `memfuse-nonexistent-123`.";
+        let line = "Referenz auf `contextra-core` und `contextra-store` sowie `contextra-nonexistent-123`.";
         let refs = extract_crate_references(line);
         assert_eq!(
             refs,
-            vec!["memfuse-core", "memfuse-nonexistent-123", "memfuse-store"]
+            vec!["contextra-core", "contextra-nonexistent-123", "contextra-store"]
         );
     }
 
     #[test]
     fn test_extract_crate_references_with_ignore_tag() {
-        let line = "Prüfe `memfuse-deleted-crate` <!-- crate-ref-ignore -->";
+        let line = "Prüfe `contextra-deleted-crate` <!-- crate-ref-ignore -->";
         let refs = extract_crate_references(line);
         assert!(refs.is_empty());
     }
@@ -246,7 +245,7 @@ mod tests {
         assert!(should_check_file("Cargo.toml"));
         assert!(should_check_file("justfile"));
         assert!(should_check_file("docs/ARCHITECTURE.md"));
-        assert!(should_check_file("crates/memfuse-core/Cargo.toml"));
+        assert!(should_check_file("crates/contextra-core/Cargo.toml"));
 
         // Exclusions
         assert!(!should_check_file("docs/decisions/ADR-001.md"));
@@ -258,15 +257,15 @@ mod tests {
     #[test]
     fn test_check_crate_references_in_content() {
         let mut active = HashSet::new();
-        active.insert("memfuse-core".to_string());
-        active.insert("memfuse-store".to_string());
+        active.insert("contextra-core".to_string());
+        active.insert("contextra-store".to_string());
 
-        let content = "Gültig: `memfuse-core`\nUngültig: `memfuse-old-crate`\n";
+        let content = "Gültig: `contextra-core`\nUngültig: `contextra-old-crate`\n";
         let violations = check_crate_references_in_content(content, "test.md", &active);
 
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].file, "test.md");
         assert_eq!(violations[0].line, 2);
-        assert_eq!(violations[0].crate_name, "memfuse-old-crate");
+        assert_eq!(violations[0].crate_name, "contextra-old-crate");
     }
 }

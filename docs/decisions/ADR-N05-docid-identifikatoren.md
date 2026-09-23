@@ -3,7 +3,7 @@
 * **Status:** Proposed / Pending Product-Owner-Entscheidung (gemäß §A2.4 Nr. 3)
 * **Datum:** 2026-09-22
 * **Kontext / Auslöser:**
-  Im MemFuse Cognitive OS besteht eine architektonische Spannung zwischen der externen, benutzerseitigen Dokumenten-Identifikation (`DocId`, 128-Bit BLAKE3-Truncation oder String-Key; siehe ADR-082) und dem internen Kompakt-Index (`DocIdx`, `u32` / 32-Bit In-Memory Slot-Index):
+  Im Contextra Cognitive OS besteht eine architektonische Spannung zwischen der externen, benutzerseitigen Dokumenten-Identifikation (`DocId`, 128-Bit BLAKE3-Truncation oder String-Key; siehe ADR-082) und dem internen Kompakt-Index (`DocIdx`, `u32` / 32-Bit In-Memory Slot-Index):
 
   1. **Externes `DocId` (128-Bit BLAKE3 / String):**
      * Deterministische Hash-Derivierung aus dem Quellschlüssel (`key`).
@@ -39,4 +39,4 @@ Zur finalen Entscheidung durch den Product Owner (PO) stehen folgende drei Archi
 ## Konsequenzen
 
 * **Status-Sperre:** Der Status bleibt explizit auf **Proposed / Pending Product-Owner-Entscheidung** gesetzt.
-* **Keine Code-Invasivität:** Es erfolgen keine Änderungen an `memfuse-core`, `memfuse-db` oder Index-Crates bis zur formellen Beschlussfassung durch den Product Owner.
+* **Keine Code-Invasivität:** Es erfolgen keine Änderungen an `contextra-core`, `contextra-db` oder Index-Crates bis zur formellen Beschlussfassung durch den Product Owner.

@@ -17,7 +17,7 @@ Is it file delete / rename / metadata?
 ## The spawn_blocking Pattern (SSTable reads)
 
 ```rust
-// From crates/memfuse-store/src/sstable.rs:542-551
+// From crates/contextra-store/src/sstable.rs:542-551
 let (file, file_size) =
     tokio::task::spawn_blocking(move || -> std::io::Result<(std::fs::File, u64)> {
         let file = std::fs::File::open(&path)?;
@@ -25,8 +25,8 @@ let (file, file_size) =
         Ok((file, metadata.len()))
     })
     .await
-    .map_err(|e| MemFuseError::Storage(format!("Join error: {}", e)))?
-    .map_err(|e| MemFuseError::Storage(format!("File open failed: {}", e)))?;
+    .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
+    .map_err(|e| ContextraError::Storage(format!("File open failed: {}", e)))?;
 ```
 
 Note the double `?` — first for `JoinError` (task panic), then for the inner `io::Error`.

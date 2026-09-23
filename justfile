@@ -42,30 +42,30 @@ check:
         $RUNNER cargo xtask check-coverage-gate
     fi
 
-# Modular check for memfuse-core
+# Modular check for contextra-core
 check-core:
-    nix develop -c cargo check -p memfuse-core || cargo check -p memfuse-core
+    nix develop -c cargo check -p contextra-core || cargo check -p contextra-core
 
-# Modular check for memfuse-store
+# Modular check for contextra-store
 check-store:
-    nix develop -c cargo check -p memfuse-store || cargo check -p memfuse-store
+    nix develop -c cargo check -p contextra-store || cargo check -p contextra-store
 
 # Runs the chaos matrix fault-injection integration test suite
 chaos-test:
-    nix develop -c cargo test -p memfuse-store --test chaos_matrix -- --ignored --test-threads=1 || \
-    cargo test -p memfuse-store --test chaos_matrix -- --ignored --test-threads=1
+    nix develop -c cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1 || \
+    cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1
 
-# Modular check for memfuse-vector
+# Modular check for contextra-vector
 check-vector:
-    nix develop -c cargo check -p memfuse-vector || cargo check -p memfuse-vector
+    nix develop -c cargo check -p contextra-vector || cargo check -p contextra-vector
 
-# Modular check for memfuse-db
+# Modular check for contextra-db
 check-db:
-    nix develop -c cargo check -p memfuse-db || cargo check -p memfuse-db
+    nix develop -c cargo check -p contextra-db || cargo check -p contextra-db
 
-# Modular check for memfuse-text
+# Modular check for contextra-text
 check-text:
-    nix develop -c cargo check -p memfuse-text || cargo check -p memfuse-text
+    nix develop -c cargo check -p contextra-text || cargo check -p contextra-text
 
 # Sync documentation from inline tags and cargo topology
 sync-docs:
@@ -112,16 +112,16 @@ check-result-dropped-io:
     cargo xtask check-result-dropped-io
 
 coverage-gate:
-    cargo llvm-cov --workspace --exclude memfuse-py --json --output-path coverage.json
+    cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
     cargo xtask check-coverage-gate coverage.json
 
-# Modular check for memfuse-py
+# Modular check for contextra-py
 check-py:
-    nix develop -c cargo check --manifest-path crates/memfuse-py/Cargo.toml || cargo check --manifest-path crates/memfuse-py/Cargo.toml
+    nix develop -c cargo check --manifest-path crates/contextra-py/Cargo.toml || cargo check --manifest-path crates/contextra-py/Cargo.toml
 
-# Modular check for memfuse-infer
+# Modular check for contextra-infer
 check-infer:
-    nix develop -c cargo check -p memfuse-infer-candle -p memfuse-infer-ollama -p memfuse-infer-onnx || cargo check -p memfuse-infer-candle -p memfuse-infer-ollama -p memfuse-infer-onnx
+    nix develop -c cargo check -p contextra-infer-candle -p contextra-infer-ollama -p contextra-infer-onnx || cargo check -p contextra-infer-candle -p contextra-infer-ollama -p contextra-infer-onnx
 
 # Generiert prompter-data.json aus dem Live-Repo-Stand
 gen-prompter-data:
@@ -172,7 +172,7 @@ debt-audit:
         | grep -v "/tests\.rs:" \
         | grep -v "/benches/" \
         | grep -v "benches\.rs:" \
-        | grep -v "memfuse_generated\.rs:" \
+        | grep -v "contextra_generated\.rs:" \
         | grep -v "::tests::" \
         | grep -v "//.*unwrap" \
         | grep -v "// expect" \
@@ -186,7 +186,7 @@ debt-audit:
 
     echo "--- [2/4] unsafe außerhalb distance.rs ---"
     UNSAFE=$(grep -rn "unsafe " crates/ --include="*.rs" \
-        | grep -v "crates/memfuse-vector/src/distance\.rs" \
+        | grep -v "crates/contextra-vector/src/distance\.rs" \
         | grep -v "#\[allow(unsafe_code)\]" \
         | grep -v "//.*unsafe" \
         || true)
@@ -231,9 +231,9 @@ debt-audit:
 bench-regression:
     #!/usr/bin/env bash
     if command -v nix &> /dev/null && nix develop -c true &> /dev/null; then
-        nix develop -c cargo run -p memfuse-bench --release
+        nix develop -c cargo run -p contextra-bench --release
     else
-        cargo run -p memfuse-bench --release
+        cargo run -p contextra-bench --release
     fi
 
 # Bootstrap a new feature using the Micro-Spec Template
@@ -271,14 +271,14 @@ prove-bugs:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "🔬 Führe Bug-Proof-Tests aus..."
-	cargo test -p memfuse-store --test toctou_put_if_absent -- --nocapture 2>&1 | tee /tmp/proof-b1.log
-	cargo test -p memfuse-vector --test nan_validation_policy -- --nocapture 2>&1 | tee /tmp/proof-b2.log
-	cargo test -p memfuse-db --test search_result_bound -- --nocapture 2>&1 | tee /tmp/proof-b3.log
-	cargo test -p memfuse-store --test manifest_corruption -- --nocapture 2>&1 | tee /tmp/proof-b4.log
-	cargo test -p memfuse-text --test tombstone_read_your_writes -- --nocapture 2>&1 | tee /tmp/proof-b5.log
-	cargo test -p memfuse-graph --test source_doc_ids_populated -- --nocapture 2>&1 | tee /tmp/proof-b6.log
-	cargo test -p memfuse-store --test wal_truncate_ordering -- --nocapture 2>&1 | tee /tmp/proof-b7.log
-	cargo test -p memfuse-vector --test deleted_nodes_lock_contention -- --nocapture 2>&1 | tee /tmp/proof-b8.log
+	cargo test -p contextra-store --test toctou_put_if_absent -- --nocapture 2>&1 | tee /tmp/proof-b1.log
+	cargo test -p contextra-vector --test nan_validation_policy -- --nocapture 2>&1 | tee /tmp/proof-b2.log
+	cargo test -p contextra-db --test search_result_bound -- --nocapture 2>&1 | tee /tmp/proof-b3.log
+	cargo test -p contextra-store --test manifest_corruption -- --nocapture 2>&1 | tee /tmp/proof-b4.log
+	cargo test -p contextra-text --test tombstone_read_your_writes -- --nocapture 2>&1 | tee /tmp/proof-b5.log
+	cargo test -p contextra-graph --test source_doc_ids_populated -- --nocapture 2>&1 | tee /tmp/proof-b6.log
+	cargo test -p contextra-store --test wal_truncate_ordering -- --nocapture 2>&1 | tee /tmp/proof-b7.log
+	cargo test -p contextra-vector --test deleted_nodes_lock_contention -- --nocapture 2>&1 | tee /tmp/proof-b8.log
 	echo "✅ Alle Bug-Proof-Tests grün"
 
 # Führt alle Property-Tests aus
@@ -286,11 +286,11 @@ prop-tests:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "🔬 Property-Tests..."
-	cargo test -p memfuse-db --test proptest_search_invariants -- --nocapture
-	cargo test -p memfuse-text --test proptest_bm25_invariants -- --nocapture
-	cargo test -p memfuse-graph --test proptest_csr_invariants -- --nocapture
-	cargo test -p memfuse-store proptest -- --nocapture
-	cargo test -p memfuse-vector proptest -- --nocapture
+	cargo test -p contextra-db --test proptest_search_invariants -- --nocapture
+	cargo test -p contextra-text --test proptest_bm25_invariants -- --nocapture
+	cargo test -p contextra-graph --test proptest_csr_invariants -- --nocapture
+	cargo test -p contextra-store proptest -- --nocapture
+	cargo test -p contextra-vector proptest -- --nocapture
 	echo "✅ Alle Property-Tests grün"
 
 # Vollständige QA-Suite: L0 Lints + L1 Proofs + L2 Property + L5 Integration
@@ -310,8 +310,8 @@ tsan:
 	echo "🔒 ThreadSanitizer..."
 	RUSTFLAGS="-Z sanitizer=thread" \
 	cargo +nightly test \
-		-p memfuse-store --test toctou_put_if_absent \
-		-p memfuse-vector --test deleted_nodes_lock_contention \
+		-p contextra-store --test toctou_put_if_absent \
+		-p contextra-vector --test deleted_nodes_lock_contention \
 		--target x86_64-unknown-linux-gnu \
 		-- --test-threads=1
 	echo "✅ TSan: keine Races gefunden"
@@ -322,7 +322,7 @@ asan:
 	set -euo pipefail
 	echo "🔍 AddressSanitizer..."
 	RUSTFLAGS="-Z sanitizer=address" \
-	cargo +nightly test -p memfuse-store -p memfuse-vector \
+	cargo +nightly test -p contextra-store -p contextra-vector \
 		--target x86_64-unknown-linux-gnu \
 		-- --test-threads=1
 
@@ -331,7 +331,7 @@ coverage-html:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	which cargo-llvm-cov || cargo install cargo-llvm-cov
-	cargo llvm-cov --workspace --exclude memfuse-py --html --output-dir target/coverage/
+	cargo llvm-cov --workspace --exclude contextra-py --html --output-dir target/coverage/
 	echo "✅ Coverage-Report: target/coverage/index.html"
 	if command -v xdg-open &>/dev/null; then xdg-open target/coverage/index.html; fi
 
@@ -340,7 +340,7 @@ coverage-json:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	which cargo-llvm-cov || cargo install cargo-llvm-cov
-	cargo llvm-cov --workspace --exclude memfuse-py --json --output-path coverage.json
+	cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
 	cargo xtask check-coverage-gate
 	echo "✅ Coverage-Gate bestanden"
 
@@ -351,13 +351,13 @@ fuzz-all SECONDS="60":
 	which cargo-fuzz || cargo install cargo-fuzz
 	echo "🔥 Fuzzing für {{SECONDS}} Sekunden pro Target..."
 	targets=(
-		"memfuse-store:wal_roundtrip"
-		"memfuse-store:fuzz_manifest_load"
-		"memfuse-store:wal_mutation_chaos"
-		"memfuse-vector:hnsw_insert_search"
-		"memfuse-vector:fuzz_hnsw_persistence"
-		"memfuse-db:rrf_fusion"
-		"memfuse-text:fuzz_bm25_tokenize"
+		"contextra-store:wal_roundtrip"
+		"contextra-store:fuzz_manifest_load"
+		"contextra-store:wal_mutation_chaos"
+		"contextra-vector:hnsw_insert_search"
+		"contextra-vector:fuzz_hnsw_persistence"
+		"contextra-db:rrf_fusion"
+		"contextra-text:fuzz_bm25_tokenize"
 	)
 	for entry in "${targets[@]}"; do
 		crate="${entry%%:*}"
@@ -399,5 +399,5 @@ bench-external:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	echo "🌐 Externe Benchmarks (BEIR + ANN)..."
-	cargo run -p memfuse-bench --release -- --synthetic-only 2>&1 | tee benchmarks/results/external_latest.json
+	cargo run -p contextra-bench --release -- --synthetic-only 2>&1 | tee benchmarks/results/external_latest.json
 	echo "✅ Externe Benchmarks abgeschlossen: benchmarks/results/external_latest.json"

@@ -15,23 +15,23 @@ Diese Tabelle listet **alle 24 Jobs** aus den 9 GitHub Actions Workflows des Rep
 | `Format Check` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Erzwingt den `rustfmt`-Standard für den gesamten Rust-Code im Repository. |
 | `Clippy (-D warnings)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Verhindert Linter-Warnungen und verstärkende Fehler im Haupt-Workspace. |
 | `Feature Matrix Checks` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Crate-Feature-Kombinationen (`--no-default-features`, `--all-features`, `--features reranking`). |
-| `PyPI Wheel Build Check (Maturin Dry-Run)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Validiert vorab, dass `memfuse-py` via Maturin fehlerfrei gebaut werden kann. |
+| `PyPI Wheel Build Check (Maturin Dry-Run)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Validiert vorab, dass `contextra-py` via Maturin fehlerfrei gebaut werden kann. |
 | `Test Suite (cargo-nextest with retries)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt Unit- und Integrationstests des Haupt-Workspace sowie Doc-Tests aus. |
-| `Clippy (memfuse-py)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Python-Binding-Code (`memfuse-py`) auf Clippy-Warnungen. |
-| `Test Suite (memfuse-py)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt die Rust-Tests für das Python-Binding (`memfuse-py`) aus. |
-| `Clippy (memfuse-tauri --lib)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft die `memfuse-tauri` Bibliothek auf Clippy-Warnungen. |
-| `Test Suite (memfuse-tauri --lib)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt die Unit- und Integrationstests für `memfuse-tauri` aus. |
+| `Clippy (contextra-py)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Python-Binding-Code (`contextra-py`) auf Clippy-Warnungen. |
+| `Test Suite (contextra-py)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt die Rust-Tests für das Python-Binding (`contextra-py`) aus. |
+| `Clippy (contextra-tauri --lib)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft die `contextra-tauri` Bibliothek auf Clippy-Warnungen. |
+| `Test Suite (contextra-tauri --lib)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt die Unit- und Integrationstests für `contextra-tauri` aus. |
 | `Cross-Platform Core Tests` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Kern-Crates auf Windows und macOS auf Plattform-Kompatibilität. |
 | `context-gates` | `.github/workflows/context-gates.yml` | `push`, `pull_request` | **Y** | Kanonisches Gate für Governance, Unwraps, DAG, Tag-Grammatik, Review-Coverage und Commit-Qualität. |
 | `Fixture-Smoke-Test & Harness Dry-Run` | `.github/workflows/bench.yml` | `push`, `pull_request`, `workflow_dispatch` | **Y** | Schnelltests für Benchmark-Harness & Smoke-Tests bei jedem PR. |
-| `Retrieval Accuracy Benchmark (memfuse-bench)` | `.github/workflows/bench.yml` | `push`, `pull_request`, `workflow_dispatch` | **Y** | Misst Retrieval-Genauigkeit und stützt die Regressions-Verifikation bei PRs. |
+| `Retrieval Accuracy Benchmark (contextra-bench)` | `.github/workflows/bench.yml` | `push`, `pull_request`, `workflow_dispatch` | **Y** | Misst Retrieval-Genauigkeit und stützt die Regressions-Verifikation bei PRs. |
 | `Retrieval Quality Regression Gate (LongMemEval & LoCoMo)` | `.github/workflows/bench.yml` | `push`, `pull_request`, `workflow_dispatch` | **Y** | Prüft auf Retrieval-Qualitäts-Regressionen gegenüber der Baseline. |
 | `chaos-matrix` | `.github/workflows/chaos.yml` | `schedule` (`0 2 * * *`), `workflow_dispatch` | **N** | Nightly-Fehler-Injektionstest; läuft nicht bei PRs und würde PRs dauerhaft blockieren. |
 | `prepare-audit-context` | `.github/workflows/scheduled-audit.yml` | `schedule` (`0 22 * * 5`), `workflow_dispatch` | **N** | Wöchentlicher Audit-Issue-Ersteller; läuft nicht bei PRs. |
 | `trigger-mutation-testing` | `.github/workflows/scheduled-audit.yml` | `schedule` (`0 22 * * 5`), `workflow_dispatch` | **N** | Wöchentlicher Auslöser für Mutation-Testing; läuft nicht bei PRs. |
 | `build` | `.github/workflows/tauri-release.yml` | `push` (tags `v*`) | **N** | Release-Build-Workflow für Tagged Releases; läuft nicht bei PRs. |
-| `Build Wheels (${{ matrix.os }} - ${{ matrix.target \|\| 'default' }})` | `.github/workflows/publish-pypi.yml` | `push` (tags `memfuse-py-v*`), `workflow_dispatch` | **N** | PyPI-Release Wheel Builder; läuft nur bei Release-Tags oder manuell. |
-| `Publish Wheels to PyPI` | `.github/workflows/publish-pypi.yml` | `push` (tags `memfuse-py-v*`), `workflow_dispatch` | **N** | PyPI-Upload-Job; läuft nur bei Release-Tags oder manuell. |
+| `Build Wheels (${{ matrix.os }} - ${{ matrix.target \|\| 'default' }})` | `.github/workflows/publish-pypi.yml` | `push` (tags `contextra-py-v*`), `workflow_dispatch` | **N** | PyPI-Release Wheel Builder; läuft nur bei Release-Tags oder manuell. |
+| `Publish Wheels to PyPI` | `.github/workflows/publish-pypi.yml` | `push` (tags `contextra-py-v*`), `workflow_dispatch` | **N** | PyPI-Upload-Job; läuft nur bei Release-Tags oder manuell. |
 | `measure-and-record-recall` | `.github/workflows/nucleation-recall-history.yml` | `schedule` (`0 3 * * *`), `workflow_dispatch` | **N** | Täglicher Recall-Messextraktions-Job; läuft nicht im PR-Kontext. |
 | `prune` | `.github/workflows/prune-branches.yml` | `schedule` (`0 2 * * *`), `workflow_dispatch` | **N** | Remote-Branch-Bereinigungsjob; ist explizit für PRs deaktiviert (`if: github.event_name != 'pull_request'`). |
 | `overlap-report` | `.github/workflows/prune-branches.yml` | `schedule`, `workflow_dispatch`, `pull_request` | **N** | Advisory-Only Overlap-Bericht (`continue-on-error: true`); soll Merges nicht blockieren. |
@@ -53,14 +53,14 @@ Um sicherzustellen, dass keine PRs gemergt werden, bei denen kritische Quality G
    - `Feature Matrix Checks`
    - `PyPI Wheel Build Check (Maturin Dry-Run)`
    - `Test Suite (cargo-nextest with retries)`
-   - `Clippy (memfuse-py)`
-   - `Test Suite (memfuse-py)`
-   - `Clippy (memfuse-tauri --lib)`
-   - `Test Suite (memfuse-tauri --lib)`
+   - `Clippy (contextra-py)`
+   - `Test Suite (contextra-py)`
+   - `Clippy (contextra-tauri --lib)`
+   - `Test Suite (contextra-tauri --lib)`
    - `Cross-Platform Core Tests`
    - `context-gates`
    - `Fixture-Smoke-Test & Harness Dry-Run`
-   - `Retrieval Accuracy Benchmark (memfuse-bench)`
+   - `Retrieval Accuracy Benchmark (contextra-bench)`
    - `Retrieval Quality Regression Gate (LongMemEval & LoCoMo)`
 5. Speichern durch Klicken auf **"Save changes"**.
 

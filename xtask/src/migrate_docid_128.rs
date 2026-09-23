@@ -1,4 +1,4 @@
-//! Offline migration tool to upgrade MemFuse data exports and manifests from 64-bit DocIds (v1)
+//! Offline migration tool to upgrade Contextra data exports and manifests from 64-bit DocIds (v1)
 //! to 128-bit DocIds (v2, ADR-082) via deterministic BLAKE3 16-byte key re-derivation.
 
 use serde::{Deserialize, Serialize};

@@ -1,0 +1,255 @@
+use contextra_core::traits::LlmTextGenerator;
+use contextra_core::BoxFuture;
+use contextra_core::DocId;
+use contextra_db::{
+    execute_background_consolidation, execute_consolidation_pass, CommunityStabilityTracker,
+    ConsolidationConfig, MaintenanceConfig, MaintenanceScheduler, Contextra, ContextraConfig,
+    SynthesisConfig,
+};
+use std::time::Duration;
+use tempfile::tempdir;
+use tokio::time::sleep;
+
+#[tokio::test]
+async fn test_consolidation_pass_tombstones_duplicates() {
+    let dir = tempdir().unwrap();
+    let config = ContextraConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+    let collection = db.collection("consolidation_test").await.unwrap();
+
+    let duplicate_emb = vec![1.0, 0.0, 0.0, 0.0];
+
+    // Insert 10 identical chunks into the collection
+    let mut turns = Vec::new();
+    for i in 1..=10 {
+        let doc_id_str = format!("chunk_{}", i);
+        collection
+            .insert(&doc_id_str, &duplicate_emb, None)
+            .await
+            .unwrap();
+        let doc_id = DocId::from_key(&doc_id_str).unwrap();
+        turns.push((doc_id, duplicate_emb.clone()));
+    }
+
+    assert_eq!(collection.len().await, 10);
+
+    let consolidation_config = ConsolidationConfig {
+        min_turns_per_segment: 3,
+        max_turns_per_segment: 20,
+        segment_cohesion_threshold: 0.70,
+        near_duplicate_cosine_threshold: 0.95,
+        ..Default::default()
+    };
+
+    let result = execute_consolidation_pass(&collection, &turns, &consolidation_config)
+        .await
+        .unwrap();
+
+    // 10 identical turns produce 9 tombstoned duplicates (the older 9 turns)
+    assert_eq!(result.duplicates_tombstoned.len(), 9);
+
+    // Only 1 document should remain in the collection
+    assert_eq!(collection.len().await, 1);
+    assert!(collection.get("chunk_10").await.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn test_consolidation_worker_periodic_execution_and_cancellation() {
+    let dir = tempdir().unwrap();
+    let config = ContextraConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+    let collection = db.collection("consolidation_worker_test").await.unwrap();
+
+    let duplicate_emb = vec![0.0, 1.0, 0.0, 0.0];
+
+    // Insert 10 identical chunks
+    for i in 1..=10 {
+        let doc_id_str = format!("worker_chunk_{}", i);
+        collection
+            .insert(&doc_id_str, &duplicate_emb, None)
+            .await
+            .unwrap();
+    }
+
+    assert_eq!(collection.len().await, 10);
+
+    let cancel_token = tokio_util::sync::CancellationToken::new();
+    let maintenance_config = MaintenanceConfig {
+        tick_interval_secs: 1,
+        background_consolidation_enabled: true,
+        background_consolidation_episode_threshold: 10,
+        decay_enabled: false,
+        percolation_enabled: false,
+        replicator_enabled: false,
+        ..Default::default()
+    };
+
+    let scheduler = std::sync::Arc::new(MaintenanceScheduler::new(
+        maintenance_config,
+        collection.clone(),
+        ConsolidationConfig::default(),
+    ));
+
+    let handle = scheduler.start(cancel_token.clone());
+
+    // Wait for the worker ticker to execute consolidation
+    let mut consolidated = false;
+    for _ in 0..50 {
+        sleep(Duration::from_millis(20)).await;
+        if collection.len().await == 1 {
+            consolidated = true;
+            break;
+        }
+    }
+
+    cancel_token.cancel();
+    let handle_res = handle.await;
+
+    assert!(handle_res.is_ok(), "Worker task should exit cleanly");
+    assert!(
+        consolidated,
+        "Consolidation worker should consolidate duplicate chunks down to 1"
+    );
+}
+
+struct TestLlmGenerator;
+
+impl LlmTextGenerator for TestLlmGenerator {
+    fn generate<'a>(&'a self, prompt: &'a str) -> BoxFuture<'a, contextra_core::Result<String>> {
+        Box::pin(async move {
+            Ok(format!(
+                "Synthesized summary from prompt of length {}",
+                prompt.len()
+            ))
+        })
+    }
+}
+
+// RESOLVED: AGT-DB-7c141164 — Updated turn embeddings to normalized distinct vectors with cosine similarity < 0.99 and > 0.5, resolving near-duplicate tombstoning in consolidation test (TS: 2026-09-09T20:33:05Z)
+#[tokio::test]
+async fn test_execute_background_consolidation_with_synthesis_pass() {
+    let dir = tempdir().unwrap();
+    let config = ContextraConfig {
+        dimension: 4,
+        ..Default::default()
+    };
+    let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+    let collection = db.collection("synthesis_test").await.unwrap();
+
+    // Distinct, normalized, coherent embeddings (cosine sim < 0.99 and > 0.5)
+    let emb_a = vec![1.0, 0.0, 0.0, 0.0];
+    let emb_b = vec![0.9, 0.436, 0.0, 0.0];
+    let emb_c = vec![0.8, 0.0, 0.6, 0.0];
+    let emb_d = vec![0.7, 0.3, 0.0, 0.648];
+    let emb_e = vec![0.6, 0.0, 0.5, 0.624];
+
+    let raw_embs = [emb_a, emb_b, emb_c, emb_d, emb_e];
+    let mut turns = Vec::new();
+
+    // Insert 5 turns into collection and build a graph cluster among them
+    for (i, emb) in raw_embs.into_iter().enumerate() {
+        let turn_idx = i + 1;
+        let doc_id_str = format!("turn_{}", turn_idx);
+        collection
+            .insert(
+                &doc_id_str,
+                &emb,
+                Some(serde_json::json!({ "text": format!("Memory content {}", turn_idx) })),
+            )
+            .await
+            .unwrap();
+        let doc_id = DocId::from_key(&doc_id_str).unwrap();
+        turns.push((doc_id, emb));
+    }
+
+    // Connect nodes into a graph cluster
+    for i in 1..5 {
+        collection
+            .relate(
+                &format!("turn_{}", i),
+                &format!("turn_{}", i + 1),
+                "connected",
+            )
+            .await
+            .unwrap();
+    }
+
+    let consolidation_config = ConsolidationConfig {
+        min_turns_per_segment: 3,
+        max_turns_per_segment: 20,
+        segment_cohesion_threshold: 0.70,
+        near_duplicate_cosine_threshold: 0.95,
+    };
+
+    let synthesis_config = SynthesisConfig {
+        min_community_size: 3,
+        stability_cycles_required: 2,
+        max_llm_calls_per_cycle: 5,
+        min_grounding_score: None,
+    };
+
+    let llm = TestLlmGenerator;
+    let mut tracker = CommunityStabilityTracker::new();
+
+    // First cycle: stability count = 1 (< required 2)
+    let (consolidation_res_1, synthesis_res_1) = execute_background_consolidation(
+        &collection,
+        &turns,
+        &consolidation_config,
+        Some(&synthesis_config),
+        Some(&llm),
+        None,
+        Some(&mut tracker),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(consolidation_res_1.segments_created, 1);
+    let synth_1 = synthesis_res_1.expect("Synthesis result should be present");
+    assert_eq!(
+        synth_1.synthesized.len(),
+        0,
+        "Community observed once < stability_cycles_required=2, so 0 synthesized"
+    );
+
+    // Second cycle: stability count = 2 (>= required 2)
+    let (_consolidation_res_2, synthesis_res_2) = execute_background_consolidation(
+        &collection,
+        &turns,
+        &consolidation_config,
+        Some(&synthesis_config),
+        Some(&llm),
+        None,
+        Some(&mut tracker),
+    )
+    .await
+    .unwrap();
+
+    let synth_2 = synthesis_res_2.expect("Synthesis result should be present");
+    assert_eq!(
+        synth_2.synthesized.len(),
+        1,
+        "Stable community should now be synthesized"
+    );
+
+    let meta_chunk = &synth_2.synthesized[0];
+    assert!(meta_chunk.content.starts_with("[SYNTHESIZED FROM"));
+    assert_eq!(meta_chunk.abstracts_from.len(), 5);
+
+    // Verify synthesized chunk was inserted into collection via get_kv
+    let synth_id = format!("rem_synth_{}_0", meta_chunk.source_community_hash);
+    let kv_val = collection.get_kv(&synth_id).await.unwrap();
+    assert!(kv_val.is_some());
+    let doc_meta = kv_val.unwrap();
+    assert_eq!(doc_meta["rem_synthesized"], true);
+    assert_eq!(
+        doc_meta["source_community_hash"],
+        meta_chunk.source_community_hash
+    );
+}

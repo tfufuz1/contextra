@@ -1,0 +1,93 @@
+// FILE-CONTEXT
+// STAND: 2026-09-09T15:45:22Z (SESSION: 6cae458a)
+// ZWECK: GGUF model container header and metadata parser for Candle models.
+// INVARIANTEN: No full tensor payload loading during metadata parsing; error propagation via ContextraError.
+
+use candle_core::quantized::gguf_file;
+use contextra_core::ContextraError;
+use std::fs::File;
+use std::path::Path;
+
+/// Metadata extracted from a GGUF model container.
+#[derive(Debug, Clone)]
+pub struct GgufMetadata {
+    /// Identified architecture (e.g., "llama", "mistral").
+    pub architecture: String,
+    /// Number of tensors present in the container.
+    pub tensor_count: usize,
+    /// Metadata keys present in the GGUF header.
+    pub metadata_keys: Vec<String>,
+}
+
+/// Inspects a GGUF model file and extracts its architecture and metadata header keys.
+///
+/// Uses `candle_core::quantized::gguf_file` to parse container headers without reading tensor payloads into memory.
+pub fn parse_gguf_metadata(model_path: &Path) -> Result<GgufMetadata, ContextraError> {
+    let mut file = File::open(model_path).map_err(|e| {
+        ContextraError::Io(std::io::Error::new(
+            e.kind(),
+            format!(
+                "Failed to open GGUF model file {}: {e}",
+                model_path.display()
+            ),
+        ))
+    })?;
+
+    let content = gguf_file::Content::read(&mut file).map_err(|e| {
+        ContextraError::Internal(format!(
+            "Failed to parse GGUF container header for {}: {e}",
+            model_path.display()
+        ))
+    })?;
+
+    let architecture = content
+        .metadata
+        .get("general.architecture")
+        .and_then(|v| v.to_string().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let metadata_keys = content.metadata.keys().cloned().collect();
+    let tensor_count = content.tensor_infos.len();
+
+    Ok(GgufMetadata {
+        architecture,
+        tensor_count,
+        metadata_keys,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_gguf_metadata_nonexistent_path_returns_io_error() {
+        let path = Path::new("/nonexistent/file/path.gguf");
+        let res = parse_gguf_metadata(path);
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            ContextraError::Io(e) => assert_eq!(e.kind(), std::io::ErrorKind::NotFound),
+            other => panic!("Expected ContextraError::Io, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_gguf_metadata_invalid_header_bytes_returns_internal_error(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let mut tmp_file = NamedTempFile::new()?;
+        tmp_file.write_all(b"CORRUPT_NOT_GGUF_HEADER_BYTES_12345678")?;
+
+        let res = parse_gguf_metadata(tmp_file.path());
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            ContextraError::Internal(msg) => {
+                assert!(msg.contains("Failed to parse GGUF container header"));
+            }
+            other => panic!("Expected ContextraError::Internal, got {:?}", other),
+        }
+        Ok(())
+    }
+}

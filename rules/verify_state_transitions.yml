@@ -3,7 +3,7 @@ language: rust
 rule:
   any:
     - pattern: |
-        pub async fn $FUNC($$$) -> Result<$RET, MemFuseError> {
+        pub async fn $FUNC($$$) -> Result<$RET, ContextraError> {
           $$$
           let mut $TX = Transaction::new($$$);
           $$$

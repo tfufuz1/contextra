@@ -1,22 +1,22 @@
 //! # Hybrid Search — BM25 + Vector Fusion
 //!
-//! Demonstrates MemFuse's 4-Signal Fusion: combining semantic vector search
+//! Demonstrates Contextra's 4-Signal Fusion: combining semantic vector search
 //! with keyword-based BM25 scoring via Reciprocal Rank Fusion (RRF).
 //!
 //! Run with: `cargo run --example hybrid_search`
 
-use memfuse_db::{MemFuse, MemFuseConfig};
+use contextra_db::{Contextra, ContextraConfig};
 
 #[tokio::main]
-async fn main() -> memfuse_core::Result<()> {
-    let config = MemFuseConfig {
+async fn main() -> contextra_core::Result<()> {
+    let config = ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = MemFuse::open_with_config("./hybrid_data", config).await?;
+    let db = Contextra::open_with_config("./hybrid_data", config).await?;
 
     // Insert documents with both embeddings AND text metadata.
-    // MemFuse automatically indexes the "text" field for BM25 search.
+    // Contextra automatically indexes the "text" field for BM25 search.
     let docs = vec![
         (
             "doc-rust".to_string(),

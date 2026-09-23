@@ -1,4 +1,4 @@
-// MemFuse — Check Placeholder References & Unresolved ADR References Gate
+// Contextra — Check Placeholder References & Unresolved ADR References Gate
 //
 // Modul zur Überprüfung von Platzhalter-Referenzen (z. B. ADR-0XX, TBD, TODO-ADR, <...>)
 // und nicht existierenden ADR-Dateireferenzen in Governance-Dokumenten (VETOES.md, AGENTS.md, docs/decisions/*.md).

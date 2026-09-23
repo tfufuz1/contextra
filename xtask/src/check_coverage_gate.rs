@@ -39,12 +39,12 @@ struct LlvmCovMetric {
 
 pub fn get_threshold_for_crate(crate_name: &str) -> f64 {
     match crate_name {
-        "memfuse-store" => 80.0,
-        "memfuse-db" => 75.0,
-        "memfuse-index" => 75.0,
-        "memfuse-graph" => 70.0,
-        "memfuse-text" => 70.0,
-        "memfuse-core" => 85.0,
+        "contextra-store" => 80.0,
+        "contextra-db" => 75.0,
+        "contextra-index" => 75.0,
+        "contextra-graph" => 70.0,
+        "contextra-text" => 70.0,
+        "contextra-core" => 85.0,
         _ => 50.0,
     }
 }
@@ -123,12 +123,12 @@ mod tests {
 
     #[test]
     fn test_coverage_thresholds() {
-        assert_eq!(get_threshold_for_crate("memfuse-store"), 80.0);
-        assert_eq!(get_threshold_for_crate("memfuse-db"), 75.0);
-        assert_eq!(get_threshold_for_crate("memfuse-index"), 75.0);
-        assert_eq!(get_threshold_for_crate("memfuse-graph"), 70.0);
-        assert_eq!(get_threshold_for_crate("memfuse-text"), 70.0);
-        assert_eq!(get_threshold_for_crate("memfuse-core"), 85.0);
+        assert_eq!(get_threshold_for_crate("contextra-store"), 80.0);
+        assert_eq!(get_threshold_for_crate("contextra-db"), 75.0);
+        assert_eq!(get_threshold_for_crate("contextra-index"), 75.0);
+        assert_eq!(get_threshold_for_crate("contextra-graph"), 70.0);
+        assert_eq!(get_threshold_for_crate("contextra-text"), 70.0);
+        assert_eq!(get_threshold_for_crate("contextra-core"), 85.0);
     }
 
     #[test]
@@ -142,13 +142,13 @@ mod tests {
     {
       "files": [
         {
-          "filename": "crates/memfuse-store/src/lib.rs",
+          "filename": "crates/contextra-store/src/lib.rs",
           "summary": {
             "lines": { "count": 100, "covered": 80 }
           }
         },
         {
-          "filename": "crates/memfuse-db/src/lib.rs",
+          "filename": "crates/contextra-db/src/lib.rs",
           "summary": {
             "lines": { "count": 100, "covered": 50 }
           }
@@ -165,14 +165,14 @@ mod tests {
 
         let store_res = results
             .iter()
-            .find(|r| r.crate_name == "memfuse-store")
+            .find(|r| r.crate_name == "contextra-store")
             .unwrap();
         assert_eq!(store_res.actual_coverage, 80.0);
         assert!(store_res.passed);
 
         let db_res = results
             .iter()
-            .find(|r| r.crate_name == "memfuse-db")
+            .find(|r| r.crate_name == "contextra-db")
             .unwrap();
         assert_eq!(db_res.actual_coverage, 50.0);
         assert!(!db_res.passed);

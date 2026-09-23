@@ -2,7 +2,7 @@
 // ZIEL: Criterion-basierte Messung von relate() Latenz und Durchsatz für AK-8 Regressionsnachweis
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use memfuse_db::MemFuse;
+use contextra_db::Contextra;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
@@ -22,10 +22,10 @@ fn bench_relate_performance(c: &mut Criterion) {
             return;
         }
     };
-    let db = match rt.block_on(MemFuse::open(tmp.path())) {
+    let db = match rt.block_on(Contextra::open(tmp.path())) {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("Failed to open MemFuse DB: {}", e);
+            eprintln!("Failed to open Contextra DB: {}", e);
             return;
         }
     };

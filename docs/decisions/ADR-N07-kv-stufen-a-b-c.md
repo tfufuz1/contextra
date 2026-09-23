@@ -13,7 +13,7 @@
 
 ### Stufe A: In-RAM Prefix-Reuse (Fork-Free Default) — *Beschlossen*
 * **Konzept:**
-  Wiederverwendung von In-RAM KV-Cache-Blöcken auf Basis von Radix-Tree-Prefix-Matching (`memfuse-kvcache`) unter Nutzung der unveränderten Upstream-Abstraktionen (`ModelWeights::clone()`).
+  Wiederverwendung von In-RAM KV-Cache-Blöcken auf Basis von Radix-Tree-Prefix-Matching (`contextra-kvcache`) unter Nutzung der unveränderten Upstream-Abstraktionen (`ModelWeights::clone()`).
 * **Eigenschaften:**
   - Kein Upstream-Fork von Candle/Ort-Modell-Backends erforderlich.
   - Zero-Copy In-Memory Prefix-Lookup.
@@ -22,7 +22,7 @@
 
 ### Stufe B: Eigenes Llama-Modell mit direkter `KvState`-Kopplung — *In Evaluation / Offen*
 * **Konzept:**
-  Tiefe Integration in die Transformer-Inferenzschleife durch Modikation/Forking der Tensor-Generierung, sodass `KvState` direkt aus dem MemFuse-KV-Cache in die Attention-Matrizen injiziert wird.
+  Tiefe Integration in die Transformer-Inferenzschleife durch Modikation/Forking der Tensor-Generierung, sodass `KvState` direkt aus dem Contextra-KV-Cache in die Attention-Matrizen injiziert wird.
 * **Eigenschaften:**
   - Fein-granulares Token-Level Paging und Swapping.
   - Höhere Speicher-Effizienz bei stark fragmentierten Caches.
@@ -30,7 +30,7 @@
 
 ### Stufe C: Verschlüsselte Segmentdateien / Platten-Spill — *In Evaluation / Offen*
 * **Konzept:**
-  Auslagerung nicht aktiver KV-Cache-Segmente auf sekundäre Speichermedien (NVMe/SSD) in Form verschlüsselter Segmentdateien (`memfuse-security/kv-encryption`), um RAM-Engpässe bei extrem großen Kontextfenstern zu vermeiden.
+  Auslagerung nicht aktiver KV-Cache-Segmente auf sekundäre Speichermedien (NVMe/SSD) in Form verschlüsselter Segmentdateien (`contextra-security/kv-encryption`), um RAM-Engpässe bei extrem großen Kontextfenstern zu vermeiden.
 * **Eigenschaften:**
   - Nahezu unbegrenzte Kontext-Größe bei moderater I/O-Latenz.
   - Strenge Mandatentrennung via AEAD-AES-256-GCM Verschlüsselung pro Tenant und Segment.
@@ -63,5 +63,5 @@ Gemäß **Gesamtspezifikation §A2.4 Nr. 2** wird die finale Ambitionsstufe (nur
 
 ## 4. Konsequenzen
 
-* Derzeitige Arbeiten beschränken sich auf die isolierte Implementierung von Stufe A in `memfuse-kvcache`.
+* Derzeitige Arbeiten beschränken sich auf die isolierte Implementierung von Stufe A in `contextra-kvcache`.
 * Code für Stufe B/C bleibt hinter entsprechenden Feature-Flags (`kv-bridge`) isoliert.

@@ -1,17 +1,17 @@
-# Audit-Report: `memfuse-db` — `fusion.rs` BoundedTopK vs. HeapEntry (Dead-Code & Selektions-Algorithmik)
+# Audit-Report: `contextra-db` — `fusion.rs` BoundedTopK vs. HeapEntry (Dead-Code & Selektions-Algorithmik)
 
 **Stand:** 2026-09-16
-**Ziel-Crate:** `crates/memfuse-db` (Layer 5)
-**Ziel-Datei:** `crates/memfuse-db/src/fusion.rs`
+**Ziel-Crate:** `crates/contextra-db` (Layer 5)
+**Ziel-Datei:** `crates/contextra-db/src/fusion.rs`
 **Task-Typ:** AUDIT (read-only)
-**Claim-Status:** `cargo xtask claim --crate memfuse-db --mode audit-readonly` (aktiv)
+**Claim-Status:** `cargo xtask claim --crate contextra-db --mode audit-readonly` (aktiv)
 **Parallelitäts-Hinweis:** Parallel-Lesen auf `fusion.rs` durch synchrone Audit-Tasks (z. B. J4, J5) ist konfliktfrei, da alle beteiligten Tasks im Read-Only-Modus operieren.
 
 ---
 
 ## 1. Übersicht & Audit-Gegenstand
 
-Dieser Audit-Report untersucht die Selektions- und Aggregations-Algorithmik im Modul `crates/memfuse-db/src/fusion.rs` mit Schwerpunkt auf:
+Dieser Audit-Report untersucht die Selektions- und Aggregations-Algorithmik im Modul `crates/contextra-db/src/fusion.rs` mit Schwerpunkt auf:
 1. Das Schicksal des in älteren Spezifikationen/Drafts erwähnten `HeapEntry` (`#[cfg(test)]`) im Vergleich zu `BoundedTopK`.
 2. Die Laufzeit- und Speicherkomplexität der Top-K-Selektion via `BoundedTopK`.
 3. Die korrekte Übernahme des Parameter-Limits `k` (`max_results`) aus Query-Aufrufen.
@@ -26,7 +26,7 @@ Dieser Audit-Report untersucht die Selektions- und Aggregations-Algorithmik im M
 * **Frage:** Wird `HeapEntry` AUSSCHLIESSLICH unter `#[cfg(test)]` kompiliert, oder gibt es einen Pfad, in dem es auch im Produktions-Build (non-test) referenziert wird?
 * **Befund:** **BELEGT**
 * **Detail-Analyse:**
-  - Eine Volltextsuche (`git grep "HeapEntry"`) im Repository zeigt, dass `HeapEntry` in `crates/memfuse-db/src/fusion.rs` **überhaupt nicht mehr existiert** (weder im Produktionscode noch im `#[cfg(test)]`-Block).
+  - Eine Volltextsuche (`git grep "HeapEntry"`) im Repository zeigt, dass `HeapEntry` in `crates/contextra-db/src/fusion.rs` **überhaupt nicht mehr existiert** (weder im Produktionscode noch im `#[cfg(test)]`-Block).
   - In historischen Spezifikationsentwürfen (z. B. `docs/specs/02_PROJEKT_SPEZIFIKATION_v2_archived.md`) war `HeapEntry` als Hilfs-Struct dokumentiert. Im aktuellen Produktionsstand von `fusion.rs` wurde `HeapEntry` jedoch vollständig durch `TopKCandidate<'a>` (`fusion.rs:514–541`) in Kombination mit `BoundedTopK<T>` (`fusion.rs:110–152`) ersetzt.
   - Die im Soll-Referenz-Anhang genannten historischen Zeilenbereiche (164–191, 1549, 1558, 1567, 1596, 1605, 2728–2739) enthalten im aktuellen Code andere Funktions- und Teststrukturen (`MetadataMergePriority`, `ProvenanceBuilder`, `score_normalized_fusion_with_options` sowie Unit-Tests).
   - **Fazit:** Es existiert weder ein Produktionspfad noch ein Test-Pfad für `HeapEntry`, da das Struct aus dem Quellcode von `fusion.rs` entfernt und durch `TopKCandidate` abgelöst wurde.
@@ -81,7 +81,7 @@ Dieser Audit-Report untersucht die Selektions- und Aggregations-Algorithmik im M
      - `BoundedTopK::new(capacity)` (`fusion.rs:117–123`):
        ```rust
        pub fn new(capacity: usize) -> Self {
-           let capacity = capacity.min(memfuse_core::MAX_SEARCH_K);
+           let capacity = capacity.min(contextra_core::MAX_SEARCH_K);
            Self {
                heap: std::collections::BinaryHeap::with_capacity(capacity.saturating_add(1)),
                capacity,
@@ -98,7 +98,7 @@ Dieser Audit-Report untersucht die Selektions- und Aggregations-Algorithmik im M
 * **Frage:** Wird `select_nth_unstable` irgendwo im selben Modul verwendet? Falls ja: an welcher Stelle, und operiert es nachweislich auf einer bereits vollständig materialisierten `Vec` (kein Stream-Kontext)? Falls es doch in einem Streaming-/Iterator-Kontext verwendet wird: als Abweichung vom Design vermerken.
 * **Befund:** **BELEGT**
 * **Detail-Analyse:**
-  - Eine Suche nach `select_nth_unstable` in `crates/memfuse-db/src/fusion.rs` (sowie in der gesamten Crate `crates/memfuse-db`) ergibt **0 Treffer**.
+  - Eine Suche nach `select_nth_unstable` in `crates/contextra-db/src/fusion.rs` (sowie in der gesamten Crate `crates/contextra-db`) ergibt **0 Treffer**.
   - Für die Selektion der Top-K-Ergebnisse wird im gesamten Modul `fusion.rs` konsequent `BoundedTopK` (ein gecappter Min-Heap mit maximal $k+1$ Elementen) verwendet.
   - Dadurch bleibt die Komplexität während der Iteration über $N$ kandidierende Dokumente strikt bei $\mathcal{O}(N \log k)$ Zeitaufwand und $\mathcal{O}(k)$ zusätzlichem Speicherplatz.
   - Eine fehlerhafte Nutzung von `select_nth_unstable` im Streaming-Kontext liegt somit **nicht** vor.
@@ -110,7 +110,7 @@ Dieser Audit-Report untersucht die Selektions- und Aggregations-Algorithmik im M
 * **Befund:** **BELEGT**
 * **Detail-Analyse:**
   - Das Tie-Breaking ist **100% deterministisch**.
-  - **Exakte Fundstelle:** `crates/memfuse-db/src/fusion.rs`, Zeilen 527–535:
+  - **Exakte Fundstelle:** `crates/contextra-db/src/fusion.rs`, Zeilen 527–535:
     ```rust
     impl<'a> Ord for TopKCandidate<'a> {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {

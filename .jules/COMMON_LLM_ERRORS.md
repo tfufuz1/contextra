@@ -1,4 +1,4 @@
-# MemFuse — Häufige LLM-Fehler & Korrekturen
+# Contextra — Häufige LLM-Fehler & Korrekturen
 > Destilliert aus Session-Audits. Bei Unsicherheit: diese Datei zuerst prüfen.
 
 ## FEHLER-KLASSE 1: API-Halluzination
@@ -24,7 +24,7 @@ reciprocal_rank_fusion(result_sets, max_results)
 // ❌ HALLUZINATION — SessionPool öffentlich zugreifen:
 let pool = SessionPool::new(config)?;
 
-// ✅ KORREKT — SessionPool ist pub(crate) in memfuse-embed:
+// ✅ KORREKT — SessionPool ist pub(crate) in contextra-embed:
 // Aus externem Crate nicht direkt nutzbar. CrossEncoderReranker
 // hält seinen eigenen internen Pool.
 ```
@@ -40,12 +40,12 @@ grep -n "pub fn <METHODE_NAME>" crates/<crate>/src/*.rs
 
 **Bekannte Duplikations-Risiken**:
 ```
-ContextChunk     → memfuse-core/src/types/saos.rs (NICHT neu anlegen!)
-SearchResult     → memfuse-core/src/types/ (NICHT neu anlegen!)
-TxId             → memfuse-core/src/types/ (Newtype u64, NICHT redefinen!)
-DocId            → memfuse-core/src/types/ (Blake3-Hash, NICHT redefinen!)
-MemFuseError     → memfuse-core/src/error.rs (EINZIGE Error-Enum)
-CheckpointGuard  → memfuse-store/src/checkpoint.rs (NICHT mit PersistentCheckpointStore verwechseln!)
+ContextChunk     → contextra-core/src/types/saos.rs (NICHT neu anlegen!)
+SearchResult     → contextra-core/src/types/ (NICHT neu anlegen!)
+TxId             → contextra-core/src/types/ (Newtype u64, NICHT redefinen!)
+DocId            → contextra-core/src/types/ (Blake3-Hash, NICHT redefinen!)
+ContextraError     → contextra-core/src/error.rs (EINZIGE Error-Enum)
+CheckpointGuard  → contextra-store/src/checkpoint.rs (NICHT mit PersistentCheckpointStore verwechseln!)
 ```
 
 **Heilmittel**: VOR jedem `struct` oder `enum`:
@@ -70,9 +70,9 @@ let entry = bincode::deserialize(&bytes).unwrap_or_default();
 collection.insert(key, doc).await; // kein ?
 
 // ✅ KORREKT — Fehler propagieren:
-file.sync_all().await.map_err(|e| MemFuseError::Storage(...))?;
+file.sync_all().await.map_err(|e| ContextraError::Storage(...))?;
 let entry = bincode::deserialize(&bytes)
-    .map_err(|e| MemFuseError::ParseError(format!("WAL corrupt: {e}")))?;
+    .map_err(|e| ContextraError::ParseError(format!("WAL corrupt: {e}")))?;
 collection.insert(key, doc).await?;
 ```
 
@@ -81,12 +81,12 @@ collection.insert(key, doc).await?;
 **Symptom**: Agent importiert ein Crate aus einer höheren Schicht.
 
 ```toml
-# ❌ FALSCH — memfuse-core importiert memfuse-db (Layer 2 in Layer 0):
-# In crates/memfuse-core/Cargo.toml:
-memfuse-db = { path = "../memfuse-db" }  # ARCH-BRUCH!
+# ❌ FALSCH — contextra-core importiert contextra-db (Layer 2 in Layer 0):
+# In crates/contextra-core/Cargo.toml:
+contextra-db = { path = "../contextra-db" }  # ARCH-BRUCH!
 
-# ❌ FALSCH — memfuse-store importiert memfuse-index (Layer 1 → Layer 1 Peer):
-memfuse-index = { path = "../memfuse-index" }  # LAYER-PEER-BRUCH!
+# ❌ FALSCH — contextra-store importiert contextra-index (Layer 1 → Layer 1 Peer):
+contextra-index = { path = "../contextra-index" }  # LAYER-PEER-BRUCH!
 ```
 
 **Heilmittel**: Vor jeder `Cargo.toml`-Änderung:
@@ -123,9 +123,9 @@ unsafe { ptr::copy_nonoverlapping(src, dst, len) }
 ```
 
 **unsafe ist NUR erlaubt in** (AGENTS.md §4):
-- `crates/memfuse-index/src/distance.rs` (SIMD)
-- `crates/memfuse-index/src/diskann.rs` (Mmap)
-- `crates/memfuse-index/src/persistence.rs` (Mmap)
+- `crates/contextra-index/src/distance.rs` (SIMD)
+- `crates/contextra-index/src/diskann.rs` (Mmap)
+- `crates/contextra-index/src/persistence.rs` (Mmap)
 
 ## FEHLER-KLASSE 7: Test-Mirroring
 
@@ -166,7 +166,7 @@ assert!((result - 1.41421356_f32).abs() < 1e-4);
 
 ```markdown
 <!-- ❌ FALSCH — Agent bewertet Status ohne CI-Beweis: -->
-| `memfuse-mcp` | 🟢 Clean |
+| `contextra-mcp` | 🟢 Clean |
 
 <!-- ✅ KORREKT — Status NUR aus CI: -->
 <!-- Status-Indikatoren werden AUSSCHLIESSLICH durch cargo xtask sync-docs
@@ -189,15 +189,15 @@ collection.search(...).await?;
 
 ## FEHLER-KLASSE 12: Feature-Gate-Vergessen (onnx)
 
-**Symptom**: Agent verwendet Code aus `memfuse-embed` ohne Feature-Flag.
+**Symptom**: Agent verwendet Code aus `contextra-embed` ohne Feature-Flag.
 
 ```rust
 // ❌ FALSCH:
-use memfuse_embed::TextEmbedder; // Bricht Builds ohne onnx-Feature!
+use contextra_embed::TextEmbedder; // Bricht Builds ohne onnx-Feature!
 
 // ✅ KORREKT:
 #[cfg(feature = "onnx")]
-use memfuse_embed::TextEmbedder;
+use contextra_embed::TextEmbedder;
 ```
 
 ## FEHLER-KLASSE 13: Modul-Pfad-Halluzination
@@ -206,8 +206,8 @@ use memfuse_embed::TextEmbedder;
 
 ```rust
 // ❌ FALSCH — Halluzinierter Pfad:
-use memfuse_db::collection::Collection;
+use contextra_db::collection::Collection;
 
 // ✅ KORREKT — Tatsächlicher Pfad (vorher grep nutzen):
-use memfuse_db::Collection;
+use contextra_db::Collection;
 ```

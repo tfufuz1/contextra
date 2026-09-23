@@ -1,6 +1,6 @@
-# MemFuse Cognitive OS — Systemarchitektur & Ring-Modell
+# Contextra Cognitive OS — Systemarchitektur & Ring-Modell
 
-Dieses Dokument ist die maßgebliche technische Architekturbeschreibung des MemFuse Cognitive OS. Es übersetzt die normative Gesamtspezifikation (`README.md`) in eine vertiefte Systembeschreibung, dokumentiert den tatsächlichen Crate-Bestand, das Ring-0–4-Modell, die Layering-Invarianten und die bekannten Abweichungen zwischen dem Soll- und Ist-Zustand.
+Dieses Dokument ist die maßgebliche technische Architekturbeschreibung des Contextra Cognitive OS. Es übersetzt die normative Gesamtspezifikation (`README.md`) in eine vertiefte Systembeschreibung, dokumentiert den tatsächlichen Crate-Bestand, das Ring-0–4-Modell, die Layering-Invarianten und die bekannten Abweichungen zwischen dem Soll- und Ist-Zustand.
 
 ---
 
@@ -17,7 +17,7 @@ Dieses Dokument ist die maßgebliche technische Architekturbeschreibung des MemF
 <a id="1-ring-modell"></a>
 ## 1. Ring-Modell (Ring 0–4) & Layering-Invarianten
 
-MemFuse gliedert seine Funktionalität in ein Fünf-Ring-Schichtenmodell (Ring 0 bis Ring 4). Abhängigkeiten dürfen ausschließlich **von höheren Ringen auf tiefere Ringe** verlaufen. Aufwärtskanten (z. B. ein Ring-0-Crate, das von einem Ring-3-Crate abhängt) sind streng verboten.
+Contextra gliedert seine Funktionalität in ein Fünf-Ring-Schichtenmodell (Ring 0 bis Ring 4). Abhängigkeiten dürfen ausschließlich **von höheren Ringen auf tiefere Ringe** verlaufen. Aufwärtskanten (z. B. ein Ring-0-Crate, das von einem Ring-3-Crate abhängt) sind streng verboten.
 
 ### 1.1 Definition der Ringe
 
@@ -30,15 +30,15 @@ MemFuse gliedert seine Funktionalität in ein Fünf-Ring-Schichtenmodell (Ring 0
 * **Ring 3 — Orchestration & Cognition**:
   Enthält die Geschäfts- und Orchestrierungslogik (Transaktions-Management, Collection-Engine, Synthese, PII-Vault/Privacy Gateway, Profil-Routing, Agent-Workflow).
 * **Ring 4 — Boundary & Composition Roots**:
-  Öffentliche Fassade (`memfuse`), MCP-Server (`memfuse-mcp`) und Language-Bindings (`memfuse-py`). Bildet die einzige Composition Root.
+  Öffentliche Fassade (`contextra`), MCP-Server (`contextra-mcp`) und Language-Bindings (`contextra-py`). Bildet die einzige Composition Root.
 
 ### 1.2 Verbot von Aufwärtskanten (DAG-Integrität, P5)
 
 Das System erzwingt strikte Directed Acyclic Graph (DAG) Modularität.
 
 **Konkretes Negativ-Beispiel für eine verbotene Aufwärtskante:**
-In einer früheren Version hing das Datenbank-Crate `memfuse-db` (damals Layer 2 / Ring 3) direkt von `memfuse-candle` und `memfuse-ollama` (damals Layer 3 / Ring 2) ab, um Embedding-Backends direkt zu instanziieren. Dies verletzte P5, da eine Kern-Engine von konkreten Inferenz-Adaptern abhing.
-Im Zielmodell (`ARCHITECTURE.md` / `README.md` §4.2) erhält die Engine stattdessen Trait-Objekte (`Arc<dyn Embedder>`) aus `memfuse-ports` (Ring 0), und die konkrete Verdrahtung erfolgt ausschließlich in Ring 4 (`memfuse` Fassade).
+In einer früheren Version hing das Datenbank-Crate `contextra-db` (damals Layer 2 / Ring 3) direkt von `contextra-candle` und `contextra-ollama` (damals Layer 3 / Ring 2) ab, um Embedding-Backends direkt zu instanziieren. Dies verletzte P5, da eine Kern-Engine von konkreten Inferenz-Adaptern abhing.
+Im Zielmodell (`ARCHITECTURE.md` / `README.md` §4.2) erhält die Engine stattdessen Trait-Objekte (`Arc<dyn Embedder>`) aus `contextra-ports` (Ring 0), und die konkrete Verdrahtung erfolgt ausschließlich in Ring 4 (`contextra` Fassade).
 
 ---
 
@@ -49,33 +49,33 @@ Die folgende Tabelle führt alle 27 im Repository unter `crates/` vorgefundenen 
 
 | Crate-Name | Ring | Verantwortlichkeit (1 Satz) | Status |
 |---|---|---|---|
-| `memfuse-types` | 0 | Identifikatoren (`DocId`, `TxId`, `TenantId`), Filter-AST und Kernel-Budgets. | Fertig |
-| `memfuse-ports` | 0 | `dyn`-kompatible Trait-Definitionen für Storage, Indizes, Embedder und System-Uhren. | Fertig |
-| `memfuse-mvcc` | 0 | `SeqLog`, `SnapshotRegistry` und transaktionaler `TxBuffer`. | Fertig |
-| `memfuse-wire` | 0 | FlatBuffers-IPC-Generat und Zero-Copy-Adapter (Unsafe-Insel). | Fertig |
-| `memfuse-sys` | 0 | System-Abstraktionen für `mmap`, `mlock` und Win32-ACLs (Unsafe-Insel). | Fertig |
-| `memfuse-simd` | 0 | AVX2/AVX-512/NEON SIMD-Distanzberechnungskerne mit Laufzeit-Dispatch (Unsafe-Insel). | Fertig |
-| `memfuse-crypto` | 0 | AES-256-GCM-SIV, WAL-HMAC-Integritätsketten, Zeroize und Deletion-Proofs. | In Migration |
-| `memfuse-vector` | 0 | HNSW- und DiskANN-Vektorindex-Implementierungen (vormals `memfuse-index`). | In Migration |
-| `memfuse-text` | 0 | BM25/BM25F-Volltextindexierung und deutsche Kompositazerlegung. | Fertig |
-| `memfuse-graph` | 0 | Compressed Sparse Row (CSR) Graph, Forward-Push PPR, Leiden und Hyperkanten. | Fertig |
-| `memfuse-rank` | 0 | 4-Signal-Retrieval-Fusion, Score-Kalibrierung und Drift-Messung. | In Migration |
-| `memfuse-adapt` | 0 | LinUCB-Bandit-Mathematik, Lyapunov-Drift-Wächter und PID-Regler. | Fertig |
-| `memfuse-store` | 1 | LSM-Tree Storage Engine mit WAL-Group-Commit und HMAC-Integritätsprüfung. | Fertig |
-| `memfuse-kvcache` | 1 | Verschlüsselter Prefix-Radix-Baum und KV-Cache-Segment-Verwaltung. | Fertig |
-| `memfuse-checkpoint` | 1 | Time-Travel-Registry und Checkpoint-Verwaltung ohne globalen Zustand. | Fertig |
-| `memfuse-infer-candle` | 2 | Native GGUF-Modell-Inferenz via Candle (vormals `memfuse-candle`). | In Migration |
-| `memfuse-infer-ollama` | 2 | HTTP-Inferenz-Client für Ollama mit Contextual-Chunk-Prefixing (vormals `memfuse-ollama`). | In Migration |
-| `memfuse-infer-onnx` | 2 | ONNX-Embeddings und Reranking via `ort` (vormals `memfuse-embed`). | In Migration |
-| `memfuse-sandbox` | 2 | WASM-Ausführungs-Isolation mit Fuel- und Wall-Clock-Limits via Wasmtime. | Fertig |
-| `memfuse-engine` | 3 | Collection-LSM-Anbindung, Multi-Index-Pläne und Schreibtransaktionen (vormals Teil von `memfuse-db`). | In Migration |
-| `memfuse-cognition` | 3 | Hintergrund-Kompaktierung, Synthese und Konsolidierungs-Scheduler. | In Migration |
-| `memfuse-privacy` | 3 | Cloud-Egress Privacy Gateway, PII-Vault, Surrogat-Tokenisierung und DLP. | In Migration |
-| `memfuse-router` | 3 | SLM-Profil-Routing und MCP-Dispatch (Numerik nach `adapt` ausgelagert). | In Migration |
-| `memfuse-agent` | 3 | Agenten-Workflow-Engine mit auditierbarer State-Machine und DLQ. | Fertig |
-| `memfuse` | 4 | Öffentliche Haupt-Fassade und Composition Root für Rust-Anwendungen. | Fertig |
-| `memfuse-mcp` | 4 | Stdio-JSON-RPC MCP-Server-Protokoll-Adapter. | In Migration |
-| `memfuse-py` | 4 | PyO3 Python-FFI-Bindings. | In Migration |
+| `contextra-types` | 0 | Identifikatoren (`DocId`, `TxId`, `TenantId`), Filter-AST und Kernel-Budgets. | Fertig |
+| `contextra-ports` | 0 | `dyn`-kompatible Trait-Definitionen für Storage, Indizes, Embedder und System-Uhren. | Fertig |
+| `contextra-mvcc` | 0 | `SeqLog`, `SnapshotRegistry` und transaktionaler `TxBuffer`. | Fertig |
+| `contextra-wire` | 0 | FlatBuffers-IPC-Generat und Zero-Copy-Adapter (Unsafe-Insel). | Fertig |
+| `contextra-sys` | 0 | System-Abstraktionen für `mmap`, `mlock` und Win32-ACLs (Unsafe-Insel). | Fertig |
+| `contextra-simd` | 0 | AVX2/AVX-512/NEON SIMD-Distanzberechnungskerne mit Laufzeit-Dispatch (Unsafe-Insel). | Fertig |
+| `contextra-crypto` | 0 | AES-256-GCM-SIV, WAL-HMAC-Integritätsketten, Zeroize und Deletion-Proofs. | In Migration |
+| `contextra-vector` | 0 | HNSW- und DiskANN-Vektorindex-Implementierungen (vormals `contextra-index`). | In Migration |
+| `contextra-text` | 0 | BM25/BM25F-Volltextindexierung und deutsche Kompositazerlegung. | Fertig |
+| `contextra-graph` | 0 | Compressed Sparse Row (CSR) Graph, Forward-Push PPR, Leiden und Hyperkanten. | Fertig |
+| `contextra-rank` | 0 | 4-Signal-Retrieval-Fusion, Score-Kalibrierung und Drift-Messung. | In Migration |
+| `contextra-adapt` | 0 | LinUCB-Bandit-Mathematik, Lyapunov-Drift-Wächter und PID-Regler. | Fertig |
+| `contextra-store` | 1 | LSM-Tree Storage Engine mit WAL-Group-Commit und HMAC-Integritätsprüfung. | Fertig |
+| `contextra-kvcache` | 1 | Verschlüsselter Prefix-Radix-Baum und KV-Cache-Segment-Verwaltung. | Fertig |
+| `contextra-checkpoint` | 1 | Time-Travel-Registry und Checkpoint-Verwaltung ohne globalen Zustand. | Fertig |
+| `contextra-infer-candle` | 2 | Native GGUF-Modell-Inferenz via Candle (vormals `contextra-candle`). | In Migration |
+| `contextra-infer-ollama` | 2 | HTTP-Inferenz-Client für Ollama mit Contextual-Chunk-Prefixing (vormals `contextra-ollama`). | In Migration |
+| `contextra-infer-onnx` | 2 | ONNX-Embeddings und Reranking via `ort` (vormals `contextra-embed`). | In Migration |
+| `contextra-sandbox` | 2 | WASM-Ausführungs-Isolation mit Fuel- und Wall-Clock-Limits via Wasmtime. | Fertig |
+| `contextra-engine` | 3 | Collection-LSM-Anbindung, Multi-Index-Pläne und Schreibtransaktionen (vormals Teil von `contextra-db`). | In Migration |
+| `contextra-cognition` | 3 | Hintergrund-Kompaktierung, Synthese und Konsolidierungs-Scheduler. | In Migration |
+| `contextra-privacy` | 3 | Cloud-Egress Privacy Gateway, PII-Vault, Surrogat-Tokenisierung und DLP. | In Migration |
+| `contextra-router` | 3 | SLM-Profil-Routing und MCP-Dispatch (Numerik nach `adapt` ausgelagert). | In Migration |
+| `contextra-agent` | 3 | Agenten-Workflow-Engine mit auditierbarer State-Machine und DLQ. | Fertig |
+| `contextra` | 4 | Öffentliche Haupt-Fassade und Composition Root für Rust-Anwendungen. | Fertig |
+| `contextra-mcp` | 4 | Stdio-JSON-RPC MCP-Server-Protokoll-Adapter. | In Migration |
+| `contextra-py` | 4 | PyO3 Python-FFI-Bindings. | In Migration |
 
 ---
 
@@ -86,78 +86,78 @@ Das folgende Mermaid-Diagramm bildet die tatsächlichen `[dependencies]` zwische
 
 ```mermaid
 graph TD
-    memfuse_adapt[memfuse-adapt]
-    memfuse_agent[memfuse-agent] --> memfuse_core[memfuse-core]
-    memfuse_agent[memfuse-agent] --> memfuse_db[memfuse-db]
-    memfuse_agent[memfuse-agent] --> memfuse_graph[memfuse-graph]
-    memfuse_agent[memfuse-agent] --> memfuse_checkpoint[memfuse-checkpoint]
-    memfuse_agent[memfuse-agent] --> memfuse_store[memfuse-store]
-    memfuse_agent[memfuse-agent] --> memfuse_router[memfuse-router]
-    memfuse_calibration[memfuse-calibration] --> memfuse_core[memfuse-core]
-    memfuse_calibration[memfuse-calibration] --> memfuse_adapt[memfuse-adapt]
-    memfuse_candle[memfuse-candle] --> memfuse_core[memfuse-core]
-    memfuse_candle[memfuse-candle] --> memfuse_calibration[memfuse-calibration]
-    memfuse_candle[memfuse-candle] --> memfuse_crypto[memfuse-crypto]
-    memfuse_candle[memfuse-candle] --> memfuse_store[memfuse-store]
-    memfuse_checkpoint[memfuse-checkpoint] --> memfuse_core[memfuse-core]
-    memfuse_core[memfuse-core] --> memfuse_types[memfuse-types]
-    memfuse_core[memfuse-core] --> memfuse_ports[memfuse-ports]
-    memfuse_core[memfuse-core] --> memfuse_mvcc[memfuse-mvcc]
-    memfuse_core[memfuse-core] --> memfuse_wire[memfuse-wire]
-    memfuse_crypto[memfuse-crypto] --> memfuse_core[memfuse-core]
-    memfuse_db[memfuse-db] --> memfuse_sys[memfuse-sys]
-    memfuse_db[memfuse-db] --> memfuse_core[memfuse-core]
-    memfuse_db[memfuse-db] --> memfuse_crypto[memfuse-crypto]
-    memfuse_db[memfuse-db] --> memfuse_store[memfuse-store]
-    memfuse_db[memfuse-db] --> memfuse_index[memfuse-index]
-    memfuse_db[memfuse-db] --> memfuse_text[memfuse-text]
-    memfuse_db[memfuse-db] --> memfuse_checkpoint[memfuse-checkpoint]
-    memfuse_db[memfuse-db] --> memfuse_graph[memfuse-graph]
-    memfuse_db[memfuse-db] --> memfuse_calibration[memfuse-calibration]
-    memfuse_db[memfuse-db] --> memfuse_adapt[memfuse-adapt]
-    memfuse_embed[memfuse-embed] --> memfuse_core[memfuse-core]
-    memfuse_embed[memfuse-embed] --> memfuse_calibration[memfuse-calibration]
-    memfuse_embed[memfuse-embed] --> memfuse_candle[memfuse-candle]
-    memfuse_graph[memfuse-graph] --> memfuse_core[memfuse-core]
-    memfuse_index[memfuse-index] --> memfuse_core[memfuse-core]
-    memfuse_index[memfuse-index] --> memfuse_crypto[memfuse-crypto]
-    memfuse_index[memfuse-index] --> memfuse_simd[memfuse-simd]
-    memfuse_kvcache[memfuse-kvcache] --> memfuse_core[memfuse-core]
-    memfuse_kvcache[memfuse-kvcache] --> memfuse_crypto[memfuse-crypto]
-    memfuse_mcp[memfuse-mcp] --> memfuse_db[memfuse-db]
-    memfuse_mcp[memfuse-mcp] --> memfuse_core[memfuse-core]
-    memfuse_mcp[memfuse-mcp] --> memfuse_crypto[memfuse-crypto]
-    memfuse_mcp[memfuse-mcp] --> memfuse_ollama[memfuse-ollama]
-    memfuse_mcp[memfuse-mcp] --> memfuse_router[memfuse-router]
-    memfuse_mcp[memfuse-mcp] --> memfuse_calibration[memfuse-calibration]
-    memfuse_mcp[memfuse-mcp] --> memfuse_embed[memfuse-embed]
-    memfuse_mcp[memfuse-mcp] --> memfuse_agent[memfuse-agent]
-    memfuse_mcp[memfuse-mcp] --> memfuse_candle[memfuse-candle]
-    memfuse_mvcc[memfuse-mvcc] --> memfuse_types[memfuse-types]
-    memfuse_ollama[memfuse-ollama] --> memfuse_core[memfuse-core]
-    memfuse_ollama[memfuse-ollama] --> memfuse_calibration[memfuse-calibration]
-    memfuse_ports[memfuse-ports] --> memfuse_types[memfuse-types]
-    memfuse_py[memfuse-py] --> memfuse_router[memfuse-router]
-    memfuse_py[memfuse-py] --> memfuse_calibration[memfuse-calibration]
-    memfuse_py[memfuse-py] --> memfuse_core[memfuse-core]
-    memfuse_py[memfuse-py] --> memfuse_db[memfuse-db]
-    memfuse_router[memfuse-router] --> memfuse_core[memfuse-core]
-    memfuse_router[memfuse-router] --> memfuse_adapt[memfuse-adapt]
-    memfuse_router[memfuse-router] --> memfuse_store[memfuse-store]
-    memfuse_router[memfuse-router] --> memfuse_db[memfuse-db]
-    memfuse_sandbox[memfuse-sandbox] --> memfuse_core[memfuse-core]
-    memfuse_simd[memfuse-simd] --> memfuse_core[memfuse-core]
-    memfuse_store[memfuse-store] --> memfuse_sys[memfuse-sys]
-    memfuse_store[memfuse-store] --> memfuse_core[memfuse-core]
-    memfuse_store[memfuse-store] --> memfuse_crypto[memfuse-crypto]
-    memfuse_testkit[memfuse-testkit] --> memfuse_core[memfuse-core]
-    memfuse_text[memfuse-text] --> memfuse_core[memfuse-core]
-    memfuse[memfuse] --> memfuse_core[memfuse-core]
-    memfuse[memfuse] --> memfuse_db[memfuse-db]
-    memfuse[memfuse] --> memfuse_candle[memfuse-candle]
-    memfuse[memfuse] --> memfuse_ollama[memfuse-ollama]
-    memfuse[memfuse] --> memfuse_embed[memfuse-embed]
-    memfuse[memfuse] --> memfuse_router[memfuse-router]
+    contextra_adapt[contextra-adapt]
+    contextra_agent[contextra-agent] --> contextra_core[contextra-core]
+    contextra_agent[contextra-agent] --> contextra_db[contextra-db]
+    contextra_agent[contextra-agent] --> contextra_graph[contextra-graph]
+    contextra_agent[contextra-agent] --> contextra_checkpoint[contextra-checkpoint]
+    contextra_agent[contextra-agent] --> contextra_store[contextra-store]
+    contextra_agent[contextra-agent] --> contextra_router[contextra-router]
+    contextra_calibration[contextra-calibration] --> contextra_core[contextra-core]
+    contextra_calibration[contextra-calibration] --> contextra_adapt[contextra-adapt]
+    contextra_candle[contextra-candle] --> contextra_core[contextra-core]
+    contextra_candle[contextra-candle] --> contextra_calibration[contextra-calibration]
+    contextra_candle[contextra-candle] --> contextra_crypto[contextra-crypto]
+    contextra_candle[contextra-candle] --> contextra_store[contextra-store]
+    contextra_checkpoint[contextra-checkpoint] --> contextra_core[contextra-core]
+    contextra_core[contextra-core] --> contextra_types[contextra-types]
+    contextra_core[contextra-core] --> contextra_ports[contextra-ports]
+    contextra_core[contextra-core] --> contextra_mvcc[contextra-mvcc]
+    contextra_core[contextra-core] --> contextra_wire[contextra-wire]
+    contextra_crypto[contextra-crypto] --> contextra_core[contextra-core]
+    contextra_db[contextra-db] --> contextra_sys[contextra-sys]
+    contextra_db[contextra-db] --> contextra_core[contextra-core]
+    contextra_db[contextra-db] --> contextra_crypto[contextra-crypto]
+    contextra_db[contextra-db] --> contextra_store[contextra-store]
+    contextra_db[contextra-db] --> contextra_index[contextra-index]
+    contextra_db[contextra-db] --> contextra_text[contextra-text]
+    contextra_db[contextra-db] --> contextra_checkpoint[contextra-checkpoint]
+    contextra_db[contextra-db] --> contextra_graph[contextra-graph]
+    contextra_db[contextra-db] --> contextra_calibration[contextra-calibration]
+    contextra_db[contextra-db] --> contextra_adapt[contextra-adapt]
+    contextra_embed[contextra-embed] --> contextra_core[contextra-core]
+    contextra_embed[contextra-embed] --> contextra_calibration[contextra-calibration]
+    contextra_embed[contextra-embed] --> contextra_candle[contextra-candle]
+    contextra_graph[contextra-graph] --> contextra_core[contextra-core]
+    contextra_index[contextra-index] --> contextra_core[contextra-core]
+    contextra_index[contextra-index] --> contextra_crypto[contextra-crypto]
+    contextra_index[contextra-index] --> contextra_simd[contextra-simd]
+    contextra_kvcache[contextra-kvcache] --> contextra_core[contextra-core]
+    contextra_kvcache[contextra-kvcache] --> contextra_crypto[contextra-crypto]
+    contextra_mcp[contextra-mcp] --> contextra_db[contextra-db]
+    contextra_mcp[contextra-mcp] --> contextra_core[contextra-core]
+    contextra_mcp[contextra-mcp] --> contextra_crypto[contextra-crypto]
+    contextra_mcp[contextra-mcp] --> contextra_ollama[contextra-ollama]
+    contextra_mcp[contextra-mcp] --> contextra_router[contextra-router]
+    contextra_mcp[contextra-mcp] --> contextra_calibration[contextra-calibration]
+    contextra_mcp[contextra-mcp] --> contextra_embed[contextra-embed]
+    contextra_mcp[contextra-mcp] --> contextra_agent[contextra-agent]
+    contextra_mcp[contextra-mcp] --> contextra_candle[contextra-candle]
+    contextra_mvcc[contextra-mvcc] --> contextra_types[contextra-types]
+    contextra_ollama[contextra-ollama] --> contextra_core[contextra-core]
+    contextra_ollama[contextra-ollama] --> contextra_calibration[contextra-calibration]
+    contextra_ports[contextra-ports] --> contextra_types[contextra-types]
+    contextra_py[contextra-py] --> contextra_router[contextra-router]
+    contextra_py[contextra-py] --> contextra_calibration[contextra-calibration]
+    contextra_py[contextra-py] --> contextra_core[contextra-core]
+    contextra_py[contextra-py] --> contextra_db[contextra-db]
+    contextra_router[contextra-router] --> contextra_core[contextra-core]
+    contextra_router[contextra-router] --> contextra_adapt[contextra-adapt]
+    contextra_router[contextra-router] --> contextra_store[contextra-store]
+    contextra_router[contextra-router] --> contextra_db[contextra-db]
+    contextra_sandbox[contextra-sandbox] --> contextra_core[contextra-core]
+    contextra_simd[contextra-simd] --> contextra_core[contextra-core]
+    contextra_store[contextra-store] --> contextra_sys[contextra-sys]
+    contextra_store[contextra-store] --> contextra_core[contextra-core]
+    contextra_store[contextra-store] --> contextra_crypto[contextra-crypto]
+    contextra_testkit[contextra-testkit] --> contextra_core[contextra-core]
+    contextra_text[contextra-text] --> contextra_core[contextra-core]
+    contextra[contextra] --> contextra_core[contextra-core]
+    contextra[contextra] --> contextra_db[contextra-db]
+    contextra[contextra] --> contextra_candle[contextra-candle]
+    contextra[contextra] --> contextra_ollama[contextra-ollama]
+    contextra[contextra] --> contextra_embed[contextra-embed]
+    contextra[contextra] --> contextra_router[contextra-router]
 ```
 
 ---
@@ -167,21 +167,21 @@ graph TD
 
 Während der schrittweisen Strangler-Migration (§20) existieren vorübergehende Diskrepanzen zwischen dem Zielmodell laut `README.md` und dem vorgefundenen Repository-Stand:
 
-1. **`memfuse-core` als Fassaden-Re-Export:**
-   * *SOLL:* `memfuse-core` entfällt als monolithisches Crate vollständig.
-   * *IST:* `memfuse-core` existiert im Repo als Re-Export-Fassade über `memfuse-types`, `memfuse-ports`, `memfuse-mvcc` und `memfuse-wire`, um Abwärtskompatibilität während der Migration zu sichern.
-2. **`memfuse-db` Re-Export & Aufwärtskante in `memfuse-router`:**
-   * *SOLL:* `memfuse-db` wird in `engine`/`cognition`/`rank`/`adapt`/`router`/`privacy` zerlegt. `memfuse-router` darf nicht von `memfuse-db` abhängen.
-   * *IST:* `memfuse-db` existiert weiterhin als Fassade. `memfuse-router` importiert noch `memfuse-db` (dokumentiertes Audit: `docs/refactor/router-db-edge-audit.md`).
+1. **`contextra-core` als Fassaden-Re-Export:**
+   * *SOLL:* `contextra-core` entfällt als monolithisches Crate vollständig.
+   * *IST:* `contextra-core` existiert im Repo als Re-Export-Fassade über `contextra-types`, `contextra-ports`, `contextra-mvcc` und `contextra-wire`, um Abwärtskompatibilität während der Migration zu sichern.
+2. **`contextra-db` Re-Export & Aufwärtskante in `contextra-router`:**
+   * *SOLL:* `contextra-db` wird in `engine`/`cognition`/`rank`/`adapt`/`router`/`privacy` zerlegt. `contextra-router` darf nicht von `contextra-db` abhängen.
+   * *IST:* `contextra-db` existiert weiterhin als Fassade. `contextra-router` importiert noch `contextra-db` (dokumentiertes Audit: `docs/refactor/router-db-edge-audit.md`).
 3. **Inferenz-Namenskonvention:**
-   * *SOLL:* Umbenennung in `memfuse-infer-candle`, `memfuse-infer-ollama` und `memfuse-infer-onnx`.
-   * *IST:* Crates heißen aktuell noch `memfuse-candle`, `memfuse-ollama` und `memfuse-embed`.
+   * *SOLL:* Umbenennung in `contextra-infer-candle`, `contextra-infer-ollama` und `contextra-infer-onnx`.
+   * *IST:* Crates heißen aktuell noch `contextra-candle`, `contextra-ollama` und `contextra-embed`.
 4. **Vektorindex-Namenskonvention:**
-   * *SOLL:* Umbenennung in `memfuse-vector`.
-   * *IST:* Crate heisst aktuell noch `memfuse-index`.
+   * *SOLL:* Umbenennung in `contextra-vector`.
+   * *IST:* Crate heisst aktuell noch `contextra-index`.
 5. **Legacy-Calibration-Crate:**
-   * *SOLL:* `memfuse-calibration` geht in `memfuse-adapt` und `memfuse-rank` auf.
-   * *IST:* `memfuse-calibration` existiert aktuell noch als eigenständiges Crate.
+   * *SOLL:* `contextra-calibration` geht in `contextra-adapt` und `contextra-rank` auf.
+   * *IST:* `contextra-calibration` existiert aktuell noch als eigenständiges Crate.
 
 ---
 
@@ -192,9 +192,9 @@ Während der schrittweisen Strangler-Migration (§20) existieren vorübergehende
 
 Standardmäßig gilt in allen Nicht-Insel-Crates `#![forbid(unsafe_code)]`. Es gibt genau **drei zulässige Unsafe-Inseln** im Produktionscode, die per `#![allow(unsafe_code)]` ausgenommen sind:
 
-1. **`memfuse-sys`**: Abstraktionen für Low-Level-OS-Operationen (`mmap`, `mlock`, Win32-ACLs).
-2. **`memfuse-simd`**: SIMD-Vektordistanzberechnungskerne (AVX2, AVX-512, NEON) mit Laufzeit-Dispatch.
-3. **`memfuse-wire`**: FlatBuffers-generierter Code, der konstruktionsbedingt `unsafe` Blöcke für Zero-Copy-Transfers benötigt.
+1. **`contextra-sys`**: Abstraktionen für Low-Level-OS-Operationen (`mmap`, `mlock`, Win32-ACLs).
+2. **`contextra-simd`**: SIMD-Vektordistanzberechnungskerne (AVX2, AVX-512, NEON) mit Laufzeit-Dispatch.
+3. **`contextra-wire`**: FlatBuffers-generierter Code, der konstruktionsbedingt `unsafe` Blöcke für Zero-Copy-Transfers benötigt.
 
 Jeder `unsafe`-Block in diesen Inseln muss zwingend mit einem `// SAFETY:`-Kommentar begründet werden.
 

@@ -11,12 +11,12 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - { crate: memfuse-store,  target: wal_mutation_chaos }
-          - { crate: memfuse-store,  target: fuzz_manifest_load }
-          - { crate: memfuse-vector,  target: fuzz_hnsw_persistence }
-          - { crate: memfuse-db,     target: fuzz_rrf_edge_cases }
-          - { crate: memfuse-text,   target: fuzz_bm25_query }
-          - { crate: memfuse-vector,  target: fuzz_distance_boundaries }
+          - { crate: contextra-store,  target: wal_mutation_chaos }
+          - { crate: contextra-store,  target: fuzz_manifest_load }
+          - { crate: contextra-vector,  target: fuzz_hnsw_persistence }
+          - { crate: contextra-db,     target: fuzz_rrf_edge_cases }
+          - { crate: contextra-text,   target: fuzz_bm25_query }
+          - { crate: contextra-vector,  target: fuzz_distance_boundaries }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly

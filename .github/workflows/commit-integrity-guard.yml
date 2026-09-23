@@ -17,11 +17,11 @@ jobs:
 
       - name: "Check Commit Integrity (No Empty Commits with Misleading Messages)"
         env:
-          MEMFUSE_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+          CONTEXTRA_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
         run: |
           set -euo pipefail
 
-          BASE_REF="${MEMFUSE_CI_BASE_REF:-origin/main}"
+          BASE_REF="${CONTEXTRA_CI_BASE_REF:-origin/main}"
           if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
             BASE_REF="HEAD~1"
           fi
@@ -80,11 +80,11 @@ jobs:
 
       - name: "PR Diff Stat vs Commit Message Discrepancy Gate (PZ-01)"
         env:
-          MEMFUSE_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+          CONTEXTRA_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
         run: |
           set -euo pipefail
 
-          BASE_REF="${MEMFUSE_CI_BASE_REF:-origin/main}"
+          BASE_REF="${CONTEXTRA_CI_BASE_REF:-origin/main}"
           if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
             BASE_REF="HEAD~1"
           fi

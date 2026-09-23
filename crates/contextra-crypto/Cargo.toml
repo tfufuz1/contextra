@@ -1,0 +1,48 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
+
+[dependencies]
+thiserror = { workspace = true }
+sha2 = "0.10"
+hmac = "0.12"
+aes-gcm-siv = "0.11"
+argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
+hkdf = "0.12"
+subtle = "2.6"
+blake3 = { workspace = true }
+bincode = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+contextra-core = { workspace = true }
+contextra-privacy = { workspace = true }
+rand = { workspace = true }
+tracing = { workspace = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+parking_lot = { workspace = true }
+ahash = { workspace = true }
+lru = "0.16.4"
+regex = { workspace = true }
+
+[features]
+test-utils = []
+kv-encryption = []
+cloud-egress-guard = []
+
+[dev-dependencies]
+contextra-crypto = { path = ".", features = ["test-utils"] }
+tokio = { workspace = true, features = ["full", "test-util"] }
+proptest = "1.4"
+criterion = { workspace = true }
+loom = "0.7"
+
+[[bench]]
+name = "crypto_benchmarks"
+harness = false

@@ -31,7 +31,7 @@ jobs:
       - name: Run Nucleation Recall Regression Test
         id: run-test
         run: |
-          cargo test -p memfuse-vector --features partial-index-rebuild nucleation_recall_regression -- --nocapture 2>&1 | tee test_output.log
+          cargo test -p contextra-vector --features partial-index-rebuild nucleation_recall_regression -- --nocapture 2>&1 | tee test_output.log
 
       - name: Parse Metric and Append to History
         env:

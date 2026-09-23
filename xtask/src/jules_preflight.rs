@@ -70,7 +70,7 @@ pub fn check_no_active_claim_conflict(root: &Path, target_crate: Option<&str>) -
 
     let krate = match target_crate {
         Some(c) if !c.trim().is_empty() => c.to_string(),
-        _ => match std::env::var("MEMFUSE_CLAIM_CRATE") {
+        _ => match std::env::var("CONTEXTRA_CLAIM_CRATE") {
             Ok(c) if !c.trim().is_empty() => c,
             _ => {
                 let changed_files = get_changed_rs_files_from_git_diff().unwrap_or_default();
@@ -94,19 +94,19 @@ pub fn check_no_active_claim_conflict(root: &Path, target_crate: Option<&str>) -
         },
     };
 
-    let is_ci = std::env::var("MEMFUSE_CI")
+    let is_ci = std::env::var("CONTEXTRA_CI")
         .map(|v| v == "true")
         .unwrap_or(false);
     let token = std::env::var("GITHUB_TOKEN")
         .ok()
         .filter(|t| !t.trim().is_empty());
-    let current_session = std::env::var("MEMFUSE_SESSION_HASH")
+    let current_session = std::env::var("CONTEXTRA_SESSION_HASH")
         .or_else(|_| std::env::var("JULES_SESSION_ID"))
         .unwrap_or_default();
 
     if let Some(tok) = token {
         let check_url = format!(
-            "https://api.github.com/repos/tfufuz1/memfuse/issues?labels=claim:{}&state=open",
+            "https://api.github.com/repos/tfufuz1/contextra/issues?labels=claim:{}&state=open",
             krate
         );
         let output = std::process::Command::new("curl")
@@ -115,7 +115,7 @@ pub fn check_no_active_claim_conflict(root: &Path, target_crate: Option<&str>) -
                 "-H",
                 &format!("Authorization: Bearer {}", tok),
                 "-H",
-                "User-Agent: memfuse-xtask",
+                "User-Agent: contextra-xtask",
                 "-H",
                 "Accept: application/vnd.github+json",
                 &check_url,
@@ -155,7 +155,7 @@ pub fn check_no_active_claim_conflict(root: &Path, target_crate: Option<&str>) -
     let max_claims = crate::claim::get_max_active_claims();
     if active_count > max_claims {
         return CheckResult::Fail(format!(
-            "MemFuseError::ConcurrencyLimitExceeded: Globales Parallelitäts-Limit von {} aktiven Claims überschritten (aktuell {} aktive Claims).",
+            "ContextraError::ConcurrencyLimitExceeded: Globales Parallelitäts-Limit von {} aktiven Claims überschritten (aktuell {} aktive Claims).",
             max_claims, active_count
         ));
     }
@@ -381,10 +381,10 @@ pub fn run_jules_preflight(fast_only: bool) -> bool {
         });
     }
 
-    // Gate 4: axum in memfuse-mcp
+    // Gate 4: axum in contextra-mcp
     {
         let start = Instant::now();
-        let mcp_cargo = fs::read_to_string("crates/memfuse-mcp/Cargo.toml").unwrap_or_default();
+        let mcp_cargo = fs::read_to_string("crates/contextra-mcp/Cargo.toml").unwrap_or_default();
         let passed = !mcp_cargo.contains("axum");
         results.push(GateResult {
             name: format!(
@@ -395,7 +395,7 @@ pub fn run_jules_preflight(fast_only: bool) -> bool {
             detail: if passed {
                 None
             } else {
-                Some("axum-Dependency in memfuse-mcp — ADR-010 verletzt (stdio only)".to_string())
+                Some("axum-Dependency in contextra-mcp — ADR-010 verletzt (stdio only)".to_string())
             },
         });
     }
@@ -650,12 +650,12 @@ mod tests {
     fn test_derive_crate_from_changed_files() {
         let files = vec![
             "README.md".to_string(),
-            "crates/memfuse-core/src/lib.rs".to_string(),
-            "crates/memfuse-db/src/lib.rs".to_string(),
+            "crates/contextra-core/src/lib.rs".to_string(),
+            "crates/contextra-db/src/lib.rs".to_string(),
         ];
         assert_eq!(
             derive_crate_from_changed_files(&files),
-            Some("memfuse-core".to_string())
+            Some("contextra-core".to_string())
         );
 
         let non_crate_files = vec!["xtask/src/main.rs".to_string(), "docs/index.md".to_string()];
@@ -664,14 +664,14 @@ mod tests {
 
     #[test]
     fn test_claim_conflict_check_unset_crate_skips() {
-        std::env::remove_var("MEMFUSE_CLAIM_CRATE");
+        std::env::remove_var("CONTEXTRA_CLAIM_CRATE");
         let dir = tempdir().unwrap();
         let result = check_no_active_claim_conflict(dir.path(), None);
         // If git diff in test workspace has no crates/*.rs changes, it skips with "Keine geänderten .rs-Dateien unter crates/ gefunden"
         match result {
             CheckResult::Skip(reason) => {
                 assert!(
-                    reason.contains("crates/") || reason.contains("MEMFUSE_CLAIM_CRATE"),
+                    reason.contains("crates/") || reason.contains("CONTEXTRA_CLAIM_CRATE"),
                     "Unexpected skip reason: {}",
                     reason
                 );
@@ -686,7 +686,7 @@ mod tests {
     #[test]
     fn test_claim_conflict_check_no_conflict_passes() {
         let dir = tempdir().unwrap();
-        let result = check_no_active_claim_conflict(dir.path(), Some("memfuse-unclaimed"));
+        let result = check_no_active_claim_conflict(dir.path(), Some("contextra-unclaimed"));
         assert_eq!(result, CheckResult::Pass);
     }
 
@@ -699,7 +699,7 @@ mod tests {
 
         let mut db = ClaimsDatabase::default();
         db.claims.push(ClaimEntry {
-            krate: "memfuse-active".to_string(),
+            krate: "contextra-active".to_string(),
             issue: "TASK-123".to_string(),
             timestamp: "2026-09-08T20:00:00Z".to_string(),
             session_id: "s123".to_string(),
@@ -709,10 +709,10 @@ mod tests {
         });
         db.save(&claims_path).unwrap();
 
-        let result = check_no_active_claim_conflict(dir.path(), Some("memfuse-active"));
+        let result = check_no_active_claim_conflict(dir.path(), Some("contextra-active"));
         match result {
             CheckResult::Fail(msg) => {
-                assert!(msg.contains("memfuse-active"));
+                assert!(msg.contains("contextra-active"));
                 assert!(msg.contains("TASK-123"));
             }
             _ => panic!("Expected CheckResult::Fail for active local claim"),
@@ -730,7 +730,7 @@ mod tests {
         let mut db = ClaimsDatabase::default();
         for i in 1..=4 {
             db.claims.push(ClaimEntry {
-                krate: format!("memfuse-active-{}", i),
+                krate: format!("contextra-active-{}", i),
                 issue: format!("TASK-{}", i),
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 session_id: format!("s{}", i),
@@ -741,11 +741,11 @@ mod tests {
         }
         db.save(&claims_path).unwrap();
 
-        let result = check_no_active_claim_conflict(dir.path(), Some("memfuse-new"));
+        let result = check_no_active_claim_conflict(dir.path(), Some("contextra-new"));
         match result {
             CheckResult::Fail(msg) => {
                 assert!(
-                    msg.contains("MemFuseError::ConcurrencyLimitExceeded"),
+                    msg.contains("ContextraError::ConcurrencyLimitExceeded"),
                     "Expected ConcurrencyLimitExceeded error, got: {}",
                     msg
                 );

@@ -27,17 +27,17 @@ jobs:
           if command -v just &> /dev/null; then
             just chaos-test
           else
-            cargo test -p memfuse-store --test chaos_matrix -- --ignored --test-threads=1
+            cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1
           fi
 
       - name: Chaos L6-1 WAL Corruption During Flush
-        run: cargo test -p memfuse-store --test chaos_matrix chaos_wal_corruption_during_flush -- --ignored
+        run: cargo test -p contextra-store --test chaos_matrix chaos_wal_corruption_during_flush -- --ignored
 
       - name: Chaos L6-2 Manifest Corruption During Compaction
-        run: cargo test -p memfuse-store --test chaos_matrix chaos_manifest_corruption_during_compaction -- --ignored
+        run: cargo test -p contextra-store --test chaos_matrix chaos_manifest_corruption_during_compaction -- --ignored
 
       - name: Chaos L6-6 Concurrent Crash Recovery Matrix
-        run: cargo test -p memfuse-store --test chaos_matrix chaos_concurrent_crash_recovery_matrix -- --ignored --test-threads=1
+        run: cargo test -p contextra-store --test chaos_matrix chaos_concurrent_crash_recovery_matrix -- --ignored --test-threads=1
 
       - name: Report Failure
         if: failure()
@@ -56,7 +56,7 @@ jobs:
 
             Please review the workflow logs for the logged \`CHAOS_SEED\` value to reproduce and resolve this failure locally:
             \`\`\`bash
-            CHAOS_SEED=<seed_from_logs> cargo test -p memfuse-store --test chaos_matrix -- --ignored --test-threads=1
+            CHAOS_SEED=<seed_from_logs> cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1
             \`\`\`
             `;
             if (context.eventName === 'schedule') {
@@ -82,8 +82,8 @@ jobs:
       - name: ThreadSanitizer (Race Detection S1-01, S1-11)
         run: |
           RUSTFLAGS="-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer" cargo +nightly test \
-            -p memfuse-store --test toctou_put_if_absent \
+            -p contextra-store --test toctou_put_if_absent \
             --target x86_64-unknown-linux-gnu -- --test-threads=1
           RUSTFLAGS="-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer" cargo +nightly test \
-            -p memfuse-vector --test deleted_nodes_lock_contention \
+            -p contextra-vector --test deleted_nodes_lock_contention \
             --target x86_64-unknown-linux-gnu -- --test-threads=1

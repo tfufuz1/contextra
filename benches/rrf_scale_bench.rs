@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use memfuse_db::fusion::weighted_reciprocal_rank_fusion;
-use memfuse_db::SearchResult;
+use contextra_db::fusion::weighted_reciprocal_rank_fusion;
+use contextra_db::SearchResult;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
@@ -90,7 +90,7 @@ fn generate_signal_results(
 }
 
 fn bench_rrf_scaling(c: &mut Criterion) {
-    let hit_counts: Vec<usize> = match std::env::var("MEMFUSE_RRF_TIERS") {
+    let hit_counts: Vec<usize> = match std::env::var("CONTEXTRA_RRF_TIERS") {
         Ok(val) => val
             .split(',')
             .filter_map(|s| s.trim().parse::<usize>().ok())

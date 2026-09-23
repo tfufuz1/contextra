@@ -1,10 +1,10 @@
-# MemFuse Memory Export Format (v1.0)
+# Contextra Memory Export Format (v1.0)
 
-This document describes the canonical JSON Export and Import format (`schema_version: "1.0"`) for MemFuse memory stores.
+This document describes the canonical JSON Export and Import format (`schema_version: "1.0"`) for Contextra memory stores.
 
 ## Overview & Architecture
 
-The Export/Import system allows full backups, migrations, and instance replication of MemFuse memories across environments.
+The Export/Import system allows full backups, migrations, and instance replication of Contextra memories across environments.
 
 - **Schema Version**: `"1.0"` (mandatory field)
 - **Data Integrity**: Scans user document keys (`key_type = 0`) and relationship keys (`key_type = 2`).

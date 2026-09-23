@@ -62,7 +62,7 @@ if [ "$ALL_STALE" = true ]; then
     MERGED_ONLY=false
 fi
 
-echo "=== MemFuse Remote Branch Pruning Utility ==="
+echo "=== Contextra Remote Branch Pruning Utility ==="
 echo "Modus: $( [ "$DRY_RUN" = true ] && echo "DRY-RUN (Simulation — keine Änderungen auf origin)" || echo "LIVE APPLY (Löschen auf origin)" )"
 echo "Fetch & Synchronisiere Remote-Tracking-Branches..."
 git fetch --prune origin >/dev/null 2>&1
@@ -111,7 +111,7 @@ while IFS='|' read -r branch commit_ts; do
 
     # Check if automated agent/task branch
     is_auto_task=false
-    if [[ "$branch" =~ -[0-9]{15,}$ ]] || [[ "$branch" =~ ^audit-memfuse- ]] || [[ "$branch" =~ ^jules- ]]; then
+    if [[ "$branch" =~ -[0-9]{15,}$ ]] || [[ "$branch" =~ ^audit-contextra- ]] || [[ "$branch" =~ ^jules- ]]; then
         is_auto_task=true
     fi
 

@@ -1,20 +1,20 @@
 //! # Collections — Multi-Namespace Workflow
 //!
-//! Demonstrates MemFuse's Collection system for logically isolated
+//! Demonstrates Contextra's Collection system for logically isolated
 //! namespaces within a single database. Each collection has its own
 //! HNSW index and BM25 index while sharing the underlying storage.
 //!
 //! Run with: `cargo run --example collections`
 
-use memfuse_db::{MemFuse, MemFuseConfig};
+use contextra_db::{Contextra, ContextraConfig};
 
 #[tokio::main]
-async fn main() -> memfuse_core::Result<()> {
-    let config = MemFuseConfig {
+async fn main() -> contextra_core::Result<()> {
+    let config = ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = MemFuse::open_with_config("./collections_data", config).await?;
+    let db = Contextra::open_with_config("./collections_data", config).await?;
 
     // --- Create two isolated collections ---
     let agents = db.collection("agents").await?;

@@ -1,23 +1,23 @@
 // ANCHOR[PERF:BENCH-001] STATUS:PARTIAL (TS:2026-08-29T00:00:00Z) — Benchmark Suite für LangGraph Migration
-// ZIEL: Latenz-Baseline für MemFuse-interne Operationen — KEIN Cross-System-Vergleich
+// ZIEL: Latenz-Baseline für Contextra-interne Operationen — KEIN Cross-System-Vergleich
 // AGENT:09 DATE:2026-05-15 STATUS:PARTIAL
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use memfuse_checkpoint::PersistentCheckpointStore;
-use memfuse_core::TxId;
-use memfuse_db::{MemFuse, MemFuseConfig};
+use contextra_checkpoint::PersistentCheckpointStore;
+use contextra_core::TxId;
+use contextra_db::{Contextra, ContextraConfig};
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
 fn bench_hybrid_search(c: &mut Criterion) {
     let rt = Runtime::new().unwrap(); // unwrap allowed
     let tmp = TempDir::new().unwrap(); // unwrap allowed
-    let config = MemFuseConfig {
+    let config = ContextraConfig {
         dimension: 768,
         ..Default::default()
     };
     let db = rt
-        .block_on(MemFuse::open_with_config(tmp.path(), config))
+        .block_on(Contextra::open_with_config(tmp.path(), config))
         .unwrap(); // unwrap allowed
 
     // Prepare data
@@ -44,7 +44,7 @@ fn bench_hybrid_search(c: &mut Criterion) {
 fn bench_agent_state_checkpoint(c: &mut Criterion) {
     let rt = Runtime::new().unwrap(); // unwrap allowed
     let tmp = TempDir::new().unwrap(); // unwrap allowed
-    let db = rt.block_on(MemFuse::open(tmp.path())).unwrap(); // unwrap allowed
+    let db = rt.block_on(Contextra::open(tmp.path())).unwrap(); // unwrap allowed
     let storage = db.inner_storage();
     let manager = PersistentCheckpointStore::new(storage, "test").unwrap();
 
@@ -61,12 +61,12 @@ fn bench_agent_state_checkpoint(c: &mut Criterion) {
 fn bench_rerun_cost(c: &mut Criterion) {
     let rt = Runtime::new().unwrap(); // unwrap allowed
     let tmp = TempDir::new().unwrap(); // unwrap allowed
-    let config = MemFuseConfig {
+    let config = ContextraConfig {
         dimension: 768,
         ..Default::default()
     };
     let db = rt
-        .block_on(MemFuse::open_with_config(tmp.path(), config))
+        .block_on(Contextra::open_with_config(tmp.path(), config))
         .unwrap(); // unwrap allowed
 
     // Prepare data
@@ -90,12 +90,12 @@ fn bench_rerun_cost(c: &mut Criterion) {
 fn bench_snapshot_overhead(c: &mut Criterion) {
     let rt = Runtime::new().unwrap(); // unwrap allowed
     let tmp = TempDir::new().unwrap(); // unwrap allowed
-    let config = MemFuseConfig {
+    let config = ContextraConfig {
         dimension: 768,
         ..Default::default()
     };
     let db = rt
-        .block_on(MemFuse::open_with_config(tmp.path(), config))
+        .block_on(Contextra::open_with_config(tmp.path(), config))
         .unwrap(); // unwrap allowed
 
     rt.block_on(async {
@@ -123,12 +123,12 @@ fn bench_snapshot_overhead(c: &mut Criterion) {
 fn bench_staged_stats_commit(c: &mut Criterion) {
     let rt = Runtime::new().unwrap(); // unwrap allowed
     let tmp = TempDir::new().unwrap(); // unwrap allowed
-    let config = MemFuseConfig {
+    let config = ContextraConfig {
         dimension: 768,
         ..Default::default()
     };
     let db = rt
-        .block_on(MemFuse::open_with_config(tmp.path(), config))
+        .block_on(Contextra::open_with_config(tmp.path(), config))
         .unwrap(); // unwrap allowed
 
     c.bench_function("staged_stats_commit_overhead", |b| {

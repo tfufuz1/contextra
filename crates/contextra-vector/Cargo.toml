@@ -1,0 +1,105 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-vector"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "HNSW vector index with SIMD distance computation for Contextra"
+
+[dependencies]
+contextra-core = { workspace = true }
+contextra-crypto = { workspace = true }
+contextra-simd = { workspace = true }
+contextra-sys = { workspace = true }
+subtle = "2.6"
+ahash = { workspace = true }
+parking_lot = { workspace = true }
+rand = { workspace = true }
+roaring = { workspace = true }
+tracing = { workspace = true }
+memmap2 = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+
+[features]
+default = []
+docid-128 = ["contextra-core/docid-128"]
+experimental-diskann = []
+experimental-rabitq = []
+graph = []
+# ACHTUNG: partial-index-rebuild aktiviert F-02 (Partial HNSW Rebuild), das gegen ein
+# dokumentiertes Architektur-Veto verstößt (siehe VETOES.md, falls vorhanden, sonst
+# docs/decisions/ nach "Nucleation" durchsuchen). Der aktuelle rebuild_region()
+# implementiert reines Tombstone-Pruning ohne Re-Wiring — Risiko: Grad-Verlust ohne
+# Navigierbarkeits-Wiederherstellung. NICHT als default-Feature aktivieren bis
+# test_partial_rebuild_recall_regression() in crates/contextra-index/tests/partial_rebuild_recall_regression.rs
+# für > 30 Tage stabil grün ist UND ein ADR das ursprüngliche Veto explizit revidiert oder
+# bestätigt einschränkt.
+partial-index-rebuild = []
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+criterion = "0.5"
+tempfile = "3"
+proptest = "1.4"
+bincode = { workspace = true }
+loom = "0.7"
+
+[[bench]]
+name = "distance_bench"
+harness = false
+
+[[bench]]
+name = "sq8_bench"
+harness = false
+
+[[bench]]
+name = "hnsw_bench"
+harness = false
+
+[[bench]]
+name = "hnsw_delete_search_bench"
+harness = false
+
+[[bench]]
+name = "audit_benchmarks"
+harness = false
+
+[[bench]]
+name = "flush_threshold_amplification"
+harness = false
+
+[[bench]]
+name = "partial_rebuild_recall_bench"
+harness = false
+required-features = ["partial-index-rebuild"]
+
+[[bench]]
+name = "distance_nan_impact_bench"
+harness = false
+
+[[test]]
+name = "diskann_fault_injection_test"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "diskann_corruption_fallback_test"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "diskann_recall_test"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "mmap_toctou_test"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "quantize_persistence_audit"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "recall_audit"
+required-features = ["experimental-diskann"]

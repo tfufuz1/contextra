@@ -1,7 +1,7 @@
-# MemFuse Audit-Findings: Jules Fix-Prompts (Round 3)
+# Contextra Audit-Findings: Jules Fix-Prompts (Round 3)
 
 **Erstellt:** 2026-09-09  
-**Quelle:** Systematische Analyse aller `docs/audits/AUDIT_memfuse-*.md` Dokumente  
+**Quelle:** Systematische Analyse aller `docs/audits/AUDIT_contextra-*.md` Dokumente  
 **Zweck:** Isolierte, parallelisierbare Jules-Prompts zur Behebung aller offenen Audit-Findings  
 
 ---
@@ -10,38 +10,38 @@
 
 | # | Crate | Finding-ID | Severity | Kurzbeschreibung |
 |---|---|---|---|---|
-| 1 | `memfuse-tauri` | `AGT-TAURI-96c44961` | BLOCKER | Fehlendes `provenance`-Feld in `multi_step_search` |
-| 2 | `memfuse-db` | `AGT-DB-8ddf8937` | MAJOR | Ungebundene Variable `text_str` im `reranking`-Feature-Block |
-| 3 | `memfuse-db` | `AGT-DB-7c141164` | MAJOR | Konsolidierungstest mit identischen Embeddings |
-| 4 | `memfuse-mcp` | `AGT-MCP-98350010` | MAJOR | `clippy::field_reassign_with_default` in `config.rs` |
-| 5 | `memfuse-mcp` | — | MINOR | `clippy::unnecessary_lazy_evaluations` in `mcp_test.rs` |
-| 6 | `memfuse-embed` | `AGT-EMBED-f07dcaf8` | MAJOR | ONNX Session wird bei jedem Aufruf neu instantiiert |
-| 7 | `memfuse-embed` | `AGT-EMBED-62093e61` | MINOR | Unkalibrierte Sigmoid-Scores im Cross-Encoder |
-| 8 | `memfuse-ollama` | `AGT-OLLAMA-47e6619b` | MINOR | 2 überlebende Mutanten in `context_prefixer.rs` |
-| 9 | `memfuse-ollama` | `AGT-OLLAMA-14c0c140` | MINOR | `score_importance` ohne Konfidenz-Metadaten |
-| 10 | `memfuse-tauri` | — | BLOCKER | Kompilierungsfehler durch fehlende Felder |
-| 11 | `memfuse-py` | `AGT-PY-d5d2be30` | MAJOR | `panic = "abort"` deaktiviert `catch_unwind` |
-| 12 | `memfuse-py` | `AGT-PY-ff475c8e` | MAJOR | `_trigger_panic_for_test` testet nicht die echte Boundary |
-| 13 | `memfuse-bench` | `AGT-BENCH-3b6c4f9c` | MINOR | `clippy::vec_init_then_push` in `long_mem_eval.rs` |
-| 14 | `memfuse-bench` | `AGT-BENCH-032cfc65` | MINOR | `clippy::unnecessary_filter_map` in `long_mem_eval.rs` |
-| 15 | `memfuse-checkpoint` | `AGT-CHECKPOINT-a3ccc9fe` | MAJOR | Race-Condition auf `ORPHAN_REGISTRY` Singleton |
+| 1 | `contextra-tauri` | `AGT-TAURI-96c44961` | BLOCKER | Fehlendes `provenance`-Feld in `multi_step_search` |
+| 2 | `contextra-db` | `AGT-DB-8ddf8937` | MAJOR | Ungebundene Variable `text_str` im `reranking`-Feature-Block |
+| 3 | `contextra-db` | `AGT-DB-7c141164` | MAJOR | Konsolidierungstest mit identischen Embeddings |
+| 4 | `contextra-mcp` | `AGT-MCP-98350010` | MAJOR | `clippy::field_reassign_with_default` in `config.rs` |
+| 5 | `contextra-mcp` | — | MINOR | `clippy::unnecessary_lazy_evaluations` in `mcp_test.rs` |
+| 6 | `contextra-embed` | `AGT-EMBED-f07dcaf8` | MAJOR | ONNX Session wird bei jedem Aufruf neu instantiiert |
+| 7 | `contextra-embed` | `AGT-EMBED-62093e61` | MINOR | Unkalibrierte Sigmoid-Scores im Cross-Encoder |
+| 8 | `contextra-ollama` | `AGT-OLLAMA-47e6619b` | MINOR | 2 überlebende Mutanten in `context_prefixer.rs` |
+| 9 | `contextra-ollama` | `AGT-OLLAMA-14c0c140` | MINOR | `score_importance` ohne Konfidenz-Metadaten |
+| 10 | `contextra-tauri` | — | BLOCKER | Kompilierungsfehler durch fehlende Felder |
+| 11 | `contextra-py` | `AGT-PY-d5d2be30` | MAJOR | `panic = "abort"` deaktiviert `catch_unwind` |
+| 12 | `contextra-py` | `AGT-PY-ff475c8e` | MAJOR | `_trigger_panic_for_test` testet nicht die echte Boundary |
+| 13 | `contextra-bench` | `AGT-BENCH-3b6c4f9c` | MINOR | `clippy::vec_init_then_push` in `long_mem_eval.rs` |
+| 14 | `contextra-bench` | `AGT-BENCH-032cfc65` | MINOR | `clippy::unnecessary_filter_map` in `long_mem_eval.rs` |
+| 15 | `contextra-checkpoint` | `AGT-CHECKPOINT-a3ccc9fe` | MAJOR | Race-Condition auf `ORPHAN_REGISTRY` Singleton |
 
 ---
 
-## Prompt 1 — `memfuse-tauri`: BLOCKER SearchResultDto Fix
+## Prompt 1 — `contextra-tauri`: BLOCKER SearchResultDto Fix
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust Desktop Application Architect mit Expertise in Tauri v2, 
-IPC-Sicherheit und der MemFuse 4-Signal-Fusion-Architektur.
+IPC-Sicherheit und der Contextra 4-Signal-Fusion-Architektur.
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig — verifiziere HEAD-Commit und Crate-Topologie.
-2. Führe `cargo xtask claim --crate memfuse-tauri --issue AGT-TAURI-96c44961` aus.
-3. Lies `docs/audits/AUDIT_memfuse-tauri.md` (Finding BUG-TAURI-002, Abschnitt 14).
+2. Führe `cargo xtask claim --crate contextra-tauri --issue AGT-TAURI-96c44961` aus.
+3. Lies `docs/audits/AUDIT_contextra-tauri.md` (Finding BUG-TAURI-002, Abschnitt 14).
 
 ## Problem (BLOCKER)
-In `crates/memfuse-tauri/src/commands/search.rs` fehlt das Feld `provenance` in 
+In `crates/contextra-tauri/src/commands/search.rs` fehlt das Feld `provenance` in 
 der `SearchResultDto`-Initialisierung innerhalb der Funktion `multi_step_search`. 
 Upstream-Commit #1598 hat `SearchResultDto` um `pub provenance: Option<ProvenanceDto>` 
 erweitert. `hybrid_search` wurde angepasst, `multi_step_search` jedoch nicht.
@@ -50,7 +50,7 @@ erweitert. `hybrid_search` wurde angepasst, `multi_step_search` jedoch nicht.
 'SearchResultDto'`
 
 ## Implementierungsschritte
-1. **Datei:** `crates/memfuse-tauri/src/commands/search.rs`
+1. **Datei:** `crates/contextra-tauri/src/commands/search.rs`
    - Finde die `SearchResultDto`-Konstruktion in `multi_step_search`
    - Füge `provenance: None` als Feld hinzu (Multi-Step-Search hat keinen 
      Provenance-Kontext, daher `None` als sicherer Default)
@@ -58,40 +58,40 @@ erweitert. `hybrid_search` wurde angepasst, `multi_step_search` jedoch nicht.
      und ebenfalls das Feld benötigen
 
 2. **Verifikation:**
-   cargo check -p memfuse-tauri --all-features
-   cargo clippy -p memfuse-tauri --no-deps -- -D warnings
-   cargo test -p memfuse-tauri --all-features
+   cargo check -p contextra-tauri --all-features
+   cargo clippy -p contextra-tauri --no-deps -- -D warnings
+   cargo test -p contextra-tauri --all-features
 
 3. **Tag-Resolution:** Markiere `AI-TAG` `AGT-TAURI-96c44961` als `RESOLVED` mit 
    Zeitstempel und Session-Hash.
 
 ## Constraints
-- NUR Dateien in `crates/memfuse-tauri/` modifizieren
+- NUR Dateien in `crates/contextra-tauri/` modifizieren
 - Keine funktionalen Änderungen an der Search-Logik
-- `cargo check --workspace --exclude memfuse-tauri` muss WEITERHIN kompilieren
+- `cargo check --workspace --exclude contextra-tauri` muss WEITERHIN kompilieren
 ```
 
 ---
 
-## Prompt 2 — `memfuse-db`: Feature-Gate Variable Fix
+## Prompt 2 — `contextra-db`: Feature-Gate Variable Fix
 
 ```
 ## Rolle & Kompetenzen
-Du bist ein Senior Rust Datenbank-Architekt mit Expertise in der MemFuse 
-4-Signal-Fusion, Feature-Gates und dem `memfuse-db` Orchestrator-Crate (Layer 2).
+Du bist ein Senior Rust Datenbank-Architekt mit Expertise in der Contextra 
+4-Signal-Fusion, Feature-Gates und dem `contextra-db` Orchestrator-Crate (Layer 2).
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig — verifiziere HEAD-Commit.
-2. Führe `cargo xtask claim --crate memfuse-db --issue AGT-DB-8ddf8937` aus.
-3. Lies `docs/audits/AUDIT_memfuse-db.md` (Abschnitt 11, Finding AGT-DB-8ddf8937).
+2. Führe `cargo xtask claim --crate contextra-db --issue AGT-DB-8ddf8937` aus.
+3. Lies `docs/audits/AUDIT_contextra-db.md` (Abschnitt 11, Finding AGT-DB-8ddf8937).
 
 ## Problem (MAJOR)
-In `crates/memfuse-db/src/collection/query_builder.rs` ist die Variable `text_str` 
+In `crates/contextra-db/src/collection/query_builder.rs` ist die Variable `text_str` 
 im `feature="reranking"` Block ungebunden. Das Code-Smell wurde als 
 `AI-TAG[SMELL][MAJOR]` dokumentiert.
 
 ## Implementierungsschritte
-1. **Datei:** `crates/memfuse-db/src/collection/query_builder.rs`
+1. **Datei:** `crates/contextra-db/src/collection/query_builder.rs`
    - Suche den `#[cfg(feature = "reranking")]`-Block
    - Identifiziere die ungebundene Variable `text_str`
    - Binde `text_str` korrekt an den Query-Text (wahrscheinlich aus 
@@ -99,36 +99,36 @@ im `feature="reranking"` Block ungebunden. Das Code-Smell wurde als
    - Stelle sicher, dass der Block mit UND ohne `reranking`-Feature kompiliert
 
 2. **Verifikation:**
-   cargo check -p memfuse-db --all-features
-   cargo check -p memfuse-db --no-default-features
-   cargo clippy -p memfuse-db -- -D warnings
-   cargo test -p memfuse-db --all-features
+   cargo check -p contextra-db --all-features
+   cargo check -p contextra-db --no-default-features
+   cargo clippy -p contextra-db -- -D warnings
+   cargo test -p contextra-db --all-features
 
 3. **Tag-Resolution:** Markiere `AGT-DB-8ddf8937` als `RESOLVED`.
 
 ## Constraints
-- NUR `crates/memfuse-db/src/collection/query_builder.rs` modifizieren
+- NUR `crates/contextra-db/src/collection/query_builder.rs` modifizieren
 - Keine Änderungen an der öffentlichen API
 - Bestehende Tests DÜRFEN NICHT brechen
 ```
 
 ---
 
-## Prompt 3 — `memfuse-db`: Konsolidierungstest Embedding-Fix
+## Prompt 3 — `contextra-db`: Konsolidierungstest Embedding-Fix
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust Datenbank-Architekt mit Fokus auf Context-Compaction, 
-Near-Duplicate-Detection und Community-Synthese im `memfuse-db` Crate.
+Near-Duplicate-Detection und Community-Synthese im `contextra-db` Crate.
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig.
-2. Führe `cargo xtask claim --crate memfuse-db --issue AGT-DB-7c141164` aus.
-3. Lies `docs/audits/AUDIT_memfuse-db.md` (Abschnitt 12, Finding AGT-DB-7c141164).
+2. Führe `cargo xtask claim --crate contextra-db --issue AGT-DB-7c141164` aus.
+3. Lies `docs/audits/AUDIT_contextra-db.md` (Abschnitt 12, Finding AGT-DB-7c141164).
 
 ## Problem (MAJOR)
 `test_execute_sleep_cycle_with_synthesis_pass` in 
-`crates/memfuse-db/tests/consolidation_integration_test.rs` verwendet identische 
+`crates/contextra-db/tests/consolidation_integration_test.rs` verwendet identische 
 Embeddings `[1.0, 0.0, 0.0, 0.0]` für alle 5 Turns. Da Cosine Similarity = 1.0 > 0.99 
 (`near_duplicate_cosine_threshold`), markiert der Consolidation Pass 4 von 5 Turns 
 als Near-Duplicates und tombstoned sie. In Zyklus 2 verbleibt nur 1 Knoten im Graph, 
@@ -136,7 +136,7 @@ Community-Größe ist 1 < 3 (`min_community_size`), wodurch die Synthese-Asserti
 fehlschlägt.
 
 ## Implementierungsschritte
-1. **Datei:** `crates/memfuse-db/tests/consolidation_integration_test.rs`
+1. **Datei:** `crates/contextra-db/tests/consolidation_integration_test.rs`
    - Ersetze die identischen Embedding-Vektoren durch distinkte, aber kohärente 
      Vektoren, z.B.:
      let emb_a = vec![1.0, 0.0, 0.0, 0.0];
@@ -150,79 +150,79 @@ fehlschlägt.
      c) Cosine Similarity > 0.5 (kohärent genug für Community-Detection)
 
 2. **Verifikation:**
-   cargo test -p memfuse-db --test consolidation_integration_test
-   cargo test -p memfuse-db --all-features
+   cargo test -p contextra-db --test consolidation_integration_test
+   cargo test -p contextra-db --all-features
 
 3. **Tag-Resolution:** Markiere `AGT-DB-7c141164` als `RESOLVED`.
 
 ## Constraints
-- NUR `crates/memfuse-db/tests/consolidation_integration_test.rs` modifizieren
+- NUR `crates/contextra-db/tests/consolidation_integration_test.rs` modifizieren
 - Keine Änderungen am Produktionscode
 ```
 
 ---
 
-## Prompt 4 — `memfuse-mcp`: Clippy Lint Fixes
+## Prompt 4 — `contextra-mcp`: Clippy Lint Fixes
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust Protocol Engineer mit Expertise in stdio JSON-RPC 2.0, 
-MCP-Sandbox-Security und dem `memfuse-mcp` Crate (Layer 4).
+MCP-Sandbox-Security und dem `contextra-mcp` Crate (Layer 4).
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig.
-2. Führe `cargo xtask claim --crate memfuse-mcp --issue AGT-MCP-98350010` aus.
-3. Lies `docs/audits/AUDIT_memfuse-mcp.md` (Abschnitt 15, Findings).
+2. Führe `cargo xtask claim --crate contextra-mcp --issue AGT-MCP-98350010` aus.
+3. Lies `docs/audits/AUDIT_contextra-mcp.md` (Abschnitt 15, Findings).
 
 ## Probleme
 ### Problem A (MAJOR): `clippy::field_reassign_with_default` in `config.rs`
-In `crates/memfuse-mcp/src/config.rs:209-210` wird ein Struct mit `Default::default()` 
+In `crates/contextra-mcp/src/config.rs:209-210` wird ein Struct mit `Default::default()` 
 initialisiert und anschließend Felder überschrieben.
 
 ### Problem B (MINOR): `clippy::unnecessary_lazy_evaluations` in `mcp_test.rs`
-In `crates/memfuse-mcp/tests/mcp_test.rs` werden `ok_or_else` mit String-Literalen 
+In `crates/contextra-mcp/tests/mcp_test.rs` werden `ok_or_else` mit String-Literalen 
 verwendet, wo `ok_or` ausreicht.
 
 ## Implementierungsschritte
-1. **Datei A:** `crates/memfuse-mcp/src/config.rs`
+1. **Datei A:** `crates/contextra-mcp/src/config.rs`
    - Finde die Stelle ab Zeile 209 mit `field_reassign_with_default`
    - Refactore zu einer direkten Struct-Konstruktion mit benannten Feldern
    - Alternativ: Verwende einen Builder-Pattern falls vorhanden
 
-2. **Datei B:** `crates/memfuse-mcp/tests/mcp_test.rs`
+2. **Datei B:** `crates/contextra-mcp/tests/mcp_test.rs`
    - Ersetze `ok_or_else(|| "string literal".to_string())` durch 
      `ok_or("string literal")` (nur bei String-Literalen, nicht bei 
      dynamisch konstruierten Fehlern)
 
 3. **Verifikation:**
-   cargo clippy -p memfuse-mcp --no-deps -- -D warnings
-   cargo test -p memfuse-mcp --all-features
-   cargo fmt --check -p memfuse-mcp
+   cargo clippy -p contextra-mcp --no-deps -- -D warnings
+   cargo test -p contextra-mcp --all-features
+   cargo fmt --check -p contextra-mcp
 
 4. **Tag-Resolution:** Markiere `AGT-MCP-98350010` als `RESOLVED`.
 
 ## Constraints
-- NUR Dateien in `crates/memfuse-mcp/` modifizieren
+- NUR Dateien in `crates/contextra-mcp/` modifizieren
 - Keine funktionalen Änderungen am Protokoll-Verhalten
 - ADR-010 (stdio-only, kein HTTP) MUSS weiterhin eingehalten werden
 ```
 
 ---
 
-## Prompt 5 — `memfuse-embed`: ONNX Session Caching (Performance)
+## Prompt 5 — `contextra-embed`: ONNX Session Caching (Performance)
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust ML-Infrastructure Engineer mit Expertise in ONNX Runtime 
-Session-Management, tokio::spawn_blocking und dem `memfuse-embed` Crate.
+Session-Management, tokio::spawn_blocking und dem `contextra-embed` Crate.
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig.
-2. Führe `cargo xtask claim --crate memfuse-embed --issue AGT-EMBED-f07dcaf8` aus.
-3. Lies `docs/audits/AUDIT_memfuse-embed.md` (Abschnitt 14.3, PERF Finding).
+2. Führe `cargo xtask claim --crate contextra-embed --issue AGT-EMBED-f07dcaf8` aus.
+3. Lies `docs/audits/AUDIT_contextra-embed.md` (Abschnitt 14.3, PERF Finding).
 
 ## Problem (MAJOR — Performance)
-In `crates/memfuse-embed/src/lib.rs` instantiiert `TextEmbedder::embed_async` bei 
+In `crates/contextra-embed/src/lib.rs` instantiiert `TextEmbedder::embed_async` bei 
 JEDEM Aufruf eine neue `ort::session::Session` aus der Datei innerhalb von 
 `spawn_blocking`. Dies verursacht:
 - Unnötigen I/O pro Embedding-Anfrage
@@ -231,7 +231,7 @@ JEDEM Aufruf eine neue `ort::session::Session` aus der Datei innerhalb von
   `parking_lot::Mutex<ort::session::Session>` hält
 
 ## Implementierungsschritte
-1. **Datei:** `crates/memfuse-embed/src/lib.rs`
+1. **Datei:** `crates/contextra-embed/src/lib.rs`
    - Refactore `TextEmbedder` zu einer Struktur, die die `ort::session::Session` 
      einmalig beim Erstellen lädt und als `Arc<parking_lot::Mutex<Session>>` hält
    - Modifiziere `embed_async` so, dass es die gecachte Session über 
@@ -240,15 +240,15 @@ JEDEM Aufruf eine neue `ort::session::Session` aus der Datei innerhalb von
    - Alle Änderungen MÜSSEN hinter `#[cfg(feature = "onnx")]` stehen
 
 2. **Verifikation:**
-   cargo check -p memfuse-embed --no-default-features
-   cargo check -p memfuse-embed --all-features
-   cargo test -p memfuse-embed --all-features
-   cargo clippy -p memfuse-embed --all-features -- -D warnings
+   cargo check -p contextra-embed --no-default-features
+   cargo check -p contextra-embed --all-features
+   cargo test -p contextra-embed --all-features
+   cargo clippy -p contextra-embed --all-features -- -D warnings
 
 3. **Tag-Resolution:** Markiere `AGT-EMBED-f07dcaf8` als `RESOLVED`.
 
 ## Constraints
-- NUR `crates/memfuse-embed/src/lib.rs` modifizieren
+- NUR `crates/contextra-embed/src/lib.rs` modifizieren
 - Default-Build (ohne `onnx`-Feature) DARF NICHT beeinflusst werden
 - `#![deny(unsafe_code)]` MUSS eingehalten werden
 - Hermetic Feature-Gate Isolation MUSS bestehen bleiben
@@ -256,18 +256,18 @@ JEDEM Aufruf eine neue `ort::session::Session` aus der Datei innerhalb von
 
 ---
 
-## Prompt 6 — `memfuse-py`: Panic-Abort und Test-Boundary Fixes
+## Prompt 6 — `contextra-py`: Panic-Abort und Test-Boundary Fixes
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust FFI-Engineer mit Expertise in PyO3, GIL-Management, 
-catch_unwind/panic-Boundary und dem `memfuse-py` Crate.
+catch_unwind/panic-Boundary und dem `contextra-py` Crate.
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig — beachte insbesondere §3 "Bewusst entkoppelte 
-   Architektur-Komponenten": `memfuse-py` ist bewusst isoliert (ADR-064).
+   Architektur-Komponenten": `contextra-py` ist bewusst isoliert (ADR-064).
 2. Führe den Claim aus.
-3. Lies `docs/audits/AUDIT_memfuse-py.md` (Findings AGT-PY-d5d2be30 und 
+3. Lies `docs/audits/AUDIT_contextra-py.md` (Findings AGT-PY-d5d2be30 und 
    AGT-PY-ff475c8e).
 
 ## Problem A (MAJOR — Security): `panic = "abort"` deaktiviert catch_unwind
@@ -279,14 +279,14 @@ wodurch Rust-Panics den CPython-Prozess via SIGABRT terminieren statt als
 
 ## Problem B (MAJOR — Test): Fake-Panic-Test
 **Finding ID:** `AGT-PY-ff475c8e`  
-`_trigger_panic_for_test` in `crates/memfuse-py/src/lib.rs` gibt direkt 
+`_trigger_panic_for_test` in `crates/contextra-py/src/lib.rs` gibt direkt 
 `PyRuntimeError` zurück statt über `run_blocking_ffi(py, || panic!(...))` einen 
 echten Panic auszulösen. Dadurch wird die catch_unwind-Boundary nicht getestet.
 
 ## Implementierungsschritte
-1. **Datei A:** `crates/memfuse-py/Cargo.toml`
-   - Prüfe ob `memfuse-py` eine eigene `Cargo.toml` mit Workspace-Referenz hat
-   - Da `memfuse-py` bewusst isoliert ist (ADR-064, eigener Workspace), 
+1. **Datei A:** `crates/contextra-py/Cargo.toml`
+   - Prüfe ob `contextra-py` eine eigene `Cargo.toml` mit Workspace-Referenz hat
+   - Da `contextra-py` bewusst isoliert ist (ADR-064, eigener Workspace), 
      stelle sicher dass das Release-Profil `panic = "unwind"` gesetzt ist:
      ```toml
      [profile.release]
@@ -294,7 +294,7 @@ echten Panic auszulösen. Dadurch wird die catch_unwind-Boundary nicht getestet.
      ```
    - ACHTUNG: Die Root-`Cargo.toml` NICHT ändern!
 
-2. **Datei B:** `crates/memfuse-py/src/lib.rs`
+2. **Datei B:** `crates/contextra-py/src/lib.rs`
    - Finde `_trigger_panic_for_test` (ca. Zeile 1435)
    - Ersetze die direkte `PyRuntimeError`-Rückgabe durch:
      ```rust
@@ -306,32 +306,32 @@ echten Panic auszulösen. Dadurch wird die catch_unwind-Boundary nicht getestet.
      korrekt `PyRuntimeError` erwarten
 
 3. **Verifikation:**
-   cargo check --manifest-path crates/memfuse-py/Cargo.toml --all-features
-   cargo test --manifest-path crates/memfuse-py/Cargo.toml --all-features
-   cargo clippy --manifest-path crates/memfuse-py/Cargo.toml -- -D warnings
+   cargo check --manifest-path crates/contextra-py/Cargo.toml --all-features
+   cargo test --manifest-path crates/contextra-py/Cargo.toml --all-features
+   cargo clippy --manifest-path crates/contextra-py/Cargo.toml -- -D warnings
 
 4. **Tag-Resolution:** Markiere `AGT-PY-d5d2be30` und `AGT-PY-ff475c8e` als 
    `RESOLVED`.
 
 ## Constraints
-- NUR Dateien in `crates/memfuse-py/` modifizieren
+- NUR Dateien in `crates/contextra-py/` modifizieren
 - Die Root-`Cargo.toml` NICHT ändern (ADR-064 Workspace-Isolation)
 - `#![forbid(unsafe_code)]` MUSS eingehalten werden
 ```
 
 ---
 
-## Prompt 7 — `memfuse-bench`: Clippy Lint Fixes
+## Prompt 7 — `contextra-bench`: Clippy Lint Fixes
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust Benchmark-Engineer mit Fokus auf Retrieval-Accuracy-Regression 
-und dem `memfuse-bench` Crate.
+und dem `contextra-bench` Crate.
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig.
-2. Führe `cargo xtask claim --crate memfuse-bench --issue AGT-BENCH-CLIPPY` aus.
-3. Lies `docs/audits/AUDIT_memfuse-bench.md` (Abschnitt 2, Findings).
+2. Führe `cargo xtask claim --crate contextra-bench --issue AGT-BENCH-CLIPPY` aus.
+3. Lies `docs/audits/AUDIT_contextra-bench.md` (Abschnitt 2, Findings).
 
 ## Probleme
 ### Problem A (MINOR): `clippy::vec_init_then_push`
@@ -343,7 +343,7 @@ und dem `memfuse-bench` Crate.
 `json_val_to_string` nutzt `.filter_map(...)` wo `.map(...)` ausreicht.
 
 ## Implementierungsschritte
-1. **Datei:** `benchmarks/memfuse-bench/src/long_mem_eval.rs`
+1. **Datei:** `benchmarks/contextra-bench/src/long_mem_eval.rs`
    - **Fix A (Zeile ~189):** Ersetze `Vec::new()` + multiple `.push()` durch 
      `vec![scenario1, scenario2, ...]` Makro-Initialisierung
    - **Fix B (Zeile ~1225):** Ersetze `.filter_map(|x| ...)` durch `.map(|x| ...)` 
@@ -351,33 +351,33 @@ und dem `memfuse-bench` Crate.
      zurückgibt)
 
 2. **Verifikation:**
-   cargo clippy -p memfuse-bench -- -D warnings
-   cargo test -p memfuse-bench --all-features
-   cargo fmt --check -p memfuse-bench
+   cargo clippy -p contextra-bench -- -D warnings
+   cargo test -p contextra-bench --all-features
+   cargo fmt --check -p contextra-bench
 
 3. **Tag-Resolution:** Markiere `AGT-BENCH-3b6c4f9c` und `AGT-BENCH-032cfc65` 
    als `RESOLVED`.
 
 ## Constraints
-- NUR `benchmarks/memfuse-bench/src/long_mem_eval.rs` modifizieren
+- NUR `benchmarks/contextra-bench/src/long_mem_eval.rs` modifizieren
 - Keine funktionalen Änderungen an der Benchmark-Logik
 - Benchmark-Ergebnisse MÜSSEN identisch bleiben
 ```
 
 ---
 
-## Prompt 8 — `memfuse-checkpoint`: ORPHAN_REGISTRY Race-Condition
+## Prompt 8 — `contextra-checkpoint`: ORPHAN_REGISTRY Race-Condition
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust Transaktionssystem-Engineer mit Expertise in RAII-Guards, 
-OnceLock-Singleton-Patterns, paralleler Testausführung und dem `memfuse-checkpoint` 
+OnceLock-Singleton-Patterns, paralleler Testausführung und dem `contextra-checkpoint` 
 Crate (Layer 1).
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig.
-2. Führe `cargo xtask claim --crate memfuse-checkpoint --issue AGT-CHECKPOINT-a3ccc9fe` aus.
-3. Lies `docs/audits/AUDIT_memfuse-checkpoint.md` (Abschnitt 8, Finding 
+2. Führe `cargo xtask claim --crate contextra-checkpoint --issue AGT-CHECKPOINT-a3ccc9fe` aus.
+3. Lies `docs/audits/AUDIT_contextra-checkpoint.md` (Abschnitt 8, Finding 
    AGT-CHECKPOINT-a3ccc9fe).
 
 ## Problem (MAJOR)
@@ -410,14 +410,14 @@ arbeiten, aber der Test greift weiterhin auf den globalen `OnceLock`-Singleton z
 4. **Verifikation:**
    # 10x parallele Ausführung zum Nachweis der Race-Freedom:
    for i in $(seq 1 10); do
-     cargo test -p memfuse-checkpoint --all-features -- --test-threads=8 || exit 1
+     cargo test -p contextra-checkpoint --all-features -- --test-threads=8 || exit 1
    done
-   cargo clippy -p memfuse-checkpoint -- -D warnings
+   cargo clippy -p contextra-checkpoint -- -D warnings
 
 5. **Tag-Resolution:** Markiere `AGT-CHECKPOINT-a3ccc9fe` als `RESOLVED`.
 
 ## Constraints
-- NUR Dateien in `crates/memfuse-checkpoint/` modifizieren
+- NUR Dateien in `crates/contextra-checkpoint/` modifizieren
 - `#![forbid(unsafe_code)]` MUSS eingehalten werden
 - ADR-011 und ADR-015 Konformität MUSS gewahrt bleiben
 - Bestehende 45+ Unit-Tests und 32+ Integrationstests DÜRFEN NICHT brechen
@@ -425,18 +425,18 @@ arbeiten, aber der Test greift weiterhin auf den globalen `OnceLock`-Singleton z
 
 ---
 
-## Prompt 9 — `memfuse-ollama`: Mutation-Testing Lücken & APM-22
+## Prompt 9 — `contextra-ollama`: Mutation-Testing Lücken & APM-22
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust Security & LLM Integration Lead mit Expertise in 
-HTTP-Client-Robustheit, Prompt-Injection-Resistance und dem `memfuse-ollama` 
+HTTP-Client-Robustheit, Prompt-Injection-Resistance und dem `contextra-ollama` 
 Crate (Layer 1).
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig.
-2. Führe `cargo xtask claim --crate memfuse-ollama --issue AGT-OLLAMA-MUTATIONS` aus.
-3. Lies `docs/audits/AUDIT_memfuse-ollama.md` (Abschnitte 14.4 und 14.5).
+2. Führe `cargo xtask claim --crate contextra-ollama --issue AGT-OLLAMA-MUTATIONS` aus.
+3. Lies `docs/audits/AUDIT_contextra-ollama.md` (Abschnitte 14.4 und 14.5).
 
 ## Problem A (MINOR): 2 überlebende Mutanten in `context_prefixer.rs`
 **Finding:** `AGT-OLLAMA-47e6619b`  
@@ -449,14 +449,14 @@ auf fehlende Grenzwert-Tests hin.
 Modell-Metadaten zurück (APM-22, APM-24 Risiko).
 
 ## Implementierungsschritte
-1. **Datei:** `crates/memfuse-ollama/src/context_prefixer.rs`
+1. **Datei:** `crates/contextra-ollama/src/context_prefixer.rs`
    - Identifiziere die 2 überlebenden Mutanten (typischerweise 
      Grenzwertprüfungen in `truncate_prefix` oder `truncate_chars`)
    - Füge Unit-Tests hinzu, die diese spezifischen Operatorgrenzen abdecken:
      - Off-by-one in Wort-/Zeichengrenzen
      - Leere Eingaben, Eingaben exakt am Limit
 
-2. **Datei:** `crates/memfuse-ollama/src/importance.rs`
+2. **Datei:** `crates/contextra-ollama/src/importance.rs`
    - Erweitere den Rückgabewert von `score_importance` um ein Struct:
      ```rust
      pub struct ImportanceScore {
@@ -469,33 +469,33 @@ Modell-Metadaten zurück (APM-22, APM-24 Risiko).
      PR-Body, wenn die Änderung architekturrelevant ist (gemäß AGENTS.md §6)
 
 3. **Verifikation:**
-   cargo test -p memfuse-ollama --all-features
-   cargo clippy -p memfuse-ollama -- -D warnings
+   cargo test -p contextra-ollama --all-features
+   cargo clippy -p contextra-ollama -- -D warnings
 
 4. **Tag-Resolution:** Markiere beide Findings als `RESOLVED`.
 
 ## Constraints
-- NUR Dateien in `crates/memfuse-ollama/` modifizieren
+- NUR Dateien in `crates/contextra-ollama/` modifizieren
 - XML-Escaping (`xml_escape`) NICHT verändern
 - HTTP-Client-Retry-Logik NICHT verändern
 ```
 
 ---
 
-## Prompt 10 — `memfuse-embed`: Platt-Kalibrierung für Cross-Encoder
+## Prompt 10 — `contextra-embed`: Platt-Kalibrierung für Cross-Encoder
 
 ```
 ## Rolle & Kompetenzen
 Du bist ein Senior Rust ML-Infrastructure Engineer mit Expertise in Score-
-Kalibrierung, Platt-Scaling und dem `memfuse-embed` Crate.
+Kalibrierung, Platt-Scaling und dem `contextra-embed` Crate.
 
 ## Kontext & Mandatory Bootstrap
 1. Lies `AGENTS.md` vollständig.
-2. Führe `cargo xtask claim --crate memfuse-embed --issue AGT-EMBED-62093e61` aus.
-3. Lies `docs/audits/AUDIT_memfuse-embed.md` (Abschnitt 14.2, APM-22 Finding).
+2. Führe `cargo xtask claim --crate contextra-embed --issue AGT-EMBED-62093e61` aus.
+3. Lies `docs/audits/AUDIT_contextra-embed.md` (Abschnitt 14.2, APM-22 Finding).
 
 ## Problem (MINOR — ML-Scoring)
-In `crates/memfuse-embed/src/reranker.rs` werden Raw Cross-Encoder Logits via 
+In `crates/contextra-embed/src/reranker.rs` werden Raw Cross-Encoder Logits via 
 unkalibrierte Sigmoid-Transformation (1 / (1 + e^{-x})) auf [0,1] gemappt. 
 Für die Kombination heterogener Model-Backends wird eine Kalibrierung empfohlen 
 (Temperature Scaling / Platt Calibration).
@@ -507,7 +507,7 @@ Für die Kombination heterogener Model-Backends wird eine Kalibrierung empfohlen
 1. **Prüfe zunächst** ob `PlattScaler` bereits in `reranker.rs` integriert ist 
    (Audit 15.2 deutet darauf hin)
 2. **Falls NICHT integriert:**
-   - Integriere `memfuse_calibration::PlattScaler` in `CrossEncoderReranker`
+   - Integriere `contextra_calibration::PlattScaler` in `CrossEncoderReranker`
    - Wende die Kalibrierung NACH dem ONNX-Forward-Pass, VOR der Score-Sortierung an
    - Behalte den Passthrough-Fallback (ohne ONNX) unverändert
 3. **Falls BEREITS integriert:**
@@ -517,12 +517,12 @@ Für die Kombination heterogener Model-Backends wird eine Kalibrierung empfohlen
      Kalibrierung verifiziert
 
 4. **Verifikation:**
-   cargo check -p memfuse-embed --no-default-features
-   cargo check -p memfuse-embed --all-features
-   cargo test -p memfuse-embed --all-features
+   cargo check -p contextra-embed --no-default-features
+   cargo check -p contextra-embed --all-features
+   cargo test -p contextra-embed --all-features
 
 ## Constraints
-- NUR Dateien in `crates/memfuse-embed/` modifizieren
+- NUR Dateien in `crates/contextra-embed/` modifizieren
 - Passthrough-Fallback (ohne ONNX) MUSS unverändert bleiben
 - `#![deny(unsafe_code)]` MUSS eingehalten werden
 ```
@@ -536,15 +536,15 @@ werden können (keine Dateiüberschneidungen):
 
 | Gruppe | Prompts | Betroffene Crates | Parallel-sicher? |
 |--------|---------|-------------------|-----------------|
-| **A** | 1 | `memfuse-tauri` | ✅ Unabhängig |
-| **B** | 2, 3 | `memfuse-db` (verschiedene Dateien) | ✅ Parallel zueinander |
-| **C** | 4 | `memfuse-mcp` | ✅ Unabhängig |
-| **D** | 5 | `memfuse-embed` (`lib.rs`) | ⚠️ Sequenziell mit 10 |
-| **E** | 6 | `memfuse-py` | ✅ Unabhängig |
-| **F** | 7 | `memfuse-bench` | ✅ Unabhängig |
-| **G** | 8 | `memfuse-checkpoint` | ✅ Unabhängig |
-| **H** | 9 | `memfuse-ollama` | ✅ Unabhängig |
-| **I** | 10 | `memfuse-embed` (`reranker.rs`) | ⚠️ Sequenziell mit 5 |
+| **A** | 1 | `contextra-tauri` | ✅ Unabhängig |
+| **B** | 2, 3 | `contextra-db` (verschiedene Dateien) | ✅ Parallel zueinander |
+| **C** | 4 | `contextra-mcp` | ✅ Unabhängig |
+| **D** | 5 | `contextra-embed` (`lib.rs`) | ⚠️ Sequenziell mit 10 |
+| **E** | 6 | `contextra-py` | ✅ Unabhängig |
+| **F** | 7 | `contextra-bench` | ✅ Unabhängig |
+| **G** | 8 | `contextra-checkpoint` | ✅ Unabhängig |
+| **H** | 9 | `contextra-ollama` | ✅ Unabhängig |
+| **I** | 10 | `contextra-embed` (`reranker.rs`) | ⚠️ Sequenziell mit 5 |
 
 ### Empfohlene Ausführungsreihenfolge
 
@@ -552,6 +552,6 @@ werden können (keine Dateiüberschneidungen):
 > Prompts **1, 2, 3, 4, 6, 7, 8, 9** — Alle betreffen unterschiedliche Crates
 
 **Welle 2 (2 sequenzielle Sessions):**
-> Prompt **5** (memfuse-embed/lib.rs), danach Prompt **10** (memfuse-embed/reranker.rs)  
+> Prompt **5** (contextra-embed/lib.rs), danach Prompt **10** (contextra-embed/reranker.rs)  
 > *Alternativ:* Da die Prompts verschiedene Dateien betreffen (`lib.rs` vs. `reranker.rs`), 
 > können sie potentiell auch parallel ausgeführt werden, Merge-Konfliktrisiko ist gering.

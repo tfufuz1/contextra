@@ -1,0 +1,356 @@
+// Integration tests for continuous event loop and event sources.
+
+use contextra_agent::event_source::{
+    BackgroundEvent, EventSource, PollingDocumentEventSource, VecEventSource,
+};
+use contextra_agent::step::StepResult;
+use contextra_agent::{AgentContext, EventLoopExitReason, NodeType, OrchestratorEngine, StateGraph};
+use contextra_core::BoxFuture;
+use contextra_core::TokenBudget;
+use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
+use serde_json::json;
+use std::sync::Arc;
+use std::time::Duration;
+use tempfile::TempDir;
+use tokio_util::sync::CancellationToken;
+
+/// Tool that captures the current event and returns a result.
+struct TelemetryTool;
+
+impl contextra_agent::AgentTool for TelemetryTool {
+    fn name(&self) -> &str {
+        "telemetry_tool"
+    }
+
+    fn execute<'a>(
+        &'a self,
+        ctx: &'a AgentContext,
+        _input: serde_json::Value,
+    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+        Box::pin(async move {
+            let latest = ctx
+                .memory
+                .get("latest_event")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            Ok(StepResult {
+                node_id: "telemetry_step".to_string(),
+                output: json!({"processed_event": latest}),
+                tokens_consumed: 2,
+                next_edge: None,
+            })
+        })
+    }
+}
+
+async fn setup_test_environment() -> (OrchestratorEngine, Arc<Contextra>, TempDir) {
+    let tmp = TempDir::new().expect("temp dir"); // unwrap allowed
+    let config = ContextraConfig {
+        dimension: 4,
+        max_elements: 1000,
+        distance_metric: DistanceMetric::Cosine,
+        ..Default::default()
+    };
+    let db = Arc::new(
+        Contextra::open_with_config(tmp.path(), config)
+            .await
+            .expect("open db"), // unwrap allowed
+    );
+
+    let storage = db.inner_storage();
+    let mut engine = OrchestratorEngine::try_new(storage).expect("engine try_new");
+    engine.try_register_tool(Box::new(TelemetryTool)).unwrap();
+
+    (engine, db, tmp)
+}
+
+#[tokio::test]
+async fn test_event_loop_exhausted_source_exit_and_checkpointing() {
+    let (engine, db, _tmp) = setup_test_environment().await;
+
+    let mut graph = StateGraph::new();
+    graph
+        .try_add_node("start", "Start node", NodeType::Start, None)
+        .unwrap();
+    graph
+        .try_add_node(
+            "task",
+            "Process event",
+            NodeType::Task,
+            Some("telemetry_tool"),
+        )
+        .unwrap();
+    graph
+        .try_add_node("end", "Finish step", NodeType::End, None)
+        .unwrap();
+
+    graph.try_add_edge("start", "task", None, 1).unwrap();
+    graph.try_add_edge("task", "end", None, 1).unwrap();
+
+    let state_col = db.collection("agent-state").await.expect("state col"); // unwrap allowed
+    let budget = TokenBudget::new(1000, 0);
+    let mut ctx =
+        AgentContext::try_new("task-evt-1", "start", db.clone(), state_col, budget).unwrap();
+
+    let events = vec![
+        BackgroundEvent::try_new(json!({"type": "log", "msg": "event 1"}), "log_stream", 1)
+            .unwrap(),
+        BackgroundEvent::try_new(json!({"type": "log", "msg": "event 2"}), "log_stream", 2)
+            .unwrap(),
+        BackgroundEvent::try_new(json!({"type": "log", "msg": "event 3"}), "log_stream", 3)
+            .unwrap(),
+    ];
+    let mut source = VecEventSource::try_new(events).unwrap();
+    let shutdown = CancellationToken::new();
+
+    let exit_reason = engine
+        .run_event_loop(&mut ctx, &graph, &mut source, shutdown)
+        .await
+        .expect("run event loop"); // unwrap allowed
+
+    assert_eq!(exit_reason, EventLoopExitReason::SourceExhausted);
+    assert_eq!(ctx.events.len(), 3);
+    assert_eq!(ctx.events[0].payload["msg"], "event 1");
+    assert_eq!(ctx.events[1].payload["msg"], "event 2");
+    assert_eq!(ctx.events[2].payload["msg"], "event 3");
+
+    // Verify checkpoint store has recorded checkpoints for each processed event
+    let checkpoints = engine
+        .checkpoint_store
+        .list_checkpoints()
+        .await
+        .expect("list checkpoints"); // unwrap allowed
+    assert!(checkpoints.len() >= 3);
+}
+
+#[tokio::test]
+async fn test_event_loop_cancellation_token_exit() {
+    let (engine, db, _tmp) = setup_test_environment().await;
+
+    let mut graph = StateGraph::new();
+    graph
+        .try_add_node("start", "Start node", NodeType::Start, None)
+        .unwrap();
+    graph
+        .try_add_node("end", "End node", NodeType::End, None)
+        .unwrap();
+    graph.try_add_edge("start", "end", None, 1).unwrap();
+
+    let state_col = db.collection("agent-state").await.expect("state col"); // unwrap allowed
+    let budget = TokenBudget::new(1000, 0);
+    let mut ctx =
+        AgentContext::try_new("task-cancel-1", "start", db.clone(), state_col, budget).unwrap();
+
+    let shutdown = CancellationToken::new();
+    shutdown.cancel();
+
+    let mut source = VecEventSource::try_new(vec![BackgroundEvent::try_new(
+        json!({"data": "ignored"}),
+        "test",
+        1,
+    )
+    .unwrap()])
+    .unwrap();
+
+    let exit_reason = engine
+        .run_event_loop(&mut ctx, &graph, &mut source, shutdown)
+        .await
+        .expect("run event loop"); // unwrap allowed
+
+    assert_eq!(exit_reason, EventLoopExitReason::Shutdown);
+}
+
+#[tokio::test]
+async fn test_polling_document_event_source_delta_detection() {
+    let tmp = TempDir::new().expect("temp dir"); // unwrap allowed
+    let config = ContextraConfig {
+        dimension: 4,
+        max_elements: 1000,
+        distance_metric: DistanceMetric::Cosine,
+        ..Default::default()
+    };
+    let db = Arc::new(
+        Contextra::open_with_config(tmp.path(), config)
+            .await
+            .expect("open db"), // unwrap allowed
+    );
+
+    let doc_col = db.collection("telemetry-docs").await.expect("doc col"); // unwrap allowed
+    let mut source = PollingDocumentEventSource::new(doc_col.clone(), Duration::from_millis(10));
+
+    // Initially no events
+    let initial_evt = source.next_event().await.expect("next event"); // unwrap allowed
+    assert!(initial_evt.is_none());
+
+    // Insert first document
+    doc_col
+        .insert(
+            "doc-1",
+            &[1.0, 0.0, 0.0, 0.0],
+            Some(json!({"text": "first"})),
+        )
+        .await
+        .expect("insert doc 1"); // unwrap allowed
+
+    let evt1 = source
+        .next_event()
+        .await
+        .expect("next event") // unwrap allowed
+        .expect("event 1 present"); // unwrap allowed
+
+    assert_eq!(evt1.source, "collection:telemetry-docs");
+    assert!(evt1.observed_at_seq > 0);
+
+    // Polling again without changes returns None
+    let empty_evt = source.next_event().await.expect("next event"); // unwrap allowed
+    assert!(empty_evt.is_none());
+
+    // Insert second document
+    doc_col
+        .insert(
+            "doc-2",
+            &[0.0, 1.0, 0.0, 0.0],
+            Some(json!({"text": "second"})),
+        )
+        .await
+        .expect("insert doc 2"); // unwrap allowed
+
+    let evt2 = source
+        .next_event()
+        .await
+        .expect("next event") // unwrap allowed
+        .expect("event 2 present"); // unwrap allowed
+
+    assert_eq!(evt2.source, "collection:telemetry-docs");
+    assert!(evt2.observed_at_seq > evt1.observed_at_seq);
+}
+
+/// A second trivial custom EventSource to verify polymorphism and extensibility.
+struct CustomStreamSource {
+    stream: Vec<BackgroundEvent>,
+    idx: usize,
+}
+
+impl EventSource for CustomStreamSource {
+    fn next_event<'a>(
+        &'a mut self,
+    ) -> BoxFuture<'a, contextra_core::Result<Option<BackgroundEvent>>> {
+        Box::pin(async move {
+            if self.idx < self.stream.len() {
+                let item = self.stream[self.idx].clone();
+                self.idx += 1;
+                Ok(Some(item))
+            } else {
+                Ok(None)
+            }
+        })
+    }
+
+    fn is_exhausted(&self) -> bool {
+        self.idx >= self.stream.len()
+    }
+}
+
+#[tokio::test]
+async fn test_custom_event_source_extensibility() {
+    let (engine, db, _tmp) = setup_test_environment().await;
+
+    let mut graph = StateGraph::new();
+    graph
+        .try_add_node("start", "Start node", NodeType::Start, None)
+        .unwrap();
+    graph
+        .try_add_node("end", "End node", NodeType::End, None)
+        .unwrap();
+    graph.try_add_edge("start", "end", None, 1).unwrap();
+
+    let state_col = db.collection("agent-state").await.expect("state col"); // unwrap allowed
+    let budget = TokenBudget::new(1000, 0);
+    let mut ctx =
+        AgentContext::try_new("task-custom-1", "start", db.clone(), state_col, budget).unwrap();
+
+    let mut custom_source = CustomStreamSource {
+        stream: vec![
+            BackgroundEvent::try_new(json!({"screen": "frame_001"}), "camera", 10).unwrap(),
+        ],
+        idx: 0,
+    };
+    let shutdown = CancellationToken::new();
+
+    let exit_reason = engine
+        .run_event_loop(&mut ctx, &graph, &mut custom_source, shutdown)
+        .await
+        .expect("run event loop"); // unwrap allowed
+
+    assert_eq!(exit_reason, EventLoopExitReason::SourceExhausted);
+    assert_eq!(ctx.events.len(), 1);
+    assert_eq!(ctx.events[0].source, "camera");
+}
+
+/// A push-based EventSource using tokio::sync::Notify for real signal backpressure.
+struct NotifyEventSource {
+    notify: Arc<tokio::sync::Notify>,
+    events: std::collections::VecDeque<BackgroundEvent>,
+    exhausted: bool,
+}
+
+impl EventSource for NotifyEventSource {
+    fn next_event<'a>(
+        &'a mut self,
+    ) -> BoxFuture<'a, contextra_core::Result<Option<BackgroundEvent>>> {
+        Box::pin(async move { Ok(self.events.pop_front()) })
+    }
+
+    fn is_exhausted(&self) -> bool {
+        self.exhausted && self.events.is_empty()
+    }
+
+    fn wait_for_event<'a>(&'a self) -> BoxFuture<'a, ()> {
+        Box::pin(async move {
+            self.notify.notified().await;
+        })
+    }
+}
+
+#[tokio::test]
+async fn test_notify_push_event_source_wait_for_event() {
+    let (engine, db, _tmp) = setup_test_environment().await;
+
+    let mut graph = StateGraph::new();
+    graph
+        .try_add_node("start", "Start node", NodeType::Start, None)
+        .unwrap();
+    graph
+        .try_add_node("end", "End node", NodeType::End, None)
+        .unwrap();
+    graph.try_add_edge("start", "end", None, 1).unwrap();
+
+    let state_col = db.collection("agent-state").await.expect("state col");
+    let budget = TokenBudget::new(1000, 0);
+    let mut ctx =
+        AgentContext::try_new("task-notify-1", "start", db.clone(), state_col, budget).unwrap();
+
+    let notify = Arc::new(tokio::sync::Notify::new());
+    let mut source = NotifyEventSource {
+        notify: notify.clone(),
+        events: std::collections::VecDeque::new(),
+        exhausted: false,
+    };
+
+    let shutdown = CancellationToken::new();
+    let shutdown_clone = shutdown.clone();
+
+    // Spawn task to signal notify after a short delay
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        shutdown_clone.cancel();
+        notify.notify_one();
+    });
+
+    let exit_reason = engine
+        .run_event_loop(&mut ctx, &graph, &mut source, shutdown)
+        .await
+        .expect("run event loop");
+
+    assert_eq!(exit_reason, EventLoopExitReason::Shutdown);
+}

@@ -1,4 +1,4 @@
-# MemFuse — Retrieval Accuracy Benchmark Report
+# Contextra — Retrieval Accuracy Benchmark Report
 
 **Stand / Zeitstempel**: `2026-09-03T10:00:00Z`
 **Testkorpus**: 50 Dokument-Chunks, 10 Testabfragen

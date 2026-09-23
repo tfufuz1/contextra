@@ -1,0 +1,46 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+default-run = "contextra-bench"
+description = "Contextra — Reproducible Benchmark Harness for Retrieval Accuracy"
+
+[lib]
+name = "contextra_bench"
+path = "src/lib.rs"
+
+[[bin]]
+name = "contextra-bench"
+path = "src/main.rs"
+
+[[bin]]
+name = "compare-baseline"
+path = "src/bin/compare_baseline.rs"
+
+[dependencies]
+contextra-core = { workspace = true }
+contextra-store = { workspace = true }
+contextra-vector = { workspace = true }
+contextra-text = { workspace = true }
+contextra-graph = { workspace = true }
+contextra-db = { workspace = true }
+contextra-infer-onnx = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = "1"
+hdrhistogram = "7"
+rand = { workspace = true }
+
+[features]
+default = []
+external-benchmarks = []
+onnx-bench = ["contextra-infer-onnx/onnx", "contextra-db/reranking"]

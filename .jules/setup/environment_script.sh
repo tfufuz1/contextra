@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # =============================================================================
-# MemFuse — Jules Environment Setup Script
-# Repository: https://github.com/tfufuz1/memfuse
+# Contextra — Jules Environment Setup Script
+# Repository: https://github.com/tfufuz1/contextra
 # Target: Jules VM (Ubuntu 24, Rust pre-installed)
 # =============================================================================
 
 set -euo pipefail
 
 echo "============================================================"
-echo "  MemFuse Jules Environment Setup"
+echo "  Contextra Jules Environment Setup"
 echo "  $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 echo "============================================================"
 
@@ -92,15 +92,15 @@ echo "[7/8] Pre-compiling workspace dependencies..."
 
 cd /app 2>/dev/null || cd /home/jules/repo 2>/dev/null || cd .
 
-cargo check --workspace --exclude memfuse-tauri 2>&1 | tail -5
+cargo check --workspace --exclude contextra-tauri 2>&1 | tail -5
 echo "  ✅ Workspace dependency cache warmed"
 
-cargo test --workspace --exclude memfuse-tauri --no-run 2>&1 | tail -3
+cargo test --workspace --exclude contextra-tauri --no-run 2>&1 | tail -3
 echo "  ✅ Test binaries pre-compiled"
 
 # ── 8. Validate Key Invariants ───────────────────────────────────────────────
 echo ""
-echo "[8/8] Validating MemFuse workspace invariants..."
+echo "[8/8] Validating Contextra workspace invariants..."
 
 if [ -f "AGENTS.md" ]; then
     echo "  ✅ AGENTS.md found ($(wc -l < AGENTS.md) lines)"
@@ -112,15 +112,15 @@ fi
 OPEN_TAGS=$(grep -rn 'AI-TAG\[SMELL\]\[CRITICAL\]' crates/ --include='*.rs' 2>/dev/null | grep -v RESOLVED | wc -l || echo "0")
 echo "  ✅ Open AI-TAG[SMELL][CRITICAL]: $OPEN_TAGS (target: 0)"
 
-if grep -q "axum" crates/memfuse-mcp/Cargo.toml 2>/dev/null; then
-    echo "  ❌ CRITICAL: axum found in memfuse-mcp! Violates ADR-010"
+if grep -q "axum" crates/contextra-mcp/Cargo.toml 2>/dev/null; then
+    echo "  ❌ CRITICAL: axum found in contextra-mcp! Violates ADR-010"
     exit 1
 else
-    echo "  ✅ ADR-010: axum not in memfuse-mcp (stdio-only MCP)"
+    echo "  ✅ ADR-010: axum not in contextra-mcp (stdio-only MCP)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo "============================================================"
-echo "  ✅ MemFuse Jules Environment Ready"
+echo "  ✅ Contextra Jules Environment Ready"
 echo "============================================================"

@@ -6,7 +6,7 @@
   Im Rahmen der Vektorindex-Weiterentwicklung wurde der naive Vorschlag evaluiert, DiskANN generell als primären Vektorindex für alle Szenarien einzusetzen und HNSW vollständig abzulösen.
 
   Eine kritische System- und Architektur-Prüfung deckte jedoch zwei funktionale Invarianten-Blocker auf, die einer alleinigen Nutzung von DiskANN im aktuellen Zustand entgegenstehen:
-  1. **Fehlende native Lösch-Semantik (Tombstones):** DiskANN unterstützt im gegenwärtigen Stand keine nativen Soft-Deletes oder Tombstone-Maskierungen ohne aufwendigen, teuren Komplett-Rebuild des Vamana-Graphen. Dies beeinträchtigt die Snapshot Isolation und MVCC-Semantik für mutable Kollektionen (`memfuse-db::Collection`), in denen Dokumente häufig aktualisiert oder gelöscht werden.
+  1. **Fehlende native Lösch-Semantik (Tombstones):** DiskANN unterstützt im gegenwärtigen Stand keine nativen Soft-Deletes oder Tombstone-Maskierungen ohne aufwendigen, teuren Komplett-Rebuild des Vamana-Graphen. Dies beeinträchtigt die Snapshot Isolation und MVCC-Semantik für mutable Kollektionen (`contextra-db::Collection`), in denen Dokumente häufig aktualisiert oder gelöscht werden.
   2. **SQ8 Codebook-Drift:** Bei der 8-Bit Skalarquantisierung (SQ8) erfordert eine dynamische Schreiblast kontinuierliches Perzentil-Clipping und Codebook-Rekalibrierung, um Recall-Einbußen durch Distributional Drift zu verhindern.
 
   Zudem stellt die Verabschiedung dieser ADR laut Architektur-Roadmap die explizite formale Voraussetzung dar, BEVOR IP-06 (HNSW-Formatwechsel) beginnen darf.
@@ -15,7 +15,7 @@
 Es wird ein **gestuftes Vektorindex-Modell** verabschiedet:
 
 1. **HNSW (`HnswIndex`) als Default / Mutable Index:**
-   `HnswIndex` bleibt unverändert der primäre, mutable Default-Vektorindex für alle aktiven Kollektionen in `memfuse-db::Collection`. HNSW bietet hervorragende In-Memory-Suchlatenzen bei frequenten Schreib-/Löschaktivitäten und unterstützt das MVCC-Snapshot-Isolationsmodell uneingeschränkt.
+   `HnswIndex` bleibt unverändert der primäre, mutable Default-Vektorindex für alle aktiven Kollektionen in `contextra-db::Collection`. HNSW bietet hervorragende In-Memory-Suchlatenzen bei frequenten Schreib-/Löschaktivitäten und unterstützt das MVCC-Snapshot-Isolationsmodell uneingeschränkt.
 
 2. **DiskANN (`DiskAnnIndex`) als Read-Heavy / Out-of-Core Tier:**
    `DiskAnnIndex` wird als offizieller Tier für großvolumige (Out-of-Core), überwiegend lesende Kollektionen verabschiedet. DiskANN ermöglicht durch Beam Search auf mmap-gestützten Vamana-Graphen eine hohe Skalierbarkeit bei reduziertem Arbeitsspeicherbedarf.
@@ -34,7 +34,7 @@ Der Übergang zum gestuften Modell folgt einem strikten 4-Stufen-Plan:
 1. **Schritt 1 (ADR §16.2 Verabschiedung — Dieser Schritt):** Formalisierung und Genehmigung der gestuften Architektur-Dokumentation als verbindliche Grundlage (Prerequisite für IP-06).
 2. **Schritt 2 (Native Delete-Semantik — Prompt 1.6):** Erweiterung von DiskANN um native Soft-Delete-/Tombstone-Unterstützung für MVCC-Konformität.
 3. **Schritt 3 (SQ8-Perzentil-Clipping — Prompt 1.7):** Integration des dynamischen SQ8-Perzentil-Clippings zur Stabilisierung des Such-Recalls.
-4. **Schritt 4 (Feature-Flag Entfernung & Tier Integration):** Entfernung von `experimental-diskann` und Einbettung von DiskANN als konfigurierbares Writable/Read-Heavy Tier in `memfuse-db::Collection`.
+4. **Schritt 4 (Feature-Flag Entfernung & Tier Integration):** Entfernung von `experimental-diskann` und Einbettung von DiskANN als konfigurierbares Writable/Read-Heavy Tier in `contextra-db::Collection`.
 
 ## Abschnitt 8: Konsolidierte Entscheidungstabelle
 
@@ -48,7 +48,7 @@ Der Übergang zum gestuften Modell folgt einem strikten 4-Stufen-Plan:
 | **Gate-Zustand** | Einsatzbereit / Production Default | Behind `experimental-diskann` (Aktivierung nach Prompt 1.6 + 1.7) |
 
 ## Konsequenzen
-* `memfuse-db::Collection` verwendet standardmäßig `HnswIndex` für alle regulären Operationen.
+* `contextra-db::Collection` verwendet standardmäßig `HnswIndex` für alle regulären Operationen.
 * IP-06 (HNSW-Formatwechsel) ist nach Verabschiedung dieser ADR zur Durchführung freigegeben.
 * `experimental-diskann` bleibt bis zum Abschluss der Prompts 1.6 und 1.7 als isoliertes Feature-Flag erhalten.
 

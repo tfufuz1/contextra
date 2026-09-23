@@ -2,7 +2,7 @@
 
 **Date**: 2026-08-30
 **Status**: 🟢 Completed
-**Crate**: `memfuse-db`
+**Crate**: `contextra-db`
 
 ---
 
@@ -12,24 +12,24 @@
 Prior to this implementation, intermediate search results and RRF fusion results across several search paths were initialized with `provenance: None`, leaving invariant **INV-PROV-1** (`sum(signal_contributions[*].rrf_contribution) ≈ unboosted RRF score`) unverified outside the single primary fusion path.
 
 This task implemented:
-1. Complete audit and classification of all `provenance: None` occurrences in `crates/memfuse-db/src/fusion.rs` and `collection/search.rs`.
+1. Complete audit and classification of all `provenance: None` occurrences in `crates/contextra-db/src/fusion.rs` and `collection/search.rs`.
 2. Public helper function `build_provenance()` calculating per-signal RRF contributions (`weight / (rrf_k + rank)`) and satisfying **INV-PROV-1**.
-3. Plumbing of `include_provenance: bool` flag across `HybridQuery` in `memfuse-core`, `HybridQueryBuilder` in `memfuse-db`, and `weighted_reciprocal_rank_fusion_with_options` in `fusion.rs`.
+3. Plumbing of `include_provenance: bool` flag across `HybridQuery` in `contextra-core`, `HybridQueryBuilder` in `contextra-db`, and `weighted_reciprocal_rank_fusion_with_options` in `fusion.rs`.
 4. Comprehensive verification test `test_provenance_rrf_sum_invariant` proving invariant **INV-PROV-1**.
 
 ---
 
 ## 1. Audit & Categorization of `provenance: None` Occurrences
 
-Every `provenance: None` occurrence in `crates/memfuse-db/src/fusion.rs` and `collection/search.rs` was audited:
+Every `provenance: None` occurrence in `crates/contextra-db/src/fusion.rs` and `collection/search.rs` was audited:
 
 ### Category A: Single-Signal / Intermediate Search Results
-* **Locations**: `crates/memfuse-db/src/collection/search.rs` lines 346 (`hydrate_from_scored_at`) and 384 (`hydrate_from_tuples_at`).
+* **Locations**: `crates/contextra-db/src/collection/search.rs` lines 346 (`hydrate_from_scored_at`) and 384 (`hydrate_from_tuples_at`).
 * **Purpose**: Produces initial un-fused candidates from single engines (HNSW, BM25, Graph) prior to fusion.
 * **Resolution**: In the RRF fusion loop in `weighted_reciprocal_rank_fusion_with_options`, these raw scores and 1-based ranks are gathered and aggregated into `ProvenanceRecord` (populating `vector_distance`, `bm25_score`, `graph_score`, `signal_ranks`, `signal_contributions`, and `index_type`).
 
 ### Category B: Edge Cases, Empty Results, and Test Dummies
-* **Locations**: `crates/memfuse-db/src/fusion.rs` unit tests (lines 368, 376, 383, 402, 409, 416, 426, 433, 457, 471, 478, 515, 525, 546, 553, 562, 569, 595, 608, 646, 660, 674, 786, 807, 820, 836, 843, 856, 863, 875, 914).
+* **Locations**: `crates/contextra-db/src/fusion.rs` unit tests (lines 368, 376, 383, 402, 409, 416, 426, 433, 457, 471, 478, 515, 525, 546, 553, 562, 569, 595, 608, 646, 660, 674, 786, 807, 820, 836, 843, 856, 863, 875, 914).
 * **Purpose**: Input result sets constructed in unit tests or zero-result fallbacks.
 * **Resolution**: Validly `None` on input; transformed into populated `ProvenanceRecord` when fused if `include_provenance` is `true`.
 
@@ -41,7 +41,7 @@ Every `provenance: None` occurrence in `crates/memfuse-db/src/fusion.rs` and `co
 
 ## 2. `build_provenance()` API
 
-Implemented in `crates/memfuse-db/src/fusion.rs`:
+Implemented in `crates/contextra-db/src/fusion.rs`:
 
 ```rust
 /// Baut einen ProvenanceRecord aus den verfügbaren Signal-Scores und optionalen Signal-Gewichten.
@@ -76,7 +76,7 @@ This equality holds strictly ($|\Delta| < 10^{-6}$) across all standard and weig
 
 ## 3. INV-PROV-1 Verification Test Proof
 
-The test `test_provenance_rrf_sum_invariant` in `crates/memfuse-db/src/lib.rs` executes a multi-signal query over a 10-document corpus with `include_provenance = true` and asserts:
+The test `test_provenance_rrf_sum_invariant` in `crates/contextra-db/src/lib.rs` executes a multi-signal query over a 10-document corpus with `include_provenance = true` and asserts:
 
 ```rust
 #[tokio::test]
@@ -133,4 +133,4 @@ async fn test_provenance_rrf_sum_invariant() {
 running 1 test
 test tests::test_provenance_rrf_sum_invariant ... ok
 ```
-Full `memfuse-db` test suite (142 tests) passed with 0 errors and 0 clippy warnings.
+Full `contextra-db` test suite (142 tests) passed with 0 errors and 0 clippy warnings.

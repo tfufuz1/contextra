@@ -36,14 +36,14 @@ jobs:
 
       - name: "Gate 12: Duplicate-PR-Intent-Detection"
         env:
-          MEMFUSE_PR_BODY: ${{ github.event.pull_request.body || '' }}
+          CONTEXTRA_PR_BODY: ${{ github.event.pull_request.body || '' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cargo xtask check-duplicate-intent
 
       - name: "Gate 12b: Phantom-File-Verification"
         env:
-          MEMFUSE_PR_BODY: ${{ github.event.pull_request.body || '' }}
-          MEMFUSE_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+          CONTEXTRA_PR_BODY: ${{ github.event.pull_request.body || '' }}
+          CONTEXTRA_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
         run: |
           cargo xtask check-phantom-files
           echo "✅ Gate 12b: Keine Phantom-Dateien in Commit-Messages/PR-Body"
@@ -80,13 +80,13 @@ jobs:
             -W clippy::let_underscore_must_use
           echo "✅ Keine silent IO-Fehler"
 
-      - name: "Gate 4: axum nicht in memfuse-mcp"
+      - name: "Gate 4: axum nicht in contextra-mcp"
         run: |
-          if grep -q "axum" crates/memfuse-mcp/Cargo.toml 2>/dev/null; then
-            echo "❌ axum-Dependency in memfuse-mcp — ADR-010 verletzt (stdio only)"
+          if grep -q "axum" crates/contextra-mcp/Cargo.toml 2>/dev/null; then
+            echo "❌ axum-Dependency in contextra-mcp — ADR-010 verletzt (stdio only)"
             exit 1
           fi
-          echo "✅ memfuse-mcp korrekt: kein axum"
+          echo "✅ contextra-mcp korrekt: kein axum"
 
       - name: "Gate 4b/4c: Unsafe-Inseln (alle Nicht-Insel-Crates)"
         run: cargo xtask check-unsafe-islands
@@ -201,17 +201,17 @@ jobs:
             echo "Bitte Pflicht-Leseordnung beachten: JULES_CONTEXT.md → AGENTS.md → crates/{crate}/AGENTS.md → WORKING_STATE.md"
           fi
 
-      # TODO(opt-RC-1/A-2): Enforce MEMFUSE_CLAIM_CRATE extraction from PR body across all PR gates and verify required check status on main.
+      # TODO(opt-RC-1/A-2): Enforce CONTEXTRA_CLAIM_CRATE extraction from PR body across all PR gates and verify required check status on main.
       - name: "Gate 14: Jules Preflight Aggregator + Claim-Check"
         env:
-          MEMFUSE_CI: "true"
+          CONTEXTRA_CI: "true"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Claim-Crate aus PR-Body extrahieren (falls vorhanden)
           PR_BODY="${{ github.event.pull_request.body || '' }}"
           CLAIM_CRATE=$(echo "$PR_BODY" | grep -oP '(?<=Claim-Crate: )\S+' || true)
           if [ -n "$CLAIM_CRATE" ] && [ "$CLAIM_CRATE" != "<!--" ]; then
-            export MEMFUSE_CLAIM_CRATE="$CLAIM_CRATE"
+            export CONTEXTRA_CLAIM_CRATE="$CLAIM_CRATE"
             echo "ℹ️ Claim-Crate aus PR-Body: $CLAIM_CRATE"
           fi
           cargo xtask jules-preflight --fast
@@ -219,7 +219,7 @@ jobs:
 
       - name: "Gate 16: Commit Message Quality"
         env:
-          MEMFUSE_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
+          CONTEXTRA_CI_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || (github.event.before != '' && github.event.before != '0000000000000000000000000000000000000000' && github.event.before || 'HEAD~1') }}
         run: cargo xtask check-commit-messages
 
       - name: "Wöchentlicher Shell-Commit-Audit"

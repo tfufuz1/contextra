@@ -1,9 +1,9 @@
-# LSM Subsystem Audit Report — `crates/memfuse-store/src/lsm.rs`
+# LSM Subsystem Audit Report — `crates/contextra-store/src/lsm.rs`
 
 **Auditor:** Jules (Senior Rust Storage-Engine Engineer)
 **Timestamp:** 2026-09-13T01:42:00Z
 **Session:** b72f020d
-**Target:** `crates/memfuse-store/src/lsm.rs` (XL file, ~4895 LOC)
+**Target:** `crates/contextra-store/src/lsm.rs` (XL file, ~4895 LOC)
 **Mode:** AUDIT (Subsystem Audit — No functional code modifications)
 
 ---
@@ -12,7 +12,7 @@
 
 ### C-1: Startup-Flush VOR WAL-Löschung (Durability)
 - **Status:** **OK (VERIFIED)**
-- **Befund / Code-Stelle:** `lsm.rs` Zeilen 598–630. Bei `LsmStorage::open()` wird bei `replayed_size > 0 && !wal_files.is_empty()` zwingend ein `storage.flush().await` ausgeführt, bevor alte replayed WAL-Dateien via `tokio::fs::remove_file()` gelöscht werden. Falls `flush()` fehlschlägt, bricht `open()` mit `MemFuseError::Storage` ab und behält die WAL-Dateien auf Disk.
+- **Befund / Code-Stelle:** `lsm.rs` Zeilen 598–630. Bei `LsmStorage::open()` wird bei `replayed_size > 0 && !wal_files.is_empty()` zwingend ein `storage.flush().await` ausgeführt, bevor alte replayed WAL-Dateien via `tokio::fs::remove_file()` gelöscht werden. Falls `flush()` fehlschlägt, bricht `open()` mit `ContextraError::Storage` ab und behält die WAL-Dateien auf Disk.
 
 ### H-1: Per-Source-Limit statt globalem Limit in `scan_prefix_bounded` (Scan Memory Isolation)
 - **Status:** **OK (VERIFIED)**
