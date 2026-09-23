@@ -11,7 +11,7 @@
     3. `Wal::try_new` und `append_batch` erzeugen ausnahmslos WAL V3 Dateien.
     4. Version-aware `replay()` validiert V1, V2 und V3 Formate abwärtskompatibel. Beim Öffnen einer V1/V2-Datei wird nach erfolgreichem Replay automatisch eine transparente Migration/Rewrite zu V3 durchgeführt.
 *   **Alternativen**:
-    - Belassen von V2 und Vertrauen auf Dateisystem-Rechte: Verworfen, da dies das Zero-Trust/Cryptographic-Integrity-Gebot von MemFuse verletzt.
+    - Belassen von V2 und Vertrauen auf Dateisystem-Rechte: Verworfen, da dies das Zero-Trust/Cryptographic-Integrity-Gebot von Contextra verletzt.
 *   **Begründung**:
     Stellt sicher, dass WAL-Einträge nicht nur bzgl. `seq_no` und Key/Value fälschungssicher sind, sondern auch die Kausalordnung der Transaktions-IDs (`tx_id`) kryptographisch authentifiziert ist.
 *   **Konsequenzen**:

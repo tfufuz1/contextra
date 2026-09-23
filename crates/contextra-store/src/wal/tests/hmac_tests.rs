@@ -293,7 +293,7 @@ async fn test_open_with_key_manager_is_new_race_condition() {
 #[test]
 fn test_legacy_integrity_key_deobfuscation() {
     let key = legacy_integrity_key();
-    assert_eq!(&key, b"contextra-integrity-key-v1\0\0\0\0\0\0\0\0");
+    assert_eq!(&key, b"contextra-integrity-key-v1\0\0\0\0\0\0");
 }
 
 #[cfg(feature = "fault-injection")]

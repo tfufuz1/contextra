@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MemFuse Pre-Commit Hook — Schnell-Gate vor jedem Commit
+# Contextra Pre-Commit Hook — Schnell-Gate vor jedem Commit
 # Installation: just bootstrap (setzt core.hooksPath auf .githooks)
 set -euo pipefail
 

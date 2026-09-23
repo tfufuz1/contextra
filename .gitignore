@@ -13,7 +13,7 @@ CLAUDE.local.md
 *.dll
 *.pyd
 
-# --- memfuse cleanup: added by 05-harden-gitignore.sh ---
+# --- contextra cleanup: added by 05-harden-gitignore.sh ---
 # Lokale Umgebungs-/Cache-Verzeichnisse (nie versionieren)
 .cache/
 .local/
@@ -25,15 +25,15 @@ CLAUDE.local.md
 *.log
 clippy*.log
 *_output.txt
-memfuse_orphaned_checkpoints.json
+contextra_orphaned_checkpoints.json
 *_orphaned_checkpoints.json
-memfuse_orphaned_pins.json
+contextra_orphaned_pins.json
 *_orphaned_pins.json
 
 # TODO: .unwrap-baseline.json is tracked in repository to provide baseline for Gate 2
 
 # Benchmark-Datenbanken / Downloads
-benchmarks/memfuse-bench/tests/data/
+benchmarks/contextra-bench/tests/data/
 
 # Kompilierte Ad-hoc-Binaries ohne Cargo-Build-System
 /fix_unsafe

@@ -5,8 +5,8 @@
 * **Anforderung / Referenz:** K12 aus Gesamtspezifikation v7.0 (Sicherheitsinvariante INV-TENANT-1)
 
 ## Kontext & Problemstellung
-In `crates/memfuse-core/src/types/domain.rs` ist die Invariante **INV-TENANT-1** definiert:
-> `TenantId(0)` ist ausschließlich für `TenantId::SYSTEM` reserviert. `TenantId::try_new(0)` liefert `Err(MemFuseError::InvalidInput)`.
+In `crates/contextra-core/src/types/domain.rs` ist die Invariante **INV-TENANT-1** definiert:
+> `TenantId(0)` ist ausschließlich für `TenantId::SYSTEM` reserviert. `TenantId::try_new(0)` liefert `Err(ContextraError::InvalidInput)`.
 
 Bisher existierten jedoch die ungeschützte `const fn` `TenantId::new(id: u64)` sowie `impl From<u64> for TenantId`, die den Parameter `id` direkt in `Self(id)` verpackten ohne den Guard aus `try_new()` auszuführen. Dadurch konnten Aufrufer im Workspace `TenantId::new(0)` oder `TenantId::from(0u64)` nutzen und so die Sicherheitsinvariante INV-TENANT-1 unterlaufen (K12). Zudem bestanden `TenantId::DEFAULT` und `TenantId::INVALID` als Aliase für `Self(0)`, was zu semantischer Mehrdeutigkeit führte.
 

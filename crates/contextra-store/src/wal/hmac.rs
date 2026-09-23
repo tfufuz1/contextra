@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
 
 const LEGACY_KEY_OBFUSCATION_MASK: u8 = 0x5A;
-const LEGACY_INTEGRITY_KEY_OBFUSCATED: [u8; 32] = *b"7?7</)?w34.?=(3.#w1?#w,kZZZZZZZZ";
+const LEGACY_INTEGRITY_KEY_OBFUSCATED: [u8; 32] = *b"954.?\".(;w34.?=(3.#w1?#w,kZZZZZZ";
 
 /// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
 pub(crate) const fn legacy_integrity_key() -> [u8; 32] {

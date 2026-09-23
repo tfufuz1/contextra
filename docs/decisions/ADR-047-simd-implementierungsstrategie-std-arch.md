@@ -4,7 +4,7 @@
 *   **Datum**: 2026-09-03
 *   **Status**: ✅ Entschieden
 *   **Kontext**: AGT-INDEX-002 dokumentierte, dass `std::simd` (portable_simd, Issue #86656) per
-    September 2026 noch nicht auf stable Rust verfügbar ist. `memfuse-index/src/distance.rs` nutzt
+    September 2026 noch nicht auf stable Rust verfügbar ist. `contextra-index/src/distance.rs` nutzt
     bereits korrekt `std::arch::x86_64` Intrinsics mit Runtime-Feature-Detection via
     `is_x86_feature_detected!` (AVX-512, AVX2, SSE4) und `is_aarch64_feature_detected!` (NEON).
 *   **Entscheidung**: Status quo (`std::arch` + Runtime-Detection) ist der korrekte, stabile Pfad.

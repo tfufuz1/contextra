@@ -30,7 +30,7 @@ use std::sync::Arc;
 const DISKANN_MAGIC: &[u8; 4] = b"DANN";
 const DISKANN_VERSION: u16 = 1;
 const DISKANN_FOOTER_MAGIC: &[u8; 4] = b"DANF";
-const DISKANN_INTEGRITY_KEY: &[u8; 32] = b"contextra_diskann_integrity_key_32";
+const DISKANN_INTEGRITY_KEY: &[u8; 32] = b"contextra_diskann_integri_key_32";
 
 const PENDING_WAL_MAGIC: &[u8; 4] = b"PWAL";
 const PENDING_WAL_VERSION: u8 = 1;
