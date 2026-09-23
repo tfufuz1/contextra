@@ -259,6 +259,14 @@
       "session_id": "8044639698693422459",
       "active": true,
       "expires_at": "2026-09-23T17:31:19.805522508+00:00"
+    },
+    {
+      "krate": "jules-prompter-tiers",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-23T14:55:02.364448772+00:00",
+      "session_id": "14017673989022889217",
+      "active": true,
+      "expires_at": "2026-09-23T18:55:02.364438693+00:00"
     }
   ]
 }
