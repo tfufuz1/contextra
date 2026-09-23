@@ -267,6 +267,15 @@
       "session_id": "3960929584497528942",
       "active": true,
       "expires_at": "2026-09-23T18:40:55.720062796+00:00"
+    },
+    {
+      "krate": "docs-source-of-truth",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-23T15:36:36.698578451+00:00",
+      "session_id": "7227834121449943309",
+      "active": false,
+      "expires_at": "2026-09-23T19:36:36.698550251+00:00",
+      "released_at": "2026-09-23T15:44:03.202219220+00:00 [RELEASED]"
     }
   ]
 }
