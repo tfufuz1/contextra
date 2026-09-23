@@ -13,7 +13,13 @@ fn test_ring_layering_subcommand_default_exit_zero() {
     };
 
     let output = Command::new("cargo")
-        .args(["run", "--manifest-path", manifest_path, "--", "check-ring-layering"])
+        .args([
+            "run",
+            "--manifest-path",
+            manifest_path,
+            "--",
+            "check-ring-layering",
+        ])
         .output()
         .expect("Failed to execute check-ring-layering");
 

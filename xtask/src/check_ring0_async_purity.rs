@@ -154,7 +154,10 @@ pub fn run_check_ring0_async_purity() -> Result<bool, String> {
     }
 
     let allowlisted: Vec<_> = all_violations.iter().filter(|v| v.is_allowlisted).collect();
-    let unallowlisted: Vec<_> = all_violations.iter().filter(|v| !v.is_allowlisted).collect();
+    let unallowlisted: Vec<_> = all_violations
+        .iter()
+        .filter(|v| !v.is_allowlisted)
+        .collect();
 
     if !allowlisted.is_empty() {
         println!(

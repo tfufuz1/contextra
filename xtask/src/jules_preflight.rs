@@ -345,7 +345,6 @@ pub fn run_jules_preflight(fast_only: bool) -> bool {
         });
     }
 
-
     // Gate 3: Silent IO-Fehler
     {
         let start = Instant::now();

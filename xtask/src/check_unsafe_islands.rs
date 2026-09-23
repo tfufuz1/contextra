@@ -57,7 +57,11 @@ fn strip_comments_and_strings(source: &str) -> String {
 
     while i < len {
         let c = chars[i];
-        let next = if i + 1 < len { Some(chars[i + 1]) } else { None };
+        let next = if i + 1 < len {
+            Some(chars[i + 1])
+        } else {
+            None
+        };
 
         if in_line_comment {
             if c == '\n' {
@@ -193,10 +197,7 @@ pub fn extract_crate_name_from_path(rel_path: &str) -> Option<String> {
 }
 
 /// Scannt eine `.rs`-Datei nach Keyword `unsafe` und Attributen.
-pub fn scan_file_for_unsafe(
-    file_path: &Path,
-    repo_root: &Path,
-) -> Vec<UnsafeOccurrence> {
+pub fn scan_file_for_unsafe(file_path: &Path, repo_root: &Path) -> Vec<UnsafeOccurrence> {
     let mut occurrences = Vec::new();
 
     let rel_path = file_path
@@ -222,7 +223,8 @@ pub fn scan_file_for_unsafe(
 
     let stripped = strip_comments_and_strings(&content);
     let unsafe_kw_re = regex::Regex::new(r"\bunsafe\b").unwrap();
-    let allow_unsafe_re = regex::Regex::new(r"#!\s*\[\s*allow\s*\(\s*unsafe_code\s*\)\s*\]").unwrap();
+    let allow_unsafe_re =
+        regex::Regex::new(r"#!\s*\[\s*allow\s*\(\s*unsafe_code\s*\)\s*\]").unwrap();
 
     for (line_idx, line) in stripped.lines().enumerate() {
         let line_num = line_idx + 1;
@@ -250,7 +252,8 @@ pub fn scan_file_for_unsafe(
     if file_path.file_name().and_then(|s| s.to_str()) == Some("lib.rs")
         && !ALLOWED_ISLANDS.contains(&crate_name.as_str())
     {
-        let forbid_re = regex::Regex::new(r"#!\s*\[\s*forbid\s*\(\s*unsafe_code\s*\)\s*\]").unwrap();
+        let forbid_re =
+            regex::Regex::new(r"#!\s*\[\s*forbid\s*\(\s*unsafe_code\s*\)\s*\]").unwrap();
         if !forbid_re.is_match(&stripped) {
             occurrences.push(UnsafeOccurrence {
                 file_path: rel_path,
@@ -297,7 +300,8 @@ pub fn run_check_unsafe_islands_at(
         let occurrences = scan_file_for_unsafe(&file, root);
         for occ in occurrences {
             let is_allowed_island = ALLOWED_ISLANDS.contains(&occ.crate_name.as_str());
-            let is_transition_island = PHASE_0R_TRANSITION_ISLANDS.contains(&occ.crate_name.as_str());
+            let is_transition_island =
+                PHASE_0R_TRANSITION_ISLANDS.contains(&occ.crate_name.as_str());
 
             match occ.kind {
                 UnsafeKind::Keyword => {
@@ -348,7 +352,10 @@ pub fn run_check_unsafe_islands_at(
 }
 
 pub fn run_check_unsafe_islands(strict: bool) -> Result<bool, String> {
-    println!("=== Running xtask check-unsafe-islands (strict={}) ===", strict);
+    println!(
+        "=== Running xtask check-unsafe-islands (strict={}) ===",
+        strict
+    );
     let root = crate::find_root_dir();
     let res = run_check_unsafe_islands_at(&root, strict)?;
 

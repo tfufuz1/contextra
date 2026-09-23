@@ -62,8 +62,14 @@ pub fn consolidate_decisions(root: &Path) -> Result<(), String> {
         let trimmed = content.trim();
         if let Some(first_line) = trimmed.lines().next() {
             let first_line_clean = first_line.trim_start_matches('#').trim();
-            let title_key = first_line_clean.split(':').next().unwrap_or(first_line_clean).trim();
-            if !current_decisions.contains(title_key) && !current_decisions.contains(first_line_clean) {
+            let title_key = first_line_clean
+                .split(':')
+                .next()
+                .unwrap_or(first_line_clean)
+                .trim();
+            if !current_decisions.contains(title_key)
+                && !current_decisions.contains(first_line_clean)
+            {
                 if !current_decisions.ends_with("\n\n") {
                     if !current_decisions.ends_with('\n') {
                         current_decisions.push('\n');

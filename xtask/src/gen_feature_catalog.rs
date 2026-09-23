@@ -19,11 +19,21 @@ pub fn run_gen_feature_catalog() -> Result<(), String> {
             continue;
         }
 
-        let content = fs::read_to_string(&crate_cargo_path)
-            .map_err(|e| format!("Fehler beim Lesen von {}: {}", crate_cargo_path.display(), e))?;
+        let content = fs::read_to_string(&crate_cargo_path).map_err(|e| {
+            format!(
+                "Fehler beim Lesen von {}: {}",
+                crate_cargo_path.display(),
+                e
+            )
+        })?;
 
-        let toml_val: toml::Value = toml::from_str(&content)
-            .map_err(|e| format!("Fehler beim Parsen von {}: {}", crate_cargo_path.display(), e))?;
+        let toml_val: toml::Value = toml::from_str(&content).map_err(|e| {
+            format!(
+                "Fehler beim Parsen von {}: {}",
+                crate_cargo_path.display(),
+                e
+            )
+        })?;
 
         let mut features_map = BTreeMap::new();
 
@@ -82,6 +92,9 @@ pub fn run_gen_feature_catalog() -> Result<(), String> {
     fs::write(&out_path, markdown)
         .map_err(|e| format!("Fehler beim Schreiben von {}: {}", out_path.display(), e))?;
 
-    println!("✅ Feature-Katalog erfolgreich generiert: {}", out_path.display());
+    println!(
+        "✅ Feature-Katalog erfolgreich generiert: {}",
+        out_path.display()
+    );
     Ok(())
 }
