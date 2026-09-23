@@ -1,6 +1,6 @@
 # Contextra — Betriebsanleitung für Autonome AI-Agenten (AGENTS.md)
 
-## Stand 2026-09-20 · HEAD `6eb0c782145c65989718e86c058d6e859028933d`
+## Stand 2026-09-20 · HEAD `346edb1c4d66cc7043be2b4859c4a74a59d6cb24`
 
 ---
 
@@ -17,7 +17,7 @@ Im Standardbetrieb läuft das Contextra Cognitive OS im **Single-Agent-Modus** (
 ---
 
 ## 3. Pflicht-Workflow
-Jeder Agent befolgt strikt den iterativen 5-Phasen-Workflow. Die detaillierten Phasen-Templates sind in [`docs/refactor/`](docs/refactor/) dokumentiert und einzusehen:
+Jeder Agent befolgt strikt den iterativen 5-Phasen-Workflow:
 1. **Phase 1: Exploration & Session:** Session-Zustand in `.jules/SESSION.md` prüfen/führen (Claim-Schritt entfällt im Single-Agent-Modus `CONTEXTRA_SINGLE_AGENT_MODE=1`), Workspace-Status via `git status`, `read_file` und `bash` erforschen.
 2. **Phase 2: Plan & Review:** Gliederung/Plan verfassen, `set_plan` setzen, Review via `request_plan_review` einholen.
 3. **Phase 3: Act:** Code/Dokumentation präzise und ununterbrochen bearbeiten, dabei ausschließlich den erlaubten Scope anfassen.
@@ -59,7 +59,7 @@ Detaillierte Spezifikationen siehe [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md
 | `contextra-wire` | Ring 0 | ✅ vorhanden | FlatBuffers-Generat (`contextra.fbs`) + IPC-Adapter (Unsafe-Insel) |
 | `contextra-sys` | Ring 0 | ✅ vorhanden | Unsafe-Insel: `ReadOnlyMap` (mmap), Win32-ACL |
 | `contextra-simd` | Ring 0 | ✅ vorhanden | Unsafe-Insel: SIMD-Distanzkernel, Laufzeit-Dispatch |
-| `contextra-crypto` | Ring 0 | ✅ vorhanden | Package `contextra-security`: Encryption-at-Rest, Zeroize |
+| `contextra-crypto` | Ring 0 | ✅ vorhanden | Package `contextra-crypto`: Encryption-at-Rest, Zeroize |
 | `contextra-text` | Ring 0 | ✅ vorhanden | BM25 Volltextsuche, deutsche Morphologie & Komposita |
 | `contextra-graph` | Ring 0 | ✅ vorhanden | CSR-Graph, PPR, Leiden, Hyperkanten |
 | `contextra-adapt` | Ring 0 | ✅ vorhanden | LinUCB-Bandit, Lyapunov, PID Controller |

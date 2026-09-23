@@ -12,7 +12,7 @@ bootstrap:
     echo "✅ git core.hooksPath configured to .githooks"
 
 # Runs the TDD Validation Loop (Red -> Green -> Refactor)
-test: check
+test *ARGS:
     #!/usr/bin/env bash
     set -euo pipefail
     if command -v nix &> /dev/null && nix develop -c true &> /dev/null; then
@@ -20,7 +20,7 @@ test: check
     else
         RUNNER=""
     fi
-    $RUNNER cargo nextest run --workspace 2>/dev/null || $RUNNER cargo test --workspace
+    $RUNNER cargo nextest run {{ARGS}} 2>/dev/null || $RUNNER cargo test {{ARGS}}
 
 # Runs formatting, clippy and checks compilation
 check:
