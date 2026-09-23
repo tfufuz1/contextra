@@ -69,6 +69,9 @@ jobs:
           print(f'Recorded entry in {history_path}: {json.dumps(entry)}')
           "
 
+      - name: Ensure gate-status branch exists
+        run: git checkout -B gate-status
+
       - name: Commit and Push Updated Recall History
         run: |
           git config user.name "github-actions[bot]"
@@ -78,7 +81,7 @@ jobs:
             echo "No changes to nucleation_recall_history.jsonl"
           else
             git commit -m "chore(bench): record daily nucleation recall metric ($(date -u +%Y-%m-%d))"
-            git push origin HEAD:${{ github.ref_name || 'main' }}
+            git push origin HEAD:gate-status
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
