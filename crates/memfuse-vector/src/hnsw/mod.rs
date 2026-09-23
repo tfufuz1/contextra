@@ -559,6 +559,24 @@ impl HnswIndex {
             }
         }
 
+        if ep.is_empty() {
+            let nodes = self.inner.hot.nodes.read();
+            let deleted = self.inner.cold.deleted_nodes.read();
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            let mmap_node_count = mmap_guard
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            let total = mmap_node_count + nodes.len();
+            for i in 0..total {
+                if !deleted.contains(i as u64) {
+                    ep.push(i);
+                    self.inner.hot.set_entry_point(Some(i));
+                    break;
+                }
+            }
+        }
+
         let nodes = self.inner.hot.nodes.read();
         let deleted = self.inner.cold.deleted_nodes.read();
 
@@ -1410,9 +1428,7 @@ impl HnswIndexCore {
         if let Some(node) = ctx.nodes.get(ram_idx) {
             return self.compute_distance_with_data(query, query_q, &node.vector, q_ref);
         }
-        Err(MemFuseError::Index(format!(
-            "Node vector not found for index {idx}"
-        )))
+        Ok(f32::MAX)
     }
 
     fn resolve_connections<'a>(
@@ -1777,11 +1793,11 @@ impl HnswIndexCore {
             sorted_fallback.sort_by(|a, b| a.distance.total_cmp(&b.distance));
 
             for cand in sorted_fallback {
-                if fallback.len() >= m || (fallback.len() >= min_neighbors && !fallback.is_empty())
+                if (fallback.len() >= m
+                    || (fallback.len() >= min_neighbors && !fallback.is_empty()))
+                    && fallback.len() >= min_neighbors
                 {
-                    if fallback.len() >= min_neighbors {
-                        break;
-                    }
+                    break;
                 }
                 if !fallback.iter().any(|c| c.index == cand.index) {
                     fallback.push(cand);
@@ -2099,12 +2115,12 @@ impl HnswIndexCore {
         })
     }
 
-    pub fn apply_insert(&self, prepared: PreparedInsert) {
+    pub fn apply_insert(&self, prepared: PreparedInsert, tx_id: u64) {
         let node = HnswNode {
             doc_id: prepared.doc_id,
             vector: prepared.vector_data,
             max_layer: prepared.new_layer,
-            committed_tx: 0,
+            committed_tx: tx_id,
         };
 
         let m = self.cold.config.m;
@@ -2131,21 +2147,25 @@ impl HnswIndexCore {
             .write()
             .insert(prepared.doc_id.inner(), prepared.new_idx);
 
-        if prepared.should_update_entry_point {
+        let current_ep = self.hot.get_entry_point();
+        if prepared.should_update_entry_point || current_ep.is_none() {
             self.hot.set_entry_point(Some(prepared.new_idx));
-            self.hot
-                .max_layer
-                .store(prepared.new_layer as u64, Ordering::SeqCst);
+            let current_max = self.hot.max_layer.load(Ordering::Acquire) as usize;
+            if prepared.new_layer > current_max || current_ep.is_none() {
+                self.hot
+                    .max_layer
+                    .store(prepared.new_layer as u64, Ordering::Release);
+            }
         }
 
-        if prepared.should_update_ram_entry_point {
+        if prepared.should_update_ram_entry_point || self.hot.get_ram_entry_point().is_none() {
             self.hot.set_ram_entry_point(Some(prepared.new_idx));
         }
     }
 
-    fn do_insert(&self, id: DocId, vector: &[f32]) -> Result<()> {
+    fn do_insert(&self, id: DocId, vector: &[f32], tx_id: u64) -> Result<()> {
         let prepared = self.compute_insert(id, vector)?;
-        self.apply_insert(prepared);
+        self.apply_insert(prepared, tx_id);
         Ok(())
     }
 
@@ -2420,7 +2440,10 @@ impl HnswIndexCore {
             for (i, node) in nodes.iter().enumerate() {
                 let global_idx = mmap_count + i;
                 if node.committed_tx <= snapshot_tx {
-                    let is_deleted = deleted_nodes.contains(global_idx as u64);
+                    let is_deleted = deleted_nodes.contains(global_idx as u64)
+                        && seq_log
+                            .deletion_seq(node.doc_id)
+                            .map_or(true, |del_seq| del_seq <= snapshot_tx);
                     if !is_deleted {
                         all.push((node.doc_id, node.vector.clone(), node.committed_tx, false));
                     } else if let Some(min_ret_seq) = min_retention_seq {
@@ -2489,7 +2512,7 @@ impl HnswIndexCore {
         for (doc_id, vector, committed_tx, is_deleted) in all_nodes {
             match vector {
                 VectorData::F32(v) => {
-                    new_index.inner.do_insert(doc_id, &v)?;
+                    new_index.inner.do_insert(doc_id, &v, committed_tx)?;
                 }
                 VectorData::U8(v) => {
                     let dequantized = {
@@ -2498,24 +2521,9 @@ impl HnswIndexCore {
                         })?;
                         q.dequantize(&v)?
                     };
-                    new_index.inner.do_insert(doc_id, &dequantized)?;
-                }
-            }
-            let mmap_count = new_index
-                .inner
-                .cold
-                .mmap_index
-                .read()
-                .as_ref()
-                .map(|m| m.header.node_count() as usize)
-                .unwrap_or(0);
-            if let Some(&global_idx) = new_index.inner.hot.doc_to_node.read().get(&doc_id.inner()) {
-                if global_idx >= mmap_count {
-                    let ram_idx = global_idx - mmap_count;
-                    let mut nodes = new_index.inner.hot.nodes.write();
-                    if let Some(node) = nodes.get_mut(ram_idx) {
-                        node.committed_tx = committed_tx;
-                    }
+                    new_index
+                        .inner
+                        .do_insert(doc_id, &dequantized, committed_tx)?;
                 }
             }
             if is_deleted {
@@ -2575,27 +2583,7 @@ impl HnswIndexCore {
                             }
                         };
 
-                        new_index.inner.do_insert(doc_id, &f32_vec)?;
-
-                        let mmap_count = new_index
-                            .inner
-                            .cold
-                            .mmap_index
-                            .read()
-                            .as_ref()
-                            .map(|m| m.header.node_count() as usize)
-                            .unwrap_or(0);
-                        if let Some(&global_idx) =
-                            new_index.inner.hot.doc_to_node.read().get(&doc_id.inner())
-                        {
-                            if global_idx >= mmap_count {
-                                let ram_idx = global_idx - mmap_count;
-                                let mut nodes = new_index.inner.hot.nodes.write();
-                                if let Some(node) = nodes.get_mut(ram_idx) {
-                                    node.committed_tx = seq;
-                                }
-                            }
-                        }
+                        new_index.inner.do_insert(doc_id, &f32_vec, seq)?;
                     }
                 }
                 memfuse_core::SeqLogChange::Delete { doc_id, .. } => {
@@ -2608,6 +2596,11 @@ impl HnswIndexCore {
             let mut nodes = self.hot.nodes.write();
             let mut doc_to_node = self.hot.doc_to_node.write();
             let mut deleted_nodes = self.cold.deleted_nodes.write();
+            let mut offsets = self.hot.arena.offsets.write();
+            let mut capacities = self.hot.arena.capacities.write();
+            let mut count_offsets = self.hot.arena.count_offsets.write();
+            let mut counts = self.hot.arena.counts.write();
+            let mut arena = self.hot.arena.arena.write();
 
             let new_nodes = std::mem::take(&mut *new_index.inner.hot.nodes.write());
             let new_doc_to_node = std::mem::take(&mut *new_index.inner.hot.doc_to_node.write());
@@ -2630,11 +2623,11 @@ impl HnswIndexCore {
             *doc_to_node = new_doc_to_node;
             self.hot.set_entry_point(new_entry_point);
             self.hot.set_ram_entry_point(new_ram_entry_point);
-            *self.hot.arena.offsets.write() = new_offsets;
-            *self.hot.arena.capacities.write() = new_capacities;
-            *self.hot.arena.count_offsets.write() = new_count_offsets;
-            *self.hot.arena.counts.write() = new_counts;
-            *self.hot.arena.arena.write() = new_arena;
+            *offsets = new_offsets;
+            *capacities = new_capacities;
+            *count_offsets = new_count_offsets;
+            *counts = new_counts;
+            *arena = new_arena;
 
             self.hot.max_layer.store(
                 new_index.inner.hot.max_layer.load(Ordering::SeqCst),
@@ -2741,6 +2734,24 @@ impl VectorIndex for HnswIndex {
         if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
             if !ep.contains(&ram_ep) {
                 ep.push(ram_ep);
+            }
+        }
+
+        if ep.is_empty() {
+            let nodes = self.inner.hot.nodes.read();
+            let deleted = self.inner.cold.deleted_nodes.read();
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            let mmap_node_count = mmap_guard
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            let total = mmap_node_count + nodes.len();
+            for i in 0..total {
+                if !deleted.contains(i as u64) {
+                    ep.push(i);
+                    self.inner.hot.set_entry_point(Some(i));
+                    break;
+                }
             }
         }
 
@@ -2965,17 +2976,17 @@ impl VectorIndex for HnswIndex {
             }
         }
 
-        let mut inserted_doc_ids = Vec::with_capacity(prepared_inserts.len());
-        for prepared in prepared_inserts {
-            inserted_doc_ids.push(prepared.doc_id);
-            self.inner.apply_insert(prepared);
-        }
-
         for doc_id in deletes_to_apply {
             self.inner.do_delete(doc_id)?;
         }
 
         let seq = tx.inner();
+        let mut inserted_doc_ids = Vec::with_capacity(prepared_inserts.len());
+        for prepared in prepared_inserts {
+            inserted_doc_ids.push(prepared.doc_id);
+            self.inner.apply_insert(prepared, seq);
+        }
+
         let mut seq_log = self.inner.cold.seq_log.write();
         for op in &ops {
             match op {
@@ -2989,30 +3000,6 @@ impl VectorIndex for HnswIndex {
             }
         }
         drop(seq_log);
-
-        if !inserted_doc_ids.is_empty() {
-            let mmap_count = self
-                .inner
-                .cold
-                .mmap_index
-                .read()
-                .as_ref()
-                .map(|m| m.header.node_count() as usize)
-                .unwrap_or(0);
-            let doc_map = self.inner.hot.doc_to_node.read();
-            let mut nodes = self.inner.hot.nodes.write();
-
-            for doc_id in inserted_doc_ids {
-                if let Some(&global_idx) = doc_map.get(&doc_id.inner()) {
-                    if global_idx >= mmap_count {
-                        let ram_idx = global_idx - mmap_count;
-                        if let Some(node) = nodes.get_mut(ram_idx) {
-                            node.committed_tx = tx.inner();
-                        }
-                    }
-                }
-            }
-        }
 
         if self.inner.is_rebuild_required() {
             tracing::warn!(
@@ -3029,7 +3016,7 @@ impl VectorIndex for HnswIndex {
         self.inner
             .hot
             .last_tx_id
-            .store(tx.inner(), Ordering::SeqCst);
+            .fetch_max(tx.inner(), Ordering::SeqCst);
         Ok(())
     }
 

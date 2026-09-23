@@ -210,7 +210,7 @@ pub(crate) fn forward_push_ppr(
     if ctx.out_weight_sums.len() < n {
         ctx.out_weight_sums.resize(n, 0.0);
     }
-    if deleted_nodes.is_empty() && inner.out_weight_sums.len() >= n {
+    if deleted_nodes.is_empty() && inner.hyperedges.is_empty() && inner.out_weight_sums.len() >= n {
         ctx.out_weight_sums[..n].copy_from_slice(&inner.out_weight_sums[..n]);
     } else {
         for i in 0..n {
@@ -251,6 +251,35 @@ pub(crate) fn forward_push_ppr(
                         && edge.weight > 0.0
                     {
                         sum += edge.weight;
+                    }
+                }
+            }
+
+            if let Some(&u_eid) = inner.reverse_map.get(i) {
+                if let Some(hedge_ids) = inner.hyperedge_index.get(&u_eid) {
+                    for hid in hedge_ids {
+                        if let Some(hedge) = inner.hyperedges.get(hid) {
+                            if hedge.tx_valid_to.is_none() && hedge.participants.len() >= 2 {
+                                let w_star = crate::hyperedge::star_weight(
+                                    hedge.weight,
+                                    hedge.participants.len(),
+                                );
+                                if w_star > 0.0 {
+                                    for p in hedge.participants.iter() {
+                                        if p.entity != u_eid {
+                                            if let Some(&target_idx) = inner.id_map.get(&p.entity) {
+                                                if target_idx < n
+                                                    && !deleted_nodes.contains(target_idx)
+                                                    && inner.entity_at(target_idx).is_some()
+                                                {
+                                                    sum += w_star;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -383,6 +412,37 @@ pub(crate) fn forward_push_ppr(
                     }
                 }
             }
+
+            if let Some(&u_eid) = inner.reverse_map.get(u) {
+                if let Some(hedge_ids) = inner.hyperedge_index.get(&u_eid) {
+                    for hid in hedge_ids {
+                        if let Some(hedge) = inner.hyperedges.get(hid) {
+                            if hedge.tx_valid_to.is_none() && hedge.participants.len() >= 2 {
+                                let w_star = crate::hyperedge::star_weight(
+                                    hedge.weight,
+                                    hedge.participants.len(),
+                                );
+                                if w_star > 0.0 {
+                                    for p in hedge.participants.iter() {
+                                        if p.entity != u_eid {
+                                            if let Some(&target_idx) = inner.id_map.get(&p.entity) {
+                                                if target_idx < n
+                                                    && !deleted_nodes.contains(target_idx)
+                                                    && inner.entity_at(target_idx).is_some()
+                                                {
+                                                    let share = push_mass * (w_star / w_u);
+                                                    let entry = r.entry(target_idx).or_insert(0.0);
+                                                    *entry += share;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         } else {
             // Dead-end / dangling node: redistribute push_mass to seeds
             let seed_share = push_mass / seed_count;
@@ -472,7 +532,7 @@ pub(crate) fn compute_ppr_dense(
     }
 
     // 3. Populate outgoing weight sum per node directly from GraphInner precomputed out_weight_sums.
-    if deleted_nodes.is_empty() && inner.out_weight_sums.len() >= n {
+    if deleted_nodes.is_empty() && inner.hyperedges.is_empty() && inner.out_weight_sums.len() >= n {
         ctx.out_weight_sums[..n].copy_from_slice(&inner.out_weight_sums[..n]);
     } else {
         for i in 0..n {
@@ -513,6 +573,35 @@ pub(crate) fn compute_ppr_dense(
                         && edge.weight > 0.0
                     {
                         sum += edge.weight;
+                    }
+                }
+            }
+
+            if let Some(&u_eid) = inner.reverse_map.get(i) {
+                if let Some(hedge_ids) = inner.hyperedge_index.get(&u_eid) {
+                    for hid in hedge_ids {
+                        if let Some(hedge) = inner.hyperedges.get(hid) {
+                            if hedge.tx_valid_to.is_none() && hedge.participants.len() >= 2 {
+                                let w_star = crate::hyperedge::star_weight(
+                                    hedge.weight,
+                                    hedge.participants.len(),
+                                );
+                                if w_star > 0.0 {
+                                    for p in hedge.participants.iter() {
+                                        if p.entity != u_eid {
+                                            if let Some(&target_idx) = inner.id_map.get(&p.entity) {
+                                                if target_idx < n
+                                                    && !deleted_nodes.contains(target_idx)
+                                                    && inner.entity_at(target_idx).is_some()
+                                                {
+                                                    sum += w_star;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -600,6 +689,50 @@ pub(crate) fn compute_ppr_dense(
                         && weight > 0.0
                     {
                         ctx.next_ranks[target] += share * weight;
+                    }
+                }
+
+                if let Some(pending) = inner.pending_edges.get(&i) {
+                    for edge in pending {
+                        let target = edge.target;
+                        if !deleted_nodes.contains(target)
+                            && inner.entity_at(target).is_some()
+                            && edge.weight > 0.0
+                        {
+                            ctx.next_ranks[target] += share * edge.weight;
+                        }
+                    }
+                }
+
+                if let Some(&u_eid) = inner.reverse_map.get(i) {
+                    if let Some(hedge_ids) = inner.hyperedge_index.get(&u_eid) {
+                        for hid in hedge_ids {
+                            if let Some(hedge) = inner.hyperedges.get(hid) {
+                                if hedge.tx_valid_to.is_none() && hedge.participants.len() >= 2 {
+                                    let w_star = crate::hyperedge::star_weight(
+                                        hedge.weight,
+                                        hedge.participants.len(),
+                                    );
+                                    if w_star > 0.0 {
+                                        for p in hedge.participants.iter() {
+                                            if p.entity != u_eid {
+                                                if let Some(&target_idx) =
+                                                    inner.id_map.get(&p.entity)
+                                                {
+                                                    if target_idx < n
+                                                        && !deleted_nodes.contains(target_idx)
+                                                        && inner.entity_at(target_idx).is_some()
+                                                    {
+                                                        ctx.next_ranks[target_idx] +=
+                                                            share * w_star;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

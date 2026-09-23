@@ -1,18 +1,4 @@
-use arc_swap::ArcSwap;
-use parking_lot::{Mutex, RwLock};
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-
-use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
-use crate::GraphIndexExt;
-use memfuse_core::{
-    BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
-    StorageEngine, TxId,
-};
-
-use super::types::Edge;
+use memfuse_core::TxId;
 
 /// Untere Schranke für Wall-Clock-abgeleitete TxId-Heuristik.
 ///

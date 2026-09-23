@@ -120,6 +120,7 @@ pub fn known_dimension(model: &str) -> Option<usize> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

@@ -2,9 +2,7 @@
 // ZWECK: Layer-4 EgressGuard (Re-export from memfuse-privacy)
 
 use memfuse::Collection;
-use memfuse_crypto::egress_vault::{
-    BlockReason, BoxFuture, EgressClassification, EgressClassifier,
-};
+use memfuse_crypto::egress_vault::{BlockReason, EgressClassification};
 use std::sync::Arc;
 use std::time::Duration;
 

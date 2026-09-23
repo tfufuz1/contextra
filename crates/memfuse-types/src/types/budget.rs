@@ -434,6 +434,7 @@ impl ResourceTracker {
 
 // INTENT: Resource Tracker (Memory Budget & Backpressure) verified by 5 tests.
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

@@ -109,14 +109,15 @@ impl GraphGarbageCollection for CsrGraph {
             let mut orphaned = Vec::new();
             for (id, hedge) in inner.hyperedges.iter() {
                 if hedge.tx_valid_to.is_none() {
-                    let mut all_tombstoned_or_missing = true;
+                    let mut active_participant_count = 0usize;
                     for p in hedge.participants.iter() {
-                        if inner.id_map.contains_key(&p.entity) {
-                            all_tombstoned_or_missing = false;
-                            break;
+                        if let Some(&idx) = inner.id_map.get(&p.entity) {
+                            if inner.entity_at(idx).is_some() {
+                                active_participant_count += 1;
+                            }
                         }
                     }
-                    if all_tombstoned_or_missing {
+                    if active_participant_count < 2 {
                         orphaned.push(*id);
                     }
                 }
@@ -213,7 +214,7 @@ mod tests {
     use crate::csr::EdgeType;
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
     use crate::path_rag::PathRAGEngine;
-    use memfuse_core::{Edge, GraphIndex};
+    use memfuse_core::{Edge, Entity, GraphIndex};
 
     #[tokio::test]
     async fn test_cascade_invalidation_tombstones_edges_of_superseded_doc() {
@@ -665,5 +666,68 @@ mod tests {
         // Doc B's hyperedge remains unaffected
         assert!(graph.get_hyperedge(id_b1).is_some());
         assert_eq!(graph.hyperedges_for_doc(doc_b), vec![id_b1]);
+    }
+
+    #[tokio::test]
+    async fn test_sweep_orphans_sweeps_degenerated_hyperedges() {
+        let graph = CsrGraph::new();
+        let tx = TxId::new(1);
+
+        let e1 = EntityId::new(10);
+        let e2 = EntityId::new(20);
+        let e3 = EntityId::new(30);
+
+        graph
+            .add_entity(tx, Entity::new(e1, "E1", "Node"))
+            .await
+            .unwrap();
+        graph
+            .add_entity(tx, Entity::new(e2, "E2", "Node"))
+            .await
+            .unwrap();
+        graph.commit(tx).await.unwrap();
+
+        const ROLE: RoleId = RoleId::new(1);
+
+        // Hyperedge 1: e1, e2 (both active -> valid)
+        let h1 = HyperEdge::new(
+            HyperEdgeId::new(1),
+            EdgeType::Default,
+            vec![RoleBinding::new(ROLE, e1), RoleBinding::new(ROLE, e2)],
+            1.0,
+        );
+
+        // Hyperedge 2: e1, e3 (e3 non-existent -> active count = 1 < 2 -> orphan)
+        let h2 = HyperEdge::new(
+            HyperEdgeId::new(2),
+            EdgeType::Default,
+            vec![RoleBinding::new(ROLE, e1), RoleBinding::new(ROLE, e3)],
+            1.0,
+        );
+
+        // Hyperedge 3: e3, e4 (both non-existent -> active count = 0 < 2 -> orphan)
+        let h3 = HyperEdge::new(
+            HyperEdgeId::new(3),
+            EdgeType::Default,
+            vec![
+                RoleBinding::new(ROLE, e3),
+                RoleBinding::new(ROLE, EntityId::new(40)),
+            ],
+            1.0,
+        );
+
+        graph.insert_hyperedge_direct(h1);
+        graph.insert_hyperedge_direct(h2);
+        graph.insert_hyperedge_direct(h3);
+
+        let swept = graph.sweep_orphans(TxId::new(10)).unwrap();
+        assert_eq!(
+            swept, 2,
+            "Must sweep exactly 2 orphaned hyperedges (h2 and h3)"
+        );
+
+        assert!(graph.get_hyperedge(HyperEdgeId::new(1)).is_some());
+        assert!(graph.get_hyperedge(HyperEdgeId::new(2)).is_none());
+        assert!(graph.get_hyperedge(HyperEdgeId::new(3)).is_none());
     }
 }
