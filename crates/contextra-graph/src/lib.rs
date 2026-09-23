@@ -47,6 +47,7 @@ pub mod percolation;
 pub mod ppr;
 pub mod provenance;
 pub mod session_dag;
+pub mod tl_hfd;
 
 pub use arc_slice::ArcSlice;
 pub use cascade::{
@@ -87,6 +88,9 @@ pub use ppr::{DeletedView, PprContext};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
 pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,
+};
+pub use tl_hfd::{
+    shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, ShadowComparison, TlHfdError, TlHfdParams,
 };
 
 /// Extension trait for [`contextra_core::GraphIndex`] providing entity removal functionality.
