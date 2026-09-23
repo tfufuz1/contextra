@@ -3,12 +3,6 @@
 # Current violations are allowlisted until refactored under dedicated ADRs.
 
 [[exceptions]]
-crate = "memfuse-vector"
-dependency = "tokio"
-reason = "Legacy async background index rebuild mechanism in HNSW insertion path"
-adr_reference = "ADR-TODO"
-
-[[exceptions]]
 crate = "memfuse-graph"
 dependency = "tokio"
 reason = "Async compaction and path graph traversal routines in CSR implementation"

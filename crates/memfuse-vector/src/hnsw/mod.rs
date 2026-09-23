@@ -29,7 +29,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 /// Sentinel-Wert für ungültigen / nicht gesetzten Entry-Point in HNSW.
 pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
-use tokio::sync::Mutex;
+use parking_lot::Mutex;
 
 /// Standard-Löschanteil (0.10 = 10 % gelöschte Knoten), ab dem ein Rebuild getriggert wird.
 pub const HNSW_REBUILD_DELETION_RATIO: f64 = 0.10;
@@ -57,6 +57,8 @@ pub struct HnswConfig {
     pub quantizer_recalibration_sample_size: usize,
     /// Quantizer drift ratio threshold above which an index rebuild is recommended.
     pub quantizer_drift_threshold: f32,
+    /// Optional compute pool for background index rebuilds.
+    pub compute_pool: Option<crate::compute_pool::ComputePool>,
     /// Partial rebuild configuration for hot-path local rebuilds (F-02).
     #[cfg(feature = "partial-index-rebuild")]
     pub partial_rebuild_config: crate::partial_rebuild::PartialRebuildConfig,
@@ -75,6 +77,7 @@ impl Default for HnswConfig {
             quantize: false,
             quantizer_recalibration_sample_size: 10_000,
             quantizer_drift_threshold: 0.10,
+            compute_pool: None,
             #[cfg(feature = "partial-index-rebuild")]
             partial_rebuild_config: crate::partial_rebuild::PartialRebuildConfig::default(),
         }
@@ -357,6 +360,7 @@ pub struct HnswColdCore {
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
     pub deleted_nodes: RwLock<RoaringTreemap>,
+    pub compute_pool: crate::compute_pool::ComputePool,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
     #[cfg(test)]
@@ -375,6 +379,7 @@ impl HnswIndex {
     /// Creates a new HNSW index, validating configuration upfront.
     pub fn try_new(config: HnswConfig) -> Result<Self> {
         config.validate()?;
+        let compute_pool = config.compute_pool.clone().unwrap_or_default();
         let ml = 1.0 / (config.m as f64).ln();
         #[cfg(feature = "partial-index-rebuild")]
         let partial_rebuild_config = config.partial_rebuild_config.clone();
@@ -405,6 +410,7 @@ impl HnswIndex {
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    compute_pool,
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
@@ -424,6 +430,7 @@ impl HnswIndex {
     )]
     pub fn new(config: HnswConfig) -> Self {
         let validation_error = config.validate().err().map(|e| e.to_string());
+        let compute_pool = config.compute_pool.clone().unwrap_or_default();
         let ml = 1.0 / (config.m as f64).ln();
         #[cfg(feature = "partial-index-rebuild")]
         let partial_rebuild_config = config.partial_rebuild_config.clone();
@@ -454,6 +461,7 @@ impl HnswIndex {
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    compute_pool,
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
                         partial_rebuild_config,
@@ -790,7 +798,7 @@ impl HnswIndex {
     }
 
     #[cfg(feature = "partial-index-rebuild")]
-    pub fn check_and_trigger_partial_rebuild(&self) -> Option<tokio::task::JoinHandle<Result<()>>> {
+    pub fn check_and_trigger_partial_rebuild(&self) {
         let global_tombstone_ratio = self.deleted_ratio() as f32;
         let tracker = self.inner.cold.traversal_tracker.read();
 
@@ -814,15 +822,12 @@ impl HnswIndex {
 
         if let Some(region_node_ids) = regions {
             let inner = std::sync::Arc::clone(&self.inner);
-            Some(tokio::spawn(async move {
-                let res = inner.rebuild_region(region_node_ids).await;
+            self.inner.cold.compute_pool.execute(move || {
+                let res = inner.rebuild_region_sync(region_node_ids);
                 if let Err(ref e) = res {
                     tracing::error!("Failed local partial rebuild: {}", e);
                 }
-                res
-            }))
-        } else {
-            None
+            });
         }
     }
 
@@ -847,18 +852,15 @@ impl HnswIndex {
             .collect()
     }
 
-    pub fn trigger_rebuild_async(&self) -> Option<tokio::task::JoinHandle<Result<()>>> {
+    pub fn trigger_rebuild_async(&self) {
         if self.is_rebuild_required() {
             let inner = std::sync::Arc::clone(&self.inner);
-            Some(tokio::spawn(async move {
-                let res = inner.rebuild().await;
+            self.inner.cold.compute_pool.execute(move || {
+                let res = inner.rebuild_sync();
                 if let Err(ref e) = res {
                     tracing::error!("Failed to rebuild HNSW index: {}", e);
                 }
-                res
-            }))
-        } else {
-            None
+            });
         }
     }
 
@@ -875,212 +877,205 @@ impl HnswIndex {
     }
 
     pub async fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
-        let _lock = self.inner.hot.write_mutex.lock().await;
-        let inner = std::sync::Arc::clone(&self.inner);
+        let _lock = self.inner.hot.write_mutex.lock();
+        let inner = &self.inner;
         let path_buf = path.as_ref().to_path_buf();
 
-        tokio::task::spawn_blocking(move || {
-            use std::io::{Seek, Write};
+        use std::io::{Seek, Write};
 
-            let nodes = inner.hot.nodes.read();
-            let entry_point = inner.hot.get_entry_point();
-            let q_guard = inner.cold.quantizer.read();
+        let nodes = inner.hot.nodes.read();
+        let entry_point = inner.hot.get_entry_point();
+        let q_guard = inner.cold.quantizer.read();
 
-            let temp_path = path_buf.with_extension("hnsw.tmp");
-            let file = std::fs::File::create(&temp_path).map_err(|e| {
-                MemFuseError::Storage(format!("Failed to create temporary HNSW file: {}", e))
-            })?;
-            let mut writer = std::io::BufWriter::new(file);
+        let temp_path = path_buf.with_extension("hnsw.tmp");
+        let file = std::fs::File::create(&temp_path).map_err(|e| {
+            MemFuseError::Storage(format!("Failed to create temporary HNSW file: {}", e))
+        })?;
+        let mut writer = std::io::BufWriter::new(file);
 
-            let node_count = nodes.len();
-            let nodes_offset = crate::persistence::HnswHeader::SIZE as u64;
-            let vectors_offset =
-                nodes_offset + (node_count * crate::persistence::NodeRecord::SIZE) as u64;
+        let node_count = nodes.len();
+        let nodes_offset = crate::persistence::HnswHeader::SIZE as u64;
+        let vectors_offset =
+            nodes_offset + (node_count * crate::persistence::NodeRecord::SIZE) as u64;
 
-            let (q_min, q_max) = if let Some(q) = q_guard.as_ref() {
-                (
-                    q.mins.first().copied().unwrap_or(0.0),
-                    q.maxes.first().copied().unwrap_or(0.0),
-                )
-            } else {
-                (0.0, 0.0)
-            };
+        let (q_min, q_max) = if let Some(q) = q_guard.as_ref() {
+            (
+                q.mins.first().copied().unwrap_or(0.0),
+                q.maxes.first().copied().unwrap_or(0.0),
+            )
+        } else {
+            (0.0, 0.0)
+        };
 
-            let bias = *inner.cold.sq8_bias.read();
+        let bias = *inner.cold.sq8_bias.read();
 
-            let mut header = crate::persistence::HnswHeader::new_v2_with_bias(
-                inner.cold.config.dimension as u32,
-                inner.cold.config.m as u32,
-                inner.cold.config.distance_metric as u8,
-                if inner.cold.config.quantize { 1 } else { 0 },
-                q_min,
-                q_max,
-                node_count as u64,
-                entry_point.map(|i| i as i64).unwrap_or(-1),
-                nodes_offset,
-                0,
-                inner.hot.last_tx_id.load(Ordering::SeqCst),
-                0,
-                0,
-                bias.mean_bias,
-                bias.variance_bias,
-            );
+        let mut header = crate::persistence::HnswHeader::new_v2_with_bias(
+            inner.cold.config.dimension as u32,
+            inner.cold.config.m as u32,
+            inner.cold.config.distance_metric as u8,
+            if inner.cold.config.quantize { 1 } else { 0 },
+            q_min,
+            q_max,
+            node_count as u64,
+            entry_point.map(|i| i as i64).unwrap_or(-1),
+            nodes_offset,
+            0,
+            inner.hot.last_tx_id.load(Ordering::SeqCst),
+            0,
+            0,
+            bias.mean_bias,
+            bias.variance_bias,
+        );
 
+        writer
+            .write_all(&header.to_bytes())
+            .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+
+        let mut node_records = Vec::with_capacity(node_count);
+        for _ in 0..node_count {
+            node_records.push(crate::persistence::NodeRecord {
+                doc_id: 0,
+                max_layer: 0,
+                vector_offset: 0,
+                connections_offset: 0,
+            });
+        }
+        for record in &node_records {
             writer
-                .write_all(&header.to_bytes())
+                .write_all(&record.to_bytes())
                 .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+        }
 
-            let mut node_records = Vec::with_capacity(node_count);
-            for _ in 0..node_count {
-                node_records.push(crate::persistence::NodeRecord {
-                    doc_id: 0,
-                    max_layer: 0,
-                    vector_offset: 0,
-                    connections_offset: 0,
-                });
-            }
-            for record in &node_records {
-                writer
-                    .write_all(&record.to_bytes())
-                    .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-            }
+        let mut current_pos = vectors_offset;
+        for (i, node) in nodes.iter().enumerate() {
+            node_records[i].doc_id = node.doc_id.inner();
+            node_records[i].max_layer = node.max_layer as u8;
+            node_records[i].vector_offset = current_pos;
 
-            let mut current_pos = vectors_offset;
-            for (i, node) in nodes.iter().enumerate() {
-                node_records[i].doc_id = node.doc_id.inner();
-                node_records[i].max_layer = node.max_layer as u8;
-                node_records[i].vector_offset = current_pos;
-
-                match &node.vector {
-                    VectorData::F32(v) => {
-                        for &val in v {
-                            writer
-                                .write_all(&val.to_le_bytes())
-                                .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-                        }
-                        current_pos += (v.len() * 4) as u64;
-                    }
-                    VectorData::U8(v) => {
+            match &node.vector {
+                VectorData::F32(v) => {
+                    for &val in v {
                         writer
-                            .write_all(v)
-                            .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-                        current_pos += v.len() as u64;
-                    }
-                }
-            }
-
-            let connections_offset = (current_pos + 3) & !3;
-            header.set_connections_offset(connections_offset);
-
-            if connections_offset > current_pos {
-                let padding = [0u8; 4];
-                writer
-                    .write_all(&padding[..(connections_offset - current_pos) as usize])
-                    .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-            }
-
-            let mut conn_pos = connections_offset;
-            for (i, node) in nodes.iter().enumerate() {
-                node_records[i].connections_offset = conn_pos;
-                let num_layers = (node.max_layer + 1) as u8;
-                writer
-                    .write_all(&[num_layers])
-                    .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-                conn_pos += 1;
-
-                for layer in 0..num_layers as usize {
-                    let layer_conns =
-                        inner
-                            .hot
-                            .get_ram_node_connections(i, layer, inner.cold.config.m);
-                    let len = layer_conns.len() as u32;
-                    writer
-                        .write_all(&len.to_le_bytes())
-                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-                    for &conn in layer_conns.iter() {
-                        writer
-                            .write_all(&conn.to_le_bytes())
+                            .write_all(&val.to_le_bytes())
                             .map_err(|e| MemFuseError::Storage(e.to_string()))?;
                     }
-                    conn_pos += 4 + (len as u64) * 4;
+                    current_pos += (v.len() * 4) as u64;
+                }
+                VectorData::U8(v) => {
+                    writer
+                        .write_all(v)
+                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+                    current_pos += v.len() as u64;
                 }
             }
+        }
 
-            let cal_offset = conn_pos;
-            let mut cal_len = 0u32;
+        let connections_offset = (current_pos + 3) & !3;
+        header.set_connections_offset(connections_offset);
 
-            if let Some(ref q) = *q_guard {
-                let dim = q.mins().len();
-                cal_len = (dim * 4 * 2) as u32;
-                for &m in q.mins() {
-                    writer
-                        .write_all(&m.to_le_bytes())
-                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-                }
-                for &m in q.maxes() {
-                    writer
-                        .write_all(&m.to_le_bytes())
-                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-                }
-            }
-
-            header = crate::persistence::HnswHeader::new_v2_with_bias(
-                inner.cold.config.dimension as u32,
-                inner.cold.config.m as u32,
-                inner.cold.config.distance_metric as u8,
-                if inner.cold.config.quantize { 1 } else { 0 },
-                q_min,
-                q_max,
-                node_count as u64,
-                entry_point.map(|i| i as i64).unwrap_or(-1),
-                nodes_offset,
-                connections_offset,
-                inner.hot.last_tx_id.load(Ordering::SeqCst),
-                cal_offset,
-                cal_len,
-                bias.mean_bias,
-                bias.variance_bias,
-            );
-
+        if connections_offset > current_pos {
+            let padding = [0u8; 4];
             writer
-                .flush()
+                .write_all(&padding[..(connections_offset - current_pos) as usize])
                 .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-            let mut file = writer.into_inner().map_err(|_| {
-                MemFuseError::Storage("Failed to retrieve file from BufWriter".into())
-            })?;
+        }
 
-            file.seek(std::io::SeekFrom::Start(0))
+        let mut conn_pos = connections_offset;
+        for (i, node) in nodes.iter().enumerate() {
+            node_records[i].connections_offset = conn_pos;
+            let num_layers = (node.max_layer + 1) as u8;
+            writer
+                .write_all(&[num_layers])
                 .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-            file.write_all(&header.to_bytes())
-                .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-            file.seek(std::io::SeekFrom::Start(nodes_offset))
-                .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-            for record in &node_records {
-                file.write_all(&record.to_bytes())
+            conn_pos += 1;
+
+            for layer in 0..num_layers as usize {
+                let layer_conns = inner
+                    .hot
+                    .get_ram_node_connections(i, layer, inner.cold.config.m);
+                let len = layer_conns.len() as u32;
+                writer
+                    .write_all(&len.to_le_bytes())
+                    .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+                for &conn in layer_conns.iter() {
+                    writer
+                        .write_all(&conn.to_le_bytes())
+                        .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+                }
+                conn_pos += 4 + (len as u64) * 4;
+            }
+        }
+
+        let cal_offset = conn_pos;
+        let mut cal_len = 0u32;
+
+        if let Some(ref q) = *q_guard {
+            let dim = q.mins().len();
+            cal_len = (dim * 4 * 2) as u32;
+            for &m in q.mins() {
+                writer
+                    .write_all(&m.to_le_bytes())
                     .map_err(|e| MemFuseError::Storage(e.to_string()))?;
             }
-            file.sync_all()
-                .map_err(|e| MemFuseError::Storage(e.to_string()))?;
-
-            std::fs::rename(&temp_path, &path_buf).map_err(|e| {
-                MemFuseError::Storage(format!("Failed to rename temporary HNSW file: {}", e))
-            })?;
-
-            if let Some(parent) = path_buf.parent() {
-                if let Ok(parent_dir) = std::fs::File::open(parent) {
-                    parent_dir.sync_all().map_err(|e| {
-                        MemFuseError::Storage(format!(
-                            "Failed to fsync parent directory after rename: {}",
-                            e
-                        ))
-                    })?;
-                }
+            for &m in q.maxes() {
+                writer
+                    .write_all(&m.to_le_bytes())
+                    .map_err(|e| MemFuseError::Storage(e.to_string()))?;
             }
+        }
 
-            Ok::<(), MemFuseError>(())
-        })
-        .await
-        .map_err(|e| MemFuseError::Storage(format!("Join error: {}", e)))??;
+        header = crate::persistence::HnswHeader::new_v2_with_bias(
+            inner.cold.config.dimension as u32,
+            inner.cold.config.m as u32,
+            inner.cold.config.distance_metric as u8,
+            if inner.cold.config.quantize { 1 } else { 0 },
+            q_min,
+            q_max,
+            node_count as u64,
+            entry_point.map(|i| i as i64).unwrap_or(-1),
+            nodes_offset,
+            connections_offset,
+            inner.hot.last_tx_id.load(Ordering::SeqCst),
+            cal_offset,
+            cal_len,
+            bias.mean_bias,
+            bias.variance_bias,
+        );
+
+        writer
+            .flush()
+            .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+        let mut file = writer
+            .into_inner()
+            .map_err(|_| MemFuseError::Storage("Failed to retrieve file from BufWriter".into()))?;
+
+        file.seek(std::io::SeekFrom::Start(0))
+            .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+        file.write_all(&header.to_bytes())
+            .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+        file.seek(std::io::SeekFrom::Start(nodes_offset))
+            .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+        for record in &node_records {
+            file.write_all(&record.to_bytes())
+                .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+        }
+        file.sync_all()
+            .map_err(|e| MemFuseError::Storage(e.to_string()))?;
+
+        std::fs::rename(&temp_path, &path_buf).map_err(|e| {
+            MemFuseError::Storage(format!("Failed to rename temporary HNSW file: {}", e))
+        })?;
+
+        if let Some(parent) = path_buf.parent() {
+            if let Ok(parent_dir) = std::fs::File::open(parent) {
+                parent_dir.sync_all().map_err(|e| {
+                    MemFuseError::Storage(format!(
+                        "Failed to fsync parent directory after rename: {}",
+                        e
+                    ))
+                })?;
+            }
+        }
 
         Ok(())
     }
@@ -1297,12 +1292,12 @@ impl HnswIndexCore {
     }
 
     pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
-        let deadline = tokio::time::Instant::now() + timeout;
+        let deadline = std::time::Instant::now() + timeout;
         while self.hot.rebuilding.load(Ordering::Acquire) {
-            if tokio::time::Instant::now() >= deadline {
+            if std::time::Instant::now() >= deadline {
                 return false;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
         true
     }
@@ -2303,6 +2298,10 @@ impl HnswIndexCore {
     }
 
     pub async fn rebuild(&self) -> Result<()> {
+        self.rebuild_sync()
+    }
+
+    pub fn rebuild_sync(&self) -> Result<()> {
         if self.hot.rebuilding.swap(true, Ordering::SeqCst) {
             tracing::debug!("HNSW rebuild already in progress, skipping");
             return Ok(());
@@ -2316,8 +2315,7 @@ impl HnswIndexCore {
 
         tracing::info!("HNSW index rebuild Phase 1 completed, starting Phase 2 merge & swap");
 
-        self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)
-            .await?;
+        self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)?;
 
         self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
         tracing::info!("HNSW rebuild completed in {:?}", start_time.elapsed());
@@ -2325,11 +2323,15 @@ impl HnswIndexCore {
     }
 
     pub async fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {
+        self.rebuild_region_sync(region_node_ids)
+    }
+
+    pub fn rebuild_region_sync(&self, region_node_ids: Vec<u64>) -> Result<()> {
         if region_node_ids.is_empty() {
             return Ok(());
         }
 
-        let _write_lock = self.hot.write_mutex.lock().await;
+        let _write_lock = self.hot.write_mutex.lock();
 
         let region_set: AHashSet<u64> = region_node_ids.into_iter().collect();
 
@@ -2534,12 +2536,8 @@ impl HnswIndexCore {
         Ok((new_index, snapshot_tx))
     }
 
-    async fn rebuild_phase2_merge_and_swap(
-        &self,
-        new_index: HnswIndex,
-        snapshot_tx: u64,
-    ) -> Result<()> {
-        let _write_lock = self.hot.write_mutex.lock().await;
+    fn rebuild_phase2_merge_and_swap(&self, new_index: HnswIndex, snapshot_tx: u64) -> Result<()> {
+        let _write_lock = self.hot.write_mutex.lock();
 
         let delta_changes = self.cold.seq_log.read().changes_since(snapshot_tx);
 
@@ -2901,7 +2899,7 @@ impl VectorIndex for HnswIndex {
                 err
             )));
         }
-        let _lock = self.inner.hot.write_mutex.lock().await;
+        let _lock = self.inner.hot.write_mutex.lock();
         let ops = self.inner.cold.tx_buffer.drain(tx);
 
         if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
@@ -3049,7 +3047,7 @@ impl VectorIndex for HnswIndex {
 
         let target = tx_id.inner();
 
-        let _guard = self.inner.hot.write_mutex.lock().await;
+        let _guard = self.inner.hot.write_mutex.lock();
 
         let indices_to_remove: Vec<usize> = {
             let nodes = self.inner.hot.nodes.read();
@@ -3166,7 +3164,7 @@ impl VectorIndex for HnswIndex {
     }
 
     fn trigger_rebuild_async(&self) {
-        drop(HnswIndex::trigger_rebuild_async(self));
+        HnswIndex::trigger_rebuild_async(self);
     }
 
     async fn stats(&self) -> Result<VectorIndexStats> {

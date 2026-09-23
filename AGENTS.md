@@ -9,17 +9,16 @@ Diese `AGENTS.md` ist die maßgebliche, operative Betriebsanleitung für autonom
 
 ---
 
-## 2. Crate-Claiming & Parallelitäts-Schutz
-Um Kollisionen bei paralleler Bearbeitung durch mehrere Agenten-Instanzen zu verhindern, MUSS zu Beginn jeder Aufgabe ein Crate-Claim registriert werden:
-* **Claim-Befehl:** `cargo xtask claim --crate <crate-name>`
-  * Beispielsyntax: `cargo xtask claim --crate docs-agents` oder `cargo xtask claim --crate memfuse-core`
-* **Gate `check-duplicate-intent`:** Stellt sicher, dass keine zwei aktiven Sessions am selben Crate oder mit überschneidendem Intent arbeiten. Ein fehlgeschlagener Claim blockiert die Bearbeitung.
+## 2. Crate-Claiming & Session-Zustand (Single-Agent-Modus)
+Im Standardbetrieb läuft das MemFuse Cognitive OS im **Single-Agent-Modus** (`MEMFUSE_SINGLE_AGENT_MODE=1`, Default).
+* **Crate-Claiming:** Der bisher verpflichtende Claim-Schritt via `cargo xtask claim --crate <crate-name>` entfällt im Single-Agent-Modus. Der Session-Zustand wird stattdessen in `.jules/SESSION.md` gehalten.
+* **Multi-Agent-Reversibilität & `check-duplicate-intent`:** Der Claim-Mechanismus und das `check-duplicate-intent`-Gate bleiben inaktiv bzw. optional erhalten und können jederzeit reaktiviert werden, falls künftig wieder mehrere Agenten parallel an unterschiedlichen Crates arbeiten.
 
 ---
 
 ## 3. Pflicht-Workflow
 Jeder Agent befolgt strikt den iterativen 5-Phasen-Workflow. Die detaillierten Phasen-Templates sind in [`docs/refactor/`](docs/refactor/) dokumentiert und einzusehen:
-1. **Phase 1: Exploration & Claim:** Claim registrieren (`cargo xtask claim --crate <name>`), Workspace-Status via `git status`, `read_file` und `bash` erforschen.
+1. **Phase 1: Exploration & Session:** Session-Zustand in `.jules/SESSION.md` prüfen/führen (Claim-Schritt entfällt im Single-Agent-Modus `MEMFUSE_SINGLE_AGENT_MODE=1`), Workspace-Status via `git status`, `read_file` und `bash` erforschen.
 2. **Phase 2: Plan & Review:** Gliederung/Plan verfassen, `set_plan` setzen, Review via `request_plan_review` einholen.
 3. **Phase 3: Act:** Code/Dokumentation präzise und ununterbrochen bearbeiten, dabei ausschließlich den erlaubten Scope anfassen.
 4. **Phase 4: Verify:** Qualitätssicherung durchführen (siehe Verify-Pflichtbefehle unten).

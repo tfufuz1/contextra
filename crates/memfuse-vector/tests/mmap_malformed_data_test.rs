@@ -159,20 +159,20 @@ fn test_mmap_connection_len_overflow_returns_err() {
         0.0, 1.0, // q_min, q_max
         1,   // node_count
         0,   // entry_point
-        64,  // nodes_offset
+        84,  // nodes_offset
         128, // connections_offset
         1,   // last_tx_id
     );
 
     let mut data = Vec::new();
-    data.extend_from_slice(&header.to_bytes()); // 0..64
+    data.extend_from_slice(&header.to_bytes()); // 0..84
     let record = NodeRecord {
         doc_id: 1,
         max_layer: 1,
-        vector_offset: 200,
+        vector_offset: 84 + NodeRecord::SIZE as u64,
         connections_offset: 128,
     };
-    data.extend_from_slice(&record.to_bytes()); // 64..89
+    data.extend_from_slice(&record.to_bytes()); // 84..109
     data.resize(128, 0); // Padding bis connections_offset (128)
 
     // num_layers = 1
@@ -185,6 +185,9 @@ fn test_mmap_connection_len_overflow_returns_err() {
     std::fs::write(&path, &data).expect("write overflow test file");
 
     let mmap_res = MmapIndex::open(&path);
+    if let Err(ref e) = mmap_res {
+        eprintln!("MmapIndex::open failed with: {:?}", e);
+    }
     assert!(mmap_res.is_ok(), "Header is valid so open should succeed");
     let mmap_index = mmap_res.unwrap();
 
