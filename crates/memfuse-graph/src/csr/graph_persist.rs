@@ -1,3 +1,10 @@
+//! Persistenz-Hilfsmethoden für CsrGraph.
+//!
+//! # Ring-0 Reinheit (R-03)
+//! `memfuse-graph` besitzt keine eigene Storage-Anbindung oder Dateisystem-I/O.
+//! Alle Persistenzinteraktionen erfolgen entkoppelt über den `StorageEngine`-Trait
+//! (bzw. `StorageRead`/`StorageWrite`-Trait-Abstraktionen aus `memfuse-ports`/`memfuse-core`).
+
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
