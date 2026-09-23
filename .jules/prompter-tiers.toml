@@ -21,7 +21,7 @@ risk = "sec"
 tier = "1"
 risk = "crash"
 
-[crate_overrides.memfuse-index]
+[crate_overrides.memfuse-vector]
 tier = "1"
 risk = "simd"
 
@@ -41,11 +41,11 @@ risk = "none"
 tier = "1"
 risk = "fusion"
 
-[crate_overrides.memfuse-embed]
+[crate_overrides.memfuse-infer-onnx]
 tier = "3"
 risk = "gate"
 
-[crate_overrides.memfuse-ollama]
+[crate_overrides.memfuse-infer-ollama]
 tier = "3"
 risk = "inj"
 
@@ -65,11 +65,7 @@ risk = "nan"
 tier = "1"
 risk = "proto"
 
-[crate_overrides.memfuse-tauri]
-tier = "2"
-risk = "parse"
-
-[crate_overrides.memfuse-candle]
+[crate_overrides.memfuse-infer-candle]
 tier = "3"
 risk = "candle"
 
@@ -79,18 +75,17 @@ risk = "candle"
 "memfuse-security" = "memfuse-security"
 "memfuse-store" = "memfuse-persistence"
 "memfuse-checkpoint" = "memfuse-persistence"
-"memfuse-index" = "memfuse-retrieval"
+"memfuse-vector" = "memfuse-retrieval"
 "memfuse-graph" = "memfuse-retrieval"
 "memfuse-text" = "memfuse-retrieval"
 "memfuse-db" = "memfuse-orchestrator"
 "memfuse-router" = "memfuse-inference"
-"memfuse-ollama" = "memfuse-inference"
-"memfuse-candle" = "memfuse-inference"
-"memfuse-embed" = "memfuse-inference"
+"memfuse-infer-ollama" = "memfuse-inference"
+"memfuse-infer-candle" = "memfuse-inference"
+"memfuse-infer-onnx" = "memfuse-inference"
 "memfuse-agent" = "memfuse-agentic"
 "memfuse-mcp" = "memfuse-mcp"
 "memfuse-py" = "memfuse-bindings"
-"memfuse-tauri" = "memfuse-bindings"
 
 # Komponenten-Fokus-Notizen (redaktionell, per Datei)
 [component_focus."memfuse-core"."lib.rs"]
@@ -179,31 +174,31 @@ risk = "DAG"
 desc = "pub(crate)-Checkpoint-Interna der Storage-Engine"
 focus = "Diese Datei ist bewusst pub(crate) — memfuse-checkpoint (eigenes Crate, Layer 1) darf sie NICHT importieren. Jede Sichtbarkeitsänderung hier ist ein Architektur-Vorfall."
 
-[component_focus."memfuse-index"."lib.rs"]
+[component_focus."memfuse-vector"."lib.rs"]
 desc = "Modul-Exports des HNSW-Index"
 focus = "Prüfe Feature-Gate-Konsistenz für experimental-diskann."
 
-[component_focus."memfuse-index"."hnsw.rs"]
+[component_focus."memfuse-vector"."hnsw.rs"]
 risk = "APM-2/3"
 desc = "HNSW-Graph-Kern — Suche, Insert, Tombstone-Handling, SQ8-Bound-Expansion"
 focus = "search_filtered(): Tombstone-Prüfung MUSS unconditional VOR jedem Custom-Filter erfolgen (zwei separate if-Blöcke, kein if/else-if — APM-2). SQ8-Bound-Expansion in do_insert() MUSS über write() laufen, nicht try_write() (APM-3) — sonst lastabhängige, stille Präzisionsverluste."
 
-[component_focus."memfuse-index"."distance.rs"]
+[component_focus."memfuse-vector"."distance.rs"]
 risk = "SIMD/unsafe"
 desc = "SIMD-Distanzfunktionen (AVX2/NEON), einziger regulär erlaubter unsafe-Ort neben diskann.rs/persistence.rs"
 focus = "JEDER unsafe-Block muss direkt von is_x86_feature_detected!(\"avx2\") (bzw. äquivalent für NEON) umschlossen sein. SIMD-Pfad und Scalar-Fallback müssen identische Semantik haben (beide sqrt oder beide squared) — sonst schleichende Ranking-Divergenz."
 
-[component_focus."memfuse-index"."quantize.rs"]
+[component_focus."memfuse-vector"."quantize.rs"]
 risk = "Precision"
 desc = "ScalarQuantizer (SQ8) — per-Dimension Min/Max-Skalierung von Vektoren"
 focus = "Prüfe Rundungsverhalten an den Quantisierungsgrenzen — Bound-Expansion in hnsw.rs hängt direkt von der hier definierten Skalierung ab. [KORR v22: Datei hieß zuvor quantization.rs — tatsächlicher Dateiname ist quantize.rs.]"
 
-[component_focus."memfuse-index"."diskann.rs"]
+[component_focus."memfuse-vector"."diskann.rs"]
 risk = "unsafe/Mmap"
 desc = "Experimentelles DiskANN, Out-of-Core, hinter Feature-Flag experimental-diskann"
 focus = "unsafe hier ist erlaubt (Mmap, ADR-017), aber ausschließlich innerhalb dieses Feature-Gates. Noch nicht produktionsreif — jede Änderung explizit als experimentell kennzeichnen."
 
-[component_focus."memfuse-index"."persistence.rs"]
+[component_focus."memfuse-vector"."persistence.rs"]
 risk = "unsafe/TOCTOU"
 desc = "Mmap-basierte Persistenz des Index"
 focus = "TOCTOU-Risiko: Datei kann zwischen Öffnen und aktivem Mmap verkürzt/gelöscht werden → SIGBUS. Prüfe Dateigrößen-Validierung vor jedem Mmap-Zugriff."
@@ -298,30 +293,30 @@ focus = "Prüfe die Abbruchbedingung bei Konvergenz vs. hartem Runden-Limit — 
 desc = "ContextCompactor + ConsolidationSession — StatusToken-Ersetzung veralteter Tool-Outputs"
 focus = "Prüfe, dass komprimierte Historie für nachgelagerte Agent-Schritte semantisch äquivalent bleibt (kein Informationsverlust an kritischen Entscheidungspunkten). [KORR v22: Datei hieß zuvor compactor.rs — tatsächlicher Dateiname ist context_compaction.rs; Größenklasse auf L korrigiert (ursprünglich fälschlich als M eingeschätzt).]"
 
-[component_focus."memfuse-embed"."lib.rs"]
+[component_focus."memfuse-infer-onnx"."lib.rs"]
 risk = "Feature-Gate"
 desc = "Feature-Gate-Wurzel (default=[])"
 focus = "cargo check --no-default-features MUSS 0 Fehler ergeben — dies ist die zentrale Hermetizitäts-Garantie des optionalen Crates."
 
-[component_focus."memfuse-embed"."reranker.rs"]
+[component_focus."memfuse-infer-onnx"."reranker.rs"]
 risk = "Blocking/Sichtbarkeit"
 desc = "CrossEncoderReranker UND OnnxSessionPool (bewusst pub(crate), nicht exportiert) — beides in derselben Datei"
 focus = "ONNX-Inferenz blockiert den Thread — spawn_blocking ist Pflicht, sonst Stall des Tokio-Executors. Score-Ties müssen stabil sortiert werden, Richtung höher=besser verifizieren. Für Modul-externe Nutzung des SessionPool einen eigenen Pool halten statt Sichtbarkeit zu erweitern (Planungsdokument-Blueprint-Korrektur #1). [KORR v22: Es gibt keine eigene session_pool.rs — der Crate besteht nur aus lib.rs + reranker.rs, OnnxSessionPool ist Teil von reranker.rs.]"
 
-[component_focus."memfuse-ollama"."lib.rs"]
+[component_focus."memfuse-infer-ollama"."lib.rs"]
 desc = "Modul-Exports des Ollama-Clients"
 focus = "Prüfe, dass keine Business-Logik hier landet, die eigentlich in client.rs gehört."
 
-[component_focus."memfuse-ollama"."context_prefixer.rs"]
+[component_focus."memfuse-infer-ollama"."context_prefixer.rs"]
 desc = "ContextPrefixEngine — 50-100-Token-Kontext-Präfix-Generierung"
 focus = "Prüfe Verhalten bei nicht erreichbarer Ollama-Instanz — kontrollierter Fehler, kein Hang. [KORR v22: Datei hieß zuvor context_prefix.rs — tatsächlicher Dateiname ist context_prefixer.rs.]"
 
-[component_focus."memfuse-ollama"."embedding.rs"]
+[component_focus."memfuse-infer-ollama"."embedding.rs"]
 risk = "Konsistenz"
 desc = "OllamaEmbedder — Embedding-Erzeugung"
 focus = "Vektor-Dimension muss über alle Aufrufe und Modelle hinweg konsistent bleiben — Dimensionswechsel ohne Fehler ist ein kritischer Befund. [KORR v22: Datei hieß zuvor embedder.rs — tatsächlicher Dateiname ist embedding.rs.]"
 
-[component_focus."memfuse-ollama"."importance.rs / model_info.rs"]
+[component_focus."memfuse-infer-ollama"."importance.rs / model_info.rs"]
 desc = "Bisher NICHT im Inventar erfasste Dateien: Importance-Scoring bzw. Ollama-Modell-Metadaten"
 focus = "Neu ergänzt in v22 — noch keine vertiefte Fokus-Analyse hinterlegt; bei erster Bearbeitung dieser Dateien vollständige Lektüre vor Änderung durchführen und Fokus-Notiz hier nachtragen."
 
@@ -379,7 +374,7 @@ focus = "Reine Serialisierungs-Helfer — Fehler-Codes müssen exakt der JSON-RP
 [component_focus."memfuse-mcp"."prompt_injection.rs"]
 risk = "Injection"
 desc = "Prompt-Injection-Erkennung/-Abwehr für Tool-Outputs"
-focus = "Neu ergänzt in v22 — diese Datei fehlte bisher VOLLSTÄNDIG im Komponenten-Inventar, obwohl sie mit direktem Injection-Bezug zu den sicherheitskritischsten Dateien des gesamten Crates zählt. Bei jeder Änderung: keine Denylist-basierte Erkennung als alleinige Verteidigungslinie akzeptieren (gleiche Grundregel wie bei memfuse-ollama::client.rs)."
+focus = "Neu ergänzt in v22 — diese Datei fehlte bisher VOLLSTÄNDIG im Komponenten-Inventar, obwohl sie mit direktem Injection-Bezug zu den sicherheitskritischsten Dateien des gesamten Crates zählt. Bei jeder Änderung: keine Denylist-basierte Erkennung als alleinige Verteidigungslinie akzeptieren (gleiche Grundregel wie bei memfuse-infer-ollama::client.rs)."
 
 [component_focus."memfuse-mcp"."sandbox.rs"]
 risk = "Krypto"
@@ -390,31 +385,3 @@ focus = "Tool-Outputs müssen AES-256-GCM-SIV-verschlüsselt und bei Verwerfen g
 desc = "Binary-Einstiegspunkt — startet McpServer::run_stdio(), Logs ausschließlich nach stderr"
 focus = "Neu ergänzt in v22. stdout ist für JSON-RPC reserviert — JEDE println!/log-Ausgabe hierhin bricht das Protokoll; nur eprintln!/tracing-nach-stderr ist zulässig."
 
-[component_focus."memfuse-tauri"."lib.rs"]
-desc = "Tauri-App-Einstiegspunkt"
-focus = "Prüfe IPC-Command-Registrierung auf vollständige Fehlerbehandlung."
-
-[component_focus."memfuse-tauri"."state.rs"]
-risk = "Concurrency"
-desc = "AppState — geteilter Zustand über Tauri-Commands"
-focus = "Tauri-Commands laufen parallel — jeder Zugriff auf AppState braucht korrekte Synchronisation (RwLock/Arc/Mutex); prüfe explizit auf Data-Races bei gleichzeitigen Commands."
-
-[component_focus."memfuse-tauri"."ingestion/pdf.rs"]
-risk = "Sicherheit/Parser"
-desc = "PDF-Parser für externe, nicht-vertrauenswürdige Nutzerdateien"
-focus = "Eingebettetes PDF-JavaScript MUSS ignoriert, niemals ausgeführt werden. Leere/trunkierte/falsch benannte Dateien → kontrollierter Err, kein Panic. Fehlendes Größenlimit ist ein DoS-Risiko (RAM-Erschöpfung)."
-
-[component_focus."memfuse-tauri"."ingestion/docx.rs"]
-risk = "Sicherheit/Parser"
-desc = "DOCX-Parser für externe Nutzerdateien"
-focus = "Gleiche Robustheitsanforderungen wie pdf.rs: leere/trunkierte Datei → Err, kein Panic. Geparste Inhalte landen später im RAG-Kontext — Prompt-Injection-Bewusstsein wie bei memfuse-ollama."
-
-[component_focus."memfuse-tauri"."ingestion/email.rs"]
-risk = "Sicherheit/Parser"
-desc = "E-Mail-Parser für externe Nutzerdateien"
-focus = "Gleiche Robustheitsanforderungen wie pdf.rs/docx.rs. Zusätzlich: Header-Injection und verschachtelte MIME-Strukturen als Fuzzing-Ziel betrachten."
-
-[component_focus."memfuse-tauri"."ollama.rs"]
-risk = "Duplikation"
-desc = "OllamaBridge — Desktop-App-seitige Ollama-Anbindung"
-focus = "Prüfe auf Logik-Duplikation gegenüber memfuse-ollama::client.rs — jede Abweichung im Verhalten zwischen Bridge und Client ist ein Wartungsrisiko und potenzielle Inkonsistenzquelle. [KORR v22: Datei hieß zuvor ollama_bridge.rs — tatsächlicher Dateiname ist ollama.rs.]"
