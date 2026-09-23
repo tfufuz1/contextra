@@ -14,9 +14,7 @@ Brücke zwischen Rust-Kern und Python-Ökosystem. Ermöglicht NumPy-Zero-Copy-Um
 
 ## Installation
 
-```bash
-pip install memfuse
-```
+> **Hinweis zur Distribution:** Eine PyPI-Distribution dieses Pakets existiert aktuell noch nicht und wird nachgereicht, sobald die Namensfrage für das Gesamtprojekt geklärt ist.
 
 ## Quick Start
 
