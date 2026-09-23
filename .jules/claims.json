@@ -259,6 +259,14 @@
       "session_id": "8044639698693422459",
       "active": true,
       "expires_at": "2026-09-23T17:31:19.805522508+00:00"
+    },
+    {
+      "krate": "docs-constitution",
+      "issue": "UNSPECIFIED",
+      "timestamp": "2026-09-23T14:41:25.532039168+00:00",
+      "session_id": "11962878962551536413",
+      "active": true,
+      "expires_at": "2026-09-23T18:41:25.532026303+00:00"
     }
   ]
 }
