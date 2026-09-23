@@ -16,10 +16,8 @@ echo "============================================================"
 echo ""
 echo "[1/8] Verifying Rust toolchain..."
 
-# Vorheriges Stable entfernen, um OverlayFS-Rename-Fehler zu umgehen
-rustup toolchain uninstall stable || true
-rustup toolchain install stable
-rustup default stable
+rustup toolchain install 1.89.0 --profile minimal
+rustup default 1.89.0
 
 RUST_VERSION=$(rustc --version)
 echo "  ✅ $RUST_VERSION"
