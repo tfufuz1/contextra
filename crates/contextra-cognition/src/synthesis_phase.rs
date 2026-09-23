@@ -7,14 +7,17 @@
 use crate::memory_consolidation::TurnSegment;
 use contextra_core::{DocId, SegmentSynthesizer};
 
-/// Ergebnis des Generative Synthesis Pass.
+/// Ergebnis des Generative Synthesis Pass auf Segment-Ebene.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SynthesisPhaseResult {
+pub struct SegmentSynthesisResult {
     /// Neu synthetisierte Chunks (einer pro konsolidiertem Segment).
     pub synthesized_chunks: Vec<SynthesizedChunk>,
     /// Anzahl der Segmente, für die keine Synthese möglich war (LLM-Fehler / zu kurz).
     pub skipped_segments: usize,
 }
+
+#[deprecated(note = "use SegmentSynthesisResult")]
+pub type SynthesisPhaseResult = SegmentSynthesisResult;
 
 /// Ein generativ synthetisierter Wissens-Chunk mit Provenienz.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,7 +45,7 @@ pub async fn run_synthesis_pass(
     segment_texts: &[Vec<String>], // Texte der Turns pro Segment
     synthesizer: &dyn SegmentSynthesizer,
     min_turns_for_synthesis: usize, // Default: 3 — kurze Segmente überspringen
-) -> SynthesisPhaseResult {
+) -> SegmentSynthesisResult {
     let mut synthesized_chunks = Vec::new();
     let mut skipped_segments = 0;
 
@@ -86,7 +89,7 @@ pub async fn run_synthesis_pass(
         }
     }
 
-    SynthesisPhaseResult {
+    SegmentSynthesisResult {
         synthesized_chunks,
         skipped_segments,
     }

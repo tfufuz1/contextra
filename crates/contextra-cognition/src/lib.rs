@@ -12,6 +12,7 @@ pub mod context;
 pub mod context_compaction;
 pub mod maintenance_config;
 pub mod maintenance_scheduler;
+pub mod aggregation_phase;
 pub mod memory_consolidation;
 pub mod synthesis_phase;
 
@@ -33,6 +34,11 @@ pub use memory_consolidation::{
     group_turns_into_segments, run_consolidation_pass, CommunityStabilityTracker,
     ConsolidationConfig, ConsolidationPhaseResult, MetaChunk, SynthesisConfig,
     SynthesisPhaseResult, TurnSegment,
+};
+pub use aggregation_phase::{
+    check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,
+    AggregationConfig, AggregationEdge, AggregationNode, AggregationPhaseResult, AlphaNode,
+    ConsolidationPipelineResult, SuperEdgeDraft, SuperEdgeSink,
 };
 pub use synthesis_phase::run_synthesis_pass;
 
