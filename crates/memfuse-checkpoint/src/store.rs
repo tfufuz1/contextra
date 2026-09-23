@@ -32,6 +32,16 @@ pub trait CheckpointRegistry: memfuse_core::traits::Checkpoint + Send + Sync {
     }
 }
 
+/// P-23 LOCK-KONSOLIDIERUNG: Konsolidierter Checkpoint Index
+///
+/// Schützt sowohl die Sequenz-zu-Metadata Map (`by_seq`) als auch die Name-zu-Sequenz Map (`by_name`)
+/// atomar innerhalb einer einzigen Datenstruktur unter einem gemeinsamen `parking_lot::RwLock`.
+///
+/// **Architektur- und Sicherheitsvorteil (P-23):**
+/// Durch die Vereinigung zweier ehemals separater Maps/Locks in ein einziges `CheckpointIndex`-RwLock
+/// werden potenzielle Deadlock-Fenster durch unterschiedliche Lock-Erwerbsreihenfolgen (Name-First vs. Seq-First)
+/// vollständig ausgeschlossen. Säufige Mutationen (`insert`, `remove_by_name`, `remove_by_seq`, `clear`)
+/// erfolgen strikt atomar.
 #[derive(Debug, Default)]
 struct CheckpointIndex {
     by_seq: HashMap<u64, CheckpointMeta>,
@@ -117,7 +127,7 @@ async fn persist_hwm_internal<S: memfuse_core::StorageEngine>(
 /// - Keine Panics (Zero-Panic Doctrine)
 pub struct PersistentCheckpointStore<S: memfuse_core::StorageEngine> {
     storage: Arc<S>,
-    /// Registrierter Checkpoint-Index im Arbeitsspeicher — geschützt durch ein konsolidiertes RwLock
+    /// Registrierter Checkpoint-Index im Arbeitsspeicher — geschützt durch ein konsolidiertes RwLock (P-23)
     index: RwLock<CheckpointIndex>,
     /// Namespace-Präfix für Storage-Keys
     namespace: String,
