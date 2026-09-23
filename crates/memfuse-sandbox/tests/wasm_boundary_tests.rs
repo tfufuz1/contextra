@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Integration & Property-Based Tests for memfuse-sandbox (§4.18, §10.14).
 
 use memfuse_sandbox::{SandboxError, WasmCapabilities, WasmExecutor};

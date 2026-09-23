@@ -127,7 +127,7 @@ impl ManifestEntry {
         }
 
         let op_tag = *payload
-            .get(0)
+            .first()
             .ok_or_else(|| MemFuseError::Serialization("Failed to read op_tag".into()))?;
         let remaining = payload.get(1..).ok_or_else(|| {
             MemFuseError::Serialization("Failed to read remaining payload".into())

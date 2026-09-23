@@ -30,7 +30,7 @@ jobs:
 
       - name: TSan — TOCTOU put_if_absent (B-1)
         env:
-          RUSTFLAGS: "-Z sanitizer=thread"
+          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
           cargo +nightly test -p memfuse-store \
             --test toctou_put_if_absent \
@@ -40,7 +40,7 @@ jobs:
 
       - name: TSan — deleted_nodes Lock-Contention (B-8)
         env:
-          RUSTFLAGS: "-Z sanitizer=thread"
+          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
           cargo +nightly test -p memfuse-vector \
             --test deleted_nodes_lock_contention \
@@ -50,7 +50,7 @@ jobs:
 
       - name: TSan — WAL Concurrent Flush+Truncate (B-7)
         env:
-          RUSTFLAGS: "-Z sanitizer=thread"
+          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
           cargo +nightly test -p memfuse-store \
             --test wal_truncate_ordering \
@@ -60,7 +60,7 @@ jobs:
 
       - name: TSan — CSR Concurrent Insert+Query
         env:
-          RUSTFLAGS: "-Z sanitizer=thread"
+          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
           cargo +nightly test -p memfuse-graph \
             --test stress_dag \

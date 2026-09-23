@@ -55,9 +55,9 @@ chaos-test:
     nix develop -c cargo test -p memfuse-store --test chaos_matrix -- --ignored --test-threads=1 || \
     cargo test -p memfuse-store --test chaos_matrix -- --ignored --test-threads=1
 
-# Modular check for memfuse-index
-check-index:
-    nix develop -c cargo check -p memfuse-index || cargo check -p memfuse-index
+# Modular check for memfuse-vector
+check-vector:
+    nix develop -c cargo check -p memfuse-vector || cargo check -p memfuse-vector
 
 # Modular check for memfuse-db
 check-db:
@@ -119,9 +119,9 @@ coverage-gate:
 check-py:
     nix develop -c cargo check --manifest-path crates/memfuse-py/Cargo.toml || cargo check --manifest-path crates/memfuse-py/Cargo.toml
 
-# Modular check for memfuse-embed
-check-embed:
-    nix develop -c cargo check -p memfuse-embed || cargo check -p memfuse-embed
+# Modular check for memfuse-infer
+check-infer:
+    nix develop -c cargo check -p memfuse-infer-candle -p memfuse-infer-ollama -p memfuse-infer-onnx || cargo check -p memfuse-infer-candle -p memfuse-infer-ollama -p memfuse-infer-onnx
 
 # Generiert prompter-data.json aus dem Live-Repo-Stand
 gen-prompter-data:
@@ -186,7 +186,7 @@ debt-audit:
 
     echo "--- [2/4] unsafe außerhalb distance.rs ---"
     UNSAFE=$(grep -rn "unsafe " crates/ --include="*.rs" \
-        | grep -v "crates/memfuse-index/src/distance\.rs" \
+        | grep -v "crates/memfuse-vector/src/distance\.rs" \
         | grep -v "#\[allow(unsafe_code)\]" \
         | grep -v "//.*unsafe" \
         || true)
@@ -272,13 +272,13 @@ prove-bugs:
 	set -euo pipefail
 	echo "🔬 Führe Bug-Proof-Tests aus..."
 	cargo test -p memfuse-store --test toctou_put_if_absent -- --nocapture 2>&1 | tee /tmp/proof-b1.log
-	cargo test -p memfuse-index --test nan_validation_policy -- --nocapture 2>&1 | tee /tmp/proof-b2.log
+	cargo test -p memfuse-vector --test nan_validation_policy -- --nocapture 2>&1 | tee /tmp/proof-b2.log
 	cargo test -p memfuse-db --test search_result_bound -- --nocapture 2>&1 | tee /tmp/proof-b3.log
 	cargo test -p memfuse-store --test manifest_corruption -- --nocapture 2>&1 | tee /tmp/proof-b4.log
 	cargo test -p memfuse-text --test tombstone_read_your_writes -- --nocapture 2>&1 | tee /tmp/proof-b5.log
 	cargo test -p memfuse-graph --test source_doc_ids_populated -- --nocapture 2>&1 | tee /tmp/proof-b6.log
 	cargo test -p memfuse-store --test wal_truncate_ordering -- --nocapture 2>&1 | tee /tmp/proof-b7.log
-	cargo test -p memfuse-index --test deleted_nodes_lock_contention -- --nocapture 2>&1 | tee /tmp/proof-b8.log
+	cargo test -p memfuse-vector --test deleted_nodes_lock_contention -- --nocapture 2>&1 | tee /tmp/proof-b8.log
 	echo "✅ Alle Bug-Proof-Tests grün"
 
 # Führt alle Property-Tests aus
@@ -290,7 +290,7 @@ prop-tests:
 	cargo test -p memfuse-text --test proptest_bm25_invariants -- --nocapture
 	cargo test -p memfuse-graph --test proptest_csr_invariants -- --nocapture
 	cargo test -p memfuse-store proptest -- --nocapture
-	cargo test -p memfuse-index proptest -- --nocapture
+	cargo test -p memfuse-vector proptest -- --nocapture
 	echo "✅ Alle Property-Tests grün"
 
 # Vollständige QA-Suite: L0 Lints + L1 Proofs + L2 Property + L5 Integration
@@ -311,7 +311,7 @@ tsan:
 	RUSTFLAGS="-Z sanitizer=thread" \
 	cargo +nightly test \
 		-p memfuse-store --test toctou_put_if_absent \
-		-p memfuse-index --test deleted_nodes_lock_contention \
+		-p memfuse-vector --test deleted_nodes_lock_contention \
 		--target x86_64-unknown-linux-gnu \
 		-- --test-threads=1
 	echo "✅ TSan: keine Races gefunden"
@@ -322,7 +322,7 @@ asan:
 	set -euo pipefail
 	echo "🔍 AddressSanitizer..."
 	RUSTFLAGS="-Z sanitizer=address" \
-	cargo +nightly test -p memfuse-store -p memfuse-index \
+	cargo +nightly test -p memfuse-store -p memfuse-vector \
 		--target x86_64-unknown-linux-gnu \
 		-- --test-threads=1
 
@@ -354,8 +354,8 @@ fuzz-all SECONDS="60":
 		"memfuse-store:wal_roundtrip"
 		"memfuse-store:fuzz_manifest_load"
 		"memfuse-store:wal_mutation_chaos"
-		"memfuse-index:hnsw_insert_search"
-		"memfuse-index:fuzz_hnsw_persistence"
+		"memfuse-vector:hnsw_insert_search"
+		"memfuse-vector:fuzz_hnsw_persistence"
 		"memfuse-db:rrf_fusion"
 		"memfuse-text:fuzz_bm25_tokenize"
 	)

@@ -656,6 +656,99 @@ async fn test_ppr_exact_score_tie_breaking_by_entity_id() {
     );
 }
 
+#[tokio::test]
+async fn test_ppr_hyperedge_expansion_dense_and_forward_push() {
+    use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    let e1 = EntityId::new(100);
+    let e2 = EntityId::new(200);
+    let e3 = EntityId::new(300);
+
+    graph
+        .add_entity(tx, Entity::new(e1, "E1", "Node"))
+        .await
+        .unwrap();
+    graph
+        .add_entity(tx, Entity::new(e2, "E2", "Node"))
+        .await
+        .unwrap();
+    graph
+        .add_entity(tx, Entity::new(e3, "E3", "Node"))
+        .await
+        .unwrap();
+
+    // Binary edge e1 -> e2
+    graph
+        .add_edge(tx, Edge::new(e1, e2, "knows").with_weight(1.0))
+        .await
+        .unwrap();
+    graph.commit(tx).await.unwrap();
+
+    // Hyperedge linking e1, e2, e3
+    const ROLE: RoleId = RoleId::new(1);
+    let hedge = HyperEdge::new(
+        HyperEdgeId::new(1),
+        crate::csr::EdgeType::Default,
+        vec![
+            RoleBinding::new(ROLE, e1),
+            RoleBinding::new(ROLE, e2),
+            RoleBinding::new(ROLE, e3),
+        ],
+        1.5,
+    );
+    graph.insert_hyperedge_direct(hedge);
+
+    // Test Dense Power Iteration
+    let cfg_dense = PprConfig {
+        damping_factor: 0.85,
+        max_iterations: 100,
+        convergence_epsilon: 1e-6,
+        algorithm: PprAlgorithm::DensePowerIteration,
+        warn_on_non_convergence: true,
+    };
+
+    let res_dense = graph
+        .personalized_page_rank(&[e1], &cfg_dense)
+        .await
+        .unwrap();
+
+    let rank_map_dense: std::collections::HashMap<EntityId, f32> = res_dense.into_iter().collect();
+
+    assert!(
+        rank_map_dense.contains_key(&e3),
+        "e3 must receive rank mass via hyperedge expansion in dense PPR"
+    );
+    assert!(
+        rank_map_dense[&e3] > 0.0,
+        "e3 score must be positive via hyperedge link"
+    );
+
+    // Test Forward Push
+    let cfg_fp = PprConfig {
+        damping_factor: 0.85,
+        max_iterations: 100,
+        convergence_epsilon: 1e-6,
+        algorithm: PprAlgorithm::ForwardPush,
+        warn_on_non_convergence: true,
+    };
+
+    let res_fp = graph.personalized_page_rank(&[e1], &cfg_fp).await.unwrap();
+
+    let rank_map_fp: std::collections::HashMap<EntityId, f32> = res_fp.into_iter().collect();
+
+    assert!(
+        rank_map_fp.contains_key(&e3),
+        "e3 must receive rank mass via hyperedge expansion in forward push PPR"
+    );
+    assert!(
+        rank_map_fp[&e3] > 0.0,
+        "e3 score must be positive via hyperedge link in forward push"
+    );
+}
+
 proptest::proptest! {
     #[test]
     fn prop_ppr_rank_mass_conservation(

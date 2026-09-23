@@ -83,6 +83,7 @@ pub struct RoutingHandle {
 /// Conditionally sets up `RouterEngine`, `IsotonicCalibrator`, and `PidController` if routing profiles are configured.
 /// Attaches their `Weak` pointers to `db` via `set_router`, `set_calibrator`, and `set_pid_controller`.
 /// Returns `Some(RoutingHandle)` if profiles were present, or `None` if no profiles were configured.
+#[allow(dead_code)]
 struct CollectionSearchAdapter(Arc<memfuse::Collection>);
 
 impl memfuse::router::ports_local::HybridSearchProvider for CollectionSearchAdapter {

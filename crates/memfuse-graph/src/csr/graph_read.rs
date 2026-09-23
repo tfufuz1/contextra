@@ -1,23 +1,10 @@
-use arc_swap::ArcSwap;
-use parking_lot::{Mutex, RwLock};
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::collections::{HashMap, HashSet};
 
-use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
 use crate::GraphIndexExt;
-use memfuse_core::{
-    BoxFuture, DocId, Entity, EntityId, GraphIndex, GraphIndexStats, MemFuseError, Result,
-    StorageEngine, TxId,
-};
+use memfuse_core::{EntityId, Result, TxId};
 
 use super::graph_write::CsrGraph;
-use super::inner::GraphInner;
-use super::types::{Edge, EdgePayload, EdgeType, PersistedEdgePayload, GRAPH_COMMUNITY_PREFIX};
-use super::visibility::{
-    is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id,
-};
+use super::types::GRAPH_COMMUNITY_PREFIX;
 
 impl CsrGraph {
     /// Force compacts the graph delta buffer into the main CSR arrays to optimize traversal layout.

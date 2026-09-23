@@ -260,6 +260,7 @@ pub fn parse_importance_score_response(raw_response: &str) -> ImportanceAssessme
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

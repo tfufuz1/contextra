@@ -59,18 +59,14 @@ jobs:
           fi
           echo "✅ Keine offenen kritischen/blockierenden Tags"
 
-<<<<<<< HEAD
-      # Unwrap-Ratchet entfällt (§0.4). Durchsetzung: merge-gate.yml → clippy-panic-lints
-=======
       - name: "Gate 2: Ring-Layering Verification (Phase 0R Warnmodus)"
-        run: cargo xtask check-layering
+        run: cargo xtask check-ring-layering
 
       - name: "Gate 2b: Unsafe-Islands Inventory Gate"
         run: cargo xtask check-unsafe-islands
 
       - name: "Gate 2c: Module-Reachability Gate (GOV-D)"
         run: cargo xtask check-module-reachability
->>>>>>> 54333148 (Shell-Commit)
 
       - name: "Gate 3: Kein silent let _ für IO-Operationen"
         run: |
