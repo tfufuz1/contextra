@@ -59,17 +59,17 @@ Die technische Ist-Architektur, DAG-Topologie sowie Layer-Aufteilung der Workspa
 ```
 Layer 0:  memfuse-core        — Typen, Primitiven, Fehler, Embedding Trait (keine Abhängigkeiten)
 Layer 1:  memfuse-store       — LSM-Tree, WAL, SSTables, Crypt-at-Rest
-          memfuse-index       — HNSW, SIMD-Distanzen, SQ8-Quantisierung
+          memfuse-vector      — HNSW, SIMD-Distanzen, SQ8-Quantisierung
           memfuse-text        — BM25, Inverted Index, Deutsche Morphologie
           memfuse-crypto      — AES-256-GCM, HMAC-Chaining
           memfuse-graph       — CSR-Graph, Entity-Relation Traversal (LSM-Persistenz), Session DAG
           memfuse-checkpoint  — Async Checkpointing & State Snapshot Management
 Layer 2:  memfuse-db          — Collections, 4-Signal-Fusion, RRF, Multi-Step Engine, Context Compactor
 Layer 3:  memfuse-py          — PyO3 Python FFI-Bindings
-          memfuse-ollama      — Ollama Client & Embedder Provider, ContextPrefixEngine
-Layer 3:  memfuse-embed       — ONNX Embeddings & CrossEncoderReranker (optional, Feature-gated, default=[])
+          memfuse-infer-ollama — Ollama Client & Embedder Provider, ContextPrefixEngine
+Layer 3:  memfuse-infer-onnx  — ONNX Embeddings & CrossEncoderReranker (optional, Feature-gated, default=[])
 Layer 4:  memfuse-mcp         — Model Context Protocol (MCP) stdio JSON-RPC 2.0 Server, McpSandbox (ADR-010)
-          memfuse-tauri       — Desktop Application Shell ("MemFuse Brain")
+          memfuse-tauri       — Desktop Application Shell ("MemFuse Brain") <!-- TODO(crate-mapping): manuell prüfen -->
 ```
 
 ---
