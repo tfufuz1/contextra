@@ -34,19 +34,17 @@ Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENT
 
 | Crate | Pfad für view_file / read |
 |---|---|
-| `memfuse-core-ipc-gen` | `crates/memfuse-core-ipc-gen/AGENTS.md` |
 | `memfuse-core` | `crates/memfuse-core/AGENTS.md` |
-| `memfuse-calibration` | `crates/memfuse-calibration/AGENTS.md` |
 | `memfuse-checkpoint` | `crates/memfuse-checkpoint/AGENTS.md` |
 | `memfuse-crypto` | `crates/memfuse-crypto/AGENTS.md` |
 | `memfuse-graph` | `crates/memfuse-graph/AGENTS.md` |
 | `memfuse-sandbox` | `crates/memfuse-sandbox/AGENTS.md` |
 | `memfuse-text` | `crates/memfuse-text/AGENTS.md` |
 | `memfuse-store` | `crates/memfuse-store/AGENTS.md` |
-| `memfuse-index` | `crates/memfuse-index/AGENTS.md` |
-| `memfuse-ollama` | `crates/memfuse-ollama/AGENTS.md` |
-| `memfuse-candle` | `crates/memfuse-candle/AGENTS.md` |
-| `memfuse-embed` | `crates/memfuse-embed/AGENTS.md` |
+| `memfuse-vector` | `crates/memfuse-vector/AGENTS.md` |
+| `memfuse-infer-ollama` | `crates/memfuse-infer-ollama/AGENTS.md` |
+| `memfuse-infer-candle` | `crates/memfuse-infer-candle/AGENTS.md` |
+| `memfuse-infer-onnx` | `crates/memfuse-infer-onnx/AGENTS.md` |
 | `memfuse-db` | `crates/memfuse-db/AGENTS.md` |
 | `memfuse-engine` | `crates/memfuse-engine/AGENTS.md` |
 | `memfuse-cognition` | `crates/memfuse-cognition/AGENTS.md` |
@@ -55,7 +53,6 @@ Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENT
 | `memfuse-agent` | `crates/memfuse-agent/AGENTS.md` |
 | `memfuse-mcp` | `crates/memfuse-mcp/AGENTS.md` |
 | `memfuse-py` | `crates/memfuse-py/AGENTS.md` |
-| `memfuse-tauri` | `crates/memfuse-tauri/AGENTS.md` (deprecated, ADR-077) |
 
 ---
 

@@ -32,7 +32,7 @@ Er besteht aus zwei unabhängigen Jobs:
 - Berechnet die ISO-Kalenderwoche (`KW % 4`).
 - Rotiert wöchentlich durch die 4 Fokus-Crates:
   - **Woche 0**: `memfuse-graph`
-  - **Woche 1**: `memfuse-index`
+  - **Woche 1**: `memfuse-vector`
   - **Woche 2**: `memfuse-agent`
   - **Woche 3**: `memfuse-db`
 - Löst für den berechneten Fokus-Crate den `mutation-testing.yml`-Workflow via `workflow_dispatch` aus.

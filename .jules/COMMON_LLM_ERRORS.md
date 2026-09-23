@@ -24,7 +24,7 @@ reciprocal_rank_fusion(result_sets, max_results)
 // ❌ HALLUZINATION — SessionPool öffentlich zugreifen:
 let pool = SessionPool::new(config)?;
 
-// ✅ KORREKT — SessionPool ist pub(crate) in memfuse-embed:
+// ✅ KORREKT — SessionPool ist pub(crate) in memfuse-infer-onnx:
 // Aus externem Crate nicht direkt nutzbar. CrossEncoderReranker
 // hält seinen eigenen internen Pool.
 ```
@@ -85,8 +85,8 @@ collection.insert(key, doc).await?;
 # In crates/memfuse-core/Cargo.toml:
 memfuse-db = { path = "../memfuse-db" }  # ARCH-BRUCH!
 
-# ❌ FALSCH — memfuse-store importiert memfuse-index (Layer 1 → Layer 1 Peer):
-memfuse-index = { path = "../memfuse-index" }  # LAYER-PEER-BRUCH!
+# ❌ FALSCH — memfuse-store importiert memfuse-vector (Layer 1 → Layer 1 Peer):
+memfuse-vector = { path = "../memfuse-vector" }  # LAYER-PEER-BRUCH!
 ```
 
 **Heilmittel**: Vor jeder `Cargo.toml`-Änderung:
@@ -123,9 +123,9 @@ unsafe { ptr::copy_nonoverlapping(src, dst, len) }
 ```
 
 **unsafe ist NUR erlaubt in** (AGENTS.md §4):
-- `crates/memfuse-index/src/distance.rs` (SIMD)
-- `crates/memfuse-index/src/diskann.rs` (Mmap)
-- `crates/memfuse-index/src/persistence.rs` (Mmap)
+- `crates/memfuse-vector/src/distance.rs` (SIMD)
+- `crates/memfuse-vector/src/diskann.rs` (Mmap)
+- `crates/memfuse-vector/src/persistence.rs` (Mmap)
 
 ## FEHLER-KLASSE 7: Test-Mirroring
 
@@ -189,15 +189,15 @@ collection.search(...).await?;
 
 ## FEHLER-KLASSE 12: Feature-Gate-Vergessen (onnx)
 
-**Symptom**: Agent verwendet Code aus `memfuse-embed` ohne Feature-Flag.
+**Symptom**: Agent verwendet Code aus `memfuse-infer-onnx` ohne Feature-Flag.
 
 ```rust
 // ❌ FALSCH:
-use memfuse_embed::TextEmbedder; // Bricht Builds ohne onnx-Feature!
+use memfuse_infer_onnx::TextEmbedder; // Bricht Builds ohne onnx-Feature!
 
 // ✅ KORREKT:
 #[cfg(feature = "onnx")]
-use memfuse_embed::TextEmbedder;
+use memfuse_infer_onnx::TextEmbedder;
 ```
 
 ## FEHLER-KLASSE 13: Modul-Pfad-Halluzination
