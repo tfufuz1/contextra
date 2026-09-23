@@ -13,14 +13,7 @@ bootstrap:
 
 # Runs the TDD Validation Loop (Red -> Green -> Refactor)
 test *ARGS:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if command -v nix &> /dev/null && nix develop -c true &> /dev/null; then
-        RUNNER="nix develop -c"
-    else
-        RUNNER=""
-    fi
-    $RUNNER cargo nextest run {{ARGS}} 2>/dev/null || $RUNNER cargo test {{ARGS}}
+    cargo test --locked {{ARGS}}
 
 # Runs formatting, clippy and checks compilation
 check:

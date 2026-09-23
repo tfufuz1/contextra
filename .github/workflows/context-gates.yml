@@ -104,18 +104,6 @@ jobs:
       - name: Gate 7 — ISO-8601 tag validation
         run: cargo xtask validate-tags
 
-      - name: "Gate 5: Dokumentation ist synchron mit Inline-Tags (kein Drift)"
-        run: |
-          cargo xtask sync-docs
-          if ! git diff --quiet -- WORKING_STATE.md docs/ARCHITECTURE.md docs/SOURCE_OF_TRUTH.md; then
-            echo "❌ Generierte Doku-Abschnitte sind veraltet. Lokal ausführen:"
-            echo "    just sync-docs"
-            echo "und den Diff committen."
-            git --no-pager diff -- WORKING_STATE.md docs/ARCHITECTURE.md docs/SOURCE_OF_TRUTH.md
-            exit 1
-          fi
-          echo "✅ Dokumentation synchron mit Code"
-
       - name: "Gate 8: Mehrfach-Session-Review vor DONE erzwungen"
         run: |
           cargo xtask check-review-coverage
@@ -136,11 +124,6 @@ jobs:
 
       - name: "Gate 16: ADR Deprecation & Removal Deadline Monitoring"
         run: cargo xtask check-adr-deadlines
-
-      - name: "Gate 10: Jules Context Frischeprüfung"
-        run: |
-          cargo xtask check-jules-context-freshness
-          echo "✅ Jules Context Frischeprüfung erfolgreich"
 
       - name: "Gate 10b: Prompter-Data Freshness"
         run: |

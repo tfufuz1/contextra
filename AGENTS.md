@@ -1,7 +1,5 @@
 # Contextra — Betriebsanleitung für Autonome AI-Agenten (AGENTS.md)
 
-## Stand 2026-09-20 · HEAD `346edb1c4d66cc7043be2b4859c4a74a59d6cb24`
-
 ---
 
 ## 1. Zweck
