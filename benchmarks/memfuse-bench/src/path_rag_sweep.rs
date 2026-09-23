@@ -101,14 +101,7 @@ pub async fn run_pathrag_sweep_long_mem_eval(
                 .await
             {
                 Ok(r) => r,
-                Err(memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(_)) => {
-                    col.query()
-                        .text(&scenario.query)
-                        .strategy(SearchStrategy::Hops { max_hops: 4 })
-                        .k(10)
-                        .execute()
-                        .await?
-                }
+                Err(memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
                 Err(e) => return Err(e),
             };
 
@@ -262,14 +255,7 @@ pub async fn run_pathrag_sweep_locomo(
                 .await
             {
                 Ok(r) => r,
-                Err(memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(_)) => {
-                    col.query()
-                        .text(&case.question)
-                        .strategy(SearchStrategy::Hops { max_hops: 4 })
-                        .k(10)
-                        .execute()
-                        .await?
-                }
+                Err(memfuse_core::MemFuseError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
                 Err(e) => return Err(e),
             };
 
