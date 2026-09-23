@@ -5,9 +5,9 @@
 *   **Status**: ✅ Final
 *   **Kontext**: Der strategische Forschungsbericht 2026-08-26 zeigt:
     Der Wettbewerb (Mem0 ECAI-2025, Zep/Graphiti, MemOS) hat sich zu
-    kognitiven Gedächtnisarchitekturen entwickelt. MemFuse als reiner
+    kognitiven Gedächtnisarchitekturen entwickelt. Contextra als reiner
     "4-Signal RAG-Engine" ist 2026/2027 nicht SOTA.
-*   **Entscheidung**: MemFuse positioniert sich als **Cognitive Operating
+*   **Entscheidung**: Contextra positioniert sich als **Cognitive Operating
     System für LLM-Agenten**. Das bedeutet:
     - Explizite Differenzierung von Gedächtnistypen (Episodic/Semantic/
       Procedural/Working) als Roadmap-Ziel ab Phase 2
@@ -26,7 +26,7 @@
 *   **Konsequenzen**:
     - README, SOURCE_OF_TRUTH, ARCHITECTURE werden auf "Cognitive OS"
       umformuliert (nicht nur "Memory Engine")
-    - docs/memfuse_strategic_roadmap.md wird auf 4-Phasen-Plan aktualisiert <!-- doc-ref-ignore -->
+    - docs/contextra_strategic_roadmap.md wird auf 4-Phasen-Plan aktualisiert <!-- doc-ref-ignore -->
     - Phase-2-Features (Gedächtnistypen, temporaler Graph) als ADR-geplant
 
 ---

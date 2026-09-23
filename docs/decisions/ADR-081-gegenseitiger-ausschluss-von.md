@@ -2,7 +2,7 @@
 
 * **Datum:** 2026-09-12
 * **Status:** ✅ Final
-* **Target Path:** crates/memfuse-db/src/collection/mod.rs, crates/memfuse-db/src/consolidation_executor.rs, crates/memfuse-db/src/maintenance_scheduler.rs
+* **Target Path:** crates/contextra-db/src/collection/mod.rs, crates/contextra-db/src/consolidation_executor.rs, crates/contextra-db/src/maintenance_scheduler.rs
 * **Kontext / Auslöser:** Problem H-19: Bei künftiger oder paralleler Aktivierung von `MaintenanceScheduler` und `ConsolidationEngine` besteht das Risiko, dass beide Background-Pfade gleichzeitig einen `execute_consolidation_pass`-Aufruf auf derselben `Collection`-Instanz ausführen.
 
 ## Entscheidung

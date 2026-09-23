@@ -90,10 +90,7 @@ TEXT_FILENAMES_NO_SUFFIX = {"justfile", "Justfile", "Dockerfile"}
 #    veröffentlichten Datendateien/Nutzer hat. Bei Bedarf hier ergänzen,
 #    BEVOR --apply gelaufen wird.
 EXCLUDE_GLOBS: list[str] = [
-    # Beispiel, falls doch Bedarf besteht:
-    # "tests/golden/*.bin",
-    # "docs/decisions/*.md",  # historische Beschlussprotokolle, falls
-    #                          # "vormals MemFuse" bewusst erhalten bleiben soll
+    "docs/rename/*.md",
 ]
 
 # Cargo.lock wird bewusst NICHT von Hand editiert (wird durch `cargo check`

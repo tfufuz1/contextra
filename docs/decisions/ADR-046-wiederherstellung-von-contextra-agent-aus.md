@@ -1,12 +1,12 @@
-# ADR-046: Wiederherstellung von `memfuse-agent` aus dem Archiv
+# ADR-046: Wiederherstellung von `contextra-agent` aus dem Archiv
 
 
 - **Datum**: 2026-08-27
 - **Status**: ✅ Final
-- **Entscheidung**: Kernkomponenten aus `memfuse-saos-agent` (gelöscht in Commit 55a3464)
-  werden als `memfuse-agent` wiederhergestellt: `AgentTool` Trait, `OrchestratorEngine`,
+- **Entscheidung**: Kernkomponenten aus `contextra-saos-agent` (gelöscht in Commit 55a3464)
+  werden als `contextra-agent` wiederhergestellt: `AgentTool` Trait, `OrchestratorEngine`,
   `StateGraph`, `AuditLog`.
-- **Was NICHT zurückgeholt wird**: `memfuse-cluster` (Raft — bleibt in ADR-005 Frozen Zone).
+- **Was NICHT zurückgeholt wird**: `contextra-cluster` (Raft — bleibt in ADR-005 Frozen Zone).
 - **Begründung**: Die MCP-Sandbox ist zustandslos. Multi-Step Agent-Workflows über MCP
   verlieren bei Crash ihren State. Der `checkpoint → execute → commit → audit`-Loop aus dem
   alten Crate ist genau die fehlende Persistenzschicht.

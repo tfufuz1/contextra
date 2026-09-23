@@ -6,18 +6,18 @@
 *   **Kontext**: Die RAG-Sprints (RAG-01 bis RAG-05) haben die Ingestion-
     und Retrieval-Pipeline mit mehreren Schichten erweitert. Diese
     Entscheidung kodifiziert die Gesamtarchitektur.
-*   **Entscheidung**: MemFuse implementiert eine mehrstufige RAG-Pipeline:
-    1. **Contextual Ingestion**: ContextPrefixEngine (memfuse-ollama)
+*   **Entscheidung**: Contextra implementiert eine mehrstufige RAG-Pipeline:
+    1. **Contextual Ingestion**: ContextPrefixEngine (contextra-ollama)
        generiert 50–100 Token LLM-Präfixe vor BM25/HNSW-Indexierung
     2. **4-Signal Indexierung**: HNSW + Contextual-BM25 + CSR-Graph +
        Metadaten parallel indexiert
     3. **Hybrid Retrieval via RRF**: Alle Signale über reciprocal_rank_fusion()
-       fusioniert (memfuse-db/fusion.rs) <!-- doc-ref-ignore -->
-    4. **Multi-Step Expansion**: MultiStepEngine (memfuse-db/multistep.rs) <!-- doc-ref-ignore -->
+       fusioniert (contextra-db/fusion.rs) <!-- doc-ref-ignore -->
+    4. **Multi-Step Expansion**: MultiStepEngine (contextra-db/multistep.rs) <!-- doc-ref-ignore -->
        führt bis zu 3 iterative Retrieval-Schleifen aus
-    5. **Cross-Encoder Reranking**: CrossEncoderReranker (memfuse-embed,
+    5. **Cross-Encoder Reranking**: CrossEncoderReranker (contextra-embed,
        --features onnx) reordnet Top-K Kandidaten (optionaler Schritt)
-    6. **Context Compaction**: ContextCompactor (memfuse-db/compaction.rs) <!-- doc-ref-ignore -->
+    6. **Context Compaction**: ContextCompactor (contextra-db/compaction.rs) <!-- doc-ref-ignore -->
        ersetzt alte Tool-Outputs durch StatusToken
 *   **Alternativen**: Jeder Schritt einzeln opt-in — zu komplex für Nutzer
 *   **Begründung**: Empirisch (Anthropic, 2024): Contextual Embeddings →

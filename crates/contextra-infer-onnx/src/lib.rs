@@ -746,7 +746,7 @@ mod tests {
 
         let engine = MockEngine;
         let res = engine.embed("contextra").await?;
-        assert_eq!(res, vec![7.0]);
+        assert_eq!(res, vec![9.0]);
         Ok(())
     }
 

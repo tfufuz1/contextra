@@ -571,10 +571,26 @@ pub fn get_workspace_crates_from_root(
         let crate_dir = root_dir.join(path_str);
         let loc = calculate_crate_loc(&crate_dir);
 
+        let (ring, maturity, description, status) =
+            if let Some(entry) = capabilities.crates.get(&name) {
+                let ring = entry.ring.clone().unwrap_or_else(|| "unklassifiziert".to_string());
+                let maturity = entry.maturity.clone().unwrap_or_else(|| "unklassifiziert".to_string());
+                let desc = entry.description.clone().unwrap_or_else(|| if cargo_desc.is_empty() { "unklassifiziert".to_string() } else { cargo_desc.clone() });
+                let st = match maturity.as_str() {
+                    "stable" => "🟢 stable".to_string(),
+                    "experimental" => "🟡 experimental".to_string(),
+                    "deprecated" => "🔴 deprecated".to_string(),
+                    _ => "🔴 unklassifiziert".to_string(),
+                };
+                (ring, maturity, desc, st)
+            } else {
+                ("unklassifiziert".to_string(), "unklassifiziert".to_string(), if cargo_desc.is_empty() { "unklassifiziert".to_string() } else { cargo_desc.clone() }, "🔴 unklassifiziert".to_string())
+            };
+
         let status = if name == "contextra-embed" {
             "🧊 Optional".to_string()
         } else {
-            "🟢 Clean".to_string()
+            status
         };
 
         crates.push(CrateInfo {
@@ -3450,6 +3466,8 @@ description = "Core crate"
                 status: "🟢 stable".to_string(),
                 description: "Store".to_string(),
                 dependencies: vec!["contextra-core".to_string()],
+                ring: "Ring 1".to_string(),
+                maturity: "stable".to_string(),
             },
         ];
         let violations = check_dag_layer_violations(&crates);
@@ -3467,6 +3485,8 @@ description = "Core crate"
                 status: "🟢 stable".to_string(),
                 description: "DB".to_string(),
                 dependencies: vec!["contextra-ollama".to_string()],
+                ring: "Ring 3".to_string(),
+                maturity: "stable".to_string(),
             },
             CrateInfo {
                 name: "contextra-ollama".to_string(),
@@ -3476,6 +3496,8 @@ description = "Core crate"
                 status: "🟢 stable".to_string(),
                 description: "Ollama".to_string(),
                 dependencies: vec!["contextra-core".to_string()],
+                ring: "Ring 2".to_string(),
+                maturity: "stable".to_string(),
             },
         ];
         let violations = check_dag_layer_violations(&crates);
@@ -3758,8 +3780,8 @@ Always ensure all unit tests pass cleanly.
             .filter(|c| c.maturity == "experimental")
             .map(|c| c.name.as_str())
             .collect();
-        assert!(experimental_crates.contains(&"memfuse-adapt"));
-        assert!(experimental_crates.contains(&"memfuse-infer-onnx"));
+        assert!(experimental_crates.contains(&"contextra-adapt"));
+        assert!(experimental_crates.contains(&"contextra-infer-onnx"));
 
         for c in &capabilities_crates {
             if c.maturity == "experimental" {
@@ -3786,17 +3808,17 @@ Always ensure all unit tests pass cleanly.
         fs::write(
             root.join("Cargo.toml"),
             r#"[workspace]
-members = ["crates/memfuse-unclassified"]
+members = ["crates/contextra-unclassified"]
 "#,
         )
         .unwrap();
 
-        let crate_dir = root.join("crates/memfuse-unclassified");
+        let crate_dir = root.join("crates/contextra-unclassified");
         fs::create_dir_all(crate_dir.join("src")).unwrap();
         fs::write(
             crate_dir.join("Cargo.toml"),
             r#"[package]
-name = "memfuse-unclassified"
+name = "contextra-unclassified"
 version = "0.1.0"
 edition = "2021"
 description = ""
@@ -3810,7 +3832,7 @@ description = ""
 
         assert_eq!(crates.len(), 1);
         let unclass_crate = &crates[0];
-        assert_eq!(unclass_crate.name, "memfuse-unclassified");
+        assert_eq!(unclass_crate.name, "contextra-unclassified");
         assert_eq!(unclass_crate.status, "🔴 unklassifiziert");
         assert_eq!(unclass_crate.ring, "unklassifiziert");
         assert_eq!(unclass_crate.maturity, "unklassifiziert");

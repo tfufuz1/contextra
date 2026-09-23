@@ -6,13 +6,13 @@
 
 ## Kontext & Problemstellung
 
-In `crates/memfuse-index/src/diskann.rs` legt die Konstante `PENDING_FLUSH_THRESHOLD: u64 = 50` fest, nach wie vielen uncommitted Vektoreinfügungen im WAL/RAM automatisch ein DiskANN `persist_delta()` ausgelöst wird. Dieser Wert wurde ohne begleitenden ADR von einem früheren Wert (1.000) auf 50 gesenkt (Faktor 20 häufigeres Background-Persist bei kleinen Collections).
+In `crates/contextra-index/src/diskann.rs` legt die Konstante `PENDING_FLUSH_THRESHOLD: u64 = 50` fest, nach wie vielen uncommitted Vektoreinfügungen im WAL/RAM automatisch ein DiskANN `persist_delta()` ausgelöst wird. Dieser Wert wurde ohne begleitenden ADR von einem früheren Wert (1.000) auf 50 gesenkt (Faktor 20 häufigeres Background-Persist bei kleinen Collections).
 
 Die Auswirkung dieser Frequenzänderung auf die Schreibverstärkung (Write-Amplification) und die I/O-Belastung von NVMe/SSD-Speichermedien war bislang undokumentiert und unquantifiziert, was eine Dokumentationslücke gemäß v7.0 §4.2 und Technischen Schulden A.9 darstellte.
 
 ## Messmethodik & Empirische Ergebnisse
 
-Über den dedizierten Benchmark `crates/memfuse-index/benches/flush_threshold_amplification.rs` wurden DiskANN-Collections der Größen $N \in \{100, 1.000, 10.000, 100.000\}$ mit Insert-Workloads unter Schwellenwerten $T \in \{50, 200, 1.000\}$ vermessen. Die Ergebnisse sind in `crates/memfuse-index/benches/results/flush_threshold_amplification.md` abgelegt.
+Über den dedizierten Benchmark `crates/contextra-index/benches/flush_threshold_amplification.rs` wurden DiskANN-Collections der Größen $N \in \{100, 1.000, 10.000, 100.000\}$ mit Insert-Workloads unter Schwellenwerten $T \in \{50, 200, 1.000\}$ vermessen. Die Ergebnisse sind in `crates/contextra-index/benches/results/flush_threshold_amplification.md` abgelegt.
 
 ### Wichtigste Messergebnisse:
 1. **Write Amplification (WA) skaliert direkt proportional zur Collection-Größe $N$ und umgekehrt proportional zum Threshold $T$:**
@@ -36,11 +36,11 @@ $$\text{PENDING\_FLUSH\_THRESHOLD}(N) = \max\left(50, \min\left(1.000, \left\lfl
 3. **Große Collections ($N \ge 20.000$):** Threshold = **1.000**
    - Deckelt die Write-Amplification bei großen Vektormengen und schont SSD-/NVMe-Speichermedien vor I/O-Sättigung.
 
-*Hinweis:* Die eigentliche Implementierung der adaptiven Funktion in `crates/memfuse-index/src/diskann.rs` ist bewusst Gegenstand eines separaten Folge-Tasks mit eigenem Code-Review.
+*Hinweis:* Die eigentliche Implementierung der adaptiven Funktion in `crates/contextra-index/src/diskann.rs` ist bewusst Gegenstand eines separaten Folge-Tasks mit eigenem Code-Review.
 
 ## Konsequenzen & Dokumentationsabschluss
 
 - **Schließung der Dokumentationslücke:** Erfüllt die Anforderungen aus Gesamtspezifikation v7.0 §4.2 und beseitigt Technische Schulden A.9.
-- **Nachvollziehbarkeit:** Der Benchmark `cargo bench -p memfuse-index --bench flush_threshold_amplification --features experimental-diskann` steht als reproduzierbare Messgrundlage im Repository bereit.
+- **Nachvollziehbarkeit:** Der Benchmark `cargo bench -p contextra-index --bench flush_threshold_amplification --features experimental-diskann` steht als reproduzierbare Messgrundlage im Repository bereit.
 
 ---
