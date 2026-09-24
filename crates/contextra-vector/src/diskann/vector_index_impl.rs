@@ -51,6 +51,15 @@ impl VectorIndex for DiskAnnIndex {
         self.search_internal(query, k).await
     }
 
+    async fn search_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
+    ) -> Result<Vec<ScoredDocument>> {
+        self.search_filtered_internal(query, k, filter).await
+    }
+
     #[allow(clippy::unnecessary_cast)]
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
         let fallback_opt = self.inner.hnsw_fallback.read().clone();
