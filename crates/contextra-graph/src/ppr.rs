@@ -167,7 +167,198 @@ pub(crate) fn compute_ppr_with_context(
 
             dense_results
         }
+        PprAlgorithm::TlHfd(params) => {
+            let g_params = crate::tl_hfd::TlHfdParams {
+                sigma: params.sigma,
+                delta: params.delta,
+                gamma: params.gamma,
+                max_iterations: params.max_iterations,
+                max_top_k_expansion: params.max_top_k_expansion,
+                max_hyperedge_sort_size: params.max_hyperedge_sort_size,
+            };
+            match crate::tl_hfd::tl_hfd_local(inner, seed_nodes, &g_params) {
+                Ok(map) => {
+                    let sum: f32 = map.values().sum();
+                    let mut vec: Vec<(EntityId, f32)> = if sum > 0.0 {
+                        map.into_iter().map(|(id, val)| (id, val / sum)).collect()
+                    } else {
+                        map.into_iter().collect()
+                    };
+                    vec.sort_by(|a, b| {
+                        b.1.partial_cmp(&a.1)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| a.0.cmp(&b.0))
+                    });
+                    vec
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        error = %err,
+                        "TL-HFD execution failed; falling back to dense power iteration"
+                    );
+                    compute_ppr_dense(inner, seed_nodes, config, deleted_nodes, ctx)
+                }
+            }
+        }
+        PprAlgorithm::ShadowModeTlHfd(params) => {
+            let g_params = crate::tl_hfd::TlHfdParams {
+                sigma: params.sigma,
+                delta: params.delta,
+                gamma: params.gamma,
+                max_iterations: params.max_iterations,
+                max_top_k_expansion: params.max_top_k_expansion,
+                max_hyperedge_sort_size: params.max_hyperedge_sort_size,
+            };
+            let ppr_params = crate::path_rag::PprParams {
+                alpha: if config.damping_factor.is_nan()
+                    || config.damping_factor <= 0.0
+                    || config.damping_factor >= 1.0
+                {
+                    0.15
+                } else {
+                    1.0 - config.damping_factor
+                },
+                epsilon: if config.convergence_epsilon.is_nan()
+                    || config.convergence_epsilon <= 0.0
+                {
+                    1e-6
+                } else {
+                    config.convergence_epsilon
+                },
+                hyperedge_decay: 0.85,
+            };
+            let top_k = g_params.max_top_k_expansion;
+            match crate::tl_hfd::shadow_compare_forward_push_vs_tl_hfd(
+                inner,
+                seed_nodes,
+                &ppr_params,
+                &g_params,
+                top_k,
+            ) {
+                Ok(comp) => comp.forward_push_results,
+                Err(err) => {
+                    tracing::warn!(
+                        error = %err,
+                        "TL-HFD shadow mode comparison failed; falling back to forward push"
+                    );
+                    forward_push_ppr(inner, seed_nodes, config, deleted_nodes, ctx)
+                }
+            }
+        }
         PprAlgorithm::Auto => unreachable!("Auto resolved above"),
+    }
+}
+
+impl crate::path_rag::PathGraph for GraphInner {
+    fn neighbors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        let node_idx = match self.id_map.get(&node) {
+            Some(&idx) => idx,
+            None => return Vec::new(),
+        };
+        if self.entity_at(node_idx).is_none() {
+            return Vec::new();
+        }
+
+        let mut result = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+
+        if node_idx < self.offsets.len() - 1 {
+            let start_edge = self.offsets[node_idx];
+            let end_edge = self.offsets[node_idx + 1];
+            for edge_idx in start_edge..end_edge {
+                let neighbor_idx = self.targets[edge_idx];
+                if !self.tombstoned_edges.contains(&(node_idx, neighbor_idx))
+                    && self.entity_at(neighbor_idx).is_some()
+                {
+                    if let Some(&id) = self.reverse_map.get(neighbor_idx) {
+                        if seen.insert(id) {
+                            result.push((id, self.weights[edge_idx]));
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(pending) = self.pending_edges.get(&node_idx) {
+            for edge in pending {
+                let neighbor_idx = edge.target;
+                if !self.tombstoned_edges.contains(&(node_idx, neighbor_idx))
+                    && self.entity_at(neighbor_idx).is_some()
+                {
+                    if let Some(&id) = self.reverse_map.get(neighbor_idx) {
+                        if seen.insert(id) {
+                            result.push((id, edge.weight));
+                        }
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    fn predecessors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        let target_idx = match self.id_map.get(&node) {
+            Some(&idx) => idx,
+            None => return Vec::new(),
+        };
+        if self.entity_at(target_idx).is_none() {
+            return Vec::new();
+        }
+
+        let mut result = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let num_nodes = self.reverse_map.len();
+
+        for u_idx in 0..num_nodes {
+            if self.entity_at(u_idx).is_none() {
+                continue;
+            }
+            let u_id = match self.reverse_map.get(u_idx) {
+                Some(&id) => id,
+                None => continue,
+            };
+
+            if u_idx < self.offsets.len() - 1 {
+                let start_edge = self.offsets[u_idx];
+                let end_edge = self.offsets[u_idx + 1];
+                for edge_idx in start_edge..end_edge {
+                    if self.targets[edge_idx] == target_idx
+                        && !self.tombstoned_edges.contains(&(u_idx, target_idx))
+                        && seen.insert(u_id)
+                    {
+                        result.push((u_id, self.weights[edge_idx]));
+                    }
+                }
+            }
+
+            if let Some(pending) = self.pending_edges.get(&u_idx) {
+                for edge in pending {
+                    if edge.target == target_idx
+                        && !self.tombstoned_edges.contains(&(u_idx, target_idx))
+                        && seen.insert(u_id)
+                    {
+                        result.push((u_id, edge.weight));
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    fn hyperedges_for_entity(&self, node: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        self.hyperedge_index
+            .get(&node)
+            .map(|set| set.iter().copied().collect())
+            .unwrap_or_default()
+    }
+
+    fn get_hyperedge(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+    ) -> Option<std::sync::Arc<crate::hyperedge::HyperEdge>> {
+        self.hyperedges.get(&id).cloned()
     }
 }
 

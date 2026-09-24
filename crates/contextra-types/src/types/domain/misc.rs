@@ -337,8 +337,67 @@ impl MemoryType {
     }
 }
 
+/// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
+///
+/// # Ring Architecture
+/// Defined in `contextra-types` (Ring 0) to avoid dependency on `contextra-graph` (Ring 1).
+/// Graph algorithms in `contextra-graph` map this configuration to `contextra_graph::TlHfdParams`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct TlHfdParams {
+    /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
+    #[serde(default = "default_tl_hfd_sigma")]
+    pub sigma: f32,
+    /// Seed injection multiplier $\delta \ge 2.0$ (default: 2.0).
+    #[serde(default = "default_tl_hfd_delta")]
+    pub delta: f32,
+    /// Boundary conductance exponent $\gamma \ge 0$ (default: 1.0).
+    #[serde(default = "default_tl_hfd_gamma")]
+    pub gamma: f32,
+    /// Maximum number of diffusion iterations $\ge 1$ (default: 50).
+    #[serde(default = "default_tl_hfd_max_iterations")]
+    pub max_iterations: u32,
+    /// Maximum number of boundary nodes to activate per iteration $\ge 1$ (default: 10).
+    #[serde(default = "default_tl_hfd_max_top_k_expansion")]
+    pub max_top_k_expansion: usize,
+    /// Maximum hyperedge participant size before truncation $\ge 2$ (default: 64).
+    #[serde(default = "default_tl_hfd_max_hyperedge_sort_size")]
+    pub max_hyperedge_sort_size: usize,
+}
+
+fn default_tl_hfd_sigma() -> f32 {
+    0.1
+}
+fn default_tl_hfd_delta() -> f32 {
+    2.0
+}
+fn default_tl_hfd_gamma() -> f32 {
+    1.0
+}
+fn default_tl_hfd_max_iterations() -> u32 {
+    50
+}
+fn default_tl_hfd_max_top_k_expansion() -> usize {
+    10
+}
+fn default_tl_hfd_max_hyperedge_sort_size() -> usize {
+    64
+}
+
+impl Default for TlHfdParams {
+    fn default() -> Self {
+        Self {
+            sigma: 0.1,
+            delta: 2.0,
+            gamma: 1.0,
+            max_iterations: 50,
+            max_top_k_expansion: 10,
+            max_hyperedge_sort_size: 64,
+        }
+    }
+}
+
 /// Selection of algorithm strategy for Personalized PageRank (PPR).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PprAlgorithm {
     /// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise).
@@ -350,6 +409,12 @@ pub enum PprAlgorithm {
     ForwardPush,
     /// Shadow mode: executes both algorithms, returns DensePowerIteration result, and logs discrepancies.
     ShadowMode,
+    /// Thresholded Local Hyper-Flow Diffusion (§21.1). Läuft nur, wenn explizit gewählt oder über
+    /// `ShadowModeTlHfd` gegen ForwardPush verglichen (AK-16).
+    TlHfd(TlHfdParams),
+    /// Shadow-Vergleich Forward-Push ↔ TL-HFD (AK-16), getrennt von `ShadowMode`
+    /// (Forward-Push ↔ DensePowerIteration), um dessen 8 bestehende Call-Sites nicht zu brechen.
+    ShadowModeTlHfd(TlHfdParams),
 }
 
 /// Configuration parameters for Personalized PageRank (PPR).

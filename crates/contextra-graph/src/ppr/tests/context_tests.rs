@@ -782,3 +782,37 @@ async fn test_forward_push_performance_benchmark_vs_dense() {
             "Forward-push must achieve significant speedup over dense power iteration (expected >= {expected_min_speedup}x, got {speedup:.2}x)"
         );
 }
+
+#[tokio::test]
+async fn test_ppr_tl_hfd_and_shadow_mode_context_dispatch() {
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    let e1 = EntityId::new(100);
+    let e2 = EntityId::new(200);
+    let e3 = EntityId::new(300);
+
+    graph.add_entity(tx, Entity::new(e1, "Alpha", "Type1")).await.unwrap();
+    graph.add_entity(tx, Entity::new(e2, "Beta", "Type1")).await.unwrap();
+    graph.add_entity(tx, Entity::new(e3, "Gamma", "Type1")).await.unwrap();
+
+    graph.add_edge(tx, Edge::new(e1, e2, "rel_a")).await.unwrap();
+    graph.add_edge(tx, Edge::new(e2, e3, "rel_b")).await.unwrap();
+    graph.commit(tx).await.unwrap();
+
+    let cfg_tlhfd = PprConfig {
+        algorithm: PprAlgorithm::TlHfd(contextra_core::TlHfdParams::default()),
+        ..Default::default()
+    };
+
+    let cfg_shadow = PprConfig {
+        algorithm: PprAlgorithm::ShadowModeTlHfd(contextra_core::TlHfdParams::default()),
+        ..Default::default()
+    };
+
+    let res_tlhfd = graph.personalized_page_rank(&[e1], &cfg_tlhfd).await.unwrap();
+    let res_shadow = graph.personalized_page_rank(&[e1], &cfg_shadow).await.unwrap();
+
+    assert!(!res_tlhfd.is_empty(), "TL-HFD should return non-empty PPR results");
+    assert!(!res_shadow.is_empty(), "ShadowModeTlHfd should return non-empty PPR results");
+}
