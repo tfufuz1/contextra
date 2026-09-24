@@ -11,7 +11,8 @@
 //! [`AgentTool`] trait to participate in the orchestration loop.
 
 use crate::context::AgentContext;
-use contextra_core::{BoxFuture, Result, TxId};
+use contextra_ports::{BoxFuture};
+use contextra_types::{Result, TxId};
 use serde::{Deserialize, Serialize};
 
 /// Ein fehlgeschlagener Agent-Schritt der für spätere Analyse und Idempotenz-Prüfung persistiert wird.

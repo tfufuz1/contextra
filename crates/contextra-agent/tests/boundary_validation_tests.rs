@@ -1,13 +1,13 @@
 // Comprehensive tests verifying boundary input validations and resource limits.
 
-use contextra_core::BoxFuture;
+use contextra_ports::BoxFuture;
 
 use contextra_agent::context::{validate_node_id, validate_task_id};
 use contextra_agent::{
     AgentContext, AgentTool, BackgroundEvent, NodeType, OrchestratorEngine, StateGraph, StepResult,
     VecEventSource,
 };
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use contextra_db::{Contextra, ContextraConfig};
 use tempfile::TempDir;
 
@@ -24,7 +24,7 @@ impl AgentTool for DummyTool {
         &'a self,
         _ctx: &'a AgentContext,
         _input: serde_json::Value,
-    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> BoxFuture<'a, contextra_types::Result<StepResult>> {
         Box::pin(async move {
             Ok(StepResult {
                 node_id: "test".to_string(),

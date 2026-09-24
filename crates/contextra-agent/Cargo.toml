@@ -14,7 +14,8 @@ default = []
 test-utils = []
 
 [dependencies]
-contextra-core       = { workspace = true }
+contextra-types      = { workspace = true }
+contextra-ports      = { workspace = true }
 bytes = { workspace = true }
 contextra-db         = { workspace = true }
 contextra-graph      = { workspace = true }

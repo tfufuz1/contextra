@@ -10,7 +10,8 @@
 //! Provides `EventSource` trait and concrete implementations (`PollingDocumentEventSource`, `VecEventSource`).
 
 use crate::context::MAX_ID_LEN;
-use contextra_core::{BoxFuture, ContextraError, Result, StorageEngine};
+use contextra_ports::{BoxFuture, StorageEngine};
+use contextra_types::{ContextraError, Result};
 use contextra_db::Collection;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -38,19 +39,19 @@ impl BackgroundEvent {
     ) -> Result<Self> {
         let source_str = source.into();
         if source_str.trim().is_empty() {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "BackgroundEvent source must not be empty".to_string(),
             ));
         }
         if source_str.len() > MAX_ID_LEN {
-            return Err(contextra_core::ContextraError::InvalidInput(format!(
+            return Err(contextra_types::ContextraError::InvalidInput(format!(
                 "BackgroundEvent source length {} exceeds maximum allowed length of {}",
                 source_str.len(),
                 MAX_ID_LEN
             )));
         }
         if source_str.contains('\0') {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "BackgroundEvent source cannot contain null bytes".to_string(),
             ));
         }

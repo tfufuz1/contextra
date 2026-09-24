@@ -1,5 +1,5 @@
 use contextra_agent::{NodeType, StateGraph};
-use contextra_core::BoxFuture;
+use contextra_ports::BoxFuture;
 
 #[tokio::test]
 async fn test_stategraph_construction() {
@@ -36,7 +36,7 @@ fn test_stategraph_boundary_validation() {
     // Empty Node ID validation
     let node_res = graph.try_add_node("", "Invalid empty node", NodeType::Task, None);
     assert!(node_res.is_err());
-    if let Err(contextra_core::ContextraError::InvalidInput(msg)) = node_res {
+    if let Err(contextra_types::ContextraError::InvalidInput(msg)) = node_res {
         assert!(msg.contains("node_id cannot be empty"));
     } else {
         panic!("Expected InvalidInput error");
@@ -45,7 +45,7 @@ fn test_stategraph_boundary_validation() {
     // Empty Node description validation
     let desc_res = graph.try_add_node("node_x", "", NodeType::Task, None);
     assert!(desc_res.is_err());
-    if let Err(contextra_core::ContextraError::InvalidInput(msg)) = desc_res {
+    if let Err(contextra_types::ContextraError::InvalidInput(msg)) = desc_res {
         assert!(msg.contains("StateGraph node description must not be empty"));
     } else {
         panic!("Expected InvalidInput error");
@@ -89,7 +89,7 @@ fn test_background_event_boundary_validation() {
 #[tokio::test]
 async fn test_agent_context_boundary_validation() {
     use contextra_agent::context::AgentContext;
-    use contextra_core::TokenBudget;
+    use contextra_types::TokenBudget;
     use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -159,7 +159,7 @@ impl contextra_agent::AgentTool for CountingTool {
         &'a self,
         _ctx: &'a contextra_agent::AgentContext,
         _input: serde_json::Value,
-    ) -> BoxFuture<'a, contextra_core::Result<contextra_agent::StepResult>> {
+    ) -> BoxFuture<'a, contextra_types::Result<contextra_agent::StepResult>> {
         Box::pin(async move {
             self.call_count
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -177,7 +177,7 @@ impl contextra_agent::AgentTool for CountingTool {
 async fn test_pre_execution_budget_check_prevents_tool_execution() {
     use contextra_agent::context::AgentContext;
     use contextra_agent::{NodeType, OrchestratorEngine, StateGraph};
-    use contextra_core::TokenBudget;
+    use contextra_types::TokenBudget;
     use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -260,7 +260,7 @@ async fn test_pre_execution_budget_check_prevents_tool_execution() {
 async fn test_replay_from_restores_budget_state() {
     use contextra_agent::context::AgentContext;
     use contextra_agent::{NodeType, OrchestratorEngine, StateGraph};
-    use contextra_core::TokenBudget;
+    use contextra_types::TokenBudget;
     use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -333,7 +333,7 @@ async fn test_replay_from_restores_budget_state() {
 async fn test_replay_from_identifier_resolution() {
     use contextra_agent::context::AgentContext;
     use contextra_agent::{NodeType, OrchestratorEngine, StateGraph};
-    use contextra_core::TokenBudget;
+    use contextra_types::TokenBudget;
     use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -476,7 +476,7 @@ async fn test_audit_log_field_reused_across_steps() {
     use contextra_agent::audit::AuditLog;
     use contextra_agent::context::AgentContext;
     use contextra_agent::{NodeType, OrchestratorEngine, StateGraph};
-    use contextra_core::TokenBudget;
+    use contextra_types::TokenBudget;
     use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;

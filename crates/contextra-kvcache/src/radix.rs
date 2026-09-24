@@ -13,7 +13,7 @@
 //! - **`KvBlockGuard`**: RAII-Guard mit atomarer Referenzzählung, der bei `Drop` den Block freigibt.
 //! - **`PrefixRadixTree`**: Komprimierter Radix-Trie für schnelle O(L) LCP-Suche und Blockzuweisung.
 
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::{ContextraError, TenantId};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 

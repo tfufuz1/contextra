@@ -2,7 +2,7 @@ use contextra_agent::{
     AgentContext, AgentTool, BackgroundEvent, DeadLetterReason, NodeType, OrchestratorEngine,
     StateGraph, StepResult, MAX_WORKFLOW_STEPS,
 };
-use contextra_core::{ContextraError, TokenBudget};
+use contextra_types::{ContextraError, TokenBudget};
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -56,7 +56,7 @@ impl AgentTool for FailingRetriableTool {
         &'a self,
         _ctx: &'a AgentContext,
         _input: serde_json::Value,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<StepResult>> {
         let count = self.exec_count.clone();
         Box::pin(async move {
             count.fetch_add(1, Ordering::SeqCst);

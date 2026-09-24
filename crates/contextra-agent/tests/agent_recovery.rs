@@ -1,8 +1,8 @@
 use contextra_agent::{
     AgentContext, AgentTool, NodeType, OrchestratorEngine, StateGraph, StepResult,
 };
-use contextra_core::BoxFuture;
-use contextra_core::TokenBudget;
+use contextra_ports::BoxFuture;
+use contextra_types::TokenBudget;
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
@@ -19,9 +19,9 @@ impl AgentTool for FailingTool {
         &'a self,
         _ctx: &'a AgentContext,
         _input: serde_json::Value,
-    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> BoxFuture<'a, contextra_types::Result<StepResult>> {
         Box::pin(async move {
-            Err(contextra_core::ContextraError::Internal(
+            Err(contextra_types::ContextraError::Internal(
                 "Simulated failure".to_string(),
             ))
         })
@@ -39,7 +39,7 @@ impl AgentTool for SuccessTool {
         &'a self,
         ctx: &'a AgentContext,
         _input: serde_json::Value,
-    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> BoxFuture<'a, contextra_types::Result<StepResult>> {
         Box::pin(async move {
             Ok(StepResult {
                 node_id: ctx.current_node.clone(),
@@ -366,7 +366,7 @@ async fn test_agent_engine_recovers_orphaned_checkpoint_on_restart() {
 
     // Simulate an abrupt step drop (uncommitted guard)
     let orphan_cp = contextra_checkpoint::StateCheckpoint {
-        tx_id: contextra_core::TxId::new(505),
+        tx_id: contextra_types::TxId::new(505),
         timestamp_ms: 1000,
         namespace: Some("agent".to_string()),
     };
@@ -382,7 +382,7 @@ async fn test_agent_engine_recovers_orphaned_checkpoint_on_restart() {
     assert!(
         initial_orphans
             .iter()
-            .any(|cp| cp.tx_id == contextra_core::TxId::new(505)),
+            .any(|cp| cp.tx_id == contextra_types::TxId::new(505)),
         "Orphaned checkpoint 505 must be registered in engine_a"
     );
 
@@ -418,7 +418,7 @@ async fn test_agent_engine_recovers_orphaned_checkpoint_on_restart() {
     if let Some(registry) = engine_b.checkpoint_store.orphan_registry() {
         let remaining = registry.get_orphaned_checkpoints();
         assert!(
-            !remaining.iter().any(|cp| cp.tx_id == contextra_core::TxId::new(505)),
+            !remaining.iter().any(|cp| cp.tx_id == contextra_types::TxId::new(505)),
             "Orphaned checkpoint 505 must be recovered and cleared after OrchestratorEngine startup recovery"
         );
     }

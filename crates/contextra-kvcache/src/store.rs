@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use lru::LruCache;
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::{ContextraError, TenantId};
 use parking_lot::RwLock;
 
 use super::eviction_worker::EvictionWorker;

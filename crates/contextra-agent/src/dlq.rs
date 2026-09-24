@@ -10,8 +10,8 @@
 //! Persistent Dead-Letter-Queue for failed agent step executions.
 
 use crate::step::StepDeadLetter;
-use contextra_core::traits::StorageEngine;
-use contextra_core::{ContextraError, Result, TxId};
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::OnceCell;

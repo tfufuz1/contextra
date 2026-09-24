@@ -8,7 +8,7 @@
 //! Declarative StateGraph definition for Agent Workflows.
 
 use crate::context::{validate_node_id, MAX_ID_LEN};
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -81,7 +81,7 @@ impl StateGraph {
             ));
         }
         if description.trim().is_empty() {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "StateGraph node description must not be empty".to_string(),
             ));
         }

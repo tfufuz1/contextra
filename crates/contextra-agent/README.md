@@ -33,7 +33,7 @@ Persistent agent workflow engine for Contextra — `checkpoint → execute → c
 
 ```rust
 use contextra_agent::{AgentContext, AgentTool, NodeType, OrchestratorEngine, StateGraph, StepResult};
-use contextra_core::TokenBudget;
+use contextra_types::TokenBudget;
 use contextra_db::{Contextra, ContextraConfig};
 use std::sync::Arc;
 

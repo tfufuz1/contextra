@@ -4,8 +4,8 @@
 
 use contextra_agent::step::StepResult;
 use contextra_agent::{AgentContext, NodeType, OrchestratorEngine, StateGraph};
-use contextra_core::BoxFuture;
-use contextra_core::TokenBudget;
+use contextra_ports::BoxFuture;
+use contextra_types::TokenBudget;
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ impl contextra_agent::AgentTool for EchoTool {
         &'a self,
         _ctx: &'a AgentContext,
         input: serde_json::Value,
-    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> BoxFuture<'a, contextra_types::Result<StepResult>> {
         Box::pin(async move {
             Ok(StepResult {
                 node_id: "echo".to_string(),
