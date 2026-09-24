@@ -125,7 +125,7 @@ impl EgressGuard {
 mod tests {
     use super::*;
     use contextra::Contextra;
-    use contextra_core::traits::{BoxFuture, EmbeddingError, EmbeddingProvider, TextEmbeddingEngine};
+    use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider, TextEmbeddingEngine};
     use tempfile::TempDir;
 
     #[derive(Clone, Debug)]

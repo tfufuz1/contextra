@@ -57,11 +57,11 @@ impl McpError {
     }
 }
 
-impl From<contextra_core::ContextraError> for McpError {
-    fn from(err: contextra_core::ContextraError) -> Self {
+impl From<contextra_types::ContextraError> for McpError {
+    fn from(err: contextra_types::ContextraError) -> Self {
         match err {
-            contextra_core::ContextraError::InvalidInput(msg)
-            | contextra_core::ContextraError::NotFound(msg) => Self::invalid_params(msg),
+            contextra_types::ContextraError::InvalidInput(msg)
+            | contextra_types::ContextraError::NotFound(msg) => Self::invalid_params(msg),
             other => Self::internal_error(other.to_string()),
         }
     }
@@ -79,7 +79,7 @@ impl From<&str> for McpError {
     }
 }
 
-pub use contextra_core::ipc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
+pub use contextra_wire::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 
 /// Helper function to convert an `McpError` directly into a `JsonRpcResponse`.
 pub fn response_from_error(id: Option<Value>, err: McpError) -> JsonRpcResponse {

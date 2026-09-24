@@ -6,8 +6,9 @@
 #![cfg(feature = "kv-stage-b")]
 
 use candle_core::Device;
-use contextra_core::traits::ContextSegment;
-use contextra_core::{ContextraError, LlmTextGenerator, ModelFingerprint, Result, TenantId};
+use contextra_ports::ContextSegment;
+use contextra_types::{ContextraError, ModelFingerprint, Result, TenantId};
+use contextra_ports::LlmTextGenerator;
 use contextra_infer_candle::{
     CandleLlmClient, CandleModelInner, KvState, LayerKv, PrefixRun, PrefixSeed, QuantizedLlamaModel,
 };

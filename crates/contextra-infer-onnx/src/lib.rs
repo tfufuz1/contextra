@@ -25,7 +25,9 @@
 use std::sync::Arc;
 
 #[cfg(feature = "onnx")]
-use contextra_core::{BoxFuture, EmbeddingError, EmbeddingProvider, ContextraError, Result};
+use contextra_types::{ContextraError, Result};
+#[cfg(any(feature = "onnx", feature = "candle-backend"))]
+use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider};
 #[cfg(feature = "onnx")]
 use ort::value::Value;
 #[cfg(feature = "onnx")]
@@ -176,8 +178,8 @@ async fn download_onnx_file(
 pub async fn ensure_onnx_model_download(
     _model_name: &str,
     _cache_dir: Option<&Path>,
-) -> contextra_core::Result<PathBuf> {
-    Err(contextra_core::ContextraError::CapabilityUnsupported {
+) -> contextra_types::Result<PathBuf> {
+    Err(contextra_types::ContextraError::CapabilityUnsupported {
         capability: "onnx".to_string(),
         reason: "ONNX support is disabled in this build. Recompile with feature flag 'onnx'."
             .to_string(),
@@ -191,14 +193,9 @@ pub use contextra_infer_candle::CandleEmbedClient;
 /// Creates a trait object `Box<dyn EmbeddingProvider>` wrapping a `CandleEmbedClient`.
 pub fn create_candle_embedder(
     client: CandleEmbedClient,
-) -> Box<dyn contextra_core::EmbeddingProvider> {
+) -> Box<dyn contextra_ports::EmbeddingProvider> {
     Box::new(client)
 }
-
-/// Counter tracking the number of ONNX session load operations (for test verification).
-#[cfg(feature = "onnx")]
-pub static SESSION_LOAD_COUNT: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
 
 /// Conservative default. Override via `TextEmbedderConfig::max_batch_size`.
 /// At 1536D × 512 × f32 = ~3 MB input tensor; safe within 128 MB memory budgets.
@@ -276,6 +273,8 @@ pub struct TextEmbedder {
     config: TextEmbedderConfig,
     /// Expected output embedding dimension.
     expected_dim: Option<usize>,
+    /// Number of ONNX session loads for this instance.
+    session_load_count: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 #[cfg(feature = "onnx")]
@@ -437,7 +436,7 @@ impl TextEmbedder {
                 ))
             })?;
 
-        SESSION_LOAD_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let session_load_count = Arc::new(std::sync::atomic::AtomicUsize::new(1));
 
         let expected_dim = config.expected_dim;
         let max_concurrent = config.max_concurrent_embeddings;
@@ -447,7 +446,14 @@ impl TextEmbedder {
             semaphore: Arc::new(tokio::sync::Semaphore::new(max_concurrent)),
             config,
             expected_dim,
+            session_load_count,
         })
+    }
+
+    /// Returns the number of times an ONNX session has been loaded by this embedder instance.
+    #[doc(hidden)]
+    pub fn session_load_count(&self) -> usize {
+        self.session_load_count.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Sets the expected embedding output dimension for post-inference validation.
@@ -703,7 +709,7 @@ mod tests {
 
     #[test]
     fn test_formatting_safety() {
-        use contextra_core::ContextraError;
+        use contextra_types::ContextraError;
         // Verify that Debug formatting on ContextraError doesn't panic
         let err = ContextraError::Internal("test".into());
         let formatted = format!("{:?}", err);
@@ -735,7 +741,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_embedding_engine() -> std::result::Result<(), Box<dyn std::error::Error>> {
-        use contextra_core::{BoxFuture, Result, TextEmbeddingEngine};
+        use contextra_types::Result;
+use contextra_ports::{BoxFuture, TextEmbeddingEngine};
 
         struct MockEngine;
         impl TextEmbeddingEngine for MockEngine {
@@ -753,7 +760,8 @@ mod tests {
     #[tokio::test]
     async fn test_embed_batch_ordering_and_fallback(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        use contextra_core::{BoxFuture, ContextraError, Result, TextEmbeddingEngine};
+        use contextra_types::{ContextraError, Result};
+use contextra_ports::{BoxFuture, TextEmbeddingEngine};
 
         struct MockOrderedEngine {
             fail_on: Option<String>,
@@ -799,7 +807,7 @@ mod tests {
     #[tokio::test]
     async fn test_embed_batch_oversized_limit(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        use contextra_core::EmbeddingProvider;
+        use contextra_ports::EmbeddingProvider;
         use std::path::PathBuf;
 
         let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -833,7 +841,7 @@ mod tests {
         if let Err(err) = res {
             assert!(matches!(
                 err,
-                contextra_core::ContextraError::CapabilityUnsupported { .. }
+                contextra_types::ContextraError::CapabilityUnsupported { .. }
             ));
         }
     }

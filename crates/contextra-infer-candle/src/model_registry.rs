@@ -3,7 +3,7 @@
 // ZWECK: Model fingerprinting and CandleQuantization definitions.
 // INVARIANTEN: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
 
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::fs::File;
@@ -47,7 +47,7 @@ impl FromStr for CandleQuantization {
     }
 }
 
-pub use contextra_core::ModelFingerprint;
+pub use contextra_types::ModelFingerprint;
 
 /// Computes a unique fingerprint for a model file and quantization variant.
 ///

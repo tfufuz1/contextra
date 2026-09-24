@@ -3,8 +3,8 @@
 // ZWECK: Trait-based EmbeddingProvider implementation for CandleEmbedClient.
 // INVARIANTEN: No block-on in async context; spawn_blocking for CPU inference; embedding_dim strictly matches model dimension.
 
-use contextra_core::traits::embedding::EmbeddingError;
-use contextra_core::traits::{BoxFuture, EmbeddingProvider};
+use contextra_ports::embedding::EmbeddingError;
+use contextra_ports::{BoxFuture, EmbeddingProvider};
 use std::sync::Arc;
 
 use crate::embedding::CandleEmbedClient;

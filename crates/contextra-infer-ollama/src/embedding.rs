@@ -7,7 +7,8 @@
 
 use crate::client::{OllamaClient, OllamaConfig, DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL};
 use crate::model_info::known_dimension;
-use contextra_core::{BoxFuture, EmbeddingError, EmbeddingProvider, ContextraError};
+use contextra_types::ContextraError;
+use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider};
 
 /// Implementation of `TextEmbeddingEngine` using Ollama's HTTP API.
 #[derive(Clone, Debug)]
@@ -189,7 +190,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dimension_validation_mismatch_returns_index_error() {
-        use contextra_core::TextEmbeddingEngine;
+        use contextra_ports::TextEmbeddingEngine;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
         let server_url = format!("http://{}", addr);

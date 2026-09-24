@@ -12,12 +12,12 @@
 #![cfg(feature = "kv-bridge")]
 
 use bytes::Bytes;
-use contextra_core::traits::ContextSegment;
+use contextra_ports::ContextSegment;
 #[cfg(feature = "contextra-store")]
-use contextra_core::traits::StorageEngine;
+use contextra_ports::StorageEngine;
 #[cfg(feature = "contextra-store")]
-use contextra_core::TxId;
-use contextra_core::{ModelFingerprint, TenantId};
+use contextra_types::TxId;
+use contextra_types::{ModelFingerprint, TenantId};
 #[cfg(feature = "contextra-store")]
 use contextra_crypto::EncryptedKvLayer;
 #[cfg(test)]

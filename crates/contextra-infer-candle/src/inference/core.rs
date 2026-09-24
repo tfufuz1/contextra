@@ -20,10 +20,9 @@ use crate::model::quantized_llama::ModelWeights;
 #[cfg(not(feature = "kv-stage-b"))]
 use candle_transformers::models::quantized_llama::ModelWeights;
 use futures_util::stream;
-use contextra_core::traits::{BoxFuture, BoxStream, ContextSegment};
-use contextra_core::{
-    ConfigFingerprint, LlmTextGenerator, LlmTextGeneratorStreaming, ContextraError, Result, TenantId,
-};
+use contextra_ports::{BoxFuture, BoxStream, ContextSegment};
+use contextra_types::{ConfigFingerprint, ContextraError, Result, TenantId};
+use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;

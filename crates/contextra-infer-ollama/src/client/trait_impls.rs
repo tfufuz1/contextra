@@ -1,21 +1,21 @@
 use super::core::OllamaClient;
 
-impl contextra_core::LlmTextGenerator for OllamaClient {
+impl contextra_ports::LlmTextGenerator for OllamaClient {
     fn generate<'a>(
         &'a self,
         prompt: &'a str,
-    ) -> contextra_core::traits::BoxFuture<'a, contextra_core::Result<String>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<String>> {
         Box::pin(async move { self.generate_text(&self.config().model, prompt).await })
     }
 }
 
-impl contextra_core::LlmTextGeneratorStreaming for OllamaClient {
+impl contextra_ports::LlmTextGeneratorStreaming for OllamaClient {
     fn generate_stream<'a>(
         &'a self,
         prompt: &'a str,
-        _config: &'a contextra_core::ConfigFingerprint,
-    ) -> contextra_core::traits::BoxStream<'a, contextra_core::Result<String>> {
-        let (tx, rx) = tokio::sync::mpsc::channel::<contextra_core::Result<String>>(32);
+        _config: &'a contextra_types::ConfigFingerprint,
+    ) -> contextra_ports::BoxStream<'a, contextra_types::Result<String>> {
+        let (tx, rx) = tokio::sync::mpsc::channel::<contextra_types::Result<String>>(32);
         let client = self.clone();
         let prompt_owned = prompt.to_string();
 
@@ -38,11 +38,11 @@ impl contextra_core::LlmTextGeneratorStreaming for OllamaClient {
     }
 }
 
-impl contextra_core::SegmentSynthesizer for OllamaClient {
+impl contextra_ports::SegmentSynthesizer for OllamaClient {
     fn synthesize_segment<'a>(
         &'a self,
         segment_texts: &'a [&'a str],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<String>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<String>> {
         Box::pin(async move {
             let combined = segment_texts.join("\n---\n");
             let prompt = format!(

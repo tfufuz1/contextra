@@ -22,8 +22,8 @@ serde = { workspace = true }
 tracing = { workspace = true }
 bincode = { workspace = true, optional = true }
 half = "2.4"
-contextra-core = { workspace = true }
-contextra-ports = { workspace = true, optional = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-crypto = { workspace = true, optional = true }
 contextra-store = { workspace = true, optional = true }
@@ -32,7 +32,6 @@ contextra-store = { workspace = true, optional = true }
 tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { workspace = true }
-contextra-core = { workspace = true }
 contextra-crypto = { workspace = true }
 
 [[bench]]
@@ -43,9 +42,9 @@ required-features = ["kv-bridge"]
 [features]
 default = []
 candle = []
-docid-128 = ["contextra-core/docid-128"]
+docid-128 = ["contextra-types/docid-128"]
 kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode", "dep:contextra-store", "contextra-store"]
-kv-stage-b = ["dep:contextra-ports", "dep:bincode"]
+kv-stage-b = ["dep:bincode"]
 contextra-store = ["dep:contextra-store"]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 

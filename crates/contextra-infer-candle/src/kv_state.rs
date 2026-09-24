@@ -7,7 +7,7 @@
 use bytes::Bytes;
 use candle_core::{DType, Device, Tensor};
 use half::f16;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use contextra_ports::kv::KvBlock;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;

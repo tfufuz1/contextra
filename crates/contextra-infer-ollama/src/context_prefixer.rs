@@ -15,7 +15,7 @@
 
 use crate::client::xml_escape;
 use crate::OllamaClient;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 
 /// Konfiguration für Kontext-Präfix-Generierung.
 #[derive(Debug, Clone)]
@@ -46,7 +46,7 @@ impl Default for ContextPrefixConfig {
 ///
 /// # Verwendung
 /// ```no_run
-/// # async fn example() -> Result<(), contextra_core::ContextraError> {
+/// # async fn example() -> Result<(), contextra_types::ContextraError> {
 /// use contextra_infer_ollama::{OllamaClient, ContextPrefixEngine, ContextPrefixConfig};
 /// let client = OllamaClient::new("http://localhost:11434");
 /// let engine = ContextPrefixEngine::new(client, ContextPrefixConfig::default());

@@ -2,7 +2,7 @@
 // STAND: 2026-09-15T16:10:40Z (SESSION: ec33599e)
 // ZWECK: Haupt-Reranker-API (`CrossEncoderReranker`) und Backend-Abstraktion.
 
-use contextra_core::{ConfigFingerprint, ContextraError};
+use contextra_types::{ConfigFingerprint, ContextraError};
 use contextra_rank::PlattScaler;
 
 use super::config::{MAX_CANDIDATES, RerankConfig, RerankResult};

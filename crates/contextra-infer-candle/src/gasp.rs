@@ -18,10 +18,8 @@
 //! ein Abstention-Pfad ausgelöst (`Err(ContextraError::PolicyViolation(...))` mit `LowConfidenceGrounding`),
 //! anstatt die ungeprüfte/unsichere Antwort durchzureichen.
 
-use contextra_core::traits::{
-    BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
-};
-use contextra_core::{ConfigFingerprint, ContextChunk, ContextraError, Result};
+use contextra_ports::{ BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator, };
+use contextra_types::{ConfigFingerprint, ContextChunk, ContextraError, Result};
 use contextra_rank::IsotonicCalibrator;
 use std::sync::Mutex;
 
@@ -268,7 +266,7 @@ impl ResponseGroundingValidator for GaspValidator {
             .iter()
             .enumerate()
             .map(|(i, src)| ContextChunk {
-                doc_id: contextra_core::DocId::from(i as u64 + 1),
+                doc_id: contextra_types::DocId::from(i as u64 + 1),
                 content: src.to_string(),
                 relevance: 1.0,
                 token_count: 0,
@@ -315,7 +313,7 @@ impl GroundingValidator for GaspValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::DocId;
+    use contextra_types::DocId;
 
     fn sample_chunk(id: u64, content: &str) -> ContextChunk {
         ContextChunk {
