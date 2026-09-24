@@ -1,0 +1,452 @@
+//! PathRAG Engine — Graph-basiertes Retrieval via bidirektionaler Dijkstra.
+//!
+//! Basis: arXiv:2502.14902 (PathRAG, AAAI 2026).
+//! Präzisions-Scope: Nur für Multi-Hop-Anfragen verwenden (arXiv:2506.05690).
+//! Sufficiency-Gate verhindert Precision-Kollaps (arXiv:2506.00610).
+//!
+//! INTEGRATION: PathRAG liefert ein RRF-Signal neben Vektor- und BM25-Signal.
+//! Resultat von to_rrf_signal() wird in FusionEngine als drittes Signal eingespeist.
+
+pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use ahash::AHashMap;
+use contextra_types::DocId;
+pub use contextra_types::EntityId;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
+use std::sync::Arc;
+
+/// Ein gefundener Pfad zwischen zwei Knoten.
+#[derive(Debug, Clone)]
+pub struct GraphPath {
+    /// Knoten-Sequenz vom Start zum Ziel.
+    pub nodes: Vec<EntityId>,
+    /// Kantengewichte entlang des Pfades (len = nodes.len() - 1).
+    pub edge_weights: Vec<f32>,
+    /// Konfidenz: Produkt aller Kantengewichte.
+    pub confidence: f64,
+    /// Invertierte Gesamtdistanz als Flow-Proxy.
+    pub total_flow: f32,
+}
+
+/// Trait für Graphen die PathRAG konsumieren kann.
+/// Ermöglicht Testbarkeit ohne echten CSR-Graphen.
+pub trait PathGraph: Send + Sync {
+    fn neighbors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)>;
+    fn predecessors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)>;
+
+    /// Returns hyperedge IDs associated with the given entity (default: empty).
+    fn hyperedges_for_entity(&self, _node: EntityId) -> Vec<HyperEdgeId> {
+        Vec::new()
+    }
+
+    /// Resolves a HyperEdgeId to its full HyperEdge details (default: None).
+    fn get_hyperedge(&self, _id: HyperEdgeId) -> Option<Arc<HyperEdge>> {
+        None
+    }
+
+    /// Returns participant role bindings for a given hyperedge ID (default: resolves via get_hyperedge).
+    fn hyperedge_participants(&self, id: HyperEdgeId) -> Arc<[RoleBinding]> {
+        match self.get_hyperedge(id) {
+            Some(he) => he.participants.clone(),
+            None => Arc::from([]),
+        }
+    }
+}
+
+/// Configuration parameters for Forward-Push Personalized PageRank (PPR).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PprParams {
+    /// Teleport probability ($\alpha$, default: 0.15).
+    pub alpha: f32,
+    /// Convergence error tolerance threshold ($\epsilon$, default: 1e-4).
+    pub epsilon: f32,
+    /// Discount factor applied to virtual hyperedge neighbor push shares (default: 0.85).
+    pub hyperedge_decay: f32,
+}
+
+impl Default for PprParams {
+    fn default() -> Self {
+        Self {
+            alpha: 0.15,
+            epsilon: 1e-4,
+            hyperedge_decay: 0.85,
+        }
+    }
+}
+
+/// Andersen-Chung-Lang Forward-Push PPR implementation with Hyperedge Expansion (§6.6, H3).
+///
+/// Runtime is $O(1/(\alpha \cdot \epsilon))$, independent of $|V| + |E|$ (P24).
+pub fn forward_push_ppr<G: PathGraph>(
+    graph: &G,
+    seeds: &[EntityId],
+    params: &PprParams,
+) -> AHashMap<EntityId, f32> {
+    let mut p: AHashMap<EntityId, f32> = AHashMap::default();
+    if seeds.is_empty() {
+        return p;
+    }
+
+    let mut r: AHashMap<EntityId, f32> = seeds
+        .iter()
+        .map(|&s| (s, 1.0 / seeds.len() as f32))
+        .collect();
+    let mut queue: std::collections::VecDeque<EntityId> = seeds.iter().copied().collect();
+    let mut in_queue: ahash::AHashSet<EntityId> = seeds.iter().copied().collect();
+
+    while let Some(u) = queue.pop_front() {
+        in_queue.remove(&u);
+
+        let binary_neighbors = graph.neighbors_with_weights(u);
+        let mut hyper_participants = Vec::new();
+        for hedge_id in graph.hyperedges_for_entity(u) {
+            for role_binding in graph.hyperedge_participants(hedge_id).iter() {
+                if role_binding.entity != u {
+                    hyper_participants.push(role_binding.entity);
+                }
+            }
+        }
+
+        let total_neighbors_count = binary_neighbors.len() + hyper_participants.len();
+        let degree = (total_neighbors_count as f32).max(1.0);
+
+        let r_u = *r.get(&u).unwrap_or(&0.0);
+        if r_u / degree <= params.epsilon {
+            continue;
+        }
+
+        *p.entry(u).or_insert(0.0) += params.alpha * r_u;
+        r.insert(u, 0.0);
+
+        let push_share = (1.0 - params.alpha) * r_u / degree;
+
+        // Binary neighbors (unmodified hotpath invariant).
+        for (v, _w) in binary_neighbors {
+            let entry = r.entry(v).or_insert(0.0);
+            *entry += push_share;
+            if in_queue.insert(v) {
+                queue.push_back(v);
+            }
+        }
+
+        // Virtual neighbors from hyperedges (§6.6, H3) with hyperedge_decay discount.
+        for v in hyper_participants {
+            let entry = r.entry(v).or_insert(0.0);
+            *entry += push_share * params.hyperedge_decay;
+            if in_queue.insert(v) {
+                queue.push_back(v);
+            }
+        }
+    }
+
+    p
+}
+
+/// Normativer Default-Schwellenwert für das Sufficiency-Gate (ADR-067).
+///
+/// Pfade mit Konfidenz < 0.10 werden verworfen, um Precision-Kollaps durch
+/// Rauschen bei tiefen Multi-Hop-Traversierungen zu verhindern (arXiv:2506.00610).
+pub const DEFAULT_SUFFICIENCY_THRESHOLD: f64 = 0.1;
+
+/// Configuration options for [`PathRAGEngine`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct PathRAGConfig {
+    /// Maximale Suchtiefe (Hop-Limit).
+    pub max_hops: usize,
+    /// Sufficiency-Schwelle: Pfade unter dieser Konfidenz werden gefiltert.
+    pub sufficiency_threshold: f64,
+    /// Enable virtual neighbor expansion over hyperedges during PathRAG traversal.
+    pub hyperedge_expansion_enabled: bool,
+    /// Discount factor applied to hyperedge weights when expanded as virtual neighbors (default: 0.85).
+    pub hyperedge_weight_discount: f32,
+}
+
+impl Default for PathRAGConfig {
+    fn default() -> Self {
+        Self {
+            max_hops: 4,
+            sufficiency_threshold: DEFAULT_SUFFICIENCY_THRESHOLD,
+            hyperedge_expansion_enabled: false,
+            hyperedge_weight_discount: 0.85,
+        }
+    }
+}
+
+pub struct PathRAGEngine<G: PathGraph> {
+    graph: G,
+    pub config: PathRAGConfig,
+}
+
+impl<G: PathGraph> PathRAGEngine<G> {
+    pub fn new(graph: G, max_hops: usize, sufficiency_threshold: f64) -> Self {
+        Self::with_config(
+            graph,
+            PathRAGConfig {
+                max_hops,
+                sufficiency_threshold,
+                hyperedge_expansion_enabled: false,
+                hyperedge_weight_discount: 0.85,
+            },
+        )
+    }
+
+    pub fn with_defaults(graph: G) -> Self {
+        Self::with_config(graph, PathRAGConfig::default())
+    }
+
+    pub fn with_config(graph: G, config: PathRAGConfig) -> Self {
+        Self { graph, config }
+    }
+
+    pub fn max_hops(&self) -> usize {
+        self.config.max_hops
+    }
+
+    pub fn sufficiency_threshold(&self) -> f64 {
+        self.config.sufficiency_threshold
+    }
+
+    /// Returns physical neighbors plus virtual neighbors from hyperedges if expansion is enabled.
+    #[inline]
+    fn get_expanded_neighbors(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        let base_neighbors = self.graph.neighbors_with_weights(node);
+        if !self.config.hyperedge_expansion_enabled {
+            return base_neighbors;
+        }
+
+        self.expand_with_hyperedges(node, base_neighbors)
+    }
+
+    /// Returns physical predecessors plus virtual predecessors from hyperedges if expansion is enabled.
+    #[inline]
+    fn get_expanded_predecessors(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        let base_predecessors = self.graph.predecessors_with_weights(node);
+        if !self.config.hyperedge_expansion_enabled {
+            return base_predecessors;
+        }
+
+        self.expand_with_hyperedges(node, base_predecessors)
+    }
+
+    fn expand_with_hyperedges(
+        &self,
+        node: EntityId,
+        mut candidates: Vec<(EntityId, f32)>,
+    ) -> Vec<(EntityId, f32)> {
+        let hyperedge_ids = self.graph.hyperedges_for_entity(node);
+        for id in hyperedge_ids {
+            if let Some(hyperedge) = self.graph.get_hyperedge(id) {
+                let virtual_weight = hyperedge.weight * self.config.hyperedge_weight_discount;
+                for participant in hyperedge.participants.iter() {
+                    if participant.entity != node {
+                        candidates.push((participant.entity, virtual_weight));
+                    }
+                }
+            }
+        }
+        candidates
+    }
+
+    /// Findet den optimalen Pfad zwischen source und target via bidirektionalem Dijkstra.
+    ///
+    /// Gibt None zurück wenn kein Pfad innerhalb max_hops existiert
+    /// oder Sufficiency-Gate fehlschlägt.
+    pub fn find_path(&self, source: EntityId, target: EntityId) -> Option<GraphPath> {
+        if source == target {
+            return Some(GraphPath {
+                nodes: vec![source],
+                edge_weights: vec![],
+                confidence: 1.0,
+                total_flow: f32::INFINITY,
+            });
+        }
+
+        // Bidirektionaler Dijkstra: Forward von source, Backward von target
+        let mut dist_fwd: HashMap<EntityId, f32> = HashMap::new();
+        let mut dist_bwd: HashMap<EntityId, f32> = HashMap::new();
+        let mut prev_fwd: HashMap<EntityId, (EntityId, f32)> = HashMap::new();
+        let mut prev_bwd: HashMap<EntityId, (EntityId, f32)> = HashMap::new();
+
+        // BinaryHeap: Reverse((f32_bits, EntityId)) — f32 über Bits geordnet
+        let mut heap_fwd: BinaryHeap<Reverse<(u32, EntityId)>> = BinaryHeap::new();
+        let mut heap_bwd: BinaryHeap<Reverse<(u32, EntityId)>> = BinaryHeap::new();
+
+        dist_fwd.insert(source, 0.0);
+        dist_bwd.insert(target, 0.0);
+        heap_fwd.push(Reverse((0u32, source)));
+        heap_bwd.push(Reverse((0u32, target)));
+
+        let mut best_dist = f32::INFINITY;
+        let mut meeting_node: Option<EntityId> = None;
+
+        let mut steps = 0;
+        let max_steps = self.config.max_hops * 1000; // Schutzzähler gegen Endlosschleife
+
+        while (!heap_fwd.is_empty() || !heap_bwd.is_empty()) && steps < max_steps {
+            steps += 1;
+
+            // Vorwärts-Schritt
+            if let Some(Reverse((d_bits, u))) = heap_fwd.pop() {
+                let d = f32::from_bits(d_bits);
+                if d <= *dist_fwd.get(&u).unwrap_or(&f32::INFINITY) {
+                    // Treffen-Check
+                    if let Some(&bwd_d) = dist_bwd.get(&u) {
+                        let total = d + bwd_d;
+                        if total < best_dist {
+                            best_dist = total;
+                            meeting_node = Some(u);
+                        }
+                    }
+
+                    if d <= best_dist {
+                        for (neighbor, weight) in self.get_expanded_neighbors(u) {
+                            let new_d = d + (1.0 / weight.max(1e-8));
+                            let entry = dist_fwd.entry(neighbor).or_insert(f32::INFINITY);
+                            if new_d < *entry {
+                                *entry = new_d;
+                                prev_fwd.insert(neighbor, (u, weight));
+                                heap_fwd.push(Reverse((new_d.to_bits(), neighbor)));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Rückwärts-Schritt
+            if let Some(Reverse((d_bits, u))) = heap_bwd.pop() {
+                let d = f32::from_bits(d_bits);
+                if d <= *dist_bwd.get(&u).unwrap_or(&f32::INFINITY) {
+                    if let Some(&fwd_d) = dist_fwd.get(&u) {
+                        let total = fwd_d + d;
+                        if total < best_dist {
+                            best_dist = total;
+                            meeting_node = Some(u);
+                        }
+                    }
+
+                    if d <= best_dist {
+                        for (neighbor, weight) in self.get_expanded_predecessors(u) {
+                            let new_d = d + (1.0 / weight.max(1e-8));
+                            let entry = dist_bwd.entry(neighbor).or_insert(f32::INFINITY);
+                            if new_d < *entry {
+                                *entry = new_d;
+                                prev_bwd.insert(neighbor, (u, weight));
+                                heap_bwd.push(Reverse((new_d.to_bits(), neighbor)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let meeting = meeting_node?;
+
+        // Pfad rekonstruieren
+        let mut path_nodes = vec![];
+        let mut path_weights = vec![];
+
+        // Vorwärts-Pfad: source → meeting
+        let mut cur = meeting;
+        while cur != source {
+            let (prev, w) = *prev_fwd.get(&cur)?;
+            path_nodes.push(cur);
+            path_weights.push(w);
+            cur = prev;
+        }
+        path_nodes.push(source);
+        path_nodes.reverse();
+        path_weights.reverse();
+
+        // Rückwärts-Pfad: meeting → target
+        cur = meeting;
+        while cur != target {
+            let (next, w) = *prev_bwd.get(&cur)?;
+            path_nodes.push(next);
+            path_weights.push(w);
+            cur = next;
+        }
+
+        let confidence: f64 = path_weights.iter().map(|&w| w as f64).product();
+        let total_flow = if best_dist > 0.0 {
+            best_dist.recip()
+        } else {
+            f32::INFINITY
+        };
+
+        Some(GraphPath {
+            nodes: path_nodes,
+            edge_weights: path_weights,
+            confidence,
+            total_flow,
+        })
+    }
+
+    /// Findet Pfade von einem Ankerknoten zu allen erreichbaren Knoten innerhalb von max_hops.
+    pub fn find_all_paths(&self, source: EntityId) -> Vec<GraphPath> {
+        let mut targets = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back((source, 0));
+
+        while let Some((curr, depth)) = queue.pop_front() {
+            if depth >= self.config.max_hops {
+                continue;
+            }
+            for (nbr, _) in self.get_expanded_neighbors(curr) {
+                if nbr != source && targets.insert(nbr) {
+                    queue.push_back((nbr, depth + 1));
+                }
+            }
+        }
+
+        let mut paths = Vec::new();
+        for target in targets {
+            if let Some(path) = self.find_path(source, target) {
+                if self.sufficiency_check(&path) {
+                    paths.push(path);
+                }
+            }
+        }
+        paths
+    }
+
+    /// Sufficiency-Gate: Filtert Pfade unter Konfidenz-Schwelle.
+    /// Kritisch für Precision (arXiv:2506.00610).
+    pub fn sufficiency_check(&self, path: &GraphPath) -> bool {
+        path.confidence >= self.config.sufficiency_threshold
+    }
+
+    /// Konvertiert gefilterte Pfade in RRF-kompatibles Signal.
+    /// Nur Knoten aus Pfaden die sufficiency_check() passiert haben.
+    ///
+    /// NOTE (Type-Punning Assumption): Re-uses `EntityId` numerical value as `DocId`.
+    /// See explicit confirmation in `csr.rs:5104` ("querying DocId(10) (which equals EntityId 10)").
+    pub fn to_rrf_signal(&self, paths: &[GraphPath]) -> Vec<(DocId, f32)> {
+        let mut scored: HashMap<u64, f32> = HashMap::new();
+
+        for path in paths.iter().filter(|p| self.sufficiency_check(p)) {
+            for (i, &entity_id) in path.nodes.iter().enumerate() {
+                let position_weight = (i + 1) as f32 / path.nodes.len() as f32;
+                *scored.entry(entity_id.inner()).or_insert(0.0) +=
+                    path.total_flow * position_weight;
+            }
+        }
+
+        #[cfg(not(feature = "docid-128"))]
+        let mut result: Vec<(DocId, f32)> = scored
+            .into_iter()
+            .map(|(id, score)| (DocId(id), score))
+            .collect();
+
+        #[cfg(feature = "docid-128")]
+        let mut result: Vec<(DocId, f32)> = scored
+            .into_iter()
+            .map(|(id, score)| (DocId(id as u128), score))
+            .collect();
+
+        result.sort_by(|a, b| b.1.total_cmp(&a.1));
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests;
