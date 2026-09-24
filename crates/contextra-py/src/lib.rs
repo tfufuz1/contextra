@@ -25,6 +25,7 @@ use pyo3::prelude::*;
 use std::sync::Arc;
 
 mod bindings;
+mod kv_links;
 
 use bindings::*;
 
