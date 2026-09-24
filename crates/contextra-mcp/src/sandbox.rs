@@ -188,6 +188,7 @@ impl McpSandbox {
             | "contextra_forget"
             | "contextra_upsert"
             | "contextra_relate"
+            | "contextra_relate_n_ary"
             | "contextra_create_collection"
             | "contextra_drop_collection"
             | "contextra_consolidate" => ToolCategory::DatabaseWrite,

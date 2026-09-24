@@ -7,6 +7,9 @@ use contextra::chunker::{ChunkerConfig, MarkdownChunker};
 use contextra_core::{DocId, StorageEngine, MAX_SEARCH_K};
 use serde_json::{json, Value};
 
+/// Maximale Anzahl von Teilnehmern an einer n-ären Hyperkante (`contextra_relate_n_ary`).
+pub(crate) const MAX_RELATE_PARTICIPANTS: usize = 64;
+
 impl McpServer {
     pub(crate) async fn call_tool(&self, name: &str, args: &Value) -> Result<Value, McpError> {
         self.sandbox
@@ -627,6 +630,291 @@ impl McpServer {
                 serde_json::to_value(&response).map_err(|e| {
                     McpError::internal_error(format!("Response serialization error: {e}"))
                 })
+            }
+
+            "contextra_relate" => {
+                let from = match args.get("from") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'from' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("from cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "from length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'from'"));
+                    }
+                };
+
+                let to = match args.get("to") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'to' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("to cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "to length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'to'"));
+                    }
+                };
+
+                let label = match args.get("label") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'label' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("label cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "label length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'label'"));
+                    }
+                };
+
+                let col_name = if let Some(col_val) = args.get("collection") {
+                    let s = col_val.as_str().ok_or_else(|| {
+                        McpError::invalid_params("Invalid params: 'collection' must be a string")
+                    })?;
+                    if s.trim().is_empty() {
+                        "default"
+                    } else {
+                        validate_collection_name(s)?;
+                        s
+                    }
+                } else {
+                    "default"
+                };
+
+                let bidirectional = match args.get("bidirectional") {
+                    Some(Value::Bool(b)) => *b,
+                    Some(_) => {
+                        return Err(McpError::invalid_params(
+                            "Invalid params: 'bidirectional' must be a boolean",
+                        ));
+                    }
+                    None => false,
+                };
+
+                if let Some(matched_pattern) = self.injection_guard.detect(label) {
+                    return Err(McpError::invalid_params(format!(
+                        "Prompt injection detected in label: {matched_pattern}"
+                    )));
+                }
+
+                let col = self.db.collection(col_name).await.map_err(McpError::from)?;
+                if bidirectional {
+                    col.relate_bidirectional(from, to, label)
+                        .await
+                        .map_err(McpError::from)?;
+                } else {
+                    col.relate(from, to, label)
+                        .await
+                        .map_err(McpError::from)?;
+                }
+
+                Ok(json!({
+                    "status": "ok",
+                    "from": from,
+                    "to": to,
+                    "label": label,
+                    "collection": col_name,
+                    "bidirectional": bidirectional
+                }))
+            }
+
+            "contextra_relate_n_ary" => {
+                let predicate = match args.get("predicate") {
+                    Some(v) => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params("Invalid params: 'predicate' must be a string")
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("predicate cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "predicate length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        s
+                    }
+                    None => {
+                        return Err(McpError::invalid_params("missing required field: 'predicate'"));
+                    }
+                };
+
+                if let Some(matched_pattern) = self.injection_guard.detect(predicate) {
+                    return Err(McpError::invalid_params(format!(
+                        "Prompt injection detected in predicate: {matched_pattern}"
+                    )));
+                }
+
+                let participants_arr = match args.get("participants") {
+                    Some(v) => v.as_array().ok_or_else(|| {
+                        McpError::invalid_params(
+                            "Invalid params: 'participants' must be an array of objects",
+                        )
+                    })?,
+                    None => {
+                        return Err(McpError::invalid_params(
+                            "missing required field: 'participants'",
+                        ));
+                    }
+                };
+
+                if participants_arr.len() < 2 {
+                    return Err(McpError::invalid_params(format!(
+                        "participants must contain at least 2 items, found {}",
+                        participants_arr.len()
+                    )));
+                }
+                if participants_arr.len() > MAX_RELATE_PARTICIPANTS {
+                    return Err(McpError::invalid_params(format!(
+                        "participants count exceeds limit: {} > {} limit",
+                        participants_arr.len(),
+                        MAX_RELATE_PARTICIPANTS
+                    )));
+                }
+
+                let mut participant_pairs: Vec<(&str, &str)> =
+                    Vec::with_capacity(participants_arr.len());
+
+                for (idx, elem) in participants_arr.iter().enumerate() {
+                    let obj = elem.as_object().ok_or_else(|| {
+                        McpError::invalid_params(format!(
+                            "Invalid params: participant at index {idx} must be an object"
+                        ))
+                    })?;
+
+                    let doc_id = match obj.get("doc_id") {
+                        Some(v) => {
+                            let s = v.as_str().ok_or_else(|| {
+                                McpError::invalid_params(format!(
+                                    "Invalid params: participant[{idx}].doc_id must be a string"
+                                ))
+                            })?;
+                            if s.trim().is_empty() {
+                                return Err(McpError::invalid_params(format!(
+                                    "participant[{idx}].doc_id cannot be empty"
+                                )));
+                            }
+                            if s.len() > 256 {
+                                return Err(McpError::invalid_params(format!(
+                                    "participant[{idx}].doc_id length exceeds limit: max 256 chars"
+                                )));
+                            }
+                            s
+                        }
+                        None => {
+                            return Err(McpError::invalid_params(format!(
+                                "missing required field: participant[{idx}].doc_id"
+                            )));
+                        }
+                    };
+
+                    let role = match obj.get("role") {
+                        Some(v) => {
+                            let s = v.as_str().ok_or_else(|| {
+                                McpError::invalid_params(format!(
+                                    "Invalid params: participant[{idx}].role must be a string"
+                                ))
+                            })?;
+                            if s.trim().is_empty() {
+                                return Err(McpError::invalid_params(format!(
+                                    "participant[{idx}].role cannot be empty"
+                                )));
+                            }
+                            if s.len() > 256 {
+                                return Err(McpError::invalid_params(format!(
+                                    "participant[{idx}].role length exceeds limit: max 256 chars"
+                                )));
+                            }
+                            s
+                        }
+                        None => {
+                            return Err(McpError::invalid_params(format!(
+                                "missing required field: participant[{idx}].role"
+                            )));
+                        }
+                    };
+
+                    if let Some(matched_pattern) = self.injection_guard.detect(role) {
+                        return Err(McpError::invalid_params(format!(
+                            "Prompt injection detected in participant[{idx}].role: {matched_pattern}"
+                        )));
+                    }
+
+                    participant_pairs.push((doc_id, role));
+                }
+
+                let source_doc_id_opt = match args.get("source_doc_id") {
+                    Some(v) if !v.is_null() => {
+                        let s = v.as_str().ok_or_else(|| {
+                            McpError::invalid_params(
+                                "Invalid params: 'source_doc_id' must be a string",
+                            )
+                        })?;
+                        if s.trim().is_empty() {
+                            return Err(McpError::invalid_params("source_doc_id cannot be empty"));
+                        }
+                        if s.len() > 256 {
+                            return Err(McpError::invalid_params(
+                                "source_doc_id length exceeds limit: max 256 chars",
+                            ));
+                        }
+                        Some(s)
+                    }
+                    _ => None,
+                };
+
+                let col_name = if let Some(col_val) = args.get("collection") {
+                    let s = col_val.as_str().ok_or_else(|| {
+                        McpError::invalid_params("Invalid params: 'collection' must be a string")
+                    })?;
+                    if s.trim().is_empty() {
+                        "default"
+                    } else {
+                        validate_collection_name(s)?;
+                        s
+                    }
+                } else {
+                    "default"
+                };
+
+                let col = self.db.collection(col_name).await.map_err(McpError::from)?;
+                let hyperedge_id = col
+                    .relate_n_ary(predicate, &participant_pairs, source_doc_id_opt)
+                    .await
+                    .map_err(McpError::from)?;
+
+                Ok(json!({
+                    "status": "ok",
+                    "hyperedge_id": hyperedge_id.inner(),
+                    "participants": participant_pairs.len(),
+                    "collection": col_name
+                }))
             }
 
             other => Err(McpError::invalid_params(format!(
