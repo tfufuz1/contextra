@@ -1,4 +1,5 @@
 pub use super::*;
+pub use crate::compaction::{CompactionConfig, CompactionEngine};
 use tempfile::TempDir;
 
 pub(crate) async fn test_storage() -> (LsmStorage, TempDir) {

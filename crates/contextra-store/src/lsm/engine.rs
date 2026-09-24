@@ -2,31 +2,36 @@ use super::config::LsmConfig;
 use super::guard::LsmState;
 use super::group_commit::PendingCommitQueue;
 use crate::compaction::CompactionEngine;
-use crate::memtable::MemTable;
 use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::Wal;
-use contextra_core::{ContextraError, Result, ResourceTracker, SnapshotRegistry, StorageEngine, TxBuffer, TxId};
+use contextra_core::{
+    ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId,
+};
 use contextra_crypto::crypto::KeyManager;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, AtomicUsize};
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 
 /// LSM-Tree based storage engine.
 pub struct LsmStorage {
-    pub config: LsmConfig,
+    pub(super) config: LsmConfig,
     pub(super) key_manager: Option<Arc<KeyManager>>,
     pub(super) state: RwLock<LsmState>,
+    /// SSTables stored separately for shared access with compaction engine.
     pub(super) sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
     pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
     pub(super) budget: Arc<ResourceTracker>,
     pub(super) block_cache: Arc<BlockCache>,
     pub(super) wal: RwLock<Arc<Wal>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
+    /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
+    /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
     pub(super) compaction_engine: Arc<CompactionEngine>,
     pub(super) manifest: Arc<crate::manifest::Manifest>,
     pub(super) next_seq_no: AtomicU64,
     pub(super) last_committed_tx: AtomicU64,
+    /// Mutex to serialize commits and prevent snapshot inversion (parallel seq_no holes).
     pub(super) commit_mutex: tokio::sync::Mutex<()>,
     pub(super) cancel_token: tokio_util::sync::CancellationToken,
     pub(super) task_tracker: tokio_util::task::TaskTracker,
