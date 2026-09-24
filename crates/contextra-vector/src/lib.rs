@@ -25,12 +25,14 @@ pub mod hnsw;
 pub mod persistence;
 pub mod quantize;
 
+pub mod candidate_stream;
 pub mod compute_pool;
 pub mod partial_rebuild;
 
 #[cfg(feature = "experimental-rabitq")]
 pub mod quantize_rabitq;
 
+pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 pub use compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
