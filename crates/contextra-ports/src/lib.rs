@@ -20,12 +20,16 @@ pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> +
 
 /// Checkpoint and snapshot traits.
 pub mod checkpoint;
+/// Clock port trait and system clock implementation.
+pub mod clock;
 /// Embedding provider and LLM generation traits.
 pub mod embedding;
 /// Graph mutation and CSR traversal port traits.
 pub mod graph;
 /// Graph index traits and CSR statistics.
 pub mod graph_index;
+/// ID generator port trait and sequential implementation.
+pub mod id_gen;
 /// Key-value prefix store traits and types.
 pub mod kv;
 /// Memory lifecycle, grounding validator, and distance calculator contracts.
@@ -34,6 +38,8 @@ pub mod lifecycle;
 pub mod metrics;
 /// Observability and lifecycle re-exports.
 pub mod observability;
+/// Random number generator port trait and deterministic implementation.
+pub mod rng;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -42,13 +48,16 @@ pub mod text_index;
 pub mod vector_index;
 
 pub use checkpoint::*;
+pub use clock::*;
 pub use embedding::*;
 pub use graph::*;
 pub use graph_index::*;
+pub use id_gen::*;
 pub use kv::*;
 pub use lifecycle::*;
 pub use metrics::*;
 pub use observability::*;
+pub use rng::*;
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
@@ -76,6 +85,9 @@ mod dyn_safety {
     fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
+    fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
+    fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
+    fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -87,5 +99,8 @@ mod dyn_safety {
         _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
+        _assert_dyn_clock(None);
+        _assert_dyn_rng(None);
+        _assert_dyn_id_gen(None);
     }
 }
