@@ -209,6 +209,47 @@ impl McpServer {
                                 },
                                 "required": ["query"]
                             }
+                        },
+                        {
+                            "name": "contextra_relate",
+                            "description": "Create a directed or bidirectional binary relationship between two documents. Write permissions must be enabled.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "from":          { "type": "string" },
+                                    "to":            { "type": "string" },
+                                    "label":         { "type": "string" },
+                                    "collection":    { "type": "string", "default": "default" },
+                                    "bidirectional": { "type": "boolean", "default": false }
+                                },
+                                "required": ["from", "to", "label"]
+                            }
+                        },
+                        {
+                            "name": "contextra_relate_n_ary",
+                            "description": "Create an n-ary hyperedge graph relationship connecting multiple participants with assigned roles. Core Spec §6 feature. Write permissions must be enabled.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "predicate": { "type": "string" },
+                                    "participants": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "doc_id": { "type": "string" },
+                                                "role":   { "type": "string" }
+                                            },
+                                            "required": ["doc_id", "role"]
+                                        },
+                                        "minItems": 2,
+                                        "maxItems": 64
+                                    },
+                                    "source_doc_id": { "type": "string" },
+                                    "collection":    { "type": "string", "default": "default" }
+                                },
+                                "required": ["predicate", "participants"]
+                            }
                         }
                     ]
                 }),
@@ -255,7 +296,9 @@ impl McpServer {
             | "contextra_forget"
             | "contextra_collections"
             | "contextra_consolidate"
-            | "contextra_cloud_query" => {
+            | "contextra_cloud_query"
+            | "contextra_relate"
+            | "contextra_relate_n_ary" => {
                 let tool_name = req.method.as_str();
                 match self
                     .sandbox
