@@ -2,7 +2,7 @@
 //!
 //! # Öffentliche Checkpoint-Subsystem Architecture (ADR-011)
 //! `contextra-checkpoint` ist der **einzige öffentlich sichtbare Einstiegspunkt** für das Checkpoint-Konzept.
-//! Es stellt den Trait [`contextra_core::traits::CheckpointCoordinator`], die Registrie [`PersistentCheckpointStore`]
+//! Es stellt den Trait [`contextra_ports::CheckpointCoordinator`], die Registrie [`PersistentCheckpointStore`]
 //! sowie den RAII-Guard [`CheckpointGuard`] für automatisches Rollback bei Fehlern bereit.
 //!
 //! **Hinweis zur Abgrenzung:**
@@ -11,7 +11,7 @@
 //! des Store-Crates verwendet werden.
 //!
 //! # Architektur & Crash-Safety
-//! `PersistentCheckpointStore` delegiert Persistenz an ein [`contextra_core::StorageEngine`]-Objekt
+//! `PersistentCheckpointStore` delegiert Persistenz an ein [`contextra_ports::StorageEngine`]-Objekt
 //! und cacht aktive Checkpoints in einem thread-sicheren In-Memory-Store (`parking_lot::RwLock`).
 //!
 //! **Drop-Semantik & Non-Blocking-I/O:**

@@ -1,4 +1,4 @@
-use contextra_core::{ContextraError, Result, TxId, WorkflowState};
+use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use serde::{Deserialize, Serialize};
 
 // RESOLVED: AGT-CKPT-001 — UTF-8 char counting used for 256 char limit (TS: 2026-09-01T23:07:05Z) (SESSION: 358e3b0a)
@@ -48,6 +48,7 @@ pub struct StateCheckpoint {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
 

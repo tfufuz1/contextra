@@ -2,7 +2,8 @@ use crate::guard::{CheckpointGuard, PinGuard};
 use crate::manifest::CheckpointManifest;
 use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::{monotonic_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
-use contextra_core::{BoxFuture, ContextraError, Result, TxId, WorkflowState};
+use contextra_types::{ContextraError, Result, TxId, WorkflowState};
+use contextra_ports::{BoxFuture};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 /// Trait für die Checkpoint-Verwaltung.
-pub trait CheckpointRegistry: contextra_core::traits::Checkpoint + Send + Sync {
+pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
     fn save_checkpoint<'a>(&'a self, meta: CheckpointMeta) -> BoxFuture<'a, Result<()>>;
     fn load_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<Option<CheckpointMeta>>>;
     fn list_checkpoints<'a>(&'a self) -> BoxFuture<'a, Result<Vec<CheckpointMeta>>>;
@@ -101,7 +102,7 @@ struct TxCounterMeta {
 
 const TX_BATCH_SIZE: u64 = 100;
 
-async fn persist_hwm_internal<S: contextra_core::StorageEngine>(
+async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
     storage: &Arc<S>,
     namespace: &str,
     hwm: u64,
@@ -125,7 +126,7 @@ async fn persist_hwm_internal<S: contextra_core::StorageEngine>(
 /// - Alle Methoden sind durch `RwLock` thread-sicher
 /// - `StorageEngine`-Zugriffe nutzen atomare Transaktionen via `TxId`
 /// - Keine Panics (Zero-Panic Doctrine)
-pub struct PersistentCheckpointStore<S: contextra_core::StorageEngine> {
+pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     storage: Arc<S>,
     /// Registrierter Checkpoint-Index im Arbeitsspeicher — geschützt durch ein konsolidiertes RwLock (P-23)
     index: RwLock<CheckpointIndex>,
@@ -147,7 +148,7 @@ pub struct PersistentCheckpointStore<S: contextra_core::StorageEngine> {
     skipped_rollbacks: Arc<AtomicU64>,
 }
 
-impl<S: contextra_core::StorageEngine> PersistentCheckpointStore<S> {
+impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     /// Öffnet einen PersistentCheckpointStore asynchron mit Rekonstruktion und Monotonie-Garantie.
     pub async fn open(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> {
         let ns = namespace.into();
@@ -711,7 +712,7 @@ impl<S: contextra_core::StorageEngine> PersistentCheckpointStore<S> {
     }
 }
 
-impl<S: contextra_core::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
+impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
     fn save_checkpoint<'a>(&'a self, meta: CheckpointMeta) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let _guard = self.write_lock.lock().await;
@@ -751,7 +752,7 @@ impl<S: contextra_core::StorageEngine> CheckpointRegistry for PersistentCheckpoi
     }
 }
 
-impl<S: contextra_core::StorageEngine> contextra_core::traits::CheckpointCoordinator
+impl<S: contextra_ports::StorageEngine> contextra_ports::CheckpointCoordinator
     for PersistentCheckpointStore<S>
 {
     type Meta = CheckpointMeta;
@@ -781,7 +782,7 @@ impl<S: contextra_core::StorageEngine> contextra_core::traits::CheckpointCoordin
     }
 }
 
-impl<S: contextra_core::StorageEngine> contextra_core::traits::Checkpoint
+impl<S: contextra_ports::StorageEngine> contextra_ports::Checkpoint
     for PersistentCheckpointStore<S>
 {
     fn take_snapshot<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<WorkflowState>> {

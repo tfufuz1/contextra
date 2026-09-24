@@ -1,6 +1,6 @@
 use crate::meta::StateCheckpoint;
 use crate::orphan::{InstanceOrphanRegistry, PinnedSeqNoOrphan};
-use contextra_core::{ContextraError, Result, TxId};
+use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -9,13 +9,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Garantiert, dass eine gepinnte Sequenznummer bei einem Fehler oder Panic während des Schreibens
 /// automatisch entpinnt wird, um dauerhafte GC-Blockaden zu verhindern.
 #[must_use = "PinGuard must be defused upon successful checkpoint storage"]
-pub struct PinGuard<S: contextra_core::StorageEngine> {
+pub struct PinGuard<S: contextra_ports::StorageEngine> {
     storage: Arc<S>,
     seq_no: Option<u64>,
     orphan_registry: Arc<InstanceOrphanRegistry>,
 }
 
-impl<S: contextra_core::StorageEngine> PinGuard<S> {
+impl<S: contextra_ports::StorageEngine> PinGuard<S> {
     pub async fn pin(
         storage: Arc<S>,
         seq_no: u64,
@@ -46,7 +46,7 @@ impl<S: contextra_core::StorageEngine> PinGuard<S> {
     }
 }
 
-impl<S: contextra_core::StorageEngine> Drop for PinGuard<S> {
+impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
     fn drop(&mut self) {
         if let Some(seq_no) = self.seq_no.take() {
             let wall_ms = SystemTime::now()
@@ -74,7 +74,7 @@ impl<S: contextra_core::StorageEngine> Drop for PinGuard<S> {
 /// wird KEIN asynchroner Hintergrund-Rollback gespawnt, um Kollisionen mit späteren Transaktionen zu verhindern.
 /// Stattdessen wird der Checkpoint als "orphaned" registriert/persistiert und beim nächsten kontrollierten Recovery-Zyklus verarbeitet.
 #[must_use = "CheckpointGuard must be explicitly finalized via .commit() or .rollback().await"]
-pub struct CheckpointGuard<S: contextra_core::StorageEngine> {
+pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
     pub(crate) checkpoint: Option<StateCheckpoint>,
     pub(crate) storage: Arc<S>,
     pub(crate) namespace: String,
@@ -82,7 +82,7 @@ pub struct CheckpointGuard<S: contextra_core::StorageEngine> {
     pub(crate) skipped_rollbacks: Arc<AtomicU64>,
 }
 
-impl<S: contextra_core::StorageEngine> CheckpointGuard<S> {
+impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self {
         let ns = namespace.into();
         let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
@@ -250,7 +250,7 @@ impl<S: contextra_core::StorageEngine> CheckpointGuard<S> {
     }
 }
 
-impl<S: contextra_core::StorageEngine> Drop for CheckpointGuard<S> {
+impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
     fn drop(&mut self) {
         if let Some(mut cp) = self.checkpoint.take() {
             cp.namespace = Some(self.namespace.clone());
@@ -266,9 +266,10 @@ impl<S: contextra_core::StorageEngine> Drop for CheckpointGuard<S> {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_core::{BoxFuture, StorageEngine, StorageStats};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
     use parking_lot::Mutex;
     use std::collections::{HashMap, HashSet};
 

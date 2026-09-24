@@ -1,5 +1,5 @@
 use crate::meta::{validate_identifier, CheckpointMeta};
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
 /// AI-TAG\[PANIC-SAFETY\]\[CRITICAL\] RESOLVED: AGT-CKPT-f3a1b2c4 (TS:2026-08-29T08:06:29Z) (SESSION:14348074)
@@ -49,9 +49,10 @@ impl CheckpointManifest {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_core::TxId;
+    use contextra_types::TxId;
 
     #[test]
     fn test_manifest_validation_blank_component() {

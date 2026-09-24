@@ -1,5 +1,5 @@
 use crate::meta::StateCheckpoint;
-use contextra_core::{Result, TxId};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,30 +8,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Type alias for sequence numbers managed as pinned checkpoint identifiers.
 pub type PinId = u64;
 
-/// R-07 AUDIT BEFUND: `DUMMY_ORPHAN_REGISTRY` & Deprecated Global State
-///
-/// **Befund-Zusammenfassung:**
-/// `DUMMY_ORPHAN_REGISTRY` ist ein träger `OnceLock<OrphanRegistry>`-Platzhalter mit leerem Persistierungspfad (`""`),
-/// der ausschließlich zur Abwärtskompatibilität für als `#[deprecated]` markierte legacy Freifunktionen
-/// (`global_orphan_registry`, `register_pinned_seq_no_orphan`, etc.) existiert.
-///
-/// **P29 / Global-State Bewertung:**
-/// 1. Im Produktionsbetrieb (`Contextra::open`, `PersistentCheckpointStore::open`) kommt KEIN globaler Zustand zum Einsatz.
-///    Jede Instanz initialisiert eine isolierte `Arc<InstanceOrphanRegistry>` mit eigenem Dateipfad (ADR-053).
-/// 2. `DUMMY_ORPHAN_REGISTRY` wird im regulären Contextra Cognitive OS Runtime-Betrieb weder gelesen noch geschrieben.
-/// 3. Da `DUMMY_ORPHAN_REGISTRY` mit dem leeren Pfad `""` initialisiert ist, führt ein versehentlicher Aufruf von
-///    Legacy-Methoden zu keinen Dateisystem-Seiteneffekten oder mandantenübergreifenden Zustandskollisionen.
-///
-/// Fazit: Es liegt KEIN echter/aktiver globaler Mutable State im Produktionscode vor; eine refactoringbedingte
-/// Ersetzung ist im Produktionspfad bereits durch `InstanceOrphanRegistry` vollzogen.
-#[allow(deprecated)]
-static DUMMY_ORPHAN_REGISTRY: std::sync::OnceLock<OrphanRegistry> = std::sync::OnceLock::new();
-
+/// Deprecated global orphan functions are no-ops without static mutable state (Spec §3 P29).
+/// All production code uses instance-bound [`InstanceOrphanRegistry`] instances.
 fn warn_deprecated_global_orphan_path() {
     static WARN_ONCE: std::sync::Once = std::sync::Once::new();
     WARN_ONCE.call_once(|| {
         tracing::warn!(
-            "Deprecated global OrphanRegistry path used — migrate to InstanceOrphanRegistry (ADR-053)"
+            "Deprecated global OrphanRegistry path used — migrate to InstanceOrphanRegistry (ADR-053 / P29)"
         );
     });
 }
@@ -43,7 +26,9 @@ fn warn_deprecated_global_orphan_path() {
 #[allow(deprecated)]
 pub fn global_orphan_registry() -> &'static OrphanRegistry {
     warn_deprecated_global_orphan_path();
-    DUMMY_ORPHAN_REGISTRY.get_or_init(|| OrphanRegistry::new(""))
+    static EMPTY_ORPHAN_REGISTRY: std::sync::LazyLock<OrphanRegistry> =
+        std::sync::LazyLock::new(|| OrphanRegistry::new(""));
+    &EMPTY_ORPHAN_REGISTRY
 }
 
 /// Returns the default directory for orphan state files when no environment variable is set.
@@ -122,7 +107,7 @@ impl OrphanRegistry {
     }
 
     /// Recovers all registered orphaned pins by unpinning them in storage and cleaning the registry.
-    pub async fn recover_and_clean<S: contextra_core::StorageEngine>(
+    pub async fn recover_and_clean<S: contextra_ports::StorageEngine>(
         &self,
         storage: &S,
     ) -> Result<Vec<PinId>> {
@@ -471,14 +456,12 @@ pub fn orphaned_checkpoint_count() -> usize {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
 
-    static TEST_GLOBAL_ORPHAN_MUTEX: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
-
     #[test]
     fn test_deprecated_global_orphan_path_warns() {
-        let _guard = TEST_GLOBAL_ORPHAN_MUTEX.lock();
         #[allow(deprecated)]
         {
             clear_all_orphaned_checkpoints();
@@ -553,6 +536,35 @@ mod tests {
 
         let state = OrphanState::default();
         assert!(state.persist_sync().is_ok());
+    }
+
+    #[test]
+    fn test_two_instance_registries_independent() {
+        let dir1 = tempfile::tempdir().expect("tempdir 1");
+        let dir2 = tempfile::tempdir().expect("tempdir 2");
+
+        let path1 = dir1.path().join("orphans1.json");
+        let path2 = dir2.path().join("orphans2.json");
+
+        let reg1 = InstanceOrphanRegistry::new(&path1);
+        let reg2 = InstanceOrphanRegistry::new(&path2);
+
+        reg1.register_orphan_sync(PinnedSeqNoOrphan {
+            seq_no: 101,
+            timestamp_ms: 1000,
+        });
+
+        reg2.register_checkpoint_sync(StateCheckpoint {
+            tx_id: TxId::new(202),
+            timestamp_ms: 2000,
+            namespace: Some("ns2".to_string()),
+        });
+
+        assert_eq!(reg1.get_orphan_pins().len(), 1);
+        assert_eq!(reg1.get_orphaned_checkpoints().len(), 0);
+
+        assert_eq!(reg2.get_orphan_pins().len(), 0);
+        assert_eq!(reg2.get_orphaned_checkpoints().len(), 1);
     }
 
     proptest::proptest! {

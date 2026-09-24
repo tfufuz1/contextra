@@ -1,5 +1,5 @@
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta};
-use contextra_core::TxId;
+use contextra_types::TxId;
 
 fn sample_meta() -> CheckpointMeta {
     CheckpointMeta {
