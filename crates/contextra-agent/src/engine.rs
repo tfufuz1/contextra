@@ -16,8 +16,8 @@ use crate::step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
 use contextra_checkpoint::{
     CheckpointGuard, CheckpointMeta, CheckpointRegistry, PersistentCheckpointStore,
 };
-use contextra_core::traits::StorageEngine;
-use contextra_core::{ContextraError, Result};
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, Result};
 use contextra_store::LsmStorage;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -63,28 +63,28 @@ impl OrchestratorEngine {
             fn save_checkpoint<'a>(
                 &'a self,
                 _meta: CheckpointMeta,
-            ) -> contextra_core::BoxFuture<'a, Result<()>> {
+            ) -> contextra_ports::BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
             fn load_checkpoint<'a>(
                 &'a self,
                 _seq_no: u64,
-            ) -> contextra_core::BoxFuture<'a, Result<Option<CheckpointMeta>>> {
+            ) -> contextra_ports::BoxFuture<'a, Result<Option<CheckpointMeta>>> {
                 Box::pin(async move { Ok(None) })
             }
             fn list_checkpoints<'a>(
                 &'a self,
-            ) -> contextra_core::BoxFuture<'a, Result<Vec<CheckpointMeta>>> {
+            ) -> contextra_ports::BoxFuture<'a, Result<Vec<CheckpointMeta>>> {
                 Box::pin(async move { Ok(Vec::new()) })
             }
         }
-        impl contextra_core::traits::Checkpoint for FallbackRegistry {
+        impl contextra_ports::Checkpoint for FallbackRegistry {
             fn take_snapshot<'a>(
                 &'a self,
-                tx: contextra_core::TxId,
-            ) -> contextra_core::BoxFuture<'a, Result<contextra_core::WorkflowState>> {
+                tx: contextra_types::TxId,
+            ) -> contextra_ports::BoxFuture<'a, Result<contextra_types::WorkflowState>> {
                 Box::pin(async move {
-                    Ok(contextra_core::WorkflowState {
+                    Ok(contextra_types::WorkflowState {
                         tx,
                         graph_hash: [0u8; 32],
                     })
@@ -92,8 +92,8 @@ impl OrchestratorEngine {
             }
             fn restore<'a>(
                 &'a self,
-                _state: &'a contextra_core::WorkflowState,
-            ) -> contextra_core::BoxFuture<'a, Result<()>> {
+                _state: &'a contextra_types::WorkflowState,
+            ) -> contextra_ports::BoxFuture<'a, Result<()>> {
                 Box::pin(async move { Ok(()) })
             }
         }
@@ -578,7 +578,7 @@ impl OrchestratorEngine {
             .and_then(|v| v.as_u64())
         {
             let restored_budget =
-                contextra_core::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
+                contextra_types::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
                     .with_strategy(ctx.budget.strategy.clone());
             restored_budget.consume(consumed as usize);
             ctx.budget = restored_budget;
@@ -593,7 +593,7 @@ impl OrchestratorEngine {
                 .saturating_sub(ctx.budget.reserved);
             let consumed = total_usable.saturating_sub(available as usize);
             let restored_budget =
-                contextra_core::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
+                contextra_types::TokenBudget::new(ctx.budget.limit, ctx.budget.reserved)
                     .with_strategy(ctx.budget.strategy.clone());
             restored_budget.consume(consumed);
             ctx.budget = restored_budget;

@@ -5,7 +5,8 @@
 
 use contextra_agent::step::{AgentTool, StepResult};
 use contextra_agent::{AgentContext, NodeType, OrchestratorEngine, StateGraph};
-use contextra_core::{BoxFuture, Result, TokenBudget};
+use contextra_ports::{BoxFuture};
+use contextra_types::{Result, TokenBudget};
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -128,7 +129,7 @@ async fn test_failed_step_raii_drop_refunds_tokens() -> Result<()> {
             _input: serde_json::Value,
         ) -> BoxFuture<'a, Result<StepResult>> {
             Box::pin(async move {
-                Err(contextra_core::ContextraError::Internal(
+                Err(contextra_types::ContextraError::Internal(
                     "Simulated tool error".into(),
                 ))
             })

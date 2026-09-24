@@ -4,12 +4,12 @@
 
 //! # Mandantenisolierter KV-Prefix-Store (`TenantPrefixKvStore`)
 //!
-//! Implementierung des Ports `contextra_core::KvPrefixStore` für `contextra-kvcache`.
+//! Implementierung des Ports `contextra_ports::KvPrefixStore` für `contextra-kvcache`.
 //! Verwendet `PrefixRadixTree` und `KvReusePolicy`, mit Byte-Budget pro Tenant und LRU-Eviction.
 
 use ahash::AHashMap;
-use contextra_core::kv::{KvBlock, KvPrefixHit, KvPrefixStore, PrefixKey};
-use contextra_core::{ContextraError, TenantId};
+use contextra_ports::kv::{KvBlock, KvPrefixHit, KvPrefixStore, PrefixKey};
+use contextra_types::{ContextraError, TenantId};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 

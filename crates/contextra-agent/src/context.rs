@@ -10,7 +10,7 @@
 //! Carries task identity, graph position, token budget, DB references, and
 //! accumulated step memory across the entire lifecycle of a single workflow run.
 
-use contextra_core::{ContextraError, Result, TokenBudget};
+use contextra_types::{ContextraError, Result, TokenBudget};
 use contextra_db::{Collection, Contextra};
 use contextra_store::LsmStorage;
 use std::collections::{HashMap, VecDeque};
@@ -104,18 +104,18 @@ impl AgentContext {
         db: Arc<Contextra>,
         state_collection: Arc<Collection<LsmStorage>>,
         budget: TokenBudget,
-    ) -> contextra_core::Result<Self> {
+    ) -> contextra_types::Result<Self> {
         let task_id_str = task_id.into();
         let start_node_str = start_node.into();
 
         if task_id_str.trim().is_empty() {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "AgentContext task_id must not be empty".to_string(),
             ));
         }
 
         if start_node_str.trim().is_empty() {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "AgentContext start_node must not be empty".to_string(),
             ));
         }
@@ -231,7 +231,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_agent_context_fifo_eviction() -> contextra_core::Result<()> {
+    async fn test_agent_context_fifo_eviction() -> contextra_types::Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();
         let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
@@ -269,7 +269,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_try_attach_event_error_message_unit() -> contextra_core::Result<()> {
+    async fn test_try_attach_event_error_message_unit() -> contextra_types::Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();
         let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
@@ -322,7 +322,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_telemetry_100k_insertions_and_amortized_performance() -> contextra_core::Result<()>
+    async fn test_telemetry_100k_insertions_and_amortized_performance() -> contextra_types::Result<()>
     {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();

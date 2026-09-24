@@ -10,7 +10,8 @@ rust-version.workspace = true
 description = "Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra"
 
 [dependencies]
-contextra-core = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 contextra-crypto = { workspace = true }
 ahash = { workspace = true }
 lru = "0.16.4"

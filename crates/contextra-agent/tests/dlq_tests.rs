@@ -1,7 +1,8 @@
 use contextra_agent::{
     AgentContext, AgentTool, DeadLetterReason, NodeType, OrchestratorEngine, StateGraph, StepResult,
 };
-use contextra_core::{BoxFuture, ContextraError, Result, TokenBudget};
+use contextra_ports::{BoxFuture};
+use contextra_types::{ContextraError, Result, TokenBudget};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -95,7 +96,7 @@ async fn test_tool_timeout_creates_dead_letter() -> Result<()> {
 #[tokio::test]
 async fn test_dlq_remove_and_string_tx_id_idempotency() -> Result<()> {
     use contextra_agent::step::StepDeadLetter;
-    use contextra_core::TxId;
+    use contextra_types::TxId;
 
     let temp_dir = tempfile::TempDir::new()?;
     let config = contextra_db::ContextraConfig::default();
@@ -151,7 +152,7 @@ async fn test_dlq_remove_and_string_tx_id_idempotency() -> Result<()> {
 #[tokio::test]
 async fn test_dlq_replay_idempotency_scenarios() -> Result<()> {
     use contextra_agent::step::StepDeadLetter;
-    use contextra_core::TxId;
+    use contextra_types::TxId;
 
     let temp_dir = tempfile::TempDir::new()?;
     let config = contextra_db::ContextraConfig::default();

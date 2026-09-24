@@ -1,5 +1,5 @@
 use super::*;
-use contextra_core::TokenBudget;
+use contextra_types::TokenBudget;
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
@@ -131,7 +131,7 @@ impl AgentTool for MockTool {
         &'a self,
         _ctx: &'a AgentContext,
         _input: serde_json::Value,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<StepResult>> {
         Box::pin(async move {
             Ok(StepResult {
                 node_id: "test".to_string(),

@@ -87,7 +87,7 @@ async fn test_decision_node_condition_branching() {
         .unwrap();
 
     let state_col = db.collection("agent-state").await.expect("state col");
-    let budget = contextra_core::TokenBudget::new(1000, 0);
+    let budget = contextra_types::TokenBudget::new(1000, 0);
     let mut ctx = contextra_agent::AgentContext::try_new(
         "task-decision-1",
         "start",

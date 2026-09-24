@@ -12,8 +12,9 @@
 
 use crate::context::{validate_node_id, validate_task_id};
 #[cfg(any(test, feature = "test-utils"))]
-use contextra_core::BoxFuture;
-use contextra_core::{Result, StorageEngine};
+use contextra_ports::BoxFuture;
+use contextra_ports::{StorageEngine};
+use contextra_types::{Result};
 use contextra_db::Collection;
 use contextra_store::LsmStorage;
 use serde::{Deserialize, Serialize};
@@ -30,7 +31,7 @@ pub struct AuditEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tx_id: Option<contextra_core::TxId>,
+    pub tx_id: Option<contextra_types::TxId>,
 }
 
 /// Summary statistics for legacy audit entry migration.
@@ -52,12 +53,12 @@ pub fn validate_audit_payload_and_error(
 ) -> Result<()> {
     if let Some(err) = error {
         if err.trim().is_empty() {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "Audit error message cannot be empty when provided".to_string(),
             ));
         }
         if err.contains('\0') {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "Audit error message cannot contain null bytes".to_string(),
             ));
         }
@@ -65,7 +66,7 @@ pub fn validate_audit_payload_and_error(
 
     if let Some(s) = payload.as_str() {
         if s.trim().is_empty() {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "Audit string payload cannot be empty".to_string(),
             ));
         }
@@ -73,7 +74,7 @@ pub fn validate_audit_payload_and_error(
 
     let json_str = payload.to_string();
     if json_str.contains('\0') || json_str.contains("\\u0000") {
-        return Err(contextra_core::ContextraError::InvalidInput(
+        return Err(contextra_types::ContextraError::InvalidInput(
             "Audit payload cannot contain null bytes".to_string(),
         ));
     }
@@ -94,7 +95,7 @@ impl<S: StorageEngine> AuditLog<S> {
 
         let audit_id = format!("audit:{}:step:{}", entry.task_id, entry.step_count);
         let payload = serde_json::to_value(entry)
-            .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
 
         collection.put_kv_if_absent(&audit_id, &payload).await
     }
@@ -136,7 +137,7 @@ impl<S: StorageEngine> AuditLog<S> {
 /// into the direct LSM KV store format (`put_kv`).
 ///
 /// Returns [`MigrationStats`] detailing successfully migrated and failed entries.
-pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: contextra_core::VectorIndex>(
+pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: contextra_ports::VectorIndex>(
     collection: &Collection<S, V>,
 ) -> Result<MigrationStats> {
     let raw = collection.scan_prefix("audit:", None).await?;
@@ -153,7 +154,7 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: contextra_core::V
                 // Extract audit entry payload from metadata
                 let entry_val = obj.get("metadata").cloned().unwrap_or(val.clone());
 
-                let doc_id = match contextra_core::DocId::from_key(&key) {
+                let doc_id = match contextra_types::DocId::from_key(&key) {
                     Ok(id) => id,
                     Err(err) => {
                         tracing::error!(
@@ -355,7 +356,7 @@ mod tests {
 
         let dup_res = audit_log.append(&entry).await;
         assert!(
-            matches!(dup_res, Err(contextra_core::ContextraError::Conflict(_))),
+            matches!(dup_res, Err(contextra_types::ContextraError::Conflict(_))),
             "Expected Conflict error on duplicate audit step append"
         );
     }
@@ -395,7 +396,7 @@ mod tests {
             assert!(
                 matches!(
                     audit_log.append(&entry).await,
-                    Err(contextra_core::ContextraError::InvalidInput(_))
+                    Err(contextra_types::ContextraError::InvalidInput(_))
                 ),
                 "Expected InvalidInput for task_id: {:?}",
                 task_id
@@ -403,7 +404,7 @@ mod tests {
             assert!(
                 matches!(
                     audit_log.replay_task(task_id).await,
-                    Err(contextra_core::ContextraError::InvalidInput(_))
+                    Err(contextra_types::ContextraError::InvalidInput(_))
                 ),
                 "Expected InvalidInput for replay_task with task_id: {:?}",
                 task_id
@@ -426,7 +427,7 @@ mod tests {
             assert!(
                 matches!(
                     audit_log.append(&entry).await,
-                    Err(contextra_core::ContextraError::InvalidInput(_))
+                    Err(contextra_types::ContextraError::InvalidInput(_))
                 ),
                 "Expected InvalidInput for node_id: {:?}",
                 node_id
@@ -456,7 +457,7 @@ mod tests {
             assert!(
                 matches!(
                     audit_log.append(&entry).await,
-                    Err(contextra_core::ContextraError::InvalidInput(_))
+                    Err(contextra_types::ContextraError::InvalidInput(_))
                 ),
                 "Expected InvalidInput for payload: {:?}",
                 entry.payload
@@ -479,7 +480,7 @@ mod tests {
             assert!(
                 matches!(
                     audit_log.append(&entry).await,
-                    Err(contextra_core::ContextraError::InvalidInput(_))
+                    Err(contextra_types::ContextraError::InvalidInput(_))
                 ),
                 "Expected InvalidInput for error: {:?}",
                 err_msg
@@ -488,11 +489,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_migrate_legacy_audit_entries() -> contextra_core::Result<()> {
+    async fn test_migrate_legacy_audit_entries() -> contextra_types::Result<()> {
         let storage = Arc::new(InMemoryStorageEngine::new());
         let index = Arc::new(
             HnswIndex::try_new(HnswConfig::default())
-                .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?,
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?,
         );
         let graph_index = Arc::new(CsrGraph::new());
         let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
@@ -508,8 +509,8 @@ mod tests {
         ));
 
         let key = "audit:task-mig:step:1";
-        let doc_id = contextra_core::DocId::from_key(key)?;
-        let tx = contextra_core::TxId::new(1);
+        let doc_id = contextra_types::DocId::from_key(key)?;
+        let tx = contextra_types::TxId::new(1);
 
         let legacy_doc = serde_json::json!({
             "id": key,
@@ -526,7 +527,7 @@ mod tests {
         let user_key = collection.namespaced_key(key.as_bytes(), 0);
         let doc_key = collection.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
         let data = serde_json::to_vec(&legacy_doc)
-            .map_err(|e| contextra_core::ContextraError::Serialization(e.to_string()))?;
+            .map_err(|e| contextra_types::ContextraError::Serialization(e.to_string()))?;
 
         storage.put(tx, &user_key, &data).await?;
         storage.put(tx, &doc_key, &data).await?;
@@ -571,7 +572,7 @@ impl StorageEngine for InMemoryStorageEngine {
             let guard = self
                 .data
                 .lock()
-                .map_err(|e| contextra_core::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
             Ok(guard.get(key).cloned().map(bytes::Bytes::from))
         })
     }
@@ -586,7 +587,7 @@ impl StorageEngine for InMemoryStorageEngine {
 
     fn put<'a>(
         &'a self,
-        _tx_id: contextra_core::TxId,
+        _tx_id: contextra_types::TxId,
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<()>> {
@@ -594,7 +595,7 @@ impl StorageEngine for InMemoryStorageEngine {
             let mut guard = self
                 .data
                 .lock()
-                .map_err(|e| contextra_core::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
             guard.insert(key.to_vec(), value.to_vec());
             Ok(())
         })
@@ -602,7 +603,7 @@ impl StorageEngine for InMemoryStorageEngine {
 
     fn put_if_absent<'a>(
         &'a self,
-        _tx_id: contextra_core::TxId,
+        _tx_id: contextra_types::TxId,
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<bool>> {
@@ -610,7 +611,7 @@ impl StorageEngine for InMemoryStorageEngine {
             let mut guard = self
                 .data
                 .lock()
-                .map_err(|e| contextra_core::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
             if guard.contains_key(key) {
                 Ok(false)
             } else {
@@ -622,28 +623,28 @@ impl StorageEngine for InMemoryStorageEngine {
 
     fn delete<'a>(
         &'a self,
-        _tx_id: contextra_core::TxId,
+        _tx_id: contextra_types::TxId,
         key: &'a [u8],
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let mut guard = self
                 .data
                 .lock()
-                .map_err(|e| contextra_core::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
             guard.remove(key);
             Ok(())
         })
     }
 
-    fn commit<'a>(&'a self, _tx_id: contextra_core::TxId) -> BoxFuture<'a, Result<()>> {
+    fn commit<'a>(&'a self, _tx_id: contextra_types::TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
-    fn rollback<'a>(&'a self, _tx_id: contextra_core::TxId) -> BoxFuture<'a, Result<()>> {
+    fn rollback<'a>(&'a self, _tx_id: contextra_types::TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
-    fn rollback_to_tx<'a>(&'a self, _tx_id: contextra_core::TxId) -> BoxFuture<'a, Result<()>> {
+    fn rollback_to_tx<'a>(&'a self, _tx_id: contextra_types::TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
@@ -651,9 +652,9 @@ impl StorageEngine for InMemoryStorageEngine {
         Box::pin(async move { Ok(()) })
     }
 
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
         Box::pin(async move {
-            Ok(contextra_core::StorageStats {
+            Ok(contextra_ports::StorageStats {
                 num_segments: 0,
                 total_size_bytes: 0,
                 memtable_size_bytes: 0,
@@ -665,8 +666,8 @@ impl StorageEngine for InMemoryStorageEngine {
         Box::pin(async move { Ok(0) })
     }
 
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::TxId>> {
-        Box::pin(async move { Ok(contextra_core::TxId::new(0)) })
+    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<contextra_types::TxId>> {
+        Box::pin(async move { Ok(contextra_types::TxId::new(0)) })
     }
 
     fn pin_checkpoint<'a>(&'a self, _seq_no: u64) -> BoxFuture<'a, Result<()>> {
@@ -685,7 +686,7 @@ impl StorageEngine for InMemoryStorageEngine {
             let guard = self
                 .data
                 .lock()
-                .map_err(|e| contextra_core::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
             let entries = guard
                 .iter()
                 .filter(|(k, _)| k.starts_with(prefix))
@@ -706,7 +707,7 @@ impl StorageEngine for InMemoryStorageEngine {
             let guard = self
                 .data
                 .lock()
-                .map_err(|e| contextra_core::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
             let mut entries: Vec<(Vec<u8>, Vec<u8>)> = guard
                 .iter()
                 .filter(|(k, _)| {

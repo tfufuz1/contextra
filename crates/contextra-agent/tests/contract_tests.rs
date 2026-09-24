@@ -8,8 +8,9 @@
 use contextra_agent::audit::AuditLog;
 use contextra_agent::step::StepResult;
 use contextra_agent::{AgentContext, AgentTool, NodeType, OrchestratorEngine, StateGraph};
-use contextra_core::traits::StorageEngine;
-use contextra_core::{BoxFuture, TokenBudget};
+use contextra_ports::StorageEngine;
+use contextra_ports::{BoxFuture};
+use contextra_types::{TokenBudget};
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
@@ -43,7 +44,7 @@ impl AgentTool for TokenTool {
         &'a self,
         _ctx: &'a AgentContext,
         _input: serde_json::Value,
-    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> BoxFuture<'a, contextra_types::Result<StepResult>> {
         Box::pin(async move {
             Ok(StepResult {
                 node_id: self.name.clone(),

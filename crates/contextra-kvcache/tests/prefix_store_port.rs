@@ -4,9 +4,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_core::kv::{KvBlock, KvLayout, KvPrefixStore, PrefixKey, RopeConfig};
-use contextra_core::model_fingerprint::ModelFingerprint;
-use contextra_core::{ContextraError, TenantId};
+use contextra_ports::kv::{KvBlock, KvLayout, KvPrefixStore, PrefixKey, RopeConfig};
+use contextra_types::model_fingerprint::ModelFingerprint;
+use contextra_types::{ContextraError, TenantId};
 use contextra_kvcache::{KvReusePolicy, TenantPrefixKvStore};
 use std::sync::Arc;
 

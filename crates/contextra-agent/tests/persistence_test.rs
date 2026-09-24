@@ -2,8 +2,8 @@ use contextra_agent::context::{AgentContext, AgentStatus};
 use contextra_agent::engine::OrchestratorEngine;
 use contextra_agent::graph::{NodeType, StateGraph};
 use contextra_agent::step::{AgentTool, StepResult};
-use contextra_core::BoxFuture;
-use contextra_core::TokenBudget;
+use contextra_ports::BoxFuture;
+use contextra_types::TokenBudget;
 use contextra_db::{Contextra, ContextraConfig};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -19,7 +19,7 @@ impl AgentTool for IncrementTool {
         &'a self,
         _ctx: &'a AgentContext,
         input: serde_json::Value,
-    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> BoxFuture<'a, contextra_types::Result<StepResult>> {
         Box::pin(async move {
             let val = input.as_u64().unwrap_or(0);
             Ok(StepResult {

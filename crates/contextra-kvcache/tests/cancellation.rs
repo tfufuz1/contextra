@@ -2,7 +2,7 @@
 // ZWECK: Cancellation- & RAII-Guard-Tests für den KV-Cache (Task KV-06).
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::{ContextraError, TenantId};
 use contextra_kvcache::{EvictionWorker, KvSegment, TenantIsolatedKvStore};
 use std::sync::Arc;
 use std::thread;

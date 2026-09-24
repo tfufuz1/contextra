@@ -5,8 +5,8 @@ use contextra_agent::event_source::{
 };
 use contextra_agent::step::StepResult;
 use contextra_agent::{AgentContext, EventLoopExitReason, NodeType, OrchestratorEngine, StateGraph};
-use contextra_core::BoxFuture;
-use contextra_core::TokenBudget;
+use contextra_ports::BoxFuture;
+use contextra_types::TokenBudget;
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
@@ -26,7 +26,7 @@ impl contextra_agent::AgentTool for TelemetryTool {
         &'a self,
         ctx: &'a AgentContext,
         _input: serde_json::Value,
-    ) -> BoxFuture<'a, contextra_core::Result<StepResult>> {
+    ) -> BoxFuture<'a, contextra_types::Result<StepResult>> {
         Box::pin(async move {
             let latest = ctx
                 .memory
@@ -234,7 +234,7 @@ struct CustomStreamSource {
 impl EventSource for CustomStreamSource {
     fn next_event<'a>(
         &'a mut self,
-    ) -> BoxFuture<'a, contextra_core::Result<Option<BackgroundEvent>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Option<BackgroundEvent>>> {
         Box::pin(async move {
             if self.idx < self.stream.len() {
                 let item = self.stream[self.idx].clone();
@@ -297,7 +297,7 @@ struct NotifyEventSource {
 impl EventSource for NotifyEventSource {
     fn next_event<'a>(
         &'a mut self,
-    ) -> BoxFuture<'a, contextra_core::Result<Option<BackgroundEvent>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Option<BackgroundEvent>>> {
         Box::pin(async move { Ok(self.events.pop_front()) })
     }
 

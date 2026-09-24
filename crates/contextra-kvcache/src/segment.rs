@@ -2,7 +2,7 @@
 // ZWECK: KvSegment mit Zeroize-Garantie, Tier-2 AEAD-Verschlüsselung & Crypto-Shredding.
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::{ContextraError, TenantId};
 use contextra_crypto::CryptoKey;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};

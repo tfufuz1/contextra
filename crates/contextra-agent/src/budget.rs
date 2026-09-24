@@ -6,7 +6,7 @@
 
 //! RAII budget management and token reservation for agent workflows (§6.3.3).
 
-pub use contextra_core::types::budget::{
+pub use contextra_types::types::budget::{
     BudgetStrategy, Reservation, ResourceBudget, ResourceTracker, TokenBudget,
 };
 
@@ -17,7 +17,7 @@ pub use contextra_core::types::budget::{
 pub fn reserve_tokens<'a>(
     budget: &'a TokenBudget,
     amount: usize,
-) -> contextra_core::Result<Reservation<'a>> {
+) -> contextra_types::Result<Reservation<'a>> {
     budget.reserve(amount)
 }
 
