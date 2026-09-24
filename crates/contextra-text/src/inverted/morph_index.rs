@@ -35,6 +35,13 @@ impl<S: StorageEngine> TextIndex for BM25MorphIndex<S> {
         self.inner.search(query, k).await
     }
 
+    /// Searches the inverted index at a specific MVCC sequence number snapshot.
+    ///
+    /// Snapshot isolation is preserved by delegating to `InvertedIndex::search_at`.
+    async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
+        self.inner.search_at(query, k, seq_no).await
+    }
+
     async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {
         self.inner.insert(tx, id, text).await
     }
