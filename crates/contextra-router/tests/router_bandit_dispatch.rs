@@ -2,10 +2,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_adapt::bandit::BanditProfileState;
-use contextra_core::{
-    BoxFuture, ContextChunk, ContextWindow, ContextraError, DocId, EntityId, Result, TokenBudget,
+use contextra_ports::{BoxFuture, CommunityResolver, ContextPreparer, HybridSearchProvider};
+use contextra_types::{
+    ContextChunk, ContextWindow, ContextraError, DocId, EntityId, Result, TokenBudget,
 };
-use contextra_ports::{CommunityResolver, ContextPreparer, HybridSearchProvider};
 use contextra_router::{RouterEngine, RoutingOutcome, RoutingStrategy, SlmProfile};
 use std::sync::Arc;
 

@@ -1,4 +1,5 @@
 #![cfg(feature = "bandit-routing")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_router::{BanditImplementation, BanditProfileState};
 use std::time::Instant;

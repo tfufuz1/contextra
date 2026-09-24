@@ -2,7 +2,8 @@ use super::super::fixtures::*;
 use crate::{
     SlmProfile, RoutingOutcome,
 };
-use contextra_core::{EntityId, ContextraError, StorageEngine, TokenBudget};
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, EntityId, TokenBudget};
 use std::sync::Arc;
 use contextra_db::{Contextra, ContextraConfig};
 use serde_json::json;
@@ -10,7 +11,7 @@ use serde_json::json;
     #[test]
     fn test_nan_single_chunk_ignored_in_max_score() -> Result<(), Box<dyn std::error::Error>> {
         use crate::router::{compute_max_score, select_profile_from_chunks};
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
 
         let profile = SlmProfile::new(
             "test-slm",
@@ -77,7 +78,7 @@ use serde_json::json;
     #[test]
     fn test_nan_all_chunks_fallback_and_tracing_error() -> Result<(), Box<dyn std::error::Error>> {
         use crate::router::select_profile_from_chunks;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
         use tracing_subscriber::layer::SubscriberExt;
 
         let logs = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -142,7 +143,7 @@ use serde_json::json;
     #[test]
     fn test_nan_routing_determinism_repeats() -> Result<(), Box<dyn std::error::Error>> {
         use crate::router::select_profile_from_chunks;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
 
         let profile_a = SlmProfile::new(
             "slm-a",
@@ -283,7 +284,7 @@ use serde_json::json;
     #[test]
     fn prop_routing_decision_profile_in_input() {
         use crate::router::select_profile_from_chunks;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
         use proptest::prelude::*;
 
         proptest!(|(
@@ -352,7 +353,7 @@ use serde_json::json;
     #[test]
     fn test_cascade_hit() {
         use crate::profile::ProfileCalibrationState;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
         use std::collections::HashMap;
 
         let profile_high = SlmProfile::new(
@@ -423,7 +424,7 @@ use serde_json::json;
     #[test]
     fn test_cascade_fallthrough() {
         use crate::profile::ProfileCalibrationState;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
         use std::collections::HashMap;
 
         let profile_high = SlmProfile::new(
@@ -488,7 +489,7 @@ use serde_json::json;
 
     #[tokio::test]
     async fn test_calibrated_threshold_convergence() {
-        use contextra_core::ConfigFingerprint;
+        use contextra_types::ConfigFingerprint;
 
         let dir = tempfile::tempdir().unwrap();
         let config = ContextraConfig {
@@ -509,7 +510,7 @@ use serde_json::json;
             .await
             .unwrap();
 
-        let eid = EntityId::from_doc_id(contextra_core::DocId::new(1));
+        let eid = EntityId::from_doc_id(contextra_types::DocId::new(1));
         let tx = db.allocate_tx().unwrap();
         let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
         db.inner_storage()
@@ -558,7 +559,7 @@ use serde_json::json;
 
     #[tokio::test]
     async fn test_calibration_invalidation_on_temperature_change() {
-        use contextra_core::ConfigFingerprint;
+        use contextra_types::ConfigFingerprint;
 
         let dir = tempfile::tempdir().unwrap();
         let config = ContextraConfig {
@@ -657,7 +658,7 @@ use serde_json::json;
 
     #[tokio::test]
     async fn test_calibration_invalidation_on_prompt_template_hash_change() {
-        use contextra_core::ConfigFingerprint;
+        use contextra_types::ConfigFingerprint;
 
         let dir = tempfile::tempdir().unwrap();
         let config = ContextraConfig {
@@ -731,7 +732,7 @@ use serde_json::json;
 
     #[tokio::test]
     async fn test_calibration_invalidation_on_quantization_change() {
-        use contextra_core::ConfigFingerprint;
+        use contextra_types::ConfigFingerprint;
 
         let dir = tempfile::tempdir().unwrap();
         let config = ContextraConfig {
@@ -871,7 +872,7 @@ use serde_json::json;
             .await
             .unwrap();
 
-        let eid = EntityId::from_doc_id(contextra_core::DocId::new(1));
+        let eid = EntityId::from_doc_id(contextra_types::DocId::new(1));
         let tx = db.allocate_tx().unwrap();
         let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
         db.inner_storage()

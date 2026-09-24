@@ -45,7 +45,7 @@ mod tests;
 pub use contextra_adapt::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
 pub use contextra_adapt::{OffPolicyEvaluator, OffPolicyStats};
 pub use dispatch::dispatch_to_slm;
-pub use outcome::{DecisionId, RoutingOutcome};
+pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 pub use profile::SlmProfile;
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 

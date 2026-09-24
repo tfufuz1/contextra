@@ -7,8 +7,8 @@
 //! Client-side MCP dispatch mechanism for sending routed context to SLM endpoints.
 
 use crate::router::RoutingDecision;
-use contextra_core::ipc::{JsonRpcRequest, JsonRpcResponse};
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
+use contextra_wire::{JsonRpcRequest, JsonRpcResponse};
 use serde_json::json;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -56,7 +56,7 @@ fn split_endpoint(s: &str) -> Result<(String, Vec<String>)> {
 /// Dispatches the prepared context from a [`RoutingDecision`] to the target SLM's MCP endpoint
 /// over stdio JSON-RPC 2.0 (ADR-010 compliant).
 ///
-/// Sends ONLY the tailored [`contextra_core::ContextWindow`] (not raw full search results)
+/// Sends ONLY the tailored [`contextra_types::ContextWindow`] (not raw full search results)
 /// to the executable or script specified in `decision.profile.mcp_endpoint`.
 pub async fn dispatch_to_slm(decision: &RoutingDecision) -> Result<String> {
     let endpoint = decision.profile.mcp_endpoint.trim();
@@ -166,10 +166,11 @@ pub async fn dispatch_to_slm(decision: &RoutingDecision) -> Result<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::profile::SlmProfile;
-    use contextra_core::{ContextChunk, ContextWindow, DocId, TokenBudget};
+    use contextra_types::{ContextChunk, ContextWindow, DocId, TokenBudget};
 
     #[test]
     fn test_split_endpoint_simple() {
@@ -239,7 +240,7 @@ mod tests {
                 truncated: false,
             },
             confidence: None,
-            decision_id: crate::DecisionId::new(),
+            decision_id: crate::DecisionId::from_raw(0),
             drift_status: None,
         };
 

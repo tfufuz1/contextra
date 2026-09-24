@@ -1,5 +1,8 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, dead_code)]
+
 use criterion::{criterion_group, criterion_main, Criterion};
-use contextra_core::{BoxFuture, ContextChunk, EntityId, Result, StorageEngine, TokenBudget};
+use contextra_ports::{BoxFuture, StorageEngine};
+use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget};
 use contextra_db::{Collection, Contextra, ContextraConfig};
 use contextra_router::ports_local::{CommunityResolver, HybridSearchProvider};
 use contextra_router::{RouterEngine, SlmProfile};
@@ -115,7 +118,7 @@ fn bench_router_engine(c: &mut Criterion) {
                 query_text: &'a str,
                 query_embedding: &'a [f32],
                 top_k: usize,
-            ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<contextra_core::ContextChunk>>>
+            ) -> BoxFuture<'a, Result<Vec<ContextChunk>>>
             {
                 Box::pin(async move {
                     let search_results = self
@@ -129,7 +132,7 @@ fn bench_router_engine(c: &mut Criterion) {
 
                     let mut chunks = Vec::with_capacity(search_results.len());
                     for res in search_results {
-                        if let Ok(mut chunk) = contextra_core::ContextChunk::try_from(res) {
+                        if let Ok(mut chunk) = ContextChunk::try_from(res) {
                             chunk.content = chunk.combined_text_owned();
                             chunks.push(chunk);
                         }
@@ -143,7 +146,7 @@ fn bench_router_engine(c: &mut Criterion) {
             fn get_community<'a>(
                 &'a self,
                 entity_id: EntityId,
-            ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<u64>>> {
+            ) -> BoxFuture<'a, Result<Option<u64>>> {
                 Box::pin(async move { self.collection.get_community(entity_id).await })
             }
         }
@@ -153,10 +156,10 @@ fn bench_router_engine(c: &mut Criterion) {
         impl contextra_ports::ContextPreparer for BenchContextPreparer {
             fn prepare_context(
                 &self,
-                chunks: Vec<contextra_core::ContextChunk>,
+                chunks: Vec<ContextChunk>,
                 budget: &TokenBudget,
                 relevance_threshold: f32,
-            ) -> contextra_core::Result<contextra_core::ContextWindow> {
+            ) -> Result<ContextWindow> {
                 let mut manager = contextra_db::context::ContextManager::new(budget.clone());
                 manager.set_relevance_threshold(relevance_threshold);
                 manager.prepare_context(chunks)
