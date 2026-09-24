@@ -1,3 +1,7 @@
+// FILE-CONTEXT
+// ZWECK: Konfiguration und Trait für Orphan-Cleanup-Backoff und HNSW-Index-Rebuild.
+// INVARIANTEN: Berechnet exponentielle Cooldown-Zeiten für Rebuild-Versuche.
+
 use std::time::Duration;
 
 /// Configuration parameters for HNSW index rebuild backoff and failure escalation.

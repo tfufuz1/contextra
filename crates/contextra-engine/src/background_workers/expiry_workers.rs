@@ -1,3 +1,7 @@
+// FILE-CONTEXT
+// ZWECK: Worker-Tasks zur TTL-Löschung abgelaufener Dokumente und Entropie-Pruning/Decay-Eviction.
+// INVARIANTEN: Intervallsteuerung und geordnete Task-Beendigung über CancellationToken.
+
 use crate::collection::Collection;
 #[cfg(feature = "background-maintenance")]
 use contextra_adapt::{AdaptiveDecayController, DecayControllerConfig};

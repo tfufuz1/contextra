@@ -1,7 +1,8 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// FILE-CONTEXT
+// ZWECK: Unit-Tests für background_workers Submodule.
 
 use super::*;
-use contextra_core::tx_buffer::{IndexOp, TxBuffer};
+use contextra_core::tx_buffer::IndexOp;
 use contextra_core::types::{DocId, TxId};
 use contextra_graph::hyperedge::HyperEdgeId;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -295,6 +296,8 @@ async fn test_deferred_hyperedge_worker_graceful_shutdown_preserves_queue() {
 
 #[tokio::test]
 async fn test_orphan_cleanup_rebuild_backoff_and_alert() {
+    use contextra_core::tx_buffer::TxBuffer;
+
     let buffer = Arc::new(TxBuffer::<String>::new_with_config(
         64,
         Duration::from_millis(500),
@@ -450,6 +453,8 @@ async fn test_expiry_cleanup_worker_task_cleans_documents() {
 
 #[tokio::test]
 async fn test_orphan_cleanup_worker_removes_expired() {
+    use contextra_core::tx_buffer::TxBuffer;
+
     let buffer = Arc::new(TxBuffer::<String>::new_with_config(
         64,
         Duration::from_millis(50),
