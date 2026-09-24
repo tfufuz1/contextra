@@ -9,12 +9,9 @@
 
 pub use contextra_simd::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted,
-    cosine_distance, cosine_distance_f32_bytes, cosine_distance_scalar,
-    cosine_similarity_parts_f32_u8, cosine_similarity_parts_u8, dot_product_distance,
-    dot_product_distance_f32_bytes, dot_product_f32_u8, dot_product_scalar, dot_product_u8,
-    euclidean_distance, euclidean_distance_f32_bytes, euclidean_distance_scalar,
-    euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8, normalize_inplace, validate_vector,
-    CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
+    cosine_distance, cosine_similarity_parts_u8, dot_product_distance, dot_product_f32_u8, dot_product_u8,
+    euclidean_distance,
+    euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8, normalize_inplace,
 };
 
 #[cfg(test)]
