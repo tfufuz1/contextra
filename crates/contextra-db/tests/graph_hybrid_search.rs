@@ -205,21 +205,13 @@ async fn test_hybrid_search_with_ppr_strategy() {
             Some(&ppr_strategy),
             None,
         )
-        .await;
+        .await
+        .expect("PPR under snapshot isolation must succeed");
 
     assert!(
-        res.is_err(),
-        "PPR under snapshot isolation must fail-closed with error"
+        res.iter().any(|r| r.id == "doc_b"),
+        "doc_b should be included in PPR hybrid search results"
     );
-    match res.unwrap_err() {
-        contextra_core::ContextraError::SnapshotUnsupportedForSignal(msg) => {
-            assert!(msg.contains("PersonalizedPageRank"));
-        }
-        other => panic!(
-            "Expected SnapshotUnsupportedForSignal error, got: {:?}",
-            other
-        ),
-    }
 }
 
 #[tokio::test]

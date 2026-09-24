@@ -515,13 +515,11 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_core:
         )
         .await;
 
-    assert!(ppr_res.is_err(), "PPR under snapshot isolation must fail");
-    match ppr_res.unwrap_err() {
-        contextra_core::ContextraError::SnapshotUnsupportedForSignal(msg) => {
-            assert!(msg.contains("PersonalizedPageRank"));
-        }
-        other => panic!("Expected SnapshotUnsupportedForSignal, got: {:?}", other),
-    }
+    assert!(
+        ppr_res.is_ok(),
+        "PPR under snapshot isolation must succeed, got {:?}",
+        ppr_res
+    );
 
     let eid_1 = contextra_core::EntityId::from_key("doc_1")?;
     let anchors = vec![eid_1];

@@ -11,7 +11,7 @@ pub use contextra_simd::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted,
     cosine_distance, cosine_similarity_parts_u8, dot_product_distance, dot_product_f32_u8, dot_product_u8,
     euclidean_distance,
-    euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8, normalize_inplace,
+    euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8, normalize_inplace, validate_vector,
 };
 
 #[cfg(test)]
