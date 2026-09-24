@@ -61,21 +61,22 @@
 //! 3. `sstables` write lock (`tokio::sync::RwLock<Vec<Arc<SstableReader>>>`) - Protects SSTable set.
 //!    Read locks on `state` and `sstables` may be acquired concurrently without holding `commit_mutex`.
 
-use crate::compaction::{CompactionConfig, CompactionEngine};
-use crate::memtable::MemTable;
-use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
-use crate::wal::{Wal, WalOp};
-use bytes::Bytes;
-use contextra_core::{
-    BoxFuture, DocId, IndexOp, ContextraError, ResourceTracker, Result, SnapshotRegistry,
-    StorageEngine, TxBuffer, TxId, TOMBSTONE_BIT,
+pub(super) use crate::memtable::MemTable;
+pub(super) use crate::sstable::{SstableBuilder, SstableReader};
+pub(super) use crate::wal::{Wal, WalOp};
+pub(super) use bytes::Bytes;
+pub(super) use contextra_core::{
+    BoxFuture, ContextraError, IndexOp, Result, StorageEngine, TxId, TOMBSTONE_BIT,
 };
-use contextra_crypto::crypto::KeyManager;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::RwLock;
+pub(super) use std::path::PathBuf;
+pub(super) use std::sync::atomic::Ordering;
+pub(super) use std::sync::Arc;
+pub(super) use std::time::Duration;
+
+mod config;
+mod engine;
+mod guard;
+mod validate;
 
 pub mod commit;
 pub mod flush;
@@ -86,7 +87,12 @@ pub mod scan;
 #[cfg(test)]
 mod tests;
 
-use group_commit::PendingCommitQueue;
+pub mod ops;
+
+pub use config::LsmConfig;
+pub use engine::LsmStorage;
+pub(super) use guard::{CommitGuard, LsmState};
+pub(super) use validate::{derive_doc_id, validate_key, validate_value};
 
 /// Maximum key size allowed for LSM operations (65,535 bytes).
 pub const MAX_KEY_SIZE: usize = 65_535;
@@ -107,187 +113,3 @@ pub const MAX_GROUP_COMMIT_BATCH_SIZE: usize = 1_000;
 /// Below this threshold (1..7 entries), surviving entries from a spanning SSTable are inserted
 /// directly into the MemTable instead of allocating a full new SSTable/manifest pipeline.
 pub const MIN_ENTRIES_FOR_SSTABLE_REBUILD: usize = 8;
-
-fn validate_key(key: &[u8]) -> Result<()> {
-    if key.is_empty() {
-        return Err(ContextraError::InvalidInput("Key cannot be empty".into()));
-    }
-    if key.len() > MAX_KEY_SIZE {
-        return Err(ContextraError::InvalidInput(format!(
-            "Key length ({} bytes) exceeds limit of {} bytes",
-            key.len(),
-            MAX_KEY_SIZE
-        )));
-    }
-    Ok(())
-}
-
-#[cfg(not(feature = "docid-128"))]
-fn derive_doc_id(key: &[u8]) -> DocId {
-    let hash = blake3::hash(key);
-    let mut bytes = [0u8; 8];
-    bytes.copy_from_slice(&hash.as_bytes()[..8]);
-    DocId::new(u64::from_le_bytes(bytes))
-}
-
-#[cfg(feature = "docid-128")]
-fn derive_doc_id(key: &[u8]) -> DocId {
-    let hash = blake3::hash(key);
-    let mut bytes = [0u8; 16];
-    bytes.copy_from_slice(&hash.as_bytes()[..16]);
-    DocId::new(u128::from_le_bytes(bytes))
-}
-
-fn validate_value(value: &[u8]) -> Result<()> {
-    if value.len() > MAX_VALUE_SIZE {
-        return Err(ContextraError::InvalidInput(format!(
-            "Value length ({} bytes) exceeds limit of {} bytes",
-            value.len(),
-            MAX_VALUE_SIZE
-        )));
-    }
-    Ok(())
-}
-
-/// LSM storage configuration.
-// SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
-// TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key
-// DONE: LsmConfig akzeptiert Passphrase, AES-256 wird für Disk-I/O verwendet.
-#[derive(Clone, Debug)]
-/// Configuration for the LSM storage engine.
-pub struct LsmConfig {
-    /// Path to the data directory.
-    pub path: PathBuf,
-    /// Maximum size of the memtable before flushing to disk.
-    pub memtable_size_limit: usize,
-    /// Maximum RAM usage for the storage engine in MB.
-    pub max_ram_mb: u64,
-    /// Timeout for transactions in the buffer.
-    pub tx_timeout: Duration,
-    /// Configuration for background compaction.
-    pub compaction: CompactionConfig,
-    pub encryption_passphrase: Option<String>,
-    /// Time window in microseconds to batch concurrent WAL commits before issuing fsync.
-    /// Set to 0 to disable group commit batching (immediate single commit).
-    pub group_commit_window_micros: u64,
-    /// Number of shards for the block cache.
-    /// Default is 64 (increased from 16 to reduce lock contention during concurrent BM25 range scans).
-    pub block_cache_shards: usize,
-}
-
-impl Default for LsmConfig {
-    fn default() -> Self {
-        Self {
-            path: PathBuf::from("contextra_data"),
-            memtable_size_limit: 64 * 1024 * 1024,
-            max_ram_mb: 2048,
-            tx_timeout: Duration::from_secs(60),
-            compaction: CompactionConfig::default(),
-            encryption_passphrase: None,
-            group_commit_window_micros: 500,
-            block_cache_shards: 64,
-        }
-    }
-}
-
-/// Proof that `commit_mutex` is currently held by the calling task.
-/// Can only be constructed while holding the mutex guard.
-pub(super) struct CommitGuard<'a> {
-    _lock: &'a tokio::sync::MutexGuard<'a, ()>,
-}
-
-pub(super) struct LsmState {
-    memtable: Arc<MemTable>,
-    immutable_memtables: Vec<Arc<MemTable>>,
-}
-
-/// LSM-Tree based storage engine.
-pub struct LsmStorage {
-    config: LsmConfig,
-    key_manager: Option<Arc<KeyManager>>,
-    state: RwLock<LsmState>,
-    /// SSTables stored separately for shared access with compaction engine.
-    sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
-    tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
-    budget: Arc<ResourceTracker>,
-    block_cache: Arc<BlockCache>,
-    wal: RwLock<Arc<Wal>>,
-    pub snapshot_registry: Arc<SnapshotRegistry>,
-    /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
-    /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
-    compaction_engine: Arc<CompactionEngine>,
-    manifest: Arc<crate::manifest::Manifest>,
-    next_seq_no: AtomicU64,
-    last_committed_tx: AtomicU64,
-    /// Mutex to serialize commits and prevent snapshot inversion (parallel seq_no holes).
-    commit_mutex: tokio::sync::Mutex<()>,
-    cancel_token: tokio_util::sync::CancellationToken,
-    task_tracker: tokio_util::task::TaskTracker,
-    flush_counter: AtomicU64,
-    segment_counter: AtomicU64,
-    budget_tracking_drift_bytes: std::sync::atomic::AtomicU64,
-    pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,
-    wal_queue_depth: Arc<std::sync::atomic::AtomicUsize>,
-    pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
-    intent_locks: std::sync::Mutex<std::collections::HashMap<Vec<u8>, TxId>>,
-}
-
-impl LsmStorage {
-    /// Returns a watch receiver for monitoring system pressure levels.
-    pub fn pressure_receiver(
-        &self,
-    ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
-        self.pressure_rx.clone()
-    }
-
-    /// Signals the background compaction engine to stop.
-    pub fn shutdown(&self) {
-        self.cancel_token.cancel();
-    }
-
-    /// Waits for all spawned tasks to shut down fully.
-    pub async fn wait_shutdown(&self) {
-        self.shutdown();
-        self.task_tracker.wait().await;
-    }
-
-    /// Gracefully closes the storage engine, stopping background tasks and flushing active memtable to disk.
-    pub async fn close(&self) -> Result<()> {
-        self.wait_shutdown().await;
-        self.flush().await?;
-        Ok(())
-    }
-
-    /// Spawns a background task tracked by this storage instance.
-    pub fn spawn_tracked<F>(&self, future: F)
-    where
-        F: std::future::Future<Output = ()> + Send + 'static,
-    {
-        self.task_tracker.spawn(future);
-    }
-
-    #[doc(hidden)]
-    pub async fn simulate_wal_append_failure_for_test(&self) {
-        #[cfg(feature = "fault-injection")]
-        crate::wal::FAIL_APPEND_FOR_TX.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    #[doc(hidden)]
-    pub async fn restore_wal_file_handle_for_test(&self) {
-        #[cfg(feature = "fault-injection")]
-        crate::wal::FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Returns the accumulated total memory budget tracking drift in bytes caused by
-    /// unbudgeted memtable puts during commit when memory limit was exceeded.
-    pub fn budget_tracking_drift_bytes(&self) -> u64 {
-        self.budget_tracking_drift_bytes
-            .load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    /// Maximum threshold for surviving entries during rollback below which entries are retained in memtable
-    /// instead of creating a new SSTable (M-4 optimization).
-    pub const ROLLBACK_INLINE_THRESHOLD_ENTRIES: usize = 1;
-}
-
-pub mod ops;

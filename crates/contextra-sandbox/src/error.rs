@@ -23,6 +23,15 @@ pub enum SandboxError {
     #[error("Invalid WASM module: {0}")]
     InvalidModule(String),
 
+    #[error("Output stream {stream} limit exceeded ({limit} bytes)")]
+    OutputLimitExceeded { stream: &'static str, limit: usize },
+
+    #[error("Input too large ({len} bytes, max {limit} bytes)")]
+    InputTooLarge { len: usize, limit: usize },
+
+    #[error("Process exited with code {code}")]
+    ProcessExit { code: i32 },
+
     #[error("WASM runtime error: {0}")]
     Runtime(String),
 }

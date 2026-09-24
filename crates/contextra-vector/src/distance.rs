@@ -13,6 +13,9 @@ pub use contextra_simd::{
     euclidean_distance,
     euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8, normalize_inplace, validate_vector,
 };
+pub use contextra_simd::kernels::scalar::{
+    cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,
+};
 
 #[cfg(test)]
 mod tests {

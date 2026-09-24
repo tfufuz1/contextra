@@ -47,6 +47,13 @@ impl<S: contextra_core::StorageEngine> TextIndex for Bm25Scorer<S> {
         self.index.search(query, k).await
     }
 
+    /// Searches the inverted index at a specific MVCC sequence number snapshot.
+    ///
+    /// Snapshot isolation is preserved by delegating to `InvertedIndex::search_at`.
+    async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
+        self.index.search_at(query, k, seq_no).await
+    }
+
     async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {
         self.index.insert(tx, id, text).await
     }

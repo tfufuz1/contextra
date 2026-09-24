@@ -257,8 +257,8 @@ struct BlockWeighter;
 
 #[cfg(feature = "block-cache-v2")]
 impl quick_cache::Weighter<(u64, u64), Bytes> for BlockWeighter {
-    fn weight(&self, _key: &(u64, u64), value: &Bytes) -> u32 {
-        value.len().try_into().unwrap_or(u32::MAX)
+    fn weight(&self, _key: &(u64, u64), value: &Bytes) -> u64 {
+        value.len() as u64
     }
 }
 

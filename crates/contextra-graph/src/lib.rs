@@ -45,6 +45,7 @@ pub mod path_rag;
 #[cfg(feature = "graph-connectivity-health")]
 pub mod percolation;
 pub mod ppr;
+pub mod ppr_stream;
 pub mod provenance;
 pub mod session_dag;
 pub mod tl_hfd;
@@ -85,6 +86,7 @@ pub use percolation::{
     PercolationConfig,
 };
 pub use ppr::{DeletedView, PprContext};
+pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
 pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,

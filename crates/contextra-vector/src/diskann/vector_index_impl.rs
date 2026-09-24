@@ -6,7 +6,7 @@
 
 use super::format::compute_adaptive_flush_threshold;
 use super::types::DiskAnnIndex;
-use crate::distance::validate_vector;
+use contextra_simd::validate_vector;
 use contextra_core::{
     DocId, ContextraError, Result, ScoredDocument, TxId, VectorIndex, VectorIndexStats,
 };
@@ -49,6 +49,15 @@ impl VectorIndex for DiskAnnIndex {
 
     async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
         self.search_internal(query, k).await
+    }
+
+    async fn search_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
+    ) -> Result<Vec<ScoredDocument>> {
+        self.search_filtered_internal(query, k, filter).await
     }
 
     #[allow(clippy::unnecessary_cast)]

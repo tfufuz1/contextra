@@ -38,6 +38,12 @@ pub struct WasmCapabilities {
     pub max_module_size_bytes: usize,
     /// Max. WASM-Tabellen-Einträge (INV-SBX-2). Default: 10_000.
     pub max_table_entries: u32,
+    /// Max. Output-Größe in Bytes je Stream (stdout/stderr). Default: 1 MB (1_048_576).
+    pub max_output_bytes: usize,
+    /// Max. Stdin-Input-Größe in Bytes. Default: 1 MB (1_048_576).
+    pub max_stdin_bytes: usize,
+    /// Seed für deterministisches `random_get`. Default: `None` (`random_get` liefert `NOSYS`).
+    pub random_seed: Option<u64>,
 }
 
 impl Default for WasmCapabilities {
@@ -54,6 +60,9 @@ impl Default for WasmCapabilities {
             max_wall_clock_ms: 5_000,
             max_module_size_bytes: 10 * 1024 * 1024, // 10 MB
             max_table_entries: 10_000,
+            max_output_bytes: 1024 * 1024, // 1 MB
+            max_stdin_bytes: 1024 * 1024,  // 1 MB
+            random_seed: None,
         }
     }
 }
