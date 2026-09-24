@@ -16,7 +16,8 @@ flow-corrected-thompson = ["contextra-adapt/flow-corrected-thompson"]
 
 [dependencies]
 shlex = "1"
-contextra-core = { workspace = true }
+contextra-types = { workspace = true }
+contextra-wire = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-adapt = { workspace = true }
 contextra-privacy = { workspace = true }

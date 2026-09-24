@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // Testpflicht AK-15 (docs/specs/CONTEXTRA_SPEC_v2.md)
 
 use contextra_router::OffPolicyEvaluator;

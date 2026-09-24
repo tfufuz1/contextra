@@ -2,7 +2,8 @@ use super::super::fixtures::*;
 use crate::{
     SlmProfile, RoutingOutcome,
 };
-use contextra_core::{EntityId, ContextraError, StorageEngine, TokenBudget};
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, EntityId, TokenBudget};
 use contextra_db::{Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
@@ -48,7 +49,7 @@ use std::sync::Arc;
     #[test]
     fn test_select_profile_from_chunks_empty_chunks_and_unmatched_community() {
         use crate::router::select_profile_from_chunks;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
 
         let profile = SlmProfile::new(
             "slm-test",
@@ -198,7 +199,7 @@ use std::sync::Arc;
             .await
             .unwrap();
 
-        let eid = EntityId::from_doc_id(contextra_core::DocId::new(1));
+        let eid = EntityId::from_doc_id(contextra_types::DocId::new(1));
         let tx = db.allocate_tx().unwrap();
         let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
         db.inner_storage()
@@ -207,7 +208,7 @@ use std::sync::Arc;
             .unwrap();
         db.inner_storage().commit(tx).await.unwrap();
 
-        use contextra_core::ConfigFingerprint;
+        use contextra_types::ConfigFingerprint;
         let fp = ConfigFingerprint::new("llama-3b", "F16", "template", 0.5);
         let profile = SlmProfile::new(
             "parallel-conv-slm",
@@ -482,7 +483,7 @@ use std::sync::Arc;
     async fn test_select_profile_cascade_error_branches_and_fallback(
     ) -> Result<(), Box<dyn std::error::Error>> {
         use crate::profile::ProfileCalibrationState;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
         use std::collections::HashMap;
 
         let dir = tempfile::tempdir()?;
@@ -574,8 +575,8 @@ use std::sync::Arc;
     }
 
     #[tokio::test]
-    async fn test_router_engine_additional_coverage_paths() -> contextra_core::Result<()> {
-        use contextra_core::{ContextChunk, DocId, TokenBudget};
+    async fn test_router_engine_additional_coverage_paths() -> contextra_types::Result<()> {
+        use contextra_types::{ContextChunk, DocId, TokenBudget};
 
         let dir = tempfile::tempdir()?;
         let config = contextra_db::ContextraConfig {
@@ -605,7 +606,7 @@ use std::sync::Arc;
 
         // 2. Evict stale decisions map capacity overflow test
         for _ in 0..(crate::router::MAX_PENDING_DECISIONS + 10) {
-            let id = crate::DecisionId::new();
+            let id = router.decision_ids.next();
             router.pending_decisions.write().insert(
                 id,
                 (
@@ -620,7 +621,7 @@ use std::sync::Arc;
         assert!(router.pending_decision_count() <= crate::router::MAX_PENDING_DECISIONS);
 
         // 3. record_outcome without active fingerprint (or unknown profile fingerprint)
-        let dec_id = crate::DecisionId::new();
+        let dec_id = router.decision_ids.next();
         router
             .pending_decisions
             .write()

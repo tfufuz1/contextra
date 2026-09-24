@@ -1,5 +1,6 @@
 use crate::{RouterEngine, SlmProfile};
-use contextra_core::{EntityId, StorageEngine, TokenBudget};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget, TxId};
 use contextra_db::{Collection, ContextManager};
 use std::sync::Arc;
 
@@ -9,87 +10,87 @@ impl StorageEngine for MockStorageEngine {
     fn get<'a>(
         &'a self,
         _: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<bytes::Bytes>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
     fn get_at_seq<'a>(
         &'a self,
         _: &'a [u8],
         _: u64,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<bytes::Bytes>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
     fn put<'a>(
         &'a self,
-        _: contextra_core::TxId,
+        _: TxId,
         _: &'a [u8],
         _: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn delete<'a>(
         &'a self,
-        _: contextra_core::TxId,
+        _: TxId,
         _: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn commit<'a>(
         &'a self,
-        _: contextra_core::TxId,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+        _: TxId,
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn rollback<'a>(
         &'a self,
-        _: contextra_core::TxId,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+        _: TxId,
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn rollback_to_tx<'a>(
         &'a self,
-        _: contextra_core::TxId,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+        _: TxId,
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn flush<'a>(&'a self) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn stats<'a>(
         &'a self,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<contextra_core::StorageStats>> {
+    ) -> BoxFuture<'a, Result<StorageStats>> {
         Box::pin(async move {
-            Ok(contextra_core::StorageStats {
+            Ok(StorageStats {
                 num_segments: 0,
                 total_size_bytes: 0,
                 memtable_size_bytes: 0,
             })
         })
     }
-    fn last_seq_no<'a>(&'a self) -> contextra_core::BoxFuture<'a, contextra_core::Result<u64>> {
+    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { Ok(0) })
     }
     fn last_tx_id<'a>(
         &'a self,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<contextra_core::TxId>> {
-        Box::pin(async move { Ok(contextra_core::TxId(0)) })
+    ) -> BoxFuture<'a, Result<TxId>> {
+        Box::pin(async move { Ok(TxId(0)) })
     }
     fn pin_checkpoint<'a>(
         &'a self,
         _: u64,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn unpin_checkpoint<'a>(
         &'a self,
         _: u64,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn scan_prefix<'a>(
         &'a self,
         _: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { Ok(vec![]) })
     }
     fn scan<'a>(
@@ -97,7 +98,7 @@ impl StorageEngine for MockStorageEngine {
         _: std::ops::Bound<&'a [u8]>,
         _: std::ops::Bound<&'a [u8]>,
         _: Option<usize>,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { Ok(vec![]) })
     }
 }
@@ -118,7 +119,7 @@ impl<S: StorageEngine + 'static> crate::ports_local::HybridSearchProvider for Co
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<contextra_core::ContextChunk>>>
+    ) -> BoxFuture<'a, Result<Vec<ContextChunk>>>
     {
         Box::pin(async move {
             let search_results = self
@@ -132,7 +133,7 @@ impl<S: StorageEngine + 'static> crate::ports_local::HybridSearchProvider for Co
 
             let mut chunks = Vec::with_capacity(search_results.len());
             for res in search_results {
-                if let Ok(mut chunk) = contextra_core::ContextChunk::try_from(res) {
+                if let Ok(mut chunk) = ContextChunk::try_from(res) {
                     chunk.content = chunk.combined_text_owned();
                     chunks.push(chunk);
                 }
@@ -146,7 +147,7 @@ impl<S: StorageEngine + 'static> crate::ports_local::CommunityResolver for Colle
     fn get_community<'a>(
         &'a self,
         entity_id: EntityId,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<u64>>> {
+    ) -> BoxFuture<'a, Result<Option<u64>>> {
         Box::pin(async move { self.collection.get_community(entity_id).await })
     }
 }
@@ -156,10 +157,10 @@ pub(crate) struct TestContextPreparer;
 impl crate::ports_local::ContextPreparer for TestContextPreparer {
     fn prepare_context(
         &self,
-        chunks: Vec<contextra_core::ContextChunk>,
+        chunks: Vec<ContextChunk>,
         budget: &TokenBudget,
         relevance_threshold: f32,
-    ) -> contextra_core::Result<contextra_core::ContextWindow> {
+    ) -> Result<ContextWindow> {
         let mut manager = ContextManager::new(budget.clone());
         manager.set_relevance_threshold(relevance_threshold);
         manager.prepare_context(chunks)
@@ -186,7 +187,7 @@ pub(crate) fn try_create_test_router<S: StorageEngine + 'static>(
     collection: Arc<Collection<S>>,
     profiles: Vec<SlmProfile>,
     calibration_store_path: Option<std::path::PathBuf>,
-) -> contextra_core::Result<RouterEngine> {
+) -> Result<RouterEngine> {
     let adapter = Arc::new(CollectionAdapter::new(collection));
     let preparer = Arc::new(TestContextPreparer);
     RouterEngine::try_new(

@@ -1,7 +1,7 @@
 use crate::{
     dispatch_to_slm, DecisionId, RoutingDecision, SlmProfile,
 };
-use contextra_core::{ContextraError, TokenBudget};
+use contextra_types::{ContextChunk, ContextWindow, ContextraError, DocId, TokenBudget};
 
     #[tokio::test]
     async fn test_dispatch_to_slm_mock_server_receives_trimmed_context_only() {
@@ -20,8 +20,8 @@ use contextra_core::{ContextraError, TokenBudget};
         let endpoint = format!("sh {}", script_path.display());
         let profile = SlmProfile::new("mock-slm", endpoint, vec![1], TokenBudget::new(50, 0), 0.1);
 
-        let chunk = contextra_core::ContextChunk {
-            doc_id: contextra_core::DocId::new(1),
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
             content: "Minimal context content for SLM".to_string(),
             relevance: 0.95,
             token_count: 5,
@@ -30,7 +30,7 @@ use contextra_core::{ContextraError, TokenBudget};
             links: Vec::new(),
         };
 
-        let context_window = contextra_core::ContextWindow {
+        let context_window = ContextWindow {
             chunks: vec![chunk],
             total_tokens: 5,
             truncated: false,
@@ -40,7 +40,7 @@ use contextra_core::{ContextraError, TokenBudget};
             profile,
             context: context_window,
             confidence: None,
-            decision_id: DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
 
@@ -73,8 +73,8 @@ use contextra_core::{ContextraError, TokenBudget};
             TokenBudget::new(50, 0),
             0.1,
         );
-        let chunk = contextra_core::ContextChunk {
-            doc_id: contextra_core::DocId::new(1),
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
             content: "test content".to_string(),
             relevance: 0.9,
             token_count: 5,
@@ -84,13 +84,13 @@ use contextra_core::{ContextraError, TokenBudget};
         };
         let decision = RoutingDecision {
             profile: bad_profile,
-            context: contextra_core::ContextWindow {
+            context: ContextWindow {
                 chunks: vec![chunk.clone()],
                 total_tokens: 5,
                 truncated: false,
             },
             confidence: None,
-            decision_id: DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
         let res_err = dispatch_to_slm(&decision).await;
@@ -105,7 +105,7 @@ use contextra_core::{ContextraError, TokenBudget};
             profile: profile_closed,
             context: decision.context.clone(),
             confidence: None,
-            decision_id: DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
         let res_closed = dispatch_to_slm(&decision_closed).await;
@@ -125,7 +125,7 @@ use contextra_core::{ContextraError, TokenBudget};
             profile: profile_rpc_err,
             context: decision.context.clone(),
             confidence: None,
-            decision_id: DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
         let res_rpc_err = dispatch_to_slm(&decision_rpc_err).await;
@@ -147,7 +147,7 @@ use contextra_core::{ContextraError, TokenBudget};
             profile: profile_obj,
             context: decision.context.clone(),
             confidence: None,
-            decision_id: DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
         let res_obj = dispatch_to_slm(&decision_obj).await.unwrap(); // unwrap
@@ -165,7 +165,7 @@ use contextra_core::{ContextraError, TokenBudget};
             profile: profile_empty,
             context: decision.context.clone(),
             confidence: None,
-            decision_id: DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
         let res_empty = dispatch_to_slm(&decision_empty).await;
@@ -184,8 +184,8 @@ use contextra_core::{ContextraError, TokenBudget};
             0.1,
         );
 
-        let chunk = contextra_core::ContextChunk {
-            doc_id: contextra_core::DocId::new(1),
+        let chunk = ContextChunk {
+            doc_id: DocId::new(1),
             content: "test content".to_string(),
             relevance: 0.9,
             token_count: 5,
@@ -196,13 +196,13 @@ use contextra_core::{ContextraError, TokenBudget};
 
         let decision = RoutingDecision {
             profile,
-            context: contextra_core::ContextWindow {
+            context: ContextWindow {
                 chunks: vec![chunk],
                 total_tokens: 5,
                 truncated: false,
             },
             confidence: None,
-            decision_id: DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
 
@@ -217,13 +217,13 @@ use contextra_core::{ContextraError, TokenBudget};
         let profile = SlmProfile::new("empty-ep", "  ", vec![1], TokenBudget::default(), 0.1);
         let decision = RoutingDecision {
             profile,
-            context: contextra_core::ContextWindow {
+            context: ContextWindow {
                 chunks: vec![],
                 total_tokens: 0,
                 truncated: false,
             },
             confidence: None,
-            decision_id: DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
 
@@ -236,7 +236,7 @@ use contextra_core::{ContextraError, TokenBudget};
     #[tokio::test]
     async fn test_dispatch_additional_error_and_format_paths() {
         use crate::dispatch_to_slm;
-        use contextra_core::{ContextWindow, TokenBudget};
+        use contextra_types::{ContextWindow, TokenBudget};
 
         let profile_exit = SlmProfile::new(
             "test-exit",
@@ -253,7 +253,7 @@ use contextra_core::{ContextraError, TokenBudget};
                 truncated: false,
             },
             confidence: None,
-            decision_id: crate::DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
 
@@ -282,7 +282,7 @@ use contextra_core::{ContextraError, TokenBudget};
                 truncated: false,
             },
             confidence: None,
-            decision_id: crate::DecisionId::new(),
+            decision_id: DecisionId::from_raw(0),
             drift_status: None,
         };
 

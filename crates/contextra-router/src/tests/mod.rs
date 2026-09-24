@@ -1,7 +1,13 @@
 //! Unit tests for contextra-router.
 
 #[cfg(test)]
-#[allow(clippy::module_inception)]
+#[allow(
+    clippy::module_inception,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::field_reassign_with_default
+)]
 #[path = "."]
 pub(crate) mod tests {
     pub(crate) mod bandit_tests;

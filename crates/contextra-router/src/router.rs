@@ -8,10 +8,10 @@
 //! Core routing engine for matching hybrid search context to SLM profiles.
 
 use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
-use crate::outcome::{DecisionId, RoutingOutcome};
+use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
-use contextra_core::{ContextChunk, ContextWindow, EntityId, ContextraError, Result};
+use contextra_types::{ContextChunk, ContextWindow, EntityId, ContextraError, Result};
 use contextra_ports::{
     CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
     HybridSearchProvider,
@@ -165,6 +165,7 @@ pub struct RouterEngine {
     /// eliminates state-cloning overhead while keeping transient outcome tracking isolated from core
     /// routing calibration consistency.
     pub(crate) pending_decisions: RwLock<HashMap<DecisionId, (String, Instant)>>,
+    pub(crate) decision_ids: DecisionIdGenerator,
     #[cfg(feature = "bandit-routing")]
     pub(crate) routing_strategy: RoutingStrategy,
     #[cfg(feature = "bandit-routing")]
@@ -225,6 +226,7 @@ impl RouterEngine {
             context_preparer,
             state: ArcSwap::from(Arc::new(router_state)),
             pending_decisions: RwLock::new(HashMap::new()),
+            decision_ids: DecisionIdGenerator::new(0),
             #[cfg(feature = "bandit-routing")]
             routing_strategy: RoutingStrategy::Cascade,
             #[cfg(feature = "bandit-routing")]
@@ -232,6 +234,12 @@ impl RouterEngine {
             #[cfg(feature = "bandit-routing")]
             pending_bandit: RwLock::new(HashMap::new()),
         }
+    }
+
+    /// Konfiguriert den Startwert des instanzgebundenen DecisionIdGenerators.
+    pub fn with_initial_decision_id(mut self, start: u64) -> Self {
+        self.decision_ids = DecisionIdGenerator::new(start);
+        self
     }
 
     #[cfg(feature = "bandit-routing")]
@@ -651,7 +659,7 @@ impl RouterEngine {
             (selected_profile, metrics, is_bandit_decision)
         };
 
-        let decision_id = DecisionId::new();
+        let decision_id = self.decision_ids.next();
         self.pending_decisions
             .write()
             .insert(decision_id, (selected_profile.name.clone(), Instant::now()));
@@ -1174,7 +1182,41 @@ impl LocalDriftStatusProvider for RouterEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::TokenBudget;
+    use contextra_types::TokenBudget;
+
+    #[tokio::test]
+    async fn test_router_engine_instance_decision_id_independence() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = contextra_db::ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let db = contextra_db::Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let collection = db.collection("default").await.unwrap();
+
+        let profile = SlmProfile::new(
+            "p1",
+            "http://localhost:8000/mcp",
+            vec![],
+            TokenBudget::new(1000, 100),
+            0.1,
+        );
+
+        let router1 = crate::tests::tests::create_test_router(collection.clone(), vec![profile.clone()], None);
+        let router2 = crate::tests::tests::create_test_router(collection, vec![profile], None);
+
+        let id1_a = router1.decision_ids.next();
+        let id2_a = router2.decision_ids.next();
+
+        assert_eq!(id1_a.inner(), 0);
+        assert_eq!(id2_a.inner(), 0);
+
+        let id1_b = router1.decision_ids.next();
+        let id2_b = router2.decision_ids.next();
+
+        assert_eq!(id1_b.inner(), 1);
+        assert_eq!(id2_b.inner(), 1);
+    }
 
     #[tokio::test]
     async fn test_calibration_stats_initial_state(
@@ -1290,7 +1332,7 @@ mod tests {
                 let mut map = router.pending_bandit.write();
                 for _ in 0..10_000 {
                     map.insert(
-                        DecisionId::new(),
+                        router.decision_ids.next(),
                         PendingBanditDecision {
                             context: vec![0.0; 4],
                             profile_name: "p1".to_string(),

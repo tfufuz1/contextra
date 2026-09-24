@@ -2,7 +2,8 @@ use super::super::fixtures::*;
 use crate::{
     RouterEngine, SlmProfile,
 };
-use contextra_core::{EntityId, ContextraError, StorageEngine, TokenBudget};
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, EntityId, TokenBudget};
 use contextra_db::{Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
@@ -445,7 +446,7 @@ use std::sync::Arc;
     #[test]
     fn test_route_determinism_and_tie_breaking() -> Result<(), Box<dyn std::error::Error>> {
         use crate::router::select_profile_from_chunks;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
 
         let profile_0 = SlmProfile::new(
             "profile-0",
@@ -591,7 +592,7 @@ use std::sync::Arc;
     #[test]
     fn test_select_profile_max_score_meets_threshold_when_aggregated_does_not() {
         use crate::router::select_profile_from_chunks;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
 
         // Profile requires min_relevance_score = 0.8
         let profile = SlmProfile::new(

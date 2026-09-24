@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 #[cfg(feature = "bandit-routing")]
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 

@@ -1,8 +1,8 @@
 use super::super::fixtures::*;
 use crate::{
-    DecisionId, SlmProfile, RoutingOutcome,
+    DecisionId, DecisionIdGenerator, SlmProfile, RoutingOutcome,
 };
-use contextra_core::TokenBudget;
+use contextra_types::TokenBudget;
 use std::sync::Arc;
 use contextra_db::{Contextra, ContextraConfig};
 use serde_json::json;
@@ -97,7 +97,7 @@ use serde_json::json;
             .await
             .unwrap();
 
-        use contextra_core::ConfigFingerprint;
+        use contextra_types::ConfigFingerprint;
         let fp = ConfigFingerprint::new("llama-3b", "F16", "template", 0.1);
         let profile = SlmProfile::new(
             "default",
@@ -126,9 +126,16 @@ use serde_json::json;
 
     #[test]
     fn test_decision_id_and_routing_outcome_methods() {
-        let default_id = DecisionId::default();
-        let new_id = DecisionId::new();
-        assert_ne!(default_id.inner(), new_id.inner());
+        let gen1 = DecisionIdGenerator::new(0);
+        let gen2 = DecisionIdGenerator::new(0);
+        let id1 = gen1.next();
+        let id2 = gen2.next();
+        assert_eq!(id1.inner(), 0);
+        assert_eq!(id2.inner(), 0);
+
+        let id1_next = gen1.next();
+        assert_eq!(id1_next.inner(), 1);
+        assert_ne!(id1.inner(), id1_next.inner());
 
         let success = RoutingOutcome::Success;
         let escalated = RoutingOutcome::Escalated {
@@ -162,7 +169,7 @@ use serde_json::json;
         );
 
         let router = create_test_router(collection, vec![profile], None);
-        let unknown_id = DecisionId::new();
+        let unknown_id = DecisionId::from_raw(9999);
 
         assert!(!router.record_outcome(unknown_id, RoutingOutcome::Success));
     }
@@ -262,7 +269,7 @@ use serde_json::json;
 
         // Score boundary clamping in histogram bins
         let mut watcher_clamped = LyapunovDriftWatcher::new(5);
-        watcher_clamped.set_baseline(&vec![0.5; 50]);
+        watcher_clamped.set_baseline(&[0.5; 50]);
         // Scores out of [0.0, 1.0] bound (-0.5, 1.5, NaN) clamped safely without panic
         let res_clamped = watcher_clamped.update(&[-0.5, 1.5, f32::NAN]);
         assert_eq!(res_clamped, LyapunovResult::InsufficientData);
@@ -305,7 +312,7 @@ use serde_json::json;
         {
             let mut map = router.pending_decisions.write();
             for _ in 0..MAX_PENDING_DECISIONS {
-                map.insert(DecisionId::new(), ("p1".to_string(), stale_timestamp));
+                map.insert(router.decision_ids.next(), ("p1".to_string(), stale_timestamp));
             }
         }
 
@@ -359,7 +366,7 @@ use serde_json::json;
         {
             let mut map = router.pending_decisions.write();
             for _ in 0..=(MAX_PENDING_DECISIONS) {
-                map.insert(DecisionId::new(), ("p1".to_string(), stale_timestamp));
+                map.insert(router.decision_ids.next(), ("p1".to_string(), stale_timestamp));
             }
         }
 
@@ -378,7 +385,7 @@ use serde_json::json;
     fn test_cascade_confidence_uses_conformal_alpha() -> Result<(), Box<dyn std::error::Error>> {
         use crate::profile::ProfileCalibrationState;
         use crate::router::COMMUNITY_RELEVANCE_BOOST;
-        use contextra_core::{ConfigFingerprint, ContextChunk, DocId};
+        use contextra_types::{ConfigFingerprint, ContextChunk, DocId};
         use std::collections::HashMap;
 
         let fp = ConfigFingerprint::new("model1", "Q4_K_M", "prompt", 0.7);
@@ -447,7 +454,7 @@ use serde_json::json;
     #[test]
     fn test_cascade_non_conformity_score_not_zero() -> Result<(), Box<dyn std::error::Error>> {
         use crate::profile::ProfileCalibrationState;
-        use contextra_core::{ContextChunk, DocId};
+        use contextra_types::{ContextChunk, DocId};
         use std::collections::HashMap;
 
         let profile = SlmProfile::new(
@@ -571,7 +578,7 @@ use serde_json::json;
     #[test]
     fn test_profile_calibration_state_edge_cases() {
         use crate::profile::ProfileCalibrationState;
-        use contextra_core::ConfigFingerprint;
+        use contextra_types::ConfigFingerprint;
 
         let mut state = ProfileCalibrationState::new(0.5);
         assert_eq!(state.average_confidence(), 1.0);

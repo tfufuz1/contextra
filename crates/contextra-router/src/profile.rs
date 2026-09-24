@@ -7,7 +7,7 @@
 
 //! Profile definition for Small Language Models (SLMs) in Contextra Router.
 
-use contextra_core::{ConfigFingerprint, ContextraError, Result, TokenBudget};
+use contextra_types::{ConfigFingerprint, ContextraError, Result, TokenBudget};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
