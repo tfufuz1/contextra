@@ -6,6 +6,11 @@
 //! Verbindet Structural Consolidation Pass-Ergebnisse mit der Collection-Mutation-API.
 //! INVARIANTE: Nur Structural Consolidation Pass (rein strukturell) hier. Keine LLM-Calls.
 
+use crate::aggregation_phase::{
+    run_aggregation_pass, AggregationConfig, AggregationEdge, AggregationNode,
+    AggregationPhaseResult, AlphaNode,
+};
+use crate::graph_sink::CsrGraphSuperEdgeSink;
 use crate::memory_consolidation::{
     compute_community_hash, run_consolidation_pass, run_structural_synthesis_pass,
     CommunityStabilityTracker, ConsolidationConfig, ConsolidationPhaseResult, SynthesisConfig,
@@ -277,6 +282,22 @@ pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
     };
 
     Ok((consolidation_result, synthesis_result))
+}
+
+/// Führt die Stage-3-Aggregation (LeanRAG) aus und wendet Kanten-Tombstones und Super-Hyperkanten
+/// atomar über [`CsrGraphSuperEdgeSink`] an.
+pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>(
+    collection: &Collection<S, V>,
+    nodes: &[AggregationNode],
+    edges: &[AggregationEdge],
+    cfg: &AggregationConfig,
+    llm: &dyn LlmTextGenerator,
+    tracker: &mut CommunityStabilityTracker,
+    wal_tx: contextra_core::TxId,
+) -> Result<(AggregationPhaseResult, Vec<AlphaNode>)> {
+    let graph = collection.graph_index();
+    let mut sink = CsrGraphSuperEdgeSink::new(&graph, wal_tx);
+    run_aggregation_pass(nodes, edges, cfg, llm, tracker, &mut sink).await
 }
 
 /// Deprecated legacy wrapper for `execute_background_consolidation`.
