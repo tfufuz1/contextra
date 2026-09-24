@@ -9,9 +9,8 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use contextra_core::traits::{BoxFuture, StorageEngine, StorageStats};
-use contextra_core::types::TxId;
-use contextra_core::Result;
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
 
 #[derive(Debug, Clone)]
 enum StagedOp {
