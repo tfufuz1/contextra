@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>CONTEXTRA.PROMPTER v32.1 — SDLC COCKPIT · 4 EBENEN (CRATE, SUBSYSTEM, EIGENBAU, PROZESS) · PLAN→IMPLEMENT→REVIEW TRIAS · ROLE-LOCK · CLAIM-KEYS · PROOF-OF-WORK-SCHRANKEN · JULES-VM-VERIFIZIERT</title>
+<title>CONTEXTRA.PROMPTER v33 — SDLC COCKPIT · 31 WORKSPACE-CRATES · RING 0-4 ARCHITEKTUR · PLAN→IMPLEMENT→REVIEW TRIAS · ROLE-LOCK · CLAIM-KEYS · JULES-VM-VERIFIZIERT</title>
 <!-- v32 CHANGELOG (2026-09-13, gegen .jules/JULES_LOG.md + .jules/JULES_LOG_2.md sowie den realen
      xtask-Quellcode im Repo abgeglichen — Fokus: Korrektheit der generierten Befehle in der
      tatsächlichen Google-Jules-VM-Sandbox, nicht nur inhaltliche Vollständigkeit):
@@ -292,11 +292,11 @@ kbd{font-family:monospace;font-size:8px}
 
 <header class="hdr">
   <div class="hdr-in">
-    <span class="logo"><em>CONTEXTRA</em>.BAUKASTEN<span class="lver">v32</span></span>
+    <span class="logo"><em>CONTEXTRA</em>.BAUKASTEN<span class="lver">v33</span></span>
     <span class="hdot"></span>
-    <span class="hsub">SDLC Cockpit v32 · 4 Ebenen (Crate, Subsystem, Eigenbau, Prozess) · PLAN→IMPLEMENT→REVIEW Trias · ROLE-LOCK · Claim-Keys</span>
+    <span class="hsub">SDLC Cockpit v33 · 31 Workspace-Crates · Ring 0-4 Architektur · PLAN→IMPLEMENT→REVIEW Trias · ROLE-LOCK · Claim-Keys</span>
     <div class="hright">
-      <span class="hbadge hb-a">16 CRATES · 4 SUBSYSTEME · 4 EIGENBAU · GATES/DOCS/COMMITS</span>
+      <span class="hbadge hb-a">31 WORKSPACE-CRATES · RING 0-4 ARCHITEKTUR · GATES/DOCS/COMMITS</span>
       <span class="hbadge" style="background:rgba(255,107,157,.12);color:#ff6b9d;border:1px solid rgba(255,107,157,.3)">3 SUBSYSTEME (KEIN MISCHEN)</span>
       <span class="hbadge hb-b">14 TASK-TYPEN</span>
       <span class="hbadge hb-c">42 APM-PATTERN</span>
@@ -760,44 +760,70 @@ const APM_ON = new Set(['1','2','3','4','5','6','7','8','9','10','11','12','13',
 // werden. Die ENGINE (TASKS, APM, Tag-Grammatik, Protokoll-Blöcke weiter unten)
 // bleibt davon unberührt und ist projektunabhängig.
 let TARGET_ARCH = {
-  "contextra-core-ipc-gen": "contextra-foundation",
-  "contextra-core": "contextra-foundation",
-  "contextra-crypto": "contextra-crypto",
-  "contextra-store": "contextra-persistence",
-  "contextra-checkpoint": "contextra-persistence",
-  "contextra-index": "contextra-retrieval",
-  "contextra-graph": "contextra-retrieval",
-  "contextra-text": "contextra-retrieval",
-  "contextra-db": "contextra-orchestrator",
-  "contextra-calibration": "contextra-inference",
-  "contextra-router": "contextra-inference",
-  "contextra-ollama": "contextra-inference",
-  "contextra-candle": "contextra-inference",
-  "contextra-embed": "contextra-inference",
+  "contextra": "contextra-facade",
+  "contextra-adapt": "contextra-inference",
   "contextra-agent": "contextra-agentic",
-  "contextra-mcp": "contextra-mcp",
-  "contextra-py": "contextra-bindings",
   "contextra-bench": "contextra-benchmarks",
+  "contextra-checkpoint": "contextra-persistence",
+  "contextra-cognition": "contextra-orchestrator",
+  "contextra-core": "contextra-foundation",
+  "contextra-db": "contextra-orchestrator",
+  "contextra-engine": "contextra-orchestrator",
+  "contextra-graph": "contextra-retrieval",
+  "contextra-infer-candle": "contextra-inference",
+  "contextra-infer-ollama": "contextra-inference",
+  "contextra-infer-onnx": "contextra-inference",
+  "contextra-kvcache": "contextra-persistence",
+  "contextra-mcp": "contextra-mcp",
+  "contextra-mvcc": "contextra-foundation",
+  "contextra-ports": "contextra-foundation",
+  "contextra-privacy": "contextra-security",
+  "contextra-py": "contextra-bindings",
+  "contextra-rank": "contextra-retrieval",
+  "contextra-router": "contextra-inference",
+  "contextra-sandbox": "contextra-agentic",
+  "contextra-security": "contextra-security",
+  "contextra-simd": "contextra-foundation",
+  "contextra-store": "contextra-persistence",
+  "contextra-sys": "contextra-foundation",
+  "contextra-testkit": "contextra-testkit",
+  "contextra-text": "contextra-retrieval",
+  "contextra-types": "contextra-foundation",
+  "contextra-vector": "contextra-retrieval",
+  "contextra-wire": "contextra-foundation"
 };
 const DEFAULT_CRATES = [
-  { id:'contextra-core-ipc-gen', layer:0, order:0, desc:'NEU in v30 (war komplett unerfasst, obwohl realer Workspace-Member): Wurzel des Cargo-DAG, keine internen Abhängigkeiten. Auto-generierter FlatBuffers-IPC-Code (contextra_generated.rs, 815 LOC) aus .fbs-Schemata via build.rs — Grundlage für search_fb()/hybrid_search_fb() in contextra-py.', loc:'858', tests:'0', status:'✅', risk:'gen', tier:'3' },
-  { id:'contextra-core', layer:0, order:1, desc:'Typen · Traits · Fehler · SnapshotRegistry · TxBuffer · ModelFingerprint (kanonisch, siehe contextra-crypto/contextra-candle) · LlmTextGeneratorStreaming/generate_with_context()', loc:'9286', tests:'168+', status:'✅', risk:'none', tier:'1' },
-  { id:'contextra-calibration', layer:1, order:2, desc:'Score-Kalibrierung · ECE-Metriken · Confidence-Fitting', loc:'1249', tests:'59+', status:'✅', risk:'calib', tier:'3' },
-  { id:'contextra-checkpoint', layer:1, order:3, desc:'RAII CheckpointGuard · Time-Travel · BLAKE3-Manifest', loc:'2797', tests:'83+', status:'✅', risk:'none', tier:'2' },
-  { id:'contextra-crypto', layer:1, order:4, desc:'Package-Name contextra-security · AES-256-GCM-SIV · HKDF · HMAC-SHA256 · Zeroize · TenantIsolatedKvStore (KV-Cache-Bridge-Fundament, kv_segment/) · DeletionProof (DSGVO Art. 17) · dedizierter EvictionWorker-Thread', loc:'3733', tests:'135+', status:'✅', risk:'sec', tier:'1' },
-  { id:'contextra-graph', layer:1, order:5, desc:'CSR-Graph · PPR · Community · Session-DAG · BFS (in csr.rs) · cascade_invalidate_edges_for_superseded_doc', loc:'9486', tests:'161+', status:'✅', risk:'none', tier:'2' },
-  { id:'contextra-text', layer:1, order:6, desc:'BM25 · Invertierter Index (inverted.rs) · German Compound Splitter', loc:'4116', tests:'94+', status:'✅', risk:'utf8', tier:'2' },
-  { id:'contextra-candle', layer:2, order:7, desc:'Pure-Rust ML Inferenz-Backend (Air-Gap-Fundament) · GGUF/Quantisierung · KvBridgeAdapter (kv_bridge.rs, Feature kv-bridge) · ModelFingerprint-Berechnung (model_registry.rs) · GASP-Grounding-Validator (gasp.rs) · Streaming-Generierung', loc:'2602', tests:'54+', status:'🟡', risk:'candle', tier:'2' },
-  { id:'contextra-index', layer:2, order:8, desc:'HNSW · DiskANN · SIMD AVX2/NEON · SQ8-Quantisierung', loc:'11172', tests:'183+', status:'✅', risk:'simd', tier:'1' },
-  { id:'contextra-ollama', layer:2, order:9, desc:'HTTP-Client · ContextPrefixEngine · xml_escape · Embedder', loc:'4247', tests:'84+', status:'🟡', risk:'inj', tier:'3' },
-  { id:'contextra-store', layer:2, order:10, desc:'LSM-Tree · WAL · MemTable · SSTable · Compaction', loc:'14271', tests:'231+', status:'✅', risk:'crash', tier:'1' },
-  { id:'contextra-embed', layer:3, order:11, desc:'ONNX CrossEncoder-Reranking · Feature-gated · SessionPool (in reranker.rs)', loc:'1935', tests:'36+', status:'🟡', risk:'gate', tier:'3' },
-  { id:'contextra-db', layer:4, order:12, desc:'4-Signal-Fusion · RRF · 2PC · MultiStep · repair_on_open · ConsolidationEngine (Sleep-Cycle) · Memory-Export/-Import-Format v1 (export.rs/import.rs)', loc:'23332', tests:'386+', status:'✅', risk:'fusion', tier:'1' },
-  { id:'contextra-bench', layer:5, order:13, desc:'LOCOMO/Long-Mem-Eval-Benchmark-Harness · Retrieval-Accuracy-Vergleich ggü. Baselines (eigenständiges Workspace-Mitglied, kein Produktionscode im DAG-Sinn)', loc:'3920', tests:'10+', status:'🟡', risk:'none', tier:'2' },
-  { id:'contextra-router', layer:5, order:14, desc:'SLM-Routing · NaN-Validierung · 100%-Branch-Ziel · Lyapunov-Drift-Watcher (F-11, event-driven, ADR-079) · Weak<RouterEngine>-Injection für Live-Stats (ADR-080)', loc:'5457', tests:'85+', status:'✅', risk:'nan', tier:'3' },
-  { id:'contextra-agent', layer:6, order:15, desc:'State-Machine · Exactly-Once · AuditLog (audit.rs) · Token-Budget', loc:'2795', tests:'59+', status:'✅', risk:'budget', tier:'2' },
-  { id:'contextra-mcp', layer:7, order:16, desc:'stdio JSON-RPC 2.0 (lib.rs) · Sandbox · Prompt-Injection-Guard · Slowloris · fünf Tools inkl. contextra_consolidate', loc:'3601', tests:'88+', status:'✅', risk:'proto', tier:'1' },
-  { id:'contextra-py', layer:null, order:17, desc:'PyO3-FFI · GIL-Release · Zero-Panic-Boundary · OnceLock — SEIT ADR-064 (2026-09-07) EIGENSTÄNDIGER Cargo-Workspace (eigenes [workspace] in crates/contextra-py/Cargo.toml), NICHT Mitglied des Root-Workspace. Grund: Root-Workspace = panic-Strategie "abort", PyO3-FFI-Grenze braucht catch_unwind. Gates NUR via --manifest-path, niemals -p contextra-py. PyDbStats trägt Live-Felder drift_status/calibration_ece/last_calibration_at/pid_pool_size (ADR-080).', loc:'1683', tests:'17+', status:'✅', risk:'ffi', tier:'1' },
+  { id:'contextra-adapt', layer:0, order:1, desc:'Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller)', loc:'3975', tests:'77+', status:'❓', risk:'calib', tier:'2' },
+  { id:'contextra-privacy', layer:0, order:2, desc:'Egress Filtering, Anonymisierung und Privacy Compliance Rules', loc:'1865', tests:'37+', status:'❓', risk:'sec', tier:'2' },
+  { id:'contextra-sandbox', layer:0, order:3, desc:'WASM Execution Boundary und Isolations-Sandbox', loc:'1918', tests:'25+', status:'❓', risk:'sec', tier:'2' },
+  { id:'contextra-sys', layer:0, order:4, desc:'Systemnahe Bindings, Low-Level I/O und Memory-Mapping', loc:'526', tests:'2+', status:'❓', risk:'ffi', tier:'2' },
+  { id:'contextra-types', layer:0, order:5, desc:'Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)', loc:'6065', tests:'115+', status:'❓', risk:'none', tier:'2' },
+  { id:'contextra-wire', layer:0, order:6, desc:'FlatBuffers Wire-Protokolle und Serialisierungs-Formate', loc:'1751', tests:'11+', status:'❓', risk:'gen', tier:'2' },
+  { id:'contextra-crypto', layer:1, order:7, desc:'Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC', loc:'6964', tests:'167+', status:'❓', risk:'sec', tier:'1' },
+  { id:'contextra-mvcc', layer:1, order:8, desc:'Multi-Version Concurrency Control und Isolation-Mechanismen', loc:'1955', tests:'38+', status:'❓', risk:'concurrency', tier:'2' },
+  { id:'contextra-ports', layer:1, order:9, desc:'Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung', loc:'2963', tests:'33+', status:'❓', risk:'none', tier:'2' },
+  { id:'contextra-checkpoint', layer:2, order:10, desc:'Persistent Checkpoint Engine und Blake3 Manifest-Verifikation', loc:'6165', tests:'90+', status:'❓', risk:'none', tier:'2' },
+  { id:'contextra-core', layer:2, order:11, desc:'Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer', loc:'368', tests:'7+', status:'❓', risk:'none', tier:'1' },
+  { id:'contextra-graph', layer:2, order:12, desc:'CSR Graph-Engine, Path Graphing und GraphRAG Community Detection', loc:'21599', tests:'285+', status:'❓', risk:'none', tier:'2' },
+  { id:'contextra-kvcache', layer:2, order:13, desc:'Stufenmodell KV-Cache Storage & Offloading', loc:'3160', tests:'50+', status:'❓', risk:'sec', tier:'2' },
+  { id:'contextra-rank', layer:2, order:14, desc:'Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers)', loc:'3753', tests:'44+', status:'❓', risk:'fusion', tier:'2' },
+  { id:'contextra-router', layer:2, order:15, desc:'Lyapunov Drift Control und Multi-Candidate Search Routing Engine', loc:'7149', tests:'113+', status:'❓', risk:'nan', tier:'3' },
+  { id:'contextra-testkit', layer:2, order:16, desc:'Test Fixtures, Mock Engines und Chaos Matrix Harness', loc:'562', tests:'7+', status:'❓', risk:'none', tier:'2' },
+  { id:'contextra-text', layer:2, order:17, desc:'Volltextsuche und Inverted-Index (BM25 Engine)', loc:'9381', tests:'135+', status:'❓', risk:'utf8', tier:'2' },
+  { id:'contextra-infer-ollama', layer:3, order:18, desc:'Ollama External Provider Client und Embeddings Integration', loc:'4604', tests:'92+', status:'❓', risk:'inj', tier:'3' },
+  { id:'contextra-infer-onnx', layer:3, order:19, desc:'ONNX Embeddings und Cross-Encoder Reranking Execution Provider', loc:'2264', tests:'37+', status:'❓', risk:'gate', tier:'3' },
+  { id:'contextra-simd', layer:3, order:20, desc:'SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen', loc:'1388', tests:'0+', status:'❓', risk:'simd', tier:'2' },
+  { id:'contextra-store', layer:3, order:21, desc:'LSM-Tree Storage Engine, WAL Durability und Compaction Engine', loc:'28098', tests:'307+', status:'❓', risk:'crash', tier:'1' },
+  { id:'contextra-infer-candle', layer:4, order:22, desc:'Candle LLM Inference Client und KV-Bridge Adapter', loc:'6664', tests:'89+', status:'❓', risk:'candle', tier:'3' },
+  { id:'contextra-vector', layer:4, order:23, desc:'Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung)', loc:'17021', tests:'173+', status:'❓', risk:'simd', tier:'1' },
+  { id:'contextra-engine', layer:5, order:24, desc:'Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02)', loc:'15899', tests:'137+', status:'❓', risk:'concurrency', tier:'2' },
+  { id:'contextra-cognition', layer:6, order:25, desc:'Konsolidierungs- und Background Sleep Passes', loc:'6578', tests:'71+', status:'❓', risk:'none', tier:'2' },
+  { id:'contextra-db', layer:7, order:26, desc:'Contextra Main Database Abstraction, Hybrid Search & Collections', loc:'12516', tests:'176+', status:'❓', risk:'fusion', tier:'1' },
+  { id:'contextra', layer:8, order:27, desc:'Haupt-Library Facade für Endanwender', loc:'721', tests:'10+', status:'❓', risk:'none', tier:'2' },
+  { id:'contextra-agent', layer:8, order:28, desc:'Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline', loc:'6976', tests:'78+', status:'❓', risk:'budget', tier:'2' },
+  { id:'contextra-bench', layer:8, order:29, desc:'Contextra — Reproducible Benchmark Harness for Retrieval Accuracy', loc:'5751', tests:'39+', status:'❓', risk:'none', tier:'2' },
+  { id:'contextra-py', layer:8, order:30, desc:'PyO3 Python Bindings', loc:'2249', tests:'24+', status:'❓', risk:'ffi', tier:'1' },
+  { id:'contextra-mcp', layer:9, order:31, desc:'Model Context Protocol Server & Cloud Egress Gateway', loc:'7073', tests:'112+', status:'❓', risk:'proto', tier:'1' },
 ];
 // contextra-tauri (vormals layer:5, order:15) wurde per ADR-077 am 2026-09-12 PHYSISCH aus dem Repository
 // entfernt (nicht mehr nur deprecated). Der Eintrag existiert bewusst nicht mehr in DEFAULT_CRATES —
@@ -826,14 +852,13 @@ const TIER_INFO = {
 // PKG() ist die EINZIGE Stelle, die dieses Package-Flag erzeugt — alle
 // Gate-Vorlagen rufen ausschließlich PKG(crate) statt "-p ${crate}" auf.
 function PKG(crateId) {
-  // v32 BUGFIX (kritisch, gegen Jules-VM-Realität verifiziert): das Cargo-Package in
-  // crates/contextra-crypto/Cargo.toml heißt tatsächlich "contextra-security" (einziger
-  // Verzeichnisname≠Package-Name-Fall im gesamten Workspace, per `grep "^name ="` gegen
-  // alle Cargo.toml-Dateien verifiziert). Ohne dieses Mapping schlägt JEDER generierte
-  // `cargo -p contextra-crypto ...`-Befehl in der echten Jules-VM mit "package not found"
-  // fehl — Verzeichnispfade (crates/contextra-crypto/src/...) bleiben davon unberührt und
-  // verwenden weiterhin den Verzeichnisnamen.
-  const CARGO_PACKAGE_NAME = { 'contextra-crypto': 'contextra-security' };
+  const CARGO_PACKAGE_NAME = {
+    'contextra-crypto': 'contextra-security',
+    'contextra-index': 'contextra-vector',
+    'contextra-embed': 'contextra-infer-onnx',
+    'contextra-candle': 'contextra-infer-candle',
+    'contextra-ollama': 'contextra-infer-ollama',
+  };
   const pkgName = CARGO_PACKAGE_NAME[crateId] || crateId;
   return crateId === 'contextra-py'
     ? '--manifest-path crates/contextra-py/Cargo.toml'
@@ -2517,16 +2542,22 @@ function SUBSYS_LOC(crate, filename) {
 const SUBSYSTEMS = [
   { id:'wal', crate:'contextra-store', file:'crates/contextra-store/src/wal.rs',
     loc:'3598', size:'XL', icon:'📜', name:'WAL',
-    desc:'Write-Ahead-Log — fsync-Disziplin, HMAC-Bindung, höchstes Crash-Safety-Risiko im gesamten Workspace' },
+    desc:'Write-Ahead-Log — fsync-Disziplin, HMAC-Bindung, Group-Commit Scope Reduction, crash-safety' },
   { id:'lsm', crate:'contextra-store', file:'crates/contextra-store/src/lsm.rs',
     loc:'4689', size:'XL', icon:'🗂️', name:'LSM-Tree',
-    desc:'LsmStorage — StorageEngine-Trait-Implementierung, commit_mutex-Verwaltung, rollback_to_tx (größte Einzeldatei des Crates)' },
+    desc:'LsmStorage — StorageEngine-Trait-Implementierung, put_if_absent intent_locks, commit_mutex' },
   { id:'mcp_sandbox', crate:'contextra-mcp', file:'crates/contextra-mcp/src/sandbox.rs',
     loc:'431', size:'M', icon:'🧪', name:'MCP-Sandbox',
-    desc:'McpSandbox — Zero-Trust Tool-Output-Isolation, Volatile-Result-Verschlüsselung (AES-256-GCM-SIV via contextra-crypto)' },
-  { id:'kv_cache_bridge', crate:'contextra-candle', file:'crates/contextra-candle/src/kv_bridge.rs',
+    desc:'McpSandbox — Zero-Trust Tool-Output-Isolation, Volatile-Result-Verschlüsselung (AES-256-GCM-SIV via contextra-security)' },
+  { id:'kv_cache_bridge', crate:'contextra-infer-candle', file:'crates/contextra-infer-candle/src/kv_bridge.rs',
     loc:'—', size:'M', icon:'🔐', name:'KV-Cache-Bridge',
-    desc:'NEU (v30): KvBridgeAdapter — verbindet Retrieval-Chunks mandantenisoliert-verschlüsselt mit dem Candle-Inferenz-Pfad (Feature kv-bridge). Cross-Cutting über contextra-candle/kv_bridge.rs + contextra-crypto/kv_cipher.rs + kv_segment/. Kernrisiko: Fail-Open-Pflicht bei Cache-Miss/Krypto-Fehler UND ModelFingerprint-Isolation — siehe JULES_PROMPTS_KV_CRYPTO_GAP_2026-09-12.md.' },
+    desc:'KvBridgeAdapter — verbindet Retrieval-Chunks mandantenisoliert-verschlüsselt mit dem Candle-Inferenz-Pfad (Feature kv-bridge). Fail-Open-Pflicht & ModelFingerprint-Isolation' },
+  { id:'consolidation', crate:'contextra-cognition', file:'crates/contextra-cognition/src/memory_consolidation.rs',
+    loc:'—', size:'L', icon:'🧠', name:'Memory-Consolidation (P1)',
+    desc:'Structural Consolidation Pass — deterministisch, LLM-frei, zero dependencies on memfuse-graph/contextra-graph' },
+  { id:'engine_tx', crate:'contextra-engine', file:'crates/contextra-engine/src/transaction/mod.rs',
+    loc:'—', size:'L', icon:'⚡', name:'Engine-Transactions',
+    desc:'Submodule-Verzeichnis-Reexport für Transaktionsverarbeitung (cleanup, compensating actions, intent, commit, rollback)' },
 ];
 // Live-Auflösung der LOC-Werte gegen COMPONENTS direkt nach Deklaration (Single-Source-of-Truth-Patch):
 SUBSYSTEMS.forEach(s => {
@@ -2546,28 +2577,27 @@ const EIGENBAU_COMPONENTS = [
       'crates/contextra-store/src/wal.rs',
       'crates/contextra-store/src/lsm.rs',
       'crates/contextra-store/src/compaction.rs',
-      'crates/contextra-store/src/tx_buffer.rs',
       'crates/contextra-checkpoint/src/lib.rs'
     ],
     depends_on: [],
     review_focus: 'crash-simulation',
-    desc: 'Disk-Physik: fsync-Reihenfolge, Intent-Files, HMAC-Chains, rollback_to_tx, Crash-mitten-im-Rollback'
+    desc: 'Disk-Physik: fsync-Reihenfolge, Group-Commit Scope Reduction, HMAC-Chains, rollback_to_tx'
   },
   {
     id: 'eigenbau-candle-tensor',
     name: 'Candle ML-Inferenz-Pfad',
     role: 'ML-Inferenz-Korrektheits-Spezialist',
     icon: '🕯️',
-    crate: 'contextra-candle',
+    crate: 'contextra-infer-candle',
     spans: [
-      'crates/contextra-candle/src/inference.rs',
-      'crates/contextra-candle/src/embedding.rs',
-      'crates/contextra-candle/src/gasp.rs',
-      'crates/contextra-candle/src/gguf_loader.rs'
+      'crates/contextra-infer-candle/src/inference.rs',
+      'crates/contextra-infer-candle/src/embedding.rs',
+      'crates/contextra-infer-candle/src/gasp.rs',
+      'crates/contextra-infer-candle/src/gguf_loader.rs'
     ],
     depends_on: [],
     review_focus: 'non-constant-output-proof',
-    desc: 'Reale GGUF Forward-Passes, Wortgrenzen-Analyse (GASP), Modell-Fingerprinting, Nicht-Konstanz-Beweis'
+    desc: 'Reale GGUF Forward-Passes, GASP Grounding, Modell-Fingerprinting, Nicht-Konstanz-Beweis'
   },
   {
     id: 'eigenbau-index-store-sync',
@@ -2578,43 +2608,58 @@ const EIGENBAU_COMPONENTS = [
     spans: [
       'crates/contextra-db/src/collection/search.rs',
       'crates/contextra-db/src/collection/crud.rs',
-      'crates/contextra-index',
+      'crates/contextra-vector',
       'crates/contextra-store'
     ],
     depends_on: ['eigenbau-lsm-wal'],
     review_focus: 'split-brain-simulation',
-    desc: 'Transaktionale Vektor-Index <-> LSM Sync, CheckpointPinGuard, Lösch-Split-Brain Schutz. [v30 UMBENANNT von "eigenbau-kv-bridge" auf "eigenbau-index-store-sync" — Namenskollision mit der NEUEN, fachlich unabhängigen KV-Cache-Bridge (Retrieval↔Inferenz-Beschleunigung, siehe eigenbau-kv-cache-bridge unten) aufgelöst. Beide Begriffe kommen im Repo/der Spezifikation vor und bezeichnen unterschiedliche Dinge — bei Bearbeitung IMMER die vollständige ID prüfen, nicht nur "KV-Bridge" im Namen.]'
+    desc: 'Transaktionale Vektor-Index <-> LSM Sync, CheckpointPinGuard, Lösch-Split-Brain Schutz'
   },
   {
     id: 'eigenbau-kv-cache-bridge',
-    name: 'KV-Cache-Bridge (Retrieval↔Inferenz, kryptographisch isoliert)',
+    name: 'KV-Cache-Bridge (Retrieval↔Inferenz)',
     role: 'Inferenz-Beschleunigungs-/Krypto-Isolations-Spezialist',
     icon: '🔐',
-    crate: 'contextra-candle',
+    crate: 'contextra-infer-candle',
     spans: [
-      'crates/contextra-candle/src/kv_bridge.rs',
-      'crates/contextra-candle/src/inference.rs',
-      'crates/contextra-candle/src/model_registry.rs',
+      'crates/contextra-infer-candle/src/kv_bridge.rs',
+      'crates/contextra-infer-candle/src/inference.rs',
       'crates/contextra-crypto/src/kv_cipher.rs',
       'crates/contextra-crypto/src/kv_segment/',
       'crates/contextra-core/src/model_fingerprint.rs'
     ],
     depends_on: ['eigenbau-candle-tensor'],
     review_focus: 'fail-open-and-fingerprint-isolation',
-    desc: 'NEU (v30, Alleinstellungsmerkmal §2.3.6 der Spezifikation): verbindet Retrieval-Treffer direkt mit dem Inferenz-Backend — bereits berechnete KV-Tensoren häufig wiederverwendeter Chunks werden mandantenisoliert verschlüsselt zwischengespeichert (contextra-crypto::TenantIsolatedKvStore) und bei erneutem Treffer injiziert, wodurch der LLM-Prefill entfällt. Zwei Kern-Invarianten: (1) Fail-Open bei Cache-Miss/Krypto-Fehler — niemals Request-Fehler; (2) ModelFingerprint-Bindung — Modell-/Quantisierungswechsel macht alte Segmente kryptographisch unlesbar statt fälschlich gültig (P8). Betroffene Prompts: siehe JULES_PROMPTS_KV_CRYPTO_GAP_2026-09-12.md — gilt als in Umsetzung, nicht als unbearbeitete Lücke neu ansetzen.'
+    desc: 'Verbindet Retrieval-Treffer direkt mit dem Inferenz-Backend — KV-Tensoren mandantenisoliert verschlüsselt in TenantIsolatedKvStore. Fail-Open bei Cache-Miss'
   },
   {
     id: 'eigenbau-rrf-fusion',
-    name: 'RRF Rank Fusion & Numerik',
+    name: '4-Signal RRF Fusion & Calibration',
     role: 'Rank-Fusion-/Numerik-Spezialist',
     icon: '🔀',
-    crate: 'contextra-db',
+    crate: 'contextra-rank',
     spans: [
-      'crates/contextra-db/src/fusion.rs'
+      'crates/contextra-rank/src/fusion.rs',
+      'crates/contextra-rank/src/calibration.rs',
+      'crates/contextra-adapt/src/pid.rs'
     ],
     depends_on: [],
     review_focus: 'nan-and-tie-cases',
-    desc: 'Reciprocal Rank Fusion, IEEE-754 NaN-Scores, Total-Order Sortierung, Zettelkasten-Displacement'
+    desc: '4-Signal Search Fusion (Vector, Text, Graph, Recency/Bandit), IsotonicCalibrator, PlattScaler, Rerank PID Pool Sizing'
+  },
+  {
+    id: 'eigenbau-consolidation-pass',
+    name: 'Memory Consolidation Pass (P1)',
+    role: 'Memory-Consolidation-Spezialist',
+    icon: '🧠',
+    crate: 'contextra-cognition',
+    spans: [
+      'crates/contextra-cognition/src/memory_consolidation.rs',
+      'crates/contextra-cognition/src/synthesis_phase.rs'
+    ],
+    depends_on: [],
+    review_focus: 'pass-separation-invariant',
+    desc: 'Pass Separation Invariant (P1): Deterministischer Structural Consolidation Pass (zero graph deps, zero LLM calls) vs. Generativer Synthese-Pass'
   }
 ];
 
