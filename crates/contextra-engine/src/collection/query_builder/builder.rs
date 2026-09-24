@@ -2,10 +2,8 @@ use super::strategy::SearchStrategy;
 use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
-use contextra_core::{
-    DocId, EntityId, FilterExpr, FusionStrategy, FusionWeights, MemoryType, StorageEngine,
-    VectorIndex,
-};
+use contextra_types::{DocId, EntityId, FilterExpr, FusionStrategy, FusionWeights, MemoryType};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 #[cfg(feature = "adaptive-candidate-pool-sizing")]
 use std::sync::Arc;
@@ -46,7 +44,7 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) seq: Option<u64>,
     pub(super) as_of_timestamp: Option<u64>,
     pub(super) query_timestamp: Option<u64>,
-    pub(super) current_tx: Option<contextra_core::TxId>,
+    pub(super) current_tx: Option<contextra_types::TxId>,
 }
 
 impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
@@ -106,7 +104,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     /// Sets custom signal fusion weights using `SignalWeights` or `FusionWeights`.
     pub fn weights<W>(mut self, weights: W) -> Self
     where
-        W: TryInto<FusionWeights, Error = contextra_core::ContextraError>,
+        W: TryInto<FusionWeights, Error = contextra_types::ContextraError>,
     {
         if let Ok(fw) = weights.try_into() {
             self.weights = Some(fw);
@@ -246,13 +244,13 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     }
 
     /// Sets current system transaction ID for temporal validity filtering (Post-RRF, Pre-Reranking).
-    pub fn current_tx(mut self, tx: contextra_core::TxId) -> Self {
+    pub fn current_tx(mut self, tx: contextra_types::TxId) -> Self {
         self.current_tx = Some(tx);
         self
     }
 
     /// Configures builder options from an existing `HybridQuery` struct.
-    pub fn query_config(mut self, query: &contextra_core::HybridQuery) -> Self {
+    pub fn query_config(mut self, query: &contextra_types::HybridQuery) -> Self {
         if let Some(ref text) = query.text_query {
             self.text = Some(text.clone());
         }

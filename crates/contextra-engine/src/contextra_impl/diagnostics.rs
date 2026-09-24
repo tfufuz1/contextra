@@ -1,5 +1,5 @@
 use crate::*;
-use contextra_core::Result;
+use contextra_types::Result;
 use std::sync::Arc;
 
 impl Contextra {

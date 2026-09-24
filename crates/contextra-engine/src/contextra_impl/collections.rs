@@ -1,5 +1,5 @@
 use crate::*;
-use contextra_core::{Result, TxId};
+use contextra_types::{Result, TxId};
 use contextra_store::LsmStorage;
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ impl Contextra {
         language: Language,
     ) -> Result<Arc<Collection<LsmStorage>>> {
         if name.len() > 64 {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "Collection name too long (max 64)",
             ));
         }
@@ -23,7 +23,7 @@ impl Contextra {
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
         {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "Invalid characters in collection name",
             ));
         }
@@ -95,7 +95,7 @@ impl Contextra {
     pub fn allocate_tx(&self) -> Result<TxId> {
         let id = self.next_tx.fetch_add(1, Ordering::SeqCst);
         if id > TxId::MAX_COLLECTION_SEQUENCE {
-            return Err(contextra_core::ContextraError::Transaction(
+            return Err(contextra_types::ContextraError::Transaction(
                 "TxId counter exhausted: MAX_COLLECTION_SEQUENCE range exceeded. Collection must be recreated.".into(),
             ));
         }
@@ -135,7 +135,7 @@ impl Contextra {
         proof_key: &[u8],
     ) -> Result<DeletionProof> {
         if name == "default" {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "Cannot drop default collection",
             ));
         }
@@ -200,7 +200,7 @@ impl Contextra {
         .into_iter()
         .collect::<Result<Vec<_>>>()
         .map_err(|e| {
-            contextra_core::ContextraError::Internal(format!(
+            contextra_types::ContextraError::Internal(format!(
                 "CRITICAL: Collection '{name}' was physically sanitized and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
                 tx.inner()
             ))
@@ -215,7 +215,7 @@ impl Contextra {
             proof_key,
         )
         .map_err(|e| {
-            contextra_core::ContextraError::Internal(format!(
+            contextra_types::ContextraError::Internal(format!(
                 "CRITICAL: Collection '{name}' was physically sanitized and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
                 tx.inner()
             ))

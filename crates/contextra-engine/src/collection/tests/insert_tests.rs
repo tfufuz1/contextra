@@ -109,7 +109,7 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
     col.insert_typed(
         "ep1",
         &[1.0, 0.0, 0.0, 0.0],
-        contextra_core::MemoryType::Episodic,
+        contextra_types::MemoryType::Episodic,
         None,
     )
     .await
@@ -161,7 +161,7 @@ async fn test_insert_typed_working_has_ttl_metadata() {
     col.insert_typed(
         "wk1",
         &[1.0, 0.0, 0.0, 0.0],
-        contextra_core::MemoryType::Working,
+        contextra_types::MemoryType::Working,
         None,
     )
     .await
@@ -221,14 +221,16 @@ async fn test_insert_backward_compatible_has_semantic_default() {
     let doc = col.get("plain1").await.unwrap().unwrap(); // unwrap
     assert_eq!(
         crate::filter::extract_memory_type(&doc.metadata),
-        contextra_core::MemoryType::Semantic
+        contextra_types::MemoryType::Semantic
     );
 }
 
 
 #[tokio::test]
 async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
-    use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+use contextra_types::{Result, TxId};
+use contextra_ports::{StorageStats};
+use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::CsrGraph;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -266,7 +268,7 @@ async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
         }
         fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
-                Err(contextra_core::ContextraError::Internal(
+                Err(contextra_types::ContextraError::Internal(
                     "Simulated rollback failure".into(),
                 ))
             })
@@ -349,7 +351,7 @@ async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
 
     assert!(res.is_err(), "put_kv_if_absent must fail");
     match res.unwrap_err() {
-        contextra_core::ContextraError::Conflict(msg) => {
+        contextra_types::ContextraError::Conflict(msg) => {
             assert!(
                 msg.contains("existing_key"),
                 "Conflict message must reference key, got: {}",

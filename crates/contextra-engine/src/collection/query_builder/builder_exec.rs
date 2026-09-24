@@ -1,5 +1,6 @@
 use super::builder::HybridQueryBuilder;
-use contextra_core::{DocId, Result, StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     /// Executes search query, delegating core signal retrieval to `Collection::hybrid_search_with_query()`.
@@ -20,7 +21,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             .or_else(|| self.strategy.as_ref().map(|s| s.to_fusion_strategy()))
             .unwrap_or_default();
 
-        let hybrid_query = contextra_core::HybridQuery {
+        let hybrid_query = contextra_types::HybridQuery {
             text_query: self.text.clone(),
             vector_query: self.vector.clone(),
             graph_start_node: self
@@ -90,7 +91,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         if let Some(as_of) = self.as_of_timestamp {
             results = crate::temporal_filter::apply_temporal_validity_filter_at(results, as_of);
         } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
-            let ctx = self.current_tx.unwrap_or(contextra_core::TxId::new(u64::MAX));
+            let ctx = self.current_tx.unwrap_or(contextra_types::TxId::new(u64::MAX));
             results = crate::temporal_filter::apply_temporal_validity_filter(
                 results,
                 ctx,

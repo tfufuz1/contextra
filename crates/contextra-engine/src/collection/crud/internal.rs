@@ -1,19 +1,20 @@
 use crate::collection::Collection;
-use contextra_core::{Result, StorageEngine, VectorIndex};
+use contextra_types::{Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 pub(crate) fn validate_doc_id(id: &str) -> Result<()> {
     if id.is_empty() {
-        return Err(contextra_core::ContextraError::invalid_input(
+        return Err(contextra_types::ContextraError::invalid_input(
             "Document ID cannot be empty",
         ));
     }
     if id.len() > 256 {
-        return Err(contextra_core::ContextraError::invalid_input(
+        return Err(contextra_types::ContextraError::invalid_input(
             "Document ID exceeds maximum length of 256 bytes",
         ));
     }
     if id.contains('\0') {
-        return Err(contextra_core::ContextraError::invalid_input(
+        return Err(contextra_types::ContextraError::invalid_input(
             "Document ID cannot contain null bytes",
         ));
     }
@@ -22,17 +23,17 @@ pub(crate) fn validate_doc_id(id: &str) -> Result<()> {
 
 pub(crate) fn validate_embedding(embedding: &[f32]) -> Result<()> {
     if embedding.is_empty() {
-        return Err(contextra_core::ContextraError::invalid_input(
+        return Err(contextra_types::ContextraError::invalid_input(
             "Embedding vector cannot be empty",
         ));
     }
     if embedding.iter().all(|&x| x == 0.0) {
-        return Err(contextra_core::ContextraError::invalid_input(
+        return Err(contextra_types::ContextraError::invalid_input(
             "Zero vector embeddings are not allowed in regular Collection insertion. Use put_kv for non-vector entries.",
         ));
     }
     if embedding.iter().any(|&x| !x.is_finite()) {
-        return Err(contextra_core::ContextraError::invalid_input(
+        return Err(contextra_types::ContextraError::invalid_input(
             "Embedding vector contains NaN or Infinite values",
         ));
     }

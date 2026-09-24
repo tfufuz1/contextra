@@ -2,8 +2,8 @@
 // ZWECK: Unit-Tests für background_workers Submodule.
 
 use super::*;
-use contextra_core::tx_buffer::IndexOp;
-use contextra_core::types::{DocId, TxId};
+use contextra_mvcc::tx_buffer::IndexOp;
+use contextra_types::{DocId, TxId};
 use contextra_graph::hyperedge::HyperEdgeId;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -45,11 +45,11 @@ struct MockDegradedHnswIndex {
 }
 
 impl OrphanCleanupIndex for MockDegradedHnswIndex {
-    fn check_connectivity(&self) -> contextra_core::Result<()> {
+    fn check_connectivity(&self) -> contextra_types::Result<()> {
         if self.connectivity_ok.load(Ordering::SeqCst) {
             Ok(())
         } else {
-            Err(contextra_core::ContextraError::HnswConnectivityDegraded {
+            Err(contextra_types::ContextraError::HnswConnectivityDegraded {
                 deleted_ratio: 50.0,
             })
         }
@@ -58,7 +58,7 @@ impl OrphanCleanupIndex for MockDegradedHnswIndex {
     fn rebuild(
         &self,
     ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = contextra_core::Result<()>> + Send + '_>,
+        Box<dyn std::future::Future<Output = contextra_types::Result<()>> + Send + '_>,
     > {
         let calls = self.rebuild_calls.clone();
         let should_restore = self.rebuild_should_restore.load(Ordering::SeqCst);
@@ -296,7 +296,7 @@ async fn test_deferred_hyperedge_worker_graceful_shutdown_preserves_queue() {
 
 #[tokio::test]
 async fn test_orphan_cleanup_rebuild_backoff_and_alert() {
-    use contextra_core::tx_buffer::TxBuffer;
+    use contextra_mvcc::tx_buffer::TxBuffer;
 
     let buffer = Arc::new(TxBuffer::<String>::new_with_config(
         64,
@@ -453,7 +453,7 @@ async fn test_expiry_cleanup_worker_task_cleans_documents() {
 
 #[tokio::test]
 async fn test_orphan_cleanup_worker_removes_expired() {
-    use contextra_core::tx_buffer::TxBuffer;
+    use contextra_mvcc::tx_buffer::TxBuffer;
 
     let buffer = Arc::new(TxBuffer::<String>::new_with_config(
         64,
@@ -595,7 +595,7 @@ async fn test_worker_immediate_cancellation() {
 #[tokio::test]
 async fn test_decay_eviction_thresholds() {
     use crate::decay_controller::{AdaptiveDecayController, DecayControllerConfig};
-    use contextra_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -688,7 +688,7 @@ async fn test_decay_eviction_thresholds() {
 #[tokio::test]
 async fn test_start_decay_cleanup_worker_background_task() {
     use contextra_adapt::DecayControllerConfig;
-    use contextra_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;

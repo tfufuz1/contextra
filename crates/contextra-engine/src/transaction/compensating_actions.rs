@@ -1,9 +1,7 @@
 use super::intent::{CommitIntent, StagedKeyOp};
 use crate::Collection;
-use contextra_core::{
-    BoxFuture, DocId, GraphIndex, ContextraError, Result, StorageEngine, TenantId, TextIndex, TxId,
-    VectorIndex,
-};
+use contextra_types::{DocId, ContextraError, Result, TenantId, TxId};
+use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use std::sync::Arc;
 
 /// Trait representing an undo operation to be executed during transaction rollback/compensation.

@@ -1,5 +1,6 @@
 use crate::collection::Collection;
-use contextra_core::{DocId, EntityId, Result, StorageEngine, VectorIndex};
+use contextra_types::{DocId, EntityId, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Deletes a document from the collection by its ID.

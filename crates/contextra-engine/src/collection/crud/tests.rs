@@ -82,7 +82,7 @@ async fn test_scan_prefix_explicit_limit_smaller_than_count_returns_limit_exceed
     let res = col.scan_prefix("", Some(10)).await;
     assert!(matches!(
         res,
-        Err(contextra_core::ContextraError::LimitExceeded { limit: 10, .. })
+        Err(contextra_types::ContextraError::LimitExceeded { limit: 10, .. })
     ));
 
     let res_exact = col.scan_prefix("", Some(15)).await;
@@ -174,7 +174,7 @@ async fn test_scan_explicit_limit_smaller_than_count_returns_limit_exceeded() {
     let res = col.scan(Bound::Unbounded, Bound::Unbounded, Some(10)).await;
     assert!(matches!(
         res,
-        Err(contextra_core::ContextraError::LimitExceeded { limit: 10, .. })
+        Err(contextra_types::ContextraError::LimitExceeded { limit: 10, .. })
     ));
 
     let res_exact = col.scan(Bound::Unbounded, Bound::Unbounded, Some(15)).await;
@@ -211,7 +211,7 @@ async fn test_concurrent_put_kv_if_absent_race() {
     while let Some(res) = set.join_next().await {
         match res.unwrap() {
             Ok(_) => ok_count += 1,
-            Err(contextra_core::ContextraError::Conflict(_)) => conflict_count += 1,
+            Err(contextra_types::ContextraError::Conflict(_)) => conflict_count += 1,
             Err(other) => panic!("Unexpected error: {:?}", other),
         }
     }
@@ -323,7 +323,7 @@ async fn test_insert_rejects_dimension_mismatch_before_lock_acquisition() {
     // Must fail immediately
     assert!(res.is_err());
     let err_msg = match res {
-        Err(contextra_core::ContextraError::InvalidInput(msg)) => msg,
+        Err(contextra_types::ContextraError::InvalidInput(msg)) => msg,
         Err(other) => panic!("Expected InvalidInput error, got: {:?}", other),
         Ok(_) => panic!("Expected insert to fail due to dimension mismatch"),
     };

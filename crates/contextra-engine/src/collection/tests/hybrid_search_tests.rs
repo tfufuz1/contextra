@@ -39,10 +39,10 @@ async fn hybrid_search_caps_k_at_max_search_k() {
         .unwrap(); // unwrap
 
     assert!(
-        res.len() <= contextra_core::MAX_SEARCH_K,
+        res.len() <= contextra_types::MAX_SEARCH_K,
         "Results length {} should be <= MAX_SEARCH_K ({})",
         res.len(),
-        contextra_core::MAX_SEARCH_K
+        contextra_types::MAX_SEARCH_K
     );
 }
 
@@ -163,7 +163,8 @@ async fn test_hybrid_search_reranked_none() {
 #[tokio::test]
 #[cfg(feature = "experimental-diskann")]
 async fn test_collection_with_diskann_index_hybrid_search() {
-    use contextra_core::{DocId, StorageEngine, TextIndex};
+    use contextra_types::{DocId};
+use contextra_ports::{StorageEngine, TextIndex};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_text::Language;
@@ -288,7 +289,7 @@ async fn test_collection_with_diskann_index_hybrid_search() {
 
 #[tokio::test]
 async fn test_hybrid_search_with_query_memory_type_filter() {
-    use contextra_core::{HybridQuery, MemoryType};
+    use contextra_types::{HybridQuery, MemoryType};
     use contextra_graph::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
@@ -407,14 +408,14 @@ async fn test_hybrid_search_with_query_memory_type_filter() {
 
 
 #[tokio::test]
-async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_core::Result<()> {
+async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_types::Result<()> {
     use contextra_graph::csr::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
-    let dir = tempfile::TempDir::new().map_err(contextra_core::ContextraError::from)?;
+    let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let lsm_config = LsmConfig {
         path: dir.path().to_path_buf(),
         ..Default::default()
@@ -463,14 +464,14 @@ async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_
 
 
 #[tokio::test]
-async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_core::Result<()> {
+async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_types::Result<()> {
     use contextra_graph::csr::CsrGraph;
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
 
-    let dir = tempfile::TempDir::new().map_err(contextra_core::ContextraError::from)?;
+    let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let lsm_config = LsmConfig {
         path: dir.path().to_path_buf(),
         ..Default::default()
@@ -500,8 +501,8 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_core:
     )
     .await?;
 
-    let ppr_strat = contextra_core::GraphTraversalStrategy::PersonalizedPageRank(
-        contextra_core::PprConfig::default(),
+    let ppr_strat = contextra_types::GraphTraversalStrategy::PersonalizedPageRank(
+        contextra_types::PprConfig::default(),
     );
     let ppr_res = col
         .hybrid_search_with_strategy(
@@ -521,9 +522,9 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_core:
         ppr_res
     );
 
-    let eid_1 = contextra_core::EntityId::from_key("doc_1")?;
+    let eid_1 = contextra_types::EntityId::from_key("doc_1")?;
     let anchors = vec![eid_1];
-    let path_rag_strat = contextra_core::GraphTraversalStrategy::PathRag {
+    let path_rag_strat = contextra_types::GraphTraversalStrategy::PathRag {
         max_hops: 2,
         sufficiency_threshold: 0.5,
     };
@@ -544,7 +545,7 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_core:
         "PathRag under snapshot isolation must fail"
     );
     match path_res.unwrap_err() {
-        contextra_core::ContextraError::SnapshotUnsupportedForSignal(msg) => {
+        contextra_types::ContextraError::SnapshotUnsupportedForSignal(msg) => {
             assert!(msg.contains("PathRag"));
         }
         other => panic!("Expected SnapshotUnsupportedForSignal, got: {:?}", other),

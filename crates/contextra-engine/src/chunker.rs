@@ -10,7 +10,7 @@
 //! heading hierarchy. Merges small sections and attaches heading paths as
 //! metadata breadcrumbs.
 
-use contextra_core::{ContextChunk, DocId};
+use contextra_types::{ContextChunk, DocId};
 use serde_json::json;
 
 /// Approximate character count per token (BPE ratio).

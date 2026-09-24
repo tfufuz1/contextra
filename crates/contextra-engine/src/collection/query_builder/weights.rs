@@ -1,4 +1,4 @@
-use contextra_core::{FusionWeights, Result};
+use contextra_types::{FusionWeights, Result};
 
 /// Custom weights for vector, text, and graph signals in hybrid search.
 #[derive(Debug, Clone, Copy, PartialEq)]

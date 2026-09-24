@@ -6,10 +6,8 @@
 
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
-use contextra_core::{
-    DocId, EntityId, GraphIndex, ContextraError, Result, StorageEngine, TextIndex, TxId, VectorIndex,
-    EXPIRY_METADATA_KEY,
-};
+use contextra_types::{DocId, EntityId, ContextraError, Result, TxId, EXPIRY_METADATA_KEY};
+use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -81,7 +79,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if let Some(obj) = meta_obj {
                     if let Some(imp_val) = obj.get("importance") {
                         let (base_score, created_tx) = if let Ok(imp) =
-                            serde_json::from_value::<contextra_core::MemoryImportance>(
+                            serde_json::from_value::<contextra_types::MemoryImportance>(
                                 imp_val.clone(),
                             ) {
                             (imp.base_score.value(), imp.created_at_tx.inner())
@@ -256,7 +254,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             if has_graph {
                                 if let Ok(eid) = EntityId::from_key(&stored.id) {
                                     let entity =
-                                        contextra_core::Entity::new(eid, &stored.id, "Document");
+                                        contextra_types::Entity::new(eid, &stored.id, "Document");
                                     if let Err(e) =
                                         self.graph_index.add_entity(recovery_tx, entity).await
                                     {
@@ -358,7 +356,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Returns statistics for the collection's vector index.
     #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn stats(&self) -> Result<contextra_core::VectorIndexStats> {
+    pub async fn stats(&self) -> Result<contextra_ports::VectorIndexStats> {
         self.index.stats().await
     }
 
@@ -462,7 +460,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn trigger_expiry_cleanup(&self) -> Result<usize> {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?
             .as_millis() as u64;
 
         let now_tx = self.next_tx.load(Ordering::SeqCst);
@@ -531,10 +529,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     // 2. TxId-basierter Decay-Sweep (nur wenn decay != None)
                     if !marked_for_deletion {
                         if let Some(imp_val) = obj.get("importance") {
-                            if let Ok(imp) = serde_json::from_value::<contextra_core::MemoryImportance>(
+                            if let Ok(imp) = serde_json::from_value::<contextra_types::MemoryImportance>(
                                 imp_val.clone(),
                             ) {
-                                if imp.decay != contextra_core::DecayFunction::None {
+                                if imp.decay != contextra_types::DecayFunction::None {
                                     let effective = imp.effective_score(TxId::new(now_tx));
                                     if effective < Self::DECAY_DELETION_THRESHOLD {
                                         expired_ids.push(user_key);
@@ -596,7 +594,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     ) -> Result<()> {
         let user_key = self.namespaced_key(doc_id.as_bytes(), 0);
         let Some(data) = self.storage.get(&user_key).await? else {
-            return Err(contextra_core::ContextraError::NotFound(format!(
+            return Err(contextra_types::ContextraError::NotFound(format!(
                 "Document not found: {doc_id}"
             )));
         };
@@ -623,21 +621,21 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let imp = if let Some(imp_val) = meta_obj.get("importance") {
             if let Ok(mut existing_imp) =
-                serde_json::from_value::<contextra_core::MemoryImportance>(imp_val.clone())
+                serde_json::from_value::<contextra_types::MemoryImportance>(imp_val.clone())
             {
-                existing_imp.base_score = contextra_core::ImportanceScore::new(importance_score);
+                existing_imp.base_score = contextra_types::ImportanceScore::new(importance_score);
                 existing_imp
             } else {
-                contextra_core::MemoryImportance::new(
-                    contextra_core::ImportanceScore::new(importance_score),
-                    contextra_core::DecayFunction::None,
+                contextra_types::MemoryImportance::new(
+                    contextra_types::ImportanceScore::new(importance_score),
+                    contextra_types::DecayFunction::None,
                     tx,
                 )
             }
         } else {
-            contextra_core::MemoryImportance::new(
-                contextra_core::ImportanceScore::new(importance_score),
-                contextra_core::DecayFunction::None,
+            contextra_types::MemoryImportance::new(
+                contextra_types::ImportanceScore::new(importance_score),
+                contextra_types::DecayFunction::None,
                 tx,
             )
         };
@@ -705,7 +703,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         );
         if let Some(bytes) = self.storage.get(&key).await? {
             let comm_id: u64 = serde_json::from_slice(&bytes).map_err(|e| {
-                contextra_core::ContextraError::Internal(format!("community deserialize: {e}"))
+                contextra_types::ContextraError::Internal(format!("community deserialize: {e}"))
             })?;
             Ok(Some(comm_id))
         } else {
@@ -757,7 +755,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn drop_collection(&self) -> Result<()> {
         let _guard = self.consolidation_guard.lock().await;
         let prefix = if self.name == "default" {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "Cannot drop default collection",
             ));
         } else {

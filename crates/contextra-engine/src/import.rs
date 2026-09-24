@@ -6,7 +6,8 @@
 use crate::collection::Collection;
 use crate::export::{ExportCollectionV1, ExportDocumentV1, SCHEMA_VERSION_V1};
 use crate::Contextra;
-use contextra_core::{Result, StorageEngine, VectorIndex};
+use contextra_types::{Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 use serde::{Deserialize, Serialize};
 
 /// Zusammenfassung eines Import-Vorgangs.
@@ -33,7 +34,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 obj.insert(
                     "memory_type".to_string(),
                     serde_json::to_value(mem.memory_type)
-                        .map_err(|e| contextra_core::ContextraError::Serialization(e.to_string()))?,
+                        .map_err(|e| contextra_types::ContextraError::Serialization(e.to_string()))?,
                 );
                 if let Some(ref text) = mem.content {
                     if !obj.contains_key("text") && !obj.contains_key("content") {
@@ -50,7 +51,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 }
                 if !mem.links.is_empty() {
                     let links_val = serde_json::to_value(&mem.links)
-                        .map_err(|e| contextra_core::ContextraError::Serialization(e.to_string()))?;
+                        .map_err(|e| contextra_types::ContextraError::Serialization(e.to_string()))?;
                     obj.insert("links".to_string(), links_val);
                 }
             }
@@ -61,7 +62,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 } else if let Some(ref text) = mem.content {
                     self.upsert_text_only(&mem.id, text, Some(meta)).await
                 } else {
-                    Err(contextra_core::ContextraError::invalid_input(format!(
+                    Err(contextra_types::ContextraError::invalid_input(format!(
                         "Dimension mismatch for memory '{}': expected {}, got {}",
                         mem.id,
                         self.dimension(),
@@ -101,7 +102,7 @@ impl Contextra {
     /// Importiert ein ExportDocumentV1 in die Contextra-Datenbank mit Schema-Versionsprüfung und Idempotenz.
     pub async fn import_memories(&self, doc: ExportDocumentV1) -> Result<ImportSummary> {
         if doc.schema_version != SCHEMA_VERSION_V1 {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Incompatible export schema version '{}', expected '{}'",
                 doc.schema_version, SCHEMA_VERSION_V1
             )));

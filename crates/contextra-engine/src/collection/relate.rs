@@ -1,5 +1,6 @@
 use super::{crud::validate_doc_id, Collection};
-use contextra_core::{DocId, Result, StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     // AI-TAG[CONCURRENCY][CRITICAL] RESOLVED: AGT-DB-005 — relate() rollback race behoben, siehe ADR-023 (TS:2026-08-28T00:00:00Z)
@@ -11,8 +12,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let _guards = self.lock_keys_sorted([from, to]).await;
         let db_tx = self.begin_transaction()?;
 
-        let from_id = contextra_core::EntityId::from_key(from)?;
-        let to_id = contextra_core::EntityId::from_key(to)?;
+        let from_id = contextra_types::EntityId::from_key(from)?;
+        let to_id = contextra_types::EntityId::from_key(to)?;
 
         let key_str = format!("{}:{}:{}", from, label, to);
         let key = self.namespaced_key(key_str.as_bytes(), 2);
@@ -40,12 +41,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let dummy_doc_id = DocId::from_key(from)?;
         db_tx.record_keys_with_old_values(key.clone(), old_val, vec![], None, dummy_doc_id);
 
-        let from_entity = contextra_core::Entity::new(from_id, from, "Node");
-        let to_entity = contextra_core::Entity::new(to_id, to, "Node");
+        let from_entity = contextra_types::Entity::new(from_id, from, "Node");
+        let to_entity = contextra_types::Entity::new(to_id, to, "Node");
         db_tx.stage_graph_entity(from_entity);
         db_tx.stage_graph_entity(to_entity);
 
-        let edge = contextra_core::Edge::new(from_id, to_id, label);
+        let edge = contextra_types::Edge::new(from_id, to_id, label);
         db_tx.stage_graph_edge(edge);
 
         match db_tx.commit().await {
@@ -80,7 +81,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         source_doc_id: Option<&str>,
     ) -> Result<contextra_graph::hyperedge::HyperEdgeId> {
         if participants.len() < 2 {
-            return Err(contextra_core::ContextraError::InvalidInput(format!(
+            return Err(contextra_types::ContextraError::InvalidInput(format!(
                 "relate_n_ary requires at least 2 participants, found {}",
                 participants.len()
             )));
@@ -96,8 +97,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // 1. Resolve and validate all participant DocIds, EntityIds, and RoleIds
         let mut resolved_participants = Vec::with_capacity(participants.len());
         for &(doc_id_str, role_str) in participants {
-            let entity_id = contextra_core::EntityId::from_key(doc_id_str)?;
-            let role_doc_id = contextra_core::DocId::from_key(role_str)?;
+            let entity_id = contextra_types::EntityId::from_key(doc_id_str)?;
+            let role_doc_id = contextra_types::DocId::from_key(role_str)?;
             let role_id = contextra_graph::hyperedge::RoleId::new(role_doc_id.inner() as u32);
             resolved_participants.push((doc_id_str, role_id, entity_id));
         }
@@ -162,7 +163,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         // 5. Stage entities and hyperedge in DbTransaction
         for &(doc_id_str, _, entity_id) in &resolved_participants {
-            let entity = contextra_core::Entity::new(entity_id, doc_id_str, "Node");
+            let entity = contextra_types::Entity::new(entity_id, doc_id_str, "Node");
             db_tx.stage_graph_entity(entity);
         }
         db_tx.stage_hyperedge(hyperedge);
@@ -186,7 +187,7 @@ mod tests {
         let config = crate::ContextraConfig {
             dimension: dim,
             max_elements: 10_000,
-            distance_metric: contextra_core::DistanceMetric::Cosine,
+            distance_metric: contextra_types::DistanceMetric::Cosine,
             ..Default::default()
         };
         let db = crate::Contextra::open_with_config(tmp.path(), config)
@@ -232,7 +233,7 @@ mod tests {
         assert_eq!(hyperedge.participants.len(), 3);
 
         // Verify hyperedge lookup by participant entity
-        let e1 = contextra_core::EntityId::from_key("doc-1").expect("entity_id");
+        let e1 = contextra_types::EntityId::from_key("doc-1").expect("entity_id");
         let hes_e1 = col.graph_index().hyperedges_for_entity(e1);
         assert!(hes_e1.contains(&hyperedge_id));
     }
@@ -252,7 +253,7 @@ mod tests {
         assert!(res.is_err(), "relate_n_ary with < 2 participants must fail");
         let err = res.unwrap_err();
         assert!(
-            matches!(err, contextra_core::ContextraError::InvalidInput(ref msg) if msg.contains("at least 2 participants"))
+            matches!(err, contextra_types::ContextraError::InvalidInput(ref msg) if msg.contains("at least 2 participants"))
         );
     }
 }

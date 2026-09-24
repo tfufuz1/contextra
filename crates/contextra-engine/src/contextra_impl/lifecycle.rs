@@ -1,5 +1,5 @@
 use crate::*;
-use contextra_core::{Result, TxId};
+use contextra_types::{Result, TxId};
 use contextra_store::LsmStorage;
 use std::path::Path;
 use std::sync::Arc;
@@ -13,12 +13,12 @@ impl Contextra {
     #[tracing::instrument(level = "trace", skip(path, config))]
     pub async fn open_with_config(path: impl AsRef<Path>, config: ContextraConfig) -> Result<Self> {
         if config.dimension == 0 {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "dimension must be > 0",
             ));
         }
         if config.dimension > 65536 {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "dimension exceeds maximum",
             ));
         }
@@ -38,7 +38,7 @@ impl Contextra {
             if let Ok(s) = std::str::from_utf8(&stored_dim_bytes) {
                 if let Ok(stored_dim) = s.parse::<usize>() {
                     if stored_dim != config.dimension {
-                        return Err(contextra_core::ContextraError::invalid_input(format!(
+                        return Err(contextra_types::ContextraError::invalid_input(format!(
                             "Dimension mismatch: DB wurde mit dim={} erstellt, \
                              Config fordert dim={}. \
                              Passe ContextraConfig::dimension an oder nutze eine neue DB.",
@@ -96,7 +96,7 @@ impl Contextra {
         let default_col = db.collection("default").await?;
 
         if config.consolidation_enabled {
-            if let Some(launcher) = CONSOLIDATION_LAUNCHER.read().as_ref() {
+            if let Some(launcher) = config.consolidation_launcher.as_ref() {
                 let handle = launcher(
                     default_col,
                     config.consolidation_interval,
@@ -165,7 +165,7 @@ impl Contextra {
             Ok(res) => res,
             Err(_) => {
                 tracing::error!("repair_on_open: Startup recovery timed out after 30 seconds");
-                Err(contextra_core::ContextraError::Storage(
+                Err(contextra_types::ContextraError::Storage(
                     "repair_on_open: Startup recovery timed out after 30s".to_string(),
                 ))
             }
@@ -319,7 +319,7 @@ impl Contextra {
         );
 
         if !repair_errors.is_empty() {
-            return Err(contextra_core::ContextraError::Storage(format!(
+            return Err(contextra_types::ContextraError::Storage(format!(
                 "repair_on_open: {} Collection(s) konnten nach Crash nicht \
                  wiederhergestellt werden: {}. \
                  Datenbankintegrität nicht garantiert — manuelle Intervention erforderlich.",
@@ -423,4 +423,58 @@ impl Contextra {
         Ok(())
     }
 
+}
+
+#[cfg(test)]
+mod consolidation_launcher_tests {
+    use crate::*;
+    use tempfile::tempdir;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_instance_bound_consolidation_launchers_isolation() -> contextra_types::Result<()> {
+        let dir1 = tempdir().unwrap();
+        let dir2 = tempdir().unwrap();
+
+        let counter1 = Arc::new(AtomicU32::new(0));
+        let counter2 = Arc::new(AtomicU32::new(0));
+
+        let c1 = Arc::clone(&counter1);
+        let launcher1: ConsolidationLauncher = Arc::new(move |_col, _interval, _max_llm, _cancel| {
+            c1.fetch_add(1, Ordering::SeqCst);
+            tokio::spawn(async {})
+        });
+
+        let c2 = Arc::clone(&counter2);
+        let launcher2: ConsolidationLauncher = Arc::new(move |_col, _interval, _max_llm, _cancel| {
+            c2.fetch_add(10, Ordering::SeqCst);
+            tokio::spawn(async {})
+        });
+
+        let config1 = ContextraConfig::default().with_consolidation_launcher(launcher1);
+        let config2 = ContextraConfig::default().with_consolidation_launcher(launcher2);
+
+        let db1 = Contextra::open_with_config(dir1.path(), config1).await?;
+        let db2 = Contextra::open_with_config(dir2.path(), config2).await?;
+
+        assert_eq!(counter1.load(Ordering::SeqCst), 1);
+        assert_eq!(counter2.load(Ordering::SeqCst), 10);
+
+        db1.close().await?;
+        db2.close().await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_without_consolidation_launcher_initializes_cleanly() -> contextra_types::Result<()> {
+        let dir = tempdir().unwrap();
+        let config = ContextraConfig::default(); // no launcher set
+
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        db.close().await?;
+
+        Ok(())
+    }
 }

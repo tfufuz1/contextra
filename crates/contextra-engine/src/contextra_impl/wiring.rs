@@ -1,5 +1,5 @@
 use crate::*;
-use contextra_core::DriftStatusProvider;
+use contextra_ports::DriftStatusProvider;
 
 impl Contextra {
     pub fn set_router(&self, router: std::sync::Weak<dyn DriftStatusProvider>) {

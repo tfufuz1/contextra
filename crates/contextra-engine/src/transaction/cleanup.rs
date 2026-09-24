@@ -1,5 +1,6 @@
 use super::intent::CommitIntent;
-use contextra_core::{Result, StorageEngine, TxId};
+use contextra_types::{Result, TxId};
+use contextra_ports::{StorageEngine};
 
 /// Aufgerufen beim Öffnen einer Collection / DB. Findet und entfernt verwaiste
 /// ConsolidationIntents aus dem WAL/Storage.

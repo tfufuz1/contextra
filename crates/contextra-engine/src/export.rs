@@ -6,7 +6,8 @@
 use crate::collection::{extract_effective_importance, extract_text, Collection, StoredDocument};
 use crate::filter::extract_memory_type;
 use crate::Contextra;
-use contextra_core::{MemoryLink, MemoryType, Result, StorageEngine, VectorIndex};
+use contextra_types::{MemoryLink, MemoryType, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 use serde::{Deserialize, Serialize};
 
 /// Aktuelle Schema-Version für das JSON Export-Format.
@@ -140,7 +141,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
                 let importance_score = extract_effective_importance(
                     &stored.metadata,
-                    contextra_core::TxId::new(u64::MAX),
+                    contextra_types::TxId::new(u64::MAX),
                 );
 
                 let links: Vec<MemoryLink> = stored
@@ -217,7 +218,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 mod tests {
     use super::*;
     use crate::ContextraConfig;
-    use contextra_core::{LinkRelation, MemoryType};
+    use contextra_types::{LinkRelation, MemoryType};
     use serde_json::json;
     use tempfile::TempDir;
 
@@ -261,8 +262,8 @@ mod tests {
 
         col_default
             .link_memories(
-                contextra_core::DocId::from_key("mem-1").unwrap(),
-                contextra_core::DocId::from_key("mem-2").unwrap(),
+                contextra_types::DocId::from_key("mem-1").unwrap(),
+                contextra_types::DocId::from_key("mem-2").unwrap(),
                 LinkRelation::References,
             )
             .await
@@ -313,13 +314,13 @@ mod tests {
         assert_eq!(meta2["memory_type"], "semantic");
 
         let links1 = col2_default
-            .get_links(contextra_core::DocId::from_key("mem-1").unwrap())
+            .get_links(contextra_types::DocId::from_key("mem-1").unwrap())
             .await
             .unwrap();
         assert_eq!(links1.len(), 1);
         assert_eq!(
             links1[0].target,
-            contextra_core::DocId::from_key("mem-2").unwrap()
+            contextra_types::DocId::from_key("mem-2").unwrap()
         );
         assert_eq!(links1[0].relation, LinkRelation::References);
 

@@ -5,7 +5,8 @@ use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
-use contextra_core::{DocId, FilterExpr, Result, StorageEngine, VectorIndex};
+use contextra_types::{DocId, FilterExpr, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs semantic k-NN search over stored embeddings.
@@ -18,11 +19,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         k: usize,
     ) -> Result<Vec<crate::SearchResult>> {
         if k == 0 {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "Search k must be greater than 0",
             ));
         }
-        let k = k.min(contextra_core::MAX_SEARCH_K);
+        let k = k.min(contextra_types::MAX_SEARCH_K);
         self.search_with_filter_expr(query_embedding, k, None).await
     }
 
@@ -54,18 +55,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         filter: Option<FilterExpr>,
     ) -> Result<Vec<crate::SearchResult>> {
         if k == 0 {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "Search k must be greater than 0",
             ));
         }
         if query.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 query.len()
             )));
         }
-        let k = k.min(contextra_core::MAX_SEARCH_K);
+        let k = k.min(contextra_types::MAX_SEARCH_K);
         // 🛡️ SICHERUNG: Snapshot-Isolation (FIND-DB-003)
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
@@ -98,14 +99,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         query_text: &str,
         k: usize,
     ) -> Result<Vec<crate::SearchResult>> {
-        let k = k.min(contextra_core::MAX_SEARCH_K);
+        let k = k.min(contextra_types::MAX_SEARCH_K);
         let embedding = {
             let embedder = {
                 let guard = self.embedder.read();
                 guard
                     .as_ref()
                     .ok_or_else(|| {
-                        contextra_core::ContextraError::Internal(
+                        contextra_types::ContextraError::Internal(
                             "No embedder configured for this collection".into(),
                         )
                     })?

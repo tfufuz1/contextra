@@ -1,4 +1,4 @@
-use contextra_core::{FusionStrategy, GraphTraversalStrategy};
+use contextra_types::{FusionStrategy, GraphTraversalStrategy};
 
 /// Strategy for hybrid search and graph signal traversal.
 #[derive(Debug, Clone, PartialEq)]
@@ -13,7 +13,7 @@ pub enum SearchStrategy {
         max_hops: usize,
     },
     /// Personalized PageRank power iteration graph traversal strategy.
-    PersonalizedPageRank(contextra_core::PprConfig),
+    PersonalizedPageRank(contextra_types::PprConfig),
     /// PathRAG bidirectional Dijkstra graph traversal strategy.
     PathRag {
         /// Maximum traversal hop depth.

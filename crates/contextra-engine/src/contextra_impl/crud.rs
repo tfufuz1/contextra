@@ -1,5 +1,5 @@
 use crate::*;
-use contextra_core::{FilterExpr, Result};
+use contextra_types::{FilterExpr, Result};
 use contextra_store::LsmStorage;
 use serde_json::Value;
 use std::sync::Arc;
@@ -33,7 +33,7 @@ impl Contextra {
         collection_name: &str,
         id: &str,
         embedding: &[f32],
-        memory_type: contextra_core::MemoryType,
+        memory_type: contextra_types::MemoryType,
         metadata: Option<Value>,
     ) -> Result<()> {
         self.collection(collection_name)
@@ -102,7 +102,7 @@ impl Contextra {
 
     #[deprecated(
         since = "0.1.0",
-        note = "Use search_with_filter_expr with contextra_core::FilterExpr directly"
+        note = "Use search_with_filter_expr with contextra_types::FilterExpr directly"
     )]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self))]
@@ -196,7 +196,7 @@ impl Contextra {
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_core::EntityId]>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
     ) -> Result<Vec<SearchResult>> {
         let col = self.default_col().await?;
         let mut builder = col.query().text(text).vector(vector).k(k);
@@ -215,7 +215,7 @@ impl Contextra {
         vector: &[f32],
         k: usize,
         reranker: Option<&contextra_infer_onnx::CrossEncoderReranker>,
-        anchor_entities: Option<&[contextra_core::EntityId]>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
     ) -> Result<Vec<SearchResult>> {
         let col = self.default_col().await?;
         let mut builder = col.query().text(text).vector(vector).k(k);
@@ -235,8 +235,8 @@ impl Contextra {
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_core::EntityId]>,
-        weights: Option<&contextra_core::FusionWeights>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
+        weights: Option<&contextra_types::FusionWeights>,
     ) -> Result<Vec<SearchResult>> {
         let col = self.default_col().await?;
         let mut builder = col.query().text(text).vector(vector).k(k);
@@ -256,9 +256,9 @@ impl Contextra {
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_core::EntityId]>,
-        weights: Option<&contextra_core::FusionWeights>,
-        strategy: Option<&contextra_core::GraphTraversalStrategy>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
+        weights: Option<&contextra_types::FusionWeights>,
+        strategy: Option<&contextra_types::GraphTraversalStrategy>,
     ) -> Result<Vec<SearchResult>> {
         let col = self.default_col().await?;
         let mut builder = col.query().text(text).vector(vector).k(k);
@@ -278,7 +278,7 @@ impl Contextra {
     #[tracing::instrument(level = "trace", skip(self, query))]
     pub async fn hybrid_search_with_query(
         &self,
-        query: &contextra_core::HybridQuery,
+        query: &contextra_types::HybridQuery,
     ) -> Result<Vec<SearchResult>> {
         self.default_col()
             .await?

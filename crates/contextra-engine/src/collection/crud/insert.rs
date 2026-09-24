@@ -2,9 +2,8 @@ use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
     ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
 };
-use contextra_core::{
-    DocId, EntityId, Result, StorageEngine, VectorIndex, EXPIRY_METADATA_KEY,
-};
+use contextra_types::{DocId, EntityId, Result, EXPIRY_METADATA_KEY};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Inserts a text document, automatically generating its embedding.
@@ -21,7 +20,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 guard
                     .as_ref()
                     .ok_or_else(|| {
-                        contextra_core::ContextraError::Internal(
+                        contextra_types::ContextraError::Internal(
                             "No embedder configured for this collection".into(),
                         )
                     })?
@@ -54,7 +53,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 guard
                     .as_ref()
                     .ok_or_else(|| {
-                        contextra_core::ContextraError::Internal(
+                        contextra_types::ContextraError::Internal(
                             "No embedder configured for this collection".into(),
                         )
                     })?
@@ -83,7 +82,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         ttl_committed_ops: u64,
     ) -> Result<()> {
         if embedding.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 embedding.len()
@@ -107,11 +106,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         &self,
         id: &str,
         embedding: &[f32],
-        memory_type: contextra_core::MemoryType,
+        memory_type: contextra_types::MemoryType,
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         if embedding.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 embedding.len()
@@ -122,7 +121,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             obj.insert(
                 "memory_type".to_string(),
                 serde_json::to_value(memory_type)
-                    .map_err(|e| contextra_core::ContextraError::Serialization(e.to_string()))?,
+                    .map_err(|e| contextra_types::ContextraError::Serialization(e.to_string()))?,
             );
             if !obj.contains_key("decay_function") {
                 if let Ok(decay_val) = serde_json::to_value(memory_type.default_decay()) {
@@ -147,7 +146,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         if embedding.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 embedding.len()
@@ -166,13 +165,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         if id.is_empty() {
-            return Err(contextra_core::ContextraError::invalid_input("Document ID cannot be empty"));
+            return Err(contextra_types::ContextraError::invalid_input("Document ID cannot be empty"));
         }
         if id.len() > 1024 {
-            return Err(contextra_core::ContextraError::invalid_input("Document ID length exceeds maximum allowed limit of 1024 bytes"));
+            return Err(contextra_types::ContextraError::invalid_input("Document ID length exceeds maximum allowed limit of 1024 bytes"));
         }
         if embedding.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 embedding.len()
@@ -211,7 +210,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             if let Some(existing) = existing_id {
                 if existing != id {
-                    return Err(contextra_core::ContextraError::Internal(format!(
+                    return Err(contextra_types::ContextraError::Internal(format!(
                         "DocId-Kollision erkannt für Schlüssel '{id}' — bitte Support kontaktieren"
                     )));
                 }
@@ -272,7 +271,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         if let Ok(eid) = EntityId::from_key(id) {
-            let entity = contextra_core::Entity::new(eid, id, "Document");
+            let entity = contextra_types::Entity::new(eid, id, "Document");
             db_tx.stage_graph_entity(entity);
         }
 
@@ -286,10 +285,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         docs: &[(String, Vec<f32>, Option<serde_json::Value>)],
     ) -> Result<()> {
         if docs.is_empty() {
-            return Err(contextra_core::ContextraError::invalid_input("insert_many requires at least one document"));
+            return Err(contextra_types::ContextraError::invalid_input("insert_many requires at least one document"));
         }
         if docs.len() > 10_000 {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Batch size {} exceeds maximum allowed limit 10000",
                 docs.len()
             )));
@@ -297,7 +296,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         for (_id, embedding, _) in docs {
             if embedding.len() != self.dimension {
-                return Err(contextra_core::ContextraError::invalid_input(format!(
+                return Err(contextra_types::ContextraError::invalid_input(format!(
                     "Dimension mismatch: expected {}, got {}",
                     self.dimension,
                     embedding.len()
@@ -314,7 +313,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback insert_many on dimension mismatch: {}", rollback_err);
                 }
-                return Err(contextra_core::ContextraError::invalid_input(format!(
+                return Err(contextra_types::ContextraError::invalid_input(format!(
                     "Dimension mismatch: expected {}, got {}",
                     self.dimension,
                     embedding.len()
@@ -348,13 +347,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         if id.is_empty() {
-            return Err(contextra_core::ContextraError::invalid_input("Document ID cannot be empty"));
+            return Err(contextra_types::ContextraError::invalid_input("Document ID cannot be empty"));
         }
         if id.len() > 1024 {
-            return Err(contextra_core::ContextraError::invalid_input("Document ID length exceeds maximum allowed limit of 1024 bytes"));
+            return Err(contextra_types::ContextraError::invalid_input("Document ID length exceeds maximum allowed limit of 1024 bytes"));
         }
         if embedding.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 embedding.len()
@@ -388,10 +387,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         docs: &[(String, Vec<f32>, Option<serde_json::Value>)],
     ) -> Result<()> {
         if docs.is_empty() {
-            return Err(contextra_core::ContextraError::invalid_input("upsert_many requires at least one document"));
+            return Err(contextra_types::ContextraError::invalid_input("upsert_many requires at least one document"));
         }
         if docs.len() > 10_000 {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Batch size {} exceeds maximum allowed limit 10000",
                 docs.len()
             )));
@@ -399,7 +398,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         for (_id, embedding, _) in docs {
             if embedding.len() != self.dimension {
-                return Err(contextra_core::ContextraError::invalid_input(format!(
+                return Err(contextra_types::ContextraError::invalid_input(format!(
                     "Dimension mismatch: expected {}, got {}",
                     self.dimension,
                     embedding.len()
@@ -415,7 +414,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback upsert_many on dimension mismatch: {}", rollback_err);
                 }
-                return Err(contextra_core::ContextraError::invalid_input(format!(
+                return Err(contextra_types::ContextraError::invalid_input(format!(
                     "Dimension mismatch: expected {}, got {}",
                     self.dimension,
                     embedding.len()

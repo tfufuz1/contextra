@@ -43,20 +43,20 @@ pub fn calculate_rebuild_cooldown(
 
 /// Abstraction trait over vector indexes capable of connectivity check and rebuild.
 pub trait OrphanCleanupIndex: Send + Sync {
-    fn check_connectivity(&self) -> contextra_core::Result<()>;
+    fn check_connectivity(&self) -> contextra_types::Result<()>;
     fn rebuild(
         &self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = contextra_core::Result<()>> + Send + '_>>;
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = contextra_types::Result<()>> + Send + '_>>;
 }
 
 impl OrphanCleanupIndex for contextra_vector::hnsw::HnswIndex {
-    fn check_connectivity(&self) -> contextra_core::Result<()> {
+    fn check_connectivity(&self) -> contextra_types::Result<()> {
         self.check_connectivity()
     }
 
     fn rebuild(
         &self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = contextra_core::Result<()>> + Send + '_>>
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = contextra_types::Result<()>> + Send + '_>>
     {
         Box::pin(async move { self.rebuild().await })
     }
