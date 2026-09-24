@@ -2,7 +2,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use contextra_core::{DocId, TenantId, TxId};
+use contextra_types::{DocId, TenantId, TxId};
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };

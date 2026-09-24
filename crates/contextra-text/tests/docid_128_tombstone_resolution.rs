@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_imports)]
 
-use contextra_core::{DocId, StorageEngine, TextIndex, TxId};
+use contextra_types::{DocId, TxId};
+use contextra_ports::{StorageEngine, TextIndex};
 use contextra_text::InvertedIndex;
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -28,7 +29,7 @@ impl StorageEngine for MockStorage {
     fn get<'a>(
         &'a self,
         key: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<bytes::Bytes>>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
     }
     fn put<'a>(
@@ -36,7 +37,7 @@ impl StorageEngine for MockStorage {
         tx_id: TxId,
         key: &'a [u8],
         value: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move {
             let seq = self
                 .next_seq
@@ -58,18 +59,18 @@ impl StorageEngine for MockStorage {
         &'a self,
         tx_id: TxId,
         key: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move {
             let seq = self
                 .next_seq
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             let mut w = self.store.write();
             if let Some(versions) = w.get_mut(key) {
-                versions.push((Vec::new(), seq | contextra_core::TOMBSTONE_BIT));
+                versions.push((Vec::new(), seq | contextra_types::TOMBSTONE_BIT));
             } else {
                 w.insert(
                     key.to_vec(),
-                    vec![(Vec::new(), seq | contextra_core::TOMBSTONE_BIT)],
+                    vec![(Vec::new(), seq | contextra_types::TOMBSTONE_BIT)],
                 );
             }
             self.staged
@@ -80,7 +81,7 @@ impl StorageEngine for MockStorage {
             Ok(())
         })
     }
-    fn commit<'a>(&'a self, tx_id: TxId) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    fn commit<'a>(&'a self, tx_id: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move {
             self.staged.write().remove(&tx_id);
             Ok(())
@@ -89,7 +90,7 @@ impl StorageEngine for MockStorage {
     fn rollback<'a>(
         &'a self,
         tx_id: TxId,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move {
             let keys = self.staged.write().remove(&tx_id).unwrap_or_default();
             let mut store = self.store.write();
@@ -107,21 +108,21 @@ impl StorageEngine for MockStorage {
     fn rollback_to_tx<'a>(
         &'a self,
         _tx_id: TxId,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn get_at_seq<'a>(
         &'a self,
         key: &'a [u8],
         seq: u64,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Option<bytes::Bytes>>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
         Box::pin(async move {
             let store = self.store.read();
             if let Some(versions) = store.get(key) {
                 for (val, v_seq) in versions.iter().rev() {
-                    let raw_seq = v_seq & !contextra_core::TOMBSTONE_BIT;
+                    let raw_seq = v_seq & !contextra_types::TOMBSTONE_BIT;
                     if raw_seq <= seq {
-                        if (v_seq & contextra_core::TOMBSTONE_BIT) != 0 {
+                        if (v_seq & contextra_types::TOMBSTONE_BIT) != 0 {
                             return Ok(None);
                         }
                         return Ok(Some(bytes::Bytes::from(val.clone())));
@@ -131,7 +132,7 @@ impl StorageEngine for MockStorage {
             Ok(None)
         })
     }
-    fn last_seq_no<'a>(&'a self) -> contextra_core::BoxFuture<'a, contextra_core::Result<u64>> {
+    fn last_seq_no<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<u64>> {
         Box::pin(async move {
             Ok(self
                 .next_seq
@@ -139,17 +140,17 @@ impl StorageEngine for MockStorage {
                 .saturating_sub(1))
         })
     }
-    fn last_tx_id<'a>(&'a self) -> contextra_core::BoxFuture<'a, contextra_core::Result<TxId>> {
+    fn last_tx_id<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<TxId>> {
         Box::pin(async move { Ok(TxId::new(0)) })
     }
-    fn flush<'a>(&'a self) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    fn flush<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn stats<'a>(
         &'a self,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<contextra_core::StorageStats>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>> {
         Box::pin(async move {
-            Ok(contextra_core::StorageStats {
+            Ok(contextra_ports::StorageStats {
                 num_segments: 0,
                 total_size_bytes: 0,
                 memtable_size_bytes: 0,
@@ -159,13 +160,13 @@ impl StorageEngine for MockStorage {
     fn pin_checkpoint<'a>(
         &'a self,
         _id: u64,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn unpin_checkpoint<'a>(
         &'a self,
         _id: u64,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn scan<'a>(
@@ -173,29 +174,29 @@ impl StorageEngine for MockStorage {
         _start: std::ops::Bound<&'a [u8]>,
         _end: std::ops::Bound<&'a [u8]>,
         _: Option<usize>,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { Ok(Vec::new()) })
     }
     fn scan_prefix<'a>(
         &'a self,
         prefix: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { self.scan_prefix_at(prefix, u64::MAX).await })
     }
     fn scan_prefix_at<'a>(
         &'a self,
         prefix: &'a [u8],
         seq_no: u64,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move {
             let store = self.store.read();
             let mut results = Vec::new();
             for (k, versions) in store.iter() {
                 if k.starts_with(prefix) {
                     for (val, v_seq) in versions.iter().rev() {
-                        let raw_seq = v_seq & !contextra_core::TOMBSTONE_BIT;
+                        let raw_seq = v_seq & !contextra_types::TOMBSTONE_BIT;
                         if raw_seq <= seq_no {
-                            if (v_seq & contextra_core::TOMBSTONE_BIT) == 0 {
+                            if (v_seq & contextra_types::TOMBSTONE_BIT) == 0 {
                                 results.push((k.clone(), val.clone()));
                             }
                             break;
@@ -210,7 +211,7 @@ impl StorageEngine for MockStorage {
 
 #[cfg(feature = "docid-128")]
 #[tokio::test]
-async fn test_docid_128_tombstone_resolution_exceeding_u64_max() -> contextra_core::Result<()> {
+async fn test_docid_128_tombstone_resolution_exceeding_u64_max() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "docid_128_test");
 

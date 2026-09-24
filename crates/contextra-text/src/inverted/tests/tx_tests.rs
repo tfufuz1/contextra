@@ -1,7 +1,8 @@
 use super::mock::MockStorage;
 use crate::inverted::{BM25MorphIndex, InvertedIndex, Language, TextIndexMetadata};
 use crate::tokenizer::{DefaultTokenizer, Tokenizer};
-use contextra_core::{DocId, ContextraError, Result, StorageEngine, TextIndex, TxId};
+use contextra_types::{DocId, ContextraError, Result, TxId};
+use contextra_ports::{StorageEngine, TextIndex};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

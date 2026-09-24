@@ -3,7 +3,8 @@
 //! Verifies pull-stream batching, geometric reloading, deduplication, prefix ordering,
 //! snapshot isolation, and laziness using `MockStorage`.
 
-use contextra_core::{BoxFuture, DocId, Result, StorageEngine, TextIndex, TxId, MAX_SEARCH_K};
+use contextra_types::{DocId, Result, TxId, MAX_SEARCH_K};
+use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::{Bm25CandidateStream, InvertedIndex, DEFAULT_STREAM_BATCH_SIZE};
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -109,9 +110,9 @@ impl StorageEngine for MockStorage {
         Box::pin(async move { Ok(()) })
     }
 
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
         Box::pin(async move {
-            Ok(contextra_core::StorageStats {
+            Ok(contextra_ports::StorageStats {
                 num_segments: 0,
                 total_size_bytes: 0,
                 memtable_size_bytes: 0,

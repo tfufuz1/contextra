@@ -7,7 +7,7 @@
 
 //! Pure BM25 scoring functions and parameter structure.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 /// Default k1 parameter for BM25 term frequency saturation scaling.
 pub const BM25_K1: f32 = 1.5;

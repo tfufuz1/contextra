@@ -23,11 +23,11 @@
 
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
-use contextra_core::TenantId;
+use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-pub use contextra_core::ModelFingerprint;
+pub use contextra_types::ModelFingerprint;
 
 /// Current serialized format version for [`EncryptedKvLayer`].
 /// Increment when the serialized layout changes in a breaking way.

@@ -98,7 +98,7 @@ pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
 mod tests {
     use super::*;
     use crate::kv_segment::segment::KvSegment;
-    use contextra_core::TenantId;
+    use contextra_types::TenantId;
     use std::time::Duration;
 
     #[test]

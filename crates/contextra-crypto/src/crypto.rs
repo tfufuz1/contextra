@@ -220,7 +220,7 @@ impl KeyManager {
     /// `CryptoError::KvFormatVersionMismatch` — never with a silent garbage-data result.
     pub fn derive_kv_key(
         &self,
-        tenant_id: contextra_core::TenantId,
+        tenant_id: contextra_types::TenantId,
         model_fingerprint: &crate::kv_cipher::ModelFingerprint,
     ) -> Result<Self> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
@@ -616,7 +616,7 @@ mod tests {
     #[test]
     fn test_derive_kv_key_length_prefix_prevents_collision() -> Result<()> {
         use crate::kv_cipher::ModelFingerprint;
-        use contextra_core::TenantId;
+        use contextra_types::TenantId;
 
         // Setup: Zwei ModelFingerprint-Instanzen mit gleichem hash, aber unterschiedlicher
         // Aufteilung von model_id/quantization die ohne Längenpräfix kollidieren würden.
@@ -648,7 +648,7 @@ mod tests {
     #[test]
     fn test_derive_kv_key_same_fingerprint_produces_same_key() -> Result<()> {
         use crate::kv_cipher::ModelFingerprint;
-        use contextra_core::TenantId;
+        use contextra_types::TenantId;
 
         // Determinismus-Test: Gleiche Eingaben → gleicher Key (HKDF ist deterministisch)
         let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;

@@ -27,14 +27,15 @@ pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTok
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
 pub use tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 
-use contextra_core::{DocId, Result, ScoredDocument, TextIndex, TextIndexStats, TxId};
+use contextra_types::{DocId, Result, ScoredDocument, TxId};
+use contextra_ports::{TextIndex, TextIndexStats};
 
 /// Evaluates keyword weights and applies standard BM25 logic.
-pub struct Bm25Scorer<S: contextra_core::StorageEngine> {
+pub struct Bm25Scorer<S: contextra_ports::StorageEngine> {
     index: InvertedIndex<S>,
 }
 
-impl<S: contextra_core::StorageEngine> Bm25Scorer<S> {
+impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
     pub fn new(storage: std::sync::Arc<S>, namespace: &str) -> Self {
         Self {
             index: InvertedIndex::new(storage, namespace),
@@ -42,7 +43,7 @@ impl<S: contextra_core::StorageEngine> Bm25Scorer<S> {
     }
 }
 
-impl<S: contextra_core::StorageEngine> TextIndex for Bm25Scorer<S> {
+impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
     async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {
         self.index.search(query, k).await
     }
@@ -90,8 +91,8 @@ impl<S: contextra_core::StorageEngine> TextIndex for Bm25Scorer<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::BoxFuture;
-    use contextra_core::{StorageEngine, StorageStats};
+    use contextra_ports::BoxFuture;
+    use contextra_ports::{StorageEngine, StorageStats};
     use std::collections::HashMap;
     use std::sync::Mutex;
 

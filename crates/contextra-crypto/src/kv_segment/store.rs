@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use lru::LruCache;
-use contextra_core::TenantId;
+use contextra_types::TenantId;
 use parking_lot::RwLock;
 
 use super::segment::KvSegment;

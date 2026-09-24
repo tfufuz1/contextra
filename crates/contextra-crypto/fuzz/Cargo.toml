@@ -13,7 +13,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1.4", features = ["derive"] }
 bincode = "1.3"
-contextra-core = { path = "../../contextra-core" }
+contextra-types = { path = "../../contextra-types" }
 contextra-crypto = { path = ".." }
 
 [[bin]]
