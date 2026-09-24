@@ -1,7 +1,6 @@
 use super::audit::{SecurityAuditLogger, SecurityAuditRecord};
 use super::policy::{
-    default_redaction_placeholder, PromptInjectionConfig, QuarantinePolicy,
-    DEFAULT_REDACTION_PLACEHOLDER,
+    PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER,
 };
 use std::path::{Path, PathBuf};
 use unicode_normalization::UnicodeNormalization;
