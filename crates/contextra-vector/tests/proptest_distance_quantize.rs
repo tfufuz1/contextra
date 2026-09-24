@@ -9,7 +9,7 @@ use proptest::prelude::*;
 // Importiere ScalarQuantizer nur in Tests (pub(crate) sichtbar)
 #[path = "../src/distance.rs"]
 mod distance;
-#[path = "../src/quantize.rs"]
+#[path = "../src/quantize/mod.rs"]
 mod quantize;
 use quantize::ScalarQuantizer;
 
