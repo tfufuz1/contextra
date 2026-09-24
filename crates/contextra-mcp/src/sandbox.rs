@@ -8,7 +8,7 @@
 // contextra-mcp/src/sandbox.rs
 // MCP Tool Isolation Layer (Contextra Volatile-Output Isolation)
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use parking_lot::Mutex;
 use serde_json::Value;
 use std::collections::HashMap;

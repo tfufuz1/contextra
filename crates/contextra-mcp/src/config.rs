@@ -5,7 +5,8 @@
 // HOTSPOTS:    create_embedding_provider(), create_llm_text_generator()
 // SIEHE AUCH:  ADR-010, contextra-core/src/traits/mod.rs
 
-use contextra_core::{EmbeddingProvider, LlmTextGenerator, ContextraError};
+use contextra_types::ContextraError;
+use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -136,7 +137,7 @@ pub fn create_embedding_provider(
             })
         }
         "mock" => {
-            let embedder = contextra_core::MockEmbedder::new(768);
+            let embedder = contextra_ports::MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
         other => Err(ContextraError::InvalidInput(format!(
@@ -311,7 +312,7 @@ impl LlmTextGenerator for MockLlmGenerator {
     fn generate<'a>(
         &'a self,
         prompt: &'a str,
-    ) -> contextra_core::traits::BoxFuture<'a, Result<String, ContextraError>> {
+    ) -> contextra_ports::BoxFuture<'a, Result<String, ContextraError>> {
         let response = format!("[Mock LLM response for: {prompt}]");
         Box::pin(async move { Ok(response) })
     }

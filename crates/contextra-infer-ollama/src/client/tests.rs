@@ -1,7 +1,7 @@
 use super::*;
 use crate::embedding::OllamaEmbedder;
-use contextra_core::ContextraError;
-use contextra_core::TextEmbeddingEngine;
+use contextra_types::ContextraError;
+use contextra_ports::TextEmbeddingEngine;
 use std::time::Duration;
 
 #[tokio::test]
@@ -14,7 +14,7 @@ async fn test_generate_text_returns_string() {
 
 #[tokio::test]
 async fn test_segment_synthesizer_implementation() {
-    use contextra_core::SegmentSynthesizer;
+    use contextra_ports::SegmentSynthesizer;
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -1518,7 +1518,8 @@ async fn test_system_instruction_preserves_injection_guard(
 #[tokio::test]
 async fn test_llm_text_generator_streaming_ollama_mock() {
     use futures_util::StreamExt;
-    use contextra_core::{ConfigFingerprint, LlmTextGenerator, LlmTextGeneratorStreaming};
+    use contextra_types::ConfigFingerprint;
+use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();

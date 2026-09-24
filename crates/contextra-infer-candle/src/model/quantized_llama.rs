@@ -9,7 +9,7 @@ use candle_core::quantized::{gguf_file, QMatMul, QTensor};
 use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::{Embedding, Module};
 use candle_transformers::quantized_nn::RmsNorm;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use std::collections::HashMap;
 
 pub const MAX_SEQ_LEN: usize = 4096;

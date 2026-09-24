@@ -9,7 +9,7 @@ use crate::model_registry::ModelFingerprint;
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config, DTYPE};
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -325,7 +325,7 @@ impl CandleEmbedInner for DefaultCandleEmbedModel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::traits::{EmbeddingProvider, TextEmbeddingEngine};
+    use contextra_ports::{EmbeddingProvider, TextEmbeddingEngine};
 
     struct MockEmbedModel {
         dim: usize,

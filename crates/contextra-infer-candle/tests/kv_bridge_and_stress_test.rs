@@ -6,8 +6,8 @@
 #[cfg(feature = "kv-bridge")]
 mod tests {
     use candle_core::Device;
-    use contextra_core::traits::ResponseGroundingValidator;
-    use contextra_core::{ModelFingerprint, Result, TenantId};
+    use contextra_ports::ResponseGroundingValidator;
+    use contextra_types::{ModelFingerprint, Result, TenantId};
     use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
     use contextra_infer_candle::inference::CandleModelInner;
     use contextra_infer_candle::kv_bridge::KvCacheKey;

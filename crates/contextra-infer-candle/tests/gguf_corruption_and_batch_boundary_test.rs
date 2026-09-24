@@ -4,9 +4,9 @@
 // INVARIANTEN: Zero real model downloads (hermetic bytes); no panics on corrupt binary inputs; strict batch boundary limits.
 
 use candle_core::Device;
-use contextra_core::traits::embedding::EmbeddingError;
-use contextra_core::traits::{EmbeddingProvider, LlmTextGenerator};
-use contextra_core::Result;
+use contextra_ports::embedding::EmbeddingError;
+use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
+use contextra_types::Result;
 use contextra_infer_candle::embedding::CandleEmbedInner;
 use contextra_infer_candle::gguf_loader::parse_gguf_metadata;
 use contextra_infer_candle::inference::{CandleLlmClient, CandleModelInner, QuantizedLlamaModel};

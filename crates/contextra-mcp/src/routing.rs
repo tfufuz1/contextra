@@ -1,6 +1,6 @@
 use crate::config::RouterConfig;
 use contextra::Contextra;
-use contextra_core::{ContextChunk, ContextWindow, EntityId, ContextraError, TokenBudget};
+use contextra_types::{ContextChunk, ContextWindow, EntityId, ContextraError, TokenBudget};
 use std::sync::Arc;
 
 struct CollectionAdapter(Arc<contextra::Collection>);
@@ -11,7 +11,7 @@ impl contextra::router::ports_local::HybridSearchProvider for CollectionAdapter 
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
-    ) -> contextra_core::BoxFuture<'a, Result<Vec<ContextChunk>, ContextraError>> {
+    ) -> contextra_ports::BoxFuture<'a, Result<Vec<ContextChunk>, ContextraError>> {
         Box::pin(async move {
             let search_results = self
                 .0
@@ -39,7 +39,7 @@ impl contextra::router::ports_local::CommunityResolver for CommunityAdapter {
     fn get_community<'a>(
         &'a self,
         _entity_id: EntityId,
-    ) -> contextra_core::BoxFuture<'a, Result<Option<u64>, ContextraError>> {
+    ) -> contextra_ports::BoxFuture<'a, Result<Option<u64>, ContextraError>> {
         Box::pin(async move { Ok(None) })
     }
 }
@@ -66,7 +66,7 @@ impl contextra::router::ports_local::ContextPreparer for ContextPreparerAdapter 
 
 struct RouterDriftAdapter(Arc<contextra::router::DefaultRouterEngine>);
 
-impl contextra_core::DriftStatusProvider for RouterDriftAdapter {
+impl contextra_ports::DriftStatusProvider for RouterDriftAdapter {
     fn overall_drift_status(&self) -> String {
         self.0.overall_drift_status()
     }
@@ -77,7 +77,7 @@ pub struct RoutingHandle {
     pub router: Arc<contextra::router::DefaultRouterEngine>,
     pub calibrator: Arc<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>,
     pub pid_controller: Arc<parking_lot::Mutex<contextra_adapt::PidController>>,
-    pub _drift_adapter: Arc<dyn contextra_core::DriftStatusProvider>,
+    pub _drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider>,
 }
 
 /// Conditionally sets up `RouterEngine`, `IsotonicCalibrator`, and `PidController` if routing profiles are configured.
@@ -92,7 +92,7 @@ impl contextra::router::ports_local::HybridSearchProvider for CollectionSearchAd
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
-    ) -> contextra_core::BoxFuture<'a, Result<Vec<contextra_core::ContextChunk>, ContextraError>> {
+    ) -> contextra_ports::BoxFuture<'a, Result<Vec<contextra_types::ContextChunk>, ContextraError>> {
         let col = self.0.clone();
         Box::pin(async move {
             let search_results = col
@@ -104,7 +104,7 @@ impl contextra::router::ports_local::HybridSearchProvider for CollectionSearchAd
                 .await?;
             search_results
                 .into_iter()
-                .map(contextra_core::ContextChunk::try_from)
+                .map(contextra_types::ContextChunk::try_from)
                 .collect()
         })
     }
@@ -140,7 +140,7 @@ pub async fn setup_routing(
         contextra_adapt::PidController::default(),
     ));
 
-    let drift_adapter: Arc<dyn contextra_core::DriftStatusProvider> =
+    let drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider> =
         Arc::new(RouterDriftAdapter(router.clone()));
     let router_weak = Arc::downgrade(&drift_adapter);
     db.set_router(router_weak);

@@ -814,11 +814,11 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "candle-transformers",
- "contextra-core",
  "contextra-crypto",
  "contextra-ports",
  "contextra-rank",
  "contextra-store",
+ "contextra-types",
  "criterion",
  "futures-util",
  "half",
@@ -835,9 +835,10 @@ dependencies = [
 name = "contextra-infer-ollama"
 version = "0.1.0"
 dependencies = [
- "contextra-core",
  "contextra-infer-onnx",
+ "contextra-ports",
  "contextra-rank",
+ "contextra-types",
  "futures",
  "futures-util",
  "parking_lot",
@@ -857,9 +858,10 @@ dependencies = [
 name = "contextra-infer-onnx"
 version = "0.1.0"
 dependencies = [
- "contextra-core",
  "contextra-infer-candle",
+ "contextra-ports",
  "contextra-rank",
+ "contextra-types",
  "criterion",
  "ndarray 0.15.6",
  "ort",
@@ -898,12 +900,14 @@ dependencies = [
  "contextra",
  "contextra-adapt",
  "contextra-agent",
- "contextra-core",
  "contextra-crypto",
  "contextra-infer-candle",
  "contextra-infer-onnx",
+ "contextra-ports",
  "contextra-privacy",
  "contextra-rank",
+ "contextra-types",
+ "contextra-wire",
  "futures-util",
  "parking_lot",
  "rand 0.8.8",

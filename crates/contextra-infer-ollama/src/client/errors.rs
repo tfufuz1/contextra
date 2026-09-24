@@ -1,4 +1,4 @@
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 
 /// Helper to check if a reqwest error is a transient network error (timeout or connection error).
 pub fn is_transient_network_error(err: &reqwest::Error) -> bool {

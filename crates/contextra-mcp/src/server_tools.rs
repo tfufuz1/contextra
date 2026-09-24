@@ -4,7 +4,8 @@ use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
 use contextra::chunker::{ChunkerConfig, MarkdownChunker};
-use contextra_core::{DocId, StorageEngine, MAX_SEARCH_K};
+use contextra_types::{DocId, MAX_SEARCH_K};
+use contextra_ports::StorageEngine;
 use serde_json::{json, Value};
 
 /// Maximale Anzahl von Teilnehmern an einer n-ären Hyperkante (`contextra_relate_n_ary`).
@@ -95,7 +96,7 @@ impl McpServer {
                             .and_then(|m| m.get("text").or_else(|| m.get("content")))
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
-                        let segment = contextra_core::traits::ContextSegment::new(chunk_id, text);
+                        let segment = contextra_ports::ContextSegment::new(chunk_id, text);
                         bridge.consult_segment(&segment);
                     }
                 }
@@ -450,8 +451,8 @@ impl McpServer {
                         ));
                     }
 
-                    let tenant_id = contextra_core::TenantId::try_new(1)
-                        .unwrap_or(contextra_core::TenantId::SYSTEM);
+                    let tenant_id = contextra_types::TenantId::try_new(1)
+                        .unwrap_or(contextra_types::TenantId::SYSTEM);
 
                     let proof = self
                         .db

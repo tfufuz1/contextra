@@ -8,7 +8,7 @@ use super::wire::{
     EmbedResponse, GenerateRequest, GenerateResponse,
 };
 use futures_util::StreamExt;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use serde::Deserialize;
 use std::time::Duration;
 

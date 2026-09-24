@@ -1,5 +1,5 @@
 use contextra::Contextra;
-use contextra_core::BoxFuture;
+use contextra_ports::BoxFuture;
 use contextra_mcp::{
     protocol::JsonRpcRequest,
     sandbox::{McpSandbox, SandboxPolicy},
@@ -25,7 +25,7 @@ struct MockEmbedder {
     dimension: usize,
 }
 
-impl contextra_core::EmbeddingProvider for MockEmbedder {
+impl contextra_ports::EmbeddingProvider for MockEmbedder {
     fn provider_name(&self) -> &str {
         "mock"
     }
@@ -33,7 +33,7 @@ impl contextra_core::EmbeddingProvider for MockEmbedder {
     fn embed<'a>(
         &'a self,
         _text: &'a str,
-    ) -> BoxFuture<'a, std::result::Result<Vec<f32>, contextra_core::EmbeddingError>> {
+    ) -> BoxFuture<'a, std::result::Result<Vec<f32>, contextra_ports::EmbeddingError>> {
         Box::pin(async move { Ok(vec![0.1f32; self.dimension]) })
     }
 
@@ -44,7 +44,7 @@ impl contextra_core::EmbeddingProvider for MockEmbedder {
     fn embed_batch<'a>(
         &'a self,
         texts: &'a [&'a str],
-    ) -> BoxFuture<'a, std::result::Result<Vec<Vec<f32>>, contextra_core::EmbeddingError>> {
+    ) -> BoxFuture<'a, std::result::Result<Vec<Vec<f32>>, contextra_ports::EmbeddingError>> {
         Box::pin(async move { Ok(vec![vec![0.1f32; self.dimension]; texts.len()]) })
     }
 }
@@ -975,7 +975,7 @@ async fn test_mcp_boot_with_routing_config() {
         "test-profile",
         "http://localhost:11434",
         vec![1],
-        contextra_core::TokenBudget::new(1000, 100),
+        contextra_types::TokenBudget::new(1000, 100),
         0.5,
     );
 

@@ -9,7 +9,7 @@
 
 use crate::client::xml_escape;
 use crate::OllamaClient;
-use contextra_core::{ImportanceScore, ContextraError, Result};
+use contextra_types::{ImportanceScore, ContextraError, Result};
 use contextra_rank::IsotonicCalibrator;
 use parking_lot::Mutex;
 use regex::Regex;

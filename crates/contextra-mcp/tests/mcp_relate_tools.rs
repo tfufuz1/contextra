@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra::Contextra;
-use contextra_core::{BoxFuture, StorageEngine};
+use contextra_ports::{BoxFuture, StorageEngine};
 use contextra_mcp::{protocol::JsonRpcRequest, McpServer};
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -12,7 +12,7 @@ struct MockEmbedder {
     dimension: usize,
 }
 
-impl contextra_core::EmbeddingProvider for MockEmbedder {
+impl contextra_ports::EmbeddingProvider for MockEmbedder {
     fn provider_name(&self) -> &str {
         "mock"
     }
@@ -20,7 +20,7 @@ impl contextra_core::EmbeddingProvider for MockEmbedder {
     fn embed<'a>(
         &'a self,
         _text: &'a str,
-    ) -> BoxFuture<'a, std::result::Result<Vec<f32>, contextra_core::EmbeddingError>> {
+    ) -> BoxFuture<'a, std::result::Result<Vec<f32>, contextra_ports::EmbeddingError>> {
         Box::pin(async move { Ok(vec![0.1f32; self.dimension]) })
     }
 
@@ -31,7 +31,7 @@ impl contextra_core::EmbeddingProvider for MockEmbedder {
     fn embed_batch<'a>(
         &'a self,
         texts: &'a [&'a str],
-    ) -> BoxFuture<'a, std::result::Result<Vec<Vec<f32>>, contextra_core::EmbeddingError>> {
+    ) -> BoxFuture<'a, std::result::Result<Vec<Vec<f32>>, contextra_ports::EmbeddingError>> {
         Box::pin(async move { Ok(vec![vec![0.1f32; self.dimension]; texts.len()]) })
     }
 }
@@ -208,7 +208,7 @@ async fn test_contextra_relate_n_ary_success() {
 
     // Verify graph index contains the hyperedge for participant entity
     let col = db.collection("default").await.expect("col");
-    let e1 = contextra_core::EntityId::from_key("doc_1").expect("entity_id");
+    let e1 = contextra_types::EntityId::from_key("doc_1").expect("entity_id");
     let hes_e1 = col.graph_index().hyperedges_for_entity(e1);
     assert!(!hes_e1.is_empty(), "HyperEdge must exist for participant doc_1");
     assert_eq!(hes_e1[0].inner(), hyperedge_id_num);

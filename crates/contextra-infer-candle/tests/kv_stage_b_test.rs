@@ -5,7 +5,7 @@
 #![cfg(feature = "kv-stage-b")]
 
 use candle_core::{DType, Device, Tensor};
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use contextra_infer_candle::kv_state::{KvState, LayerKv};
 
 #[test]

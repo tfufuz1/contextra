@@ -8,7 +8,7 @@
 //! Bekannte Ollama-Modell-Dimensionen für Embedding-Modelle.
 
 use crate::client::OllamaClient;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

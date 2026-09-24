@@ -1,9 +1,8 @@
 #![cfg(feature = "onnx")]
 
-use contextra_core::{EmbeddingError, EmbeddingProvider};
-use contextra_infer_onnx::{OnnxEmbedder, TextEmbedderConfig, SESSION_LOAD_COUNT};
+use contextra_ports::{EmbeddingError, EmbeddingProvider};
+use contextra_infer_onnx::{OnnxEmbedder, TextEmbedderConfig};
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 fn fixture_path() -> PathBuf {
@@ -84,15 +83,12 @@ async fn test_single_session_load_across_multiple_embed_calls() {
     let model_file = fixture_path();
     assert!(model_file.exists(), "Fixture model.onnx missing.");
 
-    let initial_loads = SESSION_LOAD_COUNT.load(Ordering::SeqCst);
-
     let embedder = OnnxEmbedder::from_path(&model_file)
         .expect("Failed to create OnnxEmbedder from model path fixture");
 
-    let loads_after_creation = SESSION_LOAD_COUNT.load(Ordering::SeqCst);
+    let loads_after_creation = embedder.session_load_count();
     assert_eq!(
-        loads_after_creation,
-        initial_loads + 1,
+        loads_after_creation, 1,
         "Creating TextEmbedder must perform exactly one session load"
     );
 
@@ -106,7 +102,7 @@ async fn test_single_session_load_across_multiple_embed_calls() {
     let res3 = embedder.embed_async("Third test text").await;
     assert!(res3.is_ok());
 
-    let loads_after_embeds = SESSION_LOAD_COUNT.load(Ordering::SeqCst);
+    let loads_after_embeds = embedder.session_load_count();
     assert_eq!(
         loads_after_embeds, loads_after_creation,
         "embed_async calls must NOT trigger additional session loads"

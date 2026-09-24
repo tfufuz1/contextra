@@ -2,9 +2,10 @@ use super::*;
 use crate::gasp::GaspValidator;
 use crate::model_registry::ModelFingerprint;
 use candle_core::Device;
-use contextra_core::{ConfigFingerprint, LlmTextGenerator, LlmTextGeneratorStreaming, Result};
+use contextra_types::{ConfigFingerprint, Result};
+use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 #[cfg(feature = "kv-bridge")]
-use contextra_core::{ContextSegment, TenantId};
+use contextra_types::TenantId;
 use std::sync::Arc;
 
 struct MockCandleModel {
@@ -395,9 +396,9 @@ fn test_llm_from_dir_valid_temp_dir() {
 #[tokio::test]
 async fn test_candle_llm_client_swap_model_invalidates_validator_calibration() {
     use crate::gasp::GaspConfig;
-    use contextra_core::traits::GroundingValidator;
-    use contextra_core::ContextChunk;
-    use contextra_core::DocId;
+    use contextra_ports::GroundingValidator;
+    use contextra_types::ContextChunk;
+    use contextra_types::DocId;
 
     let mock_model_1 = Box::new(MockCandleModel {
         response: "Model 1 Completion".to_string(),

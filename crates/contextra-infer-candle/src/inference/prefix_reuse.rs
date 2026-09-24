@@ -4,7 +4,7 @@
 // INVARIANTEN: Zero-Panic doctrine; at least 1 token must be computed forward during prefill to obtain logits.
 
 use crate::kv_state::KvState;
-use contextra_core::{ContextraError, ModelFingerprint, Result};
+use contextra_types::{ContextraError, ModelFingerprint, Result};
 use contextra_ports::kv::{KvBlock, KvLayout, KvPrefixHit, KvPrefixStore, PrefixKey, RopeConfig};
 use sha2::{Digest, Sha256};
 use std::fmt;

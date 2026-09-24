@@ -3,7 +3,7 @@
 // ZWECK: Real ONNX Runtime Cross-Encoder Inferenz-Backend.
 
 #[cfg(feature = "onnx")]
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 #[cfg(feature = "onnx")]
 use contextra_rank::PlattScaler;
 #[cfg(feature = "onnx")]

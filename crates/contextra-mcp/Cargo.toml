@@ -12,12 +12,14 @@ agent-workflows = ["contextra-agent"]
 onnx = ["contextra-infer-onnx", "contextra-infer-onnx/onnx"]
 candle = ["dep:contextra-infer-candle"]
 kv-bridge = ["contextra-infer-candle/kv-bridge", "dep:contextra-infer-candle"]
-test-utils = ["contextra-core/test-utils"]
-docid-128 = ["contextra-core/docid-128"]
+test-utils = []
+docid-128 = ["contextra-types/docid-128"]
 
 [dependencies]
 contextra = { workspace = true, features = ["ollama", "router"] }
-contextra-core = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-wire = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-adapt = { workspace = true }
 contextra-crypto = { workspace = true }

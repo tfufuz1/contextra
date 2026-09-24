@@ -4,7 +4,7 @@
 // INVARIANTEN: No full tensor payload loading during metadata parsing; error propagation via ContextraError.
 
 use candle_core::quantized::gguf_file;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use std::fs::File;
 use std::path::Path;
 

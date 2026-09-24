@@ -1,5 +1,5 @@
 use super::config::{MAX_BATCH_SIZE, MAX_TEXT_BYTES};
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 /// Escapes XML special characters in string inputs to prevent tag injection.
 pub fn xml_escape(input: &str) -> String {
