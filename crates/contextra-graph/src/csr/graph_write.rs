@@ -152,7 +152,8 @@ impl CsrGraph {
 
     /// Drains and processes up to `batch_size` deferred hyperedges from the cascade queue.
     ///
-    /// Tombstones each hyperedge and removes its key from persistent storage if present.
+    /// Tombstones each hyperedge and all its non-tombstoned ancestors in topological order,
+    /// and removes corresponding queue keys from persistent storage.
     pub async fn process_cascade_queue(&self, batch_size: usize, wal_tx: TxId) -> Result<usize> {
         let mut items = Vec::new();
         {
@@ -171,9 +172,48 @@ impl CsrGraph {
 
         let mut tombstoned_count = 0usize;
         for (doc_id, hid) in items {
-            if self.tombstone_hyperedge(hid, wal_tx) {
-                tombstoned_count += 1;
+            let mut visited = HashSet::new();
+            let mut on_stack = HashSet::new();
+            let mut closure_nodes = Vec::new();
+
+            fn dfs_upward(
+                graph: &CsrGraph,
+                node: crate::hyperedge::HyperEdgeId,
+                visited: &mut HashSet<crate::hyperedge::HyperEdgeId>,
+                on_stack: &mut HashSet<crate::hyperedge::HyperEdgeId>,
+                closure_nodes: &mut Vec<crate::hyperedge::HyperEdgeId>,
+            ) {
+                if !visited.insert(node) {
+                    return;
+                }
+                on_stack.insert(node);
+                closure_nodes.push(node);
+
+                for parent in graph.parent_hyperedges_of(node) {
+                    if on_stack.contains(&parent) {
+                        tracing::warn!(
+                            child = %node.inner(),
+                            parent = %parent.inner(),
+                            "Cycle detected in hyperedge child-parent graph during background cascade queue processing"
+                        );
+                    } else {
+                        dfs_upward(graph, parent, visited, on_stack, closure_nodes);
+                    }
+                }
+
+                on_stack.remove(&node);
             }
+
+            dfs_upward(self, hid, &mut visited, &mut on_stack, &mut closure_nodes);
+
+            let topo_order = crate::cascade::topological_sort_hyperedge_closure(self, &closure_nodes);
+
+            for node in topo_order {
+                if self.tombstone_hyperedge(node, wal_tx) {
+                    tombstoned_count += 1;
+                }
+            }
+
             if let Some(storage) = self.storage() {
                 let key = format!(
                     "{}{:016x}:{:016x}",
@@ -374,7 +414,38 @@ impl CsrGraph {
                 .or_default()
                 .insert(hyperedge_id);
         }
+        for &child_id in hyperedge_arc.child_edge_ids.iter() {
+            inner
+                .child_to_parents
+                .entry(child_id)
+                .or_default()
+                .insert(hyperedge_id);
+        }
         inner.hyperedges.insert(hyperedge_id, hyperedge_arc);
+    }
+
+    /// Returns all non-tombstoned parent hyperedge IDs that contain `child` in `child_edge_ids`.
+    ///
+    /// The returned list is sorted in ascending order by `HyperEdgeId`.
+    pub fn parent_hyperedges_of(&self, child: crate::hyperedge::HyperEdgeId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        let inner = self.inner_read();
+        let mut parents: Vec<_> = inner
+            .child_to_parents
+            .get(&child)
+            .map(|set| {
+                set.iter()
+                    .copied()
+                    .filter(|id| {
+                        inner
+                            .hyperedges
+                            .get(id)
+                            .is_some_and(|edge| edge.tx_valid_to.is_none())
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        parents.sort_unstable();
+        parents
     }
 
     /// Returns all non-tombstoned hyperedge IDs derived from `doc_id`.
@@ -469,6 +540,15 @@ impl CsrGraph {
                 set.remove(&id);
                 if set.is_empty() {
                     inner_ptr.hyperedge_index.remove(&participant.entity);
+                }
+            }
+        }
+
+        for &child_id in updated_arc.child_edge_ids.iter() {
+            if let Some(set) = inner_ptr.child_to_parents.get_mut(&child_id) {
+                set.remove(&id);
+                if set.is_empty() {
+                    inner_ptr.child_to_parents.remove(&child_id);
                 }
             }
         }

@@ -143,6 +143,27 @@ pub struct HyperEdge {
     /// Optionales Quell-Dokument, aus dem diese Hyperkante abgeleitet wurde.
     #[serde(default)]
     pub source_doc_id: Option<DocId>,
+    /// Untergeordnete Hyperkanten-IDs (LeanRAG Super-Kanten-Abstraktion).
+    #[serde(default)]
+    pub child_edge_ids: Arc<[HyperEdgeId]>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct LegacyHyperEdgeV1 {
+    id: HyperEdgeId,
+    predicate: EdgeType,
+    participants: Arc<[RoleBinding]>,
+    weight: f32,
+    #[serde(default)]
+    tx_valid_from: Option<TxId>,
+    #[serde(default)]
+    tx_valid_to: Option<TxId>,
+    #[serde(default)]
+    business_valid_from: Option<i64>,
+    #[serde(default)]
+    business_valid_to: Option<i64>,
+    #[serde(default)]
+    source_doc_id: Option<DocId>,
 }
 
 impl HyperEdge {
@@ -163,6 +184,7 @@ impl HyperEdge {
             business_valid_from: None,
             business_valid_to: None,
             source_doc_id: None,
+            child_edge_ids: Arc::from([]),
         }
     }
 
@@ -190,11 +212,28 @@ impl HyperEdge {
         self
     }
 
+    /// Setzt die untergeordneten Hyperkanten-IDs (LeanRAG Super-Kanten).
+    ///
+    /// Sortiert und dedupliziert die IDs deterministisch und entfernt eine etwaige Selbstreferenz.
+    pub fn with_child_edge_ids(mut self, ids: impl Into<Arc<[HyperEdgeId]>>) -> Self {
+        let mut vec: Vec<HyperEdgeId> = ids
+            .into()
+            .iter()
+            .copied()
+            .filter(|&child_id| child_id != self.id)
+            .collect();
+        vec.sort_unstable();
+        vec.dedup();
+        self.child_edge_ids = vec.into();
+        self
+    }
+
     /// Validiert die Invarianten der Hyperkante.
     ///
     /// # Invarianten
     /// - Mindestens 2 Teilnehmer (`participants.len() >= 2`), sonst degeneriert zur binären Edge.
     /// - Endliches, nicht-negatives Gewicht (`0.0 <= weight`).
+    /// - `child_edge_ids` darf nicht die eigene `id` enthalten.
     pub fn validate(&self) -> std::result::Result<(), GraphMutationError> {
         if self.participants.len() < 2 {
             return Err(GraphMutationError::InsufficientParticipants {
@@ -208,6 +247,12 @@ impl HyperEdge {
                 reason: "weight must be finite and non-negative".to_string(),
             });
         }
+        if self.child_edge_ids.contains(&self.id) {
+            return Err(GraphMutationError::Internal(format!(
+                "HyperEdge {} cannot contain itself in child_edge_ids",
+                self.id
+            )));
+        }
         Ok(())
     }
 
@@ -220,8 +265,24 @@ impl HyperEdge {
 
     /// Deserialisiert eine Hyperkante aus einem `bincode`-Byte-Slice.
     pub fn deserialize(bytes: &[u8]) -> Result<Self> {
-        bincode::deserialize(bytes)
-            .map_err(|e| ContextraError::Internal(format!("Failed to deserialize hyperedge: {e}")))
+        if let Ok(edge) = bincode::deserialize::<Self>(bytes) {
+            return Ok(edge);
+        }
+        let legacy: LegacyHyperEdgeV1 = bincode::deserialize(bytes).map_err(|e| {
+            ContextraError::Internal(format!("Failed to deserialize hyperedge: {e}"))
+        })?;
+        Ok(Self {
+            id: legacy.id,
+            predicate: legacy.predicate,
+            participants: legacy.participants,
+            weight: legacy.weight,
+            tx_valid_from: legacy.tx_valid_from,
+            tx_valid_to: legacy.tx_valid_to,
+            business_valid_from: legacy.business_valid_from,
+            business_valid_to: legacy.business_valid_to,
+            source_doc_id: legacy.source_doc_id,
+            child_edge_ids: Arc::from([]),
+        })
     }
 
     /// Erstellt eine Zero-Copy-Teilsicht (`HyperEdgeView`) auf diese Hyperkante.
@@ -447,12 +508,73 @@ mod tests {
         )
         .with_tx_validity(Some(TxId::new(1)), Some(TxId::new(10)))
         .with_business_validity(Some(1000), Some(2000))
-        .with_source_doc_id(Some(DocId::new(500)));
+        .with_source_doc_id(Some(DocId::new(500)))
+        .with_child_edge_ids(vec![HyperEdgeId::new(5), HyperEdgeId::new(2)]);
 
         let serialized = edge.serialize().expect("Serialization failed");
         let deserialized = HyperEdge::deserialize(&serialized).expect("Deserialization failed");
 
         assert_eq!(edge, deserialized);
+    }
+
+    #[test]
+    fn test_hyperedge_legacy_deserialization_fallback() {
+        // Construct legacy byte layout (without child_edge_ids)
+        let legacy = LegacyHyperEdgeV1 {
+            id: HyperEdgeId::new(42),
+            predicate: EdgeType::Default,
+            participants: vec![
+                RoleBinding::new(RoleId::new(1), EntityId::new(10)),
+                RoleBinding::new(RoleId::new(2), EntityId::new(20)),
+            ]
+            .into(),
+            weight: 2.0,
+            tx_valid_from: Some(TxId::new(1)),
+            tx_valid_to: None,
+            business_valid_from: None,
+            business_valid_to: None,
+            source_doc_id: Some(DocId::new(99)),
+        };
+
+        let legacy_bytes = bincode::serialize(&legacy).unwrap();
+        let deserialized = HyperEdge::deserialize(&legacy_bytes).expect("Fallback deserialization failed");
+
+        assert_eq!(deserialized.id, HyperEdgeId::new(42));
+        assert_eq!(deserialized.weight, 2.0);
+        assert_eq!(deserialized.source_doc_id, Some(DocId::new(99)));
+        assert!(deserialized.child_edge_ids.is_empty());
+    }
+
+    #[test]
+    fn test_with_child_edge_ids_sorting_dedup_and_self_removal() {
+        let edge_id = HyperEdgeId::new(10);
+        let edge = HyperEdge::new(
+            edge_id,
+            EdgeType::Default,
+            vec![
+                RoleBinding::new(RoleId::new(1), EntityId::new(1)),
+                RoleBinding::new(RoleId::new(2), EntityId::new(2)),
+            ],
+            1.0,
+        )
+        .with_child_edge_ids(vec![
+            HyperEdgeId::new(30),
+            HyperEdgeId::new(10), // self-reference
+            HyperEdgeId::new(20),
+            HyperEdgeId::new(30), // duplicate
+            HyperEdgeId::new(5),
+        ]);
+
+        assert_eq!(
+            *edge.child_edge_ids,
+            [HyperEdgeId::new(5), HyperEdgeId::new(20), HyperEdgeId::new(30)]
+        );
+        assert!(edge.validate().is_ok());
+
+        // Test manual self-reference setting causing validation failure
+        let mut invalid_edge = edge;
+        invalid_edge.child_edge_ids = vec![edge_id].into();
+        assert!(invalid_edge.validate().is_err());
     }
 
     #[test]
