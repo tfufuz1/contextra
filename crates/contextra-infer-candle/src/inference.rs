@@ -12,7 +12,13 @@
 
 mod core;
 
+#[cfg(feature = "kv-stage-b")]
+mod prefix_reuse;
+
 #[cfg(test)]
 mod tests;
 
 pub use core::*;
+
+#[cfg(feature = "kv-stage-b")]
+pub use prefix_reuse::*;
