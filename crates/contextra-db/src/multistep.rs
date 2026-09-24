@@ -11,7 +11,8 @@ use crate::pid_latency_controller::{
     LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS,
 };
 use crate::{Collection, SearchResult};
-use contextra_core::{BoxFuture, Result, StorageEngine};
+use contextra_ports::{BoxFuture, StorageEngine};
+use contextra_types::Result;
 use std::sync::Arc;
 
 /// Konfiguration für Multi-Step Retrieval.
@@ -104,7 +105,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
     ) -> Result<MultiStepResult> {
         use crate::fusion::reciprocal_rank_fusion;
 
-        let k = k.min(contextra_core::MAX_SEARCH_K);
+        let k = k.min(contextra_types::MAX_SEARCH_K);
         let current_k = k;
         let mut all_result_sets: Vec<Vec<SearchResult>> = Vec::new();
         let mut sub_queries: Vec<String> = Vec::new();
@@ -436,7 +437,7 @@ mod tests {
             _current_results: &'a [SearchResult],
         ) -> BoxFuture<'a, Result<Vec<String>>> {
             Box::pin(async move {
-                Err(contextra_core::ContextraError::Internal(
+                Err(contextra_types::ContextraError::Internal(
                     "Rewriter error".into(),
                 ))
             })

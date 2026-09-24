@@ -16,7 +16,7 @@
 //!   Berechtigungen), bleibt der Vault nutzbar, aber ohne physische RAM-Fixierung.
 //!   Eine Warnung wird via `tracing::warn!` ausgegeben.
 
-use contextra_core::types::{DocId, TxId};
+use contextra_types::{DocId, TxId};
 use contextra_sys::LockedRegions;
 use std::time::Instant;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -298,7 +298,7 @@ impl Drop for VolatileContextVault {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::types::{DocId, TxId};
+    use contextra_types::{DocId, TxId};
 
     fn make_chunk(id: u64, content: &[u8]) -> VaultChunk {
         VaultChunk::new(
