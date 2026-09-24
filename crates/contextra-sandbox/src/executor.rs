@@ -10,11 +10,17 @@
 //! Jeder execute()-Aufruf startet eine frische Store+Instance (kein Zustandsüberlauf).
 //! Fuel (CPU-Limit) UND Wall-Clock-Timeout (tokio) sind beide aktiv.
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tracing::warn;
 use wasmtime::{Config, Engine, Module, Store};
 
-use crate::{capabilities::WasmCapabilities, error::SandboxError, output::WasmOutput};
+use crate::{
+    capabilities::WasmCapabilities,
+    error::SandboxError,
+    output::WasmOutput,
+    wasi::{self, OutputLimitExceededError, ProcessExitError},
+};
 
 /// Custom error type returned by host functions on capability violation (INV-SBX-3).
 #[derive(Debug, Clone)]
@@ -30,12 +36,20 @@ impl std::fmt::Display for CapabilityViolationError {
 
 impl std::error::Error for CapabilityViolationError {}
 
-struct SandboxState {
-    max_pages: u32,
-    max_table_entries: u32,
-    allow_cloud_egress: bool,
-    allow_stdout: bool,
-    allow_stderr: bool,
+pub(crate) struct SandboxState {
+    pub(crate) max_pages: u32,
+    pub(crate) max_table_entries: u32,
+    pub(crate) allow_cloud_egress: bool,
+    pub(crate) allow_stdout: bool,
+    pub(crate) allow_stderr: bool,
+    pub(crate) allow_clock: bool,
+    pub(crate) max_output_bytes: usize,
+    pub(crate) stdin_input: Vec<u8>,
+    pub(crate) stdin_pos: usize,
+    pub(crate) stdout_buf: Arc<Mutex<Vec<u8>>>,
+    pub(crate) stderr_buf: Arc<Mutex<Vec<u8>>>,
+    pub(crate) start_instant: std::time::Instant,
+    pub(crate) rng_state: Option<u64>,
 }
 
 impl wasmtime::ResourceLimiter for SandboxState {
@@ -120,6 +134,14 @@ impl WasmExecutor {
         let timeout_ms = effective_timeout.as_millis() as u64;
         let deadline = tokio::time::Instant::now() + effective_timeout;
 
+        // Check input size limit prior to execution
+        if input.len() > capabilities.max_stdin_bytes {
+            return Err(SandboxError::InputTooLarge {
+                len: input.len(),
+                limit: capabilities.max_stdin_bytes,
+            });
+        }
+
         // INV-SBX-1: WASM module binary size limit check prior to compilation
         if wasm_bytes.len() > capabilities.max_module_size_bytes {
             return Err(SandboxError::InvalidModule(format!(
@@ -148,6 +170,10 @@ impl WasmExecutor {
             Err(_) => return Err(SandboxError::Timeout { timeout_ms }),
         };
 
+        // Stdout/Stderr Buffer
+        let stdout_buf = Arc::new(Mutex::new(Vec::<u8>::new()));
+        let stderr_buf = Arc::new(Mutex::new(Vec::<u8>::new()));
+
         // Frische Store für diese Execution (kein Zustandsüberlauf)
         let mut store = Store::new(
             &self.engine,
@@ -157,6 +183,14 @@ impl WasmExecutor {
                 allow_cloud_egress: capabilities.allow_cloud_egress,
                 allow_stdout: capabilities.allow_stdout,
                 allow_stderr: capabilities.allow_stderr,
+                allow_clock: capabilities.allow_clock,
+                max_output_bytes: capabilities.max_output_bytes,
+                stdin_input: input.to_vec(),
+                stdin_pos: 0,
+                stdout_buf: stdout_buf.clone(),
+                stderr_buf: stderr_buf.clone(),
+                start_instant: std::time::Instant::now(),
+                rng_state: capabilities.random_seed,
             },
         );
 
@@ -167,10 +201,6 @@ impl WasmExecutor {
 
         // Memory-Limit via Store-Limiter
         store.limiter(|state| state);
-
-        // Stdout/Stderr Buffer
-        let stdout_buf = std::sync::Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
-        let stderr_buf = std::sync::Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
 
         // Capability-Checks
         // INV-SBX-5: Capability fields (allow_filesystem, allow_network) are strictly enforced by non-registration
@@ -185,144 +215,11 @@ impl WasmExecutor {
             warn!("WasmExecutor: allow_cloud_egress=true — erhöhtes Risiko");
         }
 
-        // Linker mit minimalen WASI-Imports
+        // Linker mit WASI-Imports
         let mut linker = wasmtime::Linker::new(&self.engine);
 
-        // Input als WASM-Export verfügbar machen (über stdin-Emulation)
-        let _input_clone = input.to_vec();
-        let stdout_clone = stdout_buf.clone();
-        let stderr_clone = stderr_buf.clone();
-
-        // AI-TAG[RESOLVED] WASI fd_write buffer parsing (ID: AGT-SANDBOX-12a4a39c) (TS: 2026-09-15T16:05:00Z) (SESSION: acf8fe72)
-        // BEFUND: Linker stub for WASI fd_write discards iovs memory buffers and returns 0 without writing to stdout_buf or stderr_buf.
-        // RESOLVED: Implemented WASI preview1 buffer parser reading guest memory ciovec structures into stdout_buf/stderr_buf with defensive bounds checking.
-        linker
-            .func_wrap(
-                "wasi_snapshot_preview1",
-                "fd_write",
-                move |mut caller: wasmtime::Caller<'_, SandboxState>,
-                      fd: i32,
-                      iovs_ptr: i32,
-                      iovs_len: i32,
-                      nwritten_ptr: i32|
-                      -> i32 {
-                    const ERRNO_SUCCESS: i32 = 0;
-                    const ERRNO_BADF: i32 = 8;
-                    const ERRNO_INVAL: i32 = 28;
-
-                    if fd != 1 && fd != 2 {
-                        return ERRNO_BADF;
-                    }
-
-                    if iovs_ptr < 0 || iovs_len < 0 || nwritten_ptr < 0 {
-                        return ERRNO_INVAL;
-                    }
-
-                    let memory = match caller.get_export("memory") {
-                        Some(wasmtime::Extern::Memory(mem)) => mem,
-                        _ => return ERRNO_INVAL,
-                    };
-
-                    let mem_slice = memory.data(&caller);
-                    let iovs_start = iovs_ptr as usize;
-                    let iovs_count = iovs_len as usize;
-
-                    let iovs_bytes = match iovs_count.checked_mul(8) {
-                        Some(bytes) => bytes,
-                        None => return ERRNO_INVAL,
-                    };
-
-                    let iovs_end = match iovs_start.checked_add(iovs_bytes) {
-                        Some(end) => end,
-                        None => return ERRNO_INVAL,
-                    };
-
-                    if iovs_end > mem_slice.len() {
-                        return ERRNO_INVAL;
-                    }
-
-                    let mut total_written: u32 = 0;
-                    let allow_write = if fd == 1 {
-                        caller.data().allow_stdout
-                    } else {
-                        caller.data().allow_stderr
-                    };
-
-                    for i in 0..iovs_count {
-                        let offset = iovs_start + i * 8;
-                        let iov_buf = match mem_slice.get(offset..offset + 8) {
-                            Some(slice) => slice,
-                            None => return ERRNO_INVAL,
-                        };
-
-                        let buf_ptr = u32::from_le_bytes(match iov_buf[0..4].try_into() {
-                            Ok(arr) => arr,
-                            Err(_) => return ERRNO_INVAL,
-                        }) as usize;
-                        let buf_len = u32::from_le_bytes(match iov_buf[4..8].try_into() {
-                            Ok(arr) => arr,
-                            Err(_) => return ERRNO_INVAL,
-                        }) as usize;
-
-                        let buf_end = match buf_ptr.checked_add(buf_len) {
-                            Some(end) => end,
-                            None => return ERRNO_INVAL,
-                        };
-
-                        if buf_end > mem_slice.len() {
-                            return ERRNO_INVAL;
-                        }
-
-                        if allow_write && buf_len > 0 {
-                            if let Some(slice) = mem_slice.get(buf_ptr..buf_end) {
-                                if fd == 1 {
-                                    if let Ok(mut guard) = stdout_clone.lock() {
-                                        guard.extend_from_slice(slice);
-                                    }
-                                } else if fd == 2 {
-                                    if let Ok(mut guard) = stderr_clone.lock() {
-                                        guard.extend_from_slice(slice);
-                                    }
-                                }
-                            }
-                        }
-
-                        total_written = match total_written.checked_add(buf_len as u32) {
-                            Some(sum) => sum,
-                            None => return ERRNO_INVAL,
-                        };
-                    }
-
-                    let nwritten_offset = nwritten_ptr as usize;
-                    let nwritten_end = match nwritten_offset.checked_add(4) {
-                        Some(end) => end,
-                        None => return ERRNO_INVAL,
-                    };
-
-                    let mem_slice_mut = memory.data_mut(&mut caller);
-                    if nwritten_end > mem_slice_mut.len() {
-                        return ERRNO_INVAL;
-                    }
-
-                    if let Some(dest) = mem_slice_mut.get_mut(nwritten_offset..nwritten_end) {
-                        dest.copy_from_slice(&total_written.to_le_bytes());
-                    } else {
-                        return ERRNO_INVAL;
-                    }
-
-                    ERRNO_SUCCESS
-                },
-            )
-            .map_err(|e| SandboxError::Runtime(format!("Linker setup failed: {}", e)))?;
-
-        // proc_exit
-        linker
-            .func_wrap(
-                "wasi_snapshot_preview1",
-                "proc_exit",
-                |_: wasmtime::Caller<'_, SandboxState>, _code: i32| {},
-            )
-            .map_err(|e| SandboxError::Runtime(format!("Linker proc_exit failed: {}", e)))?;
+        wasi::register(&mut linker)
+            .map_err(|e| SandboxError::Runtime(format!("Linker WASI setup failed: {}", e)))?;
 
         // Host Cloud Query function enforcement
         linker
@@ -364,24 +261,31 @@ impl WasmExecutor {
 
             // _start / main aufrufen
             if let Ok(start_fn) = instance.get_typed_func::<(), ()>(&mut store, "_start") {
-                start_fn.call_async(&mut store, ()).await.map_err(|e| {
+                if let Err(e) = start_fn.call_async(&mut store, ()).await {
                     // INV-SBX-3: Precise error classification using downcast_ref without string matching
-                    if let Some(cap_err) = e.downcast_ref::<CapabilityViolationError>() {
-                        SandboxError::CapabilityViolation {
+                    if let Some(exit_err) = e.downcast_ref::<ProcessExitError>() {
+                        if exit_err.code != 0 {
+                            return Err(SandboxError::ProcessExit { code: exit_err.code });
+                        }
+                        // Code 0 counts as success, stdout/stderr captured so far will be returned.
+                    } else if let Some(out_err) = e.downcast_ref::<OutputLimitExceededError>() {
+                        return Err(SandboxError::OutputLimitExceeded {
+                            stream: out_err.stream,
+                            limit: out_err.limit,
+                        });
+                    } else if let Some(cap_err) = e.downcast_ref::<CapabilityViolationError>() {
+                        return Err(SandboxError::CapabilityViolation {
                             capability: cap_err.capability.to_string(),
-                        }
-                    } else if let Some(trap) = e.downcast_ref::<wasmtime::Trap>() {
-                        match trap {
-                            wasmtime::Trap::OutOfFuel => {
-                                let consumed = capabilities.max_fuel;
-                                SandboxError::FuelExhausted { consumed }
-                            }
-                            _ => SandboxError::WasmTrap(format!("{:#}", e)),
-                        }
+                        });
+                    } else if let Some(wasmtime::Trap::OutOfFuel) =
+                        e.downcast_ref::<wasmtime::Trap>()
+                    {
+                        let consumed = capabilities.max_fuel;
+                        return Err(SandboxError::FuelExhausted { consumed });
                     } else {
-                        SandboxError::WasmTrap(format!("{:#}", e))
+                        return Err(SandboxError::WasmTrap(format!("{:#}", e)));
                     }
-                })?;
+                }
             }
 
             let fuel_consumed = capabilities
@@ -657,6 +561,14 @@ mod tests {
             allow_cloud_egress: false,
             allow_stdout: true,
             allow_stderr: false,
+            allow_clock: true,
+            max_output_bytes: 1024 * 1024,
+            stdin_input: Vec::new(),
+            stdin_pos: 0,
+            stdout_buf: Arc::new(Mutex::new(Vec::new())),
+            stderr_buf: Arc::new(Mutex::new(Vec::new())),
+            start_instant: std::time::Instant::now(),
+            rng_state: None,
         };
         use wasmtime::ResourceLimiter;
         // 65536 bytes = 1 page
@@ -676,6 +588,14 @@ mod tests {
             allow_cloud_egress: false,
             allow_stdout: true,
             allow_stderr: false,
+            allow_clock: true,
+            max_output_bytes: 1024 * 1024,
+            stdin_input: Vec::new(),
+            stdin_pos: 0,
+            stdout_buf: Arc::new(Mutex::new(Vec::new())),
+            stderr_buf: Arc::new(Mutex::new(Vec::new())),
+            start_instant: std::time::Instant::now(),
+            rng_state: None,
         };
         use wasmtime::ResourceLimiter;
         assert!(state.table_growing(0, 10, None)?);

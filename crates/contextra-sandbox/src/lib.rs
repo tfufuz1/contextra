@@ -14,6 +14,7 @@ pub mod capabilities;
 pub mod error;
 pub mod executor;
 pub mod output;
+pub mod wasi;
 
 pub use capabilities::WasmCapabilities;
 pub use error::SandboxError;
