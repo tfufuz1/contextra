@@ -16,6 +16,9 @@ pub enum RoutingStrategy {
     /// LinUCB Contextual Bandit (Feature `bandit-routing`, Default: off).
     #[cfg(feature = "bandit-routing")]
     ContextualBandit,
+    #[cfg(feature = "flow-corrected-thompson")]
+    /// Flow-Corrected Thompson Sampling (§21.3, AK-18). Feature `flow-corrected-thompson`, Default: off.
+    FlowCorrectedThompson,
 }
 
 #[cfg(test)]
@@ -31,5 +34,14 @@ mod tests {
     fn test_cascade_serde() {
         let s = serde_json::to_string(&RoutingStrategy::Cascade).unwrap();
         assert_eq!(s, "\"Cascade\"");
+    }
+
+    #[test]
+    #[cfg(feature = "flow-corrected-thompson")]
+    fn test_flow_corrected_thompson_serde() {
+        let s = serde_json::to_string(&RoutingStrategy::FlowCorrectedThompson).unwrap();
+        assert_eq!(s, "\"FlowCorrectedThompson\"");
+        let de: RoutingStrategy = serde_json::from_str(&s).unwrap();
+        assert_eq!(de, RoutingStrategy::FlowCorrectedThompson);
     }
 }
