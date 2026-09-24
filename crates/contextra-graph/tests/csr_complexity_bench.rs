@@ -1,4 +1,5 @@
-use contextra_core::{Entity, EntityId, GraphIndex};
+use contextra_types::{Entity, EntityId};
+use contextra_ports::GraphIndex;
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use std::sync::Arc;
 use std::time::Instant;

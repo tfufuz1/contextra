@@ -17,7 +17,7 @@
 //! Verantwortung des Aufrufers.
 
 use crate::session_dag::NodeIdx;
-use contextra_core::{EntityId, TxId};
+use contextra_types::{EntityId, TxId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

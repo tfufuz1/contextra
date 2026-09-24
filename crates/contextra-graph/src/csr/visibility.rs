@@ -1,4 +1,4 @@
-use contextra_core::TxId;
+use contextra_types::TxId;
 
 /// Untere Schranke für Wall-Clock-abgeleitete TxId-Heuristik.
 ///

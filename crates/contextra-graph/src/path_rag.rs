@@ -9,8 +9,8 @@
 
 pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use ahash::AHashMap;
-use contextra_core::DocId;
-pub use contextra_core::EntityId;
+use contextra_types::DocId;
+pub use contextra_types::EntityId;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;

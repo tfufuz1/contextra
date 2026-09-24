@@ -10,7 +10,8 @@
 // HOTSPOTS: L100-L150 (branch_from & path_to_head)
 // SIEHE AUCH: DECISIONS.md ADR-004
 
-use contextra_core::{ContextraError, Result, StorageEngine, TxId};
+use contextra_types::{ContextraError, Result, TxId};
+use contextra_ports::StorageEngine;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -4,7 +4,7 @@
 // STAND: TS:2026-08-30T19:00:00Z
 
 use crate::csr::CsrGraph;
-use contextra_core::{DocId, EntityId, Result, TxId};
+use contextra_types::{DocId, EntityId, Result, TxId};
 
 /// Maximum number of hyperedges processed synchronously per cascade invalidation run
 /// to bound latency spikes. Any remaining hyperedges are returned in `deferred`.
@@ -336,7 +336,8 @@ mod tests {
     use crate::csr::EdgeType;
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
     use crate::path_rag::PathRAGEngine;
-    use contextra_core::{Edge, Entity, GraphIndex};
+    use contextra_types::{Edge, Entity};
+use contextra_ports::GraphIndex;
 
     #[tokio::test]
     async fn test_cascade_invalidation_tombstones_edges_of_superseded_doc() {
@@ -352,21 +353,21 @@ mod tests {
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node1, "n1", "Node"),
+            contextra_types::Entity::new(node1, "n1", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node2, "n2", "Node"),
+            contextra_types::Entity::new(node2, "n2", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node3, "n3", "Node"),
+            contextra_types::Entity::new(node3, "n3", "Node"),
         )
         .await
         .unwrap();
@@ -414,14 +415,14 @@ mod tests {
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node1, "n1", "Node"),
+            contextra_types::Entity::new(node1, "n1", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node2, "n2", "Node"),
+            contextra_types::Entity::new(node2, "n2", "Node"),
         )
         .await
         .unwrap();
@@ -458,14 +459,14 @@ mod tests {
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node1, "n1", "Node"),
+            contextra_types::Entity::new(node1, "n1", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node2, "n2", "Node"),
+            contextra_types::Entity::new(node2, "n2", "Node"),
         )
         .await
         .unwrap();
@@ -517,14 +518,14 @@ mod tests {
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node1, "n1", "Node"),
+            contextra_types::Entity::new(node1, "n1", "Node"),
         )
         .await
         .unwrap();
         GraphIndex::add_entity(
             graph.as_ref(),
             tx1,
-            contextra_core::Entity::new(node2, "n2", "Node"),
+            contextra_types::Entity::new(node2, "n2", "Node"),
         )
         .await
         .unwrap();
@@ -557,7 +558,7 @@ mod tests {
             GraphIndex::add_entity(
                 graph.as_ref(),
                 tx1,
-                contextra_core::Entity::new(n, format!("n{}", n.inner()), "Node"),
+                contextra_types::Entity::new(n, format!("n{}", n.inner()), "Node"),
             )
             .await
             .unwrap();

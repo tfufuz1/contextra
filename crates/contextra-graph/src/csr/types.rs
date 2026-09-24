@@ -1,4 +1,4 @@
-use contextra_core::{DocId, EntityId, ResourceTracker, TxId};
+use contextra_types::{DocId, EntityId, ResourceTracker, TxId};
 use serde::{Deserialize, Serialize};
 
 pub(crate) const GRAPH_ENTITY_PREFIX: &[u8] = b"__graph:entity:";

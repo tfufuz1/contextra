@@ -6,7 +6,7 @@
 
 use crate::consistency_enforcement::EdgeId;
 use ahash::{AHashMap, AHashSet};
-use contextra_core::{DocId, TxId};
+use contextra_types::{DocId, TxId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
@@ -80,7 +80,7 @@ impl DocEdgeIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
 
     #[test]
     fn test_doc_edge_index_record_and_retrieve() {

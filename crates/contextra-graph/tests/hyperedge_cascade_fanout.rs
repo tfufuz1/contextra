@@ -1,4 +1,4 @@
-use contextra_core::{DocId, EntityId};
+use contextra_types::{DocId, EntityId};
 use contextra_graph::cascade::{
     cascade_invalidate_hyperedges_for_superseded_doc, MAX_HYPEREDGE_CASCADE_FANOUT,
 };

@@ -1,6 +1,6 @@
 #![expect(clippy::unwrap_used)]
 
-use contextra_core::{DocId, EntityId, TxId};
+use contextra_types::{DocId, EntityId, TxId};
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{
     ConsolidationNodesGuard, HyperEdge, HyperEdgeId, RoleBinding, RoleId,

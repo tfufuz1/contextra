@@ -1,4 +1,5 @@
-use contextra_core::{Edge, Entity, EntityId, GraphIndex, PprAlgorithm, PprConfig, TxId};
+use contextra_types::{Edge, Entity, EntityId, PprAlgorithm, PprConfig, TxId};
+use contextra_ports::GraphIndex;
 use contextra_graph::CsrGraph;
 
 #[tokio::test]

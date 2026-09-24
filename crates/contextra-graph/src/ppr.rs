@@ -10,7 +10,7 @@
 pub(crate) mod snapshot;
 
 use crate::csr::GraphInner;
-use contextra_core::{EntityId, PprAlgorithm, PprConfig};
+use contextra_types::{EntityId, PprAlgorithm, PprConfig};
 use std::collections::{BTreeMap, HashSet};
 
 /// Information view over graph tombstones/deleted node indices.

@@ -1,4 +1,4 @@
-use contextra_core::{EntityId, TxId};
+use contextra_types::{EntityId, TxId};
 use contextra_graph::csr::EdgeType;
 use contextra_graph::error::GraphMutationError;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};

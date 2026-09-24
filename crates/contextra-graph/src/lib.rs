@@ -95,12 +95,12 @@ pub use tl_hfd::{
     shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, ShadowComparison, TlHfdError, TlHfdParams,
 };
 
-/// Extension trait for [`contextra_core::GraphIndex`] providing entity removal functionality.
-pub trait GraphIndexExt: contextra_core::GraphIndex {
+/// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
+pub trait GraphIndexExt: contextra_ports::GraphIndex {
     /// Removes an entity node and all its incident (outgoing and incoming) edges from the graph.
     fn remove_entity<'a>(
         &'a self,
-        tx: contextra_core::TxId,
+        tx: contextra_types::TxId,
         entity: EntityId,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>>;
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>>;
 }

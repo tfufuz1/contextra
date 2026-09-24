@@ -17,7 +17,7 @@
 pub mod edge_reinforcement_buffer {
     use crate::csr::CsrGraph;
     use crate::edge_reinforcement::EdgeReinforcementConfig;
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
     use parking_lot::Mutex;
 
     /// Ein gepufferter Co-Occurrence-Update: zwei ko-aktivierte Entitäten.
@@ -135,7 +135,7 @@ pub mod edge_reinforcement_buffer {
 #[cfg(test)]
 mod tests {
     use super::edge_reinforcement_buffer::*;
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
 
     #[test]
     fn test_push_and_count() {
@@ -163,7 +163,8 @@ mod tests {
     async fn test_flush_with_populated_graph_edges() {
         use crate::csr::CsrGraph;
         use crate::edge_reinforcement::EdgeReinforcementConfig;
-        use contextra_core::{Edge, Entity, GraphIndex, TxId};
+        use contextra_types::{Edge, Entity, TxId};
+use contextra_ports::GraphIndex;
 
         let graph = CsrGraph::new();
         let tx = TxId::new(1);

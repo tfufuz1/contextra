@@ -4,7 +4,7 @@
 //! KEIN neuer Index — nutzt bestehende CSR-Struktur und Embedding-Infrastruktur.
 //! Re-Bonding ist eine seltene, asynchrone Background-Operation.
 
-use contextra_core::EntityId;
+use contextra_types::EntityId;
 use std::collections::HashMap;
 
 /// Konfiguration für den Perkolations-Gesundheitsmonitor.
@@ -68,7 +68,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 
 /// Findet Kandidaten-Paare für Re-Bonding.
 /// Gibt `(EntityId, EntityId, similarity)`-Tupel zurück, sortiert absteigend nach Similarity.
-pub async fn find_rebonding_candidates<G: contextra_core::GraphIndex>(
+pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
     graph: &G,
     embeddings: &HashMap<EntityId, Vec<f32>>,
     config: &PercolationConfig,
@@ -140,7 +140,8 @@ pub async fn find_rebonding_candidates<G: contextra_core::GraphIndex>(
 mod tests {
     use super::*;
     use crate::CsrGraph;
-    use contextra_core::{Entity, GraphIndex, TxId};
+    use contextra_types::{Entity, TxId};
+use contextra_ports::GraphIndex;
     use std::sync::Arc;
 
     #[test]

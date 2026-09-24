@@ -1,6 +1,6 @@
 //! Graph mutation error taxonomy for Contextra Graph.
 
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use thiserror::Error;
 
 /// Error variants for graph mutation operations.

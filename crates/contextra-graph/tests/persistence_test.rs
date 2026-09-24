@@ -1,4 +1,5 @@
-use contextra_core::{Edge, Entity, EntityId, GraphIndex, StorageEngine, TxId};
+use contextra_types::{Edge, Entity, EntityId, TxId};
+use contextra_ports::{GraphIndex, StorageEngine};
 use contextra_graph::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
 use std::sync::Arc;

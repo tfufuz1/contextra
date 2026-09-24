@@ -2,7 +2,8 @@ use super::super::*;
 use super::basic_tests::setup_test_graph;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
 use crate::GraphIndexExt;
-use contextra_core::{DocId, Edge, Entity, EntityId, GraphIndex, ContextraError, StorageEngine, TxId};
+use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
+use contextra_ports::{GraphIndex, StorageEngine};
 use std::sync::Arc;
 
 #[tokio::test]
@@ -472,7 +473,7 @@ async fn test_bitemporal_regression_pure_tx_time_unchanged() {
 }
 
 #[tokio::test]
-async fn test_hub_node_1m_neighbors_bfs_capped() -> contextra_core::Result<()> {
+async fn test_hub_node_1m_neighbors_bfs_capped() -> contextra_types::Result<()> {
     // Use a high rebuild_threshold to avoid repeated O(N) CSR compactions during setup
     let graph = Arc::new(CsrGraph::with_config(CsrGraphConfig {
         rebuild_threshold: 2_000_000,

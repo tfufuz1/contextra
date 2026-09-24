@@ -15,7 +15,7 @@ pub use shadow::{shadow_compare_forward_push_vs_tl_hfd, ShadowComparison};
 use crate::csr::CsrGraph;
 use crate::path_rag::PathGraph;
 use ahash::AHashMap;
-use contextra_core::EntityId;
+use contextra_types::EntityId;
 
 /// Computes Thresholded Local Hyper-Flow Diffusion (TL-HFD) over a generic [`PathGraph`].
 ///

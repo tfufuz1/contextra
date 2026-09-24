@@ -43,7 +43,7 @@ impl Default for EdgeReinforcementConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
 
     #[test]
     fn test_compute_edge_weight_formula() {

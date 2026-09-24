@@ -4,7 +4,7 @@
 
 #![allow(unsafe_code)]
 
-use contextra_core::{Entity, EntityId, PprConfig};
+use contextra_types::{Entity, EntityId, PprConfig};
 use contextra_graph::{CsrGraph, PprContext};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -85,7 +85,7 @@ async fn test_ppr_alloc_reduction_100k_nodes() {
         damping_factor: 0.85,
         max_iterations: 10,
         convergence_epsilon: 1e-6,
-        algorithm: contextra_core::PprAlgorithm::Auto,
+        algorithm: contextra_types::PprAlgorithm::Auto,
         warn_on_non_convergence: true,
     };
 
