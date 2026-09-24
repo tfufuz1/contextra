@@ -42,7 +42,7 @@ proptest! {
     ) {
         let validator = GaspValidator::new();
         let chunk = ContextChunk {
-            doc_id: DocId::new(1),
+            doc_id: DocId::from(1u64),
             content: chunk_content,
             relevance: 1.0,
             token_count: 10,

@@ -266,7 +266,7 @@ impl ResponseGroundingValidator for GaspValidator {
             .iter()
             .enumerate()
             .map(|(i, src)| ContextChunk {
-                doc_id: contextra_types::DocId::from(i as u64 + 1),
+                doc_id: contextra_types::DocId::from((i + 1) as u64),
                 content: src.to_string(),
                 relevance: 1.0,
                 token_count: 0,
@@ -317,7 +317,7 @@ mod tests {
 
     fn sample_chunk(id: u64, content: &str) -> ContextChunk {
         ContextChunk {
-            doc_id: DocId::new(id),
+            doc_id: DocId::from(id),
             content: content.to_string(),
             relevance: 0.95,
             token_count: 20,
