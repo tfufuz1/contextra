@@ -13,7 +13,8 @@ description = "Contextra — Embedded hybrid-search for AI agents"
 contextra-engine = { workspace = true }
 contextra-cognition = { workspace = true }
 contextra-sys = { workspace = true }
-contextra-core = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 bytes = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-store = { workspace = true }
@@ -54,7 +55,7 @@ graph-connectivity-health = ["contextra-graph/physio-percolation"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = []
 volatile-vault = []
-docid-128 = ["contextra-core/docid-128"]
+docid-128 = ["contextra-types/docid-128"]
 # RESOLVED: AGT-DB-897f3a5c — Forward edge-reinforcement-learning feature to contextra-graph/edge-reinforcement-learning (TS: 2026-09-09T15:48:51Z) (SESSION: 2c31404a)
 edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
 

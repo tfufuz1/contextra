@@ -107,17 +107,15 @@ pub use contextra_checkpoint;
 #[cfg(feature = "graph-connectivity-health")]
 pub use contextra_graph::percolation::PercolationConfig;
 
-pub use contextra_core::DistanceMetric;
-pub use contextra_core::DriftStatusProvider;
-pub use contextra_core::SegmentSynthesizer;
-pub use contextra_core::TextEmbeddingEngine;
+pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
+pub use contextra_types::DistanceMetric;
 pub use serde_json::json;
 
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests {
     use super::*;
-    use contextra_core::types::TenantId;
+    use contextra_types::TenantId;
     use std::sync::Arc;
     use tempfile::TempDir;
 
@@ -709,9 +707,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_open_dimension_mismatch_fails() -> contextra_core::Result<()> {
+    async fn test_open_dimension_mismatch_fails() -> contextra_types::Result<()> {
         let dir = tempfile::tempdir()
-            .map_err(|e| contextra_core::ContextraError::InvalidInput(e.to_string()))?;
+            .map_err(|e| contextra_types::ContextraError::InvalidInput(e.to_string()))?;
         let config_768 = ContextraConfig {
             dimension: 768,
             ..Default::default()
