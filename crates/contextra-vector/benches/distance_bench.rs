@@ -1,4 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use contextra_simd::kernels::scalar::{cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar};
 use contextra_vector::distance::*;
 use rand::Rng;
 

@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+#[cfg(feature = "bandit-routing")]
 pub mod bandit;
 pub mod decay_controller;
 pub mod drift;
@@ -15,6 +16,7 @@ pub mod offpolicy;
 pub mod pid;
 pub mod pid_latency_controller;
 
+#[cfg(feature = "bandit-routing")]
 pub use bandit::*;
 pub use decay_controller::*;
 pub use drift::*;

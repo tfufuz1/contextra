@@ -6,7 +6,7 @@
 
 use super::format::compute_adaptive_flush_threshold;
 use super::types::DiskAnnIndex;
-use crate::distance::validate_vector;
+use contextra_simd::validate_vector;
 use contextra_core::{
     DocId, ContextraError, Result, ScoredDocument, TxId, VectorIndex, VectorIndexStats,
 };
