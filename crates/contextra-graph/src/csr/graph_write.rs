@@ -112,7 +112,7 @@ impl CsrGraph {
     /// # PPR Integration Contract
     /// Downstream PPR algorithms (e.g. `ppr.rs`) consume this snapshot directly via `inner_read()`.
     /// The returned `Arc<GraphInner>` snapshot is point-in-time immutable and guaranteed not to be mutated in-place.
-    pub(crate) fn inner_read(&self) -> arc_swap::Guard<Arc<GraphInner>> {
+    pub fn inner_read(&self) -> arc_swap::Guard<Arc<GraphInner>> {
         self.inner.load()
     }
 
@@ -468,6 +468,12 @@ impl CsrGraph {
             .unwrap_or_default()
     }
 
+    /// Returns the maximum `HyperEdgeId` present in the current graph snapshot, or 0 if empty.
+    pub fn max_hyperedge_id(&self) -> u64 {
+        let inner = self.inner_read();
+        inner.hyperedges.keys().map(|id| id.inner()).max().unwrap_or(0)
+    }
+
     /// Retrieves a non-tombstoned hyperedge by its ID if present.
     pub fn get_hyperedge(
         &self,
@@ -556,6 +562,109 @@ impl CsrGraph {
         inner_ptr.hyperedges.insert(id, updated_arc);
 
         true
+    }
+
+    /// Batched, atomic commit of hyperedge tombstoning and new superedge insertion.
+    ///
+    /// Ein Aufruf = ein `ArcSwap::store` = ein atomarer RCU-Publish für
+    /// alle Tombstones und die neue Superkante gemeinsam.
+    ///
+    /// # Errors
+    /// Returns `GraphMutationError::DuplicateHyperEdgeId` if any new edge ID collides with an existing
+    /// hyperedge or another edge in the batch. No mutations are applied on error (all-or-nothing semantics).
+    pub fn commit_super_edge_batch(
+        &self,
+        tombstone_ids: &[crate::hyperedge::HyperEdgeId],
+        new_edges: Vec<crate::hyperedge::HyperEdge>,
+        wal_tx: TxId,
+    ) -> std::result::Result<(), GraphMutationError> {
+        let mut inner = self.inner_write();
+        let inner_ptr = &mut *inner;
+
+        // Collision & Validation pre-check
+        let mut seen_ids = HashSet::with_capacity(new_edges.len());
+        for edge in &new_edges {
+            if !seen_ids.insert(edge.id) || inner_ptr.hyperedges.contains_key(&edge.id) {
+                return Err(GraphMutationError::DuplicateHyperEdgeId(edge.id));
+            }
+            edge.validate()?;
+        }
+
+        // Apply tombstone updates
+        for &id in tombstone_ids {
+            let existing = match inner_ptr.hyperedges.get(&id) {
+                Some(edge) => {
+                    if edge.tx_valid_to.is_some() {
+                        continue;
+                    }
+                    edge.clone()
+                }
+                None => continue,
+            };
+
+            let mut updated = (*existing).clone();
+            updated.tx_valid_to = Some(wal_tx);
+            let updated_arc = Arc::new(updated);
+
+            if let Some(doc_id) = updated_arc.source_doc_id {
+                if let Some(set) = inner_ptr.doc_to_hyperedges.get_mut(&doc_id) {
+                    set.remove(&id);
+                    if set.is_empty() {
+                        inner_ptr.doc_to_hyperedges.remove(&doc_id);
+                    }
+                }
+            }
+
+            for participant in updated_arc.participants.iter() {
+                if let Some(set) = inner_ptr.hyperedge_index.get_mut(&participant.entity) {
+                    set.remove(&id);
+                    if set.is_empty() {
+                        inner_ptr.hyperedge_index.remove(&participant.entity);
+                    }
+                }
+            }
+
+            for &child_id in updated_arc.child_edge_ids.iter() {
+                if let Some(set) = inner_ptr.child_to_parents.get_mut(&child_id) {
+                    set.remove(&id);
+                    if set.is_empty() {
+                        inner_ptr.child_to_parents.remove(&child_id);
+                    }
+                }
+            }
+
+            inner_ptr.hyperedges.insert(id, updated_arc);
+        }
+
+        // Apply new hyperedges
+        for edge in new_edges {
+            let hyperedge_arc = Arc::new(edge);
+            let hyperedge_id = hyperedge_arc.id;
+            if let Some(doc_id) = hyperedge_arc.source_doc_id {
+                inner_ptr
+                    .doc_to_hyperedges
+                    .entry(doc_id)
+                    .or_default()
+                    .insert(hyperedge_id);
+            }
+            for participant in hyperedge_arc.participants.iter() {
+                inner_ptr
+                    .hyperedge_index
+                    .entry(participant.entity)
+                    .or_default()
+                    .insert(hyperedge_id);
+            }
+            for &child_id in hyperedge_arc.child_edge_ids.iter() {
+                inner_ptr
+                    .child_to_parents
+                    .entry(child_id)
+                    .or_default()
+                    .insert(hyperedge_id);
+            }
+            inner_ptr.hyperedges.insert(hyperedge_id, hyperedge_arc);
+        }
+
+        Ok(())
     }
 
     /// Returns all edge IDs derived from the given source `DocId`.

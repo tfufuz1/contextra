@@ -13,13 +13,15 @@ pub mod context_compaction;
 pub mod maintenance_config;
 pub mod maintenance_scheduler;
 pub mod aggregation_phase;
+pub mod graph_sink;
 pub mod memory_consolidation;
 pub mod synthesis_phase;
 
 #[allow(deprecated)]
 pub use consolidation_executor::{
-    execute_background_consolidation, execute_consolidation_pass, execute_sleep_cycle,
-    start_consolidation_reaper, start_consolidation_worker, ConsolidationEngine,
+    execute_background_consolidation, execute_consolidation_pass,
+    execute_leanrag_aggregation_stage, execute_sleep_cycle, start_consolidation_reaper,
+    start_consolidation_worker, ConsolidationEngine,
 };
 pub use consolidation_locks::ConsolidationNodesGuard;
 pub use context::{ContextManager, SpatialFence};
@@ -40,6 +42,7 @@ pub use aggregation_phase::{
     AggregationConfig, AggregationEdge, AggregationNode, AggregationPhaseResult, AlphaNode,
     ConsolidationPipelineResult, SuperEdgeDraft, SuperEdgeSink,
 };
+pub use graph_sink::CsrGraphSuperEdgeSink;
 pub use synthesis_phase::run_synthesis_pass;
 
 /// Registers consolidation engine launcher with `contextra-engine`.

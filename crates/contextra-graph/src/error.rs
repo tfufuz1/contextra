@@ -33,6 +33,10 @@ pub enum GraphMutationError {
     #[error("Hyperedge not found: {0}")]
     HyperedgeNotFound(u64),
 
+    /// Hyperedge ID collision detected during batch commit.
+    #[error("Duplicate hyperedge ID detected during batch commit: {0}")]
+    DuplicateHyperEdgeId(crate::hyperedge::HyperEdgeId),
+
     /// Invalid hyperedge weight.
     #[error("Invalid hyperedge weight {weight}: {reason}")]
     InvalidWeight {
@@ -96,5 +100,11 @@ mod tests {
 
         let err8 = GraphMutationError::Internal("db panic".into());
         assert_eq!(err8.to_string(), "Internal graph mutation error: db panic");
+
+        let err9 = GraphMutationError::DuplicateHyperEdgeId(crate::hyperedge::HyperEdgeId::new(42));
+        assert_eq!(
+            err9.to_string(),
+            "Duplicate hyperedge ID detected during batch commit: HyperEdgeId(42)"
+        );
     }
 }
