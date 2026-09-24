@@ -12,6 +12,7 @@ default = []
 bandit-routing = ["egress-sherman-morrison"]
 cloud-egress-guard = []
 egress-sherman-morrison = []
+flow-corrected-thompson = ["contextra-adapt/flow-corrected-thompson"]
 
 [dependencies]
 shlex = "1"
