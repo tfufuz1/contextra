@@ -2,12 +2,13 @@
 // ZWECK: Hydrierungs-Familie (hydrate_from_scored_at, hydrate_from_tuples_at) für Collection.
 
 use super::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_core::{DocId, Result, StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub(super) async fn hydrate_from_scored_at(
         &self,
-        scored_docs: Vec<contextra_core::ScoredDocument>,
+        scored_docs: Vec<contextra_types::ScoredDocument>,
         seq: u64,
     ) -> Result<(Vec<crate::SearchResult>, usize)> {
         if scored_docs.is_empty() {

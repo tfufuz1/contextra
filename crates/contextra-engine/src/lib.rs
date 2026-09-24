@@ -6,9 +6,10 @@
 #![forbid(unsafe_code)]
 
 #[cfg(feature = "sandbox")]
-use contextra_core::BoxFuture;
-pub use contextra_core::TextEmbeddingEngine;
-use contextra_core::{CollectionId, DocId, StorageEngine, TenantId};
+use contextra_ports::BoxFuture;
+pub use contextra_ports::TextEmbeddingEngine;
+use contextra_types::{CollectionId, DocId, TenantId};
+use contextra_ports::{StorageEngine};
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
 };
@@ -54,23 +55,22 @@ pub use contextra_graph::percolation::PercolationConfig;
 pub use contextra_text::Language;
 
 #[allow(clippy::type_complexity)]
-static CONSOLIDATION_LAUNCHER: parking_lot::RwLock<
-    Option<
-        Arc<
-            dyn Fn(
-                    Arc<Collection<LsmStorage>>,
-                    std::time::Duration,
-                    usize,
-                    tokio_util::sync::CancellationToken,
-                ) -> tokio::task::JoinHandle<()>
-                + Send
-                + Sync,
-        >,
-    >,
-> = parking_lot::RwLock::new(None);
+pub type ConsolidationLauncher = Arc<
+    dyn Fn(
+            Arc<Collection<LsmStorage>>,
+            std::time::Duration,
+            usize,
+            tokio_util::sync::CancellationToken,
+        ) -> tokio::task::JoinHandle<()>
+        + Send
+        + Sync,
+>;
 
-/// Registers a consolidation worker launcher function (used by `contextra-cognition`).
-pub fn register_consolidation_launcher<F>(f: F)
+/// Registers a consolidation worker launcher function (deprecated: set on `ContextraConfig` instead).
+#[deprecated(
+    note = "Instanzgebundenen Launcher via ContextraConfig::with_consolidation_launcher setzen (P29)"
+)]
+pub fn register_consolidation_launcher<F>(_f: F)
 where
     F: Fn(
             Arc<Collection<LsmStorage>>,
@@ -82,7 +82,9 @@ where
         + Sync
         + 'static,
 {
-    *CONSOLIDATION_LAUNCHER.write() = Some(Arc::new(f));
+    tracing::warn!(
+        "register_consolidation_launcher is deprecated and has no effect. Set consolidation_launcher on ContextraConfig instead."
+    );
 }
 
 pub use fusion::{ProvenanceRecord, SearchResult, SignalContribution};
@@ -103,11 +105,11 @@ pub struct ContextraStats {
     pub active_memory_count: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pid_pool_size: Option<usize>,
-    pub index_stats: contextra_core::VectorIndexStats,
-    pub storage_stats: contextra_core::StorageStats,
+    pub index_stats: contextra_ports::VectorIndexStats,
+    pub storage_stats: contextra_ports::StorageStats,
 }
 
-pub use contextra_core::DriftStatusProvider;
+pub use contextra_ports::DriftStatusProvider;
 pub type DbStats = ContextraStats;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,11 +143,11 @@ impl Default for EmbeddingBackend {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ContextraConfig {
     pub dimension: usize,
     pub max_elements: usize,
-    pub distance_metric: contextra_core::DistanceMetric,
+    pub distance_metric: contextra_types::DistanceMetric,
     pub encryption_passphrase: Option<String>,
     pub expiry_reaper_interval: std::time::Duration,
     pub orphan_registry_path: Option<std::path::PathBuf>,
@@ -154,6 +156,33 @@ pub struct ContextraConfig {
     pub consolidation_enabled: bool,
     pub consolidation_interval: std::time::Duration,
     pub max_llm_calls_per_cycle: usize,
+    pub consolidation_launcher: Option<ConsolidationLauncher>,
+}
+
+impl ContextraConfig {
+    pub fn with_consolidation_launcher(mut self, launcher: ConsolidationLauncher) -> Self {
+        self.consolidation_launcher = Some(launcher);
+        self
+    }
+}
+
+impl std::fmt::Debug for ContextraConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContextraConfig")
+            .field("dimension", &self.dimension)
+            .field("max_elements", &self.max_elements)
+            .field("distance_metric", &self.distance_metric)
+            .field("encryption_passphrase", &self.encryption_passphrase.as_ref().map(|_| "***"))
+            .field("expiry_reaper_interval", &self.expiry_reaper_interval)
+            .field("orphan_registry_path", &self.orphan_registry_path)
+            .field("community_detection", &self.community_detection)
+            .field("embedding_backend", &self.embedding_backend)
+            .field("consolidation_enabled", &self.consolidation_enabled)
+            .field("consolidation_interval", &self.consolidation_interval)
+            .field("max_llm_calls_per_cycle", &self.max_llm_calls_per_cycle)
+            .field("consolidation_launcher", &self.consolidation_launcher.as_ref().map(|_| "Fn(...)"))
+            .finish()
+    }
 }
 
 impl Default for ContextraConfig {
@@ -161,7 +190,7 @@ impl Default for ContextraConfig {
         Self {
             dimension: 768,
             max_elements: 1_000_000,
-            distance_metric: contextra_core::DistanceMetric::Cosine,
+            distance_metric: contextra_types::DistanceMetric::Cosine,
             encryption_passphrase: None,
             expiry_reaper_interval: std::time::Duration::from_secs(60),
             orphan_registry_path: None,
@@ -170,6 +199,7 @@ impl Default for ContextraConfig {
             consolidation_enabled: true,
             consolidation_interval: std::time::Duration::from_secs(6 * 3600),
             max_llm_calls_per_cycle: 10,
+            consolidation_launcher: None,
         }
     }
 }
@@ -198,7 +228,7 @@ pub struct Contextra {
 mod contextra_impl;
 
 
-pub use contextra_core::DistanceMetric;
+pub use contextra_types::DistanceMetric;
 pub use serde_json::json;
 
 impl Contextra {
@@ -227,11 +257,11 @@ impl SandboxBridge for Contextra {
                     query
                         .get(start..start + 4)
                         .ok_or_else(|| {
-                            contextra_core::ContextraError::Serialization("Query too short".into())
+                            contextra_types::ContextraError::Serialization("Query too short".into())
                         })?
                         .try_into()
                         .map_err(|_| {
-                            contextra_core::ContextraError::Serialization("Invalid slice".into())
+                            contextra_types::ContextraError::Serialization("Invalid slice".into())
                         })?,
                 );
                 vector.push(f32::from_bits(bits));
@@ -239,7 +269,7 @@ impl SandboxBridge for Contextra {
 
             let results: Vec<SearchResult> = self.search(&vector, k).await?;
             serde_json::to_vec(&results)
-                .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))
         })
     }
 
@@ -260,7 +290,7 @@ impl SandboxBridge for Contextra {
             match doc {
                 Some(d) => {
                     Ok(Some(serde_json::to_vec(&d).map_err(|e| {
-                        contextra_core::ContextraError::Internal(e.to_string())
+                        contextra_types::ContextraError::Internal(e.to_string())
                     })?))
                 }
                 None => Ok(None),

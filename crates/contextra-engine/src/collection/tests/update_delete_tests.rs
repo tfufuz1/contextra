@@ -46,7 +46,7 @@ async fn test_update_document_importance_persists_model_id_provenance() {
     let meta = doc.metadata.unwrap(); // unwrap
 
     let imp = meta.get("importance").unwrap();
-    let imp_score: contextra_core::MemoryImportance = serde_json::from_value(imp.clone()).unwrap();
+    let imp_score: contextra_types::MemoryImportance = serde_json::from_value(imp.clone()).unwrap();
     assert_eq!(imp_score.base_score.value(), 0.92);
     assert_eq!(
         meta.get("model_id").and_then(|v| v.as_str()),
@@ -57,7 +57,7 @@ async fn test_update_document_importance_persists_model_id_provenance() {
 
 #[tokio::test]
 async fn test_expiry_cleanup_deletes_decayed_working_memory() {
-    use contextra_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -128,7 +128,7 @@ async fn test_expiry_cleanup_deletes_decayed_working_memory() {
 
 #[tokio::test]
 async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
-    use contextra_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;

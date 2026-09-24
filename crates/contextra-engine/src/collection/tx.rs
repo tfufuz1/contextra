@@ -1,5 +1,6 @@
 use super::Collection;
-use contextra_core::{Result, StorageEngine, TxId, VectorIndex};
+use contextra_types::{Result, TxId};
+use contextra_ports::{StorageEngine, VectorIndex};
 use std::sync::atomic::Ordering;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
@@ -18,7 +19,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub fn allocate_tx(&self) -> Result<TxId> {
         let id = self.next_tx.fetch_add(1, Ordering::SeqCst);
         if id > TxId::MAX_COLLECTION_SEQUENCE {
-            return Err(contextra_core::ContextraError::Transaction(
+            return Err(contextra_types::ContextraError::Transaction(
                 "TxId counter exhausted: MAX_COLLECTION_SEQUENCE range exceeded. Collection must be recreated.".into(),
             ));
         }

@@ -1,5 +1,6 @@
 use crate::collection::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_core::{DocId, Result, StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Links two memories together with a specific relation (Zettelkasten A-MEM).
@@ -8,10 +9,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         &self,
         from: DocId,
         to: DocId,
-        relation: contextra_core::types::domain::LinkRelation,
+        relation: contextra_types::domain::LinkRelation,
     ) -> Result<()> {
         if from == to {
-            return Err(contextra_core::ContextraError::InvalidInput(
+            return Err(contextra_types::ContextraError::InvalidInput(
                 "Cannot link a document to itself".into(),
             ));
         }
@@ -41,7 +42,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     break;
                 }
                 if curr == from {
-                    return Err(contextra_core::ContextraError::InvalidInput(format!(
+                    return Err(contextra_types::ContextraError::InvalidInput(format!(
                         "Cyclic {:?} relation detected: document {:?} transitively reaches {:?}",
                         relation, to, from
                     )));
@@ -68,7 +69,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 doc_id_str = Some(meta.id.clone());
                 let meta_obj = meta.metadata.get_or_insert_with(|| serde_json::json!({}));
                 if let Some(obj) = meta_obj.as_object_mut() {
-                    let mut links: Vec<contextra_core::types::domain::MemoryLink> = obj
+                    let mut links: Vec<contextra_types::domain::MemoryLink> = obj
                         .get("links")
                         .and_then(|v| serde_json::from_value(v.clone()).ok())
                         .unwrap_or_default();
@@ -78,14 +79,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         .iter()
                         .any(|l| l.target == to && l.relation == relation)
                     {
-                        links.push(contextra_core::types::domain::MemoryLink {
+                        links.push(contextra_types::domain::MemoryLink {
                             target: to,
                             relation,
                             created_at_tx: tx,
                         });
 
                         let links_val = serde_json::to_value(links).map_err(|e| {
-                            contextra_core::ContextraError::Serialization(e.to_string())
+                            contextra_types::ContextraError::Serialization(e.to_string())
                         })?;
                         obj.insert("links".to_string(), links_val);
                         obj.insert("updated_at_tx".to_string(), serde_json::json!(tx.inner()));
@@ -98,7 +99,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 doc_id_str = Some(full.id.clone());
                 let full_obj = full.metadata.get_or_insert_with(|| serde_json::json!({}));
                 if let Some(obj) = full_obj.as_object_mut() {
-                    let mut links: Vec<contextra_core::types::domain::MemoryLink> = obj
+                    let mut links: Vec<contextra_types::domain::MemoryLink> = obj
                         .get("links")
                         .and_then(|v| serde_json::from_value(v.clone()).ok())
                         .unwrap_or_default();
@@ -107,14 +108,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         .iter()
                         .any(|l| l.target == to && l.relation == relation)
                     {
-                        links.push(contextra_core::types::domain::MemoryLink {
+                        links.push(contextra_types::domain::MemoryLink {
                             target: to,
                             relation,
                             created_at_tx: tx,
                         });
 
                         let links_val = serde_json::to_value(links).map_err(|e| {
-                            contextra_core::ContextraError::Serialization(e.to_string())
+                            contextra_types::ContextraError::Serialization(e.to_string())
                         })?;
                         obj.insert("links".to_string(), links_val);
                         obj.insert("updated_at_tx".to_string(), serde_json::json!(tx.inner()));
@@ -137,7 +138,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                 .metadata
                                 .get_or_insert_with(|| serde_json::json!({}));
                             if let Some(obj) = doc_obj.as_object_mut() {
-                                let mut links: Vec<contextra_core::types::domain::MemoryLink> = obj
+                                let mut links: Vec<contextra_types::domain::MemoryLink> = obj
                                     .get("links")
                                     .and_then(|v| serde_json::from_value(v.clone()).ok())
                                     .unwrap_or_default();
@@ -145,13 +146,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                     .iter()
                                     .any(|l| l.target == to && l.relation == relation)
                                 {
-                                    links.push(contextra_core::types::domain::MemoryLink {
+                                    links.push(contextra_types::domain::MemoryLink {
                                         target: to,
                                         relation,
                                         created_at_tx: tx,
                                     });
                                     let links_val = serde_json::to_value(links).map_err(|e| {
-                                        contextra_core::ContextraError::Serialization(e.to_string())
+                                        contextra_types::ContextraError::Serialization(e.to_string())
                                     })?;
                                     obj.insert("links".to_string(), links_val);
                                     let new_user_bytes = serde_json::to_vec(&full_doc)?;
@@ -165,7 +166,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 // INVARIANT INV-GRAPH-PROV-1: Graph tombstone MUST precede LSM commit
                 // for Supersedes links. CSR is rebuilt from LSM on startup — tombstone state is recovered
                 // transitively.
-                if relation == contextra_core::types::domain::LinkRelation::Supersedes {
+                if relation == contextra_types::domain::LinkRelation::Supersedes {
                     contextra_graph::cascade_invalidate_edges_for_superseded_doc(
                         &self.graph_index,
                         to,
@@ -186,7 +187,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn get_links(
         &self,
         doc_id: DocId,
-    ) -> Result<Vec<contextra_core::types::domain::MemoryLink>> {
+    ) -> Result<Vec<contextra_types::domain::MemoryLink>> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
         if let Some(bytes) = self.storage.get_at_seq(&doc_key, u64::MAX).await? {
             if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {

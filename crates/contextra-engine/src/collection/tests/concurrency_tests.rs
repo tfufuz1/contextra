@@ -1,7 +1,7 @@
 use super::fixtures::*;
 
 #[tokio::test]
-async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_core::Result<()> {
+async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -66,7 +66,7 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_core:
 
 
 #[tokio::test]
-async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> contextra_core::Result<()> {
+async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -309,7 +309,8 @@ async fn test_concurrent_insert_and_write_ops_lock_safety() {
 
 #[tokio::test]
 async fn test_concurrent_insert_many_collision_safety() {
-    use contextra_core::{DocId, ContextraError, StorageEngine, TxId};
+    use contextra_types::{DocId, ContextraError, TxId};
+use contextra_ports::{StorageEngine};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -527,7 +528,7 @@ async fn test_begin_transaction_returns_active_db_transaction() {
 
 
 #[tokio::test]
-async fn test_apm3_lock_contention_fallback() -> contextra_core::Result<()> {
+async fn test_apm3_lock_contention_fallback() -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;

@@ -1,8 +1,7 @@
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
-use contextra_core::{
-    GraphIndex, ContextraError, Result, StorageEngine, TextIndex, TxId, VectorIndex,
-};
+use contextra_types::{ContextraError, Result, TxId};
+use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 

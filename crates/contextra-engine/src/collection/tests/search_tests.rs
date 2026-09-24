@@ -46,7 +46,9 @@ async fn test_search_dimension_mismatch_rejected() {
 
 #[tokio::test]
 async fn test_checkpoint_unpin_on_search_error_path() {
-    use contextra_core::{BoxFuture, FilterExpr, Result, StorageEngine, StorageStats, TxId};
+use contextra_types::{FilterExpr, Result, TxId};
+use contextra_ports::{StorageStats};
+use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::CsrGraph;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
@@ -128,7 +130,7 @@ async fn test_checkpoint_unpin_on_search_error_path() {
             _: u64,
         ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
             Box::pin(async move {
-                Err(contextra_core::ContextraError::Storage(
+                Err(contextra_types::ContextraError::Storage(
                     "Simulated storage failure during scan_prefix_at".into(),
                 ))
             })
@@ -271,8 +273,8 @@ async fn test_single_pid_controller_instantiation_in_query_builder() {
 
 #[tokio::test]
 async fn test_query_builder_query_config_include_superseded_displacement(
-) -> contextra_core::Result<()> {
-    use contextra_core::{DocId, HybridQuery};
+) -> contextra_types::Result<()> {
+    use contextra_types::{DocId, HybridQuery};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -323,7 +325,7 @@ async fn test_query_builder_query_config_include_superseded_displacement(
     col.link_memories(
         DocId::from_key("new_doc")?,
         DocId::from_key("old_doc")?,
-        contextra_core::types::domain::LinkRelation::Supersedes,
+        contextra_types::domain::LinkRelation::Supersedes,
     )
     .await?;
 
@@ -352,7 +354,7 @@ async fn test_query_builder_query_config_include_superseded_displacement(
 #[tokio::test]
 async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -447,9 +449,9 @@ async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
 
 
 #[tokio::test]
-async fn test_post_rrf_supersedes_displacement_truncation_preserves_k() -> contextra_core::Result<()>
+async fn test_post_rrf_supersedes_displacement_truncation_preserves_k() -> contextra_types::Result<()>
 {
-    use contextra_core::DocId;
+    use contextra_types::DocId;
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -513,14 +515,14 @@ async fn test_post_rrf_supersedes_displacement_truncation_preserves_k() -> conte
     col.link_memories(
         DocId::from_key("doc2")?,
         DocId::from_key("doc1")?,
-        contextra_core::types::domain::LinkRelation::Supersedes,
+        contextra_types::domain::LinkRelation::Supersedes,
     )
     .await?;
 
     // When searching with k = 2 and include_superseded = false,
     // doc1 is displaced by doc2.
     // With 3*k candidate pool, doc3 advances into top-2 so we still get 2 results!
-    let query = contextra_core::HybridQuery::builder()
+    let query = contextra_types::HybridQuery::builder()
         .with_vector_query(vec![1.0, 0.0, 0.0, 0.0])
         .with_k(2)
         .with_include_superseded(false)

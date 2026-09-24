@@ -5,7 +5,8 @@ mod query;
 
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{extract_effective_importance, Collection};
-use contextra_core::{DocId, EntityId, GraphIndex, Result, StorageEngine, TextIndex, TxId, VectorIndex};
+use contextra_types::{DocId, EntityId, Result, TxId};
+use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs hybrid search combining BM25, vector search, and graph traversal results via RRF.
@@ -17,7 +18,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_core::EntityId]>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
     ) -> Result<Vec<crate::SearchResult>> {
         self.hybrid_search_with_weights(text, vector, k, anchor_entities, None)
             .await
@@ -39,7 +40,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         vector: &[f32],
         k: usize,
         reranker: Option<&contextra_infer_onnx::CrossEncoderReranker>,
-        anchor_entities: Option<&[contextra_core::EntityId]>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
     ) -> Result<Vec<crate::SearchResult>> {
         let mut builder = self.query().text(text).vector(vector).k(k);
         if let Some(r) = reranker {
@@ -61,8 +62,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_core::EntityId]>,
-        weights: Option<&contextra_core::FusionWeights>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
+        weights: Option<&contextra_types::FusionWeights>,
     ) -> Result<Vec<crate::SearchResult>> {
         self.hybrid_search_with_strategy(text, vector, k, anchor_entities, weights, None, None)
             .await
@@ -78,22 +79,22 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_core::EntityId]>,
-        weights: Option<&contextra_core::FusionWeights>,
-        strategy: Option<&contextra_core::GraphTraversalStrategy>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
+        weights: Option<&contextra_types::FusionWeights>,
+        strategy: Option<&contextra_types::GraphTraversalStrategy>,
         same_community_as: Option<EntityId>,
     ) -> Result<Vec<crate::SearchResult>> {
         if k == 0 {
             return Ok(Vec::new());
         }
         if !vector.is_empty() && vector.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 vector.len()
             )));
         }
-        let k = k.min(contextra_core::MAX_SEARCH_K);
+        let k = k.min(contextra_types::MAX_SEARCH_K);
 
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
@@ -101,7 +102,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let is_vector_zero = vector.iter().all(|&v| v == 0.0);
             let is_text_empty = text.trim().is_empty();
 
-            let default_strategy = contextra_core::GraphTraversalStrategy::default();
+            let default_strategy = contextra_types::GraphTraversalStrategy::default();
             let graph_strat = strategy.unwrap_or(&default_strategy);
 
             // 1. Vector Signal (Candidate overfetching for RRF fusion)
@@ -137,8 +138,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             // 3. Graph Signal
             // AI-TAG[RESOLVED][MINOR] graph_search snapshot isolation via multi_traverse_at for Hops; PARTIAL with warning for PPR/PathRag. (ID: AGT-DB-6d724b1a)
-            let implicit_anchors: Vec<contextra_core::EntityId>;
-            let anchors_ref: Option<&[contextra_core::EntityId]> = if let Some(anchors) = anchor_entities
+            let implicit_anchors: Vec<contextra_types::EntityId>;
+            let anchors_ref: Option<&[contextra_types::EntityId]> = if let Some(anchors) = anchor_entities
             {
                 if anchors.is_empty() {
                     None
@@ -149,7 +150,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
                 implicit_anchors = text_results
                     .iter()
-                    .filter_map(|r| contextra_core::EntityId::from_key(r.id.as_str()).ok())
+                    .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
                     .collect();
                 Some(&implicit_anchors)
             } else {
@@ -158,7 +159,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let graph_results = if let Some(anchors) = anchors_ref {
                 let tuples = match graph_strat {
-                    contextra_core::GraphTraversalStrategy::Hops { max_hops } => {
+                    contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
                         let mut raw_tuples = self
                             .graph_index
                             .multi_traverse_at(anchors, *max_hops, seq)
@@ -167,7 +168,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         raw_tuples.truncate(k);
                         raw_tuples
                     }
-                    contextra_core::GraphTraversalStrategy::PersonalizedPageRank(cfg) => {
+                    contextra_types::GraphTraversalStrategy::PersonalizedPageRank(cfg) => {
                         let mut raw_tuples = self
                             .graph_index
                             .personalized_page_rank_at(anchors, cfg, seq)
@@ -176,15 +177,15 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         raw_tuples.truncate(k);
                         raw_tuples
                     }
-                    contextra_core::GraphTraversalStrategy::PathRag { .. } => {
-                        return Err(contextra_core::ContextraError::snapshot_unsupported_for_signal(
+                    contextra_types::GraphTraversalStrategy::PathRag { .. } => {
+                        return Err(contextra_types::ContextraError::snapshot_unsupported_for_signal(
                             "PathRag strategy does not support snapshot-isolated retrieval",
                         ));
                     }
                 };
                 let doc_tuples = tuples
                     .into_iter()
-                    .map(|(eid, score)| (contextra_core::DocId::new(eid.inner()), score))
+                    .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
                     .collect();
                 self.hydrate_from_tuples_at(doc_tuples, seq).await?
             } else {
@@ -227,7 +228,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 crate::fusion::MetadataMergePriority::default(),
                 true,
                 None,
-                contextra_core::FusionStrategy::Rrf,
+                contextra_types::FusionStrategy::Rrf,
             );
             fused.truncate(k);
 
@@ -265,12 +266,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             return Ok(results);
         }
 
-        let parsed_eids: Vec<Option<contextra_core::EntityId>> = results
+        let parsed_eids: Vec<Option<contextra_types::EntityId>> = results
             .iter()
-            .map(|res| contextra_core::EntityId::from_key(&res.id).ok())
+            .map(|res| contextra_types::EntityId::from_key(&res.id).ok())
             .collect();
 
-        let candidate_eids: Vec<contextra_core::EntityId> =
+        let candidate_eids: Vec<contextra_types::EntityId> =
             parsed_eids.iter().filter_map(|&eid| eid).collect();
 
         if candidate_eids.is_empty() {
@@ -325,7 +326,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if visited.insert(link.target) {
                     let next_depth = depth + 1;
                     results.push((link.target, next_depth));
-                    if results.len() >= contextra_core::MAX_SEARCH_K {
+                    if results.len() >= contextra_types::MAX_SEARCH_K {
                         return Ok(results);
                     }
                     if next_depth < max_depth {

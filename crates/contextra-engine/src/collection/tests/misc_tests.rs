@@ -2,15 +2,15 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_collection_embedder_async_embed() {
-    use contextra_core::TextEmbeddingEngine;
+    use contextra_ports::TextEmbeddingEngine;
     use std::sync::Arc;
 
-    use contextra_core::BoxFuture;
+    use contextra_ports::BoxFuture;
 
     struct FakeEmbedder;
 
     impl TextEmbeddingEngine for FakeEmbedder {
-        fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, contextra_core::Result<Vec<f32>>> {
+        fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, contextra_types::Result<Vec<f32>>> {
             Box::pin(async move { Ok(vec![text.len() as f32 / 100.0; 4]) })
         }
     }
@@ -62,26 +62,26 @@ async fn test_input_guards_boundary_validation() {
     let err_relate_empty_from = col.relate("", "doc2", "knows").await;
     assert!(matches!(
         err_relate_empty_from,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     let err_relate_empty_to = col.relate("doc1", "", "knows").await;
     assert!(matches!(
         err_relate_empty_to,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     // 1. Empty ID guard on insert / upsert
     let err_empty_id = col.insert("", &vec, None).await;
     assert!(matches!(
         err_empty_id,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     let err_empty_id_upsert = col.upsert("", &vec, None).await;
     assert!(matches!(
         err_empty_id_upsert,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     // 2. Oversized ID guard (>1024 bytes)
@@ -89,20 +89,20 @@ async fn test_input_guards_boundary_validation() {
     let err_long_id = col.insert(&long_id, &vec, None).await;
     assert!(matches!(
         err_long_id,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     // 3. insert_many / upsert_many empty batch guard
     let err_empty_batch = col.insert_many(&[]).await;
     assert!(matches!(
         err_empty_batch,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     let err_empty_batch_upsert = col.upsert_many(&[]).await;
     assert!(matches!(
         err_empty_batch_upsert,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     // 4. insert_many / upsert_many oversized batch guard (>10,000)
@@ -112,27 +112,28 @@ async fn test_input_guards_boundary_validation() {
     let err_huge_batch = col.insert_many(&huge_batch).await;
     assert!(matches!(
         err_huge_batch,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     let err_huge_batch_upsert = col.upsert_many(&huge_batch).await;
     assert!(matches!(
         err_huge_batch_upsert,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     // 5. search / search_with_filter_expr k = 0 guard
     let err_search_k_zero = col.search(&vec, 0).await;
     assert!(matches!(
         err_search_k_zero,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 }
 
 
 #[tokio::test]
 async fn test_doc_id_collision_rejected() {
-    use contextra_core::{DocId, ContextraError, StorageEngine, TxId};
+    use contextra_types::{DocId, ContextraError, TxId};
+use contextra_ports::{StorageEngine};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -258,7 +259,7 @@ fn test_compute_default_importance_entropy_and_clamping() {
 
 #[test]
 fn test_extract_effective_importance_defaults() {
-    use contextra_core::types::TxId;
+    use contextra_types::TxId;
 
     let none_meta = None;
     assert_eq!(
@@ -278,7 +279,7 @@ fn test_extract_effective_importance_defaults() {
 
 #[test]
 fn test_importance_metadata_integration_and_filtering() {
-    use contextra_core::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use serde_json::json;
 
     let created_tx = TxId::new(10);
@@ -390,7 +391,7 @@ async fn test_invalid_doc_ids_rejected() {
 
 
 #[tokio::test]
-async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contextra_core::Result<()> {
+async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -442,7 +443,7 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contex
 
 
 #[tokio::test]
-async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_core::Result<()> {
+async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -485,7 +486,7 @@ async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_core::Resu
 
 
 #[tokio::test]
-async fn test_collection_mandatory_matrix_error_paths() -> contextra_core::Result<()> {
+async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -519,14 +520,14 @@ async fn test_collection_mandatory_matrix_error_paths() -> contextra_core::Resul
     let err_dim = col.insert("d1", &[1.0, 0.0], None).await;
     assert!(matches!(
         err_dim,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     // Empty string ID
     let err_id = col.insert("", &[1.0, 0.0, 0.0, 0.0], None).await;
     assert!(matches!(
         err_id,
-        Err(contextra_core::ContextraError::InvalidInput(_))
+        Err(contextra_types::ContextraError::InvalidInput(_))
     ));
 
     Ok(())
@@ -534,7 +535,7 @@ async fn test_collection_mandatory_matrix_error_paths() -> contextra_core::Resul
 
 
 #[tokio::test]
-async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_core::Result<()> {
+async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -594,7 +595,7 @@ proptest::proptest! {
         input in proptest::prelude::any::<String>()
     ) {
         let chunker = crate::chunker::MarkdownChunker::with_defaults();
-        let doc_id = contextra_core::DocId::new(1);
+        let doc_id = contextra_types::DocId::new(1);
         let _ = chunker.chunk(doc_id, &input);
     }
 }

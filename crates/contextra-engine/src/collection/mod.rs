@@ -20,7 +20,8 @@ pub mod tx;
 #[allow(deprecated)]
 mod tests;
 
-use contextra_core::{DocId, Result, StorageEngine, TextEmbeddingEngine, TxId, VectorIndex};
+use contextra_types::{DocId, Result, TxId};
+use contextra_ports::{StorageEngine, TextEmbeddingEngine, VectorIndex};
 use contextra_graph::CsrGraph;
 use contextra_store::LsmStorage;
 use contextra_text::inverted::InvertedIndex;
@@ -92,20 +93,20 @@ pub fn parse_importance_score(response: &str) -> f32 {
 }
 
 /// Computes a non-LLM heuristic baseline importance score based on text length and character entropy.
-pub fn compute_default_importance(text_opt: Option<&str>) -> contextra_core::ImportanceScore {
+pub fn compute_default_importance(text_opt: Option<&str>) -> contextra_types::ImportanceScore {
     let text = match text_opt {
         Some(t) if !t.is_empty() => t,
-        _ => return contextra_core::ImportanceScore::new(0.5),
+        _ => return contextra_types::ImportanceScore::new(0.5),
     };
     let char_count = text.chars().count();
     if char_count == 0 {
-        return contextra_core::ImportanceScore::new(0.5);
+        return contextra_types::ImportanceScore::new(0.5);
     }
     let unique_chars = text.chars().collect::<std::collections::HashSet<_>>().len() as f32;
     let entropy_ratio = unique_chars / char_count as f32;
     let len_factor = (char_count as f32 / 500.0).clamp(0.1, 0.8);
     let raw = (len_factor * 0.5) + (entropy_ratio * 0.5);
-    contextra_core::ImportanceScore::new(raw)
+    contextra_types::ImportanceScore::new(raw)
 }
 
 /// Ensures document metadata contains a valid `MemoryImportance` JSON payload.
@@ -128,25 +129,25 @@ pub fn ensure_importance_metadata(
 
     // Determine default decay function based on explicit decay_function or memory_type
     let decay = if let Some(decay_val) = meta_obj.get("decay_function") {
-        serde_json::from_value::<contextra_core::DecayFunction>(decay_val.clone())
-            .unwrap_or(contextra_core::DecayFunction::None)
+        serde_json::from_value::<contextra_types::DecayFunction>(decay_val.clone())
+            .unwrap_or(contextra_types::DecayFunction::None)
     } else if let Some(mem_type_val) = meta_obj.get("memory_type") {
         if let Ok(mem_type) =
-            serde_json::from_value::<contextra_core::MemoryType>(mem_type_val.clone())
+            serde_json::from_value::<contextra_types::MemoryType>(mem_type_val.clone())
         {
             mem_type.default_decay()
         } else {
-            contextra_core::DecayFunction::None
+            contextra_types::DecayFunction::None
         }
     } else {
-        contextra_core::DecayFunction::None
+        contextra_types::DecayFunction::None
     };
 
     // Also populate default TTL if memory_type defines one and not already set
     if !meta_obj.contains_key("ttl_tx") {
         if let Some(mem_type_val) = meta_obj.get("memory_type") {
             if let Ok(mem_type) =
-                serde_json::from_value::<contextra_core::MemoryType>(mem_type_val.clone())
+                serde_json::from_value::<contextra_types::MemoryType>(mem_type_val.clone())
             {
                 if let Some(ttl) = mem_type.default_ttl_tx() {
                     meta_obj.insert("ttl_tx".to_string(), serde_json::json!(ttl));
@@ -156,11 +157,11 @@ pub fn ensure_importance_metadata(
     }
 
     if let Some(imp_val) = meta_obj.get("importance").cloned() {
-        if serde_json::from_value::<contextra_core::MemoryImportance>(imp_val.clone()).is_ok() {
+        if serde_json::from_value::<contextra_types::MemoryImportance>(imp_val.clone()).is_ok() {
             return;
         } else if let Some(raw_f64) = imp_val.as_f64() {
-            let imp = contextra_core::MemoryImportance::new(
-                contextra_core::ImportanceScore::new(raw_f64 as f32),
+            let imp = contextra_types::MemoryImportance::new(
+                contextra_types::ImportanceScore::new(raw_f64 as f32),
                 decay,
                 tx,
             );
@@ -172,7 +173,7 @@ pub fn ensure_importance_metadata(
     }
 
     let base_score = compute_default_importance(text_opt);
-    let imp = contextra_core::MemoryImportance::new(base_score, decay, tx);
+    let imp = contextra_types::MemoryImportance::new(base_score, decay, tx);
     if let Ok(val) = serde_json::to_value(imp) {
         meta_obj.insert("importance".to_string(), val);
     }
@@ -190,10 +191,10 @@ pub fn extract_effective_importance(metadata: &Option<serde_json::Value>, now_tx
         return 1.0;
     };
 
-    if let Ok(imp) = serde_json::from_value::<contextra_core::MemoryImportance>(imp_val.clone()) {
+    if let Ok(imp) = serde_json::from_value::<contextra_types::MemoryImportance>(imp_val.clone()) {
         imp.effective_score(now_tx)
     } else if let Some(raw_f64) = imp_val.as_f64() {
-        contextra_core::ImportanceScore::new(raw_f64 as f32).value()
+        contextra_types::ImportanceScore::new(raw_f64 as f32).value()
     } else {
         1.0
     }

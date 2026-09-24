@@ -3,7 +3,8 @@
 
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_core::{DocId, FilterExpr, Result, StorageEngine, VectorIndex};
+use contextra_types::{DocId, FilterExpr, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Estimates the selectivity (fraction of documents matching `filter`) over the collection metadata.
@@ -104,7 +105,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     pub(super) async fn get_matching_doc_ids_for_query_at(
         &self,
-        query: &contextra_core::HybridQuery,
+        query: &contextra_types::HybridQuery,
         seq: u64,
     ) -> Result<Option<std::collections::HashSet<DocId>>> {
         if query.filter.is_none() && query.memory_type_filter.is_none() {
@@ -155,7 +156,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Performs filtered semantic vector search in the collection.
-    // AI-TAG[SMELL][RESOLVED] audit-5.1: Vector-Suche clampt k stets auf k.min(contextra_core::MAX_SEARCH_K) über alle Einstiegspunkte hinweg.
+    // AI-TAG[SMELL][RESOLVED] audit-5.1: Vector-Suche clampt k stets auf k.min(contextra_types::MAX_SEARCH_K) über alle Einstiegspunkte hinweg.
     // AI-TAG[SMELL][RESOLVED] audit-M-7: CheckpointPinGuard handles unpinning safely across all error return paths.
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
@@ -166,7 +167,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         k: usize,
         filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
     ) -> Result<Vec<crate::SearchResult>> {
-        let k = k.min(contextra_core::MAX_SEARCH_K);
+        let k = k.min(contextra_types::MAX_SEARCH_K);
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
         with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
@@ -185,18 +186,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         seq: u64,
     ) -> Result<Vec<crate::SearchResult>> {
         if query.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 query.len()
             )));
         }
         if k == 0 {
-            return Err(contextra_core::ContextraError::invalid_input(
+            return Err(contextra_types::ContextraError::invalid_input(
                 "Search k must be greater than 0",
             ));
         }
-        let target_k = k.min(contextra_core::MAX_SEARCH_K);
+        let target_k = k.min(contextra_types::MAX_SEARCH_K);
         let mut fetch_k = target_k;
 
         loop {
@@ -222,7 +223,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             // Backfill: we need more candidates because tombstones reduced the valid result count below target_k.
             let next_fetch_k = (fetch_k * 2)
                 .max(target_k + skipped * 2)
-                .min(contextra_core::MAX_SEARCH_K);
+                .min(contextra_types::MAX_SEARCH_K);
 
             if next_fetch_k <= fetch_k {
                 if skipped > 0 {

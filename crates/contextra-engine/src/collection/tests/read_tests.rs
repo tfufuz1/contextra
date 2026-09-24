@@ -2,7 +2,9 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_collection_scan_prefix_batches_via_mock_storage() {
-    use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+use contextra_types::{Result, TxId};
+use contextra_ports::{StorageStats};
+use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::CsrGraph;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -144,7 +146,7 @@ async fn test_collection_scan_prefix_batches_via_mock_storage() {
 
 #[tokio::test]
 async fn test_maintenance_pagination_over_10k_documents() {
-    use contextra_core::EXPIRY_METADATA_KEY;
+    use contextra_types::EXPIRY_METADATA_KEY;
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -242,10 +244,10 @@ async fn test_maintenance_pagination_over_10k_documents() {
     let decay_key = "doc_10300";
     let decay_controller = crate::decay_controller::AdaptiveDecayController::with_defaults();
 
-    let imp = contextra_core::MemoryImportance::new(
-        contextra_core::ImportanceScore::new(1.0),
-        contextra_core::DecayFunction::Exponential { half_life_tx: 10 },
-        contextra_core::TxId::new(0),
+    let imp = contextra_types::MemoryImportance::new(
+        contextra_types::ImportanceScore::new(1.0),
+        contextra_types::DecayFunction::Exponential { half_life_tx: 10 },
+        contextra_types::TxId::new(0),
     );
 
     col.insert(
@@ -279,7 +281,8 @@ async fn test_maintenance_pagination_over_10k_documents() {
 
 #[tokio::test]
 async fn test_migrate_doc_keys_v1() {
-    use contextra_core::{DocId, StorageEngine, TxId};
+    use contextra_types::{DocId, TxId};
+use contextra_ports::{StorageEngine};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;

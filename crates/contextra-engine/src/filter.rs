@@ -1,13 +1,13 @@
 // FILE-CONTEXT
 // ZWECK: Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working).
 // INVARIANTEN: Keine Panics bei Typ-Mismatches im Filter-Evaluation-Pfad; Rückfall auf MemoryType::Semantic.
-// NICHT-OFFENSICHTLICH: Deprecated MetadataFilter wandelt via TryFrom verlustfrei in contextra_core::FilterExpr um.
+// NICHT-OFFENSICHTLICH: Deprecated MetadataFilter wandelt via TryFrom verlustfrei in contextra_types::FilterExpr um.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use contextra_core::{FilterExpr, MemoryType};
+use contextra_types::{FilterExpr, MemoryType};
 
 /// Extrahiert den MemoryType aus Dokument-Metadaten (Rückwärtskompatibel).
 pub fn extract_memory_type(metadata: &Option<Value>) -> MemoryType {
@@ -21,7 +21,7 @@ pub fn extract_memory_type(metadata: &Option<Value>) -> MemoryType {
 /// Operators for metadata filtering.
 #[deprecated(
     since = "0.1.0",
-    note = "Use contextra_core::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
+    note = "Use contextra_types::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
 )]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FilterOp {
@@ -48,7 +48,7 @@ pub enum FilterOp {
 /// Advanced metadata filter for document retrieval and search.
 #[deprecated(
     since = "0.1.0",
-    note = "Use contextra_core::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
+    note = "Use contextra_types::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
 )]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MetadataFilter {
@@ -72,7 +72,7 @@ impl MetadataFilter {
     /// Evaluates the filter against a metadata object.
     #[deprecated(
         since = "0.1.0",
-        note = "Use contextra_core::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
+        note = "Use contextra_types::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
     )]
     pub fn matches(&self, metadata: &Value) -> bool {
         if let Ok(expr) = FilterExpr::try_from(self.clone()) {
@@ -85,7 +85,7 @@ impl MetadataFilter {
 
 #[allow(deprecated)]
 impl TryFrom<MetadataFilter> for FilterExpr {
-    type Error = contextra_core::ContextraError;
+    type Error = contextra_types::ContextraError;
 
     fn try_from(filter: MetadataFilter) -> Result<Self, Self::Error> {
         match filter {
@@ -126,7 +126,7 @@ impl TryFrom<MetadataFilter> for FilterExpr {
                     }
                     Ok(acc)
                 } else {
-                    Err(contextra_core::ContextraError::invalid_input(
+                    Err(contextra_types::ContextraError::invalid_input(
                         "Empty And filter",
                     ))
                 }
@@ -140,7 +140,7 @@ impl TryFrom<MetadataFilter> for FilterExpr {
                     }
                     Ok(acc)
                 } else {
-                    Err(contextra_core::ContextraError::invalid_input("Empty Or filter"))
+                    Err(contextra_types::ContextraError::invalid_input("Empty Or filter"))
                 }
             }
             MetadataFilter::Not(filter) => {
@@ -254,14 +254,14 @@ mod tests {
         let err_and = FilterExpr::try_from(empty_and);
         assert!(matches!(
             err_and,
-            Err(contextra_core::ContextraError::InvalidInput(_))
+            Err(contextra_types::ContextraError::InvalidInput(_))
         ));
 
         let empty_or = MetadataFilter::Or(vec![]);
         let err_or = FilterExpr::try_from(empty_or);
         assert!(matches!(
             err_or,
-            Err(contextra_core::ContextraError::InvalidInput(_))
+            Err(contextra_types::ContextraError::InvalidInput(_))
         ));
     }
 

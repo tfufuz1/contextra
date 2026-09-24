@@ -1,7 +1,7 @@
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use crate::Collection;
-use contextra_core::DocId;
+use contextra_types::DocId;
 use contextra_graph::CsrGraph;
 use contextra_store::LsmStorage;
 use contextra_vector::HnswIndex;
@@ -39,7 +39,7 @@ async fn create_test_collection() -> Collection<LsmStorage, HnswIndex> {
 
 #[tokio::test]
 async fn test_db_transaction_staging_and_commit() {
-    use contextra_core::{Edge, Entity, EntityId};
+    use contextra_types::{Edge, Entity, EntityId};
 
     let col = create_test_collection().await;
     let tx_id = col.allocate_tx().unwrap();
@@ -57,7 +57,7 @@ async fn test_db_transaction_staging_and_commit() {
 
 #[tokio::test]
 async fn test_db_transaction_staging_and_rollback() {
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
 
     let col = create_test_collection().await;
     let tx_id = col.allocate_tx().unwrap();
@@ -96,7 +96,7 @@ async fn test_db_transaction_rollback_cleans_kv_store_segments() {
     use contextra_crypto::TenantIsolatedKvStore;
 
     let kv_store = Arc::new(TenantIsolatedKvStore::new());
-    let tenant = contextra_core::TenantId::try_new(1).unwrap();
+    let tenant = contextra_types::TenantId::try_new(1).unwrap();
     let doc_id = DocId::new(500);
 
     kv_store.insert_segment(
@@ -124,8 +124,8 @@ async fn test_db_transaction_rollback_cleans_kv_store_segments() {
 
 #[test]
 fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
-    let doc_ids_vec = vec![contextra_core::DocId::new(1), contextra_core::DocId::new(2)];
-    let doc_ids_arc: Arc<Vec<contextra_core::DocId>> = Arc::new(doc_ids_vec.clone());
+    let doc_ids_vec = vec![contextra_types::DocId::new(1), contextra_types::DocId::new(2)];
+    let doc_ids_arc: Arc<Vec<contextra_types::DocId>> = Arc::new(doc_ids_vec.clone());
 
     let intent_arc = CommitIntent::Pending {
         doc_ids: doc_ids_arc,
@@ -146,8 +146,8 @@ fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
     match roundtrip {
         CommitIntent::Pending { doc_ids, .. } => {
             assert_eq!(doc_ids.len(), 2);
-            assert_eq!(doc_ids[0], contextra_core::DocId::new(1));
-            assert_eq!(doc_ids[1], contextra_core::DocId::new(2));
+            assert_eq!(doc_ids[0], contextra_types::DocId::new(1));
+            assert_eq!(doc_ids[1], contextra_types::DocId::new(2));
         }
         _ => panic!("Unexpected CommitIntent variant"),
     }

@@ -8,7 +8,7 @@
 //! Evaluates candidate validity against both transaction/system time (`TxId` / MVCC)
 //! and business time (`[valid_from, valid_until)` interval semantics per ADR-033/ADR-038).
 
-use contextra_core::TxId;
+use contextra_types::TxId;
 use serde_json::Value;
 
 /// Type alias for search & fusion results in post-retrieval pipelines.

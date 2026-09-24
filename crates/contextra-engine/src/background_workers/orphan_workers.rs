@@ -3,7 +3,7 @@
 // INVARIANTEN: Geordnete Abschaltung via CancellationToken; Beschränkung der pro Tick verarbeiteten Waisen.
 
 use super::config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanCleanupIndex};
-use contextra_core::tx_buffer::TxBuffer;
+use contextra_mvcc::tx_buffer::TxBuffer;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;

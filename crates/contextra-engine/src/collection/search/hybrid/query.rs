@@ -3,9 +3,8 @@
 
 use crate::collection::search::checkpoint::{with_pinned_checkpoint, with_pinned_checkpoint_at_latest};
 use crate::collection::Collection;
-use contextra_core::{
-    DocId, GraphIndex, Result, StorageEngine, TextIndex, VectorIndex,
-};
+use contextra_types::{DocId, Result};
+use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery`.
@@ -17,7 +16,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     #[tracing::instrument(level = "trace", skip(self, query))]
     pub async fn hybrid_search_with_query(
         &self,
-        query: &contextra_core::HybridQuery,
+        query: &contextra_types::HybridQuery,
     ) -> Result<Vec<crate::SearchResult>> {
         // Pin-first, read-after: the seq is read under the protection of the pin,
         // eliminating the TOCTOU window between snapshot_seq() and pin activation.
@@ -31,13 +30,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     #[allow(deprecated)]
     pub async fn hybrid_search_with_query_at(
         &self,
-        query: &contextra_core::HybridQuery,
+        query: &contextra_types::HybridQuery,
         seq: u64,
     ) -> Result<Vec<crate::SearchResult>> {
         if query.k == 0 {
             return Ok(Vec::new());
         }
-        let k = query.k.min(contextra_core::MAX_SEARCH_K);
+        let k = query.k.min(contextra_types::MAX_SEARCH_K);
 
         let text = query.text_query.as_deref().unwrap_or("");
         let vector = query.vector_query.as_deref().unwrap_or(&[]);
@@ -46,7 +45,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if !vector.is_empty() {
             for (i, &val) in vector.iter().enumerate() {
                 if !val.is_finite() {
-                    return Err(contextra_core::ContextraError::invalid_input(format!(
+                    return Err(contextra_types::ContextraError::invalid_input(format!(
                         "hybrid_search: query vector element at index {i} is not finite (value: {val}). \
                          Check embedding model output for NaN/Inf before querying."
                     )));
@@ -80,7 +79,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             candidate_k = candidate_k
                 .max(rerank_k)
                 .saturating_mul(Self::OVERFETCH_FACTOR)
-                .min(contextra_core::MAX_SEARCH_K)
+                .min(contextra_types::MAX_SEARCH_K)
                 .max(k);
 
             let total_docs = self.len().await;
@@ -120,7 +119,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     } else {
                         let matched_ids_cloned = matched_ids.clone();
                         let filter_fn = move |id: DocId| matched_ids_cloned.contains(&id);
-                        let max_cap = total_docs.min(contextra_core::MAX_SEARCH_K).max(candidate_k);
+                        let max_cap = total_docs.min(contextra_types::MAX_SEARCH_K).max(candidate_k);
                         let mut oversample = candidate_k;
                         let mut iterations = 0;
                         loop {
@@ -147,7 +146,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         }
                     }
                 } else {
-                    let max_cap = total_docs.min(contextra_core::MAX_SEARCH_K).max(candidate_k);
+                    let max_cap = total_docs.min(contextra_types::MAX_SEARCH_K).max(candidate_k);
                     let mut oversample = candidate_k;
                     let mut iterations = 0;
                     loop {
@@ -188,7 +187,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 } else {
                     0.1
                 };
-                let max_cap = total_docs.min(contextra_core::MAX_SEARCH_K).max(candidate_k);
+                let max_cap = total_docs.min(contextra_types::MAX_SEARCH_K).max(candidate_k);
                 let calculated_initial =
                     ((candidate_k as f64) / selectivity.max(0.0001)).ceil() as usize;
                 let min_oversample = candidate_k.min(max_cap);
@@ -234,11 +233,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             };
 
             // 3. Graph Signal
-            let implicit_anchors: Vec<contextra_core::EntityId>;
-            let anchors_ref: Option<&[contextra_core::EntityId]> =
+            let implicit_anchors: Vec<contextra_types::EntityId>;
+            let anchors_ref: Option<&[contextra_types::EntityId]> =
                 if let Some(ref start_node) = query.graph_start_node {
                     let parsed_eid = if let Ok(u) = start_node.parse::<u64>() {
-                        Some(contextra_core::EntityId::new(u))
+                        Some(contextra_types::EntityId::new(u))
                     } else if let Some(inner_str) = start_node
                         .strip_prefix("EntityId(")
                         .and_then(|s| s.strip_suffix(')'))
@@ -246,9 +245,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         inner_str
                             .parse::<u64>()
                             .ok()
-                            .map(contextra_core::EntityId::new)
+                            .map(contextra_types::EntityId::new)
                     } else {
-                        contextra_core::EntityId::from_key(start_node).ok()
+                        contextra_types::EntityId::from_key(start_node).ok()
                     };
                     if let Some(eid) = parsed_eid {
                         implicit_anchors = vec![eid];
@@ -260,7 +259,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
                     implicit_anchors = text_results
                         .iter()
-                        .filter_map(|r| contextra_core::EntityId::from_key(r.id.as_str()).ok())
+                        .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
                         .collect();
                     Some(&implicit_anchors)
                 } else {
@@ -269,7 +268,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let graph_results = if let Some(anchors) = anchors_ref {
                 let tuples = match query.graph_strategy {
-                    contextra_core::GraphTraversalStrategy::Hops { max_hops } => {
+                    contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
                         let mut raw_tuples = self
                             .graph_index
                             .multi_traverse_at(anchors, max_hops, seq)
@@ -278,7 +277,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         raw_tuples.truncate(candidate_k);
                         raw_tuples
                     }
-                    contextra_core::GraphTraversalStrategy::PersonalizedPageRank(ref cfg) => {
+                    contextra_types::GraphTraversalStrategy::PersonalizedPageRank(ref cfg) => {
                         let mut raw_tuples = self
                             .graph_index
                             .personalized_page_rank_at(anchors, cfg, seq)
@@ -287,15 +286,15 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         raw_tuples.truncate(candidate_k);
                         raw_tuples
                     }
-                    contextra_core::GraphTraversalStrategy::PathRag { .. } => {
-                        return Err(contextra_core::ContextraError::snapshot_unsupported_for_signal(
+                    contextra_types::GraphTraversalStrategy::PathRag { .. } => {
+                        return Err(contextra_types::ContextraError::snapshot_unsupported_for_signal(
                             "PathRag strategy does not support snapshot-isolated retrieval",
                         ));
                     }
                 };
                 let doc_tuples = tuples
                     .into_iter()
-                    .map(|(eid, score)| (contextra_core::DocId::new(eid.inner()), score))
+                    .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
                     .collect();
                 let hydrated = self.hydrate_from_tuples_at(doc_tuples, seq).await?;
                 filter_pre_rrf(hydrated)
@@ -337,7 +336,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let max_fusion_results = candidate_k
                 .saturating_mul(Self::OVERFETCH_FACTOR)
-                .min(contextra_core::MAX_SEARCH_K);
+                .min(contextra_types::MAX_SEARCH_K);
 
             let mut fused_results = crate::fusion::fuse_search_results_with_strategy(
                 signal_sets,
@@ -357,7 +356,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     if let Ok(doc_id) = DocId::from_key(&res.id) {
                         let links = self.get_links(doc_id).await?;
                         for link in links {
-                            if link.relation == contextra_core::types::domain::LinkRelation::Supersedes {
+                            if link.relation == contextra_types::domain::LinkRelation::Supersedes {
                                 superseded_targets.insert(link.target);
                             }
                         }
@@ -387,9 +386,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             #[cfg(feature = "edge-reinforcement-learning")]
             if fused_results.len() >= 2 {
                 let graph_index = self.graph_index.clone();
-                let result_eids: Vec<contextra_core::EntityId> = fused_results
+                let result_eids: Vec<contextra_types::EntityId> = fused_results
                     .iter()
-                    .filter_map(|r| contextra_core::EntityId::from_key(&r.id).ok())
+                    .filter_map(|r| contextra_types::EntityId::from_key(&r.id).ok())
                     .collect();
                 tokio::spawn(async move {
                     let _config = contextra_graph::edge_reinforcement::EdgeReinforcementConfig::default();

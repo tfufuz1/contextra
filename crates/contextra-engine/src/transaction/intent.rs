@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use contextra_core::{DocId, TxId};
+use contextra_types::{DocId, TxId};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

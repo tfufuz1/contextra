@@ -1,6 +1,7 @@
 use super::internal::validate_doc_id;
 use crate::collection::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_core::{DocId, Result, StorageEngine, TxId, VectorIndex};
+use contextra_types::{DocId, Result, TxId};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 /// Harte Obergrenze für scan()/scan_prefix()-Ergebnisse, falls kein explizites `limit`
 /// übergeben wird. Verhindert unbeabsichtigten Vollscan bei generischen Präfixen.
@@ -83,7 +84,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let effective_limit = match limit {
             None => DEFAULT_SCAN_LIMIT,
             Some(n) if n > MAX_SCAN_RESULTS => {
-                return Err(contextra_core::ContextraError::invalid_input(format!(
+                return Err(contextra_types::ContextraError::invalid_input(format!(
                     "requested limit {n} exceeds MAX_SCAN_RESULTS ({MAX_SCAN_RESULTS}); use cursor-based pagination via repeated calls instead"
                 )));
             }
@@ -128,7 +129,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
                 if let Ok(val) = serde_json::from_slice(&v) {
                     if results.len() >= effective_limit {
-                        return Err(contextra_core::ContextraError::LimitExceeded {
+                        return Err(contextra_types::ContextraError::LimitExceeded {
                             limit: effective_limit,
                             context: format!(
                                 "scan_prefix(prefix={})",
@@ -170,7 +171,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let effective_limit = match limit {
             None => DEFAULT_SCAN_LIMIT,
             Some(n) if n > MAX_SCAN_RESULTS => {
-                return Err(contextra_core::ContextraError::invalid_input(format!(
+                return Err(contextra_types::ContextraError::invalid_input(format!(
                     "requested limit {n} exceeds MAX_SCAN_RESULTS ({MAX_SCAN_RESULTS}); use cursor-based pagination via repeated calls instead"
                 )));
             }
@@ -247,7 +248,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
                 if let Ok(val) = serde_json::from_slice(&v) {
                     if results.len() >= effective_limit {
-                        return Err(contextra_core::ContextraError::LimitExceeded {
+                        return Err(contextra_types::ContextraError::LimitExceeded {
                             limit: effective_limit,
                             context: "scan()".to_string(),
                         });

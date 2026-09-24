@@ -11,7 +11,9 @@ description = "Contextra — Core storage, index, and transaction orchestrator e
 
 [dependencies]
 contextra-sys = { workspace = true }
-contextra-core = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-mvcc = { workspace = true }
 bytes = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-store = { workspace = true }
@@ -47,7 +49,7 @@ onnx = []
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = []
 graph-connectivity-health = ["contextra-graph/physio-percolation"]
-docid-128 = ["contextra-core/docid-128"]
+docid-128 = ["contextra-types/docid-128"]
 edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = []

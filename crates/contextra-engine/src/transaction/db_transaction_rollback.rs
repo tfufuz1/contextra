@@ -1,8 +1,7 @@
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
-use contextra_core::{
-    DocId, GraphIndex, ContextraError, Result, StorageEngine, TextIndex, TxId, VectorIndex,
-};
+use contextra_types::{DocId, ContextraError, Result, TxId};
+use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -10,7 +9,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     pub(super) fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) {
         if let Some(kv_store) = self.collection.kv_store() {
             let chunk_ids: Vec<u64> = doc_ids.iter().map(|d| d.inner()).collect();
-            let tenant = contextra_core::TenantId::try_new(1).unwrap_or_default();
+            let tenant = contextra_types::TenantId::try_new(1).unwrap_or_default();
             kv_store.on_rollback(tenant, &chunk_ids);
         }
     }

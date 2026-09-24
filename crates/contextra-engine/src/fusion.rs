@@ -10,7 +10,7 @@ pub use contextra_rank::fusion::{
     SignalContribution, SignalKind,
 };
 
-pub use contextra_core::FusionStrategy;
+pub use contextra_types::FusionStrategy;
 
 /// Fuses search result sets using the specified FusionStrategy.
 pub fn fuse_search_results_with_strategy(
@@ -19,7 +19,7 @@ pub fn fuse_search_results_with_strategy(
     priority: MetadataMergePriority,
     include_provenance: bool,
     resonance_config: Option<&ResonanceConfig>,
-    strategy: contextra_core::FusionStrategy,
+    strategy: contextra_types::FusionStrategy,
 ) -> Vec<SearchResult> {
     contextra_rank::fusion::fuse_search_results_with_strategy(
         result_sets,

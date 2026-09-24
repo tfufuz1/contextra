@@ -2,7 +2,8 @@ use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
     ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
 };
-use contextra_core::{DocId, EntityId, Result, StorageEngine, VectorIndex};
+use contextra_types::{DocId, EntityId, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Updates an existing document in the collection.
@@ -14,7 +15,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         if embedding.len() != self.dimension {
-            return Err(contextra_core::ContextraError::invalid_input(format!(
+            return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.dimension,
                 embedding.len()
@@ -91,7 +92,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         // Stage graph entity update
         if let Ok(eid) = EntityId::from_key(id) {
-            let entity = contextra_core::Entity::new(eid, id, "Document");
+            let entity = contextra_types::Entity::new(eid, id, "Document");
             db_tx.stage_graph_entity(entity);
         }
 

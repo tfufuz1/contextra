@@ -2,7 +2,7 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_relate_success_visible_in_storage_and_graph() {
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
     use contextra_graph::csr::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
@@ -54,7 +54,9 @@ async fn test_relate_success_visible_in_storage_and_graph() {
 
 #[tokio::test]
 async fn test_relate_rollback_semantics_on_storage_commit_failure() {
-    use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+use contextra_types::{Result, TxId};
+use contextra_ports::{StorageStats};
+use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::CsrGraph;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -81,7 +83,7 @@ async fn test_relate_rollback_semantics_on_storage_commit_failure() {
         }
         fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
-                Err(contextra_core::ContextraError::Storage(
+                Err(contextra_types::ContextraError::Storage(
                     "Simulated Storage Commit Failure".into(),
                 ))
             })
@@ -164,7 +166,9 @@ async fn test_relate_rollback_semantics_on_storage_commit_failure() {
 
 #[tokio::test]
 async fn test_relate_rollback_semantics_on_graph_commit_failure() {
-    use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+use contextra_types::{Result, TxId};
+use contextra_ports::{StorageStats};
+use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
@@ -190,7 +194,7 @@ async fn test_relate_rollback_semantics_on_graph_commit_failure() {
         fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
                 if self.should_fail.load(Ordering::SeqCst) {
-                    Err(contextra_core::ContextraError::Storage(
+                    Err(contextra_types::ContextraError::Storage(
                         "Simulated Graph Storage Commit Failure".into(),
                     ))
                 } else {
@@ -302,8 +306,8 @@ async fn test_relate_rollback_semantics_on_graph_commit_failure() {
 
 
 #[tokio::test]
-async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_core::Result<()> {
-    use contextra_core::DocId;
+async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_types::Result<()> {
+    use contextra_types::DocId;
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -345,7 +349,7 @@ async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_co
     let b = DocId::from_key("node_b")?;
     let c = DocId::from_key("node_c")?;
 
-    let rel = contextra_core::types::domain::LinkRelation::Elaborates;
+    let rel = contextra_types::domain::LinkRelation::Elaborates;
 
     // A -> B
     col.link_memories(a, b, rel).await?;
@@ -364,9 +368,9 @@ async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_co
 
 #[cfg(feature = "graph-connectivity-health")]
 #[tokio::test]
-async fn test_run_percolation_check_rebonding() -> contextra_core::Result<()> {
+async fn test_run_percolation_check_rebonding() -> contextra_types::Result<()> {
     use crate::{Contextra, ContextraConfig};
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
 
     let dir = tempfile::tempdir().unwrap();
     let db = Contextra::open_with_config(

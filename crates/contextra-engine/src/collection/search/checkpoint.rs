@@ -2,7 +2,8 @@
 // ZWECK: RAII CheckpointPinGuard und higher-order helper functions für Snapshot-Pinning während Suchoperationen.
 // INVARIANTEN: Snapshot-Pinning garantiert Isolation während gefilterter Suche.
 
-use contextra_core::{Result, StorageEngine};
+use contextra_types::{Result};
+use contextra_ports::{StorageEngine};
 
 /// RAII Guard for pinning snapshot checkpoints during search/scan operations.
 ///

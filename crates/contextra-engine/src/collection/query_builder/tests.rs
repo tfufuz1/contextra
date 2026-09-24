@@ -1,6 +1,6 @@
 use super::*;
 use crate::{Collection, DistanceMetric, Language};
-use contextra_core::{FilterExpr, HybridQuery};
+use contextra_types::{FilterExpr, HybridQuery};
 use contextra_graph::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_vector::{HnswConfig, HnswIndex};
@@ -507,7 +507,7 @@ fn test_no_reranker_uses_k_not_10k() {
     }
     candidate_k = candidate_k
         .max(rerank_k)
-        .min(contextra_core::MAX_SEARCH_K)
+        .min(contextra_types::MAX_SEARCH_K)
         .max(k);
 
     assert!(
@@ -539,7 +539,7 @@ fn test_reranker_expands_to_100_for_k10() {
     }
     candidate_k = candidate_k
         .max(rerank_k)
-        .min(contextra_core::MAX_SEARCH_K)
+        .min(contextra_types::MAX_SEARCH_K)
         .max(k);
 
     assert!(
