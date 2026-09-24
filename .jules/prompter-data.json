@@ -1,247 +1,529 @@
 {
-  "generated_at": "2026-09-12T11:19:38Z",
-  "head": "b61fbb2",
+  "generated_at": "2026-09-24T17:14:50Z",
+  "head": "f3fb3c1",
+  "context_preamble": "Pflicht-Schritt 1 (vor jeder Aufgabe): Lies `.jules/JULES_CONTEXT.md`, dann `AGENTS.md`, dann `crates/{crate}/AGENTS.md`, dann `WORKING_STATE.md`. Fasse in 2 Sätzen zusammen, was du gelesen hast, bevor du mit der Aufgabe beginnst.\n",
   "target_architecture": {
+    "contextra": "contextra-facade",
+    "contextra-adapt": "contextra-inference",
     "contextra-agent": "contextra-agentic",
-    "contextra-calibration": "contextra-inference",
-    "contextra-candle": "contextra-inference",
+    "contextra-bench": "contextra-benchmarks",
     "contextra-checkpoint": "contextra-persistence",
+    "contextra-cognition": "contextra-orchestrator",
     "contextra-core": "contextra-foundation",
     "contextra-db": "contextra-orchestrator",
-    "contextra-embed": "contextra-inference",
+    "contextra-engine": "contextra-orchestrator",
     "contextra-graph": "contextra-retrieval",
-    "contextra-index": "contextra-retrieval",
+    "contextra-infer-candle": "contextra-inference",
+    "contextra-infer-ollama": "contextra-inference",
+    "contextra-infer-onnx": "contextra-inference",
+    "contextra-kvcache": "contextra-persistence",
     "contextra-mcp": "contextra-mcp",
-    "contextra-ollama": "contextra-inference",
+    "contextra-mvcc": "contextra-foundation",
+    "contextra-ports": "contextra-foundation",
+    "contextra-privacy": "contextra-security",
     "contextra-py": "contextra-bindings",
+    "contextra-rank": "contextra-retrieval",
     "contextra-router": "contextra-inference",
+    "contextra-sandbox": "contextra-agentic",
     "contextra-security": "contextra-security",
+    "contextra-simd": "contextra-foundation",
     "contextra-store": "contextra-persistence",
-    "contextra-tauri": "contextra-bindings",
-    "contextra-text": "contextra-retrieval"
+    "contextra-sys": "contextra-foundation",
+    "contextra-testkit": "contextra-testkit",
+    "contextra-text": "contextra-retrieval",
+    "contextra-types": "contextra-foundation",
+    "contextra-vector": "contextra-retrieval",
+    "contextra-wire": "contextra-foundation"
   },
   "crates": [
     {
-      "id": "contextra-core-ipc-gen",
+      "id": "contextra-adapt",
       "layer": 0,
       "order": 1,
-      "loc": 858,
-      "tests": "0+",
-      "desc": "Auto-generated FlatBuffers IPC code for Contextra Core",
-      "status": "✅",
+      "loc": 3975,
+      "tests": "77+",
+      "desc": "Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller)",
+      "status": "❓",
+      "risk": "calib",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-privacy",
+      "layer": 0,
+      "order": 2,
+      "loc": 1865,
+      "tests": "37+",
+      "desc": "Egress Filtering, Anonymisierung und Privacy Compliance Rules",
+      "status": "❓",
+      "risk": "sec",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-sandbox",
+      "layer": 0,
+      "order": 3,
+      "loc": 1918,
+      "tests": "25+",
+      "desc": "WASM Execution Boundary und Isolations-Sandbox",
+      "status": "❓",
+      "risk": "sec",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-sys",
+      "layer": 0,
+      "order": 4,
+      "loc": 526,
+      "tests": "2+",
+      "desc": "Systemnahe Bindings, Low-Level I/O und Memory-Mapping",
+      "status": "❓",
+      "risk": "ffi",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-types",
+      "layer": 0,
+      "order": 5,
+      "loc": 6065,
+      "tests": "115+",
+      "desc": "Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)",
+      "status": "❓",
+      "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-wire",
+      "layer": 0,
+      "order": 6,
+      "loc": 1751,
+      "tests": "11+",
+      "desc": "FlatBuffers Wire-Protokolle und Serialisierungs-Formate",
+      "status": "❓",
+      "risk": "gen",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-crypto",
+      "layer": 1,
+      "order": 7,
+      "loc": 6964,
+      "tests": "167+",
+      "desc": "Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC",
+      "status": "❓",
+      "risk": "sec",
+      "tier": "1"
+    },
+    {
+      "id": "contextra-mvcc",
+      "layer": 1,
+      "order": 8,
+      "loc": 1955,
+      "tests": "38+",
+      "desc": "Multi-Version Concurrency Control und Isolation-Mechanismen",
+      "status": "❓",
+      "risk": "concurrency",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-ports",
+      "layer": 1,
+      "order": 9,
+      "loc": 2963,
+      "tests": "33+",
+      "desc": "Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung",
+      "status": "❓",
+      "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-checkpoint",
+      "layer": 2,
+      "order": 10,
+      "loc": 6165,
+      "tests": "90+",
+      "desc": "Persistent Checkpoint Engine und Blake3 Manifest-Verifikation",
+      "status": "❓",
       "risk": "none",
       "tier": "2"
     },
     {
       "id": "contextra-core",
-      "layer": 1,
-      "order": 2,
-      "loc": 9364,
-      "tests": "166+",
-      "desc": "Core types, traits, and error handling for Contextra",
-      "status": "✅",
+      "layer": 2,
+      "order": 11,
+      "loc": 368,
+      "tests": "7+",
+      "desc": "Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer",
+      "status": "❓",
       "risk": "none",
       "tier": "1"
-    },
-    {
-      "id": "contextra-calibration",
-      "layer": 2,
-      "order": 3,
-      "loc": 2225,
-      "tests": "71+",
-      "desc": "",
-      "status": "✅",
-      "risk": "calib",
-      "tier": "3"
-    },
-    {
-      "id": "contextra-checkpoint",
-      "layer": 2,
-      "order": 4,
-      "loc": 5707,
-      "tests": "82+",
-      "desc": "Backup and snapshot management for Contextra storage",
-      "status": "✅",
-      "risk": "none",
-      "tier": "2"
     },
     {
       "id": "contextra-graph",
       "layer": 2,
-      "order": 5,
-      "loc": 10627,
-      "tests": "161+",
-      "desc": "CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)",
-      "status": "✅",
-      "risk": "none",
-      "tier": "2"
-    },
-    {
-      "id": "contextra-security",
-      "layer": 2,
-      "order": 6,
-      "loc": 5068,
-      "tests": "132+",
-      "desc": "Encryption at Rest and KV-Cache Security utilities for Contextra",
-      "status": "✅",
-      "risk": "sec",
-      "tier": "1"
-    },
-    {
-      "id": "contextra-text",
-      "layer": 2,
-      "order": 7,
-      "loc": 5433,
-      "tests": "94+",
-      "desc": "Contextra — Text processing and BM25 search for Hybrid Search",
-      "status": "✅",
-      "risk": "utf8",
-      "tier": "2"
-    },
-    {
-      "id": "contextra-candle",
-      "layer": 3,
-      "order": 8,
-      "loc": 2686,
-      "tests": "43+",
-      "desc": "Native Candle GGUF ML inference backend for Contextra",
-      "status": "✅",
-      "risk": "candle",
-      "tier": "3"
-    },
-    {
-      "id": "contextra-index",
-      "layer": 3,
-      "order": 9,
-      "loc": 15865,
-      "tests": "183+",
-      "desc": "HNSW vector index with SIMD distance computation for Contextra",
-      "status": "✅",
-      "risk": "simd",
-      "tier": "1"
-    },
-    {
-      "id": "contextra-ollama",
-      "layer": 3,
-      "order": 10,
-      "loc": 3990,
-      "tests": "80+",
-      "desc": "",
-      "status": "✅",
-      "risk": "inj",
-      "tier": "3"
-    },
-    {
-      "id": "contextra-store",
-      "layer": 3,
-      "order": 11,
-      "loc": 20231,
-      "tests": "230+",
-      "desc": "LSM-Tree storage engine for Contextra",
-      "status": "✅",
-      "risk": "crash",
-      "tier": "1"
-    },
-    {
-      "id": "contextra-embed",
-      "layer": 4,
       "order": 12,
-      "loc": 2033,
-      "tests": "34+",
-      "desc": "",
-      "status": "🧊",
-      "risk": "gate",
-      "tier": "3"
-    },
-    {
-      "id": "contextra-db",
-      "layer": 5,
-      "order": 13,
-      "loc": 31208,
-      "tests": "367+",
-      "desc": "Contextra — Embedded hybrid-search for AI agents",
-      "status": "✅",
-      "risk": "fusion",
-      "tier": "1"
-    },
-    {
-      "id": "contextra-bench",
-      "layer": 6,
-      "order": 14,
-      "loc": 4641,
-      "tests": "26+",
-      "desc": "Contextra — Reproducible Benchmark Harness for Retrieval Accuracy",
-      "status": "✅",
+      "loc": 21599,
+      "tests": "285+",
+      "desc": "CSR Graph-Engine, Path Graphing und GraphRAG Community Detection",
+      "status": "❓",
       "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-kvcache",
+      "layer": 2,
+      "order": 13,
+      "loc": 3160,
+      "tests": "50+",
+      "desc": "Stufenmodell KV-Cache Storage & Offloading",
+      "status": "❓",
+      "risk": "sec",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-rank",
+      "layer": 2,
+      "order": 14,
+      "loc": 3753,
+      "tests": "44+",
+      "desc": "Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers)",
+      "status": "❓",
+      "risk": "fusion",
       "tier": "2"
     },
     {
       "id": "contextra-router",
-      "layer": 6,
+      "layer": 2,
       "order": 15,
-      "loc": 5456,
-      "tests": "85+",
-      "desc": "",
-      "status": "✅",
+      "loc": 7149,
+      "tests": "113+",
+      "desc": "Lyapunov Drift Control und Multi-Candidate Search Routing Engine",
+      "status": "❓",
       "risk": "nan",
       "tier": "3"
     },
     {
-      "id": "contextra-tauri",
-      "layer": 6,
+      "id": "contextra-testkit",
+      "layer": 2,
       "order": 16,
-      "loc": 6209,
-      "tests": "118+",
-      "desc": "DEPRECATED (ADR-077): Desktop-App 'Contextra Brain'. Wird am 2026-11-07 entfernt. Bitte auf contextra-py migrieren.",
-      "status": "✅",
-      "risk": "parse",
+      "loc": 562,
+      "tests": "7+",
+      "desc": "Test Fixtures, Mock Engines und Chaos Matrix Harness",
+      "status": "❓",
+      "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-text",
+      "layer": 2,
+      "order": 17,
+      "loc": 9381,
+      "tests": "135+",
+      "desc": "Volltextsuche und Inverted-Index (BM25 Engine)",
+      "status": "❓",
+      "risk": "utf8",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-infer-ollama",
+      "layer": 3,
+      "order": 18,
+      "loc": 4604,
+      "tests": "92+",
+      "desc": "Ollama External Provider Client und Embeddings Integration",
+      "status": "❓",
+      "risk": "inj",
+      "tier": "3"
+    },
+    {
+      "id": "contextra-infer-onnx",
+      "layer": 3,
+      "order": 19,
+      "loc": 2264,
+      "tests": "37+",
+      "desc": "ONNX Embeddings und Cross-Encoder Reranking Execution Provider",
+      "status": "❓",
+      "risk": "gate",
+      "tier": "3"
+    },
+    {
+      "id": "contextra-simd",
+      "layer": 3,
+      "order": 20,
+      "loc": 1388,
+      "tests": "0+",
+      "desc": "SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen",
+      "status": "❓",
+      "risk": "simd",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-store",
+      "layer": 3,
+      "order": 21,
+      "loc": 28098,
+      "tests": "307+",
+      "desc": "LSM-Tree Storage Engine, WAL Durability und Compaction Engine",
+      "status": "❓",
+      "risk": "crash",
+      "tier": "1"
+    },
+    {
+      "id": "contextra-infer-candle",
+      "layer": 4,
+      "order": 22,
+      "loc": 6664,
+      "tests": "89+",
+      "desc": "Candle LLM Inference Client und KV-Bridge Adapter",
+      "status": "❓",
+      "risk": "candle",
+      "tier": "3"
+    },
+    {
+      "id": "contextra-vector",
+      "layer": 4,
+      "order": 23,
+      "loc": 17021,
+      "tests": "173+",
+      "desc": "Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung)",
+      "status": "❓",
+      "risk": "simd",
+      "tier": "1"
+    },
+    {
+      "id": "contextra-engine",
+      "layer": 5,
+      "order": 24,
+      "loc": 15899,
+      "tests": "137+",
+      "desc": "Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02)",
+      "status": "❓",
+      "risk": "concurrency",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-cognition",
+      "layer": 6,
+      "order": 25,
+      "loc": 6578,
+      "tests": "71+",
+      "desc": "Konsolidierungs- und Background Sleep Passes",
+      "status": "❓",
+      "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-db",
+      "layer": 7,
+      "order": 26,
+      "loc": 12516,
+      "tests": "176+",
+      "desc": "Contextra Main Database Abstraction, Hybrid Search & Collections",
+      "status": "❓",
+      "risk": "fusion",
+      "tier": "1"
+    },
+    {
+      "id": "contextra",
+      "layer": 8,
+      "order": 27,
+      "loc": 721,
+      "tests": "10+",
+      "desc": "Haupt-Library Facade für Endanwender",
+      "status": "❓",
+      "risk": "none",
       "tier": "2"
     },
     {
       "id": "contextra-agent",
-      "layer": 7,
-      "order": 17,
-      "loc": 5935,
-      "tests": "59+",
-      "desc": "Persistent agent workflow engine for Contextra — checkpoint/execute/audit loop",
-      "status": "✅",
+      "layer": 8,
+      "order": 28,
+      "loc": 6976,
+      "tests": "78+",
+      "desc": "Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline",
+      "status": "❓",
       "risk": "budget",
       "tier": "2"
     },
     {
-      "id": "contextra-mcp",
+      "id": "contextra-bench",
       "layer": 8,
-      "order": 18,
-      "loc": 4406,
-      "tests": "81+",
-      "desc": "",
-      "status": "✅",
+      "order": 29,
+      "loc": 5751,
+      "tests": "39+",
+      "desc": "Contextra — Reproducible Benchmark Harness for Retrieval Accuracy",
+      "status": "❓",
+      "risk": "none",
+      "tier": "2"
+    },
+    {
+      "id": "contextra-py",
+      "layer": 8,
+      "order": 30,
+      "loc": 2249,
+      "tests": "24+",
+      "desc": "PyO3 Python Bindings",
+      "status": "❓",
+      "risk": "ffi",
+      "tier": "1"
+    },
+    {
+      "id": "contextra-mcp",
+      "layer": 9,
+      "order": 31,
+      "loc": 7073,
+      "tests": "112+",
+      "desc": "Model Context Protocol Server & Cloud Egress Gateway",
+      "status": "❓",
       "risk": "proto",
       "tier": "1"
     }
   ],
   "components": {
+    "contextra": [
+      {
+        "file": "agent_memory.rs",
+        "size": "M",
+        "loc": 213,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "builder.rs",
+        "size": "S",
+        "loc": 177,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 84,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-adapt": [
+      {
+        "file": "bandit.rs",
+        "size": "L",
+        "loc": 780,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "decay_controller.rs",
+        "size": "M",
+        "loc": 209,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "drift.rs",
+        "size": "S",
+        "loc": 124,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "flow_thompson.rs",
+        "size": "M",
+        "loc": 592,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "homeostat.rs",
+        "size": "M",
+        "loc": 230,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 32,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lyapunov.rs",
+        "size": "M",
+        "loc": 552,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "off_policy.rs",
+        "size": "S",
+        "loc": 3,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "offpolicy.rs",
+        "size": "M",
+        "loc": 302,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "pid.rs",
+        "size": "M",
+        "loc": 394,
+        "risk": "calib",
+        "desc": "Adaptive PID Pool Sizing & LinUCB Contextual Bandit",
+        "focus": "Rerank PID Controller hält Recall Floor k_min >= 50 ein."
+      },
+      {
+        "file": "pid_latency_controller.rs",
+        "size": "M",
+        "loc": 278,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
     "contextra-agent": [
       {
         "file": "audit.rs",
         "size": "L",
-        "loc": 636,
-        "risk": "Integrität",
-        "desc": "Append-only Audit-Log",
-        "focus": "Es darf KEINE öffentliche API zum nachträglichen Ändern oder Löschen von Einträgen geben — jede solche Erweiterung ist ein Integritätsverstoß. [KORR v22: Datei hieß zuvor audit_log.rs — tatsächlicher Dateiname ist audit.rs.]"
+        "loc": 735,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "budget.rs",
+        "size": "S",
+        "loc": 89,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "context.rs",
         "size": "M",
         "loc": 408,
-        "risk": "Performance",
-        "desc": "AgentContext — events-Verwaltung",
-        "focus": "events als Vec mit remove(0) ist O(N) bei häufigem Front-Dequeue — bei Performance-Änderungen VecDeque erwägen. Identifier-Ambiguität beachten: Knotenname \"1\" darf nicht als Schrittnummer fehlinterpretiert werden."
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "dlq.rs",
-        "size": "S",
-        "loc": 109,
+        "size": "M",
+        "loc": 262,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -249,45 +531,77 @@
       {
         "file": "engine.rs",
         "size": "L",
-        "loc": 961,
+        "loc": 830,
         "risk": "APM-4",
-        "desc": "State-Machine — checkpoint → execute → commit → audit",
-        "focus": "Budget-Check MUSS VOR tool.execute() erfolgen (APM-4 kritisch) — niemals execute() → consume() → check(), da das Tool dann bereits Seiteneffekte ausgeführt hat, bevor der Budget-Fehler erkannt wird. Exactly-Once: Crash zwischen execute und commit darf nach Recovery weder Doppel- noch Nichtausführung erzeugen."
+        "desc": "State Machine & TokenBudget RAII Reservation",
+        "focus": "Budget-Check vor Tool-Execution. Reservation guarantees atomic refunds on Drop unless settled."
+      },
+      {
+        "file": "engine/condition.rs",
+        "size": "S",
+        "loc": 145,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "engine/tests.rs",
+        "size": "S",
+        "loc": 190,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "event_source.rs",
         "size": "M",
-        "loc": 276,
+        "loc": 289,
         "risk": "—",
-        "desc": "Bisher NICHT im Inventar erfasste Dateien: Event-Quelle der State-Machine, Workflow-Graph-Struktur, Step-Definitionen",
-        "focus": "Neu ergänzt in v22 — noch keine vertiefte Fokus-Analyse hinterlegt; bei erster Bearbeitung dieser Dateien vollständige Lektüre vor Änderung durchführen und Fokus-Notiz hier nachtragen."
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "graph.rs",
         "size": "M",
-        "loc": 231,
+        "loc": 233,
         "risk": "—",
-        "desc": "Bisher NICHT im Inventar erfasste Dateien: Event-Quelle der State-Machine, Workflow-Graph-Struktur, Step-Definitionen",
-        "focus": "Neu ergänzt in v22 — noch keine vertiefte Fokus-Analyse hinterlegt; bei erster Bearbeitung dieser Dateien vollständige Lektüre vor Änderung durchführen und Fokus-Notiz hier nachtragen."
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 87,
+        "loc": 90,
         "risk": "—",
-        "desc": "Modul-Exports der Agent-Workflow-Engine",
-        "focus": "Prüfe Konsistenz der öffentlichen State-Machine-API mit ARCHITECTURE.md."
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "step.rs",
         "size": "S",
-        "loc": 87,
+        "loc": 94,
         "risk": "—",
-        "desc": "Bisher NICHT im Inventar erfasste Dateien: Event-Quelle der State-Machine, Workflow-Graph-Struktur, Step-Definitionen",
-        "focus": "Neu ergänzt in v22 — noch keine vertiefte Fokus-Analyse hinterlegt; bei erster Bearbeitung dieser Dateien vollständige Lektüre vor Änderung durchführen und Fokus-Notiz hier nachtragen."
+        "desc": "",
+        "focus": ""
       }
     ],
     "contextra-bench": [
+      {
+        "file": "ann_benchmarks.rs",
+        "size": "M",
+        "loc": 284,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "beir_eval.rs",
+        "size": "M",
+        "loc": 378,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
       {
         "file": "bin/compare_baseline.rs",
         "size": "S",
@@ -299,7 +613,7 @@
       {
         "file": "compare.rs",
         "size": "M",
-        "loc": 234,
+        "loc": 437,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -307,7 +621,7 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 9,
+        "loc": 14,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -315,7 +629,7 @@
       {
         "file": "locomo.rs",
         "size": "M",
-        "loc": 260,
+        "loc": 385,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -331,7 +645,7 @@
       {
         "file": "main.rs",
         "size": "L",
-        "loc": 1336,
+        "loc": 1441,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -339,7 +653,7 @@
       {
         "file": "path_rag_sweep.rs",
         "size": "M",
-        "loc": 351,
+        "loc": 361,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -353,145 +667,11 @@
         "focus": ""
       }
     ],
-    "contextra-calibration": [
-      {
-        "file": "isotonic.rs",
-        "size": "M",
-        "loc": 541,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 19,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "pid.rs",
-        "size": "M",
-        "loc": 432,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "platt.rs",
-        "size": "M",
-        "loc": 229,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "replicator.rs",
-        "size": "M",
-        "loc": 367,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
-    "contextra-candle": [
-      {
-        "file": "embedding.rs",
-        "size": "M",
-        "loc": 389,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "embedding_provider.rs",
-        "size": "S",
-        "loc": 86,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "gasp.rs",
-        "size": "L",
-        "loc": 604,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "gguf_loader.rs",
-        "size": "S",
-        "loc": 58,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "inference.rs",
-        "size": "M",
-        "loc": 492,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 33,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "model_registry.rs",
-        "size": "S",
-        "loc": 137,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
     "contextra-checkpoint": [
       {
-        "file": "lib.rs",
-        "size": "XL",
-        "loc": 2745,
-        "risk": "RAII/Time-Travel",
-        "desc": "GESAMTER Crate in einer Datei: CheckpointGuard (RAII, non-Clone, pin-before-save, Drop-Handling), CheckpointRegistry-Trait, PersistentCheckpointStore, Time-Travel-Rollback",
-        "focus": "APM-8 kritisch: niemals tokio::spawn() im Drop-Handler — das bricht die RAII-Garantie (Task kann vor Completion gecancelled werden). Pin-before-Save-Reihenfolge (ADR-011) ist bindend: Snapshot muss gepinnt sein, BEVOR der Checkpoint gespeichert wird. Rollback zu Checkpoint X muss bytegenau den State nach X wiederherstellen — verifiziere dies mit einem Byte-Vergleich, nicht nur mit einem Existenz-Check. [KORR v22: Es gibt keine separate registry.rs — der komplette Crate (inkl. Registry/Time-Travel) ist eine einzige Datei; Größenklasse deshalb XL statt L, höchste Sorgfaltspflicht bei jeder Änderung.]"
-      }
-    ],
-    "contextra-core": [
-      {
-        "file": "error.rs",
-        "size": "L",
-        "loc": 888,
-        "risk": "FFI",
-        "desc": "ContextraError-Enum + serialisierbares FFI-DTO-Mapping",
-        "focus": "JEDE ContextraError-Variante muss eine korrespondierende ContextraErrorDto-Variante besitzen — fehlende Zuordnung bricht contextra-py und contextra-mcp stillschweigend an der FFI-Grenze."
-      },
-      {
-        "file": "error_dto.rs",
+        "file": "guard.rs",
         "size": "M",
-        "loc": 476,
-        "risk": "FFI",
-        "desc": "ContextraError-Enum + serialisierbares FFI-DTO-Mapping",
-        "focus": "JEDE ContextraError-Variante muss eine korrespondierende ContextraErrorDto-Variante besitzen — fehlende Zuordnung bricht contextra-py und contextra-mcp stillschweigend an der FFI-Grenze."
-      },
-      {
-        "file": "ipc/jsonrpc.rs",
-        "size": "S",
-        "loc": 144,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ipc/mod.rs",
-        "size": "S",
-        "loc": 37,
+        "loc": 557,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -499,211 +679,73 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 53,
-        "risk": "—",
-        "desc": "Modulstruktur, pub-Exports, Re-Exports der Kern-Traits",
-        "focus": "Prüfe bei jeder Änderung, ob neue pub-Exports das DAG-Prinzip verletzen (contextra-core darf keine contextra-*-Abhängigkeit referenzieren)."
-      },
-      {
-        "file": "seq_log.rs",
-        "size": "M",
-        "loc": 410,
+        "loc": 49,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "snapshot.rs",
-        "size": "M",
-        "loc": 390,
-        "risk": "Concurrency",
-        "desc": "SnapshotRegistry + SnapshotGuard — Pin/Unpin-Verwaltung, Schutz gepinnter Snapshots vor GC",
-        "focus": "Das Pin-vs-GC-Race ist der bekannt sensibelste Pfad dieser Datei: jede Änderung an pin_snapshot()/unpin() erfordert einen begleitenden Concurrency-Test mit mind. 8 parallelen Threads. [KORR v22: Datei hieß zuvor snapshot_registry.rs — tatsächlicher Dateiname ist snapshot.rs.]"
-      },
-      {
-        "file": "traits/embedding.rs",
+        "file": "manifest.rs",
         "size": "S",
-        "loc": 174,
+        "loc": 164,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "traits/mod.rs",
-        "size": "XL",
-        "loc": 1868,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "tx_buffer.rs",
-        "size": "L",
-        "loc": 872,
-        "risk": "Concurrency",
-        "desc": "TxBuffer-Sharding, Lock-Granularität, Kapazitätsgrenze",
-        "focus": "Prüfe Lock-Granularität pro Shard — ein zu grobes Locking erzeugt Starvation unter hoher TX-Last, ein zu feines gefährdet Konsistenz zwischen Shards."
-      },
-      {
-        "file": "types.rs",
+        "file": "meta.rs",
         "size": "S",
-        "loc": 18,
+        "loc": 146,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "types/budget.rs",
+        "file": "orphan.rs",
         "size": "M",
-        "loc": 447,
-        "risk": "Budget",
-        "desc": "TokenBudget, consume()/available() — bewusst non-atomare Read-Modify-Write-Semantik",
-        "focus": "consume() ist heute durch &mut self (Borrow-Checker) vor Nebenläufigkeit geschützt — dokumentiere explizit jede Änderung, die diese Annahme berührt (z.B. Arc<Mutex<>>-Kapselung)."
-      },
-      {
-        "file": "types/domain.rs",
-        "size": "XL",
-        "loc": 1946,
-        "risk": "TxId",
-        "desc": "Kanonische Domain-Typen (DocId, EntityId, TxId, Embedding, Edge, Entity) — TxId::MAX_COLLECTION_SEQUENCE/INTERNAL_BASE-Trennung (ADR-028)",
-        "focus": "Niemals SystemTime für TxId verwenden. Die Grenze zwischen Collection- und System-TxId-Bereich (INTERNAL_BASE = u64::MAX - 1_000_000) ist eine architektonische Invariante — jede Änderung hier erfordert einen ADR. [KORR v22: Datei hieß im Prompter zuvor fälschlich types/tx.rs — TxId liegt tatsächlich in types/domain.rs, es gibt keine eigene tx.rs.]"
-      },
-      {
-        "file": "types/filter.rs",
-        "size": "M",
-        "loc": 416,
+        "loc": 578,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "types/importance.rs",
-        "size": "M",
-        "loc": 309,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "types/saos.rs",
+        "file": "store.rs",
         "size": "L",
-        "loc": 684,
+        "loc": 808,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "store/tests.rs",
+        "size": "L",
+        "loc": 857,
         "risk": "—",
         "desc": "",
         "focus": ""
       }
     ],
-    "contextra-core-ipc-gen": [
+    "contextra-cognition": [
       {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 9,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "contextra_generated.rs",
+        "file": "aggregation_phase.rs",
         "size": "L",
-        "loc": 815,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
-    "contextra-db": [
-      {
-        "file": "background_workers.rs",
-        "size": "L",
-        "loc": 685,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "chunker.rs",
-        "size": "L",
-        "loc": 641,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection/crud.rs",
-        "size": "XL",
-        "loc": 1565,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection/kv_lock.rs",
-        "size": "S",
-        "loc": 41,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection/maintenance.rs",
-        "size": "L",
-        "loc": 760,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection/mod.rs",
-        "size": "M",
-        "loc": 566,
-        "risk": "Locking",
-        "desc": "Collection-API, Lock-Hierarchie",
-        "focus": "Lock-Reihenfolge ist bindend: collections → embedder → insert_lock — IMMER in dieser Reihenfolge, jede Abweichung ist ein Deadlock-Risiko."
-      },
-      {
-        "file": "collection/query_builder.rs",
-        "size": "L",
-        "loc": 1133,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection/relate.rs",
-        "size": "S",
-        "loc": 67,
-        "risk": "Zyklen",
-        "desc": "Zettelkasten-Traversierung über ContextChunk.links",
-        "focus": "Relation A→B→A erfordert Visited-Set UND Timeout/Tiefenlimit — ohne beides Endlosschleifen-Risiko bei zyklischen Link-Strukturen."
-      },
-      {
-        "file": "collection/search.rs",
-        "size": "L",
-        "loc": 1388,
-        "risk": "Snapshot",
-        "desc": "hybrid_search() — Orchestrierung aller 4 Signale",
-        "focus": "LSM/BM25/Metadaten binden an seq_no, HNSW und CSR-Graph lesen unpinnten Live-State — verlasse dich in neuem Code NIE auf implizite Snapshot-Konsistenz von HNSW/Graph; nachgelagerte Filterung muss veraltete/gelöschte Treffer aktiv verwerfen."
-      },
-      {
-        "file": "collection/tests.rs",
-        "size": "XL",
-        "loc": 3204,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "collection/tx.rs",
-        "size": "S",
-        "loc": 34,
+        "loc": 694,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "consolidation_executor.rs",
-        "size": "M",
-        "loc": 242,
+        "size": "L",
+        "loc": 983,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "consolidation_locks.rs",
+        "size": "S",
+        "loc": 104,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -711,58 +753,82 @@
       {
         "file": "context.rs",
         "size": "M",
-        "loc": 588,
+        "loc": 553,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "context_compaction.rs",
-        "size": "L",
-        "loc": 1056,
-        "risk": "—",
-        "desc": "ContextCompactor + ConsolidationSession — StatusToken-Ersetzung veralteter Tool-Outputs",
-        "focus": "Prüfe, dass komprimierte Historie für nachgelagerte Agent-Schritte semantisch äquivalent bleibt (kein Informationsverlust an kritischen Entscheidungspunkten). [KORR v22: Datei hieß zuvor compactor.rs — tatsächlicher Dateiname ist context_compaction.rs; Größenklasse auf L korrigiert (ursprünglich fälschlich als M eingeschätzt).]"
-      },
-      {
-        "file": "decay_controller.rs",
-        "size": "M",
-        "loc": 204,
+        "file": "context_compaction/cleanup.rs",
+        "size": "S",
+        "loc": 39,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "filter.rs",
+        "file": "context_compaction/compactor.rs",
         "size": "M",
-        "loc": 320,
+        "loc": 256,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "fusion.rs",
-        "size": "XL",
-        "loc": 2501,
-        "risk": "APM-5",
-        "desc": "reciprocal_rank_fusion() / weighted_reciprocal_rank_fusion() — Kern der 4-Signal-Fusion",
-        "focus": "RRF nutzt AUSSCHLIESSLICH die Rang-Position, nicht den Score-Wert — jede score *= boost-Modifikation VOR der Fusion hat NULLEFFEKT (APM-5). Boosts müssen POST-RRF angewendet werden. Beachte zusätzlich: weighted_reciprocal_rank_fusion() materialisiert und sortiert VOLLSTÄNDIG (O(U log U)) — jede neue Aufruferstelle muss MAX_SEARCH_K respektieren."
+        "file": "context_compaction/mod.rs",
+        "size": "S",
+        "loc": 26,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
-        "file": "homeostat.rs",
+        "file": "context_compaction/session.rs",
         "size": "M",
-        "loc": 230,
+        "loc": 306,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "context_compaction/tests.rs",
+        "size": "M",
+        "loc": 565,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "context_compaction/types.rs",
+        "size": "S",
+        "loc": 41,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "graph_sink.rs",
+        "size": "S",
+        "loc": 85,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "leanrag_input.rs",
+        "size": "S",
+        "loc": 116,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "lib.rs",
-        "size": "XL",
-        "loc": 2318,
+        "size": "S",
+        "loc": 68,
         "risk": "—",
-        "desc": "Contextra-Orchestrator-Einstiegspunkt",
-        "focus": "Prüfe die öffentliche API auf Konsistenz mit README.md-Beispielen."
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "maintenance_config.rs",
@@ -775,7 +841,7 @@
       {
         "file": "maintenance_scheduler.rs",
         "size": "M",
-        "loc": 474,
+        "loc": 460,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -783,421 +849,59 @@
       {
         "file": "memory_consolidation.rs",
         "size": "L",
-        "loc": 880,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "multistep.rs",
-        "size": "M",
-        "loc": 429,
-        "risk": "—",
-        "desc": "MultiStepEngine — iteratives Query-Rewriting (bis 3 Runden)",
-        "focus": "Prüfe die Abbruchbedingung bei Konvergenz vs. hartem Runden-Limit — beide müssen greifen können."
+        "loc": 972,
+        "risk": "P1-Pass-Separation",
+        "desc": "Structural Consolidation Pass (run_structural_synthesis_pass) — LLM-frei",
+        "focus": "Pass Separation Invariant (P1): Strikt ZERO dependencies on memfuse-graph/contextra-graph und ZERO LLM API calls."
       },
       {
         "file": "synthesis_phase.rs",
-        "size": "S",
-        "loc": 199,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "temporal_filter.rs",
         "size": "M",
-        "loc": 352,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "transaction.rs",
-        "size": "L",
-        "loc": 812,
-        "risk": "2PC",
-        "desc": "2PC-Koordination über alle 4 Sub-Engines, repair_on_open()",
-        "focus": "Bei Fehler nach Commit von Signal N müssen die Signale N..4 vollständig zurückgerollt werden. repair_on_open() muss CommitIntent::Pending nach Crash forward-committen, nicht verwerfen."
-      },
-      {
-        "file": "volatile_vault.rs",
-        "size": "M",
-        "loc": 425,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
+        "loc": 206,
+        "risk": "LLM-Synthesis",
+        "desc": "Generative Synthesis Pass (run_synthesis_pass) — LLM-basiert",
+        "focus": "Generativer Pass zur Erzeugung synthetischer Chunks mit Provenance-Kennzeichnung."
       }
     ],
-    "contextra-embed": [
-      {
-        "file": "lib.rs",
-        "size": "L",
-        "loc": 662,
-        "risk": "Feature-Gate",
-        "desc": "Feature-Gate-Wurzel (default=[])",
-        "focus": "cargo check --no-default-features MUSS 0 Fehler ergeben — dies ist die zentrale Hermetizitäts-Garantie des optionalen Crates."
-      },
-      {
-        "file": "reranker.rs",
-        "size": "L",
-        "loc": 1105,
-        "risk": "Blocking/Sichtbarkeit",
-        "desc": "CrossEncoderReranker UND OnnxSessionPool (bewusst pub(crate), nicht exportiert) — beides in derselben Datei",
-        "focus": "ONNX-Inferenz blockiert den Thread — spawn_blocking ist Pflicht, sonst Stall des Tokio-Executors. Score-Ties müssen stabil sortiert werden, Richtung höher=besser verifizieren. Für Modul-externe Nutzung des SessionPool einen eigenen Pool halten statt Sichtbarkeit zu erweitern (Planungsdokument-Blueprint-Korrektur #1). [KORR v22: Es gibt keine eigene session_pool.rs — der Crate besteht nur aus lib.rs + reranker.rs, OnnxSessionPool ist Teil von reranker.rs.]"
-      }
-    ],
-    "contextra-graph": [
-      {
-        "file": "cascade.rs",
-        "size": "M",
-        "loc": 307,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "community.rs",
-        "size": "M",
-        "loc": 592,
-        "risk": "Determinismus",
-        "desc": "Label-Propagation Community-Detection",
-        "focus": "Muss deterministisch sein (ADR-027) — identischer Input-Graph erzeugt identische Community-Zuordnung über mehrere Läufe."
-      },
-      {
-        "file": "consistency_enforcement.rs",
-        "size": "M",
-        "loc": 452,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "csr.rs",
-        "size": "XL",
-        "loc": 4601,
-        "risk": "Invariante/DoS",
-        "desc": "CSR-Graph-Kern — offsets/reverse_map, compact(), rollback(), traverse()/traverse_at() Multi-Hop-BFS mit Hub-Node-Branching-Limit",
-        "focus": "offsets.len() == reverse_map.len() + 1 MUSS immer gelten, auch bei entity-only-Commits ohne Kanten — compact() darf das offsets-Padding in diesem Fall nicht überspringen. rollback() MUSS id_map UND reverse_map bereinigen, nicht nur staged_edges. Ein Knoten mit sehr vielen Kanten (Hub) darf die Traversal-Queue nicht explodieren lassen — MAX_VISITED_NODES-Limit muss PER LEVEL greifen, nicht nur als globales Ergebnis-Limit. [KORR v22: Es gibt keine eigene bfs.rs — die komplette Traversal-Logik (traverse/traverse_at/traverse_at_bitemporal) lebt bereits in dieser Datei.]"
-      },
-      {
-        "file": "edge_reinforcement.rs",
-        "size": "S",
-        "loc": 181,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "edge_reinforcement_buffer.rs",
-        "size": "S",
-        "loc": 154,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
+    "contextra-core": [
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 83,
+        "loc": 136,
         "risk": "—",
-        "desc": "Modul-Exports des CSR-Graphen",
-        "focus": "Prüfe, dass keine petgraph-Abhängigkeit eingeführt wurde (ADR-004, Pure-Rust-Policy)."
-      },
-      {
-        "file": "path_rag.rs",
-        "size": "M",
-        "loc": 428,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "percolation.rs",
-        "size": "M",
-        "loc": 311,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ppr.rs",
-        "size": "L",
-        "loc": 1328,
-        "risk": "Numerik",
-        "desc": "Personalized PageRank — Power-Iteration, Dangling-Node-Handling",
-        "focus": "Summe aller PPR-Scores muss exakt 1.0 sein (Mass-Conservation) — auch bei Dangling Nodes, deren Teleportation-Mass korrekt redistributiert werden muss."
-      },
-      {
-        "file": "provenance.rs",
-        "size": "S",
-        "loc": 181,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "session_dag.rs",
-        "size": "L",
-        "loc": 870,
-        "risk": "Concurrency",
-        "desc": "SessionBranchTree — Konversationsverzweigung als persistierter DAG",
-        "focus": "Kein Lock darf über einen .await-Punkt gehalten werden — Lock-Scopes methodenlokal und minimal halten."
+        "desc": "Modulstruktur, pub-Exports, Re-Exports der Kern-Traits",
+        "focus": "Prüfe bei jeder Änderung, ob neue pub-Exports das DAG-Prinzip verletzen (contextra-core darf keine contextra-*-Abhängigkeit referenzieren)."
       }
     ],
-    "contextra-index": [
-      {
-        "file": "diskann.rs",
-        "size": "XL",
-        "loc": 3055,
-        "risk": "unsafe/Mmap",
-        "desc": "Experimentelles DiskANN, Out-of-Core, hinter Feature-Flag experimental-diskann",
-        "focus": "unsafe hier ist erlaubt (Mmap, ADR-017), aber ausschließlich innerhalb dieses Feature-Gates. Noch nicht produktionsreif — jede Änderung explizit als experimentell kennzeichnen."
-      },
-      {
-        "file": "distance.rs",
-        "size": "XL",
-        "loc": 1909,
-        "risk": "SIMD/unsafe",
-        "desc": "SIMD-Distanzfunktionen (AVX2/NEON), einziger regulär erlaubter unsafe-Ort neben diskann.rs/persistence.rs",
-        "focus": "JEDER unsafe-Block muss direkt von is_x86_feature_detected!(\"avx2\") (bzw. äquivalent für NEON) umschlossen sein. SIMD-Pfad und Scalar-Fallback müssen identische Semantik haben (beide sqrt oder beide squared) — sonst schleichende Ranking-Divergenz."
-      },
-      {
-        "file": "hnsw.rs",
-        "size": "XL",
-        "loc": 4121,
-        "risk": "APM-2/3",
-        "desc": "HNSW-Graph-Kern — Suche, Insert, Tombstone-Handling, SQ8-Bound-Expansion",
-        "focus": "search_filtered(): Tombstone-Prüfung MUSS unconditional VOR jedem Custom-Filter erfolgen (zwei separate if-Blöcke, kein if/else-if — APM-2). SQ8-Bound-Expansion in do_insert() MUSS über write() laufen, nicht try_write() (APM-3) — sonst lastabhängige, stille Präzisionsverluste."
-      },
-      {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 36,
-        "risk": "—",
-        "desc": "Modul-Exports des HNSW-Index",
-        "focus": "Prüfe Feature-Gate-Konsistenz für experimental-diskann."
-      },
-      {
-        "file": "partial_rebuild.rs",
-        "size": "M",
-        "loc": 345,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "persistence.rs",
-        "size": "L",
-        "loc": 851,
-        "risk": "unsafe/TOCTOU",
-        "desc": "Mmap-basierte Persistenz des Index",
-        "focus": "TOCTOU-Risiko: Datei kann zwischen Öffnen und aktivem Mmap verkürzt/gelöscht werden → SIGBUS. Prüfe Dateigrößen-Validierung vor jedem Mmap-Zugriff."
-      },
-      {
-        "file": "quantize.rs",
-        "size": "L",
-        "loc": 857,
-        "risk": "Precision",
-        "desc": "ScalarQuantizer (SQ8) — per-Dimension Min/Max-Skalierung von Vektoren",
-        "focus": "Prüfe Rundungsverhalten an den Quantisierungsgrenzen — Bound-Expansion in hnsw.rs hängt direkt von der hier definierten Skalierung ab. [KORR v22: Datei hieß zuvor quantization.rs — tatsächlicher Dateiname ist quantize.rs.]"
-      }
-    ],
-    "contextra-mcp": [
-      {
-        "file": "bin/contextra-mcp-server.rs",
-        "size": "S",
-        "loc": 70,
-        "risk": "—",
-        "desc": "Binary-Einstiegspunkt — startet McpServer::run_stdio(), Logs ausschließlich nach stderr",
-        "focus": "Neu ergänzt in v22. stdout ist für JSON-RPC reserviert — JEDE println!/log-Ausgabe hierhin bricht das Protokoll; nur eprintln!/tracing-nach-stderr ist zulässig."
-      },
-      {
-        "file": "config.rs",
-        "size": "M",
-        "loc": 453,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lib.rs",
-        "size": "L",
-        "loc": 824,
-        "risk": "Protokoll/DoS/Injection",
-        "desc": "McpServer — stdio JSON-RPC 2.0 Server-Loop UND contextra_search/insert/get/collections-Tool-Dispatch in EINER Datei (größte Datei des Crates)",
-        "focus": "ADR-010: AUSSCHLIESSLICH stdio — kein axum/TcpListener/HTTP, jeder Rest davon ist ein kritischer Architektur-Befund. Grenzwerte MAX_RPC_BYTES=16MB / MAX_SEARCH_QUERY=64KB an n-1/n/n+1 Bytes testen. Prüfe Inaktivitäts-Timeout (Slowloris-Schutz) für sehr langsame Clients. Prüfe zusätzlich, dass interne Pfade/Stacktraces niemals in Fehlermeldungen an den Client durchsickern (Informations-Leck-Risiko). [KORR v22: Es gibt keine separaten server.rs/tools.rs — Server-Loop UND Tool-Dispatch liegen beide in lib.rs; Größenklasse deshalb XL statt S/L.]"
-      },
-      {
-        "file": "prompt_injection.rs",
-        "size": "L",
-        "loc": 789,
-        "risk": "Injection",
-        "desc": "Prompt-Injection-Erkennung/-Abwehr für Tool-Outputs",
-        "focus": "Neu ergänzt in v22 — diese Datei fehlte bisher VOLLSTÄNDIG im Komponenten-Inventar, obwohl sie mit direktem Injection-Bezug zu den sicherheitskritischsten Dateien des gesamten Crates zählt. Bei jeder Änderung: keine Denylist-basierte Erkennung als alleinige Verteidigungslinie akzeptieren (gleiche Grundregel wie bei contextra-ollama::client.rs)."
-      },
-      {
-        "file": "protocol.rs",
-        "size": "S",
-        "loc": 87,
-        "risk": "—",
-        "desc": "JsonRpcResponse-Hilfsfunktionen (response_from_error etc.)",
-        "focus": "Reine Serialisierungs-Helfer — Fehler-Codes müssen exakt der JSON-RPC-2.0-Spec entsprechen (kein Custom-Errorcode-Schema)."
-      },
-      {
-        "file": "sandbox.rs",
-        "size": "M",
-        "loc": 431,
-        "risk": "Krypto",
-        "desc": "McpSandbox — Tool-Output-Isolation",
-        "focus": "Tool-Outputs müssen AES-256-GCM-SIV-verschlüsselt und bei Verwerfen ge-zeroized werden (Anthropic-Containment-Pattern) — prüfe SandboxPolicy-Defaults (DB-Reads erlaubt, DB-Writes/Code-Execution opt-in)."
-      },
-      {
-        "file": "tests.rs",
-        "size": "M",
-        "loc": 537,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
-    "contextra-ollama": [
-      {
-        "file": "client.rs",
-        "size": "XL",
-        "loc": 2511,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "context_prefixer.rs",
-        "size": "M",
-        "loc": 441,
-        "risk": "—",
-        "desc": "ContextPrefixEngine — 50-100-Token-Kontext-Präfix-Generierung",
-        "focus": "Prüfe Verhalten bei nicht erreichbarer Ollama-Instanz — kontrollierter Fehler, kein Hang. [KORR v22: Datei hieß zuvor context_prefix.rs — tatsächlicher Dateiname ist context_prefixer.rs.]"
-      },
-      {
-        "file": "embedding.rs",
-        "size": "M",
-        "loc": 208,
-        "risk": "Konsistenz",
-        "desc": "OllamaEmbedder — Embedding-Erzeugung",
-        "focus": "Vektor-Dimension muss über alle Aufrufe und Modelle hinweg konsistent bleiben — Dimensionswechsel ohne Fehler ist ein kritischer Befund. [KORR v22: Datei hieß zuvor embedder.rs — tatsächlicher Dateiname ist embedding.rs.]"
-      },
-      {
-        "file": "importance.rs",
-        "size": "L",
-        "loc": 625,
-        "risk": "—",
-        "desc": "Bisher NICHT im Inventar erfasste Dateien: Importance-Scoring bzw. Ollama-Modell-Metadaten",
-        "focus": "Neu ergänzt in v22 — noch keine vertiefte Fokus-Analyse hinterlegt; bei erster Bearbeitung dieser Dateien vollständige Lektüre vor Änderung durchführen und Fokus-Notiz hier nachtragen."
-      },
-      {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 21,
-        "risk": "—",
-        "desc": "Modul-Exports des Ollama-Clients",
-        "focus": "Prüfe, dass keine Business-Logik hier landet, die eigentlich in client.rs gehört."
-      },
-      {
-        "file": "model_info.rs",
-        "size": "S",
-        "loc": 184,
-        "risk": "—",
-        "desc": "Bisher NICHT im Inventar erfasste Dateien: Importance-Scoring bzw. Ollama-Modell-Metadaten",
-        "focus": "Neu ergänzt in v22 — noch keine vertiefte Fokus-Analyse hinterlegt; bei erster Bearbeitung dieser Dateien vollständige Lektüre vor Änderung durchführen und Fokus-Notiz hier nachtragen."
-      }
-    ],
-    "contextra-router": [
-      {
-        "file": "dispatch.rs",
-        "size": "S",
-        "loc": 171,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "lib.rs",
-        "size": "S",
-        "loc": 17,
-        "risk": "—",
-        "desc": "Modul-Exports der Routing-Engine",
-        "focus": "Prüfe, dass contextra-mcp (Layer 4) hier nicht importiert wird (DAG-Verletzung, ADR-045-Kontext)."
-      },
-      {
-        "file": "lyapunov.rs",
-        "size": "M",
-        "loc": 499,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "outcome.rs",
-        "size": "S",
-        "loc": 59,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "profile.rs",
-        "size": "M",
-        "loc": 473,
-        "risk": "NaN",
-        "desc": "SlmProfile::new() / try_new()",
-        "focus": "SlmProfile::new() akzeptiert derzeit NaN, wodurch score >= NaN immer false ist und kein Routing mehr stattfindet — try_new() mit is_finite() && >= 0.0-Check ist der korrekte Pfad für neue Nutzung."
-      },
-      {
-        "file": "router.rs",
-        "size": "L",
-        "loc": 920,
-        "risk": "NaN",
-        "desc": "SLM-Routing-Logik",
-        "focus": "f32::max(0.0, NaN) = NaN → Routing wird nicht-deterministisch. Bei dieser Dateigröße ist 100%-Branch-Coverage (cargo llvm-cov --branch) das realistische und verbindliche Ziel — jede neue Branch braucht einen dedizierten Test."
-      },
-      {
-        "file": "serde_helpers.rs",
-        "size": "S",
-        "loc": 22,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "tests.rs",
-        "size": "XL",
-        "loc": 3216,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      }
-    ],
-    "contextra-security": [
+    "contextra-crypto": [
       {
         "file": "anti_tamper.rs",
         "size": "S",
-        "loc": 144,
-        "risk": "Zeroize",
-        "desc": "IntegrityVerifier, VolatileEncryptionKey (#[zeroize(drop)]) & Zeroize-Drop-Semantik-Verifikation",
-        "focus": "Test-only unsafe hier ist explizit erlaubt (AGENTS.md-Ausnahme) — ausschließlich zur Verifikation der Zeroize-Drop-Semantik via Raw-Pointer-Inspektion, niemals für Produktionslogik. JEDES neue Struct mit Schlüsselmaterial MUSS ZeroizeOnDrop implementieren — lückenlos, keine Ausnahme. [KORR v22: Es gibt keine eigene zeroize_types.rs — VolatileEncryptionKey lebt bereits hier in anti_tamper.rs.]"
+        "loc": 145,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "crypto.rs",
         "size": "L",
-        "loc": 707,
-        "risk": "RFC 8452/5869/4231",
-        "desc": "KeyManager — AES-256-GCM-SIV encrypt/decrypt + Nonce-Konstruktion, HKDF Key Derivation, HMAC-SHA256 (alle drei Primitiven in EINER Datei, Größenklasse L)",
-        "focus": "Nonce = 4B Instanz-Präfix (OsRng) + 8B per-Call OsRng-Suffix — jede Änderung an der Nonce-Konstruktion erfordert eine erneute Kollisionswahrscheinlichkeits-Betrachtung (Referenz p≈2.71e-8 bei 10⁶ Nonces). Jeder neue abgeleitete Schlüsseltyp braucht einen eigenen, disjunkten HKDF-Domain-Separator-String. Jeder Tag-/MAC-Vergleich MUSS über subtle::ConstantTimeEq laufen. [KORR v22: Es gibt KEINE separaten Dateien aes_gcm_siv.rs/hkdf.rs/hmac.rs — alle drei Primitiven sind im KeyManager in crypto.rs konsolidiert.]"
+        "loc": 816,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "deletion_proof.rs",
         "size": "L",
-        "loc": 661,
+        "loc": 906,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "egress_vault.rs",
+        "size": "S",
+        "loc": 4,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1205,7 +909,15 @@
       {
         "file": "error.rs",
         "size": "S",
-        "loc": 97,
+        "loc": 118,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kdf.rs",
+        "size": "M",
+        "loc": 278,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1213,7 +925,7 @@
       {
         "file": "kv_cipher.rs",
         "size": "M",
-        "loc": 210,
+        "loc": 343,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1221,7 +933,7 @@
       {
         "file": "kv_segment/eviction_worker.rs",
         "size": "M",
-        "loc": 206,
+        "loc": 210,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1237,7 +949,7 @@
       {
         "file": "kv_segment/segment.rs",
         "size": "M",
-        "loc": 243,
+        "loc": 351,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1245,7 +957,7 @@
       {
         "file": "kv_segment/store.rs",
         "size": "L",
-        "loc": 617,
+        "loc": 845,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1253,89 +965,2489 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 34,
+        "loc": 47,
         "risk": "—",
-        "desc": "Modul-Exports der Krypto-Primitiven & KV-Segment-Sicherheit",
-        "focus": "Stelle sicher, dass ausschließlich geprüfte Primitiven exportiert werden — kein Ad-hoc-Crypto-Code außerhalb dieses Crates darf entstehen (Krypto-Isolation)."
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "wal_crypto.rs",
         "size": "L",
-        "loc": 686,
-        "risk": "HMAC-Chain",
-        "desc": "WAL-HMAC-Chaining v3 — kryptographische Integritätskette über das gesamte WAL",
-        "focus": "Byte-Reihenfolge ist bindend: domain-separator → prev_hmac → seq_no → tx_id → op_type+kv. Jede Abweichung bricht die Chain rückwirkend. Änderungen hier erfordern Regressionstests gegen die bestehende v3-Testvektor-Suite UND explizite Versionierung (nie v3 stillschweigend überschreiben)."
+        "loc": 732,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-db": [
+      {
+        "file": "lib.rs",
+        "size": "L",
+        "loc": 885,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "multistep.rs",
+        "size": "M",
+        "loc": 575,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "volatile_vault.rs",
+        "size": "M",
+        "loc": 392,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-engine": [
+      {
+        "file": "background_workers/config.rs",
+        "size": "S",
+        "loc": 63,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "background_workers/expiry_workers.rs",
+        "size": "S",
+        "loc": 113,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "background_workers/hyperedge_worker.rs",
+        "size": "S",
+        "loc": 102,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "background_workers/mod.rs",
+        "size": "S",
+        "loc": 31,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "background_workers/orphan_workers.rs",
+        "size": "S",
+        "loc": 176,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "background_workers/tests.rs",
+        "size": "L",
+        "loc": 763,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "chunker.rs",
+        "size": "L",
+        "loc": 681,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/delete.rs",
+        "size": "S",
+        "loc": 57,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/insert.rs",
+        "size": "M",
+        "loc": 441,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/internal.rs",
+        "size": "S",
+        "loc": 80,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/kv.rs",
+        "size": "S",
+        "loc": 59,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/links.rs",
+        "size": "M",
+        "loc": 211,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/mod.rs",
+        "size": "S",
+        "loc": 19,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/read.rs",
+        "size": "M",
+        "loc": 269,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/tests.rs",
+        "size": "M",
+        "loc": 370,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/crud/update.rs",
+        "size": "S",
+        "loc": 113,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/kv_lock.rs",
+        "size": "S",
+        "loc": 49,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/maintenance.rs",
+        "size": "L",
+        "loc": 870,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/mod.rs",
+        "size": "L",
+        "loc": 657,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/query_builder/builder.rs",
+        "size": "M",
+        "loc": 285,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/query_builder/builder_exec.rs",
+        "size": "S",
+        "loc": 181,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/query_builder/mod.rs",
+        "size": "S",
+        "loc": 19,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/query_builder/strategy.rs",
+        "size": "S",
+        "loc": 75,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/query_builder/tests.rs",
+        "size": "M",
+        "loc": 549,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/query_builder/weights.rs",
+        "size": "S",
+        "loc": 40,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/relate.rs",
+        "size": "M",
+        "loc": 259,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/search/basic.rs",
+        "size": "S",
+        "loc": 119,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/search/checkpoint.rs",
+        "size": "S",
+        "loc": 131,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/search/filtered.rs",
+        "size": "M",
+        "loc": 245,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/search/hybrid/mod.rs",
+        "size": "M",
+        "loc": 359,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/search/hybrid/query.rs",
+        "size": "M",
+        "loc": 409,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/search/hydrate.rs",
+        "size": "S",
+        "loc": 103,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/search/mod.rs",
+        "size": "S",
+        "loc": 26,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/concurrency_tests.rs",
+        "size": "M",
+        "loc": 581,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/fixtures.rs",
+        "size": "S",
+        "loc": 3,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/hybrid_search_tests.rs",
+        "size": "M",
+        "loc": 555,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/insert_tests.rs",
+        "size": "M",
+        "loc": 363,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/link_tests.rs",
+        "size": "M",
+        "loc": 427,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/misc_tests.rs",
+        "size": "L",
+        "loc": 601,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/mod.rs",
+        "size": "S",
+        "loc": 16,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/read_tests.rs",
+        "size": "M",
+        "loc": 356,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/search_tests.rs",
+        "size": "M",
+        "loc": 552,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tests/update_delete_tests.rs",
+        "size": "M",
+        "loc": 341,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "collection/tx.rs",
+        "size": "S",
+        "loc": 35,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "contextra_impl/collections.rs",
+        "size": "M",
+        "loc": 229,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "contextra_impl/crud.rs",
+        "size": "M",
+        "loc": 336,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "contextra_impl/diagnostics.rs",
+        "size": "S",
+        "loc": 60,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "contextra_impl/lifecycle.rs",
+        "size": "M",
+        "loc": 480,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "contextra_impl/mod.rs",
+        "size": "S",
+        "loc": 5,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "contextra_impl/wiring.rs",
+        "size": "S",
+        "loc": 23,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "decay_controller.rs",
+        "size": "M",
+        "loc": 204,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "export.rs",
+        "size": "M",
+        "loc": 388,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "filter.rs",
+        "size": "M",
+        "loc": 320,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion.rs",
+        "size": "S",
+        "loc": 40,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "import.rs",
+        "size": "S",
+        "loc": 124,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "M",
+        "loc": 300,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "temporal_filter.rs",
+        "size": "M",
+        "loc": 352,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "transaction/cleanup.rs",
+        "size": "S",
+        "loc": 36,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "transaction/compensating_actions.rs",
+        "size": "M",
+        "loc": 303,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "transaction/db_transaction.rs",
+        "size": "S",
+        "loc": 172,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "transaction/db_transaction_commit.rs",
+        "size": "M",
+        "loc": 290,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "transaction/db_transaction_rollback.rs",
+        "size": "M",
+        "loc": 254,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "transaction/intent.rs",
+        "size": "S",
+        "loc": 34,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "transaction/mod.rs",
+        "size": "S",
+        "loc": 41,
+        "risk": "2PC",
+        "desc": "Submodule directory re-exporting transaction modules (cleanup, compensating_actions, intent, db_transaction)",
+        "focus": "Byte-identical public API surface. 2PC transaction coordination."
+      },
+      {
+        "file": "transaction/tests.rs",
+        "size": "S",
+        "loc": 154,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-graph": [
+      {
+        "file": "arc_slice.rs",
+        "size": "S",
+        "loc": 157,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "cascade.rs",
+        "size": "L",
+        "loc": 856,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "community.rs",
+        "size": "L",
+        "loc": 629,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "community/tests.rs",
+        "size": "L",
+        "loc": 812,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "consistency_enforcement.rs",
+        "size": "M",
+        "loc": 452,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr.rs",
+        "size": "S",
+        "loc": 23,
+        "risk": "Invariante/DoS",
+        "desc": "CSR-Graph-Kern — offsets/reverse_map, bitemporal traversal, cascade_invalidate_hyperedges",
+        "focus": "Traverse_at_bitemporal trennt transaction time (tx_valid_from/to) und business validity time."
+      },
+      {
+        "file": "csr/graph_index.rs",
+        "size": "L",
+        "loc": 859,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/graph_persist.rs",
+        "size": "M",
+        "loc": 271,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/graph_read.rs",
+        "size": "M",
+        "loc": 351,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/graph_write.rs",
+        "size": "L",
+        "loc": 915,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/inner.rs",
+        "size": "L",
+        "loc": 811,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/path_graph.rs",
+        "size": "S",
+        "loc": 153,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/tests.rs",
+        "size": "S",
+        "loc": 4,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/tests/basic_tests.rs",
+        "size": "L",
+        "loc": 759,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/tests/bitemporal_tests.rs",
+        "size": "M",
+        "loc": 554,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/tests/graph_index_tests.rs",
+        "size": "L",
+        "loc": 700,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/tests/persistence_tests.rs",
+        "size": "L",
+        "loc": 757,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/types.rs",
+        "size": "S",
+        "loc": 113,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "csr/visibility.rs",
+        "size": "S",
+        "loc": 79,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "edge_reinforcement.rs",
+        "size": "S",
+        "loc": 181,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "edge_reinforcement_buffer.rs",
+        "size": "M",
+        "loc": 201,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "error.rs",
+        "size": "S",
+        "loc": 110,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hyperedge.rs",
+        "size": "L",
+        "loc": 819,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 106,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "path_rag.rs",
+        "size": "L",
+        "loc": 1002,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "percolation.rs",
+        "size": "M",
+        "loc": 312,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "ppr.rs",
+        "size": "L",
+        "loc": 998,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "ppr/snapshot.rs",
+        "size": "S",
+        "loc": 141,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "ppr/tests.rs",
+        "size": "S",
+        "loc": 2,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "ppr/tests/algo_tests.rs",
+        "size": "L",
+        "loc": 928,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "ppr/tests/context_tests.rs",
+        "size": "L",
+        "loc": 819,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "ppr_stream.rs",
+        "size": "S",
+        "loc": 151,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "provenance.rs",
+        "size": "S",
+        "loc": 175,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "session_dag.rs",
+        "size": "L",
+        "loc": 978,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tl_hfd/diffusion.rs",
+        "size": "M",
+        "loc": 252,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tl_hfd/error.rs",
+        "size": "S",
+        "loc": 21,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tl_hfd/lovasz.rs",
+        "size": "S",
+        "loc": 193,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tl_hfd/mod.rs",
+        "size": "S",
+        "loc": 50,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tl_hfd/params.rs",
+        "size": "S",
+        "loc": 135,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tl_hfd/shadow.rs",
+        "size": "S",
+        "loc": 114,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-infer-candle": [
+      {
+        "file": "embedding.rs",
+        "size": "M",
+        "loc": 451,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "embedding_provider.rs",
+        "size": "S",
+        "loc": 97,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "gasp.rs",
+        "size": "L",
+        "loc": 661,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "gguf_loader.rs",
+        "size": "S",
+        "loc": 93,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "inference.rs",
+        "size": "S",
+        "loc": 24,
+        "risk": "candle",
+        "desc": "Candle ML Inferenz Backend & KvBridgeAdapter",
+        "focus": "#![forbid(unsafe_code)] at crate root. Native Candle GGUF ML inference backend."
+      },
+      {
+        "file": "inference/core.rs",
+        "size": "L",
+        "loc": 934,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "inference/prefix_reuse.rs",
+        "size": "S",
+        "loc": 90,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "inference/tests.rs",
+        "size": "L",
+        "loc": 701,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kv_bridge.rs",
+        "size": "L",
+        "loc": 709,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kv_state.rs",
+        "size": "M",
+        "loc": 319,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 51,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "model/mod.rs",
+        "size": "S",
+        "loc": 8,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "model/quantized_llama.rs",
+        "size": "L",
+        "loc": 642,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "model_registry.rs",
+        "size": "S",
+        "loc": 141,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-infer-ollama": [
+      {
+        "file": "client.rs",
+        "size": "S",
+        "loc": 24,
+        "risk": "inj",
+        "desc": "Ollama Client & XML Special Character Escaping",
+        "focus": "build_rag_prompt escapes XML special characters (<, >, &, \", '). Static regex helpers use OnceLock."
+      },
+      {
+        "file": "client/config.rs",
+        "size": "S",
+        "loc": 44,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "client/core.rs",
+        "size": "L",
+        "loc": 981,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "client/errors.rs",
+        "size": "S",
+        "loc": 48,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "client/tests.rs",
+        "size": "XL",
+        "loc": 1591,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "client/trait_impls.rs",
+        "size": "S",
+        "loc": 60,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "client/validation.rs",
+        "size": "S",
+        "loc": 62,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "client/wire.rs",
+        "size": "S",
+        "loc": 62,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "context_prefixer.rs",
+        "size": "M",
+        "loc": 442,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "embedding.rs",
+        "size": "M",
+        "loc": 316,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "importance.rs",
+        "size": "L",
+        "loc": 626,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 24,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "model_info.rs",
+        "size": "M",
+        "loc": 324,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-infer-onnx": [
+      {
+        "file": "lib.rs",
+        "size": "L",
+        "loc": 852,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "reranker/config.rs",
+        "size": "S",
+        "loc": 64,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "reranker/cross_encoder.rs",
+        "size": "S",
+        "loc": 186,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "reranker/mod.rs",
+        "size": "S",
+        "loc": 29,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "reranker/onnx.rs",
+        "size": "M",
+        "loc": 342,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "reranker/tests.rs",
+        "size": "M",
+        "loc": 525,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-kvcache": [
+      {
+        "file": "eviction_worker.rs",
+        "size": "M",
+        "loc": 212,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 20,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "prefix_store.rs",
+        "size": "M",
+        "loc": 275,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "radix.rs",
+        "size": "M",
+        "loc": 461,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "segment.rs",
+        "size": "M",
+        "loc": 473,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "store.rs",
+        "size": "L",
+        "loc": 976,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-mcp": [
+      {
+        "file": "bin/contextra-mcp-server.rs",
+        "size": "S",
+        "loc": 88,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bulk_exfiltration_detector.rs",
+        "size": "S",
+        "loc": 4,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "config.rs",
+        "size": "M",
+        "loc": 501,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "egress_gateway.rs",
+        "size": "S",
+        "loc": 25,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "egress_guard.rs",
+        "size": "S",
+        "loc": 154,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "io.rs",
+        "size": "S",
+        "loc": 82,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 50,
+        "risk": "proto",
+        "desc": "stdio JSON-RPC 2.0 Server & McpSandbox",
+        "focus": "ADR-010 stdio transport only. read_line_bounded enforced by MAX_RPC_BYTES = 16MB. SLM dispatch directly executes binary without shell."
+      },
+      {
+        "file": "prompt_injection.rs",
+        "size": "S",
+        "loc": 57,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "prompt_injection/audit.rs",
+        "size": "S",
+        "loc": 67,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "prompt_injection/guard.rs",
+        "size": "L",
+        "loc": 611,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "prompt_injection/policy.rs",
+        "size": "S",
+        "loc": 61,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "prompt_injection/tests.rs",
+        "size": "M",
+        "loc": 305,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "protocol.rs",
+        "size": "S",
+        "loc": 87,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "routing.rs",
+        "size": "S",
+        "loc": 165,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sandbox.rs",
+        "size": "M",
+        "loc": 499,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "server.rs",
+        "size": "S",
+        "loc": 168,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "server_dispatch.rs",
+        "size": "M",
+        "loc": 320,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "server_tools.rs",
+        "size": "L",
+        "loc": 926,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests.rs",
+        "size": "L",
+        "loc": 1150,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "validation.rs",
+        "size": "S",
+        "loc": 29,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-mvcc": [
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 21,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "seq_log.rs",
+        "size": "M",
+        "loc": 556,
+        "risk": "MVCC",
+        "desc": "24-Byte Sequential Versioned Log (DocId + insert_seq + delete_seq)",
+        "focus": "Sichtbarkeitsinvariante (insert_seq <= as_of && (delete_seq.is_none() || delete_seq > as_of)) muss lückenlos gelten."
+      },
+      {
+        "file": "snapshot.rs",
+        "size": "M",
+        "loc": 390,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tx_buffer.rs",
+        "size": "L",
+        "loc": 988,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-ports": [
+      {
+        "file": "checkpoint.rs",
+        "size": "S",
+        "loc": 57,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "clock.rs",
+        "size": "S",
+        "loc": 92,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "embedding.rs",
+        "size": "M",
+        "loc": 303,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "graph.rs",
+        "size": "M",
+        "loc": 214,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "graph_index.rs",
+        "size": "M",
+        "loc": 484,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "id_gen.rs",
+        "size": "S",
+        "loc": 96,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kv.rs",
+        "size": "M",
+        "loc": 250,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 107,
+        "risk": "Ports",
+        "desc": "Dyn-kompatible Non-Determinismus-Ports (Clock, Rng, IdGen)",
+        "focus": "Clock, Rng und IdGen sind synchron und Dyn-kompatibel. ManualClock in contextra-testkit zur deterministischen Zeitsteuerung nutzen."
+      },
+      {
+        "file": "lifecycle.rs",
+        "size": "S",
+        "loc": 124,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "metrics.rs",
+        "size": "S",
+        "loc": 69,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "observability.rs",
+        "size": "S",
+        "loc": 17,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "rng.rs",
+        "size": "S",
+        "loc": 142,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "storage.rs",
+        "size": "M",
+        "loc": 471,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "text_index.rs",
+        "size": "M",
+        "loc": 227,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "vector_index.rs",
+        "size": "M",
+        "loc": 310,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-privacy": [
+      {
+        "file": "bulk_exfiltration_detector.rs",
+        "size": "M",
+        "loc": 299,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "egress_gateway.rs",
+        "size": "M",
+        "loc": 441,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "egress_guard.rs",
+        "size": "M",
+        "loc": 258,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "egress_vault.rs",
+        "size": "L",
+        "loc": 739,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "error.rs",
+        "size": "S",
+        "loc": 25,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "guarded_payload.rs",
+        "size": "S",
+        "loc": 75,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 28,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-py": [
+      {
+        "file": "bindings/collection.rs",
+        "size": "S",
+        "loc": 89,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/common.rs",
+        "size": "M",
+        "loc": 368,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/crud_macros.rs",
+        "size": "M",
+        "loc": 453,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/db.rs",
+        "size": "S",
+        "loc": 188,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/db_stats.rs",
+        "size": "S",
+        "loc": 40,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/document.rs",
+        "size": "S",
+        "loc": 17,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/functions.rs",
+        "size": "S",
+        "loc": 91,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/hyperedge.rs",
+        "size": "S",
+        "loc": 153,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/mod.rs",
+        "size": "S",
+        "loc": 29,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/runtime_state.rs",
+        "size": "S",
+        "loc": 77,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/search_result.rs",
+        "size": "S",
+        "loc": 19,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/storage_stats.rs",
+        "size": "S",
+        "loc": 23,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/tests.rs",
+        "size": "M",
+        "loc": 389,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "bindings/vector_index_stats.rs",
+        "size": "S",
+        "loc": 23,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kv_links.rs",
+        "size": "M",
+        "loc": 209,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 81,
+        "risk": "ffi",
+        "desc": "PyO3 Standalone Workspace Bindings",
+        "focus": "ADR-064 workspace isolation. Standalone [workspace] in crates/contextra-py/Cargo.toml."
+      }
+    ],
+    "contextra-rank": [
+      {
+        "file": "calibration/isotonic.rs",
+        "size": "M",
+        "loc": 252,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "calibration/mod.rs",
+        "size": "S",
+        "loc": 7,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "calibration/platt.rs",
+        "size": "S",
+        "loc": 151,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "dibud/driver.rs",
+        "size": "S",
+        "loc": 62,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "dibud/mod.rs",
+        "size": "S",
+        "loc": 9,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "dibud/state.rs",
+        "size": "M",
+        "loc": 286,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "dibud/types.rs",
+        "size": "S",
+        "loc": 118,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "drift.rs",
+        "size": "S",
+        "loc": 122,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion/mod.rs",
+        "size": "S",
+        "loc": 22,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion/normalized.rs",
+        "size": "M",
+        "loc": 283,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion/provenance.rs",
+        "size": "M",
+        "loc": 226,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion/resonance.rs",
+        "size": "S",
+        "loc": 80,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion/rrf.rs",
+        "size": "M",
+        "loc": 412,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion/signal.rs",
+        "size": "S",
+        "loc": 135,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion/topk.rs",
+        "size": "S",
+        "loc": 85,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fusion/types.rs",
+        "size": "S",
+        "loc": 131,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 26,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-router": [
+      {
+        "file": "bandit_regret_tests.rs",
+        "size": "M",
+        "loc": 306,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "dispatch.rs",
+        "size": "M",
+        "loc": 254,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "fc_ts_dispatch.rs",
+        "size": "S",
+        "loc": 38,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 67,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "outcome.rs",
+        "size": "S",
+        "loc": 135,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "ports_local.rs",
+        "size": "S",
+        "loc": 24,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "profile.rs",
+        "size": "M",
+        "loc": 489,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "router.rs",
+        "size": "L",
+        "loc": 1353,
+        "risk": "nan",
+        "desc": "SLM Router Engine & recalibrate_conformal",
+        "focus": "Rejects non-finite query embeddings (!v.is_finite()). Recalibrate_conformal requires window_total >= 30."
+      },
+      {
+        "file": "routing_strategy.rs",
+        "size": "S",
+        "loc": 47,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "serde_helpers.rs",
+        "size": "S",
+        "loc": 22,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/bandit_tests.rs",
+        "size": "S",
+        "loc": 78,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/fixtures.rs",
+        "size": "M",
+        "loc": 225,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/latency_tests.rs",
+        "size": "S",
+        "loc": 1,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/misc_tests.rs",
+        "size": "S",
+        "loc": 2,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/misc_tests/part1.rs",
+        "size": "L",
+        "loc": 949,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/misc_tests/part2.rs",
+        "size": "L",
+        "loc": 756,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/mod.rs",
+        "size": "S",
+        "loc": 20,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/routing_tests.rs",
+        "size": "S",
+        "loc": 3,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/routing_tests/dispatch.rs",
+        "size": "M",
+        "loc": 292,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/routing_tests/engine_part1.rs",
+        "size": "L",
+        "loc": 619,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tests/routing_tests/engine_part2.rs",
+        "size": "L",
+        "loc": 727,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "transport.rs",
+        "size": "S",
+        "loc": 44,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-sandbox": [
+      {
+        "file": "capabilities.rs",
+        "size": "S",
+        "loc": 83,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "error.rs",
+        "size": "S",
+        "loc": 37,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "executor.rs",
+        "size": "L",
+        "loc": 630,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 22,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "output.rs",
+        "size": "S",
+        "loc": 29,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wasi.rs",
+        "size": "M",
+        "loc": 577,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-simd": [
+      {
+        "file": "dispatch.rs",
+        "size": "M",
+        "loc": 234,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kernels/avx2.rs",
+        "size": "M",
+        "loc": 383,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kernels/avx512.rs",
+        "size": "M",
+        "loc": 367,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kernels/mod.rs",
+        "size": "S",
+        "loc": 9,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kernels/neon.rs",
+        "size": "S",
+        "loc": 108,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kernels/scalar.rs",
+        "size": "M",
+        "loc": 212,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 75,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       }
     ],
     "contextra-store": [
       {
         "file": "checkpoint.rs",
         "size": "S",
-        "loc": 114,
-        "risk": "DAG",
-        "desc": "pub(crate)-Checkpoint-Interna der Storage-Engine",
-        "focus": "Diese Datei ist bewusst pub(crate) — contextra-checkpoint (eigenes Crate, Layer 1) darf sie NICHT importieren. Jede Sichtbarkeitsänderung hier ist ein Architektur-Vorfall."
+        "loc": 126,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "compaction.rs",
-        "size": "XL",
-        "loc": 1604,
-        "risk": "Crash-Safety",
-        "desc": "Compaction-Logik, Tombstone-Handling unter gepinnten Snapshots",
-        "focus": "Ein gepinnter Snapshot MUSS Tombstones/Daten, die er referenziert, vor Compaction-GC schützen. Jede Änderung an der Compaction-Reihenfolge braucht einen Test mit aktiv gehaltenem Snapshot-Pin während laufender Compaction."
+        "size": "S",
+        "loc": 10,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "compaction/config.rs",
+        "size": "S",
+        "loc": 70,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "compaction/engine.rs",
+        "size": "L",
+        "loc": 683,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "compaction/tests.rs",
+        "size": "S",
+        "loc": 33,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "compaction/tests/advanced.rs",
+        "size": "L",
+        "loc": 1024,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "compaction/tests/basic.rs",
+        "size": "L",
+        "loc": 933,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "kv_locks.rs",
+        "size": "S",
+        "loc": 171,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 39,
+        "loc": 57,
         "risk": "—",
-        "desc": "Modul-Exports, Storage-Engine-Einstiegspunkt",
-        "focus": "Prüfe öffentliche API-Oberfläche auf versehentliche Lecks interner LSM-Implementierungsdetails."
+        "desc": "",
+        "focus": ""
       },
       {
-        "file": "lsm.rs",
-        "size": "XL",
-        "loc": 4841,
-        "risk": "Locking",
-        "desc": "LsmStorage — StorageEngine-Trait-Implementierung, commit_mutex-Verwaltung, rollback_to_tx (größte Einzeldatei des Crates — Größenklasse XL)",
-        "focus": "rollback_to_tx darf niemals innerhalb eines bereits gehaltenen commit_mutex erneut aufgerufen werden (Deadlock-Risiko, APM-3-Kontext). [KORR v22: Es gibt keine commit.rs — diese Logik liegt in lsm.rs, das zuvor komplett im Komponenten-Inventar fehlte, obwohl es als architektonisch zentralste Datei des Crates gilt. Höchste Sorgfaltspflicht gilt hier uneingeschränkt.]"
+        "file": "lsm/commit.rs",
+        "size": "S",
+        "loc": 97,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
-        "file": "manifest.rs",
+        "file": "lsm/config.rs",
+        "size": "S",
+        "loc": 44,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/engine.rs",
+        "size": "S",
+        "loc": 103,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/flush.rs",
+        "size": "S",
+        "loc": 18,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/group_commit.rs",
+        "size": "S",
+        "loc": 31,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/guard.rs",
+        "size": "S",
+        "loc": 13,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/mod.rs",
+        "size": "S",
+        "loc": 115,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/ops.rs",
+        "size": "L",
+        "loc": 1083,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/recovery.rs",
+        "size": "L",
+        "loc": 729,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/scan.rs",
         "size": "M",
-        "loc": 498,
+        "loc": 203,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/tests.rs",
+        "size": "S",
+        "loc": 29,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/tests/commit_tests.rs",
+        "size": "M",
+        "loc": 410,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/tests/flush_tests.rs",
+        "size": "M",
+        "loc": 252,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/tests/mvcc_tests.rs",
+        "size": "M",
+        "loc": 545,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/tests/recovery_tests.rs",
+        "size": "L",
+        "loc": 1005,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/tests/scan_tests.rs",
+        "size": "M",
+        "loc": 523,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lsm/validate.rs",
+        "size": "S",
+        "loc": 43,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "manifest/core.rs",
+        "size": "M",
+        "loc": 320,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "manifest/entry.rs",
+        "size": "M",
+        "loc": 310,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "manifest/mod.rs",
+        "size": "S",
+        "loc": 22,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "manifest/recovery.rs",
+        "size": "S",
+        "loc": 104,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "manifest/rollover.rs",
+        "size": "S",
+        "loc": 164,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "manifest/tests.rs",
+        "size": "M",
+        "loc": 405,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "memtable.rs",
-        "size": "M",
-        "loc": 577,
-        "risk": "—",
-        "desc": "In-Memory-Puffer vor Flush auf SSTable",
-        "focus": "Prüfe Flush-Trigger-Schwellwerte und das Race-Window zwischen Flush-Start und neuen konkurrierenden Writes (ADR-043-Kontext)."
-      },
-      {
-        "file": "mmap.rs",
-        "size": "S",
-        "loc": 39,
+        "size": "L",
+        "loc": 915,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
         "file": "sstable.rs",
-        "size": "XL",
-        "loc": 2430,
-        "risk": "Atomarität",
-        "desc": "SSTable-Format, atomare Datei-Erstellung",
-        "focus": "APM-1 gilt hier absolut: tmp-Datei → sync_all → rename → fsync_parent_dir. Kein direktes tokio::fs::write ohne dieses Muster."
+        "size": "S",
+        "loc": 20,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/block_cache.rs",
+        "size": "M",
+        "loc": 397,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/block_search.rs",
+        "size": "S",
+        "loc": 161,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/bloom.rs",
+        "size": "S",
+        "loc": 139,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/builder.rs",
+        "size": "M",
+        "loc": 350,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/io.rs",
+        "size": "S",
+        "loc": 29,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/reader.rs",
+        "size": "L",
+        "loc": 830,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/reader_ext.rs",
+        "size": "M",
+        "loc": 290,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/stream.rs",
+        "size": "S",
+        "loc": 130,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "sstable/tests.rs",
+        "size": "L",
+        "loc": 871,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "system_pressure.rs",
         "size": "M",
-        "loc": 214,
+        "loc": 223,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1357,25 +3469,155 @@
         "focus": ""
       },
       {
-        "file": "wal.rs",
-        "size": "XL",
-        "loc": 3701,
-        "risk": "Crash-Safety",
-        "desc": "Write-Ahead-Log — fsync-Disziplin, HMAC-Bindung, höchstes Crash-Safety-Risiko im gesamten Workspace",
-        "focus": "sync_all() MUSS vor jeder Ok-Rückgabe aus append() erfolgen. Sequenznummer UND Datei-ID müssen in die HMAC-Berechnung eingebunden sein (nicht nur Payload). Jede Änderung braucht einen begleitenden Crash-Mid-Write-Fault-Injection-Test."
-      }
-    ],
-    "contextra-tauri": [
-      {
-        "file": "commands/chat.rs",
+        "file": "wal/encode.rs",
         "size": "M",
-        "loc": 274,
+        "loc": 421,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "commands/collections.rs",
+        "file": "wal/flusher.rs",
+        "size": "M",
+        "loc": 490,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/hmac.rs",
+        "size": "M",
+        "loc": 277,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/io.rs",
+        "size": "L",
+        "loc": 900,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/mod.rs",
+        "size": "M",
+        "loc": 494,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/replay.rs",
+        "size": "L",
+        "loc": 666,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/tests.rs",
+        "size": "S",
+        "loc": 14,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/tests/encode_tests.rs",
+        "size": "M",
+        "loc": 218,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/tests/flusher_tests.rs",
+        "size": "M",
+        "loc": 252,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/tests/hmac_tests.rs",
+        "size": "M",
+        "loc": 417,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/tests/io_tests.rs",
+        "size": "M",
+        "loc": 570,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wal/tests/replay_tests.rs",
+        "size": "XL",
+        "loc": 1627,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-sys": [
+      {
+        "file": "acl_win32.rs",
+        "size": "M",
+        "loc": 317,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 15,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "mlock.rs",
+        "size": "S",
+        "loc": 49,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "mmap.rs",
+        "size": "S",
+        "loc": 15,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "posix.rs",
+        "size": "S",
+        "loc": 43,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "vault.rs",
+        "size": "S",
+        "loc": 87,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-testkit": [
+      {
+        "file": "fault_vfs.rs",
         "size": "S",
         "loc": 189,
         "risk": "—",
@@ -1383,63 +3625,421 @@
         "focus": ""
       },
       {
-        "file": "commands/ingest.rs",
+        "file": "in_memory_store.rs",
+        "size": "M",
+        "loc": 250,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
         "size": "S",
-        "loc": 159,
+        "loc": 14,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "commands/mod.rs",
+        "file": "manual_clock.rs",
         "size": "S",
-        "loc": 153,
+        "loc": 109,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-text": [
+      {
+        "file": "bm25.rs",
+        "size": "L",
+        "loc": 655,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "commands/search.rs",
-        "size": "M",
-        "loc": 378,
+        "file": "inverted.rs",
+        "size": "S",
+        "loc": 25,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "commands/session_dag.rs",
-        "size": "M",
-        "loc": 564,
+        "file": "inverted/index_struct.rs",
+        "size": "L",
+        "loc": 665,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "commands/transform.rs",
-        "size": "M",
-        "loc": 579,
+        "file": "inverted/morph_index.rs",
+        "size": "S",
+        "loc": 77,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "ingestion/docx.rs",
-        "size": "M",
-        "loc": 372,
-        "risk": "Sicherheit/Parser",
-        "desc": "DOCX-Parser für externe Nutzerdateien",
-        "focus": "Gleiche Robustheitsanforderungen wie pdf.rs: leere/trunkierte Datei → Err, kein Panic. Geparste Inhalte landen später im RAG-Kontext — Prompt-Injection-Bewusstsein wie bei contextra-ollama."
+        "file": "inverted/tests.rs",
+        "size": "S",
+        "loc": 3,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
-        "file": "ingestion/email.rs",
-        "size": "M",
-        "loc": 202,
-        "risk": "Sicherheit/Parser",
-        "desc": "E-Mail-Parser für externe Nutzerdateien",
-        "focus": "Gleiche Robustheitsanforderungen wie pdf.rs/docx.rs. Zusätzlich: Header-Injection und verschachtelte MIME-Strukturen als Fuzzing-Ziel betrachten."
+        "file": "inverted/tests/mock.rs",
+        "size": "S",
+        "loc": 185,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
-        "file": "ingestion/entities.rs",
+        "file": "inverted/tests/search_tests.rs",
+        "size": "L",
+        "loc": 718,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "inverted/tests/tx_tests.rs",
+        "size": "M",
+        "loc": 477,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "inverted/types.rs",
+        "size": "S",
+        "loc": 48,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "M",
+        "loc": 263,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "morphology.rs",
+        "size": "S",
+        "loc": 23,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "morphology/compound_splitter.rs",
+        "size": "M",
+        "loc": 265,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "morphology/metrics.rs",
+        "size": "S",
+        "loc": 22,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "morphology/passthrough.rs",
+        "size": "S",
+        "loc": 23,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "morphology/stopwords.rs",
+        "size": "S",
+        "loc": 51,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "morphology/tests.rs",
+        "size": "L",
+        "loc": 743,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "morphology/trie.rs",
+        "size": "S",
+        "loc": 56,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "posting_list.rs",
+        "size": "M",
+        "loc": 498,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "stream.rs",
+        "size": "S",
+        "loc": 146,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tokenizer.rs",
+        "size": "M",
+        "loc": 428,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "wand.rs",
+        "size": "L",
+        "loc": 811,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-types": [
+      {
+        "file": "error.rs",
+        "size": "L",
+        "loc": 905,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "error_dto.rs",
+        "size": "M",
+        "loc": 489,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "lib.rs",
+        "size": "S",
+        "loc": 24,
+        "risk": "TxId",
+        "desc": "Kanonische Domain-Typen (DocId, TxId, TenantId, EntityId, Embedding, FilterExpr, TokenBudget)",
+        "focus": "Niemals SystemTime für TxId verwenden. Ring 0 Synchronisationspurity wahren."
+      },
+      {
+        "file": "model_fingerprint.rs",
+        "size": "S",
+        "loc": 53,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "schema.rs",
+        "size": "S",
+        "loc": 102,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "tombstone.rs",
+        "size": "S",
+        "loc": 131,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types.rs",
+        "size": "S",
+        "loc": 18,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/budget.rs",
+        "size": "L",
+        "loc": 691,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/domain/document.rs",
+        "size": "M",
+        "loc": 206,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/domain/ids.rs",
+        "size": "M",
+        "loc": 464,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/domain/misc.rs",
+        "size": "M",
+        "loc": 528,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/domain/mod.rs",
+        "size": "S",
+        "loc": 27,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/domain/tests/doc_tests.rs",
+        "size": "M",
+        "loc": 280,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/domain/tests/ids_tests.rs",
+        "size": "M",
+        "loc": 453,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/domain/tests/misc_tests.rs",
+        "size": "M",
+        "loc": 252,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/domain/tests/mod.rs",
+        "size": "S",
+        "loc": 3,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/filter.rs",
+        "size": "M",
+        "loc": 417,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/importance.rs",
+        "size": "M",
+        "loc": 310,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "types/saos.rs",
+        "size": "L",
+        "loc": 712,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      }
+    ],
+    "contextra-vector": [
+      {
+        "file": "candidate_stream.rs",
+        "size": "S",
+        "loc": 173,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "compute_pool.rs",
+        "size": "S",
+        "loc": 165,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "diskann/build.rs",
+        "size": "L",
+        "loc": 712,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "diskann/config.rs",
+        "size": "S",
+        "loc": 78,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "diskann/filtered.rs",
+        "size": "S",
+        "loc": 73,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "diskann/format.rs",
+        "size": "S",
+        "loc": 198,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "diskann/mod.rs",
+        "size": "S",
+        "loc": 20,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "diskann/persistence.rs",
+        "size": "L",
+        "loc": 613,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "diskann/search.rs",
         "size": "M",
         "loc": 397,
         "risk": "—",
@@ -1447,33 +4047,121 @@
         "focus": ""
       },
       {
-        "file": "ingestion/mod.rs",
-        "size": "S",
-        "loc": 12,
-        "risk": "—",
-        "desc": "",
-        "focus": ""
-      },
-      {
-        "file": "ingestion/pdf.rs",
-        "size": "S",
-        "loc": 51,
-        "risk": "Sicherheit/Parser",
-        "desc": "PDF-Parser für externe, nicht-vertrauenswürdige Nutzerdateien",
-        "focus": "Eingebettetes PDF-JavaScript MUSS ignoriert, niemals ausgeführt werden. Leere/trunkierte/falsch benannte Dateien → kontrollierter Err, kein Panic. Fehlendes Größenlimit ist ein DoS-Risiko (RAM-Erschöpfung)."
-      },
-      {
-        "file": "ingestion/pipeline.rs",
+        "file": "diskann/tests.rs",
         "size": "L",
-        "loc": 611,
+        "loc": 1087,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "ingestion/progress.rs",
+        "file": "diskann/types.rs",
         "size": "S",
-        "loc": 136,
+        "loc": 146,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "diskann/vector_index_impl.rs",
+        "size": "S",
+        "loc": 191,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "distance.rs",
+        "size": "M",
+        "loc": 241,
+        "risk": "SIMD/unsafe",
+        "desc": "SIMD-Distanzfunktionen (AVX2/NEON)",
+        "focus": "JEDER unsafe-Block muss von is_x86_feature_detected!(\"avx2\") umschlossen sein."
+      },
+      {
+        "file": "hnsw/arena.rs",
+        "size": "M",
+        "loc": 369,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/batch.rs",
+        "size": "S",
+        "loc": 99,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/config.rs",
+        "size": "S",
+        "loc": 183,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/core_insert.rs",
+        "size": "M",
+        "loc": 443,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/core_rebuild.rs",
+        "size": "L",
+        "loc": 814,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/core_search.rs",
+        "size": "M",
+        "loc": 428,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/mod.rs",
+        "size": "S",
+        "loc": 31,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/sq8_bias.rs",
+        "size": "S",
+        "loc": 108,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/tests.rs",
+        "size": "S",
+        "loc": 158,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/types.rs",
+        "size": "L",
+        "loc": 732,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "hnsw/vector_index_impl.rs",
+        "size": "M",
+        "loc": 557,
         "risk": "—",
         "desc": "",
         "focus": ""
@@ -1481,156 +4169,115 @@
       {
         "file": "lib.rs",
         "size": "S",
-        "loc": 81,
-        "risk": "—",
-        "desc": "Tauri-App-Einstiegspunkt",
-        "focus": "Prüfe IPC-Command-Registrierung auf vollständige Fehlerbehandlung."
-      },
-      {
-        "file": "main.rs",
-        "size": "S",
-        "loc": 6,
+        "loc": 43,
         "risk": "—",
         "desc": "",
         "focus": ""
       },
       {
-        "file": "ollama.rs",
-        "size": "S",
-        "loc": 89,
-        "risk": "Duplikation",
-        "desc": "OllamaBridge — Desktop-App-seitige Ollama-Anbindung",
-        "focus": "Prüfe auf Logik-Duplikation gegenüber contextra-ollama::client.rs — jede Abweichung im Verhalten zwischen Bridge und Client ist ein Wartungsrisiko und potenzielle Inkonsistenzquelle. [KORR v22: Datei hieß zuvor ollama_bridge.rs — tatsächlicher Dateiname ist ollama.rs.]"
+        "file": "partial_rebuild.rs",
+        "size": "M",
+        "loc": 363,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
-        "file": "state.rs",
+        "file": "persistence/header.rs",
+        "size": "M",
+        "loc": 435,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "persistence/mmap.rs",
+        "size": "M",
+        "loc": 216,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "persistence/mod.rs",
         "size": "S",
-        "loc": 121,
-        "risk": "Concurrency",
-        "desc": "AppState — geteilter Zustand über Tauri-Commands",
-        "focus": "Tauri-Commands laufen parallel — jeder Zugriff auf AppState braucht korrekte Synchronisation (RwLock/Arc/Mutex); prüfe explizit auf Data-Races bei gleichzeitigen Commands."
+        "loc": 19,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "persistence/node.rs",
+        "size": "S",
+        "loc": 82,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "persistence/tests.rs",
+        "size": "M",
+        "loc": 475,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "quantize.rs",
+        "size": "L",
+        "loc": 1013,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "quantize_rabitq.rs",
+        "size": "M",
+        "loc": 438,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       }
     ],
-    "contextra-text": [
+    "contextra-wire": [
       {
-        "file": "bm25.rs",
-        "size": "M",
-        "loc": 399,
-        "risk": "Numerik",
-        "desc": "BM25-Scoring, IDF-Berechnung",
-        "focus": "ln(idf_arg) wird bei df>N/2 negativ — prüfe den IDF-Floor-Mechanismus (z.B. 1e-6 statt hartem 0), da ein harter 0-Floor Stoppwörter künstlich einfärbt."
+        "file": "adapter.rs",
+        "size": "S",
+        "loc": 36,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
-        "file": "inverted.rs",
-        "size": "XL",
-        "loc": 1849,
-        "risk": "Konsistenz",
-        "desc": "Postings-Listen, Update/Delete-Pfad",
-        "focus": "DF-Zähler MUSS bei jedem Update/Delete korrekt dekrementiert werden — sonst Ghost-Terms in den Postings, die Suchqualität schleichend verfälschen. [KORR v22: Datei hieß zuvor inverted_index.rs — tatsächlicher Dateiname ist inverted.rs.]"
+        "file": "contextra_generated.rs",
+        "size": "L",
+        "loc": 1200,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
+      },
+      {
+        "file": "jsonrpc.rs",
+        "size": "S",
+        "loc": 144,
+        "risk": "—",
+        "desc": "",
+        "focus": ""
       },
       {
         "file": "lib.rs",
-        "size": "M",
-        "loc": 243,
+        "size": "S",
+        "loc": 22,
         "risk": "—",
-        "desc": "Modul-Exports von BM25 und Tokenizer",
-        "focus": "#[forbid(unsafe_code)] gilt für dieses Crate vollständig — 0 unsafe-Vorkommen erlaubt."
-      },
-      {
-        "file": "morphology.rs",
-        "size": "L",
-        "loc": 1164,
-        "risk": "DoS",
-        "desc": "Deutscher Compound-Splitter, rekursive Wortzerlegung",
-        "focus": "Rekursion ohne Memoization für lange Komposita = O(2^n)-Laufzeitrisiko (DoS-Vektor). Jede Änderung an der Rekursionslogik braucht einen Worst-Case-Laufzeittest mit pathologisch langen Eingaben."
-      },
-      {
-        "file": "tokenizer.rs",
-        "size": "M",
-        "loc": 431,
-        "risk": "Performance",
-        "desc": "GermanMorphTokenizer, Trie-basierte Kompositazerlegung",
-        "focus": "Der Trie darf nicht bei jedem Aufruf neu aufgebaut werden — prüfe OnceLock<Arc<Trie>>-Caching. Fehlendes Caching ist ein Performance-kritischer Befund."
+        "desc": "",
+        "focus": ""
       }
     ]
   },
   "working_state_snapshot": {
-    "generated_at": "2026-09-12T11:19:38Z",
-    "crate_count": 18,
-    "crates": [
-      {
-        "name": "contextra-core-ipc-gen",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-core",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-calibration",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-checkpoint",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-graph",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-security",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-text",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-candle",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-index",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-ollama",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-store",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-embed",
-        "status": "🧊 Optional"
-      },
-      {
-        "name": "contextra-db",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-bench",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-router",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-tauri",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-agent",
-        "status": "🟢 Clean"
-      },
-      {
-        "name": "contextra-mcp",
-        "status": "🟢 Clean"
-      }
-    ],
-    "last_merge": "Letzter Merge: b448084 — \"ci(bench): integrate LongMemEval dataset & regression gate (#1788)\" (unbekannt)"
+    "generated_at": "2026-09-24T17:14:50Z",
+    "crate_count": 0,
+    "crates": [],
+    "last_merge": "unbekannt"
   }
 }
