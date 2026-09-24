@@ -6,6 +6,7 @@ pub mod common;
 pub mod db;
 pub mod db_stats;
 pub mod document;
+pub mod hyperedge;
 pub mod functions;
 pub mod runtime_state;
 pub mod search_result;
