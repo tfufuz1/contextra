@@ -6,6 +6,8 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use contextra_ports::Clock;
+
 /// A thread-safe, manually advanceable clock for deterministic tests.
 #[derive(Debug)]
 pub struct ManualClock {
@@ -53,6 +55,16 @@ impl ManualClock {
     }
 }
 
+impl Clock for ManualClock {
+    fn now_unix_nanos(&self) -> u64 {
+        self.now_nanos()
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.now_nanos()
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -79,5 +91,19 @@ mod tests {
             clock.now_system_time(),
             UNIX_EPOCH + Duration::from_nanos(42)
         );
+    }
+
+    #[test]
+    fn test_manual_clock_as_dyn_clock() {
+        let clock = ManualClock::new(1_000);
+        let dyn_clock: &dyn Clock = &clock;
+
+        assert_eq!(dyn_clock.now_unix_nanos(), 1_000);
+        assert_eq!(dyn_clock.monotonic_nanos(), 1_000);
+
+        clock.advance(Duration::from_nanos(500));
+
+        assert_eq!(dyn_clock.now_unix_nanos(), 1_500);
+        assert_eq!(dyn_clock.monotonic_nanos(), 1_500);
     }
 }

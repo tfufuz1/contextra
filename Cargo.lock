@@ -1093,7 +1093,8 @@ name = "contextra-testkit"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "contextra-core",
+ "contextra-ports",
+ "contextra-types",
  "parking_lot",
  "tempfile",
  "tokio",

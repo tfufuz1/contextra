@@ -10,7 +10,8 @@ rust-version.workspace = true
 description = "Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for Contextra"
 
 [dependencies]
-contextra-core = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-types = { workspace = true }
 bytes = { workspace = true }
 parking_lot = { workspace = true }
 tracing = { workspace = true }
