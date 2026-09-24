@@ -155,14 +155,32 @@ fn strip_comments_and_strings(source: &str) -> String {
         }
 
         if c == '\'' {
-            let prev_alphanum = if i > 0 {
-                chars[i - 1].is_alphanumeric() || chars[i - 1] == '_'
+            let is_char_lit = if i + 2 < len && chars[i + 2] == '\'' && chars[i + 1] != '\\' {
+                true
+            } else if i + 3 < len && chars[i + 1] == '\\' && chars[i + 3] == '\'' {
+                true
+            } else if i + 4 < len && chars[i + 1] == '\\' && chars[i + 2] == 'x' && chars[i + 4] == '\'' {
+                true
+            } else if i + 3 < len && chars[i + 1] == '\\' && chars[i + 2] == 'u' {
+                let mut found_end = false;
+                for j in (i + 3)..len.min(i + 12) {
+                    if chars[j] == '\'' {
+                        found_end = true;
+                        break;
+                    }
+                }
+                found_end
             } else {
                 false
             };
-            if !prev_alphanum {
+
+            if is_char_lit {
                 in_char = true;
                 result.push(' ');
+                i += 1;
+                continue;
+            } else {
+                result.push(c);
                 i += 1;
                 continue;
             }
@@ -313,10 +331,11 @@ pub fn check_crate_reachability(crate_root: &Path, repo_root: &Path) -> ModuleRe
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
 
-    let src_dir = crate_root.join("src");
-    if !src_dir.exists() {
+    let raw_src_dir = crate_root.join("src");
+    if !raw_src_dir.exists() {
         return ModuleReachabilityResult { errors, warnings };
     }
+    let src_dir = raw_src_dir.canonicalize().unwrap_or(raw_src_dir);
 
     let mut all_rs_files = Vec::new();
     for entry in WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {

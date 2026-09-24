@@ -1,37 +1,20 @@
 #![cfg(feature = "dibud")]
 
+use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-use std::future::Future;
 
 use contextra_rank::dibud::{
     fuse_exact_prefix, fuse_exact_prefix_async, BudgetedChannel, DiBudFusionState, FusionBudget,
 };
 use contextra_types::{ContextraError, DocId};
 
-fn dummy_waker() -> Waker {
-    fn raw_waker() -> RawWaker {
-        fn noop(_: *const ()) {}
-        fn clone(_: *const ()) -> RawWaker {
-            raw_waker()
-        }
-        let vtable = &RawWakerVTable::new(clone, noop, noop, noop);
-        RawWaker::new(std::ptr::null(), vtable)
-    }
-    unsafe { Waker::from_raw(raw_waker()) }
-}
-
-fn block_on<F: Future>(mut fut: F) -> F::Output {
-    let waker = dummy_waker();
-    let mut cx = Context::from_waker(&waker);
-    let mut fut = unsafe { std::pin::Pin::new_unchecked(&mut fut) };
-    loop {
-        match fut.as_mut().poll(&mut cx) {
-            Poll::Ready(res) => return res,
-            Poll::Pending => continue,
-        }
-    }
+fn block_on<F: Future>(fut: F) -> F::Output {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+    rt.block_on(fut)
 }
 
 fn make_doc_id(idx: usize) -> DocId {
