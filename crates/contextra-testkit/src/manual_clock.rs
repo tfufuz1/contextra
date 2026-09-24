@@ -95,15 +95,15 @@ mod tests {
 
     #[test]
     fn test_manual_clock_as_dyn_clock() {
-        let clock = ManualClock::new(1_000_000);
-        let clock_ref: &dyn Clock = &clock;
+        let clock = ManualClock::new(1_000);
+        let dyn_clock: &dyn Clock = &clock;
 
-        assert_eq!(clock_ref.now_unix_nanos(), 1_000_000);
-        assert_eq!(clock_ref.monotonic_nanos(), 1_000_000);
+        assert_eq!(dyn_clock.now_unix_nanos(), 1_000);
+        assert_eq!(dyn_clock.monotonic_nanos(), 1_000);
 
-        clock.advance(Duration::from_millis(500));
+        clock.advance(Duration::from_nanos(500));
 
-        assert_eq!(clock_ref.now_unix_nanos(), 501_000_000);
-        assert_eq!(clock_ref.monotonic_nanos(), 501_000_000);
+        assert_eq!(dyn_clock.now_unix_nanos(), 1_500);
+        assert_eq!(dyn_clock.monotonic_nanos(), 1_500);
     }
 }

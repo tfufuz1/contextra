@@ -10,8 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_types::TxId;
-use contextra_types::Result;
+use contextra_types::{Result, TxId};
 
 #[derive(Debug, Clone)]
 enum StagedOp {

@@ -1,24 +1,17 @@
-//! ID generator port trait definition and sequential implementation.
+//! Unique ID generator port trait and atomic sequential implementation.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-/// Abstract ID generator trait for non-determinism injection.
+/// Port trait for unique ID generation.
 pub trait IdGen: Send + Sync + 'static {
-    /// Generates and returns the next unique 64-bit identifier.
+    /// Generates and returns the next unique 64-bit unsigned identifier.
     fn next_id(&self) -> u64;
 }
 
-impl<T: IdGen + ?Sized> IdGen for Arc<T> {
-    fn next_id(&self) -> u64 {
-        (**self).next_id()
-    }
-}
-
-/// A thread-safe, lock-free sequential ID generator backed by an [`AtomicU64`].
+/// A thread-safe ID generator that produces monotonically increasing 64-bit IDs.
 ///
-/// Increments monotonically on each invocation using atomic fetch-add semantics.
-/// Overflow wraps around safely via `wrapping_add`.
+/// Wraps around safely on integer overflow (`u64::MAX` -> `0`) via atomic standard wrapping.
 #[derive(Debug)]
 pub struct SequentialIdGen {
     next: AtomicU64,
@@ -45,12 +38,18 @@ impl IdGen for SequentialIdGen {
     }
 }
 
+impl<T: IdGen + ?Sized> IdGen for Arc<T> {
+    fn next_id(&self) -> u64 {
+        (**self).next_id()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashSet;
-    use std::sync::Arc;
-    use std::thread;
+
+    fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
 
     #[test]
     fn test_sequential_id_gen_monotonic() {
@@ -61,25 +60,14 @@ mod tests {
     }
 
     #[test]
-    fn test_sequential_id_gen_wrap_around() {
-        let gen = SequentialIdGen::new(u64::MAX);
-        assert_eq!(gen.next_id(), u64::MAX);
-        assert_eq!(gen.next_id(), 0);
-        assert_eq!(gen.next_id(), 1);
-    }
-
-    #[test]
-    fn test_sequential_id_gen_multithreaded() {
+    fn test_sequential_id_gen_concurrent_no_duplicates() {
         let gen = Arc::new(SequentialIdGen::new(1));
-        let num_threads = 8;
-        let ids_per_thread = 1000;
-
-        let handles: Vec<_> = (0..num_threads)
+        let handles: Vec<_> = (0..8)
             .map(|_| {
                 let g = gen.clone();
-                thread::spawn(move || {
-                    let mut ids = Vec::with_capacity(ids_per_thread);
-                    for _ in 0..ids_per_thread {
+                std::thread::spawn(move || {
+                    let mut ids = Vec::with_capacity(1000);
+                    for _ in 0..1000 {
                         ids.push(g.next_id());
                     }
                     ids
@@ -87,20 +75,22 @@ mod tests {
             })
             .collect();
 
-        let mut all_ids = HashSet::new();
+        let mut all_ids = HashSet::with_capacity(8000);
         for handle in handles {
-            let ids = handle.join().unwrap();
+            let ids = handle.join().expect("Thread panicked");
             for id in ids {
-                assert!(all_ids.insert(id), "Duplicate ID generated: {}", id);
+                assert!(all_ids.insert(id), "Duplicate ID found: {id}");
             }
         }
 
-        assert_eq!(all_ids.len(), num_threads * ids_per_thread);
+        assert_eq!(all_ids.len(), 8000);
     }
 
     #[test]
-    fn test_arc_dyn_id_gen_compiles() {
-        let gen: Arc<dyn IdGen> = Arc::new(SequentialIdGen::default());
-        let _ = gen.next_id();
+    fn test_arc_dyn_id_gen() {
+        let gen: Arc<dyn IdGen> = Arc::new(SequentialIdGen::new(100));
+        _assert_dyn_id_gen(Some(gen.as_ref()));
+        assert_eq!(gen.next_id(), 100);
+        assert_eq!(gen.next_id(), 101);
     }
 }

@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::type_complexity))]
 
 use std::future::Future;
 use std::pin::Pin;
@@ -20,7 +21,7 @@ pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> +
 
 /// Checkpoint and snapshot traits.
 pub mod checkpoint;
-/// Clock port trait and system clock implementation.
+/// Clock port trait and system time implementation.
 pub mod clock;
 /// Embedding provider and LLM generation traits.
 pub mod embedding;
@@ -28,7 +29,7 @@ pub mod embedding;
 pub mod graph;
 /// Graph index traits and CSR statistics.
 pub mod graph_index;
-/// ID generator port trait and sequential implementation.
+/// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
 /// Key-value prefix store traits and types.
 pub mod kv;
@@ -38,7 +39,7 @@ pub mod lifecycle;
 pub mod metrics;
 /// Observability and lifecycle re-exports.
 pub mod observability;
-/// Random number generator port trait and deterministic implementation.
+/// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
 /// Key-value storage engine traits.
 pub mod storage;
