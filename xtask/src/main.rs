@@ -58,7 +58,7 @@ mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
 mod check_commit_messages;
 mod check_compile;
-mod gates;
+use xtask::gates;
 mod check_coverage_gate;
 mod check_doc_references;
 mod check_duplicate_intent;

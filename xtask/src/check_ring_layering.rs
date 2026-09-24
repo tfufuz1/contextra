@@ -192,6 +192,7 @@ pub fn check_ring_layering_from_metadata_json(
             let violation_reason = match (from_ring, to_ring, kind) {
                 // Ring 0
                 (Ring::Ring0, Ring::Ring0, _) => None,
+                (Ring::Ring0, Ring::Tooling, "dev") => None,
                 (Ring::Ring0, other, _) => Some(format!(
                     "Ring 0 crate cannot depend on {} ({})",
                     other.name(),

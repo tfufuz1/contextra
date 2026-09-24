@@ -3,6 +3,8 @@
 // STAND: 2026-09-16
 // ZWECK: Exportierte Module für benchmarks/contextra-bench
 
+#![forbid(unsafe_code)]
+
 #[cfg(feature = "external-benchmarks")]
 pub mod ann_benchmarks;
 #[cfg(feature = "external-benchmarks")]

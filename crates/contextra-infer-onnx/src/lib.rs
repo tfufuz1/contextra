@@ -16,10 +16,7 @@
 //! Backpressure contract: `max_concurrent_embeddings` limits `spawn_blocking` calls.
 //! Callers will experience back-pressure (await on permit acquire) rather than Tokio thread pool exhaustion.
 
-// `deny(unsafe_code)` is consciously chosen over `forbid(unsafe_code)` to allow
-// low-level C-FFI / ONNX Runtime interactions when `onnx` feature is enabled.
-// In default (non-onnx) builds, zero unsafe code exists in production.
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 #[cfg(feature = "onnx")]
 use std::sync::Arc;

@@ -344,7 +344,6 @@ dependencies = [
  "argon2",
  "bincode",
  "blake3",
- "contextra-privacy",
  "contextra-types",
  "hkdf",
  "hmac",

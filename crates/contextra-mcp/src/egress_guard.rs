@@ -2,7 +2,7 @@
 // ZWECK: Layer-4 EgressGuard (Re-export from contextra-privacy)
 
 use contextra::Collection;
-use contextra_crypto::egress_vault::{BlockReason, EgressClassification};
+use contextra_privacy::egress_vault::{BlockReason, EgressClassification};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -124,31 +124,11 @@ impl EgressGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra::Contextra;
-    use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider, TextEmbeddingEngine};
-    use tempfile::TempDir;
 
-    #[derive(Clone, Debug)]
-    struct DummyEmbedder {
-        dim: usize,
-    }
-
-    impl EmbeddingProvider for DummyEmbedder {
-        fn provider_name(&self) -> &str {
-            "dummy"
-        }
-
-        fn embedding_dim(&self) -> usize {
-            self.dim
-        }
-
-        fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, Result<Vec<f32>, EmbeddingError>> {
-            let dim = self.dim;
-            let mut v = vec![0.1f32; dim];
-            if text.contains("secret") {
-                v[0] = 1.0;
-            }
-            Box::pin(async move { Ok(v) })
-        }
+    #[test]
+    fn test_egress_guard_defaults() {
+        assert_eq!(DEFAULT_EGRESS_GUARD_TIMEOUT, Duration::from_millis(200));
+        assert_eq!(DEFAULT_EGRESS_GUARD_THRESHOLD, 0.85);
+        assert_eq!(DEFAULT_EGRESS_GUARD_MIN_BYTES, 128);
     }
 }
