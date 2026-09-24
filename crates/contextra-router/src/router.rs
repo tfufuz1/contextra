@@ -22,6 +22,50 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "bandit-routing")]
+use crate::routing_strategy::RoutingStrategy;
+
+#[cfg(feature = "bandit-routing")]
+#[derive(Debug, Clone)]
+pub(crate) struct PendingBanditDecision {
+    pub context: Vec<f32>,
+    pub profile_name: String,
+    pub action_idx: u32,
+    pub propensity: f32,
+    pub created: Instant,
+}
+
+#[cfg(feature = "bandit-routing")]
+pub(crate) struct BanditExploration {
+    pub epsilon: f32,
+    pub rng_state: parking_lot::Mutex<u64>,
+}
+
+#[cfg(feature = "bandit-routing")]
+impl BanditExploration {
+    pub fn new(epsilon: f32, seed: u64) -> Self {
+        Self {
+            epsilon,
+            rng_state: parking_lot::Mutex::new(if seed == 0 {
+                0x9e37_79b9_7f4a_7c15
+            } else {
+                seed
+            }),
+        }
+    }
+
+    /// Liefert eine deterministische Pseudo-Zufallszahl in [0.0, 1.0) (SplitMix64).
+    pub fn next_sample(&self) -> f32 {
+        let mut state = self.rng_state.lock();
+        *state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = *state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        let u = z ^ (z >> 31);
+        ((u >> 11) as f64 / ((1u64 << 53) as f64)) as f32
+    }
+}
+
 /// Minimum calibration samples before conformal quantiles are considered reliable.
 /// Statistical basis: ≥100 samples required for α=0.1 coverage guarantee per
 /// Venn & Gammerman (2005). At 30 samples the quantile interval is too wide
@@ -121,6 +165,12 @@ pub struct RouterEngine {
     /// eliminates state-cloning overhead while keeping transient outcome tracking isolated from core
     /// routing calibration consistency.
     pub(crate) pending_decisions: RwLock<HashMap<DecisionId, (String, Instant)>>,
+    #[cfg(feature = "bandit-routing")]
+    pub(crate) routing_strategy: RoutingStrategy,
+    #[cfg(feature = "bandit-routing")]
+    pub(crate) bandit_exploration: BanditExploration,
+    #[cfg(feature = "bandit-routing")]
+    pub(crate) pending_bandit: RwLock<HashMap<DecisionId, PendingBanditDecision>>,
 }
 
 impl RouterEngine {
@@ -175,7 +225,32 @@ impl RouterEngine {
             context_preparer,
             state: ArcSwap::from(Arc::new(router_state)),
             pending_decisions: RwLock::new(HashMap::new()),
+            #[cfg(feature = "bandit-routing")]
+            routing_strategy: RoutingStrategy::Cascade,
+            #[cfg(feature = "bandit-routing")]
+            bandit_exploration: BanditExploration::new(0.1, 0x1234_5678_9abc_def0),
+            #[cfg(feature = "bandit-routing")]
+            pending_bandit: RwLock::new(HashMap::new()),
         }
+    }
+
+    #[cfg(feature = "bandit-routing")]
+    /// Builder-Methode zur Konfiguration der Routing-Strategie und Bandit-Exploration.
+    pub fn with_routing_strategy(
+        mut self,
+        strategy: RoutingStrategy,
+        epsilon: f32,
+        seed: u64,
+    ) -> Self {
+        self.routing_strategy = strategy;
+        self.bandit_exploration = BanditExploration::new(epsilon, seed);
+        self
+    }
+
+    #[cfg(feature = "bandit-routing")]
+    /// Liefert die aufgezeichnete Logging-Propensity für eine ausstehende Bandit-Entscheidung.
+    pub fn bandit_decision_propensity(&self, id: DecisionId) -> Option<f32> {
+        self.pending_bandit.read().get(&id).map(|d| d.propensity)
     }
 
     /// Validates all profiles and creates a new `RouterEngine` instance.
@@ -321,6 +396,16 @@ impl RouterEngine {
                 map.retain(|_, (_, ts)| *ts > cutoff);
             }
         }
+
+        #[cfg(feature = "bandit-routing")]
+        {
+            let mut bandit_map = self.pending_bandit.write();
+            if bandit_map.len() >= MAX_PENDING_DECISIONS {
+                if let Some(cutoff) = cutoff {
+                    bandit_map.retain(|_, decision| decision.created > cutoff);
+                }
+            }
+        }
     }
 
     /// Muss vom Aufrufer (Agent-Loop) nach Abschluss des SLM-Aufrufs aufgerufen werden.
@@ -363,6 +448,41 @@ impl RouterEngine {
                 );
             }
         }
+
+        #[cfg(feature = "bandit-routing")]
+        {
+            if let Some(pending_bandit_entry) = self.pending_bandit.write().remove(&decision_id) {
+                let reward = 1.0 - non_conformity;
+                if let Some(profile) = new_state.profiles.iter_mut().find(|p| p.name == profile_name) {
+                    #[cfg(feature = "cloud-egress-guard")]
+                    let is_cloud = profile.transport.is_cloud();
+                    #[cfg(not(feature = "cloud-egress-guard"))]
+                    let is_cloud = false;
+
+                    let cost = profile.estimated_cost();
+                    if let Some(ref mut bstate) = profile.bandit_state {
+                        if let Err(err) = bstate.update(&pending_bandit_entry.context, reward, cost, is_cloud) {
+                            tracing::warn!(
+                                profile = %pending_bandit_entry.profile_name,
+                                action = pending_bandit_entry.action_idx,
+                                ?err,
+                                "Fehler beim BanditProfileState-Update in record_outcome"
+                            );
+                        } else {
+                            tracing::debug!(
+                                profile = %pending_bandit_entry.profile_name,
+                                action = pending_bandit_entry.action_idx,
+                                propensity = pending_bandit_entry.propensity,
+                                reward,
+                                cost,
+                                "BanditProfileState erfolgreich aktualisiert"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         self.state.store(Arc::new(new_state));
         true
     }
@@ -439,7 +559,7 @@ impl RouterEngine {
         let current_state = self.state.load_full();
         let mut new_state = (*current_state).clone();
 
-        let (selected_profile, confidence_metrics) = {
+        let (selected_profile, confidence_metrics, _is_bandit_decision) = {
             let cal = &mut new_state.calibration;
 
             // 1. Derive effective profiles using calibrated_min_score from calibration state
@@ -457,9 +577,22 @@ impl RouterEngine {
                 })
                 .collect();
 
-            // 2. Scoring + Cascade Selection
-            let (selected_idx, selected_profile, _) =
-                self.select_profile_cascade(&chunks, &effective_profiles, cal)?;
+            // 2. Profile Selection: Bandit (opt-in) or Cascade (default)
+            #[cfg(feature = "bandit-routing")]
+            let bandit_selection = if matches!(self.routing_strategy, RoutingStrategy::ContextualBandit) {
+                self.select_profile_bandit(&chunks, &effective_profiles, query_embedding)
+            } else {
+                None
+            };
+            #[cfg(not(feature = "bandit-routing"))]
+            let bandit_selection: Option<(usize, SlmProfile, u32, f32)> = None;
+
+            let (selected_idx, selected_profile, is_bandit_decision) = if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
+                (idx, profile, Some((action_idx, propensity)))
+            } else {
+                let (idx, profile, _) = self.select_profile_cascade(&chunks, &effective_profiles, cal)?;
+                (idx, profile, None)
+            };
 
             let profile_scores = compute_profile_scores(&profiles, &chunks);
             let best_score = profile_scores.get(&selected_idx).copied().unwrap_or(0.0);
@@ -515,13 +648,27 @@ impl RouterEngine {
                 }
             });
 
-            (selected_profile, metrics)
+            (selected_profile, metrics, is_bandit_decision)
         };
 
         let decision_id = DecisionId::new();
         self.pending_decisions
             .write()
             .insert(decision_id, (selected_profile.name.clone(), Instant::now()));
+
+        #[cfg(feature = "bandit-routing")]
+        if let Some((action_idx, propensity)) = _is_bandit_decision {
+            self.pending_bandit.write().insert(
+                decision_id,
+                PendingBanditDecision {
+                    context: query_embedding.to_vec(),
+                    profile_name: selected_profile.name.clone(),
+                    action_idx,
+                    propensity,
+                    created: Instant::now(),
+                },
+            );
+        }
 
         // 4. Construct ContextWindow using ContextManager tailored to selected_profile.token_budget and min_relevance_score
         let raw_chunks: Vec<ContextChunk> = chunks.into_iter().map(|(c, _)| c).collect();
@@ -775,6 +922,115 @@ impl RouterEngine {
 
         Ok((fallback_idx, fallback_profile.clone(), confidence))
     }
+
+    #[cfg(feature = "bandit-routing")]
+    /// Contextual Bandit Profilauswahl via LinUCB / Sherman-Morrison (§13.2, §8.5, AK-15).
+    ///
+    /// Algorithmus:
+    /// 1. Filter eligible profiles based on community matching (identical eligibility to cascade).
+    /// 2. For each eligible profile, evaluate bandit_state.score(x = query_embedding, cost = estimated_cost(), is_cloud).
+    /// 3. Fail-safe: If any eligible profile has bandit_state == None or returns BanditError/NaN,
+    ///    issue tracing::warn! and return None (falling back to Cascade without panic).
+    /// 4. Greedy choice = profile with highest score (total_cmp, tie-breaker smallest original index).
+    /// 5. Randomized logging policy with clamped epsilon (max(epsilon, 0.01 * K).min(1.0)) for propensity >= 0.01 guarantee.
+    /// 6. Return Some((selected_orig_idx, selected_profile, action_idx, propensity)).
+    pub(crate) fn select_profile_bandit(
+        &self,
+        chunks: &[(ContextChunk, Option<u64>)],
+        profiles: &[SlmProfile],
+        query_embedding: &[f32],
+    ) -> Option<(usize, SlmProfile, u32, f32)> {
+        use contextra_adapt::offpolicy::RandomizedLoggingPolicy;
+
+        if profiles.is_empty() || chunks.is_empty() {
+            return None;
+        }
+
+        // Filter profiles by community match eligibility (matching select_profile_cascade logic)
+        let eligible_profiles: Vec<(usize, &SlmProfile)> = profiles
+            .iter()
+            .enumerate()
+            .filter(|(_, profile)| {
+                profile.domain_communities.is_empty()
+                    || chunks.iter().any(|(_, comm_id)| {
+                        comm_id.is_some_and(|cid| profile.domain_communities.contains(&cid))
+                    })
+            })
+            .collect();
+
+        if eligible_profiles.is_empty() {
+            return None;
+        }
+
+        let num_actions = eligible_profiles.len() as u32;
+
+        // Evaluate scores for each eligible profile
+        let mut profile_scores: Vec<(usize, &SlmProfile, f32)> = Vec::with_capacity(eligible_profiles.len());
+
+        for &(orig_idx, profile) in &eligible_profiles {
+            let Some(ref bstate) = profile.bandit_state else {
+                tracing::warn!(
+                    profile = %profile.name,
+                    "Bandit-Dispatch Fallback auf Cascade: Profil besitzt keinen bandit_state"
+                );
+                return None;
+            };
+
+            #[cfg(feature = "cloud-egress-guard")]
+            let is_cloud = profile.transport.is_cloud();
+            #[cfg(not(feature = "cloud-egress-guard"))]
+            let is_cloud = false;
+
+            let cost = profile.estimated_cost();
+            match bstate.score(query_embedding, cost, is_cloud) {
+                Ok(score) if score.is_finite() => {
+                    profile_scores.push((orig_idx, profile, score));
+                }
+                Ok(non_finite) => {
+                    tracing::warn!(
+                        profile = %profile.name,
+                        score = non_finite,
+                        "Bandit-Dispatch Fallback auf Cascade: UCB-Score ist nicht-finit (NaN/Inf)"
+                    );
+                    return None;
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        profile = %profile.name,
+                        ?err,
+                        "Bandit-Dispatch Fallback auf Cascade: BanditError bei Score-Berechnung"
+                    );
+                    return None;
+                }
+            }
+        }
+
+        // Greedy choice: action index in 0..num_actions with highest score
+        let greedy_action_idx = profile_scores
+            .iter()
+            .enumerate()
+            .max_by(|(_, (orig_idx_a, _, score_a)), (_, (orig_idx_b, _, score_b))| {
+                score_a.total_cmp(score_b).then_with(|| orig_idx_b.cmp(orig_idx_a))
+            })
+            .map(|(action_idx, _)| action_idx as u32)
+            .unwrap_or(0);
+
+        // Clamp epsilon to guarantee propensity >= 0.01 per action (AK-15, Spec §8.5)
+        // Since uniform exploration distributes epsilon / K across K actions,
+        // we require epsilon / K >= 0.01 => epsilon >= 0.01 * K
+        let base_epsilon = self.bandit_exploration.epsilon;
+        let min_epsilon = 0.01 * (num_actions as f32);
+        let clamped_epsilon = base_epsilon.max(min_epsilon).min(1.0);
+
+        let logging_policy = RandomizedLoggingPolicy::new(clamped_epsilon, num_actions);
+        let sample = self.bandit_exploration.next_sample();
+        let (selected_action_idx, propensity) = logging_policy.select_action(greedy_action_idx, sample);
+
+        let selected_action_usize = (selected_action_idx as usize).min(profile_scores.len() - 1);
+        let (orig_idx, selected_profile, _score) = profile_scores[selected_action_usize];
+
+        Some((orig_idx, selected_profile.clone(), selected_action_idx, propensity))
+    }
 }
 
 pub(crate) const COMMUNITY_RELEVANCE_BOOST: f32 = 1.2;
@@ -1004,5 +1260,52 @@ mod tests {
         router.reset_calibration("p1");
         assert_eq!(router.calibration_stats()["p1"].times_selected, 0);
         Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "bandit-routing")]
+    fn test_pending_bandit_eviction_unit() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = contextra_db::ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        };
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let db = contextra_db::Contextra::open_with_config(dir.path(), config).await.unwrap();
+            let collection = db.collection("default").await.unwrap();
+
+            let profile = SlmProfile::new(
+                "p1",
+                "http://localhost:1111",
+                vec![1],
+                TokenBudget::new(1000, 100),
+                0.5,
+            );
+
+            let router = crate::tests::tests::create_test_router(collection, vec![profile], None);
+            let old_time = Instant::now() - Duration::from_secs(400);
+
+            {
+                let mut map = router.pending_bandit.write();
+                for _ in 0..10_000 {
+                    map.insert(
+                        DecisionId::new(),
+                        PendingBanditDecision {
+                            context: vec![0.0; 4],
+                            profile_name: "p1".to_string(),
+                            action_idx: 0,
+                            propensity: 0.5,
+                            created: old_time,
+                        },
+                    );
+                }
+                assert_eq!(map.len(), 10_000);
+            }
+
+            router.evict_stale_decisions();
+
+            assert_eq!(router.pending_bandit.read().len(), 0);
+        });
     }
 }
