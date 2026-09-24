@@ -1,6 +1,7 @@
 use super::super::*;
 use crate::csr::CsrGraph;
-use contextra_core::{DocId, Edge, Entity, EntityId, GraphIndex, ContextraError, TxId};
+use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
+use contextra_ports::GraphIndex;
 
 use super::*;
 use std::sync::Arc;
@@ -849,7 +850,7 @@ async fn test_ppr_tl_hfd_dispatch_valid() {
     graph.commit(tx).await.unwrap();
 
     let config = PprConfig {
-        algorithm: PprAlgorithm::TlHfd(contextra_core::TlHfdParams::default()),
+        algorithm: PprAlgorithm::TlHfd(contextra_types::TlHfdParams::default()),
         ..Default::default()
     };
 
@@ -884,7 +885,7 @@ async fn test_ppr_shadow_mode_tl_hfd_parity() {
     };
 
     let cfg_shadow = PprConfig {
-        algorithm: PprAlgorithm::ShadowModeTlHfd(contextra_core::TlHfdParams::default()),
+        algorithm: PprAlgorithm::ShadowModeTlHfd(contextra_types::TlHfdParams::default()),
         ..Default::default()
     };
 
@@ -912,7 +913,7 @@ async fn test_ppr_tl_hfd_invalid_params_fallback() {
     graph.commit(tx).await.unwrap();
 
     // Invalid delta (< 2.0) triggers TlHfdError::InvalidParameter
-    let invalid_tl_params = contextra_core::TlHfdParams {
+    let invalid_tl_params = contextra_types::TlHfdParams {
         delta: 1.0,
         ..Default::default()
     };

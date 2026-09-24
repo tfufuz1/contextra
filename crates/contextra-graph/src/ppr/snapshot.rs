@@ -10,7 +10,7 @@ use crate::csr::types::{EdgePayload, InternalIndex};
 use crate::csr::visibility::is_edge_visible_bitemporal;
 use crate::csr::GraphInner;
 use crate::ppr::{compute_ppr_with_context, DeletedView, PprContext};
-use contextra_core::{EntityId, PprConfig, TxId};
+use contextra_types::{EntityId, PprConfig, TxId};
 use std::collections::HashMap;
 
 /// Calculates Personalized PageRank (PPR) over the graph state visible at a specific MVCC transaction sequence number (`as_of_tx`).

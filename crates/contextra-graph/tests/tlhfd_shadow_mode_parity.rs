@@ -1,6 +1,6 @@
 //! Integration and parity tests for Thresholded Local Hyper-Flow Diffusion (TL-HFD, AK-16).
 
-use contextra_core::EntityId;
+use contextra_types::EntityId;
 use contextra_graph::path_rag::{PathGraph, PprParams};
 use contextra_graph::{
     shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, HyperEdge, HyperEdgeId, RoleBinding,

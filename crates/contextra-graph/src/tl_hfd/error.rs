@@ -14,8 +14,8 @@ pub enum TlHfdError {
     NonFinite,
 }
 
-impl From<TlHfdError> for contextra_core::ContextraError {
+impl From<TlHfdError> for contextra_types::ContextraError {
     fn from(err: TlHfdError) -> Self {
-        contextra_core::ContextraError::InvalidInput(err.to_string())
+        contextra_types::ContextraError::InvalidInput(err.to_string())
     }
 }

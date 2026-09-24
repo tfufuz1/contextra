@@ -1,6 +1,7 @@
 #![expect(clippy::unwrap_used)]
 
-use contextra_core::{DocId, EntityId, StorageEngine, TxId};
+use contextra_types::{DocId, EntityId, TxId};
+use contextra_ports::StorageEngine;
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId, HYPEREDGE_PREFIX};
 use contextra_store::{LsmConfig, LsmStorage};

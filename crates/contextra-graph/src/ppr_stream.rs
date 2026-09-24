@@ -6,11 +6,12 @@
 //! # Lazy Evaluation & Performance
 //! Personalized PageRank ([`PprConfig`]) does not accept a `top_k` parameter; PPR computes the entire ranking vector.
 //! Consequently, [`PprCandidateStream`] calculates PPR **once lazily** on the first pull ([`PprCandidateStream::next_batch`], [`PprCandidateStream::next_entity`], or [`PprCandidateStream::next_batch_docs`]),
-//! truncates the result list to [`MAX_SEARCH_K`][contextra_core::MAX_SEARCH_K] (1,000), and yields from the cached vector in batches.
+//! truncates the result list to [`MAX_SEARCH_K`][contextra_types::MAX_SEARCH_K] (1,000), and yields from the cached vector in batches.
 //!
 //! The performance gain (P24) stems from seed-local forward-push calculation in the underlying PPR engine, rather than incremental batching.
 
-use contextra_core::{DocId, EntityId, GraphIndex, PprConfig, Result, MAX_SEARCH_K};
+use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
+use contextra_ports::GraphIndex;
 use std::collections::{HashSet, VecDeque};
 
 /// Default batch size for candidate retrieval (Spec §21.2).
@@ -142,7 +143,7 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
 
         match self.ranked.as_mut() {
             Some(ranked) => Ok(ranked),
-            None => Err(contextra_core::ContextraError::Internal(
+            None => Err(contextra_types::ContextraError::Internal(
                 "Failed to initialize PPR stream ranking buffer".to_string(),
             )),
         }

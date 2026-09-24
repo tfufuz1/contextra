@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use contextra_core::EntityId;
+use contextra_types::EntityId;
 
 use super::graph_write::CsrGraph;
 

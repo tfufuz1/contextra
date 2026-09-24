@@ -1,4 +1,5 @@
-use contextra_core::{DocId, Edge, Entity, EntityId, GraphIndex, TxId};
+use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
+use contextra_ports::GraphIndex;
 use contextra_graph::{CsrGraph, PathGraph};
 use proptest::prelude::*;
 use std::collections::HashSet;

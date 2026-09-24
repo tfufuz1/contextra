@@ -3,7 +3,8 @@
 //! Evaluates peak intermediate memory consumption and CPU latency of `CsrGraph`
 //! traversal across synthetic hub nodes with varying out-degrees (1K, 10K, 100K, 1M).
 
-use contextra_core::{Entity, EntityId, GraphIndex, TxId};
+use contextra_types::{Entity, EntityId, TxId};
+use contextra_ports::GraphIndex;
 use contextra_graph::CsrGraph;
 use std::time::Instant;
 
@@ -36,7 +37,7 @@ async fn test_hub_node_bfs_scaling_benchmark() {
         graph
             .add_edge(
                 tx,
-                contextra_core::Edge::new(start_id, hub_id, "connects").with_weight(1.0),
+                contextra_types::Edge::new(start_id, hub_id, "connects").with_weight(1.0),
             )
             .await
             .unwrap();
@@ -51,7 +52,7 @@ async fn test_hub_node_bfs_scaling_benchmark() {
             graph
                 .add_edge(
                     tx,
-                    contextra_core::Edge::new(hub_id, leaf_id, "points_to").with_weight(0.9),
+                    contextra_types::Edge::new(hub_id, leaf_id, "points_to").with_weight(0.9),
                 )
                 .await
                 .unwrap();

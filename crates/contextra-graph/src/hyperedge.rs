@@ -6,7 +6,7 @@
 use crate::arc_slice::ArcSlice;
 use crate::csr::EdgeType;
 use crate::error::GraphMutationError;
-use contextra_core::{DocId, EntityId, ContextraError, Result, TxId};
+use contextra_types::{DocId, EntityId, ContextraError, Result, TxId};
 use scc::HashMap;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;

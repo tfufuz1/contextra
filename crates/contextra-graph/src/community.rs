@@ -19,7 +19,7 @@
 // SIEHE AUCH: crates/contextra-graph/src/csr.rs
 
 use crate::CsrGraph;
-use contextra_core::{EntityId, Result};
+use contextra_types::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

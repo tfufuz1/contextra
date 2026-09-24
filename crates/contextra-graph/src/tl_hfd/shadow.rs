@@ -5,7 +5,7 @@ use super::error::TlHfdError;
 use super::params::TlHfdParams;
 use crate::path_rag::{forward_push_ppr, PathGraph, PprParams};
 use ahash::AHashSet;
-use contextra_core::EntityId;
+use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Result structure of shadow mode comparison between Forward-Push PPR and TL-HFD.

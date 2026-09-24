@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::GraphIndexExt;
-use contextra_core::{EntityId, Result, TxId};
+use contextra_types::{EntityId, Result, TxId};
 
 use super::graph_write::CsrGraph;
 use super::types::GRAPH_COMMUNITY_PREFIX;
@@ -290,7 +290,7 @@ impl CsrGraph {
     pub async fn personalized_page_rank_with_context_async(
         &self,
         seed_nodes: &[EntityId],
-        config: &contextra_core::PprConfig,
+        config: &contextra_types::PprConfig,
         ctx: &mut crate::PprContext,
     ) -> Vec<(EntityId, f32)> {
         let deleted_view = self.deleted_view().await;

@@ -11,7 +11,7 @@ description = "CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fus
 
 [features]
 default = []
-docid-128 = ["contextra-core/docid-128"]
+docid-128 = ["contextra-types/docid-128"]
 graph-connectivity-health = []
 edge-reinforcement-learning = []
 ppr-forward-push = []
@@ -21,7 +21,8 @@ physio-percolation = ["graph-connectivity-health"]
 physio-synaptic-edges = ["edge-reinforcement-learning"]
 
 [dependencies]
-contextra-core = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 parking_lot = { workspace = true }
 tracing = { workspace = true }
 ahash = { workspace = true }

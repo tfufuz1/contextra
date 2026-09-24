@@ -1,4 +1,4 @@
-use contextra_core::{DocId, EntityId};
+use contextra_types::{DocId, EntityId};
 use contextra_graph::path_rag::{GraphPath, PathGraph, PathRAGEngine};
 use std::collections::HashMap;
 

@@ -6,9 +6,8 @@ use std::sync::Arc;
 
 use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
 use crate::error::GraphMutationError;
-use contextra_core::{
-    DocId, Entity, EntityId, GraphIndex, ContextraError, Result, StorageEngine, TxId,
-};
+use contextra_types::{DocId, Entity, EntityId, ContextraError, Result, TxId};
+use contextra_ports::{GraphIndex, StorageEngine};
 
 use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::{CsrGraphConfig, EdgePayload};
@@ -510,7 +509,7 @@ impl CsrGraph {
     /// Atomically tombstones a hyperedge by setting `tx_valid_to = Some(wal_tx)` and removing
     /// it from `hyperedge_index` and `doc_to_hyperedges` in a single write lock.
     ///
-    /// NOTE: Callers in `cascade.rs` will adjust to pass `wal_tx: contextra_core::TxId` as part of
+    /// NOTE: Callers in `cascade.rs` will adjust to pass `wal_tx: contextra_types::TxId` as part of
     /// parallel wave updates.
     ///
     /// Returns `true` if the hyperedge was found and newly tombstoned, or `false` if

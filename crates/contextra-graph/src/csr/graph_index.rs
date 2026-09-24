@@ -3,9 +3,8 @@ use std::sync::atomic::Ordering;
 
 use crate::consistency_enforcement::EdgeAssertion;
 use crate::GraphIndexExt;
-use contextra_core::{
-    BoxFuture, Entity, EntityId, GraphIndex, GraphIndexStats, ContextraError, Result, TxId,
-};
+use contextra_types::{Entity, EntityId, ContextraError, Result, TxId};
+use contextra_ports::{BoxFuture, GraphIndex, GraphIndexStats};
 
 use super::graph_write::CsrGraph;
 use super::inner::sentinel_entity;
@@ -162,7 +161,7 @@ impl GraphIndex for CsrGraph {
         })
     }
 
-    fn add_edge<'a>(&'a self, tx: TxId, edge: contextra_core::Edge) -> BoxFuture<'a, Result<()>> {
+    fn add_edge<'a>(&'a self, tx: TxId, edge: contextra_types::Edge) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             debug_assert!(
             tx != TxId::INVALID && tx.is_valid_origin(),
@@ -257,7 +256,7 @@ impl GraphIndex for CsrGraph {
     fn personalized_page_rank<'a>(
         &'a self,
         seed_nodes: &'a [EntityId],
-        config: &'a contextra_core::PprConfig,
+        config: &'a contextra_types::PprConfig,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
             let deleted_view = self.deleted_view().await;
@@ -282,7 +281,7 @@ impl GraphIndex for CsrGraph {
     fn personalized_page_rank_at<'a>(
         &'a self,
         seed_nodes: &'a [EntityId],
-        config: &'a contextra_core::PprConfig,
+        config: &'a contextra_types::PprConfig,
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
@@ -794,9 +793,9 @@ impl GraphIndex for CsrGraph {
         label: &'a str,
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            self.add_edge(tx, contextra_core::Edge::new(from, to, label))
+            self.add_edge(tx, contextra_types::Edge::new(from, to, label))
                 .await?;
-            self.add_edge(tx, contextra_core::Edge::new(to, from, label))
+            self.add_edge(tx, contextra_types::Edge::new(to, from, label))
                 .await?;
             Ok(())
         })

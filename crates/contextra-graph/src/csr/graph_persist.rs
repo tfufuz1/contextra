@@ -9,7 +9,8 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 
-use contextra_core::{Entity, EntityId, ContextraError, Result, StorageEngine, TxId};
+use contextra_types::{Entity, EntityId, ContextraError, Result, TxId};
+use contextra_ports::StorageEngine;
 
 use super::graph_write::CsrGraph;
 use super::types::{
@@ -218,12 +219,12 @@ impl CsrGraph {
                 if let Some(obj) = meta_obj {
                     if let Some(links_val) = obj.get("links") {
                         if let Ok(links) = serde_json::from_value::<
-                            Vec<contextra_core::types::domain::MemoryLink>,
+                            Vec<contextra_types::MemoryLink>,
                         >(links_val.clone())
                         {
                             for link in links {
                                 if link.relation
-                                    == contextra_core::types::domain::LinkRelation::Supersedes
+                                    == contextra_types::LinkRelation::Supersedes
                                 {
                                     let superseded_doc = link.target;
                                     let edge_ids = graph.edges_for_doc(superseded_doc);

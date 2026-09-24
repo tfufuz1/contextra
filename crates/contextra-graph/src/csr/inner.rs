@@ -2,7 +2,7 @@ use arc_swap::ArcSwap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use contextra_core::{DocId, Entity, EntityId, TxId};
+use contextra_types::{DocId, Entity, EntityId, TxId};
 
 use super::types::{EdgePayload, InternalIndex, StagedEdgePayload};
 

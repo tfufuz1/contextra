@@ -1,5 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use contextra_core::{DocId, Entity, EntityId, GraphIndex, TxId};
+use contextra_types::{DocId, Entity, EntityId, TxId};
+use contextra_ports::GraphIndex;
 use contextra_graph::csr::CsrGraph;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -13,7 +14,7 @@ pub trait CsrGraphBenchExt {
         max_hops: usize,
     ) -> std::pin::Pin<
         Box<
-            dyn std::future::Future<Output = contextra_core::Result<Vec<(EntityId, f32)>>>
+            dyn std::future::Future<Output = contextra_types::Result<Vec<(EntityId, f32)>>>
                 + Send
                 + '_,
         >,
@@ -23,7 +24,7 @@ pub trait CsrGraphBenchExt {
         &self,
         doc_id: DocId,
     ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = contextra_core::Result<Vec<EntityId>>> + Send + '_>,
+        Box<dyn std::future::Future<Output = contextra_types::Result<Vec<EntityId>>> + Send + '_>,
     >;
 }
 
@@ -34,7 +35,7 @@ impl CsrGraphBenchExt for CsrGraph {
         max_hops: usize,
     ) -> std::pin::Pin<
         Box<
-            dyn std::future::Future<Output = contextra_core::Result<Vec<(EntityId, f32)>>>
+            dyn std::future::Future<Output = contextra_types::Result<Vec<(EntityId, f32)>>>
                 + Send
                 + '_,
         >,
@@ -46,7 +47,7 @@ impl CsrGraphBenchExt for CsrGraph {
         &self,
         doc_id: DocId,
     ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = contextra_core::Result<Vec<EntityId>>> + Send + '_>,
+        Box<dyn std::future::Future<Output = contextra_types::Result<Vec<EntityId>>> + Send + '_>,
     > {
         Box::pin(self.neighbors(EntityId::new(doc_id.inner())))
     }
@@ -77,7 +78,7 @@ fn build_test_graph(rt: &Runtime, n_nodes: usize, n_edges: usize) -> Arc<CsrGrap
             let _ = GraphIndex::add_edge(
                 graph.as_ref(),
                 tx,
-                contextra_core::Edge::new(
+                contextra_types::Edge::new(
                     EntityId::new(src as u64),
                     EntityId::new(dst as u64),
                     "link",
@@ -110,7 +111,7 @@ fn build_test_graph_with_pending(
             let _ = GraphIndex::add_edge(
                 graph.as_ref(),
                 tx,
-                contextra_core::Edge::new(
+                contextra_types::Edge::new(
                     EntityId::new(src as u64),
                     EntityId::new(dst as u64),
                     "pending_rel",

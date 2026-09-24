@@ -1,6 +1,7 @@
 use super::*;
 use crate::csr::CsrGraph;
-use contextra_core::{Edge, Entity, EntityId, GraphIndex, ContextraError, TxId};
+use contextra_types::{Edge, Entity, EntityId, ContextraError, TxId};
+use contextra_ports::GraphIndex;
 
 use super::*;
 

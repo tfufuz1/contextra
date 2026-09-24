@@ -1,6 +1,7 @@
 use super::super::*;
 use crate::csr::CsrGraph;
-use contextra_core::{DocId, Edge, Entity, EntityId, GraphIndex, ContextraError, TxId};
+use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
+use contextra_ports::GraphIndex;
 use std::sync::Arc;
 
 struct LogCaptureLayer(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
@@ -180,7 +181,7 @@ async fn test_ppr_pathological_max_iterations_ceiling() {
 
 #[tokio::test]
 async fn test_ppr_ignores_deleted_entities() {
-    use contextra_core::StorageEngine;
+    use contextra_ports::StorageEngine;
     use contextra_store::{LsmConfig, LsmStorage};
     use std::sync::Arc;
 
@@ -256,7 +257,7 @@ async fn test_ppr_ignores_deleted_entities() {
 
 #[tokio::test]
 async fn test_ppr_phantom_node_no_rank_mass() {
-    use contextra_core::StorageEngine;
+    use contextra_ports::StorageEngine;
     use contextra_store::{LsmConfig, LsmStorage};
     use std::sync::Arc;
 
@@ -362,7 +363,7 @@ fn test_deleted_view_methods() {
 
 #[tokio::test]
 async fn test_deleted_view_tombstone_filtering_all_entry_points() {
-    use contextra_core::StorageEngine;
+    use contextra_ports::StorageEngine;
     use std::sync::Arc;
     let temp_dir = tempfile::tempdir().unwrap();
     let config = contextra_store::LsmConfig {
@@ -801,12 +802,12 @@ async fn test_ppr_tl_hfd_and_shadow_mode_context_dispatch() {
     graph.commit(tx).await.unwrap();
 
     let cfg_tlhfd = PprConfig {
-        algorithm: PprAlgorithm::TlHfd(contextra_core::TlHfdParams::default()),
+        algorithm: PprAlgorithm::TlHfd(contextra_types::TlHfdParams::default()),
         ..Default::default()
     };
 
     let cfg_shadow = PprConfig {
-        algorithm: PprAlgorithm::ShadowModeTlHfd(contextra_core::TlHfdParams::default()),
+        algorithm: PprAlgorithm::ShadowModeTlHfd(contextra_types::TlHfdParams::default()),
         ..Default::default()
     };
 

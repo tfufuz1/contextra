@@ -5,7 +5,7 @@ use super::lovasz::{compute_lovasz_extension, truncate_participants};
 use super::params::TlHfdParams;
 use crate::path_rag::PathGraph;
 use ahash::{AHashMap, AHashSet};
-use contextra_core::EntityId;
+use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Internal representation of a deduplicated edge (binary or hyperedge) touching the active region.

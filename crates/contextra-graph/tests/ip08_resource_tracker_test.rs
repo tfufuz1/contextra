@@ -1,4 +1,4 @@
-use contextra_core::{Entity, EntityId, ResourceBudget, ResourceTracker};
+use contextra_types::{Entity, EntityId, ResourceBudget, ResourceTracker};
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use std::sync::Arc;
 

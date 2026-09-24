@@ -1,6 +1,6 @@
 //! Lovász extension and subgradient calculations for TL-HFD (Spec §21.1).
 
-use contextra_core::EntityId;
+use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Truncates hyperedge participants to at most `max_sort_size` top x-value participants plus the min x-value participant.

@@ -2,9 +2,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_core::{
-    ContextraError, DocId, Edge, Entity, EntityId, GraphIndex, GraphIndexStats, PprConfig, TxId,
-};
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, PprConfig, TxId};
+use contextra_ports::{GraphIndex, GraphIndexStats};
 use contextra_graph::{CsrGraph, PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 use std::collections::HashSet;
 
@@ -15,7 +14,7 @@ impl GraphIndex for MockNoPprGraph {
         &'a self,
         _start_node: EntityId,
         _max_hops: usize,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<Vec<(EntityId, f32)>>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move { Ok(vec![]) })
     }
 
@@ -23,7 +22,7 @@ impl GraphIndex for MockNoPprGraph {
         &'a self,
         _tx: TxId,
         _entity: Entity,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
@@ -31,36 +30,36 @@ impl GraphIndex for MockNoPprGraph {
         &'a self,
         _tx: TxId,
         _edge: Edge,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
-    fn commit<'a>(&'a self, _tx: TxId) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    fn commit<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
-    fn rollback<'a>(&'a self, _tx: TxId) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    fn rollback<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
     fn rollback_to_tx<'a>(
         &'a self,
         _tx_id: TxId,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
-    fn last_tx_id<'a>(&'a self) -> contextra_core::BoxFuture<'a, contextra_core::Result<TxId>> {
+    fn last_tx_id<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<TxId>> {
         Box::pin(async move { Ok(TxId::new(0)) })
     }
 
-    fn len<'a>(&'a self) -> contextra_core::BoxFuture<'a, usize> {
+    fn len<'a>(&'a self) -> contextra_ports::BoxFuture<'a, usize> {
         Box::pin(async move { 0 })
     }
 
     fn stats<'a>(
         &'a self,
-    ) -> contextra_core::BoxFuture<'a, contextra_core::Result<GraphIndexStats>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<GraphIndexStats>> {
         Box::pin(async move {
             Ok(GraphIndexStats {
                 num_entities: 0,
