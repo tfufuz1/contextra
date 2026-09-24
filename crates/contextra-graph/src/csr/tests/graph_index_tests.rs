@@ -656,6 +656,7 @@ async fn test_csr_is_entity_deleted_returns_false_for_live_entity() {
 #[test]
 #[cfg(feature = "edge-reinforcement-learning")]
 fn test_edge_store_invalidated_after_compact() {
+    use crate::csr::types::EdgePayload;
     let mut inner = GraphInner::new();
     let entity_a = EntityId::new(1);
     let entity_b = EntityId::new(2);
