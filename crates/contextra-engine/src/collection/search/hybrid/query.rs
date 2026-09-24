@@ -278,10 +278,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         raw_tuples.truncate(candidate_k);
                         raw_tuples
                     }
-                    contextra_core::GraphTraversalStrategy::PersonalizedPageRank(_) => {
-                        return Err(contextra_core::ContextraError::snapshot_unsupported_for_signal(
-                            "PersonalizedPageRank strategy does not support snapshot-isolated retrieval",
-                        ));
+                    contextra_core::GraphTraversalStrategy::PersonalizedPageRank(ref cfg) => {
+                        let mut raw_tuples = self
+                            .graph_index
+                            .personalized_page_rank_at(anchors, cfg, seq)
+                            .await?;
+                        raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        raw_tuples.truncate(candidate_k);
+                        raw_tuples
                     }
                     contextra_core::GraphTraversalStrategy::PathRag { .. } => {
                         return Err(contextra_core::ContextraError::snapshot_unsupported_for_signal(

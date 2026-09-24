@@ -107,16 +107,16 @@ Example:
 
 ---
 
-## 6. Known Harness Technical Blocker (Snapshot Isolation & PPR / PathRag)
+## 6. Known Harness Technical Blocker (Snapshot Isolation & PathRag)
 
 ### Status & Root Cause Analysis
-During benchmark harness validation, tests utilizing `PathRag` graph retrieval or Personalized PageRank (PPR) under active MVCC snapshot isolation currently encounter a runtime limitation:
+Personalized PageRank (PPR) graph retrieval under active MVCC snapshot isolation is fully supported via `personalized_page_rank_at`. However, tests utilizing `PathRag` graph retrieval under active MVCC snapshot isolation currently encounter a runtime limitation:
 - **Error:** `ContextraError::SnapshotUnsupportedForSignal("PathRag strategy does not support snapshot-isolated retrieval")`
-- **Location:** `crates/contextra-db/src/collection/search.rs`
-- **Architectural Reason:** PPR graph traversal operates on the live unversioned CSR graph structure (`contextra-graph`), which does not yet maintain sequence-number-aware edge visibility slices for historical MVCC snapshots. Consequently, snapshot isolation explicitly rejects PPR/PathRag queries to prevent stale data leakage.
+- **Location:** `crates/contextra-engine/src/collection/search/hybrid/{mod,query}.rs`
+- **Architectural Reason:** `PathRag` operates on live graph paths which do not yet support sequence-number-aware edge visibility slices for historical MVCC snapshots. Consequently, snapshot isolation explicitly rejects PathRag queries to prevent stale data leakage.
 
 ### Impact on Protocol Execution
-Multi-signal benchmark sweeps (Tier B and Tier C) that request snapshot-isolated PathRag retrieval will return `SnapshotUnsupportedForSignal` until graph MVCC edge versioning is implemented. Benchmark execution scripts MUST handle this error gracefully or run graph sweeps in live read mode where snapshot isolation is disengaged.
+Multi-signal benchmark sweeps (Tier B and Tier C) using PPR operate under snapshot isolation without errors. Sweeps requesting snapshot-isolated PathRag retrieval will return `SnapshotUnsupportedForSignal` until PathRag graph MVCC edge versioning is implemented. Benchmark execution scripts MUST handle PathRag errors gracefully or run PathRag sweeps in live read mode where snapshot isolation is disengaged.
 
 ---
 

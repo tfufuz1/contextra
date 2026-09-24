@@ -279,6 +279,39 @@ impl GraphIndex for CsrGraph {
         })
     }
 
+    fn personalized_page_rank_at<'a>(
+        &'a self,
+        seed_nodes: &'a [EntityId],
+        config: &'a contextra_core::PprConfig,
+        seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+        Box::pin(async move {
+            let as_of_tx = TxId::new(seq_no);
+            if is_suspicious_tx_id(as_of_tx) {
+                tracing::warn!(
+                    tx_id = seq_no,
+                    hint = if as_of_tx == TxId::INVALID { "Sentinel TxId(0)" } else { "Wall-Clock-ns-Bereich" },
+                    "AGT-GRAPH-001: Verdächtiger oder unallozierter seq_no in personalized_page_rank_at"
+                );
+            }
+            let deleted_view = self.deleted_view().await;
+            if let Err(err) = self.compact_async().await {
+                tracing::warn!(
+                    error = %err,
+                    "compact_async failed during personalized_page_rank_at compaction"
+                );
+            }
+            let inner = self.inner_read();
+            Ok(crate::ppr::snapshot::compute_ppr_at(
+                &inner,
+                seed_nodes,
+                config,
+                &deleted_view,
+                as_of_tx,
+            ))
+        })
+    }
+
     fn traverse_at<'a>(
         &'a self,
         start_node: EntityId,

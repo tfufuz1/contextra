@@ -161,6 +161,26 @@ pub trait GraphIndex: Send + Sync + 'static {
         })
     }
 
+    /// Calculates Personalized PageRank (PPR) starting from seed nodes on the graph state visible at a specific sequence number (`seq_no`).
+    ///
+    /// # Errors
+    /// Returns [`ContextraError::CapabilityUnsupported`][crate::ContextraError::CapabilityUnsupported]
+    /// with capability `"graph_ppr_snapshot"` if snapshot-isolated Personalized PageRank is not implemented.
+    /// Tested via `capability_coverage` test module.
+    fn personalized_page_rank_at<'a>(
+        &'a self,
+        _seed_nodes: &'a [EntityId],
+        _config: &'a PprConfig,
+        _seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+        Box::pin(async move {
+            Err(crate::error::ContextraError::capability_unsupported(
+                "graph_ppr_snapshot",
+                "Personalized PageRank snapshot isolation (personalized_page_rank_at) is not supported by default — tracked in ADR-024",
+            ))
+        })
+    }
+
     /// Traverses the entity graph using BFS at a specific point in time (bi-temporal edge filtering).
     ///
     /// # Errors
@@ -448,6 +468,17 @@ mod tests {
                 assert_eq!(capability, "graph_ppr");
             }
             _ => panic!("Expected CapabilityUnsupported for personalized_page_rank"),
+        }
+
+        let res_ppr_at = index
+            .personalized_page_rank_at(&[EntityId::new(1)], &PprConfig::default(), 42)
+            .await;
+        match res_ppr_at {
+            Err(crate::error::ContextraError::CapabilityUnsupported { capability, reason }) => {
+                assert_eq!(capability, "graph_ppr_snapshot");
+                assert!(reason.contains("ADR-024"), "Unexpected reason: {reason}");
+            }
+            _ => panic!("Expected CapabilityUnsupported for personalized_page_rank_at"),
         }
     }
 }
