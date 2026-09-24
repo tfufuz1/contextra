@@ -1,7 +1,8 @@
 #![allow(deprecated)]
 
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta, PersistentCheckpointStore};
-use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+use contextra_types::{Result, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
 use proptest::prelude::*;
 use std::collections::{HashMap, HashSet};

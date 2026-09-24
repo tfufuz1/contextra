@@ -1,7 +1,8 @@
 #![allow(clippy::type_complexity)]
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_core::{BoxFuture, Result, StorageEngine, StorageStats, TxId};
+use contextra_types::{Result, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
@@ -678,17 +679,17 @@ async fn test_concurrent_two_session_rollback_race_stress_100_iterations() {
 
             // Verify checksum matches
             if storage_a.user_state_checksum() != checksum_a_base {
-                return Err(contextra_core::ContextraError::Internal(format!(
+                return Err(contextra_types::ContextraError::Internal(format!(
                     "Alpha checksum mismatch in stress iteration {iter}"
                 )));
             }
             if storage_b.user_state_checksum() != checksum_b_base {
-                return Err(contextra_core::ContextraError::Internal(format!(
+                return Err(contextra_types::ContextraError::Internal(format!(
                     "Beta checksum mismatch in stress iteration {iter}"
                 )));
             }
 
-            Ok::<(), contextra_core::ContextraError>(())
+            Ok::<(), contextra_types::ContextraError>(())
         });
     }
 

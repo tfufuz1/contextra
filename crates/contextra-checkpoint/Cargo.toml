@@ -10,7 +10,8 @@ rust-version.workspace = true
 description = "Backup and snapshot management for Contextra storage"
 
 [dependencies]
-contextra-core = { version = "0.1.0", path = "../contextra-core" }
+contextra-types = { version = "0.1.0", path = "../contextra-types" }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
 bytes = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -22,7 +23,6 @@ futures-executor = "0.3"
 dirs = "6.0.0"
 
 [dev-dependencies]
-contextra-core = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 proptest = "1.4"

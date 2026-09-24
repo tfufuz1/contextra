@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::orphan::pending_rollback_count;
-use contextra_core::{BoxFuture, StorageEngine, StorageStats};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
 use std::collections::HashSet;
 
@@ -388,7 +388,7 @@ async fn checkpoint_guard_commit_prevents_rollback() {
 
 #[tokio::test]
 async fn list_checkpoints_empty_initially() {
-    use contextra_core::traits::CheckpointCoordinator;
+    use contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store = PersistentCheckpointStore::new(storage, "test").unwrap();
 
@@ -398,7 +398,7 @@ async fn list_checkpoints_empty_initially() {
 
 #[tokio::test]
 async fn checkpoint_not_found_returns_err() {
-    use contextra_core::traits::CheckpointCoordinator;
+    use contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store = PersistentCheckpointStore::new(storage, "test").unwrap();
 
@@ -408,7 +408,7 @@ async fn checkpoint_not_found_returns_err() {
 
 #[tokio::test]
 async fn test_list_named_checkpoints_after_reopen() {
-    use contextra_core::traits::CheckpointCoordinator;
+    use contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     {
         let store1 = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
@@ -444,7 +444,7 @@ async fn test_list_named_checkpoints_after_reopen() {
 
 #[tokio::test]
 async fn list_checkpoints_cache_matches_storage() {
-    use contextra_core::traits::CheckpointCoordinator;
+    use contextra_ports::CheckpointCoordinator;
     let storage = Arc::new(MockStorage::new());
     let store1 = Arc::new(PersistentCheckpointStore::new(storage.clone(), "test").unwrap());
 
@@ -473,7 +473,7 @@ async fn list_checkpoints_cache_matches_storage() {
 
 #[tokio::test]
 async fn concurrent_checkpoint_creation_is_safe() {
-    use contextra_core::traits::CheckpointCoordinator;
+    use contextra_ports::CheckpointCoordinator;
     use tokio::task::JoinSet;
 
     let storage = Arc::new(MockStorage::new());
