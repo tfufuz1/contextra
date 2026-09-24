@@ -14,6 +14,7 @@ pub mod maintenance_config;
 pub mod maintenance_scheduler;
 pub mod aggregation_phase;
 pub mod graph_sink;
+pub mod leanrag_input;
 pub mod memory_consolidation;
 pub mod synthesis_phase;
 
@@ -43,6 +44,7 @@ pub use aggregation_phase::{
     ConsolidationPipelineResult, SuperEdgeDraft, SuperEdgeSink,
 };
 pub use graph_sink::CsrGraphSuperEdgeSink;
+pub use leanrag_input::{build_leanrag_inputs, LeanRagInputs, DEFAULT_MAX_LEANRAG_NODES};
 pub use synthesis_phase::run_synthesis_pass;
 
 /// Registers consolidation engine launcher with `contextra-engine`.

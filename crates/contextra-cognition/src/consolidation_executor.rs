@@ -7,9 +7,10 @@
 //! INVARIANTE: Nur Structural Consolidation Pass (rein strukturell) hier. Keine LLM-Calls.
 
 use crate::aggregation_phase::{
-    run_aggregation_pass, AggregationConfig, AggregationEdge, AggregationNode,
-    AggregationPhaseResult, AlphaNode,
+    check_compaction_budget, run_aggregation_pass, AggregationConfig, AggregationEdge,
+    AggregationNode, AggregationPhaseResult, AlphaNode,
 };
+use crate::leanrag_input::{build_leanrag_inputs, DEFAULT_MAX_LEANRAG_NODES};
 use crate::graph_sink::CsrGraphSuperEdgeSink;
 use crate::memory_consolidation::{
     compute_community_hash, run_consolidation_pass, run_structural_synthesis_pass,
@@ -366,6 +367,7 @@ pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex = contextra_vect
     validator: Option<Arc<dyn ResponseGroundingValidator>>,
     consolidation_config: ConsolidationConfig,
     synthesis_config: SynthesisConfig,
+    leanrag: Option<AggregationConfig>,
     interval: std::time::Duration,
     cancel_token: tokio_util::sync::CancellationToken,
     stability_tracker: Arc<tokio::sync::Mutex<CommunityStabilityTracker>>,
@@ -386,6 +388,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             validator: None,
             consolidation_config,
             synthesis_config,
+            leanrag: None,
             interval,
             cancel_token,
             stability_tracker: Arc::new(tokio::sync::Mutex::new(CommunityStabilityTracker::new())),
@@ -395,6 +398,12 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
     /// Fügt ein optionales LLM für die generative Wissenssynthese hinzu.
     pub fn with_llm(mut self, llm: Arc<dyn LlmTextGenerator>) -> Self {
         self.llm = Some(llm);
+        self
+    }
+
+    /// Fügt eine optionale AggregationConfig für LeanRAG Stage 3 (Opt-in) hinzu.
+    pub fn with_leanrag(mut self, cfg: AggregationConfig) -> Self {
+        self.leanrag = Some(cfg);
         self
     }
 
@@ -562,6 +571,90 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
                 .collection
                 .evict_decayed_chunks(&decay_controller, 100)
                 .await;
+        }
+
+        // LeanRAG Stage 3 (Opt-in): NUR wenn leanrag.is_some() UND self.llm.is_some()
+        if let (Some(ref cfg), Some(ref llm_arc)) = (&self.leanrag, &self.llm) {
+            if let Err(val_err) = cfg.validate() {
+                tracing::warn!(
+                    collection = %self.collection.name(),
+                    error = %val_err,
+                    "LeanRAG config validation failed; skipping stage 3"
+                );
+            } else {
+                let graph = self.collection.graph_index();
+                let peak_bytes = graph.estimate_compaction_peak_bytes();
+                if let Err(budget_err) = check_compaction_budget(peak_bytes, cfg) {
+                    tracing::warn!(
+                        collection = %self.collection.name(),
+                        error = %budget_err,
+                        "LeanRAG compaction budget exceeded; skipping stage 3"
+                    );
+                } else {
+                    let inputs = build_leanrag_inputs(
+                        self.collection.as_ref(),
+                        &turns,
+                        DEFAULT_MAX_LEANRAG_NODES,
+                    );
+
+                    if !inputs.nodes.is_empty() && !inputs.edges.is_empty() {
+                        match self.collection.allocate_tx() {
+                            Ok(wal_tx) => {
+                                // Drop tracker_guard so stability_tracker can be locked in spawn_blocking
+                                drop(tracker_guard);
+
+                                let collection_clone = self.collection.clone();
+                                let cfg_clone = cfg.clone();
+                                let llm_clone = llm_arc.clone();
+                                let stability_tracker_clone = self.stability_tracker.clone();
+
+                                let join_res = tokio::task::spawn_blocking(move || {
+                                    let handle = tokio::runtime::Handle::current();
+                                    let mut tracker_g = stability_tracker_clone.blocking_lock();
+                                    handle.block_on(async {
+                                        execute_leanrag_aggregation_stage(
+                                            collection_clone.as_ref(),
+                                            &inputs.nodes,
+                                            &inputs.edges,
+                                            &cfg_clone,
+                                            llm_clone.as_ref(),
+                                            &mut tracker_g,
+                                            wal_tx,
+                                        )
+                                        .await
+                                    })
+                                })
+                                .await;
+
+                                match join_res {
+                                    Ok(Err(stage_err)) => {
+                                        tracing::error!(
+                                            collection = %self.collection.name(),
+                                            error = %stage_err,
+                                            "LeanRAG stage 3 execution failed"
+                                        );
+                                    }
+                                    Err(join_err) => {
+                                        tracing::error!(
+                                            collection = %self.collection.name(),
+                                            error = %join_err,
+                                            "LeanRAG stage 3 task panicked or cancelled"
+                                        );
+                                    }
+                                    Ok(Ok(_)) => {}
+                                }
+                            }
+                            Err(tx_err) => {
+                                tracing::error!(
+                                    collection = %self.collection.name(),
+                                    error = %tx_err,
+                                    "Failed to allocate TxId for LeanRAG stage 3"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Ok((consolidation_res, synthesis_res))
