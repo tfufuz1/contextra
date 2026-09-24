@@ -10,8 +10,8 @@
 use crate::consolidation_executor::{execute_consolidation_pass, ConsolidationLockGuard};
 use crate::maintenance_config::MaintenanceConfig;
 use crate::memory_consolidation::ConsolidationConfig;
-use contextra_core::traits::{StorageEngine, VectorIndex};
-use contextra_core::{DocId, ContextraError, TxId};
+use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{ContextraError, DocId, TxId};
 use contextra_engine::collection::{Collection, StoredDocument};
 use contextra_engine::decay_controller::AdaptiveDecayController;
 use std::sync::atomic::{AtomicUsize, Ordering};

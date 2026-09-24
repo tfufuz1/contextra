@@ -5,7 +5,7 @@
 //! is called, executing a single atomic RCU publish on the underlying graph.
 
 use crate::aggregation_phase::{SuperEdgeDraft, SuperEdgeSink};
-use contextra_core::{ContextraError, Result, TxId};
+use contextra_types::{ContextraError, Result, TxId};
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;

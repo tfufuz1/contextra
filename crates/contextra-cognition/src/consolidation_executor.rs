@@ -17,10 +17,10 @@ use crate::memory_consolidation::{
     CommunityStabilityTracker, ConsolidationConfig, ConsolidationPhaseResult, SynthesisConfig,
     SynthesisPhaseResult,
 };
-use contextra_core::traits::{
+use contextra_ports::{
     LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex,
 };
-use contextra_core::{DocId, Result};
+use contextra_types::{DocId, Result};
 use contextra_engine::collection::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_engine::decay_controller::AdaptiveDecayController;
 use contextra_graph::{detect_communities, CommunityDetectionConfig};
@@ -107,7 +107,7 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
     .map_err(|join_err| {
         // JoinError tritt auf bei Task-Panic — gemäß Zero-Panic-Doctrine nicht erwartet,
         // aber explizit behandeln statt unwrap().
-        contextra_core::ContextraError::Internal(format!(
+        contextra_types::ContextraError::Internal(format!(
             "Consolidation compute task panicked: {}",
             join_err
         ))
@@ -294,7 +294,7 @@ pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>
     cfg: &AggregationConfig,
     llm: &dyn LlmTextGenerator,
     tracker: &mut CommunityStabilityTracker,
-    wal_tx: contextra_core::TxId,
+    wal_tx: contextra_types::TxId,
 ) -> Result<(AggregationPhaseResult, Vec<AlphaNode>)> {
     let graph = collection.graph_index();
     let mut sink = CsrGraphSuperEdgeSink::new(&graph, wal_tx);
@@ -664,8 +664,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::traits::LlmTextGenerator;
-    use contextra_core::BoxFuture;
+    use contextra_ports::{BoxFuture, LlmTextGenerator};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -690,11 +689,11 @@ mod tests {
     }
 
     impl LlmTextGenerator for TestMockLlm {
-        fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_core::Result<String>> {
+        fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_types::Result<String>> {
             Box::pin(async move {
                 self.call_count.fetch_add(1, Ordering::SeqCst);
                 if self.should_fail.load(Ordering::SeqCst) {
-                    Err(contextra_core::ContextraError::Internal(
+                    Err(contextra_types::ContextraError::Internal(
                         "Simulated LLM Fault Injection Failure".to_string(),
                     ))
                 } else {
@@ -799,7 +798,7 @@ mod tests {
         col.insert_typed(
             "turn_1",
             &[1.0, 0.0, 0.0, 0.0],
-            contextra_core::MemoryType::Episodic,
+            contextra_types::MemoryType::Episodic,
             Some(json!({"text": "Turn 1 content"})),
         )
         .await
@@ -808,7 +807,7 @@ mod tests {
         col.insert_typed(
             "turn_2",
             &[0.0, 1.0, 0.0, 0.0],
-            contextra_core::MemoryType::Episodic,
+            contextra_types::MemoryType::Episodic,
             Some(json!({"text": "Turn 2 content"})),
         )
         .await
@@ -956,9 +955,9 @@ mod tests {
         use tokio::time::timeout;
 
         // Erstelle minimale Eingabe
-        let turns: Vec<(contextra_core::DocId, Vec<f32>)> = vec![
-            (contextra_core::DocId::new(1), vec![0.1_f32; 16]),
-            (contextra_core::DocId::new(2), vec![0.9_f32; 16]),
+        let turns: Vec<(contextra_types::DocId, Vec<f32>)> = vec![
+            (contextra_types::DocId::new(1), vec![0.1_f32; 16]),
+            (contextra_types::DocId::new(2), vec![0.9_f32; 16]),
         ];
         let config = crate::memory_consolidation::ConsolidationConfig::default();
         let turns_owned = turns.clone();

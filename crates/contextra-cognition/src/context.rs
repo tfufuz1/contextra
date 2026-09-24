@@ -15,7 +15,7 @@
 // TEST: cargo test -p contextra-db
 // DONE: ContextManager nutzt MarkdownChunker zur Dokument-Zerlegung.
 
-use contextra_core::{ContextChunk, ContextWindow, Result, TokenBudget};
+use contextra_types::{ContextChunk, ContextWindow, Result, TokenBudget};
 
 /// Manages autonomous context preparation for LLM consumption.
 ///
@@ -245,7 +245,7 @@ impl SpatialFence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::DocId;
+    use contextra_types::DocId;
 
     #[test]
     fn context_manager_respects_token_budget() {
@@ -424,7 +424,7 @@ mod tests {
 #[cfg(test)]
 mod token_tests {
     use super::*;
-    use contextra_core::DocId;
+    use contextra_types::DocId;
 
     #[test]
     fn test_estimate_tokens_empty() {
@@ -474,7 +474,7 @@ mod token_tests {
         let res = ContextChunk::try_from(sr);
         assert!(matches!(
             res,
-            Err(contextra_core::ContextraError::InvalidInput(_))
+            Err(contextra_types::ContextraError::InvalidInput(_))
         ));
     }
 

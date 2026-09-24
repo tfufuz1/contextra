@@ -1,4 +1,4 @@
-use contextra_core::{ContextChunk, DocId};
+use contextra_types::{ContextChunk, DocId};
 
 /// Strategie für Context Compaction.
 #[derive(Debug, Clone, PartialEq, Eq)]

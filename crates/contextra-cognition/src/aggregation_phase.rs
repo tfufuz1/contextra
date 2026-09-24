@@ -7,8 +7,8 @@
 //! - Super-Hyperkanten-Entwürfe via `SuperEdgeSink`-Trait
 
 use crate::memory_consolidation::{CommunityStabilityTracker, ConsolidationPhaseResult};
-use contextra_core::traits::LlmTextGenerator;
-use contextra_core::{ContextraError, EntityId, Result};
+use contextra_ports::LlmTextGenerator;
+use contextra_types::{ContextraError, EntityId, Result};
 use contextra_graph::HyperEdgeId;
 use std::collections::{HashMap, HashSet};
 

@@ -13,8 +13,8 @@
 //! importiert werden. `ConsolidationNodesGuard` implementiert das gleiche strukturelle Muster (einziger
 //! Einstiegspunkt fuer geordnete Graph-/Node-Invalidierung waehrend der Konsolidierung).
 
-use contextra_core::traits::{StorageEngine, VectorIndex};
-use contextra_core::{DocId, Result};
+use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
 use contextra_engine::collection::Collection;
 use contextra_graph::cascade::CascadeInvalidationReport;
 use tokio::sync::MutexGuard;

@@ -19,8 +19,8 @@
 //! - `synthesis_phase::run_synthesis_pass()` in `synthesis_phase.rs` ist der LLM-basierte Generative Synthesis Pass über Segmenten (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait).
 
 use crate::context_compaction::{CompactedContext, ContextCompactor};
-use contextra_core::traits::{LlmTextGenerator, ResponseGroundingValidator};
-use contextra_core::{ContextChunk, DocId, TxId};
+use contextra_ports::{LlmTextGenerator, ResponseGroundingValidator};
+use contextra_types::{ContextChunk, DocId, TxId};
 use std::collections::HashSet;
 
 /// Konfiguration für den Structural Consolidation Pass.
@@ -406,7 +406,7 @@ pub async fn run_structural_synthesis_pass(
     llm: &dyn LlmTextGenerator,
     config: &SynthesisConfig,
     validator: Option<&dyn ResponseGroundingValidator>,
-) -> contextra_core::Result<SynthesisPhaseResult> {
+) -> contextra_types::Result<SynthesisPhaseResult> {
     if stable_communities.is_empty() {
         return Ok(SynthesisPhaseResult {
             synthesized: Vec::new(),
@@ -748,11 +748,11 @@ mod tests {
         fn generate<'a>(
             &'a self,
             prompt: &'a str,
-        ) -> contextra_core::BoxFuture<'a, contextra_core::Result<String>> {
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<String>> {
             Box::pin(async move {
                 if let Some(ref fail_str) = self.fail_community_contains {
                     if prompt.contains(fail_str) {
-                        return Err(contextra_core::ContextraError::Internal(
+                        return Err(contextra_types::ContextraError::Internal(
                             "Simulated LLM error".into(),
                         ));
                     }
@@ -927,7 +927,7 @@ mod tests {
     struct MockLowScoreGroundingValidator;
 
     impl ResponseGroundingValidator for MockLowScoreGroundingValidator {
-        fn score_grounding(&self, _response: &str, _sources: &[&str]) -> contextra_core::Result<f32> {
+        fn score_grounding(&self, _response: &str, _sources: &[&str]) -> contextra_types::Result<f32> {
             Ok(0.2) // Score 0.2 is below threshold 0.70
         }
     }

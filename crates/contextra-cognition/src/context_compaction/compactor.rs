@@ -1,7 +1,5 @@
-use contextra_core::{
-    ContextChunk, ContextSegment, DocId, LlmTextGenerator, Result, StorageEngine,
-    TenantId, TokenBudget, VectorIndex,
-};
+use contextra_ports::{ContextSegment, LlmTextGenerator, StorageEngine, VectorIndex};
+use contextra_types::{ContextChunk, DocId, Result, TenantId, TokenBudget};
 use contextra_engine::collection::Collection;
 use contextra_engine::ProvenanceRecord;
 

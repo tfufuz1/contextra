@@ -2,8 +2,8 @@ use contextra_cognition::aggregation_phase::AggregationConfig;
 use contextra_cognition::consolidation_executor::ConsolidationEngine;
 use contextra_cognition::leanrag_input::build_leanrag_inputs;
 use contextra_cognition::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
-use contextra_core::traits::LlmTextGenerator;
-use contextra_core::{BoxFuture, DocId, EntityId};
+use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::{DocId, EntityId};
 use contextra_engine::collection::Collection;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -31,11 +31,11 @@ impl TestMockLlm {
 }
 
 impl LlmTextGenerator for TestMockLlm {
-    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_core::Result<String>> {
+    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_types::Result<String>> {
         Box::pin(async move {
             self.call_count.fetch_add(1, Ordering::SeqCst);
             if self.should_fail.load(Ordering::SeqCst) {
-                Err(contextra_core::ContextraError::Internal(
+                Err(contextra_types::ContextraError::Internal(
                     "Simulated LLM Fault Injection Failure".to_string(),
                 ))
             } else {
