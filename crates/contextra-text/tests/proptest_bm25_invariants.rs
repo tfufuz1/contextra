@@ -1,6 +1,7 @@
 //! Property-based tests for BM25 score invariants and tombstone isolation.
 
-use contextra_core::{BoxFuture, DocId, Result, StorageEngine, TextIndex, TxId};
+use contextra_types::{DocId, Result, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::bm25::score_term;
 use contextra_text::tokenizer::{DefaultTokenizer, Tokenizer};
 use contextra_text::InvertedIndex;
@@ -42,9 +43,9 @@ impl StorageEngine for MVCCMockStorage {
             let store = self.store.read();
             if let Some(versions) = store.get(key) {
                 for (val, v_seq) in versions.iter().rev() {
-                    let raw_seq = v_seq & !contextra_core::TOMBSTONE_BIT;
+                    let raw_seq = v_seq & !contextra_types::TOMBSTONE_BIT;
                     if raw_seq <= seq {
-                        if (v_seq & contextra_core::TOMBSTONE_BIT) != 0 {
+                        if (v_seq & contextra_types::TOMBSTONE_BIT) != 0 {
                             return Ok(None);
                         }
                         return Ok(Some(bytes::Bytes::from(val.clone())));
@@ -81,11 +82,11 @@ impl StorageEngine for MVCCMockStorage {
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             let mut w = self.store.write();
             if let Some(versions) = w.get_mut(key) {
-                versions.push((Vec::new(), seq | contextra_core::TOMBSTONE_BIT));
+                versions.push((Vec::new(), seq | contextra_types::TOMBSTONE_BIT));
             } else {
                 w.insert(
                     key.to_vec(),
-                    vec![(Vec::new(), seq | contextra_core::TOMBSTONE_BIT)],
+                    vec![(Vec::new(), seq | contextra_types::TOMBSTONE_BIT)],
                 );
             }
             self.staged
@@ -141,9 +142,9 @@ impl StorageEngine for MVCCMockStorage {
         Box::pin(async move { Ok(()) })
     }
 
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
         Box::pin(async move {
-            Ok(contextra_core::StorageStats {
+            Ok(contextra_ports::StorageStats {
                 num_segments: 0,
                 total_size_bytes: 0,
                 memtable_size_bytes: 0,
@@ -186,9 +187,9 @@ impl StorageEngine for MVCCMockStorage {
             for (k, versions) in store.iter() {
                 if k.starts_with(prefix) {
                     for (val, v_seq) in versions.iter().rev() {
-                        let raw_seq = v_seq & !contextra_core::TOMBSTONE_BIT;
+                        let raw_seq = v_seq & !contextra_types::TOMBSTONE_BIT;
                         if raw_seq <= seq_no {
-                            if (v_seq & contextra_core::TOMBSTONE_BIT) == 0 {
+                            if (v_seq & contextra_types::TOMBSTONE_BIT) == 0 {
                                 results.push((k.clone(), val.clone()));
                             }
                             break;

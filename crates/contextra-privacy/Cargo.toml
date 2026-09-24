@@ -13,7 +13,6 @@ description = "Cloud Egress Security, DLP & Exfiltration Protection for Contextr
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-contextra-core = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }

@@ -1,6 +1,7 @@
 use super::index_struct::InvertedIndex;
 use crate::morphology::MorphologicalTokenizer;
-use contextra_core::{DocId, Result, ScoredDocument, StorageEngine, TextIndex, TextIndexStats, TxId};
+use contextra_types::{DocId, Result, ScoredDocument, TxId};
+use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
 use std::sync::Arc;
 
 /// An inverted index with morphological optimization.

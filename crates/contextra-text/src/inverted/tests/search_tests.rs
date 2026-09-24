@@ -1,6 +1,7 @@
 use super::mock::MockStorage;
 use crate::inverted::{InvertedIndex, Language, TextIndexMetadata};
-use contextra_core::{BoxFuture, DocId, ContextraError, Result, StorageEngine, TextIndex, TxId};
+use contextra_types::{DocId, ContextraError, Result, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -316,7 +317,7 @@ async fn test_new_default_english_does_not_split_compounds() -> Result<()> {
 
 #[tokio::test]
 async fn test_contextual_bm25_indexes_prefix_terms() -> Result<()> {
-    use contextra_core::ContextChunk;
+    use contextra_types::ContextChunk;
 
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "contextual_test");
@@ -538,7 +539,7 @@ impl StorageEngine for CountingStorage {
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         self.inner.flush()
     }
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
         self.inner.stats()
     }
     fn pin_checkpoint<'a>(&'a self, id: u64) -> BoxFuture<'a, Result<()>> {

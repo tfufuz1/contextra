@@ -17,7 +17,7 @@
 //! INVARIANTE INV-DELETION-1: DeletionProof::create() wird NUR nach
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
-use contextra_core::{CollectionId, DocId, ContextraError, Result, TenantId, TxId};
+use contextra_types::{CollectionId, DocId, ContextraError, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
 
 /// Beweis, dass ein bestimmter DeletionLayer physisch bereinigt wurde.
@@ -400,7 +400,7 @@ fn compute_hmac_sha256(key: &[u8], data_parts: &[&[u8]]) -> Result<[u8; 32]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::{DocId, TenantId, TxId};
+    use contextra_types::{DocId, TenantId, TxId};
 
     fn test_key() -> Vec<u8> {
         vec![0u8; 32]

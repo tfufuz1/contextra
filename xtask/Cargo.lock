@@ -342,8 +342,8 @@ dependencies = [
  "argon2",
  "bincode",
  "blake3",
- "contextra-core",
  "contextra-privacy",
+ "contextra-types",
  "hkdf",
  "hmac",
  "lru",
@@ -474,7 +474,6 @@ name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "contextra-core",
  "parking_lot",
  "rand",
  "regex",
@@ -567,7 +566,8 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bytes",
- "contextra-core",
+ "contextra-ports",
+ "contextra-types",
  "itoa",
  "parking_lot",
  "regex",

@@ -57,7 +57,7 @@ impl CryptoError {
     }
 }
 
-impl From<CryptoError> for contextra_core::ContextraError {
+impl From<CryptoError> for contextra_types::ContextraError {
     fn from(e: CryptoError) -> Self {
         match e {
             CryptoError::WalCorruption { offset, reason } => Self::wal_corruption(offset, reason),
@@ -73,7 +73,7 @@ impl From<CryptoError> for contextra_core::ContextraError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::ContextraError;
+    use contextra_types::ContextraError;
 
     #[test]
     fn test_from_crypto_error() {

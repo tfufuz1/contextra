@@ -5,10 +5,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use contextra_core::{
-    DocId, ContextraError, Result, ScoredDocument, StorageEngine, TextIndex, TextIndexStats, TxId,
-    MAX_SEARCH_K,
-};
+use contextra_types::{DocId, ContextraError, Result, ScoredDocument, TxId, MAX_SEARCH_K};
+use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
 /// An inverted index tied to a specific collection namespace.
 ///
 /// # Concurrency & Lock Hierarchy:
@@ -118,9 +116,9 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k
     }
 
-    pub(crate) fn key_with_id(&self, type_prefix: &str, id: u64) -> Vec<u8> {
+    pub(crate) fn key_with_id(&self, type_prefix: &str, id: impl Into<u128>) -> Vec<u8> {
         let mut itoa_buf = itoa::Buffer::new();
-        let id_str = itoa_buf.format(id);
+        let id_str = itoa_buf.format(id.into());
         let mut k = Vec::with_capacity(self.prefix.len() + type_prefix.len() + id_str.len());
         k.extend_from_slice(&self.prefix);
         k.extend_from_slice(type_prefix.as_bytes());
@@ -183,7 +181,12 @@ impl<S: StorageEngine> InvertedIndex<S> {
         for (key, val_bytes) in raw_entries {
             let suffix_bytes = &key[prefix.len()..];
             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
-                if let Ok(doc_id_raw) = suffix.parse::<u64>() {
+                #[cfg(not(feature = "docid-128"))]
+                let parsed_doc_id = suffix.parse::<u64>().ok();
+                #[cfg(feature = "docid-128")]
+                let parsed_doc_id = suffix.parse::<u128>().ok();
+
+                if let Some(doc_id_raw) = parsed_doc_id {
                     if val_bytes.len() == 4 {
                         let doc_id = DocId::new(doc_id_raw);
                         let tf =

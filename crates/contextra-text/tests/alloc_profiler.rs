@@ -2,7 +2,8 @@
 //! Measures heap allocation count, bytes allocated, execution time, and throughput
 //! for 10,000 documents (~500 words per document) across German and English workloads.
 
-use contextra_core::{BoxFuture, DocId, StorageEngine, TextIndex, TxId};
+use contextra_types::{DocId, TxId};
+use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::inverted::{InvertedIndex, Language};
 use contextra_text::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 use std::alloc::{GlobalAlloc, Layout, System};
@@ -85,7 +86,7 @@ impl StorageEngine for FastRamStorage {
     fn get<'a>(
         &'a self,
         key: &'a [u8],
-    ) -> BoxFuture<'a, contextra_core::Result<Option<bytes::Bytes>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.store.read().get(key).cloned().map(bytes::Bytes::from)) })
     }
     fn put<'a>(
@@ -93,7 +94,7 @@ impl StorageEngine for FastRamStorage {
         _tx_id: TxId,
         key: &'a [u8],
         value: &'a [u8],
-    ) -> BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move {
             self.store.write().insert(key.to_vec(), value.to_vec());
             Ok(())
@@ -103,50 +104,50 @@ impl StorageEngine for FastRamStorage {
         &'a self,
         _tx_id: TxId,
         key: &'a [u8],
-    ) -> BoxFuture<'a, contextra_core::Result<()>> {
+    ) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move {
             self.store.write().remove(key);
             Ok(())
         })
     }
-    fn commit<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, contextra_core::Result<()>> {
+    fn commit<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn rollback<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, contextra_core::Result<()>> {
+    fn rollback<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn rollback_to_tx<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, contextra_core::Result<()>> {
+    fn rollback_to_tx<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn get_at_seq<'a>(
         &'a self,
         key: &'a [u8],
         _seq: u64,
-    ) -> BoxFuture<'a, contextra_core::Result<Option<bytes::Bytes>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.store.read().get(key).cloned().map(bytes::Bytes::from)) })
     }
-    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, contextra_core::Result<u64>> {
+    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<u64>> {
         Box::pin(async move { Ok(1) })
     }
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, contextra_core::Result<TxId>> {
+    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<TxId>> {
         Box::pin(async move { Ok(TxId::new(1)) })
     }
-    fn flush<'a>(&'a self) -> BoxFuture<'a, contextra_core::Result<()>> {
+    fn flush<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn stats<'a>(&'a self) -> BoxFuture<'a, contextra_core::Result<contextra_core::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>> {
         Box::pin(async move {
-            Ok(contextra_core::StorageStats {
+            Ok(contextra_ports::StorageStats {
                 num_segments: 1,
                 total_size_bytes: 0,
                 memtable_size_bytes: 0,
             })
         })
     }
-    fn pin_checkpoint<'a>(&'a self, _id: u64) -> BoxFuture<'a, contextra_core::Result<()>> {
+    fn pin_checkpoint<'a>(&'a self, _id: u64) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn unpin_checkpoint<'a>(&'a self, _id: u64) -> BoxFuture<'a, contextra_core::Result<()>> {
+    fn unpin_checkpoint<'a>(&'a self, _id: u64) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn scan<'a>(
@@ -154,13 +155,13 @@ impl StorageEngine for FastRamStorage {
         _start: std::ops::Bound<&'a [u8]>,
         _end: std::ops::Bound<&'a [u8]>,
         _: Option<usize>,
-    ) -> BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { Ok(Vec::new()) })
     }
     fn scan_prefix<'a>(
         &'a self,
         prefix: &'a [u8],
-    ) -> BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move {
             let guard = self.store.read();
             let res = guard
@@ -175,7 +176,7 @@ impl StorageEngine for FastRamStorage {
         &'a self,
         prefix: &'a [u8],
         _seq_no: u64,
-    ) -> BoxFuture<'a, contextra_core::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { self.scan_prefix(prefix).await })
     }
 }

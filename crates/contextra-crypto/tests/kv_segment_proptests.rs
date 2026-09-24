@@ -4,7 +4,7 @@
 
 #![allow(unsafe_code)]
 
-use contextra_core::TenantId;
+use contextra_types::TenantId;
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use proptest::prelude::*;
 use std::collections::HashSet;

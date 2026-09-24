@@ -694,9 +694,9 @@ dependencies = [
  "argon2",
  "bincode",
  "blake3",
- "contextra-core",
  "contextra-crypto",
  "contextra-privacy",
+ "contextra-types",
  "criterion",
  "hkdf",
  "hmac",
@@ -950,7 +950,6 @@ name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "contextra-core",
  "parking_lot",
  "rand 0.8.8",
  "regex",
@@ -1030,7 +1029,6 @@ name = "contextra-sandbox"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "contextra-core",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -1108,7 +1106,8 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bytes",
- "contextra-core",
+ "contextra-ports",
+ "contextra-types",
  "itoa",
  "parking_lot",
  "proptest",

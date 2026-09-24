@@ -8,7 +8,7 @@
 // 5. MVCC-Sichtbarkeit und Tombstones werden weiterhin dynamisch pro Anfrage evaluiert.
 // INVARIANTEN: Zero-Panic Doctrine, repr(C, align(8)) Layout für Postings, RCU-Locking ohne globale Exklusivlocks.
 
-use contextra_core::{DocId, ContextraError};
+use contextra_types::{DocId, ContextraError};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,12 +19,18 @@ pub const POSTING_LIST_V2_MAGIC: &[u8; 4] = b"PL\x02\x00";
 /// Block size for Block-Max WAND decomposition.
 pub const BLOCK_SIZE: usize = 64;
 
+#[cfg(not(feature = "docid-128"))]
+pub type DocIdRaw = u64;
+
+#[cfg(feature = "docid-128")]
+pub type DocIdRaw = u128;
+
 /// Block-Max metadata for a chunk of postings (typically 64 postings).
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct PostingBlockInfo {
     /// Upper bound doc_id in this block (for fast skip).
-    pub max_doc_id: u64,
+    pub max_doc_id: DocIdRaw,
     /// Maximum term frequency in this block.
     pub max_tf: u32,
     /// Minimum document length in this block (maximizing BM25 score upper bound).
@@ -36,7 +42,7 @@ pub struct PostingBlockInfo {
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Posting {
-    pub doc_id: u64,
+    pub doc_id: DocIdRaw,
     pub tf: u32,
     pub doc_len: u32,
 }
@@ -174,13 +180,13 @@ impl PostingList {
 
         let mut prev_doc_id = 0u64;
         for p in &self.postings {
-            let delta = p.doc_id.checked_sub(prev_doc_id).ok_or_else(|| {
+            let delta = (p.doc_id as u128).checked_sub(prev_doc_id as u128).ok_or_else(|| {
                 ContextraError::Storage("Unsorted or overflow doc_id in posting list".to_string())
-            })?;
+            })? as u64;
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
             encode_varint(p.doc_len as u64, &mut buf);
-            prev_doc_id = p.doc_id;
+            prev_doc_id = p.doc_id as u64;
         }
 
         Ok(buf)
@@ -217,7 +223,7 @@ impl PostingList {
                     .map_err(|_| ContextraError::Storage("DocLen overflow in varint".to_string()))?;
 
                 postings.push(Posting {
-                    doc_id,
+                    doc_id: doc_id as DocIdRaw,
                     tf,
                     doc_len,
                 });

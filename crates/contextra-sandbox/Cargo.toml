@@ -15,7 +15,6 @@ anyhow = "1"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-contextra-core = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
