@@ -830,3 +830,98 @@ impl tracing::field::Visit for StringVisitor {
         write!(self.0, "{}={:?} ", field.name(), value).ok();
     }
 }
+
+#[tokio::test]
+async fn test_ppr_tl_hfd_dispatch_valid() {
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    let e1 = EntityId::new(1);
+    let e2 = EntityId::new(2);
+    let e3 = EntityId::new(3);
+
+    graph.add_entity(tx, Entity::new(e1, "Node1", "TypeA")).await.unwrap();
+    graph.add_entity(tx, Entity::new(e2, "Node2", "TypeA")).await.unwrap();
+    graph.add_entity(tx, Entity::new(e3, "Node3", "TypeA")).await.unwrap();
+
+    graph.add_edge(tx, Edge::new(e1, e2, "link")).await.unwrap();
+    graph.add_edge(tx, Edge::new(e2, e3, "link")).await.unwrap();
+    graph.commit(tx).await.unwrap();
+
+    let config = PprConfig {
+        algorithm: PprAlgorithm::TlHfd(contextra_core::TlHfdParams::default()),
+        ..Default::default()
+    };
+
+    let results = graph.personalized_page_rank(&[e1], &config).await.unwrap();
+    assert!(!results.is_empty(), "TL-HFD dispatch must return non-empty PPR results");
+
+    for (entity, score) in &results {
+        assert!(score.is_finite() && *score >= 0.0, "Entity {:?} score {} must be finite and non-negative", entity, score);
+    }
+}
+
+#[tokio::test]
+async fn test_ppr_shadow_mode_tl_hfd_parity() {
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    let e1 = EntityId::new(1);
+    let e2 = EntityId::new(2);
+    let e3 = EntityId::new(3);
+
+    graph.add_entity(tx, Entity::new(e1, "Node1", "TypeA")).await.unwrap();
+    graph.add_entity(tx, Entity::new(e2, "Node2", "TypeA")).await.unwrap();
+    graph.add_entity(tx, Entity::new(e3, "Node3", "TypeA")).await.unwrap();
+
+    graph.add_edge(tx, Edge::new(e1, e2, "link")).await.unwrap();
+    graph.add_edge(tx, Edge::new(e2, e3, "link")).await.unwrap();
+    graph.commit(tx).await.unwrap();
+
+    let cfg_fp = PprConfig {
+        algorithm: PprAlgorithm::ForwardPush,
+        ..Default::default()
+    };
+
+    let cfg_shadow = PprConfig {
+        algorithm: PprAlgorithm::ShadowModeTlHfd(contextra_core::TlHfdParams::default()),
+        ..Default::default()
+    };
+
+    let fp_results = graph.personalized_page_rank(&[e1], &cfg_fp).await.unwrap();
+    let shadow_results = graph.personalized_page_rank(&[e1], &cfg_shadow).await.unwrap();
+
+    assert_eq!(fp_results.len(), shadow_results.len(), "ShadowModeTlHfd must return same result length as ForwardPush");
+    for ((id_fp, score_fp), (id_sh, score_sh)) in fp_results.iter().zip(shadow_results.iter()) {
+        assert_eq!(id_fp, id_sh, "Entity IDs must match between ForwardPush and ShadowModeTlHfd");
+        assert_eq!(score_fp.to_bits(), score_sh.to_bits(), "Scores must be bit-identical between ForwardPush and ShadowModeTlHfd");
+    }
+}
+
+#[tokio::test]
+async fn test_ppr_tl_hfd_invalid_params_fallback() {
+    let graph = CsrGraph::new();
+    let tx = TxId::new(1);
+
+    let e1 = EntityId::new(1);
+    let e2 = EntityId::new(2);
+
+    graph.add_entity(tx, Entity::new(e1, "Node1", "TypeA")).await.unwrap();
+    graph.add_entity(tx, Entity::new(e2, "Node2", "TypeA")).await.unwrap();
+    graph.add_edge(tx, Edge::new(e1, e2, "link")).await.unwrap();
+    graph.commit(tx).await.unwrap();
+
+    // Invalid delta (< 2.0) triggers TlHfdError::InvalidParameter
+    let invalid_tl_params = contextra_core::TlHfdParams {
+        delta: 1.0,
+        ..Default::default()
+    };
+
+    let config = PprConfig {
+        algorithm: PprAlgorithm::TlHfd(invalid_tl_params),
+        ..Default::default()
+    };
+
+    let results = graph.personalized_page_rank(&[e1], &config).await.unwrap();
+    assert!(!results.is_empty(), "TL-HFD fallback must safely compute PPR via dense power iteration");
+}
