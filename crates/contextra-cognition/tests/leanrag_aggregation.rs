@@ -6,8 +6,8 @@ use contextra_cognition::aggregation_phase::{
 };
 use contextra_cognition::memory_consolidation::CommunityStabilityTracker;
 use contextra_cognition::synthesis_phase::SegmentSynthesisResult;
-use contextra_core::traits::LlmTextGenerator;
-use contextra_core::{BoxFuture, ContextraError, EntityId, Result};
+use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::{ContextraError, EntityId, Result};
 use contextra_graph::HyperEdgeId;
 
 struct MockLlm {

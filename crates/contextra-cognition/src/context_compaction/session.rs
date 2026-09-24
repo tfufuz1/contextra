@@ -1,6 +1,6 @@
-use contextra_core::{
-    ContextChunk, ContextraError, DocId, LlmTextGenerator, Result, StorageEngine,
-    TenantId, TokenBudget, TxId, VectorIndex,
+use contextra_ports::{LlmTextGenerator, StorageEngine, VectorIndex};
+use contextra_types::{
+    ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId,
 };
 use contextra_engine::collection::{Collection, StoredDocumentMeta};
 use contextra_engine::transaction::CommitIntent;
@@ -70,14 +70,14 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
             match self.collection.get_doc_tx(doc_id).await? {
                 Some(current_tx) => {
                     if current_tx.inner() > expected_tx.inner() {
-                        return Err(contextra_core::ContextraError::StaleRead(format!(
+                        return Err(ContextraError::StaleRead(format!(
                             "OCC conflict: Document {:?} was mutated during consolidation (snapshot tx={}, current tx={})",
                             doc_id, expected_tx, current_tx
                         )));
                     }
                 }
                 None => {
-                    return Err(contextra_core::ContextraError::StaleRead(format!(
+                    return Err(ContextraError::StaleRead(format!(
                         "OCC conflict: Document {:?} was deleted or missing during consolidation",
                         doc_id
                     )));

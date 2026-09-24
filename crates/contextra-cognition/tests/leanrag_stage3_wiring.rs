@@ -3,8 +3,8 @@ use contextra_cognition::aggregation_phase::{
 };
 use contextra_cognition::consolidation_executor::execute_leanrag_aggregation_stage;
 use contextra_cognition::memory_consolidation::CommunityStabilityTracker;
-use contextra_core::traits::LlmTextGenerator;
-use contextra_core::{BoxFuture, EntityId, TxId};
+use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::{EntityId, TxId};
 use contextra_engine::collection::Collection;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -18,7 +18,7 @@ use tempfile::tempdir;
 struct TestMockLlm;
 
 impl LlmTextGenerator for TestMockLlm {
-    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_core::Result<String>> {
+    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_types::Result<String>> {
         Box::pin(async move { Ok("Mock abstract community summary".to_string()) })
     }
 }

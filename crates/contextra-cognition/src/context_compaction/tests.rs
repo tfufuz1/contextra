@@ -1,7 +1,7 @@
 use super::*;
-use contextra_core::{
-    ContextChunk, ContextraError, DocId, LlmTextGenerator, Result, StorageEngine, StorageStats,
-    TenantId, TokenBudget, TxId,
+use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
+use contextra_types::{
+    ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId,
 };
 use contextra_engine::collection::Collection;
 use contextra_engine::transaction::CommitIntent;
@@ -128,7 +128,7 @@ fn test_compact_with_contextual_prefix_respects_budget() {
 
 struct UnreachableLlmGenerator;
 impl LlmTextGenerator for UnreachableLlmGenerator {
-    fn generate<'a>(&'a self, _prompt: &'a str) -> contextra_core::BoxFuture<'a, Result<String>> {
+    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
             Err(ContextraError::Io(std::io::Error::new(
                 std::io::ErrorKind::ConnectionRefused,
@@ -182,7 +182,7 @@ async fn test_consolidate_via_llm_provenance_and_empty() {
 
 struct MockLlmGenerator;
 impl LlmTextGenerator for MockLlmGenerator {
-    fn generate<'a>(&'a self, _prompt: &'a str) -> contextra_core::BoxFuture<'a, Result<String>> {
+    fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move { Ok("Zusammenfassung der 3 Quelldokumente".to_string()) })
     }
 }
@@ -250,7 +250,7 @@ impl StorageEngine for FaultyDeleteStorage {
     fn get<'a>(
         &'a self,
         key: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.inner.get(key).await })
     }
 
@@ -258,7 +258,7 @@ impl StorageEngine for FaultyDeleteStorage {
         &'a self,
         key: &'a [u8],
         seq: u64,
-    ) -> contextra_core::BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.inner.get_at_seq(key, seq).await })
     }
 
@@ -267,7 +267,7 @@ impl StorageEngine for FaultyDeleteStorage {
         tx_id: TxId,
         key: &'a [u8],
         value: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, Result<()>> {
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.put(tx_id, key, value).await })
     }
 
@@ -276,7 +276,7 @@ impl StorageEngine for FaultyDeleteStorage {
         tx_id: TxId,
         key: &'a [u8],
         value: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, Result<bool>> {
+    ) -> BoxFuture<'a, Result<bool>> {
         Box::pin(async move { self.inner.put_if_absent(tx_id, key, value).await })
     }
 
@@ -284,10 +284,10 @@ impl StorageEngine for FaultyDeleteStorage {
         &'a self,
         tx_id: TxId,
         key: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, Result<()>> {
+    ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_delete.load(Ordering::SeqCst) {
-                return Err(contextra_core::ContextraError::Transaction(
+                return Err(ContextraError::Transaction(
                     "INJECTED FAULT: Storage delete failure".into(),
                 ));
             }
@@ -295,46 +295,46 @@ impl StorageEngine for FaultyDeleteStorage {
         })
     }
 
-    fn commit<'a>(&'a self, tx_id: TxId) -> contextra_core::BoxFuture<'a, Result<()>> {
+    fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.commit(tx_id).await })
     }
 
-    fn rollback<'a>(&'a self, tx_id: TxId) -> contextra_core::BoxFuture<'a, Result<()>> {
+    fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.rollback(tx_id).await })
     }
 
-    fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> contextra_core::BoxFuture<'a, Result<()>> {
+    fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.rollback_to_tx(tx_id).await })
     }
 
-    fn flush<'a>(&'a self) -> contextra_core::BoxFuture<'a, Result<()>> {
+    fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.flush().await })
     }
 
-    fn stats<'a>(&'a self) -> contextra_core::BoxFuture<'a, Result<StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
         Box::pin(async move { self.inner.stats().await })
     }
 
-    fn last_seq_no<'a>(&'a self) -> contextra_core::BoxFuture<'a, Result<u64>> {
+    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { self.inner.last_seq_no().await })
     }
 
-    fn last_tx_id<'a>(&'a self) -> contextra_core::BoxFuture<'a, Result<TxId>> {
+    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { self.inner.last_tx_id().await })
     }
 
-    fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> contextra_core::BoxFuture<'a, Result<()>> {
+    fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.pin_checkpoint(seq_no).await })
     }
 
-    fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> contextra_core::BoxFuture<'a, Result<()>> {
+    fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.unpin_checkpoint(seq_no).await })
     }
 
     fn scan_prefix<'a>(
         &'a self,
         prefix: &'a [u8],
-    ) -> contextra_core::BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { self.inner.scan_prefix(prefix).await })
     }
 
@@ -342,7 +342,7 @@ impl StorageEngine for FaultyDeleteStorage {
         &'a self,
         prefix: &'a [u8],
         seq_no: u64,
-    ) -> contextra_core::BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { self.inner.scan_prefix_at(prefix, seq_no).await })
     }
 
@@ -351,7 +351,7 @@ impl StorageEngine for FaultyDeleteStorage {
         start: std::ops::Bound<&'a [u8]>,
         end: std::ops::Bound<&'a [u8]>,
         limit: Option<usize>,
-    ) -> contextra_core::BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { self.inner.scan(start, end, limit).await })
     }
 }

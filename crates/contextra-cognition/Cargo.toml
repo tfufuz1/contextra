@@ -11,7 +11,8 @@ description = "Contextra — Memory consolidation, compaction, and context manag
 
 [dependencies]
 contextra-engine = { workspace = true }
-contextra-core = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 contextra-store = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-graph = { workspace = true }
@@ -30,7 +31,7 @@ blake3 = { workspace = true }
 default = []
 graph-connectivity-health = ["contextra-graph/physio-percolation", "contextra-engine/graph-connectivity-health"]
 edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning", "contextra-engine/edge-reinforcement-learning"]
-docid-128 = ["contextra-core/docid-128", "contextra-engine/docid-128"]
+docid-128 = ["contextra-types/docid-128", "contextra-engine/docid-128"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

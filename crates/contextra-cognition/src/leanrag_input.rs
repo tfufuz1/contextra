@@ -5,8 +5,8 @@
 //! Extraktion von LeanRAG-Eingabedaten ([`AggregationNode`], [`AggregationEdge`]) aus einer [`Collection`].
 
 use crate::aggregation_phase::{AggregationEdge, AggregationNode};
-use contextra_core::traits::{StorageEngine, VectorIndex};
-use contextra_core::{DocId, EntityId};
+use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, EntityId};
 use contextra_engine::collection::Collection;
 use contextra_graph::hyperedge::HyperEdgeId;
 use std::collections::{HashMap, HashSet};

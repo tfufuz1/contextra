@@ -5,7 +5,8 @@
 //! TurnSegment aus dem Structural Consolidation Pass. Dies entspricht LycheeMemory V2 (arXiv:2608.12990).
 
 use crate::memory_consolidation::TurnSegment;
-use contextra_core::{DocId, SegmentSynthesizer};
+use contextra_ports::SegmentSynthesizer;
+use contextra_types::DocId;
 
 /// Ergebnis des Generative Synthesis Pass auf Segment-Ebene.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,7 +32,7 @@ pub struct SynthesizedChunk {
 }
 
 /// Trait-Abstraktion für den LLM-Synthesizer (testbar via Mock).
-pub use contextra_core::SegmentSynthesizer as TraitSegmentSynthesizer;
+pub use contextra_ports::SegmentSynthesizer as TraitSegmentSynthesizer;
 
 /// Dies ist der LLM-BASIERTE Generative Synthesis Pass (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait). Für den deterministischen Structural Consolidation Pass siehe `memory_consolidation::run_structural_synthesis_pass()`.
 ///
@@ -98,7 +99,8 @@ pub async fn run_synthesis_pass(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_core::{BoxFuture, Result};
+    use contextra_ports::BoxFuture;
+    use contextra_types::Result;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     struct MockSynthesizer {
@@ -122,7 +124,7 @@ mod tests {
         ) -> BoxFuture<'a, Result<String>> {
             Box::pin(async move {
                 if self.should_fail.load(Ordering::SeqCst) {
-                    Err(contextra_core::ContextraError::Internal(
+                    Err(contextra_types::ContextraError::Internal(
                         "Mock LLM synthesis error".into(),
                     ))
                 } else {
