@@ -1,0 +1,36 @@
+# CODEOWNERS - Contextra Governance & Ownership
+#
+# Fachliche Begründung: CONTEXTRA_SPEC_2_.md §15.5 (Crate-Tier-Modell nach Kritikalität).
+# Diese Datei definiert die automatische Zuordnung von Code-Ownern für Pull Requests
+# basierend auf der Architektur-Kritikalität der verschiedenen Komponenten.
+#
+# HINWEIS FOR MAINTAINER:
+# Die untenstehenden GitHub-Team-Handles (@contextra/*) sind Platzhalter.
+# Die tatsächlichen Team- und Nutzernamen müssen vom Repository-Maintainer vor dem
+# Merge final in dieses Repository eingetragen werden.
+
+# Tier 0 — Höchste Kritikalität (Sicherheit, Kryptographie)
+/crates/contextra-crypto/              @contextra/security-tier0
+
+# Tier 1 — Hohe Kritikalität (Speicher & Checkpointing)
+/crates/contextra-store/               @contextra/storage-tier1
+/crates/contextra-checkpoint/          @contextra/storage-tier1
+
+# Tier 2 — Mittlere Kritikalität (Retrieval, Vektoren & Indizierung)
+/crates/contextra-vector/              @contextra/retrieval-tier2
+/crates/contextra-text/                @contextra/retrieval-tier2
+/crates/contextra-simd/                @contextra/retrieval-tier2
+
+# Tier 3 — Spezifische Funktionalität (Graph, Routing & Adaption)
+/crates/contextra-graph/               @contextra/intelligence-tier3
+/crates/contextra-router/              @contextra/intelligence-tier3
+/crates/contextra-rank/                @contextra/intelligence-tier3
+/crates/contextra-adapt/               @contextra/intelligence-tier3
+
+# Build & Infrastruktur
+/xtask/                                @contextra/build-infra
+/justfile                              @contextra/build-infra
+
+# Architektur-Dokumentation & Entscheidungen
+/DECISIONS.md                          @contextra/architecture-board
+/docs/decisions/                       @contextra/architecture-board

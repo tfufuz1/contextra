@@ -43,6 +43,10 @@ check-core:
 check-store:
     nix develop -c cargo check -p contextra-store || cargo check -p contextra-store
 
+# Runs Loom concurrency exploration model test for group commit lock handoff (unoptimized debug build required by Loom)
+loom-store:
+    RUSTFLAGS="--cfg loom" cargo test -p contextra-store --test loom_group_commit_handoff -- --nocapture
+
 # Runs the chaos matrix fault-injection integration test suite
 chaos-test:
     nix develop -c cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1 || \
@@ -151,9 +155,82 @@ triple-test: check
     done
     echo "✅ Triple-Test-Gate PASSED (3/3)"
 
+# Security Advisory Audit: scannt Abhängigkeiten auf bekannte Schwachstellen via cargo-audit
+security-audit:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Security Advisory Audit ==="
+    if ! cargo audit --version &>/dev/null 2>&1; then
+        echo "❌ cargo-audit ist nicht installiert."
+        echo "   Für lokale Verifikation: cargo install cargo-audit --locked"
+        echo "   In CI-Umgebungen muss cargo-audit im Runner-Environment bzw. Setup bereitgestellt werden."
+        echo "   Siehe Dokumentation unter docs/ci/cargo-audit.md"
+        exit 1
+    fi
+    cargo audit --deny warnings
+
 # Tech-Debt Audit: scannt nach .unwrap(), unsafe, std::fs in Produktionscode
+# Hinweis: Security-Advisory-Scans wurden entkoppelt und laufen separat über `just security-audit`.
 debt-audit:
-    cargo xtask debt-audit
+    #!/usr/bin/env bash
+    set -euo pipefail
+    FAIL=0
+    echo "=== Tech-Debt Audit ==="
+
+    echo "--- [1/4] .unwrap() außerhalb von Test-Code ---"
+    UNWRAP=$(grep -rn "\.unwrap()" crates/ --include="*.rs" \
+        | grep -v "_test\.rs:" \
+        | grep -v "/tests/" \
+        | grep -v "/tests\.rs:" \
+        | grep -v "/benches/" \
+        | grep -v "benches\.rs:" \
+        | grep -v "contextra_generated\.rs:" \
+        | grep -v "::tests::" \
+        | grep -v "//.*unwrap" \
+        | grep -v "// expect" \
+        || true)
+    if [ -n "$UNWRAP" ]; then
+        UNWRAP_COUNT=$(echo "$UNWRAP" | wc -l)
+        echo "❌ UNWRAP VIOLATIONS ($UNWRAP_COUNT Treffer — fix in WP-0.0):"
+        echo "$UNWRAP" | head -15
+        FAIL=1
+    else echo "✅ Kein .unwrap() in Produktionscode"; fi
+
+    echo "--- [2/4] unsafe außerhalb distance.rs ---"
+    UNSAFE=$(grep -rn "unsafe " crates/ --include="*.rs" \
+        | grep -v "crates/contextra-vector/src/distance\.rs" \
+        | grep -v "#\[allow(unsafe_code)\]" \
+        | grep -v "//.*unsafe" \
+        || true)
+    if [ -n "$UNSAFE" ]; then
+        echo "❌ UNSAFE VIOLATIONS:"; echo "$UNSAFE"; FAIL=1
+    else echo "✅ Kein unsafe außerhalb distance.rs"; fi
+
+    echo "--- [3/4] std::fs in Produktionscode (Soft-Warning) ---"
+    STDFS=$(grep -rn "std::fs::" crates/ --include="*.rs" \
+        | grep -v "/tests/" | grep -v "mod tests" || true)
+    if [ -n "$STDFS" ]; then
+        echo "⚠️  std::fs:: Treffer (nach tokio::fs migrieren):"
+        echo "$STDFS"
+    else echo "✅ Kein std::fs:: in Produktionscode"; fi
+
+    echo "--- [4/4] Lock-Hierarchy & Async-Safety (AST Analysis) ---"
+    # Prüfe auf verschachtelte Locks (potenzielle Deadlocks) mittels ast-grep
+    if command -v sg > /dev/null; then
+        if sg scan --rule rules/detect_nested_locks.yml crates/; then
+            echo "❌ Graceful Deadlock Risiko erkannt! Verschachtelte Locks gefunden:"
+            FAIL=1
+        else
+            echo "✅ Keine kritischen Deadlock-Zustände im AST gefunden."
+        fi
+    else
+        echo "⚠️  ast-grep (sg) nicht installiert, überspringe AST-Lock-Analyse."
+    fi
+
+    if [ $FAIL -eq 1 ]; then
+        echo ""; echo "❌ Debt-Audit FAILED — WP-0.0 zuerst abschließen!"; exit 1
+    fi
+    echo ""; echo "✅ Debt-Audit PASSED"
 
 # Runs the LongMemEval regression benchmark suite and compares against baseline
 bench-regression:

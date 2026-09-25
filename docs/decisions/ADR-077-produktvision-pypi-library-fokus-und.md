@@ -20,3 +20,24 @@
 - Doku-Artefakte und README/Architecture-Guides werden entsprechend aktualisiert.
 
 ---
+
+## Review-Log (Vetoes F-02 & OP-03)
+
+### Veto F-02: Partielles HNSW-Rewiring / Teilgraph-Rebuilding
+* **Status:** AUSSTEHEND — Frist 2026-10-07
+* **Verantwortliche Rolle:** Projektleiter (gemäß stabilization_plan.md §5.4)
+* **Betroffener Code:**
+  - `crates/contextra-vector/src/hnsw/` (`core_rebuild.rs`, `config.rs`, `types.rs`, `vector_index_impl.rs`)
+  - `crates/contextra-vector/src/partial_rebuild.rs`
+* **Reviewer-Signatur:** `[AUSSTEHEND]`
+* **Review-Datum:** `[AUSSTEHEND]`
+* **Inhaltlicher Review-Befund / Entscheidung:** `[Inhaltliche Entscheidung über Aufhebung/Bestätigung ausstehend]`
+
+### Veto OP-03: Realtime-Audio / Voice / Speech-to-Text / Jarvis
+* **Status:** AUSSTEHEND — Frist 2026-10-07
+* **Verantwortliche Rolle:** Projektleiter (gemäß stabilization_plan.md §5.4)
+* **Betroffener Code:**
+  - Kein betroffener Code im aktuellen Workspace gefunden (Hinweis: `crates/contextra-db/src/volatile_vault.rs` enthält lediglich das Metadaten-Enum `SignalModality::AudioTranscript`, jedoch keine Audio-Streaming-, Speech-to-Text-, Voice- oder Jarvis-Engine).
+* **Reviewer-Signatur:** `[AUSSTEHEND]`
+* **Review-Datum:** `[AUSSTEHEND]`
+* **Inhaltlicher Review-Befund / Entscheidung:** `[Inhaltliche Entscheidung über Aufhebung/Bestätigung ausstehend]`

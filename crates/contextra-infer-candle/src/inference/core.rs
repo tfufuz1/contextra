@@ -375,6 +375,7 @@ impl CandleLlmClient {
         let gguf_path = model_dir.join("model.gguf");
         let fingerprint = if gguf_path.exists() {
             crate::model_registry::compute_fingerprint(&gguf_path, &quantization)?
+        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         } else if let Ok(entries) = std::fs::read_dir(model_dir) {
             let mut gguf_found = None;
             for entry in entries.flatten() {
@@ -411,6 +412,7 @@ impl CandleLlmClient {
 
         let gguf_file_path = if gguf_path.exists() {
             Some(gguf_path)
+        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         } else if let Ok(entries) = std::fs::read_dir(model_dir) {
             entries
                 .flatten()
@@ -441,6 +443,7 @@ pub struct QuantizedLlamaModel {
 impl QuantizedLlamaModel {
     /// Loads GGUF quantized model weights from the specified file path.
     pub fn load(model_path: &Path, device: &Device) -> Result<Self> {
+        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         let mut file = File::open(model_path).map_err(|e| {
             ContextraError::Io(std::io::Error::new(
                 e.kind(),
