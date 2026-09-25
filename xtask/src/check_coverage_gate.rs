@@ -41,10 +41,13 @@ pub fn get_threshold_for_crate(crate_name: &str) -> f64 {
     match crate_name {
         "contextra-store" => 80.0,
         "contextra-db" => 75.0,
-        "contextra-index" => 75.0,
+        "contextra-vector" => 75.0,
         "contextra-graph" => 70.0,
         "contextra-text" => 70.0,
         "contextra-core" => 85.0,
+        "contextra-crypto" => 90.0,
+        "contextra-mvcc" => 85.0,
+        "contextra-checkpoint" => 80.0,
         _ => 50.0,
     }
 }
@@ -125,10 +128,13 @@ mod tests {
     fn test_coverage_thresholds() {
         assert_eq!(get_threshold_for_crate("contextra-store"), 80.0);
         assert_eq!(get_threshold_for_crate("contextra-db"), 75.0);
-        assert_eq!(get_threshold_for_crate("contextra-index"), 75.0);
+        assert_eq!(get_threshold_for_crate("contextra-vector"), 75.0);
         assert_eq!(get_threshold_for_crate("contextra-graph"), 70.0);
         assert_eq!(get_threshold_for_crate("contextra-text"), 70.0);
         assert_eq!(get_threshold_for_crate("contextra-core"), 85.0);
+        assert_eq!(get_threshold_for_crate("contextra-crypto"), 90.0);
+        assert_eq!(get_threshold_for_crate("contextra-mvcc"), 85.0);
+        assert_eq!(get_threshold_for_crate("contextra-checkpoint"), 80.0);
     }
 
     #[test]
