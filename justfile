@@ -151,7 +151,22 @@ triple-test: check
     done
     echo "✅ Triple-Test-Gate PASSED (3/3)"
 
+# Security Advisory Audit: scannt Abhängigkeiten auf bekannte Schwachstellen via cargo-audit
+security-audit:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "=== Security Advisory Audit ==="
+    if ! cargo audit --version &>/dev/null 2>&1; then
+        echo "❌ cargo-audit ist nicht installiert."
+        echo "   Für lokale Verifikation: cargo install cargo-audit --locked"
+        echo "   In CI-Umgebungen muss cargo-audit im Runner-Environment bzw. Setup bereitgestellt werden."
+        echo "   Siehe Dokumentation unter docs/ci/cargo-audit.md"
+        exit 1
+    fi
+    cargo audit --deny warnings
+
 # Tech-Debt Audit: scannt nach .unwrap(), unsafe, std::fs in Produktionscode
+# Hinweis: Security-Advisory-Scans wurden entkoppelt und laufen separat über `just security-audit`.
 debt-audit:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -206,13 +221,6 @@ debt-audit:
         fi
     else
         echo "⚠️  ast-grep (sg) nicht installiert, überspringe AST-Lock-Analyse."
-    fi
-
-    echo "--- [5/5] Security & Audit ---"
-    if cargo audit --version &>/dev/null 2>&1; then
-        cargo audit || echo "⚠️ Audit warnings — manuell prüfen"
-    else
-        echo "⚠️ cargo-audit nicht installiert: cargo install cargo-audit"
     fi
 
     if [ $FAIL -eq 1 ]; then
