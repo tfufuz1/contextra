@@ -47,8 +47,7 @@ fuzz_target!(|data: &[u8]| {
         }
 
         let config = LsmConfig {
-            db_path: path.to_path_buf(),
-            allow_legacy_integrity_key_fallback: true,
+            path: path.to_path_buf(),
             ..Default::default()
         };
 

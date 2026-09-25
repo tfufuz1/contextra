@@ -124,7 +124,7 @@ impl Wal {
         let fallback_integrity_key = self.fallback_integrity_key;
         let allow_legacy_integrity_key_fallback = self.allow_legacy_integrity_key_fallback;
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let mut pending_cmd: Option<WalCommand> = None;
 
             loop {
@@ -494,6 +494,9 @@ impl Wal {
         });
 
         *tx_guard = Some(tx);
+        if let Ok(mut guard) = self.flusher_task.lock() {
+            *guard = Some(handle);
+        }
         Ok(())
     }
 }

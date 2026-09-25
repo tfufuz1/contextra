@@ -49,6 +49,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 [dev-dependencies]
 contextra-testkit = { workspace = true }
+libc = "0.2"
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio"] }
@@ -56,6 +57,10 @@ proptest = "1.4"
 loom = "0.7"
 futures = "0.3"
 redb = "2"
+
+[[test]]
+name = "differential_redb"
+path = "tests/differential/redb_operation_sequence.rs"
 
 [[bench]]
 name = "sstable_bench"

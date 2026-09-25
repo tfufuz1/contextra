@@ -152,13 +152,11 @@ impl LsmStorage {
         let mut max_seq = 0u64;
         let mut max_tx = 0u64;
         let mut replayed_size = 0u64;
-        let mut last_wal = None;
-
         let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
             std::collections::HashMap::new();
 
         for (_ts, wal_path) in &wal_files {
-            let wal = Wal::open_with_key_manager(wal_path, key_manager.clone()).await?;
+            let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
             let wal_entries = wal.replay().await?;
 
             for (lsn, entry, _offset) in &wal_entries {
@@ -212,14 +210,15 @@ impl LsmStorage {
                     }
                 }
             }
-            last_wal = Some(wal);
+            drop(wal);
         }
 
-        let wal = if let Some(w) = last_wal {
-            w
+        let active_wal_path = if let Some((_, last_path)) = wal_files.last() {
+            last_path.clone()
         } else {
-            Wal::open_with_key_manager(config.path.join("wal.log"), key_manager.clone()).await?
+            config.path.join("wal.log")
         };
+        let wal = Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?;
 
         let budget_config = ResourceBudget {
             memory_limit: config.max_ram_mb * 1024 * 1024,
@@ -530,6 +529,7 @@ impl LsmStorage {
                 })?;
             let parent = self.config.path.clone();
             tokio::task::spawn_blocking(move || {
+                // INVARIANT-KONFORM: In spawn_blocking gewrappt; Parent-Directory FSync bei Crash-Recovery / Rollback (kein Hot-Path).
                 std::fs::File::open(&parent)
                     .and_then(|f| f.sync_all())
                     .map_err(|e| {

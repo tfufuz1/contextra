@@ -24,7 +24,7 @@ test = false
 doc = false
 
 [[bin]]
-name = "deletion_proof_verify_external_fuzz"
-path = "fuzz_targets/deletion_proof_verify_external_fuzz.rs"
+name = "wal_hmac_chain_verify_fuzz"
+path = "fuzz_targets/wal_hmac_chain_verify_fuzz.rs"
 test = false
 doc = false

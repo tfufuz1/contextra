@@ -1,12 +1,9 @@
 use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_suspicious_tx_id;
-use crate::GraphIndexExt;
 use contextra_ports::GraphIndex;
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
-
-use super::*;
 
 pub(super) async fn setup_test_graph() -> CsrGraph {
     let graph = CsrGraph::new();

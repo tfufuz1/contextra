@@ -1,3 +1,4 @@
+// ANCHOR[TEST:STO-001] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
 use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use tempfile::TempDir;

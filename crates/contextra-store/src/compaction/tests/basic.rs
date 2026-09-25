@@ -1,7 +1,6 @@
 use super::*;
 
 use crate::sstable::{create_block_cache, SstableBuilder};
-use contextra_core::StorageEngine;
 use tempfile::TempDir;
 
 async fn create_test_sstable(

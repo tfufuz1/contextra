@@ -226,7 +226,6 @@ dependencies = [
  "bincode",
  "contextra-crypto",
  "contextra-types",
- "ed25519-dalek",
  "libfuzzer-sys",
 ]
 
