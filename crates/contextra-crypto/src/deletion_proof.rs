@@ -21,10 +21,15 @@ use crate::error::CryptoError;
 use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
 
+/// Berechnet den Blake3-Hash einer sortierten Liste gelöschter Schlüssel mit Längenpräfix.
+///
+/// VORTEIL / SICHERHEIT: Vermeidet Hash-Kollisionen bei unterschiedlichen Schlüssel-Aufteilungen
+/// wie `["ab", "c"]` vs. `["a", "bc"]`, da die Grenzen zwischen den Elementen explizit
+/// durch ein 8-Byte Big-Endian Längenpräfix vor jedem Schlüssel-Byte-Array in den Hasher eingespeist werden.
 pub(crate) fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     for key in deleted_keys {
-        hasher.update(&(key.len() as u64).to_le_bytes());
+        hasher.update(&(key.len() as u64).to_be_bytes());
         hasher.update(key);
     }
     *hasher.finalize().as_bytes()
@@ -316,13 +321,7 @@ impl DeletionProof {
     ) -> Result<Self> {
         // Keys sortieren für deterministischen Hash
         deleted_keys.sort();
-
-        // Blake3 über alle sortierten Keys
-        let mut hasher = blake3::Hasher::new();
-        for key in &deleted_keys {
-            hasher.update(key);
-        }
-        let deleted_keys_hash: [u8; 32] = *hasher.finalize().as_bytes();
+        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&deleted_keys);
 
         let scope_bytes =
             bincode::serialize(&scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
@@ -542,6 +541,7 @@ impl DeletionProof {
         let scope_bytes = bincode::serialize(&self.scope)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+        let timestamp_bytes = self.timestamp.to_le_bytes();
         let covered_layers_bytes = bincode::serialize(&self.covered_layers)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
@@ -557,6 +557,7 @@ impl DeletionProof {
             scope_bytes.len()
                 + 32
                 + tx_bytes.len()
+                + timestamp_bytes.len()
                 + covered_layers_bytes.len()
                 + excluded_scopes_bytes.len()
                 + receipt_part.len(),
@@ -564,6 +565,7 @@ impl DeletionProof {
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&self.deleted_keys_hash);
         payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp_bytes);
         payload.extend_from_slice(&covered_layers_bytes);
         payload.extend_from_slice(&excluded_scopes_bytes);
         payload.extend_from_slice(receipt_part);
@@ -1399,20 +1401,18 @@ mod tests {
         )
         .unwrap();
 
-        // Valid key bytes (32 bytes)
-        assert!(proof.verify_external(&keypair.verifying_key_bytes()).unwrap());
+        assert!(proof.verify_external(&keypair.verifying_key).is_ok());
 
-        // Invalid key length (e.g. 16 bytes, 64 bytes)
-        assert!(!proof.verify_external(&[0u8; 16]).unwrap());
-        assert!(!proof.verify_external(&[0u8; 64]).unwrap());
-
-        // Invalid Curve25519 point (32 bytes of invalid point)
-        let invalid_point = [0xFFu8; 32];
-        assert!(!proof.verify_external(&invalid_point).unwrap());
+        let wrong_keypair = DeletionProofKeyPair::generate();
+        assert!(matches!(
+            proof.verify_external(&wrong_keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
     }
 
     #[test]
     fn test_verify_external_v2_hmac() {
+        let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
@@ -1427,8 +1427,10 @@ mod tests {
         )
         .unwrap();
 
-        assert!(proof.verify_external(hmac_key).unwrap());
-        assert!(!proof.verify_external(b"wrong_hmac_key").unwrap());
+        assert!(matches!(
+            proof.verify_external(&keypair.verifying_key),
+            Err(CryptoError::UnsupportedProofVersion(2))
+        ));
     }
 
     #[test]
