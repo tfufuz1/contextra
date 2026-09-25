@@ -10,6 +10,8 @@ pub mod drift;
 #[cfg(feature = "flow-corrected-thompson")]
 pub mod flow_thompson;
 pub mod homeostat;
+#[cfg(feature = "rie-greedy-personalization")]
+pub mod rie_greedy;
 pub mod lyapunov;
 pub mod off_policy;
 pub mod offpolicy;
@@ -26,6 +28,8 @@ pub use flow_thompson::{
     FlowCorrectedThompsonBandit, Ring3Token, SplitMix64,
 };
 pub use homeostat::*;
+#[cfg(feature = "rie-greedy-personalization")]
+pub use rie_greedy::{RieGreedyError, RieGreedyProfile};
 pub use lyapunov::*;
 pub use off_policy::*;
 pub use pid::*;
