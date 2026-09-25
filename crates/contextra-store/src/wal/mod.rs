@@ -23,9 +23,11 @@ pub(crate) mod fs {
 pub(crate) mod fs {
     use std::path::Path;
 
+    // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
     pub async fn read<P: AsRef<Path>>(path: P) -> std::io::Result<Vec<u8>> {
         std::fs::read(path)
     }
+    // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
     pub async fn write<P: AsRef<Path>, C: AsRef<[u8]>>(
         path: P,
         contents: C,
@@ -52,6 +54,7 @@ pub(crate) mod fs {
         let _ = path;
         Ok(false)
     }
+    // INVARIANT-KONFORM: Perm-Signatur in Loom-Mock-Typen.
     pub async fn set_permissions<P: AsRef<Path>>(
         path: P,
         perm: std::fs::Permissions,
@@ -70,14 +73,17 @@ pub(crate) mod fs {
         pub fn len(&self) -> u64 {
             0
         }
+        // INVARIANT-KONFORM: Perm-Signatur und Mode-Konstruktion in Loom-Mock-Metadata.
         pub fn permissions(&self) -> std::fs::Permissions {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
+                // INVARIANT-KONFORM: Constructing Permissions from unix mode mask in Loom mock metadata.
                 std::fs::Permissions::from_mode(0o644)
             }
             #[cfg(not(unix))]
             {
+                // INVARIANT-KONFORM: Non-unix fallback in Loom mock metadata.
                 std::fs::metadata(".").map(|m| m.permissions()).unwrap()
             }
         }
