@@ -1,0 +1,37 @@
+name: Cargo Deny
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deny:
+    name: Cargo Deny Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@1.89.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@e0956f9d9dbb1e627ef0de00822045c6cd14c74e # cargo-deny
+        with:
+          tool: cargo-deny
+
+      - name: Verify deny.toml exists
+        run: |
+          if [ ! -f deny.toml ]; then
+            echo "::error::deny.toml missing in repository root! Please create deny.toml before running cargo deny."
+            exit 1
+          fi
+
+      - name: Run cargo deny check
+        run: cargo deny check
