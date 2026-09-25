@@ -40,3 +40,27 @@ name = "fuzz_manifest_load"
 path = "fuzz_targets/fuzz_manifest_load.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_wal_replay"
+path = "fuzz_targets/fuzz_wal_replay.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_memtable_concurrent"
+path = "fuzz_targets/fuzz_memtable_concurrent.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_compaction_interleave"
+path = "fuzz_targets/fuzz_compaction_interleave.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_recovery_arbitrary_state"
+path = "fuzz_targets/fuzz_recovery_arbitrary_state.rs"
+test = false
+doc = false
