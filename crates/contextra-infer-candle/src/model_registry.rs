@@ -57,6 +57,7 @@ pub fn compute_fingerprint(
     model_path: &Path,
     quantization: &CandleQuantization,
 ) -> Result<ModelFingerprint, ContextraError> {
+    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
     let file = File::open(model_path).map_err(|e| {
         ContextraError::Io(std::io::Error::new(
             e.kind(),

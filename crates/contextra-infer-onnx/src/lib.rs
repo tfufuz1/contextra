@@ -68,6 +68,7 @@ pub async fn ensure_onnx_model_download(
         return Ok(target_dir);
     }
 
+    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
     std::fs::create_dir_all(&target_dir).map_err(|e| {
         ContextraError::Internal(format!(
             "Konnte Modellspeicherverzeichnis {:?} nicht erstellen: {}",
@@ -158,12 +159,14 @@ async fn download_onnx_file(
         )
     })?;
 
+    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
     std::fs::write(&tmp_path, &bytes).map_err(|e| {
         ContextraError::Internal(format!(
             "Konnte temporäre Datei {tmp_path:?} nicht schreiben: {e}"
         ))
     })?;
 
+    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
     std::fs::rename(&tmp_path, dest_path).map_err(|e| {
         ContextraError::Internal(format!("Konnte {dest_path:?} nicht speichern: {e}"))
     })?;

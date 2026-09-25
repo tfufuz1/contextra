@@ -23,6 +23,7 @@ pub struct GgufMetadata {
 ///
 /// Uses `candle_core::quantized::gguf_file` to parse container headers without reading tensor payloads into memory.
 pub fn parse_gguf_metadata(model_path: &Path) -> Result<GgufMetadata, ContextraError> {
+    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
     let mut file = File::open(model_path).map_err(|e| {
         ContextraError::Io(std::io::Error::new(
             e.kind(),
