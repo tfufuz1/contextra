@@ -617,6 +617,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-audit-export"
+version = "0.1.0"
+dependencies = [
+ "contextra-ports",
+ "contextra-types",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
