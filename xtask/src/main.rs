@@ -2085,6 +2085,12 @@ fn main() {
                 process::exit(1);
             }
         }
+        "generate-diagnostics" => {
+            if let Err(e) = xtask::generate_diagnostics::run_generate_diagnostics() {
+                eprintln!("❌ generate-diagnostics failed: {}", e);
+                process::exit(1);
+            }
+        }
         "sync-docs" => {
             let check_only = args.iter().any(|arg| arg == "--check");
             let success = run_sync_docs(check_only);
