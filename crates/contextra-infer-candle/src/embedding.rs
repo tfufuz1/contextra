@@ -124,6 +124,7 @@ impl CandleEmbedClient {
         let gguf_path = model_dir.join("model.gguf");
         let fingerprint = if gguf_path.exists() {
             crate::model_registry::compute_fingerprint(&gguf_path, &quantization)?
+        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         } else if let Ok(entries) = std::fs::read_dir(model_dir) {
             let mut gguf_found = None;
             for entry in entries.flatten() {
@@ -181,6 +182,7 @@ pub struct BertEmbedModel {
 impl BertEmbedModel {
     /// Loads BERT model weights from a `.safetensors` file and configuration from `config.json`.
     pub fn load(weights_path: &Path, _config_path: &Path, device: &Device) -> Result<Self> {
+        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         let weights_bytes = std::fs::read(weights_path).map_err(|e| {
             ContextraError::Io(std::io::Error::new(
                 e.kind(),
