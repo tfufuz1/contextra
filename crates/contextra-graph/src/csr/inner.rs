@@ -5,6 +5,8 @@ use std::sync::Arc;
 use contextra_types::{DocId, Entity, EntityId, TxId};
 
 use super::types::{EdgePayload, InternalIndex, StagedEdgePayload};
+#[cfg(feature = "edge-reinforcement-learning")]
+use super::types::Edge;
 
 /// Inner state of the CsrGraph to manage contiguous storage.
 #[derive(Clone)]
