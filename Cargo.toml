@@ -32,7 +32,7 @@ members = [
     "crates/contextra-engine",
     "crates/contextra-cognition",
     "crates/contextra-rank",
-    "crates/contextra-avv-generator",
+    "crates/contextra-audit-export",
 ]
 exclude = ["xtask"]
 default-members = [
