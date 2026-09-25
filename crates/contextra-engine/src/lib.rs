@@ -5,9 +5,80 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_crypto::deletion_proof::{
+#[cfg(feature = "encryption-at-rest")]
+pub use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
 };
+
+#[cfg(not(feature = "encryption-at-rest"))]
+pub use no_crypto_stubs::*;
+
+#[cfg(not(feature = "encryption-at-rest"))]
+mod no_crypto_stubs {
+    use contextra_types::{CollectionId, TenantId, TxId};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    pub enum DeletionLayer {
+        LsmMemtable,
+        SsTableAllLevels,
+        HnswIndex,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub enum DeletionScope {
+        Collection {
+            collection_id: CollectionId,
+            tenant_id: TenantId,
+        },
+        Document {
+            doc_id: contextra_types::DocId,
+            tenant_id: TenantId,
+        },
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct LayerCleanupProof {
+        pub layer: DeletionLayer,
+        pub remaining_count: usize,
+    }
+
+    impl LayerCleanupProof {
+        pub fn new_after_verified_empty(
+            layer: DeletionLayer,
+            remaining_count: usize,
+        ) -> contextra_types::Result<Self> {
+            Ok(Self {
+                layer,
+                remaining_count,
+            })
+        }
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct DeletionProof {
+        pub scope: DeletionScope,
+        pub deleted_keys: Vec<Vec<u8>>,
+        pub tx_id: TxId,
+    }
+
+    impl DeletionProof {
+        pub fn create(
+            scope: DeletionScope,
+            deleted_keys: Vec<Vec<u8>>,
+            tx_id: TxId,
+            _layer_proofs: Vec<LayerCleanupProof>,
+            _cas_proofs: Vec<Vec<u8>>,
+            _proof_key: &[u8],
+        ) -> contextra_types::Result<Self> {
+            Ok(Self {
+                scope,
+                deleted_keys,
+                tx_id,
+            })
+        }
+    }
+}
 #[cfg(feature = "sandbox")]
 use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;

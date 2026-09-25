@@ -254,6 +254,7 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub consolidation_guard: Arc<tokio::sync::Mutex<()>>,
     pub(super) kv_locks: Arc<kv_lock::KvKeyLocks>,
     /// Optionaler tenant-isolierter KV-Cache-Store zur automatischen KV-Cache-Bereinigung bei Rollbacks.
+    #[cfg(feature = "encryption-at-rest")]
     pub(super) kv_store: Option<Arc<contextra_crypto::TenantIsolatedKvStore>>,
     /// Zählt Graph-Mutationen seit letzter Community Detection.
     pub(super) mutations_since_community_detection: Arc<AtomicU64>,
@@ -282,6 +283,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             embedder: parking_lot::RwLock::new(self.embedder.read().as_ref().map(Arc::clone)),
             consolidation_guard: self.consolidation_guard.clone(),
             kv_locks: self.kv_locks.clone(),
+            #[cfg(feature = "encryption-at-rest")]
             kv_store: self.kv_store.clone(),
             mutations_since_community_detection: self.mutations_since_community_detection.clone(),
             community_detection_trigger_threshold: self
@@ -359,6 +361,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             embedder: parking_lot::RwLock::new(None),
             consolidation_guard: Arc::new(tokio::sync::Mutex::new(())),
             kv_locks: Arc::new(kv_lock::KvKeyLocks::new()),
+            #[cfg(feature = "encryption-at-rest")]
             kv_store: None,
             mutations_since_community_detection: Arc::new(AtomicU64::new(0)),
             community_detection_trigger_threshold: Arc::new(AtomicU64::new(100)),
@@ -412,17 +415,20 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
+    #[cfg(feature = "encryption-at-rest")]
     pub fn with_kv_store(mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
         self.kv_store = Some(kv_store);
         self
     }
 
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
+    #[cfg(feature = "encryption-at-rest")]
     pub fn set_kv_store(&mut self, kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {
         self.kv_store = Some(kv_store);
     }
 
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
+    #[cfg(feature = "encryption-at-rest")]
     pub fn kv_store(&self) -> Option<&Arc<contextra_crypto::TenantIsolatedKvStore>> {
         self.kv_store.as_ref()
     }
