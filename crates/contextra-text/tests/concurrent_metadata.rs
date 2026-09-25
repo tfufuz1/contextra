@@ -120,7 +120,7 @@ async fn test_sequential_large_batch_stats_correct(
     // Insert 50 documents with 3 tokens each
     for i in 0..50u64 {
         let tx = TxId::new(i + 1);
-        let doc_id = DocId::new(i + 1);
+        let doc_id = DocId::from(i + 1);
         index
             .upsert_document(tx, doc_id, "alpha beta gamma")
             .await?;
@@ -137,7 +137,7 @@ async fn test_sequential_large_batch_stats_correct(
     // Update 25 documents to have 2 tokens each
     for i in 0..25u64 {
         let tx = TxId::new(100 + i);
-        let doc_id = DocId::new(i + 1);
+        let doc_id = DocId::from(i + 1);
         index.upsert_document(tx, doc_id, "delta epsilon").await?;
         index.commit(tx).await?;
     }
@@ -166,7 +166,7 @@ async fn test_concurrent_upserts_no_panic() -> std::result::Result<(), Box<dyn s
         let idx = index.clone();
         handles.push(tokio::spawn(async move {
             let tx = TxId::new(i + 1);
-            let doc_id = DocId::new(i + 1);
+            let doc_id = DocId::from(i + 1);
             idx.upsert_document(tx, doc_id, "concurrent test data")
                 .await
                 .expect("upsert should not panic");
@@ -201,7 +201,7 @@ async fn test_concurrent_upserts_stats_eventual_count(
     // Serialize inserts to get a baseline correct count
     for i in 0..20u64 {
         let tx = TxId::new(i + 1);
-        let doc_id = DocId::new(i + 1);
+        let doc_id = DocId::from(i + 1);
         index.upsert_document(tx, doc_id, "word").await?;
         index.commit(tx).await?;
     }

@@ -357,7 +357,7 @@ async fn run_profile_10k_documents() {
     let start_de_idx = Instant::now();
     for (i, doc) in german_docs.iter().enumerate() {
         let tx = TxId::new((i + 1) as u64);
-        let doc_id = DocId::new((i + 1) as u64);
+        let doc_id = DocId::from((i + 1) as u64);
         index_de
             .insert(tx, doc_id, doc)
             .await
@@ -402,7 +402,7 @@ async fn run_profile_10k_documents() {
     let start_en_idx = Instant::now();
     for (i, doc) in english_docs.iter().enumerate() {
         let tx = TxId::new((i + 1) as u64);
-        let doc_id = DocId::new((i + 1) as u64);
+        let doc_id = DocId::from((i + 1) as u64);
         index_en
             .insert(tx, doc_id, doc)
             .await

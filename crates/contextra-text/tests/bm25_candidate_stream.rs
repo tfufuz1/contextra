@@ -178,7 +178,7 @@ async fn create_test_index_with_docs(
 
     let tx = TxId::new(1);
     for i in 1..=count {
-        let doc_id = DocId::new(i as u64);
+        let doc_id = DocId::from(i as u64);
         let text = format!("rust database candidate search benchmark item {i}");
         index
             .upsert_document(tx, doc_id, &text)

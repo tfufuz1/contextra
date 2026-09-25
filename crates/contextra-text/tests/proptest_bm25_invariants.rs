@@ -327,7 +327,7 @@ proptest! {
         rt.block_on(async move {
             let storage = Arc::new(MVCCMockStorage::new());
             let index = InvertedIndex::new(storage.clone(), "prop5_ns");
-            let doc_id = DocId::new(doc_id_raw);
+            let doc_id = DocId::from(doc_id_raw);
 
             // Step 1: Insert document with the query text `q` at transaction tx1
             let tx1 = TxId::new(1);
