@@ -542,6 +542,7 @@ impl DeletionProof {
         let scope_bytes = bincode::serialize(&self.scope)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+        let timestamp_bytes = self.timestamp.to_le_bytes();
         let covered_layers_bytes = bincode::serialize(&self.covered_layers)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
@@ -557,6 +558,7 @@ impl DeletionProof {
             scope_bytes.len()
                 + 32
                 + tx_bytes.len()
+                + timestamp_bytes.len()
                 + covered_layers_bytes.len()
                 + excluded_scopes_bytes.len()
                 + receipt_part.len(),
@@ -564,6 +566,7 @@ impl DeletionProof {
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&self.deleted_keys_hash);
         payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp_bytes);
         payload.extend_from_slice(&covered_layers_bytes);
         payload.extend_from_slice(&excluded_scopes_bytes);
         payload.extend_from_slice(receipt_part);
@@ -1399,20 +1402,17 @@ mod tests {
         )
         .unwrap();
 
-        // Valid key bytes (32 bytes)
-        assert!(proof.verify_external(&keypair.verifying_key_bytes()).unwrap());
+        // Valid key
+        assert!(proof.verify_external(&keypair.verifying_key).is_ok());
 
-        // Invalid key length (e.g. 16 bytes, 64 bytes)
-        assert!(!proof.verify_external(&[0u8; 16]).unwrap());
-        assert!(!proof.verify_external(&[0u8; 64]).unwrap());
-
-        // Invalid Curve25519 point (32 bytes of invalid point)
-        let invalid_point = [0xFFu8; 32];
-        assert!(!proof.verify_external(&invalid_point).unwrap());
+        // Wrong key
+        let wrong_keypair = DeletionProofKeyPair::generate();
+        assert!(proof.verify_external(&wrong_keypair.verifying_key).is_err());
     }
 
     #[test]
     fn test_verify_external_v2_hmac() {
+        let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
@@ -1427,8 +1427,10 @@ mod tests {
         )
         .unwrap();
 
-        assert!(proof.verify_external(hmac_key).unwrap());
-        assert!(!proof.verify_external(b"wrong_hmac_key").unwrap());
+        assert!(matches!(
+            proof.verify_external(&keypair.verifying_key),
+            Err(CryptoError::UnsupportedProofVersion(2))
+        ));
     }
 
     #[test]
