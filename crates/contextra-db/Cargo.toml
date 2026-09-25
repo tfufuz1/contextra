@@ -42,6 +42,7 @@ tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
 contextra-index = { workspace = true, features = ["experimental-diskann"] }
+ed25519-dalek = "2"
 
 [features]
 default = []
@@ -96,3 +97,6 @@ required-features = ["experimental-diskann"]
 
 [[example]]
 name = "collections"
+
+[[example]]
+name = "verify_deletion_proof_external"
