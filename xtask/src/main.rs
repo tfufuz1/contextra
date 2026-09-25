@@ -59,6 +59,7 @@ mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
 mod check_commit_messages;
 mod check_compile;
+mod check_mutation_score_gate;
 use xtask::gates;
 mod check_coverage_gate;
 mod check_doc_references;
@@ -2224,6 +2225,14 @@ fn main() {
         }
         "lint-unsafe-slices" => {
             if !lint_unsafe_slice_bounds::run_lint_unsafe_slice_bounds() {
+                process::exit(1);
+            }
+        }
+        "check-mutation-score-gate" => {
+            let root = find_root_dir();
+            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+            if let Err(e) = check_mutation_score_gate::run_check_mutation_score_gate(extra_args, &root) {
+                eprintln!("❌ check-mutation-score-gate failed: {}", e);
                 process::exit(1);
             }
         }

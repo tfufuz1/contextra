@@ -1,7 +1,9 @@
-# Configuration for cargo-mutants scoped to contextra-crypto (Tier-0)
+# Configuration for cargo-mutants scoped to Tier-0/1 crates
 
 examine_globs = [
     "crates/contextra-crypto/src/**/*.rs",
+    "crates/contextra-store/src/**/*.rs",
+    "crates/contextra-checkpoint/src/**/*.rs",
 ]
 
 exclude_globs = [
