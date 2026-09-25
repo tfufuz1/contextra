@@ -45,6 +45,12 @@ pub enum CryptoError {
         /// Detail text describing corruption cause.
         reason: String,
     },
+
+    #[error("invalid proof signature")]
+    InvalidProofSignature,
+
+    #[error("unsupported signature version: {0}")]
+    UnsupportedSignatureVersion(u8),
 }
 
 impl CryptoError {

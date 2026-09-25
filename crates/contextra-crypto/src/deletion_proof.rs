@@ -19,6 +19,7 @@
 
 use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
+use crate::error::CryptoError;
 
 fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
@@ -256,6 +257,9 @@ pub struct DeletionProof {
     /// TxId nach der kein gelöschtes Datum mehr im System vorhanden ist.
     /// ADR-016: TxId statt SystemTime für Determinismus.
     pub deleted_after_tx: TxId,
+    /// Zeitstempel der Erstellung (Unix Timestamp in Sekunden).
+    #[serde(default)]
+    pub timestamp: u64,
     /// Signatur (32 Bytes für v1/v2 HMAC, 64 Bytes für v3 Ed25519).
     pub signature: Vec<u8>,
     /// List of physically sanitized storage layers.
@@ -356,6 +360,7 @@ impl DeletionProof {
             scope,
             deleted_keys_hash,
             deleted_after_tx,
+            timestamp: 0,
             signature: signature.to_vec(),
             covered_layers,
             excluded_scopes,
@@ -416,10 +421,16 @@ impl DeletionProof {
             &[]
         };
 
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
         let mut payload = Vec::new();
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&deleted_keys_hash);
         payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp.to_le_bytes());
         payload.extend_from_slice(&covered_layers_bytes);
         payload.extend_from_slice(&excluded_scopes_bytes);
         payload.extend_from_slice(receipt_part);
@@ -432,6 +443,7 @@ impl DeletionProof {
             scope,
             deleted_keys_hash,
             deleted_after_tx,
+            timestamp,
             signature: sig.to_bytes().to_vec(),
             covered_layers,
             excluded_scopes,
@@ -522,6 +534,7 @@ impl DeletionProof {
                 payload.extend_from_slice(&scope_bytes);
                 payload.extend_from_slice(&self.deleted_keys_hash);
                 payload.extend_from_slice(&tx_bytes);
+                payload.extend_from_slice(&self.timestamp.to_le_bytes());
                 payload.extend_from_slice(&covered_layers_bytes);
                 payload.extend_from_slice(&excluded_scopes_bytes);
                 payload.extend_from_slice(receipt_part);
@@ -538,6 +551,49 @@ impl DeletionProof {
                 "Unsupported DeletionProof signature_version: {v}"
             ))),
         }
+    }
+
+    /// Verifiziert einen v3-DeletionProof extern mit einem Ed25519-Public-Key (AK-20).
+    ///
+    /// # Errors
+    /// - `CryptoError::UnsupportedSignatureVersion`: Für v1/v2-Proofs (HMAC-basiert).
+    /// - `CryptoError::InvalidProofSignature`: Bei ungültiger Signatur oder manipulierten Feldern.
+    pub fn verify_external(&self, public_key: &ed25519_dalek::VerifyingKey) -> crate::error::Result<()> {
+        if self.signature_version != 3 {
+            return Err(CryptoError::UnsupportedSignatureVersion(self.signature_version));
+        }
+
+        let scope_bytes = bincode::serialize(&self.scope)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+        let timestamp_bytes = self.timestamp.to_le_bytes();
+        let covered_layers_bytes = bincode::serialize(&self.covered_layers)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
+        let receipt_part = if self.wal_chain_receipt.is_some() {
+            receipt_bytes.as_slice()
+        } else {
+            &[]
+        };
+
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&scope_bytes);
+        payload.extend_from_slice(&self.deleted_keys_hash);
+        payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp_bytes);
+        payload.extend_from_slice(&covered_layers_bytes);
+        payload.extend_from_slice(&excluded_scopes_bytes);
+        payload.extend_from_slice(receipt_part);
+
+        use ed25519_dalek::Verifier;
+        let sig = ed25519_dalek::Signature::from_slice(&self.signature)
+            .map_err(|_| CryptoError::InvalidProofSignature)?;
+
+        public_key
+            .verify(&payload, &sig)
+            .map_err(|_| CryptoError::InvalidProofSignature)
     }
 
     /// Exportiert Proof als JSON für Compliance-Dokumentation.
@@ -804,6 +860,7 @@ mod tests {
             scope,
             deleted_keys_hash,
             deleted_after_tx: TxId(10),
+            timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![],
             excluded_scopes: vec![],
@@ -1131,6 +1188,7 @@ mod tests {
             scope,
             deleted_keys_hash,
             deleted_after_tx,
+            timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
@@ -1187,6 +1245,7 @@ mod tests {
             scope,
             deleted_keys_hash,
             deleted_after_tx,
+            timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
