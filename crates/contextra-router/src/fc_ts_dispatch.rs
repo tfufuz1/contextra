@@ -1,5 +1,5 @@
 //! FC-TS-Profilauswahl für contextra-router (§21.3, AK-18). Eigenständiges Modul, analog im Aufbau
-//! zu `router::select_profile_cascade`, aber ohne Abhängigkeit von `router.rs`/`profile.rs`.
+//! zu `router::select_profile_cascade`, aber ohne Abhängigkeit von `router/`/`profile.rs`.
 
 use contextra_adapt::{FcTsArmSet, FcTsError, FcTsRng, SplitMix64};
 
