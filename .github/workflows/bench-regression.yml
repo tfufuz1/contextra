@@ -7,10 +7,10 @@ jobs:
   bench-regression:
     runs-on: ubuntu-latest-4-cores
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { fetch-depth: 0 }
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Run Criterion Benchmarks
         run: |
           cargo bench -p contextra-vector --bench distance_nan_impact_bench -- --save-baseline current
@@ -20,7 +20,7 @@ jobs:
       - name: Assert No Regression (±5%)
         run: cargo xtask bench-gate --tolerance 0.05
       - name: Upload Benchmark Results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: criterion-results-${{ github.sha }}
           path: target/criterion/

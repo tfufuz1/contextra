@@ -22,13 +22,13 @@ jobs:
     name: Fixture-Smoke-Test & Harness Dry-Run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.89.0
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Fixture Evaluation & Benchmark Unit Tests
         run: |
@@ -47,7 +47,7 @@ jobs:
           CONTEXTRA_SCALE_TIERS=100,500 cargo bench --locked -p contextra-db --bench scale_bench -- --save-baseline pr-${{ github.event.number || github.sha }}
 
       - name: Upload Benchmark Results Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: benchmark-criterion-data
           path: |
@@ -58,17 +58,17 @@ jobs:
     name: Retrieval Accuracy Benchmark (contextra-bench)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.89.0
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Cache LongMemEval Dataset
         id: cache-longmemeval
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: benchmarks/contextra-bench/tests/data/
           key: longmemeval-dataset-v1-${{ hashFiles('benchmarks/contextra-bench/src/long_mem_eval.rs') }}
@@ -139,7 +139,7 @@ jobs:
 
       - name: Upload Retrieval Accuracy Benchmark Results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: retrieval-accuracy-benchmark-results
           path: |
@@ -151,20 +151,20 @@ jobs:
     name: Retrieval Quality Regression Gate (LongMemEval & LoCoMo)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.89.0
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Build Benchmark Harness and Comparison Tooling
         run: cargo build --locked -p contextra-bench --release
 
       - name: Cache Benchmark Datasets
         id: cache-datasets
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: benchmarks/contextra-bench/tests/data/
           key: benchmark-datasets-v1-${{ hashFiles('benchmarks/contextra-bench/src/long_mem_eval.rs', 'benchmarks/contextra-bench/src/locomo.rs') }}
@@ -282,7 +282,7 @@ jobs:
 
       - name: Upload Retrieval Quality Regression Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: benchmark-regression-metrics
           path: |

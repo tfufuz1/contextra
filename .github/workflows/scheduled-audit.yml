@@ -12,7 +12,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Sammle Commits der letzten 7 Tage
@@ -100,7 +100,7 @@ $COMMIT_LIST
 EOF
           fi
       - name: Erstelle Pull Request mit Audit-Task
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
         with:
           branch: automated/weekly-audit-task-${{ steps.task.outputs.date }}
           title: "Wöchentlicher Audit-Auftrag ${{ steps.task.outputs.date }}"
@@ -117,7 +117,7 @@ EOF
       actions: write
     steps:
       - name: Trigger Rotating Mutation Testing Workflow
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const crates = ["contextra-graph", "contextra-vector", "contextra-agent", "contextra-db"];
