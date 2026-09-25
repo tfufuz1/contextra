@@ -1382,6 +1382,57 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_external_v3_valid_and_invalid_keys() {
+        let keypair = DeletionProofKeyPair::generate();
+        let scope = DeletionScope::Document {
+            doc_id: DocId(42),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let proof = DeletionProof::create_v3(
+            scope,
+            vec![b"k1".to_vec()],
+            TxId(100),
+            vec![
+                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+            ],
+            vec![ExcludedScope::LlmParameterMemory],
+            keypair.signing_key(),
+        )
+        .unwrap();
+
+        // Valid key bytes (32 bytes)
+        assert!(proof.verify_external(&keypair.verifying_key_bytes()).unwrap());
+
+        // Invalid key length (e.g. 16 bytes, 64 bytes)
+        assert!(!proof.verify_external(&[0u8; 16]).unwrap());
+        assert!(!proof.verify_external(&[0u8; 64]).unwrap());
+
+        // Invalid Curve25519 point (32 bytes of invalid point)
+        let invalid_point = [0xFFu8; 32];
+        assert!(!proof.verify_external(&invalid_point).unwrap());
+    }
+
+    #[test]
+    fn test_verify_external_v2_hmac() {
+        let scope = DeletionScope::Tenant {
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let hmac_key = b"secret_hmac_key_32_bytes_long!!";
+        let proof = DeletionProof::create(
+            scope,
+            vec![b"k1".to_vec()],
+            TxId(10),
+            vec![],
+            vec![],
+            hmac_key,
+        )
+        .unwrap();
+
+        assert!(proof.verify_external(hmac_key).unwrap());
+        assert!(!proof.verify_external(b"wrong_hmac_key").unwrap());
+    }
+
+    #[test]
     fn test_deletion_proof_unsupported_signature_version() {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
