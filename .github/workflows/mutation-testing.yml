@@ -108,6 +108,13 @@ jobs:
             cargo run -p xtask -- mutation-score-record --crate "$crate" --total "$TOTAL" --caught "$CAUGHT"
           done
 
+      - name: Enforce Mutation Score Gate
+        run: |
+          for crate in ${{ steps.target.outputs.crates }}; do
+            echo "Enforcing mutation score gate for crate: $crate"
+            cargo run -p xtask -- check-mutation-score-gate --crate "$crate"
+          done
+
       - name: Report Failure
         if: failure()
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
