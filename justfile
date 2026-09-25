@@ -406,3 +406,11 @@ bench-external:
 	echo "🌐 Externe Benchmarks (BEIR + ANN)..."
 	cargo run -p contextra-bench --release -- --synthetic-only 2>&1 | tee benchmarks/results/external_latest.json
 	echo "✅ Externe Benchmarks abgeschlossen: benchmarks/results/external_latest.json"
+
+# Führt Mutation-Testing für contextra-crypto (Tier-0) aus
+mutants-crypto *ARGS:
+	cargo mutants --package contextra-crypto {{ARGS}}
+
+# Alias für mutants-crypto
+mutants *ARGS:
+	cargo mutants --package contextra-crypto {{ARGS}}
