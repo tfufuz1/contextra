@@ -10,12 +10,16 @@
 //! - `WasmOutput.stdout` ist `ZeroizeOnDrop` (P9)
 //! - Kein Dateisystem-/Netzwerkzugriff per Default
 
+pub mod approval;
 pub mod capabilities;
 pub mod error;
 pub mod executor;
 pub mod output;
 pub mod wasi;
 
+pub use approval::{
+    classify_risk, ApprovalRequest, ApprovalRisk, ApprovalStatus, ApprovalTransitionError,
+};
 pub use capabilities::WasmCapabilities;
 pub use error::SandboxError;
 pub use executor::WasmExecutor;
