@@ -35,6 +35,7 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) include_superseded: bool,
     pub(super) include_provenance: bool,
     pub(super) filter_fn: Option<Box<dyn Fn(DocId) -> bool + Send + Sync>>,
+    pub(super) hard_scope: Option<super::scope::ScopeConstraint>,
     #[cfg(feature = "reranking")]
     pub(super) reranker: Option<&'a contextra_infer_onnx::CrossEncoderReranker>,
     pub(super) rerank_pool_multiplier: Option<usize>,
@@ -65,6 +66,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             include_superseded: false,
             include_provenance: false,
             filter_fn: None,
+            hard_scope: None,
             #[cfg(feature = "reranking")]
             reranker: None,
             rerank_pool_multiplier: None,

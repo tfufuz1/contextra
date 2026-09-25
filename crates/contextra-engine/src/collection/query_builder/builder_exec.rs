@@ -53,6 +53,13 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             self.collection.snapshot_seq().await?
         };
 
+        if self.hard_scope.is_some() {
+            return Err(contextra_types::ContextraError::capability_unsupported(
+                "acorn_hard_boundary",
+                "ACORN hard-boundary scoping requires execute_with_scope() on a vector index implementing FilteredIndex",
+            ));
+        }
+
         #[allow(deprecated)]
         let mut results = self
             .collection
@@ -172,6 +179,171 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                         }
                     }
                     tracing::debug!("Reranking applied: {} candidates", reranked_results.len());
+                    return Ok(reranked_results);
+                }
+            }
+        }
+
+        results.truncate(k);
+        Ok(results)
+    }
+}
+
+impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V>
+where
+    V: contextra_vector::acorn::FilteredIndex<Predicate = dyn Fn(DocId) -> bool>,
+{
+    /// Executes search query with ACORN hard-boundary scoping (`.scope(ScopeConstraint)`).
+    ///
+    /// Evaluates vector similarity strictly within `allowed_doc_ids` during ACORN graph traversal
+    /// with `gamma` edge budget augmentation (Spec §5.3, §8.5, §10.4).
+    pub async fn execute_with_scope(self) -> Result<Vec<crate::SearchResult>> {
+        let k = self.k.unwrap_or(10);
+        if k == 0 {
+            return Ok(Vec::new());
+        }
+
+        let scope = self.hard_scope.as_ref().ok_or_else(|| {
+            contextra_types::ContextraError::invalid_input(
+                "execute_with_scope called without a configured ScopeConstraint via .scope()",
+            )
+        })?;
+
+        let embedding = self.vector.as_ref().ok_or_else(|| {
+            contextra_types::ContextraError::invalid_input(
+                "Dense vector query embedding is required for ACORN hard-boundary scoped search",
+            )
+        })?;
+
+        let allowed_set = scope.allowed_doc_ids.clone();
+        let predicate: Box<dyn Fn(DocId) -> bool + Send + Sync> =
+            Box::new(move |doc_id| allowed_set.contains(&doc_id));
+
+        let acorn_tuples = self
+            .collection
+            .index
+            .search_knn_acorn(embedding, k, predicate.as_ref(), scope.gamma)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+
+        let seq_no = if let Some(s) = self.seq {
+            s
+        } else {
+            self.collection.snapshot_seq().await?
+        };
+
+        let mut results = Vec::with_capacity(acorn_tuples.len());
+        for (doc_id, score) in acorn_tuples {
+            let doc_key = self
+                .collection
+                .namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+            if let Some(bytes) = self.collection.storage().get_at_seq(&doc_key, seq_no).await? {
+                let (id, metadata) = if let Ok(meta) =
+                    serde_json::from_slice::<crate::collection::StoredDocumentMeta>(&bytes)
+                {
+                    (meta.id, meta.metadata)
+                } else if let Ok(full) =
+                    serde_json::from_slice::<crate::collection::StoredDocument>(&bytes)
+                {
+                    (full.id, full.metadata)
+                } else {
+                    continue;
+                };
+                let prov = crate::ProvenanceRecord {
+                    source_collection: Some(self.collection.name().to_string()),
+                    ..Default::default()
+                };
+                results.push(crate::SearchResult {
+                    id,
+                    score,
+                    metadata,
+                    matched_signals: vec!["acorn_vector".to_string()],
+                    provenance: Some(prov),
+                });
+            }
+        }
+
+        if let Some(ref filter_expr) = self.filter {
+            results.retain(|res| {
+                let meta_ref = res.metadata.as_ref().unwrap_or(&serde_json::Value::Null);
+                filter_expr.evaluate(meta_ref)
+            });
+        }
+
+        if let Some(ref memory_types) = self.memory_type_filter {
+            results.retain(|res| {
+                let mt = crate::filter::extract_memory_type(&res.metadata);
+                memory_types.contains(&mt)
+            });
+        }
+
+        if let Some(ref filter_fn) = self.filter_fn {
+            let mut filtered = Vec::with_capacity(results.len());
+            for res in results {
+                if let Ok(doc_id) = DocId::from_key(&res.id) {
+                    if filter_fn(doc_id) {
+                        filtered.push(res);
+                    }
+                }
+            }
+            results = filtered;
+        }
+
+        if let Some(as_of) = self.as_of_timestamp {
+            results = crate::temporal_filter::apply_temporal_validity_filter_at(results, as_of);
+        } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
+            let ctx = self
+                .current_tx
+                .unwrap_or(contextra_types::TxId::new(u64::MAX));
+            results = crate::temporal_filter::apply_temporal_validity_filter(
+                results,
+                ctx,
+                self.query_timestamp,
+            );
+        }
+
+        #[cfg(feature = "reranking")]
+        if let Some(reranker) = self.reranker {
+            let text_str = self.text.as_deref().unwrap_or("");
+            if !results.is_empty() && !text_str.is_empty() {
+                let candidate_texts: Vec<String> = results
+                    .iter()
+                    .map(|r| {
+                        r.metadata
+                            .as_ref()
+                            .and_then(|m| m.get("text").or_else(|| m.get("content")))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(&r.id)
+                            .to_string()
+                    })
+                    .collect();
+
+                let rerank_deadline = std::time::Duration::from_millis(
+                    reranker.config().rerank_deadline_ms.unwrap_or(500),
+                );
+
+                if let Ok(Ok(ranked)) = tokio::time::timeout(
+                    rerank_deadline,
+                    reranker.rerank(text_str, &candidate_texts),
+                )
+                .await
+                {
+                    let mut reranked_results = Vec::with_capacity(k);
+                    for r in ranked.into_iter().take(k) {
+                        if let Some(mut result) = results.get(r.original_index).cloned() {
+                            if let Some(meta) = result.metadata.as_mut() {
+                                if let Some(obj) = meta.as_object_mut() {
+                                    obj.insert("ce_score".to_string(), serde_json::json!(r.score));
+                                }
+                            } else {
+                                result.metadata = Some(serde_json::json!({ "ce_score": r.score }));
+                            }
+                            result.score = r.score;
+                            if let Some(p) = result.provenance.as_mut() {
+                                p.rerank_score = Some(r.score);
+                            }
+                            reranked_results.push(result);
+                        }
+                    }
                     return Ok(reranked_results);
                 }
             }
