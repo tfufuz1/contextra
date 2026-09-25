@@ -5,6 +5,8 @@ use candle_core::Device;
 use contextra_types::{ConfigFingerprint, Result};
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 #[cfg(feature = "kv-bridge")]
+use contextra_ports::ContextSegment;
+#[cfg(feature = "kv-bridge")]
 use contextra_types::TenantId;
 use std::sync::Arc;
 
@@ -436,7 +438,7 @@ async fn test_candle_llm_client_swap_model_invalidates_validator_calibration() {
 
     // Record a grounding observation on the validator via record_external_feedback (INV-CAL-3)
     let chunk = ContextChunk {
-        doc_id: DocId::new(1),
+        doc_id: DocId::from(1u64),
         content: "Der Umsatz betrug im Jahr 2025 genau 50 Millionen Euro.".to_string(),
         relevance: 0.95,
         token_count: 20,

@@ -8,7 +8,7 @@ use contextra_infer_candle::gasp::{GaspConfig, GaspValidator};
 
 fn chunk(id: u64, content: &str) -> ContextChunk {
     ContextChunk {
-        doc_id: DocId::new(id),
+        doc_id: DocId::from(id),
         content: content.to_string(),
         relevance: 1.0,
         token_count: 10,
