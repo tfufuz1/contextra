@@ -2276,6 +2276,7 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-duplicate-symbols-cross-file" => { #[path = "check_duplicate_symbols_cross_file.rs"] mod check_duplicate_symbols_cross_file; if let Err(e) = check_duplicate_symbols_cross_file::run() { eprintln!("❌ check-duplicate-symbols-cross-file failed: {}", e); process::exit(1); } }
         "check-duplicate-symbols" => {
             let cross_module = args.iter().any(|arg| arg == "--cross-module");
             let changed_files = get_changed_rs_files_from_git_diff().unwrap_or_default();
