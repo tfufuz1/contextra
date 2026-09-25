@@ -1,13 +1,16 @@
 #![forbid(unsafe_code)]
 //! `contextra-privacy` — Cloud Egress Security, DLP & Exfiltration Protection (Ring 3)
 
+pub mod avv_generator;
 pub mod bulk_exfiltration_detector;
 pub mod egress_gateway;
 pub mod egress_guard;
 pub mod egress_vault;
 pub mod error;
 pub mod guarded_payload;
+pub mod processing_registry;
 
+pub use avv_generator::{generate_avv_draft, AvvContext};
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
 };
@@ -26,3 +29,7 @@ pub use egress_vault::{
 };
 pub use error::EgressError;
 pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
+pub use processing_registry::{
+    generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistryExport,
+    ProcessorRole, TenantId,
+};
