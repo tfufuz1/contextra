@@ -16,6 +16,7 @@ default = ["bandit-routing"]
 bandit-routing = []
 egress-sherman-morrison = ["bandit-routing"]
 flow-corrected-thompson = ["bandit-routing"]
+rie-greedy-personalization = []
 
 [lints]
 workspace = true
