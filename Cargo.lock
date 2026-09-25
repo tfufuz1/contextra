@@ -569,10 +569,12 @@ name = "contextra"
 version = "0.1.0"
 dependencies = [
  "contextra-core",
+ "contextra-crypto",
  "contextra-db",
  "contextra-infer-candle",
  "contextra-infer-ollama",
  "contextra-infer-onnx",
+ "contextra-privacy",
  "contextra-rank",
  "contextra-router",
  "serde",
