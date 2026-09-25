@@ -20,6 +20,7 @@
 use crate::error::CryptoError;
 use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
+use crate::error::CryptoError;
 
 pub(crate) fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
@@ -257,6 +258,9 @@ pub struct DeletionProof {
     /// TxId nach der kein gelöschtes Datum mehr im System vorhanden ist.
     /// ADR-016: TxId statt SystemTime für Determinismus.
     pub deleted_after_tx: TxId,
+    /// Zeitstempel der Erstellung (Unix Timestamp in Sekunden).
+    #[serde(default)]
+    pub timestamp: u64,
     /// Signatur (32 Bytes für v1/v2 HMAC, 64 Bytes für v3 Ed25519).
     pub signature: Vec<u8>,
     /// List of physically sanitized storage layers.
@@ -357,6 +361,7 @@ impl DeletionProof {
             scope,
             deleted_keys_hash,
             deleted_after_tx,
+            timestamp: 0,
             signature: signature.to_vec(),
             covered_layers,
             excluded_scopes,
@@ -417,10 +422,16 @@ impl DeletionProof {
             &[]
         };
 
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
         let mut payload = Vec::new();
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&deleted_keys_hash);
         payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp.to_le_bytes());
         payload.extend_from_slice(&covered_layers_bytes);
         payload.extend_from_slice(&excluded_scopes_bytes);
         payload.extend_from_slice(receipt_part);
@@ -433,6 +444,7 @@ impl DeletionProof {
             scope,
             deleted_keys_hash,
             deleted_after_tx,
+            timestamp,
             signature: sig.to_bytes().to_vec(),
             covered_layers,
             excluded_scopes,
@@ -859,6 +871,7 @@ mod tests {
             scope,
             deleted_keys_hash,
             deleted_after_tx: TxId(10),
+            timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![],
             excluded_scopes: vec![],
@@ -1186,6 +1199,7 @@ mod tests {
             scope,
             deleted_keys_hash,
             deleted_after_tx,
+            timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
@@ -1242,6 +1256,7 @@ mod tests {
             scope,
             deleted_keys_hash,
             deleted_after_tx,
+            timestamp: 0,
             signature: v1_signature.to_vec(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
