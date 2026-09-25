@@ -3,7 +3,7 @@
 // INVARIANTEN: Verifiziert, ob 4-Signal Hybrid-Suche konsistent gegen einen Snapshot liest oder Isolation-Asymmetrien auftreten.
 // STAND: TS:2026-08-31T23:10:00Z (SESSION: 0dcb9f3b)
 
-use contextra_core::{DistanceMetric, Result};
+use contextra_types::{DistanceMetric, Result};
 use contextra_db::{Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -67,7 +67,7 @@ async fn test_cross_signal_isolation_single_run() -> Result<()> {
 
 #[tokio::test]
 async fn test_graph_signal_snapshot_isolation_with_hops_strategy() -> Result<()> {
-    use contextra_core::GraphTraversalStrategy;
+    use contextra_types::GraphTraversalStrategy;
 
     let dir = tempdir().unwrap();
     let config = ContextraConfig {
@@ -110,14 +110,13 @@ async fn test_graph_signal_snapshot_isolation_with_hops_strategy() -> Result<()>
     collection.relate("doc-2", "doc-3", "connected_to").await?;
 
     // Step 3: Execute hybrid search pinned at seq_n with Hops strategy (max_hops = 2) starting from e1
-    let query = contextra_core::HybridQueryBuilder::new()
-        .with_text_query("graph node 1")
-        .with_k(10)
-        .with_graph_strategy(GraphTraversalStrategy::Hops { max_hops: 2 })
-        .build()?;
-
     let results = collection
-        .hybrid_search_with_query_at(&query, seq_n)
+        .query()
+        .text("graph node 1")
+        .strategy(contextra_db::SearchStrategy::Hops { max_hops: 2 })
+        .seq(seq_n)
+        .k(10)
+        .execute()
         .await?;
 
     // Verifiziere:

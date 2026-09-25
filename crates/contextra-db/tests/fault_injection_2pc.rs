@@ -2,9 +2,11 @@
 // ZWECK: Prüft atomare 2PC-Transaktions-Kompensation und Crash-Recovery (repair_on_open) über alle 4 Sub-Engines.
 // STAND: TS:2026-08-31T22:30:00Z (SESSION: 0dcb9f3b)
 
-use contextra_core::{
-    BoxFuture, DocId, EntityId, ContextraError, Result, ScoredDocument, StorageEngine, StorageStats,
-    TxId, VectorIndex, VectorIndexStats,
+use contextra_ports::{
+    BoxFuture, ScoredDocument, StorageEngine, StorageStats, VectorIndex, VectorIndexStats,
+};
+use contextra_types::{
+    ContextraError, DocId, EntityId, Result, TxId,
 };
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_graph::CsrGraph;

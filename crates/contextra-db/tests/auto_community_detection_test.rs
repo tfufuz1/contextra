@@ -1,4 +1,4 @@
-use contextra_core::EntityId;
+use contextra_types::EntityId;
 use contextra_db::{CommunityDetectionConfig, Contextra, ContextraConfig};
 use tempfile::TempDir;
 

@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use contextra_checkpoint::{global_orphan_registry, PinnedSeqNoOrphan, StateCheckpoint};
-use contextra_core::TxId;
+use contextra_types::TxId;
 use contextra_db::{Contextra, ContextraConfig};
 use tempfile::TempDir;
 

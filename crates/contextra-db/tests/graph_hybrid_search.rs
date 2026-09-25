@@ -1,6 +1,7 @@
 #![allow(deprecated)]
 
-use contextra_core::{Edge, Entity, EntityId, GraphIndex, TxId};
+use contextra_ports::GraphIndex;
+use contextra_types::{Edge, Entity, EntityId, TxId};
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use tempfile::TempDir;
@@ -120,7 +121,7 @@ async fn test_relate_updates_graph_index_and_affects_hybrid_search() {
 
     // 3. Perform hybrid_search with doc_a as anchor entity
     let anchor_eid =
-        contextra_core::EntityId::from_key("doc_a").expect("test: non-empty key must succeed");
+        contextra_types::EntityId::from_key("doc_a").expect("test: non-empty key must succeed");
     let results = col
         .hybrid_search(
             "nonmatchingtext",
@@ -141,7 +142,7 @@ async fn test_relate_updates_graph_index_and_affects_hybrid_search() {
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_hybrid_search_with_ppr_strategy() {
-    use contextra_core::{GraphTraversalStrategy, PprConfig};
+    use contextra_types::{GraphTraversalStrategy, PprConfig};
 
     let tmp = TempDir::new().expect("temp dir");
     let config = ContextraConfig {
@@ -191,7 +192,7 @@ async fn test_hybrid_search_with_ppr_strategy() {
         damping_factor: 0.85,
         max_iterations: 100,
         convergence_epsilon: 1e-6,
-        algorithm: contextra_core::PprAlgorithm::Auto,
+        algorithm: contextra_types::PprAlgorithm::Auto,
         warn_on_non_convergence: true,
     });
 
@@ -216,7 +217,7 @@ async fn test_hybrid_search_with_ppr_strategy() {
 
 #[tokio::test]
 async fn test_hybrid_search_with_pathrag_strategy() {
-    use contextra_core::GraphTraversalStrategy;
+    use contextra_types::GraphTraversalStrategy;
     use contextra_db::SearchStrategy;
 
     let tmp = TempDir::new().expect("temp dir");
@@ -285,7 +286,7 @@ async fn test_hybrid_search_with_pathrag_strategy() {
         "PathRag under snapshot isolation must fail-closed with error"
     );
     match res.unwrap_err() {
-        contextra_core::ContextraError::SnapshotUnsupportedForSignal(msg) => {
+        contextra_types::ContextraError::SnapshotUnsupportedForSignal(msg) => {
             assert!(msg.contains("PathRag"));
         }
         other => panic!(
@@ -302,7 +303,7 @@ async fn test_hybrid_search_with_pathrag_strategy() {
             max_hops: 3,
             sufficiency_threshold: 0.1,
         })
-        .fusion_weights(contextra_core::FusionWeights::new(0.33, 0.33, 0.34).expect("weights"))
+        .fusion_weights(contextra_types::FusionWeights::new(0.33, 0.33, 0.34).expect("weights"))
         .k(10)
         .execute()
         .await;
@@ -312,7 +313,7 @@ async fn test_hybrid_search_with_pathrag_strategy() {
         "QueryBuilder PathRag under snapshot isolation must fail-closed with error"
     );
     match builder_res.unwrap_err() {
-        contextra_core::ContextraError::SnapshotUnsupportedForSignal(msg) => {
+        contextra_types::ContextraError::SnapshotUnsupportedForSignal(msg) => {
             assert!(msg.contains("PathRag"));
         }
         other => panic!(

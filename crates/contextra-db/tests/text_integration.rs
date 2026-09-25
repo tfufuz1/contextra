@@ -1,4 +1,5 @@
-use contextra_core::{DocId, StorageEngine, TextIndex, TxId};
+use contextra_ports::{StorageEngine, TextIndex};
+use contextra_types::{DocId, TxId};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_text::inverted::InvertedIndex;
 use std::sync::Arc;

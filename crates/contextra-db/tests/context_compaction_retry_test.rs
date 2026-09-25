@@ -1,4 +1,5 @@
-use contextra_core::{BoxFuture, DocId, LlmTextGenerator, ContextraError, Result, StorageEngine};
+use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, VectorIndex};
+use contextra_types::{ContextraError, DocId, Result, TxId};
 use contextra_db::{
     cleanup_orphaned_consolidation_intents, ContextCompactor, Contextra, ContextraConfig,
 };
@@ -26,14 +27,14 @@ impl LlmTextGenerator for MockLlmGenerator {
     }
 }
 
-struct MutatingLlmGenerator<S: StorageEngine, V: contextra_core::VectorIndex> {
+struct MutatingLlmGenerator<S: StorageEngine, V: VectorIndex> {
     collection: Arc<contextra_db::collection::Collection<S, V>>,
     doc_to_mutate: String,
     fail_attempts: usize,
     call_count: Arc<AtomicUsize>,
 }
 
-impl<S: StorageEngine, V: contextra_core::VectorIndex> LlmTextGenerator
+impl<S: StorageEngine, V: VectorIndex> LlmTextGenerator
     for MutatingLlmGenerator<S, V>
 {
     fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String>> {
@@ -196,10 +197,10 @@ async fn test_cleanup_orphaned_intents_removes_stale_keys() -> Result<()> {
     let storage = contextra_store::LsmStorage::new(lsm_config).await?;
     let next_tx = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(10));
 
-    let tx = contextra_core::TxId::new(1);
+    let tx = contextra_types::TxId::new(1);
     let key = b"consolidation_intent:orphaned_123";
     let intent = contextra_db::transaction::CommitIntent::Consolidation {
-        source_docs: vec![(DocId::new(1), contextra_core::TxId::new(1))],
+        source_docs: vec![(DocId::new(1), contextra_types::TxId::new(1))],
         target_id: DocId::new(99),
         base_tx: tx,
     };

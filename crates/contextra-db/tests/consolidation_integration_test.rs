@@ -1,6 +1,6 @@
-use contextra_core::traits::LlmTextGenerator;
-use contextra_core::BoxFuture;
-use contextra_core::DocId;
+use contextra_ports::LlmTextGenerator;
+use contextra_ports::BoxFuture;
+use contextra_types::DocId;
 use contextra_db::{
     execute_background_consolidation, execute_consolidation_pass, CommunityStabilityTracker,
     ConsolidationConfig, MaintenanceConfig, MaintenanceScheduler, Contextra, ContextraConfig,
@@ -121,7 +121,7 @@ async fn test_consolidation_worker_periodic_execution_and_cancellation() {
 struct TestLlmGenerator;
 
 impl LlmTextGenerator for TestLlmGenerator {
-    fn generate<'a>(&'a self, prompt: &'a str) -> BoxFuture<'a, contextra_core::Result<String>> {
+    fn generate<'a>(&'a self, prompt: &'a str) -> BoxFuture<'a, contextra_types::Result<String>> {
         Box::pin(async move {
             Ok(format!(
                 "Synthesized summary from prompt of length {}",

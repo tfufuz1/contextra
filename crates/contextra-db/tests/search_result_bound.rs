@@ -1,4 +1,4 @@
-use contextra_core::DistanceMetric;
+use contextra_types::DistanceMetric;
 use contextra_db::{Collection, Language};
 use contextra_graph::CsrGraph;
 use contextra_index::{HnswConfig, HnswIndex};

@@ -1,6 +1,6 @@
-use contextra_core::types::DocId;
+use contextra_types::DocId;
 #[cfg(feature = "volatile-vault")]
-use contextra_core::types::TxId;
+use contextra_types::TxId;
 use contextra_db::memory_consolidation::compute_community_hash;
 #[cfg(feature = "volatile-vault")]
 use contextra_db::volatile_vault::{SignalModality, VaultChunk};

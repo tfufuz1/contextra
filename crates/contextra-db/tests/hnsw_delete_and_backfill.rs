@@ -1,8 +1,11 @@
 // FILE-CONTEXT: HNSW Soft-Delete Error Propagation & Search Backfill Verification
 // ZWECK: Verifiziert, dass ein Fehler beim HNSW-Delete nicht verschluckt wird und Vektorsuchen bei Tombstones durch Backfill k valide Ergebnisse liefern.
 
-use contextra_core::{
-    DocId, ContextraError, Result, ScoredDocument, TxId, VectorIndex, VectorIndexStats,
+use contextra_ports::{
+    ScoredDocument, VectorIndex, VectorIndexStats,
+};
+use contextra_types::{
+    ContextraError, DocId, Result, TxId,
 };
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_graph::CsrGraph;

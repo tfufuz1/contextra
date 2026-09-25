@@ -1,4 +1,4 @@
-use contextra_core::{DistanceMetric, Result};
+use contextra_types::{DistanceMetric, Result};
 use contextra_db::{Contextra, ContextraConfig};
 use std::sync::Arc;
 use tempfile::tempdir;

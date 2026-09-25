@@ -1,4 +1,4 @@
-use contextra_core::{DistanceMetric, FilterExpr, HybridQuery};
+use contextra_types::{DistanceMetric, FilterExpr, HybridQuery};
 use contextra_db::{Collection, Language};
 use contextra_graph::CsrGraph;
 use contextra_index::{HnswConfig, HnswIndex};
@@ -232,7 +232,7 @@ async fn test_unselective_filter_performance_regression() {
 
 #[tokio::test]
 async fn test_memory_type_filter_recall() {
-    use contextra_core::MemoryType;
+    use contextra_types::MemoryType;
 
     let dir = TempDir::new().expect("tempdir");
     let lsm_config = LsmConfig {

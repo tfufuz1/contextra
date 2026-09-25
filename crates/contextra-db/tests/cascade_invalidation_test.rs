@@ -1,5 +1,6 @@
-use contextra_core::types::domain::LinkRelation;
-use contextra_core::{DocId, Edge, Entity, EntityId, GraphIndex, TxId};
+use contextra_types::LinkRelation;
+use contextra_ports::GraphIndex;
+use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use contextra_db::Contextra;
 use contextra_graph::path_rag::PathRAGEngine;
 use tempfile::tempdir;

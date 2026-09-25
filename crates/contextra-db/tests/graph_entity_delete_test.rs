@@ -1,4 +1,5 @@
-use contextra_core::{Edge, Entity, EntityId, GraphIndex, PprConfig};
+use contextra_ports::GraphIndex;
+use contextra_types::{Edge, Entity, EntityId, PprConfig};
 use contextra_db::transaction::DbTransaction;
 use contextra_db::Collection;
 use contextra_graph::CsrGraph;

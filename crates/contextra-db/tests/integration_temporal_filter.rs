@@ -1,4 +1,4 @@
-use contextra_core::TxId;
+use contextra_types::TxId;
 use contextra_db::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;
 use contextra_index::{HnswConfig, HnswIndex};

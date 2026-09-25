@@ -8,7 +8,8 @@
 //!
 //! DECISION-REF: sprint_2_data_integrity_acid.md — Verifikationsplan
 
-use contextra_core::{StorageEngine, TenantId};
+use contextra_ports::StorageEngine;
+use contextra_types::TenantId;
 use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use tempfile::TempDir;
@@ -137,7 +138,8 @@ async fn test_drop_collection_removes_all_data() {
 
 #[tokio::test]
 async fn test_partial_compaction_preserves_tombstones() {
-    use contextra_core::{StorageEngine, TxId};
+    use contextra_ports::StorageEngine;
+use contextra_types::TxId;
     use contextra_store::{CompactionConfig, LsmConfig};
 
     let tmp = TempDir::new().expect("temp dir");
