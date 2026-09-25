@@ -67,8 +67,6 @@ async fn test_cross_signal_isolation_single_run() -> Result<()> {
 
 #[tokio::test]
 async fn test_graph_signal_snapshot_isolation_with_hops_strategy() -> Result<()> {
-    use contextra_types::GraphTraversalStrategy;
-
     let dir = tempdir().unwrap();
     let config = ContextraConfig {
         dimension: 4,

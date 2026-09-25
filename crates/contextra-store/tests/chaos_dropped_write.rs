@@ -10,12 +10,6 @@ use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
 use tempfile::TempDir;
 
-#[cfg(target_os = "linux")]
-extern "C" {
-    fn open(path: *const std::ffi::c_char, flags: std::ffi::c_int) -> std::ffi::c_int;
-    fn dup2(oldfd: std::ffi::c_int, newfd: std::ffi::c_int) -> std::ffi::c_int;
-    fn close(fd: std::ffi::c_int) -> std::ffi::c_int;
-}
 
 /// Verifies that an I/O failure during `commit()` properly propagates an error,
 /// leaves `last_committed_tx` unchanged, allows recovery once write permissions are restored,
