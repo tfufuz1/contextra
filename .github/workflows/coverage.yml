@@ -36,13 +36,7 @@ jobs:
 
       - name: Run Coverage Gate
         run: cargo xtask check-coverage-gate
-        # Gate-Schwellwerte (in xtask/src/check_coverage_gate.rs):
-        # contextra-store:  75%
-        # contextra-vector:  70%
-        # contextra-text:   70%
-        # contextra-graph:  65%
-        # contextra-db:     60%
-        # Andere Crates:  55%
+        # Gate-Schwellwerte: siehe xtask/src/check_coverage_gate.rs::get_threshold_for_crate (einzige maßgebliche Quelle, nicht hier duplizieren)
 
       - name: Upload Coverage to Codecov
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
