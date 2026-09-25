@@ -1,0 +1,44 @@
+name: SIMD Cross Validation
+
+on:
+  pull_request:
+    paths:
+      - 'crates/contextra-simd/**'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  simd-cross-validation:
+    name: SIMD vs Scalar Cross-Validation (${{ matrix.target }}, rustflags="${{ matrix.rustflags }}")
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          # TODO: Add aarch64-unknown-linux-gnu via QEMU / cross runner when QEMU cross-test pattern is established.
+        rustflags:
+          - ""
+          - "-C target-feature=-avx2,-avx512f"
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run SIMD Cross-Validation Tests
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
+        run: cargo test -p contextra-simd --test simd_cross_validation --target ${{ matrix.target }}
