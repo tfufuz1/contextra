@@ -1,7 +1,8 @@
 //! Split-Brain & Idempotency Integration Testsuite for Vector-ID ↔ Document Consistency.
 // ANCHOR[TEST:SPLIT_BRAIN_CONSISTENCY] STATUS:IN_PROGRESS (TS:2026-09-09T22:00:00Z) (SESSION: 504d02fc)
 
-use contextra_core::{DocId, StorageEngine, VectorIndex};
+use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::DocId;
 use contextra_db::context_compaction::ConsolidationSession;
 use contextra_db::transaction::CommitIntent;
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};

@@ -1,5 +1,5 @@
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_core::TxId;
+use contextra_types::TxId;
 use contextra_db::{Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;

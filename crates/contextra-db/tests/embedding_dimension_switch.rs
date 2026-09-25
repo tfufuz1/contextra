@@ -1,6 +1,6 @@
 // FILE-CONTEXT: Integration test verifying dimension mismatch rejection, no-panic guarantee, absence of phantom nodes, and system recovery. (TS: 2026-09-11)
 
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use contextra_db::{Contextra, ContextraConfig};
 use serde_json::json;
 use tempfile::tempdir;

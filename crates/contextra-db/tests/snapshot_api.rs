@@ -161,7 +161,7 @@ async fn test_create_snapshot_equals_last_committed_seq() {
 /// executes snapshot-isolated queries without returning `CapabilityUnsupported`.
 #[tokio::test]
 async fn test_vector_and_graph_search_at_returns_adr024_capability_unsupported() {
-    use contextra_core::{GraphIndex, VectorIndex};
+    use contextra_ports::{GraphIndex, VectorIndex};
 
     let (db, _tmp) = test_db(4).await;
     let col = db.collection("isolation_policy").await.expect("col");
@@ -175,7 +175,7 @@ async fn test_vector_and_graph_search_at_returns_adr024_capability_unsupported()
     assert!(
         !matches!(
             res_vec,
-            Err(contextra_core::ContextraError::CapabilityUnsupported { .. })
+            Err(contextra_types::ContextraError::CapabilityUnsupported { .. })
         ),
         "VectorIndex::search_at should be supported, got: {:?}",
         res_vec
@@ -183,12 +183,12 @@ async fn test_vector_and_graph_search_at_returns_adr024_capability_unsupported()
 
     let graph_idx = col.graph_index();
     let res_graph = graph_idx
-        .traverse_at(contextra_core::EntityId::new(1), 2, 1)
+        .traverse_at(contextra_types::EntityId::new(1), 2, 1)
         .await;
     assert!(
         !matches!(
             res_graph,
-            Err(contextra_core::ContextraError::CapabilityUnsupported { .. })
+            Err(contextra_types::ContextraError::CapabilityUnsupported { .. })
         ),
         "GraphIndex::traverse_at should be supported, got: {:?}",
         res_graph

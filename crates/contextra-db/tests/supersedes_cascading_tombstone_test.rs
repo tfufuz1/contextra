@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use contextra_core::types::domain::{DocId, EntityId, LinkRelation};
+use contextra_types::{DocId, EntityId, LinkRelation};
 use contextra_db::Contextra;
 use contextra_graph::PathRAGEngine;
 use tempfile::tempdir;

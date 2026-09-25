@@ -44,7 +44,7 @@ async fn test_collection_atomic_rollback_on_error() {
 
 #[tokio::test]
 async fn test_4_index_atomic_rollback_on_vector_failure() {
-    use contextra_core::EntityId;
+    use contextra_types::EntityId;
     use serde_json::json;
 
     let tmp = TempDir::new().unwrap();

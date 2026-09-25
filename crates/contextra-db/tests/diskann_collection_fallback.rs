@@ -4,7 +4,8 @@
 
 #![cfg(feature = "experimental-diskann")]
 
-use contextra_core::{DistanceMetric, DocId, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId};
 use contextra_db::Collection;
 use contextra_graph::csr::CsrGraph;
 use contextra_index::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
@@ -47,7 +48,7 @@ async fn test_collection_query_with_corrupted_diskann_returns_results_via_fallba
     let _ = reloaded_diskann.load().await; // Load fails & activates HNSW fallback internally
 
     // Insert new document into the fallback index
-    let tx = contextra_core::TxId::new(10);
+    let tx = contextra_types::TxId::new(10);
     reloaded_diskann
         .insert(tx, DocId::from(500), &[1.0f32, 0.0, 0.0, 0.0])
         .await

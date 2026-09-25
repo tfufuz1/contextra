@@ -3,7 +3,7 @@
 
 #![allow(deprecated, clippy::needless_range_loop)]
 
-use contextra_core::FusionWeights;
+use contextra_types::FusionWeights;
 use contextra_db::{Contextra, ContextraConfig};
 use tempfile::tempdir;
 

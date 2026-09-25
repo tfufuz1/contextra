@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
-use contextra_core::types::domain::{DocId, LinkRelation, TxId};
-use contextra_core::HybridQuery;
+use contextra_types::{DocId, LinkRelation, TxId};
+use contextra_types::HybridQuery;
 use contextra_db::Contextra;
 use tempfile::tempdir;
 
@@ -109,7 +109,7 @@ async fn test_supersedes_displacement_logic() {
         .await
         .unwrap();
 
-    let weights = contextra_core::FusionWeights::new(0.0, 1.0, 0.0).unwrap();
+    let weights = contextra_types::FusionWeights::new(0.0, 1.0, 0.0).unwrap();
 
     // Query with include_superseded = false (default)
     let q_default = HybridQuery::builder()
