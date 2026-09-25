@@ -115,4 +115,42 @@ fn write_wal(file: &mut std::fs::File) {
         let violations = run_check_result_dropped_on_io(dir.path()).unwrap();
         assert_eq!(violations.len(), 0);
     }
+
+    #[test]
+    fn test_async_io_result_dropped_negative() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("fuzz_target.rs");
+        fs::write(
+            &file,
+            r#"
+async fn run(storage: &Storage) {
+    let _ = storage.flush().await;
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_result_dropped_on_io(dir.path()).unwrap();
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].line_num, 3);
+        assert_eq!(violations[0].line_content, "let _ = storage.flush().await;");
+    }
+
+    #[test]
+    fn test_async_io_result_handled_positive() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("fuzz_target.rs");
+        fs::write(
+            &file,
+            r#"
+async fn run(storage: &Storage) {
+    if let Err(_e) = storage.flush().await {}
+}
+"#,
+        )
+        .unwrap();
+
+        let violations = run_check_result_dropped_on_io(dir.path()).unwrap();
+        assert_eq!(violations.len(), 0);
+    }
 }
