@@ -20,7 +20,6 @@
 use crate::error::CryptoError;
 use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
-use crate::error::CryptoError;
 
 pub(crate) fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
