@@ -34,7 +34,7 @@ graph = []
 # docs/decisions/ nach "Nucleation" durchsuchen). Der aktuelle rebuild_region()
 # implementiert reines Tombstone-Pruning ohne Re-Wiring — Risiko: Grad-Verlust ohne
 # Navigierbarkeits-Wiederherstellung. NICHT als default-Feature aktivieren bis
-# test_partial_rebuild_recall_regression() in crates/contextra-index/tests/partial_rebuild_recall_regression.rs
+# test_partial_rebuild_recall_regression() in crates/contextra-vector/tests/partial_rebuild_recall_regression.rs
 # für > 30 Tage stabil grün ist UND ein ADR das ursprüngliche Veto explizit revidiert oder
 # bestätigt einschränkt.
 partial-index-rebuild = []
