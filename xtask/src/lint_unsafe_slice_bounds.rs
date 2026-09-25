@@ -204,7 +204,7 @@ pub fn lint_code_str(code: &str, file_name: &str) -> Result<Vec<LintViolation>, 
 pub fn run_lint_unsafe_slice_bounds() -> bool {
     println!("=== xtask lint-unsafe-slices ===");
     let mut all_violations = Vec::new();
-    let target_dir = Path::new("crates/contextra-index/src");
+    let target_dir = Path::new("crates/contextra-vector/src");
 
     if !target_dir.exists() {
         eprintln!("Target directory {} does not exist!", target_dir.display());
@@ -327,5 +327,15 @@ mod tests {
 
         let violations = lint_code_str(safe_code, "synthetic_safe.rs").unwrap();
         assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_target_dir_exists() {
+        let target_dir = Path::new("crates/contextra-vector/src");
+        let alt_target_dir = Path::new("../crates/contextra-vector/src");
+        assert!(
+            target_dir.exists() || alt_target_dir.exists(),
+            "Target directory for SIMD unsafe slice bounds lint (crates/contextra-vector/src) must exist!"
+        );
     }
 }
