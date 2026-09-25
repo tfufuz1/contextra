@@ -2079,6 +2079,12 @@ fn main() {
     let subcommand = args.get(1).map(|s| s.as_str()).unwrap_or("sync-docs");
 
     match subcommand {
+        "debt-audit" => {
+            if let Err(e) = gates::debt_audit::run_debt_audit() {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+        }
         "sync-docs" => {
             let check_only = args.iter().any(|arg| arg == "--check");
             let success = run_sync_docs(check_only);
