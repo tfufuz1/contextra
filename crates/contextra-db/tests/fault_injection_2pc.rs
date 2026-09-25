@@ -2,10 +2,8 @@
 // ZWECK: Prüft atomare 2PC-Transaktions-Kompensation und Crash-Recovery (repair_on_open) über alle 4 Sub-Engines.
 // STAND: TS:2026-08-31T22:30:00Z (SESSION: 0dcb9f3b)
 
-use contextra_core::{
-    BoxFuture, ContextraError, DocId, EntityId, Result, ScoredDocument, StorageEngine,
-    StorageStats, TxId, VectorIndex, VectorIndexStats,
-};
+use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex, VectorIndexStats};
+use contextra_types::{ContextraError, DocId, EntityId, Result, ScoredDocument, TxId};
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_graph::CsrGraph;
 use contextra_index::{HnswConfig, HnswIndex};
@@ -70,6 +68,27 @@ impl StorageEngine for FaultyStorage {
                 ));
             }
             self.inner.put(tx_id, key, value).await
+        })
+    }
+
+    fn put_if_absent<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(async move {
+            if self.fail_put_text.load(Ordering::SeqCst) && key.starts_with(b"__txt:") {
+                return Err(ContextraError::Transaction(
+                    "INJECTED FAULT: BM25/Text staging storage put failure".into(),
+                ));
+            }
+            if self.fail_put_graph.load(Ordering::SeqCst) && key.starts_with(b"__graph:") {
+                return Err(ContextraError::Transaction(
+                    "INJECTED FAULT: CSR-Graph staging storage put failure".into(),
+                ));
+            }
+            self.inner.put_if_absent(tx_id, key, value).await
         })
     }
 
