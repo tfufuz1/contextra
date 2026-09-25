@@ -6,6 +6,7 @@
 
 mod builder;
 mod builder_exec;
+mod scope;
 mod strategy;
 mod weights;
 
@@ -13,6 +14,7 @@ mod weights;
 mod tests;
 
 pub use builder::{HybridQueryBuilder, DEFAULT_RERANK_POOL_MAX, DEFAULT_RERANK_POOL_MULTIPLIER};
+pub use scope::ScopeConstraint;
 pub use strategy::SearchStrategy;
 pub use weights::SignalWeights;
 
