@@ -4,8 +4,6 @@
 
 #![forbid(unsafe_code)]
 
-use std::sync::Arc;
-
 pub mod aggregation_phase;
 pub mod consolidation_executor;
 pub mod consolidation_locks;
@@ -46,23 +44,3 @@ pub use memory_consolidation::{
     SynthesisPhaseResult, TurnSegment,
 };
 pub use synthesis_phase::run_synthesis_pass;
-
-/// Registers consolidation engine launcher with `contextra-engine`.
-pub fn init() {
-    contextra_engine::register_consolidation_launcher(
-        |col, interval, max_llm_calls, cancel_token| {
-            let synthesis_config = memory_consolidation::SynthesisConfig {
-                max_llm_calls_per_cycle: max_llm_calls as u32,
-                ..Default::default()
-            };
-            let engine = Arc::new(consolidation_executor::ConsolidationEngine::new(
-                col,
-                memory_consolidation::ConsolidationConfig::default(),
-                synthesis_config,
-                interval,
-                cancel_token,
-            ));
-            engine.start()
-        },
-    );
-}

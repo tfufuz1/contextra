@@ -1,6 +1,6 @@
 use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};
-use contextra_core::{ContextraError, Result, StorageEngine, TOMBSTONE_BIT};
+use contextra_core::{ContextraError, Result, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 

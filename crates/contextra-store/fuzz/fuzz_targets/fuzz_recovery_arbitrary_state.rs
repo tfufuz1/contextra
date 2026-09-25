@@ -29,15 +29,21 @@ fuzz_target!(|data: &[u8]| {
         let sstable_bytes = &data[chunk_size * 2..];
 
         if !manifest_bytes.is_empty() {
-            let _ = tokio::fs::write(path.join("MANIFEST"), manifest_bytes).await;
+            if tokio::fs::write(path.join("MANIFEST"), manifest_bytes).await.is_err() {
+                return;
+            }
         }
 
         if !wal_bytes.is_empty() {
-            let _ = tokio::fs::write(path.join("wal-0.log"), wal_bytes).await;
+            if tokio::fs::write(path.join("wal-0.log"), wal_bytes).await.is_err() {
+                return;
+            }
         }
 
         if !sstable_bytes.is_empty() {
-            let _ = tokio::fs::write(path.join("000001.sst"), sstable_bytes).await;
+            if tokio::fs::write(path.join("000001.sst"), sstable_bytes).await.is_err() {
+                return;
+            }
         }
 
         let config = LsmConfig {

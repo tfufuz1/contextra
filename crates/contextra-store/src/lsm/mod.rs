@@ -66,12 +66,10 @@ pub(super) use crate::sstable::{SstableBuilder, SstableReader};
 pub(super) use crate::wal::{Wal, WalOp};
 pub(super) use bytes::Bytes;
 pub(super) use contextra_core::{
-    BoxFuture, ContextraError, IndexOp, Result, StorageEngine, TxId, TOMBSTONE_BIT,
+    BoxFuture, ContextraError, Result, StorageEngine, TxId,
 };
 pub(super) use std::path::PathBuf;
 pub(super) use std::sync::atomic::Ordering;
-pub(super) use std::sync::Arc;
-pub(super) use std::time::Duration;
 
 mod config;
 mod engine;
@@ -92,7 +90,7 @@ pub mod ops;
 pub use config::LsmConfig;
 pub use engine::LsmStorage;
 pub(super) use guard::{CommitGuard, LsmState};
-pub(super) use validate::{derive_doc_id, validate_key, validate_value};
+pub(super) use validate::validate_key;
 
 /// Maximum key size allowed for LSM operations (65,535 bytes).
 pub const MAX_KEY_SIZE: usize = 65_535;

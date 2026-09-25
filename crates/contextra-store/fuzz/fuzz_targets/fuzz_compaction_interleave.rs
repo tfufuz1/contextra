@@ -87,7 +87,7 @@ fuzz_target!(|input: CompactionInterleaveInput| {
                     }
                 }
                 CompactionOp::Flush => {
-                    let _ = storage.flush().await;
+                    if let Err(_e) = storage.flush().await {}
                 }
                 CompactionOp::Compact => {
                     let _ = storage.maybe_compact().await;
