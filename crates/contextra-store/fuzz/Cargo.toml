@@ -14,6 +14,7 @@ libfuzzer-sys = "0.4"
 arbitrary = { version = "1.4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 tempfile = "3"
+bytes = "1"
 contextra-core = { path = "../../contextra-core" }
 contextra-store = { path = ".." }
 

@@ -45,7 +45,7 @@ fuzz_target!(|input: CompactionInterleaveInput| {
         };
 
         let config = LsmConfig {
-            db_path: dir.path().to_path_buf(),
+            path: dir.path().to_path_buf(),
             memtable_size_limit: 1024,
             ..Default::default()
         };
