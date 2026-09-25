@@ -27,6 +27,8 @@ serde_json = { workspace = true }
 tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
+contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
+contextra-store = { version = "0.1.0", path = "../contextra-store" }
 
 [[bench]]
 name = "checkpoint_bench"
