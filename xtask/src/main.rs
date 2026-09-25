@@ -50,6 +50,7 @@ fn chrono_or_today() -> String {
 // AUFGABE: chrono_or_today() lieferte statischen String "2026-08-27" — behoben durch Systemaufruf
 // GATE:    grep -v "2026-08-27" WORKING_STATE.md
 mod bench_gate;
+mod check_action_pinning;
 mod check_adr_deadlines;
 mod check_agents_integrity;
 mod check_audit_duplication;
@@ -2311,6 +2312,27 @@ fn main() {
             if let Err(e) = check_bandit_latency_budget::check_bandit_latency_budget() {
                 eprintln!("❌ check-bandit-latency-budget failed: {}", e);
                 process::exit(1);
+            }
+        }
+        "check-action-pinning" => {
+            match check_action_pinning::run_check_action_pinning(Path::new(".github/workflows")) {
+                Ok(violations) => {
+                    if !violations.is_empty() {
+                        eprintln!(
+                            "❌ check-action-pinning failed: {} violation(s) found:",
+                            violations.len()
+                        );
+                        for v in &violations {
+                            eprintln!("  {}", v);
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ No violations found (check-action-pinning)");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-action-pinning error: {}", e);
+                    process::exit(1);
+                }
             }
         }
         "check-flatbuffers-drift" | "check-fbs-drift" => {
