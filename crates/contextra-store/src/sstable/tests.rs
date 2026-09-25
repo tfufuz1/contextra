@@ -1,6 +1,6 @@
 use super::*;
 use bytes::Bytes;
-use contextra_core::{ContextraError, StorageEngine};
+use contextra_core::ContextraError;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 

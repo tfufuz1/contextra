@@ -6,12 +6,7 @@ use contextra_vector::distance::compute_distance;
 use proptest::prelude::*;
 
 // --- Suite A: ScalarQuantizer ---
-// Importiere ScalarQuantizer nur in Tests (pub(crate) sichtbar)
-#[path = "../src/distance.rs"]
-mod distance;
-#[path = "../src/quantize/mod.rs"]
-mod quantize;
-use quantize::ScalarQuantizer;
+use contextra_vector::ScalarQuantizer;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(200))]

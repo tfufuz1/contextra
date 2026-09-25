@@ -16,6 +16,7 @@ enum Op {
     Scan { start: Vec<u8>, end: Vec<u8> },
     Flush,
     Compact,
+    CheckpointPinUnpin,
     Restart,
 }
 
@@ -30,6 +31,7 @@ fn op_strategy() -> impl Strategy<Value = Op> {
         (key_strat.clone(), key_strat).prop_map(|(start, end)| Op::Scan { start, end }),
         Just(Op::Flush),
         Just(Op::Compact),
+        Just(Op::CheckpointPinUnpin),
         Just(Op::Restart),
     ]
 }
@@ -244,6 +246,33 @@ async fn run_differential(ops: Vec<Op>) -> Result<(), TestCaseError> {
                     &storage,
                     &redb_db,
                     &format!("Compact at op index {}", idx),
+                )
+                .await?;
+            }
+            Op::CheckpointPinUnpin => {
+                let seq = storage
+                    .last_seq_no()
+                    .await
+                    .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                storage
+                    .pin_checkpoint(seq)
+                    .await
+                    .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                assert_full_state_match(
+                    &storage,
+                    &redb_db,
+                    &format!("Checkpoint pinned at seq {} at op index {}", seq, idx),
+                )
+                .await?;
+
+                storage
+                    .unpin_checkpoint(seq)
+                    .await
+                    .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                assert_full_state_match(
+                    &storage,
+                    &redb_db,
+                    &format!("Checkpoint unpinned at seq {} at op index {}", seq, idx),
                 )
                 .await?;
             }

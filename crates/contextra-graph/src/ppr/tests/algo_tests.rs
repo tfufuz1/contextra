@@ -1,10 +1,7 @@
 use super::super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
-use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
-
-use super::*;
-use std::sync::Arc;
+use contextra_types::{Edge, Entity, EntityId, TxId};
 
 #[tokio::test]
 async fn test_ppr_context_reuse_when_graph_grows() {
@@ -810,6 +807,7 @@ proptest::proptest! {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)] // Test utility for tracing log capture assertions
 struct LogCaptureLayer(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
 
 impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogCaptureLayer {
@@ -824,6 +822,7 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogCaptureLayer {
     }
 }
 
+#[allow(dead_code)] // Test utility visitor for tracing log capture assertions
 struct StringVisitor(String);
 impl tracing::field::Visit for StringVisitor {
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {

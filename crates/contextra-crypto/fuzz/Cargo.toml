@@ -21,3 +21,9 @@ name = "deletion_proof_tamper"
 path = "fuzz_targets/deletion_proof_tamper.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "wal_hmac_chain_verify_fuzz"
+path = "fuzz_targets/wal_hmac_chain_verify_fuzz.rs"
+test = false
+doc = false

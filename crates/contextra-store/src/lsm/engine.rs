@@ -42,6 +42,12 @@ pub struct LsmStorage {
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
 }
 
+impl Drop for LsmStorage {
+    fn drop(&mut self) {
+        self.cancel_token.cancel();
+    }
+}
+
 impl LsmStorage {
     /// Returns a watch receiver for monitoring system pressure levels.
     pub fn pressure_receiver(

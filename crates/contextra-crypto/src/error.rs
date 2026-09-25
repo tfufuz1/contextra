@@ -46,11 +46,11 @@ pub enum CryptoError {
         reason: String,
     },
 
-    #[error("invalid proof signature")]
+    #[error("invalid deletion proof signature")]
     InvalidProofSignature,
 
-    #[error("unsupported signature version: {0}")]
-    UnsupportedSignatureVersion(u8),
+    #[error("unsupported deletion proof version for external verification: {0}")]
+    UnsupportedProofVersion(u8),
 }
 
 impl CryptoError {

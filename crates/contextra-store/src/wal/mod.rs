@@ -23,9 +23,11 @@ pub(crate) mod fs {
 pub(crate) mod fs {
     use std::path::Path;
 
+    // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
     pub async fn read<P: AsRef<Path>>(path: P) -> std::io::Result<Vec<u8>> {
         std::fs::read(path)
     }
+    // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
     pub async fn write<P: AsRef<Path>, C: AsRef<[u8]>>(
         path: P,
         contents: C,
@@ -52,6 +54,7 @@ pub(crate) mod fs {
         let _ = path;
         Ok(false)
     }
+    // INVARIANT-KONFORM: Perm-Signatur in Loom-Mock-Typen.
     pub async fn set_permissions<P: AsRef<Path>>(
         path: P,
         perm: std::fs::Permissions,
@@ -70,14 +73,17 @@ pub(crate) mod fs {
         pub fn len(&self) -> u64 {
             0
         }
+        // INVARIANT-KONFORM: Perm-Signatur und Mode-Konstruktion in Loom-Mock-Metadata.
         pub fn permissions(&self) -> std::fs::Permissions {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
+                // INVARIANT-KONFORM: Constructing Permissions from unix mode mask in Loom mock metadata.
                 std::fs::Permissions::from_mode(0o644)
             }
             #[cfg(not(unix))]
             {
+                // INVARIANT-KONFORM: Non-unix fallback in Loom mock metadata.
                 std::fs::metadata(".").map(|m| m.permissions()).unwrap()
             }
         }
@@ -275,10 +281,21 @@ pub struct Wal {
     pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,
     pub(crate) flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::Sender<WalCommand>>>,
+    pub(crate) flusher_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
     pub truncate_lock: Arc<tokio::sync::Mutex<()>>,
     #[allow(dead_code)]
     pub(crate) simulate_append_failure: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Drop for Wal {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.flusher_task.lock() {
+            if let Some(handle) = guard.take() {
+                handle.abort();
+            }
+        }
+    }
 }
 
 impl std::fmt::Debug for Wal {
@@ -293,6 +310,58 @@ impl std::fmt::Debug for Wal {
 impl Wal {
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_config(path, WalConfig::default()).await
+    }
+
+    /// Opens an existing WAL file solely for read-only replay, without spawning
+    /// a background write flusher actor or keeping write handles open.
+    pub async fn open_read_only(
+        path: impl AsRef<Path>,
+        key_manager: Option<Arc<KeyManager>>,
+    ) -> Result<Self> {
+        Self::open_read_only_with_config(
+            path,
+            WalConfig {
+                key_manager,
+                ..Default::default()
+            },
+        )
+        .await
+    }
+
+    /// Opens an existing WAL file solely for read-only replay with explicit configuration.
+    pub async fn open_read_only_with_config(
+        path: impl AsRef<Path>,
+        config: WalConfig,
+    ) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
+
+        let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
+            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
+            (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
+        } else {
+            let key = Self::load_or_create_integrity_key(&path).await?;
+            (None, Some(key))
+        };
+
+        let file_len = self::fs::metadata(&path)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        Ok(Self {
+            path,
+            size: Arc::new(std::sync::atomic::AtomicU64::new(file_len)),
+            header_written: Arc::new(std::sync::atomic::AtomicBool::new(file_len > 0)),
+            key_manager: derived_key_manager,
+            fallback_integrity_key,
+            allow_legacy_integrity_key_fallback: config.allow_legacy_integrity_key_fallback,
+            last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
+            flusher_tx: std::sync::RwLock::new(None),
+            flusher_task: std::sync::Mutex::new(None),
+            sealed: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
+            simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        })
     }
 
     /// Opens or creates a WAL file with an optional KeyManager.
@@ -382,6 +451,7 @@ impl Wal {
             allow_legacy_integrity_key_fallback: config.allow_legacy_integrity_key_fallback,
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
+            flusher_task: std::sync::Mutex::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
             simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -476,6 +546,7 @@ impl Wal {
             allow_legacy_integrity_key_fallback: false,
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
+            flusher_task: std::sync::Mutex::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
             simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
