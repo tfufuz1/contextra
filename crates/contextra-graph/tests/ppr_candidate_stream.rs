@@ -288,7 +288,7 @@ async fn test_next_batch_docs_skips_unresolvable_entities() {
 
     let resolver = |eid: EntityId| {
         if eid.inner() % 2 == 0 {
-            Some(DocId::new(eid.inner()))
+            Some(DocId::from(eid.inner()))
         } else {
             None
         }

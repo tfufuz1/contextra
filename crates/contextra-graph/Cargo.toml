@@ -11,7 +11,7 @@ description = "CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fus
 
 [features]
 default = []
-docid-128 = ["contextra-types/docid-128"]
+docid-128 = ["contextra-types/docid-128", "contextra-store/docid-128"]
 graph-connectivity-health = []
 edge-reinforcement-learning = []
 ppr-forward-push = []

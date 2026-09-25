@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use contextra_types::{DocId, Entity, EntityId, TxId};
 
+#[cfg(feature = "edge-reinforcement-learning")]
+use super::types::Edge;
 use super::types::{EdgePayload, InternalIndex, StagedEdgePayload};
 #[cfg(feature = "edge-reinforcement-learning")]
 use super::types::Edge;
