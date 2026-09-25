@@ -9,6 +9,7 @@
 pub mod arena;
 pub mod sq8_bias;
 
+mod acorn_filtered;
 mod batch;
 mod config;
 mod core_insert;
