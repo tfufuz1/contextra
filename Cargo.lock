@@ -630,6 +630,7 @@ dependencies = [
  "contextra-vector",
  "criterion",
  "hdrhistogram",
+ "libc",
  "rand 0.8.8",
  "redb",
  "serde",
