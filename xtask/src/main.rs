@@ -94,6 +94,7 @@ mod lint_unsafe_slice_bounds;
 mod migrate_docid_128;
 mod post_merge_report;
 mod record_mutation_score;
+mod reproducible_build;
 mod validate_pr_checklist;
 
 pub use check_jules_context_freshness::run_check_jules_context_freshness;
@@ -2082,6 +2083,13 @@ fn main() {
         "debt-audit" => {
             if let Err(e) = gates::debt_audit::run_debt_audit() {
                 eprintln!("{}", e);
+                process::exit(1);
+            }
+        }
+        "reproducible-build-check" => {
+            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+            let success = reproducible_build::run_reproducible_build_check(extra_args);
+            if !success {
                 process::exit(1);
             }
         }
