@@ -81,3 +81,7 @@ harness = false
 [[bench]]
 name = "block_cache_bench"
 harness = false
+
+[[bench]]
+name = "redb_comparative_bench"
+harness = false
