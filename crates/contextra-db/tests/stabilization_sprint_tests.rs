@@ -1,4 +1,4 @@
-use contextra_core::FusionWeights;
+use contextra_types::FusionWeights;
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use serde_json::json;
 use std::sync::Arc;
