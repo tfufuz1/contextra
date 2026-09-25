@@ -6,7 +6,7 @@ use std::path::Path;
 /// Toleranzband für den maximal zulässigen Recall@10-Abfall nach `rebuild_region()`:
 /// ±5 Prozentpunkte (0.05).
 ///
-/// Synch-Referenz: `crates/contextra-index/tests/nucleation_recall_regression.rs`
+/// Synch-Referenz: `crates/contextra-vector/tests/partial_rebuild_recall_regression.rs`
 /// Bei Änderungen an dieser Schwelle MÜSSEN beide Stellen synchron angepasst werden!
 pub const RECALL_TOLERANCE_BAND: f64 = 0.05;
 
