@@ -1,0 +1,28 @@
+name: Unwrap Gate
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  unwrap-gate:
+    name: Production Unwrap Counter Gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Count Production Unwraps
+        run: |
+          COUNT=$(grep -r '\.unwrap()\|\.expect(' crates/ --include="*.rs" \
+            | grep -v '/tests' | grep -v '/test' | grep -v '/bench' \
+            | grep -v '#\[cfg(test)\]' | wc -l)
+          echo "Production unwrap/expect count: $COUNT"
+          BASELINE=$(cat .github/unwrap_baseline.txt 2>/dev/null || echo 99999)
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Production unwrap count increased from $BASELINE to $COUNT"
+            exit 1
+          fi

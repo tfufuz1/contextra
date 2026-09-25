@@ -2,7 +2,7 @@ use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;
 use bytes::Bytes;
-use contextra_core::{Result, TOMBSTONE_BIT};
+use contextra_core::{Result, StorageEngine, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 
 pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {

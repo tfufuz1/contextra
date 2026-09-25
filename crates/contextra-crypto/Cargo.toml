@@ -29,6 +29,7 @@ parking_lot = { workspace = true }
 ahash = { workspace = true }
 lru = "0.16.4"
 regex = { workspace = true }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
 test-utils = []
@@ -44,4 +45,8 @@ loom = "0.7"
 
 [[bench]]
 name = "crypto_benchmarks"
+harness = false
+
+[[bench]]
+name = "deletion_proof_latency_bench"
 harness = false

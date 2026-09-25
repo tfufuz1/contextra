@@ -15,6 +15,9 @@ on:
       - 'crates/contextra-candle/**'
       - 'crates/contextra-db/**'
       - 'crates/contextra-vector/**'
+      - 'crates/contextra-text/**'
+      - 'crates/contextra-graph/**'
+      - 'crates/contextra-rank/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -62,6 +65,15 @@ jobs:
             fi
             if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-vector/'; then
               CRATES="$CRATES contextra-vector"
+            fi
+            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-text/'; then
+              CRATES="$CRATES contextra-text"
+            fi
+            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-graph/'; then
+              CRATES="$CRATES contextra-graph"
+            fi
+            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^crates/contextra-rank/'; then
+              CRATES="$CRATES contextra-rank"
             fi
             if [ -z "$CRATES" ]; then
               CRATES="contextra-crypto"

@@ -47,3 +47,7 @@ harness = false
 [[bench]]
 name = "bandit_latency_gate"
 harness = false
+
+[[bench]]
+name = "cost_routing_savings_bench"
+harness = false
