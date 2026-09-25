@@ -21,6 +21,7 @@
 pub mod anti_tamper;
 pub mod crypto;
 pub mod deletion_proof;
+pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
 pub mod kv_cipher;
