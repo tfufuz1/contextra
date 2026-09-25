@@ -17,6 +17,7 @@
 //! INVARIANTE INV-DELETION-1: DeletionProof::create() wird NUR nach
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
+use crate::error::CryptoError;
 use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
 
@@ -507,24 +508,9 @@ impl DeletionProof {
                         ))
                     }
                 };
-                let covered_layers_bytes = bincode::serialize(&self.covered_layers)
+                let payload = self
+                    .construct_v3_payload()
                     .map_err(|e| ContextraError::Internal(e.to_string()))?;
-                let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
-                let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
-                let receipt_part = if self.wal_chain_receipt.is_some() {
-                    receipt_bytes.as_slice()
-                } else {
-                    &[]
-                };
-
-                let mut payload = Vec::new();
-                payload.extend_from_slice(&scope_bytes);
-                payload.extend_from_slice(&self.deleted_keys_hash);
-                payload.extend_from_slice(&tx_bytes);
-                payload.extend_from_slice(&covered_layers_bytes);
-                payload.extend_from_slice(&excluded_scopes_bytes);
-                payload.extend_from_slice(receipt_part);
 
                 use ed25519_dalek::Verifier;
                 let sig = match ed25519_dalek::Signature::from_slice(&self.signature) {
@@ -538,6 +524,75 @@ impl DeletionProof {
                 "Unsupported DeletionProof signature_version: {v}"
             ))),
         }
+    }
+
+    /// Helper to construct the signed payload for signature version 3 (Ed25519).
+    fn construct_v3_payload(&self) -> std::result::Result<Vec<u8>, CryptoError> {
+        let scope_bytes = bincode::serialize(&self.scope)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+        let covered_layers_bytes = bincode::serialize(&self.covered_layers)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
+        let receipt_part = if self.wal_chain_receipt.is_some() {
+            receipt_bytes.as_slice()
+        } else {
+            &[]
+        };
+
+        let mut payload = Vec::with_capacity(
+            scope_bytes.len()
+                + 32
+                + tx_bytes.len()
+                + covered_layers_bytes.len()
+                + excluded_scopes_bytes.len()
+                + receipt_part.len(),
+        );
+        payload.extend_from_slice(&scope_bytes);
+        payload.extend_from_slice(&self.deleted_keys_hash);
+        payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&covered_layers_bytes);
+        payload.extend_from_slice(&excluded_scopes_bytes);
+        payload.extend_from_slice(receipt_part);
+
+        Ok(payload)
+    }
+
+    /// Verifies this proof using ONLY the provided Ed25519 public key.
+    /// Does NOT require access to any `KeyManager` state — this is the
+    /// verification path intended for third parties who received a
+    /// `DeletionProof` and the corresponding public key out-of-band.
+    ///
+    /// # Differences from [`verify`][Self::verify]
+    /// - [`verify`][Self::verify] supports legacy HMAC proof versions (v1 and v2) requiring symmetric key access,
+    ///   as well as v3 Ed25519 proofs via [`VerificationKey`].
+    /// - `verify_external` operates strictly on `signature_version == 3` (Ed25519 asymmetric signatures) and
+    ///   requires zero access to secret key material or internal `KeyManager` state. It returns explicit
+    ///   [`CryptoError`] types ([`CryptoError::UnsupportedProofVersion`] for v1/v2, [`CryptoError::InvalidProofSignature`]
+    ///   for invalid signatures or malformed signature bytes).
+    ///
+    /// # Errors
+    /// - [`CryptoError::UnsupportedProofVersion`] if `signature_version` is not 3.
+    /// - [`CryptoError::InvalidProofSignature`] if the signature does not match or cannot be parsed.
+    pub fn verify_external(
+        &self,
+        public_key: &ed25519_dalek::VerifyingKey,
+    ) -> std::result::Result<(), CryptoError> {
+        if self.signature_version != 3 {
+            return Err(CryptoError::UnsupportedProofVersion(self.signature_version));
+        }
+
+        let payload = self.construct_v3_payload()?;
+
+        use ed25519_dalek::Verifier;
+        let sig = ed25519_dalek::Signature::from_slice(&self.signature)
+            .map_err(|_| CryptoError::InvalidProofSignature)?;
+
+        public_key
+            .verify(&payload, &sig)
+            .map_err(|_| CryptoError::InvalidProofSignature)
     }
 
     /// Exportiert Proof als JSON für Compliance-Dokumentation.
@@ -1324,5 +1379,154 @@ mod tests {
         assert!(
             matches!(res, Err(ContextraError::Internal(ref msg)) if msg.contains("Unsupported DeletionProof signature_version: 255"))
         );
+    }
+
+    #[test]
+    fn test_verify_external_v3_success() {
+        let keypair = DeletionProofKeyPair::generate();
+        let scope = DeletionScope::Document {
+            doc_id: DocId(42),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let proof = DeletionProof::create_v3(
+            scope,
+            vec![b"k1".to_vec(), b"k2".to_vec()],
+            TxId(100),
+            vec![
+                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+            ],
+            vec![ExcludedScope::LlmParameterMemory],
+            keypair.signing_key(),
+        )
+        .unwrap();
+
+        assert!(proof.verify_external(&keypair.verifying_key).is_ok());
+    }
+
+    #[test]
+    fn test_verify_external_v3_tampered_payload_returns_invalid_proof_signature() {
+        let keypair = DeletionProofKeyPair::generate();
+        let scope = DeletionScope::Document {
+            doc_id: DocId(42),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        let proof = DeletionProof::create_with_wal_receipt_v3(
+            scope,
+            vec![b"k1".to_vec()],
+            TxId(10),
+            vec![
+                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+            ],
+            vec![ExcludedScope::LlmParameterMemory],
+            Some([0xABu8; 32]),
+            keypair.signing_key(),
+        )
+        .unwrap();
+
+        // 1. Tamper timestamp / TxId
+        let mut tampered = proof.clone();
+        tampered.deleted_after_tx = TxId(11);
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+
+        // 2. Tamper deleted_keys_hash
+        let mut tampered = proof.clone();
+        tampered.deleted_keys_hash[0] ^= 0xFF;
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+
+        // 3. Tamper scope
+        let mut tampered = proof.clone();
+        tampered.scope = DeletionScope::Document {
+            doc_id: DocId(43),
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+
+        // 4. Tamper covered_layers
+        let mut tampered = proof.clone();
+        tampered.covered_layers.push(DeletionLayer::HnswIndex);
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+
+        // 5. Tamper excluded_scopes
+        let mut tampered = proof.clone();
+        tampered.excluded_scopes.clear();
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+
+        // 6. Tamper wal_chain_receipt
+        let mut tampered = proof.clone();
+        tampered.wal_chain_receipt = Some([0xCDu8; 32]);
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+
+        // 7. Tamper signature bytes
+        let mut tampered = proof.clone();
+        tampered.signature[0] ^= 0xFF;
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+
+        // 8. Invalid public key
+        let wrong_keypair = DeletionProofKeyPair::generate();
+        assert!(matches!(
+            proof.verify_external(&wrong_keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+
+        // 9. Malformed signature length
+        let mut tampered = proof.clone();
+        tampered.signature.truncate(32);
+        assert!(matches!(
+            tampered.verify_external(&keypair.verifying_key),
+            Err(CryptoError::InvalidProofSignature)
+        ));
+    }
+
+    #[test]
+    fn test_verify_external_v1_v2_unsupported_version_error() {
+        let keypair = DeletionProofKeyPair::generate();
+        let scope = DeletionScope::Tenant {
+            tenant_id: TenantId::try_new(1).unwrap(),
+        };
+
+        // v2 HMAC proof
+        let proof_v2 = DeletionProof::create(
+            scope.clone(),
+            vec![b"k1".to_vec()],
+            TxId(10),
+            vec![],
+            vec![],
+            &test_key(),
+        )
+        .unwrap();
+        assert_eq!(proof_v2.signature_version, 2);
+        assert!(matches!(
+            proof_v2.verify_external(&keypair.verifying_key),
+            Err(CryptoError::UnsupportedProofVersion(2))
+        ));
+
+        // v1 HMAC proof
+        let mut proof_v1 = proof_v2.clone();
+        proof_v1.signature_version = 1;
+        assert!(matches!(
+            proof_v1.verify_external(&keypair.verifying_key),
+            Err(CryptoError::UnsupportedProofVersion(1))
+        ));
     }
 }

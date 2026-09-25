@@ -45,6 +45,12 @@ pub enum CryptoError {
         /// Detail text describing corruption cause.
         reason: String,
     },
+
+    #[error("invalid deletion proof signature")]
+    InvalidProofSignature,
+
+    #[error("unsupported deletion proof version for external verification: {0}")]
+    UnsupportedProofVersion(u8),
 }
 
 impl CryptoError {
