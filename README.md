@@ -16,8 +16,8 @@ Contextra is an embedded, multi-signal hybrid search vector database written in 
 | **Multi-Signal Fusion (RRF)** | 🟢 Supported | Reciprocal Rank Fusion combining vector, text, and graph scores. |
 | **Graph Signal Traversals** | 🟡 Partial | Graph storage and path traversals require manual `relate()` calls. |
 | **Automatic Entity Extraction** | 🔴 Not Implemented | Text chunking does not automatically extract entities/relations into the graph. |
-| **Python Bindings (`contextra-py`)** | 🟡 Alpha | Basic PyO3 FFI bindings (see status in crate documentation). |
-| **Model Context Protocol (`contextra-mcp`)** | 🟡 Alpha | Local MCP server interface for AI agents. |
+| **Python Bindings (`contextra-py`)** | 🟢 Supported | PyO3 FFI bindings for Python, supporting document CRUD, hybrid search, zero-copy NumPy vectors, and GIL-safe async execution. |
+| **Model Context Protocol (`contextra-mcp`)** | 🟢 Supported | JSON-RPC 2.0 stdio MCP server exposing search, document management, and graph relation tools for AI agents. |
 
 ---
 
