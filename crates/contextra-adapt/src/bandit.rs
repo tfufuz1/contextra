@@ -1,7 +1,6 @@
 //! LinUCB Contextual Bandit für SLM-Profil-Routing (§13.2).
 //! Feature `bandit-routing` (Default: off). Kein Default-Wechsel ohne P7-Nachweis.
 
-#![cfg(feature = "bandit-routing")]
 #![allow(clippy::needless_range_loop)]
 
 use serde::{Deserialize, Serialize};

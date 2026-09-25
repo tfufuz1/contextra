@@ -548,6 +548,7 @@ impl DeletionProof {
         let scope_bytes = bincode::serialize(&self.scope)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+        let timestamp_bytes = self.timestamp.to_le_bytes();
         let covered_layers_bytes = bincode::serialize(&self.covered_layers)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
@@ -563,6 +564,7 @@ impl DeletionProof {
             scope_bytes.len()
                 + 32
                 + tx_bytes.len()
+                + timestamp_bytes.len()
                 + covered_layers_bytes.len()
                 + excluded_scopes_bytes.len()
                 + receipt_part.len(),
@@ -570,6 +572,7 @@ impl DeletionProof {
         payload.extend_from_slice(&scope_bytes);
         payload.extend_from_slice(&self.deleted_keys_hash);
         payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp_bytes);
         payload.extend_from_slice(&covered_layers_bytes);
         payload.extend_from_slice(&excluded_scopes_bytes);
         payload.extend_from_slice(receipt_part);
@@ -1415,6 +1418,7 @@ mod tests {
 
     #[test]
     fn test_verify_external_v2_hmac() {
+        let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
