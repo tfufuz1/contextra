@@ -302,7 +302,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
-                                        let doc_id = DocId::new(doc_id_raw);
+                                        let doc_id = DocId::from(doc_id_raw);
                                         let tf = u32::from_le_bytes(
                                             (&val_bytes[..4]).try_into().map_err(|_| {
                                                 ContextraError::Storage(
@@ -438,7 +438,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if min_doc_id == pivot_doc_id {
-            let doc_id = DocId::new(pivot_doc_id);
+            let doc_id = DocId::from(pivot_doc_id);
 
             // Check if block max scores at pivot_doc_id still exceed threshold
             let block_max_sum: f32 = cursors
@@ -750,7 +750,7 @@ mod tests {
         // "common" occurs in all 500 documents.
         // "rare" occurs in only 5 documents (DocId 100, 200, 300, 400, 500) with high frequency.
         for i in 1..=500 {
-            let doc_id = DocId::new(i as u64);
+            let doc_id = DocId::new((i as u64).into());
             let text = if i % 100 == 0 {
                 format!("common rare rare rare rare rare doc {}", i)
             } else {
