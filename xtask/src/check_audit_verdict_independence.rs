@@ -410,8 +410,8 @@ mod tests {
 
     #[test]
     fn test_legacy_audit_verdict_passes_with_warning() {
-        let line = "**VERDICT: GO / APPROVED**. `contextra-index` erfüllt alle Tier-1 Qualitäts-Invarianten.";
-        let entry = parse_verdict_line(line, "docs/audits/AUDIT_contextra-index.md", 281).unwrap();
+        let line = "**VERDICT: GO / APPROVED**. `contextra-vector` erfüllt alle Tier-1 Qualitäts-Invarianten.";
+        let entry = parse_verdict_line(line, "docs/audits/AUDIT_contextra-vector.md", 281).unwrap();
         assert!(!entry.has_verified_by_field);
 
         let now = Utc::now();
