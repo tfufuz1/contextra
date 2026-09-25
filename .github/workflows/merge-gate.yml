@@ -153,3 +153,8 @@ jobs:
 
       - name: Loom Concurrency Tests (LSM / WAL)
         run: RUSTFLAGS="--cfg loom" cargo test -p contextra-store --test loom_group_commit --release
+
+      - name: Loom Concurrency Tests (Group Commit Handoff)
+        run: |
+          which just || cargo install just --cheap-only || true
+          just loom-store
