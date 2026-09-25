@@ -8,7 +8,7 @@
 use contextra_db::{Contextra, ContextraConfig};
 
 #[tokio::main]
-async fn main() -> contextra_core::Result<()> {
+async fn main() -> contextra_types::Result<()> {
     let config = ContextraConfig {
         dimension: 4,
         ..Default::default()

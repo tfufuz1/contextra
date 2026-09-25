@@ -22,3 +22,11 @@ In Phase 1b des Migrationsplans wird die Fassade kontinuierlich erweitert. Momen
 ## Architektur & Verweise
 
 Für Details zur Zielarchitektur, Ring-Struktur und den einzelnen Migrationsphasen siehe [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §A2 / §4.2 im Repository-Root.
+
+## Feature-Ringe (Ring-Split)
+
+| Ring-Name | Enthaltene Features | Zielgruppe | Lizenzmodell |
+| --- | --- | --- | --- |
+| `fast` | `fast` | OSS-Adoption | Open Source (MIT/Apache-2.0) |
+| `sovereign` | `sovereign`, `contextra-crypto`, `contextra-privacy` | Kanzlei-Appliance | Open Source (MIT/Apache-2.0) |
+| `compliance` | `compliance`, `sovereign`, `audit-export`, `avv-generator` | Kommerziell | Trade-Secret / Kommerziell (`compliance`) |

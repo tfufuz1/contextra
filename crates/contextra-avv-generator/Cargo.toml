@@ -1,0 +1,15 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-avv-generator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "AVV (Auftragsverarbeitungsvertrag) template generator referencing technical guarantees for Contextra"
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+contextra-types = { workspace = true }
