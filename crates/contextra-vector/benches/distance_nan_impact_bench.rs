@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use contextra_core::DistanceMetric;
 use contextra_vector::distance::{compute_distance, cosine_distance};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_distance_nan_impact(c: &mut Criterion) {
     let dim = 768;

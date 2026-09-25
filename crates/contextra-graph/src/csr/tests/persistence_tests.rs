@@ -2,8 +2,8 @@ use super::super::*;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload};
 use crate::csr::visibility::is_edge_visible;
 use crate::GraphIndexExt;
-use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
 use contextra_ports::{GraphIndex, StorageEngine};
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 #[tokio::test]

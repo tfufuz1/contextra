@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use contextra_types::{DocId, Entity, EntityId, TxId};
-use contextra_ports::GraphIndex;
 use contextra_graph::csr::CsrGraph;
+use contextra_ports::GraphIndex;
+use contextra_types::{DocId, Entity, EntityId, TxId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -40,7 +40,7 @@ impl CsrGraphBenchExt for CsrGraph {
                 + '_,
         >,
     > {
-        Box::pin(self.traverse(EntityId::from_doc_id(doc_id), max_hops))
+        Box::pin(self.traverse(EntityId::new(doc_id.inner()), max_hops))
     }
 
     fn get_neighbors(
@@ -49,15 +49,17 @@ impl CsrGraphBenchExt for CsrGraph {
     ) -> std::pin::Pin<
         Box<dyn std::future::Future<Output = contextra_types::Result<Vec<EntityId>>> + Send + '_>,
     > {
-        Box::pin(self.neighbors(EntityId::from_doc_id(doc_id)))
+        Box::pin(self.neighbors(EntityId::new(doc_id.inner())))
     }
 }
 
 fn build_test_graph(rt: &Runtime, n_nodes: usize, n_edges: usize) -> Arc<CsrGraph> {
-    let graph = Arc::new(CsrGraph::with_config(contextra_graph::csr::CsrGraphConfig {
-        rebuild_threshold: 10_000_000,
-        ..Default::default()
-    }));
+    let graph = Arc::new(CsrGraph::with_config(
+        contextra_graph::csr::CsrGraphConfig {
+            rebuild_threshold: 10_000_000,
+            ..Default::default()
+        },
+    ));
     rt.block_on(async {
         for i in 0..n_nodes {
             graph
@@ -141,7 +143,7 @@ fn bench_csr_traversal(c: &mut Criterion) {
                 b.to_async(&rt).iter(|| async {
                     black_box(
                         graph
-                            .bfs(black_box(DocId::from(0u64)), 2)
+                            .bfs(black_box(DocId::new(0)), 2)
                             .await
                             .unwrap_or_default(),
                     )
@@ -157,7 +159,7 @@ fn bench_csr_traversal(c: &mut Criterion) {
                 b.to_async(&rt).iter(|| async {
                     black_box(
                         graph
-                            .get_neighbors(black_box(DocId::from(0u64)))
+                            .get_neighbors(black_box(DocId::new(0)))
                             .await
                             .unwrap_or_default(),
                     )
@@ -174,7 +176,7 @@ fn bench_csr_traversal(c: &mut Criterion) {
                 b.to_async(&rt).iter(|| async {
                     black_box(
                         graph_dirty
-                            .bfs(black_box(DocId::from(0u64)), 2)
+                            .bfs(black_box(DocId::new(0)), 2)
                             .await
                             .unwrap_or_default(),
                     )

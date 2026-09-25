@@ -98,7 +98,9 @@ impl TenantPrefixKvStore {
         let mut partitions = self.partitions.write();
         let partition = partitions.get_mut(&(tenant, key.clone()))?;
 
-        let pm = partition.tree.find_longest_prefix(tokens, self.reuse_policy)?;
+        let pm = partition
+            .tree
+            .find_longest_prefix(tokens, self.reuse_policy)?;
         let group = partition.groups.get_mut(&pm.block_id)?;
 
         group.tick = self.next_tick.fetch_add(1, Ordering::Relaxed);

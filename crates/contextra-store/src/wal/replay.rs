@@ -479,7 +479,10 @@ impl Wal {
                                 } else {
                                     format!("Deserialization failed: {e}")
                                 };
-                                return Err(ContextraError::wal_corruption(chunk_start_pos, reason));
+                                return Err(ContextraError::wal_corruption(
+                                    chunk_start_pos,
+                                    reason,
+                                ));
                             }
                         }
                     };

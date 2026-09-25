@@ -6,9 +6,9 @@
 
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
-use contextra_types::{DocId, EntityId, ContextraError, Result, TxId, EXPIRY_METADATA_KEY};
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
+use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{ContextraError, DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -529,9 +529,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     // 2. TxId-basierter Decay-Sweep (nur wenn decay != None)
                     if !marked_for_deletion {
                         if let Some(imp_val) = obj.get("importance") {
-                            if let Ok(imp) = serde_json::from_value::<contextra_types::MemoryImportance>(
-                                imp_val.clone(),
-                            ) {
+                            if let Ok(imp) = serde_json::from_value::<
+                                contextra_types::MemoryImportance,
+                            >(imp_val.clone())
+                            {
                                 if imp.decay != contextra_types::DecayFunction::None {
                                     let effective = imp.effective_score(TxId::new(now_tx));
                                     if effective < Self::DECAY_DELETION_THRESHOLD {

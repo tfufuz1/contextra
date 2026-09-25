@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use contextra_types::{DocId, ContextraError, Result, ScoredDocument, TxId, MAX_SEARCH_K};
 use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
+use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_SEARCH_K};
 /// An inverted index tied to a specific collection namespace.
 ///
 /// # Concurrency & Lock Hierarchy:
@@ -188,7 +188,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
                 if let Some(doc_id_raw) = parsed_doc_id {
                     if val_bytes.len() == 4 {
-                        let doc_id = DocId::from(doc_id_raw);
+                        let doc_id = DocId::new(doc_id_raw);
                         let tf =
                             u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(|_| {
                                 ContextraError::Storage("Invalid posting tf length".into())
@@ -348,12 +348,12 @@ impl<S: StorageEngine> InvertedIndex<S> {
             let doc_id_raw_opt = std::str::from_utf8(parts[0])
                 .ok()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(DocId::from);
+                .map(DocId::new);
             #[cfg(feature = "docid-128")]
             let doc_id_raw_opt = std::str::from_utf8(parts[0])
                 .ok()
                 .and_then(|s| s.parse::<u128>().ok())
-                .map(DocId::from);
+                .map(|v| DocId::new(v));
             let doc_id = match doc_id_raw_opt {
                 Some(v) => v,
                 None => continue,

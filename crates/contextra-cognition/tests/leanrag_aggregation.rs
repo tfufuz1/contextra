@@ -6,9 +6,9 @@ use contextra_cognition::aggregation_phase::{
 };
 use contextra_cognition::memory_consolidation::CommunityStabilityTracker;
 use contextra_cognition::synthesis_phase::SegmentSynthesisResult;
+use contextra_graph::HyperEdgeId;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::{ContextraError, EntityId, Result};
-use contextra_graph::HyperEdgeId;
 
 struct MockLlm {
     fail_on_prompt: Option<String>,
@@ -183,7 +183,11 @@ async fn test_clustering_two_distinct_blobs() {
         .await
         .unwrap();
 
-    assert_eq!(alphas.len(), 2, "Expected 2 alpha nodes for 2 distinct blobs");
+    assert_eq!(
+        alphas.len(),
+        2,
+        "Expected 2 alpha nodes for 2 distinct blobs"
+    );
     assert!(sink.committed);
 }
 
@@ -395,15 +399,7 @@ async fn test_no_commit_on_sink_error() {
     let mut tracker = CommunityStabilityTracker::new();
     let mut sink = MockSink::new();
 
-    let res = run_aggregation_pass(
-        &invalid_nodes,
-        &[],
-        &cfg,
-        &llm,
-        &mut tracker,
-        &mut sink,
-    )
-    .await;
+    let res = run_aggregation_pass(&invalid_nodes, &[], &cfg, &llm, &mut tracker, &mut sink).await;
 
     assert!(res.is_err());
     assert!(!sink.committed, "Sink commit must NOT be called on error");

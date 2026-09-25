@@ -3,9 +3,9 @@
 //! Evaluates peak intermediate memory consumption and CPU latency of `CsrGraph`
 //! traversal across synthetic hub nodes with varying out-degrees (1K, 10K, 100K, 1M).
 
-use contextra_types::{Entity, EntityId, TxId};
-use contextra_ports::GraphIndex;
 use contextra_graph::CsrGraph;
+use contextra_ports::GraphIndex;
+use contextra_types::{Entity, EntityId, TxId};
 use std::time::Instant;
 
 #[tokio::test]

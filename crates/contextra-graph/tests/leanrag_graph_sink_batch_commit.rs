@@ -1,8 +1,8 @@
-use contextra_types::{EntityId, TxId};
 use contextra_graph::csr::EdgeType;
 use contextra_graph::error::GraphMutationError;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
+use contextra_types::{EntityId, TxId};
 use std::sync::Arc;
 
 #[test]
@@ -102,7 +102,11 @@ fn test_batch_commit_single_rcu_publish_and_atomic_rollback() {
         assert_eq!(super_edge.id, HyperEdgeId::new(10));
         assert_eq!(
             *super_edge.child_edge_ids,
-            [HyperEdgeId::new(1), HyperEdgeId::new(2), HyperEdgeId::new(3)]
+            [
+                HyperEdgeId::new(1),
+                HyperEdgeId::new(2),
+                HyperEdgeId::new(3)
+            ]
         );
     }
 
@@ -129,15 +133,14 @@ fn test_batch_commit_single_rcu_publish_and_atomic_rollback() {
     );
     graph.insert_hyperedge_direct(h4);
 
-    let collision_res = graph.commit_super_edge_batch(
-        &[HyperEdgeId::new(4)],
-        vec![colliding_edge],
-        TxId::new(101),
-    );
+    let collision_res =
+        graph.commit_super_edge_batch(&[HyperEdgeId::new(4)], vec![colliding_edge], TxId::new(101));
 
     assert_eq!(
         collision_res,
-        Err(GraphMutationError::DuplicateHyperEdgeId(HyperEdgeId::new(10))),
+        Err(GraphMutationError::DuplicateHyperEdgeId(HyperEdgeId::new(
+            10
+        ))),
         "Must return DuplicateHyperEdgeId error"
     );
 

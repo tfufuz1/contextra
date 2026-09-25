@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use crate::consistency_enforcement::{ConsistencyEnforcer, EdgeAssertion};
 use crate::error::GraphMutationError;
-use contextra_types::{DocId, Entity, EntityId, ContextraError, Result, TxId};
 use contextra_ports::{GraphIndex, StorageEngine};
+use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
 
 use super::inner::{sentinel_entity, GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::{CsrGraphConfig, EdgePayload};
@@ -205,7 +205,8 @@ impl CsrGraph {
 
             dfs_upward(self, hid, &mut visited, &mut on_stack, &mut closure_nodes);
 
-            let topo_order = crate::cascade::topological_sort_hyperedge_closure(self, &closure_nodes);
+            let topo_order =
+                crate::cascade::topological_sort_hyperedge_closure(self, &closure_nodes);
 
             for node in topo_order {
                 if self.tombstone_hyperedge(node, wal_tx) {
@@ -426,7 +427,10 @@ impl CsrGraph {
     /// Returns all non-tombstoned parent hyperedge IDs that contain `child` in `child_edge_ids`.
     ///
     /// The returned list is sorted in ascending order by `HyperEdgeId`.
-    pub fn parent_hyperedges_of(&self, child: crate::hyperedge::HyperEdgeId) -> Vec<crate::hyperedge::HyperEdgeId> {
+    pub fn parent_hyperedges_of(
+        &self,
+        child: crate::hyperedge::HyperEdgeId,
+    ) -> Vec<crate::hyperedge::HyperEdgeId> {
         let inner = self.inner_read();
         let mut parents: Vec<_> = inner
             .child_to_parents
@@ -470,7 +474,12 @@ impl CsrGraph {
     /// Returns the maximum `HyperEdgeId` present in the current graph snapshot, or 0 if empty.
     pub fn max_hyperedge_id(&self) -> u64 {
         let inner = self.inner_read();
-        inner.hyperedges.keys().map(|id| id.inner()).max().unwrap_or(0)
+        inner
+            .hyperedges
+            .keys()
+            .map(|id| id.inner())
+            .max()
+            .unwrap_or(0)
     }
 
     /// Retrieves a non-tombstoned hyperedge by its ID if present.

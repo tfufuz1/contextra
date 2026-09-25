@@ -8,7 +8,7 @@
 // 5. MVCC-Sichtbarkeit und Tombstones werden weiterhin dynamisch pro Anfrage evaluiert.
 // INVARIANTEN: Zero-Panic Doctrine, repr(C, align(8)) Layout für Postings, RCU-Locking ohne globale Exklusivlocks.
 
-use contextra_types::{DocId, ContextraError};
+use contextra_types::{ContextraError, DocId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -51,7 +51,7 @@ impl Posting {
     #[inline]
     pub fn new(doc_id: DocId, tf: u32, doc_len: u32) -> Self {
         Self {
-            doc_id: doc_id.inner().try_into().unwrap_or(0),
+            doc_id: doc_id.inner(),
             tf,
             doc_len,
         }
@@ -59,7 +59,7 @@ impl Posting {
 
     #[inline]
     pub fn doc_id(&self) -> DocId {
-        DocId::from(self.doc_id)
+        DocId::new(self.doc_id)
     }
 }
 
@@ -162,8 +162,7 @@ impl PostingList {
     /// Removes a posting for a doc_id using RCU/copy-on-write semantics.
     pub fn remove(&self, doc_id: DocId) -> Self {
         let mut new_postings = self.postings.clone();
-        let target_id: DocIdRaw = doc_id.inner().try_into().unwrap_or(0);
-        if let Ok(idx) = new_postings.binary_search_by_key(&target_id, |p| p.doc_id) {
+        if let Ok(idx) = new_postings.binary_search_by_key(&doc_id.inner(), |p| p.doc_id) {
             new_postings.remove(idx);
         }
         let blocks = compute_blocks(&new_postings);
@@ -177,18 +176,21 @@ impl PostingList {
     pub fn encode_compact(&self) -> Result<Vec<u8>, ContextraError> {
         let mut buf = Vec::with_capacity(4 + 8 + self.postings.len() * 8);
         buf.extend_from_slice(POSTING_LIST_V2_MAGIC);
-        encode_varint(u128::try_from(self.postings.len()).map_err(|_| ContextraError::Storage("Posting list count overflow".to_string()))?, &mut buf);
+        encode_varint(self.postings.len() as u64, &mut buf);
 
-        let mut prev_doc_id = 0u128;
+        let mut prev_doc_id = 0u64;
         for p in &self.postings {
-            let curr = u128::from(p.doc_id);
-            let delta = curr.checked_sub(prev_doc_id).ok_or_else(|| {
-                ContextraError::Storage("Unsorted or overflow doc_id in posting list".to_string())
-            })?;
+            let delta = (p.doc_id as u128)
+                .checked_sub(prev_doc_id as u128)
+                .ok_or_else(|| {
+                    ContextraError::Storage(
+                        "Unsorted or overflow doc_id in posting list".to_string(),
+                    )
+                })? as u64;
             encode_varint(delta, &mut buf);
-            encode_varint(u128::from(p.tf), &mut buf);
-            encode_varint(u128::from(p.doc_len), &mut buf);
-            prev_doc_id = curr;
+            encode_varint(p.tf as u64, &mut buf);
+            encode_varint(p.doc_len as u64, &mut buf);
+            prev_doc_id = p.doc_id as u64;
         }
 
         Ok(buf)
@@ -207,33 +209,29 @@ impl PostingList {
                 )));
             }
             let mut postings = Vec::with_capacity(count as usize);
-            let mut prev_doc_id = 0u128;
+            let mut prev_doc_id = 0u64;
 
             for _ in 0..count {
                 let delta = decode_varint(bytes, &mut offset)?;
-                let tf_var = decode_varint(bytes, &mut offset)?;
-                let doc_len_var = decode_varint(bytes, &mut offset)?;
+                let tf_u64 = decode_varint(bytes, &mut offset)?;
+                let doc_len_u64 = decode_varint(bytes, &mut offset)?;
 
-                let doc_id_u128 = prev_doc_id.checked_add(delta).ok_or_else(|| {
+                let doc_id = prev_doc_id.checked_add(delta).ok_or_else(|| {
                     ContextraError::Storage("DocId overflow during delta decoding".to_string())
                 })?;
-                let tf: u32 = tf_var
+                let tf: u32 = tf_u64
                     .try_into()
                     .map_err(|_| ContextraError::Storage("TF overflow in varint".to_string()))?;
-                let doc_len: u32 = doc_len_var
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("DocLen overflow in varint".to_string()))?;
-
-                let doc_id: DocIdRaw = doc_id_u128
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("DocId overflow for platform DocIdRaw".to_string()))?;
+                let doc_len: u32 = doc_len_u64.try_into().map_err(|_| {
+                    ContextraError::Storage("DocLen overflow in varint".to_string())
+                })?;
 
                 postings.push(Posting {
-                    doc_id,
+                    doc_id: doc_id as DocIdRaw,
                     tf,
                     doc_len,
                 });
-                prev_doc_id = doc_id_u128;
+                prev_doc_id = doc_id;
             }
 
             if offset != bytes.len() {
@@ -253,7 +251,7 @@ impl PostingList {
     }
 }
 
-fn encode_varint(mut val: u128, buf: &mut Vec<u8>) {
+fn encode_varint(mut val: u64, buf: &mut Vec<u8>) {
     while val >= 0x80 {
         buf.push((val as u8 & 0x7f) | 0x80);
         val >>= 7;
@@ -261,18 +259,18 @@ fn encode_varint(mut val: u128, buf: &mut Vec<u8>) {
     buf.push(val as u8);
 }
 
-fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u128, ContextraError> {
-    let mut result = 0u128;
+fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError> {
+    let mut result = 0u64;
     let mut shift = 0u32;
     while *offset < bytes.len() {
         let byte = bytes[*offset];
         *offset += 1;
-        result |= ((byte & 0x7f) as u128) << shift;
+        result |= ((byte & 0x7f) as u64) << shift;
         if (byte & 0x80) == 0 {
             return Ok(result);
         }
         shift += 7;
-        if shift >= 128 {
+        if shift >= 64 {
             return Err(ContextraError::Storage("Varint overflow".to_string()));
         }
     }
@@ -451,7 +449,7 @@ mod tests {
             curr_doc_id += delta;
             let tf = ((i % 20) + 1) as u32;
             let doc_len = (50 + (i % 100)) as u32;
-            postings.push(Posting::new(DocId::new(curr_doc_id.into()), tf, doc_len));
+            postings.push(Posting::new(DocId::new(curr_doc_id), tf, doc_len));
         }
 
         let multi_list = PostingList::new(postings);

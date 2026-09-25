@@ -103,7 +103,9 @@ impl SstableReader {
                     let seq_no = u64::from_le_bytes(
                         block_data
                             .get(ep..ep + 8)
-                            .ok_or_else(|| ContextraError::Storage("malformed block: seq_no".into()))?
+                            .ok_or_else(|| {
+                                ContextraError::Storage("malformed block: seq_no".into())
+                            })?
                             .try_into()
                             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                     );
@@ -111,7 +113,9 @@ impl SstableReader {
                     let tx_id = u64::from_le_bytes(
                         block_data
                             .get(ep..ep + 8)
-                            .ok_or_else(|| ContextraError::Storage("malformed block: tx_id".into()))?
+                            .ok_or_else(|| {
+                                ContextraError::Storage("malformed block: tx_id".into())
+                            })?
                             .try_into()
                             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                     );
@@ -119,7 +123,9 @@ impl SstableReader {
                     let v_len = u32::from_le_bytes(
                         block_data
                             .get(ep..ep + 4)
-                            .ok_or_else(|| ContextraError::Storage("malformed block: v_len".into()))?
+                            .ok_or_else(|| {
+                                ContextraError::Storage("malformed block: v_len".into())
+                            })?
                             .try_into()
                             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                     ) as usize;

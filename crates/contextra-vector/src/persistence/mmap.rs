@@ -37,7 +37,9 @@ impl MmapIndex {
         if index_obj.header.node_count() > 0 {
             let expected_nodes_bytes = (index_obj.header.node_count() as usize)
                 .checked_mul(NodeRecord::SIZE)
-                .ok_or_else(|| ContextraError::Storage("Node records total size overflow".into()))?;
+                .ok_or_else(|| {
+                    ContextraError::Storage("Node records total size overflow".into())
+                })?;
             let actual_nodes_bytes = (index_obj.header.connections_offset() as usize)
                 .checked_sub(index_obj.header.nodes_offset() as usize)
                 .ok_or_else(|| {

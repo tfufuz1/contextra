@@ -220,8 +220,7 @@ pub(crate) fn compute_ppr_with_context(
                 } else {
                     1.0 - config.damping_factor
                 },
-                epsilon: if config.convergence_epsilon.is_nan()
-                    || config.convergence_epsilon <= 0.0
+                epsilon: if config.convergence_epsilon.is_nan() || config.convergence_epsilon <= 0.0
                 {
                     1e-6
                 } else {

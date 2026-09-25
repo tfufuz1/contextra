@@ -27,8 +27,8 @@ fn test_manifest_entry_roundtrip() {
     for entry in entries {
         let bytes = entry.to_bytes().expect("serialization should succeed");
         let payload_from_bytes = &bytes[4..]; // Skip total_payload_size prefix
-        let decoded = ManifestEntry::from_bytes(payload_from_bytes)
-            .expect("deserialization should succeed");
+        let decoded =
+            ManifestEntry::from_bytes(payload_from_bytes).expect("deserialization should succeed");
         assert_eq!(entry, decoded);
     }
 }

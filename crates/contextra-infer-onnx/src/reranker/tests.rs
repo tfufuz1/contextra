@@ -9,8 +9,8 @@ use super::cross_encoder::CrossEncoderReranker;
 #[cfg(feature = "onnx")]
 use super::onnx::OnnxReranker;
 
-use contextra_types::{ConfigFingerprint, ContextraError};
 use contextra_rank::PlattScaler;
+use contextra_types::{ConfigFingerprint, ContextraError};
 
 #[tokio::test]
 async fn test_rerank_passthrough_preserves_order() {

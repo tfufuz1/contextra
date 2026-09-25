@@ -8,10 +8,10 @@
 
 #[cfg(loom)]
 mod loom_tests {
-    use loom::sync::Arc;
-    use loom::thread;
     use contextra_core::{DocId, TxId, VectorIndex};
     use contextra_vector::{HnswConfig, HnswIndex};
+    use loom::sync::Arc;
+    use loom::thread;
 
     #[test]
     fn test_sq8_quantizer_write_lock_no_race() {

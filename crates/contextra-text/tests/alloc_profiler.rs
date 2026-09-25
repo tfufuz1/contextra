@@ -2,10 +2,10 @@
 //! Measures heap allocation count, bytes allocated, execution time, and throughput
 //! for 10,000 documents (~500 words per document) across German and English workloads.
 
-use contextra_types::{DocId, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::inverted::{InvertedIndex, Language};
 use contextra_text::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
+use contextra_types::{DocId, TxId};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -135,7 +135,9 @@ impl StorageEngine for FastRamStorage {
     fn flush<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn stats<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>> {
+    fn stats<'a>(
+        &'a self,
+    ) -> BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>> {
         Box::pin(async move {
             Ok(contextra_ports::StorageStats {
                 num_segments: 1,
@@ -357,7 +359,7 @@ async fn run_profile_10k_documents() {
     let start_de_idx = Instant::now();
     for (i, doc) in german_docs.iter().enumerate() {
         let tx = TxId::new((i + 1) as u64);
-        let doc_id = DocId::from((i + 1) as u64);
+        let doc_id = DocId::new((i + 1) as u64);
         index_de
             .insert(tx, doc_id, doc)
             .await
@@ -402,7 +404,7 @@ async fn run_profile_10k_documents() {
     let start_en_idx = Instant::now();
     for (i, doc) in english_docs.iter().enumerate() {
         let tx = TxId::new((i + 1) as u64);
-        let doc_id = DocId::from((i + 1) as u64);
+        let doc_id = DocId::new((i + 1) as u64);
         index_en
             .insert(tx, doc_id, doc)
             .await

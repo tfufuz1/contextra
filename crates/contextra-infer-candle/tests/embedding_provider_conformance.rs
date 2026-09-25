@@ -4,12 +4,12 @@
 // INVARIANTEN: embedding_dim() strictly equals output vector length to prevent HNSW index corruption.
 
 use candle_core::Device;
-use contextra_ports::embedding::EmbeddingError;
-use contextra_ports::EmbeddingProvider;
-use contextra_types::Result;
 use contextra_infer_candle::embedding::CandleEmbedInner;
 use contextra_infer_candle::model_registry::ModelFingerprint;
 use contextra_infer_candle::{CandleEmbedClient, MAX_CANDLE_EMBED_BATCH_SIZE};
+use contextra_ports::embedding::EmbeddingError;
+use contextra_ports::EmbeddingProvider;
+use contextra_types::Result;
 
 struct MockConformantEmbedModel {
     dim: usize,

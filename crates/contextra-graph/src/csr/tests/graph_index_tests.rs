@@ -1,11 +1,9 @@
 use super::super::*;
 use super::basic_tests::setup_test_graph;
-#[cfg(feature = "edge-reinforcement-learning")]
-use crate::csr::types::EdgePayload;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
 use crate::GraphIndexExt;
-use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
 use contextra_ports::{GraphIndex, StorageEngine};
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 #[tokio::test]
@@ -658,7 +656,6 @@ async fn test_csr_is_entity_deleted_returns_false_for_live_entity() {
 #[test]
 #[cfg(feature = "edge-reinforcement-learning")]
 fn test_edge_store_invalidated_after_compact() {
-    use crate::csr::types::EdgePayload;
     let mut inner = GraphInner::new();
     let entity_a = EntityId::new(1);
     let entity_b = EntityId::new(2);

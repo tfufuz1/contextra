@@ -10,9 +10,9 @@
 //! Carries task identity, graph position, token budget, DB references, and
 //! accumulated step memory across the entire lifecycle of a single workflow run.
 
-use contextra_types::{ContextraError, Result, TokenBudget};
 use contextra_db::{Collection, Contextra};
 use contextra_store::LsmStorage;
+use contextra_types::{ContextraError, Result, TokenBudget};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
@@ -234,7 +234,8 @@ mod tests {
     async fn test_agent_context_fifo_eviction() -> contextra_types::Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();
-        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let db =
+            Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
         let state_coll = db.collection("test_fifo").await?;
         let mut ctx = AgentContext::try_new(
             "test_fifo_task",
@@ -272,7 +273,8 @@ mod tests {
     async fn test_try_attach_event_error_message_unit() -> contextra_types::Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();
-        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let db =
+            Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
         let state_coll = db.collection("test_try_attach").await?;
         let mut ctx = AgentContext::try_new(
             "test_try_attach_task",
@@ -322,11 +324,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_telemetry_100k_insertions_and_amortized_performance() -> contextra_types::Result<()>
-    {
+    async fn test_telemetry_100k_insertions_and_amortized_performance(
+    ) -> contextra_types::Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();
-        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let db =
+            Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
         let state_coll = db.collection("test_100k_bench").await?;
         let mut ctx = AgentContext::try_new(
             "test_100k_task",

@@ -4,8 +4,8 @@
 
 #![allow(unsafe_code)]
 
-use contextra_types::{Entity, EntityId, PprConfig};
 use contextra_graph::{CsrGraph, PprContext};
+use contextra_types::{Entity, EntityId, PprConfig};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
 

@@ -39,6 +39,8 @@ pub mod model;
 pub use embedding::CandleEmbedClient;
 pub use embedding_provider::MAX_CANDLE_EMBED_BATCH_SIZE;
 pub use gasp::{GaspConfig, GaspValidator, DEFAULT_GROUNDING_THRESHOLD};
+#[cfg(feature = "kv-stage-b")]
+pub use inference::QuantizedLlamaModel;
 pub use inference::*;
 #[cfg(feature = "kv-bridge")]
 pub use kv_bridge::KvBridgeAdapter;
@@ -46,6 +48,4 @@ pub use kv_bridge::KvBridgeAdapter;
 pub use kv_state::{KvState, LayerKv};
 #[cfg(feature = "kv-stage-b")]
 pub use model::quantized_llama;
-#[cfg(feature = "kv-stage-b")]
-pub use inference::QuantizedLlamaModel;
 pub use model_registry::{compute_fingerprint, CandleQuantization, ModelFingerprint};

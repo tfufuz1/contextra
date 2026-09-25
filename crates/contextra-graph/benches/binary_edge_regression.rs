@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use contextra_types::{Entity, EntityId};
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use contextra_types::{Entity, EntityId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 

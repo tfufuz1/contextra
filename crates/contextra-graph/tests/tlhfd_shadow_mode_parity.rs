@@ -1,11 +1,11 @@
 //! Integration and parity tests for Thresholded Local Hyper-Flow Diffusion (TL-HFD, AK-16).
 
-use contextra_types::EntityId;
 use contextra_graph::path_rag::{PathGraph, PprParams};
 use contextra_graph::{
     shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, HyperEdge, HyperEdgeId, RoleBinding,
     RoleId, TlHfdError, TlHfdParams,
 };
+use contextra_types::EntityId;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -71,7 +71,10 @@ impl PathGraph for MockGraph {
 
     fn hyperedges_for_entity(&self, node: EntityId) -> Vec<HyperEdgeId> {
         self.hyperedge_calls.fetch_add(1, Ordering::Relaxed);
-        self.node_to_hyperedges.get(&node).cloned().unwrap_or_default()
+        self.node_to_hyperedges
+            .get(&node)
+            .cloned()
+            .unwrap_or_default()
     }
 
     fn get_hyperedge(&self, id: HyperEdgeId) -> Option<Arc<HyperEdge>> {
@@ -290,7 +293,10 @@ fn test_shadow_mode_parity_2_cluster_graph() -> Result<(), Box<dyn std::error::E
         "Top-3 overlap {} must be >= 0.66 on 2-cluster graph",
         comp.top_k_overlap
     );
-    assert!(!comp.discrepancy, "Discrepancy must be false on balanced cluster graph");
+    assert!(
+        !comp.discrepancy,
+        "Discrepancy must be false on balanced cluster graph"
+    );
 
     Ok(())
 }
@@ -317,7 +323,10 @@ fn test_shadow_mode_discrepancy_reported() -> Result<(), Box<dyn std::error::Err
     };
 
     let comp = shadow_compare_forward_push_vs_tl_hfd(&g, &seeds, &ppr_params, &tl_params, 3)?;
-    assert!(comp.discrepancy, "Discrepancy must be reported when epsilon condition is breached");
+    assert!(
+        comp.discrepancy,
+        "Discrepancy must be reported when epsilon condition is breached"
+    );
 
     Ok(())
 }

@@ -394,9 +394,14 @@ mod tests {
                 },
                 "Timeout",
             ),
-            (ContextraError::Serialization("test".into()), "Serialization"),
             (
-                ContextraError::Json(serde_json::from_str::<serde_json::Value>("{bad}").unwrap_err()),
+                ContextraError::Serialization("test".into()),
+                "Serialization",
+            ),
+            (
+                ContextraError::Json(
+                    serde_json::from_str::<serde_json::Value>("{bad}").unwrap_err(),
+                ),
                 "Json",
             ),
             (ContextraError::Crypto("test".into()), "Crypto"),

@@ -5,8 +5,8 @@
 // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:CKPT-001) (TS:2026-09-02T23:18:12Z) (SESSION: 2155aaa2) PRÜFER-KONTEXT: FRESH - Confirmed concurrent stress test, cache hit/miss reloading, and unpinning lifecycle.
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_types::{Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

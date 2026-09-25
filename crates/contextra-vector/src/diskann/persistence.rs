@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use super::config::{CachedNode, DiskAnnFallbackPolicy, VectorData};
 use super::format::{
-    DiskAnnFooter, DiskAnnHeader, DISKANN_FOOTER_MAGIC,
-    DISKANN_INTEGRITY_KEY, DISKANN_MAGIC, DISKANN_VERSION,
+    DiskAnnFooter, DiskAnnHeader, DISKANN_FOOTER_MAGIC, DISKANN_INTEGRITY_KEY, DISKANN_MAGIC,
+    DISKANN_VERSION,
 };
 use super::types::{DiskAnnIndex, DiskAnnIndexInner};
 use contextra_core::{ContextraError, DocId, Result};
@@ -508,9 +508,9 @@ impl DiskAnnIndex {
 
         let vector = if header.quantized != 0 {
             let dim = header.dimension as usize;
-            let next_cursor = cursor
-                .checked_add(dim)
-                .ok_or_else(|| ContextraError::Index("Cursor overflow in quantized vector".into()))?;
+            let next_cursor = cursor.checked_add(dim).ok_or_else(|| {
+                ContextraError::Index("Cursor overflow in quantized vector".into())
+            })?;
             let slice = node_data
                 .get(cursor..next_cursor)
                 .ok_or_else(|| ContextraError::Index("Truncated quantized vector data".into()))?;
@@ -609,5 +609,4 @@ impl DiskAnnIndex {
 
         Ok(node)
     }
-
 }

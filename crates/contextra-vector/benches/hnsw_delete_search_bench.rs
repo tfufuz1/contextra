@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use contextra_core::traits::VectorIndex;
 use contextra_core::types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
 fn bench_hnsw_delete_search(c: &mut Criterion) {

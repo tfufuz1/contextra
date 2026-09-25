@@ -1,10 +1,10 @@
 //! Property-based tests for BM25 score invariants and tombstone isolation.
 
-use contextra_types::{DocId, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::bm25::score_term;
 use contextra_text::tokenizer::{DefaultTokenizer, Tokenizer};
 use contextra_text::InvertedIndex;
+use contextra_types::{DocId, Result, TxId};
 use parking_lot::RwLock;
 use proptest::prelude::*;
 use std::collections::HashMap;
@@ -327,7 +327,7 @@ proptest! {
         rt.block_on(async move {
             let storage = Arc::new(MVCCMockStorage::new());
             let index = InvertedIndex::new(storage.clone(), "prop5_ns");
-            let doc_id = DocId::from(doc_id_raw);
+            let doc_id = DocId::new(doc_id_raw);
 
             // Step 1: Insert document with the query text `q` at transaction tx1
             let tx1 = TxId::new(1);

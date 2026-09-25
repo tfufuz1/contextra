@@ -3,8 +3,8 @@ use std::sync::atomic::Ordering;
 
 use crate::consistency_enforcement::EdgeAssertion;
 use crate::GraphIndexExt;
-use contextra_types::{Entity, EntityId, ContextraError, Result, TxId};
 use contextra_ports::{BoxFuture, GraphIndex, GraphIndexStats};
+use contextra_types::{ContextraError, Entity, EntityId, Result, TxId};
 
 use super::graph_write::CsrGraph;
 use super::inner::sentinel_entity;

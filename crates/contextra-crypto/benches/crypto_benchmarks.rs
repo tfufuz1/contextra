@@ -3,8 +3,8 @@
 // INVARIANTEN: Measures AES-256-GCM-SIV throughput at 1KB/64KB/1MB/16MB, HKDF derivation, HMAC throughput, and nonce overhead.
 // STAND: TS:2026-08-30T19:50:00Z (SESSION: 20260830)
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use contextra_crypto::CryptoKey;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 fn bench_aes_256_gcm_siv_encrypt(c: &mut Criterion) {
     let km = CryptoKey::try_new("bench-passphrase", b"bench-salt-123456").unwrap();
@@ -59,8 +59,8 @@ fn bench_hmac_integrity(c: &mut Criterion) {
 
 // ADR-082 Performance-Nachweis Benchmarks
 
-use contextra_types::TenantId;
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
+use contextra_types::TenantId;
 
 fn bench_kv_insert_n_segments(c: &mut Criterion) {
     let mut group = c.benchmark_group("kv_insert_n_segments");

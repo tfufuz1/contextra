@@ -196,11 +196,10 @@ impl SstableReader {
             )
         } else {
             // Read magic from the very end of 54-byte buffer (which would be the same as end of 52-byte if we read 54)
-            let magic_legacy = u32::from_le_bytes(
-                trailer_data[50..54]
-                    .try_into()
-                    .map_err(|_| ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0))?,
-            );
+            let magic_legacy =
+                u32::from_le_bytes(trailer_data[50..54].try_into().map_err(|_| {
+                    ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
+                })?);
             if magic_legacy == SSTABLE_MAGIC_LEGACY {
                 // Backward-compatible 12-byte trailer: [index_offset: u64][magic: u32]
                 u64::from_le_bytes(
@@ -209,7 +208,9 @@ impl SstableReader {
                         .map_err(|_| ContextraError::ParseError("Invalid index offset".into()))?,
                 )
             } else {
-                return Err(ContextraError::Storage("Invalid SSTable magic number".into()));
+                return Err(ContextraError::Storage(
+                    "Invalid SSTable magic number".into(),
+                ));
             }
         };
 
@@ -290,7 +291,9 @@ impl SstableReader {
         let index_bytes_raw = Bytes::from(index_data_raw);
         let index_bytes = if has_crc {
             if index_bytes_raw.len() < 4 {
-                return Err(ContextraError::Storage("Index data too short for CRC".into()));
+                return Err(ContextraError::Storage(
+                    "Index data too short for CRC".into(),
+                ));
             }
             let stored_crc = u32::from_le_bytes(
                 index_bytes_raw[0..4]

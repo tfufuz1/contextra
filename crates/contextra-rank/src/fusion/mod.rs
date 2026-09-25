@@ -14,8 +14,7 @@ pub use provenance::ProvenanceBuilder;
 pub use resonance::{apply_resonance_bonus, fuse_signals, ResonanceConfig};
 pub use rrf::{
     fuse_search_results_with_strategy, reciprocal_rank_fusion, weighted_reciprocal_rank_fusion,
-    weighted_reciprocal_rank_fusion_with_options,
-    weighted_reciprocal_rank_fusion_with_priority,
+    weighted_reciprocal_rank_fusion_with_options, weighted_reciprocal_rank_fusion_with_priority,
 };
 pub use signal::{MetadataMergePriority, SignalKind};
 pub use topk::BoundedTopK;

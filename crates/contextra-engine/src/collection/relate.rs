@@ -1,6 +1,6 @@
 use super::{crud::validate_doc_id, Collection};
-use contextra_types::{DocId, Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     // AI-TAG[CONCURRENCY][CRITICAL] RESOLVED: AGT-DB-005 — relate() rollback race behoben, siehe ADR-023 (TS:2026-08-28T00:00:00Z)

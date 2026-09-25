@@ -371,11 +371,7 @@ impl FlowCorrectedThompsonBandit {
     ///
     /// # Allokationsgarantie
     /// Führt KEINERLEI Heap-Allokationen durch.
-    pub fn sample_score(
-        &self,
-        context: &[f32],
-        rng: &mut dyn FcTsRng,
-    ) -> Result<f32, FcTsError> {
+    pub fn sample_score(&self, context: &[f32], rng: &mut dyn FcTsRng) -> Result<f32, FcTsError> {
         let d = self.config.dim;
         if context.len() != d {
             return Err(FcTsError::DimensionMismatch {
@@ -486,7 +482,11 @@ impl FlowCorrectedThompsonBandit {
                     ap[i] = sum;
                 }
 
-                let p_ap = p.iter().zip(ap.iter()).map(|(&pi, &api)| pi * api).sum::<f32>();
+                let p_ap = p
+                    .iter()
+                    .zip(ap.iter())
+                    .map(|(&pi, &api)| pi * api)
+                    .sum::<f32>();
                 if p_ap <= 1e-12 || !p_ap.is_finite() {
                     break;
                 }
@@ -542,11 +542,7 @@ impl FcTsArmSet {
     /// Wählt den Arm mit dem höchsten gesampelten Score aus (Argmax).
     ///
     /// Bei Gleichstand wird der kleinste Arm-Index gewählt.
-    pub fn select_arm(
-        &self,
-        context: &[f32],
-        rng: &mut dyn FcTsRng,
-    ) -> Result<u32, FcTsError> {
+    pub fn select_arm(&self, context: &[f32], rng: &mut dyn FcTsRng) -> Result<u32, FcTsError> {
         if self.arms.is_empty() {
             return Err(FcTsError::InvalidConfig("FcTsArmSet is empty".to_string()));
         }

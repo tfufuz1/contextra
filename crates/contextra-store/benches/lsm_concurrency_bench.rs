@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use contextra_core::{StorageEngine, TxId};
 use contextra_store::{LsmConfig, LsmStorage};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;

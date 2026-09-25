@@ -2,8 +2,8 @@ use super::super::*;
 use crate::csr::inner::GraphInner;
 use crate::csr::types::{CsrGraphConfig, EdgeType};
 use crate::GraphIndexExt;
-use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
 use contextra_ports::GraphIndex;
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 

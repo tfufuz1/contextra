@@ -1,9 +1,7 @@
-use contextra_ports::{LlmTextGenerator, StorageEngine, VectorIndex};
-use contextra_types::{
-    ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId,
-};
 use contextra_engine::collection::{Collection, StoredDocumentMeta};
 use contextra_engine::transaction::CommitIntent;
+use contextra_ports::{LlmTextGenerator, StorageEngine, VectorIndex};
+use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
 
 use super::compactor::ContextCompactor;
 use super::types::CompactionStrategy;
@@ -13,7 +11,8 @@ use super::types::CompactionStrategy;
 /// Prevents lost updates / phantom erasures by verifying that no source documents were modified
 /// while asynchronous LLM summarization was in progress. Also journals a `CommitIntent::Consolidation`
 /// entry into storage for crash resilience (INV-CONSOLIDATE-1, INV-CONSOLIDATE-2).
-pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
+pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex>
+{
     /// Reference to the active collection.
     pub collection: &'a Collection<S, V>,
     /// Source document IDs and their transaction IDs captured at read snapshot time.

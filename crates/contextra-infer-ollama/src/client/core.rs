@@ -7,8 +7,8 @@ use super::wire::{
     BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk, EmbedRequest,
     EmbedResponse, GenerateRequest, GenerateResponse,
 };
-use futures_util::StreamExt;
 use contextra_types::{ContextraError, Result};
+use futures_util::StreamExt;
 use serde::Deserialize;
 use std::time::Duration;
 
@@ -507,7 +507,9 @@ impl OllamaClient {
         body["message"]["content"]
             .as_str()
             .map(|s| s.trim().to_string())
-            .ok_or_else(|| ContextraError::Internal("Ollama response missing message.content".into()))
+            .ok_or_else(|| {
+                ContextraError::Internal("Ollama response missing message.content".into())
+            })
     }
 
     /// Generates non-streaming text completion via POST /api/generate.

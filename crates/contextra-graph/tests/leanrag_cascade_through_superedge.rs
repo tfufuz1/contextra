@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used)]
 
-use contextra_types::{DocId, EntityId, TxId};
 use contextra_graph::cascade::cascade_invalidate_hyperedges_for_superseded_doc;
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use contextra_types::{DocId, EntityId, TxId};
 
 #[tokio::test]
 async fn test_leanrag_cascade_recursive_through_superedges() {

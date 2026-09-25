@@ -1,8 +1,8 @@
 //! Integration tests for B-5: Tombstone read evaluation & MVCC snapshot isolation in inverted index search.
 
-use contextra_types::{DocId, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::InvertedIndex;
+use contextra_types::{DocId, Result, TxId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;

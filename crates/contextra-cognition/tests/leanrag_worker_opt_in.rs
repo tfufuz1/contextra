@@ -2,13 +2,13 @@ use contextra_cognition::aggregation_phase::AggregationConfig;
 use contextra_cognition::consolidation_executor::ConsolidationEngine;
 use contextra_cognition::leanrag_input::build_leanrag_inputs;
 use contextra_cognition::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
-use contextra_ports::{BoxFuture, LlmTextGenerator};
-use contextra_types::{DocId, EntityId};
 use contextra_engine::collection::Collection;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
+use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_store::LsmStorage;
+use contextra_types::{DocId, EntityId};
 use contextra_vector::HnswIndex;
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -310,7 +310,10 @@ async fn test_build_leanrag_inputs_determinism_and_max_nodes() {
     let inputs1 = build_leanrag_inputs(col.as_ref(), &turns, 10);
     let inputs2 = build_leanrag_inputs(col.as_ref(), &turns, 10);
 
-    assert_eq!(inputs1, inputs2, "build_leanrag_inputs must be deterministic");
+    assert_eq!(
+        inputs1, inputs2,
+        "build_leanrag_inputs must be deterministic"
+    );
     assert_eq!(inputs1.nodes.len(), 4);
     assert_eq!(inputs1.edges.len(), 4);
 

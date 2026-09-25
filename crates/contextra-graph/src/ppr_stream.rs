@@ -10,8 +10,8 @@
 //!
 //! The performance gain (P24) stems from seed-local forward-push calculation in the underlying PPR engine, rather than incremental batching.
 
-use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
 use contextra_ports::GraphIndex;
+use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
 use std::collections::{HashSet, VecDeque};
 
 /// Default batch size for candidate retrieval (Spec §21.2).

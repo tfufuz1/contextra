@@ -1,6 +1,6 @@
-use contextra_types::EntityId;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use contextra_types::EntityId;
 
 /// Helper function computing Convention K star expansion weight: w_star = 2w / (|e| - 1)
 pub fn star_weight_convention_k(hyperedge_weight: f32, cardinality: usize) -> f32 {

@@ -39,9 +39,9 @@ pub(super) async fn write_salt_atomically(
 
         tokio::task::spawn_blocking(move || -> Result<()> {
             use std::io::Write;
-            std_file
-                .write_all(&buf_copy)
-                .map_err(|e| ContextraError::Storage(format!("Failed to write SALT bytes: {}", e)))?;
+            std_file.write_all(&buf_copy).map_err(|e| {
+                ContextraError::Storage(format!("Failed to write SALT bytes: {}", e))
+            })?;
             std_file.sync_all().map_err(|e| {
                 ContextraError::Storage(format!("Failed to sync temp SALT file: {}", e))
             })?;
@@ -533,7 +533,9 @@ impl LsmStorage {
                 std::fs::File::open(&parent)
                     .and_then(|f| f.sync_all())
                     .map_err(|e| {
-                        ContextraError::Storage(format!("Failed to fsync dir after intent file: {e}"))
+                        ContextraError::Storage(format!(
+                            "Failed to fsync dir after intent file: {e}"
+                        ))
                     })
             })
             .await

@@ -230,7 +230,10 @@ mod tests {
         let index = VectorIndexPlaceholder;
         let res = index.search_at(&[1.0, 0.0], 5, 1).await;
         assert!(
-            !matches!(res, Err(crate::ContextraError::CapabilityUnsupported { .. })),
+            !matches!(
+                res,
+                Err(crate::ContextraError::CapabilityUnsupported { .. })
+            ),
             "search_at returned CapabilityUnsupported"
         );
         assert!(!index.is_rebuild_required());

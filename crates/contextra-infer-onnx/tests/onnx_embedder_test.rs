@@ -1,7 +1,7 @@
 #![cfg(feature = "onnx")]
 
-use contextra_ports::{EmbeddingError, EmbeddingProvider};
 use contextra_infer_onnx::{OnnxEmbedder, TextEmbedderConfig};
+use contextra_ports::{EmbeddingError, EmbeddingProvider};
 use std::path::PathBuf;
 use std::sync::Arc;
 

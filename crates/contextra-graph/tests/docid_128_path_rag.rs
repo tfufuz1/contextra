@@ -1,5 +1,5 @@
-use contextra_types::{DocId, EntityId};
 use contextra_graph::path_rag::{GraphPath, PathGraph, PathRAGEngine};
+use contextra_types::{DocId, EntityId};
 use std::collections::HashMap;
 
 struct DummyGraph;

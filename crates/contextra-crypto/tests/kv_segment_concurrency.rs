@@ -2,10 +2,10 @@
 // ZWECK: Concurrency Stress Test für TenantIsolatedKvStore und EvictionWorker unter hoher Parallellast.
 // STAND: TS:2026-09-09T16:15:00Z (SESSION: dafac391)
 
-use contextra_types::TenantId;
 use contextra_crypto::kv_segment::{
     emergency_wipe, EvictionWorker, KvSegment, TenantIsolatedKvStore,
 };
+use contextra_types::TenantId;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;

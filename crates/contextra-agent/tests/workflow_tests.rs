@@ -89,8 +89,8 @@ fn test_background_event_boundary_validation() {
 #[tokio::test]
 async fn test_agent_context_boundary_validation() {
     use contextra_agent::context::AgentContext;
+    use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
     use contextra_types::TokenBudget;
-    use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
 
@@ -177,8 +177,8 @@ impl contextra_agent::AgentTool for CountingTool {
 async fn test_pre_execution_budget_check_prevents_tool_execution() {
     use contextra_agent::context::AgentContext;
     use contextra_agent::{NodeType, OrchestratorEngine, StateGraph};
+    use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
     use contextra_types::TokenBudget;
-    use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
 
@@ -260,8 +260,8 @@ async fn test_pre_execution_budget_check_prevents_tool_execution() {
 async fn test_replay_from_restores_budget_state() {
     use contextra_agent::context::AgentContext;
     use contextra_agent::{NodeType, OrchestratorEngine, StateGraph};
+    use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
     use contextra_types::TokenBudget;
-    use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
 
@@ -333,8 +333,8 @@ async fn test_replay_from_restores_budget_state() {
 async fn test_replay_from_identifier_resolution() {
     use contextra_agent::context::AgentContext;
     use contextra_agent::{NodeType, OrchestratorEngine, StateGraph};
+    use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
     use contextra_types::TokenBudget;
-    use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
 
@@ -476,8 +476,8 @@ async fn test_audit_log_field_reused_across_steps() {
     use contextra_agent::audit::AuditLog;
     use contextra_agent::context::AgentContext;
     use contextra_agent::{NodeType, OrchestratorEngine, StateGraph};
+    use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
     use contextra_types::TokenBudget;
-    use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
     use std::sync::Arc;
     use tempfile::TempDir;
 

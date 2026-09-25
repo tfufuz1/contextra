@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use contextra_store::sstable::{create_block_cache, SstableBuilder, SstableReader};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 

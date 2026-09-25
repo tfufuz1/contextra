@@ -7,9 +7,9 @@
 //! - Super-Hyperkanten-Entwürfe via `SuperEdgeSink`-Trait
 
 use crate::memory_consolidation::{CommunityStabilityTracker, ConsolidationPhaseResult};
+use contextra_graph::HyperEdgeId;
 use contextra_ports::LlmTextGenerator;
 use contextra_types::{ContextraError, EntityId, Result};
-use contextra_graph::HyperEdgeId;
 use std::collections::{HashMap, HashSet};
 
 /// Konfiguration für die Aggregation-Phase.
@@ -272,10 +272,8 @@ pub async fn run_aggregation_pass(
         ));
     }
 
-    let node_type_map: HashMap<EntityId, u32> = sorted_nodes
-        .iter()
-        .map(|n| (n.entity, n.type_id))
-        .collect();
+    let node_type_map: HashMap<EntityId, u32> =
+        sorted_nodes.iter().map(|n| (n.entity, n.type_id)).collect();
 
     for node in &sorted_nodes {
         if node.embedding.len() != dim {
@@ -298,9 +296,7 @@ pub async fn run_aggregation_pass(
     let mut pred_total_counts: HashMap<u32, usize> = HashMap::new();
 
     for edge in &sorted_edges {
-        let entry_map = pred_type_counts
-            .entry(edge.predicate_type)
-            .or_default();
+        let entry_map = pred_type_counts.entry(edge.predicate_type).or_default();
         let total = pred_total_counts.entry(edge.predicate_type).or_default();
 
         for part in &edge.participants {

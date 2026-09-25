@@ -1,8 +1,8 @@
 use super::intent::StagedKeyOp;
 use crate::Collection;
 use bytes::Bytes;
-use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;

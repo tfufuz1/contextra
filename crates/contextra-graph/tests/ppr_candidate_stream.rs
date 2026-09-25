@@ -2,9 +2,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, PprConfig, TxId};
-use contextra_ports::{GraphIndex, GraphIndexStats};
 use contextra_graph::{CsrGraph, PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
+use contextra_ports::{GraphIndex, GraphIndexStats};
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, PprConfig, TxId};
 use std::collections::HashSet;
 
 struct MockNoPprGraph;
@@ -34,11 +34,17 @@ impl GraphIndex for MockNoPprGraph {
         Box::pin(async move { Ok(()) })
     }
 
-    fn commit<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+    fn commit<'a>(
+        &'a self,
+        _tx: TxId,
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
-    fn rollback<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+    fn rollback<'a>(
+        &'a self,
+        _tx: TxId,
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move { Ok(()) })
     }
 
@@ -78,7 +84,10 @@ async fn test_chain_graph_batches_and_ordering() {
 
     for i in 1..=NODE_COUNT {
         graph
-            .add_entity(tx, Entity::new(EntityId::new(i as u64), format!("N{i}"), "Node"))
+            .add_entity(
+                tx,
+                Entity::new(EntityId::new(i as u64), format!("N{i}"), "Node"),
+            )
             .await
             .unwrap();
     }
@@ -180,7 +189,10 @@ async fn test_snapshot_behavior_isolated_from_subsequent_mutations() {
             .await
             .unwrap();
         graph
-            .add_edge(tx2, Edge::new(EntityId::new(1), EntityId::new(i), "new_edge"))
+            .add_edge(
+                tx2,
+                Edge::new(EntityId::new(1), EntityId::new(i), "new_edge"),
+            )
             .await
             .unwrap();
     }
@@ -283,12 +295,12 @@ async fn test_next_batch_docs_skips_unresolvable_entities() {
     graph.commit(tx).await.unwrap();
 
     let seeds = vec![EntityId::new(1)];
-    let mut stream = PprCandidateStream::new(&graph, seeds, PprConfig::default())
-        .with_batch_size(4);
+    let mut stream =
+        PprCandidateStream::new(&graph, seeds, PprConfig::default()).with_batch_size(4);
 
     let resolver = |eid: EntityId| {
         if eid.inner() % 2 == 0 {
-            Some(DocId::from(eid.inner()))
+            Some(DocId::new(eid.inner()))
         } else {
             None
         }

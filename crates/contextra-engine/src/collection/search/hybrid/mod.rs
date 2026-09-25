@@ -5,8 +5,8 @@ mod query;
 
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{extract_effective_importance, Collection};
-use contextra_types::{DocId, EntityId, Result, TxId};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{DocId, EntityId, Result, TxId};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs hybrid search combining BM25, vector search, and graph traversal results via RRF.

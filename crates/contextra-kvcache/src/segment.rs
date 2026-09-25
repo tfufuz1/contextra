@@ -2,8 +2,8 @@
 // ZWECK: KvSegment mit Zeroize-Garantie, Tier-2 AEAD-Verschlüsselung & Crypto-Shredding.
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_types::{ContextraError, TenantId};
 use contextra_crypto::CryptoKey;
+use contextra_types::{ContextraError, TenantId};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -50,7 +50,9 @@ impl ShreddableSegmentKey {
     pub fn encrypt(&self, plaintext: &[u8]) -> Result<(Vec<u8>, [u8; 12]), ContextraError> {
         let guard = self.key_manager.read();
         let km = guard.as_ref().ok_or_else(|| {
-            ContextraError::Crypto("Segment key has been shredded: decryption impossible".to_string())
+            ContextraError::Crypto(
+                "Segment key has been shredded: decryption impossible".to_string(),
+            )
         })?;
         km.encrypt_auto_nonce(plaintext)
             .map_err(|e| ContextraError::Crypto(e.to_string()))
@@ -60,7 +62,9 @@ impl ShreddableSegmentKey {
     pub fn decrypt(&self, ciphertext: &[u8], nonce: &[u8; 12]) -> Result<Vec<u8>, ContextraError> {
         let guard = self.key_manager.read();
         let km = guard.as_ref().ok_or_else(|| {
-            ContextraError::Crypto("Segment key has been shredded: decryption impossible".to_string())
+            ContextraError::Crypto(
+                "Segment key has been shredded: decryption impossible".to_string(),
+            )
         })?;
         km.decrypt_auto_nonce(ciphertext, nonce)
             .map_err(|e| ContextraError::Crypto(e.to_string()))

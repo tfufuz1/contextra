@@ -1,8 +1,8 @@
 use super::mock::MockStorage;
 use crate::inverted::{BM25MorphIndex, InvertedIndex, Language, TextIndexMetadata};
 use crate::tokenizer::{DefaultTokenizer, Tokenizer};
-use contextra_types::{DocId, ContextraError, Result, TxId};
 use contextra_ports::{StorageEngine, TextIndex};
+use contextra_types::{ContextraError, DocId, Result, TxId};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -118,7 +118,7 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
     let mut current_doc_lengths = HashMap::new();
 
     for (i, text) in docs.iter().enumerate() {
-        let doc_id = DocId::from((i + 1) as u64);
+        let doc_id = DocId::new((i + 1) as u64);
         let tx = TxId::new((i + 1) as u64);
         let tokens = DefaultTokenizer.tokenize(text);
         current_doc_lengths.insert(doc_id, tokens.len() as u64);
@@ -132,7 +132,7 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
 
     // Step 2: Delete 5 documents (DocId 1..=5)
     for i in 1..=5 {
-        let doc_id = DocId::from(i as u64);
+        let doc_id = DocId::new(i as u64);
         let tx = TxId::new(100 + i as u64);
         current_doc_lengths.remove(&doc_id);
 
@@ -153,7 +153,7 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
     ];
 
     for (i, text) in new_docs.iter().enumerate() {
-        let doc_id = DocId::from((11 + i) as u64);
+        let doc_id = DocId::new((11 + i) as u64);
         let tx = TxId::new(200 + i as u64);
         let tokens = DefaultTokenizer.tokenize(text);
         current_doc_lengths.insert(doc_id, tokens.len() as u64);
@@ -412,7 +412,7 @@ async fn test_staged_stats_limit_exceeded() -> Result<()> {
     // Fill staged_stats up to MAX_STAGED_TRANSACTIONS
     for i in 1..=InvertedIndex::<MockStorage>::MAX_STAGED_TRANSACTIONS {
         let tx = TxId::new(i as u64);
-        let doc_id = DocId::from(i as u64);
+        let doc_id = DocId::new(i as u64);
         index.upsert_document(tx, doc_id, "test document").await?;
     }
 

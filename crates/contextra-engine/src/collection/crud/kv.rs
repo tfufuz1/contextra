@@ -1,7 +1,7 @@
 use super::internal::validate_doc_id;
 use crate::collection::Collection;
-use contextra_types::{Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::Result;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Stores a non-vector key-value entry directly in LSM storage without touching vector, text, or graph indices.

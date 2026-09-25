@@ -1,7 +1,7 @@
 use super::*;
 use crate::embedding::OllamaEmbedder;
-use contextra_types::ContextraError;
 use contextra_ports::TextEmbeddingEngine;
+use contextra_types::ContextraError;
 use std::time::Duration;
 
 #[tokio::test]
@@ -969,7 +969,10 @@ async fn test_no_retry_on_400() {
     let result = client.embed("nomic-embed-text", "bad request test").await;
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), ContextraError::InvalidInput(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        ContextraError::InvalidInput(_)
+    ));
     // Must NOT retry 400 -> exactly 1 attempt
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
 }
@@ -1517,9 +1520,9 @@ async fn test_system_instruction_preserves_injection_guard(
 
 #[tokio::test]
 async fn test_llm_text_generator_streaming_ollama_mock() {
-    use futures_util::StreamExt;
+    use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
     use contextra_types::ConfigFingerprint;
-use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
+    use futures_util::StreamExt;
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();

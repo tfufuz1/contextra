@@ -2,8 +2,8 @@
 // ZWECK: Tenant-Isolations-Tests für den KV-Cache (Task KV-05 / INV-TENANT).
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_types::{ContextraError, TenantId};
 use contextra_kvcache::{emergency_wipe, KvReusePolicy, KvSegment, TenantIsolatedKvStore};
+use contextra_types::{ContextraError, TenantId};
 
 #[test]
 fn test_tenant_isolation_direct_lookup_and_segments() -> Result<(), ContextraError> {

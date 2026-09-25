@@ -43,13 +43,12 @@ async fn test_search_dimension_mismatch_rejected() {
     assert!(hybrid_res.is_err());
 }
 
-
 #[tokio::test]
 async fn test_checkpoint_unpin_on_search_error_path() {
-use contextra_types::{FilterExpr, Result, TxId};
-use contextra_ports::{StorageStats};
-use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::CsrGraph;
+    use contextra_ports::StorageStats;
+    use contextra_ports::{BoxFuture, StorageEngine};
+    use contextra_types::{FilterExpr, Result, TxId};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
     use std::sync::Arc;
@@ -193,7 +192,6 @@ use contextra_ports::{BoxFuture, StorageEngine};
     );
 }
 
-
 #[tokio::test]
 async fn test_search_k_zero_returns_canonical_error_message(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -252,7 +250,6 @@ async fn test_search_k_zero_returns_canonical_error_message(
     Ok(())
 }
 
-
 #[tokio::test]
 async fn test_single_pid_controller_instantiation_in_query_builder() {
     // Regression test: verify that exactly one PID controller type (contextra_adapt::PidController)
@@ -270,13 +267,12 @@ async fn test_single_pid_controller_instantiation_in_query_builder() {
     assert!(updated >= 50);
 }
 
-
 #[tokio::test]
 async fn test_query_builder_query_config_include_superseded_displacement(
 ) -> contextra_types::Result<()> {
-    use contextra_types::{DocId, HybridQuery};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::{DocId, HybridQuery};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -350,13 +346,12 @@ async fn test_query_builder_query_config_include_superseded_displacement(
     Ok(())
 }
 
-
 #[tokio::test]
 async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use contextra_types::EntityId;
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::EntityId;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -447,13 +442,12 @@ async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
     Ok(())
 }
 
-
 #[tokio::test]
-async fn test_post_rrf_supersedes_displacement_truncation_preserves_k() -> contextra_types::Result<()>
-{
-    use contextra_types::DocId;
+async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
+) -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::DocId;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;

@@ -203,7 +203,9 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             }
             res
         } else {
-            Err(ContextraError::Internal("Checkpoint already consumed".into()))
+            Err(ContextraError::Internal(
+                "Checkpoint already consumed".into(),
+            ))
         }
     }
 
@@ -269,7 +271,7 @@ impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+    use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
     use parking_lot::Mutex;
     use std::collections::{HashMap, HashSet};
 

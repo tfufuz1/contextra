@@ -7,8 +7,8 @@
 
 use crate::client::{OllamaClient, OllamaConfig, DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL};
 use crate::model_info::known_dimension;
-use contextra_types::ContextraError;
 use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider};
+use contextra_types::ContextraError;
 
 /// Implementation of `TextEmbeddingEngine` using Ollama's HTTP API.
 #[derive(Clone, Debug)]

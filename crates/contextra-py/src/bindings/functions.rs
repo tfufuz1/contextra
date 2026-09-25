@@ -72,12 +72,7 @@ pub fn open(
             .map_err(contextra_err)
     })?;
 
-    Ok(PyContextra::new(
-        Arc::new(db),
-        rt,
-        worker_threads,
-        poisoned,
-    ))
+    Ok(PyContextra::new(Arc::new(db), rt, worker_threads, poisoned))
 }
 
 #[pyfunction]

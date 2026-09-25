@@ -2,7 +2,7 @@
 // ANCHOR[INTEGRATION:STRESS-001] STATUS:DONE (TS:2026-05-18T00:00:00Z)
 
 use contextra_core::VectorIndex;
-use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;

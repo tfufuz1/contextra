@@ -12,8 +12,8 @@
 mod basic;
 mod checkpoint;
 mod filtered;
-mod hydrate;
 mod hybrid;
+mod hydrate;
 
 pub use checkpoint::{
     with_pinned_checkpoint, with_pinned_checkpoint_and_guard, with_pinned_checkpoint_at_latest,

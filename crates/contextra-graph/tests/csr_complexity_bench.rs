@@ -1,6 +1,6 @@
-use contextra_types::{Entity, EntityId};
-use contextra_ports::GraphIndex;
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
+use contextra_ports::GraphIndex;
+use contextra_types::{Entity, EntityId};
 use std::sync::Arc;
 use std::time::Instant;
 

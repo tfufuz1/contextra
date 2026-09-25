@@ -1,6 +1,6 @@
-use contextra_types::{Edge, Entity, EntityId, PprConfig, TxId};
-use contextra_ports::GraphIndex;
 use contextra_graph::CsrGraph;
+use contextra_ports::GraphIndex;
+use contextra_types::{Edge, Entity, EntityId, PprConfig, TxId};
 use std::collections::HashMap;
 
 /// Helper function to create a graph entity with standard naming

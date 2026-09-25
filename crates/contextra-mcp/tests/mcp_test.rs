@@ -1,10 +1,10 @@
 use contextra::Contextra;
-use contextra_ports::BoxFuture;
 use contextra_mcp::{
     protocol::JsonRpcRequest,
     sandbox::{McpSandbox, SandboxPolicy},
     McpServer,
 };
+use contextra_ports::BoxFuture;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;

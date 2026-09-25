@@ -2,8 +2,8 @@
 // ZWECK: Hydrierungs-Familie (hydrate_from_scored_at, hydrate_from_tuples_at) für Collection.
 
 use super::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_types::{DocId, Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub(super) async fn hydrate_from_scored_at(

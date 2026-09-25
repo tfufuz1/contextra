@@ -115,7 +115,9 @@ pub fn block_binary_search(
         let entry_off = u16::from_le_bytes(
             block_data
                 .get(off_pos..off_pos + 2)
-                .ok_or_else(|| ContextraError::Storage("malformed block: off_pos in bsearch".into()))?
+                .ok_or_else(|| {
+                    ContextraError::Storage("malformed block: off_pos in bsearch".into())
+                })?
                 .try_into()
                 .map_err(|_| ContextraError::Storage("invalid slice in bsearch".into()))?,
         ) as usize;
@@ -128,7 +130,9 @@ pub fn block_binary_search(
         ) as usize;
         let entry_key = block_data
             .get(entry_off + 2..entry_off + 2 + k_len)
-            .ok_or_else(|| ContextraError::Storage("malformed block: entry_key in bsearch".into()))?;
+            .ok_or_else(|| {
+                ContextraError::Storage("malformed block: entry_key in bsearch".into())
+            })?;
         match entry_key.cmp(key) {
             std::cmp::Ordering::Less => lo = mid + 1,
             std::cmp::Ordering::Greater | std::cmp::Ordering::Equal => hi = mid,
@@ -139,7 +143,9 @@ pub fn block_binary_search(
         let entry_off = u16::from_le_bytes(
             block_data
                 .get(off_pos..off_pos + 2)
-                .ok_or_else(|| ContextraError::Storage("malformed block: off_pos in bsearch".into()))?
+                .ok_or_else(|| {
+                    ContextraError::Storage("malformed block: off_pos in bsearch".into())
+                })?
                 .try_into()
                 .map_err(|_| ContextraError::Storage("invalid slice in bsearch".into()))?,
         ) as usize;
@@ -152,7 +158,9 @@ pub fn block_binary_search(
         ) as usize;
         let entry_key = block_data
             .get(entry_off + 2..entry_off + 2 + k_len)
-            .ok_or_else(|| ContextraError::Storage("malformed block: entry_key in bsearch".into()))?;
+            .ok_or_else(|| {
+                ContextraError::Storage("malformed block: entry_key in bsearch".into())
+            })?;
         if entry_key == key {
             return Ok(Some(entry_off));
         }

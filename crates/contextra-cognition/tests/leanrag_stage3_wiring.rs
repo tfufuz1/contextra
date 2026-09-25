@@ -1,15 +1,13 @@
-use contextra_cognition::aggregation_phase::{
-    AggregationConfig, AggregationEdge, AggregationNode,
-};
+use contextra_cognition::aggregation_phase::{AggregationConfig, AggregationEdge, AggregationNode};
 use contextra_cognition::consolidation_executor::execute_leanrag_aggregation_stage;
 use contextra_cognition::memory_consolidation::CommunityStabilityTracker;
-use contextra_ports::{BoxFuture, LlmTextGenerator};
-use contextra_types::{EntityId, TxId};
 use contextra_engine::collection::Collection;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
+use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_store::LsmStorage;
+use contextra_types::{EntityId, TxId};
 use contextra_vector::HnswIndex;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -23,7 +21,8 @@ impl LlmTextGenerator for TestMockLlm {
     }
 }
 
-async fn create_test_collection() -> Option<(Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir)> {
+async fn create_test_collection(
+) -> Option<(Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir)> {
     let dir = tempdir().ok()?;
     let storage = Arc::new(
         LsmStorage::new(contextra_store::LsmConfig {
@@ -163,7 +162,10 @@ async fn test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph()
     )
     .await;
 
-    assert!(stage_res.is_ok(), "execute_leanrag_aggregation_stage should succeed");
+    assert!(
+        stage_res.is_ok(),
+        "execute_leanrag_aggregation_stage should succeed"
+    );
     if let Ok((result, alpha_nodes)) = stage_res {
         assert!(
             result.abstract_hyperedges_created > 0,
@@ -177,7 +179,10 @@ async fn test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph()
     assert!(max_id > 3, "New superedge should have ID > 3");
 
     let superedge = graph.get_hyperedge(HyperEdgeId::new(max_id));
-    assert!(superedge.is_some(), "Superedge must be retrievable from graph");
+    assert!(
+        superedge.is_some(),
+        "Superedge must be retrievable from graph"
+    );
     if let Some(edge) = superedge {
         assert!(!edge.child_edge_ids.is_empty());
     }

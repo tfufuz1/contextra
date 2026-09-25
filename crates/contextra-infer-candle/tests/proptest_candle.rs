@@ -3,10 +3,10 @@
 // ZWECK: Property-based tests for contextra-candle components (fingerprinting, GaspValidator, and clients).
 // INVARIANTEN: Property tests must cover arbitrary inputs without panicking or producing illegal confidence/grounding scores.
 
-use contextra_types::ContextChunk;
-use contextra_types::DocId;
 use contextra_infer_candle::gasp::{GaspConfig, GaspValidator};
 use contextra_infer_candle::model_registry::{compute_fingerprint, CandleQuantization};
+use contextra_types::ContextChunk;
+use contextra_types::DocId;
 use proptest::prelude::*;
 use std::io::Write;
 use tempfile::NamedTempFile;
@@ -42,7 +42,7 @@ proptest! {
     ) {
         let validator = GaspValidator::new();
         let chunk = ContextChunk {
-            doc_id: DocId::from(1u64),
+            doc_id: DocId::new(1),
             content: chunk_content,
             relevance: 1.0,
             token_count: 10,

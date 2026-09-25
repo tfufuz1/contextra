@@ -14,9 +14,9 @@ pub use contextra_engine::{
     background_workers, chunker, collection, export, filter, import, temporal_filter, transaction,
 };
 pub use contextra_engine::{
-    CommunityDetectionConfig, DbStats, Document, EmbeddingBackend, ExportCollectionV1,
-    ExportDocumentV1, ExportMemoryV1, ExportRelationV1, HybridQueryBuilder, ImportSummary,
-    Language, Contextra, ContextraConfig, ContextraStats, ProvenanceRecord, SearchResult, SearchStrategy,
+    CommunityDetectionConfig, Contextra, ContextraConfig, ContextraStats, DbStats, Document,
+    EmbeddingBackend, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1, ExportRelationV1,
+    HybridQueryBuilder, ImportSummary, Language, ProvenanceRecord, SearchResult, SearchStrategy,
     SignalContribution, SignalWeights, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
 };
 
@@ -355,12 +355,9 @@ mod tests {
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
             contextra_rank::IsotonicCalibrator::new(5, 100),
         ));
-        let pid_arc = Arc::new(parking_lot::Mutex::new(contextra_adapt::PidController::new(
-            150.0,
-            50,
-            200,
-            Some(100),
-        )));
+        let pid_arc = Arc::new(parking_lot::Mutex::new(
+            contextra_adapt::PidController::new(150.0, 50, 200, Some(100)),
+        ));
 
         // Warmup calibrator so ECE is populated
         {

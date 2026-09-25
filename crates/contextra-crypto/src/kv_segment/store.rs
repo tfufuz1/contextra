@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use ahash::AHashMap;
-use lru::LruCache;
 use contextra_types::TenantId;
+use lru::LruCache;
 use parking_lot::RwLock;
 
 use super::segment::KvSegment;

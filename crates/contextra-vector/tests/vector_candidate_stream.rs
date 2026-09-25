@@ -1,4 +1,7 @@
-use contextra_core::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId, VectorIndex, VectorIndexStats};
+use contextra_core::{
+    ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId, VectorIndex,
+    VectorIndexStats,
+};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 use rand::Rng;
@@ -111,10 +114,7 @@ async fn test_full_exhaustion_200_vectors() -> Result<()> {
             break;
         }
         for doc in batch {
-            assert!(
-                collected.insert(doc.doc_id),
-                "Duplicate DocId found"
-            );
+            assert!(collected.insert(doc.doc_id), "Duplicate DocId found");
             total_yielded += 1;
         }
     }

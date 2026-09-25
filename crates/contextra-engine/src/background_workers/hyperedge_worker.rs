@@ -3,8 +3,8 @@
 // INVARIANTEN: Geordnete Entnahme und Beschränkung der pro Tick verarbeiteten Hyperedges.
 
 use crate::collection::Collection;
-use contextra_ports::StorageEngine;
 use contextra_graph::hyperedge::HyperEdgeId;
+use contextra_ports::StorageEngine;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
