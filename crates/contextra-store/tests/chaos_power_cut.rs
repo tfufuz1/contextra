@@ -1,3 +1,4 @@
+// ANCHOR[TEST:STO-003] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
 // FILE-CONTEXT: Chaos test verifying SIGKILL process termination recovery and durability invariants. (TS: 2026-09-05) (SESSION: chaos_power_cut)
 //! Chaos test proving `LsmStorage` recovery and durability guarantees under actual process SIGKILL.
 //!

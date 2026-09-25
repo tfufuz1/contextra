@@ -1,3 +1,4 @@
+// ANCHOR[TEST:STO-004] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
 // LIMITATION: FaultVfs from contextra-testkit is an in-memory VFS simulation
 // (tracking operation counts like fail_writes_after / fail_syncs_after).
 // LsmStorage directly interacts with file systems via tokio::fs / std::fs.
