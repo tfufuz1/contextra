@@ -569,10 +569,12 @@ name = "contextra"
 version = "0.1.0"
 dependencies = [
  "contextra-core",
+ "contextra-crypto",
  "contextra-db",
  "contextra-infer-candle",
  "contextra-infer-ollama",
  "contextra-infer-onnx",
+ "contextra-privacy",
  "contextra-rank",
  "contextra-router",
  "serde",
@@ -614,6 +616,18 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "contextra-audit-export"
+version = "0.1.0"
+dependencies = [
+ "contextra-ports",
+ "contextra-types",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]
