@@ -748,6 +748,7 @@ dependencies = [
  "contextra-types",
  "contextra-vector",
  "criterion",
+ "ed25519-dalek",
  "parking_lot 0.12.5",
  "proptest",
  "serde",
