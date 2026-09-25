@@ -87,6 +87,7 @@ mod claim;
 mod gen_feature_catalog;
 mod gen_prompter_data;
 mod generate_adr;
+mod generate_markers;
 mod init_audit_fix;
 mod jules_preflight;
 mod jules_submit_gate;
@@ -2081,6 +2082,20 @@ fn main() {
     match subcommand {
         "debt-audit" => {
             if let Err(e) = gates::debt_audit::run_debt_audit() {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+        }
+        "generate-markers" => {
+            let output = args.iter().position(|a| a == "--output").and_then(|i| args.get(i + 1)).map(Path::new);
+            if let Err(e) = generate_markers::run_generate_markers(output) {
+                eprintln!("{}", e);
+                process::exit(1);
+            }
+        }
+        "check-marker-drift" => {
+            let output = args.iter().position(|a| a == "--output").and_then(|i| args.get(i + 1)).map(Path::new);
+            if let Err(e) = generate_markers::run_check_marker_drift(output) {
                 eprintln!("{}", e);
                 process::exit(1);
             }
