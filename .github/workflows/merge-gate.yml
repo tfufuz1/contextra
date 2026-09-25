@@ -48,6 +48,29 @@ jobs:
         with:
           command: check advisories bans licenses sources
 
+  phantom-commit-gate:
+    name: Phantom Commit Protection Gate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Phantom Commit Gate
+        run: cargo run -p xtask -- check-commit-diff-integrity --range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+
   hyperedge-schema-merge:
     name: HyperEdge Schema Merge Gate
     needs: [flatbuffers-drift-gate]

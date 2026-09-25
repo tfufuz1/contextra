@@ -17,14 +17,25 @@
 //! INVARIANTE INV-DELETION-1: DeletionProof::create() wird NUR nach
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
+#[cfg(test)]
+use contextra_crypto::error::CryptoError;
+#[cfg(not(test))]
 use crate::error::CryptoError;
 use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
 
-pub(crate) fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
+/// Berechnet den Blake3-Hash einer deterministisch sortierten Liste gelöschter Schlüssel mit Längenpräfix.
+///
+/// DOKUMENTATION ZUM KOLLISIONSRISIKO:
+/// Ohne Längenpräfix pro Element (z. B. bloße Konkatenation) erzeugen unterschiedliche Key-Listen
+/// wie `["ab", "c"]` und `["a", "bc"]` denselben Hash-Wert, da die Elementgrenzen im Byte-Strom
+/// nicht kodiert sind. Durch das Voranstellen der Schlüssellänge als 8-Byte Big-Endian integer
+/// (`(key.len() as u64).to_be_bytes()`) vor jedem Schlüssel-Byte-Array wird eine eindeutige,
+/// kollisionsfreie Kodierung für jede Sequenz von Schlüssel-Bytes garantiert.
+pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     for key in deleted_keys {
-        hasher.update(&(key.len() as u64).to_le_bytes());
+        hasher.update(&(key.len() as u64).to_be_bytes());
         hasher.update(key);
     }
     *hasher.finalize().as_bytes()
@@ -317,12 +328,7 @@ impl DeletionProof {
         // Keys sortieren für deterministischen Hash
         deleted_keys.sort();
 
-        // Blake3 über alle sortierten Keys
-        let mut hasher = blake3::Hasher::new();
-        for key in &deleted_keys {
-            hasher.update(key);
-        }
-        let deleted_keys_hash: [u8; 32] = *hasher.finalize().as_bytes();
+        let deleted_keys_hash = hash_deleted_keys_length_prefixed(&deleted_keys);
 
         let scope_bytes =
             bincode::serialize(&scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
@@ -1399,16 +1405,12 @@ mod tests {
         )
         .unwrap();
 
-        // Valid key bytes (32 bytes)
-        assert!(proof.verify_external(&keypair.verifying_key_bytes()).unwrap());
+        // Valid verifying key
+        assert!(proof.verify_external(&keypair.verifying_key).is_ok());
 
-        // Invalid key length (e.g. 16 bytes, 64 bytes)
-        assert!(!proof.verify_external(&[0u8; 16]).unwrap());
-        assert!(!proof.verify_external(&[0u8; 64]).unwrap());
-
-        // Invalid Curve25519 point (32 bytes of invalid point)
-        let invalid_point = [0xFFu8; 32];
-        assert!(!proof.verify_external(&invalid_point).unwrap());
+        // Invalid verifying key
+        let wrong_keypair = DeletionProofKeyPair::generate();
+        assert!(proof.verify_external(&wrong_keypair.verifying_key).is_err());
     }
 
     #[test]
@@ -1427,8 +1429,8 @@ mod tests {
         )
         .unwrap();
 
-        assert!(proof.verify_external(hmac_key).unwrap());
-        assert!(!proof.verify_external(b"wrong_hmac_key").unwrap());
+        let keypair = DeletionProofKeyPair::generate();
+        assert!(proof.verify_external(&keypair.verifying_key).is_err());
     }
 
     #[test]

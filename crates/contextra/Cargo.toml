@@ -9,6 +9,8 @@ description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
 [dependencies]
 contextra-core = { workspace = true }
 contextra-db = { workspace = true }
+contextra-crypto = { workspace = true, optional = true }
+contextra-privacy = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
@@ -24,7 +26,12 @@ thiserror = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
-default = []
+default = ["fast"]
+fast = []
+sovereign = ["contextra-crypto", "contextra-privacy"]
+compliance = ["sovereign", "audit-export", "avv-generator"]
+audit-export = []
+avv-generator = []
 onnx = ["contextra-infer-onnx/onnx", "contextra-db/onnx"]
 candle = ["contextra-infer-candle"]
 ollama = ["contextra-infer-ollama"]
