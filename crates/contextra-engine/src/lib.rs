@@ -24,6 +24,8 @@ pub mod background_workers;
 pub mod chunker;
 pub mod collection;
 pub mod decay_controller;
+#[cfg(feature = "entity-extraction")]
+pub mod extraction;
 pub mod export;
 pub mod filter;
 pub mod fusion;
