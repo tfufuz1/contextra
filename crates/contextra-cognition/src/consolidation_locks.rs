@@ -13,10 +13,10 @@
 //! importiert werden. `ConsolidationNodesGuard` implementiert das gleiche strukturelle Muster (einziger
 //! Einstiegspunkt fuer geordnete Graph-/Node-Invalidierung waehrend der Konsolidierung).
 
-use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{DocId, Result};
 use contextra_engine::collection::Collection;
 use contextra_graph::cascade::CascadeInvalidationReport;
+use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
 use tokio::sync::MutexGuard;
 
 /// Guard zur Erzwingung der Lock-Reihenfolge und kanonischen Node-Sortierung waehrend der Konsolidierung.

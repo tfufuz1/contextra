@@ -219,7 +219,10 @@ pub fn topological_sort_hyperedge_closure(
 
     if topo_order.len() < node_set.len() {
         let placed: std::collections::HashSet<_> = topo_order.iter().copied().collect();
-        let mut remaining: Vec<_> = node_set.into_iter().filter(|n| !placed.contains(n)).collect();
+        let mut remaining: Vec<_> = node_set
+            .into_iter()
+            .filter(|n| !placed.contains(n))
+            .collect();
         remaining.sort_unstable();
         topo_order.extend(remaining);
     }
@@ -288,7 +291,13 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     }
 
     for &doc_hid in &candidate_ids {
-        dfs_upward(graph, doc_hid, &mut visited, &mut on_stack, &mut closure_nodes);
+        dfs_upward(
+            graph,
+            doc_hid,
+            &mut visited,
+            &mut on_stack,
+            &mut closure_nodes,
+        );
     }
 
     // 2. Topological sort: ensure parents come before children.
@@ -336,8 +345,8 @@ mod tests {
     use crate::csr::EdgeType;
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
     use crate::path_rag::PathRAGEngine;
+    use contextra_ports::GraphIndex;
     use contextra_types::{Edge, Entity};
-use contextra_ports::GraphIndex;
 
     #[tokio::test]
     async fn test_cascade_invalidation_tombstones_edges_of_superseded_doc() {

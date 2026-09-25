@@ -21,10 +21,10 @@
 #[cfg(feature = "onnx")]
 use std::sync::Arc;
 
-#[cfg(feature = "onnx")]
-use contextra_types::{ContextraError, Result};
 #[cfg(any(feature = "onnx", feature = "candle-backend"))]
 use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider};
+#[cfg(feature = "onnx")]
+use contextra_types::{ContextraError, Result};
 #[cfg(feature = "onnx")]
 use ort::value::Value;
 #[cfg(feature = "onnx")]
@@ -450,7 +450,8 @@ impl TextEmbedder {
     /// Returns the number of times an ONNX session has been loaded by this embedder instance.
     #[doc(hidden)]
     pub fn session_load_count(&self) -> usize {
-        self.session_load_count.load(std::sync::atomic::Ordering::SeqCst)
+        self.session_load_count
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Sets the expected embedding output dimension for post-inference validation.
@@ -738,8 +739,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_mock_embedding_engine() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        use contextra_ports::{BoxFuture, TextEmbeddingEngine};
         use contextra_types::Result;
-use contextra_ports::{BoxFuture, TextEmbeddingEngine};
 
         struct MockEngine;
         impl TextEmbeddingEngine for MockEngine {
@@ -757,8 +758,8 @@ use contextra_ports::{BoxFuture, TextEmbeddingEngine};
     #[tokio::test]
     async fn test_embed_batch_ordering_and_fallback(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        use contextra_ports::{BoxFuture, TextEmbeddingEngine};
         use contextra_types::{ContextraError, Result};
-use contextra_ports::{BoxFuture, TextEmbeddingEngine};
 
         struct MockOrderedEngine {
             fail_on: Option<String>,

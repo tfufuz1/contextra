@@ -1,8 +1,8 @@
 #![allow(dead_code, unused_imports)]
 
-use contextra_types::{DocId, TxId};
 use contextra_ports::{StorageEngine, TextIndex};
 use contextra_text::InvertedIndex;
+use contextra_types::{DocId, TxId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -81,7 +81,10 @@ impl StorageEngine for MockStorage {
             Ok(())
         })
     }
-    fn commit<'a>(&'a self, tx_id: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+    fn commit<'a>(
+        &'a self,
+        tx_id: TxId,
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
         Box::pin(async move {
             self.staged.write().remove(&tx_id);
             Ok(())
@@ -148,7 +151,8 @@ impl StorageEngine for MockStorage {
     }
     fn stats<'a>(
         &'a self,
-    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>>
+    {
         Box::pin(async move {
             Ok(contextra_ports::StorageStats {
                 num_segments: 0,

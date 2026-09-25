@@ -2,8 +2,8 @@ use super::super::*;
 use super::basic_tests::setup_test_graph;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
 use crate::GraphIndexExt;
-use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
 use contextra_ports::{GraphIndex, StorageEngine};
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 #[tokio::test]

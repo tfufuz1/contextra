@@ -140,7 +140,9 @@ impl TryFrom<MetadataFilter> for FilterExpr {
                     }
                     Ok(acc)
                 } else {
-                    Err(contextra_types::ContextraError::invalid_input("Empty Or filter"))
+                    Err(contextra_types::ContextraError::invalid_input(
+                        "Empty Or filter",
+                    ))
                 }
             }
             MetadataFilter::Not(filter) => {

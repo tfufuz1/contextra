@@ -69,7 +69,6 @@ async fn test_insert_with_ttl_and_reap_expired_documents() {
     );
 }
 
-
 #[tokio::test]
 async fn test_insert_typed_episodic_has_decay_metadata() {
     use contextra_graph::CsrGraph;
@@ -120,7 +119,6 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
     assert_eq!(meta.get("memory_type").unwrap(), "episodic"); // unwrap
     assert!(meta.get("decay_function").is_some());
 }
-
 
 #[tokio::test]
 async fn test_insert_typed_working_has_ttl_metadata() {
@@ -173,7 +171,6 @@ async fn test_insert_typed_working_has_ttl_metadata() {
     assert_eq!(meta.get("ttl_tx").unwrap(), 50_000); // unwrap
 }
 
-
 #[tokio::test]
 async fn test_insert_backward_compatible_has_semantic_default() {
     use contextra_graph::CsrGraph;
@@ -225,13 +222,12 @@ async fn test_insert_backward_compatible_has_semantic_default() {
     );
 }
 
-
 #[tokio::test]
 async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
-use contextra_types::{Result, TxId};
-use contextra_ports::{StorageStats};
-use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::CsrGraph;
+    use contextra_ports::StorageStats;
+    use contextra_ports::{BoxFuture, StorageEngine};
+    use contextra_types::{Result, TxId};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;

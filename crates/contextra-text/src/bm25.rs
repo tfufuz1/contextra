@@ -36,7 +36,9 @@ impl BM25 {
             return Err(ContextraError::InvalidInput("k1 must be >= 0.0".into()));
         }
         if !(0.0..=1.0).contains(&b) || b.is_nan() {
-            return Err(ContextraError::InvalidInput("b must be in [0.0, 1.0]".into()));
+            return Err(ContextraError::InvalidInput(
+                "b must be in [0.0, 1.0]".into(),
+            ));
         }
         Ok(Self { k1, b })
     }
@@ -129,7 +131,9 @@ impl FieldWeight {
             ));
         }
         if !(0.0..=1.0).contains(&b) || b.is_nan() {
-            return Err(ContextraError::InvalidInput("b must be in [0.0, 1.0]".into()));
+            return Err(ContextraError::InvalidInput(
+                "b must be in [0.0, 1.0]".into(),
+            ));
         }
         Ok(Self {
             field_id,

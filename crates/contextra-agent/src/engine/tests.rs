@@ -1,6 +1,6 @@
 use super::*;
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_types::TokenBudget;
-use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;

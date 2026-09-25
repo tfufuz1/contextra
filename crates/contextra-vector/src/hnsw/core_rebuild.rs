@@ -5,14 +5,11 @@ use std::sync::atomic::Ordering;
 
 use contextra_core::{ContextraError, DocId, Result};
 
-use crate::distance::compute_distance_trusted;
 use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
 use super::sq8_bias::Sq8Bias;
-use super::types::{
-    Candidate, HnswIndex, HnswIndexCore, RebuildGuard,
-    RebuildStatus, VectorData,
-};
+use super::types::{Candidate, HnswIndex, HnswIndexCore, RebuildGuard, RebuildStatus, VectorData};
+use crate::distance::compute_distance_trusted;
 
 impl HnswIndexCore {
     pub fn rebuild_status(&self) -> RebuildStatus {

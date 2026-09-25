@@ -4,7 +4,7 @@
 
 #![cfg(feature = "experimental-diskann")]
 
-use contextra_core::{DistanceMetric, DocId, ContextraError, VectorIndex};
+use contextra_core::{ContextraError, DistanceMetric, DocId, VectorIndex};
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 
 #[tokio::test]

@@ -1,10 +1,12 @@
 // FILE-CONTEXT
 // ZWECK: Hybrid-Familie Submodule für Query-basierte Suche.
 
-use crate::collection::search::checkpoint::{with_pinned_checkpoint, with_pinned_checkpoint_at_latest};
+use crate::collection::search::checkpoint::{
+    with_pinned_checkpoint, with_pinned_checkpoint_at_latest,
+};
 use crate::collection::Collection;
-use contextra_types::{DocId, Result};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{DocId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery`.

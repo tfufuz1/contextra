@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use contextra_core::error::ContextraError;
 use contextra_core::DistanceMetric;
-use contextra_db::{EmbeddingBackend, Contextra, ContextraConfig, TextEmbeddingEngine};
+use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
 
 /// A builder for configuring and instantiating `Contextra`.
 ///
@@ -144,7 +144,10 @@ mod tests {
             .with_consolidation(false, Duration::from_secs(300));
 
         assert_eq!(builder.config.dimension, 128);
-        assert_eq!(builder.storage_path, PathBuf::from("/tmp/test_contextra_db"));
+        assert_eq!(
+            builder.storage_path,
+            PathBuf::from("/tmp/test_contextra_db")
+        );
         assert_eq!(builder.config.max_elements, 50000);
         assert_eq!(builder.config.distance_metric, DistanceMetric::Euclidean);
         assert_eq!(

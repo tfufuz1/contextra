@@ -81,7 +81,10 @@ impl VolatileToolResult {
     }
 
     /// Entschlüsselt und gibt den Klartext zeroized zurück.
-    pub fn decrypt(&self, key: &contextra_crypto::CryptoKey) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    pub fn decrypt(
+        &self,
+        key: &contextra_crypto::CryptoKey,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>> {
         if self.nonce.len() != 12 {
             return Err(ContextraError::Internal(
                 "Sandbox decrypt: Invalid nonce length".into(),
@@ -115,7 +118,9 @@ impl McpSandbox {
         rand::thread_rng().fill_bytes(&mut passphrase);
         let key =
             contextra_crypto::CryptoKey::try_new(&hex::encode(passphrase), &salt).map_err(|e| {
-                ContextraError::Internal(format!("McpSandbox: CryptoKey initialization failed: {e}"))
+                ContextraError::Internal(format!(
+                    "McpSandbox: CryptoKey initialization failed: {e}"
+                ))
             })?;
 
         Ok(Self {
@@ -181,7 +186,9 @@ impl McpSandbox {
     /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
     pub fn classify_method(method: &str) -> ToolCategory {
         match method {
-            "contextra_search" | "contextra_get" | "contextra_collections" => ToolCategory::DatabaseRead,
+            "contextra_search" | "contextra_get" | "contextra_collections" => {
+                ToolCategory::DatabaseRead
+            }
             "contextra_cloud_query" => ToolCategory::CloudEgress,
             "contextra_insert"
             | "contextra_delete"
@@ -406,7 +413,9 @@ mod tests {
             let decrypted = result.decrypt(&key)?;
             assert_eq!(decrypted.as_slice(), plaintext);
             // Simulate early return / error before processing finishes
-            Err(ContextraError::Internal("Simulated pipeline failure".into()))
+            Err(ContextraError::Internal(
+                "Simulated pipeline failure".into(),
+            ))
         };
 
         let err = simulate_aborted_processing();

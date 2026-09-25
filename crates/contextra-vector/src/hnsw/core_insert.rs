@@ -3,7 +3,9 @@ use std::sync::atomic::Ordering;
 
 use contextra_core::{ContextraError, DocId, Result};
 
-use super::batch::{get_neighbor_conns_in_batch, BatchContext, NeighborBacklink, PreparedInsert, SearchContext};
+use super::batch::{
+    get_neighbor_conns_in_batch, BatchContext, NeighborBacklink, PreparedInsert, SearchContext,
+};
 use super::config::validate_vector;
 use super::types::{Candidate, HnswIndexCore, HnswNode, VectorData};
 
@@ -439,5 +441,4 @@ impl HnswIndexCore {
         }
         Ok(())
     }
-
 }

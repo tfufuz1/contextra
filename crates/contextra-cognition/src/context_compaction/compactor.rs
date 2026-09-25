@@ -1,7 +1,7 @@
-use contextra_ports::{ContextSegment, LlmTextGenerator, StorageEngine, VectorIndex};
-use contextra_types::{ContextChunk, DocId, Result, TenantId, TokenBudget};
 use contextra_engine::collection::Collection;
 use contextra_engine::ProvenanceRecord;
+use contextra_ports::{ContextSegment, LlmTextGenerator, StorageEngine, VectorIndex};
+use contextra_types::{ContextChunk, DocId, Result, TenantId, TokenBudget};
 
 use super::session::ConsolidationSession;
 use super::types::{CompactedContext, CompactionStrategy, StatusToken};

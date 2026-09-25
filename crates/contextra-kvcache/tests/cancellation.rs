@@ -2,8 +2,8 @@
 // ZWECK: Cancellation- & RAII-Guard-Tests für den KV-Cache (Task KV-06).
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_types::{ContextraError, TenantId};
 use contextra_kvcache::{EvictionWorker, KvSegment, TenantIsolatedKvStore};
+use contextra_types::{ContextraError, TenantId};
 use std::sync::Arc;
 use std::thread;
 
@@ -82,7 +82,8 @@ fn test_cancellation_eviction_worker_notification() -> Result<(), ContextraError
 }
 
 #[test]
-fn test_cancellation_transaction_rollback_cleans_up_staged_segments() -> Result<(), ContextraError> {
+fn test_cancellation_transaction_rollback_cleans_up_staged_segments() -> Result<(), ContextraError>
+{
     let store = TenantIsolatedKvStore::new();
     let tenant = TenantId::try_new(30)?;
 

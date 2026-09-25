@@ -19,7 +19,9 @@ impl DistanceMetric {
     /// Computes the distance between two f32 vectors using this metric.
     pub fn compute(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(ContextraError::invalid_input("Vector dimensions must match"));
+            return Err(ContextraError::invalid_input(
+                "Vector dimensions must match",
+            ));
         }
 
         for val in a.iter().chain(b.iter()) {
@@ -98,7 +100,9 @@ impl DistanceMetric {
     // ID: AGT-CORE-001
     pub fn compute_u8(&self, a: &[u8], b: &[u8]) -> Result<u32> {
         if a.len() != b.len() {
-            return Err(ContextraError::invalid_input("Vector dimensions must match"));
+            return Err(ContextraError::invalid_input(
+                "Vector dimensions must match",
+            ));
         }
 
         match self {

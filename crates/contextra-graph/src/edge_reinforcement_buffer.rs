@@ -163,8 +163,8 @@ mod tests {
     async fn test_flush_with_populated_graph_edges() {
         use crate::csr::CsrGraph;
         use crate::edge_reinforcement::EdgeReinforcementConfig;
+        use contextra_ports::GraphIndex;
         use contextra_types::{Edge, Entity, TxId};
-use contextra_ports::GraphIndex;
 
         let graph = CsrGraph::new();
         let tx = TxId::new(1);

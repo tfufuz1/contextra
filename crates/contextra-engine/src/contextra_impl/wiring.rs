@@ -19,5 +19,4 @@ impl Contextra {
     ) {
         *self.pid_controller.write() = Some(pid_controller);
     }
-
 }

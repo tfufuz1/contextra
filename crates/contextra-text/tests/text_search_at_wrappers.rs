@@ -1,9 +1,9 @@
 //! Integration tests for Bm25Scorer and BM25MorphIndex search_at delegation (ADR-024 Snapshot Isolation).
 
-use contextra_types::{DocId, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::morphology::GermanCompoundSplitter;
-use contextra_text::{Bm25Scorer, BM25MorphIndex};
+use contextra_text::{BM25MorphIndex, Bm25Scorer};
+use contextra_types::{DocId, Result, TxId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -288,9 +288,7 @@ async fn test_bm25_morph_index_search_at_snapshot_isolation() -> Result<()> {
     );
 
     // 5. search without snapshot returns both documents
-    let res_latest = morph_index
-        .search("bundesverfassungsgericht", 10)
-        .await?;
+    let res_latest = morph_index.search("bundesverfassungsgericht", 10).await?;
     assert_eq!(res_latest.len(), 2, "search() should return 2 docs");
 
     Ok(())

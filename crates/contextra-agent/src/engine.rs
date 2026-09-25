@@ -17,8 +17,8 @@ use contextra_checkpoint::{
     CheckpointGuard, CheckpointMeta, CheckpointRegistry, PersistentCheckpointStore,
 };
 use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, Result};
 use contextra_store::LsmStorage;
+use contextra_types::{ContextraError, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -82,7 +82,8 @@ impl OrchestratorEngine {
             fn take_snapshot<'a>(
                 &'a self,
                 tx: contextra_types::TxId,
-            ) -> contextra_ports::BoxFuture<'a, Result<contextra_types::WorkflowState>> {
+            ) -> contextra_ports::BoxFuture<'a, Result<contextra_types::WorkflowState>>
+            {
                 Box::pin(async move {
                     Ok(contextra_types::WorkflowState {
                         tx,

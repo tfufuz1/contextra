@@ -1,8 +1,8 @@
-use contextra_types::{Edge, Entity, EntityId, TxId};
-use contextra_ports::GraphIndex;
 use contextra_graph::community::{detect_communities, CommunityDetectionConfig};
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use contextra_ports::GraphIndex;
+use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::collections::HashMap;
 
 #[tokio::test]

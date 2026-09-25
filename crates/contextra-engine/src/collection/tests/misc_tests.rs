@@ -22,7 +22,6 @@ async fn test_collection_embedder_async_embed() {
     assert_eq!(result.len(), 4);
 }
 
-
 #[tokio::test]
 async fn test_input_guards_boundary_validation() {
     use contextra_graph::CsrGraph;
@@ -129,13 +128,12 @@ async fn test_input_guards_boundary_validation() {
     ));
 }
 
-
 #[tokio::test]
 async fn test_doc_id_collision_rejected() {
-    use contextra_types::{DocId, ContextraError, TxId};
-use contextra_ports::{StorageEngine};
     use contextra_graph::CsrGraph;
+    use contextra_ports::StorageEngine;
     use contextra_store::LsmStorage;
+    use contextra_types::{ContextraError, DocId, TxId};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -211,7 +209,6 @@ use contextra_ports::{StorageEngine};
     assert!(same_key_res.is_ok());
 }
 
-
 #[tokio::test]
 async fn test_extract_text_with_contextual_prefix() {
     use serde_json::json;
@@ -229,18 +226,22 @@ async fn test_extract_text_with_contextual_prefix() {
     assert_eq!(text, "Dokumenten-Kontext-Präfix\n\nChunk Haupttext");
 }
 
-
 #[test]
 fn test_importance_score_parser_robust() {
     assert_eq!(crate::collection::parse_importance_score("0.8"), 0.8);
     assert_eq!(crate::collection::parse_importance_score("0.8\n"), 0.8);
     assert_eq!(crate::collection::parse_importance_score("Score: 0.8"), 0.8);
-    assert_eq!(crate::collection::parse_importance_score("0.8 (high importance)"), 0.8);
+    assert_eq!(
+        crate::collection::parse_importance_score("0.8 (high importance)"),
+        0.8
+    );
     assert_eq!(crate::collection::parse_importance_score("1.5"), 1.0);
     assert_eq!(crate::collection::parse_importance_score("-0.2"), 0.0);
-    assert_eq!(crate::collection::parse_importance_score("invalid text"), 0.5);
+    assert_eq!(
+        crate::collection::parse_importance_score("invalid text"),
+        0.5
+    );
 }
-
 
 #[test]
 fn test_compute_default_importance_entropy_and_clamping() {
@@ -255,7 +256,6 @@ fn test_compute_default_importance_entropy_and_clamping() {
     ));
     assert!(score_rich.value() > score_simple.value());
 }
-
 
 #[test]
 fn test_extract_effective_importance_defaults() {
@@ -276,7 +276,6 @@ fn test_extract_effective_importance_defaults() {
     );
 }
 
-
 #[test]
 fn test_importance_metadata_integration_and_filtering() {
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
@@ -286,7 +285,11 @@ fn test_importance_metadata_integration_and_filtering() {
     let now_tx = TxId::new(30);
 
     let mut meta1 = Some(json!({"text": "Important factual doc"}));
-    crate::collection::ensure_importance_metadata(&mut meta1, created_tx, Some("Important factual doc"));
+    crate::collection::ensure_importance_metadata(
+        &mut meta1,
+        created_tx,
+        Some("Important factual doc"),
+    );
 
     // Override with explicit exponential decay
     let imp1 = MemoryImportance::new(
@@ -336,7 +339,6 @@ fn test_importance_metadata_integration_and_filtering() {
     assert_eq!(filtered[0].id, "doc2");
     assert_eq!(filtered[0].score, 0.85); // Order and original RRF/CE score preserved
 }
-
 
 #[tokio::test]
 async fn test_invalid_doc_ids_rejected() {
@@ -389,9 +391,9 @@ async fn test_invalid_doc_ids_rejected() {
     assert!(col.get(&long_id).await.is_err());
 }
 
-
 #[tokio::test]
-async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contextra_types::Result<()> {
+async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contextra_types::Result<()>
+{
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
@@ -441,7 +443,6 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contex
     Ok(())
 }
 
-
 #[tokio::test]
 async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Result<()> {
     use contextra_graph::CsrGraph;
@@ -483,7 +484,6 @@ async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Res
 
     Ok(())
 }
-
 
 #[tokio::test]
 async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Result<()> {
@@ -532,7 +532,6 @@ async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Resu
 
     Ok(())
 }
-
 
 #[tokio::test]
 async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_types::Result<()> {
@@ -587,7 +586,6 @@ async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_types::Result
 
     Ok(())
 }
-
 
 proptest::proptest! {
     #[test]

@@ -4,8 +4,8 @@
 // INVARIANTEN: Zero-Panic doctrine; at least 1 token must be computed forward during prefill to obtain logits.
 
 use crate::kv_state::KvState;
-use contextra_types::{ContextraError, ModelFingerprint, Result};
 use contextra_ports::kv::{KvBlock, KvLayout, KvPrefixHit, KvPrefixStore, PrefixKey, RopeConfig};
+use contextra_types::{ContextraError, ModelFingerprint, Result};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::sync::Arc;
@@ -54,9 +54,9 @@ pub fn build_prefix_key(
     layout: KvLayout,
     rope: RopeConfig,
 ) -> Result<PrefixKey> {
-    let json_str = tokenizer
-        .to_string(false)
-        .map_err(|e| ContextraError::Internal(format!("Failed to serialize tokenizer to JSON: {e}")))?;
+    let json_str = tokenizer.to_string(false).map_err(|e| {
+        ContextraError::Internal(format!("Failed to serialize tokenizer to JSON: {e}"))
+    })?;
     let mut hasher = Sha256::new();
     hasher.update(json_str.as_bytes());
     let result = hasher.finalize();

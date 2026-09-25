@@ -1,10 +1,10 @@
 #![expect(clippy::unwrap_used)]
 
-use contextra_types::{DocId, EntityId, TxId};
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{
     ConsolidationNodesGuard, HyperEdge, HyperEdgeId, RoleBinding, RoleId,
 };
+use contextra_types::{DocId, EntityId, TxId};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::thread;

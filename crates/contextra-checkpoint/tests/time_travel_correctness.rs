@@ -1,8 +1,8 @@
 #![allow(clippy::type_complexity)]
 
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_types::{Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;

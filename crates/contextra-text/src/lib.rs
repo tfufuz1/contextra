@@ -21,14 +21,14 @@ pub mod tokenizer;
 pub mod wand;
 
 pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
-pub use stream::{Bm25CandidateStream, DEFAULT_STREAM_BATCH_SIZE};
 pub use inverted::{BM25MorphIndex, InvertedIndex, Language};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
+pub use stream::{Bm25CandidateStream, DEFAULT_STREAM_BATCH_SIZE};
 pub use tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 
-use contextra_types::{DocId, Result, ScoredDocument, TxId};
 use contextra_ports::{TextIndex, TextIndexStats};
+use contextra_types::{DocId, Result, ScoredDocument, TxId};
 
 /// Evaluates keyword weights and applies standard BM25 logic.
 pub struct Bm25Scorer<S: contextra_ports::StorageEngine> {

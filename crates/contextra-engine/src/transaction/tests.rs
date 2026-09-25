@@ -1,9 +1,9 @@
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use crate::Collection;
-use contextra_types::DocId;
 use contextra_graph::CsrGraph;
 use contextra_store::LsmStorage;
+use contextra_types::DocId;
 use contextra_vector::HnswIndex;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -124,7 +124,10 @@ async fn test_db_transaction_rollback_cleans_kv_store_segments() {
 
 #[test]
 fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
-    let doc_ids_vec = vec![contextra_types::DocId::new(1), contextra_types::DocId::new(2)];
+    let doc_ids_vec = vec![
+        contextra_types::DocId::new(1),
+        contextra_types::DocId::new(2),
+    ];
     let doc_ids_arc: Arc<Vec<contextra_types::DocId>> = Arc::new(doc_ids_vec.clone());
 
     let intent_arc = CommitIntent::Pending {
@@ -135,7 +138,8 @@ fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
     };
     let json_arc = serde_json::to_string(&intent_arc).expect("serialize Arc");
 
-    let legacy_json = r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"has_graph":false,"stages_completed":0}}"#;
+    let legacy_json =
+        r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"has_graph":false,"stages_completed":0}}"#;
 
     assert_eq!(
         json_arc, legacy_json,

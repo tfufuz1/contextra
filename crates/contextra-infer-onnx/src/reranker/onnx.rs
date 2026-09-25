@@ -3,9 +3,9 @@
 // ZWECK: Real ONNX Runtime Cross-Encoder Inferenz-Backend.
 
 #[cfg(feature = "onnx")]
-use contextra_types::ContextraError;
-#[cfg(feature = "onnx")]
 use contextra_rank::PlattScaler;
+#[cfg(feature = "onnx")]
+use contextra_types::ContextraError;
 #[cfg(feature = "onnx")]
 use ort::value::Value;
 #[cfg(feature = "onnx")]
@@ -62,7 +62,10 @@ impl OnnxReranker {
             .map_err(|e| ContextraError::Internal(format!("ONNX session builder: {e}")))?
             .commit_from_file(&config.model_path)
             .map_err(|e| {
-                ContextraError::Internal(format!("ONNX model load from {:?}: {e}", config.model_path))
+                ContextraError::Internal(format!(
+                    "ONNX model load from {:?}: {e}",
+                    config.model_path
+                ))
             })?;
 
         Ok(Self {

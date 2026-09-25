@@ -2,8 +2,8 @@ use super::strategy::SearchStrategy;
 use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
-use contextra_types::{DocId, EntityId, FilterExpr, FusionStrategy, FusionWeights, MemoryType};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, EntityId, FilterExpr, FusionStrategy, FusionWeights, MemoryType};
 
 #[cfg(feature = "adaptive-candidate-pool-sizing")]
 use std::sync::Arc;

@@ -1,6 +1,6 @@
 use super::Collection;
-use contextra_types::{Result, TxId};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{Result, TxId};
 use std::sync::atomic::Ordering;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {

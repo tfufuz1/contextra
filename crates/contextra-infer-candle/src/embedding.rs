@@ -201,8 +201,9 @@ impl BertEmbedModel {
         let config = Config::default();
 
         let dim = config.hidden_size;
-        let model = BertModel::load(vb, &config)
-            .map_err(|e| ContextraError::Internal(format!("Failed to initialize BERT model: {e}")))?;
+        let model = BertModel::load(vb, &config).map_err(|e| {
+            ContextraError::Internal(format!("Failed to initialize BERT model: {e}"))
+        })?;
 
         Ok(Self { model, dim })
     }
@@ -227,13 +228,15 @@ impl CandleEmbedInner for BertEmbedModel {
         }
 
         let token_ids = Tensor::new(tokens, device)
-            .map_err(|e| ContextraError::Internal(format!("Failed to create token_ids tensor: {e}")))?
+            .map_err(|e| {
+                ContextraError::Internal(format!("Failed to create token_ids tensor: {e}"))
+            })?
             .unsqueeze(0)
             .map_err(|e| ContextraError::Internal(format!("Failed to unsqueeze token_ids: {e}")))?;
 
-        let token_type_ids = token_ids
-            .zeros_like()
-            .map_err(|e| ContextraError::Internal(format!("Failed to create token_type_ids: {e}")))?;
+        let token_type_ids = token_ids.zeros_like().map_err(|e| {
+            ContextraError::Internal(format!("Failed to create token_type_ids: {e}"))
+        })?;
 
         // Forward pass through BERT model
         let embeddings = self
@@ -252,11 +255,13 @@ impl CandleEmbedInner for BertEmbedModel {
         let pooled = (sum_embeddings / (seq_len as f64))
             .map_err(|e| ContextraError::Internal(format!("Failed to mean pool embeddings: {e}")))?
             .squeeze(0)
-            .map_err(|e| ContextraError::Internal(format!("Failed to squeeze pooled tensor: {e}")))?;
+            .map_err(|e| {
+                ContextraError::Internal(format!("Failed to squeeze pooled tensor: {e}"))
+            })?;
 
-        let vec: Vec<f32> = pooled
-            .to_vec1()
-            .map_err(|e| ContextraError::Internal(format!("Failed to convert tensor to vec: {e}")))?;
+        let vec: Vec<f32> = pooled.to_vec1().map_err(|e| {
+            ContextraError::Internal(format!("Failed to convert tensor to vec: {e}"))
+        })?;
 
         // L2 normalization and zero/NaN check (APM-4)
         let norm_sq: f32 = vec.iter().map(|v| v * v).sum();

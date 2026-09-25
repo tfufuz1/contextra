@@ -1,6 +1,6 @@
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_types::{ContextraError, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -35,7 +35,9 @@ impl StorageEngine for FaultyMockStorage {
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_put {
-                return Err(ContextraError::Storage("Disk full / I/O write error".into()));
+                return Err(ContextraError::Storage(
+                    "Disk full / I/O write error".into(),
+                ));
             }
             self.data.lock().insert(key.to_vec(), value.to_vec());
             Ok(())
@@ -50,7 +52,9 @@ impl StorageEngine for FaultyMockStorage {
     fn commit<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_commit {
-                return Err(ContextraError::Storage("Commit failed / fsync error".into()));
+                return Err(ContextraError::Storage(
+                    "Commit failed / fsync error".into(),
+                ));
             }
             Ok(())
         })

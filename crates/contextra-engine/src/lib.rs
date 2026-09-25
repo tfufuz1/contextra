@@ -5,15 +5,15 @@
 
 #![forbid(unsafe_code)]
 
-#[cfg(feature = "sandbox")]
-use contextra_ports::BoxFuture;
-pub use contextra_ports::TextEmbeddingEngine;
-use contextra_types::{CollectionId, DocId, TenantId};
-use contextra_ports::{StorageEngine};
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
 };
+#[cfg(feature = "sandbox")]
+use contextra_ports::BoxFuture;
+use contextra_ports::StorageEngine;
+pub use contextra_ports::TextEmbeddingEngine;
 use contextra_store::LsmStorage;
+use contextra_types::{CollectionId, DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -47,12 +47,12 @@ pub use collection::crud::MAX_SCAN_RESULTS;
 pub use collection::maintenance::PercolationResult;
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
 pub use collection::{Collection, CollectionConfig};
-#[allow(deprecated)]
-pub use filter::MetadataFilter;
 pub use contextra_checkpoint;
 #[cfg(feature = "graph-connectivity-health")]
 pub use contextra_graph::percolation::PercolationConfig;
 pub use contextra_text::Language;
+#[allow(deprecated)]
+pub use filter::MetadataFilter;
 
 #[allow(clippy::type_complexity)]
 pub type ConsolidationLauncher = Arc<
@@ -172,7 +172,10 @@ impl std::fmt::Debug for ContextraConfig {
             .field("dimension", &self.dimension)
             .field("max_elements", &self.max_elements)
             .field("distance_metric", &self.distance_metric)
-            .field("encryption_passphrase", &self.encryption_passphrase.as_ref().map(|_| "***"))
+            .field(
+                "encryption_passphrase",
+                &self.encryption_passphrase.as_ref().map(|_| "***"),
+            )
             .field("expiry_reaper_interval", &self.expiry_reaper_interval)
             .field("orphan_registry_path", &self.orphan_registry_path)
             .field("community_detection", &self.community_detection)
@@ -180,7 +183,10 @@ impl std::fmt::Debug for ContextraConfig {
             .field("consolidation_enabled", &self.consolidation_enabled)
             .field("consolidation_interval", &self.consolidation_interval)
             .field("max_llm_calls_per_cycle", &self.max_llm_calls_per_cycle)
-            .field("consolidation_launcher", &self.consolidation_launcher.as_ref().map(|_| "Fn(...)"))
+            .field(
+                "consolidation_launcher",
+                &self.consolidation_launcher.as_ref().map(|_| "Fn(...)"),
+            )
             .finish()
     }
 }
@@ -224,9 +230,7 @@ pub struct Contextra {
     >,
 }
 
-
 mod contextra_impl;
-
 
 pub use contextra_types::DistanceMetric;
 pub use serde_json::json;
@@ -288,11 +292,9 @@ impl SandboxBridge for Contextra {
             let id = String::from_utf8_lossy(key).to_string();
             let doc = self.get(&id).await?;
             match doc {
-                Some(d) => {
-                    Ok(Some(serde_json::to_vec(&d).map_err(|e| {
-                        contextra_types::ContextraError::Internal(e.to_string())
-                    })?))
-                }
+                Some(d) => Ok(Some(serde_json::to_vec(&d).map_err(|e| {
+                    contextra_types::ContextraError::Internal(e.to_string())
+                })?)),
                 None => Ok(None),
             }
         })

@@ -10,9 +10,9 @@
 //! Provides `EventSource` trait and concrete implementations (`PollingDocumentEventSource`, `VecEventSource`).
 
 use crate::context::MAX_ID_LEN;
+use contextra_db::Collection;
 use contextra_ports::{BoxFuture, StorageEngine};
 use contextra_types::{ContextraError, Result};
-use contextra_db::Collection;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;

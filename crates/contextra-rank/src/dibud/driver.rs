@@ -1,7 +1,7 @@
 //! Synchronous and std-only asynchronous drivers for DiBud fusion state machine.
 
-use core::future::Future;
 use contextra_types::{ContextraError, DocId};
+use core::future::Future;
 
 use super::state::{DiBudFusionState, DiBudStep};
 use super::types::{BudgetedChannel, DiBudOutcome, FusionBudget};

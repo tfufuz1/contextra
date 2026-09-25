@@ -334,9 +334,9 @@ impl WalEntry {
                     .to_vec();
 
                 let val_start = 12 + key_len;
-                let vlen_bytes = remaining
-                    .get(val_start..val_start + 4)
-                    .ok_or_else(|| ContextraError::Serialization("Put op missing val_len".into()))?;
+                let vlen_bytes = remaining.get(val_start..val_start + 4).ok_or_else(|| {
+                    ContextraError::Serialization("Put op missing val_len".into())
+                })?;
 
                 let val_len =
                     u32::from_le_bytes(vlen_bytes.try_into().map_err(|_| {
@@ -350,7 +350,9 @@ impl WalEntry {
 
                 let value = remaining
                     .get(val_start + 4..val_start + 4 + val_len)
-                    .ok_or_else(|| ContextraError::Serialization("Put op missing value data".into()))?
+                    .ok_or_else(|| {
+                        ContextraError::Serialization("Put op missing value data".into())
+                    })?
                     .to_vec();
 
                 WalOp::Put { tx_id, key, value }

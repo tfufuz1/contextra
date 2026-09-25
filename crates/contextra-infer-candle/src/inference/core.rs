@@ -11,18 +11,18 @@
 //! Callers will experience backpressure (await on permit acquire) rather than Tokio thread pool exhaustion.
 
 use crate::gasp::GaspValidator;
+#[cfg(feature = "kv-stage-b")]
+use crate::model::quantized_llama::ModelWeights;
 use crate::model_registry::ModelFingerprint;
 use candle_core::quantized::gguf_file;
 use candle_core::Device;
 use candle_transformers::generation::LogitsProcessor;
-#[cfg(feature = "kv-stage-b")]
-use crate::model::quantized_llama::ModelWeights;
 #[cfg(not(feature = "kv-stage-b"))]
 use candle_transformers::models::quantized_llama::ModelWeights;
-use futures_util::stream;
 use contextra_ports::{BoxFuture, BoxStream, ContextSegment};
-use contextra_types::{ConfigFingerprint, ContextraError, Result, TenantId};
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
+use contextra_types::{ConfigFingerprint, ContextraError, Result, TenantId};
+use futures_util::stream;
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
@@ -56,7 +56,12 @@ pub trait CandleModelInner: Send {
 
     /// Returns the KV layout and RoPE configuration of the underlying model, if supported.
     #[cfg(feature = "kv-stage-b")]
-    fn kv_layout(&self) -> Option<(contextra_ports::kv::KvLayout, contextra_ports::kv::RopeConfig)> {
+    fn kv_layout(
+        &self,
+    ) -> Option<(
+        contextra_ports::kv::KvLayout,
+        contextra_ports::kv::RopeConfig,
+    )> {
         None
     }
 
@@ -164,10 +169,7 @@ impl CandleLlmClient {
 
     /// Configures optional `KvPrefixStore` context for stage B prefix reuse.
     #[cfg(feature = "kv-stage-b")]
-    pub fn with_prefix_store(
-        mut self,
-        store: Arc<dyn contextra_ports::kv::KvPrefixStore>,
-    ) -> Self {
+    pub fn with_prefix_store(mut self, store: Arc<dyn contextra_ports::kv::KvPrefixStore>) -> Self {
         self.prefix_store = Some(crate::inference::KvPrefixContext { store });
         self
     }
@@ -201,33 +203,37 @@ impl CandleLlmClient {
             .join("\n\n");
 
         Box::pin(async move {
-            let _permit = semaphore
-                .acquire()
-                .await
-                .map_err(|_| ContextraError::Internal("Candle inference semaphore closed".into()))?;
+            let _permit = semaphore.acquire().await.map_err(|_| {
+                ContextraError::Internal("Candle inference semaphore closed".into())
+            })?;
 
             tokio::task::spawn_blocking(move || {
                 let mut guard = model.blocking_lock();
                 let prompt_tokens = tokenizer
                     .encode(concatenated.as_str(), true)
-                    .map_err(|e| ContextraError::InvalidInput(format!("Failed to tokenize prompt: {e}")))?
+                    .map_err(|e| {
+                        ContextraError::InvalidInput(format!("Failed to tokenize prompt: {e}"))
+                    })?
                     .get_ids()
                     .to_vec();
 
-                let (layout, rope) = guard.kv_layout().unwrap_or_else(|| (
-                    contextra_ports::kv::KvLayout {
-                        n_layer: 0,
-                        n_kv_head: 0,
-                        head_dim: 0,
-                        dtype: "f16".to_string(),
-                    },
-                    contextra_ports::kv::RopeConfig {
-                        base: 10000.0,
-                        scaling: None,
-                    },
-                ));
+                let (layout, rope) = guard.kv_layout().unwrap_or_else(|| {
+                    (
+                        contextra_ports::kv::KvLayout {
+                            n_layer: 0,
+                            n_kv_head: 0,
+                            head_dim: 0,
+                            dtype: "f16".to_string(),
+                        },
+                        contextra_ports::kv::RopeConfig {
+                            base: 10000.0,
+                            scaling: None,
+                        },
+                    )
+                });
 
-                let key = crate::inference::build_prefix_key(&fingerprint, &tokenizer, layout, rope)?;
+                let key =
+                    crate::inference::build_prefix_key(&fingerprint, &tokenizer, layout, rope)?;
                 let hit = store_ctx.store.lookup(tenant, &key, &prompt_tokens);
 
                 let seed = if let Some(ref h) = hit {
@@ -255,19 +261,27 @@ impl CandleLlmClient {
                 prefill_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 if run.reused_tokens > 0 {
                     prefill_skip_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    prefill_skipped_tokens.fetch_add(run.reused_tokens as u64, std::sync::atomic::Ordering::SeqCst);
+                    prefill_skipped_tokens.fetch_add(
+                        run.reused_tokens as u64,
+                        std::sync::atomic::Ordering::SeqCst,
+                    );
                 }
 
                 if run.prompt_tokens.len() > hit_matched_tokens {
                     if let Some(block) = run.exported_prefix {
-                        let _ = store_ctx.store.insert(tenant, &key, &run.prompt_tokens, vec![block]);
+                        let _ =
+                            store_ctx
+                                .store
+                                .insert(tenant, &key, &run.prompt_tokens, vec![block]);
                     }
                 }
 
                 Ok(run.output)
             })
             .await
-            .map_err(|e| ContextraError::Internal(format!("Candle inference task join error: {e}")))?
+            .map_err(|e| {
+                ContextraError::Internal(format!("Candle inference task join error: {e}"))
+            })?
         })
     }
 
@@ -460,7 +474,12 @@ impl QuantizedLlamaModel {
 
 impl CandleModelInner for QuantizedLlamaModel {
     #[cfg(feature = "kv-stage-b")]
-    fn kv_layout(&self) -> Option<(contextra_ports::kv::KvLayout, contextra_ports::kv::RopeConfig)> {
+    fn kv_layout(
+        &self,
+    ) -> Option<(
+        contextra_ports::kv::KvLayout,
+        contextra_ports::kv::RopeConfig,
+    )> {
         if let Some(layer) = self.weights.layers.first() {
             let layout = contextra_ports::kv::KvLayout {
                 n_layer: self.weights.layers.len() as u32,
@@ -503,14 +522,15 @@ impl CandleModelInner for QuantizedLlamaModel {
     ) -> Result<String> {
         #[cfg(feature = "kv-stage-b")]
         {
-            let run = self.generate_stream_with_prefix(prompt, tokenizer, device, None, on_token)?;
+            let run =
+                self.generate_stream_with_prefix(prompt, tokenizer, device, None, on_token)?;
             Ok(run.output)
         }
         #[cfg(not(feature = "kv-stage-b"))]
         {
-            let tokens = tokenizer
-                .encode(prompt, true)
-                .map_err(|e| ContextraError::InvalidInput(format!("Failed to tokenize prompt: {e}")))?;
+            let tokens = tokenizer.encode(prompt, true).map_err(|e| {
+                ContextraError::InvalidInput(format!("Failed to tokenize prompt: {e}"))
+            })?;
             let prompt_tokens = tokens.get_ids();
             if prompt_tokens.is_empty() {
                 return Err(ContextraError::InvalidInput(
@@ -530,14 +550,20 @@ impl CandleModelInner for QuantizedLlamaModel {
                     all_tokens.clone()
                 } else {
                     vec![*all_tokens.last().ok_or_else(|| {
-                        ContextraError::Internal("all_tokens cannot be empty during generation".into())
+                        ContextraError::Internal(
+                            "all_tokens cannot be empty during generation".into(),
+                        )
                     })?]
                 };
 
                 let input_tensor = candle_core::Tensor::new(&input_slice[..], device)
-                    .map_err(|e| ContextraError::Internal(format!("Failed to create input tensor: {e}")))?
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to create input tensor: {e}"))
+                    })?
                     .unsqueeze(0)
-                    .map_err(|e| ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}")))?;
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}"))
+                    })?;
 
                 let logits = self
                     .weights
@@ -546,9 +572,9 @@ impl CandleModelInner for QuantizedLlamaModel {
                         ContextraError::Internal(format!("Quantized Llama forward error: {e}"))
                     })?;
 
-                let logits = logits
-                    .squeeze(0)
-                    .map_err(|e| ContextraError::Internal(format!("Failed to squeeze logits: {e}")))?;
+                let logits = logits.squeeze(0).map_err(|e| {
+                    ContextraError::Internal(format!("Failed to squeeze logits: {e}"))
+                })?;
                 let logits = logits
                     .get(
                         logits
@@ -556,11 +582,13 @@ impl CandleModelInner for QuantizedLlamaModel {
                             .map_err(|e| ContextraError::Internal(e.to_string()))?
                             - 1,
                     )
-                    .map_err(|e| ContextraError::Internal(format!("Failed to slice logits: {e}")))?;
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to slice logits: {e}"))
+                    })?;
 
-                let next_token = logits_processor
-                    .sample(&logits)
-                    .map_err(|e| ContextraError::Internal(format!("Logits sampling failed: {e}")))?;
+                let next_token = logits_processor.sample(&logits).map_err(|e| {
+                    ContextraError::Internal(format!("Logits sampling failed: {e}"))
+                })?;
 
                 all_tokens.push(next_token);
                 generated_tokens.push(next_token);
@@ -617,7 +645,9 @@ impl CandleModelInner for QuantizedLlamaModel {
                 self.weights.clear_kv_cache();
                 if self.weights.import_kv_state(&s.state).is_ok() {
                     let suffix = &prompt_tokens[s.matched_len..];
-                    if let Ok(input_tensor) = candle_core::Tensor::new(suffix, device).and_then(|t| t.unsqueeze(0)) {
+                    if let Ok(input_tensor) =
+                        candle_core::Tensor::new(suffix, device).and_then(|t| t.unsqueeze(0))
+                    {
                         if let Ok(logits) = self.weights.forward(&input_tensor, s.matched_len) {
                             prefill_logits = Some(logits);
                             reused_tokens = s.matched_len;
@@ -632,13 +662,16 @@ impl CandleModelInner for QuantizedLlamaModel {
             self.weights.clear_kv_cache();
             reused_tokens = 0;
             let input_tensor = candle_core::Tensor::new(&prompt_tokens[..], device)
-                .map_err(|e| ContextraError::Internal(format!("Failed to create input tensor: {e}")))?
+                .map_err(|e| {
+                    ContextraError::Internal(format!("Failed to create input tensor: {e}"))
+                })?
                 .unsqueeze(0)
-                .map_err(|e| ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}")))?;
-            let logits = self
-                .weights
-                .forward(&input_tensor, 0)
-                .map_err(|e| ContextraError::Internal(format!("Quantized Llama forward error: {e}")))?;
+                .map_err(|e| {
+                    ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}"))
+                })?;
+            let logits = self.weights.forward(&input_tensor, 0).map_err(|e| {
+                ContextraError::Internal(format!("Quantized Llama forward error: {e}"))
+            })?;
             prefill_logits = Some(logits);
             index_pos = prompt_tokens.len();
         }
@@ -649,7 +682,8 @@ impl CandleModelInner for QuantizedLlamaModel {
             .and_then(|st| st.export_block(0..prompt_tokens.len()))
             .ok();
 
-        let logits = prefill_logits.ok_or_else(|| ContextraError::Internal("Missing prefill logits".into()))?;
+        let logits = prefill_logits
+            .ok_or_else(|| ContextraError::Internal("Missing prefill logits".into()))?;
         let logits = logits
             .squeeze(0)
             .map_err(|e| ContextraError::Internal(format!("Failed to squeeze logits: {e}")))?;
@@ -689,9 +723,13 @@ impl CandleModelInner for QuantizedLlamaModel {
                     ContextraError::Internal("all_tokens cannot be empty during generation".into())
                 })?;
                 let input_tensor = candle_core::Tensor::new(&[last_token], device)
-                    .map_err(|e| ContextraError::Internal(format!("Failed to create input tensor: {e}")))?
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to create input tensor: {e}"))
+                    })?
                     .unsqueeze(0)
-                    .map_err(|e| ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}")))?;
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}"))
+                    })?;
 
                 let logits = self
                     .weights
@@ -700,9 +738,9 @@ impl CandleModelInner for QuantizedLlamaModel {
                         ContextraError::Internal(format!("Quantized Llama forward error: {e}"))
                     })?;
 
-                let logits = logits
-                    .squeeze(0)
-                    .map_err(|e| ContextraError::Internal(format!("Failed to squeeze logits: {e}")))?;
+                let logits = logits.squeeze(0).map_err(|e| {
+                    ContextraError::Internal(format!("Failed to squeeze logits: {e}"))
+                })?;
                 let logits = logits
                     .get(
                         logits
@@ -710,11 +748,13 @@ impl CandleModelInner for QuantizedLlamaModel {
                             .map_err(|e| ContextraError::Internal(e.to_string()))?
                             - 1,
                     )
-                    .map_err(|e| ContextraError::Internal(format!("Failed to slice logits: {e}")))?;
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to slice logits: {e}"))
+                    })?;
 
-                let next_token = logits_processor
-                    .sample(&logits)
-                    .map_err(|e| ContextraError::Internal(format!("Logits sampling failed: {e}")))?;
+                let next_token = logits_processor.sample(&logits).map_err(|e| {
+                    ContextraError::Internal(format!("Logits sampling failed: {e}"))
+                })?;
 
                 all_tokens.push(next_token);
                 generated_tokens.push(next_token);
@@ -789,17 +829,18 @@ impl LlmTextGenerator for CandleLlmClient {
         let prompt_owned = prompt.to_string();
 
         Box::pin(async move {
-            let _permit = semaphore
-                .acquire()
-                .await
-                .map_err(|_| ContextraError::Internal("Candle inference semaphore closed".into()))?;
+            let _permit = semaphore.acquire().await.map_err(|_| {
+                ContextraError::Internal("Candle inference semaphore closed".into())
+            })?;
 
             tokio::task::spawn_blocking(move || {
                 let mut guard = model.blocking_lock();
                 guard.generate(&prompt_owned, &tokenizer, &device)
             })
             .await
-            .map_err(|e| ContextraError::Internal(format!("Candle inference task join error: {e}")))?
+            .map_err(|e| {
+                ContextraError::Internal(format!("Candle inference task join error: {e}"))
+            })?
         })
     }
 

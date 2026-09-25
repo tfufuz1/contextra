@@ -1,6 +1,6 @@
 use crate::collection::Collection;
-use contextra_types::{Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::Result;
 
 pub(crate) fn validate_doc_id(id: &str) -> Result<()> {
     if id.is_empty() {

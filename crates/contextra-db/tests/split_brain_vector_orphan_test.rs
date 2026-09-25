@@ -5,7 +5,7 @@ use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::DocId;
 use contextra_db::context_compaction::ConsolidationSession;
 use contextra_db::transaction::CommitIntent;
-use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use proptest::prelude::*;
 use serde_json::json;
 use std::collections::HashMap;

@@ -20,12 +20,12 @@ pub mod tx;
 #[allow(deprecated)]
 mod tests;
 
-use contextra_types::{DocId, Result, TxId};
-use contextra_ports::{StorageEngine, TextEmbeddingEngine, VectorIndex};
 use contextra_graph::CsrGraph;
+use contextra_ports::{StorageEngine, TextEmbeddingEngine, VectorIndex};
 use contextra_store::LsmStorage;
 use contextra_text::inverted::InvertedIndex;
 use contextra_text::Language;
+use contextra_types::{DocId, Result, TxId};
 use contextra_vector::HnswIndex;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64};

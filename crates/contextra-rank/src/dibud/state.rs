@@ -142,7 +142,8 @@ impl DiBudFusionState {
         ] {
             let idx = ch.index();
             if !self.exhausted[idx] {
-                let score = budget.channel_weights[idx] / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
+                let score =
+                    budget.channel_weights[idx] / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
                 if score > best_score {
                     best_score = score;
                     best_channel = Some(ch);
@@ -193,8 +194,8 @@ impl DiBudFusionState {
         let mut score = 0.0_f32;
         for idx in 0..3 {
             if !self.exhausted[idx] {
-                score += budget.channel_weights[idx]
-                    / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
+                score +=
+                    budget.channel_weights[idx] / (RRF_K + self.channel_depths[idx] as f32 + 1.0);
             }
         }
         score += budget.edge_reinforcement_weight * budget.edge_reinforcement_upper_bound;
@@ -212,12 +213,21 @@ impl DiBudFusionState {
         false
     }
 
-    fn can_overtake(&self, doc_id_p: DocId, f_minus_p: f32, doc_id_y: DocId, budget: &FusionBudget) -> bool {
+    fn can_overtake(
+        &self,
+        doc_id_p: DocId,
+        f_minus_p: f32,
+        doc_id_y: DocId,
+        budget: &FusionBudget,
+    ) -> bool {
         let f_plus_y = self.compute_f_plus(&doc_id_y, budget);
         if f_plus_y > f_minus_p {
             return true;
         }
-        if f_plus_y == f_minus_p && self.has_unobserved_unexhausted_channels(&doc_id_y) && doc_id_y < doc_id_p {
+        if f_plus_y == f_minus_p
+            && self.has_unobserved_unexhausted_channels(&doc_id_y)
+            && doc_id_y < doc_id_p
+        {
             return true;
         }
         false

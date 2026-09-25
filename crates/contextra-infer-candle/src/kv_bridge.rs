@@ -12,17 +12,17 @@
 #![cfg(feature = "kv-bridge")]
 
 use bytes::Bytes;
+#[cfg(feature = "contextra-store")]
+use contextra_crypto::EncryptedKvLayer;
+#[cfg(test)]
+use contextra_crypto::KvSegment;
+use contextra_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
 use contextra_ports::ContextSegment;
 #[cfg(feature = "contextra-store")]
 use contextra_ports::StorageEngine;
 #[cfg(feature = "contextra-store")]
 use contextra_types::TxId;
 use contextra_types::{ModelFingerprint, TenantId};
-#[cfg(feature = "contextra-store")]
-use contextra_crypto::EncryptedKvLayer;
-#[cfg(test)]
-use contextra_crypto::KvSegment;
-use contextra_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

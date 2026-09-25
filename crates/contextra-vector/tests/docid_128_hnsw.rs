@@ -1,4 +1,4 @@
-use contextra_core::{DistanceMetric, DocId, ContextraError, TxId, VectorIndex};
+use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
 

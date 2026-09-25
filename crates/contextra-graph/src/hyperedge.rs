@@ -6,7 +6,7 @@
 use crate::arc_slice::ArcSlice;
 use crate::csr::EdgeType;
 use crate::error::GraphMutationError;
-use contextra_types::{DocId, EntityId, ContextraError, Result, TxId};
+use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use scc::HashMap;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -537,7 +537,8 @@ mod tests {
         };
 
         let legacy_bytes = bincode::serialize(&legacy).unwrap();
-        let deserialized = HyperEdge::deserialize(&legacy_bytes).expect("Fallback deserialization failed");
+        let deserialized =
+            HyperEdge::deserialize(&legacy_bytes).expect("Fallback deserialization failed");
 
         assert_eq!(deserialized.id, HyperEdgeId::new(42));
         assert_eq!(deserialized.weight, 2.0);
@@ -567,7 +568,11 @@ mod tests {
 
         assert_eq!(
             *edge.child_edge_ids,
-            [HyperEdgeId::new(5), HyperEdgeId::new(20), HyperEdgeId::new(30)]
+            [
+                HyperEdgeId::new(5),
+                HyperEdgeId::new(20),
+                HyperEdgeId::new(30)
+            ]
         );
         assert!(edge.validate().is_ok());
 

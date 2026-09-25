@@ -9,8 +9,8 @@ use std::path::Path;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use hdrhistogram::Histogram;
 use contextra_db::{Contextra, ContextraConfig};
+use hdrhistogram::Histogram;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -4,10 +4,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use contextra_kvcache::{KvReusePolicy, TenantPrefixKvStore};
 use contextra_ports::kv::{KvBlock, KvLayout, KvPrefixStore, PrefixKey, RopeConfig};
 use contextra_types::model_fingerprint::ModelFingerprint;
 use contextra_types::{ContextraError, TenantId};
-use contextra_kvcache::{KvReusePolicy, TenantPrefixKvStore};
 use std::sync::Arc;
 
 fn make_key(model_id: &str) -> PrefixKey {
@@ -44,7 +44,9 @@ fn test_round_trip() -> Result<(), ContextraError> {
 
     store.insert(tenant, &key, &tokens, blocks.clone())?;
 
-    let hit = store.lookup(tenant, &key, &tokens).expect("exact match hit");
+    let hit = store
+        .lookup(tenant, &key, &tokens)
+        .expect("exact match hit");
     assert_eq!(hit.matched_tokens, 5);
     assert_eq!(hit.blocks, blocks);
 
@@ -76,9 +78,8 @@ fn test_longest_prefix_wins() -> Result<(), ContextraError> {
 
 #[test]
 fn test_cost_based_policy_suppresses_short_matches() -> Result<(), ContextraError> {
-    let store = TenantPrefixKvStore::new().with_reuse_policy(KvReusePolicy::CostBased {
-        min_prefix_len: 4,
-    });
+    let store = TenantPrefixKvStore::new()
+        .with_reuse_policy(KvReusePolicy::CostBased { min_prefix_len: 4 });
     let tenant = TenantId::try_new(1)?;
     let key = make_key("llama-3-8b");
 

@@ -1,11 +1,8 @@
 // FILE-CONTEXT: HNSW Soft-Delete Error Propagation & Search Backfill Verification
 // ZWECK: Verifiziert, dass ein Fehler beim HNSW-Delete nicht verschluckt wird und Vektorsuchen bei Tombstones durch Backfill k valide Ergebnisse liefern.
 
-use contextra_ports::{
-    ScoredDocument, VectorIndex, VectorIndexStats,
-};
-use contextra_types::{
-    ContextraError, DocId, Result, TxId,
+use contextra_core::{
+    ContextraError, DocId, Result, ScoredDocument, TxId, VectorIndex, VectorIndexStats,
 };
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_graph::CsrGraph;
@@ -165,7 +162,9 @@ async fn test_vector_search_backfill_with_tombstones() {
         ..Default::default()
     };
 
-    let db = Contextra::open_with_config(tmp.path(), config).await.unwrap();
+    let db = Contextra::open_with_config(tmp.path(), config)
+        .await
+        .unwrap();
     let col = db.collection("backfill_col").await.unwrap();
 
     // Insert 20 documents with nearly identical embeddings

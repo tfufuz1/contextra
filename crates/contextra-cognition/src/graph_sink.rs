@@ -5,10 +5,10 @@
 //! is called, executing a single atomic RCU publish on the underlying graph.
 
 use crate::aggregation_phase::{SuperEdgeDraft, SuperEdgeSink};
-use contextra_types::{ContextraError, Result, TxId};
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
+use contextra_types::{ContextraError, Result, TxId};
 
 /// Buffered sink implementation writing synthetic superedges and tombstone requests to [`CsrGraph`].
 ///
@@ -48,7 +48,12 @@ impl<'a> SuperEdgeSink for CsrGraphSuperEdgeSink<'a> {
     /// synthetic superedges do not enforce role interner constraints.
     fn write_super_edge(&mut self, draft: SuperEdgeDraft) -> Result<HyperEdgeId> {
         let graph_max_id = self.graph.max_hyperedge_id();
-        let pending_max_id = self.pending_edges.iter().map(|e| e.id.inner()).max().unwrap_or(0);
+        let pending_max_id = self
+            .pending_edges
+            .iter()
+            .map(|e| e.id.inner())
+            .max()
+            .unwrap_or(0);
         let next_id = HyperEdgeId::new(graph_max_id.max(pending_max_id) + 1);
 
         let participants: Vec<RoleBinding> = draft

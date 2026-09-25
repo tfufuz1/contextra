@@ -5,8 +5,8 @@
 // HOTSPOTS:    create_embedding_provider(), create_llm_text_generator()
 // SIEHE AUCH:  ADR-010, contextra-core/src/traits/mod.rs
 
-use contextra_types::ContextraError;
 use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
+use contextra_types::ContextraError;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -235,9 +235,10 @@ pub fn create_llm_text_generator(
             })?;
             let quantization = contextra_infer_candle::model_registry::CandleQuantization::Q4KM;
             let generator =
-                contextra_infer_candle::CandleLlmClient::from_dir(model_dir, quantization).map_err(
-                    |e| ContextraError::Internal(format!("Failed to load Candle LLM model: {e}")),
-                )?;
+                contextra_infer_candle::CandleLlmClient::from_dir(model_dir, quantization)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to load Candle LLM model: {e}"))
+                    })?;
             Ok(Arc::new(generator))
         }
         #[cfg(not(feature = "candle"))]
@@ -290,7 +291,8 @@ impl RouterConfig {
                 }
             }
         } else if let Ok(json_str) = std::env::var("CONTEXTRA_ROUTER_PROFILES_JSON") {
-            if let Ok(loaded) = serde_json::from_str::<Vec<contextra::router::SlmProfile>>(&json_str)
+            if let Ok(loaded) =
+                serde_json::from_str::<Vec<contextra::router::SlmProfile>>(&json_str)
             {
                 profiles = loaded;
             }

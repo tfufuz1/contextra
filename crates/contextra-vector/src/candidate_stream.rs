@@ -50,11 +50,7 @@ pub struct VectorCandidateStream<'a, V: VectorIndex> {
 
 impl<'a, V: VectorIndex> VectorCandidateStream<'a, V> {
     /// Creates a new vector candidate stream for a query and index snapshot.
-    pub fn new(
-        index: &'a V,
-        query: impl Into<Vec<f32>>,
-        seq_no: Option<u64>,
-    ) -> Self {
+    pub fn new(index: &'a V, query: impl Into<Vec<f32>>, seq_no: Option<u64>) -> Self {
         Self {
             index,
             query: query.into(),

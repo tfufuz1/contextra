@@ -71,7 +71,10 @@ fn _contextra(_py: Python<'_>, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult
     m.add("ContextraIOError", _py.get_type::<ContextraIOError>())?;
     m.add("ContextraIndexError", _py.get_type::<ContextraIndexError>())?;
     m.add("ContextraValueError", _py.get_type::<ContextraValueError>())?;
-    m.add("ContextraCryptoError", _py.get_type::<ContextraCryptoError>())?;
+    m.add(
+        "ContextraCryptoError",
+        _py.get_type::<ContextraCryptoError>(),
+    )?;
     m.add(
         "ContextraInternalError",
         _py.get_type::<ContextraInternalError>(),

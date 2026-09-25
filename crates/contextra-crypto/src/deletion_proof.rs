@@ -17,7 +17,7 @@
 //! INVARIANTE INV-DELETION-1: DeletionProof::create() wird NUR nach
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
-use contextra_types::{CollectionId, DocId, ContextraError, Result, TenantId, TxId};
+use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
 
 /// Beweis, dass ein bestimmter DeletionLayer physisch bereinigt wurde.
@@ -345,7 +345,8 @@ impl DeletionProof {
                 "covered_layers/excluded_scopes are not cryptographically signed in this legacy proof version"
                     .to_string(),
             );
-            serde_json::to_string_pretty(&clone).map_err(|e| ContextraError::Internal(e.to_string()))
+            serde_json::to_string_pretty(&clone)
+                .map_err(|e| ContextraError::Internal(e.to_string()))
         } else {
             serde_json::to_string_pretty(self).map_err(|e| ContextraError::Internal(e.to_string()))
         }

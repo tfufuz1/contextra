@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use contextra_types::{DocId, ContextraError, Result, ScoredDocument, TxId, MAX_SEARCH_K};
 use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
+use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_SEARCH_K};
 /// An inverted index tied to a specific collection namespace.
 ///
 /// # Concurrency & Lock Hierarchy:

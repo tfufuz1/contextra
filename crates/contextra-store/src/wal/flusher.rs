@@ -438,13 +438,22 @@ impl Wal {
                             }
 
                             file.write_all(&total_bytes).await.map_err(|e| {
-                                ContextraError::Storage(format!("WAL migration write failed: {}", e))
+                                ContextraError::Storage(format!(
+                                    "WAL migration write failed: {}",
+                                    e
+                                ))
                             })?;
                             file.flush().await.map_err(|e| {
-                                ContextraError::Storage(format!("WAL migration flush failed: {}", e))
+                                ContextraError::Storage(format!(
+                                    "WAL migration flush failed: {}",
+                                    e
+                                ))
                             })?;
                             file.sync_all().await.map_err(|e| {
-                                ContextraError::Storage(format!("WAL migration fsync failed: {}", e))
+                                ContextraError::Storage(format!(
+                                    "WAL migration fsync failed: {}",
+                                    e
+                                ))
                             })?;
 
                             size.store(

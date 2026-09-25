@@ -46,7 +46,9 @@ fn test_ak18_drift_rate_assignment_restricted_to_recompute(
         {
             // Checks that outside recompute_drift_rate_from_window there is no assignment or mutation to drift_rate
             let trimmed = line.trim();
-            if !trimmed.starts_with("//") && !trimmed.starts_with("///") && !trimmed.starts_with("!")
+            if !trimmed.starts_with("//")
+                && !trimmed.starts_with("///")
+                && !trimmed.starts_with("!")
             {
                 return Err(format!(
                     "AK-18 Violation: Direct assignment or modification of `drift_rate` outside `recompute_drift_rate_from_window` at line {line_num}: {line}"
@@ -58,15 +60,13 @@ fn test_ak18_drift_rate_assignment_restricted_to_recompute(
 }
 
 #[test]
-fn test_ak18_recompute_signature_requires_ring3_token(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn test_ak18_recompute_signature_requires_ring3_token() -> Result<(), Box<dyn std::error::Error>> {
     let workspace_root = find_workspace_root()?;
     let flow_thompson_path = workspace_root.join("crates/contextra-adapt/src/flow_thompson.rs");
     let content = fs::read_to_string(&flow_thompson_path)?;
 
     // (b) recompute_drift_rate_from_window verlangt &Ring3Token (Signatur-Check per Text)
-    if !content
-        .contains("pub fn recompute_drift_rate_from_window(&mut self, _token: &Ring3Token)")
+    if !content.contains("pub fn recompute_drift_rate_from_window(&mut self, _token: &Ring3Token)")
     {
         return Err(
             "AK-18 Violation: `recompute_drift_rate_from_window` signature must accept `&Ring3Token`".into(),

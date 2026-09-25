@@ -16,8 +16,8 @@
 //!   Berechtigungen), bleibt der Vault nutzbar, aber ohne physische RAM-Fixierung.
 //!   Eine Warnung wird via `tracing::warn!` ausgegeben.
 
-use contextra_types::{DocId, TxId};
 use contextra_sys::LockedRegions;
+use contextra_types::{DocId, TxId};
 use std::time::Instant;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 

@@ -4,11 +4,11 @@
 // ZWECK: Integrationstests, Fault-Injection und Nebenläufigkeitstests für FlatBuffers IPC (contextra-wire)
 // INVARIANTEN: Keine Panics bei beschädigten oder abgeschnittenen IPC-Puffern; thread-sicheres Deserialisieren.
 
-use flatbuffers::FlatBufferBuilder;
 use contextra_wire::{
     root_as_search_response, Embedding, EmbeddingArgs, ScoredDocument, ScoredDocumentArgs,
     SearchResponse, SearchResponseArgs, VectorIndexUpdate, VectorIndexUpdateArgs,
 };
+use flatbuffers::FlatBufferBuilder;
 use std::sync::Arc;
 use std::thread;
 

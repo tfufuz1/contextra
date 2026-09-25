@@ -26,7 +26,7 @@ pub use kernels::scalar::{
 #[cfg(target_arch = "x86_64")]
 pub use kernels::{avx2, avx512};
 
-use contextra_core::{DistanceMetric, ContextraError};
+use contextra_core::{ContextraError, DistanceMetric};
 
 /// Validates that a vector contains no NaN or Infinite values.
 #[inline]
@@ -40,7 +40,11 @@ pub fn validate_vector(vec: &[f32]) -> contextra_core::Result<()> {
 }
 
 #[inline]
-pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> contextra_core::Result<f32> {
+pub fn compute_distance(
+    a: &[f32],
+    b: &[f32],
+    metric: DistanceMetric,
+) -> contextra_core::Result<f32> {
     validate_vector(a)?;
     validate_vector(b)?;
     compute_distance_trusted(a, b, metric)

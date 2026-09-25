@@ -6,13 +6,13 @@
 #![cfg(feature = "kv-stage-b")]
 
 use candle_core::Device;
-use contextra_ports::ContextSegment;
-use contextra_types::{ContextraError, ModelFingerprint, Result, TenantId};
-use contextra_ports::LlmTextGenerator;
 use contextra_infer_candle::{
     CandleLlmClient, CandleModelInner, KvState, LayerKv, PrefixRun, PrefixSeed, QuantizedLlamaModel,
 };
 use contextra_ports::kv::{KvBlock, KvLayout, KvPrefixHit, KvPrefixStore, RopeConfig};
+use contextra_ports::ContextSegment;
+use contextra_ports::LlmTextGenerator;
+use contextra_types::{ContextraError, ModelFingerprint, Result, TenantId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -66,11 +66,7 @@ impl KvPrefixStore for InMemoryKvPrefixStore {
         Ok(())
     }
 
-    fn evict(
-        &self,
-        tenant: TenantId,
-        key: &contextra_ports::kv::PrefixKey,
-    ) -> Result<u64> {
+    fn evict(&self, tenant: TenantId, key: &contextra_ports::kv::PrefixKey) -> Result<u64> {
         let mut guard = self
             .entries
             .lock()
@@ -157,12 +153,13 @@ impl CandleModelInner for MockPrefixModel {
             len,
         );
 
-        let exported_prefix = dummy_state
-            .export_block(0..prompt_tokens.len())
-            .ok();
+        let exported_prefix = dummy_state.export_block(0..prompt_tokens.len()).ok();
 
         Ok(PrefixRun {
-            output: format!("[MockPrefixModel] Generated text for prompt of len {}", prompt_tokens.len()),
+            output: format!(
+                "[MockPrefixModel] Generated text for prompt of len {}",
+                prompt_tokens.len()
+            ),
             prompt_tokens,
             reused_tokens,
             exported_prefix,
@@ -170,7 +167,10 @@ impl CandleModelInner for MockPrefixModel {
     }
 }
 
-fn create_test_client(model: MockPrefixModel, store: Option<Arc<dyn KvPrefixStore>>) -> Result<CandleLlmClient> {
+fn create_test_client(
+    model: MockPrefixModel,
+    store: Option<Arc<dyn KvPrefixStore>>,
+) -> Result<CandleLlmClient> {
     let device = Device::Cpu;
     let fingerprint = ModelFingerprint {
         hash: [1u8; 32],
@@ -272,8 +272,10 @@ async fn test_prefix_reuse_tenant_isolation() -> Result<()> {
     let model = MockPrefixModel::new(false);
     let client = create_test_client(model, Some(store.clone()))?;
 
-    let tenant_a = TenantId::try_new(10).map_err(|e| ContextraError::InvalidInput(e.to_string()))?;
-    let tenant_b = TenantId::try_new(20).map_err(|e| ContextraError::InvalidInput(e.to_string()))?;
+    let tenant_a =
+        TenantId::try_new(10).map_err(|e| ContextraError::InvalidInput(e.to_string()))?;
+    let tenant_b =
+        TenantId::try_new(20).map_err(|e| ContextraError::InvalidInput(e.to_string()))?;
 
     let segs = vec![ContextSegment {
         text: "Hello world test",
@@ -367,14 +369,12 @@ async fn test_real_gguf_greedy_identic_with_and_without_reuse() -> Result<()> {
                 tokenizer.clone(),
             );
 
-            let client_reuse = CandleLlmClient::new(
-                device,
-                Box::new(model),
-                fingerprint,
-                tokenizer,
-            ).with_prefix_store(store);
+            let client_reuse =
+                CandleLlmClient::new(device, Box::new(model), fingerprint, tokenizer)
+                    .with_prefix_store(store);
 
-            let tenant = TenantId::try_new(1).map_err(|e| ContextraError::InvalidInput(e.to_string()))?;
+            let tenant =
+                TenantId::try_new(1).map_err(|e| ContextraError::InvalidInput(e.to_string()))?;
             let segs = vec![ContextSegment {
                 text: "The capital of France is Paris.",
                 chunk_id: 1,

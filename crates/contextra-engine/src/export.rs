@@ -6,8 +6,8 @@
 use crate::collection::{extract_effective_importance, extract_text, Collection, StoredDocument};
 use crate::filter::extract_memory_type;
 use crate::Contextra;
-use contextra_types::{MemoryLink, MemoryType, Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{MemoryLink, MemoryType, Result};
 use serde::{Deserialize, Serialize};
 
 /// Aktuelle Schema-Version für das JSON Export-Format.

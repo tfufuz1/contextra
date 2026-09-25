@@ -3,7 +3,7 @@ use contextra_ports::BoxFuture;
 use contextra_types::DocId;
 use contextra_db::{
     execute_background_consolidation, execute_consolidation_pass, CommunityStabilityTracker,
-    ConsolidationConfig, MaintenanceConfig, MaintenanceScheduler, Contextra, ContextraConfig,
+    ConsolidationConfig, Contextra, ContextraConfig, MaintenanceConfig, MaintenanceScheduler,
     SynthesisConfig,
 };
 use std::time::Duration;
@@ -17,7 +17,9 @@ async fn test_consolidation_pass_tombstones_duplicates() {
         dimension: 4,
         ..Default::default()
     };
-    let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+    let db = Contextra::open_with_config(dir.path(), config)
+        .await
+        .unwrap();
     let collection = db.collection("consolidation_test").await.unwrap();
 
     let duplicate_emb = vec![1.0, 0.0, 0.0, 0.0];
@@ -63,7 +65,9 @@ async fn test_consolidation_worker_periodic_execution_and_cancellation() {
         dimension: 4,
         ..Default::default()
     };
-    let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+    let db = Contextra::open_with_config(dir.path(), config)
+        .await
+        .unwrap();
     let collection = db.collection("consolidation_worker_test").await.unwrap();
 
     let duplicate_emb = vec![0.0, 1.0, 0.0, 0.0];
@@ -139,7 +143,9 @@ async fn test_execute_background_consolidation_with_synthesis_pass() {
         dimension: 4,
         ..Default::default()
     };
-    let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+    let db = Contextra::open_with_config(dir.path(), config)
+        .await
+        .unwrap();
     let collection = db.collection("synthesis_test").await.unwrap();
 
     // Distinct, normalized, coherent embeddings (cosine sim < 0.99 and > 0.5)

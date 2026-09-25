@@ -1,6 +1,6 @@
 use crate::*;
-use contextra_types::{Result, TxId};
 use contextra_store::LsmStorage;
+use contextra_types::{Result, TxId};
 use std::sync::Arc;
 
 impl Contextra {
@@ -225,5 +225,4 @@ impl Contextra {
 
         Ok(proof)
     }
-
 }

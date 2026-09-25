@@ -1,7 +1,7 @@
 use super::super::*;
 use crate::csr::CsrGraph;
-use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
 use contextra_ports::GraphIndex;
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 struct LogCaptureLayer(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
@@ -793,12 +793,27 @@ async fn test_ppr_tl_hfd_and_shadow_mode_context_dispatch() {
     let e2 = EntityId::new(200);
     let e3 = EntityId::new(300);
 
-    graph.add_entity(tx, Entity::new(e1, "Alpha", "Type1")).await.unwrap();
-    graph.add_entity(tx, Entity::new(e2, "Beta", "Type1")).await.unwrap();
-    graph.add_entity(tx, Entity::new(e3, "Gamma", "Type1")).await.unwrap();
+    graph
+        .add_entity(tx, Entity::new(e1, "Alpha", "Type1"))
+        .await
+        .unwrap();
+    graph
+        .add_entity(tx, Entity::new(e2, "Beta", "Type1"))
+        .await
+        .unwrap();
+    graph
+        .add_entity(tx, Entity::new(e3, "Gamma", "Type1"))
+        .await
+        .unwrap();
 
-    graph.add_edge(tx, Edge::new(e1, e2, "rel_a")).await.unwrap();
-    graph.add_edge(tx, Edge::new(e2, e3, "rel_b")).await.unwrap();
+    graph
+        .add_edge(tx, Edge::new(e1, e2, "rel_a"))
+        .await
+        .unwrap();
+    graph
+        .add_edge(tx, Edge::new(e2, e3, "rel_b"))
+        .await
+        .unwrap();
     graph.commit(tx).await.unwrap();
 
     let cfg_tlhfd = PprConfig {
@@ -811,9 +826,21 @@ async fn test_ppr_tl_hfd_and_shadow_mode_context_dispatch() {
         ..Default::default()
     };
 
-    let res_tlhfd = graph.personalized_page_rank(&[e1], &cfg_tlhfd).await.unwrap();
-    let res_shadow = graph.personalized_page_rank(&[e1], &cfg_shadow).await.unwrap();
+    let res_tlhfd = graph
+        .personalized_page_rank(&[e1], &cfg_tlhfd)
+        .await
+        .unwrap();
+    let res_shadow = graph
+        .personalized_page_rank(&[e1], &cfg_shadow)
+        .await
+        .unwrap();
 
-    assert!(!res_tlhfd.is_empty(), "TL-HFD should return non-empty PPR results");
-    assert!(!res_shadow.is_empty(), "ShadowModeTlHfd should return non-empty PPR results");
+    assert!(
+        !res_tlhfd.is_empty(),
+        "TL-HFD should return non-empty PPR results"
+    );
+    assert!(
+        !res_shadow.is_empty(),
+        "ShadowModeTlHfd should return non-empty PPR results"
+    );
 }

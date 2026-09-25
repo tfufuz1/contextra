@@ -1,8 +1,8 @@
 //! Empirical recall and rank impact analysis for German compound splitting failures in 4-Signal Fusion.
 //! Evaluates actual vs. expected retrieval performance across BM25-only and Hybrid (Vector + Text) search.
 
-use contextra_types::FusionWeights;
-use contextra_db::{DistanceMetric, Language, Contextra, ContextraConfig};
+use contextra_core::FusionWeights;
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric, Language};
 use serde_json::json;
 use tempfile::TempDir;
 

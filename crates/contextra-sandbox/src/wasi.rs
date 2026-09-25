@@ -552,7 +552,10 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
     linker.func_wrap(
         "wasi_snapshot_preview1",
         "environ_get",
-        move |mut caller: Caller<'_, SandboxState>, environ_ptr: i32, environ_buf_ptr: i32| -> i32 {
+        move |mut caller: Caller<'_, SandboxState>,
+              environ_ptr: i32,
+              environ_buf_ptr: i32|
+              -> i32 {
             if environ_ptr < 0 || environ_buf_ptr < 0 {
                 return ERRNO_INVAL;
             }

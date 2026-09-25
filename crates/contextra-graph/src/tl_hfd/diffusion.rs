@@ -61,10 +61,7 @@ pub fn run_diffusion<G: PathGraph>(
     // Node degree cache
     let mut degree_cache: AHashMap<EntityId, f32> = AHashMap::new();
 
-    let get_degree = |u: EntityId,
-                      degree_cache: &mut AHashMap<EntityId, f32>,
-                      graph: &G|
-     -> f32 {
+    let get_degree = |u: EntityId, degree_cache: &mut AHashMap<EntityId, f32>, graph: &G| -> f32 {
         *degree_cache.entry(u).or_insert_with(|| {
             let mut deg = 0.0f32;
             for (_nbr, w) in graph.neighbors_with_weights(u) {
@@ -88,9 +85,8 @@ pub fn run_diffusion<G: PathGraph>(
                 params.max_hyperedge_sort_size,
             );
 
-            let (f_e, u_max, u_min) = compute_lovasz_extension(&truncated, |v| {
-                x_map.get(&v).copied().unwrap_or(0.0)
-            });
+            let (f_e, u_max, u_min) =
+                compute_lovasz_extension(&truncated, |v| x_map.get(&v).copied().unwrap_or(0.0));
 
             if f_e > 0.0 {
                 if let Some(uma) = u_max {
@@ -131,11 +127,7 @@ pub fn run_diffusion<G: PathGraph>(
                 let hid_val = hid.inner();
                 if seen_hyper.insert(hid_val) {
                     let participants = match graph.get_hyperedge(hid) {
-                        Some(he) => he
-                            .participants
-                            .iter()
-                            .map(|p| p.entity)
-                            .collect::<Vec<_>>(),
+                        Some(he) => he.participants.iter().map(|p| p.entity).collect::<Vec<_>>(),
                         None => graph
                             .hyperedge_participants(hid)
                             .iter()

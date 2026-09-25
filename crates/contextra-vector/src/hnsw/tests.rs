@@ -1,5 +1,5 @@
-use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
 use super::*;
+use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
 
 fn test_config(dim: usize) -> HnswConfig {
     HnswConfig {

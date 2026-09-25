@@ -1,5 +1,4 @@
-use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, VectorIndex};
-use contextra_types::{ContextraError, DocId, Result, TxId};
+use contextra_core::{BoxFuture, ContextraError, DocId, LlmTextGenerator, Result, StorageEngine};
 use contextra_db::{
     cleanup_orphaned_consolidation_intents, ContextCompactor, Contextra, ContextraConfig,
 };

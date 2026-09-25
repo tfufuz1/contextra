@@ -9,7 +9,7 @@
 //   PROP-5: Leere Eingaben & k=0 erzeugen niemals Panics und liefern leere Vektoren
 
 use contextra_db::fusion::{reciprocal_rank_fusion, weighted_reciprocal_rank_fusion};
-use contextra_db::{DistanceMetric, Contextra, ContextraConfig, SearchResult};
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric, SearchResult};
 use contextra_text::bm25::score_term;
 use proptest::prelude::*;
 use tempfile::TempDir;

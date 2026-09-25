@@ -3,9 +3,9 @@ use super::fixtures::*;
 #[cfg(feature = "bandit-routing")]
 use crate::SlmProfile;
 #[cfg(feature = "bandit-routing")]
-use contextra_types::TokenBudget;
-#[cfg(feature = "bandit-routing")]
 use contextra_db::{Contextra, ContextraConfig};
+#[cfg(feature = "bandit-routing")]
+use contextra_types::TokenBudget;
 #[cfg(feature = "bandit-routing")]
 use serde_json::json;
 #[cfg(feature = "bandit-routing")]

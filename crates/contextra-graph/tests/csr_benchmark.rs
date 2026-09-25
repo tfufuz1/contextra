@@ -1,6 +1,6 @@
-use contextra_types::{Edge, Entity, EntityId, TxId};
-use contextra_ports::GraphIndex;
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
+use contextra_ports::GraphIndex;
+use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::time::Instant;
 
 #[tokio::test]

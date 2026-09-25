@@ -2,9 +2,9 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_relate_success_visible_in_storage_and_graph() {
-    use contextra_types::EntityId;
     use contextra_graph::csr::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_types::EntityId;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -51,13 +51,12 @@ async fn test_relate_success_visible_in_storage_and_graph() {
     assert!(neighbors.contains(&id2));
 }
 
-
 #[tokio::test]
 async fn test_relate_rollback_semantics_on_storage_commit_failure() {
-use contextra_types::{Result, TxId};
-use contextra_ports::{StorageStats};
-use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::CsrGraph;
+    use contextra_ports::StorageStats;
+    use contextra_ports::{BoxFuture, StorageEngine};
+    use contextra_types::{Result, TxId};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -163,14 +162,13 @@ use contextra_ports::{BoxFuture, StorageEngine};
     assert_eq!(graph.entity_count(), 0);
 }
 
-
 #[tokio::test]
 async fn test_relate_rollback_semantics_on_graph_commit_failure() {
-use contextra_types::{Result, TxId};
-use contextra_ports::{StorageStats};
-use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
+    use contextra_ports::StorageStats;
+    use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_types::{Result, TxId};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;
@@ -304,12 +302,11 @@ use contextra_ports::{BoxFuture, StorageEngine};
     );
 }
 
-
 #[tokio::test]
 async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_types::Result<()> {
-    use contextra_types::DocId;
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::DocId;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -364,7 +361,6 @@ async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_ty
 
     Ok(())
 }
-
 
 #[cfg(feature = "graph-connectivity-health")]
 #[tokio::test]

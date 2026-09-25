@@ -1,10 +1,10 @@
 // ANCHOR[PERF:BENCH-003] STATUS:DONE (TS:2026-09-03T00:00:00Z) — Contextra Competitive Benchmark Suite
 // ZIEL: Criterion-basierte Messung von Write-Durchsatz, Hybrid-Search-Latenz und Context-Compaction-Durchsatz
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use contextra_core::{ContextChunk, DocId, TokenBudget};
 use contextra_db::context_compaction::{CompactionStrategy, ContextCompactor};
 use contextra_db::Contextra;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 

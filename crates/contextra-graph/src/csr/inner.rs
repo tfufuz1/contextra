@@ -70,7 +70,8 @@ pub struct GraphInner {
     /// Index mapping EntityId -> Set of HyperEdgeIds.
     pub(crate) hyperedge_index: ahash::AHashMap<EntityId, HashSet<crate::hyperedge::HyperEdgeId>>,
     /// Reverse index mapping child HyperEdgeId -> Set of parent HyperEdgeIds.
-    pub(crate) child_to_parents: ahash::AHashMap<crate::hyperedge::HyperEdgeId, HashSet<crate::hyperedge::HyperEdgeId>>,
+    pub(crate) child_to_parents:
+        ahash::AHashMap<crate::hyperedge::HyperEdgeId, HashSet<crate::hyperedge::HyperEdgeId>>,
 }
 
 /// Detailed memory estimate separating shared payloads from private structural allocations (§6.3).

@@ -135,9 +135,9 @@ mod loom_tests {
 #[cfg(not(loom))]
 #[cfg(test)]
 mod normal_tests {
-    use contextra_types::TenantId;
     use contextra_crypto::kv_segment::segment::KvSegment;
     use contextra_crypto::kv_segment::store::TenantIsolatedKvStore;
+    use contextra_types::TenantId;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::thread;

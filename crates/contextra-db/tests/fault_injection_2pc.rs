@@ -2,11 +2,9 @@
 // ZWECK: Prüft atomare 2PC-Transaktions-Kompensation und Crash-Recovery (repair_on_open) über alle 4 Sub-Engines.
 // STAND: TS:2026-08-31T22:30:00Z (SESSION: 0dcb9f3b)
 
-use contextra_ports::{
-    BoxFuture, ScoredDocument, StorageEngine, StorageStats, VectorIndex, VectorIndexStats,
-};
-use contextra_types::{
-    ContextraError, DocId, EntityId, Result, TxId,
+use contextra_core::{
+    BoxFuture, ContextraError, DocId, EntityId, Result, ScoredDocument, StorageEngine,
+    StorageStats, TxId, VectorIndex, VectorIndexStats,
 };
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_graph::CsrGraph;
@@ -680,7 +678,9 @@ async fn test_insert_many_atomic_all_or_nothing_at_50_percent_failure() {
         dimension: 768,
         ..Default::default()
     };
-    let db = Contextra::open_with_config(tmp.path(), config).await.unwrap();
+    let db = Contextra::open_with_config(tmp.path(), config)
+        .await
+        .unwrap();
     let col = db.collection("batch_col").await.unwrap();
 
     // Prepare 10 documents for insert_many, where document 5 (50% mark) triggers a dimension mismatch error

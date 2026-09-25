@@ -3,9 +3,9 @@
 //! Verifies pull-stream batching, geometric reloading, deduplication, prefix ordering,
 //! snapshot isolation, and laziness using `MockStorage`.
 
-use contextra_types::{DocId, Result, TxId, MAX_SEARCH_K};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::{Bm25CandidateStream, InvertedIndex, DEFAULT_STREAM_BATCH_SIZE};
+use contextra_types::{DocId, Result, TxId, MAX_SEARCH_K};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -94,12 +94,7 @@ impl StorageEngine for MockStorage {
     }
 
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        Box::pin(async move {
-            Ok(self
-                .seq_counter
-                .load(Ordering::SeqCst)
-                .saturating_sub(1))
-        })
+        Box::pin(async move { Ok(self.seq_counter.load(Ordering::SeqCst).saturating_sub(1)) })
     }
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
@@ -180,9 +175,7 @@ async fn create_test_index_with_docs(
     for i in 1..=count {
         let doc_id = DocId::new(i as u64);
         let text = format!("rust database candidate search benchmark item {i}");
-        index
-            .upsert_document(tx, doc_id, &text)
-            .await?;
+        index.upsert_document(tx, doc_id, &text).await?;
     }
     index.commit(tx).await?;
 
@@ -246,8 +239,7 @@ async fn test_stream_batching_and_exact_sizes() -> Result<()> {
 #[tokio::test]
 async fn test_stream_deduplication_across_reloads() -> Result<()> {
     let (index, _) = create_test_index_with_docs(60).await?;
-    let mut stream =
-        Bm25CandidateStream::new(&index, "candidate search", None).with_batch_size(10);
+    let mut stream = Bm25CandidateStream::new(&index, "candidate search", None).with_batch_size(10);
 
     let mut seen_ids = std::collections::HashSet::new();
     let mut total_count = 0;
@@ -327,7 +319,8 @@ async fn test_stream_snapshot_isolation() -> Result<()> {
     let query = "database item";
 
     let snapshot_seq = storage.last_seq_no().await?;
-    let mut stream = Bm25CandidateStream::new(&index, query, Some(snapshot_seq)).with_batch_size(10);
+    let mut stream =
+        Bm25CandidateStream::new(&index, query, Some(snapshot_seq)).with_batch_size(10);
 
     let batch1 = stream.next_batch().await?;
     assert_eq!(batch1.len(), 10);

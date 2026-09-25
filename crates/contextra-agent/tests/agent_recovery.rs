@@ -1,9 +1,9 @@
 use contextra_agent::{
     AgentContext, AgentTool, NodeType, OrchestratorEngine, StateGraph, StepResult,
 };
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_ports::BoxFuture;
 use contextra_types::TokenBudget;
-use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;

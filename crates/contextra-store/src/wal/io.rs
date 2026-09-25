@@ -63,7 +63,9 @@ where
                     .get_mut()
                     .seek(std::io::SeekFrom::Start(0))
                     .await
-                    .map_err(|e| ContextraError::Storage(format!("WAL replay seek failed: {}", e)))?;
+                    .map_err(|e| {
+                        ContextraError::Storage(format!("WAL replay seek failed: {}", e))
+                    })?;
                 reader = tokio::io::BufReader::new(reader.into_inner());
                 pos = 0;
             }
@@ -896,5 +898,6 @@ impl Wal {
 
 #[allow(dead_code)]
 pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
-    contextra_sys::set_restrictive_file_acl(path).map_err(|e| ContextraError::Storage(e.to_string()))
+    contextra_sys::set_restrictive_file_acl(path)
+        .map_err(|e| ContextraError::Storage(e.to_string()))
 }

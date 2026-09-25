@@ -4,8 +4,8 @@ use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
 use contextra::chunker::{ChunkerConfig, MarkdownChunker};
-use contextra_types::{DocId, MAX_SEARCH_K};
 use contextra_ports::StorageEngine;
+use contextra_types::{DocId, MAX_SEARCH_K};
 use serde_json::{json, Value};
 
 /// Maximale Anzahl von Teilnehmern an einer n-ären Hyperkante (`contextra_relate_n_ary`).
@@ -529,17 +529,18 @@ impl McpServer {
                 }
 
                 let turns_scanned = turns.len();
-                let (consolidation_res, synthesis_res) = contextra::execute_background_consolidation(
-                    col.as_ref(),
-                    &turns,
-                    &contextra::memory_consolidation::ConsolidationConfig::default(),
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-                .await
-                .map_err(McpError::from)?;
+                let (consolidation_res, synthesis_res) =
+                    contextra::execute_background_consolidation(
+                        col.as_ref(),
+                        &turns,
+                        &contextra::memory_consolidation::ConsolidationConfig::default(),
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                    .await
+                    .map_err(McpError::from)?;
 
                 let duplicates_tombstoned_count = consolidation_res.duplicates_tombstoned.len();
                 let cascade_tombstones_count =
@@ -730,9 +731,7 @@ impl McpServer {
                         .await
                         .map_err(McpError::from)?;
                 } else {
-                    col.relate(from, to, label)
-                        .await
-                        .map_err(McpError::from)?;
+                    col.relate(from, to, label).await.map_err(McpError::from)?;
                 }
 
                 Ok(json!({
@@ -762,7 +761,9 @@ impl McpServer {
                         s
                     }
                     None => {
-                        return Err(McpError::invalid_params("missing required field: 'predicate'"));
+                        return Err(McpError::invalid_params(
+                            "missing required field: 'predicate'",
+                        ));
                     }
                 };
 

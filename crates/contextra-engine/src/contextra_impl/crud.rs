@@ -1,6 +1,6 @@
 use crate::*;
-use contextra_types::{FilterExpr, Result};
 use contextra_store::LsmStorage;
+use contextra_types::{FilterExpr, Result};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -332,5 +332,4 @@ impl Contextra {
     ) -> Result<Vec<(String, Value)>> {
         self.default_col().await?.scan(start, end, limit).await
     }
-
 }

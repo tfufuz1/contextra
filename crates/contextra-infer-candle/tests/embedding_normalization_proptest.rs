@@ -4,10 +4,10 @@
 // INVARIANTEN: No NaN or Inf in output vectors (is_finite true); no panics on arbitrary string lengths or empty inputs; proptest with 50 cases.
 
 use candle_core::Device;
-use contextra_ports::EmbeddingProvider;
 use contextra_infer_candle::embedding::{CandleEmbedInner, DefaultCandleEmbedModel};
 use contextra_infer_candle::model_registry::ModelFingerprint;
 use contextra_infer_candle::CandleEmbedClient;
+use contextra_ports::EmbeddingProvider;
 use proptest::prelude::*;
 
 fn create_test_client() -> CandleEmbedClient {

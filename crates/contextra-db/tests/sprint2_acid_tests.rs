@@ -8,9 +8,8 @@
 //!
 //! DECISION-REF: sprint_2_data_integrity_acid.md — Verifikationsplan
 
-use contextra_ports::StorageEngine;
-use contextra_types::TenantId;
-use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
+use contextra_core::{StorageEngine, TenantId};
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use serde_json::json;
 use tempfile::TempDir;
 

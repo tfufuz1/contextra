@@ -11,7 +11,7 @@
 //! [`AgentTool`] trait to participate in the orchestration loop.
 
 use crate::context::AgentContext;
-use contextra_ports::{BoxFuture};
+use contextra_ports::BoxFuture;
 use contextra_types::{Result, TxId};
 use serde::{Deserialize, Serialize};
 

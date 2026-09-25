@@ -2,8 +2,8 @@ use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
     ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
 };
-use contextra_types::{DocId, EntityId, Result, EXPIRY_METADATA_KEY};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, EntityId, Result, EXPIRY_METADATA_KEY};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Inserts a text document, automatically generating its embedding.
@@ -32,7 +32,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let meta = metadata.get_or_insert(serde_json::json!({}));
         if let Some(obj) = meta.as_object_mut() {
             if !obj.contains_key("text") {
-                obj.insert("text".to_string(), serde_json::Value::String(text.to_string()));
+                obj.insert(
+                    "text".to_string(),
+                    serde_json::Value::String(text.to_string()),
+                );
             }
         }
 
@@ -65,7 +68,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let meta = metadata.get_or_insert(serde_json::json!({}));
         if let Some(obj) = meta.as_object_mut() {
             if !obj.contains_key("text") {
-                obj.insert("text".to_string(), serde_json::Value::String(text.to_string()));
+                obj.insert(
+                    "text".to_string(),
+                    serde_json::Value::String(text.to_string()),
+                );
             }
         }
 
@@ -93,7 +99,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let mut meta = metadata.unwrap_or_else(|| serde_json::json!({}));
         if let Some(obj) = meta.as_object_mut() {
-            obj.insert(EXPIRY_METADATA_KEY.to_string(), serde_json::json!(expiry_seq));
+            obj.insert(
+                EXPIRY_METADATA_KEY.to_string(),
+                serde_json::json!(expiry_seq),
+            );
         } else {
             meta = serde_json::json!({ EXPIRY_METADATA_KEY: expiry_seq });
         }
@@ -165,10 +174,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         if id.is_empty() {
-            return Err(contextra_types::ContextraError::invalid_input("Document ID cannot be empty"));
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Document ID cannot be empty",
+            ));
         }
         if id.len() > 1024 {
-            return Err(contextra_types::ContextraError::invalid_input("Document ID length exceeds maximum allowed limit of 1024 bytes"));
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Document ID length exceeds maximum allowed limit of 1024 bytes",
+            ));
         }
         if embedding.len() != self.dimension {
             return Err(contextra_types::ContextraError::invalid_input(format!(
@@ -285,7 +298,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         docs: &[(String, Vec<f32>, Option<serde_json::Value>)],
     ) -> Result<()> {
         if docs.is_empty() {
-            return Err(contextra_types::ContextraError::invalid_input("insert_many requires at least one document"));
+            return Err(contextra_types::ContextraError::invalid_input(
+                "insert_many requires at least one document",
+            ));
         }
         if docs.len() > 10_000 {
             return Err(contextra_types::ContextraError::invalid_input(format!(
@@ -305,13 +320,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
-        let _guards = self.lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str())).await;
+        let _guards = self
+            .lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str()))
+            .await;
         let db_tx = self.begin_transaction()?;
 
         for (id, embedding, metadata) in docs {
             if embedding.len() != self.dimension {
                 if let Err(rollback_err) = db_tx.rollback().await {
-                    tracing::error!("[INV-DB-3] Failed to rollback insert_many on dimension mismatch: {}", rollback_err);
+                    tracing::error!(
+                        "[INV-DB-3] Failed to rollback insert_many on dimension mismatch: {}",
+                        rollback_err
+                    );
                 }
                 return Err(contextra_types::ContextraError::invalid_input(format!(
                     "Dimension mismatch: expected {}, got {}",
@@ -321,14 +341,23 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
             if let Err(e) = validate_embedding(embedding) {
                 if let Err(rollback_err) = db_tx.rollback().await {
-                    tracing::error!("[INV-DB-3] Failed to rollback insert_many on invalid embedding: {}", rollback_err);
+                    tracing::error!(
+                        "[INV-DB-3] Failed to rollback insert_many on invalid embedding: {}",
+                        rollback_err
+                    );
                 }
                 return Err(e);
             }
 
-            if let Err(e) = self.insert_op(&db_tx, id, embedding, metadata.clone()).await {
+            if let Err(e) = self
+                .insert_op(&db_tx, id, embedding, metadata.clone())
+                .await
+            {
                 if let Err(rollback_err) = db_tx.rollback().await {
-                    tracing::error!("[INV-DB-3] Failed to rollback insert_many: {}", rollback_err);
+                    tracing::error!(
+                        "[INV-DB-3] Failed to rollback insert_many: {}",
+                        rollback_err
+                    );
                 }
                 return Err(e);
             }
@@ -347,10 +376,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         if id.is_empty() {
-            return Err(contextra_types::ContextraError::invalid_input("Document ID cannot be empty"));
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Document ID cannot be empty",
+            ));
         }
         if id.len() > 1024 {
-            return Err(contextra_types::ContextraError::invalid_input("Document ID length exceeds maximum allowed limit of 1024 bytes"));
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Document ID length exceeds maximum allowed limit of 1024 bytes",
+            ));
         }
         if embedding.len() != self.dimension {
             return Err(contextra_types::ContextraError::invalid_input(format!(
@@ -387,7 +420,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         docs: &[(String, Vec<f32>, Option<serde_json::Value>)],
     ) -> Result<()> {
         if docs.is_empty() {
-            return Err(contextra_types::ContextraError::invalid_input("upsert_many requires at least one document"));
+            return Err(contextra_types::ContextraError::invalid_input(
+                "upsert_many requires at least one document",
+            ));
         }
         if docs.len() > 10_000 {
             return Err(contextra_types::ContextraError::invalid_input(format!(
@@ -407,12 +442,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
-        let _guards = self.lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str())).await;
+        let _guards = self
+            .lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str()))
+            .await;
         let db_tx = self.begin_transaction()?;
         for (id, embedding, metadata) in docs {
             if embedding.len() != self.dimension {
                 if let Err(rollback_err) = db_tx.rollback().await {
-                    tracing::error!("[INV-DB-3] Failed to rollback upsert_many on dimension mismatch: {}", rollback_err);
+                    tracing::error!(
+                        "[INV-DB-3] Failed to rollback upsert_many on dimension mismatch: {}",
+                        rollback_err
+                    );
                 }
                 return Err(contextra_types::ContextraError::invalid_input(format!(
                     "Dimension mismatch: expected {}, got {}",
@@ -422,14 +462,22 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
             if let Err(e) = validate_embedding(embedding) {
                 if let Err(rollback_err) = db_tx.rollback().await {
-                    tracing::error!("[INV-DB-3] Failed to rollback upsert_many on invalid embedding: {}", rollback_err);
+                    tracing::error!(
+                        "[INV-DB-3] Failed to rollback upsert_many on invalid embedding: {}",
+                        rollback_err
+                    );
                 }
                 return Err(e);
             }
-            let result = self.update_op(&db_tx, id, embedding, metadata.clone()).await;
+            let result = self
+                .update_op(&db_tx, id, embedding, metadata.clone())
+                .await;
             if let Err(e) = result {
                 if let Err(rollback_err) = db_tx.rollback().await {
-                    tracing::error!("[INV-DB-3] Failed to rollback upsert_many: {}", rollback_err);
+                    tracing::error!(
+                        "[INV-DB-3] Failed to rollback upsert_many: {}",
+                        rollback_err
+                    );
                 }
                 return Err(e);
             }

@@ -104,10 +104,7 @@ async fn test_diskann_search_filtered_none_filter() {
         .await
         .expect("search_filtered with None failed");
 
-    let direct_res = index
-        .search(&query, k)
-        .await
-        .expect("search direct failed");
+    let direct_res = index.search(&query, k).await.expect("search direct failed");
 
     assert_eq!(
         filtered_res.len(),

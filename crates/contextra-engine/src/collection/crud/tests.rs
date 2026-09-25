@@ -356,9 +356,7 @@ async fn test_insert_does_not_block_on_collection_wide_lock() {
     // Since key-granular locking is used, inserting key_2 must not block on key_1.
     let col_clone = col.clone();
     let handle =
-        tokio::spawn(
-            async move { col_clone.insert("key_2", &[1.0, 0.0, 0.0, 0.0], None).await },
-        );
+        tokio::spawn(async move { col_clone.insert("key_2", &[1.0, 0.0, 0.0, 0.0], None).await });
 
     let res = tokio::time::timeout(std::time::Duration::from_millis(500), handle).await;
     assert!(

@@ -46,8 +46,6 @@ pub(crate) struct DiskAnnIndexInner {
     pub(crate) compute_pool: ComputePool,
 }
 
-
-
 impl Clone for DiskAnnIndex {
     fn clone(&self) -> Self {
         Self {
@@ -55,7 +53,6 @@ impl Clone for DiskAnnIndex {
         }
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub(crate) struct SearchCandidate {
@@ -79,7 +76,6 @@ impl Ord for SearchCandidate {
         self.distance.total_cmp(&other.distance)
     }
 }
-
 
 impl DiskAnnIndex {
     pub fn try_new(config: DiskAnnConfig) -> Result<Self> {
@@ -142,5 +138,4 @@ impl DiskAnnIndex {
             }
         }
     }
-
 }

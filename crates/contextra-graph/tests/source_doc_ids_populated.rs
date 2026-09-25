@@ -1,6 +1,6 @@
-use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
-use contextra_ports::GraphIndex;
 use contextra_graph::CsrGraph;
+use contextra_ports::GraphIndex;
+use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 #[tokio::test]

@@ -5,8 +5,8 @@ use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
-use contextra_types::{DocId, FilterExpr, Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, FilterExpr, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs semantic k-NN search over stored embeddings.

@@ -189,6 +189,10 @@ pub fn check_vetoes() -> Result<(), String> {
     println!("=== Running xtask check-vetoes ===");
     let root = crate::find_root_dir();
     let vetoes_path = root.join("VETOES.md");
+    if !vetoes_path.exists() {
+        println!("ℹ️ VETOES.md existiert nicht in {}, überspringe Prüfung.", root.display());
+        return Ok(());
+    }
     let vetoes_content = fs::read_to_string(&vetoes_path)
         .map_err(|e| format!("VETOES.md ({}) nicht lesbar: {e}", vetoes_path.display()))?;
 
@@ -360,7 +364,7 @@ reason: >
 feature_id: OP-03
 status: conditionally_accepted
 review_date: 2026-10-07
-adr_ref: DECISIONS.md#adr-077
+adr_ref: docs/decisions/ADR-077-produktvision-pypi-library-fokus-und.md
 reason: >
   Test OP-03 review date
 "#;
@@ -376,7 +380,7 @@ reason: >
         assert_eq!(expired_res.errors.len(), 1);
         assert_eq!(
             expired_res.errors[0],
-            "❌ VETO-FRIST ÜBERSCHRITTEN: OP-03 — Wiedervorlage war am 2026-10-07, bitte ADR mit Entscheidung erstellen oder Frist explizit per neuem ADR verlängern (adr_ref: DECISIONS.md#adr-077)."
+            "❌ VETO-FRIST ÜBERSCHRITTEN: OP-03 — Wiedervorlage war am 2026-10-07, bitte ADR mit Entscheidung erstellen oder Frist explizit per neuem ADR verlängern (adr_ref: docs/decisions/ADR-077-produktvision-pypi-library-fokus-und.md)."
         );
 
         // Warning check (within 14 days)

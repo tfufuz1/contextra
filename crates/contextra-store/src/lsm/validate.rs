@@ -20,7 +20,7 @@ pub fn derive_doc_id(key: &[u8]) -> DocId {
     let hash = blake3::hash(key);
     let mut bytes = [0u8; 8];
     bytes.copy_from_slice(&hash.as_bytes()[..8]);
-    DocId::new(u64::from_le_bytes(bytes))
+    DocId::new(u64::from_le_bytes(bytes).into())
 }
 
 #[cfg(feature = "docid-128")]

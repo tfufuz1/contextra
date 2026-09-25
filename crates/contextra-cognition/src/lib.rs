@@ -6,18 +6,23 @@
 
 use std::sync::Arc;
 
+pub mod aggregation_phase;
 pub mod consolidation_executor;
 pub mod consolidation_locks;
 pub mod context;
 pub mod context_compaction;
-pub mod maintenance_config;
-pub mod maintenance_scheduler;
-pub mod aggregation_phase;
 pub mod graph_sink;
 pub mod leanrag_input;
+pub mod maintenance_config;
+pub mod maintenance_scheduler;
 pub mod memory_consolidation;
 pub mod synthesis_phase;
 
+pub use aggregation_phase::{
+    check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,
+    AggregationConfig, AggregationEdge, AggregationNode, AggregationPhaseResult, AlphaNode,
+    ConsolidationPipelineResult, SuperEdgeDraft, SuperEdgeSink,
+};
 #[allow(deprecated)]
 pub use consolidation_executor::{
     execute_background_consolidation, execute_consolidation_pass,
@@ -30,6 +35,8 @@ pub use context_compaction::{
     cleanup_orphaned_consolidation_intents, CompactedContext, CompactionStrategy,
     ConsolidationSession, ContextCompactor, StatusToken,
 };
+pub use graph_sink::CsrGraphSuperEdgeSink;
+pub use leanrag_input::{build_leanrag_inputs, LeanRagInputs, DEFAULT_MAX_LEANRAG_NODES};
 pub use maintenance_config::MaintenanceConfig;
 pub use maintenance_scheduler::MaintenanceScheduler;
 pub use memory_consolidation::{
@@ -38,13 +45,6 @@ pub use memory_consolidation::{
     ConsolidationConfig, ConsolidationPhaseResult, MetaChunk, SynthesisConfig,
     SynthesisPhaseResult, TurnSegment,
 };
-pub use aggregation_phase::{
-    check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,
-    AggregationConfig, AggregationEdge, AggregationNode, AggregationPhaseResult, AlphaNode,
-    ConsolidationPipelineResult, SuperEdgeDraft, SuperEdgeSink,
-};
-pub use graph_sink::CsrGraphSuperEdgeSink;
-pub use leanrag_input::{build_leanrag_inputs, LeanRagInputs, DEFAULT_MAX_LEANRAG_NODES};
 pub use synthesis_phase::run_synthesis_pass;
 
 /// Registers consolidation engine launcher with `contextra-engine`.

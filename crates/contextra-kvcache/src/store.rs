@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use ahash::AHashMap;
-use lru::LruCache;
 use contextra_types::{ContextraError, TenantId};
+use lru::LruCache;
 use parking_lot::RwLock;
 
 use super::eviction_worker::EvictionWorker;
@@ -113,7 +113,11 @@ impl TenantState {
     }
 
     /// Fügt eine Token-Sequenz in den Radix-Baum ein.
-    fn insert_token_sequence(&mut self, tokens: &[u32], block_id: u64) -> Result<(), ContextraError> {
+    fn insert_token_sequence(
+        &mut self,
+        tokens: &[u32],
+        block_id: u64,
+    ) -> Result<(), ContextraError> {
         self.radix_tree.insert(tokens, block_id)
     }
 
