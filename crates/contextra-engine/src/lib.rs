@@ -66,27 +66,6 @@ pub type ConsolidationLauncher = Arc<
         + Sync,
 >;
 
-/// Registers a consolidation worker launcher function (deprecated: set on `ContextraConfig` instead).
-#[deprecated(
-    note = "Instanzgebundenen Launcher via ContextraConfig::with_consolidation_launcher setzen (P29)"
-)]
-pub fn register_consolidation_launcher<F>(_f: F)
-where
-    F: Fn(
-            Arc<Collection<LsmStorage>>,
-            std::time::Duration,
-            usize,
-            tokio_util::sync::CancellationToken,
-        ) -> tokio::task::JoinHandle<()>
-        + Send
-        + Sync
-        + 'static,
-{
-    tracing::warn!(
-        "register_consolidation_launcher is deprecated and has no effect. Set consolidation_launcher on ContextraConfig instead."
-    );
-}
-
 pub use fusion::{ProvenanceRecord, SearchResult, SignalContribution};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

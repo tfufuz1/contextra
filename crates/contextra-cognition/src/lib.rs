@@ -1,10 +1,44 @@
 // FILE-CONTEXT
 // ZWECK: Contextra Cognition Engine (Layer 3 - Cognition).
 // INVARIANTEN: No unsafe code; depends on contextra-engine; zero cyclic dependencies.
+//!
+//! # Contextra Cognition Engine
+//!
+//! Dieses Crate bietet Algorithmen für Speicher-Konsolidierung (Memory Consolidation),
+//! Kontext-Kompaktierung, LeanRAG-Aggregation und Synthese-Phasen.
+//!
+//! ## Einbindung des Consolidation Workers
+//!
+//! Da `contextra-engine` (Layer 3 Engine / Ring 2) nicht von `contextra-cognition`
+//! (Layer 3 Cognition / Ring 3) abhängen darf und kein globaler veränderlicher Zustand
+//! erlaubt ist (Prinzip P29 / ADR-N10), wird der Consolidation-Worker instanzgebunden
+//! über `ContextraConfig::with_consolidation_launcher` konfiguriert:
+//!
+//! ```rust,ignore
+//! use std::sync::Arc;
+//! use contextra_engine::{Contextra, ContextraConfig, ConsolidationLauncher};
+//! use contextra_cognition::consolidation_executor::ConsolidationEngine;
+//! use contextra_cognition::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
+//!
+//! let launcher: ConsolidationLauncher = Arc::new(|col, interval, max_llm_calls, cancel_token| {
+//!     let engine = Arc::new(ConsolidationEngine::new(
+//!         col,
+//!         ConsolidationConfig::default(),
+//!         SynthesisConfig {
+//!             max_llm_calls_per_cycle: max_llm_calls as u32,
+//!             ..Default::default()
+//!         },
+//!         interval,
+//!         cancel_token,
+//!     ));
+//!     engine.start()
+//! });
+//!
+//! let config = ContextraConfig::default().with_consolidation_launcher(launcher);
+//! let db = Contextra::open_with_config("/path/to/db", config).await?;
+//! ```
 
 #![forbid(unsafe_code)]
-
-use std::sync::Arc;
 
 pub mod consolidation_executor;
 pub mod consolidation_locks;
@@ -46,23 +80,3 @@ pub use aggregation_phase::{
 pub use graph_sink::CsrGraphSuperEdgeSink;
 pub use leanrag_input::{build_leanrag_inputs, LeanRagInputs, DEFAULT_MAX_LEANRAG_NODES};
 pub use synthesis_phase::run_synthesis_pass;
-
-/// Registers consolidation engine launcher with `contextra-engine`.
-pub fn init() {
-    contextra_engine::register_consolidation_launcher(
-        |col, interval, max_llm_calls, cancel_token| {
-            let synthesis_config = memory_consolidation::SynthesisConfig {
-                max_llm_calls_per_cycle: max_llm_calls as u32,
-                ..Default::default()
-            };
-            let engine = Arc::new(consolidation_executor::ConsolidationEngine::new(
-                col,
-                memory_consolidation::ConsolidationConfig::default(),
-                synthesis_config,
-                interval,
-                cancel_token,
-            ));
-            engine.start()
-        },
-    );
-}
