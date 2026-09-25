@@ -57,6 +57,10 @@ loom = "0.7"
 futures = "0.3"
 redb = "2"
 
+[[test]]
+name = "differential_redb"
+path = "tests/differential/redb_operation_sequence.rs"
+
 [[bench]]
 name = "sstable_bench"
 harness = false
