@@ -190,7 +190,10 @@ impl PostingList {
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
             encode_varint(p.doc_len as u64, &mut buf);
-            prev_doc_id = p.doc_id as u64;
+            #[allow(clippy::unnecessary_cast)]
+            {
+                prev_doc_id = p.doc_id as u64;
+            }
         }
 
         Ok(buf)

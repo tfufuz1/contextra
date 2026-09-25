@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bm25;
+pub mod domain;
 pub mod inverted;
 pub mod morphology;
 pub mod posting_list;
@@ -21,6 +22,7 @@ pub mod tokenizer;
 pub mod wand;
 
 pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
+pub use domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
 pub use inverted::{BM25MorphIndex, InvertedIndex, Language};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
