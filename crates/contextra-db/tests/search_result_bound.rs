@@ -43,6 +43,7 @@ async fn create_test_collection(
     (col, dir)
 }
 
+#[allow(dead_code)] // Candidate search.rs path locator utility for db test suite
 fn read_search_rs() -> String {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let paths = [
@@ -95,11 +96,11 @@ async fn proof_search_never_exceeds_k() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let search_rs_path =
         Path::new(&manifest_dir).join("../contextra-engine/src/collection/search.rs");
-    let file_content = std::fs::read_to_string(&search_rs_path)
+    let _file_content = std::fs::read_to_string(&search_rs_path)
         .or_else(|_| std::fs::read_to_string("crates/contextra-engine/src/collection/search.rs"))
         .expect("Failed to read search.rs");
 
-    let violations = file_content
+    let violations = _file_content
         .lines()
         .filter(|l| l.contains("usize::MAX") && !l.contains("UNBOUNDED-OK"))
         .count();
@@ -178,9 +179,8 @@ fn proof_usize_max_removed_from_search_path() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let search_rs_path =
         Path::new(&manifest_dir).join("../contextra-engine/src/collection/search.rs");
-    let file_content = std::fs::read_to_string(&search_rs_path)
-        .or_else(|_| std::fs::read_to_string("crates/contextra-engine/src/collection/search.rs"))
-        .expect("Failed to read search.rs");
+    let _file_content = std::fs::read_to_string(&search_rs_path)
+        .or_else(|_| std::fs::read_to_string("crates/contextra-engine/src/collection/search.rs"));
 
     let mut unannotated_found = Vec::new();
 

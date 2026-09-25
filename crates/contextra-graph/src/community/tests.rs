@@ -1,9 +1,7 @@
 use super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
-use contextra_types::{ContextraError, Edge, Entity, EntityId, TxId};
-
-use super::*;
+use contextra_types::{Edge, Entity, EntityId, TxId};
 
 #[tokio::test]
 async fn test_community_detection_determinism() {

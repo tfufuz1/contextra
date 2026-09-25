@@ -16,9 +16,6 @@ mod tests {
     use std::collections::HashSet;
     use std::path::PathBuf;
 
-    use super::*;
-
-    #[test]
     #[test]
     fn test_compute_adaptive_flush_threshold_formula() {
         // Kleine Collection: Boden greift

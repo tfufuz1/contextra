@@ -1,7 +1,7 @@
 use super::super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
-use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
+use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 struct LogCaptureLayer(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
