@@ -1,3 +1,4 @@
+use super::auto_extraction::auto_extract_and_relate;
 use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
     ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
@@ -39,7 +40,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
 
-        self.insert(id, &embedding, metadata).await
+        let res = self.insert(id, &embedding, metadata).await;
+        if res.is_ok() {
+            if let Some((generator, cfg)) = self.auto_extraction_config() {
+                if cfg.enabled {
+                    if let Err(e) = auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await {
+                        tracing::warn!(doc_id = %id, error = %e, "Auto extraction failed during insert_text_only");
+                    }
+                }
+            }
+        }
+        res
     }
 
     /// Upserts a text document, automatically generating its embedding.
@@ -75,7 +86,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
 
-        self.upsert(id, &embedding, metadata).await
+        let res = self.upsert(id, &embedding, metadata).await;
+        if res.is_ok() {
+            if let Some((generator, cfg)) = self.auto_extraction_config() {
+                if cfg.enabled {
+                    if let Err(e) = auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await {
+                        tracing::warn!(doc_id = %id, error = %e, "Auto extraction failed during upsert_text_only");
+                    }
+                }
+            }
+        }
+        res
     }
 
     /// Inserts a document with a Sequence-based Time-To-Live (TTL in committed ops).

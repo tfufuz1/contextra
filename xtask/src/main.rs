@@ -84,9 +84,11 @@ mod check_unsafe_islands;
 mod check_vetoes;
 mod check_workflow_commands;
 mod claim;
+mod gate_check;
 mod gen_feature_catalog;
 mod gen_prompter_data;
 mod generate_adr;
+mod generate_markers;
 mod init_audit_fix;
 mod jules_preflight;
 mod jules_submit_gate;
@@ -94,6 +96,7 @@ mod lint_unsafe_slice_bounds;
 mod migrate_docid_128;
 mod post_merge_report;
 mod record_mutation_score;
+mod reproducible_build;
 mod validate_pr_checklist;
 
 pub use check_jules_context_freshness::run_check_jules_context_freshness;
@@ -2085,6 +2088,12 @@ fn main() {
                 process::exit(1);
             }
         }
+        "generate-diagnostics" => {
+            if let Err(e) = xtask::generate_diagnostics::run_generate_diagnostics() {
+                eprintln!("❌ generate-diagnostics failed: {}", e);
+                process::exit(1);
+            }
+        }
         "sync-docs" => {
             let check_only = args.iter().any(|arg| arg == "--check");
             let success = run_sync_docs(check_only);
@@ -2267,6 +2276,7 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-duplicate-symbols-cross-file" => { #[path = "check_duplicate_symbols_cross_file.rs"] mod check_duplicate_symbols_cross_file; if let Err(e) = check_duplicate_symbols_cross_file::run() { eprintln!("❌ check-duplicate-symbols-cross-file failed: {}", e); process::exit(1); } }
         "check-duplicate-symbols" => {
             let cross_module = args.iter().any(|arg| arg == "--cross-module");
             let changed_files = get_changed_rs_files_from_git_diff().unwrap_or_default();
@@ -2594,6 +2604,67 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("❌ check-nan-hot-loop error: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "gate-check" => {
+            let mut level = None;
+            let mut crate_name = None;
+            let mut i = 2;
+            while i < args.len() {
+                if let Some(val) = args[i].strip_prefix("--level=") {
+                    level = Some(val.to_string());
+                } else if args[i] == "--level" && i + 1 < args.len() {
+                    level = Some(args[i + 1].clone());
+                    i += 1;
+                } else if let Some(val) = args[i].strip_prefix("--crate=") {
+                    crate_name = Some(val.to_string());
+                } else if args[i] == "--crate" && i + 1 < args.len() {
+                    crate_name = Some(args[i + 1].clone());
+                    i += 1;
+                }
+                i += 1;
+            }
+
+            let parsed_level = match level.as_deref() {
+                Some(lvl_str) => match gate_check::GateLevel::from_str(lvl_str) {
+                    Ok(lvl) => lvl,
+                    Err(e) => {
+                        eprintln!("❌ {}", e);
+                        process::exit(1);
+                    }
+                },
+                None => {
+                    eprintln!("❌ Parameter --level <0..4> ist erforderlich.");
+                    process::exit(1);
+                }
+            };
+
+            let opts = gate_check::GateCheckOptions {
+                level: parsed_level,
+                crate_name,
+            };
+
+            match gate_check::run(opts) {
+                Ok(report) => {
+                    println!("✅ Gate Check Level {:?} ERFOLGREICH BESTANDEN", report.level);
+                    if let Some(ref c) = report.crate_name {
+                        println!("   Betroffenes Crate: {}", c);
+                    }
+                    println!("   Ausgeführte Schritte ({}):", report.passed_steps.len());
+                    for step in &report.passed_steps {
+                        println!("     - {}", step);
+                    }
+                    if !report.todo_notes.is_empty() {
+                        println!("   Hinweise / TODOs:");
+                        for note in &report.todo_notes {
+                            println!("     - {}", note);
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!("❌ Gate Check FEHLGESCHLAGEN: {}", err);
                     process::exit(1);
                 }
             }

@@ -14,6 +14,28 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  check-duplicate-symbols-cross-file:
+    name: Check Duplicate Symbols Cross File Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Check Duplicate Symbols Cross File
+        run: cargo run --manifest-path xtask/Cargo.toml -- check-duplicate-symbols-cross-file
+
   flatbuffers-drift-gate:
     name: FlatBuffers Schema Drift Gate
     runs-on: ubuntu-latest
@@ -36,6 +58,28 @@ jobs:
       - name: FlatBuffers Schema Drift Gate
         run: cargo xtask check-fbs-drift
 
+  marker-drift-gate:
+    name: Capability Marker Drift Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Capability Marker Drift Gate
+        run: cargo xtask check-marker-drift
+
   dependency-policy-gate:
     name: Dependency Policy Gate (cargo deny)
     runs-on: ubuntu-latest
@@ -47,6 +91,29 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
         with:
           command: check advisories bans licenses sources
+
+  phantom-commit-gate:
+    name: Phantom Commit Protection Gate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Phantom Commit Gate
+        run: cargo run -p xtask -- check-commit-diff-integrity --range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
 
   hyperedge-schema-merge:
     name: HyperEdge Schema Merge Gate
@@ -125,8 +192,8 @@ jobs:
         run: cargo test --manifest-path xtask/Cargo.toml --locked
 
       - name: Clippy Panic Lints
-        # ersetzt check-unwrap-ratchet (§0.4); Workspace-Lints folgen in Welle 2
-        run: cargo clippy --workspace --lib --bins --locked -- -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::todo -D clippy::unimplemented
+        # ersetzt `check-unwrap-baseline`: der Ratchet entfällt ersatalos
+        run: cargo clippy --workspace --lib --bins --locked -- -D warnings
 
       - name: Ring Layering Check
         # Phase 0R: Warnmodus (Exit 0). Phase 1a: --strict
