@@ -1,0 +1,34 @@
+# Configuration for cargo-mutants scoped to contextra-crypto (Tier-0)
+
+examine_globs = [
+    "crates/contextra-crypto/src/**/*.rs",
+]
+
+exclude_globs = [
+    "**/tests/**",
+    "**/tests.rs",
+    "**/*_test.rs",
+    "**/test_*.rs",
+    "**/benches/**",
+    "**/fuzz/**",
+    "**/*_generated.rs",
+]
+
+test_package = [
+    "contextra-crypto",
+]
+
+copy_target = true
+output = "target"
+
+additional_cargo_args = [
+    "--lib",
+]
+
+additional_cargo_test_args = [
+    "--",
+    "--skip",
+    "max_boundary",
+]
+
+timeout_multiplier = 3.0
