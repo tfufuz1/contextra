@@ -1,6 +1,6 @@
 pub use super::*;
 pub use crate::compaction::{CompactionConfig, CompactionEngine};
-pub use contextra_core::{IndexOp, TOMBSTONE_BIT};
+pub use contextra_core::TOMBSTONE_BIT;
 pub use std::sync::Arc;
 pub use std::time::Duration;
 use tempfile::TempDir;

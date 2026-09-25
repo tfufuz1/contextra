@@ -1080,6 +1080,7 @@ dependencies = [
  "contextra-core",
  "contextra-crypto",
  "contextra-sys",
+ "contextra-testkit",
  "crc32fast",
  "criterion",
  "futures",
