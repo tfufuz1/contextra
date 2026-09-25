@@ -28,6 +28,7 @@ default = []
 docid-128 = ["contextra-core/docid-128"]
 experimental-diskann = []
 experimental-rabitq = []
+experimental-predicate-augmented-search = []
 graph = []
 # ACHTUNG: partial-index-rebuild aktiviert F-02 (Partial HNSW Rebuild), das gegen ein
 # dokumentiertes Architektur-Veto verstößt (siehe VETOES.md, falls vorhanden, sonst
@@ -79,6 +80,11 @@ required-features = ["partial-index-rebuild"]
 [[bench]]
 name = "distance_nan_impact_bench"
 harness = false
+
+[[bench]]
+name = "filtered_search_selectivity_bench"
+harness = false
+required-features = ["experimental-diskann"]
 
 [[test]]
 name = "diskann_fault_injection_test"
