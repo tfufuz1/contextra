@@ -41,6 +41,7 @@ pub mod edge_reinforcement;
 pub mod edge_reinforcement_buffer;
 pub mod error;
 pub mod hyperedge;
+pub mod hyperedge_suggest;
 pub mod path_rag;
 #[cfg(feature = "graph-connectivity-health")]
 pub mod percolation;
@@ -78,6 +79,10 @@ pub use error::GraphMutationError;
 pub use hyperedge::{
     sort_dedup_entities, star_weight, ConsolidationNodesGuard, HyperEdge, HyperEdgeId,
     HyperEdgeView, RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
+};
+pub use hyperedge_suggest::{
+    compute_co_occurrence_candidates, validate_candidates_with_llm, HyperEdgeCandidate,
+    HyperedgeSuggestError, ValidatedHyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
 };
 pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
 #[cfg(feature = "graph-connectivity-health")]
