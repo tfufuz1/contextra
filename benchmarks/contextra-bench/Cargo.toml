@@ -40,6 +40,15 @@ anyhow = "1"
 hdrhistogram = "7"
 rand = { workspace = true }
 
+[[bench]]
+name = "competitive_kv"
+harness = false
+
+[dev-dependencies]
+criterion = { workspace = true }
+redb = "2"
+sled = "0.34"
+
 [features]
 default = []
 external-benchmarks = []
