@@ -2085,6 +2085,7 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-commit-diff-integrity" => { #[path = "check_commit_diff_integrity.rs"] mod check_commit_diff_integrity; if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(&args[2..]) { eprintln!("❌ check-commit-diff-integrity failed: {}", e); process::exit(1); } }
         "sync-docs" => {
             let check_only = args.iter().any(|arg| arg == "--check");
             let success = run_sync_docs(check_only);
