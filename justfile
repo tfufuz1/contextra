@@ -43,6 +43,10 @@ check-core:
 check-store:
     nix develop -c cargo check -p contextra-store || cargo check -p contextra-store
 
+# Runs Loom concurrency exploration model test for group commit lock handoff (unoptimized debug build required by Loom)
+loom-store:
+    RUSTFLAGS="--cfg loom" cargo test -p contextra-store --test loom_group_commit_handoff -- --nocapture
+
 # Runs the chaos matrix fault-injection integration test suite
 chaos-test:
     nix develop -c cargo test -p contextra-store --test chaos_matrix -- --ignored --test-threads=1 || \

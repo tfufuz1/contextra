@@ -8,6 +8,7 @@ on:
     paths:
       - "crates/contextra-store/src/**"
       - "crates/contextra-store/tests/loom_group_commit.rs"
+      - "crates/contextra-store/tests/loom_group_commit_handoff.rs"
       - "crates/contextra-crypto/src/**"
       - "crates/contextra-crypto/tests/loom_kv_deferred_zeroize.rs"
       - "crates/contextra-vector/src/**"
@@ -29,6 +30,10 @@ jobs:
       - name: Run Loom Test — contextra-store (loom_group_commit)
         run: |
           RUSTFLAGS="--cfg loom" cargo test -p contextra-store --test loom_group_commit --release
+      - name: Run Loom Test — contextra-store (loom_group_commit_handoff)
+        run: |
+          which just || cargo install just --cheap-only || true
+          just loom-store
 
   loom-crypto:
     name: Loom Concurrency Check — contextra-crypto
