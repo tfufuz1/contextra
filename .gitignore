@@ -38,6 +38,10 @@ benchmarks/contextra-bench/tests/data/
 # Kompilierte Ad-hoc-Binaries ohne Cargo-Build-System
 /fix_unsafe
 
+# Cargo fuzz corpus & artifacts
+**/fuzz/corpus/
+**/fuzz/artifacts/
+
 # Generierte Benchmark-/Test-Ergebnisse
 results/
 
