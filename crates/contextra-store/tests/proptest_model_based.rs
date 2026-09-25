@@ -1,10 +1,13 @@
 use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use proptest::prelude::*;
-use std::collections::HashMap;
+use proptest::test_runner::TestCaseError;
+use std::collections::BTreeMap;
+use std::ops::Bound;
 use tempfile::TempDir;
 
 #[tokio::test]
+#[allow(clippy::unwrap_used)]
 async fn test_failing_proptest_sequence() -> contextra_core::Result<()> {
     let tmp = TempDir::new().unwrap();
     let config = LsmConfig {
@@ -49,11 +52,14 @@ async fn test_failing_proptest_sequence() -> contextra_core::Result<()> {
 
 fn operation_strategy() -> impl Strategy<Value = Operation> {
     prop_oneof![
-        (0..10u8, 0..100u8).prop_map(|(k, v)| Operation::Put(k, v)),
-        (0..10u8).prop_map(Operation::Delete),
+        (0..50u8, 0..100u8).prop_map(|(k, v)| Operation::Put(k, v)),
+        (0..50u8).prop_map(Operation::Delete),
         Just(Operation::Flush),
         Just(Operation::Compact),
         Just(Operation::Restart),
+        (0..50u8, 0..50u8).prop_map(|(k1, k2)| Operation::Scan(k1, k2)),
+        (0..50u8, 0..100u8).prop_map(|(k, v)| Operation::PutIfAbsent(k, v)),
+        (0..50u8).prop_map(Operation::GetOrDefault),
     ]
 }
 
@@ -64,15 +70,71 @@ enum Operation {
     Flush,
     Compact,
     Restart,
+    Scan(u8, u8),
+    PutIfAbsent(u8, u8),
+    GetOrDefault(u8),
+}
+
+async fn verify_storage_state(
+    storage: &LsmStorage,
+    shadow: &BTreeMap<Vec<u8>, Vec<u8>>,
+) -> Result<(), TestCaseError> {
+    for (key, expected_val) in shadow {
+        let actual_val = storage
+            .get(key)
+            .await
+            .map_err(|e| TestCaseError::fail(e.to_string()))?;
+        prop_assert_eq!(
+            actual_val.as_deref(),
+            Some(expected_val.as_slice()),
+            "Proptest mismatch for key {:?}",
+            String::from_utf8_lossy(key)
+        );
+    }
+
+    for k_byte in 0..50u8 {
+        let key = format!("prop_k_{}", k_byte).into_bytes();
+        if !shadow.contains_key(&key) {
+            let actual_val = storage
+                .get(&key)
+                .await
+                .map_err(|e| TestCaseError::fail(e.to_string()))?;
+            prop_assert_eq!(
+                actual_val,
+                None,
+                "Key {:?} expected deleted but found in LSM",
+                String::from_utf8_lossy(&key)
+            );
+        }
+    }
+
+    let lsm_all = storage
+        .scan(Bound::Unbounded, Bound::Unbounded, None)
+        .await
+        .map_err(|e| TestCaseError::fail(e.to_string()))?;
+    let model_all: Vec<_> = shadow.iter().collect();
+    prop_assert_eq!(lsm_all.len(), model_all.len());
+    for ((mk, mv), (lk, lv)) in model_all.iter().zip(lsm_all.iter()) {
+        prop_assert_eq!(*mk, lk);
+        prop_assert_eq!(*mv, lv);
+    }
+
+    Ok(())
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(20))]
+    #![proptest_config(ProptestConfig {
+        cases: std::env::var("PROPTEST_CASES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(200),
+        ..ProptestConfig::default()
+    })]
     #[test]
-    fn prop_model_based_lsm_simulation(ops in proptest::collection::vec(operation_strategy(), 1..60)) {
-        let rt = tokio::runtime::Runtime::new().unwrap();
+    fn prop_model_based_lsm_simulation(ops in proptest::collection::vec(operation_strategy(), 1..500)) {
+        let rt = tokio::runtime::Runtime::new().map_err(|e| TestCaseError::fail(e.to_string()))?;
         rt.block_on(async {
-            let tmp = TempDir::new().unwrap();
+            let tmp = TempDir::new().map_err(|e| TestCaseError::fail(e.to_string()))?;
             let path = tmp.path().to_path_buf();
 
             let config = LsmConfig {
@@ -81,8 +143,10 @@ proptest! {
                 ..Default::default()
             };
 
-            let mut storage = LsmStorage::new(config.clone()).await.unwrap();
-            let mut shadow = HashMap::<Vec<u8>, Vec<u8>>::new();
+            let mut storage = LsmStorage::new(config.clone())
+                .await
+                .map_err(|e| TestCaseError::fail(e.to_string()))?;
+            let mut shadow = BTreeMap::<Vec<u8>, Vec<u8>>::new();
             let mut tx_counter = 1u64;
 
             for op in ops {
@@ -93,8 +157,14 @@ proptest! {
                         let tx = TxId::new(tx_counter);
                         tx_counter += 1;
 
-                        storage.put(tx, &key, &val).await.unwrap();
-                        storage.commit(tx).await.unwrap();
+                        storage
+                            .put(tx, &key, &val)
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                        storage
+                            .commit(tx)
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
                         shadow.insert(key, val);
                     }
                     Operation::Delete(k_byte) => {
@@ -102,44 +172,88 @@ proptest! {
                         let tx = TxId::new(tx_counter);
                         tx_counter += 1;
 
-                        storage.delete(tx, &key).await.unwrap();
-                        storage.commit(tx).await.unwrap();
+                        storage
+                            .delete(tx, &key)
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                        storage
+                            .commit(tx)
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
                         shadow.remove(&key);
                     }
                     Operation::Flush => {
-                        storage.force_flush().await.unwrap();
+                        storage
+                            .force_flush()
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
                     }
                     Operation::Compact => {
-                        storage.maybe_compact().await.unwrap();
+                        storage
+                            .maybe_compact()
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
                     }
                     Operation::Restart => {
                         drop(storage);
-                        storage = LsmStorage::new(config.clone()).await.unwrap();
+                        storage = LsmStorage::new(config.clone())
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                        verify_storage_state(&storage, &shadow).await?;
+                    }
+                    Operation::Scan(k_start, k_end) => {
+                        let s1 = format!("prop_k_{}", k_start).into_bytes();
+                        let s2 = format!("prop_k_{}", k_end).into_bytes();
+                        let (start, end) = if s1 <= s2 { (s1, s2) } else { (s2, s1) };
+                        let lsm_results = storage
+                            .scan(
+                                Bound::Included(start.as_slice()),
+                                Bound::Excluded(end.as_slice()),
+                                None,
+                            )
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                        let model_results: Vec<_> = shadow.range(start..end).collect();
+                        prop_assert_eq!(lsm_results.len(), model_results.len());
+                        for ((mk, mv), (lk, lv)) in model_results.iter().zip(lsm_results.iter()) {
+                            prop_assert_eq!(*mk, lk);
+                            prop_assert_eq!(*mv, lv);
+                        }
+                    }
+                    Operation::PutIfAbsent(k_byte, v_byte) => {
+                        let key = format!("prop_k_{}", k_byte).into_bytes();
+                        let val = format!("prop_v_{}", v_byte).into_bytes();
+                        let tx = TxId::new(tx_counter);
+                        tx_counter += 1;
+
+                        let inserted = storage
+                            .put_if_absent(tx, &key, &val)
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                        if inserted {
+                            storage
+                                .commit(tx)
+                                .await
+                                .map_err(|e| TestCaseError::fail(e.to_string()))?;
+                            shadow.insert(key, val);
+                        }
+                    }
+                    Operation::GetOrDefault(k_byte) => {
+                        let key = format!("prop_k_{}", k_byte).into_bytes();
+                        let actual_val = storage
+                            .get(&key)
+                            .await
+                            .map_err(|e| TestCaseError::fail(e.to_string()))?
+                            .map(|b| b.to_vec())
+                            .unwrap_or_default();
+                        let expected_val = shadow.get(&key).cloned().unwrap_or_default();
+                        prop_assert_eq!(actual_val, expected_val);
                     }
                 }
             }
 
-            for (key, expected_val) in &shadow {
-                let actual_val = storage.get(key).await.unwrap();
-                assert_eq!(
-                    actual_val.as_deref(),
-                    Some(expected_val.as_slice()),
-                    "Proptest mismatch for key {:?}",
-                    String::from_utf8_lossy(key)
-                );
-            }
-
-            for k_byte in 0..10u8 {
-                let key = format!("prop_k_{}", k_byte).into_bytes();
-                if !shadow.contains_key(&key) {
-                    let actual_val = storage.get(&key).await.unwrap();
-                    assert_eq!(
-                        actual_val, None,
-                        "Key {:?} expected deleted but found in LSM",
-                        String::from_utf8_lossy(&key)
-                    );
-                }
-            }
-        });
+            verify_storage_state(&storage, &shadow).await?;
+            Ok(())
+        })?;
     }
 }
