@@ -3,7 +3,7 @@
 // INVARIANTEN: P2 Zero-Panic-Doctrine (Isolierte Fehlerbehandlung pro Teilschritt).
 //              P10 Wiederverwendung bestehender Logik ohne Duplikation.
 // NICHT-OFFENSICHTLICH: F-11 (LyapunovDriftWatcher) ist bewusst NICHT im MaintenanceScheduler-Tick enthalten,
-//                       sondern EVENT-DRIVEN in `crates/contextra-router/src/router.rs` integriert. Event-driven
+//                       sondern EVENT-DRIVEN in `crates/contextra-router/src/router/` integriert. Event-driven
 //                       ist für Drift-Erkennung reaktionsschneller als ein periodischer 60s-Tick.
 // STAND: TS:2026-08-31T00:00:00Z
 
@@ -185,7 +185,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
         // ARCHITEKTUR-ENTSCHEIDUNG (siehe ADR-079 in DECISIONS.md):
         // F-11 (LyapunovDriftWatcher.update()) ist bewusst NICHT hier im periodischen Tick enthalten.
         // F-11 ist stattdessen reaktionsschnell & event-driven direkt nach jeder Routing-Entscheidung
-        // in `crates/contextra-router/src/router.rs` integriert. Eine Auslagerung in diesen 60s-Tick
+        // in `crates/contextra-router/src/router/` integriert. Eine Auslagerung in diesen 60s-Tick
         // wäre eine architektonische Regression der Drift-Reaktionszeit.
 
         // Step f: Consolidation-Trigger
