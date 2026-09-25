@@ -11,7 +11,7 @@
 use contextra_db::{Contextra, ContextraConfig};
 
 #[tokio::main]
-async fn main() -> contextra_core::Result<()> {
+async fn main() -> contextra_types::Result<()> {
     let config = ContextraConfig {
         dimension: 4,
         ..Default::default()
@@ -110,7 +110,7 @@ async fn main() -> contextra_core::Result<()> {
     );
 
     // --- Drop a collection ---
-    let tenant_id = contextra_core::TenantId::new(1);
+    let tenant_id = contextra_types::TenantId::new(1);
     db.drop_collection("tools", tenant_id, &[0u8; 32]).await?;
     let remaining = db.list_collections().await?;
     println!("\n=== After dropping 'tools' ===");
