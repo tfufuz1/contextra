@@ -88,6 +88,7 @@ mod gate_check;
 mod gen_feature_catalog;
 mod gen_prompter_data;
 mod generate_adr;
+mod generate_markers;
 mod init_audit_fix;
 mod jules_preflight;
 mod jules_submit_gate;
