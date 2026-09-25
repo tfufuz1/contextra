@@ -1362,22 +1362,20 @@ pub fn check_no_orphan_adr_files(root_dir: &Path) -> bool {
 pub fn check_adr_consistency_dir(root_dir: &Path) -> bool {
     let mut failed = false;
 
-    // 1. Prüfe DECISIONS.md im Root-Verzeichnis (gemäß ADR-060 Einzel-Quelle)
+    // 1. Scanne docs/decisions/
+    let decisions_dir = root_dir.join("docs/decisions");
+    if !decisions_dir.exists() {
+        eprintln!("❌ Consistency error: Verzeichnis docs/decisions/ existiert nicht!");
+        return false;
+    }
+
+    // Falls DECISIONS.md im Root-Verzeichnis existiert, prüfe sie ebenfalls (Fallback/Abwärtskompatibilität)
     let root_decisions_path = root_dir.join("DECISIONS.md");
     if root_decisions_path.exists() {
         let content = fs::read_to_string(&root_decisions_path).unwrap_or_default();
         if !check_adr_consistency(&content) {
             failed = true;
         }
-    } else {
-        eprintln!("❌ Consistency error: DECISIONS.md im Root-Verzeichnis existiert nicht!");
-        failed = true;
-    }
-
-    // 2. Scanne docs/decisions/ falls vorhanden
-    let decisions_dir = root_dir.join("docs/decisions");
-    if !decisions_dir.exists() {
-        return !failed;
     }
 
     let adr_re = Regex::new(r"^ADR-(\d+)").unwrap();

@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn test_negative_existing_adr() {
         let root = crate::find_root_dir();
-        let content = "adr_ref: docs/decisions/ADR-001-lsm-tree-für-persistenz.md";
+        let content = "adr_ref: docs/decisions/ADR-001-lsm-tree-fuer-persistenz.md";
         let violations = check_placeholder_refs_in_content(content, "test.md", &root);
         assert!(violations.is_empty());
     }

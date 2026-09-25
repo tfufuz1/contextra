@@ -173,15 +173,32 @@ pub fn check_adr_deadlines_at(
 
 pub fn check_adr_deadlines_with_root(root: &Path) -> Result<(), String> {
     println!("=== Running xtask check-adr-deadlines ===");
-    let decisions_path = root.join("DECISIONS.md");
-    let decisions_content = fs::read_to_string(&decisions_path).map_err(|e| {
-        format!(
-            "DECISIONS.md ({}) nicht lesbar: {e}",
-            decisions_path.display()
-        )
-    })?;
+    let decisions_dir = root.join("docs").join("decisions");
+    let mut entries = Vec::new();
 
-    let entries = parse_adr_deadlines(&decisions_content)?;
+    if decisions_dir.exists() {
+        let read_dir = fs::read_dir(&decisions_dir)
+            .map_err(|e| format!("Kann {} nicht lesen: {e}", decisions_dir.display()))?;
+
+        for entry in read_dir.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    let file_entries = parse_adr_deadlines(&content)?;
+                    entries.extend(file_entries);
+                }
+            }
+        }
+    }
+
+    let root_decisions = root.join("DECISIONS.md");
+    if root_decisions.exists() {
+        if let Ok(content) = fs::read_to_string(&root_decisions) {
+            let root_entries = parse_adr_deadlines(&content)?;
+            entries.extend(root_entries);
+        }
+    }
+
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
     let deadline_res = check_adr_deadlines_at(&entries, &today, root);
