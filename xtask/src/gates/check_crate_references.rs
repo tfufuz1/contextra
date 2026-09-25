@@ -81,6 +81,10 @@ pub fn extract_crate_references(line: &str) -> Vec<String> {
     refs
 }
 
+/// Überprüft, ob eine Datei auf Crate-Referenzen gescannt werden soll.
+///
+/// `docs/archive/` wird bewusst ausgeschlossen, da es eingefrorene historische
+/// Snapshots enthält, die absichtlich veraltete/entfernte Crate-Namen nennen.
 #[allow(dead_code)]
 pub fn should_check_file(rel_path_str: &str) -> bool {
     // Normalisiere Pfad-Trennzeichen
@@ -88,7 +92,10 @@ pub fn should_check_file(rel_path_str: &str) -> bool {
     let clean = normalized.trim_start_matches("./");
 
     // Ausnahmen
-    if clean.starts_with("docs/decisions/") || clean == "docs/GESAMTSPEZIFIKATION.md" {
+    if clean.starts_with("docs/decisions/")
+        || clean.starts_with("docs/archive/")
+        || clean == "docs/GESAMTSPEZIFIKATION.md"
+    {
         return false;
     }
 
@@ -112,6 +119,10 @@ pub fn check_crate_references_in_content(
     doc_rel_path: &str,
     active_members: &HashSet<String>,
 ) -> Vec<CrateRefViolation> {
+    if !should_check_file(doc_rel_path) {
+        return Vec::new();
+    }
+
     let mut violations = Vec::new();
 
     for (idx, line) in content.lines().enumerate() {
@@ -148,7 +159,7 @@ pub fn scan_and_check_workspace(root: &Path) -> Result<Vec<CrateRefViolation>, S
             if clean == "target" || clean == ".git" || clean == "node_modules" {
                 return false;
             }
-            if clean == "docs/decisions" {
+            if clean == "docs/decisions" || clean == "docs/archive" {
                 return false;
             }
             true
@@ -250,6 +261,10 @@ mod tests {
         // Exclusions
         assert!(!should_check_file("docs/decisions/ADR-001.md"));
         assert!(!should_check_file("docs/GESAMTSPEZIFIKATION.md"));
+        assert!(!should_check_file(
+            "docs/archive/misc/audits/AUDIT_contextra-core_2026-09-13.md"
+        ));
+        assert!(!should_check_file("docs/archive/GESAMTSPEZIFIKATION.md"));
         assert!(!should_check_file("target/debug/build.rs"));
         assert!(!should_check_file("src/main.rs"));
     }
@@ -267,5 +282,17 @@ mod tests {
         assert_eq!(violations[0].file, "test.md");
         assert_eq!(violations[0].line, 2);
         assert_eq!(violations[0].crate_name, "contextra-old-crate");
+    }
+
+    #[test]
+    fn test_check_crate_references_in_content_archive_exclusion() {
+        let mut active = HashSet::new();
+        active.insert("contextra-core".to_string());
+
+        let content = "Historischer Audit-Bericht: `contextra-security` und `contextra-index`.\n";
+        let doc_path = "docs/archive/misc/audits/AUDIT_contextra-core_2026-09-13.md";
+        let violations = check_crate_references_in_content(content, doc_path, &active);
+
+        assert_eq!(violations.len(), 0);
     }
 }
