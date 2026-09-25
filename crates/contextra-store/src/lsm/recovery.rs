@@ -530,6 +530,7 @@ impl LsmStorage {
                 })?;
             let parent = self.config.path.clone();
             tokio::task::spawn_blocking(move || {
+                // INVARIANT-KONFORM: In spawn_blocking gewrappt; Parent-Directory FSync bei Crash-Recovery / Rollback (kein Hot-Path).
                 std::fs::File::open(&parent)
                     .and_then(|f| f.sync_all())
                     .map_err(|e| {
