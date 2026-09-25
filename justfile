@@ -153,72 +153,7 @@ triple-test: check
 
 # Tech-Debt Audit: scannt nach .unwrap(), unsafe, std::fs in Produktionscode
 debt-audit:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    FAIL=0
-    echo "=== Tech-Debt Audit ==="
-
-    echo "--- [1/4] .unwrap() außerhalb von Test-Code ---"
-    UNWRAP=$(grep -rn "\.unwrap()" crates/ --include="*.rs" \
-        | grep -v "_test\.rs:" \
-        | grep -v "/tests/" \
-        | grep -v "/tests\.rs:" \
-        | grep -v "/benches/" \
-        | grep -v "benches\.rs:" \
-        | grep -v "contextra_generated\.rs:" \
-        | grep -v "::tests::" \
-        | grep -v "//.*unwrap" \
-        | grep -v "// expect" \
-        || true)
-    if [ -n "$UNWRAP" ]; then
-        UNWRAP_COUNT=$(echo "$UNWRAP" | wc -l)
-        echo "❌ UNWRAP VIOLATIONS ($UNWRAP_COUNT Treffer — fix in WP-0.0):"
-        echo "$UNWRAP" | head -15
-        FAIL=1
-    else echo "✅ Kein .unwrap() in Produktionscode"; fi
-
-    echo "--- [2/4] unsafe außerhalb distance.rs ---"
-    UNSAFE=$(grep -rn "unsafe " crates/ --include="*.rs" \
-        | grep -v "crates/contextra-vector/src/distance\.rs" \
-        | grep -v "#\[allow(unsafe_code)\]" \
-        | grep -v "//.*unsafe" \
-        || true)
-    if [ -n "$UNSAFE" ]; then
-        echo "❌ UNSAFE VIOLATIONS:"; echo "$UNSAFE"; FAIL=1
-    else echo "✅ Kein unsafe außerhalb distance.rs"; fi
-
-    echo "--- [3/4] std::fs in Produktionscode (Soft-Warning) ---"
-    STDFS=$(grep -rn "std::fs::" crates/ --include="*.rs" \
-        | grep -v "/tests/" | grep -v "mod tests" || true)
-    if [ -n "$STDFS" ]; then
-        echo "⚠️  std::fs:: Treffer (nach tokio::fs migrieren):"
-        echo "$STDFS"
-    else echo "✅ Kein std::fs:: in Produktionscode"; fi
-
-    echo "--- [4/4] Lock-Hierarchy & Async-Safety (AST Analysis) ---"
-    # Prüfe auf verschachtelte Locks (potenzielle Deadlocks) mittels ast-grep
-    if command -v sg > /dev/null; then
-        if sg scan --rule rules/detect_nested_locks.yml crates/; then
-            echo "❌ Graceful Deadlock Risiko erkannt! Verschachtelte Locks gefunden:"
-            FAIL=1
-        else
-            echo "✅ Keine kritischen Deadlock-Zustände im AST gefunden."
-        fi
-    else
-        echo "⚠️  ast-grep (sg) nicht installiert, überspringe AST-Lock-Analyse."
-    fi
-
-    echo "--- [5/5] Security & Audit ---"
-    if cargo audit --version &>/dev/null 2>&1; then
-        cargo audit || echo "⚠️ Audit warnings — manuell prüfen"
-    else
-        echo "⚠️ cargo-audit nicht installiert: cargo install cargo-audit"
-    fi
-
-    if [ $FAIL -eq 1 ]; then
-        echo ""; echo "❌ Debt-Audit FAILED — WP-0.0 zuerst abschließen!"; exit 1
-    fi
-    echo ""; echo "✅ Debt-Audit PASSED"
+    cargo xtask debt-audit
 
 # Runs the LongMemEval regression benchmark suite and compares against baseline
 bench-regression:
