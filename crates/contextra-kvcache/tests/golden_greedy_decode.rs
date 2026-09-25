@@ -2,8 +2,8 @@
 // ZWECK: Golden-Test für identische Greedy-Tokenfolgen mit/ohne Prefix-Reuse (Spec §9.2 / Task 4-04).
 // STAND: TS:2026-09-15T00:00:00Z
 
-use contextra_types::{ContextraError, TenantId};
 use contextra_kvcache::{KvReusePolicy, KvSegment, TenantIsolatedKvStore};
+use contextra_types::{ContextraError, TenantId};
 
 /// Simuliert ein deterministisches Greedy-Decoding (z.B. Nächstes Token = (letztes Token * 31 + 7) % 1000).
 /// Gibt die generierte Tokenfolge sowie die Anzahl der wiederverwendeten Prefix-Tokens zurück.

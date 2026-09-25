@@ -2,8 +2,8 @@ use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_suspicious_tx_id;
 use crate::GraphIndexExt;
-use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};
 use contextra_ports::GraphIndex;
+use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 use super::*;

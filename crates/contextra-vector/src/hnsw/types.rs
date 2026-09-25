@@ -184,7 +184,6 @@ pub enum RebuildStatus {
     Pending,
 }
 
-
 impl HnswIndex {
     /// Creates a new HNSW index, validating configuration upfront.
     pub fn try_new(config: HnswConfig) -> Result<Self> {
@@ -695,9 +694,9 @@ impl HnswIndex {
         writer
             .flush()
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        let mut file = writer
-            .into_inner()
-            .map_err(|_| ContextraError::Storage("Failed to retrieve file from BufWriter".into()))?;
+        let mut file = writer.into_inner().map_err(|_| {
+            ContextraError::Storage("Failed to retrieve file from BufWriter".into())
+        })?;
 
         file.seek(std::io::SeekFrom::Start(0))
             .map_err(|e| ContextraError::Storage(e.to_string()))?;

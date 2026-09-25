@@ -190,7 +190,9 @@ impl MlpOrMoe {
                         .map_err(|e| ContextraError::Internal(format!("Tensor::new error: {e}")))?;
                     let selected_rws_tensor =
                         Tensor::new(selected_rws[expert_idx].as_slice(), xs.device())
-                            .map_err(|e| ContextraError::Internal(format!("Tensor::new error: {e}")))?
+                            .map_err(|e| {
+                                ContextraError::Internal(format!("Tensor::new error: {e}"))
+                            })?
                             .reshape(((), 1))
                             .map_err(|e| ContextraError::Internal(format!("reshape error: {e}")))?;
 
@@ -202,7 +204,9 @@ impl MlpOrMoe {
                     let current_hidden_states = expert_layer.forward(&current_state)?;
                     let current_hidden_states = current_hidden_states
                         .broadcast_mul(&selected_rws_tensor)
-                        .map_err(|e| ContextraError::Internal(format!("broadcast_mul error: {e}")))?;
+                        .map_err(|e| {
+                            ContextraError::Internal(format!("broadcast_mul error: {e}"))
+                        })?;
                     ys = ys
                         .index_add(&top_x_tensor, &current_hidden_states, 0)
                         .map_err(|e| ContextraError::Internal(format!("index_add error: {e}")))?;
@@ -422,8 +426,9 @@ impl ModelWeights {
         let mut layers = Vec::with_capacity(block_count);
         let head_dim = embedding_length / head_count;
 
-        let neg_inf = Tensor::new(f32::NEG_INFINITY, device)
-            .map_err(|e| ContextraError::Internal(format!("neg_inf tensor creation failed: {e}")))?;
+        let neg_inf = Tensor::new(f32::NEG_INFINITY, device).map_err(|e| {
+            ContextraError::Internal(format!("neg_inf tensor creation failed: {e}"))
+        })?;
 
         let freqs_cis = precomput_freqs_cis(head_dim, 10000.0, device)?;
 
@@ -573,7 +578,9 @@ impl ModelWeights {
                             ContextraError::Internal(format!("Failed to truncate key tensor: {e}"))
                         })?;
                         let new_v = v.narrow(2, 0, pos).map_err(|e| {
-                            ContextraError::Internal(format!("Failed to truncate value tensor: {e}"))
+                            ContextraError::Internal(format!(
+                                "Failed to truncate value tensor: {e}"
+                            ))
                         })?;
                         layer.kv_cache = Some((new_k, new_v));
                     }

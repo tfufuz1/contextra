@@ -4,8 +4,8 @@
 
 #![allow(unsafe_code)]
 
-use contextra_types::TenantId;
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
+use contextra_types::TenantId;
 use proptest::prelude::*;
 use std::collections::HashSet;
 use std::mem::ManuallyDrop;

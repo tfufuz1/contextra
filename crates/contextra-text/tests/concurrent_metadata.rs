@@ -4,9 +4,9 @@
 //! concurrent writes correctly. The current architecture uses a single
 //! key for all stats, which creates contention under parallel writes.
 
-use contextra_types::{DocId, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::InvertedIndex;
+use contextra_types::{DocId, Result, TxId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;

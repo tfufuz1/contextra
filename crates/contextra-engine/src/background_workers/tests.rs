@@ -2,9 +2,9 @@
 // ZWECK: Unit-Tests für background_workers Submodule.
 
 use super::*;
+use contextra_graph::hyperedge::HyperEdgeId;
 use contextra_mvcc::tx_buffer::IndexOp;
 use contextra_types::{DocId, TxId};
-use contextra_graph::hyperedge::HyperEdgeId;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -57,9 +57,8 @@ impl OrphanCleanupIndex for MockDegradedHnswIndex {
 
     fn rebuild(
         &self,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = contextra_types::Result<()>> + Send + '_>,
-    > {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = contextra_types::Result<()>> + Send + '_>>
+    {
         let calls = self.rebuild_calls.clone();
         let should_restore = self.rebuild_should_restore.load(Ordering::SeqCst);
         Box::pin(async move {
@@ -427,11 +426,8 @@ async fn test_expiry_cleanup_worker_task_cleans_documents() {
     col.insert("d2", &vec, None).await.unwrap();
 
     let cancel_token = tokio_util::sync::CancellationToken::new();
-    let handle = start_expiry_cleanup_worker(
-        col.clone(),
-        Duration::from_millis(10),
-        cancel_token.clone(),
-    );
+    let handle =
+        start_expiry_cleanup_worker(col.clone(), Duration::from_millis(10), cancel_token.clone());
 
     let mut cleaned = false;
     for _ in 0..50 {
@@ -595,9 +591,9 @@ async fn test_worker_immediate_cancellation() {
 #[tokio::test]
 async fn test_decay_eviction_thresholds() {
     use crate::decay_controller::{AdaptiveDecayController, DecayControllerConfig};
-    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::Ordering;
@@ -688,9 +684,9 @@ async fn test_decay_eviction_thresholds() {
 #[tokio::test]
 async fn test_start_decay_cleanup_worker_background_task() {
     use contextra_adapt::DecayControllerConfig;
-    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::Ordering;

@@ -54,12 +54,11 @@ async fn test_update_document_importance_persists_model_id_provenance() {
     );
 }
 
-
 #[tokio::test]
 async fn test_expiry_cleanup_deletes_decayed_working_memory() {
-    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -125,12 +124,11 @@ async fn test_expiry_cleanup_deletes_decayed_working_memory() {
     assert!(col.get("doc_decayed").await.unwrap().is_none()); // unwrap
 }
 
-
 #[tokio::test]
 async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
-    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -193,7 +191,6 @@ async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
     assert!(col.get("doc_semantic").await.unwrap().is_some()); // unwrap
 }
 
-
 #[tokio::test]
 async fn test_ttl_missing_created_at_does_not_expire() {
     use contextra_graph::CsrGraph;
@@ -242,7 +239,6 @@ async fn test_ttl_missing_created_at_does_not_expire() {
     assert!(col.get("doc_no_created_at").await.unwrap().is_some()); // unwrap
 }
 
-
 #[tokio::test]
 async fn test_ttl_zero_does_not_expire() {
     use contextra_graph::CsrGraph;
@@ -290,7 +286,6 @@ async fn test_ttl_zero_does_not_expire() {
     assert_eq!(reaped, 0);
     assert!(col.get("doc_zero_ttl").await.unwrap().is_some()); // unwrap
 }
-
 
 #[tokio::test]
 async fn test_ttl_overflow_does_not_expire() {

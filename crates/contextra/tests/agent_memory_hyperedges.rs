@@ -54,11 +54,7 @@ async fn test_relate_n_ary_success_and_unique_ids() {
         .await
         .expect("relate_n_ary 1");
 
-    let participants2 = vec![
-        (&mem1, "author"),
-        (&mem2, "reviewer"),
-        (&mem3, "tester"),
-    ];
+    let participants2 = vec![(&mem1, "author"), (&mem2, "reviewer"), (&mem3, "tester")];
     let rel_id2: RelationId = memory
         .relate_n_ary("project_x", &participants2, None)
         .await

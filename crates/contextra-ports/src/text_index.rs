@@ -172,7 +172,10 @@ mod tests {
         let text_index = TextIndexPlaceholder;
         let res = text_index.search_at("test", 5, 1).await;
         assert!(
-            !matches!(res, Err(crate::ContextraError::CapabilityUnsupported { .. })),
+            !matches!(
+                res,
+                Err(crate::ContextraError::CapabilityUnsupported { .. })
+            ),
             "search_at returned CapabilityUnsupported"
         );
     }

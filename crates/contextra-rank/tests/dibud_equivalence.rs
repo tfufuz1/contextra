@@ -1,11 +1,7 @@
 #![cfg(feature = "dibud")]
 
-use contextra_rank::dibud::{
-    fuse_exact_prefix, DiBudFusionState, FusionBudget,
-};
-use contextra_rank::fusion::{
-    weighted_reciprocal_rank_fusion, SearchResult,
-};
+use contextra_rank::dibud::{fuse_exact_prefix, DiBudFusionState, FusionBudget};
+use contextra_rank::fusion::{weighted_reciprocal_rank_fusion, SearchResult};
 use contextra_types::DocId;
 
 struct SimpleLcg {
@@ -18,7 +14,10 @@ impl SimpleLcg {
     }
 
     fn next_u32(&mut self) -> u32 {
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (self.state >> 32) as u32
     }
 

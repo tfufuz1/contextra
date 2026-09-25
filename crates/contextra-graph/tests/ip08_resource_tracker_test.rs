@@ -1,5 +1,5 @@
-use contextra_types::{Entity, EntityId, ResourceBudget, ResourceTracker};
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
+use contextra_types::{Entity, EntityId, ResourceBudget, ResourceTracker};
 use std::sync::Arc;
 
 #[tokio::test]

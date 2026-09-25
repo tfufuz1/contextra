@@ -161,11 +161,9 @@ impl HnswIndexCore {
         vec.sort_by(|a, b| a.distance.total_cmp(&b.distance));
         Ok(vec)
     }
-
 }
 
 impl HnswIndex {
-
     pub(super) async fn search_filtered_internal(
         &self,
         query: &[f32],
@@ -424,5 +422,4 @@ impl HnswIndex {
 
         Ok(results)
     }
-
 }

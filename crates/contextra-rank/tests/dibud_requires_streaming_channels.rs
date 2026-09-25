@@ -124,13 +124,8 @@ fn test_dibud_std_async_driver_minimal_executor() {
     };
 
     let state = DiBudFusionState::new(32);
-    let outcome = block_on(fuse_exact_prefix_async(
-        state,
-        poll_fn,
-        |_| 0.0,
-        &budget,
-    ))
-    .expect("async fusion succeeds");
+    let outcome = block_on(fuse_exact_prefix_async(state, poll_fn, |_| 0.0, &budget))
+        .expect("async fusion succeeds");
 
     assert!(!outcome.budget_exhausted);
     assert_eq!(outcome.certified_len, outcome.ranked.len());
@@ -208,7 +203,14 @@ fn test_dibud_provenance_recording() {
         let mut t_check = vec![doc2].into_iter();
         let mut g_check = Vec::<DocId>::new().into_iter();
         let test_state = DiBudFusionState::new(16);
-        let _ = fuse_exact_prefix(test_state, &mut v_check, &mut t_check, &mut g_check, |_| 0.0, &budget);
+        let _ = fuse_exact_prefix(
+            test_state,
+            &mut v_check,
+            &mut t_check,
+            &mut g_check,
+            |_| 0.0,
+            &budget,
+        );
 
         // Ensure outcome docs can be checked against provenance
         let mut run_state = DiBudFusionState::new(16);
@@ -223,7 +225,10 @@ fn test_dibud_provenance_recording() {
                 BudgetedChannel::Graph => g_run.next(),
             };
             run_state.feed(ch, item, |_| 0.0, &budget).unwrap();
-            assert!(run_state.provenance_of(doc_id).is_none() || run_state.provenance_of(doc_id).is_some());
+            assert!(
+                run_state.provenance_of(doc_id).is_none()
+                    || run_state.provenance_of(doc_id).is_some()
+            );
         }
     }
 }

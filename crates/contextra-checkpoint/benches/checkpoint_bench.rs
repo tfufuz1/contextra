@@ -1,7 +1,7 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_types::{Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{Result, TxId};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

@@ -123,13 +123,19 @@ mod tests {
         for handle in handles {
             let thread_ids = handle.join().expect("thread join ok");
             for id in thread_ids {
-                assert!(all_ids.insert(id), "Duplicate DecisionId generated under concurrency: {id}");
+                assert!(
+                    all_ids.insert(id),
+                    "Duplicate DecisionId generated under concurrency: {id}"
+                );
             }
         }
 
         assert_eq!(all_ids.len(), num_threads * ids_per_thread);
         for expected in 0..(num_threads * ids_per_thread) as u64 {
-            assert!(all_ids.contains(&expected), "Missing expected DecisionId: {expected}");
+            assert!(
+                all_ids.contains(&expected),
+                "Missing expected DecisionId: {expected}"
+            );
         }
     }
 }

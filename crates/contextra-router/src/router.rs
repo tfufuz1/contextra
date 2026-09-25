@@ -11,11 +11,11 @@ use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
-use contextra_types::{ContextChunk, ContextWindow, EntityId, ContextraError, Result};
 use contextra_ports::{
     CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
     HybridSearchProvider,
 };
+use contextra_types::{ContextChunk, ContextWindow, ContextraError, EntityId, Result};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -461,7 +461,11 @@ impl RouterEngine {
         {
             if let Some(pending_bandit_entry) = self.pending_bandit.write().remove(&decision_id) {
                 let reward = 1.0 - non_conformity;
-                if let Some(profile) = new_state.profiles.iter_mut().find(|p| p.name == profile_name) {
+                if let Some(profile) = new_state
+                    .profiles
+                    .iter_mut()
+                    .find(|p| p.name == profile_name)
+                {
                     #[cfg(feature = "cloud-egress-guard")]
                     let is_cloud = profile.transport.is_cloud();
                     #[cfg(not(feature = "cloud-egress-guard"))]
@@ -469,7 +473,9 @@ impl RouterEngine {
 
                     let cost = profile.estimated_cost();
                     if let Some(ref mut bstate) = profile.bandit_state {
-                        if let Err(err) = bstate.update(&pending_bandit_entry.context, reward, cost, is_cloud) {
+                        if let Err(err) =
+                            bstate.update(&pending_bandit_entry.context, reward, cost, is_cloud)
+                        {
                             tracing::warn!(
                                 profile = %pending_bandit_entry.profile_name,
                                 action = pending_bandit_entry.action_idx,
@@ -587,20 +593,23 @@ impl RouterEngine {
 
             // 2. Profile Selection: Bandit (opt-in) or Cascade (default)
             #[cfg(feature = "bandit-routing")]
-            let bandit_selection = if matches!(self.routing_strategy, RoutingStrategy::ContextualBandit) {
-                self.select_profile_bandit(&chunks, &effective_profiles, query_embedding)
-            } else {
-                None
-            };
+            let bandit_selection =
+                if matches!(self.routing_strategy, RoutingStrategy::ContextualBandit) {
+                    self.select_profile_bandit(&chunks, &effective_profiles, query_embedding)
+                } else {
+                    None
+                };
             #[cfg(not(feature = "bandit-routing"))]
             let bandit_selection: Option<(usize, SlmProfile, u32, f32)> = None;
 
-            let (selected_idx, selected_profile, is_bandit_decision) = if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
-                (idx, profile, Some((action_idx, propensity)))
-            } else {
-                let (idx, profile, _) = self.select_profile_cascade(&chunks, &effective_profiles, cal)?;
-                (idx, profile, None)
-            };
+            let (selected_idx, selected_profile, is_bandit_decision) =
+                if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
+                    (idx, profile, Some((action_idx, propensity)))
+                } else {
+                    let (idx, profile, _) =
+                        self.select_profile_cascade(&chunks, &effective_profiles, cal)?;
+                    (idx, profile, None)
+                };
 
             let profile_scores = compute_profile_scores(&profiles, &chunks);
             let best_score = profile_scores.get(&selected_idx).copied().unwrap_or(0.0);
@@ -973,7 +982,8 @@ impl RouterEngine {
         let num_actions = eligible_profiles.len() as u32;
 
         // Evaluate scores for each eligible profile
-        let mut profile_scores: Vec<(usize, &SlmProfile, f32)> = Vec::with_capacity(eligible_profiles.len());
+        let mut profile_scores: Vec<(usize, &SlmProfile, f32)> =
+            Vec::with_capacity(eligible_profiles.len());
 
         for &(orig_idx, profile) in &eligible_profiles {
             let Some(ref bstate) = profile.bandit_state else {
@@ -1017,9 +1027,13 @@ impl RouterEngine {
         let greedy_action_idx = profile_scores
             .iter()
             .enumerate()
-            .max_by(|(_, (orig_idx_a, _, score_a)), (_, (orig_idx_b, _, score_b))| {
-                score_a.total_cmp(score_b).then_with(|| orig_idx_b.cmp(orig_idx_a))
-            })
+            .max_by(
+                |(_, (orig_idx_a, _, score_a)), (_, (orig_idx_b, _, score_b))| {
+                    score_a
+                        .total_cmp(score_b)
+                        .then_with(|| orig_idx_b.cmp(orig_idx_a))
+                },
+            )
             .map(|(action_idx, _)| action_idx as u32)
             .unwrap_or(0);
 
@@ -1032,12 +1046,18 @@ impl RouterEngine {
 
         let logging_policy = RandomizedLoggingPolicy::new(clamped_epsilon, num_actions);
         let sample = self.bandit_exploration.next_sample();
-        let (selected_action_idx, propensity) = logging_policy.select_action(greedy_action_idx, sample);
+        let (selected_action_idx, propensity) =
+            logging_policy.select_action(greedy_action_idx, sample);
 
         let selected_action_usize = (selected_action_idx as usize).min(profile_scores.len() - 1);
         let (orig_idx, selected_profile, _score) = profile_scores[selected_action_usize];
 
-        Some((orig_idx, selected_profile.clone(), selected_action_idx, propensity))
+        Some((
+            orig_idx,
+            selected_profile.clone(),
+            selected_action_idx,
+            propensity,
+        ))
     }
 }
 
@@ -1191,7 +1211,9 @@ mod tests {
             dimension: 4,
             ..Default::default()
         };
-        let db = contextra_db::Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let db = contextra_db::Contextra::open_with_config(dir.path(), config)
+            .await
+            .unwrap();
         let collection = db.collection("default").await.unwrap();
 
         let profile = SlmProfile::new(
@@ -1202,7 +1224,11 @@ mod tests {
             0.1,
         );
 
-        let router1 = crate::tests::tests::create_test_router(collection.clone(), vec![profile.clone()], None);
+        let router1 = crate::tests::tests::create_test_router(
+            collection.clone(),
+            vec![profile.clone()],
+            None,
+        );
         let router2 = crate::tests::tests::create_test_router(collection, vec![profile], None);
 
         let id1_a = router1.decision_ids.next();
@@ -1314,7 +1340,9 @@ mod tests {
         };
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let db = contextra_db::Contextra::open_with_config(dir.path(), config).await.unwrap();
+            let db = contextra_db::Contextra::open_with_config(dir.path(), config)
+                .await
+                .unwrap();
             let collection = db.collection("default").await.unwrap();
 
             let profile = SlmProfile::new(

@@ -6,9 +6,9 @@
 
 use bytes::Bytes;
 use candle_core::{DType, Device, Tensor};
-use half::f16;
-use contextra_types::ContextraError;
 use contextra_ports::kv::KvBlock;
+use contextra_types::ContextraError;
+use half::f16;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
@@ -221,10 +221,9 @@ impl KvState {
             let dim_k = Self::tensor_seq_dim(&layer.k, self.pos);
             let dim_v = Self::tensor_seq_dim(&layer.v, self.pos);
 
-            let k_slice = layer
-                .k
-                .narrow(dim_k, range.start, len)
-                .map_err(|e| ContextraError::Internal(format!("Failed to slice key tensor: {e}")))?;
+            let k_slice = layer.k.narrow(dim_k, range.start, len).map_err(|e| {
+                ContextraError::Internal(format!("Failed to slice key tensor: {e}"))
+            })?;
             let v_slice = layer.v.narrow(dim_v, range.start, len).map_err(|e| {
                 ContextraError::Internal(format!("Failed to slice value tensor: {e}"))
             })?;

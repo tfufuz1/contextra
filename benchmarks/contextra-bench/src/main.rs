@@ -1224,7 +1224,8 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             }
 
             let corpus = contextra_bench::beir_eval::load_beir_corpus(&corpus_file)?;
-            let queries = contextra_bench::beir_eval::load_beir_queries(&queries_file, &qrels_file)?;
+            let queries =
+                contextra_bench::beir_eval::load_beir_queries(&queries_file, &qrels_file)?;
             println!(
                 "Loaded BEIR dataset: {} docs, {} queries",
                 corpus.len(),

@@ -34,8 +34,8 @@ mod tests;
 
 pub use cleanup::cleanup_orphaned_consolidation_intents;
 pub use compensating_actions::{
-    CompensateHnswAction, CompensateLsmAction, CompensateTextAction, CompensatingAction,
-    CommitLedger, RollbackStagedAction,
+    CommitLedger, CompensateHnswAction, CompensateLsmAction, CompensateTextAction,
+    CompensatingAction, RollbackStagedAction,
 };
 pub use db_transaction::DbTransaction;
 pub use intent::CommitIntent;

@@ -1,7 +1,7 @@
 #[cfg(feature = "onnx")]
-use criterion::{criterion_group, criterion_main, Criterion};
-#[cfg(feature = "onnx")]
 use contextra_infer_onnx::TextEmbedder;
+#[cfg(feature = "onnx")]
+use criterion::{criterion_group, criterion_main, Criterion};
 #[cfg(feature = "onnx")]
 use std::path::PathBuf;
 #[cfg(feature = "onnx")]

@@ -423,7 +423,9 @@ async fn test_stdout_not_polluted_by_logs() {
         .or_else(|_| std::fs::read_to_string("crates/contextra-mcp/src/lib.rs"))
         .expect("read lib.rs"); // expect
     let bin_source = std::fs::read_to_string("src/bin/contextra-mcp-server.rs")
-        .or_else(|_| std::fs::read_to_string("crates/contextra-mcp/src/bin/contextra-mcp-server.rs"))
+        .or_else(|_| {
+            std::fs::read_to_string("crates/contextra-mcp/src/bin/contextra-mcp-server.rs")
+        })
         .expect("read bin"); // expect
 
     let stdout_writes = source
@@ -890,7 +892,8 @@ async fn test_kv_bridge_adapter_consulted_on_retrieve() {
     let embedder = Arc::new(MockEmbedder { dimension: dim });
 
     let store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
-    let master_km = contextra_crypto::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
+    let master_km =
+        contextra_crypto::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
     let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
     let bridge_adapter = Arc::new(contextra_infer_candle::KvBridgeAdapter::new(store, cipher));
 

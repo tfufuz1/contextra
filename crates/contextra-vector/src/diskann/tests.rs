@@ -1013,7 +1013,9 @@ mod tests {
         DiskAnnIndex::append_to_pending_wal(&wal_path, doc2, &vec2).await?;
 
         // Corrupt a byte in the embedding payload of entry 1
-        let mut data = tokio::fs::read(&wal_path).await.map_err(ContextraError::Io)?;
+        let mut data = tokio::fs::read(&wal_path)
+            .await
+            .map_err(ContextraError::Io)?;
         // Header is 5 bytes. Entry 1 starts at byte 5.
         // ID: 8 bytes, Dim: 4 bytes -> Embedding starts at byte 5 + 12 = 17.
         data[18] ^= 0xFF;

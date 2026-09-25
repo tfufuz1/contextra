@@ -9,8 +9,8 @@
 
 use crate::client::xml_escape;
 use crate::OllamaClient;
-use contextra_types::{ImportanceScore, ContextraError, Result};
 use contextra_rank::IsotonicCalibrator;
+use contextra_types::{ContextraError, ImportanceScore, Result};
 use parking_lot::Mutex;
 use regex::Regex;
 use std::sync::{Arc, OnceLock};

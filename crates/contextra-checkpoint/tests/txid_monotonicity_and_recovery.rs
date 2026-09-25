@@ -1,6 +1,6 @@
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta, PersistentCheckpointStore};
-use contextra_types::{ContextraError, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

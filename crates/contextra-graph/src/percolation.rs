@@ -140,8 +140,8 @@ pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
 mod tests {
     use super::*;
     use crate::CsrGraph;
+    use contextra_ports::GraphIndex;
     use contextra_types::{Entity, TxId};
-use contextra_ports::GraphIndex;
     use std::sync::Arc;
 
     #[test]

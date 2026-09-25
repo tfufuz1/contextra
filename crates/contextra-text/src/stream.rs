@@ -3,8 +3,8 @@
 // INVARIANTEN: #![forbid(unsafe_code)], zero panic/unwrap, Snapshot-Isolation via max_seq, max_depth = MAX_SEARCH_K.
 // STAND: TS:2026-09-14T00:00:00Z
 
+use contextra_ports::StorageEngine;
 use contextra_types::{DocId, Result, MAX_SEARCH_K};
-use contextra_ports::{StorageEngine};
 use std::collections::{HashSet, VecDeque};
 
 use crate::inverted::InvertedIndex;

@@ -8,7 +8,7 @@
 // 5. MVCC-Sichtbarkeit und Tombstones werden weiterhin dynamisch pro Anfrage evaluiert.
 // INVARIANTEN: Zero-Panic Doctrine, repr(C, align(8)) Layout für Postings, RCU-Locking ohne globale Exklusivlocks.
 
-use contextra_types::{DocId, ContextraError};
+use contextra_types::{ContextraError, DocId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -180,9 +180,13 @@ impl PostingList {
 
         let mut prev_doc_id = 0u64;
         for p in &self.postings {
-            let delta = (p.doc_id as u128).checked_sub(prev_doc_id as u128).ok_or_else(|| {
-                ContextraError::Storage("Unsorted or overflow doc_id in posting list".to_string())
-            })? as u64;
+            let delta = (p.doc_id as u128)
+                .checked_sub(prev_doc_id as u128)
+                .ok_or_else(|| {
+                    ContextraError::Storage(
+                        "Unsorted or overflow doc_id in posting list".to_string(),
+                    )
+                })? as u64;
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
             encode_varint(p.doc_len as u64, &mut buf);
@@ -218,9 +222,9 @@ impl PostingList {
                 let tf: u32 = tf_u64
                     .try_into()
                     .map_err(|_| ContextraError::Storage("TF overflow in varint".to_string()))?;
-                let doc_len: u32 = doc_len_u64
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("DocLen overflow in varint".to_string()))?;
+                let doc_len: u32 = doc_len_u64.try_into().map_err(|_| {
+                    ContextraError::Storage("DocLen overflow in varint".to_string())
+                })?;
 
                 postings.push(Posting {
                     doc_id: doc_id as DocIdRaw,

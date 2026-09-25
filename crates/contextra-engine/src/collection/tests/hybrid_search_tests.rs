@@ -46,7 +46,6 @@ async fn hybrid_search_caps_k_at_max_search_k() {
     );
 }
 
-
 #[tokio::test]
 async fn test_hybrid_search_k_clamping_boundaries() {
     use contextra_graph::CsrGraph;
@@ -97,7 +96,6 @@ async fn test_hybrid_search_k_clamping_boundaries() {
         "k=usize::MAX on empty DB must return empty without overflow panic"
     );
 }
-
 
 #[tokio::test]
 #[cfg(feature = "reranking")]
@@ -159,15 +157,14 @@ async fn test_hybrid_search_reranked_none() {
     assert_eq!(res[0].id, "d1");
 }
 
-
 #[tokio::test]
 #[cfg(feature = "experimental-diskann")]
 async fn test_collection_with_diskann_index_hybrid_search() {
-    use contextra_types::{DocId};
-use contextra_ports::{StorageEngine, TextIndex};
     use contextra_graph::CsrGraph;
+    use contextra_ports::{StorageEngine, TextIndex};
     use contextra_store::LsmStorage;
     use contextra_text::Language;
+    use contextra_types::DocId;
     use contextra_vector::{DiskAnnConfig, DiskAnnIndex};
     use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
@@ -286,12 +283,11 @@ use contextra_ports::{StorageEngine, TextIndex};
     );
 }
 
-
 #[tokio::test]
 async fn test_hybrid_search_with_query_memory_type_filter() {
-    use contextra_types::{HybridQuery, MemoryType};
     use contextra_graph::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_types::{HybridQuery, MemoryType};
     use contextra_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::AtomicU64;
@@ -406,7 +402,6 @@ async fn test_hybrid_search_with_query_memory_type_filter() {
     }
 }
 
-
 #[tokio::test]
 async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_types::Result<()> {
     use contextra_graph::csr::CsrGraph;
@@ -461,7 +456,6 @@ async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_
 
     Ok(())
 }
-
 
 #[tokio::test]
 async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_types::Result<()> {

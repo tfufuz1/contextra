@@ -1,7 +1,7 @@
-use contextra_types::{Edge, Entity, EntityId, TxId};
-use contextra_ports::{GraphIndex, StorageEngine};
 use contextra_graph::CsrGraph;
+use contextra_ports::{GraphIndex, StorageEngine};
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 use tempfile::tempdir;
 

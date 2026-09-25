@@ -1,7 +1,7 @@
 use super::intent::{CommitIntent, StagedKeyOp};
 use crate::Collection;
-use contextra_types::{DocId, ContextraError, Result, TenantId, TxId};
 use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
 use std::sync::Arc;
 
 /// Trait representing an undo operation to be executed during transaction rollback/compensation.
@@ -235,7 +235,10 @@ pub struct CompensateTextAction<S: StorageEngine, V: VectorIndex> {
 impl<S: StorageEngine, V: VectorIndex> CompensateTextAction<S, V> {
     #[allow(dead_code)]
     pub(super) fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
-        Self { collection, doc_ids }
+        Self {
+            collection,
+            doc_ids,
+        }
     }
 }
 

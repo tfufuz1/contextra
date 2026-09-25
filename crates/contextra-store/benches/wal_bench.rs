@@ -1,7 +1,7 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use contextra_core::TxId;
 use contextra_crypto::crypto::KeyManager;
 use contextra_store::wal::{Wal, WalOp};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;

@@ -1,13 +1,11 @@
 use super::*;
-use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
-use contextra_types::{
-    ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId,
-};
 use contextra_engine::collection::Collection;
 use contextra_engine::transaction::CommitIntent;
 use contextra_engine::ProvenanceRecord;
 use contextra_graph::CsrGraph;
+use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -247,10 +245,7 @@ struct FaultyDeleteStorage {
 }
 
 impl StorageEngine for FaultyDeleteStorage {
-    fn get<'a>(
-        &'a self,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.inner.get(key).await })
     }
 
@@ -262,12 +257,7 @@ impl StorageEngine for FaultyDeleteStorage {
         Box::pin(async move { self.inner.get_at_seq(key, seq).await })
     }
 
-    fn put<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
+    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.put(tx_id, key, value).await })
     }
 
@@ -280,11 +270,7 @@ impl StorageEngine for FaultyDeleteStorage {
         Box::pin(async move { self.inner.put_if_absent(tx_id, key, value).await })
     }
 
-    fn delete<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
+    fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_delete.load(Ordering::SeqCst) {
                 return Err(ContextraError::Transaction(

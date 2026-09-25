@@ -613,7 +613,9 @@ impl CompactionEngine {
     pub(super) fn generate_sst_path(&self, data_path: &std::path::Path) -> Result<PathBuf> {
         let id = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| contextra_core::ContextraError::Storage(format!("System clock error: {}", e)))?
+            .map_err(|e| {
+                contextra_core::ContextraError::Storage(format!("System clock error: {}", e))
+            })?
             .as_micros();
         let count = self
             .compaction_counter

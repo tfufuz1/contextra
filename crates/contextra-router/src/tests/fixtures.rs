@@ -1,16 +1,13 @@
 use crate::{RouterEngine, SlmProfile};
+use contextra_db::{Collection, ContextManager};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget, TxId};
-use contextra_db::{Collection, ContextManager};
 use std::sync::Arc;
 
 pub(crate) struct MockStorageEngine;
 
 impl StorageEngine for MockStorageEngine {
-    fn get<'a>(
-        &'a self,
-        _: &'a [u8],
-    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
     fn get_at_seq<'a>(
@@ -20,45 +17,25 @@ impl StorageEngine for MockStorageEngine {
     ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
-    fn put<'a>(
-        &'a self,
-        _: TxId,
-        _: &'a [u8],
-        _: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
+    fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn delete<'a>(
-        &'a self,
-        _: TxId,
-        _: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
+    fn delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn commit<'a>(
-        &'a self,
-        _: TxId,
-    ) -> BoxFuture<'a, Result<()>> {
+    fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn rollback<'a>(
-        &'a self,
-        _: TxId,
-    ) -> BoxFuture<'a, Result<()>> {
+    fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn rollback_to_tx<'a>(
-        &'a self,
-        _: TxId,
-    ) -> BoxFuture<'a, Result<()>> {
+    fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn stats<'a>(
-        &'a self,
-    ) -> BoxFuture<'a, Result<StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
         Box::pin(async move {
             Ok(StorageStats {
                 num_segments: 0,
@@ -70,27 +47,16 @@ impl StorageEngine for MockStorageEngine {
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { Ok(0) })
     }
-    fn last_tx_id<'a>(
-        &'a self,
-    ) -> BoxFuture<'a, Result<TxId>> {
+    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { Ok(TxId(0)) })
     }
-    fn pin_checkpoint<'a>(
-        &'a self,
-        _: u64,
-    ) -> BoxFuture<'a, Result<()>> {
+    fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn unpin_checkpoint<'a>(
-        &'a self,
-        _: u64,
-    ) -> BoxFuture<'a, Result<()>> {
+    fn unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn scan_prefix<'a>(
-        &'a self,
-        _: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    fn scan_prefix<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { Ok(vec![]) })
     }
     fn scan<'a>(
@@ -119,8 +85,7 @@ impl<S: StorageEngine + 'static> crate::ports_local::HybridSearchProvider for Co
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
-    ) -> BoxFuture<'a, Result<Vec<ContextChunk>>>
-    {
+    ) -> BoxFuture<'a, Result<Vec<ContextChunk>>> {
         Box::pin(async move {
             let search_results = self
                 .collection
@@ -144,10 +109,7 @@ impl<S: StorageEngine + 'static> crate::ports_local::HybridSearchProvider for Co
 }
 
 impl<S: StorageEngine + 'static> crate::ports_local::CommunityResolver for CollectionAdapter<S> {
-    fn get_community<'a>(
-        &'a self,
-        entity_id: EntityId,
-    ) -> BoxFuture<'a, Result<Option<u64>>> {
+    fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>> {
         Box::pin(async move { self.collection.get_community(entity_id).await })
     }
 }

@@ -10,8 +10,8 @@
 // HOTSPOTS: L100-L150 (branch_from & path_to_head)
 // SIEHE AUCH: DECISIONS.md ADR-004
 
-use contextra_types::{ContextraError, Result, TxId};
 use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -415,8 +415,9 @@ impl SessionBranchTree {
         let next_id = self.next_id.load(std::sync::atomic::Ordering::SeqCst);
         let meta = (head, next_id);
         let meta_key = format!("{prefix}meta").into_bytes();
-        let meta_val = bincode::serialize(&meta)
-            .map_err(|e| ContextraError::Serialization(format!("session dag meta serialize: {e}")))?;
+        let meta_val = bincode::serialize(&meta).map_err(|e| {
+            ContextraError::Serialization(format!("session dag meta serialize: {e}"))
+        })?;
         storage.put(tx, &meta_key, &meta_val).await?;
 
         Ok(())

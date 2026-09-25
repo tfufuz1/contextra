@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use criterion::{criterion_group, criterion_main, Criterion};
 use contextra_store::memtable::MemTable;
+use criterion::{criterion_group, criterion_main, Criterion};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};

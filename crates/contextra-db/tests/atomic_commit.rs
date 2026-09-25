@@ -10,7 +10,9 @@ async fn test_collection_atomic_rollback_on_error() {
         dimension: 4,
         ..Default::default()
     };
-    let db = Contextra::open_with_config(tmp.path(), config).await.unwrap();
+    let db = Contextra::open_with_config(tmp.path(), config)
+        .await
+        .unwrap();
     let col = db.collection("test_col").await.unwrap();
 
     // Valid insert
@@ -50,7 +52,9 @@ async fn test_4_index_atomic_rollback_on_vector_failure() {
         dimension: 4,
         ..Default::default()
     };
-    let db = Contextra::open_with_config(tmp.path(), config).await.unwrap();
+    let db = Contextra::open_with_config(tmp.path(), config)
+        .await
+        .unwrap();
     let col = db.collection("four_index_col").await.unwrap();
 
     // 1. Valid insertion with text and graph

@@ -95,9 +95,9 @@ impl ManifestEntry {
             ));
         }
 
-        let stored_crc_bytes = data
-            .get(0..4)
-            .ok_or_else(|| ContextraError::Serialization("Failed to read stored CRC bytes".into()))?;
+        let stored_crc_bytes = data.get(0..4).ok_or_else(|| {
+            ContextraError::Serialization("Failed to read stored CRC bytes".into())
+        })?;
         let stored_crc = u32::from_le_bytes(
             stored_crc_bytes
                 .try_into()
@@ -126,7 +126,9 @@ impl ManifestEntry {
             0 => {
                 // Add
                 if remaining.len() < 12 {
-                    return Err(ContextraError::Serialization("Add payload too short".into()));
+                    return Err(ContextraError::Serialization(
+                        "Add payload too short".into(),
+                    ));
                 }
                 let max_tx_bytes = remaining.get(0..8).ok_or_else(|| {
                     ContextraError::Serialization("Add max_tx bytes missing".into())
@@ -147,9 +149,9 @@ impl ManifestEntry {
                         "Add path data truncated".into(),
                     ));
                 }
-                let path_bytes = remaining
-                    .get(12..12 + path_len)
-                    .ok_or_else(|| ContextraError::Serialization("Add path bytes missing".into()))?;
+                let path_bytes = remaining.get(12..12 + path_len).ok_or_else(|| {
+                    ContextraError::Serialization("Add path bytes missing".into())
+                })?;
                 let path_str = std::str::from_utf8(path_bytes).map_err(|e| {
                     ContextraError::Serialization(format!("Invalid path UTF-8: {}", e))
                 })?;
@@ -194,13 +196,12 @@ impl ManifestEntry {
                         "RollbackComplete payload too short".into(),
                     ));
                 }
-                let target_tx_bytes = remaining
-                    .get(0..8)
-                    .ok_or_else(|| ContextraError::Serialization("target_tx bytes missing".into()))?;
-                let target_tx =
-                    u64::from_le_bytes(target_tx_bytes.try_into().map_err(|_| {
-                        ContextraError::Serialization("Invalid target_tx format".into())
-                    })?);
+                let target_tx_bytes = remaining.get(0..8).ok_or_else(|| {
+                    ContextraError::Serialization("target_tx bytes missing".into())
+                })?;
+                let target_tx = u64::from_le_bytes(target_tx_bytes.try_into().map_err(|_| {
+                    ContextraError::Serialization("Invalid target_tx format".into())
+                })?);
                 Ok(ManifestEntry::RollbackComplete { target_tx })
             }
             3 => {
@@ -220,11 +221,10 @@ impl ManifestEntry {
                 let rank_bytes = remaining
                     .get(8..16)
                     .ok_or_else(|| ContextraError::Serialization("rank bytes missing".into()))?;
-                let rank = u64::from_le_bytes(
-                    rank_bytes
-                        .try_into()
-                        .map_err(|_| ContextraError::Serialization("Invalid rank format".into()))?,
-                );
+                let rank =
+                    u64::from_le_bytes(rank_bytes.try_into().map_err(|_| {
+                        ContextraError::Serialization("Invalid rank format".into())
+                    })?);
                 let added_path_len_bytes = remaining.get(16..20).ok_or_else(|| {
                     ContextraError::Serialization("added_path_len bytes missing".into())
                 })?;
@@ -271,13 +271,12 @@ impl ManifestEntry {
                             "Replace removed path length truncated".into(),
                         ));
                     }
-                    let r_len_bytes = remaining
-                        .get(offset..offset + 4)
-                        .ok_or_else(|| ContextraError::Serialization("r_len bytes missing".into()))?;
-                    let r_len =
-                        u32::from_le_bytes(r_len_bytes.try_into().map_err(|_| {
-                            ContextraError::Serialization("Invalid r_len format".into())
-                        })?) as usize;
+                    let r_len_bytes = remaining.get(offset..offset + 4).ok_or_else(|| {
+                        ContextraError::Serialization("r_len bytes missing".into())
+                    })?;
+                    let r_len = u32::from_le_bytes(r_len_bytes.try_into().map_err(|_| {
+                        ContextraError::Serialization("Invalid r_len format".into())
+                    })?) as usize;
                     offset += 4;
                     if remaining.len() < offset + r_len {
                         return Err(ContextraError::Serialization(

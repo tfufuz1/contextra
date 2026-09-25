@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use contextra_types::{DocId, Entity, EntityId, TxId};
-use contextra_ports::GraphIndex;
 use contextra_graph::csr::CsrGraph;
+use contextra_ports::GraphIndex;
+use contextra_types::{DocId, Entity, EntityId, TxId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -54,10 +54,12 @@ impl CsrGraphBenchExt for CsrGraph {
 }
 
 fn build_test_graph(rt: &Runtime, n_nodes: usize, n_edges: usize) -> Arc<CsrGraph> {
-    let graph = Arc::new(CsrGraph::with_config(contextra_graph::csr::CsrGraphConfig {
-        rebuild_threshold: 10_000_000,
-        ..Default::default()
-    }));
+    let graph = Arc::new(CsrGraph::with_config(
+        contextra_graph::csr::CsrGraphConfig {
+            rebuild_threshold: 10_000_000,
+            ..Default::default()
+        },
+    ));
     rt.block_on(async {
         for i in 0..n_nodes {
             graph

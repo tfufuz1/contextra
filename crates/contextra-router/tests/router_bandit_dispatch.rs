@@ -3,10 +3,10 @@
 
 use contextra_adapt::bandit::BanditProfileState;
 use contextra_ports::{BoxFuture, CommunityResolver, ContextPreparer, HybridSearchProvider};
+use contextra_router::{RouterEngine, RoutingOutcome, RoutingStrategy, SlmProfile};
 use contextra_types::{
     ContextChunk, ContextWindow, ContextraError, DocId, EntityId, Result, TokenBudget,
 };
-use contextra_router::{RouterEngine, RoutingOutcome, RoutingStrategy, SlmProfile};
 use std::sync::Arc;
 
 struct MockSearchProvider {
@@ -79,10 +79,22 @@ fn create_mock_router(profiles: Vec<SlmProfile>, dim: usize) -> RouterEngine {
 #[tokio::test]
 async fn test_default_strategy_is_cascade() {
     let dim = 4;
-    let mut p1 = SlmProfile::new("p1", "http://loc1", vec![1], TokenBudget::new(1000, 100), 0.5);
+    let mut p1 = SlmProfile::new(
+        "p1",
+        "http://loc1",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.5,
+    );
     p1.bandit_state = Some(BanditProfileState::cold_start(dim, 0.5));
 
-    let mut p2 = SlmProfile::new("p2", "http://loc2", vec![1], TokenBudget::new(1000, 100), 0.8);
+    let mut p2 = SlmProfile::new(
+        "p2",
+        "http://loc2",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.8,
+    );
     p2.bandit_state = Some(BanditProfileState::cold_start(dim, 0.5));
 
     let router = create_mock_router(vec![p1, p2], dim);
@@ -96,17 +108,35 @@ async fn test_default_strategy_is_cascade() {
 #[tokio::test]
 async fn test_bandit_deterministic_selection_with_same_seed() {
     let dim = 4;
-    let mut p1 = SlmProfile::new("p1", "http://loc1", vec![1], TokenBudget::new(1000, 100), 0.5);
+    let mut p1 = SlmProfile::new(
+        "p1",
+        "http://loc1",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.5,
+    );
     p1.bandit_state = Some(BanditProfileState::cold_start(dim, 0.5));
 
-    let mut p2 = SlmProfile::new("p2", "http://loc2", vec![1], TokenBudget::new(1000, 100), 0.5);
+    let mut p2 = SlmProfile::new(
+        "p2",
+        "http://loc2",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.5,
+    );
     p2.bandit_state = Some(BanditProfileState::cold_start(dim, 0.5));
 
-    let router1 = create_mock_router(vec![p1.clone(), p2.clone()], dim)
-        .with_routing_strategy(RoutingStrategy::ContextualBandit, 0.1, 42);
+    let router1 = create_mock_router(vec![p1.clone(), p2.clone()], dim).with_routing_strategy(
+        RoutingStrategy::ContextualBandit,
+        0.1,
+        42,
+    );
 
-    let router2 = create_mock_router(vec![p1.clone(), p2.clone()], dim)
-        .with_routing_strategy(RoutingStrategy::ContextualBandit, 0.1, 42);
+    let router2 = create_mock_router(vec![p1.clone(), p2.clone()], dim).with_routing_strategy(
+        RoutingStrategy::ContextualBandit,
+        0.1,
+        42,
+    );
 
     let embedding = vec![0.5f32; dim];
 
@@ -119,12 +149,21 @@ async fn test_bandit_deterministic_selection_with_same_seed() {
 #[tokio::test]
 async fn test_record_outcome_updates_theta() {
     let dim = 4;
-    let mut p1 = SlmProfile::new("p1", "http://loc1", vec![1], TokenBudget::new(1000, 100), 0.5)
-        .with_resource_cost_estimate(0.1);
+    let mut p1 = SlmProfile::new(
+        "p1",
+        "http://loc1",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.5,
+    )
+    .with_resource_cost_estimate(0.1);
     p1.bandit_state = Some(BanditProfileState::cold_start(dim, 0.5));
 
-    let router = create_mock_router(vec![p1], dim)
-        .with_routing_strategy(RoutingStrategy::ContextualBandit, 0.0, 42);
+    let router = create_mock_router(vec![p1], dim).with_routing_strategy(
+        RoutingStrategy::ContextualBandit,
+        0.0,
+        42,
+    );
 
     let embedding = vec![1.0f32, 0.0, 0.0, 0.0];
     let dec = router.route(&embedding, "test query").await.unwrap();
@@ -152,11 +191,20 @@ async fn test_record_outcome_updates_theta() {
 #[tokio::test]
 async fn test_fallback_to_cascade_when_bandit_state_missing() {
     let dim = 4;
-    let p1 = SlmProfile::new("p1", "http://loc1", vec![1], TokenBudget::new(1000, 100), 0.5);
+    let p1 = SlmProfile::new(
+        "p1",
+        "http://loc1",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.5,
+    );
     // p1 has no bandit_state (None)
 
-    let router = create_mock_router(vec![p1], dim)
-        .with_routing_strategy(RoutingStrategy::ContextualBandit, 0.1, 42);
+    let router = create_mock_router(vec![p1], dim).with_routing_strategy(
+        RoutingStrategy::ContextualBandit,
+        0.1,
+        42,
+    );
 
     let embedding = vec![0.5f32; dim];
     let decision = router.route(&embedding, "query").await;
@@ -167,12 +215,21 @@ async fn test_fallback_to_cascade_when_bandit_state_missing() {
 #[tokio::test]
 async fn test_fallback_to_cascade_on_dimension_mismatch() {
     let dim = 4;
-    let mut p1 = SlmProfile::new("p1", "http://loc1", vec![1], TokenBudget::new(1000, 100), 0.5);
+    let mut p1 = SlmProfile::new(
+        "p1",
+        "http://loc1",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.5,
+    );
     // Bandit state expects dimension 8, but query embedding will be dimension 4
     p1.bandit_state = Some(BanditProfileState::cold_start(8, 0.5));
 
-    let router = create_mock_router(vec![p1], dim)
-        .with_routing_strategy(RoutingStrategy::ContextualBandit, 0.1, 42);
+    let router = create_mock_router(vec![p1], dim).with_routing_strategy(
+        RoutingStrategy::ContextualBandit,
+        0.1,
+        42,
+    );
 
     let embedding = vec![0.5f32; dim]; // Dimension 4 != 8
     let decision = router.route(&embedding, "query").await;
@@ -183,15 +240,30 @@ async fn test_fallback_to_cascade_on_dimension_mismatch() {
 #[tokio::test]
 async fn test_bandit_decision_propensity_floor_clamp() {
     let dim = 4;
-    let mut p1 = SlmProfile::new("p1", "http://loc1", vec![1], TokenBudget::new(1000, 100), 0.5);
+    let mut p1 = SlmProfile::new(
+        "p1",
+        "http://loc1",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.5,
+    );
     p1.bandit_state = Some(BanditProfileState::cold_start(dim, 0.5));
 
-    let mut p2 = SlmProfile::new("p2", "http://loc2", vec![1], TokenBudget::new(1000, 100), 0.5);
+    let mut p2 = SlmProfile::new(
+        "p2",
+        "http://loc2",
+        vec![1],
+        TokenBudget::new(1000, 100),
+        0.5,
+    );
     p2.bandit_state = Some(BanditProfileState::cold_start(dim, 0.5));
 
     // Test with epsilon = 0.0 -> clamped epsilon should be at least 0.01 * K = 0.02
-    let router = create_mock_router(vec![p1, p2], dim)
-        .with_routing_strategy(RoutingStrategy::ContextualBandit, 0.0, 42);
+    let router = create_mock_router(vec![p1, p2], dim).with_routing_strategy(
+        RoutingStrategy::ContextualBandit,
+        0.0,
+        42,
+    );
 
     let embedding = vec![0.5f32; dim];
     let decision = router.route(&embedding, "query").await.unwrap();

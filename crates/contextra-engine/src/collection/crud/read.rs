@@ -1,7 +1,7 @@
 use super::internal::validate_doc_id;
 use crate::collection::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_types::{DocId, Result, TxId};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result, TxId};
 
 /// Harte Obergrenze für scan()/scan_prefix()-Ergebnisse, falls kein explizites `limit`
 /// übergeben wird. Verhindert unbeabsichtigten Vollscan bei generischen Präfixen.

@@ -1,8 +1,8 @@
 // ANCHOR[PERF:BENCH-RELATE] STATUS:DONE (TS:2026-09-17T00:00:00Z) — Collection::relate() Benchmark
 // ZIEL: Criterion-basierte Messung von relate() Latenz und Durchsatz für AK-8 Regressionsnachweis
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use contextra_db::Contextra;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::TempDir;
 use tokio::runtime::Runtime;

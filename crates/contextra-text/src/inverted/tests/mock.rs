@@ -1,5 +1,5 @@
-use contextra_types::{Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine};
+use contextra_types::{Result, TxId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 

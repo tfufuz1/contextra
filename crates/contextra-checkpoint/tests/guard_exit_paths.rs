@@ -1,8 +1,8 @@
 #![allow(clippy::await_holding_lock, deprecated)]
 
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore};
-use contextra_types::{ContextraError, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

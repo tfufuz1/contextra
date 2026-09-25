@@ -2,7 +2,8 @@ use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
 use contextra_core::{
-    ContextraError, DistanceMetric, DocId, IndexOp, Result, ScoredDocument, TxId, VectorIndex, VectorIndexStats,
+    ContextraError, DistanceMetric, DocId, IndexOp, Result, ScoredDocument, TxId, VectorIndex,
+    VectorIndexStats,
 };
 
 use super::batch::{BatchContext, SearchContext};

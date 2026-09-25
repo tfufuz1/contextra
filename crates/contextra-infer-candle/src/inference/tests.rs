@@ -2,10 +2,10 @@ use super::*;
 use crate::gasp::GaspValidator;
 use crate::model_registry::ModelFingerprint;
 use candle_core::Device;
-use contextra_types::{ConfigFingerprint, Result};
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 #[cfg(feature = "kv-bridge")]
 use contextra_types::TenantId;
+use contextra_types::{ConfigFingerprint, Result};
 use std::sync::Arc;
 
 struct MockCandleModel {

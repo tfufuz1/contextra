@@ -11,12 +11,12 @@
 //! Entries are stored via [`Collection`] and keyed `audit:{task_id}:step:{n}`.
 
 use crate::context::{validate_node_id, validate_task_id};
+use contextra_db::Collection;
 #[cfg(any(test, feature = "test-utils"))]
 use contextra_ports::BoxFuture;
-use contextra_ports::{StorageEngine};
-use contextra_types::{Result};
-use contextra_db::Collection;
+use contextra_ports::StorageEngine;
 use contextra_store::LsmStorage;
+use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -569,10 +569,9 @@ impl InMemoryStorageEngine {
 impl StorageEngine for InMemoryStorageEngine {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move {
-            let guard = self
-                .data
-                .lock()
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+            let guard = self.data.lock().map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
+            })?;
             Ok(guard.get(key).cloned().map(bytes::Bytes::from))
         })
     }
@@ -592,10 +591,9 @@ impl StorageEngine for InMemoryStorageEngine {
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            let mut guard = self
-                .data
-                .lock()
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+            let mut guard = self.data.lock().map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
+            })?;
             guard.insert(key.to_vec(), value.to_vec());
             Ok(())
         })
@@ -608,10 +606,9 @@ impl StorageEngine for InMemoryStorageEngine {
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<bool>> {
         Box::pin(async move {
-            let mut guard = self
-                .data
-                .lock()
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+            let mut guard = self.data.lock().map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
+            })?;
             if guard.contains_key(key) {
                 Ok(false)
             } else {
@@ -627,10 +624,9 @@ impl StorageEngine for InMemoryStorageEngine {
         key: &'a [u8],
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            let mut guard = self
-                .data
-                .lock()
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+            let mut guard = self.data.lock().map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
+            })?;
             guard.remove(key);
             Ok(())
         })
@@ -683,10 +679,9 @@ impl StorageEngine for InMemoryStorageEngine {
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move {
-            let guard = self
-                .data
-                .lock()
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+            let guard = self.data.lock().map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
+            })?;
             let entries = guard
                 .iter()
                 .filter(|(k, _)| k.starts_with(prefix))
@@ -704,10 +699,9 @@ impl StorageEngine for InMemoryStorageEngine {
         limit: Option<usize>,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move {
-            let guard = self
-                .data
-                .lock()
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}")))?;
+            let guard = self.data.lock().map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
+            })?;
             let mut entries: Vec<(Vec<u8>, Vec<u8>)> = guard
                 .iter()
                 .filter(|(k, _)| {

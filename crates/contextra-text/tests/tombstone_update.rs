@@ -3,9 +3,9 @@
 //! Verifies that `upsert_document` no longer eagerly deletes old posting-list
 //! entries on updates (tombstone path) while maintaining full BM25 correctness.
 
-use contextra_types::{DocId, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine};
 use contextra_text::InvertedIndex;
+use contextra_types::{DocId, Result, TxId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;

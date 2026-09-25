@@ -1,11 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, dead_code)]
 
-use criterion::{criterion_group, criterion_main, Criterion};
-use contextra_ports::{BoxFuture, StorageEngine};
-use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget};
 use contextra_db::{Collection, Contextra, ContextraConfig};
+use contextra_ports::{BoxFuture, StorageEngine};
 use contextra_router::ports_local::{CommunityResolver, HybridSearchProvider};
 use contextra_router::{RouterEngine, SlmProfile};
+use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget};
+use criterion::{criterion_group, criterion_main, Criterion};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -64,7 +64,9 @@ fn bench_router_engine(c: &mut Criterion) {
             dimension: 4,
             ..Default::default()
         };
-        let db = Contextra::open_with_config(dir.path(), config).await.unwrap();
+        let db = Contextra::open_with_config(dir.path(), config)
+            .await
+            .unwrap();
         let collection = db.collection("default").await.unwrap();
 
         for i in 0..10 {
@@ -112,14 +114,15 @@ fn bench_router_engine(c: &mut Criterion) {
             collection: Arc<contextra_db::Collection<S>>,
         }
 
-        impl<S: StorageEngine + 'static> contextra_ports::HybridSearchProvider for BenchCollectionAdapter<S> {
+        impl<S: StorageEngine + 'static> contextra_ports::HybridSearchProvider
+            for BenchCollectionAdapter<S>
+        {
             fn search_hybrid<'a>(
                 &'a self,
                 query_text: &'a str,
                 query_embedding: &'a [f32],
                 top_k: usize,
-            ) -> BoxFuture<'a, Result<Vec<ContextChunk>>>
-            {
+            ) -> BoxFuture<'a, Result<Vec<ContextChunk>>> {
                 Box::pin(async move {
                     let search_results = self
                         .collection

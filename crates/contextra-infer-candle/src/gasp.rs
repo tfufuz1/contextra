@@ -18,9 +18,11 @@
 //! ein Abstention-Pfad ausgelöst (`Err(ContextraError::PolicyViolation(...))` mit `LowConfidenceGrounding`),
 //! anstatt die ungeprüfte/unsichere Antwort durchzureichen.
 
-use contextra_ports::{ BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator, };
-use contextra_types::{ConfigFingerprint, ContextChunk, ContextraError, Result};
+use contextra_ports::{
+    BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
+};
 use contextra_rank::IsotonicCalibrator;
+use contextra_types::{ConfigFingerprint, ContextChunk, ContextraError, Result};
 use std::sync::Mutex;
 
 /// Standard-Schwellenwert für Grounding-Konfidenz (Default: 0.70).

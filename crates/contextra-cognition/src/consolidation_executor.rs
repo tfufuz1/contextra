@@ -10,20 +10,18 @@ use crate::aggregation_phase::{
     check_compaction_budget, run_aggregation_pass, AggregationConfig, AggregationEdge,
     AggregationNode, AggregationPhaseResult, AlphaNode,
 };
-use crate::leanrag_input::{build_leanrag_inputs, DEFAULT_MAX_LEANRAG_NODES};
 use crate::graph_sink::CsrGraphSuperEdgeSink;
+use crate::leanrag_input::{build_leanrag_inputs, DEFAULT_MAX_LEANRAG_NODES};
 use crate::memory_consolidation::{
     compute_community_hash, run_consolidation_pass, run_structural_synthesis_pass,
     CommunityStabilityTracker, ConsolidationConfig, ConsolidationPhaseResult, SynthesisConfig,
     SynthesisPhaseResult,
 };
-use contextra_ports::{
-    LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex,
-};
-use contextra_types::{DocId, Result};
 use contextra_engine::collection::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_engine::decay_controller::AdaptiveDecayController;
 use contextra_graph::{detect_communities, CommunityDetectionConfig};
+use contextra_ports::{LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -664,8 +662,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_ports::{BoxFuture, LlmTextGenerator};
     use contextra_graph::CsrGraph;
+    use contextra_ports::{BoxFuture, LlmTextGenerator};
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
@@ -689,7 +687,10 @@ mod tests {
     }
 
     impl LlmTextGenerator for TestMockLlm {
-        fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_types::Result<String>> {
+        fn generate<'a>(
+            &'a self,
+            _prompt: &'a str,
+        ) -> BoxFuture<'a, contextra_types::Result<String>> {
             Box::pin(async move {
                 self.call_count.fetch_add(1, Ordering::SeqCst);
                 if self.should_fail.load(Ordering::SeqCst) {

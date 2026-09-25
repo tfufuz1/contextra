@@ -5,9 +5,9 @@
 //! require O(N_new_terms) puts instead of O(N_old_terms) deletes + O(N_new_terms) puts.
 
 use bytes::Bytes;
-use contextra_types::{DocId, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::InvertedIndex;
+use contextra_types::{DocId, Result, TxId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};

@@ -5,10 +5,10 @@
 //! Extraktion von LeanRAG-Eingabedaten ([`AggregationNode`], [`AggregationEdge`]) aus einer [`Collection`].
 
 use crate::aggregation_phase::{AggregationEdge, AggregationNode};
-use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{DocId, EntityId};
 use contextra_engine::collection::Collection;
 use contextra_graph::hyperedge::HyperEdgeId;
+use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, EntityId};
 use std::collections::{HashMap, HashSet};
 
 /// Standardmäßige Obergrenze für die Anzahl extrahierter Knoten im LeanRAG-Input.
@@ -51,7 +51,9 @@ pub fn build_leanrag_inputs<S: StorageEngine, V: VectorIndex>(
     for (doc_id, embedding) in turns {
         let entity = EntityId::from_doc_id(*doc_id);
         if graph.entity_exists(entity) {
-            turn_nodes.entry(entity).or_insert_with(|| embedding.clone());
+            turn_nodes
+                .entry(entity)
+                .or_insert_with(|| embedding.clone());
         }
     }
 
@@ -90,18 +92,12 @@ pub fn build_leanrag_inputs<S: StorageEngine, V: VectorIndex>(
                 hyperedge.participants.iter().map(|rb| rb.entity).collect();
 
             // Kante muss >=2 Teilnehmer haben und ALLE Teilnehmer müssen in der gefilterten Knotenmenge sein
-            if participants.len() >= 2
-                && participants.iter().all(|p| node_entities.contains(p))
-            {
+            if participants.len() >= 2 && participants.iter().all(|p| node_entities.contains(p)) {
                 let pred_bytes = format!("{:?}", hyperedge.predicate).into_bytes();
                 let hash = blake3::hash(&pred_bytes);
                 let hash_arr = hash.as_bytes();
-                let predicate_type = u32::from_le_bytes([
-                    hash_arr[0],
-                    hash_arr[1],
-                    hash_arr[2],
-                    hash_arr[3],
-                ]);
+                let predicate_type =
+                    u32::from_le_bytes([hash_arr[0], hash_arr[1], hash_arr[2], hash_arr[3]]);
 
                 edges.push(AggregationEdge {
                     id: edge_id,

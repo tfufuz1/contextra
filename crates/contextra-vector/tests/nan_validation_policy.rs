@@ -1,4 +1,4 @@
-use contextra_core::{DistanceMetric, DocId, ContextraError, TxId, VectorIndex};
+use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_vector::distance::{compute_distance_trusted, validate_vector};
 use contextra_vector::hnsw::HnswIndex;
 use contextra_vector::HnswConfig;

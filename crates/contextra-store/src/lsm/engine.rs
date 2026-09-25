@@ -1,12 +1,10 @@
 use super::config::LsmConfig;
-use super::guard::LsmState;
 use super::group_commit::PendingCommitQueue;
+use super::guard::LsmState;
 use crate::compaction::CompactionEngine;
 use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::Wal;
-use contextra_core::{
-    ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId,
-};
+use contextra_core::{ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId};
 use contextra_crypto::crypto::KeyManager;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;

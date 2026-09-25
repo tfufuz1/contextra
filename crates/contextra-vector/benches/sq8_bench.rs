@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use contextra_core::DistanceMetric;
 use contextra_vector::quantize::ScalarQuantizer;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 
 fn bench_sq8(c: &mut Criterion) {

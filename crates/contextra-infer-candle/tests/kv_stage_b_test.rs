@@ -5,8 +5,8 @@
 #![cfg(feature = "kv-stage-b")]
 
 use candle_core::{DType, Device, Tensor};
-use contextra_types::ContextraError;
 use contextra_infer_candle::kv_state::{KvState, LayerKv};
+use contextra_types::ContextraError;
 
 #[test]
 fn test_kv_state_4d_model_tensor_export_import_truncation() -> Result<(), Box<dyn std::error::Error>>

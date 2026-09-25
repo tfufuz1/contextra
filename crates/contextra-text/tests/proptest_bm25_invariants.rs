@@ -1,10 +1,10 @@
 //! Property-based tests for BM25 score invariants and tombstone isolation.
 
-use contextra_types::{DocId, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::bm25::score_term;
 use contextra_text::tokenizer::{DefaultTokenizer, Tokenizer};
 use contextra_text::InvertedIndex;
+use contextra_types::{DocId, Result, TxId};
 use parking_lot::RwLock;
 use proptest::prelude::*;
 use std::collections::HashMap;

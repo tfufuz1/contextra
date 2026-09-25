@@ -265,7 +265,9 @@ impl WasmExecutor {
                     // INV-SBX-3: Precise error classification using downcast_ref without string matching
                     if let Some(exit_err) = e.downcast_ref::<ProcessExitError>() {
                         if exit_err.code != 0 {
-                            return Err(SandboxError::ProcessExit { code: exit_err.code });
+                            return Err(SandboxError::ProcessExit {
+                                code: exit_err.code,
+                            });
                         }
                         // Code 0 counts as success, stdout/stderr captured so far will be returned.
                     } else if let Some(out_err) = e.downcast_ref::<OutputLimitExceededError>() {

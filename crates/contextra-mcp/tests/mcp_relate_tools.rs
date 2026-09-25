@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra::Contextra;
-use contextra_ports::{BoxFuture, StorageEngine};
 use contextra_mcp::{protocol::JsonRpcRequest, McpServer};
+use contextra_ports::{BoxFuture, StorageEngine};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -36,17 +36,14 @@ impl contextra_ports::EmbeddingProvider for MockEmbedder {
     }
 }
 
-async fn setup_app_write(
-    allow_write: bool,
-) -> (Arc<Contextra>, Arc<McpServer>, TempDir) {
+async fn setup_app_write(allow_write: bool) -> (Arc<Contextra>, Arc<McpServer>, TempDir) {
     let tmp = TempDir::new().expect("temp dir");
     let db = Arc::new(Contextra::open(tmp.path()).await.expect("open db"));
     let collection = db.collection("default").await.expect("collection");
     let dim = collection.dimension();
     let embedder = Arc::new(MockEmbedder { dimension: dim });
     let server = Arc::new(
-        McpServer::with_write_permission(db.clone(), embedder, allow_write)
-            .expect("server new"),
+        McpServer::with_write_permission(db.clone(), embedder, allow_write).expect("server new"),
     );
     (db, server, tmp)
 }
@@ -165,7 +162,10 @@ async fn test_contextra_relate_success() {
         .get_at_seq(&key, u64::MAX)
         .await
         .expect("get_at_seq");
-    assert!(stored.is_some(), "Binary relationship key must exist in storage");
+    assert!(
+        stored.is_some(),
+        "Binary relationship key must exist in storage"
+    );
 }
 
 /// (c) `contextra_relate_n_ary` creates a hyperedge with 3 participants and returns hyperedge_id.
@@ -210,7 +210,10 @@ async fn test_contextra_relate_n_ary_success() {
     let col = db.collection("default").await.expect("col");
     let e1 = contextra_types::EntityId::from_key("doc_1").expect("entity_id");
     let hes_e1 = col.graph_index().hyperedges_for_entity(e1);
-    assert!(!hes_e1.is_empty(), "HyperEdge must exist for participant doc_1");
+    assert!(
+        !hes_e1.is_empty(),
+        "HyperEdge must exist for participant doc_1"
+    );
     assert_eq!(hes_e1[0].inner(), hyperedge_id_num);
 }
 

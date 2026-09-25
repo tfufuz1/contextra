@@ -1,4 +1,4 @@
-use contextra_core::{BoxFuture, DocId, LlmTextGenerator, ContextraError, Result, StorageEngine};
+use contextra_core::{BoxFuture, ContextraError, DocId, LlmTextGenerator, Result, StorageEngine};
 use contextra_db::{
     cleanup_orphaned_consolidation_intents, ContextCompactor, Contextra, ContextraConfig,
 };

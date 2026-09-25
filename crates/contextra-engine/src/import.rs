@@ -6,8 +6,8 @@
 use crate::collection::Collection;
 use crate::export::{ExportCollectionV1, ExportDocumentV1, SCHEMA_VERSION_V1};
 use crate::Contextra;
-use contextra_types::{Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 
 /// Zusammenfassung eines Import-Vorgangs.
@@ -33,8 +33,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             if let Some(obj) = meta.as_object_mut() {
                 obj.insert(
                     "memory_type".to_string(),
-                    serde_json::to_value(mem.memory_type)
-                        .map_err(|e| contextra_types::ContextraError::Serialization(e.to_string()))?,
+                    serde_json::to_value(mem.memory_type).map_err(|e| {
+                        contextra_types::ContextraError::Serialization(e.to_string())
+                    })?,
                 );
                 if let Some(ref text) = mem.content {
                     if !obj.contains_key("text") && !obj.contains_key("content") {
@@ -50,8 +51,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     }
                 }
                 if !mem.links.is_empty() {
-                    let links_val = serde_json::to_value(&mem.links)
-                        .map_err(|e| contextra_types::ContextraError::Serialization(e.to_string()))?;
+                    let links_val = serde_json::to_value(&mem.links).map_err(|e| {
+                        contextra_types::ContextraError::Serialization(e.to_string())
+                    })?;
                     obj.insert("links".to_string(), links_val);
                 }
             }

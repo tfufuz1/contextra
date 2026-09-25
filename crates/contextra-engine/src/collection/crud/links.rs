@@ -1,6 +1,6 @@
 use crate::collection::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_types::{DocId, Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Links two memories together with a specific relation (Zettelkasten A-MEM).
@@ -152,7 +152,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                         created_at_tx: tx,
                                     });
                                     let links_val = serde_json::to_value(links).map_err(|e| {
-                                        contextra_types::ContextraError::Serialization(e.to_string())
+                                        contextra_types::ContextraError::Serialization(
+                                            e.to_string(),
+                                        )
                                     })?;
                                     obj.insert("links".to_string(), links_val);
                                     let new_user_bytes = serde_json::to_vec(&full_doc)?;

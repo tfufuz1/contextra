@@ -318,7 +318,9 @@ impl ScalarQuantizer {
                 contextra_core::ContextraError::invalid_input("Quantizer maxes index out of bounds")
             })?;
             let scale_v = self.scales.get(i).copied().ok_or_else(|| {
-                contextra_core::ContextraError::invalid_input("Quantizer scales index out of bounds")
+                contextra_core::ContextraError::invalid_input(
+                    "Quantizer scales index out of bounds",
+                )
             })?;
             let clamped = v.clamp(min_v, max_v);
             let byte_val = ((clamped - min_v) * scale_v).round().clamp(0.0, 255.0) as u8;

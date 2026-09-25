@@ -1,7 +1,7 @@
 use super::mock::MockStorage;
 use crate::inverted::{InvertedIndex, Language, TextIndexMetadata};
-use contextra_types::{DocId, ContextraError, Result, TxId};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
+use contextra_types::{ContextraError, DocId, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 

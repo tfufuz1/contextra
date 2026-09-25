@@ -1,6 +1,6 @@
-use contextra_types::{Edge, Entity, EntityId, TxId};
-use contextra_ports::GraphIndex;
 use contextra_graph::CsrGraph;
+use contextra_ports::GraphIndex;
+use contextra_types::{Edge, Entity, EntityId, TxId};
 
 #[tokio::test]
 async fn test_graph_integration_pipeline() {

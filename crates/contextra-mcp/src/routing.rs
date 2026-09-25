@@ -1,6 +1,6 @@
 use crate::config::RouterConfig;
 use contextra::Contextra;
-use contextra_types::{ContextChunk, ContextWindow, EntityId, ContextraError, TokenBudget};
+use contextra_types::{ContextChunk, ContextWindow, ContextraError, EntityId, TokenBudget};
 use std::sync::Arc;
 
 struct CollectionAdapter(Arc<contextra::Collection>);
@@ -92,7 +92,8 @@ impl contextra::router::ports_local::HybridSearchProvider for CollectionSearchAd
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
-    ) -> contextra_ports::BoxFuture<'a, Result<Vec<contextra_types::ContextChunk>, ContextraError>> {
+    ) -> contextra_ports::BoxFuture<'a, Result<Vec<contextra_types::ContextChunk>, ContextraError>>
+    {
         let col = self.0.clone();
         Box::pin(async move {
             let search_results = col
@@ -157,7 +158,9 @@ pub async fn setup_routing(
 
 /// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
 #[cfg(feature = "kv-bridge")]
-pub fn setup_kv_bridge(_db: &Arc<Contextra>) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
+pub fn setup_kv_bridge(
+    _db: &Arc<Contextra>,
+) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
     tracing::info!(
         "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
     );

@@ -4,7 +4,7 @@
 //! Ensures that batch operations (insert_many, upsert_many) and range scans
 //! maintain the logical isolation and data integrity of the SAOS.
 
-use contextra_db::{DistanceMetric, Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use serde_json::json;
 use std::ops::Bound;
 use tempfile::TempDir;

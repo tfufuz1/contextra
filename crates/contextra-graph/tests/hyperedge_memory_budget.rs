@@ -1,6 +1,6 @@
-use contextra_types::EntityId;
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use contextra_types::EntityId;
 use std::sync::Arc;
 
 #[test]

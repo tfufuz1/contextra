@@ -1,8 +1,8 @@
 use contextra_agent::audit::{migrate_legacy_audit_entries, AuditEntry, AuditLog};
-use contextra_ports::{ScoredDocument, StorageEngine, VectorIndex, VectorIndexStats};
-use contextra_types::{ContextraError, DocId, Result, TxId};
 use contextra_db::{Collection, Contextra, ContextraConfig};
 use contextra_graph::CsrGraph;
+use contextra_ports::{ScoredDocument, StorageEngine, VectorIndex, VectorIndexStats};
+use contextra_types::{ContextraError, DocId, Result, TxId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use std::collections::HashSet;
 use std::sync::Arc;

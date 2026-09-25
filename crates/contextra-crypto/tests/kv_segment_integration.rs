@@ -4,9 +4,9 @@
 
 #![cfg(feature = "kv-encryption")]
 
-use contextra_types::TenantId;
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use contextra_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};
+use contextra_types::TenantId;
 use std::mem::ManuallyDrop;
 use zeroize::Zeroize;
 

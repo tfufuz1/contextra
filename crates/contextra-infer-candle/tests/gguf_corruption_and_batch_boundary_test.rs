@@ -4,14 +4,14 @@
 // INVARIANTEN: Zero real model downloads (hermetic bytes); no panics on corrupt binary inputs; strict batch boundary limits.
 
 use candle_core::Device;
-use contextra_ports::embedding::EmbeddingError;
-use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
-use contextra_types::Result;
 use contextra_infer_candle::embedding::CandleEmbedInner;
 use contextra_infer_candle::gguf_loader::parse_gguf_metadata;
 use contextra_infer_candle::inference::{CandleLlmClient, CandleModelInner, QuantizedLlamaModel};
 use contextra_infer_candle::model_registry::ModelFingerprint;
 use contextra_infer_candle::{CandleEmbedClient, MAX_CANDLE_EMBED_BATCH_SIZE};
+use contextra_ports::embedding::EmbeddingError;
+use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
+use contextra_types::Result;
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;

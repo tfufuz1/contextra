@@ -1,9 +1,9 @@
-use contextra_types::{DocId, EntityId};
 use contextra_graph::cascade::{
     cascade_invalidate_hyperedges_for_superseded_doc, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use contextra_types::{DocId, EntityId};
 use std::time::Instant;
 
 #[tokio::test]

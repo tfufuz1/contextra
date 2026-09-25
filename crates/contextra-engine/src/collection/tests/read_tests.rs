@@ -2,10 +2,10 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_collection_scan_prefix_batches_via_mock_storage() {
-use contextra_types::{Result, TxId};
-use contextra_ports::{StorageStats};
-use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_graph::csr::CsrGraph;
+    use contextra_ports::StorageStats;
+    use contextra_ports::{BoxFuture, StorageEngine};
+    use contextra_types::{Result, TxId};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
@@ -143,12 +143,11 @@ use contextra_ports::{BoxFuture, StorageEngine};
     assert_eq!(mock_storage.bounded_call_count.load(Ordering::SeqCst), 5);
 }
 
-
 #[tokio::test]
 async fn test_maintenance_pagination_over_10k_documents() {
-    use contextra_types::EXPIRY_METADATA_KEY;
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
+    use contextra_types::EXPIRY_METADATA_KEY;
     use contextra_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::AtomicU64;
@@ -278,13 +277,12 @@ async fn test_maintenance_pagination_over_10k_documents() {
     );
 }
 
-
 #[tokio::test]
 async fn test_migrate_doc_keys_v1() {
-    use contextra_types::{DocId, TxId};
-use contextra_ports::{StorageEngine};
     use contextra_graph::CsrGraph;
+    use contextra_ports::StorageEngine;
     use contextra_store::LsmStorage;
+    use contextra_types::{DocId, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
     use std::sync::atomic::{AtomicU64, Ordering};

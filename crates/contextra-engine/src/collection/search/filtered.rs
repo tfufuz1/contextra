@@ -3,8 +3,8 @@
 
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_types::{DocId, FilterExpr, Result};
 use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_types::{DocId, FilterExpr, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Estimates the selectivity (fraction of documents matching `filter`) over the collection metadata.

@@ -383,7 +383,9 @@ impl HnswHeader {
                     .get(80..84)
                     .ok_or_else(|| ContextraError::Storage("Invalid sq8_bias_variance".into()))?
                     .try_into()
-                    .map_err(|_| ContextraError::Storage("Invalid sq8_bias_variance bytes".into()))?,
+                    .map_err(|_| {
+                        ContextraError::Storage("Invalid sq8_bias_variance bytes".into())
+                    })?,
             );
             (mean, variance)
         } else {

@@ -1,6 +1,6 @@
 use crate::*;
-use contextra_types::{Result, TxId};
 use contextra_store::LsmStorage;
+use contextra_types::{Result, TxId};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -422,18 +422,18 @@ impl Contextra {
         }
         Ok(())
     }
-
 }
 
 #[cfg(test)]
 mod consolidation_launcher_tests {
     use crate::*;
-    use tempfile::tempdir;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
+    use tempfile::tempdir;
 
     #[tokio::test]
-    async fn test_instance_bound_consolidation_launchers_isolation() -> contextra_types::Result<()> {
+    async fn test_instance_bound_consolidation_launchers_isolation() -> contextra_types::Result<()>
+    {
         let dir1 = tempdir().unwrap();
         let dir2 = tempdir().unwrap();
 
@@ -441,16 +441,18 @@ mod consolidation_launcher_tests {
         let counter2 = Arc::new(AtomicU32::new(0));
 
         let c1 = Arc::clone(&counter1);
-        let launcher1: ConsolidationLauncher = Arc::new(move |_col, _interval, _max_llm, _cancel| {
-            c1.fetch_add(1, Ordering::SeqCst);
-            tokio::spawn(async {})
-        });
+        let launcher1: ConsolidationLauncher =
+            Arc::new(move |_col, _interval, _max_llm, _cancel| {
+                c1.fetch_add(1, Ordering::SeqCst);
+                tokio::spawn(async {})
+            });
 
         let c2 = Arc::clone(&counter2);
-        let launcher2: ConsolidationLauncher = Arc::new(move |_col, _interval, _max_llm, _cancel| {
-            c2.fetch_add(10, Ordering::SeqCst);
-            tokio::spawn(async {})
-        });
+        let launcher2: ConsolidationLauncher =
+            Arc::new(move |_col, _interval, _max_llm, _cancel| {
+                c2.fetch_add(10, Ordering::SeqCst);
+                tokio::spawn(async {})
+            });
 
         let config1 = ContextraConfig::default().with_consolidation_launcher(launcher1);
         let config2 = ContextraConfig::default().with_consolidation_launcher(launcher2);
@@ -468,7 +470,8 @@ mod consolidation_launcher_tests {
     }
 
     #[tokio::test]
-    async fn test_without_consolidation_launcher_initializes_cleanly() -> contextra_types::Result<()> {
+    async fn test_without_consolidation_launcher_initializes_cleanly() -> contextra_types::Result<()>
+    {
         let dir = tempdir().unwrap();
         let config = ContextraConfig::default(); // no launcher set
 

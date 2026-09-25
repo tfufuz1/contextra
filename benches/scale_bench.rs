@@ -2,8 +2,8 @@
 // ZIEL: Parameterisierte Messung (10K, 100K, 1M Chunks) von Batch-Insert-Durchsatz, Hybrid-Search-Latenz und Peak-RSS
 // AGENT:09 DATE:2026-08-29 STATUS:DONE
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use contextra_db::Contextra;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;

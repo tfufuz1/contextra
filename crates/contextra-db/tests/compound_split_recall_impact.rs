@@ -2,7 +2,7 @@
 //! Evaluates actual vs. expected retrieval performance across BM25-only and Hybrid (Vector + Text) search.
 
 use contextra_core::FusionWeights;
-use contextra_db::{DistanceMetric, Language, Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric, Language};
 use serde_json::json;
 use tempfile::TempDir;
 
