@@ -26,7 +26,13 @@ pub(super) async fn get_at_seq(
     validate_key(key)?;
     // Genau EINMAL laden — Snapshot-Konsistenz über die gesamte Methode (INVARIANT-2)
     let snapshot_tx = storage.last_committed_tx.load(Ordering::Acquire);
-    let state = storage.state.read().await;
+    let (memtable, immutable_memtables) = {
+        let state = storage.state.read().await;
+        (
+            std::sync::Arc::clone(&state.memtable),
+            state.immutable_memtables.clone(),
+        )
+    };
     tracing::debug!(
         "LsmStorage::get_at_seq key={:?} seq={} snapshot_tx={}",
         String::from_utf8_lossy(key),
@@ -35,7 +41,7 @@ pub(super) async fn get_at_seq(
     );
 
     // 1. MemTable (only if seq_no in entry <= target seq_no AND tx_id <= snapshot_tx)
-    if let Some((val, seq, _tx)) = state.memtable.get_at_seq(key, seq_no, snapshot_tx) {
+    if let Some((val, seq, _tx)) = memtable.get_at_seq(key, seq_no, snapshot_tx) {
         if (seq & TOMBSTONE_BIT) != 0 {
             return Ok(None);
         }
@@ -43,7 +49,7 @@ pub(super) async fn get_at_seq(
     }
 
     // 2. Immutable MemTables (newest first)
-    for mt in state.immutable_memtables.iter().rev() {
+    for mt in immutable_memtables.iter().rev() {
         if let Some((val, seq, _tx)) = mt.get_at_seq(key, seq_no, snapshot_tx) {
             if (seq & TOMBSTONE_BIT) != 0 {
                 return Ok(None);
@@ -53,8 +59,11 @@ pub(super) async fn get_at_seq(
     }
 
     // 3. SSTables (newest first, filtered by seq_no and snapshot_tx)
-    let sstables = storage.sstables.read().await;
+    let sstables = storage.sstables.read().await.clone();
     for sst in sstables.iter().rev() {
+        if snapshot_tx < sst.metadata().min_tx_id || seq_no < sst.metadata().min_seq {
+            continue;
+        }
         // SSTables already only contain entries up to their last_key.
         // But we still need to check the entry's seq_no and tx_id.
         if let Some((val, seq, tx)) = sst.get(key).await? {
