@@ -25,6 +25,7 @@ pub mod hnsw;
 pub mod persistence;
 pub mod quantize;
 
+pub mod acorn;
 pub mod candidate_stream;
 pub mod compute_pool;
 pub mod partial_rebuild;
