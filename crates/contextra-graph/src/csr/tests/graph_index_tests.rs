@@ -1,5 +1,7 @@
 use super::super::*;
 use super::basic_tests::setup_test_graph;
+#[cfg(feature = "edge-reinforcement-learning")]
+use crate::csr::types::EdgePayload;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
 use crate::GraphIndexExt;
 use contextra_types::{DocId, Edge, Entity, EntityId, ContextraError, TxId};

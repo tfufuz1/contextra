@@ -21,9 +21,9 @@ async fn proof_source_doc_ids_set_after_compact() {
 
     // Add 10 edges with distinct non-zero source_doc_ids
     for i in 0..10 {
-        let id_a = EntityId::new(i);
-        let id_b = EntityId::new(i + 1);
-        let doc_id = DocId::new(i + 100);
+        let id_a = EntityId::new(i as u64);
+        let id_b = EntityId::new((i + 1) as u64);
+        let doc_id = DocId::from((i + 100) as u64);
         let edge = Edge::new(id_a, id_b, "relates").with_source_doc_id(doc_id);
         GraphIndex::add_edge(graph.as_ref(), tx, edge)
             .await
@@ -37,14 +37,14 @@ async fn proof_source_doc_ids_set_after_compact() {
     // For each edge index 0..10: get_source_doc_id(idx) must be Some(DocId::new(i + 100))
     for i in 0..10 {
         let idx = i as usize;
-        let expected_doc = DocId::new(i + 100);
+        let expected_doc = DocId::from((i + 100) as u64);
         assert_eq!(
             graph.get_source_doc_id(idx),
             Some(expected_doc),
             "source_doc_ids at index {idx} must be Some({expected_doc:?}) after compact"
         );
-        let id_a = EntityId::new(i);
-        let id_b = EntityId::new(i + 1);
+        let id_a = EntityId::new(i as u64);
+        let id_b = EntityId::new((i + 1) as u64);
         assert_eq!(
             graph.source_doc_id_at(id_a, id_b),
             Some(expected_doc),
@@ -59,7 +59,7 @@ async fn proof_source_doc_ids_empty_before_first_compact() {
     let tx = TxId::new(1);
     let id_a = EntityId::new(1);
     let id_b = EntityId::new(2);
-    let doc_id = DocId::new(42);
+    let doc_id = DocId::from(42u64);
 
     graph
         .add_entity(tx, Entity::new(id_a, "NodeA", "Type"))
@@ -105,8 +105,8 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
             .unwrap();
     }
     for i in 0..50 {
-        let edge = Edge::new(EntityId::new(i), EntityId::new(i + 1), "rel1")
-            .with_source_doc_id(DocId::new(i + 1000));
+        let edge = Edge::new(EntityId::new(i as u64), EntityId::new((i + 1) as u64), "rel1")
+            .with_source_doc_id(DocId::from((i + 1000) as u64));
         GraphIndex::add_edge(graph.as_ref(), tx1, edge)
             .await
             .unwrap();
@@ -117,8 +117,8 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
     // Verify first 50 edges
     for i in 0..50 {
         assert_eq!(
-            graph.source_doc_id_at(EntityId::new(i), EntityId::new(i + 1)),
-            Some(DocId::new(i + 1000))
+            graph.source_doc_id_at(EntityId::new(i as u64), EntityId::new((i + 1) as u64)),
+            Some(DocId::from((i + 1000) as u64))
         );
     }
 
@@ -134,8 +134,8 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
             .unwrap();
     }
     for i in 50..100 {
-        let edge = Edge::new(EntityId::new(i), EntityId::new(i + 1), "rel2")
-            .with_source_doc_id(DocId::new(i + 1000));
+        let edge = Edge::new(EntityId::new(i as u64), EntityId::new((i + 1) as u64), "rel2")
+            .with_source_doc_id(DocId::from((i + 1000) as u64));
         GraphIndex::add_edge(graph.as_ref(), tx2, edge)
             .await
             .unwrap();
@@ -145,9 +145,9 @@ async fn proof_source_doc_ids_consistent_after_multiple_compacts() {
 
     // Verify all 100 edges after second compact
     for i in 0..100 {
-        let id_a = EntityId::new(i);
-        let id_b = EntityId::new(i + 1);
-        let expected_doc = DocId::new(i + 1000);
+        let id_a = EntityId::new(i as u64);
+        let id_b = EntityId::new((i + 1) as u64);
+        let expected_doc = DocId::from((i + 1000) as u64);
         assert_eq!(
             graph.source_doc_id_at(id_a, id_b),
             Some(expected_doc),
