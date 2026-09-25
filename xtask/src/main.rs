@@ -95,6 +95,7 @@ mod lint_unsafe_slice_bounds;
 mod migrate_docid_128;
 mod post_merge_report;
 mod record_mutation_score;
+mod reproducible_build;
 mod validate_pr_checklist;
 
 pub use check_jules_context_freshness::run_check_jules_context_freshness;
