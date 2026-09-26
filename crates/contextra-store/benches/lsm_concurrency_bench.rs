@@ -61,5 +61,84 @@ Expected Baseline JSON (benchmarks/results/lsm_concurrency_baseline.json):
 }
 */
 
-criterion_group!(benches, bench_lsm_concurrent_commits);
+fn get_process_rss_bytes() -> Option<u64> {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(content) = std::fs::read_to_string("/proc/self/statm") {
+            let mut parts = content.split_whitespace();
+            let _total_size = parts.next()?;
+            if let Some(resident_pages_str) = parts.next() {
+                if let Ok(pages) = resident_pages_str.parse::<u64>() {
+                    let page_size = 4096u64;
+                    return Some(pages.saturating_mul(page_size));
+                }
+            }
+        }
+    }
+    None
+}
+
+fn bench_lsm_compaction_extreme_load(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+    let mut group = c.benchmark_group("LSM_Compaction_Extreme_Load");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(15));
+
+    group.throughput(Throughput::Elements(50_000));
+    group.bench_function("50k_puts_large_values", |b| {
+        b.to_async(&rt).iter(|| async move {
+            let tmp = TempDir::new().unwrap();
+            let config = LsmConfig {
+                path: tmp.path().to_path_buf(),
+                memtable_size_limit: 256 * 1024, // 256 KiB forces frequent flushes and compactions
+                ..Default::default()
+            };
+            let engine = LsmStorage::new(config).await.unwrap();
+
+            let initial_rss = get_process_rss_bytes().unwrap_or(0);
+            let mut peak_rss = initial_rss;
+
+            const TOTAL_OPS: usize = 50_000;
+            for i in 0..TOTAL_OPS {
+                let key = format!("key_{:08}", i);
+                // Value between 1 KiB and 16 KiB
+                let val_len = 1024 + ((i * 31) % (15 * 1024));
+                let val = vec![(i % 256) as u8; val_len];
+
+                let tx = TxId::new(i as u64 + 1);
+                engine.put(tx, key.as_bytes(), &val).await.unwrap();
+                engine.commit(tx).await.unwrap();
+
+                if i % 5000 == 0 {
+                    if let Some(rss) = get_process_rss_bytes() {
+                        if rss > peak_rss {
+                            peak_rss = rss;
+                        }
+                    }
+                }
+            }
+
+            engine.force_flush().await.unwrap();
+            let _ = engine.maybe_compact().await;
+
+            if let Some(rss) = get_process_rss_bytes() {
+                if rss > peak_rss {
+                    peak_rss = rss;
+                }
+            }
+
+            eprintln!(
+                "[LSM_Compaction_Extreme_Load] Completed 50,000 puts. Initial RSS: {:.2} MB, Peak RSS: {:.2} MB",
+                initial_rss as f64 / (1024.0 * 1024.0),
+                peak_rss as f64 / (1024.0 * 1024.0)
+            );
+
+            black_box(engine);
+        });
+    });
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_lsm_concurrent_commits, bench_lsm_compaction_extreme_load);
 criterion_main!(benches);
