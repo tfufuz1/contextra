@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// ZWECK: Opt-in Ingestion-Hook fuer LLM-gestuetzte Entitaetsextraktion (OpenIE).
-// INVARIANTEN: Opt-in Default (enabled: false); Best-Effort Fehlerbehandlung; Keine Panics.
+// ZWECK: Ingestion-Hook fuer LLM-gestuetzte Entitaetsextraktion (OpenIE).
+// INVARIANTEN: Default enabled: true (sofern nicht auto-extraction-opt-out gesetzt); Best-Effort Fehlerbehandlung; Keine Panics.
 
 #![forbid(unsafe_code)]
 
@@ -32,12 +32,24 @@ impl Default for EntityExtractionConfig {
 }
 
 /// Konfiguration fuer die automatische Entitaetsextraktion beim Einfuegen von Dokumenten.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoExtractionConfig {
-    /// Ob die automatische Extraktion aktiviert ist (Default: false).
+    /// Ob die automatische Extraktion aktiviert ist (Default: true, bzw. false wenn Feature `auto-extraction-opt-out` aktiv ist).
     pub enabled: bool,
     /// Konfiguration fuer die unterliegende Entitaetsextraktion.
     pub entity_config: EntityExtractionConfig,
+}
+
+impl Default for AutoExtractionConfig {
+    fn default() -> Self {
+        Self {
+            #[cfg(not(feature = "auto-extraction-opt-out"))]
+            enabled: true,
+            #[cfg(feature = "auto-extraction-opt-out")]
+            enabled: false,
+            entity_config: EntityExtractionConfig::default(),
+        }
+    }
 }
 
 #[allow(clippy::type_complexity)]
