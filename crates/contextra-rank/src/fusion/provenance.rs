@@ -108,6 +108,49 @@ impl ProvenanceBuilder {
             self.expected_total,
         )
     }
+
+    /// Generates a deterministic human-readable explanation string from the built provenance record.
+    pub fn explain_human_readable(&self) -> String {
+        self.clone().build().explain_human_readable()
+    }
+}
+
+impl ProvenanceRecord {
+    /// Generates a concise, deterministic human-readable explanation from retrieval signal contributions.
+    pub fn explain_human_readable(&self) -> String {
+        self.explain_human_readable_with_params(None, None)
+    }
+
+    /// Generates a concise, deterministic human-readable explanation with optional fusion mode and calibrated threshold.
+    pub fn explain_human_readable_with_params(
+        &self,
+        fusion_mode: Option<&str>,
+        calibrated_threshold: Option<f32>,
+    ) -> String {
+        let explanation = crate::explain::explain(self);
+        let base_text = explanation.to_human_readable_de();
+
+        let mut parts = Vec::new();
+
+        if let Some(mode) = fusion_mode {
+            parts.push(format!("Fusion via {mode}"));
+        }
+
+        if let Some(thresh) = calibrated_threshold {
+            parts.push(format!("Schwellenwert {:.2}", thresh));
+        }
+
+        if parts.is_empty() {
+            base_text
+        } else {
+            let extra = parts.join(", ");
+            if base_text.ends_with('.') {
+                format!("{base_text} {extra}.")
+            } else {
+                format!("{base_text}, {extra}.")
+            }
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -223,4 +266,30 @@ pub(super) fn build_provenance(
     }
 
     record
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provenance_builder_explain_human_readable_deterministic() {
+        let builder = ProvenanceBuilder::new(60.0)
+            .vector(0.15, 1, 1.0)
+            .bm25(8.5, 3, 1.0)
+            .source_collection("docs");
+
+        let text1 = builder.explain_human_readable();
+        let text2 = builder.explain_human_readable();
+
+        assert_eq!(text1, text2, "Explanation must be strictly deterministic");
+        assert!(text1.contains("Vektor-Ähnlichkeit"));
+        assert!(text1.contains("BM25-Textsuche"));
+        assert!(text1.contains("[Kollektion: docs]"));
+
+        let record = builder.build();
+        let text_params = record.explain_human_readable_with_params(Some("rrf"), Some(0.85));
+        assert!(text_params.contains("Fusion via rrf"));
+        assert!(text_params.contains("Schwellenwert 0.85"));
+    }
 }
