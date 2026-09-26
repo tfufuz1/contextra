@@ -232,9 +232,33 @@ pub(crate) mod fs {
 }
 
 use contextra_core::{ContextraError, Result};
-use contextra_crypto::crypto::KeyManager;
+#[cfg(feature = "encryption-at-rest")]
+pub use contextra_crypto::crypto::KeyManager;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+#[cfg(not(feature = "encryption-at-rest"))]
+#[derive(Debug, Clone)]
+pub struct KeyManager;
+
+#[cfg(not(feature = "encryption-at-rest"))]
+impl KeyManager {
+    pub fn try_new(_passphrase: &str, _salt: &[u8]) -> Result<Self> {
+        Ok(Self)
+    }
+    pub fn derive_file_key(&self, _file_id: &[u8]) -> Result<Self> {
+        Ok(Self)
+    }
+    pub fn encrypt_auto_nonce(&self, _plaintext: &[u8]) -> Result<(Vec<u8>, [u8; 12])> {
+        Ok((_plaintext.to_vec(), [0u8; 12]))
+    }
+    pub fn decrypt_auto_nonce(&self, _ciphertext: &[u8], _nonce: &[u8; 12]) -> Result<Vec<u8>> {
+        Ok(_ciphertext.to_vec())
+    }
+    pub fn integrity_key(&self) -> Result<[u8; 32]> {
+        Ok([0u8; 32])
+    }
+}
 
 /// Maximum WAL size before triggering a flush (128MB).
 pub const MAX_WAL_SIZE: u64 = 128 * 1024 * 1024;
@@ -335,10 +359,17 @@ impl Wal {
     ) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
 
+        #[cfg(feature = "encryption-at-rest")]
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
             let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
+            let key = Self::load_or_create_integrity_key(&path).await?;
+            (None, Some(key))
+        };
+
+        #[cfg(not(feature = "encryption-at-rest"))]
+        let (derived_key_manager, fallback_integrity_key) = {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
         };
@@ -391,10 +422,17 @@ impl Wal {
         // filename.  This makes the WAL's cryptographic sub-key independent of
         // the filesystem path — renaming or moving the file cannot cause nonce-
         // reuse between two WAL instances sharing the same master key.
+        #[cfg(feature = "encryption-at-rest")]
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
             let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
+            let key = Self::load_or_create_integrity_key(&path).await?;
+            (None, Some(key))
+        };
+
+        #[cfg(not(feature = "encryption-at-rest"))]
+        let (derived_key_manager, fallback_integrity_key) = {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
         };

@@ -2,7 +2,7 @@ use super::block_cache::{BLOCK_SIZE, SSTABLE_MAGIC_MFSX};
 use super::bloom::BloomFilter;
 use bytes::{BufMut, Bytes, BytesMut};
 use contextra_core::{ContextraError, Result};
-use contextra_crypto::crypto::KeyManager;
+use crate::wal::KeyManager;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs::File;

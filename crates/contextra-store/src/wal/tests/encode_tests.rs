@@ -1,6 +1,6 @@
 use super::*;
 use contextra_core::TxId;
-use contextra_crypto::crypto::KeyManager;
+use crate::wal::KeyManager;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
@@ -113,6 +113,7 @@ fn test_wal_entry_crc_roundtrip() {
     }
 }
 
+#[cfg(feature = "encryption-at-rest")]
 #[tokio::test]
 async fn test_batch_encryption_single_nonce_layout() {
     let dir = tempdir().expect("tempdir"); // expect
@@ -171,6 +172,44 @@ async fn test_batch_encryption_single_nonce_layout() {
     // Verify there is exactly one batch chunk header (12-byte nonce) in the file for N=3 entries
     let nonce_bytes = &file_bytes[8..20];
     assert_eq!(nonce_bytes.len(), 12);
+}
+
+#[cfg(not(feature = "encryption-at-rest"))]
+#[tokio::test]
+async fn test_batch_plaintext_layout() {
+    let dir = tempdir().expect("tempdir");
+    let wal_path = dir.path().join("plaintext_test.wal");
+
+    let wal = Wal::open(&wal_path).await.expect("open wal");
+
+    let ops = vec![
+        (
+            WalOp::Put {
+                tx_id: TxId::new(1),
+                key: b"k1".to_vec(),
+                value: b"v1".to_vec(),
+            },
+            100,
+        ),
+        (
+            WalOp::Put {
+                tx_id: TxId::new(1),
+                key: b"k2".to_vec(),
+                value: b"v2".to_vec(),
+            },
+            101,
+        ),
+    ];
+
+    let (batch, _) = wal.prepare_batch(ops).await.expect("prepare batch");
+    assert_eq!(batch.len(), 2);
+
+    wal.append_batch(batch).await.expect("append batch");
+
+    let entries = wal.replay().await.expect("replay wal");
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0].0, 100);
+    assert_eq!(entries[1].0, 101);
 }
 
 #[test]
