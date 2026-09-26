@@ -2,7 +2,7 @@
 
 //! Integration tests for GDPR Art. 17 DeletionProof generation during collection drop.
 
-use contextra_crypto::deletion_proof::{
+use contextra_engine::{
     DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
 };
 use contextra_db::{Contextra, ContextraConfig};

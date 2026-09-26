@@ -61,21 +61,21 @@ set -uo pipefail
 
 # --- DAG-Reihenfolge exakt aus §0.1/§4 der finalen Spezifikation (Layer 0 -> höchste) ---
 CRATES_ALL=(
-  contextra-core-ipc-gen   # Layer 0
+  contextra-wire           # Layer 0
   contextra-core           # Layer 0
   contextra-store          # Layer 1
   contextra-crypto         # Layer 1
   contextra-text           # Layer 1
-  contextra-index          # Layer 1
+  contextra-vector         # Layer 1
   contextra-graph          # Layer 1
   contextra-rank           # Layer 0
   contextra-checkpoint     # Layer 1
   contextra-sandbox        # Layer 6.5 (aber Blattabhängigkeit, früh prüfbar)
   contextra-db             # Layer 2
   contextra-router         # Layer 3
-  contextra-candle         # Layer 3
-  contextra-ollama         # Layer 3
-  contextra-embed          # Layer 3 (optional)
+  contextra-infer-candle   # Layer 3
+  contextra-infer-ollama   # Layer 3
+  contextra-infer-onnx     # Layer 3
   contextra-agent          # Layer 3
   contextra-mcp            # Layer 4
   contextra-bench          # Layer 5 (Pfad: benchmarks/contextra-bench)
@@ -87,12 +87,12 @@ FEATURE_CATALOG=(
   "contextra-core:docid-128:off"
   "contextra-store:block-cache-v2:off"
   "contextra-router:egress-sherman-morrison:off"
-  "contextra-index:experimental-diskann:off"
+  "contextra-vector:experimental-diskann:off"
   "contextra-graph:edge-reinforcement-learning:off"
   "contextra-router:bandit-routing:on"
   "contextra-mcp:cloud-egress-guard:on"
   "contextra-mcp:wasm-sandbox:on"
-  "contextra-candle:kv-bridge:on"
+  "contextra-infer-candle:kv-bridge:on"
   "contextra-store:fault-injection:dev"
   "contextra-store:loom:dev"
   "contextra-graph:loom:dev"

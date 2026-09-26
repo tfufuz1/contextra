@@ -250,7 +250,7 @@ impl<S: StorageEngine> MultiStepEngine<S> {
 mod tests {
     use super::*;
     use contextra_graph::CsrGraph;
-    use contextra_index::{HnswConfig, HnswIndex};
+    use contextra_vector::{HnswConfig, HnswIndex};
     use contextra_store::{LsmConfig, LsmStorage};
     use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;

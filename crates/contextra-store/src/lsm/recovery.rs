@@ -546,7 +546,6 @@ impl LsmStorage {
         let wal = self.wal.read().await.clone();
 
         let (target_offset, target_hmac) = wal.find_tx_offset(target_tx).await?;
-        println!("TARGET_OFFSET for tx {:?}: {}", target_tx, target_offset);
         wal.truncate(target_offset, target_hmac).await?;
 
         state.memtable = Arc::new(MemTable::new());
@@ -663,10 +662,7 @@ impl LsmStorage {
         }
 
         let entries = wal.replay().await?;
-        println!("REPLAY ENTRIES AFTER TRUNCATE: {}", entries.len());
-        for (s, e, o) in &entries {
-            println!("REPLAY ENTRY: seq={} op={:?} pos={}", s, e.op, o);
-        }
+        eprintln!("ROLLBACK REPLAY ENTRIES LEN: {}, target_offset: {}", entries.len(), target_offset);
         let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
             std::collections::HashMap::new();
 

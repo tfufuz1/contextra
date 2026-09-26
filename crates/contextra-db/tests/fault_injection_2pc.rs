@@ -4,7 +4,7 @@
 
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_graph::CsrGraph;
-use contextra_index::{HnswConfig, HnswIndex};
+use contextra_vector::{HnswConfig, HnswIndex};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, EntityId, Result, ScoredDocument, TxId};

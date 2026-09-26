@@ -1418,7 +1418,6 @@ mod tests {
 
     #[test]
     fn test_verify_external_v2_hmac() {
-        let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };

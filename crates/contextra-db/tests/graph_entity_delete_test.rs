@@ -1,7 +1,7 @@
 use contextra_db::transaction::DbTransaction;
 use contextra_db::Collection;
 use contextra_graph::CsrGraph;
-use contextra_index::HnswIndex;
+use contextra_vector::HnswIndex;
 use contextra_ports::GraphIndex;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{Edge, Entity, EntityId, PprConfig};
@@ -20,7 +20,7 @@ async fn create_test_collection(
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
     let index = Arc::new(
-        HnswIndex::try_new(contextra_index::HnswConfig {
+        HnswIndex::try_new(contextra_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })

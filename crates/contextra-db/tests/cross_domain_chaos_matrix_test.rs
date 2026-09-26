@@ -5,7 +5,7 @@
 
 use contextra_db::collection::Collection;
 use contextra_graph::csr::CsrGraph;
-use contextra_index::{HnswConfig, HnswIndex};
+use contextra_vector::{HnswConfig, HnswIndex};
 use contextra_ports::EmbeddingError;
 use contextra_ports::{BoxFuture, EmbeddingProvider, TextEmbeddingEngine};
 use contextra_ports::{StorageEngine, VectorIndex};

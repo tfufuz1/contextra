@@ -37,7 +37,9 @@ async fn test_lsm_rollback_persistence() {
             Some(bytes::Bytes::from_static(b"v2"))
         );
 
-        storage.rollback_to_tx(tx1).await.expect("rollback");
+        let res_rb = storage.rollback_to_tx(tx1).await;
+        eprintln!("ROLLBACK RESULT: {:?}", res_rb);
+        res_rb.expect("rollback");
 
         assert_eq!(
             storage.get(b"k1").await.unwrap(),

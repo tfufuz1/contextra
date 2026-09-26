@@ -145,8 +145,8 @@ fn verify_external_rejects_legacy_hmac_proof() {
 
     let result = proof_v2.verify_external(&keypair.verifying_key);
     assert!(
-        matches!(result, Err(CryptoError::UnsupportedSignatureVersion(2))),
-        "v2 HMAC proof MUST return UnsupportedSignatureVersion(2), got {:?}",
+        matches!(result, Err(CryptoError::UnsupportedProofVersion(2))),
+        "v2 HMAC proof MUST return UnsupportedProofVersion(2), got {:?}",
         result
     );
     assert!(

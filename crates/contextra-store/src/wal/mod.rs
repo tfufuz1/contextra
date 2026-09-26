@@ -323,11 +323,7 @@ pub struct Wal {
 
 impl Drop for Wal {
     fn drop(&mut self) {
-        if let Ok(mut guard) = self.flusher_task.lock() {
-            if let Some(handle) = guard.take() {
-                handle.abort();
-            }
-        }
+        // No-op: Flusher task loop terminates naturally when all flusher_tx senders are dropped (rx.recv() returns None).
     }
 }
 

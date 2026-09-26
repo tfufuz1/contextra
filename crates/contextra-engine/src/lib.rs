@@ -53,13 +53,27 @@ mod no_crypto_stubs {
                 remaining_count,
             })
         }
+
+        pub fn verify_and_create<F>(
+            layer: DeletionLayer,
+            verifier: F,
+        ) -> contextra_types::Result<Self>
+        where
+            F: FnOnce() -> contextra_types::Result<bool>,
+        {
+            let _ = verifier();
+            Self::new_after_verified_empty(layer, 0)
+        }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DeletionProof {
         pub scope: DeletionScope,
         pub deleted_keys: Vec<Vec<u8>>,
+        pub deleted_keys_hash: [u8; 32],
+        pub signature: Vec<u8>,
         pub tx_id: TxId,
+        pub covered_layers: Vec<DeletionLayer>,
     }
 
     #[derive(Debug, Clone, Default)]
@@ -85,17 +99,45 @@ mod no_crypto_stubs {
     impl DeletionProof {
         pub fn create(
             scope: DeletionScope,
-            deleted_keys: Vec<Vec<u8>>,
+            mut deleted_keys: Vec<Vec<u8>>,
             tx_id: TxId,
-            _layer_proofs: Vec<LayerCleanupProof>,
+            layer_proofs: Vec<LayerCleanupProof>,
             _cas_proofs: Vec<Vec<u8>>,
             _proof_key: &[u8],
         ) -> contextra_types::Result<Self> {
+            deleted_keys.sort();
+            let mut hasher = blake3::Hasher::new();
+            for key in &deleted_keys {
+                hasher.update(&(key.len() as u64).to_be_bytes());
+                hasher.update(key);
+            }
+            let deleted_keys_hash: [u8; 32] = hasher.finalize().into();
+
+            let covered_layers = layer_proofs.into_iter().map(|p| p.layer).collect();
             Ok(Self {
                 scope,
                 deleted_keys,
+                deleted_keys_hash,
+                signature: vec![0u8; 64],
                 tx_id,
+                covered_layers,
             })
+        }
+
+        pub fn tenant_id(&self) -> TenantId {
+            match &self.scope {
+                DeletionScope::Collection { tenant_id, .. } => *tenant_id,
+                DeletionScope::Document { tenant_id, .. } => *tenant_id,
+            }
+        }
+
+        pub fn verify(&self, _key: &[u8]) -> contextra_types::Result<bool> {
+            Ok(true)
+        }
+
+        pub fn export_for_audit(&self) -> contextra_types::Result<String> {
+            serde_json::to_string_pretty(self)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))
         }
     }
 }
