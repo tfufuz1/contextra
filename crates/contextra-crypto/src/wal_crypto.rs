@@ -264,6 +264,17 @@ impl IntegrityVerifier {
     }
 
     /// Verifies a V2 entry (legacy without tx_id and without length prefixes) and updates the chain state.
+    ///
+    /// # Sicherheitshinweis & Kollisionslücke (Architektur-Audit F2 / Spec §22.2b)
+    /// - Dieser Pfad verwendet KEINE längenpräfixierte Feldkodierung. Für `op_type == 0` (Put) werden `entry.key` und
+    ///   `entry.value` ohne Längenpräfix direkt hintereinander in den HMAC eingespeist. Bei variabler Key/Value-Aufteilung
+    ///   (z. B. `key = b"ab"`, `value = b"c"` vs. `key = b"a"`, `value = b"bc"`) ist dieser Pfad kollisionsanfällig.
+    /// - Dieser Pfad darf NUR zum Lesen/Reproduzieren bereits vor Einführung von `WalVersion::V3` geschriebener
+    ///   Bestandsdateien verwendet werden und darf NIEMALS für neu geschriebene WAL-Segmente aufgerufen werden.
+    /// - Referenz: Spec §22.2b und Architektur-Audit Befund F2 (2026-09-26).
+    #[deprecated(
+        note = "Nur für Legacy-Replay von WalVersion::V2-Bestandsdateien. Nicht für neue WAL-Segmente verwenden — siehe Doc-Kommentar. Audit-Referenz: F2."
+    )]
     pub fn verify_and_update_v2(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
         let mut mac = WalHmac::new(&self.integrity_key)?;
         mac.update(&self.last_hmac);
@@ -627,6 +638,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_integrity_verifier_v2_roundtrip_and_tamper() {
         let key = b"integrity-key-32-bytes-v2------";
         let mut verifier = IntegrityVerifier::new(key);
