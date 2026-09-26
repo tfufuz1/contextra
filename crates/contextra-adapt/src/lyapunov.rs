@@ -73,6 +73,11 @@ pub enum LyapunovResult {
 }
 
 impl LyapunovResult {
+    /// Returns `true` if this result represents a detected distributional drift.
+    pub fn is_drift_detected(&self) -> bool {
+        matches!(self, LyapunovResult::DriftDetected { .. })
+    }
+
     /// Wendet `apply_drift_penalty` auf die gegebene `BanditPolicy` an, falls `DriftDetected` vorliegt.
     /// Gibt `true` zurück, falls Drift erkannt und die Penalty angewendet wurde.
     #[cfg(feature = "bandit-routing")]

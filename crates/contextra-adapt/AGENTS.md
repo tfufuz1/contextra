@@ -12,6 +12,7 @@
 
 - **Ring 0 Fachkern**:
   - `bandit`: LinUCB Contextual Bandit für adaptives Routing.
-  - `lyapunov`: Proaktiver Distributional-Drift-Wächter.
+  - `drift`: `DriftDetector`, `CatoniDriftDetector`, `EnsembleDriftWatcher`, `DriftPolicyBridge` und `DriftSignal`.
+  - `lyapunov`: Proaktiver Distributional-Drift-Wächter via Lyapunov-Exponenten (`LyapunovDriftWatcher`).
   - `pid`: PID-Regler zur dynamischen Steuerung der Reranking-Poolgröße.
   - `offpolicy`: Inverse Propensity Scoring (IPS) zur kontrafaktischen Evaluation.
