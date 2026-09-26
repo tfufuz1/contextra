@@ -62,6 +62,26 @@ mod no_crypto_stubs {
         pub tx_id: TxId,
     }
 
+    #[derive(Debug, Clone, Default)]
+    pub struct TenantIsolatedKvStore;
+
+    impl TenantIsolatedKvStore {
+        pub fn new() -> Self {
+            Self
+        }
+
+        pub fn purge_tenant_segments(&self, _tenant: TenantId) {}
+
+        pub fn on_rollback(&self, _tenant: TenantId, _chunk_ids: &[u64]) {}
+
+        pub fn remove_tenant_segment(
+            &self,
+            _tenant: TenantId,
+            _doc_id: contextra_types::DocId,
+        ) {
+        }
+    }
+
     impl DeletionProof {
         pub fn create(
             scope: DeletionScope,

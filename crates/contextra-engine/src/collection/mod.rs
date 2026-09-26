@@ -427,10 +427,25 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.kv_store = Some(kv_store);
     }
 
+    #[cfg(all(not(feature = "encryption-at-rest"), test))]
+    pub fn set_kv_store(&mut self, _kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) {}
+
+    #[cfg(all(not(feature = "encryption-at-rest"), test))]
+    pub fn with_kv_store(self, _kv_store: Arc<contextra_crypto::TenantIsolatedKvStore>) -> Self {
+        self
+    }
+
+
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
     #[cfg(feature = "encryption-at-rest")]
     pub fn kv_store(&self) -> Option<&Arc<contextra_crypto::TenantIsolatedKvStore>> {
         self.kv_store.as_ref()
+    }
+
+    /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
+    #[cfg(not(feature = "encryption-at-rest"))]
+    pub fn kv_store(&self) -> Option<&Arc<crate::TenantIsolatedKvStore>> {
+        None
     }
 
     /// Sets the text embedder for this collection (consuming version).
