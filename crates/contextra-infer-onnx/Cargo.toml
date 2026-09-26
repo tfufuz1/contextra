@@ -21,7 +21,8 @@ contextra-infer-candle = { workspace = true, optional = true }
 # Optional — nur mit Feature-Flag aktiv
 [features]
 default = []
-onnx = ["ort", "tokenizers", "ndarray", "dep:reqwest"]
+reranking = ["dep:ort"]
+onnx = ["dep:ort", "dep:tokenizers", "dep:ndarray", "dep:reqwest"]
 candle-backend = ["dep:contextra-infer-candle"]
 
 [dependencies.reqwest]
