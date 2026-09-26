@@ -6,6 +6,8 @@
 
 pub mod agent_memory;
 pub mod builder;
+pub mod collection_profile;
+pub mod performance_profile;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::ContextraBuilder;
