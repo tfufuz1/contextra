@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod arm_registry;
 pub mod dispatch;
 pub mod outcome;
 pub mod ports_local;
@@ -42,6 +43,7 @@ mod bandit_regret_tests;
 #[cfg(test)]
 mod tests;
 
+pub use arm_registry::{ArmRegistry, ArmRegistryError};
 pub use contextra_adapt::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
 pub use contextra_adapt::{OffPolicyEvaluator, OffPolicyStats};
 pub use dispatch::dispatch_to_slm;
