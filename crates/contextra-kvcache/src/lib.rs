@@ -24,6 +24,10 @@ pub use prefix_store::TenantPrefixKvStore;
 #[cfg(feature = "kvcache-kivi-quant")]
 pub use quantize_kivi::{pack_kivi_block, unpack_kivi_block, KiviBlockMeta, KiviQuantizedBlock};
 pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
+#[cfg(feature = "content-addressed-kv-cache")]
+pub use radix::{
+    ContentAddressedKvStore, KvLookupResult, KvSegmentRef, SemanticCacheConfig, SemanticEmbedder,
+};
 pub use segment::{
     KvSegment, ShreddableSegmentKey, Tier2EncryptedSegment, CURRENT_KV_KEY_DERIVATION_VERSION,
 };
