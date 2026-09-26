@@ -589,6 +589,8 @@ dependencies = [
 name = "contextra-adapt"
 version = "0.1.0"
 dependencies = [
+ "blake3",
+ "contextra-ports",
  "contextra-types",
  "serde",
  "serde_json",

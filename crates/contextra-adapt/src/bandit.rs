@@ -21,6 +21,12 @@ pub enum BanditError {
         /// Tatsächliche Dimension.
         actual: usize,
     },
+    /// Ungültige Konfiguration.
+    #[error("Invalid bandit configuration: {0}")]
+    InvalidConfig(String),
+    /// Varianzterm vor sqrt() ist nicht-endlich oder negativ.
+    #[error("Non-finite or negative variance encountered: {0}")]
+    NonFiniteVariance(f32),
     /// Numerische Präzisions-Matrix Drift erkannt (Re-Faktorisierung von inv_a erforderlich).
     #[error("Sherman-Morrison precision matrix drift detected after {updates_since_reset} updates (denominator = {denominator})")]
     PrecisionMatrixDriftDetected {
@@ -37,6 +43,16 @@ impl From<BanditError> for contextra_types::ContextraError {
             BanditError::DimensionMismatch { expected, actual } => {
                 contextra_types::ContextraError::InvalidInput(format!(
                     "Embedding dimension mismatch: expected {expected}, actual {actual}"
+                ))
+            }
+            BanditError::InvalidConfig(msg) => {
+                contextra_types::ContextraError::InvalidInput(format!(
+                    "Invalid bandit configuration: {msg}"
+                ))
+            }
+            BanditError::NonFiniteVariance(val) => {
+                contextra_types::ContextraError::Internal(format!(
+                    "Non-finite or negative variance encountered: {val}"
                 ))
             }
             BanditError::PrecisionMatrixDriftDetected {
@@ -87,6 +103,7 @@ impl AlignedF32Vec {
 
 /// LinUCB-Implementierungsvariante (§13.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum BanditImplementation {
     /// Sherman-Morrison O(d²): Produktions-Default.
     #[default]
@@ -99,6 +116,75 @@ pub enum BanditImplementation {
     /// wie `ShermanMorrison`. Die eigentliche FC-TS-Anpassung mit Transport und konfidenzgewichtetem
     /// Drift-Update lebt isoliert in `flow_thompson::FlowCorrectedThompsonBandit`.
     FlowCorrectedThompson,
+    /// Sketched Projection O(d·k + k²).
+    SketchedProjection {
+        /// Projektionsdimension k.
+        projected_dim: usize,
+    },
+}
+
+/// Projektionsmatrix $R \in \mathbb{R}^{k \times d}$ für Sketched Projection.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SketchMatrix {
+    /// Flacher Speicher der Matrix (Row-Major, k Zeilen x d Spalten).
+    pub data: AlignedF32Vec,
+    /// Projektionsdimension k.
+    pub projected_dim: usize,
+    /// Ursprüngliche Dimension d.
+    pub original_dim: usize,
+    /// PRNG Seed für reproduzierbare Projektion.
+    pub seed: u64,
+}
+
+impl SketchMatrix {
+    /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash aus `TenantId` und `base_seed` ab.
+    pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"contextra_sketched_bandit_seed_v1");
+        hasher.update(&tenant_id.as_u64().to_le_bytes());
+        hasher.update(&base_seed.to_le_bytes());
+        let hash = hasher.finalize();
+        u64::from_le_bytes(hash.as_bytes()[0..8].try_into().expect("32-byte hash slice"))
+    }
+
+    /// SplitMix64-PRNG aus `seed`, Rademacher-Einträge ±1/√k.
+    pub fn from_seed(
+        seed: u64,
+        original_dim: usize,
+        projected_dim: usize,
+    ) -> Result<Self, BanditError> {
+        if projected_dim == 0 || projected_dim > original_dim {
+            return Err(BanditError::InvalidConfig(
+                "projected_dim must be in (0, original_dim]".into(),
+            ));
+        }
+
+        let scale = 1.0f32 / (projected_dim as f32).sqrt();
+        let rng = contextra_ports::SeededRng::new(seed);
+        let total_elements = projected_dim * original_dim;
+        let mut data = Vec::with_capacity(total_elements);
+
+        for _ in 0..total_elements {
+            let bit = (contextra_ports::Rng::next_u64(&rng) & 1) == 0;
+            data.push(if bit { scale } else { -scale });
+        }
+
+        Ok(Self {
+            data: AlignedF32Vec::new(data),
+            projected_dim,
+            original_dim,
+            seed,
+        })
+    }
+
+    /// Projiziert Vektor x aus dem Ursprungsraum (Dim d) in den projizierten Raum (Dim k) via Rx.
+    pub fn project(&self, x: &[f32]) -> Vec<f32> {
+        let mut projected = Vec::with_capacity(self.projected_dim);
+        for row in self.data.chunks_exact(self.original_dim) {
+            projected.push(dot_product_f32(row, x));
+        }
+        projected
+    }
 }
 
 /// Trait für Bandit-Routing Policies mit Konzeptdrift-Anpassung (§5.2.3).
@@ -265,6 +351,15 @@ pub struct BanditProfileState {
     pub drift_decay_window: usize,
     /// Implementierungsvariante (Default: ShermanMorrison).
     pub implementation: BanditImplementation,
+    /// PRNG Seed für Sketched Projection.
+    #[serde(default)]
+    pub seed: u64,
+    /// Optionale Sketch-Matrix für SketchedProjection.
+    #[serde(default)]
+    pub sketch_matrix: Option<SketchMatrix>,
+    /// Gewichtsvektor θ in projiziertem Raum (Dim k) für SketchedProjection.
+    #[serde(default)]
+    pub sketch_theta: Vec<f32>,
 }
 
 impl BanditPolicy for BanditProfileState {
@@ -307,7 +402,59 @@ impl BanditProfileState {
             drift_steps_remaining: 0,
             drift_decay_window: default_drift_decay_window(),
             implementation: BanditImplementation::default(),
+            seed: 0,
+            sketch_matrix: None,
+            sketch_theta: Vec::new(),
         }
+    }
+
+    /// Stellt sicher, dass der Sketched-State für `projected_dim` k ordnungsgemäß initialisiert ist.
+    pub fn ensure_sketched_state(
+        &mut self,
+        projected_dim: usize,
+    ) -> Result<(), BanditError> {
+        let d = if let Some(ref sketch) = self.sketch_matrix {
+            sketch.original_dim
+        } else {
+            self.theta.len()
+        };
+
+        if projected_dim == 0 || projected_dim > d {
+            return Err(BanditError::InvalidConfig(
+                "projected_dim must be in (0, original_dim]".into(),
+            ));
+        }
+
+        if self.sketch_matrix.is_none()
+            || self
+                .sketch_matrix
+                .as_ref()
+                .map(|s| (s.original_dim, s.projected_dim))
+                != Some((d, projected_dim))
+        {
+            let sketch = SketchMatrix::from_seed(self.seed, d, projected_dim)?;
+            self.sketch_matrix = Some(sketch);
+        }
+
+        if self.sketch_theta.len() != projected_dim {
+            self.sketch_theta = vec![0.0f32; projected_dim];
+        }
+
+        let k = projected_dim;
+        if self.inv_a.len() != k * k {
+            let mut inv_a = vec![0.0f32; k * k];
+            for i in 0..k {
+                inv_a[i * k + i] = 1.0;
+            }
+            self.inv_a = AlignedF32Vec::new(inv_a);
+            self.updates_since_reset = 0;
+        }
+
+        if self.work_buf.len() != k {
+            self.work_buf = AlignedF32Vec::zeros(k);
+        }
+
+        Ok(())
     }
 
     fn ensure_inv_a(&mut self) {
@@ -331,7 +478,11 @@ impl BanditProfileState {
 
     /// Gibt die erwartete Dimension der Feature-Vektoren zurück.
     pub fn expected_dim(&self) -> usize {
-        self.theta.len()
+        if let Some(ref sketch) = self.sketch_matrix {
+            sketch.original_dim
+        } else {
+            self.theta.len()
+        }
     }
 
     /// Berechnet UCB-Score für Kontext-Embedding `x` und Profilkosten `cost`.
@@ -344,11 +495,60 @@ impl BanditProfileState {
         cost: f32,
         is_cloud_transport: bool,
     ) -> Result<f32, BanditError> {
-        if x.len() != self.theta.len() {
+        let expected = self.expected_dim();
+        if x.len() != expected {
             return Err(BanditError::DimensionMismatch {
-                expected: self.theta.len(),
+                expected,
                 actual: x.len(),
             });
+        }
+
+        if let BanditImplementation::SketchedProjection { projected_dim } = self.implementation {
+            if projected_dim == 0 || projected_dim > expected {
+                return Err(BanditError::InvalidConfig(
+                    "projected_dim must be in (0, original_dim]".into(),
+                ));
+            }
+
+            let sketch_holder;
+            let sketch = match self.sketch_matrix.as_ref() {
+                Some(s) if s.original_dim == expected && s.projected_dim == projected_dim => s,
+                _ => {
+                    sketch_holder = SketchMatrix::from_seed(self.seed, expected, projected_dim)?;
+                    &sketch_holder
+                }
+            };
+
+            let rx = sketch.project(x);
+            let k = projected_dim;
+
+            let dot = if self.sketch_theta.len() == k {
+                dot_product_f32(&self.sketch_theta, &rx)
+            } else {
+                0.0
+            };
+
+            let var_sum: f32 = if self.inv_a.len() == k * k {
+                self.inv_a
+                    .chunks_exact(k)
+                    .zip(rx.iter())
+                    .map(|(row, &rxi)| {
+                        let row_dot: f32 = dot_product_f32(row, &rx);
+                        rxi * row_dot
+                    })
+                    .sum()
+            } else {
+                rx.iter().map(|&rxi| rxi * rxi).sum()
+            };
+
+            if !var_sum.is_finite() || var_sum < 0.0 {
+                return Err(BanditError::NonFiniteVariance(var_sum));
+            }
+
+            let variance_term = var_sum.sqrt();
+            let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
+
+            return Ok(dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty);
         }
 
         let dot: f32 = dot_product_f32(&self.theta, x);
@@ -373,7 +573,35 @@ impl BanditProfileState {
                             xi * row_dot
                         })
                         .sum();
-                    var_sum.max(0.0).sqrt()
+                    if !var_sum.is_finite() || var_sum < 0.0 {
+                        return Err(BanditError::NonFiniteVariance(var_sum));
+                    }
+                    var_sum.sqrt()
+                } else {
+                    self.sigma_sq
+                        .iter()
+                        .zip(x.iter())
+                        .map(|(s, xi)| xi * xi / s.max(1e-8))
+                        .sum::<f32>()
+                        .sqrt()
+                }
+            }
+            _ => {
+                let d = self.theta.len();
+                if self.inv_a.len() == d * d {
+                    let var_sum: f32 = self
+                        .inv_a
+                        .chunks_exact(d)
+                        .zip(x.iter())
+                        .map(|(row, &xi)| {
+                            let row_dot: f32 = dot_product_f32(row, x);
+                            xi * row_dot
+                        })
+                        .sum();
+                    if !var_sum.is_finite() || var_sum < 0.0 {
+                        return Err(BanditError::NonFiniteVariance(var_sum));
+                    }
+                    var_sum.sqrt()
                 } else {
                     self.sigma_sq
                         .iter()
@@ -400,9 +628,10 @@ impl BanditProfileState {
         cost: f32,
         is_cloud_transport: bool,
     ) -> Result<(), BanditError> {
-        if x.len() != self.theta.len() {
+        let expected = self.expected_dim();
+        if x.len() != expected {
             return Err(BanditError::DimensionMismatch {
-                expected: self.theta.len(),
+                expected,
                 actual: x.len(),
             });
         }
@@ -426,7 +655,50 @@ impl BanditProfileState {
                     self.sigma_sq[i] += xi * xi;
                 }
             }
-            BanditImplementation::ShermanMorrison | BanditImplementation::FlowCorrectedThompson => {
+            BanditImplementation::SketchedProjection { projected_dim } => {
+                self.ensure_sketched_state(projected_dim)?;
+                let sketch = self.sketch_matrix.as_ref().unwrap().clone();
+                let rx = sketch.project(x);
+                let k = projected_dim;
+
+                self.updates_since_reset += 1;
+                let gamma_inv = 1.0 / effective_gamma.max(1e-5);
+
+                let mut xt_v_disc = 0.0f32;
+                for (i, row) in self.inv_a.chunks_exact(k).enumerate() {
+                    let row_dot = dot_product_f32(row, &rx);
+                    let v_disc_i = gamma_inv * row_dot;
+                    self.work_buf[i] = v_disc_i;
+                    xt_v_disc += rx[i] * v_disc_i;
+                }
+
+                let denominator = 1.0 + xt_v_disc;
+                if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                    || denominator <= 0.0
+                {
+                    return Err(BanditError::PrecisionMatrixDriftDetected {
+                        updates_since_reset: self.updates_since_reset,
+                        denominator,
+                    });
+                }
+
+                let denom_safe = denominator.max(1e-8);
+                let pred_theta_x = dot_product_f32(&self.sketch_theta, &rx);
+                let residual = r_adj - pred_theta_x;
+
+                let work_slice = &self.work_buf[..k];
+                for (i, row) in self.inv_a.chunks_exact_mut(k).enumerate() {
+                    let k_i = work_slice[i] / denom_safe;
+
+                    fused_row_update(row, work_slice, gamma_inv, k_i);
+
+                    self.sketch_theta[i] += residual * k_i;
+                }
+                for (i, &rxi) in rx.iter().enumerate().take(self.sigma_sq.len().min(k)) {
+                    self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0) + rxi * rxi;
+                }
+            }
+            _ => {
                 let d = self.theta.len();
                 self.ensure_inv_a();
                 self.ensure_work_buf();
