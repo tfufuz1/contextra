@@ -8,10 +8,12 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod bsi_mapping;
 pub mod error;
 pub mod markdown_template;
 pub mod testkit;
 
+pub use bsi_mapping::{bsi_mapping_table, render_bsi_mapping_markdown, BsiMappingEntry};
 pub use error::AuditExportError;
 pub use markdown_template::render_register_markdown;
 
