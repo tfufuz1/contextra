@@ -147,11 +147,7 @@ where
 
         #[cfg(feature = "encryption-at-rest")]
         {
-            if matches!(version, WalVersion::V2 | WalVersion::V3) && key_manager.is_some() {
-                let km = match key_manager {
-                    Some(km) => km,
-                    None => unreachable!(),
-                };
+            if let (Some(km), WalVersion::V2 | WalVersion::V3) = (key_manager, version) {
                 if entry_data_raw.len() < 12 {
                     if pos >= file_size {
                         tracing::warn!("WAL truncated during read at offset {}", chunk_start_pos);
@@ -912,4 +908,52 @@ impl Wal {
 pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
     contextra_sys::set_restrictive_file_acl(path)
         .map_err(|e| ContextraError::Storage(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use tokio::io::AsyncWriteExt;
+
+    #[tokio::test]
+    async fn test_do_scan_entries_with_callback_v3_without_key_manager() {
+        let dir = tempdir().expect("tempdir creation failed");
+        let file_path = dir.path().join("test_v3.wal");
+
+        {
+            let mut file = super::super::fs::File::create(&file_path)
+                .await
+                .expect("file create failed");
+            file.write_all(&WAL_V3_HEADER).await.expect("write header failed");
+            file.flush().await.expect("flush failed");
+        }
+
+        let mut file = super::super::fs::OpenOptions::new()
+            .read(true)
+            .open(&file_path)
+            .await
+            .expect("open read failed");
+
+        let fallback_key = [1u8; 32];
+        let mut scanned_entries = Vec::new();
+
+        let res = do_scan_entries_with_callback(
+            &mut file,
+            4,
+            &file_path,
+            None,
+            Some(fallback_key),
+            false,
+            |_seq, entry, _pos| {
+                scanned_entries.push(entry);
+                true
+            },
+        )
+        .await;
+
+        assert!(res.is_ok());
+        assert_eq!(res.expect("scan result"), WalVersion::V3);
+        assert!(scanned_entries.is_empty());
+    }
 }
