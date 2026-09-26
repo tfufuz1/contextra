@@ -29,13 +29,13 @@ use serde::{Deserialize, Serialize};
 /// DOKUMENTATION ZUM KOLLISIONSRISIKO:
 /// Ohne Längenpräfix pro Element (z. B. bloße Konkatenation) erzeugen unterschiedliche Key-Listen
 /// wie `["ab", "c"]` und `["a", "bc"]` denselben Hash-Wert, da die Elementgrenzen im Byte-Strom
-/// nicht kodiert sind. Durch das Voranstellen der Schlüssellänge als 8-Byte Big-Endian integer
-/// (`(key.len() as u64).to_be_bytes()`) vor jedem Schlüssel-Byte-Array wird eine eindeutige,
+/// nicht kodiert sind. Durch das Voranstellen der Schlüssellänge als 4-Byte Little-Endian integer
+/// (`(key.len() as u32).to_le_bytes()`) vor jedem Schlüssel-Byte-Array wird eine eindeutige,
 /// kollisionsfreie Kodierung für jede Sequenz von Schlüssel-Bytes garantiert.
 pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     for key in deleted_keys {
-        hasher.update(&(key.len() as u64).to_be_bytes());
+        hasher.update(&(key.len() as u32).to_le_bytes());
         hasher.update(key);
     }
     *hasher.finalize().as_bytes()
@@ -593,6 +593,20 @@ impl DeletionProof {
     ///   [`CryptoError`] types ([`CryptoError::UnsupportedProofVersion`] for v1/v2, [`CryptoError::InvalidProofSignature`]
     ///   for invalid signatures or malformed signature bytes).
     ///
+    /// # Cryptographic Verification Standard & Constant-Time Security
+    /// Unlike version 1 and version 2 proofs which rely on symmetric HMAC-SHA256 checksums
+    /// compared via [`subtle::ConstantTimeEq`], version 3 proof signature verification relies on
+    /// Ed25519 asymmetric signature verification ([`ed25519_dalek::Verifier::verify`]).
+    ///
+    /// Ed25519 verification is an algebraic check on Curve25519 (`[S]B = R + [k]A` in curve point
+    /// arithmetic), where scalar multiplication and group operations determine validity.
+    /// Replacing curve point verification with a byte equality comparison (`ConstantTimeEq`) on
+    /// signature bytes would be mathematically incorrect and cryptographic nonsense, because
+    /// there is no "expected signature byte array" known a priori without solving the discrete logarithm problem.
+    ///
+    /// The `ed25519_dalek` implementation of `Verifier::verify` handles curve arithmetic in constant time
+    /// where necessary to prevent timing side channels during public key verification.
+    ///
     /// # Errors
     /// - [`CryptoError::UnsupportedProofVersion`] if `signature_version` is not 3.
     /// - [`CryptoError::InvalidProofSignature`] if the signature does not match or cannot be parsed.
@@ -690,9 +704,27 @@ mod tests {
     fn test_hash_collision_ab_c_vs_a_bc() {
         let keys1 = vec![b"ab".to_vec(), b"c".to_vec()];
         let keys2 = vec![b"a".to_vec(), b"bc".to_vec()];
+
+        let hash1 = hash_deleted_keys_length_prefixed(&keys1);
+        let hash2 = hash_deleted_keys_length_prefixed(&keys2);
+
         assert_ne!(
-            hash_deleted_keys_length_prefixed(&keys1),
-            hash_deleted_keys_length_prefixed(&keys2)
+            hash1, hash2,
+            "hash_deleted_keys_length_prefixed MUST produce distinct Blake3 hashes for [\"ab\", \"c\"] vs [\"a\", \"bc\"]"
+        );
+
+        // Verify exact encoding bytes fed into hasher:
+        // keys1: 4-byte LE len (2) + "ab" + 4-byte LE len (1) + "c"
+        let mut expected_bytes1 = Vec::new();
+        expected_bytes1.extend_from_slice(&(2u32).to_le_bytes());
+        expected_bytes1.extend_from_slice(b"ab");
+        expected_bytes1.extend_from_slice(&(1u32).to_le_bytes());
+        expected_bytes1.extend_from_slice(b"c");
+        let expected_hash1 = *blake3::hash(&expected_bytes1).as_bytes();
+
+        assert_eq!(
+            hash1, expected_hash1,
+            "hash_deleted_keys_length_prefixed MUST match 4-byte LE length-prefixed Blake3 calculation"
         );
     }
 

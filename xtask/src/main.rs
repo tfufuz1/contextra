@@ -75,6 +75,7 @@ mod check_orphan_modules;
 mod check_phantom_files;
 mod check_placeholder_refs;
 mod check_recall_stability;
+mod check_duplicate_core_primitives;
 mod check_result_dropped_on_io;
 mod check_ring0_async_purity;
 mod check_ring_layering;
@@ -2145,6 +2146,33 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("❌ check-ring-layering failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-ring-layering-full" => {
+            let strict = args.iter().any(|arg| arg == "--strict");
+            match check_ring_layering::run_check_ring_layering_full(strict) {
+                Ok(passed) => {
+                    if !passed {
+                        process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-ring-layering-full failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-duplicate-core-primitives" => {
+            match check_duplicate_core_primitives::run_check_duplicate_core_primitives() {
+                Ok(passed) => {
+                    if !passed {
+                        process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-duplicate-core-primitives failed: {}", e);
                     process::exit(1);
                 }
             }

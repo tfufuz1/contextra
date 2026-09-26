@@ -26,6 +26,24 @@ pub enum RieGreedyError {
     InvalidConfig(String),
 }
 
+impl From<RieGreedyError> for contextra_types::ContextraError {
+    fn from(err: RieGreedyError) -> Self {
+        match err {
+            RieGreedyError::DimensionMismatch { expected, actual } => {
+                contextra_types::ContextraError::InvalidInput(format!(
+                    "Embedding dimension mismatch: expected {expected}, actual {actual}"
+                ))
+            }
+            RieGreedyError::NonFinite => contextra_types::ContextraError::InvalidInput(
+                "Non-finite numerical value encountered".to_string(),
+            ),
+            RieGreedyError::InvalidConfig(msg) => {
+                contextra_types::ContextraError::InvalidInput(format!("Invalid configuration: {msg}"))
+            }
+        }
+    }
+}
+
 /// Laufzeitzustand eines RIE-Greedy-Profils (§10.4.1).
 ///
 /// Implementiert die deterministisch-gierige Personalisierung mit

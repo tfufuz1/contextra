@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// STAND: 2026-09-17T00:00:00Z (SESSION: KV-BRIDGE-ZERO-COPY-IMPL)
-// ZWECK: KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store (RAM Tier 1 + LSM Tier 2 Spill).
+// STAND: 2026-09-26T00:00:00Z (SESSION: KV-BRIDGE-ZERO-COPY-IMPL)
+// ZWECK: KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store (RAM Tier 1 + LSM Tier 2 Spill via KvBridgeStorage Port).
 // REIFEGRAD: 🟡 (Golden Test verifiziert, Stufe A / Tier 2 Async Spill)
 // INVARIANTEN: Cache-Miss und jeder Fehler ergeben transparenten Fallback auf vollen Prefill.
 //              Kein parking_lot-Lock über .await-Punkt.
@@ -9,20 +9,13 @@
 
 //! KV-Bridge Adapter connecting Candle inference to tenant-isolated encrypted KV cache store.
 
-#![cfg(feature = "kv-bridge")]
-
 use bytes::Bytes;
-#[cfg(feature = "contextra-store")]
 use contextra_crypto::EncryptedKvLayer;
 #[cfg(test)]
 use contextra_crypto::KvSegment;
 use contextra_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
-use contextra_ports::ContextSegment;
-#[cfg(feature = "contextra-store")]
-use contextra_ports::StorageEngine;
-#[cfg(feature = "contextra-store")]
-use contextra_types::TxId;
-use contextra_types::{ModelFingerprint, TenantId};
+use contextra_ports::{ContextSegment, KvBridgeStorage};
+use contextra_types::{ModelFingerprint, TenantId, TxId};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -60,8 +53,7 @@ impl KvCacheKey {
 #[derive(Clone)]
 pub struct KvBridgeAdapter {
     pub store: Arc<TenantIsolatedKvStore>,
-    #[cfg(feature = "contextra-store")]
-    pub lsm_store: Option<Arc<contextra_store::LsmStorage>>,
+    pub lsm_store: Option<Arc<dyn KvBridgeStorage>>,
     pub cipher: Arc<KvSegmentCipher>,
     pub consultations: Arc<std::sync::atomic::AtomicU64>,
 }
@@ -71,7 +63,6 @@ impl KvBridgeAdapter {
     pub fn new(store: Arc<TenantIsolatedKvStore>, cipher: Arc<KvSegmentCipher>) -> Self {
         Self {
             store,
-            #[cfg(feature = "contextra-store")]
             lsm_store: None,
             cipher,
             consultations: Arc::new(std::sync::atomic::AtomicU64::new(0)),
@@ -79,10 +70,9 @@ impl KvBridgeAdapter {
     }
 
     /// Erstellt einen neuen Adapter mit Zwei-Tier-Hierarchie (RAM Fast-Path + LSM-Spill Slow-Path).
-    #[cfg(feature = "contextra-store")]
     pub fn with_lsm_fallback(
         store: Arc<TenantIsolatedKvStore>,
-        lsm_store: Arc<contextra_store::LsmStorage>,
+        lsm_store: Arc<dyn KvBridgeStorage>,
         cipher: Arc<KvSegmentCipher>,
     ) -> Self {
         let lsm = Arc::clone(&lsm_store);
@@ -204,7 +194,6 @@ impl KvBridgeAdapter {
     }
 
     /// Versucht asynchron, ein gecachetes KV-Segment erst im RAM (Tier 1) und bei Miss im LSM-Store (Tier 2) zu laden.
-    #[cfg(feature = "contextra-store")]
     pub async fn try_get_cached_segment_async(
         &self,
         tenant: TenantId,
@@ -253,7 +242,6 @@ impl KvBridgeAdapter {
     }
 
     /// Versucht asynchron, ein gecachetes KV-Segment zu laden und als `Bytes` Slice (Zero-Copy) zurückzugeben.
-    #[cfg(feature = "contextra-store")]
     pub async fn try_get_cached_segment_async_bytes(
         &self,
         tenant: TenantId,
@@ -314,8 +302,42 @@ impl std::fmt::Debug for KvBridgeAdapter {
 mod tests {
     use super::*;
     use contextra_crypto::{CryptoKey, EvictionWorker};
-    use std::sync::Arc;
+    use contextra_ports::BoxFuture;
+    use contextra_types::Result;
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
     use std::thread;
+
+    #[derive(Default)]
+    struct MockKvStorage {
+        data: Mutex<HashMap<Vec<u8>, Bytes>>,
+    }
+
+    impl KvBridgeStorage for MockKvStorage {
+        fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
+            Box::pin(async move {
+                let guard = self.data.lock().unwrap();
+                Ok(guard.get(key).cloned())
+            })
+        }
+
+        fn put<'a>(
+            &'a self,
+            _tx_id: TxId,
+            key: &'a [u8],
+            value: &'a [u8],
+        ) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move {
+                let mut guard = self.data.lock().unwrap();
+                guard.insert(key.to_vec(), Bytes::copy_from_slice(value));
+                Ok(())
+            })
+        }
+
+        fn commit<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+    }
 
     fn create_test_adapter() -> KvBridgeAdapter {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
@@ -432,7 +454,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "contextra-store")]
     fn test_with_lsm_fallback_without_lsm_store() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
         let cipher = Arc::new(KvSegmentCipher::new(master_km));
@@ -446,19 +467,13 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "contextra-store")]
     async fn test_lsm_fallback_ram_hit() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
         let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
-        let temp_dir = tempfile::tempdir().unwrap();
-        let lsm_config = contextra_store::LsmConfig {
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let lsm_store = Arc::new(contextra_store::LsmStorage::new(lsm_config).await.unwrap());
+        let mock_store = Arc::new(MockKvStorage::default());
 
-        let adapter = KvBridgeAdapter::with_lsm_fallback(store, lsm_store, cipher);
+        let adapter = KvBridgeAdapter::with_lsm_fallback(store, mock_store, cipher);
         let tenant = TenantId::try_new(10).unwrap();
         let fp = dummy_fp();
         let chunk_id = 42;
@@ -472,27 +487,21 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "contextra-store")]
     async fn test_lsm_fallback_ram_miss_lsm_hit() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
         let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
-        let temp_dir = tempfile::tempdir().unwrap();
-        let lsm_config = contextra_store::LsmConfig {
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let lsm_store = Arc::new(contextra_store::LsmStorage::new(lsm_config).await.unwrap());
+        let mock_store = Arc::new(MockKvStorage::default());
 
         let adapter =
-            KvBridgeAdapter::with_lsm_fallback(store, Arc::clone(&lsm_store), cipher.clone());
+            KvBridgeAdapter::with_lsm_fallback(store, Arc::clone(&mock_store) as _, cipher.clone());
         let tenant = TenantId::try_new(10).unwrap();
         let fp = dummy_fp();
         let chunk_id = 100;
         let payload = b"LSM hit payload".to_vec();
         let key = KvCacheKey::new(chunk_id, fp.clone(), None);
 
-        // Manually serialize payload and encrypt layer, then store directly in LSM
+        // Manually serialize payload and encrypt layer, then store directly in mock LSM
         let inner_payload = CachedKvPayload {
             fingerprint: fp.clone(),
             rope_offset: None,
@@ -506,8 +515,8 @@ mod tests {
 
         let spill_key = format!("__kv_spill:{}:{:#x}", tenant.inner(), chunk_id).into_bytes();
         let tx_id = TxId(chunk_id);
-        lsm_store.put(tx_id, &spill_key, &doc_bytes).await.unwrap();
-        lsm_store.commit(tx_id).await.unwrap();
+        mock_store.put(tx_id, &spill_key, &doc_bytes).await.unwrap();
+        mock_store.commit(tx_id).await.unwrap();
 
         // Ensure RAM store is empty for key
         assert!(adapter.try_get_cached_segment(tenant, &key).is_none());
@@ -518,19 +527,13 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "contextra-store")]
     async fn test_lsm_fallback_ram_miss_lsm_miss() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
         let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
-        let temp_dir = tempfile::tempdir().unwrap();
-        let lsm_config = contextra_store::LsmConfig {
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let lsm_store = Arc::new(contextra_store::LsmStorage::new(lsm_config).await.unwrap());
+        let mock_store = Arc::new(MockKvStorage::default());
 
-        let adapter = KvBridgeAdapter::with_lsm_fallback(store, lsm_store, cipher);
+        let adapter = KvBridgeAdapter::with_lsm_fallback(store, mock_store, cipher);
         let tenant = TenantId::try_new(10).unwrap();
         let key = KvCacheKey::new(999, dummy_fp(), None);
 
@@ -539,20 +542,14 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "contextra-store")]
     async fn test_lsm_fallback_fingerprint_mismatch() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
         let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
-        let temp_dir = tempfile::tempdir().unwrap();
-        let lsm_config = contextra_store::LsmConfig {
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let lsm_store = Arc::new(contextra_store::LsmStorage::new(lsm_config).await.unwrap());
+        let mock_store = Arc::new(MockKvStorage::default());
 
         let adapter =
-            KvBridgeAdapter::with_lsm_fallback(store, Arc::clone(&lsm_store), cipher.clone());
+            KvBridgeAdapter::with_lsm_fallback(store, Arc::clone(&mock_store) as _, cipher.clone());
         let tenant = TenantId::try_new(10).unwrap();
         let fp_stored = dummy_fp();
         let fp_lookup = ModelFingerprint::new([0x88u8; 32], "other-model.gguf", "Q8_0");
@@ -572,8 +569,8 @@ mod tests {
 
         let spill_key = format!("__kv_spill:{}:{:#x}", tenant.inner(), chunk_id).into_bytes();
         let tx_id = TxId(chunk_id);
-        lsm_store.put(tx_id, &spill_key, &doc_bytes).await.unwrap();
-        lsm_store.commit(tx_id).await.unwrap();
+        mock_store.put(tx_id, &spill_key, &doc_bytes).await.unwrap();
+        mock_store.commit(tx_id).await.unwrap();
 
         let key_mismatch = KvCacheKey::new(chunk_id, fp_lookup, None);
         let retrieved = adapter
@@ -586,20 +583,14 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "contextra-store")]
     async fn test_lsm_fallback_golden_zero_copy_async_bytes() {
         let master_km =
             CryptoKey::try_new("test-passphrase-golden", b"test-salt-golden123").unwrap();
         let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::with_capacity(1));
-        let temp_dir = tempfile::tempdir().unwrap();
-        let lsm_config = contextra_store::LsmConfig {
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let lsm_store = Arc::new(contextra_store::LsmStorage::new(lsm_config).await.unwrap());
+        let mock_store = Arc::new(MockKvStorage::default());
 
-        let adapter = KvBridgeAdapter::with_lsm_fallback(store, lsm_store, cipher);
+        let adapter = KvBridgeAdapter::with_lsm_fallback(store, mock_store, cipher);
         let tenant = TenantId::try_new(777).unwrap();
         let fp = dummy_fp();
 
@@ -627,20 +618,14 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "contextra-store")]
     async fn test_lsm_fallback_eviction_triggers_spill() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
         let cipher = Arc::new(KvSegmentCipher::new(master_km));
         // Create store with capacity of 1 segment per tenant
         let store = Arc::new(TenantIsolatedKvStore::with_capacity(1));
-        let temp_dir = tempfile::tempdir().unwrap();
-        let lsm_config = contextra_store::LsmConfig {
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let lsm_store = Arc::new(contextra_store::LsmStorage::new(lsm_config).await.unwrap());
+        let mock_store = Arc::new(MockKvStorage::default());
 
-        let adapter = KvBridgeAdapter::with_lsm_fallback(store, Arc::clone(&lsm_store), cipher);
+        let adapter = KvBridgeAdapter::with_lsm_fallback(store, mock_store, cipher);
         let tenant = TenantId::try_new(100).unwrap();
         let fp = dummy_fp();
 

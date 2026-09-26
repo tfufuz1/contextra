@@ -95,6 +95,11 @@ session-context:
     echo "OFFENE ANCHORS:"
     grep -rn "ANCHOR\[.*\] STATUS:IN-PROGRESS" crates/ --include='*.rs' || echo "  (keine)"
 
+# Executes new architecture gates: check-ring-layering-full and check-duplicate-core-primitives
+check-arch-gates:
+    cargo run --manifest-path xtask/Cargo.toml -- check-ring-layering-full
+    cargo run --manifest-path xtask/Cargo.toml -- check-duplicate-core-primitives
+
 # Target checks for xtask audit lints
 check-max-results-unbound:
     cargo xtask check-max-results-unbound

@@ -18,6 +18,8 @@ async fn test_compaction_stress_and_gc() {
             check_interval: Duration::from_millis(100), // Fast check
             yield_threshold: 100,
             max_memory_bytes: Some(128 * 1024 * 1024),
+            max_peak_memory_bytes: Some(256 * 1024 * 1024),
+            max_backpressure_wait: Duration::from_secs(30),
             max_io_bytes_per_second: None,
         },
         encryption_passphrase: None,
@@ -384,7 +386,7 @@ async fn test_compaction_pressure_awareness() {
     let config = CompactionConfig {
         min_sstables_per_tier: 2,
         yield_threshold: 5, // Yield/check pressure every 5 entries
-        ..Default::default()
+        ..CompactionConfig::default()
     };
 
     let (pressure_tx, pressure_rx) = tokio::sync::watch::channel(SystemPressure {
@@ -513,6 +515,8 @@ async fn test_compaction_cancellation() {
         check_interval: std::time::Duration::from_millis(10),
         yield_threshold: 100,
         max_memory_bytes: None,
+        max_peak_memory_bytes: None,
+        max_backpressure_wait: Duration::from_secs(30),
         max_io_bytes_per_second: None,
     };
     let engine = Arc::new(CompactionEngine::new(
@@ -573,6 +577,8 @@ async fn concurrent_flush_and_compact_is_safe() {
                 check_interval: std::time::Duration::from_millis(10),
                 yield_threshold: 100,
                 max_memory_bytes: Some(1024 * 1024),
+                max_peak_memory_bytes: Some(256 * 1024 * 1024),
+                max_backpressure_wait: Duration::from_secs(30),
                 max_io_bytes_per_second: None,
             },
             encryption_passphrase: None,

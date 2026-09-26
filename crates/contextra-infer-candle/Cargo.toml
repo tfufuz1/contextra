@@ -26,7 +26,6 @@ contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-crypto = { workspace = true, optional = true }
-contextra-store = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
@@ -43,9 +42,8 @@ required-features = ["kv-bridge"]
 default = []
 candle = []
 docid-128 = ["contextra-types/docid-128"]
-kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode", "dep:contextra-store", "contextra-store"]
+kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
 kv-stage-b = ["dep:bincode"]
-contextra-store = ["dep:contextra-store"]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 
 [target.'cfg(target_os = "macos")'.dependencies]

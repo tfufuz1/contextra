@@ -332,11 +332,87 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     }
 
     let queued = deferred.len();
+
+    // Verify deletion completeness post-invalidation if all candidates were processed synchronously
+    if deferred.is_empty() {
+        #[allow(clippy::manual_range_contains)]
+        verify_doc_hyperedge_deletion_completeness(graph, superseded_doc_id)?;
+    }
+
     Ok(HyperedgeCascadeReport {
         invalidated,
         deferred,
         queued_for_background: queued,
     })
+}
+
+/// Verifies byte-accurately that no active (non-tombstoned) hyperedge in `graph` directly or
+/// transitively (via `child_edge_ids`) references `target_doc_id`.
+///
+/// # Transitive Traversal Guarantee
+/// Traverses all `child_edge_ids` transitively across arbitrarily deep hyperedge hierarchies using
+/// a `HashSet<HyperEdgeId>` visited guard to prevent infinite loops in cyclic child graphs.
+/// Only active (non-tombstoned, `tx_valid_to.is_none()`) child hyperedges are inspected.
+///
+/// # Return Value
+/// - `Ok(())` if zero active hyperedges directly or transitively reference `target_doc_id`.
+/// - `Err(ContextraError::InvalidInput)` if any active hyperedge or child hyperedge retains
+///   a reference to `target_doc_id`.
+pub fn verify_doc_hyperedge_deletion_completeness(
+    graph: &CsrGraph,
+    target_doc_id: DocId,
+) -> Result<()> {
+    let active_hyperedges = {
+        let inner = graph.inner_read();
+        inner
+            .hyperedges
+            .values()
+            .filter(|edge| edge.tx_valid_to.is_none())
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+
+    for edge in active_hyperedges {
+        // Direct reference check
+        if edge.source_doc_id == Some(target_doc_id) {
+            return Err(contextra_types::ContextraError::InvalidInput(format!(
+                "Active hyperedge {} directly references deleted DocId {}",
+                edge.id,
+                target_doc_id.inner()
+            )));
+        }
+
+        // Transitive child_edge_ids traversal check with visited guard for cycle protection
+        if !edge.child_edge_ids.is_empty() {
+            let mut visited = std::collections::HashSet::new();
+            let mut stack = edge.child_edge_ids.to_vec();
+
+            while let Some(child_id) = stack.pop() {
+                if !visited.insert(child_id) {
+                    continue;
+                }
+
+                // graph.get_hyperedge(child_id) checks tx_valid_to.is_none() internally
+                if let Some(child_edge) = graph.get_hyperedge(child_id) {
+                    if child_edge.source_doc_id == Some(target_doc_id) {
+                        return Err(contextra_types::ContextraError::InvalidInput(format!(
+                            "Active consolidated hyperedge {} transitively references deleted DocId {} via active child hyperedge {}",
+                            edge.id,
+                            target_doc_id.inner(),
+                            child_id
+                        )));
+                    }
+                    for &next_child in child_edge.child_edge_ids.iter() {
+                        if !visited.contains(&next_child) {
+                            stack.push(next_child);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -861,5 +937,123 @@ mod tests {
         assert!(graph.get_hyperedge(HyperEdgeId::new(1)).is_some());
         assert!(graph.get_hyperedge(HyperEdgeId::new(2)).is_none());
         assert!(graph.get_hyperedge(HyperEdgeId::new(3)).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_verify_deletion_completeness_multilevel_chain() {
+        let graph = CsrGraph::new();
+        let doc_to_delete = DocId::from_key("doc-delete-me").unwrap();
+
+        const ROLE_1: RoleId = RoleId::new(1);
+        const ROLE_2: RoleId = RoleId::new(2);
+
+        let edge_c_id = HyperEdgeId::new(30);
+        let edge_b_id = HyperEdgeId::new(20);
+        let edge_a_id = HyperEdgeId::new(10);
+
+        // Edge C references doc_to_delete
+        let edge_c = HyperEdge::new(
+            edge_c_id,
+            EdgeType::Default,
+            vec![
+                RoleBinding::new(ROLE_1, EntityId::new(1)),
+                RoleBinding::new(ROLE_2, EntityId::new(2)),
+            ],
+            1.0,
+        )
+        .with_source_doc_id(Some(doc_to_delete));
+
+        // Edge B is a consolidated hyperedge with child C
+        let edge_b = HyperEdge::new(
+            edge_b_id,
+            EdgeType::Default,
+            vec![
+                RoleBinding::new(ROLE_1, EntityId::new(1)),
+                RoleBinding::new(ROLE_2, EntityId::new(3)),
+            ],
+            0.8,
+        )
+        .with_child_edge_ids(vec![edge_c_id]);
+
+        // Edge A is a top-level consolidated hyperedge with child B
+        let edge_a = HyperEdge::new(
+            edge_a_id,
+            EdgeType::Default,
+            vec![
+                RoleBinding::new(ROLE_1, EntityId::new(1)),
+                RoleBinding::new(ROLE_2, EntityId::new(4)),
+            ],
+            0.5,
+        )
+        .with_child_edge_ids(vec![edge_b_id]);
+
+        graph.insert_hyperedge_direct(edge_c);
+        graph.insert_hyperedge_direct(edge_b);
+        graph.insert_hyperedge_direct(edge_a);
+
+        // Verification fails initially because Edge A transitively references doc_to_delete via A -> B -> C
+        let verify_before = verify_doc_hyperedge_deletion_completeness(&graph, doc_to_delete);
+        assert!(
+            verify_before.is_err(),
+            "Completeness check must fail while transitive child edge C references doc_to_delete"
+        );
+
+        // Execute cascade invalidation
+        cascade_invalidate_hyperedges_for_superseded_doc(&graph, doc_to_delete, 100)
+            .await
+            .unwrap();
+
+        // Verification succeeds after full transitive invalidation
+        let verify_after = verify_doc_hyperedge_deletion_completeness(&graph, doc_to_delete);
+        assert!(
+            verify_after.is_ok(),
+            "Completeness check must succeed after full transitive cascade invalidation"
+        );
+    }
+
+    #[test]
+    fn test_verify_deletion_completeness_cycle_termination() {
+        let graph = CsrGraph::new();
+        let doc_to_delete = DocId::from_key("doc-cycle-test").unwrap();
+
+        const ROLE_1: RoleId = RoleId::new(1);
+        const ROLE_2: RoleId = RoleId::new(2);
+
+        let s1_id = HyperEdgeId::new(101);
+        let s2_id = HyperEdgeId::new(102);
+
+        // s1 references s2 as child
+        let s1 = HyperEdge::new(
+            s1_id,
+            EdgeType::Default,
+            vec![
+                RoleBinding::new(ROLE_1, EntityId::new(1)),
+                RoleBinding::new(ROLE_2, EntityId::new(2)),
+            ],
+            1.0,
+        )
+        .with_child_edge_ids(vec![s2_id]);
+
+        // s2 references s1 as child (cycle A -> B -> A)
+        let s2 = HyperEdge::new(
+            s2_id,
+            EdgeType::Default,
+            vec![
+                RoleBinding::new(ROLE_1, EntityId::new(2)),
+                RoleBinding::new(ROLE_2, EntityId::new(3)),
+            ],
+            1.0,
+        )
+        .with_child_edge_ids(vec![s1_id]);
+
+        graph.insert_hyperedge_direct(s1);
+        graph.insert_hyperedge_direct(s2);
+
+        // Verification completes cleanly without infinite looping because neither edge references doc_to_delete
+        let res = verify_doc_hyperedge_deletion_completeness(&graph, doc_to_delete);
+        assert!(
+            res.is_ok(),
+            "Cycle in child_edge_ids must terminate safely without hanging"
+        );
     }
 }

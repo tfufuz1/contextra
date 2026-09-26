@@ -66,14 +66,47 @@ mod no_crypto_stubs {
         }
     }
 
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    pub enum ExcludedScope {
+        ConsolidatedAndDistilled,
+        LlmParameterMemory,
+    }
+
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DeletionProof {
+        #[serde(default = "default_signature_version")]
+        pub signature_version: u8,
         pub scope: DeletionScope,
+        #[serde(default)]
+        pub deleted_keys_hash: [u8; 32],
+        #[serde(default = "default_tx_id")]
+        pub deleted_after_tx: TxId,
+        #[serde(default)]
+        pub timestamp: u64,
+        #[serde(default)]
+        pub signature: Vec<u8>,
+        #[serde(default)]
+        pub covered_layers: Vec<DeletionLayer>,
+        #[serde(default)]
+        pub excluded_scopes: Vec<ExcludedScope>,
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        pub wal_chain_receipt: Option<[u8; 32]>,
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        pub integrity_warning: Option<String>,
+        #[serde(default)]
         pub deleted_keys: Vec<Vec<u8>>,
         pub deleted_keys_hash: [u8; 32],
         pub signature: Vec<u8>,
         pub tx_id: TxId,
         pub covered_layers: Vec<DeletionLayer>,
+    }
+
+    const fn default_signature_version() -> u8 {
+        1
+    }
+
+    const fn default_tx_id() -> TxId {
+        TxId(0)
     }
 
     #[derive(Debug, Clone, Default)]
@@ -115,7 +148,20 @@ mod no_crypto_stubs {
 
             let covered_layers = layer_proofs.into_iter().map(|p| p.layer).collect();
             Ok(Self {
+                signature_version: 2,
                 scope,
+                deleted_keys_hash: [0u8; 32],
+                deleted_after_tx: tx_id,
+                timestamp: 0,
+                signature: vec![0u8; 32],
+                covered_layers: vec![
+                    DeletionLayer::LsmMemtable,
+                    DeletionLayer::SsTableAllLevels,
+                    DeletionLayer::HnswIndex,
+                ],
+                excluded_scopes: vec![],
+                wal_chain_receipt: None,
+                integrity_warning: None,
                 deleted_keys,
                 deleted_keys_hash,
                 signature: vec![0u8; 64],

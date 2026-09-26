@@ -908,6 +908,162 @@ async fn test_compaction_swap_debug_assert_detects_unsorted_list() {
     );
 }
 
+#[tokio::test]
+async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
+    let tmp = TempDir::new().expect("temp dir");
+    let registry = Arc::new(SnapshotRegistry::new());
+    let bc = create_block_cache(1);
+    let config = CompactionConfig {
+        min_sstables_per_tier: 2,
+        // Set an extremely low peak memory limit (e.g., 100 bytes) to force an immediate abort
+        max_peak_memory_bytes: Some(100),
+        ..CompactionConfig::default()
+    };
+    let engine = CompactionEngine::new(
+        config,
+        registry,
+        Arc::clone(&bc),
+        None,
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
+                memory_limit: 1024 * 1024,
+            },
+        )),
+        None,
+    );
+
+    let sstables = Arc::new(RwLock::new(Vec::new()));
+    for i in 0..2u8 {
+        let sst = create_test_sstable(
+            tmp.path(),
+            &format!("sst-peak-{}.sst", i),
+            &[(format!("key-{}", i).as_bytes(), b"val", i as u64 + 1)],
+            Arc::clone(&bc),
+        )
+        .await;
+        sstables.write().await.push(sst);
+    }
+
+    let result = engine.maybe_compact(&sstables, tmp.path()).await;
+    assert!(result.is_err(), "Compaction should fail due to peak memory budget excess");
+
+    let err = result.unwrap_err();
+    match err {
+        contextra_core::ContextraError::MemoryBudgetExceeded { used_mb, limit_mb } => {
+            assert!(used_mb >= limit_mb);
+        }
+        other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),
+    }
+
+    // Verify NO merged SSTable write output occurred in the directory (only original sst files)
+    let mut dir = tokio::fs::read_dir(tmp.path()).await.expect("read dir");
+    let mut file_names = Vec::new();
+    while let Some(entry) = dir.next_entry().await.expect("next entry") {
+        file_names.push(entry.file_name().to_string_lossy().to_string());
+    }
+    assert!(
+        !file_names.iter().any(|name| name.starts_with("sst-compact-")),
+        "No compacted SSTable output file should be written when pre-merge peak limit is exceeded"
+    );
+}
+
+#[tokio::test]
+async fn test_compaction_succeeds_when_peak_memory_within_limit() {
+    let tmp = TempDir::new().expect("temp dir");
+    let registry = Arc::new(SnapshotRegistry::new());
+    let bc = create_block_cache(1);
+    let config = CompactionConfig {
+        min_sstables_per_tier: 2,
+        // Set a generous peak memory limit (e.g. 10MB)
+        max_peak_memory_bytes: Some(10 * 1024 * 1024),
+        ..CompactionConfig::default()
+    };
+    let engine = CompactionEngine::new(
+        config,
+        registry,
+        Arc::clone(&bc),
+        None,
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
+                memory_limit: 1024 * 1024,
+            },
+        )),
+        None,
+    );
+
+    let sstables = Arc::new(RwLock::new(Vec::new()));
+    for i in 0..2u8 {
+        let sst = create_test_sstable(
+            tmp.path(),
+            &format!("sst-ok-{}.sst", i),
+            &[(format!("key-{}", i).as_bytes(), b"val", i as u64 + 1)],
+            Arc::clone(&bc),
+        )
+        .await;
+        sstables.write().await.push(sst);
+    }
+
+    let compacted = engine
+        .maybe_compact(&sstables, tmp.path())
+        .await
+        .expect("compaction within peak budget should succeed");
+
+    assert!(compacted, "Compaction should complete successfully");
+}
+
+#[tokio::test]
+async fn test_compaction_backpressure_timeout_exceeded() {
+    let tmp = TempDir::new().expect("temp dir");
+    let registry = Arc::new(SnapshotRegistry::new());
+    let bc = create_block_cache(1);
+    let config = CompactionConfig {
+        min_sstables_per_tier: 2,
+        yield_threshold: 1, // yield/check budget on every entry
+        max_backpressure_wait: Duration::from_millis(50), // short timeout for testing
+        ..CompactionConfig::default()
+    };
+
+    // Exhausted ResourceTracker budget: capacity limit = 0
+    let exhausted_tracker = Arc::new(contextra_core::ResourceTracker::new(
+        contextra_core::ResourceBudget { memory_limit: 0 },
+    ));
+
+    let engine = CompactionEngine::new(
+        config,
+        registry,
+        Arc::clone(&bc),
+        None,
+        exhausted_tracker,
+        None,
+    );
+
+    let sst1 = create_test_sstable(
+        tmp.path(),
+        "sst1.sst",
+        &[(b"key-1", b"val-1", 1)],
+        Arc::clone(&bc),
+    )
+    .await;
+    let sst2 = create_test_sstable(
+        tmp.path(),
+        "sst2.sst",
+        &[(b"key-2", b"val-2", 2)],
+        Arc::clone(&bc),
+    )
+    .await;
+
+    let output_path = tmp.path().join("merged_timeout.sst");
+    let result = engine
+        .merge_sstables(&[sst1, sst2], &output_path, u64::MAX, true)
+        .await;
+
+    assert!(result.is_err(), "Merge should fail with timeout when budget is exhausted");
+    match result.unwrap_err() {
+        contextra_core::ContextraError::MemoryBudgetExceeded { .. } => {}
+        other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),
+    }
+}
+
 #[test]
 fn test_generate_sst_path_uniqueness() {
     let tmp = TempDir::new().expect("temp dir"); // expect

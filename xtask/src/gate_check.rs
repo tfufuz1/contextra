@@ -269,6 +269,26 @@ fn run_gate_one(opts: GateCheckOptions) -> Result<GateCheckReport, GateCheckErro
     )?;
     report.passed_steps.push(layering_step);
 
+    // 4. Ring layering full check: cargo run --manifest-path xtask/Cargo.toml -- check-ring-layering-full
+    let ring_full_step = "Gate 1: Ring layering full check".to_string();
+    execute_cmd(
+        &ring_full_step,
+        "cargo",
+        &["run", "--manifest-path", "xtask/Cargo.toml", "--", "check-ring-layering-full"],
+        &[],
+    )?;
+    report.passed_steps.push(ring_full_step);
+
+    // 5. Duplicate core primitives check: cargo run --manifest-path xtask/Cargo.toml -- check-duplicate-core-primitives
+    let dup_primitives_step = "Gate 1: Duplicate core primitives check".to_string();
+    execute_cmd(
+        &dup_primitives_step,
+        "cargo",
+        &["run", "--manifest-path", "xtask/Cargo.toml", "--", "check-duplicate-core-primitives"],
+        &[],
+    )?;
+    report.passed_steps.push(dup_primitives_step);
+
     Ok(report)
 }
 

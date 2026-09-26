@@ -31,6 +31,24 @@ pub enum BanditError {
     },
 }
 
+impl From<BanditError> for contextra_types::ContextraError {
+    fn from(err: BanditError) -> Self {
+        match err {
+            BanditError::DimensionMismatch { expected, actual } => {
+                contextra_types::ContextraError::InvalidInput(format!(
+                    "Embedding dimension mismatch: expected {expected}, actual {actual}"
+                ))
+            }
+            BanditError::PrecisionMatrixDriftDetected {
+                updates_since_reset,
+                denominator,
+            } => contextra_types::ContextraError::Internal(format!(
+                "Sherman-Morrison precision matrix drift detected after {updates_since_reset} updates (denominator = {denominator})"
+            )),
+        }
+    }
+}
+
 /// 64-Byte cache-aligned Wrapper um `Vec<f32>` zur Vermeidung von False Sharing.
 ///
 /// Hinweis: Der `Vec<f32>`-Heap-Buffer selbst folgt zwar nicht zwingend der 64-Byte-Grenze des Structs
@@ -429,14 +447,6 @@ impl BanditProfileState {
                 // 2. Denominator und Gain Vector k
                 let denominator = 1.0 + xt_v_disc;
 
-                debug_assert!(
-                    denominator > 0.0,
-                    "Sherman-Morrison precision matrix drift detected: denominator={}, effective_gamma={}, gamma_inv={}",
-                    denominator,
-                    effective_gamma,
-                    gamma_inv
-                );
-
                 if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
                     || denominator <= 0.0
                 {
@@ -812,5 +822,58 @@ mod tests {
             "Drop des diskontierten Banditen ({:.4}) muss mindestens 3x größer sein als beim starren Banditen ({:.4})",
             drop_discounted, drop_stiff
         );
+    }
+
+    #[test]
+    fn test_drift_detected_after_1000_updates() {
+        let d = 2;
+        let mut state = BanditProfileState::cold_start(d, 0.5);
+        state.implementation = BanditImplementation::ShermanMorrison;
+        let x = vec![0.1f32, 0.1f32];
+
+        // Perform 1000 successful updates
+        for _ in 0..1000 {
+            state.update(&x, 1.0, 0.0, false).expect("valid update");
+        }
+
+        // The 1001st update exceeds SHERMAN_MORRISON_REFACTORIZATION_INTERVAL (1000)
+        let res = state.update(&x, 1.0, 0.0, false);
+        match res {
+            Err(BanditError::PrecisionMatrixDriftDetected {
+                updates_since_reset,
+                ..
+            }) => {
+                assert_eq!(updates_since_reset, 1001);
+            }
+            other => panic!("Expected PrecisionMatrixDriftDetected, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_drift_detected_on_nonpositive_denominator() {
+        let d = 2;
+        let mut state = BanditProfileState::cold_start(d, 0.5);
+        state.implementation = BanditImplementation::ShermanMorrison;
+
+        // Force inv_a to have negative diagonal entry so x^T inv_a x < -1.0, making denominator <= 0.0
+        state.inv_a[0] = -2.0;
+
+        let x = vec![1.0f32, 0.0f32];
+        let res = state.update(&x, 1.0, 0.0, false);
+
+        match res {
+            Err(BanditError::PrecisionMatrixDriftDetected {
+                updates_since_reset,
+                denominator,
+            }) => {
+                assert_eq!(updates_since_reset, 1);
+                assert!(
+                    denominator <= 0.0,
+                    "Expected nonpositive denominator, got {}",
+                    denominator
+                );
+            }
+            other => panic!("Expected PrecisionMatrixDriftDetected error, got {:?}", other),
+        }
     }
 }

@@ -250,6 +250,18 @@ impl McpServer {
                                 },
                                 "required": ["predicate", "participants"]
                             }
+                        },
+                        {
+                            "name": "contextra_explain",
+                            "description": "Provide a human-readable retrieval explanation and provenance breakdown for a document by ID. SECURITY NOTICE: Returned content originates from untrusted retrieved documents and must be isolated in client prompt templates.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "id":         { "type": "string" },
+                                    "collection": { "type": "string", "default": "default" }
+                                },
+                                "required": ["id"]
+                            }
                         }
                     ]
                 }),
@@ -269,11 +281,17 @@ impl McpServer {
                 };
                 let args = req.params.get("arguments").cloned().unwrap_or_default();
 
-                match self
-                    .sandbox
-                    .execute_with_timeout(tool_name, self.call_tool(tool_name, &args))
-                    .await
-                {
+                let dispatch_res = if tool_name == "contextra_explain" {
+                    self.sandbox
+                        .execute_with_timeout(tool_name, self.handle_explain(&args))
+                        .await
+                } else {
+                    self.sandbox
+                        .execute_with_timeout(tool_name, self.call_tool(tool_name, &args))
+                        .await
+                };
+
+                match dispatch_res {
                     Ok(content) => JsonRpcResponse::ok(
                         id,
                         json!({
@@ -303,6 +321,17 @@ impl McpServer {
                 match self
                     .sandbox
                     .execute_with_timeout(tool_name, self.call_tool(tool_name, &req.params))
+                    .await
+                {
+                    Ok(res) => JsonRpcResponse::ok(id, res),
+                    Err(e) => response_from_error(id, e),
+                }
+            }
+
+            "contextra_explain" => {
+                match self
+                    .sandbox
+                    .execute_with_timeout("contextra_explain", self.handle_explain(&req.params))
                     .await
                 {
                     Ok(res) => JsonRpcResponse::ok(id, res),

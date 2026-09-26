@@ -589,6 +589,7 @@ dependencies = [
 name = "contextra-adapt"
 version = "0.1.0"
 dependencies = [
+ "contextra-types",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -857,7 +858,6 @@ dependencies = [
  "contextra-crypto",
  "contextra-ports",
  "contextra-rank",
- "contextra-store",
  "contextra-types",
  "criterion",
  "futures-util",
