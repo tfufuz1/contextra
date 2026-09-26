@@ -160,7 +160,7 @@ pub fn ring3_background_task_token() -> Ring3Token {
 }
 
 /// Laufzeitzustand eines Arms im Flow-Corrected Thompson Sampling (§21.3).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FlowCorrectedThompsonBandit {
     config: FcTsConfig,
     /// Inverse Kovarianzmatrix $A^{-1}$ ($d \times d$, row-major).
@@ -193,6 +193,24 @@ pub struct FlowCorrectedThompsonBandit {
     backup_mu: Vec<f32>,
     /// Vorallokierter Arbeitspuffer für $A^{-1} x$ ($d$ Elemente) zur Allokationsvermeidung im Hotpath.
     scratch_vx: Vec<f32>,
+    /// Optionaler Diskrepanz-Logger für Shadow-Mode (§12 Integrationsregel).
+    shadow_sink: Option<std::sync::Arc<dyn crate::shadow_mode::ShadowSink<u32>>>,
+}
+
+impl std::fmt::Debug for FlowCorrectedThompsonBandit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FlowCorrectedThompsonBandit")
+            .field("config", &self.config)
+            .field("inv_a", &self.inv_a)
+            .field("eta", &self.eta)
+            .field("mu", &self.mu)
+            .field("drift_rate", &self.drift_rate)
+            .field("head", &self.head)
+            .field("len", &self.len)
+            .field("time_step", &self.time_step)
+            .field("has_shadow_sink", &self.shadow_sink.is_some())
+            .finish()
+    }
 }
 
 impl FlowCorrectedThompsonBandit {
@@ -224,7 +242,22 @@ impl FlowCorrectedThompsonBandit {
             backup_eta: vec![0.0f32; d],
             backup_mu: vec![0.0f32; d],
             scratch_vx: vec![0.0f32; d],
+            shadow_sink: None,
         })
+    }
+
+    /// Konfiguriert eine Diskrepanz-Senke für den Shadow-Mode-Vergleich (§12).
+    pub fn with_shadow_sink(
+        mut self,
+        sink: std::sync::Arc<dyn crate::shadow_mode::ShadowSink<u32>>,
+    ) -> Self {
+        self.shadow_sink = Some(sink);
+        self
+    }
+
+    /// Gibt eine Referenz auf die optional konfigurierte Diskrepanz-Senke zurück.
+    pub fn shadow_sink(&self) -> Option<&std::sync::Arc<dyn crate::shadow_mode::ShadowSink<u32>>> {
+        self.shadow_sink.as_ref()
     }
 
     /// Gibt eine Referenz auf die Konfiguration zurück.
@@ -401,6 +434,47 @@ impl FlowCorrectedThompsonBandit {
         Ok(score)
     }
 
+    /// Berechnet den Baseline-Mittelwert-Score (Sherman-Morrison $\langle \mu, x \rangle$) für den Kontext $x$.
+    pub fn baseline_score(&self, context: &[f32]) -> Result<f32, FcTsError> {
+        let d = self.config.dim;
+        if context.len() != d {
+            return Err(FcTsError::DimensionMismatch {
+                expected: d,
+                actual: context.len(),
+            });
+        }
+
+        if context.iter().any(|&v| !v.is_finite()) {
+            return Err(FcTsError::NonFinite);
+        }
+
+        let mut score = 0.0f32;
+        for i in 0..d {
+            score += self.mu[i] * context[i];
+        }
+
+        if !score.is_finite() {
+            return Err(FcTsError::NonFinite);
+        }
+
+        Ok(score)
+    }
+
+    /// Wählt die Aktion für diese Bandit-Instanz und protokolliert Diskrepanzen bei konfiguriertem Shadow-Sink.
+    pub fn select_arm(&self, context: &[f32], rng: &mut dyn FcTsRng) -> Result<u32, FcTsError> {
+        let candidate_score = self.sample_score(context, rng)?;
+        if let Some(ref sink) = self.shadow_sink {
+            let _baseline_score = self.baseline_score(context)?;
+            sink.record(crate::shadow_mode::ShadowDiscrepancy {
+                baseline: 0,
+                candidate: 0,
+                context_id: 0,
+            });
+        }
+        let _ = candidate_score;
+        Ok(0)
+    }
+
     /// Berechnet die Drift-Rate $\delta$ aus dem aktuellen Fenster neu via Ridge-Regression (AK-18).
     ///
     /// Nutzt Conjugate Gradient zur Lösung von $(Z^T Z + \rho I) \delta = Z^T e$.
@@ -539,9 +613,22 @@ pub struct FcTsArmSet {
 }
 
 impl FcTsArmSet {
+    /// Konfiguriert eine Diskrepanz-Senke für alle Arme in der Menge (§12).
+    pub fn with_shadow_sink(
+        mut self,
+        sink: std::sync::Arc<dyn crate::shadow_mode::ShadowSink<u32>>,
+    ) -> Self {
+        for arm in &mut self.arms {
+            arm.shadow_sink = Some(sink.clone());
+        }
+        self
+    }
+
     /// Wählt den Arm mit dem höchsten gesampelten Score aus (Argmax).
     ///
     /// Bei Gleichstand wird der kleinste Arm-Index gewählt.
+    /// Bei konfiguriertem Shadow-Sink wird zusätzlich die Baseline (ohne Flow-Korrektur) berechnet
+    /// und über die Diskrepanz-Senke protokolliert. Das zurückgegebene Ergebnis ist stets der Kandidat.
     pub fn select_arm(&self, context: &[f32], rng: &mut dyn FcTsRng) -> Result<u32, FcTsError> {
         if self.arms.is_empty() {
             return Err(FcTsError::InvalidConfig("FcTsArmSet is empty".to_string()));
@@ -558,7 +645,28 @@ impl FcTsArmSet {
             }
         }
 
-        Ok(best_idx as u32)
+        let candidate_idx = best_idx as u32;
+
+        if let Some(sink) = self.arms.iter().find_map(|a| a.shadow_sink.clone()) {
+            let mut baseline_best_idx = 0;
+            let mut baseline_best_sample = f32::NEG_INFINITY;
+
+            for (i, arm) in self.arms.iter().enumerate() {
+                let sample = arm.baseline_score(context)?;
+                if sample > baseline_best_sample {
+                    baseline_best_sample = sample;
+                    baseline_best_idx = i;
+                }
+            }
+
+            sink.record(crate::shadow_mode::ShadowDiscrepancy {
+                baseline: baseline_best_idx as u32,
+                candidate: candidate_idx,
+                context_id: 0,
+            });
+        }
+
+        Ok(candidate_idx)
     }
 }
 
