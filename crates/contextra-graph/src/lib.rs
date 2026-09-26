@@ -97,7 +97,9 @@ pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,
 };
 pub use tl_hfd::{
-    shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, ShadowComparison, TlHfdError, TlHfdParams,
+    shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, DefaultFlipGate, ShadowComparison,
+    ShadowDiscrepancyReport, TlHfdError, TlHfdFlipGate, TlHfdParams, MIN_AGREEMENT_THRESHOLD,
+    MIN_SHADOW_SAMPLES,
 };
 
 /// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
