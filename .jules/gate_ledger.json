@@ -1,0 +1,48 @@
+{
+  "timestamp_utc": "1790444223",
+  "worktree_hash": "661f2f14138f8f0fb7ad0055c49040f48afd5510",
+  "mode": "full",
+  "steps": [
+    {
+      "name": "fmt",
+      "status": "FAIL",
+      "detail": null
+    },
+    {
+      "name": "clippy",
+      "status": "FAIL",
+      "detail": null
+    },
+    {
+      "name": "check",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "check-ring-layering",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "check-vetoes",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "check-agents-integrity",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "check-phantom-files",
+      "status": "PASS",
+      "detail": null
+    },
+    {
+      "name": "debt-audit",
+      "status": "FAIL",
+      "detail": null
+    }
+  ],
+  "overall_status": "FAIL"
+}
