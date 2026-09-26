@@ -12,6 +12,7 @@
 pub mod error;
 pub mod error_dto;
 pub mod model_fingerprint;
+pub mod retrieval_strategy;
 pub mod schema;
 pub mod tenant_scope;
 pub mod tombstone;
@@ -20,6 +21,7 @@ pub mod types;
 pub use error::{ContextraError, Result};
 pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;
+pub use retrieval_strategy::RetrievalStrategy;
 pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
