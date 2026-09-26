@@ -74,7 +74,10 @@ impl HybridSearchProvider for MockSearchProvider {
 struct MockCommunityResolver;
 
 impl CommunityResolver for MockCommunityResolver {
-    fn get_community<'a>(&'a self, _entity: EntityId) -> BoxFuture<'a, ContextraResult<Option<u64>>> {
+    fn get_community<'a>(
+        &'a self,
+        _entity: EntityId,
+    ) -> BoxFuture<'a, ContextraResult<Option<u64>>> {
         Box::pin(async move { Ok(None) })
     }
 }
@@ -238,7 +241,8 @@ async fn regret_grows_sublinearly() -> std::result::Result<(), Box<dyn std::erro
 }
 
 #[tokio::test]
-async fn router_eventually_prefers_best_arm() -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn router_eventually_prefers_best_arm() -> std::result::Result<(), Box<dyn std::error::Error>>
+{
     let dim = 4;
     let true_means = vec![0.85f32, 0.70, 0.55, 0.40, 0.25];
     let env = SyntheticBanditEnv::new(true_means, dim);

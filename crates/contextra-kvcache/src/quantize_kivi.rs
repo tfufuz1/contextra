@@ -104,7 +104,10 @@ pub fn pack_kivi_block(values: &[f32]) -> KiviQuantizedBlock {
     let finite_vals: Vec<f32> = values.iter().copied().filter(|v| v.is_finite()).collect();
     let (min_v, max_v) = if !finite_vals.is_empty() {
         let min_val = finite_vals.iter().copied().fold(f32::INFINITY, f32::min);
-        let max_val = finite_vals.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let max_val = finite_vals
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max);
         (min_val, max_val)
     } else {
         (0.0, 0.0)

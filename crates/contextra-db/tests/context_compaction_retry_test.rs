@@ -1,10 +1,10 @@
+use contextra_db::{
+    cleanup_orphaned_consolidation_intents, ContextCompactor, Contextra, ContextraConfig,
+};
 use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, VectorIndex};
 use contextra_types::{
     error::{ContextraError, Result},
     DocId,
-};
-use contextra_db::{
-    cleanup_orphaned_consolidation_intents, ContextCompactor, Contextra, ContextraConfig,
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -37,9 +37,7 @@ struct MutatingLlmGenerator<S: StorageEngine, V: VectorIndex> {
     call_count: Arc<AtomicUsize>,
 }
 
-impl<S: StorageEngine, V: VectorIndex> LlmTextGenerator
-    for MutatingLlmGenerator<S, V>
-{
+impl<S: StorageEngine, V: VectorIndex> LlmTextGenerator for MutatingLlmGenerator<S, V> {
     fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
             let count = self.call_count.fetch_add(1, Ordering::SeqCst);

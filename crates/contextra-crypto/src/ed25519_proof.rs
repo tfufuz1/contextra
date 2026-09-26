@@ -160,7 +160,10 @@ mod tests {
         let vk_bytes = keypair.verifying_key_bytes();
 
         assert_eq!(vk_bytes, keypair.verifying_key.to_bytes());
-        assert_eq!(keypair.signing_key().verifying_key(), *keypair.verifying_key());
+        assert_eq!(
+            keypair.signing_key().verifying_key(),
+            *keypair.verifying_key()
+        );
     }
 
     #[test]

@@ -21,6 +21,6 @@ pub use error::{ContextraError, Result};
 pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;
 pub use schema::{DocIdWidth, ManifestSchemaVersion};
-pub use tenant_scope::{TenantScoped, TenantScopeViolation};
+pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::*;

@@ -1,4 +1,6 @@
-use contextra_graph::community::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
+use contextra_graph::community::{
+    detect_communities, CommunityAssignment, CommunityDetectionConfig,
+};
 use contextra_graph::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
@@ -17,7 +19,11 @@ async fn load_karate_club_graph() -> CsrGraph {
         serde_json::from_str(raw_json).expect("Karate club fixture JSON must be valid");
 
     assert_eq!(dataset.nodes, 34, "Karate club graph must contain 34 nodes");
-    assert_eq!(dataset.edges.len(), 78, "Karate club graph must contain 78 edges");
+    assert_eq!(
+        dataset.edges.len(),
+        78,
+        "Karate club graph must contain 78 edges"
+    );
 
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
@@ -26,10 +32,7 @@ async fn load_karate_club_graph() -> CsrGraph {
     for i in 0..dataset.nodes {
         let eid = EntityId::new((i + 1) as u64);
         graph
-            .add_entity(
-                tx,
-                Entity::new(eid, format!("Node_{i}"), "KarateMember"),
-            )
+            .add_entity(tx, Entity::new(eid, format!("Node_{i}"), "KarateMember"))
             .await
             .expect("add_entity must succeed");
     }
@@ -38,17 +41,11 @@ async fn load_karate_club_graph() -> CsrGraph {
         let u_id = EntityId::new((u + 1) as u64);
         let v_id = EntityId::new((v + 1) as u64);
         graph
-            .add_edge(
-                tx,
-                Edge::new(u_id, v_id, "member_link"),
-            )
+            .add_edge(tx, Edge::new(u_id, v_id, "member_link"))
             .await
             .expect("add_edge forward must succeed");
         graph
-            .add_edge(
-                tx,
-                Edge::new(v_id, u_id, "member_link"),
-            )
+            .add_edge(tx, Edge::new(v_id, u_id, "member_link"))
             .await
             .expect("add_edge backward must succeed");
     }
@@ -139,7 +136,11 @@ async fn leiden_on_karate_club_matches_reference() {
         "Modularity Q must be at least 0.3, got: {modularity}"
     );
 
-    let num_communities = communities.iter().map(|a| a.community_id).collect::<HashSet<_>>().len();
+    let num_communities = communities
+        .iter()
+        .map(|a| a.community_id)
+        .collect::<HashSet<_>>()
+        .len();
     assert!(
         (2..=10).contains(&num_communities),
         "Number of detected communities must be between 2 and 10, got: {num_communities}"

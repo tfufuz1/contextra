@@ -50,7 +50,8 @@ async fn test_recovery_fd_exhaustion_regression() {
             .unwrap();
         let key = format!("sst_key{:05}", i).into_bytes();
         let val = format!("sst_value{:05}", i).into_bytes();
-        builder.add(&key, &val, (wal_count + i) as u64, (wal_count + i) as u64)
+        builder
+            .add(&key, &val, (wal_count + i) as u64, (wal_count + i) as u64)
             .await
             .unwrap();
         builder.finish().await.unwrap();

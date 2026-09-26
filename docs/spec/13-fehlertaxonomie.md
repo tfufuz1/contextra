@@ -9,10 +9,10 @@ chapter: "13"
 | `contextra-core` | `CoreError` | — |
 | `contextra-store` | `StoreError` | `WalError`, `LockError`, `CoreError` |
 | `contextra-crypto` | `CryptoError` | — |
-| `contextra-index` | `IndexError` | `CoreError` |
+| `contextra-vector` | `IndexError` | `CoreError` |
 | `contextra-graph` | `GraphMutationError`, `GraphError` | `LockError` |
 | `contextra-router` | `BanditError` | — |
-| `contextra-candle` | `KvBridgeError` | `CryptoError` |
+| `contextra-infer-candle` | `KvBridgeError` | `CryptoError` |
 | `contextra-mcp` | `SandboxError`, `EgressError` | `wasmtime::Error` |
 | `contextra-db` | `DbError` | alle Layer-1-Fehler per `#[from]` |
 

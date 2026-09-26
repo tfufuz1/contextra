@@ -88,7 +88,7 @@ Um bis zu **165 Sitzungen pro Tag** effizient abzuwickeln, gelten folgende Richt
    * Jede Sitzung startet in einer frischen ephemeren VM-Instanz oder einem zurückgesetzten OverlayFS.
    * Das Ausführen von `.jules/setup/environment_script.sh` zu Sitzungsbeginn garantiert, dass innerhalb von < 10 Sekunden alle System-Bibliotheken und Binaries einsatzbereit sind.
 2. **Incremental Target Warmup:**
-   * `/app/target` speichert kompilierte Abhängigkeiten vor. Durch `--exclude contextra-tauri` bei Routine-Checks werden teure C++ GTK/WebKit Builds vermieden.
+   * `/app/target` speichert kompilierte Abhängigkeiten vor. Durch `--exclude contextra-tauri` bei Routine-Checks werden teure C++ GTK/WebKit Builds vermieden. <!-- crate-ref-ignore -->
 3. **Deterministic xtask Gate Enforcement:**
    * Das xtask-System (`cargo run --manifest-path xtask/Cargo.toml -- <cmd>`) dient als alleinige Wahrheit bezüglich Quality Gates.
    * Keine Annahmen aus früheren Sitzungen übernehmen; stets den aktuellen Stand über `jules-preflight` prüfen.

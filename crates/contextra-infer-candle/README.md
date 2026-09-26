@@ -1,6 +1,6 @@
-# contextra-candle
+# contextra-infer-candle
 
-`contextra-candle` stellt die native GGUF-Inferenz und In-Memory-Inferenzunterstützung via Candle bereit (Ring 2).
+`contextra-infer-candle` stellt die native GGUF-Inferenz und In-Memory-Inferenzunterstützung via Candle bereit (Ring 2).
 
 ## Zweck
 

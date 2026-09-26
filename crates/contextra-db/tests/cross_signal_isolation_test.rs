@@ -3,8 +3,8 @@
 // INVARIANTEN: Verifiziert, ob 4-Signal Hybrid-Suche konsistent gegen einen Snapshot liest oder Isolation-Asymmetrien auftreten.
 // STAND: TS:2026-08-31T23:10:00Z (SESSION: 0dcb9f3b)
 
-use contextra_types::{DistanceMetric, Result};
 use contextra_db::{Contextra, ContextraConfig};
+use contextra_types::{DistanceMetric, Result};
 use serde_json::json;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

@@ -10,7 +10,6 @@ use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;
 use tempfile::TempDir;
 
-
 /// Verifies that an I/O failure during `commit()` properly propagates an error,
 /// leaves `last_committed_tx` unchanged, allows recovery once write permissions are restored,
 /// and preserves previously committed entries without collateral damage.

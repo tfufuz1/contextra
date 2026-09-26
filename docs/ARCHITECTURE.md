@@ -1,140 +1,147 @@
-# Contextra Architektur — Kurzreferenz
+# Contextra — Systemarchitektur & Ring-Modell
 
-## Architektur-Übersicht & Workspace Crates
+Dieses Dokument ist die maßgebliche technische Architekturbeschreibung des Contextra Kerns. Es übersetzt die **[Finale Produktspezifikation (Synthese)](spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)** in eine vertiefte Systembeschreibung, dokumentiert den Crate-Bestand, das Ring-0–4-Modell, die drei Produkt-Ringe (`fast`, `sovereign`, `compliance`), die Vier-Schichten-Interface-Architektur sowie die Systeminvarianten und Locking-Disziplin.
 
-Contextra ist in ein Schichten-Modell gegliedert. Sämtliche Workspace-Crates halten sich an den strikten gerichteten azyklischen Graphen (DAG).
+---
 
-```
-┌───────────────────────────────────────────────────────────┐
-│  Zugangswege & Anbindungen                                │
-│  ┌───────────────────────┐  ┌──────────────────────────┐  │
-│  │  contextra-py (Python)  │  │  MCP Server              │  │
-│  │  (Primär / Empfohlen) │  │  (contextra-mcp)           │  │
-│  └───────────┬───────────┘  └────────────┬─────────────┘  │
-│              │                           │                │
-│              │   ┌───────────────────────┴──────────────┐ │
-│              │   │ contextra-tauri (Desktop App)          │ │
-│              │   │ (deprecated, Entfernung 2026-11-07)  │ │
-│              │   └───────────────────────┬──────────────┘ │
-│              │                           │                │
-│  ┌───────────▼───────────────────────────▼──────────────┐ │
-│  │  contextra-ollama (lokales LLM & Embedding Backend)     │ │
-│  └──────┬───────────────────────────────────────────────┘ │
-│         │                                                 │
-│  ┌──────▼───────────────────────────────────────────────┐ │
-│  │  contextra-db (4-Signal RAG-Engine)                    │ │
-│  │  Vektor + BM25 + Wissensgraph + Metadaten            │ │
-│  └──────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────┘
-            Alles lokal. Nichts verlässt den Rechner.
-```
+## Inhaltsverzeichnis
+1. [Ring-Modell (Ring 0–4) & Produkt-Ringe](#1-ring-modell)
+2. [Vier-Schichten-Interface-Modell](#2-vier-schichten-modell)
+3. [Crate-Inventar & Abhängigkeitsmatrix](#3-crate-inventar)
+4. [DAG-Topologie (Automatisch generiert)](#4-dag-topologie)
+5. [Systeminvarianten P1–P30 (Automatisch generiert)](#5-systeminvarianten)
+6. [Unsafe-Inseln & Locking-Disziplin](#6-unsafe-inseln)
+7. [Referenzen & Weiterführende Dokumente](#7-referenzen)
+
+---
+
+<a id="1-ring-modell"></a>
+## 1. Ring-Modell (Ring 0–4) & Produkt-Ringe
+
+Contextra gliedert seine Funktionalität architektonisch in ein Fünf-Ring-Schichtenmodell (Ring 0 bis Ring 4) sowie kommerziell/kryptographisch in drei Produkt-Ringe (`fast`, `sovereign`, `compliance`).
+
+### 1.1 Das Fünf-Ring-Schichtenmodell
+
+Abhängigkeiten dürfen ausschließlich **von höheren Ringen auf tiefere Ringe** verlaufen. Aufwärtskanten (z. B. ein Ring-0-Crate, das von einem Ring-3-Crate abhängt) sind streng verboten (Principle P5 / Ring Layering).
+
+* **Ring 0 — Foundation & Pure Numerics / Types (Sync-Kern)**:
+  Kerneigene Datenstrukturen, Typdefinitionen, Traits, Kryptographie, Mathematik, Vektor- und Graph-Primitive. Ring 0 enthält **kein `tokio`** (P26: *Sync-Kern, async-Schale*).
+  *Crates:* `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-wire`, `contextra-sys`, `contextra-simd`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-adapt`.
+* **Ring 1 — Persistence & Cache**:
+  Persistenz-Engines (LSM-Tree, WAL mit Group-Commit, HMAC-Integritätskette) und Caching-Infrastruktur (KV-Cache, Checkpoint-Registry). Async-I/O an Grenzen erlaubt.
+  *Crates:* `contextra-store`, `contextra-kvcache`, `contextra-checkpoint`.
+* **Ring 2 — External Adapters & Sandboxing (Leaf Engines)**:
+  Isoliert flüchtige oder externe Schwergewicht-Abhängigkeiten (`candle`, `ollama`, `ort`/ONNX, `wasmtime`). Ring-2-Crates sind Blätter im Graphen und hängen nie von Ring 1 oder 3 ab.
+  *Crates:* `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx`, `contextra-sandbox`.
+* **Ring 3 — Orchestration & Cognition**:
+  Geschäfts- und Orchestrierungslogik (`Collection`, Multi-Index-Synthese, PII-Vault/Privacy Gateway, Profil-Routing, Agent-Workflow).
+  *Crates:* `contextra-engine`, `contextra-cognition`, `contextra-privacy`, `contextra-router`, `contextra-agent`.
+* **Ring 4 — Boundary & Composition Roots**:
+  Öffentliche Fassade (`contextra`), MCP-Server (`contextra-mcp`) und Language-Bindings (`contextra-py`). Bildet die einzige Composition Root.
+
+### 1.2 Die drei Produkt-Ringe (Open vs. Closed)
+
+- **Ring `fast` (MIT/Apache-2.0, Open Source):** Für jeden Nutzer frei zugänglich. Enthält Vektor-, Text- und Graph-Retrieval, Bandit-Routing sowie lokale Inferenz. Kein Krypto-Overhead im Hot-Path.
+- **Ring `sovereign` (Quelloffen, Opt-in Aktivierung):** Quellcode bleibt offen (Löschbeweis `DeletionProof`, Privacy Gateway, Zero-Net-Traffic). Aktivierung ist wegen Latenzkosten opt-in.
+- **Ring `compliance` (Closed-Source, Commercial):** Quellcode verlässt das Haus nie. Vertrieb als signiertes Binary/Appliance. Beinhaltet Lizenzschicht (`contextra-license`), BSI TR-02102-1 Mapping und Mandanten-Scoping. <!-- crate-ref-ignore -->
+
+---
+
+<a id="2-vier-schichten-modell"></a>
+## 2. Vier-Schichten-Interface-Modell
+
+Jede Schnittstelle in Contextra gehört zu genau einer der vier Schichten gemäß §5 der Produktspezifikation:
+
+1. **Schicht 1 — Domänentypen (`contextra-types`):** Reine, serialisierbare Typen (`DocId`, `TxId`, `TenantId`, `FilterAST`, Budgets).
+2. **Schicht 2 — Ports (`contextra-ports`):** Trait-Definitionen (`StorageEngine`, `VectorIndex`, `TextIndex`, `GraphEngine`, `Embedder`).
+3. **Schicht 3 — Fassade (`contextra-engine`, `contextra`):** Das vereinigende High-Level API für Rust.
+4. **Schicht 4 — Produktgrenze (`contextra-mcp`, `contextra-py`, `contextra-wire`):** Stdio JSON-RPC MCP Server, PyO3 Bindings, FlatBuffers Schema.
+
+---
+
+<a id="3-crate-inventar"></a>
+## 3. Crate-Inventar & Abhängigkeitsmatrix
+
+Tabelle aller Kern-Crates unter `crates/`:
+
+| Ring | Crate-Name | Inhalt & Verantwortlichkeit |
+|---|---|---|
+| **0** | `contextra-types` | Identifikatoren (`DocId`, `TxId`, `TenantId`), Filter-AST, Kernel-Budgets |
+| **0** | `contextra-ports` | Trait-Verträge für Storage, Indizes, Embedder & Uhren |
+| **0** | `contextra-mvcc` | `SeqLog`, `SnapshotRegistry` und transaktionaler `TxBuffer` |
+| **0** | `contextra-wire` | FlatBuffers-IPC Generat & Zero-Copy Adapter (**Unsafe-Insel**) |
+| **0** | `contextra-sys` | System-Abstraktionen für `mmap`, `mlock` & Win32-ACLs (**Unsafe-Insel**) |
+| **0** | `contextra-simd` | AVX2/AVX-512/NEON SIMD-Distanzberechnungskerne (**Unsafe-Insel**) |
+| **0** | `contextra-crypto` | AES-256-GCM-SIV, WAL-HMAC-Kette, `DeletionProof`, Zeroize |
+| **0** | `contextra-vector` | HNSW, DiskANN, SQ8 / RaBitQ Quantisierung |
+| **0** | `contextra-text` | BM25 / BM25F Volltextindexierung & deutsche Morphologie |
+| **0** | `contextra-graph` | CSR Graph, Forward-Push PPR, Leiden Community-Detection, Hyperkanten |
+| **0** | `contextra-rank` | 4-Signal-Fusion, Isotonic- / Platt-Kalibrierung & Drift |
+| **0** | `contextra-adapt` | LinUCB Bandit, Sherman-Morrison, FC-TS, Lyapunov-Drift & PID |
+| **1** | `contextra-store` | LSM-Tree Storage Engine mit WAL Group-Commit & HMAC-Check |
+| **1** | `contextra-kvcache` | Verschlüsselter Prefix-Radix-Baum & KV-Cache Segmentverwaltung |
+| **1** | `contextra-checkpoint` | Time-Travel-Registry & Checkpoint-Verwaltung ohne globalen Zustand |
+| **2** | `contextra-infer-candle` | GGUF-Modell-Inferenz via Candle |
+| **2** | `contextra-infer-ollama` | HTTP-Inferenz-Client für Ollama |
+| **2** | `contextra-infer-onnx` | ONNX Embeddings & Cross-Encoder Reranking via `ort` |
+| **2** | `contextra-sandbox` | WASM-Ausführungsisolation mit Fuel- & Wall-Clock-Limits via Wasmtime |
+| **3** | `contextra-engine` | `Collection`, Multi-Index-Pläne & Schreibtransaktionen |
+| **3** | `contextra-cognition` | Dreistufige Kognitionspipeline, Synthese & Kompaktierung |
+| **3** | `contextra-privacy` | Cloud-Egress Gateway, PII-Vault, Surrogat-Tokenisierung & DLP |
+| **3** | `contextra-router` | SLM-Profil-Routing & MCP-Dispatch |
+| **3** | `contextra-agent` | Agenten-Workflow-Engine mit auditierbarer State-Machine |
+| **4** | `contextra` | Haupt-Fassade & Composition Root |
+| **4** | `contextra-mcp` | Stdio-JSON-RPC MCP Server |
+| **4** | `contextra-py` | PyO3 Python-FFI Bindings |
+
+---
+
+<a id="4-dag-topologie"></a>
+## 4. DAG-Topologie (Automatisch generiert)
 
 <!-- AUTOGENERATED:START:DAG_TOPOLOGY -->
 ```
-Layer 0:  contextra-adapt — Adaptive controllers, bandits, and PID regulators for Contextra
-          contextra-sys — Low-level unsafe system abstractions and FFI island for Contextra (Ring 0)
-          contextra-types — Canonical domain types, IDs, budgets, filters, and error types for Contextra
-          contextra-wire — Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for Contextra
-Layer 1:  contextra-mvcc — Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for Contextra (deps: contextra-types)
-          contextra-ports — Canonical dyn-compatible port traits for Contextra subsystems (deps: contextra-types)
-Layer 2:  contextra-core — Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for Contextra (deps: contextra-mvcc, contextra-ports, contextra-types, contextra-wire)
-          contextra-rank — 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS (deps: contextra-ports, contextra-types)
-Layer 3:  contextra-checkpoint — Backup and snapshot management for Contextra storage (deps: contextra-core)
-          contextra-graph — CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) (deps: contextra-core)
-          contextra-infer-ollama —  (deps: contextra-core, contextra-rank)
-          contextra-infer-onnx —  (deps: contextra-candle, contextra-core, contextra-rank)
-          contextra-privacy — Cloud Egress Security, DLP & Exfiltration Protection for Contextra (Ring 3) (deps: contextra-core)
-          contextra-sandbox — WASM Execution Boundary for Contextra MCP CodeExecution Permission (deps: contextra-core)
-          contextra-simd — Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island) (deps: contextra-core)
-          contextra-testkit — Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for Contextra (deps: contextra-core)
-          contextra-text — Contextra — Text processing and BM25 search for Hybrid Search (deps: contextra-core)
-Layer 4:  contextra-crypto — Encryption at Rest and KV-Cache Security utilities for Contextra (deps: contextra-core, contextra-privacy)
-          contextra-router —  (deps: contextra-adapt, contextra-core, contextra-ports, contextra-privacy)
-Layer 5:  contextra-kvcache — Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra (deps: contextra-core, contextra-crypto)
-          contextra-store — LSM-Tree storage engine for Contextra (deps: contextra-core, contextra-crypto, contextra-sys)
-          contextra-vector — HNSW vector index with SIMD distance computation for Contextra (deps: contextra-core, contextra-crypto, contextra-simd, contextra-sys)
-Layer 6:  contextra-engine — Contextra — Core storage, index, and transaction orchestrator engine (deps: contextra-adapt, contextra-checkpoint, contextra-core, contextra-crypto, contextra-graph, contextra-rank, contextra-store, contextra-sys, contextra-text, contextra-vector)
-          contextra-infer-candle — Native Candle GGUF ML inference backend for Contextra (deps: contextra-core, contextra-crypto, contextra-ports, contextra-rank, contextra-store)
-Layer 7:  contextra-cognition — Contextra — Memory consolidation, compaction, and context management (deps: contextra-core, contextra-engine, contextra-graph, contextra-store, contextra-vector)
-Layer 8:  contextra-db — Contextra — Embedded hybrid-search for AI agents (deps: contextra-adapt, contextra-checkpoint, contextra-cognition, contextra-core, contextra-crypto, contextra-engine, contextra-graph, contextra-index, contextra-rank, contextra-store, contextra-sys, contextra-text)
-Layer 9:  contextra — Contextra — Embedded hybrid-search for AI agents (Facade) (deps: contextra-core, contextra-db, contextra-infer-candle, contextra-infer-ollama, contextra-infer-onnx, contextra-rank, contextra-router)
-          contextra-agent — Persistent agent workflow engine for Contextra — checkpoint/execute/audit loop (deps: contextra-checkpoint, contextra-core, contextra-db, contextra-graph, contextra-router, contextra-store)
+Layer 0:  contextra-adapt — Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller)
+          contextra-privacy — Egress Filtering, Anonymisierung und Privacy Compliance Rules
+          contextra-sandbox — WASM Execution Boundary und Isolations-Sandbox
+          contextra-sys — Systemnahe Bindings, Low-Level I/O und Memory-Mapping
+          contextra-types — Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)
+          contextra-wire — FlatBuffers Wire-Protokolle und Serialisierungs-Formate
+Layer 1:  contextra-crypto — Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC (deps: contextra-types)
+          contextra-mvcc — Multi-Version Concurrency Control und Isolation-Mechanismen (deps: contextra-types)
+          contextra-ports — Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung (deps: contextra-types)
+Layer 2:  contextra-audit-export — GDPR Article 30 Processing Register export generator for Contextra (deps: contextra-ports, contextra-types)
+          contextra-checkpoint — Persistent Checkpoint Engine und Blake3 Manifest-Verifikation (deps: contextra-ports, contextra-types)
+          contextra-core — Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer (deps: contextra-mvcc, contextra-ports, contextra-types, contextra-wire)
+          contextra-graph — CSR Graph-Engine, Path Graphing und GraphRAG Community Detection (deps: contextra-ports, contextra-types)
+          contextra-kvcache — Stufenmodell KV-Cache Storage & Offloading (deps: contextra-crypto, contextra-ports, contextra-types)
+          contextra-rank — Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers) (deps: contextra-ports, contextra-types)
+          contextra-router — Lyapunov Drift Control und Multi-Candidate Search Routing Engine (deps: contextra-adapt, contextra-ports, contextra-privacy, contextra-types, contextra-wire)
+          contextra-testkit — Test Fixtures, Mock Engines und Chaos Matrix Harness (deps: contextra-ports, contextra-types)
+          contextra-text — Volltextsuche und Inverted-Index (BM25 Engine) (deps: contextra-ports, contextra-types)
+Layer 3:  contextra-infer-ollama — Ollama External Provider Client und Embeddings Integration (deps: contextra-ports, contextra-rank, contextra-types)
+          contextra-simd — SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen (deps: contextra-core)
+          contextra-store — LSM-Tree Storage Engine, WAL Durability und Compaction Engine (deps: contextra-core, contextra-crypto, contextra-sys)
+Layer 4:  contextra-infer-candle — Candle LLM Inference Client und KV-Bridge Adapter (deps: contextra-crypto, contextra-ports, contextra-rank, contextra-store, contextra-types)
+          contextra-vector — Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung) (deps: contextra-core, contextra-crypto, contextra-simd, contextra-sys)
+Layer 5:  contextra-engine — Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02) (deps: contextra-adapt, contextra-checkpoint, contextra-crypto, contextra-graph, contextra-mvcc, contextra-ports, contextra-rank, contextra-store, contextra-sys, contextra-text, contextra-types, contextra-vector)
+          contextra-infer-onnx — ONNX Embeddings und Cross-Encoder Reranking Execution Provider (deps: contextra-infer-candle, contextra-ports, contextra-rank, contextra-types)
+Layer 6:  contextra-cognition — Konsolidierungs- und Background Sleep Passes (deps: contextra-engine, contextra-graph, contextra-ports, contextra-store, contextra-types, contextra-vector)
+Layer 7:  contextra-db — Contextra Main Database Abstraction, Hybrid Search & Collections (deps: contextra-adapt, contextra-checkpoint, contextra-cognition, contextra-crypto, contextra-engine, contextra-graph, contextra-ports, contextra-rank, contextra-store, contextra-sys, contextra-text, contextra-types, contextra-vector)
+Layer 8:  contextra — Haupt-Library Facade für Endanwender (deps: contextra-core, contextra-crypto, contextra-db, contextra-infer-candle, contextra-infer-ollama, contextra-infer-onnx, contextra-privacy, contextra-rank, contextra-router)
+          contextra-agent — Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline (deps: contextra-checkpoint, contextra-db, contextra-graph, contextra-ports, contextra-router, contextra-store, contextra-types)
           contextra-bench — Contextra — Reproducible Benchmark Harness for Retrieval Accuracy (deps: contextra-core, contextra-db, contextra-graph, contextra-infer-onnx, contextra-store, contextra-text, contextra-vector)
-          contextra-py — Python bindings for Contextra using PyO3 (deps: contextra-adapt, contextra-core, contextra-db, contextra-rank, contextra-router, contextra-store)
-Layer 10:  contextra-mcp —  (deps: contextra-adapt, contextra-agent, contextra-core, contextra-crypto, contextra-infer-candle, contextra-infer-onnx, contextra-privacy, contextra-rank)
+          contextra-py — PyO3 Python Bindings (deps: contextra-adapt, contextra-core, contextra-db, contextra-rank, contextra-router, contextra-store)
+Layer 9:  contextra-mcp — Model Context Protocol Server & Cloud Egress Gateway (deps: contextra-adapt, contextra-agent, contextra-crypto, contextra-infer-candle, contextra-infer-onnx, contextra-ports, contextra-privacy, contextra-rank, contextra-types, contextra-wire)
 ```
 
-**Aktiver Workspace-Build**: 31 Kern-Crates.
+**Aktiver Workspace-Build**: 32 Kern-Crates.
 <!-- AUTOGENERATED:END:DAG_TOPOLOGY -->
 
-## Crate-Status
+---
 
-### Produktionsreif ✅
-| Crate | Funktion |
-|---|---|
-| contextra-core | Typen, Traits, Domain-Modell |
-| contextra-security (crates/contextra-crypto) | WAL v3 HMAC-Chain, Kryptographie, KV-Segment-Sicherheit |
-| contextra-store | LSM-Storage, 16-Shard MemTable, SSTable-Compaction |
-| contextra-index | HNSW (2-Phasen-CoW-Rebuild), DiskANN (Build) |
-| contextra-text | BM25-Volltextsuche, Deutsche Morphologie |
-| contextra-embed | Embeddings (ONNX), Cross-Encoder Reranker |
-| contextra-graph | CSR-Graph, PPR, Community Detection, Session-DAG |
-| contextra-router | Conformal Router, SlmProfile-basiertes Routing |
-| contextra-db | Kernoperationen, Fusion, Search-Pipeline |
-| contextra-agent | Agent Workflow Engine |
-| contextra-ollama | Ollama Client & Embeddings |
-| contextra-mcp | MCP Server |
-| contextra-py | Python FFI Bindings (PyO3) — Primärer Zugangsweg |
-| contextra-tauri | Desktop App Shell (deprecated, Entfernung 2026-11-07) |
-| contextra-checkpoint | Backup & Snapshot Management |
-| contextra-bench | Synthetic Benchmark Harness |
-
-### In aktiver Entwicklung ⚙️
-| Crate | Status |
-|---|---|
-| contextra-calibration | G0-Sprint: IsotonicCalibrator + PlattScaler |
-| contextra-candle | H2-Sprint: Native GGUF-Inferenz (Datenhoheit) |
-
-## Workspace Crates Übersicht
-
-- **Layer 0**: `contextra-core-ipc-gen`, `contextra-core` (Typen, Traits, Error, DocId [64-bit Default / 128-bit via docid-128])
-- **Layer 1**: `contextra-store` (LSM-Tree, WAL, Block-Cache), `contextra-index` (HNSW/DiskANN), `contextra-text` (BM25), `contextra-security` (crates/contextra-crypto), `contextra-graph` (CSR Graph, Hyperkanten), `contextra-checkpoint` (Snapshotting), `contextra-calibration`
-- **Layer 2**: `contextra-db` (Collections & 4-Signal Fusion)
-- **Layer 3**: `contextra-ollama` (Ollama Client), `contextra-candle` (Inferenz, KV-Cache), `contextra-embed` (ONNX-Embeddings, optional), `contextra-agent` (Agent Workflow Engine), `contextra-router` (Contextual Bandit Routing), `contextra-py` (Python FFI)
-- **Layer 4**: `contextra-mcp` (MCP Server, Sandbox, Egress Gateway)
-- **Layer 5**: `contextra-bench` (Benchmark-Harness)
-- **Layer 6.5**: `contextra-sandbox` (WASM Execution Boundary)
-
-*(Hinweis: `contextra-tauri` wurde gemäß Produktfokus auf PyPI & MCP Server vollständig als deprecated markiert und entfernt, siehe ADR-077).*
-
-## Kern-Philosophie
-Contextra ist das **Cognitive Operating System für LLM-Agenten — 4-Signal-RAG-Engine mit Contextual Retrieval, Cross-Encoder Reranking, Multi-Step Query, Session DAG und MCP Sandbox** — air-gapped, zero-panic (angestrebt), 100% Pure-Rust Sovereign Core (mit Ollama als lokalem LLM/Embedding Backend).
-
-## RAG-Pipeline (Phase 1, abgeschlossen)
-
-Contextra implementiert eine gestaffelte, mehrstufige Retrieval- und Ingestion-Pipeline (ADR-021):
-
-1. **Contextual Ingestion**: `ContextPrefixEngine` (`contextra-ollama`) generiert 50–100 Token Kontext-Präfixe vor der BM25- und Embedding-Indexierung.
-2. **4-Signal Hybrid-Indexierung**: Parallele Indexierung von HNSW-Vektoren, BM25-Volltext (mit Kontext-Präfix), CSR-Wissensgraph und Metadaten-Filtern.
-3. **Hybrid Retrieval via RRF**: Fusion aller Signale über `reciprocal_rank_fusion()` in `contextra-db`.
-4. **Multi-Step Query Expansion**: Iteratives Abfrage-Rewriting via `MultiStepEngine` (`contextra-db`) für komplexe Abfragen (bis zu 3 Runden).
-5. **Cross-Encoder Reranking**: Post-RRF Neuordnung der Top-K Treffer via `CrossEncoderReranker` in `contextra-embed` (optional via `--features onnx`, Passthrough-Fallback ohne ONNX).
-6. **Context Compaction**: Komprimierung langer Agenten-Historien via `ContextCompactor` (`contextra-db`) durch Ersetzung veralteter Tool-Outputs mit `StatusToken`.
-
-### Grounding & Quellenattribuierung (RAG Grounding)
-
-RAG-Antworten in Contextra sind instruiert, Antworten **ausschließlich** auf Basis der im `<context>`-Block bereitgestellten Informationen zu formulieren und Fakten mit Quellenangaben im Format `[Dateiname]` oder `[Dateiname, Abschnitt]` zu belegen. Wenn eine Information nicht im Kontext enthalten ist, antwortet das Modell mit der festen Fallback-Phrase: *"Diese Information ist in den importierten Dokumenten nicht enthalten."*
-
-> ℹ️ **Hinweis zur Modell-Sicherheit:** Die Grounding- und Zitiergebot-Instruktionen dienen als systemische Heuristik für das lokale LLM. Kleinere Sprachmodelle (z. B. 7B-Modelle wie `llama3.2`) folgen diesen Anweisungen sehr gut, können jedoch in Einzelfällen vereinzelt abweichen.
-
-## Produktstrategie
-- **Hauptausrichtung**: Lokale eingebettete Agent-Memory-Library & Python-Schnittstelle.
-- **Embedding Backend**: Ollama HTTP Inferenz (`contextra-ollama`) als primäres Embedding-Backend (ADR-008).
-- **4-Signal Fusion**: Vektor + BM25 + Wissensgraph + Metadaten-Filter, kombiniert mittels Reciprocal Rank Fusion (RRF).
-- **Feature**: DACH-Morphologie (German Compound Splitter) als Differenzierungsmerkmal für deutsche Sprache.
-- **DiskANN**: Out-of-Core Vektorsuche ist experimentell und hinter dem Cargo-Feature `experimental-diskann` verborgen, da sie noch nicht produktionsreif in `contextra-db` integriert ist.
-
-## Invarianten-Status
+<a id="5-systeminvarianten"></a>
+## 5. Systeminvarianten P1–P30 (Automatisch generiert)
 
 <!-- AUTOGENERATED:START:INVARIANTS_TABLE -->
 | Invariante | Status | Befund |
@@ -149,27 +156,36 @@ RAG-Antworten in Contextra sind instruiert, Antworten **ausschließlich** auf Ba
 | **Snapshot Isolation** | 🟢 Vollständig | Für Storage (LSM), Text (BM25) & Vektor (HNSW) vollständig implementiert. Graph-Suche operiert auf dem aktuellen In-Memory-Zustand (ADR-024). |
 <!-- AUTOGENERATED:END:INVARIANTS_TABLE -->
 
-## Sicherheit & Privacy
-- **HKDF Key Derivation**: Kryptographischer Kontext pro Datei.
-- **HMAC Chaining**: WAL-Integrität gegen Manipulation geschützt.
-- **Namespace Isolation**: Vollständige Trennung von Collections auf Storage-Ebene.
-- **MCP Sandbox Containment**: Tool-Outputs in `contextra-mcp` via AES-256-GCM-SIV verschlüsselt und Zeroize beim Verwerfen.
+---
 
-## Planungsdokument-Blueprint-Korrekturen
-Standard-Korrekturen für Architektur- und Planungs-Blueprints:
-1. **`SessionPool` Sichtbarkeit**: `SessionPool` (bzw. `OnnxSessionPool`) ist `pub(crate)` in `contextra-embed` und nicht exportiert. Für Modul-externe Nutzung bzw. Cross-Encoder (wie in `reranker.rs`) wird ein eigener `SessionPool` gehalten.
-2. **Keine `petgraph`-Abhängigkeit**: `contextra-graph` nutzt eine native Pure-Rust CSR-Graph-Implementierung (`SessionBranchTree`, `CsrGraph`) ohne `petgraph`-Workspace-Abhängigkeit gemäß ADR-004 (Pure Rust Sovereign Core Policy).
-3. **`CheckpointGuard` RAII & Snapshot-Referenzen**: `CheckpointGuard` besitzt RAII-Semantik (Auto-Rollback bei Drop) und ist bewusst nicht klonbar. Zustands-Referenzen werden als `snapshot_tx_id: Option<TxId>` gespeichert.
-4. **RRF-Nutzung**: `contextra-db::fusion` stellt `reciprocal_rank_fusion()` und `weighted_reciprocal_rank_fusion()` bereit. Spezifikationen und Blueprints nutzen bestehende Funktionen anstelle redundanter `execute_rrf()` Neuimplementierungen.
+<a id="6-unsafe-inseln"></a>
+## 6. Unsafe-Inseln & Locking-Disziplin
 
-## Neue Architekturkonzepte (Zielbild)
+### 6.1 Unsafe-Inseln
 
-Das Endprodukt-Zielbild definiert zusätzliche Architekturkonzepte, die sukzessive eingeführt werden (orientiert an den **Opus-Optimierungen** Stufe 0-3):
+Das Repository erzwingt `#![forbid(unsafe_code)]` in allen Crates mit exakt **drei zulässigen Unsafe-Inseln**:
 
-- **N-äre Hyperkanten (§6)**: Erweiterung des Wissensgraphen um die Struktur `HyperEdge`, um n-äre Relationen (Fakten mit mehr als zwei Beteiligten) verlustfrei darzustellen, anstatt sie in binäre Kanten zu zerlegen.
-- **SIEVE Block-Cache (§5.2)**: Ein lock-freies, epochenbasiertes Cache-Backend (via `block-cache-v2`), das den Overhead eines schreibenden Mutex bei Cache-Hits eliminiert.
-- **Sherman-Morrison-Bandit (§8)**: Mathematisch korrekte inkrementelle Ridge-Regression zur Bandit-Gewichtung (`egress-sherman-morrison` Opt-in).
-- **Architekturprinzipien P23-P25**:
-  - **P23**: Orthogonale Zeitbudgets (Fuel und Wall-Clock getrennt konfigurierbar in der WASM-Sandbox).
-  - **P24**: Lokalitätsprinzip (Globale Neuberechnungen wie bei dichten Power-Iterationen sind unzulässig; stattdessen Forward-Push PPR).
-  - **P25**: Lock-freie Cache-Treffer (Motivation für SIEVE).
+1. **`contextra-sys`**: OS-Level Operationen (`mmap`, `mlock`, Win32 ACLs).
+2. **`contextra-simd`**: Handoptimierte SIMD-Kerne (AVX2, AVX-512, NEON).
+3. **`contextra-wire`**: FlatBuffers-Zero-Copy-Adapter.
+
+Jeder `unsafe`-Block erfordert zwingend eine `// SAFETY:`-Begründung.
+
+### 6.2 Locking-Disziplin
+
+```
+collections (RwLock) → kv_locks (schlüssel-granular via KvKeyLocks) → embedder (RwLock)
+```
+
+- Mehrfach-Locks werden ausnahmslos in fester Reihenfolge von links nach rechts akquiriert.
+- `KvKeyLocks` akquiriert Shard-Indizes zwingend in aufsteigend sortierter Reihenfolge (`acquire_multi_sorted`), um Deadlocks auszuschließen.
+- Kein `.await` unter gehaltenen synchronen Mutex/RwLock-Guards.
+
+---
+
+<a id="7-referenzen"></a>
+## 7. Referenzen & Weiterführende Dokumente
+
+* **Normative Spezifikation (Synthese):** [`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`](spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)
+* **Agenten-Betriebsanleitung:** [`AGENTS.md`](../AGENTS.md)
+* **Compliance BSI TR-02102 Mapping:** [`docs/compliance/BSI_TR02102_MAPPING.md`](compliance/BSI_TR02102_MAPPING.md)

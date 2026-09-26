@@ -110,10 +110,22 @@ fn bench_filtered_search_selectivity(c: &mut Criterion) {
     // Four selectivity levels: 50%, 20%, 5%, 1%
     // Seeded deterministically using modulo on DocId inner value
     let filters: [(&str, Box<dyn Fn(DocId) -> bool + Send + Sync>); 4] = [
-        ("selectivity_50_percent", Box::new(|id: DocId| id.inner() % 2 == 0)),
-        ("selectivity_20_percent", Box::new(|id: DocId| id.inner() % 5 == 0)),
-        ("selectivity_05_percent", Box::new(|id: DocId| id.inner() % 20 == 0)),
-        ("selectivity_01_percent", Box::new(|id: DocId| id.inner() % 100 == 0)),
+        (
+            "selectivity_50_percent",
+            Box::new(|id: DocId| id.inner() % 2 == 0),
+        ),
+        (
+            "selectivity_20_percent",
+            Box::new(|id: DocId| id.inner() % 5 == 0),
+        ),
+        (
+            "selectivity_05_percent",
+            Box::new(|id: DocId| id.inner() % 20 == 0),
+        ),
+        (
+            "selectivity_01_percent",
+            Box::new(|id: DocId| id.inner() % 100 == 0),
+        ),
     ];
 
     let mut group = c.benchmark_group("FilteredSearch_Selectivity");
@@ -155,7 +167,11 @@ fn bench_filtered_search_selectivity(c: &mut Criterion) {
                 query_idx += 1;
                 rt.block_on(async {
                     let res = index
-                        .search_filtered(black_box(query), black_box(k), black_box(Some(filter.as_ref())))
+                        .search_filtered(
+                            black_box(query),
+                            black_box(k),
+                            black_box(Some(filter.as_ref())),
+                        )
                         .await;
                     black_box(res).expect("Search failed");
                 });

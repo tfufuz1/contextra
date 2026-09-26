@@ -1,7 +1,7 @@
-use contextra_ports::GraphIndex;
-use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use contextra_db::{execute_consolidation_pass, ConsolidationConfig, Contextra, ContextraConfig};
 use contextra_graph::path_rag::PathRAGEngine;
+use contextra_ports::GraphIndex;
+use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]

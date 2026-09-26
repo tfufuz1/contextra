@@ -31,7 +31,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 contextra-db = { workspace = true }
-contextra-index = { workspace = true }
+contextra-vector = { workspace = true }
 bytes = { workspace = true }
 contextra-graph = { workspace = true }
 contextra-text = { workspace = true }

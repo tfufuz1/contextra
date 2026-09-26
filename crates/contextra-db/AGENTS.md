@@ -101,7 +101,7 @@ ausgeführt werden (Fehlerklasse 11).
 
 ## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
 
-- **Erlaubte Imports**: `contextra-core` (L0), `contextra-store`, `contextra-index`, `contextra-graph`, `contextra-text` (alle L1), `contextra-checkpoint`
+- **Erlaubte Imports**: `contextra-core` (L0), `contextra-store`, `contextra-vector`, `contextra-graph`, `contextra-text` (alle L1), `contextra-checkpoint`
 - **Verbotene Imports**: `contextra-agent` (L3), `contextra-router` (L3), `contextra-mcp` (L4)
 - **Genutzt von**: Fast alle Layer 3/4 Crates
 

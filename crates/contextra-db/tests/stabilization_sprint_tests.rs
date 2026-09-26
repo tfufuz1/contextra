@@ -1,5 +1,5 @@
-use contextra_types::FusionWeights;
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
+use contextra_types::FusionWeights;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;

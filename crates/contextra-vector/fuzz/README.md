@@ -1,6 +1,6 @@
-# Fuzzing infrastructure for `contextra-index`
+# Fuzzing infrastructure for `contextra-vector`
 
-This directory contains `cargo-fuzz` targets for `contextra-index`.
+This directory contains `cargo-fuzz` targets for `contextra-vector`.
 
 ## Targets
 

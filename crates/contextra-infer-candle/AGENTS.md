@@ -1,4 +1,4 @@
-# AGENTS.md — contextra-candle
+# AGENTS.md — contextra-infer-candle
 > Layer 3 | Native Candle GGUF ML Inferenz & Embedding Provider | ~800 LOC
 
 ## 1. Zweck & Architekturrolle

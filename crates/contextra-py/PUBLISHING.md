@@ -41,10 +41,10 @@ python -m maturin build --manifest-path crates/contextra-py/Cargo.toml --release
 
 When ready to publish to PyPI:
 
-1. Create a git tag following the format `contextra-py-v*`:
+1. Create a git tag following the format `contextra-py-v*`: <!-- crate-ref-ignore -->
    ```bash
-   git tag -a contextra-py-v0.2.0 -m "Release contextra-py v0.2.0"
-   git push origin contextra-py-v0.2.0
+   git tag -a contextra-py-v0.2.0 -m "Release contextra-py v0.2.0" <!-- crate-ref-ignore -->
+   git push origin contextra-py-v0.2.0 <!-- crate-ref-ignore -->
    ```
 
 2. Pushing this tag automatically triggers `.github/workflows/publish-pypi.yml`.

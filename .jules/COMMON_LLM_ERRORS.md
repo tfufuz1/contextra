@@ -24,7 +24,7 @@ reciprocal_rank_fusion(result_sets, max_results)
 // ❌ HALLUZINATION — SessionPool öffentlich zugreifen:
 let pool = SessionPool::new(config)?;
 
-// ✅ KORREKT — SessionPool ist pub(crate) in contextra-embed:
+// ✅ KORREKT — SessionPool ist pub(crate) in contextra-infer-onnx:
 // Aus externem Crate nicht direkt nutzbar. CrossEncoderReranker
 // hält seinen eigenen internen Pool.
 ```
@@ -85,8 +85,8 @@ collection.insert(key, doc).await?;
 # In crates/contextra-core/Cargo.toml:
 contextra-db = { path = "../contextra-db" }  # ARCH-BRUCH!
 
-# ❌ FALSCH — contextra-store importiert contextra-index (Layer 1 → Layer 1 Peer):
-contextra-index = { path = "../contextra-index" }  # LAYER-PEER-BRUCH!
+# ❌ FALSCH — contextra-store importiert contextra-vector (Layer 1 → Layer 1 Peer):
+contextra-vector = { path = "../contextra-vector" }  # LAYER-PEER-BRUCH!
 ```
 
 **Heilmittel**: Vor jeder `Cargo.toml`-Änderung:
@@ -123,9 +123,9 @@ unsafe { ptr::copy_nonoverlapping(src, dst, len) }
 ```
 
 **unsafe ist NUR erlaubt in** (AGENTS.md §4):
-- `crates/contextra-index/src/distance.rs` (SIMD)
-- `crates/contextra-index/src/diskann.rs` (Mmap)
-- `crates/contextra-index/src/persistence.rs` (Mmap)
+- `crates/contextra-vector/src/distance.rs` (SIMD)
+- `crates/contextra-vector/src/diskann.rs` (Mmap)
+- `crates/contextra-vector/src/persistence.rs` (Mmap)
 
 ## FEHLER-KLASSE 7: Test-Mirroring
 
@@ -189,7 +189,7 @@ collection.search(...).await?;
 
 ## FEHLER-KLASSE 12: Feature-Gate-Vergessen (onnx)
 
-**Symptom**: Agent verwendet Code aus `contextra-embed` ohne Feature-Flag.
+**Symptom**: Agent verwendet Code aus `contextra-infer-onnx` ohne Feature-Flag.
 
 ```rust
 // ❌ FALSCH:

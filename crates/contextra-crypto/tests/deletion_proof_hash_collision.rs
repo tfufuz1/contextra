@@ -84,9 +84,8 @@ fn test_v2_hmac_proof_creation_and_verification_regression() {
         tenant_id: TenantId::try_new(10).expect("valid tenant_id"),
     };
     let hmac_key = b"0123456789abcdef0123456789abcdef";
-    let layer_proof =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
-            .expect("valid layer proof");
+    let layer_proof = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
+        .expect("valid layer proof");
 
     let proof = DeletionProof::create(
         scope,

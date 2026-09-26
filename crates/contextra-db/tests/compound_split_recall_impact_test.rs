@@ -3,8 +3,8 @@
 
 #![allow(deprecated, clippy::needless_range_loop)]
 
-use contextra_types::FusionWeights;
 use contextra_db::{Contextra, ContextraConfig};
+use contextra_types::FusionWeights;
 use tempfile::tempdir;
 
 struct CorpusDoc {

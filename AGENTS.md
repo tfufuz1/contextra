@@ -1,12 +1,14 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
+Stand: 2026-09-26
+
 ## 1. Geltungsbereich und Rangfolge
 Diese Datei regelt die Arbeit aller autonomen Agenten im Repository.
-Bei Konflikten gilt stets folgende Rangfolge: Code + grüne Gates > AGENTS.md > docs/spec > alle sonstigen Vorgaben.
+Bei Konflikten gilt stets folgende Rangfolge: Code + grüne Gates > AGENTS.md > docs/spec (`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`) > alle sonstigen Vorgaben.
 
 ## 2. Start
 Arbeitskontext zu Beginn der Session laden:
-- `just start` (Zielzustand, siehe Folgeaufgabe)
+- `cargo run --manifest-path xtask/Cargo.toml -- jules-preflight`
 
 ## 3. Ablauf
 Jeder Task folgt diesem iterativen Ablauf:
@@ -29,13 +31,14 @@ Jeder Task folgt diesem iterativen Ablauf:
 ## 6. Invarianten
 - **Zero-Panic:** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden; Fehler per `Result` propagieren.
 - **Prozessaufrufe:** Niemals über `sh -c`; Parameter via `shlex` parsen und als Argument-Array übergeben.
-- **Unsafe-Isolierung:** `unsafe` ist streng isoliert auf `contextra-simd`, `contextra-sys` und `contextra-wire`. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
-- **Sync-Kern:** Ring 0 (`contextra-text`, `contextra-graph`, `contextra-adapt`, `contextra-crypto`) enthält keine Async-Runtime (`tokio`).
+- **Unsafe-Isolierung:** `unsafe` ist streng isoliert auf die drei Unsafe-Inseln (`contextra-simd`, `contextra-sys` und `contextra-wire`). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
+- **Sync-Kern:** Ring 0 (`contextra-types`, `contextra-ports`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-adapt`, `contextra-crypto`) enthält keine Async-Runtime (`tokio`).
 - **Nichtdeterminismus:** Zeit, Zufall und IDs injizieren; `TxId` über `collection.allocate_tx()` erzeugen.
 - **Speicher & Locks:** SIMD-Puffer (`contextra-simd`) korrekt ausrichten; keine Locks über `.await`-Punkte halten.
+- **Spec-Sync:** Jede API-Änderung MUSS `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` spiegeln.
 
 ## 7. Nicht tun
 - Kein partielles HNSW-Rewiring oder Teilgraph-Rebuilding (F-02) durchführen wegen Recall-Kollaps und RwLock-Contention; zulässig ist ausschließlich reines Tombstone-Pruning.
 - Keine mandantenübergreifenden Datenflüsse, Knowledge-Sharing oder Cross-Tenant-Aggregationen (F-10) herstellen; Mandantenisolation (`TenantId`) ist absolut zur Wahrung von DSGVO-Löschgarantien und KV-Cache-Sicherheit.
 - Keine Realtime-Audio-, Speech-to-Text-, Voice- oder Jarvis-Assistenten-Funktionen (OP-03) integrieren, da Audio-Streaming nicht zum bi-temporalen Speichersubstrat gehört.
-- Keine Veto-Sperren oder Isolationsgrenzen ohne explizites ADR in `DECISIONS.md` umgehen.
+- Keine Veto-Sperren oder Isolationsgrenzen ohne explizites ADR in `docs/decisions/` umgehen.

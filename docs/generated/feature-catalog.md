@@ -11,7 +11,7 @@
 | `default` | `default` / keine weiteren Flags |
 | `ollama` | `contextra-infer-ollama` |
 | `onnx` | `contextra-infer-onnx/onnx`, `contextra-db/onnx` |
-| `router` | `contextra-router`, `contextra-calibration` |
+| `router` | `contextra-router`, `contextra-rank` |
 
 ## Crate `contextra-adapt`
 
@@ -36,7 +36,7 @@
 | `external-benchmarks` | `default` / keine weiteren Flags |
 | `onnx-bench` | `contextra-infer-onnx/onnx`, `contextra-db/reranking` |
 
-## Crate `contextra-calibration`
+## Crate `contextra-rank`
 
 | Feature Flag | Aktivierte Abhaengigkeiten / Flags |
 | :--- | :--- |
@@ -82,7 +82,7 @@
 | `default` | `default` / keine weiteren Flags |
 | `docid-128` | `contextra-core/docid-128` |
 | `edge-reinforcement-learning` | `contextra-graph/edge-reinforcement-learning` |
-| `experimental-diskann` | `contextra-index/experimental-diskann` |
+| `experimental-diskann` | `contextra-vector/experimental-diskann` |
 | `graph-connectivity-health` | `contextra-graph/physio-percolation` |
 | `onnx` | `default` / keine weiteren Flags |
 | `reranking` | `default` / keine weiteren Flags |
@@ -137,7 +137,7 @@
 
 | Feature Flag | Aktivierte Abhaengigkeiten / Flags |
 | :--- | :--- |
-| `candle-backend` | `dep:contextra-candle` |
+| `candle-backend` | `dep:contextra-infer-candle` |
 | `default` | `default` / keine weiteren Flags |
 | `onnx` | `ort`, `tokenizers`, `ndarray`, `dep:reqwest` |
 

@@ -21,9 +21,21 @@ fn bench_acorn_vs_post_filter(c: &mut Criterion) {
     let query: Vec<f32> = (0..dim).map(|j| (j as f32 * 0.15).cos()).collect();
 
     let selectivities: [(&str, f32, Box<dyn Fn(DocId) -> bool>); 3] = [
-        ("selectivity_50_percent", 0.50, Box::new(|id: DocId| id.inner() % 2 == 0)),
-        ("selectivity_10_percent", 0.10, Box::new(|id: DocId| id.inner() % 10 == 0)),
-        ("selectivity_01_percent", 0.01, Box::new(|id: DocId| id.inner() % 100 == 0)),
+        (
+            "selectivity_50_percent",
+            0.50,
+            Box::new(|id: DocId| id.inner() % 2 == 0),
+        ),
+        (
+            "selectivity_10_percent",
+            0.10,
+            Box::new(|id: DocId| id.inner() % 10 == 0),
+        ),
+        (
+            "selectivity_01_percent",
+            0.01,
+            Box::new(|id: DocId| id.inner() % 100 == 0),
+        ),
     ];
 
     let mut group = c.benchmark_group("ACORN_Vs_PostFilter_Baseline");

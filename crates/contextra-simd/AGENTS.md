@@ -28,4 +28,4 @@ ausführende CPU die SIMD-Erweiterungen nicht unterstützt.
 ## 4. Cross-Crate-Schnittstellen & DAG-Grenzen
 
 - **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-store` (L1), `contextra-index` (L1 Peer), `contextra-db` (L2)
+- **Verbotene Imports**: `contextra-store` (L1), `contextra-vector` (L1 Peer), `contextra-db` (L2)

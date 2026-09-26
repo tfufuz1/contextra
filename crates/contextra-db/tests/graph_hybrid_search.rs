@@ -1,8 +1,8 @@
 #![allow(deprecated)]
 
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
-use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use serde_json::json;
 use tempfile::TempDir;
 
@@ -217,8 +217,8 @@ async fn test_hybrid_search_with_ppr_strategy() {
 
 #[tokio::test]
 async fn test_hybrid_search_with_pathrag_strategy() {
-    use contextra_types::GraphTraversalStrategy;
     use contextra_db::SearchStrategy;
+    use contextra_types::GraphTraversalStrategy;
 
     let tmp = TempDir::new().expect("temp dir");
     let config = ContextraConfig {

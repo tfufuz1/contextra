@@ -125,15 +125,8 @@ fn test_bm25_known_reference_value() {
     let k1 = 1.5f32;
     let b = 0.75f32;
 
-    let expected = compute_reference_bm25_score(
-        tf,
-        doc_len,
-        avg_doc_len as f64,
-        df,
-        n,
-        k1 as f64,
-        b as f64,
-    );
+    let expected =
+        compute_reference_bm25_score(tf, doc_len, avg_doc_len as f64, df, n, k1 as f64, b as f64);
 
     let actual = score_term_with_params(tf, doc_len, avg_doc_len, df, n, k1, b);
 
@@ -184,15 +177,7 @@ fn test_bm25_reference_table() {
                             b as f64,
                         );
 
-                        let actual = score_term_with_params(
-                            tf,
-                            doc_len,
-                            avg_doc_len,
-                            df,
-                            n,
-                            k1,
-                            b,
-                        );
+                        let actual = score_term_with_params(tf, doc_len, avg_doc_len, df, n, k1, b);
 
                         let diff = (actual as f64 - expected).abs();
                         assert!(
@@ -228,31 +213,20 @@ fn test_bm25f_reference_value() {
         (field_0_id, 2u32, 10u32, 10.0f32),
         (field_1_id, 5u32, 500u32, 250.0f32),
     ];
-    let field_weights_f32 = vec![
-        (field_0_id, 2.0f32, 0.5f32),
-        (field_1_id, 1.0f32, 0.8f32),
-    ];
+    let field_weights_f32 = vec![(field_0_id, 2.0f32, 0.5f32), (field_1_id, 1.0f32, 0.8f32)];
 
     let field_tfs_f64 = vec![
         (field_0_id, 2u32, 10u32, 10.0f64),
         (field_1_id, 5u32, 500u32, 250.0f64),
     ];
-    let field_weights_f64 = vec![
-        (field_0_id, 2.0f64, 0.5f64),
-        (field_1_id, 1.0f64, 0.8f64),
-    ];
+    let field_weights_f64 = vec![(field_0_id, 2.0f64, 0.5f64), (field_1_id, 1.0f64, 0.8f64)];
 
     let df = 50u32;
     let n = 1000u32;
     let k1 = 1.5f32;
 
-    let expected = compute_reference_bm25f_score(
-        &field_tfs_f64,
-        &field_weights_f64,
-        k1 as f64,
-        df,
-        n,
-    );
+    let expected =
+        compute_reference_bm25f_score(&field_tfs_f64, &field_weights_f64, k1 as f64, df, n);
 
     let actual = score_term_bm25f(&field_tfs_f32, &field_weights_f32, k1, df, n);
 

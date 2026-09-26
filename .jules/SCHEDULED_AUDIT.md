@@ -32,7 +32,7 @@ Er besteht aus zwei unabhängigen Jobs:
 - Berechnet die ISO-Kalenderwoche (`KW % 4`).
 - Rotiert wöchentlich durch die 4 Fokus-Crates:
   - **Woche 0**: `contextra-graph`
-  - **Woche 1**: `contextra-index`
+  - **Woche 1**: `contextra-vector`
   - **Woche 2**: `contextra-agent`
   - **Woche 3**: `contextra-db`
 - Löst für den berechneten Fokus-Crate den `mutation-testing.yml`-Workflow via `workflow_dispatch` aus.

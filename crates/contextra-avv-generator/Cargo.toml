@@ -2,7 +2,7 @@
 workspace = true
 
 [package]
-name = "contextra-avv-generator"
+name = "contextra-avv-generator" <!-- crate-ref-ignore -->
 version.workspace = true
 edition.workspace = true
 license.workspace = true

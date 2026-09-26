@@ -2,7 +2,7 @@
 
 ## Zweck & Kontext
 
-Dieses Dokument beschreibt die Werkzeuge, Policies und Prozesse zur Gewährleistung der **Supply-Chain-Sicherheit** und **Build-Reproduzierbarkeit** im Contextra-Workspace gemäß `contextra-roadmap.md` (§2, Punkt 5).
+Dieses Dokument beschreibt die Werkzeuge, Policies und Prozesse zur Gewährleistung der **Supply-Chain-Sicherheit** und **Build-Reproduzierbarkeit** im Contextra-Workspace gemäß `contextra-roadmap.md` (§2, Punkt 5). <!-- crate-ref-ignore -->
 
 Für Behörden, Kanzleien und hochsichere Enterprise-Umgebungen sind auditierte Drittanbieter-Dependencies, nachweisbare Bit-Identität kompilierten Codes sowie maschinenlesbare Software-Stücklisten (SBOM) eine fundamentale Voraussetzung.
 

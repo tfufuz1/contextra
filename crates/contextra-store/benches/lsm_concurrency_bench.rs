@@ -6,6 +6,18 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
+fn get_rss_bytes() -> usize {
+    if let Ok(statm) = std::fs::read_to_string("/proc/self/statm") {
+        let parts: Vec<&str> = statm.split_whitespace().collect();
+        if parts.len() >= 2 {
+            if let Ok(pages) = parts[1].parse::<usize>() {
+                return pages * 4096;
+            }
+        }
+    }
+    0
+}
+
 fn bench_lsm_concurrent_commits(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("LSM_Concurrent_Commits");
@@ -48,6 +60,67 @@ fn bench_lsm_concurrent_commits(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_lsm_compaction_extreme_load(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+    let mut group = c.benchmark_group("LSM_Compaction_Extreme_Load");
+    group.sample_size(10);
+    group.throughput(Throughput::Elements(50_000));
+
+    group.bench_function("50k_puts_large_values_under_compaction", |b| {
+        b.to_async(&rt).iter(|| async move {
+            let tmp = TempDir::new().unwrap();
+            let config = LsmConfig {
+                path: tmp.path().to_path_buf(),
+                memtable_size_limit: 256 * 1024, // Low limit (256 KiB) forces frequent flushes & compactions
+                ..Default::default()
+            };
+            let engine = LsmStorage::new(config).await.unwrap();
+
+            let mut peak_rss = 0usize;
+            let value_buf = vec![0xABu8; 16 * 1024];
+
+            let batch_size = 100;
+            let total_puts = 50_000usize;
+            let mut global_op_idx = 0u64;
+
+            for batch_idx in 0..(total_puts / batch_size) {
+                let tx = TxId::new(batch_idx as u64 + 1);
+                for _ in 0..batch_size {
+                    let key = format!("extreme_load_key_{:08}", global_op_idx);
+                    let val_len = 1024 + ((global_op_idx as usize * 37) % (15 * 1024));
+                    let val = &value_buf[..val_len];
+
+                    engine.put(tx, key.as_bytes(), val).await.unwrap();
+                    global_op_idx += 1;
+                }
+                engine.commit(tx).await.unwrap();
+
+                if batch_idx % 10 == 0 {
+                    let cur_rss = get_rss_bytes();
+                    if cur_rss > peak_rss {
+                        peak_rss = cur_rss;
+                    }
+                }
+            }
+
+            let final_rss = get_rss_bytes();
+            if final_rss > peak_rss {
+                peak_rss = final_rss;
+            }
+
+            eprintln!(
+                "[LSM_Compaction_Extreme_Load] 50,000 puts completed. Peak RSS: {} MB ({} bytes)",
+                peak_rss / (1024 * 1024),
+                peak_rss
+            );
+
+            black_box(engine);
+        });
+    });
+
+    group.finish();
+}
+
 // REGRESSIONS-GATE: TPS@16-Writer >= 0.6 * 16 * TPS@1-Writer (Group-Commit-Effizienz)
 // Baseline: aufgezeichnet in benchmarks/results/lsm_concurrency_baseline.json
 
@@ -60,85 +133,6 @@ Expected Baseline JSON (benchmarks/results/lsm_concurrency_baseline.json):
   "tps_writers_32": 180000
 }
 */
-
-fn get_process_rss_bytes() -> Option<u64> {
-    #[cfg(target_os = "linux")]
-    {
-        if let Ok(content) = std::fs::read_to_string("/proc/self/statm") {
-            let mut parts = content.split_whitespace();
-            let _total_size = parts.next()?;
-            if let Some(resident_pages_str) = parts.next() {
-                if let Ok(pages) = resident_pages_str.parse::<u64>() {
-                    let page_size = 4096u64;
-                    return Some(pages.saturating_mul(page_size));
-                }
-            }
-        }
-    }
-    None
-}
-
-fn bench_lsm_compaction_extreme_load(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
-    let mut group = c.benchmark_group("LSM_Compaction_Extreme_Load");
-    group.sample_size(10);
-    group.measurement_time(Duration::from_secs(15));
-
-    group.throughput(Throughput::Elements(50_000));
-    group.bench_function("50k_puts_large_values", |b| {
-        b.to_async(&rt).iter(|| async move {
-            let tmp = TempDir::new().unwrap();
-            let config = LsmConfig {
-                path: tmp.path().to_path_buf(),
-                memtable_size_limit: 256 * 1024, // 256 KiB forces frequent flushes and compactions
-                ..Default::default()
-            };
-            let engine = LsmStorage::new(config).await.unwrap();
-
-            let initial_rss = get_process_rss_bytes().unwrap_or(0);
-            let mut peak_rss = initial_rss;
-
-            const TOTAL_OPS: usize = 50_000;
-            for i in 0..TOTAL_OPS {
-                let key = format!("key_{:08}", i);
-                // Value between 1 KiB and 16 KiB
-                let val_len = 1024 + ((i * 31) % (15 * 1024));
-                let val = vec![(i % 256) as u8; val_len];
-
-                let tx = TxId::new(i as u64 + 1);
-                engine.put(tx, key.as_bytes(), &val).await.unwrap();
-                engine.commit(tx).await.unwrap();
-
-                if i % 5000 == 0 {
-                    if let Some(rss) = get_process_rss_bytes() {
-                        if rss > peak_rss {
-                            peak_rss = rss;
-                        }
-                    }
-                }
-            }
-
-            engine.force_flush().await.unwrap();
-            let _ = engine.maybe_compact().await;
-
-            if let Some(rss) = get_process_rss_bytes() {
-                if rss > peak_rss {
-                    peak_rss = rss;
-                }
-            }
-
-            eprintln!(
-                "[LSM_Compaction_Extreme_Load] Completed 50,000 puts. Initial RSS: {:.2} MB, Peak RSS: {:.2} MB",
-                initial_rss as f64 / (1024.0 * 1024.0),
-                peak_rss as f64 / (1024.0 * 1024.0)
-            );
-
-            black_box(engine);
-        });
-    });
-
-    group.finish();
-}
 
 criterion_group!(benches, bench_lsm_concurrent_commits, bench_lsm_compaction_extreme_load);
 criterion_main!(benches);

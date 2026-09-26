@@ -1,8 +1,8 @@
-use contextra_types::DistanceMetric;
 use contextra_db::{Collection, Language};
 use contextra_graph::CsrGraph;
 use contextra_index::{HnswConfig, HnswIndex};
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::DistanceMetric;
 use serde_json::json;
 use std::path::Path;
 use std::sync::atomic::AtomicU64;
