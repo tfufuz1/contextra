@@ -79,6 +79,7 @@ mod check_result_dropped_on_io;
 mod check_ring0_async_purity;
 mod check_ring_layering;
 mod check_stale_tags;
+mod check_manifest_completeness;
 mod check_toctou_trait_defaults;
 mod check_type_registry;
 mod check_unsafe_islands;
@@ -2089,6 +2090,12 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-manifest-completeness" => {
+            if let Err(e) = check_manifest_completeness::run() {
+                eprintln!("❌ check-manifest-completeness failed: {}", e);
+                process::exit(1);
+            }
+        }
         "generate-diagnostics" => {
             if let Err(e) = xtask::generate_diagnostics::run_generate_diagnostics() {
                 eprintln!("❌ generate-diagnostics failed: {}", e);
@@ -2751,7 +2758,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, gen-feature-catalog, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-crate-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, gen-feature-catalog, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-crate-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], check-manifest-completeness, generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
             process::exit(1);
         }
     }
