@@ -43,7 +43,7 @@ Diese Events werden im `SecurityAuditLogger` unwiderruflich erfasst.
 ### Volatile Results (Anthropic Containment)
 Sehr große Tool-Ergebnisse (MAX_VOLATILE_OUTPUT_BYTES = 16 MB) oder sensitive Daten 
 werden nicht als JSON im Klartext zurückgeschickt, sondern im `VolatileToolResult` 
-RAM-verschlüsselt (via `contextra-crypto::VolatileEncryptionKey`, Cargo-Package-Name: `contextra-security`). Der Agent erhält
+RAM-verschlüsselt (via `contextra-crypto::VolatileEncryptionKey`, Cargo-Package-Name: `contextra-privacy`). Der Agent erhält
 nur einen Reference-Key, den andere Tools einlösen können.
 Die Anzahl ist begrenzt (`MAX_VOLATILE_RESULTS` = 1000).
 
@@ -94,9 +94,9 @@ Regel `detect_nested_locks.yml` verbietet geschachtelte Locks innerhalb von Laye
 
 ## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
 
-- **Erlaubte Imports**: Alle L0-L3 Crates (`contextra-core`, `contextra-db`, `contextra-agent`, `contextra-crypto` / `contextra-security`)
+- **Erlaubte Imports**: Alle L0-L3 Crates (`contextra-core`, `contextra-db`, `contextra-agent`, `contextra-crypto` / `contextra-privacy`)
 - **Verbotene Imports**: Keine (Layer 4 Top Crate)
-- **Genutzt von**: CLI (`contextra-cli`) und externen MCP-Clients (Cursor, Jules, Claude)
+- **Genutzt von**: CLI (`contextra`) und externen MCP-Clients (Cursor, Jules, Claude)
 
 ## 8. Relevante ADRs & Rules
 

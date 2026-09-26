@@ -63,8 +63,16 @@ pub fn rank_for_eviction_weighted(
     let weight = attention_weight.clamp(0.0, 1.0);
 
     // Find min and max access instants for LRU normalization
-    let min_instant = candidates.iter().map(|(_, t)| *t).min().unwrap_or(candidates[0].1);
-    let max_instant = candidates.iter().map(|(_, t)| *t).max().unwrap_or(candidates[0].1);
+    let min_instant = candidates
+        .iter()
+        .map(|(_, t)| *t)
+        .min()
+        .unwrap_or(candidates[0].1);
+    let max_instant = candidates
+        .iter()
+        .map(|(_, t)| *t)
+        .max()
+        .unwrap_or(candidates[0].1);
     let time_span_secs = max_instant.duration_since(min_instant).as_secs_f32();
 
     // Collect candidate importance scores and find min/max
@@ -81,7 +89,10 @@ pub fn rank_for_eviction_weighted(
 
     let (min_score, max_score) = if !valid_scores.is_empty() {
         let min_s = valid_scores.iter().copied().fold(f32::INFINITY, f32::min);
-        let max_s = valid_scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let max_s = valid_scores
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max);
         (min_s, max_s)
     } else {
         (0.0, 0.0)

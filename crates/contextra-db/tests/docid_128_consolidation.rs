@@ -1,9 +1,9 @@
-use contextra_types::DocId;
-#[cfg(feature = "volatile-vault")]
-use contextra_types::TxId;
 use contextra_db::memory_consolidation::compute_community_hash;
 #[cfg(feature = "volatile-vault")]
 use contextra_db::volatile_vault::{SignalModality, VaultChunk};
+use contextra_types::DocId;
+#[cfg(feature = "volatile-vault")]
+use contextra_types::TxId;
 
 #[cfg(feature = "volatile-vault")]
 #[test]

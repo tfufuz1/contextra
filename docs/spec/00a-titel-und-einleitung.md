@@ -14,9 +14,10 @@ chapter: "00a"
 > air-gapped-fähige Gedächtnisschicht statt „Cognitive OS"/„LLM OS" (Empfehlung der strategischen
 > Tiefenberatung, §3.3 dieses Beratungsdokuments — dort auch als Begründung archiviert).
 
-> **Status:** Normativ · Einzige maßgebliche Quelle für Produkt, Architektur, Algorithmen,
-> Implementierungsvorgaben, Sicherheitsmodell, Schnittstellenspezifikation, Stabilisierungsphasen und
-> Optimierungs-Roadmap des Contextra Cognitive OS.
+> **Status:** Normativ · Die Gesamtspezifikation wurde in `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`
+> ("Contextra — Finale Produktspezifikation (Synthese)") vollständig konsolidiert und synthetisiert. Sie ist die
+> einzige maßgebliche Quelle für Produkt, Architektur, Algorithmen, Implementierungsvorgaben, Sicherheitsmodell,
+> Schnittstellenspezifikation, Stabilisierungsphasen und Optimierungs-Roadmap.
 >
 > **Charakter:** Dieses Dokument führt Produktvision, Zielarchitektur, normative Signaturen,
 > algorithmische Spezifikationen, mikrofeingranulare Schnittstellendefinitionen, ein verbindliches
@@ -39,7 +40,7 @@ chapter: "00a"
 > ergänzt dieses Dokument **Teil A2 — Zielarchitektur v2 (Ring-Modell)** direkt im Anschluss an Teil A. Die
 > Prüfung `CONTEXTRA_ZIELARCHITEKTUR.md` (v1, Basis-Commit `3f37ab30`) und ihre Korrektur
 > `CONTEXTRA_ZIELARCHITEKTUR_v2.md` (Basis-Commit `806a40c1`) haben strukturelle Verstöße gegen P5 (Crate
-> `contextra-db` hängt aufwärts von `contextra-candle`/`contextra-ollama`/`contextra-embed` ab), eine unvollständige
+> `contextra-db` hängt aufwärts von `contextra-infer-candle`/`contextra-infer-ollama`/`contextra-infer-onnx` ab), eine unvollständige
 > Unsafe-Inventur, eine nicht funktionsfähige Lint-Mechanik (`forbid` plus Insel-`allow` verletzt Rust-Semantik,
 > E0453) sowie eine als 🟢 markierte, tatsächlich als Stub implementierte KV-Cache-Bridge belegt. **Ab sofort
 > gilt: Der bisherige Layer-0–5-Crate-DAG aus §4 (10 Crates) wird durch das in Teil A2/§4 beschriebene

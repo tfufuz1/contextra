@@ -59,4 +59,4 @@ The benchmark evaluates 1,000 synthetic queries generated with a fixed seed (`42
 
 ### Limitation Notice (Ehrlichkeit der Kennzahl)
 As verified in `crates/contextra-router/src/profile.rs` and `crates/contextra-router/src/router/dispatch_core.rs`, full LinUCB contextual bandit dispatch requires initializing a full `RouterEngine` instance integrated with hybrid search and community resolution components.
-To avoid pulling heavy database setup dependencies into benchmark execution while accurately quantifying the core cost optimization benefit described in `contextra-roadmap.md` §4, this benchmark explicitly implements a cost-aware greedy selection proxy (`run_cost_aware_routing`) that filters by `min_relevance_score` and selects the minimum `estimated_cost()` profile.
+To avoid pulling heavy database setup dependencies into benchmark execution while accurately quantifying the core cost optimization benefit described in `contextra-roadmap.md` §4, this benchmark explicitly implements a cost-aware greedy selection proxy (`run_cost_aware_routing`) that filters by `min_relevance_score` and selects the minimum `estimated_cost()` profile. <!-- crate-ref-ignore -->

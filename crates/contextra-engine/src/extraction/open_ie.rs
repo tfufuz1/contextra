@@ -5,9 +5,9 @@
 
 #![forbid(unsafe_code)]
 
+use super::types::{EntityExtractionConfig, ExtractedTriple};
 use contextra_ports::LlmTextGenerator;
 use contextra_types::{ContextraError, Result};
-use super::types::{EntityExtractionConfig, ExtractedTriple};
 
 /// Zerlegt den Eingabetext in einfache satz- oder zeilenbasierte Chunks.
 /// Dies ist eine einfache Erstversion (ohne komplexe NLP-Grammatik) für die Entitätsextraktion.

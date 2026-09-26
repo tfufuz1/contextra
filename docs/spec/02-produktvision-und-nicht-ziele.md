@@ -19,7 +19,7 @@ angefordert.
 | Python-Bibliothek | `pip install contextra` | In-Process-Einbettung in Python-Agenten |
 | Rust-Crate | `cargo add contextra-db` | Native Rust-Anwendungen |
 
-Eine Desktop-Shell (`contextra-tauri`) existierte als Prototyp, ist aber zugunsten der PyPI-Bibliothek
+Eine Desktop-Shell (`contextra-tauri`) existierte als Prototyp, ist aber zugunsten der PyPI-Bibliothek <!-- crate-ref-ignore -->
 und des MCP-Servers als primäre Vertriebswege eingestellt (deprecated, ADR-077).
 
 ### 2.3 Alleinstellungsmerkmale und ihr Reifegrad
@@ -64,7 +64,7 @@ und des MCP-Servers als primäre Vertriebswege eingestellt (deprecated, ADR-077)
 
 Contextra ist explizit **kein** Cloud-SaaS-Produkt, **kein** Multi-Tenant-Enterprise-System, **kein** Framework für
 LLM-Training, **keine** primär GUI-getriebene Desktop-Anwendung und **kein** Cluster-/Replikations-System. Ein
-`contextra-cluster`-Veto besteht bewusst: verteilter Konsensbetrieb ist kein Ziel der aktuellen Produktphase.
+`contextra-cluster`-Veto besteht bewusst: verteilter Konsensbetrieb ist kein Ziel der aktuellen Produktphase. <!-- crate-ref-ignore -->
 Passives WAL-Shipping für Backup-Zwecke ist als Fernziel vorgesehen (Roadmap-Stufe 4, §18), aber nicht Bestandteil
 des Kernprodukts.
 

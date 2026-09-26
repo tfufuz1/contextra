@@ -1,4 +1,4 @@
-# AGENTS.md — contextra-ollama
+# AGENTS.md — contextra-infer-ollama
 > Layer 3 | Ollama API Client, Embeddings, Context Prefixing | ~2500 LOC
 
 ## 1. Zweck & Architekturrolle

@@ -1,6 +1,6 @@
-# contextra-index
+# contextra-vector
 
-`contextra-index` stellt den HNSW- und DiskANN-Vektorindex sowie Skalar-/RaBitQ-Quantisierung bereit (Ring 0 / In Migration nach `contextra-vector`).
+`contextra-vector` stellt den HNSW- und DiskANN-Vektorindex sowie Skalar-/RaBitQ-Quantisierung bereit (Ring 0 / In Migration nach `contextra-vector`).
 
 ## Zweck
 
@@ -21,7 +21,7 @@ Core Vector Search Engine für k-NN Abfragen, HNSW-Graphaufbau, DiskANN Disk-Bac
 
 ## Safety & SIMD Isolation
 
-Im Zuge der Zielarchitektur v2 wurden alle hardwarenahen SIMD-Assembly/Intrinsics-Codeblöcke aus `contextra-index` in das dedizierte Unsafe-Insel-Crate `contextra-simd` ausgelagert. `contextra-index` selbst erzwingt `#![forbid(unsafe_code)]`.
+Im Zuge der Zielarchitektur v2 wurden alle hardwarenahen SIMD-Assembly/Intrinsics-Codeblöcke aus `contextra-vector` in das dedizierte Unsafe-Insel-Crate `contextra-simd` ausgelagert. `contextra-vector` selbst erzwingt `#![forbid(unsafe_code)]`.
 
 ## Architektur & Verweise
 

@@ -138,8 +138,8 @@ async fn test_drop_collection_removes_all_data() {
 
 #[tokio::test]
 async fn test_partial_compaction_preserves_tombstones() {
-use contextra_types::TxId;
     use contextra_store::{CompactionConfig, LsmConfig};
+    use contextra_types::TxId;
 
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {

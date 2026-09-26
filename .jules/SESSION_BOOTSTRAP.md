@@ -61,10 +61,10 @@ head -50 WORKING_STATE.md
 
 ```bash
 # Verifiziere Build-Grundlage (ohne Nix-Shell zuerst probieren)
-cargo check --workspace --exclude contextra-tauri 2>&1 | tail -5
+cargo check --workspace --exclude contextra-tauri 2>&1 | tail -5 <!-- crate-ref-ignore -->
 
 # Falls cargo nicht im PATH: Rust-Toolchain aktivieren
-# source "$HOME/.cargo/env" && cargo check --workspace --exclude contextra-tauri
+# source "$HOME/.cargo/env" && cargo check --workspace --exclude contextra-tauri <!-- crate-ref-ignore -->
 ```
 
 ## Phase 3 — Aufgaben-spezifischen Kontext laden
@@ -74,7 +74,7 @@ Lade basierend auf der Aufgabe:
 | Aufgabe-Typ | Zu lesende Dateien |
 |-------------|-------------------|
 | Code in `contextra-store/*` | `crates/contextra-store/AGENTS.md`, `rules/wal_crypto.md`, `rules/async-io.md` |
-| Code in `contextra-index/*` | `crates/contextra-index/AGENTS.md`, `rules/simd_safety.md` |
+| Code in `contextra-vector/*` | `crates/contextra-vector/AGENTS.md`, `rules/simd_safety.md` |
 | Code in `contextra-db/*` | `crates/contextra-db/AGENTS.md` |
 | Neue Dependency | `rules/dependencies.md` → Cargo.lock prüfen → crates.io verifizieren |
 | Neue API-Oberfläche | `CONSTITUTION.md`, `docs/TYPE_REGISTRY.md` |

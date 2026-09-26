@@ -16,13 +16,13 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 parking_lot = { workspace = true }
-contextra-candle = { workspace = true, optional = true }
+contextra-infer-candle = { workspace = true, optional = true }
 
 # Optional — nur mit Feature-Flag aktiv
 [features]
 default = []
 onnx = ["ort", "tokenizers", "ndarray", "dep:reqwest"]
-candle-backend = ["dep:contextra-candle"]
+candle-backend = ["dep:contextra-infer-candle"]
 
 [dependencies.reqwest]
 version = "0.12"

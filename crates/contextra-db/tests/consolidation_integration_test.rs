@@ -1,11 +1,11 @@
-use contextra_ports::LlmTextGenerator;
-use contextra_ports::BoxFuture;
-use contextra_types::DocId;
 use contextra_db::{
     execute_background_consolidation, execute_consolidation_pass, CommunityStabilityTracker,
     ConsolidationConfig, Contextra, ContextraConfig, MaintenanceConfig, MaintenanceScheduler,
     SynthesisConfig,
 };
+use contextra_ports::BoxFuture;
+use contextra_ports::LlmTextGenerator;
+use contextra_types::DocId;
 use std::time::Duration;
 use tempfile::tempdir;
 use tokio::time::sleep;

@@ -1,6 +1,6 @@
 use contextra_audit_export::{
-    render_register_json, render_register_markdown,
-    testkit::InMemoryProcessingRegisterSource, ProcessingRegisterEntry, ProcessingRegisterSource,
+    render_register_json, render_register_markdown, testkit::InMemoryProcessingRegisterSource,
+    ProcessingRegisterEntry, ProcessingRegisterSource,
 };
 use contextra_types::TenantId;
 

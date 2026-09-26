@@ -1,8 +1,8 @@
 #![allow(deprecated)]
 
-use contextra_types::{DocId, LinkRelation, TxId};
-use contextra_types::HybridQuery;
 use contextra_db::Contextra;
+use contextra_types::HybridQuery;
+use contextra_types::{DocId, LinkRelation, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]

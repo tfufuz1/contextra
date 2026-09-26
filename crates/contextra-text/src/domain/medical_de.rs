@@ -60,8 +60,9 @@ pub const MEDICAL_COMPOUND_STEMS: &[&str] = &[
 ];
 
 /// Medical domain terms that must NOT be treated as stopwords.
-pub const MEDICAL_PROTECTED_TERMS: &[&str] =
-    &["Arzt", "Dosis", "EKG", "Labor", "OP", "Reha", "Virus", "Wunde"];
+pub const MEDICAL_PROTECTED_TERMS: &[&str] = &[
+    "Arzt", "Dosis", "EKG", "Labor", "OP", "Reha", "Virus", "Wunde",
+];
 
 impl DomainVocabulary for MedicalDomainVocabulary {
     fn compound_stems(&self) -> &'static [&'static str] {

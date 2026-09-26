@@ -59,7 +59,8 @@ impl BlockCacheBackend for SieveCacheBackend {
     fn get(&self, key: &(u64, u64)) -> Option<Bytes> {
         let s = self.state.read();
         if let Some(node) = s.map.get(key) {
-            node.visited.store(true, std::sync::atomic::Ordering::Relaxed);
+            node.visited
+                .store(true, std::sync::atomic::Ordering::Relaxed);
             return Some(node.value.clone());
         }
         None
@@ -107,7 +108,8 @@ impl BlockCacheBackend for SieveCacheBackend {
             if let Some(map_node) = s.map.get(&node.key) {
                 if Arc::ptr_eq(map_node, &node) {
                     if node.visited.load(std::sync::atomic::Ordering::Relaxed) {
-                        node.visited.store(false, std::sync::atomic::Ordering::Relaxed);
+                        node.visited
+                            .store(false, std::sync::atomic::Ordering::Relaxed);
                         s.hand += 1;
                     } else {
                         s.map.remove(&node.key);

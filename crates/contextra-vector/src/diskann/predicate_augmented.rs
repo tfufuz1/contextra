@@ -63,11 +63,13 @@ impl DiskAnnIndex {
 
         if !ep_dist.is_finite() {
             return Err(ContextraError::Index(
-                "Non-finite distance encountered for entry point in search_predicate_augmented".into(),
+                "Non-finite distance encountered for entry point in search_predicate_augmented"
+                    .into(),
             ));
         }
 
-        let ep_passes = !tombstones.contains(ep_node.doc_id.inner() as u64) && filter(ep_node.doc_id);
+        let ep_passes =
+            !tombstones.contains(ep_node.doc_id.inner() as u64) && filter(ep_node.doc_id);
 
         let mut queue = BinaryHeap::new(); // Min-heap by distance ( Reverse(SearchCandidate) )
         let mut matching_results = Vec::new();
@@ -104,7 +106,8 @@ impl DiskAnnIndex {
                     continue;
                 }
 
-                let nbr_passes = !tombstones.contains(nbr_node.doc_id.inner() as u64) && filter(nbr_node.doc_id);
+                let nbr_passes =
+                    !tombstones.contains(nbr_node.doc_id.inner() as u64) && filter(nbr_node.doc_id);
 
                 if nbr_passes {
                     matching_results.push((nbr_node.doc_id, nbr_dist));
@@ -146,7 +149,8 @@ impl DiskAnnIndex {
         }
 
         // Deduplicate matching results by DocId, retaining best distance
-        let mut best_matching: std::collections::HashMap<DocId, f32> = std::collections::HashMap::new();
+        let mut best_matching: std::collections::HashMap<DocId, f32> =
+            std::collections::HashMap::new();
         for (doc_id, dist) in matching_results {
             best_matching
                 .entry(doc_id)
@@ -215,7 +219,9 @@ mod tests {
         let filter = |id: DocId| id.inner() % 2 == 0;
 
         let filtered_res = index.search_filtered(&query, 5, Some(&filter)).await?;
-        let augmented_res = index.search_predicate_augmented(&query, 5, &filter, 0).await?;
+        let augmented_res = index
+            .search_predicate_augmented(&query, 5, &filter, 0)
+            .await?;
 
         assert!(!filtered_res.is_empty());
         assert_eq!(filtered_res.len(), augmented_res.len());
@@ -254,7 +260,9 @@ mod tests {
         let filter = |id: DocId| id.inner() % 60 == 0;
 
         let filtered_res = index.search_filtered(&query, 5, Some(&filter)).await?;
-        let augmented_res = index.search_predicate_augmented(&query, 5, &filter, 2).await?;
+        let augmented_res = index
+            .search_predicate_augmented(&query, 5, &filter, 2)
+            .await?;
 
         assert!(
             augmented_res.len() >= filtered_res.len(),

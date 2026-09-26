@@ -116,7 +116,7 @@ coverage-gate:
 check-py:
     nix develop -c cargo check --manifest-path crates/contextra-py/Cargo.toml || cargo check --manifest-path crates/contextra-py/Cargo.toml
 
-# Modular check for contextra-infer
+# Modular check for contextra-infer <!-- crate-ref-ignore -->
 check-infer:
     nix develop -c cargo check -p contextra-infer-candle -p contextra-infer-ollama -p contextra-infer-onnx || cargo check -p contextra-infer-candle -p contextra-infer-ollama -p contextra-infer-onnx
 

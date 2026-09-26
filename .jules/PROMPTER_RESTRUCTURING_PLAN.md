@@ -12,8 +12,8 @@
 Das Contextra-Projekt wurde massiv umstrukturiert. Die frühere 18-Crate-Struktur wurde auf **31 Workspace-Crates** in einer geschichteten Ring-Architektur (Ring 0 Unsafe Island, Ring 0 Core, Ring 1 Infrastructure, Ring 2 Orchestration, Ring 3 Inference/Interfaces, Ring 4 Composition) erweitert.
 
 Inkompatibilitäten der vorherigen Prompter-Version (v32):
-- **Crate-Namen & Rebrandings**: Veraltete Bezeichnungen wie `contextra-index` (nun `contextra-vector`), `contextra-embed` (nun `contextra-infer-onnx`), `contextra-candle` (nun `contextra-infer-candle`), `contextra-ollama` (nun `contextra-infer-ollama`), `contextra-crypto` (Cargo-Package `contextra-security`).
-- **Aufgelöste Crates**: `contextra-calibration` wurde aufgelöst — Score-Kalibrierung (`IsotonicCalibrator`, `PlattScaler`) wanderte nach `contextra-rank`, die PID-Pool-Regelung nach `contextra-adapt`.
+- **Crate-Namen & Rebrandings**: Veraltete Bezeichnungen wie `contextra-vector` (nun `contextra-vector`), `contextra-infer-onnx` (nun `contextra-infer-onnx`), `contextra-infer-candle` (nun `contextra-infer-candle`), `contextra-infer-ollama` (nun `contextra-infer-ollama`), `contextra-crypto` (Cargo-Package `contextra-privacy`).
+- **Aufgelöste Crates**: `contextra-rank` wurde aufgelöst — Score-Kalibrierung (`IsotonicCalibrator`, `PlattScaler`) wanderte nach `contextra-rank`, die PID-Pool-Regelung nach `contextra-adapt`.
 - **Neue Ring 0 & Ring 1 Crates**: Fehlen von `contextra-wire`, `contextra-sys`, `contextra-simd`, `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-privacy`, `contextra-kvcache`, `contextra-testkit`, `contextra-sandbox`, `contextra-cognition`, `contextra-engine`, `contextra-rank`, `contextra-adapt`.
 - **Prozess- & Bau-Befehle**: `xtask` läuft isoliert außerhalb des Haupt-Workspace (`exclude = ["xtask"]`), Befehle müssen `--manifest-path xtask/Cargo.toml` nutzen.
 
@@ -31,7 +31,7 @@ Inkompatibilitäten der vorherigen Prompter-Version (v32):
 | **Ring 0 / L1** | `contextra-mvcc` | `contextra-mvcc` | MVCC Visibility, `SeqLog` (24-Byte Entries), `SnapshotRegistry` & `TxBuffer` | Tier 2 | `concurrency` |
 | **Ring 0 / L0** | `contextra-privacy` | `contextra-privacy` | Anonymisierung & PII-Redaktion | Tier 2 | `sec` |
 | **Ring 0 / L0** | `contextra-adapt` | `contextra-adapt` | LinUCB Bandit, Lyapunov Drift, PID Pool Sizing | Tier 2 | `calib` |
-| **Ring 1 / L1** | `contextra-security` | `contextra-security` | AES-256-GCM-SIV, HKDF, HMAC, DSGVO Art. 17 `DeletionProof` | Tier 1 | `sec` |
+| **Ring 1 / L1** | `contextra-privacy` | `contextra-privacy` | AES-256-GCM-SIV, HKDF, HMAC, DSGVO Art. 17 `DeletionProof` | Tier 1 | `sec` |
 | **Ring 1 / L2** | `contextra-checkpoint` | `contextra-checkpoint` | RAII `CheckpointGuard`, Time-Travel Rollback, BLAKE3 Manifest | Tier 2 | `none` |
 | **Ring 1 / L2** | `contextra-kvcache` | `contextra-kvcache` | Tenant-isoliertes KV-Cache & Block Management | Tier 2 | `sec` |
 | **Ring 1 / L3** | `contextra-store` | `contextra-store` | LSM-Tree (`LsmStorage`), WAL (`wal.rs`), MemTable, SSTable, Compaction | Tier 1 | `crash` |

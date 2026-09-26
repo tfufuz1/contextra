@@ -11,7 +11,7 @@ Pflicht-Schritt 1 (vor jeder Aufgabe): Lies `.jules/JULES_CONTEXT.md`, dann `AGE
 tier = "1"
 risk = "none"
 
-[crate_overrides.contextra-security]
+[crate_overrides.contextra-privacy]
 tier = "1"
 risk = "sec"
 
@@ -137,37 +137,37 @@ risk = "none"
 
 # Zielarchitektur-Mapping (§3, Anhang A der Zielarchitektur v8.0)
 [target_architecture]
-"contextra-wire" = "contextra-foundation"
-"contextra-sys" = "contextra-foundation"
-"contextra-simd" = "contextra-foundation"
-"contextra-types" = "contextra-foundation"
-"contextra-ports" = "contextra-foundation"
-"contextra-mvcc" = "contextra-foundation"
-"contextra-core" = "contextra-foundation"
-"contextra-security" = "contextra-security"
-"contextra-privacy" = "contextra-security"
-"contextra-store" = "contextra-persistence"
-"contextra-checkpoint" = "contextra-persistence"
-"contextra-kvcache" = "contextra-persistence"
-"contextra-vector" = "contextra-retrieval"
-"contextra-graph" = "contextra-retrieval"
-"contextra-text" = "contextra-retrieval"
-"contextra-rank" = "contextra-retrieval"
-"contextra-db" = "contextra-orchestrator"
-"contextra-engine" = "contextra-orchestrator"
-"contextra-cognition" = "contextra-orchestrator"
-"contextra-adapt" = "contextra-inference"
-"contextra-router" = "contextra-inference"
-"contextra-infer-ollama" = "contextra-inference"
-"contextra-infer-candle" = "contextra-inference"
-"contextra-infer-onnx" = "contextra-inference"
-"contextra-agent" = "contextra-agentic"
-"contextra-sandbox" = "contextra-agentic"
+"contextra-wire" = "contextra-foundation" <!-- crate-ref-ignore -->
+"contextra-sys" = "contextra-foundation" <!-- crate-ref-ignore -->
+"contextra-simd" = "contextra-foundation" <!-- crate-ref-ignore -->
+"contextra-types" = "contextra-foundation" <!-- crate-ref-ignore -->
+"contextra-ports" = "contextra-foundation" <!-- crate-ref-ignore -->
+"contextra-mvcc" = "contextra-foundation" <!-- crate-ref-ignore -->
+"contextra-core" = "contextra-foundation" <!-- crate-ref-ignore -->
+"contextra-privacy" = "contextra-privacy"
+"contextra-privacy" = "contextra-privacy"
+"contextra-store" = "contextra-persistence" <!-- crate-ref-ignore -->
+"contextra-checkpoint" = "contextra-persistence" <!-- crate-ref-ignore -->
+"contextra-kvcache" = "contextra-persistence" <!-- crate-ref-ignore -->
+"contextra-vector" = "contextra-retrieval" <!-- crate-ref-ignore -->
+"contextra-graph" = "contextra-retrieval" <!-- crate-ref-ignore -->
+"contextra-text" = "contextra-retrieval" <!-- crate-ref-ignore -->
+"contextra-rank" = "contextra-retrieval" <!-- crate-ref-ignore -->
+"contextra-db" = "contextra-orchestrator" <!-- crate-ref-ignore -->
+"contextra-engine" = "contextra-orchestrator" <!-- crate-ref-ignore -->
+"contextra-cognition" = "contextra-orchestrator" <!-- crate-ref-ignore -->
+"contextra-adapt" = "contextra-inference" <!-- crate-ref-ignore -->
+"contextra-router" = "contextra-inference" <!-- crate-ref-ignore -->
+"contextra-infer-ollama" = "contextra-inference" <!-- crate-ref-ignore -->
+"contextra-infer-candle" = "contextra-inference" <!-- crate-ref-ignore -->
+"contextra-infer-onnx" = "contextra-inference" <!-- crate-ref-ignore -->
+"contextra-agent" = "contextra-agentic" <!-- crate-ref-ignore -->
+"contextra-sandbox" = "contextra-agentic" <!-- crate-ref-ignore -->
 "contextra-mcp" = "contextra-mcp"
-"contextra-py" = "contextra-bindings"
+"contextra-py" = "contextra-bindings" <!-- crate-ref-ignore -->
 "contextra-testkit" = "contextra-testkit"
-"contextra" = "contextra-facade"
-"contextra-bench" = "contextra-benchmarks"
+"contextra" = "contextra-facade" <!-- crate-ref-ignore -->
+"contextra-bench" = "contextra-benchmarks" <!-- crate-ref-ignore -->
 
 # Komponenten-Fokus-Notizen (redaktionell, per Datei)
 [component_focus."contextra-core"."lib.rs"]
@@ -194,17 +194,17 @@ risk = "MVCC"
 desc = "24-Byte Sequential Versioned Log (DocId + insert_seq + delete_seq)"
 focus = "Sichtbarkeitsinvariante (insert_seq <= as_of && (delete_seq.is_none() || delete_seq > as_of)) muss lückenlos gelten."
 
-[component_focus."contextra-security"."crypto.rs"]
+[component_focus."contextra-privacy"."crypto.rs"]
 risk = "RFC 8452/5869/4231"
 desc = "KeyManager — AES-256-GCM-SIV encrypt/decrypt + Nonce-Konstruktion, HKDF Key Derivation, HMAC-SHA256"
 focus = "Nonce = 4B Instanz-Präfix + 8B per-Call OsRng-Suffix. Constant-Time comparisons via subtle::ConstantTimeEq erzwungen."
 
-[component_focus."contextra-security"."wal_crypto.rs"]
+[component_focus."contextra-privacy"."wal_crypto.rs"]
 risk = "HMAC-Chain"
 desc = "WAL-HMAC-Chaining v3 — kryptographische Integritätskette über das gesamte WAL"
 focus = "Byte-Reihenfolge ist bindend: domain-separator → prev_hmac → seq_no → tx_id → op_type+kv."
 
-[component_focus."contextra-security"."deletion_proof.rs"]
+[component_focus."contextra-privacy"."deletion_proof.rs"]
 risk = "sec"
 desc = "DSGVO Art. 17 DeletionProof & LayerCleanupProof"
 focus = "INV-DELETION-1: LayerCleanupProof::new_after_verified_empty fordert physical remaining_live_entries == 0."

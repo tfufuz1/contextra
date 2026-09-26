@@ -21,7 +21,7 @@ in das Write-Ahead-Log geschrieben und mit dem Datenträger synchronisiert wurde
 **P5 — Strikte DAG-Modularität.** Abhängigkeiten im Crate-Graphen verlaufen strikt abwärts; ein Verstoß
 gilt als Architekturdefekt. **Δ (verbindliche Korrektur, §A2.1):** In der Vorfassung war dieses Prinzip
 dokumentiert, aber am realen Crate `contextra-db` (Layer 2) nachweislich verletzt — es hing hart von
-`contextra-candle`/`contextra-ollama` (Layer 3) und optional von `contextra-embed` (Layer 3) ab, weil
+`contextra-infer-candle`/`contextra-infer-ollama` (Layer 3) und optional von `contextra-infer-onnx` (Layer 3) ab, weil
 `EmbeddingBackend` samt Konstruktion in `contextra-db` lag. Ab dieser Fassung wird P5 **maschinell** erzwungen
 (`tests/layering.rs` gegen `cargo_metadata`, plus `deny.toml`-Bans mit `wrappers`-Liste, §4.2 unten), nicht
 mehr nur dokumentiert. Reihenfolge und Richtung sind jetzt die Ring-Matrix in §4.2 (Ring-Modell), nicht mehr

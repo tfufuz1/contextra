@@ -1,8 +1,8 @@
 #![allow(deprecated)]
 
 use contextra_checkpoint::{global_orphan_registry, PinnedSeqNoOrphan, StateCheckpoint};
-use contextra_types::TxId;
 use contextra_db::{Contextra, ContextraConfig};
+use contextra_types::TxId;
 use tempfile::TempDir;
 
 #[tokio::test]

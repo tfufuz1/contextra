@@ -26,7 +26,7 @@ contextra/
 │   ├── contextra-sys/                # Ring 0 — mmap, mlock, Win32-ACL, Unsafe-Insel (neu, §A2 D1)
 │   ├── contextra-simd/               # Ring 0 — Distanzkernel, Laufzeit-Dispatch, Unsafe-Insel
 │   ├── contextra-crypto/             # Ring 0 — Schlüsselhierarchie, AEAD, WAL-HMAC-Kette, Deletion-Proof, Zeroize
-│   ├── contextra-vector/             # Ring 0 — HNSW, DiskANN, Quantisierung (vormals contextra-index)
+│   ├── contextra-vector/             # Ring 0 — HNSW, DiskANN, Quantisierung (vormals contextra-vector)
 │   ├── contextra-text/               # Ring 0 — BM25/BM25F, deutsche Morphologie
 │   ├── contextra-graph/              # Ring 0 — CSR, PPR, Leiden, Hyperkanten
 │   ├── contextra-rank/               # Ring 0 — 4-Signal-Fusion, Isotonic/Platt-Kalibrierung, Drift
@@ -60,20 +60,20 @@ contextra/
 ```
 contextra/
 ├── crates/
-│   ├── contextra-core-ipc-gen/       # Layer 0 — FlatBuffers-generierter Code
+│   ├── contextra-core-ipc-gen/       # Layer 0 — FlatBuffers-generierter Code <!-- crate-ref-ignore -->
 │   ├── contextra-core/               # Layer 0 — Kerntypen, Traits, Fehlerbehandlung
 │   ├── contextra-store/              # Layer 1 — LSM-Tree, WAL, Block-Cache
 │   ├── contextra-crypto/             # Layer 1 — AES-256-GCM-SIV, DeletionProof, KV-Segment-Security
 │   ├── contextra-text/               # Layer 1 — BM25/BM25F-Volltextindex, deutsche Morphologie
-│   ├── contextra-index/              # Layer 1 — HNSW/DiskANN-Vektorindex, SIMD-Distanz
+│   ├── contextra-vector/              # Layer 1 — HNSW/DiskANN-Vektorindex, SIMD-Distanz
 │   ├── contextra-graph/              # Layer 1 — CSR-Graph, PPR, Leiden, Hyperkanten
 │   ├── contextra-checkpoint/         # Layer 1 — Snapshotting
-│   ├── contextra-calibration/        # Layer 1 — Score-Kalibrierung, Drift-Erkennung
+│   ├── contextra-rank/        # Layer 1 — Score-Kalibrierung, Drift-Erkennung
 │   ├── contextra-db/                 # Layer 2 — Collection-API, 4-Signal-Fusion, Provenance
 │   ├── contextra-router/             # Layer 3 — Contextual-Bandit-Routing
-│   ├── contextra-candle/             # Layer 3 — Natives GGUF-Inferenz-Backend, KV-Cache-Bridge
-│   ├── contextra-ollama/             # Layer 3 — Ollama-Client, Contextual-Chunk-Prefixing
-│   ├── contextra-embed/              # Layer 3 — ONNX-Embeddings, Cross-Encoder (optional)
+│   ├── contextra-infer-candle/             # Layer 3 — Natives GGUF-Inferenz-Backend, KV-Cache-Bridge
+│   ├── contextra-infer-ollama/             # Layer 3 — Ollama-Client, Contextual-Chunk-Prefixing
+│   ├── contextra-infer-onnx/              # Layer 3 — ONNX-Embeddings, Cross-Encoder (optional)
 │   ├── contextra-agent/              # Layer 3 — Persistente Agent-Workflow-Engine
 │   ├── contextra-py/                 # Layer 3 — Python-FFI via PyO3 (eigener Workspace, war real nur Member)
 │   ├── contextra-sandbox/            # Layer 6.5 — WASM Execution Boundary
@@ -183,17 +183,17 @@ dahin gilt die folgende, an den Ring-Zuschnitt angepasste Tabelle als normativ:
 | ~~`docid-128`~~ | — (entfällt) | `contextra-core` | — | **Entfällt** (ADR-N05): typverändernde Features sind verboten; externes 128-Bit-`DocId` mit internem dichten `DocIdx(u32)` ist eine offene Entscheidung (§A2.4 Nr. 3), keine Compile-Time-Option |
 | `block-cache-v2` | `contextra-store` | `contextra-store` | aus | `QuickCacheBlockCacheBackend` statt `LruBlockCacheBackend` (§5.4) |
 | `egress-sherman-morrison` | `contextra-adapt` | `contextra-router` | aus | `ShermanMorrisonBandit` statt `DiagonalApproximation` (§8.2) |
-| `experimental-diskann` | `contextra-vector` | `contextra-index` | aus | `DiskAnnIndex` über `VectorIndexTier::DiskAnn` wählbar (§7.5) |
+| `experimental-diskann` | `contextra-vector` | `contextra-vector` | aus | `DiskAnnIndex` über `VectorIndexTier::DiskAnn` wählbar (§7.5) |
 | `bandit-routing` | `contextra-adapt` | `contextra-router` | an | Aktiviert den Bandit-Router überhaupt |
 | `cloud-egress-guard` | `contextra-privacy` | `contextra-mcp` | an | Aktiviert `egress_gateway`-Modul (im Manifest der Vorfassung real nicht vorhanden, wird mit dem Umzug nach `privacy` nachgezogen) |
 | `wasm-sandbox` | `contextra-sandbox` | `contextra-mcp` | an | Aktiviert die Sandbox; `contextra-sandbox` ist bis zur Anbindung an einen Konsumenten aus `default-members` ausgeschlossen (§A2.2, Waisen-Crate) |
-| `kv-bridge` | `contextra-kvcache` | `contextra-candle` | **aus** | Aktiviert Stufe B/C (§9.2); Stufe A ist kein Feature, sondern Default-Verhalten sobald `contextra-infer-candle` aktiv ist. War in der Vorfassung fälschlich als „an" mit 🟢-Status dokumentiert, obwohl der Code ein Stub war (§A2.1) |
+| `kv-bridge` | `contextra-kvcache` | `contextra-infer-candle` | **aus** | Aktiviert Stufe B/C (§9.2); Stufe A ist kein Feature, sondern Default-Verhalten sobald `contextra-infer-candle` aktiv ist. War in der Vorfassung fälschlich als „an" mit 🟢-Status dokumentiert, obwohl der Code ein Stub war (§A2.1) |
 | `edge-reinforcement-learning` | `contextra-graph` | `contextra-graph` | aus | Aktiviert `SignalKind::EdgeReinforcement`-Pfad |
 | `fault-injection` | `contextra-testkit` | `contextra-store` | nur `dev-dependencies` | Deterministische I/O-Fehlerinjektion; wandert in den neuen Tooling-Crate `contextra-testkit` |
 | `loom` | `contextra-mvcc`, `contextra-graph` | `contextra-store`, `contextra-graph` | nur `dev-dependencies` | `loom::sync::*` statt `std::sync::*` hinter `#[cfg(loom)]` |
 | `bm25f` | `contextra-text` | `contextra-text` | an | Feldgewichtete BM25-Bewertung |
 | `adaptive-decay` / `-control` | `contextra-cognition` | `contextra-db` | an | Kalibrierungs-Feintuning |
-| `partial-index-rebuild` | `contextra-vector` | `contextra-index` | an | Inkrementeller Indexaufbau |
+| `partial-index-rebuild` | `contextra-vector` | `contextra-vector` | an | Inkrementeller Indexaufbau |
 | `onnx-bench` | `contextra-bench` | — (v1 erzwang `onnx` hart) | aus | Einzige Stelle, die `contextra-infer-onnx`/`ort` in einen Benchmark-Build zieht; bereits umgesetzt (§A2.1 D8) |
 
 ### 0.4 Globale Compile-Time-Regeln
@@ -211,12 +211,12 @@ wegen E0453 nicht und wurde deshalb verworfen.
 
 | Insel (jetzt) | Begründung | Herkunft / Vorher |
 |---|---|---|
-| `contextra-simd` | Distanzkernel mit Laufzeit-Dispatch (AVX2, AVX-512, NEON), Längenprüfung im safe Wrapper, `OnceLock<fn>`-Dispatch, Proptest gegen skalares Orakel je Stufe, Miri nur für den skalaren Pfad | vorher: `contextra-index` (SIMD **und** mmap in einem Topf) |
-| `contextra-sys` (**neu**, §A2.1 D1) | `ReadOnlyMap` (mmap), `LockedBuf` (`mlock`/`munlock`/`VirtualLock`), Owner-only-ACL (Win32); Verträge safe gekapselt (`Deref<Target=[u8]>` für Mmap; Zeroize-vor-`munlock`-Drop-Guard für `LockedBuf`) | vorher verteilt und **unvollständig erfasst** in `contextra-store` (Win32-ACL), `contextra-index` (mmap), `contextra-db` (`mlock`, `volatile_vault`) — die Vorfassung nannte hierfür fälschlich `contextra-store`, `contextra-db` und `contextra-index` als *drei separate* Ausnahmen statt einer gemeinsamen Insel |
-| `contextra-wire` | FlatBuffers-Generat: `#![allow(unsafe_code, clippy::unwrap_used)]` auf Crate-Ebene, weil flatc-generierter Code `unwrap` für Felder mit Default erzeugt; bestehendes Drift-Gate `check_flatbuffers_drift` bleibt | vorher: `contextra-core-ipc-gen` |
+| `contextra-simd` | Distanzkernel mit Laufzeit-Dispatch (AVX2, AVX-512, NEON), Längenprüfung im safe Wrapper, `OnceLock<fn>`-Dispatch, Proptest gegen skalares Orakel je Stufe, Miri nur für den skalaren Pfad | vorher: `contextra-vector` (SIMD **und** mmap in einem Topf) |
+| `contextra-sys` (**neu**, §A2.1 D1) | `ReadOnlyMap` (mmap), `LockedBuf` (`mlock`/`munlock`/`VirtualLock`), Owner-only-ACL (Win32); Verträge safe gekapselt (`Deref<Target=[u8]>` für Mmap; Zeroize-vor-`munlock`-Drop-Guard für `LockedBuf`) | vorher verteilt und **unvollständig erfasst** in `contextra-store` (Win32-ACL), `contextra-vector` (mmap), `contextra-db` (`mlock`, `volatile_vault`) — die Vorfassung nannte hierfür fälschlich `contextra-store`, `contextra-db` und `contextra-vector` als *drei separate* Ausnahmen statt einer gemeinsamen Insel |
+| `contextra-wire` | FlatBuffers-Generat: `#![allow(unsafe_code, clippy::unwrap_used)]` auf Crate-Ebene, weil flatc-generierter Code `unwrap` für Felder mit Default erzeugt; bestehendes Drift-Gate `check_flatbuffers_drift` bleibt | vorher: `contextra-core-ipc-gen` | <!-- crate-ref-ignore -->
 
 **Entfallen als Unsafe-Ausnahme (0 `unsafe` verifiziert, §A2.1 D1):** `contextra-router`/`contextra-adapt`
-(Sherman-Morrison-Arithmetik ist in Safe Rust implementiert, keine Intrinsics) und `contextra-embed`/
+(Sherman-Morrison-Arithmetik ist in Safe Rust implementiert, keine Intrinsics) und `contextra-infer-onnx`/
 `contextra-infer-onnx` (die C-FFI-Grenze zu `ort` liegt außerhalb des Crates in der `ort`-Bibliothek selbst).
 `contextra-db` entfällt als Ausnahme-Crate, weil `mlock` in die neue Insel `contextra-sys` wandert.
 

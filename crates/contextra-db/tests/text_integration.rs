@@ -1,7 +1,7 @@
 use contextra_ports::{StorageEngine, TextIndex};
-use contextra_types::{DocId, TxId};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_text::inverted::InvertedIndex;
+use contextra_types::{DocId, TxId};
 use std::sync::Arc;
 use tempfile::TempDir;
 

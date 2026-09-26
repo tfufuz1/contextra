@@ -127,8 +127,8 @@ mod tests {
             contract_date: "2025-01-15".to_string(),
             deletion_proof_mechanism: "Kryptografischer Löschbeweis, siehe SECURITY.md".to_string(),
             egress_gateway_active: true,
-            tenant_isolation_model: "Logische und kryptografische Mandantenisolation (TenantId-Scoped)"
-                .to_string(),
+            tenant_isolation_model:
+                "Logische und kryptografische Mandantenisolation (TenantId-Scoped)".to_string(),
         }
     }
 

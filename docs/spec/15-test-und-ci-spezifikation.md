@@ -25,7 +25,7 @@ Jede öffentliche Funktion mit nicht-trivialer Logik erhält mindestens:
 | `crates/contextra-graph/tests/hyperedge_payload_sharing.rs` | AK-9 |
 | `crates/contextra-graph/tests/star_expansion_equals_clique.rs` | AK-10 |
 | `crates/contextra-graph/tests/hyperedge_cascade_crash_recovery.rs` | AK-11 |
-| `crates/contextra-index/tests/sq8_bias_calibration.rs` | AK-12 |
+| `crates/contextra-vector/tests/sq8_bias_calibration.rs` | AK-12 |
 | `crates/contextra-store/tests/wal_backpressure.rs` | AK-13 |
 | `crates/contextra-store/tests/kv_locks_stable_shard.rs` | AK-14 |
 | `crates/contextra-router/tests/ips_requires_propensity.rs` | AK-15 |

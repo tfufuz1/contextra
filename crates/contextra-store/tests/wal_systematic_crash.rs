@@ -53,14 +53,18 @@ async fn systematic_crash_at_every_wal_io_point() {
             let commit_result = if res_put1.is_ok() && res_put2.is_ok() {
                 storage.commit(tx1).await
             } else {
-                Err(contextra_core::ContextraError::Storage("Simulated write error".into()))
+                Err(contextra_core::ContextraError::Storage(
+                    "Simulated write error".into(),
+                ))
             };
 
             let _tx2 = TxId::new(2);
             let uncommitted_put_result = if commit_result.is_ok() {
                 storage.put(TxId::new(2), b"key3", b"val3").await
             } else {
-                Err(contextra_core::ContextraError::Storage("Skipped uncommitted put".into()))
+                Err(contextra_core::ContextraError::Storage(
+                    "Skipped uncommitted put".into(),
+                ))
             };
             let _ = uncommitted_put_result;
 

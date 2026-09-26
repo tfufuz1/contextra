@@ -40,7 +40,7 @@ Snapshot Isolation unter konkurrierenden Writes.
 
 ### WAL HMAC Key Sourcing
 **IMMER** `load_or_create_integrity_key()` verwenden. **NIEMALS** Schlüssel hartcodieren.
-Der Key wird via HKDF aus dem Master Key abgeleitet (siehe `contextra-crypto`, Cargo-Package-Name: `contextra-security`).
+Der Key wird via HKDF aus dem Master Key abgeleitet (siehe `contextra-crypto`, Cargo-Package-Name: `contextra-privacy`).
 
 ### TOMBSTONE_BIT-Disziplin (ADR-041)
 Bit 63 **strikt** maskieren (`seq & !TOMBSTONE_BIT`) vor allen `max_seq` Vergleichen.
@@ -137,8 +137,8 @@ use contextra_checkpoint::CheckpointGuard;
 
 ## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
 
-- **Erlaubte Imports**: `contextra-core` (L0), `contextra-crypto` (Cargo-Package-Name: `contextra-security`) (L1 Peer)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-index` (L1 Peer — kein Peer-Import!), `contextra-text` (L1 Peer)
+- **Erlaubte Imports**: `contextra-core` (L0), `contextra-crypto` (Cargo-Package-Name: `contextra-privacy`) (L1 Peer)
+- **Verbotene Imports**: `contextra-db` (L2), `contextra-vector` (L1 Peer — kein Peer-Import!), `contextra-text` (L1 Peer)
 - **Implementiert**: `StorageEngine` Trait aus `contextra-core`
 - **Genutzt von**: `contextra-db`, `contextra-agent`, `contextra-router` (als `Arc<dyn StorageEngine>`)
 

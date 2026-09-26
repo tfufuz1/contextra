@@ -1,7 +1,7 @@
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
