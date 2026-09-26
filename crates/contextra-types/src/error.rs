@@ -236,6 +236,10 @@ pub enum ContextraError {
         /// Identifier of timed out transaction.
         tx_id: u64,
     },
+
+    /// KV cache quantization or dequantization error.
+    #[error("KV quantization error: {0}")]
+    KvQuantization(String),
 }
 
 impl ContextraError {
@@ -300,6 +304,11 @@ impl ContextraError {
             path: path.into(),
             block_id,
         }
+    }
+
+    /// Creates a `KvQuantization` error.
+    pub fn kv_quantization(msg: impl Into<String>) -> Self {
+        Self::KvQuantization(msg.into())
     }
 
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
