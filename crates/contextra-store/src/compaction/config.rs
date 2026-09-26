@@ -48,6 +48,11 @@ pub struct CompactionConfig {
     pub yield_threshold: usize,
     /// Maximum memory (in bytes) to use for in-memory buffering during merge.
     pub max_memory_bytes: Option<u64>,
+    /// Harte Obergrenze (in Bytes) für die VORAB-Schätzung des Merge-Peaks.
+    /// `None` = unbegrenzt.
+    pub max_peak_memory_bytes: Option<u64>,
+    /// Maximale Wartezeit für die Laufzeit-Backpressure, bevor abgebrochen wird.
+    pub max_backpressure_wait: Duration,
     /// I/O-Rate-Limit für Compaction-Merge-Writes (Token-Bucket, plattformneutral).
     /// `None` = unbegrenzt (Standard).
     /// Bei Aktivierung: Token-Bucket-Delay nach jedem Merge-Block AUSSERHALB
@@ -64,6 +69,8 @@ impl Default for CompactionConfig {
             check_interval: Duration::from_secs(30),
             yield_threshold: 1000,
             max_memory_bytes: Some(128 * 1024 * 1024), // 128MB budget by default
+            max_peak_memory_bytes: Some(256 * 1024 * 1024), // 256MB peak memory limit by default
+            max_backpressure_wait: Duration::from_secs(30),
             max_io_bytes_per_second: None,
         }
     }
