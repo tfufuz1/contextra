@@ -2,7 +2,7 @@
 
 /// Feature-Ring gemäß Spec §15.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum FeatureRing {
     /// Fast ring (open source core).
     Fast,
