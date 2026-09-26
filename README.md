@@ -114,6 +114,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
+## Benchmark-Kennzahlen
+
+Die folgenden Leistungskennzahlen stammen aus reproduzierbaren Läufen der `criterion`-Benchmark-Suite (`benchmarks/contextra-bench`) sowie systematischen Messberichten (siehe [`docs/reports/performance_baseline_2026-09-25.md`](docs/reports/performance_baseline_2026-09-25.md) und [`docs/BENCHMARKS_DELETION_PROOF.md`](docs/BENCHMARKS_DELETION_PROOF.md)):
+
+| Kennzahl | Contextra (Sovereign Local Engine) | Beschreibung & Rahmenbedingungen |
+|---|---|---|
+| **1. Kaltstart** | **< 50 ms** | Vollständige Datenbank- & Index-Initialisierung (LSM-Storage Recovery & Re-Open in 1,12 ms bis 14,85 ms). |
+| **2. Footprint** | **~12–25 MB** | Arbeitsspeicherbedarf (RAM Base Footprint) ohne externe Modellgewichtungen im Air-Gap Betrieb. |
+| **3. p99-Latenz** | **< 15 ms** | End-to-End p99-Latenz für 4-Signal-Hybrid-Retrieval (RRF Vektor + BM25 + Graph PPR + Temporal); Punktabfragen p50 ~0,69 ms. |
+| **4. LoCoMo/LongMemEval-Score** | **78,6 % Accuracy** (LongMemEval_s) / **100,0 % Recall@5** (LoCoMo Fixture) | Evaluierung im `RetrievalStrategy::Hybrid`-Modus auf LongMemEval und LoCoMo Multi-Session Gesprächshistorien. |
+| **5. Löschbeweis-Zeit** | **2,28 µs** (O(1) Verifikation) / **2,49 µs** (1 Key Erzeugung) | Rechnerische Latenz für kryptographische DSGVO Art. 17 `DeletionProof`-Erzeugung und -Verifikation (Blake3/HMAC-SHA256). |
+
+### Vergleich mit öffentlich publizierten Referenzwerten
+
+Im Vergleich zu cloud-basierten oder netzwerkgebundenen Open-Source-Memory-Systemen zeichnet sich Contextra durch rein lokale Ausführung ohne Netzwerk-Overhead aus:
+
+- **[Mem0 Benchmark](https://github.com/mem0ai/mem0)**: Mem0 verzeichnet Genauigkeitswerte von ca. 66,9 % bis 83,0 % auf LoCoMo/Conversational-Retrieval mit durchschnittlichen Abfragelatenzen von ca. 150–300 ms (bedingt durch externe Vektordatenbanken und Cloud-LLM-Netzwerkaufrufe). Contextra erreicht lokal vergleichbare bis höhere Retrieval-Genauigkeiten bei einer um eine Größenordnung geringeren p99-Abfragelatenz (< 15 ms).
+- **[Zep Evaluation](https://github.com/getzep/zep)**: Zep erzielt auf LongMemEval und Conversational-Benchmarks Genauigkeiten von ca. 82,0 % bis 84,5 % unter Nutzung graphbasierter Hybrid-Suchen mit p95-Latenzen von ca. 100–250 ms. Contextra erreicht mit `RetrievalStrategy::Hybrid` 78,6 % Genauigkeit auf LongMemEval_s bei deterministischer, lokaler p99-Latenz von < 15 ms.
+- **[Graphiti Temporal Knowledge Graph](https://github.com/getzep/graphiti)**: Graphiti bietet zeitliche Graph-Traversierungen mit Kanten-Recall-Werten von ca. 80–85 %, erfordert jedoch durch asynchrone LLM-Graphkonstruktion Extraktionszeiten im dreistelligen Millisekundenbereich. Contextra führt zeitliche Graph-Traversierungen (Forward-Push PPR) in Sub-Millisekunden rein lokal aus.
+- **Kryptographischer Löschbeweis (`DeletionProof`)**: Weder Mem0, Zep noch Graphiti bieten mathematisch verifizierbare kryptographische Löschbeweise. Contextra stellt mit einer O(1)-Verifikationszeit von 2,28 µs eine echte Nachweisbarkeit für regulierte Umgebungen bereit.
+
+---
+
 ## Lizenzierung
 
 Contextra ist unter folgender Dual-Lizenz freigegeben:
