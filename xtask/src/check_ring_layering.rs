@@ -55,7 +55,8 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
         | "contextra-router" | "contextra-agent" | "contextra-db" => Some(Ring::Ring3),
 
         // Ring 4
-        "contextra" | "contextra-mcp" | "contextra-py" => Some(Ring::Ring4),
+        "contextra" | "contextra-mcp" | "contextra-py" | "contextra-audit-export"
+        | "contextra-avv-generator" | "contextra-license" => Some(Ring::Ring4),
 
         // Tooling
         "contextra-testkit" | "xtask" | "contextra-bench" => Some(Ring::Tooling),
@@ -271,13 +272,26 @@ pub fn check_ring_layering_from_metadata_json(
 }
 
 pub fn run_check_ring_layering(strict: bool) -> Result<bool, String> {
+    run_check_ring_layering_with_options(strict, false)
+}
+
+pub fn run_check_ring_layering_full(strict: bool) -> Result<bool, String> {
+    run_check_ring_layering_with_options(strict, true)
+}
+
+pub fn run_check_ring_layering_with_options(strict: bool, all_features: bool) -> Result<bool, String> {
     println!(
-        "=== Running xtask check-ring-layering (strict={}) ===",
-        strict
+        "=== Running xtask check-ring-layering (strict={}, all_features={}) ===",
+        strict, all_features
     );
 
+    let mut args = vec!["metadata", "--format-version", "1", "--no-deps"];
+    if all_features {
+        args.push("--all-features");
+    }
+
     let output = Command::new("cargo")
-        .args(["metadata", "--format-version", "1", "--no-deps"])
+        .args(&args)
         .output()
         .map_err(|e| format!("Failed to execute cargo metadata: {}", e))?;
 

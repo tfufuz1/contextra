@@ -179,6 +179,7 @@ expect_used = "deny"
 panic = "deny"
 todo = "deny"
 unimplemented = "deny"
+unreachable = "deny"
 
 [profile.release]
 panic = "unwind"

@@ -264,6 +264,7 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 name = "contextra-adapt"
 version = "0.1.0"
 dependencies = [
+ "contextra-types",
  "serde",
  "serde_json",
  "thiserror",
@@ -433,6 +434,7 @@ dependencies = [
  "arc-swap",
  "bincode",
  "blake3",
+ "contextra-adapt",
  "contextra-ports",
  "contextra-types",
  "parking_lot",
@@ -486,6 +488,7 @@ name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "contextra-types",
  "parking_lot",
  "rand",
  "regex",
@@ -548,7 +551,6 @@ dependencies = [
  "blake3",
  "bytes",
  "contextra-core",
- "contextra-crypto",
  "contextra-sys",
  "crc32fast",
  "lru",
