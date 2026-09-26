@@ -25,8 +25,12 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
     )
     .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
 
-    writeln!(out, "\n**Verantwortlicher (Auftraggeber):** {}", ctx.controller_name)
-        .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+    writeln!(
+        out,
+        "\n**Verantwortlicher (Auftraggeber):** {}",
+        ctx.controller_name
+    )
+    .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
     writeln!(
         out,
         "**Auftragsverarbeiter (Auftragnehmer):** {}",
@@ -39,7 +43,8 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
     writeln!(out, "\n---").map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
 
     // 1. Gegenstand und Dauer
-    writeln!(out, "\n## 1. Gegenstand und Dauer der Verarbeitung").map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+    writeln!(out, "\n## 1. Gegenstand und Dauer der Verarbeitung")
+        .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
     writeln!(
         out,
         "Gegenstand der Verarbeitung ist die Bereitstellung und Nutzung des Contextra RAG- & Vektordatenbank-Systems zur hochsicheren Speicherung, Indizierung und semantischen Abfrage von Dokumenten und Kontexten."
@@ -52,7 +57,8 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
     .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
 
     // 2. Art und Zweck
-    writeln!(out, "\n## 2. Art und Zweck der Verarbeitung").map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+    writeln!(out, "\n## 2. Art und Zweck der Verarbeitung")
+        .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
     writeln!(
         out,
         "Die Verarbeitung umfasst die automatisierte Vektorisierung, Speicherung, semantische Indexierung und den Abruf von Text- und Wissensdaten zum Zweck des wissensbasierten Kontext-Retrievals (RAG) für den Verantwortlichen."
@@ -77,7 +83,8 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
     .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
 
     // 4. Pflichten und Rechte des Verantwortlichen
-    writeln!(out, "\n## 4. Pflichten und Rechte des Verantwortlichen").map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+    writeln!(out, "\n## 4. Pflichten und Rechte des Verantwortlichen")
+        .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
     writeln!(
         out,
         "Der Verantwortliche ist für die Beurteilung der Zulässigkeit der Datenverarbeitung sowie für die Wahrung der Rechte der betroffenen Personen allein verantwortlich. Er ist berechtigt, Weisungen bezüglich der Datenverarbeitung zu erteilen."
@@ -109,7 +116,8 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
     }
 
     // 6. Unterauftragsverarbeiter
-    writeln!(out, "\n## 6. Unterauftragsverarbeiter").map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+    writeln!(out, "\n## 6. Unterauftragsverarbeiter")
+        .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
     if ctx.subprocessors.is_empty() {
         writeln!(
             out,
@@ -123,12 +131,14 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
         )
         .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
         for subp in &ctx.subprocessors {
-            writeln!(out, "- {}", subp).map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+            writeln!(out, "- {}", subp)
+                .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
         }
     }
 
     // 7. Löschung von Daten und SLA
-    writeln!(out, "\n## 7. Löschung von Daten und SLA").map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
+    writeln!(out, "\n## 7. Löschung von Daten und SLA")
+        .map_err(|e| AvvGeneratorError::RenderError(e.to_string()))?;
     writeln!(
         out,
         "Nach Beendigung der Leistungserbringung oder bei konkreter Löschanforderung löscht der Auftragsverarbeiter alle verarbeiteten Daten des Mandanten (`{}`) innerhalb des vereinbarten Deletion-SLA von **{} Tagen**. Auf Wunsch wird dem Verantwortlichen ein kryptografischer Löschbeweis übermittelt.",
@@ -139,7 +149,10 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvGeneratorError> {
     Ok(out)
 }
 
-fn format_technical_measure(out: &mut String, measure: &TechnicalMeasure) -> Result<(), AvvGeneratorError> {
+fn format_technical_measure(
+    out: &mut String,
+    measure: &TechnicalMeasure,
+) -> Result<(), AvvGeneratorError> {
     writeln!(
         out,
         "\n### {} ({})",

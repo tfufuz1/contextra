@@ -33,6 +33,8 @@ members = [
     "crates/contextra-cognition",
     "crates/contextra-rank",
     "crates/contextra-audit-export",
+    "crates/contextra-avv-generator",
+    "crates/contextra-license",
 ]
 exclude = ["xtask"]
 default-members = [
@@ -145,6 +147,8 @@ contextra-kvcache = { path = "crates/contextra-kvcache" }
 contextra-engine = { path = "crates/contextra-engine" }
 contextra-cognition = { path = "crates/contextra-cognition" }
 contextra-rank = { path = "crates/contextra-rank" }
+contextra-avv-generator = { path = "crates/contextra-avv-generator" }
+contextra-license = { path = "crates/contextra-license" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
 # contextra-cluster, contextra-sandbox, contextra-saos-agent wurden in Phase 0 ausgelagert. <!-- crate-ref-ignore -->
