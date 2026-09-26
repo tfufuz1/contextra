@@ -4,11 +4,20 @@ use contextra_types::{DocId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     // AI-TAG[CONCURRENCY][CRITICAL] RESOLVED: AGT-DB-005 — relate() rollback race behoben, siehe ADR-023 (TS:2026-08-28T00:00:00Z)
-    /// Creates a directional relationship between two documents in the collection.
+    /// Creates a directional relationship between two documents in the collection with optional source provenance document ID.
     #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {
+    pub async fn relate_with_provenance(
+        &self,
+        from: &str,
+        to: &str,
+        label: &str,
+        source_doc_id: Option<&str>,
+    ) -> Result<()> {
         validate_doc_id(from)?;
         validate_doc_id(to)?;
+        if let Some(src_id) = source_doc_id {
+            validate_doc_id(src_id)?;
+        }
         let _guards = self.lock_keys_sorted([from, to]).await;
         let db_tx = self.begin_transaction()?;
 
@@ -23,6 +32,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             "from": from,
             "to": to,
             "label": label,
+            "source_doc_id": source_doc_id,
         });
         let bytes = serde_json::to_vec(&val)?;
 
@@ -32,7 +42,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 tracing::warn!(
                     tx_id = %tx_id,
                     error = %rollback_err,
-                    "Konnte Transaktion nach storage.put Fehler in relate() nicht zurückrollen"
+                    "Konnte Transaktion nach storage.put Fehler in relate_with_provenance() nicht zurückrollen"
                 );
             }
             return Err(e);
@@ -46,7 +56,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         db_tx.stage_graph_entity(from_entity);
         db_tx.stage_graph_entity(to_entity);
 
-        let edge = contextra_types::Edge::new(from_id, to_id, label);
+        let mut edge = contextra_types::Edge::new(from_id, to_id, label);
+        if let Some(src_str) = source_doc_id {
+            let doc_id = DocId::from_key(src_str)?;
+            edge = edge.with_source_doc_id(doc_id);
+        }
         db_tx.stage_graph_edge(edge);
 
         match db_tx.commit().await {
@@ -56,6 +70,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
             Err(e) => Err(e),
         }
+    }
+
+    /// Creates a directional relationship between two documents in the collection.
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {
+        self.relate_with_provenance(from, to, label, None).await
     }
 
     /// Creates a bidirectional relationship atomically.

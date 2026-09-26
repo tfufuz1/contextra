@@ -32,7 +32,7 @@ impl Default for EntityExtractionConfig {
 }
 
 /// Konfiguration fuer die automatische Entitaetsextraktion beim Einfuegen von Dokumenten.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AutoExtractionConfig {
     /// Ob die automatische Extraktion aktiviert ist (Default: false).
     pub enabled: bool,
@@ -40,15 +40,7 @@ pub struct AutoExtractionConfig {
     pub entity_config: EntityExtractionConfig,
 }
 
-impl Default for AutoExtractionConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            entity_config: EntityExtractionConfig::default(),
-        }
-    }
-}
-
+#[allow(clippy::type_complexity)]
 static AUTO_EXTRACTION_REGISTRY: std::sync::LazyLock<
     parking_lot::RwLock<ahash::AHashMap<usize, (Arc<dyn LlmTextGenerator>, AutoExtractionConfig)>>,
 > = std::sync::LazyLock::new(|| parking_lot::RwLock::new(ahash::AHashMap::new()));
@@ -123,7 +115,7 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
             }
 
             match collection
-                .relate(&triple.subject, &triple.object, &triple.predicate)
+                .relate_with_provenance(&triple.subject, &triple.object, &triple.predicate, Some(doc_id))
                 .await
             {
                 Ok(_) => {

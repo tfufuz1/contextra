@@ -172,7 +172,7 @@ pub struct Edge {
     /// End of business validity (business time in Unix ms); None = currently valid business state.
     #[serde(default)]
     pub business_valid_to: Option<i64>,
-    /// Optional source document ID from which this edge was derived.
+    /// Optional source document ID from which this edge was derived for provenance and deletion proof cascade.
     #[serde(default)]
     pub source_doc_id: Option<DocId>,
 }
@@ -193,7 +193,7 @@ impl Edge {
         }
     }
 
-    /// Sets the source document ID from which this edge was derived.
+    /// Sets the optional source document ID from which this edge was derived for provenance tracking.
     pub fn with_source_doc_id(mut self, doc_id: DocId) -> Self {
         self.source_doc_id = Some(doc_id);
         self
