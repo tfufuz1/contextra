@@ -9,8 +9,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-pub const DEFAULT_CHECK_DOCS: &[&str] =
-    &["docs/GESAMTSPEZIFIKATION.md", "AGENTS.md", "DECISIONS.md"];
+pub const DEFAULT_CHECK_DOCS: &[&str] = &[
+    "docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md",
+    "AGENTS.md",
+    "docs/decisions/README.md",
+    ".jules/JULES_CONTEXT.md",
+];
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DocRefViolation {
@@ -208,6 +212,12 @@ pub fn check_doc_references_for_files(
                 let file_violations = check_doc_references_in_content(&content, &rel_path, root);
                 violations.extend(file_violations);
             }
+        } else {
+            violations.push(DocRefViolation {
+                file: rel_path.clone(),
+                line: 0,
+                referenced_path: format!("GEFEHLTE GOVERNANCE-DATEI: '{rel_path}' existiert nicht"),
+            });
         }
     }
 

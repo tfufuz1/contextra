@@ -81,6 +81,12 @@ mod check_ring0_async_purity;
 mod check_ring_layering;
 mod check_stale_tags;
 mod check_manifest_completeness;
+mod check_toc_integrity;
+mod check_agents_freshness;
+
+pub mod agent_lifecycle;
+pub mod proof;
+pub mod generators;
 mod check_toctou_trait_defaults;
 mod check_type_registry;
 mod check_unsafe_islands;
@@ -2091,6 +2097,45 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-branch-overlap" => {
+            if !agent_lifecycle::branch_overlap::run_check_branch_overlap() {
+                process::exit(1);
+            }
+        }
+        "prune-branches" => {
+            if !agent_lifecycle::prune_branches::run_prune_branches() {
+                process::exit(1);
+            }
+        }
+        "forensic-test" => {
+            let extra_args = if args.len() > 2 { args[2..].to_vec() } else { Vec::new() };
+            if !proof::forensic_test::run_forensic_test(&extra_args) {
+                process::exit(1);
+            }
+        }
+        "bench-trend" => {
+            if !proof::bench_trend::run_bench_trend() {
+                process::exit(1);
+            }
+        }
+        "gen-sbom" => {
+            if !generators::sbom::run_gen_sbom() {
+                process::exit(1);
+            }
+        }
+        "check-toc-integrity" => {
+            let targets: Vec<PathBuf> = args.iter().skip(2).map(PathBuf::from).collect();
+            if let Err(e) = check_toc_integrity::run_check_toc_integrity(&targets) {
+                eprintln!("❌ check-toc-integrity failed: {}", e);
+                process::exit(1);
+            }
+        }
+        "check-agents-freshness" => {
+            if let Err(e) = check_agents_freshness::run_check_agents_freshness() {
+                eprintln!("❌ check-agents-freshness failed: {}", e);
+                process::exit(1);
+            }
+        }
         "check-manifest-completeness" => {
             if let Err(e) = check_manifest_completeness::run() {
                 eprintln!("❌ check-manifest-completeness failed: {}", e);
@@ -2541,6 +2586,12 @@ fn main() {
         }
         "claim" => {
             let success = claim::run_claim(&args[2..]);
+            if !success {
+                process::exit(1);
+            }
+        }
+        "pre-push" => {
+            let success = jules_submit_gate::run_pre_push();
             if !success {
                 process::exit(1);
             }
