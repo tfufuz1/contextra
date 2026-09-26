@@ -39,6 +39,8 @@ pub mod graph;
 pub mod graph_index;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
+/// Key-value bridge storage port trait.
+pub mod kv_bridge_port;
 /// Key-value prefix store traits and types.
 pub mod kv;
 /// Memory lifecycle, grounding validator, and distance calculator contracts.
@@ -63,6 +65,7 @@ pub use graph::*;
 pub use graph_index::*;
 pub use id_gen::*;
 pub use kv::*;
+pub use kv_bridge_port::*;
 pub use lifecycle::*;
 pub use metrics::*;
 pub use observability::*;
@@ -89,6 +92,7 @@ mod dyn_safety {
     fn _assert_dyn_storage_read(_: Option<&dyn StorageRead>) {}
     fn _assert_dyn_storage_write(_: Option<&dyn StorageWrite>) {}
     fn _assert_dyn_metrics_sink(_: Option<&dyn MetricsSink>) {}
+    fn _assert_dyn_kv_bridge_storage(_: Option<&dyn KvBridgeStorage>) {}
     fn _assert_dyn_kv_prefix_store(_: Option<&dyn KvPrefixStore>) {}
     fn _assert_dyn_graph_mutation(_: Option<&dyn GraphCollectionMutation>) {}
     fn _assert_dyn_graph(_: Option<&dyn GraphIndex>) {}
@@ -104,6 +108,7 @@ mod dyn_safety {
         _assert_dyn_storage_read(None);
         _assert_dyn_storage_write(None);
         _assert_dyn_metrics_sink(None);
+        _assert_dyn_kv_bridge_storage(None);
         _assert_dyn_kv_prefix_store(None);
         _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
