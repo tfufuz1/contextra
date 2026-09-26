@@ -304,6 +304,11 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "tx_id": tx_id,
                 })),
             },
+            ContextraError::KvDeleteModeConfig(msg) => Self {
+                kind: "KvDeleteModeConfig".to_string(),
+                message: msg.to_string(),
+                details: None,
+            },
         }
     }
 }

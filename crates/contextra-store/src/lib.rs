@@ -24,6 +24,7 @@
 pub(crate) mod checkpoint;
 #[cfg(not(loom))]
 pub mod compaction;
+pub mod kv;
 pub mod kv_locks;
 #[cfg(not(loom))]
 pub mod lsm;

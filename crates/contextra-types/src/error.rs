@@ -236,6 +236,10 @@ pub enum ContextraError {
         /// Identifier of timed out transaction.
         tx_id: u64,
     },
+
+    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit `deletion_proof_active`.
+    #[error("KV delete mode configuration error: {0}")]
+    KvDeleteModeConfig(&'static str),
 }
 
 impl ContextraError {
