@@ -941,6 +941,7 @@ dependencies = [
 name = "contextra-license"
 version = "0.1.0"
 dependencies = [
+ "contextra-ports",
  "contextra-types",
  "thiserror 2.0.20",
 ]

@@ -17,12 +17,7 @@ pub trait KvBridgeStorage: Send + Sync {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>;
 
     /// Schreibt einen Schlüssel-Wert-Paar im Kontext einer Transaktion (`tx_id`).
-    fn put<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>>;
+    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>>;
 
     /// Committet die Transaktion mit der ID `tx_id`.
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;

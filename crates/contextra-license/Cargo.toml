@@ -12,3 +12,4 @@ description = "License and activation enforcement gate layer for Contextra featu
 [dependencies]
 thiserror = { workspace = true }
 contextra-types = { workspace = true }
+contextra-ports = { workspace = true }

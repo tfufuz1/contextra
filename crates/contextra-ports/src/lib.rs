@@ -39,10 +39,12 @@ pub mod graph;
 pub mod graph_index;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
-/// Key-value bridge storage port trait.
-pub mod kv_bridge_port;
 /// Key-value prefix store traits and types.
 pub mod kv;
+/// Key-value bridge storage port trait.
+pub mod kv_bridge_port;
+/// License and activation gate port traits.
+pub mod license;
 /// Memory lifecycle, grounding validator, and distance calculator contracts.
 pub mod lifecycle;
 /// Metrics reporting port trait.
@@ -66,6 +68,7 @@ pub use graph_index::*;
 pub use id_gen::*;
 pub use kv::*;
 pub use kv_bridge_port::*;
+pub use license::*;
 pub use lifecycle::*;
 pub use metrics::*;
 pub use observability::*;
@@ -101,6 +104,7 @@ mod dyn_safety {
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
+    fn _assert_dyn_license_gate(_: Option<&dyn LicenseGate>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -116,5 +120,6 @@ mod dyn_safety {
         _assert_dyn_clock(None);
         _assert_dyn_rng(None);
         _assert_dyn_id_gen(None);
+        _assert_dyn_license_gate(None);
     }
 }

@@ -403,6 +403,7 @@ name = "contextra-engine"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "bincode",
  "blake3",
  "bytes",
  "contextra-adapt",
@@ -416,9 +417,11 @@ dependencies = [
  "contextra-text",
  "contextra-types",
  "contextra-vector",
+ "hmac",
  "parking_lot",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "tokio",
  "tokio-util",
