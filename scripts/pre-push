@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# .githooks/pre-push — Contextra Hard-Gate-Bindung vor jedem Push
+#
+# Installation: automatisch aktiv via `just bootstrap`
+#   (setzt `git config core.hooksPath .githooks`)
+#
+# ZWECK:
+#   Verweigert den Push, wenn kein frischer, zum AKTUELLEN Working-Tree-Stand
+#   passender ".jules/gate_ledger.json"-Eintrag mit Status "PASS" existiert.
+#   Dies ist die LOKALE Schicht der Layered-Enforcement-Kette
+#   (siehe CONTEXTRA_JULES_HARD_GATE_OPTIMIERUNG.md, Abschnitt 2).
+#
+# WICHTIG: Diese Schicht ist mit `git push --no-verify` umgehbar. Sie ersetzt
+#   NICHT die serverseitige Pflicht-Statuscheck-Konfiguration auf GitHub
+#   (branch protection, enforce_admins=true) — das ist die Schicht, die
+#   `--no-verify` nicht umgehen kann. Beide Schichten sind erforderlich.
+
+set -euo pipefail
+
+LEDGER=".jules/gate_ledger.json"
+MAX_AGE_SECONDS=7200  # 2h Kulanzfenster zwischen Gate-Lauf und Push
+
+fail() {
+    echo "❌ PRE-PUSH BLOCKIERT: $1" >&2
+    echo "   → Führe zuerst aus: ./scripts/jules_hard_gate.sh" >&2
+    echo "   → Niemals 'git push --no-verify' verwenden, um dies zu umgehen." >&2
+    exit 1
+}
+
+command -v jq >/dev/null 2>&1 || fail "'jq' ist nicht installiert (wird für die Ledger-Prüfung benötigt)."
+
+[ -f "$LEDGER" ] || fail "Kein Gate-Ledger gefunden ($LEDGER). Es wurde noch kein Hard-Gate-Lauf durchgeführt."
+
+STATUS="$(jq -r '.status' "$LEDGER")"
+MODE="$(jq -r '.mode' "$LEDGER")"
+LEDGER_HASH="$(jq -r '.worktree_hash' "$LEDGER")"
+LEDGER_TS_EPOCH="$(jq -r '.timestamp_epoch' "$LEDGER")"
+
+[ "$STATUS" = "PASS" ] || fail "Letztes Gate-Ergebnis war Status='${STATUS}', nicht 'PASS'."
+[ "$MODE" = "full" ]   || fail "Letzter Gate-Lauf war im Modus '${MODE}' (--fast). Nur ein voller Lauf ist submit-fähig."
+
+NOW_EPOCH="$(date -u +%s)"
+AGE=$(( NOW_EPOCH - LEDGER_TS_EPOCH ))
+if [ "$AGE" -gt "$MAX_AGE_SECONDS" ]; then
+    fail "Ledger ist $(( AGE / 60 )) Minuten alt (Limit: $(( MAX_AGE_SECONDS / 60 )) Minuten). Gate erneut ausführen."
+fi
+
+CURRENT_HASH="$(git stash create 2>/dev/null || true)"
+if [ -z "$CURRENT_HASH" ]; then
+    CURRENT_HASH="CLEAN:$(git rev-parse HEAD)"
+fi
+
+if [ "$CURRENT_HASH" != "$LEDGER_HASH" ]; then
+    fail "Working-Tree hat sich seit dem letzten Gate-Lauf verändert (Hash-Mismatch: erwartet ${LEDGER_HASH:0:12}..., aktuell ${CURRENT_HASH:0:12}...)."
+fi
+
+echo "✅ Pre-Push Hard-Gate: Ledger gültig (Status=PASS, Modus=full, ${AGE}s alt, Hash stimmt überein)."
+exit 0
