@@ -277,6 +277,14 @@ pub static DELAY_APPEND_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::At
 pub static FAIL_TRUNCATE_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
+#[cfg(feature = "fault-injection")]
+pub static FAIL_APPEND_AFTER_PARTIAL_BYTES: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(feature = "fault-injection")]
+pub static FAIL_APPEND_PARTIAL_ONCE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 #[derive(Debug, Clone)]
 pub struct WalConfig {
     pub key_manager: Option<Arc<KeyManager>>,
@@ -310,6 +318,7 @@ pub struct Wal {
     pub truncate_lock: Arc<tokio::sync::Mutex<()>>,
     #[allow(dead_code)]
     pub(crate) simulate_append_failure: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) poisoned: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Drop for Wal {
@@ -392,6 +401,7 @@ impl Wal {
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
             simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
@@ -493,6 +503,7 @@ impl Wal {
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
             simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
         wal.enable_flusher_with_config(file, config.flusher_config)?;
@@ -570,6 +581,61 @@ impl Wal {
     pub fn is_sealed(&self) -> bool {
         self.sealed.load(std::sync::atomic::Ordering::SeqCst)
     }
+
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Recovers a poisoned `Wal` handle after a suspected torn write event.
+    ///
+    /// Re-verifies physical file state via offline replay against the last valid HMAC chain,
+    /// updates `size` and `last_hmac` to the verified end state, physically truncates any
+    /// orphan/partial bytes at the tail, and resets the `poisoned` flag to `false`.
+    ///
+    /// **This is the only supported mechanism to recover a poisoned `Wal` handle back into service.**
+    pub async fn recover_from_poison(&self) -> Result<()> {
+        if !self.is_poisoned() {
+            return Ok(());
+        }
+
+        // Replay all entries up to the last valid HMAC-verified entry
+        let entries = self.replay().await?;
+
+        let file_len = self::fs::metadata(&self.path)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        let (verified_offset, verified_hmac) =
+            if let Some((_, last_entry, end_pos)) = entries.last() {
+                (*end_pos, last_entry.checksum)
+            } else if file_len >= 4
+                && self
+                    .header_written
+                    .load(std::sync::atomic::Ordering::Acquire)
+            {
+                (4u64, [0u8; 32])
+            } else {
+                (0u64, [0u8; 32])
+            };
+
+        // Reset poisoned flag temporarily to allow truncation command to be executed by flusher
+        self.poisoned
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+
+        if let Err(e) = self.truncate(verified_offset, verified_hmac).await {
+            self.poisoned
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            return Err(e);
+        }
+
+        self.size
+            .store(verified_offset, std::sync::atomic::Ordering::SeqCst);
+        let mut hmac_guard = self.last_hmac.lock().await;
+        *hmac_guard = verified_hmac;
+
+        Ok(())
+    }
 }
 
 #[cfg(loom)]
@@ -588,6 +654,7 @@ impl Wal {
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
             simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
         if let Err(e) = wal.enable_flusher_with_config(
             self::fs::LoomFile::new(),
