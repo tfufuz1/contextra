@@ -9,7 +9,7 @@
 pub mod attention_score;
 pub mod eviction_worker;
 pub mod prefix_store;
-#[cfg(feature = "kvcache-kivi-quant")]
+#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 pub mod quantize_kivi;
 pub mod radix;
 pub mod segment;
@@ -21,10 +21,14 @@ pub use attention_score::{
 };
 pub use eviction_worker::{emergency_wipe, EvictionWorker};
 pub use prefix_store::TenantPrefixKvStore;
-#[cfg(feature = "kvcache-kivi-quant")]
-pub use quantize_kivi::{pack_kivi_block, unpack_kivi_block, KiviBlockMeta, KiviQuantizedBlock};
+#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+pub use quantize_kivi::{
+    compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, pack_kivi_block,
+    unpack_kivi_block, KiviBlockMeta, KiviQuantizeConfig, KiviQuantizedBlock, KvTensorView,
+};
 pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 pub use segment::{
-    KvSegment, ShreddableSegmentKey, Tier2EncryptedSegment, CURRENT_KV_KEY_DERIVATION_VERSION,
+    KvSegment, KvSegmentContent, ShreddableSegmentKey, Tier2EncryptedSegment,
+    CURRENT_KV_KEY_DERIVATION_VERSION,
 };
 pub use store::{SpillHandler, TenantIsolatedKvStore};

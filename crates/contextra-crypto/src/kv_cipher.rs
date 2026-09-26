@@ -55,6 +55,42 @@ pub struct EncryptedKvLayer {
     pub model_fingerprint: ModelFingerprint,
 }
 
+/// Abstract cipher trait for KV block encryption and seal/open operations.
+pub trait KvCipher: Send + Sync {
+    /// Encrypts (seals) plaintext byte payload into authenticated ciphertext bytes.
+    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>>;
+    /// Decrypts (opens) authenticated ciphertext bytes back to plaintext byte payload.
+    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>>;
+}
+
+impl KvCipher for KeyManager {
+    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+        let (ct, nonce) = self
+            .encrypt_auto_nonce(plaintext)
+            .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))?;
+        let mut out = Vec::with_capacity(12 + ct.len());
+        out.extend_from_slice(&nonce);
+        out.extend_from_slice(&ct);
+        Ok(out)
+    }
+
+    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+        if ciphertext.len() < 12 {
+            return Err(contextra_types::ContextraError::Crypto(
+                "Ciphertext too short for nonce payload".into(),
+            ));
+        }
+        let nonce: &[u8; 12] = ciphertext[..12]
+            .try_into()
+            .map_err(|e: std::array::TryFromSliceError| {
+                contextra_types::ContextraError::ParseError(e.to_string())
+            })?;
+        let ct = &ciphertext[12..];
+        self.decrypt_auto_nonce(ct, nonce)
+            .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))
+    }
+}
+
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 pub struct KvSegmentCipher {
     key_manager: KeyManager,
@@ -165,6 +201,16 @@ impl KvSegmentCipher {
 
         let sub_km = self.derive_key_for_segment(encrypted.tenant_id, segment_id, version)?;
         sub_km.decrypt_auto_nonce(&encrypted.ciphertext, &encrypted.nonce)
+    }
+}
+
+impl KvCipher for KvSegmentCipher {
+    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+        self.key_manager.seal(plaintext)
+    }
+
+    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+        self.key_manager.open(ciphertext)
     }
 }
 
