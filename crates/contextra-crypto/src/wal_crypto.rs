@@ -638,6 +638,71 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_and_update_v3_length_prefix_prevents_partition_collision() {
+        let key = b"integrity-key-32-bytes-v3-coll-";
+
+        // Entry 1: key = "ab", value = "c"
+        let mut mac1 = WalHmac::new(key).unwrap();
+        mac1.update(&[0u8; 32]); // prev_hmac
+        mac1.update(&1u64.to_le_bytes()); // seq_no
+        mac1.update(&1u64.to_le_bytes()); // tx_id
+        mac1.update(&[0u8]); // Put op
+        mac1.update(&(2u32).to_le_bytes()); // key_len = 2
+        mac1.update(b"ab");
+        mac1.update(&(1u32).to_le_bytes()); // val_len = 1
+        mac1.update(b"c");
+        let checksum1 = mac1.finalize();
+
+        let entry1 = WalEntrySnapshot {
+            tx_id: 1,
+            seq_no: 1,
+            op_type: 0,
+            key: b"ab".to_vec(),
+            value: b"c".to_vec(),
+            checksum: checksum1,
+            prev_hmac: [0u8; 32],
+        };
+
+        // Entry 2: key = "a", value = "bc"
+        let mut mac2 = WalHmac::new(key).unwrap();
+        mac2.update(&[0u8; 32]); // prev_hmac
+        mac2.update(&1u64.to_le_bytes()); // seq_no
+        mac2.update(&1u64.to_le_bytes()); // tx_id
+        mac2.update(&[0u8]); // Put op
+        mac2.update(&(1u32).to_le_bytes()); // key_len = 1
+        mac2.update(b"a");
+        mac2.update(&(2u32).to_le_bytes()); // val_len = 2
+        mac2.update(b"bc");
+        let checksum2 = mac2.finalize();
+
+        let entry2 = WalEntrySnapshot {
+            tx_id: 1,
+            seq_no: 1,
+            op_type: 0,
+            key: b"a".to_vec(),
+            value: b"bc".to_vec(),
+            checksum: checksum2,
+            prev_hmac: [0u8; 32],
+        };
+
+        // Checksums MUST be different
+        assert_ne!(
+            checksum1, checksum2,
+            "Length prefixes in V3 MUST guarantee distinct HMAC checksums for [\"ab\", \"c\"] vs [\"a\", \"bc\"]"
+        );
+
+        // Verifier 1 accepts entry 1
+        let mut verifier1 = IntegrityVerifier::new(key);
+        assert!(verifier1.verify_and_update_v3(&entry1, 0).is_ok());
+
+        // Verifier 2 fails if entry 1's checksum is used with entry 2's key/value split
+        let mut verifier2 = IntegrityVerifier::new(key);
+        let mut cross_entry = entry2.clone();
+        cross_entry.checksum = checksum1;
+        assert!(verifier2.verify_and_update_v3(&cross_entry, 0).is_err());
+    }
+
+    #[test]
     #[allow(deprecated)]
     fn test_integrity_verifier_v2_roundtrip_and_tamper() {
         let key = b"integrity-key-32-bytes-v2------";
