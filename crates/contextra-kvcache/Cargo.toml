@@ -21,12 +21,14 @@ zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 bincode = { workspace = true }
+blake3 = { workspace = true, optional = true }
 
 [features]
 default = []
 kv-encryption = ["contextra-crypto/kv-encryption"]
 kvcache-attention-eviction = []
 kvcache-kivi-quant = []
+content-addressed-kv-cache = ["dep:blake3"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

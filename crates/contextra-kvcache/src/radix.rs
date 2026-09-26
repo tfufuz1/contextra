@@ -458,4 +458,347 @@ mod tests {
         tree.clear();
         assert!(tree.is_empty());
     }
+
+    #[test]
+    #[cfg(feature = "content-addressed-kv-cache")]
+    fn test_content_addressed_kv_store_lookup_cascade() {
+        struct MockEmbedder;
+        impl SemanticEmbedder for MockEmbedder {
+            fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>, ContextraError> {
+                // Return simple normalized embedding based on sum of tokens
+                let sum: f32 = tokens.iter().map(|&t| t as f32).sum();
+                Ok(vec![sum / 100.0, 1.0])
+            }
+        }
+
+        let tenant = TenantId::try_new(100).unwrap();
+        let mut store = ContentAddressedKvStore::new(tenant).with_semantic_config(
+            SemanticCacheConfig::new(Arc::new(MockEmbedder), 0.95),
+        );
+
+        // 1. Position match: insert [1, 2, 3, 4, 5]
+        store.insert(tenant, &[1, 2, 3, 4, 5], 1001).unwrap();
+
+        // Exact prefix hit: query [1, 2, 3, 4, 5, 6] matches prefix [1, 2, 3, 4, 5]
+        let res1 = store.lookup(tenant, &[1, 2, 3, 4, 5, 6]);
+        match res1 {
+            KvLookupResult::ExactPrefixHit(seg) => {
+                assert_eq!(seg.segment_id, 1001);
+                assert_eq!(seg.tenant_id, tenant);
+            }
+            _ => panic!("Expected ExactPrefixHit"),
+        }
+
+        // 2. Content hash hit: insert [10, 20, 30] (3 tokens < min_prefix_len 4)
+        store.insert(tenant, &[10, 20, 30], 2002).unwrap();
+
+        // Query [10, 20, 30]: position_index misses because len 3 < min_prefix_len 4 under default CostBased policy.
+        // content_index matches BLAKE3 hash and returns ContentHashHit!
+        let res2 = store.lookup(tenant, &[10, 20, 30]);
+        match res2 {
+            KvLookupResult::ContentHashHit(seg) => {
+                assert_eq!(seg.segment_id, 2002);
+                assert_eq!(seg.tenant_id, tenant);
+            }
+            _ => panic!("Expected ContentHashHit for token sequence shorter than min_prefix_len"),
+        }
+
+        // Now test pure ContentHashHit where query is NOT a prefix extension in position tree
+        // e.g. query [99, 100] when only [99, 100] is inserted without position tree matching
+        let mut store_content_only = ContentAddressedKvStore::new(tenant);
+        // Manually insert into content_index only
+        let hash = ContentAddressedKvStore::hash_tokens(&[50, 60, 70]);
+        let seg_ref = KvSegmentRef::new(3003, tenant, vec![50, 60, 70]);
+        store_content_only.content_index.insert((tenant, hash), seg_ref);
+
+        let res3 = store_content_only.lookup(tenant, &[50, 60, 70]);
+        match res3 {
+            KvLookupResult::ContentHashHit(seg) => {
+                assert_eq!(seg.segment_id, 3003);
+                assert_eq!(seg.tenant_id, tenant);
+            }
+            _ => panic!("Expected ContentHashHit"),
+        }
+
+        // Miss check
+        let res_miss = store_content_only.lookup(tenant, &[999, 999]);
+        assert_eq!(res_miss, KvLookupResult::Miss);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Content-Addressed KV Cache Extension (feature = "content-addressed-kv-cache")
+// -----------------------------------------------------------------------------
+
+#[cfg(feature = "content-addressed-kv-cache")]
+/// Referenz auf ein gecachtes KV-Segment.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct KvSegmentRef {
+    pub segment_id: u64,
+    pub tenant_id: TenantId,
+    pub matched_tokens: Vec<u32>,
+}
+
+#[cfg(feature = "content-addressed-kv-cache")]
+impl KvSegmentRef {
+    /// Erstellt eine neue Segment-Referenz.
+    pub fn new(segment_id: u64, tenant_id: TenantId, matched_tokens: Vec<u32>) -> Self {
+        Self {
+            segment_id,
+            tenant_id,
+            matched_tokens,
+        }
+    }
+
+    /// Gibt die Anzahl der gematchten Tokens zurück.
+    pub fn matched_len(&self) -> usize {
+        self.matched_tokens.len()
+    }
+}
+
+#[cfg(feature = "content-addressed-kv-cache")]
+/// Ergebnis eines KV-Cache-Lookups mit `ContentAddressedKvStore`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum KvLookupResult {
+    /// Exakter Präfix-Treffer im PositionIndex (< 100 µs).
+    ExactPrefixHit(KvSegmentRef),
+    /// Content-Hash-Treffer via BLAKE3 im ContentIndex (< 500 µs).
+    ContentHashHit(KvSegmentRef),
+    /// Semantischer Similarity-Treffer via Vektorsuche (< 2 ms).
+    SemanticSimilarityHit {
+        segment: KvSegmentRef,
+        similarity: f32,
+    },
+    /// Cache-Miss.
+    Miss,
+}
+
+#[cfg(feature = "content-addressed-kv-cache")]
+/// Trait für semantische Embedding-Generierung auf KV-Cache-Keys.
+pub trait SemanticEmbedder: Send + Sync {
+    fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>, ContextraError>;
+}
+
+#[cfg(feature = "content-addressed-kv-cache")]
+/// Konfiguration für opt-in semantische Vektor-Cache-Lookups.
+#[derive(Clone)]
+pub struct SemanticCacheConfig {
+    pub embedder: Arc<dyn SemanticEmbedder>,
+    pub similarity_threshold: f32,
+}
+
+#[cfg(feature = "content-addressed-kv-cache")]
+impl SemanticCacheConfig {
+    pub fn new(embedder: Arc<dyn SemanticEmbedder>, similarity_threshold: f32) -> Self {
+        Self {
+            embedder,
+            similarity_threshold,
+        }
+    }
+}
+
+#[cfg(feature = "content-addressed-kv-cache")]
+/// Content-adressierter KV-Store mit Zwei-Ebenen-Lookup (Position, Content-Hash, Semantic-Search).
+pub struct ContentAddressedKvStore {
+    pub content_index: ahash::AHashMap<(TenantId, blake3::Hash), KvSegmentRef>,
+    pub position_index: PrefixRadixTree,
+    tenant_position_trees: ahash::AHashMap<TenantId, PrefixRadixTree>,
+    reuse_policy: KvReusePolicy,
+    semantic_config: Option<SemanticCacheConfig>,
+    semantic_entries: Vec<(TenantId, Vec<f32>, KvSegmentRef)>,
+}
+
+#[cfg(feature = "content-addressed-kv-cache")]
+impl ContentAddressedKvStore {
+    /// Erstellt einen neuen `ContentAddressedKvStore` für den primären Tenant.
+    pub fn new(primary_tenant: TenantId) -> Self {
+        Self {
+            content_index: ahash::AHashMap::new(),
+            position_index: PrefixRadixTree::new(primary_tenant),
+            tenant_position_trees: ahash::AHashMap::new(),
+            reuse_policy: KvReusePolicy::default(),
+            semantic_config: None,
+            semantic_entries: Vec::new(),
+        }
+    }
+
+    /// Konfiguriert die Präfix-Wiederverwendungs-Policy.
+    pub fn with_reuse_policy(mut self, policy: KvReusePolicy) -> Self {
+        self.reuse_policy = policy;
+        self
+    }
+
+    /// Konfiguriert den opt-in semantischen Embedder und Schwellenwert.
+    pub fn with_semantic_config(mut self, config: SemanticCacheConfig) -> Self {
+        self.semantic_config = Some(config);
+        self
+    }
+
+    /// Gibt eine Referenz auf den primären `position_index` zurück.
+    pub fn position_index(&self) -> &PrefixRadixTree {
+        &self.position_index
+    }
+
+    /// Konvertiert Token-IDs deterministisch in LE-Bytes und berechnet den BLAKE3-Hash.
+    pub fn hash_tokens(tokens: &[u32]) -> blake3::Hash {
+        let mut hasher = blake3::Hasher::new();
+        for token in tokens {
+            hasher.update(&token.to_le_bytes());
+        }
+        hasher.finalize()
+    }
+
+    /// Fügt eine Token-Sequenz und Segment-Referenz in den Store ein.
+    pub fn insert(
+        &mut self,
+        tenant: TenantId,
+        tokens: &[u32],
+        segment_id: u64,
+    ) -> Result<(), ContextraError> {
+        if tokens.is_empty() {
+            return Err(ContextraError::InvalidInput(
+                "Cannot insert empty token sequence into ContentAddressedKvStore".to_string(),
+            ));
+        }
+
+        let seg_ref = KvSegmentRef::new(segment_id, tenant, tokens.to_vec());
+
+        // 1. Position index insert
+        if tenant == self.position_index.tenant_id() {
+            self.position_index.insert(tokens, segment_id)?;
+        }
+        self.tenant_position_trees
+            .entry(tenant)
+            .or_insert_with(|| PrefixRadixTree::new(tenant))
+            .insert(tokens, segment_id)?;
+
+        // 2. Content-Hash insert mit (TenantId, Hash)-Key für strikte Mandanten-Isolierung
+        let hash = Self::hash_tokens(tokens);
+        self.content_index.insert((tenant, hash), seg_ref.clone());
+
+        // 3. Semantische Indizierung bei konfigurierter Semantic-Config
+        if let Some(config) = &self.semantic_config {
+            if let Ok(embedding) = config.embedder.embed(tokens) {
+                self.semantic_entries.push((tenant, embedding, seg_ref));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Lookup-Kaskade:
+    /// 1) Exact prefix hit via `position_index`
+    /// 2) Content hash hit via `content_index.get(&(tenant, blake3::hash(token_ids_as_bytes)))`
+    /// 3) Semantic similarity hit via Vektorsuche gegen Cache-Key-Embeddings (opt-in)
+    /// 4) Fallback zu `KvLookupResult::Miss`
+    pub fn lookup(&self, tenant: TenantId, token_ids: &[u32]) -> KvLookupResult {
+        if token_ids.is_empty() {
+            return KvLookupResult::Miss;
+        }
+
+        // 1. Exact prefix match check
+        let prefix_match = if tenant == self.position_index.tenant_id() {
+            self.position_index.find_longest_prefix(token_ids, self.reuse_policy)
+        } else {
+            self.tenant_position_trees
+                .get(&tenant)
+                .and_then(|tree| tree.find_longest_prefix(token_ids, self.reuse_policy))
+        };
+
+        if let Some(pm) = prefix_match {
+            let seg_ref = KvSegmentRef::new(pm.block_id, tenant, pm.matched_tokens);
+            return KvLookupResult::ExactPrefixHit(seg_ref);
+        }
+
+        // 2. Content-hash lookup: (TenantId, BLAKE3(token_ids))
+        let hash = Self::hash_tokens(token_ids);
+        if let Some(seg_ref) = self.content_index.get(&(tenant, hash)) {
+            // Defense-in-depth: TenantId-Check
+            if seg_ref.tenant_id == tenant {
+                return KvLookupResult::ContentHashHit(seg_ref.clone());
+            }
+        }
+
+        // 3. Semantic similarity search (falls konfiguriert)
+        if let Some(config) = &self.semantic_config {
+            if let Ok(query_embedding) = config.embedder.embed(token_ids) {
+                let mut best_match: Option<(KvSegmentRef, f32)> = None;
+                for (entry_tenant, entry_embedding, seg_ref) in &self.semantic_entries {
+                    if *entry_tenant == tenant {
+                        let sim = cosine_similarity(&query_embedding, entry_embedding);
+                        if sim >= config.similarity_threshold {
+                            match &best_match {
+                                None => best_match = Some((seg_ref.clone(), sim)),
+                                Some((_, best_sim)) => {
+                                    if sim > *best_sim {
+                                        best_match = Some((seg_ref.clone(), sim));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if let Some((seg, similarity)) = best_match {
+                    return KvLookupResult::SemanticSimilarityHit {
+                        segment: seg,
+                        similarity,
+                    };
+                }
+            }
+        }
+
+        KvLookupResult::Miss
+    }
+
+    /// Entfernt einen Eintrag aus allen Indizes für einen Mandanten.
+    pub fn remove(&mut self, tenant: TenantId, tokens: &[u32]) -> Option<KvSegmentRef> {
+        if tokens.is_empty() {
+            return None;
+        }
+
+        if tenant == self.position_index.tenant_id() {
+            self.position_index.remove(tokens);
+        }
+        if let Some(tree) = self.tenant_position_trees.get_mut(&tenant) {
+            tree.remove(tokens);
+        }
+
+        let hash = Self::hash_tokens(tokens);
+        let removed = self.content_index.remove(&(tenant, hash));
+
+        self.semantic_entries.retain(|(t, _, seg)| {
+            !(*t == tenant && seg.matched_tokens == tokens)
+        });
+
+        removed
+    }
+
+    /// Gibt die Anzahl gespeicherter Content-Index-Einträge zurück.
+    pub fn len(&self) -> usize {
+        self.content_index.len()
+    }
+
+    /// Prüft, ob der Content-Index leer ist.
+    pub fn is_empty(&self) -> bool {
+        self.content_index.is_empty()
+    }
+}
+
+#[cfg(feature = "content-addressed-kv-cache")]
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+    let mut dot = 0.0f32;
+    let mut norm_a = 0.0f32;
+    let mut norm_b = 0.0f32;
+    for (x, y) in a.iter().zip(b.iter()) {
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+    }
+    if norm_a <= 0.0 || norm_b <= 0.0 {
+        return 0.0;
+    }
+    dot / (norm_a.sqrt() * norm_b.sqrt())
 }
