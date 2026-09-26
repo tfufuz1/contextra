@@ -120,6 +120,7 @@ impl Wal {
         let header_written = Arc::clone(&self.header_written);
         let size = Arc::clone(&self.size);
         let last_hmac = Arc::clone(&self.last_hmac);
+        let poisoned = Arc::clone(&self.poisoned);
         let key_manager = self.key_manager.clone();
         let fallback_integrity_key = self.fallback_integrity_key;
         let allow_legacy_integrity_key_fallback = self.allow_legacy_integrity_key_fallback;
@@ -142,6 +143,20 @@ impl Wal {
                         last_hmac_val: _,
                         ack,
                     } => {
+                        if poisoned.load(std::sync::atomic::Ordering::SeqCst) {
+                            let _ = ack.send(Err(ContextraError::Storage(
+                                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                            )));
+                            while let Ok(next_cmd) = rx.try_recv() {
+                                if let WalCommand::Append { ack, .. } = next_cmd {
+                                    let _ = ack.send(Err(ContextraError::Storage(
+                                        "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                                    )));
+                                }
+                            }
+                            continue;
+                        }
+
                         let mut batch_payload = payload;
                         let mut acks = vec![ack];
 
@@ -218,6 +233,45 @@ impl Wal {
                                     ))
                                 })?;
                             }
+
+                            #[cfg(feature = "fault-injection")]
+                            if crate::wal::FAIL_APPEND_PARTIAL_ONCE
+                                .compare_exchange(
+                                    true,
+                                    false,
+                                    std::sync::atomic::Ordering::SeqCst,
+                                    std::sync::atomic::Ordering::SeqCst,
+                                )
+                                .is_ok()
+                            {
+                                let partial_bytes = crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
+                                    .swap(0, std::sync::atomic::Ordering::SeqCst);
+                                let cut = (partial_bytes as usize).min(batch_payload.len());
+                                if cut > 0 {
+                                    file.write_all(&batch_payload[..cut]).await.map_err(|e| {
+                                        ContextraError::Storage(format!(
+                                            "WAL flusher partial write failed for {}: {}",
+                                            path.display(),
+                                            e
+                                        ))
+                                    })?;
+                                    file.sync_all().await.map_err(|e| {
+                                        ContextraError::Storage(format!(
+                                            "WAL flusher partial fsync failed for {}: {}",
+                                            path.display(),
+                                            e
+                                        ))
+                                    })?;
+                                }
+                                crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
+                                    .store(0, std::sync::atomic::Ordering::SeqCst);
+                                crate::wal::FAIL_APPEND_PARTIAL_ONCE
+                                    .store(false, std::sync::atomic::Ordering::SeqCst);
+                                return Err(ContextraError::Storage(
+                                    "Simulated WAL append partial write failure (FAIL_APPEND_PARTIAL_ONCE)".into(),
+                                ));
+                            }
+
                             file.write_all(&batch_payload).await.map_err(|e| {
                                 ContextraError::Storage(format!(
                                     "WAL flusher write failed for {}: {}",
@@ -253,6 +307,15 @@ impl Wal {
                         }
                         .await;
 
+                        if res.is_err() {
+                            let size_before = size.load(std::sync::atomic::Ordering::Acquire);
+                            if let Ok(meta) = file.metadata().await {
+                                if meta.len() > size_before {
+                                    poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+                                }
+                            }
+                        }
+
                         for ack in acks {
                             let send_res = match &res {
                                 Ok(()) => Ok(()),
@@ -267,6 +330,13 @@ impl Wal {
                         new_last_hmac,
                         ack,
                     } => {
+                        if poisoned.load(std::sync::atomic::Ordering::SeqCst) {
+                            let _ = ack.send(Err(ContextraError::Storage(
+                                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                            )));
+                            continue;
+                        }
+
                         let res: Result<()> = async {
                             #[cfg(feature = "fault-injection")]
                             if crate::wal::FAIL_TRUNCATE_ONCE
