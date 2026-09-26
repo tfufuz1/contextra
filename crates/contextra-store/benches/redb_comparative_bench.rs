@@ -1,230 +1,298 @@
-// ============================================================================
-// CONTEXTRA TIER-1 COMPARATIVE BENCHMARK: contextra-store vs redb
-// ============================================================================
-// Zweck:
-// Dieser Benchmark misst und vergleicht die Lese-, Schreib- und Scan-Performance
-// sowie die physische Datenträgergröße (Disk Amplification) von `contextra-store`
-// (`LsmStorage`) direkt gegen den Referenz-Key-Value-Store `redb`.
-//
-// Wichtiger Hinweis:
-// Dies ist eine reine PERFORMANCE-Benchmark zur Laufzeit- und Durchsatzanalyse.
-// Die funktionale Korrektheit und Äquivalenz der Operationsergebnisse wird
-// separat über Differential-Testing in `tests/differential/redb_operation_sequence.rs`
-// sichergestellt.
-//
-// Durability-Äquivalenz:
-// - `contextra-store`: Jeder `commit(tx)`-Aufruf schreibt Änderungen in den WAL
-//   und führt ein physikalisches `fsync` aus, um synchrone Haltbarkeit zu garantieren.
-// - `redb`: Verwendet die Standard-Durability `Durability::Immediate` für Schreibtransaktionen,
-//   welche ebenfalls bei jedem `write_txn.commit()` ein synchrones `fsync` auf den
-//   Datenträger durchführt.
-//
-// Beide Systeme bieten somit äquivalente synchrone ACID-Durability-Garantien pro Batch.
-// ============================================================================
+//! Performance Benchmark: `contextra-store` (`LsmStorage`) vs `redb::Database`
+//!
+//! # Purpose
+//! This benchmark suite evaluates the comparative execution performance (latency,
+//! throughput) and physical disk usage (write/space amplification) of `contextra-store`
+//! against `redb` (v2) across identical workload profiles as specified in Spec §22.2.
+//!
+//! # Durability Equivalence
+//! - `contextra-store` (`LsmStorage`): Every transaction commit executes a synchronous
+//!   write and fsync flush to the Write-Ahead Log (WAL).
+//! - `redb`: Operates with `Durability::Immediate` by default, which executes a synchronous
+//!   sync to disk per write transaction commit.
+//! Both engines operate under strictly equivalent `Immediate` durability guarantees.
+//!
+//! # Scope
+//! This is a PERFORMANCE benchmark. Functional correctness and differential state
+//! verification are covered separately in `tests/differential/redb_operation_sequence.rs`.
+
+#![allow(clippy::unwrap_used)]
 
 use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use redb::TableDefinition;
+use redb::{Database, Durability, TableDefinition};
+use std::fs;
 use std::ops::Bound;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::path::Path;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
-const TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("bench_table");
+const REDB_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("bench_table");
 
-fn dir_size(path: &std::path::Path) -> std::io::Result<u64> {
+const NUM_ITEMS: usize = 10_000;
+const BATCH_SIZE: usize = 100;
+const VALUE_SIZE: usize = 128;
+const PREPOPULATE_COUNT: usize = 5_000;
+const MIXED_OPS_COUNT: usize = 100;
+
+fn calculate_dir_size(path: &Path) -> std::io::Result<u64> {
     let mut total = 0;
     if path.is_dir() {
-        for entry in std::fs::read_dir(path)? {
+        for entry in fs::read_dir(path)? {
             let entry = entry?;
             let p = entry.path();
             if p.is_dir() {
-                total += dir_size(&p)?;
+                total += calculate_dir_size(&p)?;
             } else {
                 total += entry.metadata()?.len();
             }
         }
     } else if path.is_file() {
-        total += std::fs::metadata(path)?.len();
+        total += fs::metadata(path)?.len();
     }
     Ok(total)
 }
 
-fn print_disk_amplification_summary(rt: &Runtime) {
-    let lsm_dir = TempDir::new().unwrap();
-    let redb_dir = TempDir::new().unwrap();
+fn generate_key(i: usize) -> Vec<u8> {
+    format!("key_{:08}", i).into_bytes()
+}
 
-    // Populate contextra-store with 10,000 entries in 100 batches of 100
-    rt.block_on(async {
-        let config = LsmConfig {
-            path: lsm_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let storage = LsmStorage::new(config).await.unwrap();
-        let value = vec![0xABu8; 128];
-        let mut tx_counter = 1u64;
-        for batch_idx in 0..100 {
-            let tx = TxId::new(tx_counter);
-            tx_counter += 1;
-            for i in 0..100 {
-                let key = format!("key_{:012}", batch_idx * 100 + i).into_bytes();
-                storage.put(tx, &key, &value).await.unwrap();
-            }
-            storage.commit(tx).await.unwrap();
-        }
-    });
+fn generate_value() -> Vec<u8> {
+    vec![0xA5; VALUE_SIZE]
+}
 
-    // Populate redb with 10,000 entries in 100 batches of 100
-    let redb_path = redb_dir.path().join("redb.db");
-    let redb_db = redb::Database::create(&redb_path).unwrap();
-    let value = vec![0xABu8; 128];
-    for batch_idx in 0..100 {
-        let write_txn = redb_db.begin_write().unwrap();
-        {
-            let mut table = write_txn.open_table(TABLE).unwrap();
-            for i in 0..100 {
-                let key = format!("key_{:012}", batch_idx * 100 + i).into_bytes();
-                table.insert(key.as_slice(), value.as_slice()).unwrap();
-            }
-        }
-        write_txn.commit().unwrap();
+fn setup_redb_table(db: &Database) {
+    let mut write_txn = db.begin_write().unwrap();
+    write_txn.set_durability(Durability::Immediate);
+    {
+        let _ = write_txn.open_table(REDB_TABLE).unwrap();
     }
-    drop(redb_db);
-
-    let lsm_bytes = dir_size(lsm_dir.path()).unwrap_or(0);
-    let redb_bytes = dir_size(redb_dir.path()).unwrap_or(0);
-
-    println!("\n============================================================================");
-    println!("[DISK AMPLIFICATION] Physical Data Size After 10,000 Sequential Writes (128-byte values):");
-    println!("  - contextra-store directory size : {} bytes", lsm_bytes);
-    println!("  - redb database directory size    : {} bytes", redb_bytes);
-    println!("============================================================================\n");
+    write_txn.commit().unwrap();
 }
 
 fn bench_sequential_write(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let mut group = c.benchmark_group("sequential_write");
-    group.sample_size(10);
 
-    group.bench_function("contextra_store_sequential_write", |b| {
-        b.to_async(&rt).iter(|| async {
-            let tmp = TempDir::new().unwrap();
-            let config = LsmConfig {
-                path: tmp.path().to_path_buf(),
-                ..Default::default()
-            };
-            let storage = LsmStorage::new(config).await.unwrap();
-            let val = vec![0xABu8; 128];
-            let mut tx_counter = 1u64;
-            for batch in 0..100 {
-                let tx = TxId::new(tx_counter);
-                tx_counter += 1;
-                for i in 0..100 {
-                    let k = format!("key_{:012}", batch * 100 + i).into_bytes();
-                    storage.put(tx, &k, &val).await.unwrap();
-                }
-                storage.commit(tx).await.unwrap();
-            }
-            black_box(storage);
-        });
-    });
+    let val = generate_value();
 
-    group.bench_function("redb_sequential_write", |b| {
-        b.iter(|| {
-            let tmp = TempDir::new().unwrap();
-            let db_path = tmp.path().join("redb.db");
-            let db = redb::Database::create(&db_path).unwrap();
-            let val = vec![0xABu8; 128];
-            for batch in 0..100 {
-                let write_txn = db.begin_write().unwrap();
-                {
-                    let mut table = write_txn.open_table(TABLE).unwrap();
-                    for i in 0..100 {
-                        let k = format!("key_{:012}", batch * 100 + i).into_bytes();
-                        table.insert(k.as_slice(), val.as_slice()).unwrap();
+    {
+        let val = val.clone();
+        group.bench_function("contextra_store_sequential_write", |b| {
+            let val = val.clone();
+            b.to_async(&rt).iter_custom(|iters| {
+                let val = val.clone();
+                async move {
+                    let mut total_duration = std::time::Duration::ZERO;
+
+                    for _ in 0..iters {
+                        let tmp_dir = TempDir::new().unwrap();
+                        let config = LsmConfig {
+                            path: tmp_dir.path().to_path_buf(),
+                            memtable_size_limit: 1024 * 1024,
+                            ..Default::default()
+                        };
+                        let storage = LsmStorage::new(config).await.unwrap();
+
+                        let start = std::time::Instant::now();
+                        let mut tx_counter = 1u64;
+
+                        for chunk in (0..NUM_ITEMS).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+                            let tx = TxId::new(tx_counter);
+                            tx_counter += 1;
+                            for &i in chunk {
+                                let key = generate_key(i);
+                                storage.put(tx, &key, &val).await.unwrap();
+                            }
+                            storage.commit(tx).await.unwrap();
+                        }
+
+                        total_duration += start.elapsed();
                     }
+
+                    total_duration
                 }
-                write_txn.commit().unwrap();
-            }
-            black_box(db);
+            });
         });
-    });
+    }
+
+    {
+        let val = val.clone();
+        group.bench_function("redb_sequential_write", |b| {
+            let val = val.clone();
+            b.iter_custom(|iters| {
+                let mut total_duration = std::time::Duration::ZERO;
+
+                for _ in 0..iters {
+                    let tmp_dir = TempDir::new().unwrap();
+                    let db_path = tmp_dir.path().join("redb_bench.db");
+                    let db = Database::create(&db_path).unwrap();
+                    setup_redb_table(&db);
+
+                    let start = std::time::Instant::now();
+
+                    for chunk in (0..NUM_ITEMS).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+                        let mut write_txn = db.begin_write().unwrap();
+                        write_txn.set_durability(Durability::Immediate);
+                        {
+                            let mut table = write_txn.open_table(REDB_TABLE).unwrap();
+                            for &i in chunk {
+                                let key = generate_key(i);
+                                table.insert(key.as_slice(), val.as_slice()).unwrap();
+                            }
+                        }
+                        write_txn.commit().unwrap();
+                    }
+
+                    total_duration += start.elapsed();
+                }
+
+                total_duration
+            });
+        });
+    }
 
     group.finish();
 
-    print_disk_amplification_summary(&rt);
+    // Perform disk usage measurement after sequential write workload
+    rt.block_on(async {
+        let lsm_tmp = TempDir::new().unwrap();
+        let lsm_config = LsmConfig {
+            path: lsm_tmp.path().to_path_buf(),
+            memtable_size_limit: 1024 * 1024,
+            ..Default::default()
+        };
+        let lsm_storage = LsmStorage::new(lsm_config).await.unwrap();
+        let mut tx_counter = 1u64;
+        for chunk in (0..NUM_ITEMS).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+            let tx = TxId::new(tx_counter);
+            tx_counter += 1;
+            for &i in chunk {
+                lsm_storage.put(tx, &generate_key(i), &val).await.unwrap();
+            }
+            lsm_storage.commit(tx).await.unwrap();
+        }
+        lsm_storage.force_flush().await.unwrap();
+        let lsm_bytes = calculate_dir_size(lsm_tmp.path()).unwrap_or(0);
+
+        let redb_tmp = TempDir::new().unwrap();
+        let redb_path = redb_tmp.path().join("redb_bench.db");
+        let redb_db = Database::create(&redb_path).unwrap();
+        setup_redb_table(&redb_db);
+        for chunk in (0..NUM_ITEMS).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+            let mut write_txn = redb_db.begin_write().unwrap();
+            write_txn.set_durability(Durability::Immediate);
+            {
+                let mut table = write_txn.open_table(REDB_TABLE).unwrap();
+                for &i in chunk {
+                    table
+                        .insert(generate_key(i).as_slice(), val.as_slice())
+                        .unwrap();
+                }
+            }
+            write_txn.commit().unwrap();
+        }
+        let redb_bytes = calculate_dir_size(redb_tmp.path()).unwrap_or(0);
+
+        println!(
+            "\n--- PHYSICAL DISK AMPLIFICATION ({NUM_ITEMS} items, {VALUE_SIZE}B values) ---"
+        );
+        println!(
+            "  contextra-store physical dir size: {} bytes ({:.2} MB)",
+            lsm_bytes,
+            lsm_bytes as f64 / 1_048_576.0
+        );
+        println!(
+            "  redb physical dir size:           {} bytes ({:.2} MB)",
+            redb_bytes,
+            redb_bytes as f64 / 1_048_576.0
+        );
+        println!("------------------------------------------------------------\n");
+    });
 }
 
 fn bench_random_read(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
+    let mut group = c.benchmark_group("random_read");
 
-    let lsm_dir = TempDir::new().unwrap();
+    let val = generate_value();
+
+    // Contextra store setup
+    let lsm_tmp = TempDir::new().unwrap();
+    let lsm_config = LsmConfig {
+        path: lsm_tmp.path().to_path_buf(),
+        memtable_size_limit: 1024 * 1024,
+        ..Default::default()
+    };
     let lsm_storage = rt.block_on(async {
-        let config = LsmConfig {
-            path: lsm_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let storage = LsmStorage::new(config).await.unwrap();
-        let val = vec![0xABu8; 128];
-        let tx = TxId::new(1);
-        for i in 0..10_000 {
-            let k = format!("key_{:012}", i).into_bytes();
-            storage.put(tx, &k, &val).await.unwrap();
+        let storage = LsmStorage::new(lsm_config).await.unwrap();
+        let mut tx_counter = 1u64;
+        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+            let tx = TxId::new(tx_counter);
+            tx_counter += 1;
+            for &i in chunk {
+                storage.put(tx, &generate_key(i), &val).await.unwrap();
+            }
+            storage.commit(tx).await.unwrap();
         }
-        storage.commit(tx).await.unwrap();
+        storage.force_flush().await.unwrap();
         storage
     });
 
-    let redb_dir = TempDir::new().unwrap();
-    let redb_path = redb_dir.path().join("redb.db");
+    // redb setup
+    let redb_tmp = TempDir::new().unwrap();
+    let redb_path = redb_tmp.path().join("redb_bench.db");
     let redb_db = {
-        let db = redb::Database::create(&redb_path).unwrap();
-        let val = vec![0xABu8; 128];
-        let write_txn = db.begin_write().unwrap();
-        {
-            let mut table = write_txn.open_table(TABLE).unwrap();
-            for i in 0..10_000 {
-                let k = format!("key_{:012}", i).into_bytes();
-                table.insert(k.as_slice(), val.as_slice()).unwrap();
+        let db = Database::create(&redb_path).unwrap();
+        setup_redb_table(&db);
+        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+            let mut write_txn = db.begin_write().unwrap();
+            write_txn.set_durability(Durability::Immediate);
+            {
+                let mut table = write_txn.open_table(REDB_TABLE).unwrap();
+                for &i in chunk {
+                    table
+                        .insert(generate_key(i).as_slice(), val.as_slice())
+                        .unwrap();
+                }
             }
+            write_txn.commit().unwrap();
         }
-        write_txn.commit().unwrap();
         db
     };
 
-    let sample_keys: Vec<Vec<u8>> = (0..1000)
-        .map(|i| {
-            let idx = (i * 37 + 13) % 10_000;
-            format!("key_{:012}", idx).into_bytes()
-        })
-        .collect();
-
-    let mut group = c.benchmark_group("random_read");
+    let sample_keys: Vec<Vec<u8>> = {
+        let mut rng = StdRng::seed_from_u64(42);
+        (0..1_000)
+            .map(|_| generate_key(rng.gen_range(0..PREPOPULATE_COUNT)))
+            .collect()
+    };
 
     group.bench_function("contextra_store_random_read", |b| {
-        let storage = &lsm_storage;
-        let keys = &sample_keys;
-        b.to_async(&rt).iter(|| async move {
-            for k in keys {
-                let val = storage.get(k).await.unwrap();
-                black_box(val);
+        let mut idx = 0;
+        b.to_async(&rt).iter(|| {
+            let key = &sample_keys[idx % sample_keys.len()];
+            idx += 1;
+            let storage = &lsm_storage;
+            async move {
+                let res = storage.get(black_box(key)).await.unwrap();
+                black_box(res);
             }
         });
     });
 
     group.bench_function("redb_random_read", |b| {
-        let db = &redb_db;
-        let keys = &sample_keys;
+        let mut idx = 0;
         b.iter(|| {
-            let read_txn = db.begin_read().unwrap();
-            let table = read_txn.open_table(TABLE).unwrap();
-            for k in keys {
-                let val = table.get(k.as_slice()).unwrap().map(|v| v.value().to_vec());
-                black_box(val);
-            }
+            let key = &sample_keys[idx % sample_keys.len()];
+            idx += 1;
+            let read_txn = redb_db.begin_read().unwrap();
+            let table = read_txn.open_table(REDB_TABLE).unwrap();
+            let res = table.get(black_box(key.as_slice())).unwrap();
+            black_box(res.map(|v| v.value().to_vec()));
         });
     });
 
@@ -233,63 +301,65 @@ fn bench_random_read(c: &mut Criterion) {
 
 fn bench_range_scan(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
+    let mut group = c.benchmark_group("range_scan");
 
-    let lsm_dir = TempDir::new().unwrap();
+    let val = generate_value();
+
+    let lsm_tmp = TempDir::new().unwrap();
+    let lsm_config = LsmConfig {
+        path: lsm_tmp.path().to_path_buf(),
+        memtable_size_limit: 1024 * 1024,
+        ..Default::default()
+    };
     let lsm_storage = rt.block_on(async {
-        let config = LsmConfig {
-            path: lsm_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let storage = LsmStorage::new(config).await.unwrap();
-        let val = vec![0xABu8; 128];
-        let tx = TxId::new(1);
-        for i in 0..10_000 {
-            let k = format!("key_{:012}", i).into_bytes();
-            storage.put(tx, &k, &val).await.unwrap();
+        let storage = LsmStorage::new(lsm_config).await.unwrap();
+        let mut tx_counter = 1u64;
+        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+            let tx = TxId::new(tx_counter);
+            tx_counter += 1;
+            for &i in chunk {
+                storage.put(tx, &generate_key(i), &val).await.unwrap();
+            }
+            storage.commit(tx).await.unwrap();
         }
-        storage.commit(tx).await.unwrap();
+        storage.force_flush().await.unwrap();
         storage
     });
 
-    let redb_dir = TempDir::new().unwrap();
-    let redb_path = redb_dir.path().join("redb.db");
+    let redb_tmp = TempDir::new().unwrap();
+    let redb_path = redb_tmp.path().join("redb_bench.db");
     let redb_db = {
-        let db = redb::Database::create(&redb_path).unwrap();
-        let val = vec![0xABu8; 128];
-        let write_txn = db.begin_write().unwrap();
-        {
-            let mut table = write_txn.open_table(TABLE).unwrap();
-            for i in 0..10_000 {
-                let k = format!("key_{:012}", i).into_bytes();
-                table.insert(k.as_slice(), val.as_slice()).unwrap();
+        let db = Database::create(&redb_path).unwrap();
+        setup_redb_table(&db);
+        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+            let mut write_txn = db.begin_write().unwrap();
+            write_txn.set_durability(Durability::Immediate);
+            {
+                let mut table = write_txn.open_table(REDB_TABLE).unwrap();
+                for &i in chunk {
+                    table
+                        .insert(generate_key(i).as_slice(), val.as_slice())
+                        .unwrap();
+                }
             }
+            write_txn.commit().unwrap();
         }
-        write_txn.commit().unwrap();
         db
     };
 
-    let scan_ranges: Vec<(Vec<u8>, Vec<u8>)> = (0..10)
-        .map(|i| {
-            let start_idx = i * 1000;
-            let end_idx = start_idx + 100;
-            (
-                format!("key_{:012}", start_idx).into_bytes(),
-                format!("key_{:012}", end_idx).into_bytes(),
-            )
-        })
-        .collect();
-
-    let mut group = c.benchmark_group("range_scan");
+    let start_key = generate_key(1_000);
+    let end_key = generate_key(1_500);
 
     group.bench_function("contextra_store_range_scan", |b| {
-        let storage = &lsm_storage;
-        let ranges = &scan_ranges;
-        b.to_async(&rt).iter(|| async move {
-            for (start, end) in ranges {
+        b.to_async(&rt).iter(|| {
+            let storage = &lsm_storage;
+            let sk = &start_key;
+            let ek = &end_key;
+            async move {
                 let items = storage
                     .scan(
-                        Bound::Included(start.as_slice()),
-                        Bound::Excluded(end.as_slice()),
+                        Bound::Included(black_box(sk.as_slice())),
+                        Bound::Excluded(black_box(ek.as_slice())),
                         None,
                     )
                     .await
@@ -300,144 +370,177 @@ fn bench_range_scan(c: &mut Criterion) {
     });
 
     group.bench_function("redb_range_scan", |b| {
-        let db = &redb_db;
-        let ranges = &scan_ranges;
         b.iter(|| {
-            let read_txn = db.begin_read().unwrap();
-            let table = read_txn.open_table(TABLE).unwrap();
-            for (start, end) in ranges {
-                let range = table
-                    .range::<&[u8]>((
-                        Bound::Included(start.as_slice()),
-                        Bound::Excluded(end.as_slice()),
-                    ))
-                    .unwrap();
-                let mut items = Vec::new();
-                for item in range {
-                    let (k, v) = item.unwrap();
-                    items.push((k.value().to_vec(), v.value().to_vec()));
-                }
-                black_box(items);
+            let read_txn = redb_db.begin_read().unwrap();
+            let table = read_txn.open_table(REDB_TABLE).unwrap();
+            let range = table
+                .range::<&[u8]>((
+                    Bound::Included(black_box(start_key.as_slice())),
+                    Bound::Excluded(black_box(end_key.as_slice())),
+                ))
+                .unwrap();
+
+            let mut count = 0;
+            for item in range {
+                let (k, v) = item.unwrap();
+                black_box((k.value(), v.value()));
+                count += 1;
             }
+            black_box(count);
         });
     });
 
     group.finish();
 }
 
+#[derive(Clone)]
 enum MixedOp {
     Read(Vec<u8>),
     Write(Vec<u8>, Vec<u8>),
 }
 
-fn generate_mixed_ops(seed: u64, count: usize) -> Vec<MixedOp> {
-    let mut rng = StdRng::seed_from_u64(seed);
+fn generate_mixed_ops(count: usize) -> Vec<MixedOp> {
+    let mut rng = StdRng::seed_from_u64(1337);
     let mut ops = Vec::with_capacity(count);
-    let val = vec![0xCDu8; 128];
+    let val = generate_value();
 
     for _ in 0..count {
-        let is_write = rng.gen_bool(0.20);
-        let idx = rng.gen_range(0..10_000);
-        let key = format!("key_{:012}", idx).into_bytes();
-
-        if is_write {
-            ops.push(MixedOp::Write(key, val.clone()));
-        } else {
+        let key_idx = rng.gen_range(0..PREPOPULATE_COUNT);
+        let key = generate_key(key_idx);
+        let roll: f64 = rng.gen();
+        if roll < 0.8 {
             ops.push(MixedOp::Read(key));
+        } else {
+            ops.push(MixedOp::Write(key, val.clone()));
         }
     }
-
     ops
 }
 
 fn bench_mixed_workload(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-
-    let ops = generate_mixed_ops(42, 1000);
-
-    let lsm_dir = TempDir::new().unwrap();
-    let lsm_storage = rt.block_on(async {
-        let config = LsmConfig {
-            path: lsm_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let storage = LsmStorage::new(config).await.unwrap();
-        let val = vec![0xABu8; 128];
-        let tx = TxId::new(1);
-        for i in 0..10_000 {
-            let k = format!("key_{:012}", i).into_bytes();
-            storage.put(tx, &k, &val).await.unwrap();
-        }
-        storage.commit(tx).await.unwrap();
-        storage
-    });
-
-    let redb_dir = TempDir::new().unwrap();
-    let redb_path = redb_dir.path().join("redb.db");
-    let redb_db = {
-        let db = redb::Database::create(&redb_path).unwrap();
-        let val = vec![0xABu8; 128];
-        let write_txn = db.begin_write().unwrap();
-        {
-            let mut table = write_txn.open_table(TABLE).unwrap();
-            for i in 0..10_000 {
-                let k = format!("key_{:012}", i).into_bytes();
-                table.insert(k.as_slice(), val.as_slice()).unwrap();
-            }
-        }
-        write_txn.commit().unwrap();
-        db
-    };
-
-    let lsm_tx_counter = AtomicU64::new(2);
-
     let mut group = c.benchmark_group("mixed_workload");
 
-    group.bench_function("contextra_store_mixed_workload", |b| {
-        let storage = &lsm_storage;
-        let ops = &ops;
-        let counter = &lsm_tx_counter;
-        b.to_async(&rt).iter(|| async move {
-            for op in ops {
-                match op {
-                    MixedOp::Read(k) => {
-                        let res = storage.get(k).await.unwrap();
-                        black_box(res);
-                    }
-                    MixedOp::Write(k, v) => {
-                        let tx = TxId::new(counter.fetch_add(1, Ordering::SeqCst));
-                        storage.put(tx, k, v).await.unwrap();
-                        storage.commit(tx).await.unwrap();
-                    }
-                }
-            }
-        });
-    });
+    let val = generate_value();
+    let mixed_ops = generate_mixed_ops(MIXED_OPS_COUNT);
 
-    group.bench_function("redb_mixed_workload", |b| {
-        let db = &redb_db;
-        let ops = &ops;
-        b.iter(|| {
-            for op in ops {
-                match op {
-                    MixedOp::Read(k) => {
-                        let read_txn = db.begin_read().unwrap();
-                        let table = read_txn.open_table(TABLE).unwrap();
-                        let res = table.get(k.as_slice()).unwrap().map(|v| v.value().to_vec());
-                        black_box(res);
+    {
+        let val = val.clone();
+        let mixed_ops = mixed_ops.clone();
+        group.bench_function("contextra_store_mixed_workload", |b| {
+            let val = val.clone();
+            let mixed_ops = mixed_ops.clone();
+            b.to_async(&rt).iter_custom(|iters| {
+                let val = val.clone();
+                let mixed_ops = mixed_ops.clone();
+                async move {
+                    let mut total_duration = std::time::Duration::ZERO;
+
+                    for _ in 0..iters {
+                        let tmp_dir = TempDir::new().unwrap();
+                        let config = LsmConfig {
+                            path: tmp_dir.path().to_path_buf(),
+                            memtable_size_limit: 1024 * 1024,
+                            ..Default::default()
+                        };
+                        let storage = LsmStorage::new(config).await.unwrap();
+                        let mut tx_counter = 1u64;
+
+                        // Pre-populate
+                        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+                            let tx = TxId::new(tx_counter);
+                            tx_counter += 1;
+                            for &i in chunk {
+                                storage.put(tx, &generate_key(i), &val).await.unwrap();
+                            }
+                            storage.commit(tx).await.unwrap();
+                        }
+
+                        let start = std::time::Instant::now();
+
+                        for op in &mixed_ops {
+                            match op {
+                                MixedOp::Read(k) => {
+                                    let res = storage.get(black_box(k)).await.unwrap();
+                                    black_box(res);
+                                }
+                                MixedOp::Write(k, v) => {
+                                    let tx = TxId::new(tx_counter);
+                                    tx_counter += 1;
+                                    storage.put(tx, k, v).await.unwrap();
+                                    storage.commit(tx).await.unwrap();
+                                }
+                            }
+                        }
+
+                        total_duration += start.elapsed();
                     }
-                    MixedOp::Write(k, v) => {
-                        let write_txn = db.begin_write().unwrap();
+
+                    total_duration
+                }
+            });
+        });
+    }
+
+    {
+        let val = val.clone();
+        let mixed_ops = mixed_ops.clone();
+        group.bench_function("redb_mixed_workload", |b| {
+            let val = val.clone();
+            let mixed_ops = mixed_ops.clone();
+            b.iter_custom(|iters| {
+                let mut total_duration = std::time::Duration::ZERO;
+
+                for _ in 0..iters {
+                    let tmp_dir = TempDir::new().unwrap();
+                    let db_path = tmp_dir.path().join("redb_bench.db");
+                    let db = Database::create(&db_path).unwrap();
+                    setup_redb_table(&db);
+
+                    // Pre-populate
+                    for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+                        let mut write_txn = db.begin_write().unwrap();
+                        write_txn.set_durability(Durability::Immediate);
                         {
-                            let mut table = write_txn.open_table(TABLE).unwrap();
-                            table.insert(k.as_slice(), v.as_slice()).unwrap();
+                            let mut table = write_txn.open_table(REDB_TABLE).unwrap();
+                            for &i in chunk {
+                                table
+                                    .insert(generate_key(i).as_slice(), val.as_slice())
+                                    .unwrap();
+                            }
                         }
                         write_txn.commit().unwrap();
                     }
+
+                    let start = std::time::Instant::now();
+
+                    for op in &mixed_ops {
+                        match op {
+                            MixedOp::Read(k) => {
+                                let read_txn = db.begin_read().unwrap();
+                                let table = read_txn.open_table(REDB_TABLE).unwrap();
+                                let res = table.get(black_box(k.as_slice())).unwrap();
+                                black_box(res.map(|v| v.value().to_vec()));
+                            }
+                            MixedOp::Write(k, v) => {
+                                let mut write_txn = db.begin_write().unwrap();
+                                write_txn.set_durability(Durability::Immediate);
+                                {
+                                    let mut table = write_txn.open_table(REDB_TABLE).unwrap();
+                                    table.insert(k.as_slice(), v.as_slice()).unwrap();
+                                }
+                                write_txn.commit().unwrap();
+                            }
+                        }
+                    }
+
+                    total_duration += start.elapsed();
                 }
-            }
+
+                total_duration
+            });
         });
-    });
+    }
 
     group.finish();
 }
