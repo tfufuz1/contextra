@@ -52,7 +52,7 @@ pub use profile::SlmProfile;
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 
 #[cfg(feature = "bandit-routing")]
-pub use contextra_adapt::{BanditError, BanditImplementation, BanditPolicy, BanditProfileState};
+pub use contextra_adapt::{BanditImplementation, BanditPolicy, BanditProfileState};
 #[deprecated(
     since = "0.1.0",
     note = "Moved to contextra_privacy as part of Ring-Modell Phase 1b"

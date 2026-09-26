@@ -237,7 +237,7 @@ fn test_bandit_diagonal_vs_linucb_latency_budget() {
 #[cfg(all(test, feature = "bandit-routing"))]
 #[test]
 fn test_dimension_mismatch_returns_err() {
-    use crate::bandit::BanditError;
+    use contextra_adapt::BanditError;
 
     let mut state = BanditProfileState::cold_start(4, 0.5);
     let x_invalid = vec![1.0f32; 3]; // Dim 3 statt 4
