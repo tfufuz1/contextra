@@ -23,6 +23,7 @@ fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
 docid-128 = ["contextra-core/docid-128"]
+encryption-at-rest = []
 
 [dependencies]
 contextra-sys = { workspace = true }
