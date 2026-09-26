@@ -25,7 +25,10 @@ impl MockTextGenerator {
 }
 
 impl TextGenerator for MockTextGenerator {
-    fn generate_text<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, contextra_ports::Result<String>> {
+    fn generate_text<'a>(
+        &'a self,
+        _prompt: &'a str,
+    ) -> BoxFuture<'a, contextra_ports::Result<String>> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
         let resp = self.response.clone();
         Box::pin(async move { Ok(resp) })
@@ -84,10 +87,7 @@ fn test_combinations_below_min_co_occurrence_filtered_out() {
     let e1 = EntityId::new(100);
     let e2 = EntityId::new(200);
 
-    let docs = vec![
-        (doc1, vec![e1, e2]),
-        (doc2, vec![e1, e2]),
-    ];
+    let docs = vec![(doc1, vec![e1, e2]), (doc2, vec![e1, e2])];
 
     // min_co_occurrence = 2 -> [e1, e2] appears in both docs
     let candidates = compute_co_occurrence_candidates(&docs, 2);
@@ -110,9 +110,7 @@ fn test_combinations_exceeding_max_relate_participants_discarded_not_truncated()
         .map(|i| EntityId::new(i as u64))
         .collect();
 
-    let normal_entity_set: Vec<EntityId> = (1..=5)
-        .map(|i| EntityId::new(i as u64))
-        .collect();
+    let normal_entity_set: Vec<EntityId> = (1..=5).map(|i| EntityId::new(i as u64)).collect();
 
     let docs = vec![
         (doc1, huge_entity_set.clone()),
@@ -151,7 +149,9 @@ async fn test_validate_candidates_exceeding_budget_returns_err() {
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, GraphMutationError::Internal(ref msg) if msg.contains("LLM validation budget exceeded")));
+    assert!(
+        matches!(err, GraphMutationError::Internal(ref msg) if msg.contains("LLM validation budget exceeded"))
+    );
     assert_eq!(generator.calls(), 0); // No LLM calls executed due to budget check
 }
 
