@@ -95,6 +95,26 @@ impl CompactionEngine {
             input_ssts.len()
         );
 
+        // 1b. Peak Memory Estimation Check
+        if let Some(limit_bytes) = self.config.max_peak_memory_bytes {
+            let estimated_peak = self.estimate_compaction_peak_bytes(&input_ssts);
+            if estimated_peak > limit_bytes {
+                let used_mb = estimated_peak.div_ceil(1024 * 1024);
+                let limit_mb = limit_bytes.div_ceil(1024 * 1024);
+                tracing::warn!(
+                    "Compaction aborted: estimated peak memory {} bytes ({}MB) exceeds max_peak_memory_bytes limit {} bytes ({}MB)",
+                    estimated_peak,
+                    used_mb,
+                    limit_bytes,
+                    limit_mb
+                );
+                return Err(contextra_core::ContextraError::MemoryBudgetExceeded {
+                    used_mb,
+                    limit_mb,
+                });
+            }
+        }
+
         // 2. Perform the merge (no lock held — this is the expensive part)
         let min_snapshot_seq = self.snapshot_registry.min_active_seqno();
         let output_path = self.generate_sst_path(data_path)?;
@@ -350,6 +370,25 @@ impl CompactionEngine {
         None
     }
 
+    /// Estimates the peak memory consumption (in bytes) during a multi-way merge of candidates.
+    ///
+    /// Computes a conservative estimate taking into account candidate file sizes, block stream
+    /// buffers, heap node structures, and in-memory deserialization overhead.
+    pub(super) fn estimate_compaction_peak_bytes(&self, candidates: &[Arc<SstableReader>]) -> u64 {
+        let mut total_file_size: u64 = 0;
+        for candidate in candidates {
+            total_file_size += candidate.metadata().file_size;
+        }
+
+        // Base memory estimate for stream buffers and multi-way merge priority queue:
+        // Each stream buffers at least 1 block (BLOCK_SIZE = 4KB), plus heap structures and
+        // deserialized entry overhead (estimated as ~1.5x raw candidate file size).
+        let raw_overhead = (total_file_size as f64 * 1.5) as u64;
+        let min_stream_buffer = (candidates.len() as u64) * 4096 * 4;
+
+        raw_overhead + min_stream_buffer
+    }
+
     /// Performs a multi-way merge of input SSTables into a single output SSTable.
     ///
     /// During merge:
@@ -510,7 +549,21 @@ impl CompactionEngine {
                 // FIND-STO-002: Budgeted Compaction
                 // Apply memory backpressure to prevent Compaction from OOMing the system
                 if !self.budget.has_memory_capacity() {
+                    let wait_start = std::time::Instant::now();
                     while !self.budget.has_memory_capacity() {
+                        if wait_start.elapsed() >= self.config.max_backpressure_wait {
+                            let limit_bytes = self.config.max_memory_bytes.unwrap_or(128 * 1024 * 1024);
+                            let used_mb = limit_bytes.div_ceil(1024 * 1024);
+                            let limit_mb = limit_bytes.div_ceil(1024 * 1024);
+                            tracing::error!(
+                                "Compaction aborted: backpressure wait timeout exceeded ({:?}) while memory budget exhausted",
+                                self.config.max_backpressure_wait
+                            );
+                            return Err(contextra_core::ContextraError::MemoryBudgetExceeded {
+                                used_mb,
+                                limit_mb,
+                            });
+                        }
                         if let Some(ct) = cancel_token {
                             if ct.is_cancelled() {
                                 return Err(contextra_core::ContextraError::Internal(
