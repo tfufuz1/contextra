@@ -304,6 +304,11 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "tx_id": tx_id,
                 })),
             },
+            ContextraError::Plugin(msg) => Self {
+                kind: "Plugin".to_string(),
+                message: msg.clone(),
+                details: None,
+            },
         }
     }
 }
@@ -433,6 +438,10 @@ mod tests {
                     index_id: "idx1".into(),
                 },
                 "OrphanedVectorReference",
+            ),
+            (
+                ContextraError::Plugin("plugin error".into()),
+                "Plugin",
             ),
         ];
 
