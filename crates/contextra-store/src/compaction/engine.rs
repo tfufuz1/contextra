@@ -1,7 +1,7 @@
 use super::config::CompactionConfig;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use contextra_core::{Result, SnapshotRegistry, TOMBSTONE_BIT};
-use contextra_crypto::crypto::KeyManager;
+use crate::wal::KeyManager;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;

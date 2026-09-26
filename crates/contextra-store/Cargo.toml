@@ -19,6 +19,7 @@ windows-sys = { version = "0.61", features = [
 
 [features]
 default = []
+encryption-at-rest = ["dep:contextra-crypto"]
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
@@ -30,7 +31,7 @@ contextra-sys = { workspace = true }
 contextra-core = { workspace = true }
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
-contextra-crypto = { workspace = true }
+contextra-crypto = { workspace = true, optional = true }
 bytes = { workspace = true }
 blake3 = { workspace = true }
 crc32fast = { workspace = true }

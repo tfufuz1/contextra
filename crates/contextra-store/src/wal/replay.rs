@@ -1,4 +1,5 @@
 use contextra_core::{ContextraError, Result};
+#[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;
 
@@ -195,6 +196,7 @@ impl Wal {
         }
     }
 
+    #[cfg(feature = "encryption-at-rest")]
     fn verify_entry_snapshot(
         &self,
         snapshot: &WalEntrySnapshot,
@@ -264,7 +266,9 @@ impl Wal {
             return Ok(version);
         }
 
+        #[cfg(feature = "encryption-at-rest")]
         let integrity_key = self.get_integrity_key()?;
+        #[cfg(feature = "encryption-at-rest")]
         let mut verifier = IntegrityVerifier::new(&integrity_key);
         let mut using_legacy_key = false;
 
@@ -364,126 +368,228 @@ impl Wal {
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
-            if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some() {
-                let km = match self.key_manager.as_ref() {
-                    Some(km) => km,
-                    None => unreachable!(),
-                };
-                if entry_data_raw.len() < 12 {
-                    if pos >= file_size {
-                        tracing::warn!("WAL truncated during read at offset {}", chunk_start_pos);
-                        break;
-                    }
-                    return Err(ContextraError::Storage(
-                        "WAL entry too short for nonce".into(),
-                    ));
-                }
-                let mut nonce = [0u8; 12];
-                let nonce_slice = match entry_data_raw.get(0..12) {
-                    Some(s) => s,
-                    None => {
-                        return Err(ContextraError::wal_corruption(
-                            chunk_start_pos,
-                            "Failed to read entry nonce",
-                        ));
-                    }
-                };
-                nonce.copy_from_slice(nonce_slice);
-                let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
-                    ContextraError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
-                })?;
-                let decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
-                    Ok(data) => data,
-                    Err(e) => {
+            #[cfg(feature = "encryption-at-rest")]
+            {
+                if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some() {
+                    let km = match self.key_manager.as_ref() {
+                        Some(km) => km,
+                        None => unreachable!(),
+                    };
+                    if entry_data_raw.len() < 12 {
                         if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), decryption failed: {}",
-                                chunk_start_pos,
-                                e
-                            );
+                            tracing::warn!("WAL truncated during read at offset {}", chunk_start_pos);
                             break;
                         }
-                        return Err(ContextraError::wal_corruption(
-                            chunk_start_pos,
-                            format!("Decryption failed: {}", e),
+                        return Err(ContextraError::Storage(
+                            "WAL entry too short for nonce".into(),
                         ));
                     }
-                };
-
-                let mut inner_slice = decrypted_data.as_slice();
-                while !inner_slice.is_empty() {
-                    if inner_slice.len() < 4 {
-                        if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), incomplete inner framing",
-                                chunk_start_pos
-                            );
-                            break;
-                        }
-                        return Err(ContextraError::wal_corruption(
-                            chunk_start_pos,
-                            "Truncated inner WAL entry length in batch",
-                        ));
-                    }
-                    let inner_len_bytes: [u8; 4] =
-                        match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
-                            Some(b) => b,
-                            None => {
-                                return Err(ContextraError::wal_corruption(
-                                    chunk_start_pos,
-                                    "Failed to extract inner WAL entry length",
-                                ));
-                            }
-                        };
-                    let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
-                    if inner_slice.len() < 4 + inner_len {
-                        if pos >= file_size {
-                            tracing::warn!(
-                                "WAL truncation at tail (offset {}), incomplete inner payload",
-                                chunk_start_pos
-                            );
-                            break;
-                        }
-                        return Err(ContextraError::wal_corruption(
-                            chunk_start_pos,
-                            "Truncated inner WAL entry in batch",
-                        ));
-                    }
-                    let inner_entry_bytes = match inner_slice.get(4..4 + inner_len) {
-                        Some(b) => b,
+                    let mut nonce = [0u8; 12];
+                    let nonce_slice = match entry_data_raw.get(0..12) {
+                        Some(s) => s,
                         None => {
+                            return Err(ContextraError::wal_corruption(
+                                chunk_start_pos,
+                                "Failed to read entry nonce",
+                            ));
+                        }
+                    };
+                    nonce.copy_from_slice(nonce_slice);
+                    let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
+                        ContextraError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
+                    })?;
+                    let decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
+                        Ok(data) => data,
+                        Err(e) => {
+                            if pos >= file_size {
+                                tracing::warn!(
+                                    "WAL truncation at tail (offset {}), decryption failed: {}",
+                                    chunk_start_pos,
+                                    e
+                                );
+                                break;
+                            }
+                            return Err(ContextraError::wal_corruption(
+                                chunk_start_pos,
+                                format!("Decryption failed: {}", e),
+                            ));
+                        }
+                    };
+
+                    let mut inner_slice = decrypted_data.as_slice();
+                    while !inner_slice.is_empty() {
+                        if inner_slice.len() < 4 {
+                            if pos >= file_size {
+                                tracing::warn!(
+                                    "WAL truncation at tail (offset {}), incomplete inner framing",
+                                    chunk_start_pos
+                                );
+                                break;
+                            }
+                            return Err(ContextraError::wal_corruption(
+                                chunk_start_pos,
+                                "Truncated inner WAL entry length in batch",
+                            ));
+                        }
+                        let inner_len_bytes: [u8; 4] =
+                            match inner_slice.get(0..4).and_then(|s| s.try_into().ok()) {
+                                Some(b) => b,
+                                None => {
+                                    return Err(ContextraError::wal_corruption(
+                                        chunk_start_pos,
+                                        "Failed to extract inner WAL entry length",
+                                    ));
+                                }
+                            };
+                        let inner_len = u32::from_le_bytes(inner_len_bytes) as usize;
+                        if inner_slice.len() < 4 + inner_len {
+                            if pos >= file_size {
+                                tracing::warn!(
+                                    "WAL truncation at tail (offset {}), incomplete inner payload",
+                                    chunk_start_pos
+                                );
+                                break;
+                            }
                             return Err(ContextraError::wal_corruption(
                                 chunk_start_pos,
                                 "Truncated inner WAL entry in batch",
                             ));
                         }
-                    };
-                    inner_slice = inner_slice.get(4 + inner_len..).unwrap_or(&[]);
-
-                    let entry = match WalEntry::from_bytes(inner_entry_bytes) {
-                        Ok(e) => e,
-                        Err(e) => {
-                            let err_msg = format!("{}", e);
-                            let is_crc_error = err_msg.contains("CRC mismatch");
-
-                            if pos >= file_size && !is_crc_error {
-                                tracing::warn!(
-                                    "WAL truncation at tail (offset {}), partial entry: {}",
-                                    chunk_start_pos,
-                                    e
-                                );
-                                break;
-                            } else {
-                                let reason = if is_crc_error {
-                                    format!("CRC validation failed: {e}")
-                                } else {
-                                    format!("Deserialization failed: {e}")
-                                };
+                        let inner_entry_bytes = match inner_slice.get(4..4 + inner_len) {
+                            Some(b) => b,
+                            None => {
                                 return Err(ContextraError::wal_corruption(
                                     chunk_start_pos,
-                                    reason,
+                                    "Truncated inner WAL entry in batch",
                                 ));
                             }
+                        };
+                        inner_slice = inner_slice.get(4 + inner_len..).unwrap_or(&[]);
+
+                        let entry = match WalEntry::from_bytes(inner_entry_bytes) {
+                            Ok(e) => e,
+                            Err(e) => {
+                                let err_msg = format!("{}", e);
+                                let is_crc_error = err_msg.contains("CRC mismatch");
+
+                                if pos >= file_size && !is_crc_error {
+                                    tracing::warn!(
+                                        "WAL truncation at tail (offset {}), partial entry: {}",
+                                        chunk_start_pos,
+                                        e
+                                    );
+                                    break;
+                                } else {
+                                    let reason = if is_crc_error {
+                                        format!("CRC validation failed: {e}")
+                                    } else {
+                                        format!("Deserialization failed: {e}")
+                                    };
+                                    return Err(ContextraError::wal_corruption(
+                                        chunk_start_pos,
+                                        reason,
+                                    ));
+                                }
+                            }
+                        };
+
+                        let (op_type, key, value) = match &entry.op {
+                            WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
+                            WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
+                            WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
+                        };
+
+                        let snapshot = WalEntrySnapshot {
+                            tx_id: entry.tx_id().inner(),
+                            seq_no: entry.seq_no,
+                            op_type,
+                            key,
+                            value,
+                            checksum: entry.checksum,
+                            prev_hmac: entry.prev_hmac,
+                        };
+
+                        self.verify_entry_snapshot(
+                            &snapshot,
+                            version,
+                            chunk_start_pos,
+                            &mut verifier,
+                            &mut using_legacy_key,
+                        )?;
+
+                        entries_count += 1;
+                        let seq = entry.seq_no;
+                        if !callback(seq, entry, pos) {
+                            break 'scan_loop;
+                        }
+                    }
+                } else {
+                    let decrypted_data;
+                    let entry_data = if let Some(km) = &self.key_manager {
+                        if entry_data_raw.len() < 12 {
+                            return Err(ContextraError::Storage(
+                                "WAL entry too short for nonce".into(),
+                            ));
+                        }
+                        let mut nonce = [0u8; 12];
+                        let nonce_slice = match entry_data_raw.get(0..12) {
+                            Some(s) => s,
+                            None => {
+                                return Err(ContextraError::Storage(
+                                    "WAL entry too short for nonce".into(),
+                                ));
+                            }
+                        };
+                        nonce.copy_from_slice(nonce_slice);
+                        let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
+                            ContextraError::wal_corruption(
+                                chunk_start_pos,
+                                "WAL entry missing ciphertext",
+                            )
+                        })?;
+                        decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
+                            Ok(data) => data,
+                            Err(e) => {
+                                if version == WalVersion::V1 {
+                                    return Err(ContextraError::Storage(format!(
+                                        "WAL entry at {} claims V1/plaintext format while KeyManager is active for {} \
+                                         (decryption failed: {}) — refusing potential downgrade attack. \
+                                         Set allow_legacy_integrity_key_fallback / min_wal_version appropriately if \
+                                         this WAL genuinely predates encryption and requires migration.",
+                                        chunk_start_pos,
+                                        self.path.display(),
+                                        e
+                                    )));
+                                } else {
+                                    if pos >= file_size {
+                                        tracing::warn!(
+                                            "WAL truncation at tail (offset {}), decryption failed: {}",
+                                            chunk_start_pos,
+                                            e
+                                        );
+                                        break;
+                                    }
+                                    return Err(ContextraError::wal_corruption(
+                                        chunk_start_pos,
+                                        format!("Decryption failed: {}", e),
+                                    ));
+                                }
+                            }
+                        };
+                        &decrypted_data
+                    } else {
+                        entry_data_raw
+                    };
+
+                    let entry = match WalEntry::from_bytes(entry_data) {
+                        Ok(e) => e,
+                        Err(e) => {
+                            if let Some(err) =
+                                Self::handle_wal_entry_parse_error(e, chunk_start_pos, pos, file_size)
+                            {
+                                return Err(err);
+                            }
+                            break;
                         }
                     };
 
@@ -517,65 +623,11 @@ impl Wal {
                         break 'scan_loop;
                     }
                 }
-            } else {
-                let decrypted_data;
-                let entry_data = if let Some(km) = &self.key_manager {
-                    if entry_data_raw.len() < 12 {
-                        return Err(ContextraError::Storage(
-                            "WAL entry too short for nonce".into(),
-                        ));
-                    }
-                    let mut nonce = [0u8; 12];
-                    let nonce_slice = match entry_data_raw.get(0..12) {
-                        Some(s) => s,
-                        None => {
-                            return Err(ContextraError::Storage(
-                                "WAL entry too short for nonce".into(),
-                            ));
-                        }
-                    };
-                    nonce.copy_from_slice(nonce_slice);
-                    let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
-                        ContextraError::wal_corruption(
-                            chunk_start_pos,
-                            "WAL entry missing ciphertext",
-                        )
-                    })?;
-                    decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
-                        Ok(data) => data,
-                        Err(e) => {
-                            if version == WalVersion::V1 {
-                                return Err(ContextraError::Storage(format!(
-                                    "WAL entry at {} claims V1/plaintext format while KeyManager is active for {} \
-                                     (decryption failed: {}) — refusing potential downgrade attack. \
-                                     Set allow_legacy_integrity_key_fallback / min_wal_version appropriately if \
-                                     this WAL genuinely predates encryption and requires migration.",
-                                    chunk_start_pos,
-                                    self.path.display(),
-                                    e
-                                )));
-                            } else {
-                                if pos >= file_size {
-                                    tracing::warn!(
-                                        "WAL truncation at tail (offset {}), decryption failed: {}",
-                                        chunk_start_pos,
-                                        e
-                                    );
-                                    break;
-                                }
-                                return Err(ContextraError::wal_corruption(
-                                    chunk_start_pos,
-                                    format!("Decryption failed: {}", e),
-                                ));
-                            }
-                        }
-                    };
-                    &decrypted_data
-                } else {
-                    entry_data_raw
-                };
+            }
 
-                let entry = match WalEntry::from_bytes(entry_data) {
+            #[cfg(not(feature = "encryption-at-rest"))]
+            {
+                let entry = match WalEntry::from_bytes(entry_data_raw) {
                     Ok(e) => e,
                     Err(e) => {
                         if let Some(err) =
@@ -586,30 +638,6 @@ impl Wal {
                         break;
                     }
                 };
-
-                let (op_type, key, value) = match &entry.op {
-                    WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
-                    WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
-                    WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
-                };
-
-                let snapshot = WalEntrySnapshot {
-                    tx_id: entry.tx_id().inner(),
-                    seq_no: entry.seq_no,
-                    op_type,
-                    key,
-                    value,
-                    checksum: entry.checksum,
-                    prev_hmac: entry.prev_hmac,
-                };
-
-                self.verify_entry_snapshot(
-                    &snapshot,
-                    version,
-                    chunk_start_pos,
-                    &mut verifier,
-                    &mut using_legacy_key,
-                )?;
 
                 entries_count += 1;
                 let seq = entry.seq_no;

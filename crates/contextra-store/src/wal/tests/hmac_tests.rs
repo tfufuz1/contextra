@@ -1,8 +1,10 @@
 use super::*;
 use crate::wal::Wal;
 use contextra_core::TxId;
-use contextra_crypto::crypto::KeyManager;
+use crate::wal::KeyManager;
+#[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::wal_crypto::WalHmac;
+#[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
