@@ -5,6 +5,7 @@ pub mod bulk_exfiltration_detector;
 pub mod config;
 pub mod egress_gateway;
 pub mod egress_guard;
+pub mod explain;
 pub mod io;
 pub mod prompt_injection;
 pub mod protocol;
@@ -27,6 +28,8 @@ pub use egress_gateway::{
     CloudQueryRequest, CloudQueryResponse, DefaultEgressClassifier, EgressClassification,
     EgressClassifier,
 };
+
+pub use explain::{ExplainRequest, ExplainResponse};
 
 pub use io::{read_line_bounded, MAX_RPC_BYTES, MAX_SEARCH_QUERY_BYTES};
 
