@@ -7,6 +7,7 @@ rust-version.workspace = true
 description = "Adaptive controllers, bandits, and PID regulators for Contextra"
 
 [dependencies]
+contextra-types = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

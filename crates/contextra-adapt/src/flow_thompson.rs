@@ -26,6 +26,24 @@ pub enum FcTsError {
     InvalidConfig(String),
 }
 
+impl From<FcTsError> for contextra_types::ContextraError {
+    fn from(err: FcTsError) -> Self {
+        match err {
+            FcTsError::DimensionMismatch { expected, actual } => {
+                contextra_types::ContextraError::InvalidInput(format!(
+                    "Embedding dimension mismatch: expected {expected}, actual {actual}"
+                ))
+            }
+            FcTsError::NonFinite => contextra_types::ContextraError::InvalidInput(
+                "Non-finite numerical value encountered".to_string(),
+            ),
+            FcTsError::InvalidConfig(msg) => {
+                contextra_types::ContextraError::InvalidInput(format!("Invalid configuration: {msg}"))
+            }
+        }
+    }
+}
+
 /// Trait für deterministischen Zufallszahlengenerator im Thompson-Sampling.
 pub trait FcTsRng {
     /// Generiert die nächste 64-Bit vorzeichenlose Ganzzahl.
