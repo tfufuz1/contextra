@@ -1,9 +1,9 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libfuzzer_sys::fuzz_target;
 use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalOp, WalVersion};
+use libfuzzer_sys::fuzz_target;
 use tempfile::tempdir;
 
 /*
@@ -27,7 +27,22 @@ use tempfile::tempdir;
  * 4. `ZeroOut` / `AllOnes`:
  *    - Zeroing or setting bytes to 0xFF tests zeroed-header validation, NULL-byte payload handling,
  *      and unexpected flag values without panicking during integer conversions or option unwraps.
+ *
+ * 5. `Targeted HMAC Mutation`:
+ *    - Explicitly targeting the 32-byte `checksum` or 32-byte `prev_hmac` fields (discovered via
+ *      `wal.replay()` offset introspection) systematically tests HMAC chain validation and corruption
+ *      detection without relying purely on random byte hits across large WAL files.
+ *
+ * 6. `Compound Mutations`:
+ *    - Applying multiple independent mutations (1..=5) sequentially before reopening tests multi-point
+ *      corruptions (e.g. length prefix corruption on entry N combined with HMAC corruption on entry N+2).
  */
+
+#[derive(Arbitrary, Debug)]
+enum FuzzInput {
+    Single(WalMutationInput),
+    Compound(CompoundMutationInput),
+}
 
 #[derive(Arbitrary, Debug)]
 struct WalMutationInput {
@@ -39,9 +54,27 @@ struct WalMutationInput {
     mutation_offset_pct: u8,
     /// Bytes to inject/overwrite (1..=64)
     mutation_bytes: Vec<u8>,
+    /// Whether to target discovered HMAC fields specifically
+    target_hmac: bool,
 }
 
 #[derive(Arbitrary, Debug)]
+struct SingleMutationSpec {
+    mutation_offset_pct: u8,
+    mutation_mode: MutationMode,
+    mutation_bytes: Vec<u8>,
+    target_hmac: bool,
+}
+
+#[derive(Arbitrary, Debug)]
+struct CompoundMutationInput {
+    /// Entries to write before mutation (0..=20)
+    valid_count: u8,
+    /// Sequence of 1..=5 mutations applied onto the same WAL file
+    mutations: Vec<SingleMutationSpec>,
+}
+
+#[derive(Arbitrary, Debug, Clone, Copy)]
 enum MutationMode {
     Overwrite, // Überschreibe N Bytes ab offset
     Insert,    // Füge N Bytes ein (verschiebt Rest)
@@ -50,7 +83,73 @@ enum MutationMode {
     AllOnes,   // Setze N Bytes auf 0xFF
 }
 
-fuzz_target!(|input: WalMutationInput| {
+fn apply_single_mutation(
+    file_bytes: &mut Vec<u8>,
+    mode: MutationMode,
+    offset_pct: u8,
+    mut bytes: Vec<u8>,
+    target_hmac: bool,
+    hmac_ranges: &[(usize, usize)],
+) {
+    if bytes.is_empty() {
+        bytes.push(0xAB);
+    }
+    if bytes.len() > 64 {
+        bytes.truncate(64);
+    }
+
+    let offset = if target_hmac && !hmac_ranges.is_empty() {
+        let (r_start, r_end) = hmac_ranges[(offset_pct as usize) % hmac_ranges.len()];
+        if r_end > r_start && r_start < file_bytes.len() {
+            r_start + ((offset_pct as usize) % (r_end - r_start))
+        } else {
+            0
+        }
+    } else if file_bytes.is_empty() {
+        0
+    } else {
+        ((offset_pct as usize) * file_bytes.len()) / 255
+    };
+
+    match mode {
+        MutationMode::Overwrite => {
+            if !file_bytes.is_empty() {
+                let start = offset.min(file_bytes.len() - 1);
+                let end = (start + bytes.len()).min(file_bytes.len());
+                let mut_len = end - start;
+                file_bytes[start..end].copy_from_slice(&bytes[..mut_len]);
+            }
+        }
+        MutationMode::Insert => {
+            let insert_pos = offset.min(file_bytes.len());
+            file_bytes.splice(insert_pos..insert_pos, bytes);
+        }
+        MutationMode::Truncate => {
+            let trunc_pos = offset.min(file_bytes.len());
+            file_bytes.truncate(trunc_pos);
+        }
+        MutationMode::ZeroOut => {
+            if !file_bytes.is_empty() {
+                let start = offset.min(file_bytes.len() - 1);
+                let end = (start + bytes.len()).min(file_bytes.len());
+                for b in &mut file_bytes[start..end] {
+                    *b = 0x00;
+                }
+            }
+        }
+        MutationMode::AllOnes => {
+            if !file_bytes.is_empty() {
+                let start = offset.min(file_bytes.len() - 1);
+                let end = (start + bytes.len()).min(file_bytes.len());
+                for b in &mut file_bytes[start..end] {
+                    *b = 0xFF;
+                }
+            }
+        }
+    }
+}
+
+fuzz_target!(|input: FuzzInput| {
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -72,8 +171,13 @@ fuzz_target!(|input: WalMutationInput| {
             ..Default::default()
         };
 
+        let (valid_count, is_compound) = match &input {
+            FuzzInput::Single(s) => (s.valid_count, false),
+            FuzzInput::Compound(c) => (c.valid_count, true),
+        };
+
         // 1. Wal öffnen & valid_count Entries schreiben
-        let count = (input.valid_count % 21) as usize;
+        let count = (valid_count % 21) as usize;
         let wal = match Wal::open_with_config(&wal_path, config.clone()).await {
             Ok(w) => w,
             Err(_) => return,
@@ -104,63 +208,68 @@ fuzz_target!(|input: WalMutationInput| {
             }
         }
 
-        // 2. File drop / schließen
+        // 2. Gezielte HMAC-Byte-Offsets via `wal.replay()` Introspektion ermitteln
+        let mut hmac_ranges = Vec::new();
+        if let Ok(replayed) = wal.replay().await {
+            for (_, entry, end_pos) in replayed {
+                if let Ok(entry_bytes) = entry.to_bytes() {
+                    let entry_len = entry_bytes.len() as u64;
+                    let start_pos = end_pos.saturating_sub(entry_len) as usize;
+                    // Layout in `WalEntry::to_bytes()`:
+                    // len (4 B) + crc32 (4 B) + seq_no (8 B) + checksum (32 B) + prev_hmac (32 B)
+                    let checksum_start = start_pos + 16;
+                    let checksum_end = checksum_start + 32;
+                    let prev_hmac_start = checksum_end;
+                    let prev_hmac_end = prev_hmac_start + 32;
+
+                    hmac_ranges.push((checksum_start, checksum_end));
+                    hmac_ranges.push((prev_hmac_start, prev_hmac_end));
+                }
+            }
+        }
+
+        // 3. File drop / schließen
         drop(wal);
 
-        // 3. Datei mutieren
+        // 4. Datei mutieren
         let mut file_bytes = match tokio::fs::read(&wal_path).await {
             Ok(b) => b,
             Err(_) => return,
         };
 
-        let file_len = file_bytes.len();
-        let offset = if file_len == 0 {
-            0
-        } else {
-            ((input.mutation_offset_pct as usize) * file_len) / 255
-        };
-
-        let mut bytes = input.mutation_bytes;
-        if bytes.is_empty() {
-            bytes.push(0xAB);
-        }
-        if bytes.len() > 64 {
-            bytes.truncate(64);
-        }
-
-        match input.mutation_mode {
-            MutationMode::Overwrite => {
-                if !file_bytes.is_empty() {
-                    let start = offset.min(file_bytes.len() - 1);
-                    let end = (start + bytes.len()).min(file_bytes.len());
-                    let mut_len = end - start;
-                    file_bytes[start..end].copy_from_slice(&bytes[..mut_len]);
+        match input {
+            FuzzInput::Single(s) => {
+                apply_single_mutation(
+                    &mut file_bytes,
+                    s.mutation_mode,
+                    s.mutation_offset_pct,
+                    s.mutation_bytes,
+                    s.target_hmac,
+                    &hmac_ranges,
+                );
+            }
+            FuzzInput::Compound(mut c) => {
+                if c.mutations.is_empty() {
+                    c.mutations.push(SingleMutationSpec {
+                        mutation_offset_pct: 128,
+                        mutation_mode: MutationMode::Overwrite,
+                        mutation_bytes: vec![0xDE, 0xAD],
+                        target_hmac: true,
+                    });
                 }
-            }
-            MutationMode::Insert => {
-                let insert_pos = offset.min(file_bytes.len());
-                file_bytes.splice(insert_pos..insert_pos, bytes);
-            }
-            MutationMode::Truncate => {
-                let trunc_pos = offset.min(file_bytes.len());
-                file_bytes.truncate(trunc_pos);
-            }
-            MutationMode::ZeroOut => {
-                if !file_bytes.is_empty() {
-                    let start = offset.min(file_bytes.len() - 1);
-                    let end = (start + bytes.len()).min(file_bytes.len());
-                    for b in &mut file_bytes[start..end] {
-                        *b = 0x00;
-                    }
+                if c.mutations.len() > 5 {
+                    c.mutations.truncate(5);
                 }
-            }
-            MutationMode::AllOnes => {
-                if !file_bytes.is_empty() {
-                    let start = offset.min(file_bytes.len() - 1);
-                    let end = (start + bytes.len()).min(file_bytes.len());
-                    for b in &mut file_bytes[start..end] {
-                        *b = 0xFF;
-                    }
+
+                for spec in c.mutations {
+                    apply_single_mutation(
+                        &mut file_bytes,
+                        spec.mutation_mode,
+                        spec.mutation_offset_pct,
+                        spec.mutation_bytes,
+                        spec.target_hmac,
+                        &hmac_ranges,
+                    );
                 }
             }
         }
@@ -169,13 +278,22 @@ fuzz_target!(|input: WalMutationInput| {
             return;
         }
 
-        // 4. Wal erneut öffnen -> kein Panic
+        // 5. Wal erneut öffnen -> darf NIEMALS paniken
         let wal_reopen = match Wal::open_with_config(&wal_path, config).await {
             Ok(w) => w,
             Err(_) => return,
         };
 
-        // 5. scan_entries / replay -> kein Panic
-        let _ = wal_reopen.replay().await;
+        // 6. scan_entries / replay -> darf NIEMALS paniken
+        if let Ok(replayed_entries) = wal_reopen.replay().await {
+            // Invariant 1c: Replayed count must never exceed original written count
+            assert!(
+                replayed_entries.len() <= count,
+                "Phantom entry detected! Replayed {} entries, but only {} were originally written (compound={})",
+                replayed_entries.len(),
+                count,
+                is_compound
+            );
+        }
     });
 });
