@@ -10,7 +10,10 @@ pub use diffusion::run_diffusion;
 pub use error::TlHfdError;
 pub use lovasz::{compute_lovasz_extension, truncate_participants};
 pub use params::TlHfdParams;
-pub use shadow::{shadow_compare_forward_push_vs_tl_hfd, ShadowComparison};
+pub use shadow::{
+    shadow_compare_forward_push_vs_tl_hfd, DefaultFlipGate, ShadowComparison,
+    ShadowDiscrepancyReport, TlHfdFlipGate, MIN_AGREEMENT_THRESHOLD, MIN_SHADOW_SAMPLES,
+};
 
 use crate::csr::CsrGraph;
 use crate::path_rag::PathGraph;
