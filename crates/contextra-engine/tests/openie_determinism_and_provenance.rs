@@ -8,7 +8,9 @@
 use contextra_engine::extraction::extract_triples;
 use contextra_engine::collection::crud::{AutoExtractionConfig, EntityExtractionConfig};
 use contextra_ports::{BoxFuture, LlmTextGenerator, TextEmbeddingEngine};
-use contextra_types::{ConfigFingerprint, DocId, EntityId, Result};
+use contextra_types::{ConfigFingerprint, Result};
+#[cfg(feature = "entity-extraction")]
+use contextra_types::{DocId, EntityId};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tempfile::TempDir;
