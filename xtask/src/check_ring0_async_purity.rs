@@ -51,16 +51,29 @@ pub fn load_allowlist(allowlist_path: &Path) -> Result<Vec<AsyncException>, Stri
     let parsed: ExceptionsFile = toml::from_str(&content)
         .map_err(|e| format!("Failed to parse allowlist file {:?}: {}", allowlist_path, e))?;
 
-    Ok(parsed
-        .exceptions
-        .into_iter()
-        .map(|r| AsyncException {
+    let mut exceptions = Vec::with_capacity(parsed.exceptions.len());
+    for r in parsed.exceptions {
+        let is_valid_adr = r.adr_reference != "ADR-TODO"
+            && r.adr_reference
+                .strip_prefix("ADR-")
+                .is_some_and(|rest| rest.chars().next().is_some_and(|c| c.is_ascii_digit()));
+
+        if !is_valid_adr {
+            return Err(format!(
+                "Invalid adr_reference '{}' for crate '{}' and dependency '{}': must start with 'ADR-' followed by a digit and cannot be 'ADR-TODO'",
+                r.adr_reference, r.crate_name, r.dependency
+            ));
+        }
+
+        exceptions.push(AsyncException {
             crate_name: r.crate_name,
             dependency: r.dependency,
             reason: r.reason,
             adr_reference: r.adr_reference,
-        })
-        .collect())
+        });
+    }
+
+    Ok(exceptions)
 }
 
 /// Liest ein Cargo.toml und prüft NUR den [dependencies]-Abschnitt auf verbotene Dependencies.

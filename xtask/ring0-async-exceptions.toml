@@ -1,9 +1,9 @@
 # Ring 0 Async Dependency Exceptions
 # Ring 0 crates are intended to be runtime-agnostic and synchronous.
 # Current violations are allowlisted until refactored under dedicated ADRs.
-
-[[exceptions]]
-crate = "contextra-graph"
-dependency = "tokio"
-reason = "Async compaction and path graph traversal routines in CSR implementation"
-adr_reference = "ADR-TODO"
+#
+# Note: Der Eintrag fuer contextra-graph/tokio wurde am 2026-09-26 entfernt,
+# da die Ausnahme nie durch ein reales ADR gedeckt war und die zugrundeliegende
+# Abhaengigkeit inzwischen nur noch [dev-dependencies] betrifft (Audit-Referenz: F4).
+# Ein kuenftiger Bedarf erfordert ein neues, vollstaendiges ADR mit echtem Kuerzel,
+# KEINEN Platzhalter.
