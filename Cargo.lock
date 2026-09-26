@@ -597,6 +597,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-adapters"
+version = "0.1.0"
+dependencies = [
+ "contextra-py",
+ "numpy",
+ "pyo3",
+ "serde_json",
+]
+
+[[package]]
 name = "contextra-agent"
 version = "0.1.0"
 dependencies = [
