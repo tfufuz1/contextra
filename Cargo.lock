@@ -865,6 +865,7 @@ dependencies = [
  "criterion",
  "futures-util",
  "half",
+ "parking_lot 0.12.5",
  "proptest",
  "serde",
  "sha2",

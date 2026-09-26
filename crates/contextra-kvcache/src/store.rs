@@ -11,6 +11,9 @@ use contextra_types::{ContextraError, TenantId};
 use lru::LruCache;
 use parking_lot::RwLock;
 
+use super::attention_score::{
+    rank_for_eviction_weighted, AttentionScoreSource, NullAttentionScoreSource,
+};
 use super::eviction_worker::EvictionWorker;
 use super::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 use super::segment::KvSegment;
@@ -92,24 +95,58 @@ impl TenantState {
         Some(seg)
     }
 
+    /// Candidate eviction selection incorporating LRU access age and attention scores.
+    fn pop_eviction_candidate(
+        &mut self,
+        scores: &dyn AttentionScoreSource,
+        attention_weight: f32,
+    ) -> Option<KvSegment> {
+        if self.cache.is_empty() {
+            return None;
+        }
+
+        let unref_ids: Vec<u64> = self
+            .cache
+            .iter()
+            .rev()
+            .filter_map(|(&id, seg)| {
+                if seg.active_refs() == 0 {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if unref_ids.is_empty() {
+            return None;
+        }
+
+        if unref_ids.len() == 1 {
+            return self.remove(unref_ids[0]);
+        }
+
+        let base_time = std::time::Instant::now();
+        let candidates: Vec<(u64, std::time::Instant)> = unref_ids
+            .into_iter()
+            .enumerate()
+            .map(|(i, id)| {
+                (
+                    id,
+                    base_time + std::time::Duration::from_nanos(i as u64 * 1000),
+                )
+            })
+            .collect();
+
+        let ranked = rank_for_eviction_weighted(&candidates, scores, attention_weight);
+        let target_id = ranked.first().copied()?;
+        self.remove(target_id)
+    }
+
     /// LRU-Eviction unter Schutz aktiver Referenzen (`active_refs == 0`).
     /// Iteriert von LRU (Least Recently Used) zu MRU.
     fn pop_lru(&mut self) -> Option<KvSegment> {
-        let target_key = self.cache.iter().rev().find_map(|(&id, seg)| {
-            if seg.active_refs() == 0 {
-                Some(id)
-            } else {
-                None
-            }
-        });
-
-        if let Some(key) = target_key {
-            let seg = self.cache.pop(&key)?;
-            self.total_bytes = self.total_bytes.saturating_sub(seg.len());
-            Some(seg)
-        } else {
-            None
-        }
+        self.pop_eviction_candidate(&NullAttentionScoreSource, 0.5)
     }
 
     /// Fügt eine Token-Sequenz in den Radix-Baum ein.
@@ -455,16 +492,31 @@ impl TenantIsolatedKvStore {
 
     const MAX_ROUNDS_PER_LOCK_ACQUISITION: usize = 4;
 
-    /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Guard-Schutz (`active_refs == 0`).
-    pub fn evict_lru_fair(&self, target_free_bytes: usize) -> usize {
+    /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Attention-Scores (Default 50/50 Gewichtung).
+    pub fn evict_fair(&self, target_free_bytes: usize, scores: &dyn AttentionScoreSource) -> usize {
+        self.evict_weighted_fair(target_free_bytes, scores, 0.5)
+    }
+
+    /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und gewichteten Attention-Scores.
+    pub fn evict_weighted_fair(
+        &self,
+        target_free_bytes: usize,
+        scores: &dyn AttentionScoreSource,
+        attention_weight: f32,
+    ) -> usize {
         #[cfg(test)]
         {
-            self.evict_lru_fair_internal(target_free_bytes, None)
+            self.evict_fair_internal(target_free_bytes, scores, attention_weight, None)
         }
         #[cfg(not(test))]
         {
-            self.evict_lru_fair_internal(target_free_bytes)
+            self.evict_fair_internal(target_free_bytes, scores, attention_weight)
         }
+    }
+
+    /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Guard-Schutz (`active_refs == 0`).
+    pub fn evict_lru_fair(&self, target_free_bytes: usize) -> usize {
+        self.evict_fair(target_free_bytes, &NullAttentionScoreSource)
     }
 
     #[cfg(test)]
@@ -472,12 +524,19 @@ impl TenantIsolatedKvStore {
     where
         F: FnMut(),
     {
-        self.evict_lru_fair_internal(target_free_bytes, Some(&mut hook))
+        self.evict_fair_internal(
+            target_free_bytes,
+            &NullAttentionScoreSource,
+            0.5,
+            Some(&mut hook),
+        )
     }
 
-    fn evict_lru_fair_internal(
+    fn evict_fair_internal(
         &self,
         target_free_bytes: usize,
+        scores: &dyn AttentionScoreSource,
+        attention_weight: f32,
         #[cfg(test)] mut batch_released_hook: Option<&mut dyn FnMut()>,
     ) -> usize {
         let mut freed = 0;
@@ -518,7 +577,9 @@ impl TenantIsolatedKvStore {
                                     }
                                     let tenant = tenants[i];
                                     if let Some(state) = shard.get_mut(&tenant) {
-                                        if let Some(evicted) = state.pop_lru() {
+                                        if let Some(evicted) =
+                                            state.pop_eviction_candidate(scores, attention_weight)
+                                        {
                                             freed += evicted.len();
                                             #[cfg(test)]
                                             {
