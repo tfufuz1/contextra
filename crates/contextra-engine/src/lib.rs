@@ -27,12 +27,15 @@ mod no_crypto_stubs {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum DeletionScope {
+        Document {
+            doc_id: contextra_types::DocId,
+            tenant_id: TenantId,
+        },
         Collection {
             collection_id: CollectionId,
             tenant_id: TenantId,
         },
-        Document {
-            doc_id: contextra_types::DocId,
+        Tenant {
             tenant_id: TenantId,
         },
     }
@@ -95,10 +98,6 @@ mod no_crypto_stubs {
         pub integrity_warning: Option<String>,
         #[serde(default)]
         pub deleted_keys: Vec<Vec<u8>>,
-        pub deleted_keys_hash: [u8; 32],
-        pub signature: Vec<u8>,
-        pub tx_id: TxId,
-        pub covered_layers: Vec<DeletionLayer>,
     }
 
     const fn default_signature_version() -> u8 {
@@ -136,37 +135,51 @@ mod no_crypto_stubs {
             tx_id: TxId,
             layer_proofs: Vec<LayerCleanupProof>,
             _cas_proofs: Vec<Vec<u8>>,
-            _proof_key: &[u8],
+            proof_key: &[u8],
         ) -> contextra_types::Result<Self> {
             deleted_keys.sort();
             let mut hasher = blake3::Hasher::new();
             for key in &deleted_keys {
-                hasher.update(&(key.len() as u64).to_be_bytes());
+                hasher.update(&(key.len() as u32).to_le_bytes());
                 hasher.update(key);
             }
             let deleted_keys_hash: [u8; 32] = hasher.finalize().into();
 
-            let covered_layers = layer_proofs.into_iter().map(|p| p.layer).collect();
+            let covered_layers: Vec<DeletionLayer> =
+                layer_proofs.into_iter().map(|p| p.layer).collect();
+            let excluded_scopes: Vec<ExcludedScope> = vec![];
+
+            let scope_bytes = bincode::serialize(&scope)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+            let tx_bytes = tx_id.0.to_le_bytes();
+            let covered_layers_bytes = bincode::serialize(&covered_layers)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+            let excluded_scopes_bytes = bincode::serialize(&excluded_scopes)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+
+            use hmac::{Hmac, Mac};
+            use sha2::Sha256;
+            let mut mac = Hmac::<Sha256>::new_from_slice(proof_key)
+                .map_err(|e| contextra_types::ContextraError::Internal(format!("HMAC key error: {e}")))?;
+            mac.update(&scope_bytes);
+            mac.update(&deleted_keys_hash);
+            mac.update(&tx_bytes);
+            mac.update(&covered_layers_bytes);
+            mac.update(&excluded_scopes_bytes);
+            let signature = mac.finalize().into_bytes().to_vec();
+
             Ok(Self {
                 signature_version: 2,
                 scope,
-                deleted_keys_hash: [0u8; 32],
+                deleted_keys_hash,
                 deleted_after_tx: tx_id,
                 timestamp: 0,
-                signature: vec![0u8; 32],
-                covered_layers: vec![
-                    DeletionLayer::LsmMemtable,
-                    DeletionLayer::SsTableAllLevels,
-                    DeletionLayer::HnswIndex,
-                ],
-                excluded_scopes: vec![],
+                signature,
+                covered_layers,
+                excluded_scopes,
                 wal_chain_receipt: None,
                 integrity_warning: None,
                 deleted_keys,
-                deleted_keys_hash,
-                signature: vec![0u8; 64],
-                tx_id,
-                covered_layers,
             })
         }
 
@@ -174,6 +187,7 @@ mod no_crypto_stubs {
             match &self.scope {
                 DeletionScope::Collection { tenant_id, .. } => *tenant_id,
                 DeletionScope::Document { tenant_id, .. } => *tenant_id,
+                DeletionScope::Tenant { tenant_id } => *tenant_id,
             }
         }
 
