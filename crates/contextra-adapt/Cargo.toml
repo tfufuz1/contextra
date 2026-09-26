@@ -7,16 +7,20 @@ rust-version.workspace = true
 description = "Adaptive controllers, bandits, and PID regulators for Contextra"
 
 [dependencies]
+blake3 = { workspace = true }
+contextra-ports = { workspace = true }
 contextra-types = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+
 [features]
 default = ["bandit-routing"]
 bandit-routing = []
 egress-sherman-morrison = ["bandit-routing"]
 flow-corrected-thompson = ["bandit-routing"]
+sketched-bandit = ["bandit-routing"]
 rie-greedy-personalization = []
 
 [lints]
