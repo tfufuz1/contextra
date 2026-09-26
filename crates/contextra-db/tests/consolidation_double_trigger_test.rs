@@ -9,7 +9,7 @@ use contextra_db::maintenance_scheduler::MaintenanceScheduler;
 use contextra_db::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
 use contextra_db::Collection;
 use contextra_graph::CsrGraph;
-use contextra_index::HnswIndex;
+use contextra_vector::HnswIndex;
 use contextra_store::LsmStorage;
 use serde_json::json;
 use std::sync::atomic::AtomicU64;
@@ -28,7 +28,7 @@ async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, te
         .expect("LsmStorage"),
     );
     let index = Arc::new(
-        HnswIndex::try_new(contextra_index::HnswConfig {
+        HnswIndex::try_new(contextra_vector::HnswConfig {
             dimension: 4,
             ..Default::default()
         })

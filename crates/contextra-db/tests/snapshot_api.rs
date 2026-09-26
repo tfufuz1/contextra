@@ -166,7 +166,7 @@ async fn test_vector_and_graph_search_at_returns_adr024_capability_unsupported()
     let (db, _tmp) = test_db(4).await;
     let col = db.collection("isolation_policy").await.expect("col");
 
-    let mock_vec_index = contextra_index::HnswIndex::try_new(contextra_index::HnswConfig {
+    let mock_vec_index = contextra_vector::HnswIndex::try_new(contextra_vector::HnswConfig {
         dimension: 4,
         ..Default::default()
     })

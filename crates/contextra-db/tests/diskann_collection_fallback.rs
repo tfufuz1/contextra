@@ -6,7 +6,7 @@
 
 use contextra_db::Collection;
 use contextra_graph::csr::CsrGraph;
-use contextra_index::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
+use contextra_vector::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use contextra_ports::VectorIndex;
 use contextra_store::LsmStorage;
 use contextra_text::Language;

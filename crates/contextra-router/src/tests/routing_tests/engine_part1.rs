@@ -9,9 +9,9 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_router_engine_instantiation_with_mock_storage() {
     let storage = Arc::new(MockStorageEngine);
-    let mut hnsw_config = contextra_index::HnswConfig::default();
+    let mut hnsw_config = contextra_vector::HnswConfig::default();
     hnsw_config.dimension = 4;
-    let hnsw = Arc::new(contextra_index::HnswIndex::try_new(hnsw_config).unwrap());
+    let hnsw = Arc::new(contextra_vector::HnswIndex::try_new(hnsw_config).unwrap());
     let graph = Arc::new(contextra_graph::CsrGraph::new());
     let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
     let collection = Arc::new(contextra_db::Collection::new(

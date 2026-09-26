@@ -215,6 +215,7 @@ impl Wal {
         };
 
         if let Err(e) = verify_res {
+            eprintln!("REPLAY_MMAP VERIFY ERROR: {:?}", e);
             if !*using_legacy_key && self.allow_legacy_integrity_key_fallback {
                 let mut legacy_verifier = IntegrityVerifier::new(&legacy_integrity_key());
                 legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());

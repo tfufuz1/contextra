@@ -53,6 +53,17 @@ mod no_crypto_stubs {
                 remaining_count,
             })
         }
+
+        pub fn verify_and_create<F>(
+            layer: DeletionLayer,
+            verifier: F,
+        ) -> contextra_types::Result<Self>
+        where
+            F: FnOnce() -> contextra_types::Result<bool>,
+        {
+            let _ = verifier();
+            Self::new_after_verified_empty(layer, 0)
+        }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -84,8 +95,10 @@ mod no_crypto_stubs {
         pub integrity_warning: Option<String>,
         #[serde(default)]
         pub deleted_keys: Vec<Vec<u8>>,
-        #[serde(default = "default_tx_id")]
+        pub deleted_keys_hash: [u8; 32],
+        pub signature: Vec<u8>,
         pub tx_id: TxId,
+        pub covered_layers: Vec<DeletionLayer>,
     }
 
     const fn default_signature_version() -> u8 {
@@ -119,12 +132,21 @@ mod no_crypto_stubs {
     impl DeletionProof {
         pub fn create(
             scope: DeletionScope,
-            deleted_keys: Vec<Vec<u8>>,
+            mut deleted_keys: Vec<Vec<u8>>,
             tx_id: TxId,
-            _layer_proofs: Vec<LayerCleanupProof>,
+            layer_proofs: Vec<LayerCleanupProof>,
             _cas_proofs: Vec<Vec<u8>>,
             _proof_key: &[u8],
         ) -> contextra_types::Result<Self> {
+            deleted_keys.sort();
+            let mut hasher = blake3::Hasher::new();
+            for key in &deleted_keys {
+                hasher.update(&(key.len() as u64).to_be_bytes());
+                hasher.update(key);
+            }
+            let deleted_keys_hash: [u8; 32] = hasher.finalize().into();
+
+            let covered_layers = layer_proofs.into_iter().map(|p| p.layer).collect();
             Ok(Self {
                 signature_version: 2,
                 scope,
@@ -141,17 +163,27 @@ mod no_crypto_stubs {
                 wal_chain_receipt: None,
                 integrity_warning: None,
                 deleted_keys,
+                deleted_keys_hash,
+                signature: vec![0u8; 64],
                 tx_id,
+                covered_layers,
             })
         }
 
-        pub fn export_for_audit(&self) -> contextra_types::Result<String> {
-            serde_json::to_string(self)
-                .map_err(|e| contextra_types::ContextraError::Serialization(e.to_string()))
+        pub fn tenant_id(&self) -> TenantId {
+            match &self.scope {
+                DeletionScope::Collection { tenant_id, .. } => *tenant_id,
+                DeletionScope::Document { tenant_id, .. } => *tenant_id,
+            }
         }
 
         pub fn verify(&self, _key: &[u8]) -> contextra_types::Result<bool> {
             Ok(true)
+        }
+
+        pub fn export_for_audit(&self) -> contextra_types::Result<String> {
+            serde_json::to_string_pretty(self)
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))
         }
     }
 }
