@@ -23,6 +23,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         let _guard = self.kv_locks.lock_for(id).await;
+        drop(_guard);
         let db_tx = self.begin_transaction()?;
 
         match self.update_op(&db_tx, id, embedding, metadata).await {

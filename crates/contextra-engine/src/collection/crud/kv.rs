@@ -9,6 +9,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn put_kv(&self, id: &str, value: &serde_json::Value) -> Result<()> {
         validate_doc_id(id)?;
         let _guard = self.kv_locks.lock_for(id).await;
+        drop(_guard);
         let tx = self.allocate_tx()?;
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let data = serde_json::to_vec(value)?;
@@ -23,6 +24,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn put_kv_if_absent(&self, id: &str, value: &serde_json::Value) -> Result<()> {
         validate_doc_id(id)?;
         let _guard = self.kv_locks.lock_for(id).await;
+        drop(_guard);
         let tx = self.allocate_tx()?;
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let data = serde_json::to_vec(value)?;
