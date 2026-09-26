@@ -61,10 +61,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Locks keys in deterministic sorted order to prevent deadlocks across batch operations.
     /// Deduplicates by lock shard index to prevent self-deadlock when multiple keys map to the same shard.
+    ///
+    /// INV-DAG-DEPS: Sperren-Hierarchie: collections (RwLock) → kv_locks → embedder (RwLock).
     pub(crate) async fn lock_keys_sorted<'a>(
         &'a self,
         keys: impl IntoIterator<Item = &'a str>,
-    ) -> Vec<tokio::sync::MutexGuard<'a, ()>> {
+    ) -> Vec<crate::collection::kv_lock::KeyGuard<'a>> {
         let mut shard_indices: Vec<usize> = keys
             .into_iter()
             .map(|k| self.kv_locks.shard_idx(k))
@@ -73,7 +75,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         shard_indices.dedup();
         let mut guards = Vec::with_capacity(shard_indices.len());
         for idx in shard_indices {
-            guards.push(self.kv_locks.lock_shard(idx).await);
+            guards.push(self.kv_locks.lock_shard(idx));
         }
         guards
     }

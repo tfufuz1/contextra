@@ -652,6 +652,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let doc_bytes = serde_json::to_vec(&meta_only)?;
 
         let _guard = self.kv_locks.lock_for(doc_id).await;
+        drop(_guard);
         self.storage.put(tx, &user_key, &user_bytes).await?;
         self.storage.put(tx, &doc_key, &doc_bytes).await?;
         self.storage.commit(tx).await?;

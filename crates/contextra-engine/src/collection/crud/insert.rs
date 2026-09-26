@@ -184,6 +184,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
         self.apply_insert_backpressure().await;
         let _guard = self.kv_locks.lock_for(id).await;
+        drop(_guard);
         self.insert_inner_unlocked(id, embedding, metadata).await
     }
 
@@ -344,6 +345,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let _guards = self
             .lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str()))
             .await;
+        drop(_guards);
         let db_tx = self.begin_transaction()?;
 
         for (id, embedding, metadata) in docs {
@@ -416,6 +418,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         self.apply_insert_backpressure().await;
         let _guard = self.kv_locks.lock_for(id).await;
+        drop(_guard);
         let db_tx = self.begin_transaction()?;
         let result = self.update_op(&db_tx, id, embedding, metadata).await;
 
@@ -466,6 +469,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let _guards = self
             .lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str()))
             .await;
+        drop(_guards);
         let db_tx = self.begin_transaction()?;
         for (id, embedding, metadata) in docs {
             if embedding.len() != self.dimension {

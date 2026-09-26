@@ -7,6 +7,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn delete(&self, id: &str) -> Result<()> {
         let _guard = self.kv_locks.lock_for(id).await;
+        drop(_guard);
         let mut db_tx = self.begin_transaction()?;
 
         match self.delete_op(&mut db_tx, id).await {
