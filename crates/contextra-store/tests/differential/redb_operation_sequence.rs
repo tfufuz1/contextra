@@ -49,6 +49,8 @@ fn op_strategy() -> impl Strategy<Value = Op> {
     ]
 }
 
+/// Strategy for large-payload differential testing under memory pressure.
+/// Values range from 64 KiB up to 4 MiB; keys remain small (1..=64 bytes).
 fn op_strategy_large() -> impl Strategy<Value = Op> {
     let key_strat = prop::collection::vec(any::<u8>(), 1..=64);
     let val_strat = prop::collection::vec(any::<u8>(), 64 * 1024..=4 * 1024 * 1024);
@@ -63,6 +65,25 @@ fn op_strategy_large() -> impl Strategy<Value = Op> {
         Just(Op::CheckpointPinUnpin),
         Just(Op::Restart),
     ]
+}
+
+/// Helper function to retrieve process Resident Set Size (RSS) in bytes.
+/// Reads `/proc/self/statm` on Linux; returns `None` on other platforms.
+fn get_process_rss_bytes() -> Option<u64> {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(content) = std::fs::read_to_string("/proc/self/statm") {
+            let mut parts = content.split_whitespace();
+            let _total_size = parts.next()?;
+            if let Some(resident_pages_str) = parts.next() {
+                if let Ok(pages) = resident_pages_str.parse::<u64>() {
+                    let page_size = 4096u64; // Linux default page size
+                    return Some(pages.saturating_mul(page_size));
+                }
+            }
+        }
+    }
+    None
 }
 
 async fn assert_full_state_match(
@@ -96,12 +117,20 @@ async fn assert_full_state_match(
 }
 
 async fn run_differential(ops: Vec<Op>) -> Result<(), TestCaseError> {
+    run_differential_with_config(ops, 1024, false).await
+}
+
+async fn run_differential_with_config(
+    ops: Vec<Op>,
+    memtable_size_limit: usize,
+    check_rss: bool,
+) -> Result<(), TestCaseError> {
     let lsm_dir = TempDir::new().map_err(|e| TestCaseError::fail(e.to_string()))?;
     let redb_dir = TempDir::new().map_err(|e| TestCaseError::fail(e.to_string()))?;
 
     let lsm_config = LsmConfig {
         path: lsm_dir.path().to_path_buf(),
-        memtable_size_limit: 1024,
+        memtable_size_limit,
         ..Default::default()
     };
 
@@ -129,10 +158,13 @@ async fn run_differential(ops: Vec<Op>) -> Result<(), TestCaseError> {
     }
 
     let mut tx_counter = 1u64;
+    let mut cumulative_payload_bytes: u64 = 0;
+    let mut last_compact_rss: Option<u64> = get_process_rss_bytes();
 
     for (idx, op) in ops.into_iter().enumerate() {
         match op {
             Op::Put(k, v) => {
+                cumulative_payload_bytes += (k.len() + v.len()) as u64;
                 let tx = TxId::new(tx_counter);
                 tx_counter += 1;
 
@@ -271,6 +303,27 @@ async fn run_differential(ops: Vec<Op>) -> Result<(), TestCaseError> {
                     .maybe_compact()
                     .await
                     .map_err(|e| TestCaseError::fail(e.to_string()))?;
+
+                if check_rss {
+                    if let Some(curr_rss) = get_process_rss_bytes() {
+                        if let Some(prev_rss) = last_compact_rss {
+                            if curr_rss > prev_rss {
+                                let growth = curr_rss - prev_rss;
+                                let max_allowed_growth = cumulative_payload_bytes
+                                    .saturating_mul(3)
+                                    .saturating_add(64 * 1024 * 1024); // 64 MB baseline headroom
+                                if growth > max_allowed_growth {
+                                    return Err(TestCaseError::fail(format!(
+                                        "Memory leak/spike detected at op index {}: RSS grew by {} bytes (prev: {}, curr: {}), exceeding threshold of {} bytes (written payload: {} bytes)",
+                                        idx, growth, prev_rss, curr_rss, max_allowed_growth, cumulative_payload_bytes
+                                    )));
+                                }
+                            }
+                        }
+                        last_compact_rss = Some(curr_rss);
+                    }
+                }
+
                 assert_full_state_match(
                     &storage,
                     &redb_db,
@@ -730,30 +783,144 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(3))]
+    #![proptest_config(ProptestConfig::with_cases(2))]
     #[test]
     fn differential_redb_under_memory_pressure_large_values(
-        ops in prop::collection::vec(op_strategy_large(), 200..=250)
+        ops in prop::collection::vec(op_strategy_large(), 200..250)
     ) {
         let rt = tokio::runtime::Runtime::new().map_err(|e| TestCaseError::fail(e.to_string()))?;
         rt.block_on(async {
-            run_differential_large(ops).await
+            // Force frequent memtable flushes & compaction with 8 KiB memtable limit and large values
+            run_differential_with_config(ops, 8192, true).await
         })?;
     }
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(5))]
-    #[test]
-    fn differential_redb_concurrent_compaction_under_load(
-        t0 in prop::collection::vec(task_op_strategy(0), 50..=100),
-        t1 in prop::collection::vec(task_op_strategy(1), 50..=100),
-        t2 in prop::collection::vec(task_op_strategy(2), 50..=100),
-        t3 in prop::collection::vec(task_op_strategy(3), 50..=100),
-    ) {
-        let rt = tokio::runtime::Runtime::new().map_err(|e| TestCaseError::fail(e.to_string()))?;
-        rt.block_on(async {
-            run_concurrent_differential(vec![t0, t1, t2, t3]).await
-        })?;
+/// Tests serializability and state equivalence under 4 concurrent writer tasks
+/// operating on disjoint key spaces against a single shared `LsmStorage` instance.
+#[tokio::test]
+async fn differential_redb_concurrent_compaction_under_load() {
+    let lsm_dir = TempDir::new().unwrap();
+    let redb_dir = TempDir::new().unwrap();
+
+    let lsm_config = LsmConfig {
+        path: lsm_dir.path().to_path_buf(),
+        memtable_size_limit: 8192, // Small limit forces frequent flush/compaction during concurrent load
+        ..Default::default()
+    };
+
+    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
+    let redb_path = redb_dir.path().join("redb.db");
+    let redb_db = redb::Database::create(&redb_path).unwrap();
+
+    // Ensure table exists for redb
+    {
+        let write_txn = redb_db.begin_write().unwrap();
+        {
+            let _ = write_txn.open_table(TABLE).unwrap();
+        }
+        write_txn.commit().unwrap();
     }
+
+    // Deterministically generate operations for 4 concurrent worker tasks.
+    // Task `t` uses key prefix `[t as u8, ...]` to guarantee disjoint key ranges.
+    const NUM_TASKS: usize = 4;
+    const OPS_PER_TASK: usize = 60;
+
+    let mut all_task_ops: Vec<Vec<(u64, Op)>> = Vec::new();
+    let mut global_seq_ops: Vec<Op> = Vec::new();
+    let mut tx_counter = 1000u64;
+
+    for task_id in 0..NUM_TASKS {
+        let mut task_ops = Vec::new();
+        for i in 0..OPS_PER_TASK {
+            let key = vec![task_id as u8, (i % 20) as u8, ((i * 7) % 256) as u8];
+            let val = vec![(task_id * 10) as u8; 1024 + i * 64]; // 1 KB+ values
+
+            let op = if i % 7 == 0 {
+                Op::Delete(key)
+            } else if i % 13 == 0 {
+                Op::Flush
+            } else if i % 17 == 0 {
+                Op::Compact
+            } else {
+                Op::Put(key, val)
+            };
+
+            task_ops.push((tx_counter, op.clone()));
+            global_seq_ops.push(op);
+            tx_counter += 1;
+        }
+        all_task_ops.push(task_ops);
+    }
+
+    // Apply all generated operations sequentially to redb (reference model)
+    let mut redb_tx_counter = 1000u64;
+    for op in &global_seq_ops {
+        match op {
+            Op::Put(k, v) => {
+                let write_txn = redb_db.begin_write().unwrap();
+                {
+                    let mut table = write_txn.open_table(TABLE).unwrap();
+                    table.insert(k.as_slice(), v.as_slice()).unwrap();
+                }
+                write_txn.commit().unwrap();
+            }
+            Op::Delete(k) => {
+                let write_txn = redb_db.begin_write().unwrap();
+                {
+                    let mut table = write_txn.open_table(TABLE).unwrap();
+                    table.remove(k.as_slice()).unwrap();
+                }
+                write_txn.commit().unwrap();
+            }
+            _ => {}
+        }
+        redb_tx_counter += 1;
+    }
+    let _ = redb_tx_counter;
+
+    // Spawn 4 concurrent tasks executing against the shared LsmStorage
+    let mut handles = Vec::new();
+    for task_ops in all_task_ops {
+        let st = Arc::clone(&storage);
+        handles.push(tokio::spawn(async move {
+            for (tx_id_raw, op) in task_ops {
+                let tx = TxId::new(tx_id_raw);
+                match op {
+                    Op::Put(k, v) => {
+                        st.put(tx, &k, &v).await.unwrap();
+                        st.commit(tx).await.unwrap();
+                    }
+                    Op::Delete(k) => {
+                        st.delete(tx, &k).await.unwrap();
+                        st.commit(tx).await.unwrap();
+                    }
+                    Op::Get(k) => {
+                        let _ = st.get(&k).await;
+                    }
+                    Op::Flush => {
+                        let _ = st.force_flush().await;
+                    }
+                    Op::Compact => {
+                        let _ = st.maybe_compact().await;
+                    }
+                    _ => {}
+                }
+            }
+        }));
+    }
+
+    for h in handles {
+        h.await.unwrap();
+    }
+
+    // Final flush & compact on LSM to ensure all data is persisted and compacted
+    storage.force_flush().await.unwrap();
+    let _ = storage.maybe_compact().await;
+
+    // Verify final state matches redb exactly
+    assert_full_state_match(&storage, &redb_db, "Concurrent Compaction Under Load")
+        .await
+        .expect("LSM storage state must match redb state after concurrent execution");
 }

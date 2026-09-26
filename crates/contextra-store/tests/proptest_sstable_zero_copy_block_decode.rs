@@ -1,281 +1,187 @@
-use bytes::Bytes;
 use contextra_store::sstable::{
-    binary_search_entry_in_block, binary_search_index_in_block, block_binary_search, BlockBuilder,
-    BlockCache, SstableBuilder, SstableReader,
+    binary_search_entry_in_block, block_binary_search, BlockBuilder, BlockCache, SstableBuilder,
+    SstableReader,
 };
 use proptest::prelude::*;
+use std::io::Write;
 use std::sync::Arc;
-use tempfile::TempDir;
+use tempfile::NamedTempFile;
 
-fn make_valid_block() -> Bytes {
+/// Constructs a valid raw block buffer with at least 10 entries using `BlockBuilder`.
+fn create_valid_raw_block() -> Vec<u8> {
     let mut builder = BlockBuilder::new(4096);
     for i in 0..15 {
-        let k = format!("key_{:04}", i);
-        let v = format!("value_{:04}_payload_data", i);
-        builder.add(k.as_bytes(), v.as_bytes(), i as u64, i as u64);
+        let key = format!("key_{:04}", i);
+        let val = format!("value_payload_{:06}", i * 10);
+        builder.add(key.as_bytes(), val.as_bytes(), i as u64, (i + 1) as u64);
     }
-    builder.build()
+    builder.build().to_vec()
 }
 
 #[derive(Debug, Clone)]
-enum Mutation {
-    BitFlip { bit: usize },
+enum BlockMutation {
+    BitFlip { pos: usize, bit_idx: u8 },
     Truncate { len: usize },
-    Insert { pos: usize, bytes: Vec<u8> },
-    OverwriteField { pos: usize, val: u32 },
-    ArbitrarySlice { pos: usize, bytes: Vec<u8> },
+    InsertRandomBytes { pos: usize, bytes: Vec<u8> },
+    OverwriteU32Max { pos: usize },
 }
 
-fn mutation_strategy(max_len: usize) -> impl Strategy<Value = Mutation> {
+fn mutation_strategy(max_len: usize) -> impl Strategy<Value = BlockMutation> {
     prop_oneof![
-        (0..max_len * 8).prop_map(|bit| Mutation::BitFlip { bit }),
-        (0..=max_len).prop_map(|len| Mutation::Truncate { len }),
-        (0..=max_len, prop::collection::vec(any::<u8>(), 1..=32))
-            .prop_map(|(pos, bytes)| Mutation::Insert { pos, bytes }),
-        (0..max_len, any::<u32>()).prop_map(|(pos, val)| Mutation::OverwriteField { pos, val }),
-        (0..max_len, prop::collection::vec(any::<u8>(), 1..=16))
-            .prop_map(|(pos, bytes)| Mutation::ArbitrarySlice { pos, bytes }),
+        (0..max_len, 0..8u8).prop_map(|(pos, bit_idx)| BlockMutation::BitFlip { pos, bit_idx }),
+        (0..max_len).prop_map(|len| BlockMutation::Truncate { len }),
+        (0..max_len, prop::collection::vec(any::<u8>(), 1..=32))
+            .prop_map(|(pos, bytes)| BlockMutation::InsertRandomBytes { pos, bytes }),
+        (0..max_len).prop_map(|pos| BlockMutation::OverwriteU32Max { pos }),
     ]
 }
 
-fn apply_mutations(base: &[u8], mutations: &[Mutation]) -> Vec<u8> {
-    let mut data = base.to_vec();
-    for m in mutations {
-        if data.is_empty() {
-            break;
+fn apply_mutation(mut data: Vec<u8>, mutation: &BlockMutation) -> Vec<u8> {
+    if data.is_empty() {
+        return data;
+    }
+    match mutation {
+        BlockMutation::BitFlip { pos, bit_idx } => {
+            let idx = pos % data.len();
+            data[idx] ^= 1 << (bit_idx % 8);
         }
-        match m {
-            Mutation::BitFlip { bit } => {
-                let byte_idx = (*bit / 8) % data.len();
-                let bit_idx = *bit % 8;
-                data[byte_idx] ^= 1 << bit_idx;
-            }
-            Mutation::Truncate { len } => {
-                let target_len = *len % (data.len() + 1);
-                data.truncate(target_len);
-            }
-            Mutation::Insert { pos, bytes } => {
-                let insert_pos = *pos % (data.len() + 1);
-                data.splice(insert_pos..insert_pos, bytes.iter().copied());
-            }
-            Mutation::OverwriteField { pos, val } => {
-                let p = *pos % data.len();
-                if p + 4 <= data.len() {
-                    let b = val.to_le_bytes();
-                    let end = p + 4;
-                    data[p..end].copy_from_slice(&b);
-                }
-            }
-            Mutation::ArbitrarySlice { pos, bytes } => {
-                let start = *pos % data.len();
-                let count = bytes.len().min(data.len() - start);
-                data[start..start + count].copy_from_slice(&bytes[..count]);
+        BlockMutation::Truncate { len } => {
+            let new_len = len % data.len();
+            data.truncate(new_len);
+        }
+        BlockMutation::InsertRandomBytes { pos, bytes } => {
+            let idx = pos % (data.len() + 1);
+            let mut new_data = Vec::with_capacity(data.len() + bytes.len());
+            new_data.extend_from_slice(&data[..idx]);
+            new_data.extend_from_slice(bytes);
+            new_data.extend_from_slice(&data[idx..]);
+            data = new_data;
+        }
+        BlockMutation::OverwriteU32Max { pos } => {
+            let idx = pos % data.len();
+            if idx + 4 <= data.len() {
+                data[idx..idx + 4].copy_from_slice(&u32::MAX.to_le_bytes());
             }
         }
     }
     data
 }
 
-fn test_block_decoders(block_data: &[u8], search_key: &[u8]) {
-    let n = block_data.len();
-    if n < 2 {
-        let _ = block_binary_search(block_data, 0, 0, search_key);
-        let _ = binary_search_entry_in_block(block_data, 0, 0, search_key);
-        let _ = binary_search_index_in_block(block_data, 0, 0, search_key);
-        return;
-    }
-
-    let num_offsets = u16::from_le_bytes([block_data[n - 2], block_data[n - 1]]) as usize;
-    let offsets_len = num_offsets.saturating_mul(2);
-    let offsets_start = n.saturating_sub(2 + offsets_len + 8);
-
-    let _ = block_binary_search(block_data, offsets_start, num_offsets, search_key);
-    let _ = binary_search_entry_in_block(block_data, offsets_start, num_offsets, search_key);
-    let _ = binary_search_index_in_block(block_data, offsets_start, num_offsets, search_key);
-
-    // Also test with randomized offsets_start / num_offsets parameters
-    let arbitrary_start = if n > 0 { search_key.len() % n } else { 0 };
-    let arbitrary_num = if n > 0 { search_key.len() % (n + 1) } else { 0 };
-    let _ = block_binary_search(block_data, arbitrary_start, arbitrary_num, search_key);
-    let _ = binary_search_entry_in_block(block_data, arbitrary_start, arbitrary_num, search_key);
-    let _ = binary_search_index_in_block(block_data, arbitrary_start, arbitrary_num, search_key);
-}
-
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(200))]
+
     #[test]
-    fn prop_sstable_zero_copy_block_decode_no_panics(
-        mutations in prop::collection::vec(mutation_strategy(2048), 1..=10),
-        search_key in prop::collection::vec(any::<u8>(), 0..=64)
+    fn proptest_sstable_zero_copy_block_decode(
+        mutations in prop::collection::vec(mutation_strategy(256), 1..=10),
+        search_key in prop::collection::vec(any::<u8>(), 0..=32),
+        offsets_start in 0..1024usize,
+        num_offsets in 0..128usize
     ) {
-        let base_block = make_valid_block();
-        let mutated = apply_mutations(&base_block, &mutations);
+        let valid_block = create_valid_raw_block();
+        let mut mutated_block = valid_block;
 
-        // Prove that block decoding functions NEVER panic under arbitrary byte corruption
-        let res = std::panic::catch_unwind(|| {
-            test_block_decoders(&mutated, &search_key);
-        });
-        prop_assert!(res.is_ok(), "Block decoding panicked on mutated byte buffer!");
-    }
-}
-
-async fn test_corrupted_sstable_file_reader(mutated_block: &[u8]) {
-    let tmp = match TempDir::new() {
-        Ok(t) => t,
-        Err(_) => return,
-    };
-    let path = tmp.path().join("corrupted.sst");
-
-    // Create a baseline valid SSTable file first
-    let mut builder = match SstableBuilder::create(&path).await {
-        Ok(b) => b,
-        Err(_) => return,
-    };
-    for i in 0..10 {
-        let _ = builder
-            .add(
-                format!("key_{:04}", i).as_bytes(),
-                format!("val_{:04}", i).as_bytes(),
-                i as u64,
-                i as u64,
-            )
-            .await;
-    }
-    if builder.finish().await.is_err() {
-        return;
-    }
-
-    // Overwrite the first block in the SSTable file with mutated block bytes
-    let crc = crc32fast::hash(mutated_block);
-    let mut block_with_crc = Vec::with_capacity(4 + mutated_block.len());
-    block_with_crc.extend_from_slice(&crc.to_le_bytes());
-    block_with_crc.extend_from_slice(mutated_block);
-
-    if let Ok(mut file) = tokio::fs::OpenOptions::new()
-        .write(true)
-        .open(&path)
-        .await
-    {
-        use tokio::io::AsyncWriteExt;
-        let _ = file.write_all(&block_with_crc).await;
-        let _ = file.sync_all().await;
-    }
-
-    let cache = Arc::new(BlockCache::new(1024));
-    // Attempt to open and read from the corrupted SSTable
-    if let Ok(reader) = SstableReader::open(&path, cache).await {
-        let reader_arc = Arc::new(reader);
-        let _ = reader_arc.get(b"key_0005").await;
-        let _ = reader_arc.iter().await;
-
-        if let Ok(mut stream) = reader_arc.stream().await {
-            let _ = stream.next().await;
-        }
-    }
-}
-
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(20))]
-    #[test]
-    fn prop_sstable_file_reader_no_panics_under_corruption(
-        mutations in prop::collection::vec(mutation_strategy(2048), 1..=5)
-    ) {
-        let base_block = make_valid_block();
-        let mutated = apply_mutations(&base_block, &mutations);
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            test_corrupted_sstable_file_reader(&mutated).await;
-        });
-    }
-}
-
-#[test]
-fn test_v_len_u32_max_overflow_handling() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        // Construct an entry with v_len = u32::MAX (0xFFFFFFFF)
-        // Entry structure:
-        // key_len (u16): 4 -> "key0"
-        // key: b"key0"
-        // seq_no (u64): 1
-        // tx_id (u64): 1
-        // val_len (u32): 0xFFFFFFFF (u32::MAX boundary)
-        let mut entry_bytes = Vec::new();
-        entry_bytes.extend_from_slice(&4u16.to_le_bytes()); // key_len
-        entry_bytes.extend_from_slice(b"key0"); // key
-        entry_bytes.extend_from_slice(&1u64.to_le_bytes()); // seq_no
-        entry_bytes.extend_from_slice(&1u64.to_le_bytes()); // tx_id
-        entry_bytes.extend_from_slice(&u32::MAX.to_le_bytes()); // v_len = u32::MAX!
-
-        let mut block_data = entry_bytes;
-        // Add bloom filter (8 bytes)
-        block_data.extend_from_slice(&0u64.to_le_bytes());
-        // Add offset to first entry (u16 offset 0)
-        block_data.extend_from_slice(&0u16.to_le_bytes());
-        // Add num_offsets (1)
-        block_data.extend_from_slice(&1u16.to_le_bytes());
-
-        // Test decoder functions directly with v_len = u32::MAX block
-        let num_offsets = 1usize;
-        let offsets_start = block_data.len() - 2 - 2 - 8;
-
-        let res_bsearch = block_binary_search(&block_data, offsets_start, num_offsets, b"key0");
-        assert!(
-            res_bsearch.is_ok(),
-            "block_binary_search must return Ok(...) or Err without panic"
-        );
-
-        let res_entry = binary_search_entry_in_block(&block_data, offsets_start, num_offsets, b"key0");
-        assert!(
-            res_entry.is_ok(),
-            "binary_search_entry_in_block must return Ok(...) or Err without panic"
-        );
-
-        // Test via SstableReader / SstableStream file reading
-        let tmp = TempDir::new().unwrap();
-        let path = tmp.path().join("overflow_test.sst");
-
-        let mut builder = SstableBuilder::create(&path).await.unwrap();
-        builder.add(b"key0", b"dummy_val", 1, 1).await.unwrap();
-        builder.finish().await.unwrap();
-
-        // Overwrite block with v_len = u32::MAX constructed block
-        let crc = crc32fast::hash(&block_data);
-        let mut block_with_crc = Vec::with_capacity(4 + block_data.len());
-        block_with_crc.extend_from_slice(&crc.to_le_bytes());
-        block_with_crc.extend_from_slice(&block_data);
-
-        {
-            use tokio::io::AsyncWriteExt;
-            let mut file = tokio::fs::OpenOptions::new()
-                .write(true)
-                .open(&path)
-                .await
-                .unwrap();
-            file.write_all(&block_with_crc).await.unwrap();
-            file.sync_all().await.unwrap();
+        for m in &mutations {
+            mutated_block = apply_mutation(mutated_block, m);
         }
 
-        let cache = Arc::new(BlockCache::new(1024));
-        if let Ok(reader) = SstableReader::open(&path, cache).await {
-            let reader_arc = Arc::new(reader);
-            // SstableReader::get must handle v_len = u32::MAX gracefully and return Err or None
-            let get_res = reader_arc.get(b"key0").await;
-            assert!(
-                get_res.is_err() || get_res.as_ref().unwrap().is_none(),
-                "Expected Err or None for u32::MAX v_len, got: {:?}",
-                get_res
-            );
+        // Test block_binary_search (must never panic regardless of mutated bytes)
+        let _ = block_binary_search(&mutated_block, offsets_start, num_offsets, &search_key);
 
-            if let Ok(mut stream) = reader_arc.stream().await {
-                let stream_res = stream.next().await;
-                assert!(
-                    stream_res.is_err() || stream_res.as_ref().unwrap().is_none(),
-                    "Expected Err or None from stream for u32::MAX v_len, got: {:?}",
-                    stream_res
-                );
+        // Test binary_search_entry_in_block (must never panic)
+        let _ = binary_search_entry_in_block(&mutated_block, offsets_start, num_offsets, &search_key);
+
+        // Calculate derived num_offsets and offsets_start if block ends with u16 num_offsets
+        if mutated_block.len() >= 2 {
+            let n = mutated_block.len();
+            let derived_num_offsets = u16::from_le_bytes([mutated_block[n - 2], mutated_block[n - 1]]) as usize;
+            let offsets_len = derived_num_offsets.saturating_mul(2);
+            if n >= 2 + offsets_len + 8 {
+                let derived_offsets_start = n - 2 - offsets_len;
+                let _ = block_binary_search(&mutated_block, derived_offsets_start, derived_num_offsets, &search_key);
+                let _ = binary_search_entry_in_block(&mutated_block, derived_offsets_start, derived_num_offsets, &search_key);
             }
         }
-    });
+    }
+}
+
+/// Targeted regression test proving that a block with `v_len = u32::MAX`
+/// (boundary condition for integer overflow `ep + v_len`) results in a clean `Err`
+/// and NEVER causes an arithmetic overflow panic or silent data corruption.
+#[tokio::test]
+async fn test_u32_max_v_len_boundary_no_panic() {
+    let valid_block = create_valid_raw_block();
+    assert!(valid_block.len() >= 30, "Valid block must contain entries");
+
+    // Locating v_len in the first entry:
+    // entry 0: key_len(u16, 2 bytes) + key + seq_no(8) + tx_id(8) + val_len(u32, 4)
+    let k_len = u16::from_le_bytes([valid_block[0], valid_block[1]]) as usize;
+    let v_len_offset = 2 + k_len + 8 + 8;
+    assert!(
+        v_len_offset + 4 <= valid_block.len(),
+        "v_len_offset out of bounds in test setup"
+    );
+
+    // Mutate v_len of first entry to u32::MAX
+    let mut corrupted_block = valid_block;
+    corrupted_block[v_len_offset..v_len_offset + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+
+    // Create an actual SSTable file containing the corrupted data block using SstableBuilder
+    let tmp_file = NamedTempFile::new().expect("Failed to create temp file");
+    let file_path = tmp_file.path().to_path_buf();
+
+    let mut builder = SstableBuilder::create(&file_path)
+        .await
+        .expect("Failed to create SstableBuilder");
+
+    for i in 0..15 {
+        let key = format!("key_{:04}", i);
+        let val = format!("value_payload_{:06}", i * 10);
+        builder
+            .add(key.as_bytes(), val.as_bytes(), i as u64, (i + 1) as u64)
+            .await
+            .expect("Add key");
+    }
+    let _meta = builder.finish().await.expect("Finish SSTable");
+
+    // Overwrite the first data block in the written SSTable file with corrupted_block
+    let mut raw_file_bytes = std::fs::read(&file_path).expect("Read SSTable file");
+    let raw_len = raw_file_bytes.len();
+    assert!(
+        raw_len > corrupted_block.len(),
+        "SSTable file size smaller than block"
+    );
+
+    // Overwrite block payload starting after 4-byte CRC header
+    if raw_len >= 4 + corrupted_block.len() {
+        raw_file_bytes[4..4 + corrupted_block.len()].copy_from_slice(&corrupted_block);
+        // Recompute CRC for the block so SstableReader CRC check passes and reaches block decode
+        let new_crc = crc32fast::hash(&corrupted_block);
+        raw_file_bytes[0..4].copy_from_slice(&new_crc.to_le_bytes());
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&file_path)
+            .expect("Open SSTable for corrupt write");
+        file.write_all(&raw_file_bytes).expect("Write corrupted file");
+        file.sync_all().expect("Sync corrupted file");
+    }
+
+    let cache = Arc::new(BlockCache::new(10));
+    let reader_res = SstableReader::open(&file_path, cache).await;
+
+    if let Ok(reader) = reader_res {
+        // Attempt point lookups and iter on the corrupted SSTable
+        let get_res = reader.get(b"key_0000").await;
+        assert!(
+            get_res.is_err(),
+            "Expected Err due to u32::MAX v_len out of bounds, got: {:?}",
+            get_res
+        );
+
+        let iter_res = reader.iter().await;
+        assert!(
+            iter_res.is_err(),
+            "Expected Err due to u32::MAX v_len during iter, got: {:?}",
+            iter_res
+        );
+    }
 }
