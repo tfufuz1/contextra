@@ -17,6 +17,7 @@ pub mod off_policy;
 pub mod offpolicy;
 pub mod pid;
 pub mod pid_latency_controller;
+pub mod shadow_mode;
 
 #[cfg(feature = "bandit-routing")]
 pub use bandit::*;
@@ -34,3 +35,4 @@ pub use lyapunov::*;
 pub use off_policy::*;
 pub use pid::*;
 pub use pid_latency_controller::*;
+pub use shadow_mode::*;

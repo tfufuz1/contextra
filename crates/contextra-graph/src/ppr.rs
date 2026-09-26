@@ -8,6 +8,7 @@
 // SIEHE AUCH: crates/contextra-graph/src/csr.rs
 
 pub(crate) mod snapshot;
+pub mod shadow_hook;
 
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprAlgorithm, PprConfig};

@@ -817,6 +817,7 @@ dependencies = [
  "arc-swap",
  "bincode",
  "blake3",
+ "contextra-adapt",
  "contextra-ports",
  "contextra-store",
  "contextra-testkit",
