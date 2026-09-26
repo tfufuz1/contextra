@@ -4,14 +4,14 @@ use contextra_types::RetrievalStrategy;
 /// Lebt in contextra-router (wo Arme registriert werden), NICHT im BanditPolicy-Port.
 #[derive(Debug, Clone, Copy)]
 pub struct ArmRegistry {
-    arms: [RetrievalStrategy; 4],
+    arms: [RetrievalStrategy; 5],
 }
 
 /// Fehlerklasse für ungültige Arm-Indizes — crate-lokal, P6-konform an Grenze konvertierbar.
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum ArmRegistryError {
-    /// Der angegebene Arm-Index liegt außerhalb des gültigen Bereichs (0..=3).
-    #[error("arm index {0} out of range, expected 0..=3")]
+    /// Der angegebene Arm-Index liegt außerhalb des gültigen Bereichs (0..=4).
+    #[error("arm index {0} out of range, expected 0..=4")]
     OutOfRange(u32),
 }
 
@@ -24,13 +24,17 @@ impl Default for ArmRegistry {
                 RetrievalStrategy::Text,
                 RetrievalStrategy::Graph,
                 RetrievalStrategy::Hybrid,
+                RetrievalStrategy::Global {
+                    max_community_nodes: None,
+                    min_community_size: None,
+                },
             ],
         }
     }
 }
 
 impl ArmRegistry {
-    /// Liefert die `RetrievalStrategy` für den gegebenen Arm-Index (0..=3).
+    /// Liefert die `RetrievalStrategy` für den gegebenen Arm-Index (0..=4).
     pub fn strategy_for(&self, arm: u32) -> Result<RetrievalStrategy, ArmRegistryError> {
         self.arms
             .get(arm as usize)
@@ -38,7 +42,7 @@ impl ArmRegistry {
             .ok_or(ArmRegistryError::OutOfRange(arm))
     }
 
-    /// Liefert den Arm-Index (0..=3) für die gegebene `RetrievalStrategy`.
+    /// Liefert den Arm-Index (0..=4) für die gegebene `RetrievalStrategy`.
     ///
     /// Die Implementierung verwendet ein `match` über alle bekannten Varianten mit einem
     /// sicheren Fallback für das von Rust bei Crate-übergreifenden `#[non_exhaustive]` Enums
@@ -49,6 +53,7 @@ impl ArmRegistry {
             RetrievalStrategy::Text => 1,
             RetrievalStrategy::Graph => 2,
             RetrievalStrategy::Hybrid => 3,
+            RetrievalStrategy::Global { .. } => 4,
             _ => 0,
         }
     }
@@ -66,6 +71,10 @@ mod tests {
             RetrievalStrategy::Text,
             RetrievalStrategy::Graph,
             RetrievalStrategy::Hybrid,
+            RetrievalStrategy::Global {
+                max_community_nodes: None,
+                min_community_size: None,
+            },
         ];
 
         for (expected_arm, &strategy) in strategies.iter().enumerate() {
@@ -84,8 +93,8 @@ mod tests {
     fn test_arm_registry_out_of_range() {
         let registry = ArmRegistry::default();
         assert_eq!(
-            registry.strategy_for(4),
-            Err(ArmRegistryError::OutOfRange(4))
+            registry.strategy_for(5),
+            Err(ArmRegistryError::OutOfRange(5))
         );
         assert_eq!(
             registry.strategy_for(100),
@@ -98,7 +107,7 @@ mod tests {
         let reg1 = ArmRegistry::default();
         let reg2 = ArmRegistry::default();
 
-        for arm in 0..4 {
+        for arm in 0..5 {
             assert_eq!(reg1.strategy_for(arm).ok(), reg2.strategy_for(arm).ok());
         }
     }
