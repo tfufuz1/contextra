@@ -2,9 +2,19 @@
 
 Dieses Verzeichnis `docs/spec/` enthält die vollständige, verbindliche Gesamtspezifikation **Contextra — Finale Produktspezifikation (Synthese)** (`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`), sowie die vorausgegangenen Kapiteldateien.
 
+> **Hinweis zur Normativität**: Die unten aufgeführten nummerierten Kapiteldateien (`00a`…`21`…`92`) sind historische Vorstufen der Synthese. Bei etwaigen Widersprüchen gilt ausschließlich `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` als normative Quelle der Wahrheit.
+
 ## Hauptspezifikation
 
 - **[`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`](CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**: Normative Mikrofeingranulare Schnittstellen- und Implementierungsspezifikation des Zielprodukts (Synthese aller Vorkapitel).
+
+## Hinweis zur Namenskollision 'Anhang E'
+
+In externen SOLL-Spezifikationsdokumenten (z. B. "Contextra Master-Spezifikation v6") wird der Name "Anhang E" für zwei unterschiedliche Dinge verwendet:
+1. Referenztabellen für Trait-/Fehler-/Abhängigkeitskataloge vs.
+2. "Teil E — Autonome Intelligenzschicht" / CIAI.
+
+Für dieses Repository gilt ausschließlich E.1–E.13 der CIAI-Vollspezifikation als "Teil E". Der Referenztabellen-Anhang ist in diesem externen Dokument nicht vorhanden und muss bei Bedarf aus Code + `capabilities.toml` + `AGENTS.md` neu erzeugt werden.
 
 ## Kapitelindex
 

@@ -1,6 +1,6 @@
 # Gate Orchestrator Phase Levels (`gate-check`)
 
-Das `gate-check`-Subkommando in `xtask` dient als zentraler Orchestrator zur automatisierten Prüfung der Phaseneintrittsbedingungen gemäß `CONTEXTRA_SPEC_UPDATED.md` Teil A.3 (Phasen und Gates).
+Das `gate-check`-Subkommando in `xtask` dient als zentraler Orchestrator zur automatisierten Prüfung der Phaseneintrittsbedingungen gemäß `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` Teil A.3 (Phasen und Gates).
 
 Es ermöglicht Entwicklern und CI-Pipelines die Ausführung von Phasen-Gates über ein einziges Kommando (`cargo run -p xtask -- gate-check --level <N>`).
 
@@ -33,19 +33,19 @@ Es ermöglicht Entwicklern und CI-Pipelines die Ausführung von Phasen-Gates üb
 - **Zweck**: Abnahme der Kriterien aus Phase 1 vor Beginn der Arbeiten an Phase 2.
 - **Implementierungsstatus**: **Platzhalter**.
 - **Verhalten**: Meldet einen klaren Fehler:
-  `"Gate 2 ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase 1 sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe CONTEXTRA_SPEC_UPDATED.md Teil A.3"` (Exit-Code != 0).
+  `"Gate 2 ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase 1 sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md Teil A.3"` (Exit-Code != 0).
 
 ### Level 3 (Gate 3 - Phase 2 Kriterien)
 - **Zweck**: Abnahme der Kriterien aus Phase 2 vor Beginn der Arbeiten an Phase 3.
 - **Implementierungsstatus**: **Platzhalter**.
 - **Verhalten**: Meldet einen klaren Fehler:
-  `"Gate 3 ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase 2 sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe CONTEXTRA_SPEC_UPDATED.md Teil A.3"` (Exit-Code != 0).
+  `"Gate 3 ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase 2 sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md Teil A.3"` (Exit-Code != 0).
 
 ### Level 4 (Gate 4 - Phase 3 Kriterien)
 - **Zweck**: Abnahme der Kriterien aus Phase 3 vor Beginn der Arbeiten an Phase 4.
 - **Implementierungsstatus**: **Platzhalter**.
 - **Verhalten**: Meldet einen klaren Fehler:
-  `"Gate 4 ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase 3 sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe CONTEXTRA_SPEC_UPDATED.md Teil A.3"` (Exit-Code != 0).
+  `"Gate 4 ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase 3 sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md Teil A.3"` (Exit-Code != 0).
 
 ---
 
@@ -61,3 +61,9 @@ cargo run -p xtask -- gate-check --level 1
 # Versuch, nicht-implementierte Gates auszuführen (schlägt mit Exit-Code 1 fehl):
 cargo run -p xtask -- gate-check --level 2
 ```
+
+---
+
+## Status (Stand 2026-09-26)
+
+Level 2–4 sind funktionale Platzhalter ohne automatisierte Kriterien; für produktive Arbeitspakete gelten stattdessen paket-lokale Akzeptanzkriterien (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `xtask jules-preflight`), bis ein gesondertes Nachfolgepaket (Referenz: "AP-001" aus der Arbeitspaket-Planung) Level 2–4 entweder real spezifiziert oder formal als entfallen markiert.

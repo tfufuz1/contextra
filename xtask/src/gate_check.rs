@@ -90,8 +90,8 @@ impl std::fmt::Display for GateCheckError {
 
 impl std::error::Error for GateCheckError {}
 
-/// Ring 0 and Ring 1 crates as defined in CONTEXTRA_SPEC_UPDATED.md §A.3 & Ring Table.
-/// Source of Truth: CONTEXTRA_SPEC_UPDATED.md Teil A.3, capabilities.toml, and docs/ARCHITECTURE.md.
+/// Ring 0 and Ring 1 crates as defined in docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md §A.3 & Ring Table.
+/// Source of Truth: docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md Teil A.3, capabilities.toml, and docs/ARCHITECTURE.md.
 pub const RING_0_1_CRATES: &[&str] = &[
     // Ring 0: Core Domain & Storage Kernels
     "contextra-types",
@@ -121,7 +121,7 @@ pub fn run(opts: GateCheckOptions) -> Result<GateCheckReport, GateCheckError> {
             let n = opts.level.number();
             let prev_phase = n - 1;
             let message = format!(
-                "Gate {} ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase {} sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe CONTEXTRA_SPEC_UPDATED.md Teil A.3",
+                "Gate {} ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase {} sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md Teil A.3",
                 n, prev_phase
             );
             Err(GateCheckError::NotImplemented {

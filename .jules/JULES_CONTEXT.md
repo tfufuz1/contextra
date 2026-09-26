@@ -6,7 +6,7 @@
 > sind gemäß MECE-Prinzip (CONSTITUTION.md §Documentation Model) in folgenden Quellen verankert:
 > - **Code-Zustand & Non-Obvious Decisions**: siehe `AGENTS.md`
 > - **Dynamischer Projektstatus & Tag-Inventar**: siehe `WORKING_STATE.md`
-> - **Architektur-Entscheidungen (ADRs)**: siehe `DECISIONS.md` / `docs/decisions/`
+> - **Architektur-Entscheidungen (ADRs)**: siehe `docs/decisions/README.md` (ADR-Index gemäß ADR-095)
 
 ---
 
@@ -14,24 +14,25 @@
 
 Um Halluzinationen und veraltete Fakten zu vermeiden, gilt für jede Jules-Session folgende Lade- und Nachschlage-Reihenfolge:
 1. **System & Arbeitsumgebung**: `.jules/JULES_CONTEXT.md` (Prozessanleitung), `.jules/SESSION_BOOTSTRAP.md`
-2. **Aktueller Code-Zustand & Invarianten**: `AGENTS.md` (Verifizierter Code-Befund, Crate-Topologie, Non-Obvious Decisions)
+2. **Aktueller Code-Zustand & Invarianten**: `AGENTS.md` (Verifizierter Code-Befund, Non-Obvious Decisions)
 3. **Offene Schulden & Tags**: `WORKING_STATE.md` (Autogenerierter Tag-Bericht)
-4. **Verbindliche Architektur-Vorgaben**: `DECISIONS.md` (ADR-Zusammenfassungen)
+4. **Verbindliche Architektur-Vorgaben**: `docs/decisions/README.md` (ADR-Index gemäß ADR-095)
 
 > 📌 **Hinweis für Prompt-Erstellung**: Die automatische Erstellung von GitHub-Issues durch Workflows/Gates ist deaktiviert.
 
 ---
 
-## 📜 Audit-Report & Remediation-Prompts Kontext-Anker (2026-09-26)
+## 📜 Audit-Report & Remediation-Prompts Kontext-Anker
 
-- **Audit-Report**: `CONTEXTRA_AUDIT_REPORT.md` dokumentiert den umfassenden System-Audit (Funde in Ring-2-Leaf, Compaction-Speicherbudget, `KvKeyLocks`-Divergenz, `BanditError`-Fehlergrenze, `ConstantTimeEq`-Lücke).
-- **Remediation-Prompts**: `CONTEXTRA_FIX_PROMPTS.md` enthält 10 isolierte Behebungs-Prompts (P1–P10) als Kontext-Anker für Folge-Sessions, die auf diese Historie referenzieren müssen.
+Produktive Remediation-Historie wird ausschließlich über Git-Commit-Historie und `docs/decisions/` nachvollzogen.
 
 ---
 
 ## 📐 Crate-Topologie & Referenzen
 
-Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENTS.md` Abschnitt **"Crate-Topologie"**.
+Alleinige Quelle für Ring-Zuordnungen und Abhängigkeiten ist `capabilities.toml`.
+
+> ⚠️ **Warnung**: `WORKING_STATE.md` darf NICHT als Architektur-Quelle referenziert werden, da dessen "Layer"-Feld ein rein build-graph-abgeleitetes Sortierkriterium ist und inhaltlich von `capabilities.toml` abweicht (z. B. ist `contextra-privacy` laut `capabilities.toml` Ring 3, in `WORKING_STATE.md` jedoch als Layer 0 geführt).
 
 ---
 
@@ -69,7 +70,7 @@ Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENT
 
 ## 🚫 Architektur-Entscheidungen (ADRs)
 
-Vollständige Liste und Verbindlichkeit aller Architektur-Entscheidungen: siehe `DECISIONS.md` sowie `AGENTS.md` Abschnitt **"Non-Obvious Decisions"**.
+Vollständige Liste und Verbindlichkeit aller Architektur-Entscheidungen: siehe `docs/decisions/README.md` (ADR-Index gemäß ADR-095) sowie `AGENTS.md` Abschnitt **"Non-Obvious Decisions"**.
 
 ---
 
