@@ -919,6 +919,22 @@ impl McpServer {
                 }))
             }
 
+            "contextra_plugin_status" => {
+                let registry = self.plugin_registry.as_ref().map(|r| r.as_ref());
+                let empty_registry;
+                let reg_ref = match registry {
+                    Some(r) => r,
+                    None => {
+                        empty_registry = contextra_ports::plugin::PluginRegistry::default();
+                        &empty_registry
+                    }
+                };
+                let status = crate::plugin_status::handle_plugin_status(reg_ref).await?;
+                serde_json::to_value(&status).map_err(|e| {
+                    McpError::internal_error(format!("Response serialization error: {e}"))
+                })
+            }
+
             other => Err(McpError::invalid_params(format!(
                 "Unbekanntes Tool: {other}"
             ))),
