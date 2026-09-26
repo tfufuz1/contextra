@@ -6,8 +6,12 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Intervall für die periodische Re-Faktorisierung/Drift-Prüfung der Sherman-Morrison Inversen.
+// Wert ist ein konservativer Startwert, siehe PR-Diskussion für Tuning
+pub const SHERMAN_MORRISON_REFACTORIZATION_INTERVAL: u64 = 1000;
+
 /// Fehlerzustände des Contextual Bandits.
-#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[derive(Debug, Error, PartialEq, Clone)]
 pub enum BanditError {
     /// Dimension des Eingabevektors stimmt nicht mit dem Bandit-Zustand überein.
     #[error("Embedding dimension mismatch: expected {expected}, actual {actual}")]
@@ -16,6 +20,14 @@ pub enum BanditError {
         expected: usize,
         /// Tatsächliche Dimension.
         actual: usize,
+    },
+    /// Numerische Präzisions-Matrix Drift erkannt (Re-Faktorisierung von inv_a erforderlich).
+    #[error("Sherman-Morrison precision matrix drift detected after {updates_since_reset} updates (denominator = {denominator})")]
+    PrecisionMatrixDriftDetected {
+        /// Anzahl der update()-Aufrufe seit der letzten Neu-Initialisierung/Re-Faktorisierung.
+        updates_since_reset: u64,
+        /// Der berechnete Nenner (denominator = 1.0 + xᵀ v_disc).
+        denominator: f32,
     },
 }
 
@@ -202,6 +214,9 @@ pub struct BanditProfileState {
     /// Inverser Kovarianzmatrix-Speicher A⁻¹ (d x d, Row-Major) für Sherman-Morrison O(d²).
     #[serde(default)]
     pub inv_a: AlignedF32Vec,
+    /// Anzahl der update()-Aufrufe seit der letzten Neu-Initialisierung von inv_a.
+    #[serde(default)]
+    updates_since_reset: u64,
     /// Pre-allocated Buffer für Matrix-Vektor Produkte (d Elemente) zur Vermeidung von Hot-Path Allokationen.
     #[serde(skip, default)]
     pub work_buf: AlignedF32Vec,
@@ -262,6 +277,7 @@ impl BanditProfileState {
             theta: vec![0.0f32; d],
             sigma_sq: vec![1.0f32; d], // Uninformative Prior
             inv_a: AlignedF32Vec::new(inv_a),
+            updates_since_reset: 0,
             work_buf: AlignedF32Vec::zeros(d),
             alpha: alpha_base,
             alpha_base,
@@ -284,6 +300,7 @@ impl BanditProfileState {
                 inv_a[i * d + i] = 1.0;
             }
             self.inv_a = AlignedF32Vec::new(inv_a);
+            self.updates_since_reset = 0;
         }
     }
 
@@ -396,6 +413,8 @@ impl BanditProfileState {
                 self.ensure_inv_a();
                 self.ensure_work_buf();
 
+                self.updates_since_reset += 1;
+
                 let gamma_inv = 1.0 / effective_gamma.max(1e-5);
 
                 // 1. Berechne v_disc = γ⁻¹ A⁻¹ x in work_buf und xᵀ v_disc (SIMD dot_product_f32)
@@ -409,6 +428,24 @@ impl BanditProfileState {
 
                 // 2. Denominator und Gain Vector k
                 let denominator = 1.0 + xt_v_disc;
+
+                debug_assert!(
+                    denominator > 0.0,
+                    "Sherman-Morrison precision matrix drift detected: denominator={}, effective_gamma={}, gamma_inv={}",
+                    denominator,
+                    effective_gamma,
+                    gamma_inv
+                );
+
+                if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                    || denominator <= 0.0
+                {
+                    return Err(BanditError::PrecisionMatrixDriftDetected {
+                        updates_since_reset: self.updates_since_reset,
+                        denominator,
+                    });
+                }
+
                 let denom_safe = denominator.max(1e-8);
 
                 // 3. Parameter Residual: r_adj - θᵀ x
