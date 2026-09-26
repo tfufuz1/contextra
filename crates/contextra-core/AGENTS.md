@@ -125,10 +125,10 @@ Keine Locks in contextra-core selbst. `TxBuffer` nutzt `DashMap` (lock-free shar
 - **Verbotene Imports**: Alle Workspace-Crates — Layer 0 hat **NULL** Workspace-Abhängigkeiten
 - **Implementoren der Traits**:
   - `StorageEngine` → `LsmStorage` in `contextra-store`
-  - `VectorIndex` → `HnswIndex` in `contextra-index`
+  - `VectorIndex` → `HnswIndex` in `contextra-vector`
   - `TextIndex` → `Bm25Scorer` in `contextra-text`
   - `GraphIndex` → `CsrGraph` in `contextra-graph`
-  - `TextEmbeddingEngine` → `OllamaEmbedder` in `contextra-ollama`
+  - `TextEmbeddingEngine` → `OllamaEmbedder` in `contextra-infer-ollama`
 
 ## 8. Relevante ADRs & Rules
 

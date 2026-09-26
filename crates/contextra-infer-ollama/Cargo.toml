@@ -25,5 +25,5 @@ quick-xml = "0.41"
 
 [dev-dependencies]
 proptest = "1.4"
-contextra-embed = { workspace = true }
+contextra-infer-onnx = { workspace = true }
 tracing-test = "0.2"

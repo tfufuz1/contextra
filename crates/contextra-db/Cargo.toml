@@ -19,7 +19,7 @@ bytes = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-store = { workspace = true }
 blake3 = { workspace = true }
-contextra-index = { workspace = true }
+contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
 contextra-checkpoint = { workspace = true }
 contextra-graph = { workspace = true }
@@ -41,7 +41,7 @@ tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
-contextra-index = { workspace = true, features = ["experimental-diskann"] }
+contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 ed25519-dalek = "2"
 
 [features]
@@ -50,7 +50,7 @@ bench = []
 sandbox = ["contextra-engine/sandbox"]
 reranking = ["contextra-engine/reranking"]
 onnx = []
-experimental-diskann = ["contextra-index/experimental-diskann"]
+experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = ["contextra-engine/background-maintenance"]
 graph-connectivity-health = ["contextra-graph/physio-percolation"]
 coherence-bonus-fusion = []

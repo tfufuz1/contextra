@@ -43,7 +43,11 @@ fn generate_kv_pairs(count: usize, seed: u64) -> Vec<(Vec<u8>, Vec<u8>)> {
 }
 
 /// Generates random keys selected from an existing dataset.
-fn generate_random_read_keys(dataset: &[(Vec<u8>, Vec<u8>)], count: usize, seed: u64) -> Vec<Vec<u8>> {
+fn generate_random_read_keys(
+    dataset: &[(Vec<u8>, Vec<u8>)],
+    count: usize,
+    seed: u64,
+) -> Vec<Vec<u8>> {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut keys = Vec::with_capacity(count);
     let n = dataset.len();

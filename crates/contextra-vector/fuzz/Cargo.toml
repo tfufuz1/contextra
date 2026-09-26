@@ -1,5 +1,5 @@
 [package]
-name = "contextra-vector-fuzz"
+name = "contextra-vector-fuzz" <!-- crate-ref-ignore -->
 version = "0.0.0"
 publish = false
 edition = "2021"

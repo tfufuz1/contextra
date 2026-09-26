@@ -13,7 +13,9 @@ pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[
     validate_value(value)?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
-        return Err(ContextraError::Storage("Memory budget exceeded (95%)".into()));
+        return Err(ContextraError::Storage(
+            "Memory budget exceeded (95%)".into(),
+        ));
     }
     let doc_id = derive_doc_id(key);
 
@@ -37,7 +39,9 @@ pub(super) async fn put_if_absent(
     validate_value(value)?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
-        return Err(ContextraError::Storage("Memory budget exceeded (95%)".into()));
+        return Err(ContextraError::Storage(
+            "Memory budget exceeded (95%)".into(),
+        ));
     }
 
     // 1. Staged write check across all active transactions
@@ -54,7 +58,10 @@ pub(super) async fn put_if_absent(
 
     // 2. Intent Lock check and registration
     {
-        let mut locks = storage.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+        let mut locks = storage
+            .intent_locks
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if let Some(&existing_tx) = locks.get(key) {
             if existing_tx != tx_id {
                 return Ok(false);
@@ -69,7 +76,10 @@ pub(super) async fn put_if_absent(
     let is_present = match storage.get_at_seq(key, current_max_seq).await {
         Ok(opt) => opt.is_some(),
         Err(e) => {
-            let mut locks = storage.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+            let mut locks = storage
+                .intent_locks
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             if locks.get(key) == Some(&tx_id) {
                 locks.remove(key);
             }
@@ -78,7 +88,10 @@ pub(super) async fn put_if_absent(
     };
 
     if is_present {
-        let mut locks = storage.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+        let mut locks = storage
+            .intent_locks
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if locks.get(key) == Some(&tx_id) {
             locks.remove(key);
         }
@@ -95,7 +108,10 @@ pub(super) async fn put_if_absent(
             data: (key.to_vec(), value.to_vec()),
         },
     ) {
-        let mut locks = storage.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+        let mut locks = storage
+            .intent_locks
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if locks.get(key) == Some(&tx_id) {
             locks.remove(key);
         }
@@ -167,7 +183,9 @@ pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u
 pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
-        return Err(ContextraError::Storage("Memory budget exceeded (95%)".into()));
+        return Err(ContextraError::Storage(
+            "Memory budget exceeded (95%)".into(),
+        ));
     }
 
     struct IntentLockGuard<'a>(&'a LsmStorage, TxId);
@@ -229,7 +247,13 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
     }
 
-    wal_ops.push((WalOp::TxEnd { tx_id, committed: true }, last_seq));
+    wal_ops.push((
+        WalOp::TxEnd {
+            tx_id,
+            committed: true,
+        },
+        last_seq,
+    ));
 
     // --- PHASE 2: Prepare WAL entries under commit_mutex ---
     let wal = storage.wal.read().await.clone();
@@ -240,13 +264,19 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         if let Err(e) = wal.append_batch(wal_entries).await {
             let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
             let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
-            let commit_guard = CommitGuard { _lock: &_commit_lock };
+            let commit_guard = CommitGuard {
+                _lock: &_commit_lock,
+            };
             if let Err(rollback_err) = storage.rollback_to_tx_locked(last_tx, &commit_guard).await {
-                tracing::error!("Failed to execute rollback_to_tx_locked after failed WAL append: {}", rollback_err);
+                tracing::error!(
+                    "Failed to execute rollback_to_tx_locked after failed WAL append: {}",
+                    rollback_err
+                );
             }
             storage.cleanup_intent_locks_for_tx(tx_id);
             return Err(ContextraError::Storage(format!(
-                "Commit failed (at WAL append), WAL rollback executed: {}", e
+                "Commit failed (at WAL append), WAL rollback executed: {}",
+                e
             )));
         }
 
@@ -270,10 +300,19 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     if let Some(ref mut queue) = *queue_guard {
         let _wal_queue_guard = WalQueueGuard::new(Arc::clone(&storage.wal_queue_depth));
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let req = GroupCommitRequest { tx_id, wal_entries, mem_updates, sender: tx };
+        let req = GroupCommitRequest {
+            tx_id,
+            wal_entries,
+            mem_updates,
+            sender: tx,
+        };
         queue.requests.push(req);
         let is_full = queue.requests.len() >= MAX_GROUP_COMMIT_BATCH_SIZE;
-        let notify_full = if is_full { Some(queue.notify_full.clone()) } else { None };
+        let notify_full = if is_full {
+            Some(queue.notify_full.clone())
+        } else {
+            None
+        };
         drop(queue_guard);
         drop(_commit_lock);
 
@@ -290,7 +329,9 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 let mut queue_guard = storage.pending_commit_queue.lock().await;
                 *queue_guard = None;
                 drop(queue_guard);
-                Err(ContextraError::CommitTimeout { tx_id: tx_id.inner() })
+                Err(ContextraError::CommitTimeout {
+                    tx_id: tx_id.inner(),
+                })
             }
         };
         storage.cleanup_intent_locks_for_tx(tx_id);
@@ -328,7 +369,9 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             Some(q) => q,
             None => {
                 tracing::error!("Group commit leader: pending_commit_queue unexpectedly missing.");
-                return Err(ContextraError::Internal("Group commit queue invariant violated".into()));
+                return Err(ContextraError::Internal(
+                    "Group commit queue invariant violated".into(),
+                ));
             }
         };
         drop(queue_guard);
@@ -342,18 +385,25 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let truncate_guard = wal.truncate_lock.lock().await;
         drop(_commit_lock);
 
-        let append_res = wal.append_batch_locked(all_wal_entries, &truncate_guard).await;
+        let append_res = wal
+            .append_batch_locked(all_wal_entries, &truncate_guard)
+            .await;
         drop(truncate_guard);
 
         if let Err(e) = append_res {
             let _commit_lock = storage.commit_mutex.lock().await;
             let _ = wal.restore_last_hmac(pending_queue.first_prev_hmac).await;
             let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
-            let commit_guard = CommitGuard { _lock: &_commit_lock };
+            let commit_guard = CommitGuard {
+                _lock: &_commit_lock,
+            };
             let rollback_res = storage.rollback_to_tx_locked(last_tx, &commit_guard).await;
 
             let err_msg = if let Err(ref rollback_err) = rollback_res {
-                tracing::error!("Failed to execute rollback_to_tx_locked after failed group WAL append: {}", rollback_err);
+                tracing::error!(
+                    "Failed to execute rollback_to_tx_locked after failed group WAL append: {}",
+                    rollback_err
+                );
                 format!("Fatal double-fault: WAL append failed ({e}) and subsequent rollback failed: {rollback_err}")
             } else {
                 format!("Commit failed (at WAL append), WAL rollback executed: {e}")
@@ -364,7 +414,10 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             storage.cleanup_intent_locks_for_txs(&batch_txs);
 
             for r in pending_queue.requests {
-                if r.sender.send(Err(ContextraError::Storage(err_msg.clone()))).is_err() {
+                if r.sender
+                    .send(Err(ContextraError::Storage(err_msg.clone())))
+                    .is_err()
+                {
                     tracing::warn!(follower_tx = ?r.tx_id, "Follower dropped receiver during group commit failure notification");
                 }
             }
@@ -372,7 +425,8 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
 
         type MemUpdateBatch<'a> = (TxId, &'a [(Vec<u8>, Vec<u8>, u64)]);
-        let mut all_updates: Vec<MemUpdateBatch> = Vec::with_capacity(1 + pending_queue.requests.len());
+        let mut all_updates: Vec<MemUpdateBatch> =
+            Vec::with_capacity(1 + pending_queue.requests.len());
         all_updates.push((leader_tx_id, &leader_mem_updates));
         for r in &pending_queue.requests {
             all_updates.push((r.tx_id, &r.mem_updates));

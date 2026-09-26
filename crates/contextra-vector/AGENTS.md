@@ -1,4 +1,4 @@
-# AGENTS.md — contextra-index
+# AGENTS.md — contextra-vector
 > Layer 1 | HNSW Vektor-Index, SIMD Distanzen, SQ8-Quantisierung | ~10800 LOC
 
 ## 1. Zweck & Architekturrolle

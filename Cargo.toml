@@ -117,7 +117,7 @@ contextra-simd = { path = "crates/contextra-simd" }
 contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
 contextra-vector = { path = "crates/contextra-vector" }
-contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" }
+contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
 contextra-db = { path = "crates/contextra-db" }
 contextra-text = { path = "crates/contextra-text" }
 contextra-checkpoint = { path = "crates/contextra-checkpoint" }
@@ -125,14 +125,14 @@ contextra-crypto = { path = "crates/contextra-crypto" }
 contextra-privacy = { path = "crates/contextra-privacy" }
 contextra-graph = { path = "crates/contextra-graph" }
 contextra-infer-onnx = { path = "crates/contextra-infer-onnx" }
-contextra-embed = { package = "contextra-infer-onnx", path = "crates/contextra-infer-onnx" }
+contextra-embed = { package = "contextra-infer-onnx", path = "crates/contextra-infer-onnx" } # <!-- crate-ref-ignore -->
 contextra-mcp   = { path = "crates/contextra-mcp" }
 contextra-agent = { path = "crates/contextra-agent" }
 contextra-infer-ollama = { path = "crates/contextra-infer-ollama" }
-contextra-ollama = { package = "contextra-infer-ollama", path = "crates/contextra-infer-ollama" }
+contextra-ollama = { package = "contextra-infer-ollama", path = "crates/contextra-infer-ollama" } # <!-- crate-ref-ignore -->
 contextra-router = { path = "crates/contextra-router" }
 contextra-infer-candle = { path = "crates/contextra-infer-candle" }
-contextra-candle = { package = "contextra-infer-candle", path = "crates/contextra-infer-candle" }
+contextra-candle = { package = "contextra-infer-candle", path = "crates/contextra-infer-candle" } # <!-- crate-ref-ignore -->
 contextra-sandbox = { path = "crates/contextra-sandbox" }
 contextra-py = { path = "crates/contextra-py" }
 contextra-testkit = { path = "crates/contextra-testkit" }
@@ -147,15 +147,15 @@ contextra-cognition = { path = "crates/contextra-cognition" }
 contextra-rank = { path = "crates/contextra-rank" }
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
-# contextra-cluster, contextra-sandbox, contextra-saos-agent wurden in Phase 0 ausgelagert.
-# contextra-embed    → ONNX-Embeddings (wird via Feature-Flag optional)
+# contextra-cluster, contextra-sandbox, contextra-saos-agent wurden in Phase 0 ausgelagert. <!-- crate-ref-ignore -->
+# contextra-embed    → ONNX-Embeddings (wird via Feature-Flag optional) <!-- crate-ref-ignore -->
 
 # 🧊 Frozen Zone — external deps for future reactivation
 # openraft = { version = "0.9", features = ["storage-v2", "serde"] }
 # tonic = { version = "0.12", features = ["tls"] }
 # prost = "0.13"
 #
-# Embedding & ML (activate with contextra-embed feature)
+# Embedding & ML (activate with contextra-infer-onnx feature)
 # ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"] }
 # hf-hub = { version = "0.3", default-features = false }
 # tokenizers = "0.19"

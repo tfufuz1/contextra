@@ -1,4 +1,4 @@
-# AGENTS.md — contextra-embed
+# AGENTS.md — contextra-infer-onnx
 > Layer 3 | Lokale ONNX-Modelle, Embeddings, Cross-Encoder | ~1200 LOC
 
 ## 1. Zweck & Architekturrolle
@@ -19,7 +19,7 @@ Implementiert den `TextEmbeddingEngine` Trait aus `contextra-core`.
 
 ### Feature-Gate-Protokoll (`onnx`)
 Die gesamte Crate erfordert umfangreiche C++-Abhängigkeiten (`ort`).
-Um Pure-Rust-Builds nicht zu brechen, MUSS jeder Code, der `contextra-embed` nutzt,
+Um Pure-Rust-Builds nicht zu brechen, MUSS jeder Code, der `contextra-infer-onnx` nutzt,
 dies strikt hinter dem `#[cfg(feature = "onnx")]` Gate verstecken.
 Default ist dieses Feature **deaktiviert**.
 
@@ -92,7 +92,7 @@ der ONNX-Runtime verwaltet seine eigenen internen Threadpools.
 ## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
 
 - **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-ollama` (L3 Peer)
+- **Verbotene Imports**: `contextra-db` (L2), `contextra-infer-ollama` (L3 Peer)
 - **Genutzt von**: Optional in `contextra-db` (falls konfiguriert).
 
 ## 8. Relevante ADRs & Rules

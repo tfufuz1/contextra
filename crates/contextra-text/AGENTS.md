@@ -89,7 +89,7 @@ hält keine langlebigen Mutexe. Cache-Strukturen (DF-Counts, Avg-Doc-Len) nutzen
 ## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
 
 - **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-store` (L1 Peer), `contextra-index` (L1 Peer)
+- **Verbotene Imports**: `contextra-db` (L2), `contextra-store` (L1 Peer), `contextra-vector` (L1 Peer)
 - **Implementiert**: `TextIndex` aus `contextra-core`
 
 ## 8. Relevante ADRs & Rules

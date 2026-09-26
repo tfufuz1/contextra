@@ -132,9 +132,9 @@ nicht über einen globalen Austausch.
 
 ### 9.4 Ring-2/3-Crates (vormals „Layer-3-Crates")
 
-- **`contextra-infer-ollama`** (vormals `contextra-ollama`): `OllamaClient::generate(prompt, contextual_prefix) -> Result<String, OllamaError>`.
+- **`contextra-infer-ollama`** (vormals `contextra-infer-ollama`): `OllamaClient::generate(prompt, contextual_prefix) -> Result<String, OllamaError>`.
   Contextual-Chunk-Prefixing fügt Retrieval-Kontext als System-Präfix ein.
-- **`contextra-infer-onnx`** (vormals `contextra-embed`): `EmbeddingModel::embed(texts) -> Result<Vec<Vec<f32>>, EmbedError>`
+- **`contextra-infer-onnx`** (vormals `contextra-infer-onnx`): `EmbeddingModel::embed(texts) -> Result<Vec<Vec<f32>>, EmbedError>`
   (ONNX, aus `default-members` ausgeschlossen, §0.2/§0.3), `CrossEncoderReranker::rerank(query, candidates) -> Vec<SearchResult>`.
 - **`contextra-agent`:** `AgentWorkflow`-Engine mit persistentem Zustand über `Checkpointable`. Unverändert im
   Zuschnitt, jetzt Ring 3.
@@ -145,7 +145,7 @@ nicht über einen globalen Austausch.
   `maturin build --release`-Wheel als `PyErr` ankommen, nicht nur im Debug-Build.
 
 `contextra-py` ist damit — anders als in der Vorfassung dokumentiert — reguläres Workspace-Mitglied, nicht
-„eigener Workspace"; die davon abweichende Doku-Behauptung in `contextra-py-ci.yml` und den Python-Tests wird
+„eigener Workspace"; die davon abweichende Doku-Behauptung in `contextra-py-ci.yml` und den Python-Tests wird <!-- crate-ref-ignore -->
 im selben Zug korrigiert (§20, Phase 0R, Track T3).
 
 ---

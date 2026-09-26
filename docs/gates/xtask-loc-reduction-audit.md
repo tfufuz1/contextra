@@ -78,7 +78,7 @@ Alle 51 Dateien unter `xtask/src/**/*.rs`, sortiert nach LOC (`wc -l`) absteigen
 | 41 | `xtask/src/check_phantom_files.rs` | 141 | **A** | `main.rs -> mod check_phantom_files;` | `context-gates.yml` | Aktives CI-Gate für Phantom-Dateien. |
 | 42 | `xtask/src/post_merge_report.rs` | 124 | **A** | `main.rs -> mod post_merge_report;` | `post-merge-verification.yml` | Post-Merge Verifikations-Reporter. |
 | 43 | `xtask/src/jules_submit_gate.rs` | 107 | **B** | `main.rs -> mod jules_submit_gate;` | CLI Helper | Submit-Gate-Helfer für Agenten; Kandidat für Auslagerung. |
-| 44 | `xtask/src/check_ffi_panic_boundary.rs` | 104 | **A** | `main.rs -> mod check_ffi_panic_boundary;` | `contextra-py-ci.yml`, `merge-gate.yml`, Script | Aktives CI-Gate für FFI Panic-Boundaries. |
+| 44 | `xtask/src/check_ffi_panic_boundary.rs` | 104 | **A** | `main.rs -> mod check_ffi_panic_boundary;` | `contextra-py-ci.yml`, `merge-gate.yml`, Script | Aktives CI-Gate für FFI Panic-Boundaries. | <!-- crate-ref-ignore -->
 | 45 | `xtask/src/gen_feature_catalog.rs` | 100 | **B** | `main.rs -> mod gen_feature_catalog;` | Kein CI Workflow | Generiert Feature-Katalog Dokumentation. |
 | 46 | `xtask/src/check_bandit_latency_budget.rs` | 66 | **A** | `main.rs -> mod check_bandit_latency_budget;` | `merge-gate.yml`, Script | Aktives CI-Gate für Latency-Budgets. |
 | 47 | `xtask/src/bench_gate.rs` | 60 | **A** | `main.rs -> mod bench_gate;` | `bench.yml`, `bench-regression.yml`, Justfile | Aktives CI-Gate für Benchmark-Regressionen. |

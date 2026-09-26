@@ -89,7 +89,7 @@ Rust
 
 **Restrisiken/offene Fragen:** Das Einbringen virtueller Knoten reduziert künstlich die Dichte des Netzwerks, was die intrinsische Resolution $\gamma$ des Leiden-Algorithmus verschiebt.
 
-## B.5.5 Vektorindex-Traversierung: HNSW-Dateiformat v2 (`crates/contextra-index`)
+## B.5.5 Vektorindex-Traversierung: HNSW-Dateiformat v2 (`crates/contextra-vector`)
 
 Der Suchpfad in HNSW leidet unter Speicher-Ineffizienzen.
 
@@ -301,7 +301,7 @@ pub const SENTINEL_NULL_ID: u32 = u32::MAX;
 
 **Spezifikation:** Statt separater Locks für `name_index` und `seq_index` fasst ein `RwLock` einen Struct zusammen, der beide Maps enthält. Atomarität ist gegeben.
 
-### B.6.2 Inference, KV-Bridge & Routing (`crates/contextra-candle`)
+### B.6.2 Inference, KV-Bridge & Routing (`crates/contextra-infer-candle`)
 
 #### B.6.2.1 — Asynchrone Zero-Copy-KV-Cache-Eviction-Bridge
 

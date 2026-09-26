@@ -17,10 +17,10 @@
 //! INVARIANTE INV-DELETION-1: DeletionProof::create() wird NUR nach
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
-#[cfg(test)]
-use contextra_crypto::error::CryptoError;
 #[cfg(not(test))]
 use crate::error::CryptoError;
+#[cfg(test)]
+use contextra_crypto::error::CryptoError;
 use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
 
@@ -545,8 +545,8 @@ impl DeletionProof {
 
     /// Helper to construct the signed payload for signature version 3 (Ed25519).
     fn construct_v3_payload(&self) -> std::result::Result<Vec<u8>, CryptoError> {
-        let scope_bytes = bincode::serialize(&self.scope)
-            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let scope_bytes =
+            bincode::serialize(&self.scope).map_err(|e| CryptoError::Crypto(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
         let covered_layers_bytes = bincode::serialize(&self.covered_layers)
             .map_err(|e| CryptoError::Crypto(e.to_string()))?;

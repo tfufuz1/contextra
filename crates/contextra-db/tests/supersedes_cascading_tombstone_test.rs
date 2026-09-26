@@ -1,8 +1,8 @@
 #![allow(deprecated)]
 
-use contextra_types::{DocId, EntityId, LinkRelation};
 use contextra_db::Contextra;
 use contextra_graph::PathRAGEngine;
+use contextra_types::{DocId, EntityId, LinkRelation};
 use tempfile::tempdir;
 
 #[tokio::test]

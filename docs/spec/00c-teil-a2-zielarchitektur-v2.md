@@ -43,15 +43,15 @@ historischen Ausgangspunkt einer Entscheidung erklärt.
 ### A2.2 Entfallende, neue und unveränderte Crates gegenüber der Vorfassung
 
 **Entfallen als eigenständige Crates** (gehen in die Ring-Struktur auf, Re-Export mit `#[deprecated]` während
-der Strangler-Phase, §20): `contextra-core`, `contextra-core-ipc-gen`, `contextra-checkpoint` *(bleibt de facto
-erhalten, siehe D3 — nur die v1-Fusionsidee entfällt)*, `contextra-calibration`, `contextra-router` *(bleibt
-erhalten, wird nur schlanker)*, `contextra-embed`, `contextra-candle`, `contextra-ollama`, `contextra-db`.
+der Strangler-Phase, §20): `contextra-core`, `contextra-core-ipc-gen`, `contextra-checkpoint` *(bleibt de facto <!-- crate-ref-ignore -->
+erhalten, siehe D3 — nur die v1-Fusionsidee entfällt)*, `contextra-rank`, `contextra-router` *(bleibt
+erhalten, wird nur schlanker)*, `contextra-infer-onnx`, `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-db`.
 
 **Neu:** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-wire` (vormals `core-ipc-gen`),
-`contextra-sys`, `contextra-simd` (vormals Teil von `contextra-index`), `contextra-vector` (vormals `contextra-index`),
-`contextra-rank` (vormals Teil von `contextra-db` + `contextra-calibration`), `contextra-adapt` (vormals Teil von
-`contextra-router` + `contextra-db`), `contextra-kvcache` (vormals Teil von `contextra-crypto` + `contextra-candle`),
-`contextra-infer-candle`/`-ollama`/`-onnx` (vormals `contextra-candle`/`-ollama`/`-embed`), `contextra-engine`,
+`contextra-sys`, `contextra-simd` (vormals Teil von `contextra-vector`), `contextra-vector` (vormals `contextra-vector`),
+`contextra-rank` (vormals Teil von `contextra-db` + `contextra-rank`), `contextra-adapt` (vormals Teil von
+`contextra-router` + `contextra-db`), `contextra-kvcache` (vormals Teil von `contextra-crypto` + `contextra-infer-candle`),
+`contextra-infer-candle`/`-ollama`/`-onnx` (vormals `contextra-infer-candle`/`-ollama`/`-embed`), `contextra-engine`,
 `contextra-cognition`, `contextra-privacy` (vormals Teile von `contextra-crypto` + `contextra-mcp`), `contextra`
 (neue, einzige Fassade/Composition Root).
 

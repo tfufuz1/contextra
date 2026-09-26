@@ -64,14 +64,14 @@ deny = [
         "tokio-util",
         "tower",
     ] },
-    # §4.2 Ring-Modell: Candle-Inferenz nur in contextra-candle (TRANSITION; künftig contextra-infer-candle) sowie Candle-Eigencrates
-    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-candle", "contextra-infer-candle"] },
-    # §4.2 Ring-Modell: ONNX/ort nur in contextra-embed (TRANSITION; künftig contextra-infer-onnx)
-    { crate = "ort", wrappers = ["contextra-embed", "contextra-infer-onnx"] },
+    # §4.2 Ring-Modell: Candle-Inferenz nur in contextra-infer-candle (TRANSITION; künftig contextra-infer-candle) sowie Candle-Eigencrates
+    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-infer-candle", "contextra-infer-candle"] },
+    # §4.2 Ring-Modell: ONNX/ort nur in contextra-infer-onnx (TRANSITION; künftig contextra-infer-onnx)
+    { crate = "ort", wrappers = ["contextra-infer-onnx", "contextra-infer-onnx"] },
     # §4.2 Ring-Modell: PyO3 nur in contextra-py (isoliertes Workspace-Crate) und Interop-Crates
     { crate = "pyo3", wrappers = ["contextra-py", "numpy", "pythonize"] },
-    # §4.2 Ring-Modell: reqwest nur in contextra-ollama (TRANSITION; künftig contextra-infer-ollama)
-    { crate = "reqwest", wrappers = ["contextra-ollama", "contextra-infer-ollama"] },
+    # §4.2 Ring-Modell: reqwest nur in contextra-infer-ollama (TRANSITION; künftig contextra-infer-ollama)
+    { crate = "reqwest", wrappers = ["contextra-infer-ollama", "contextra-infer-ollama"] },
     # §4.2 Ring-Modell: Wasmtime-Sandbox nur in contextra-sandbox
     { crate = "wasmtime", wrappers = ["contextra-sandbox", "contextra-privacy"] },
 ]

@@ -1,6 +1,6 @@
-# contextra-ollama
+# contextra-infer-ollama
 
-`contextra-ollama` stellt den Inferenz-Client für Ollama und Contextual Prefixing bereit (Ring 2).
+`contextra-infer-ollama` stellt den Inferenz-Client für Ollama und Contextual Prefixing bereit (Ring 2).
 
 ## Zweck
 

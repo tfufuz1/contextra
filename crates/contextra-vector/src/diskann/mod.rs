@@ -7,10 +7,10 @@
 pub(crate) mod build;
 pub(crate) mod config;
 pub(crate) mod filtered;
-#[cfg(feature = "experimental-predicate-augmented-search")]
-pub mod predicate_augmented;
 pub(crate) mod format;
 pub(crate) mod persistence;
+#[cfg(feature = "experimental-predicate-augmented-search")]
+pub mod predicate_augmented;
 pub(crate) mod search;
 pub(crate) mod types;
 pub(crate) mod vector_index_impl;

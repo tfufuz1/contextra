@@ -1,5 +1,5 @@
-use contextra_types::{DistanceMetric, Result};
 use contextra_db::{Contextra, ContextraConfig};
+use contextra_types::{DistanceMetric, Result};
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::sync::Barrier;

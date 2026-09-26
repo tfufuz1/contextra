@@ -1,6 +1,6 @@
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_types::TxId;
 use contextra_db::{Contextra, ContextraConfig};
+use contextra_types::TxId;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;

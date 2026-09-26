@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use contextra_types::{TenantId, TenantScoped, TenantScopeViolation};
+use contextra_types::{TenantId, TenantScopeViolation, TenantScoped};
 
 #[test]
 fn test_tenant_scoped_new_and_tenant_id_getter() {

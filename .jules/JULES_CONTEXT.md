@@ -1,5 +1,5 @@
 # Contextra — Jules Agent Context
-> Version: 2.1 | Stand: 2026-09-20 | Permanent Ambient Context für Jules Sessions
+> Version: 2.1 | Stand: 2026-09-26 | Permanent Ambient Context für Jules Sessions
 >
 > ⚠️ **FRISCHEGARANTIE**: Diese Datei regelt ausschließlich die Session-Prozessführung für Jules.
 > Die tatsächlichen Code-Fakten, Crate-Strukturen, Invarianten und Implementierungsstände
@@ -34,19 +34,20 @@ Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENT
 
 | Crate | Pfad für view_file / read |
 |---|---|
-| `contextra-core-ipc-gen` | `crates/contextra-core-ipc-gen/AGENTS.md` |
+| `contextra-core-ipc-gen` | `crates/contextra-core-ipc-gen/AGENTS.md` | <!-- crate-ref-ignore -->
 | `contextra-core` | `crates/contextra-core/AGENTS.md` |
-| `contextra-calibration` | `crates/contextra-calibration/AGENTS.md` |
 | `contextra-checkpoint` | `crates/contextra-checkpoint/AGENTS.md` |
 | `contextra-crypto` | `crates/contextra-crypto/AGENTS.md` |
 | `contextra-graph` | `crates/contextra-graph/AGENTS.md` |
 | `contextra-sandbox` | `crates/contextra-sandbox/AGENTS.md` |
 | `contextra-text` | `crates/contextra-text/AGENTS.md` |
 | `contextra-store` | `crates/contextra-store/AGENTS.md` |
-| `contextra-index` | `crates/contextra-index/AGENTS.md` |
-| `contextra-ollama` | `crates/contextra-ollama/AGENTS.md` |
-| `contextra-candle` | `crates/contextra-candle/AGENTS.md` |
-| `contextra-embed` | `crates/contextra-embed/AGENTS.md` |
+| `contextra-vector` | `crates/contextra-vector/AGENTS.md` |
+| `contextra-infer-ollama` | `crates/contextra-infer-ollama/AGENTS.md` |
+| `contextra-infer-candle` | `crates/contextra-infer-candle/AGENTS.md` |
+| `contextra-infer-onnx` | `crates/contextra-infer-onnx/AGENTS.md` |
+| `contextra-rank` | `crates/contextra-rank/AGENTS.md` |
+| `contextra-privacy` | `crates/contextra-privacy/AGENTS.md` |
 | `contextra-db` | `crates/contextra-db/AGENTS.md` |
 | `contextra-engine` | `crates/contextra-engine/AGENTS.md` |
 | `contextra-cognition` | `crates/contextra-cognition/AGENTS.md` |
@@ -55,7 +56,7 @@ Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENT
 | `contextra-agent` | `crates/contextra-agent/AGENTS.md` |
 | `contextra-mcp` | `crates/contextra-mcp/AGENTS.md` |
 | `contextra-py` | `crates/contextra-py/AGENTS.md` |
-| `contextra-tauri` | `crates/contextra-tauri/AGENTS.md` (deprecated, ADR-077) |
+| `contextra-tauri` | `crates/contextra-tauri/AGENTS.md` (deprecated, ADR-077) | <!-- crate-ref-ignore -->
 
 ---
 

@@ -27,7 +27,7 @@ dependencies = []
 
 [project.scripts]
 contextra-mcp = "contextra_mcp.server:main"
-contextra-mcp-server = "contextra_mcp.server:main"
+contextra-mcp = "contextra_mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["python/contextra_mcp"]

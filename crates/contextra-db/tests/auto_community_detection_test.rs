@@ -1,5 +1,5 @@
-use contextra_types::EntityId;
 use contextra_db::{CommunityDetectionConfig, Contextra, ContextraConfig};
+use contextra_types::EntityId;
 use tempfile::TempDir;
 
 #[tokio::test]

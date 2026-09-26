@@ -10,7 +10,7 @@ This document consolidates safety rules for SIMD/unsafe operations and WAL/crypt
 
 ### SAFETY-Kommentar-Pflicht
 
-Jeder `unsafe`-Block in `contextra-index/src/distance.rs` braucht:
+Jeder `unsafe`-Block in `contextra-vector/src/distance.rs` braucht:
 
 ```rust
 // SAFETY: `a` und `b` haben identische Länge (geprüft durch Caller `compute_distance`

@@ -19,7 +19,7 @@ Model Context Protocol (MCP) Server für **Contextra Brain** — Ermöglicht es 
 Der MCP-Server wird aus dem Repository über Cargo ausgeführt:
 
 ```bash
-cargo run -p contextra-mcp --bin contextra-mcp-server -- --db-path ~/.contextra --allow-write
+cargo run -p contextra-mcp --bin contextra-mcp -- --db-path ~/.contextra --allow-write
 ```
 
 ### Voraussetzungen & Provider
@@ -32,7 +32,7 @@ Wenn Sie den Server aus dem Quellcode im Repository bauen möchten, aktivieren S
 
 ```bash
 export CONTEXTRA_MCP_ALLOW_REPO_BUILD=1
-cargo build -p contextra-mcp --release --bin contextra-mcp-server
+cargo build -p contextra-mcp --release --bin contextra-mcp
 ```
 
 ---
@@ -57,7 +57,7 @@ Der Server kommuniziert ausschließlich über Standard I/O (stdio) via JSON-RPC 
 
 | Variable | Werte | Beschreibung |
 |---|---|---|
-| `CONTEXTRA_MCP_BINARY` | Absolute Path | Expliziter Pfad zum `contextra-mcp-server` Binary (überschreibt PATH und Downloads) |
+| `CONTEXTRA_MCP_BINARY` | Absolute Path | Expliziter Pfad zum `contextra-mcp` Binary (überschreibt PATH und Downloads) |
 | `CONTEXTRA_MCP_ALLOW_REPO_BUILD` | `1` | Erlaubt automatischen `cargo build` Fallback im Repo-Baum (Entwicklermodus) |
 | `CONTEXTRA_MCP_ALLOW_WRITE` | `1`, `true`, `yes` | Schreibende Operationen aktivieren (falls kein CLI-Flag angegeben) |
 | `CONTEXTRA_OLLAMA_URL` | z. B. `http://localhost:11434` | Alternativer Ollama Endpoint |
@@ -73,7 +73,7 @@ Fügen Sie den Server in Ihre Client-Konfigurationsdatei ein:
 - **Claude Desktop / Claude Code (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Claude Desktop / Claude Code (Windows)**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Claude Desktop / Claude Code (Linux)**: `~/.config/Claude/claude_desktop_config.json`
-- **Cursor**: Settings -> MCP -> Add new MCP server (command: `cargo`, args: `run`, `-p`, `contextra-mcp`, `--bin`, `contextra-mcp-server`, `--`, `--db-path`, `...`)
+- **Cursor**: Settings -> MCP -> Add new MCP server (command: `cargo`, args: `run`, `-p`, `contextra-mcp`, `--bin`, `contextra-mcp`, `--`, `--db-path`, `...`)
 
 ### Beispiel: `mcpServers` JSON-Konfiguration
 
@@ -89,7 +89,7 @@ Mit Cargo (lokaler Aufruf):
         "-p",
         "contextra-mcp",
         "--bin",
-        "contextra-mcp-server",
+        "contextra-mcp",
         "--",
         "--db-path",
         "/ABSOLUTER/PFAD/ZU/ihrem_datenbank_ordner",
@@ -109,7 +109,7 @@ Alternativ mit direktem Binary-Aufruf:
 {
   "mcpServers": {
     "contextra": {
-      "command": "/ABSOLUTER/PFAD/ZU/contextra-mcp-server",
+      "command": "/ABSOLUTER/PFAD/ZU/contextra-mcp",
       "args": [
         "--db-path",
         "/ABSOLUTER/PFAD/ZU/ihrem_datenbank_ordner",
@@ -134,7 +134,7 @@ Hier ist eine minimale Demonstration des MCP-Protokolls über stdio.
 ### 1. Server im schreibfähigen Modus starten
 
 ```bash
-cargo run -p contextra-mcp --bin contextra-mcp-server -- --db-path ./demo_db --allow-write
+cargo run -p contextra-mcp --bin contextra-mcp -- --db-path ./demo_db --allow-write
 ```
 
 *(Der Server wartet nun auf JSON-RPC 2.0 Anfragen über stdin.)*

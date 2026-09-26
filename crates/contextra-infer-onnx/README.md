@@ -1,6 +1,6 @@
-# contextra-embed
+# contextra-infer-onnx
 
-`contextra-embed` stellt die In-Process ONNX Embedding Engine und Cross-Encoder-Reranker bereit (Ring 2).
+`contextra-infer-onnx` stellt die In-Process ONNX Embedding Engine und Cross-Encoder-Reranker bereit (Ring 2).
 
 ## Zweck
 

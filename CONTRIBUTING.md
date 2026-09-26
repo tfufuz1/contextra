@@ -9,13 +9,13 @@ Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bünd
 - **Just Task Runner:** `just` für Entwicklungsbefehle.
 
 ### Grundprinzipien & Invarianten
-- **Souveränität & Air-Gap:** Keine Laufzeit-Annahmen über Cloud-Dienste; lokale Inferenz via Ollama (`contextra-ollama`).
+- **Souveränität & Air-Gap:** Keine Laufzeit-Annahmen über Cloud-Dienste; lokale Inferenz via Ollama (`contextra-infer-ollama`).
 - **Zero-Panic-Gesetz:** Produktionscode darf niemals `panic!`, `.unwrap()` oder `.expect()` enthalten (`Result<T, E>` nutzen).
 - **Safe Rust & Schichtenreinheit:** `#![forbid(unsafe_code)]` in Produktions-Crates. Abhängigkeiten fließen strikt unidirektional von Layer 4/3 nach Layer 0 (`contextra-core`). Minimal-Diff-Prinzip einhalten.
 
 ### Local Build & Verification Commands
 ```bash
-cargo check --workspace --exclude contextra-tauri  # Kompilierbarkeit
+cargo check --workspace --exclude contextra-tauri  # Kompilierbarkeit <!-- crate-ref-ignore -->
 just check                                         # Clippy-Warnungen als Fehler
 cargo check --examples                             # Examples prüfen
 just dag-check                                     # Schichtenarchitektur (DAG) verifizieren
@@ -41,7 +41,7 @@ cargo xtask jules-preflight                        # Preflight Verification Gate
 
 ### Tests ausführen
 ```bash
-cargo test --workspace --exclude contextra-tauri   # Alle Workspace-Tests
+cargo test --workspace --exclude contextra-tauri   # Alle Workspace-Tests <!-- crate-ref-ignore -->
 ```
 Für vertiefende Testregeln und Beispiele siehe [rules/testing.md](rules/testing.md) und [rules/test_quality.md](rules/test_quality.md).
 

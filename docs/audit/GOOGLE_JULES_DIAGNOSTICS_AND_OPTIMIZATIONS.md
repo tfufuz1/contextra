@@ -49,7 +49,7 @@ Der Durchlauf von `cargo run --manifest-path xtask/Cargo.toml -- jules-preflight
 
 ### 3.1 Gefundene Engpässe in xtask
 1. **`check-crate-references` Bottleneck (~118.7 Sekunden Laufzeit):**
-   * *Ursache:* Durchsucht rekursiv alle Markdown-, Cargo.toml- und Source-Dateien im Repository nach historischen/umbenannten Crate-Namen (`contextra-security`, `contextra-index`, `contextra-embed`, `contextra-ollama`, `contextra-calibration`).
+   * *Ursache:* Durchsucht rekursiv alle Markdown-, Cargo.toml- und Source-Dateien im Repository nach historischen/umbenannten Crate-Namen (`contextra-privacy`, `contextra-vector`, `contextra-infer-onnx`, `contextra-infer-ollama`, `contextra-rank`).
    * *Optimierungsvorschlag:* Cachen der bekannten Legacy-Realisierungen / Ignore-Pfade in `xtask` oder Einführung einer beschleunigten Index-Tabelle, um die Validierungszeit von 118s auf < 2s zu reduzieren.
 2. **`check-module-reachability` (~3.8 Sekunden Laufzeit):**
    * *Status:* Hat 12 tote/unerreichbare Moduldateien identifiziert (z.B. `crates/contextra-agent/src/engine/condition.rs`).

@@ -1,4 +1,4 @@
-# AGENTS.md — contextra-crypto (Cargo-Package-Name: `contextra-security`)
+# AGENTS.md — contextra-crypto (Cargo-Package-Name: `contextra-privacy`)
 > Layer 1 | Encryption-at-Rest, HMAC-Chaining, Zeroize | ~2300 LOC
 
 ## 1. Zweck & Architekturrolle
@@ -6,7 +6,7 @@
 Verantwortlich für Encryption-at-Rest (AES-256-GCM-SIV) und Datenintegrität 
 (HMAC-Chaining im WAL). Kapselt die Key-Derivation (HKDF), Zeroize-Speicherhygiene 
 und den Anti-Tamper-Schutz der WAL-Einträge.
-*(Hinweis zur Namensgebung: Verzeichnisname `crates/contextra-crypto`, Cargo-Package-Name `contextra-security`).*
+*(Hinweis zur Namensgebung: Verzeichnisname `crates/contextra-crypto`, Cargo-Package-Name `contextra-privacy`).*
 
 ## 2. Modul-Karte
 

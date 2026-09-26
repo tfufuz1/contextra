@@ -22,7 +22,7 @@ Dieses Dokument definiert das Bedrohungsmodell und die Sicherheitsarchitektur f�
 ---
 
 ## 3. Sandboxing, Network Boundaries & Ollama HTTP Safety
-*   **Air-Gapped & Local-First**: Keine Daten verlassen das lokale Gerät. Die Kommunikation mit Ollama (`contextra-ollama`) erfolgt ausschließlich über das lokale Loopback-Netzwerk (`http://127.0.0.1:11434`).
+*   **Air-Gapped & Local-First**: Keine Daten verlassen das lokale Gerät. Die Kommunikation mit Ollama (`contextra-infer-ollama`) erfolgt ausschließlich über das lokale Loopback-Netzwerk (`http://127.0.0.1:11434`).
 *   **MCP Server Boundaries**: Der MCP Server (`contextra-mcp`) bindet lokal und stellt ausschließlich vorgegebene Tools (`contextra_search`, `contextra_insert`, `contextra_get`, `contextra_collections`) bereit.
 *   **Disk Encryption**: Crypt-at-Rest via AES-256-GCM in `contextra-crypto` schützt persistierte SSTables. HMAC-Chaining schützt WAL-Einträge vor Tampering. Ohne Encryption-at-Rest schützt das WAL-HMAC-Chaining nur vor zufälliger Korruption, nicht vor einem Angreifer mit Schreibzugriff auf den Integritätsschlüssel selbst — dieser liegt im Klartext neben der Datenbank.
 

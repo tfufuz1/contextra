@@ -56,10 +56,10 @@ war** (§A2.1, P5-Δ) — der wichtigste Grund für die Ablösung durch das Ring
 
 | Layer | Crates | Verantwortung |
 |---|---|---|
-| **0** | `contextra-core-ipc-gen`, `contextra-core` | FlatBuffers-generierter IPC-Code; Kerntypen (`DocId`, `EntityId`, `TxId`, `ConfigFingerprint`), Traits, Fehlerbehandlung. |
-| **1** | `contextra-store`, `contextra-index`, `contextra-text`, `contextra-crypto`, `contextra-graph`, `contextra-checkpoint`, `contextra-calibration` | Persistenz- und Indexierungs-Primitive. Sollten einander laut Spec nicht kennen — real hingen `store` und `index` beide von `crypto` ab, `candle` von `store` (§A2.1, „§4 Tabelle" widerlegt). |
+| **0** | `contextra-core-ipc-gen`, `contextra-core` | FlatBuffers-generierter IPC-Code; Kerntypen (`DocId`, `EntityId`, `TxId`, `ConfigFingerprint`), Traits, Fehlerbehandlung. | <!-- crate-ref-ignore -->
+| **1** | `contextra-store`, `contextra-vector`, `contextra-text`, `contextra-crypto`, `contextra-graph`, `contextra-checkpoint`, `contextra-rank` | Persistenz- und Indexierungs-Primitive. Sollten einander laut Spec nicht kennen — real hingen `store` und `index` beide von `crypto` ab, `candle` von `store` (§A2.1, „§4 Tabelle" widerlegt). |
 | **2** | `contextra-db` | Öffentliche `Collection`-API, 4-Signal-Fusion, Multi-Step-Query-Engine, Kontext-Kompaktierung, Provenance-Tracking. Real: 26,7k LOC, > 40 öffentliche Methoden, bündelte mehrere Bounded Contexts (Datenebene, Retrieval, Kognition, Ingestion, `volatile_vault`) und hing **aufwärts** von `candle`/`ollama`/`embed` ab. |
-| **3** | `contextra-ollama`, `contextra-candle`, `contextra-embed`, `contextra-agent`, `contextra-router`, `contextra-py` | Inferenz-Backends und Anwendungslogik. `contextra-router` war laut Spec reine Bandit-Mathematik; real enthielt er zusätzlich SLM-Profil-Routing, MCP-Dispatch und Type-State-Egress-Schutz. |
+| **3** | `contextra-infer-ollama`, `contextra-infer-candle`, `contextra-infer-onnx`, `contextra-agent`, `contextra-router`, `contextra-py` | Inferenz-Backends und Anwendungslogik. `contextra-router` war laut Spec reine Bandit-Mathematik; real enthielt er zusätzlich SLM-Profil-Routing, MCP-Dispatch und Type-State-Egress-Schutz. |
 | **4** | `contextra-mcp`, `contextra-sandbox` | Externe Schnittstelle für Agenten. `contextra-sandbox` war real ein Waisen-Crate ohne Konsumenten. |
 | **5** | `contextra-bench` | Benchmark-Harness. Erzwang real ein hartes `onnx`-Feature und zog dadurch Netzwerk-Downloads in jeden `--workspace`-Build. |
 
@@ -86,21 +86,21 @@ Ziel für sich — sie ist eine Konsequenz der Kriterien, mit einer offenen Kons
 | **0** (sync, kein `tokio`) | `contextra-types` | IDs (`DocId`, `DocIdx`, `TxId`, `TenantId`), `ModelFingerprint`, Filter-AST, Budgets, Importance, `ErrorClass`, Schema-Versionen, Tombstone-Semantik | `contextra-core` (Teilmenge `types`) | D |
 | | `contextra-ports` | Traits (P27): `VectorIndex`/`TextIndex`/`GraphIndex`/`StorageRead` (sync), `StorageWrite`/`Embedder`/`TextGenerator`/`KvPrefixStore`/`ToolSandbox` (async, `BoxFuture`), `Clock`/`Rng`/`IdGen`/`MetricsSink`/`DriftStatusProvider` | `contextra-core` (Teilmenge `traits`), `contextra-db::DriftStatusProvider` | D |
 | | `contextra-mvcc` **(neu)** | `SeqLog`, `SnapshotRegistry`, `TxBuffer`; loom-getestet | `contextra-core` (`seq_log`, `snapshot`, `tx_buffer` — in der Vorfassung des Migrationsplans nicht zugeordnet, §A2.1 D4) | C, D |
-| | `contextra-wire` | FlatBuffers-Generat und Adapter, Unsafe-Insel | `contextra-core-ipc-gen` | U |
-| | `contextra-sys` **(neu)** | `ReadOnlyMap` (mmap), `LockedBuf` (mlock/VirtualLock), Owner-only-ACL (Win32), Unsafe-Insel | verteilt über `contextra-store`, `contextra-index`, `contextra-db` (§0.4) | U |
-| | `contextra-simd` | Distanzkernel, Laufzeit-Dispatch, Unsafe-Insel | `contextra-index` (`distance.rs`) | U |
+| | `contextra-wire` | FlatBuffers-Generat und Adapter, Unsafe-Insel | `contextra-core-ipc-gen` | U | <!-- crate-ref-ignore -->
+| | `contextra-sys` **(neu)** | `ReadOnlyMap` (mmap), `LockedBuf` (mlock/VirtualLock), Owner-only-ACL (Win32), Unsafe-Insel | verteilt über `contextra-store`, `contextra-vector`, `contextra-db` (§0.4) | U |
+| | `contextra-simd` | Distanzkernel, Laufzeit-Dispatch, Unsafe-Insel | `contextra-vector` (`distance.rs`) | U |
 | | `contextra-crypto` | Schlüsselhierarchie, AEAD, WAL-HMAC-Kette, Deletion-Proof, Zeroize, Anti-Tamper | `contextra-crypto` (verschlankt: Egress-Vault und KV-Segment wandern nach `privacy`/`kvcache`) | C |
-| | `contextra-vector` | HNSW, DiskANN, Quantisierung | `contextra-index` | S, C |
+| | `contextra-vector` | HNSW, DiskANN, Quantisierung | `contextra-vector` | S, C |
 | | `contextra-text` | BM25/BM25F, Morphologie | `contextra-text` | C |
 | | `contextra-graph` | CSR, PPR, Leiden, Hyperkanten | `contextra-graph` | S, C |
-| | `contextra-rank` | 4-Signal-Fusion, Isotonic/Platt-Kalibrierung, Drift | `contextra-db::fusion`, `contextra-calibration` | C |
-| | `contextra-adapt` | Bandit, Lyapunov, PID, Homeostat, Decay; `Clock`/`Rng` injiziert (P28) | `contextra-router` (Bandit/Lyapunov-Teil), `contextra-calibration::pid`, `contextra-db` (Decay/Homeostat/PID) | C |
+| | `contextra-rank` | 4-Signal-Fusion, Isotonic/Platt-Kalibrierung, Drift | `contextra-db::fusion`, `contextra-rank` | C |
+| | `contextra-adapt` | Bandit, Lyapunov, PID, Homeostat, Decay; `Clock`/`Rng` injiziert (P28) | `contextra-router` (Bandit/Lyapunov-Teil), `contextra-rank::pid`, `contextra-db` (Decay/Homeostat/PID) | C |
 | **1** (Persistenz, async an I/O-Grenzen erlaubt) | `contextra-store` | WAL (Group-Commit, HMAC-Kette), LSM, MVCC-Pin | `contextra-store` | S, C |
-| | `contextra-kvcache` **(neu)** | Prefix-Radix-Baum, KV-Blöcke, Tiering, AEAD, Segmentdateien (§9) | `contextra-crypto::kv_segment`, `contextra-candle::kv_bridge` | C |
+| | `contextra-kvcache` **(neu)** | Prefix-Radix-Baum, KV-Blöcke, Tiering, AEAD, Segmentdateien (§9) | `contextra-crypto::kv_segment`, `contextra-infer-candle::kv_bridge` | C |
 | | `contextra-checkpoint` | Time-Travel-Registry gegen Port `StorageEngine`, ohne globalen Zustand | `contextra-checkpoint` (Global-State `ORPHAN_REGISTRY` entfernt, P29) | C, D |
-| **2** (Blätter, flüchtige Abhängigkeiten) | `contextra-infer-candle` | GGUF, eigenes Llama-Modell mit `KvState` (§9, Stufe B) | `contextra-candle` | I |
-| | `contextra-infer-ollama` | HTTP-Backend, Contextual-Chunk-Prefixing | `contextra-ollama` | I |
-| | `contextra-infer-onnx` | `ort`, Cross-Encoder; aus `default-members` ausgeschlossen | `contextra-embed` | I |
+| **2** (Blätter, flüchtige Abhängigkeiten) | `contextra-infer-candle` | GGUF, eigenes Llama-Modell mit `KvState` (§9, Stufe B) | `contextra-infer-candle` | I |
+| | `contextra-infer-ollama` | HTTP-Backend, Contextual-Chunk-Prefixing | `contextra-infer-ollama` | I |
+| | `contextra-infer-onnx` | `ort`, Cross-Encoder; aus `default-members` ausgeschlossen | `contextra-infer-onnx` | I |
 | | `contextra-sandbox` | WASM-Isolation, Fuel- und Wall-Clock-Budget; implementiert `ToolSandbox` | `contextra-sandbox` (bislang Waisen-Crate, jetzt an `contextra-agent`/`contextra-mcp` angebunden) | I |
 | **3** (Anwendungskern) | `contextra-engine` | Collection, Transaktionen, `RetrievalPlanner`, Ingestion, Export/Import, `ComputePool` | `contextra-db` (Datenebene) | S, C |
 | | `contextra-cognition` | Consolidation, Synthese, Kompaktierung, Scheduler | `contextra-db` (Kontrollebene) | C |
@@ -112,8 +112,8 @@ Ziel für sich — sie ist eine Konsequenz der Kriterien, mit einer offenen Kons
 | | `contextra-py` | PyO3, eigene Runtime, `catch_unwind` | `contextra-py` | I |
 | **Tooling** | `contextra-testkit` **(neu)**, `contextra-bench`, `xtask` | Fault-VFS, `ManualClock`, In-Memory-`StorageEngine` (P28); Benchmarks; CI-Tooling (Ziel < 3.000 LOC) | `contextra-bench`, `xtask` | — |
 
-**Entfallen als eigenständige Crates:** `contextra-core`, `contextra-core-ipc-gen`, `contextra-calibration`,
-`contextra-embed`, `contextra-candle`, `contextra-ollama`, `contextra-db` (nach Abschluss der Strangler-Phase, §20).
+**Entfallen als eigenständige Crates:** `contextra-core`, `contextra-core-ipc-gen`, `contextra-rank`, <!-- crate-ref-ignore -->
+`contextra-infer-onnx`, `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-db` (nach Abschluss der Strangler-Phase, §20).
 **Löschkandidat, vor Löschung zu prüfen:** `contextra-core/types/saos.rs` (707 LOC, nur intern referenziert).
 
 ### 4.3 Abhängigkeitsmatrix (löst die alte Layer-Reihenfolge ab)

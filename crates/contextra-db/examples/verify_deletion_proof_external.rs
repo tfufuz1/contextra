@@ -38,10 +38,7 @@ use tempfile::TempDir;
 /// KeyManager-Instanzen. Sie nimmt ausschliesslich den `DeletionProof` und den
 /// öffentlichen Ed25519 `VerifyingKey` entgegen und ist somit strikt von der Betreiber-
 /// und Storage-Ebene isoliert.
-fn verify_external(
-    proof: &DeletionProof,
-    verifying_key: &VerifyingKey,
-) -> Result<(), CryptoError> {
+fn verify_external(proof: &DeletionProof, verifying_key: &VerifyingKey) -> Result<(), CryptoError> {
     let is_valid = proof
         .verify(verifying_key)
         .map_err(|e| CryptoError::Crypto(format!("InvalidProofSignature: {}", e)))?;
@@ -100,7 +97,9 @@ async fn run_operator_role(
 
     // 4. Physikalische Löschung der Collection ausführen
     let proof_key_hmac = b"hmac-key-for-internal-drop";
-    let _internal_proof = db.drop_collection(col_name, tenant_id, proof_key_hmac).await?;
+    let _internal_proof = db
+        .drop_collection(col_name, tenant_id, proof_key_hmac)
+        .await?;
 
     // Erzeuge Ed25519-Löschnachweis (Version 3) für den externen Prüfer
     let col_id = CollectionId::new(100);
@@ -134,8 +133,14 @@ async fn run_operator_role(
     fs::write(proof_file_path, &proof_json).expect("Failed to write proof file");
     fs::write(pubkey_file_path, &verifying_key_bytes).expect("Failed to write pubkey file");
 
-    println!("  [Betreiber] Proof in '{}' veröffentlicht.", proof_file_path.display());
-    println!("  [Betreiber] Öffentlicher Schlüssel in '{}' veröffentlicht.", pubkey_file_path.display());
+    println!(
+        "  [Betreiber] Proof in '{}' veröffentlicht.",
+        proof_file_path.display()
+    );
+    println!(
+        "  [Betreiber] Öffentlicher Schlüssel in '{}' veröffentlicht.",
+        pubkey_file_path.display()
+    );
 
     db.close().await?;
     Ok(())
@@ -152,31 +157,43 @@ fn run_external_verifier_role(
     label: &str,
 ) -> Result<(), CryptoError> {
     println!("=========================================================================");
-    println!("  ROLLE: Externer Prüfer (Third-Party Verifier) — {}", label);
+    println!(
+        "  ROLLE: Externer Prüfer (Third-Party Verifier) — {}",
+        label
+    );
     println!("=========================================================================");
 
     // 1. AUSSCHLIESSLICH die veröffentlichte Proof-Datei und den öffentlichen Schlüssel von Disk lesen
-    let proof_json = fs::read_to_string(proof_file_path)
-        .map_err(|e| CryptoError::InvalidInput(format!("Proof-Datei konnte nicht gelesen werden: {e}")))?;
-    let pubkey_bytes = fs::read(pubkey_file_path)
-        .map_err(|e| CryptoError::InvalidInput(format!("Schlüssel-Datei konnte nicht gelesen werden: {e}")))?;
+    let proof_json = fs::read_to_string(proof_file_path).map_err(|e| {
+        CryptoError::InvalidInput(format!("Proof-Datei konnte nicht gelesen werden: {e}"))
+    })?;
+    let pubkey_bytes = fs::read(pubkey_file_path).map_err(|e| {
+        CryptoError::InvalidInput(format!("Schlüssel-Datei konnte nicht gelesen werden: {e}"))
+    })?;
 
-    let proof: DeletionProof = serde_json::from_str(&proof_json)
-        .map_err(|e| CryptoError::InvalidInput(format!("Proof JSON Deserialisierung fehlgeschlagen: {e}")))?;
+    let proof: DeletionProof = serde_json::from_str(&proof_json).map_err(|e| {
+        CryptoError::InvalidInput(format!("Proof JSON Deserialisierung fehlgeschlagen: {e}"))
+    })?;
 
-    let pk_array: [u8; 32] = pubkey_bytes.as_slice().try_into()
-        .map_err(|_| CryptoError::InvalidLength("Öffentlicher Schlüssel hat keine 32 Bytes".to_string()))?;
+    let pk_array: [u8; 32] = pubkey_bytes.as_slice().try_into().map_err(|_| {
+        CryptoError::InvalidLength("Öffentlicher Schlüssel hat keine 32 Bytes".to_string())
+    })?;
 
     let verifying_key = VerifyingKey::from_bytes(&pk_array)
         .map_err(|e| CryptoError::InvalidInput(format!("Ungültiger Ed25519 Schlüssel: {e}")))?;
 
-    println!("  [Externer Prüfer] Proof & Öffentlichen Ed25519-Schlüssel ({}) von Disk eingelesen.", pubkey_file_path.display());
+    println!(
+        "  [Externer Prüfer] Proof & Öffentlichen Ed25519-Schlüssel ({}) von Disk eingelesen.",
+        pubkey_file_path.display()
+    );
     println!("  [Externer Prüfer] Starte eigenständige mathematische Verifikation...");
 
     // 2. Rufe verify_external auf (hat KEINEN Zugriff auf DB / KeyManager / KeyPair)
     verify_external(&proof, &verifying_key)?;
 
-    println!("  ✅ [Externer Prüfer] ERFOLG: DeletionProof ist GÜLTIG und mathematisch verifiziert!");
+    println!(
+        "  ✅ [Externer Prüfer] ERFOLG: DeletionProof ist GÜLTIG und mathematisch verifiziert!"
+    );
     println!("     • Tenant ID:         {:?}", proof.tenant_id());
     println!("     • Deletion Scope:    {:?}", proof.scope);
     println!("     • Abgedeckte Layer:  {:?}", proof.covered_layers);
@@ -224,9 +241,12 @@ async fn main() -> contextra_types::Result<()> {
     let tampered_proof_file = temp_dir.path().join("deletion_proof_tampered.json");
     fs::write(&tampered_proof_file, &tampered_json).expect("write tampered");
 
-    let tampered_result = run_external_verifier_role(&tampered_proof_file, &pubkey_file, "Manipulierter Proof");
+    let tampered_result =
+        run_external_verifier_role(&tampered_proof_file, &pubkey_file, "Manipulierter Proof");
     match tampered_result {
-        Ok(_) => panic!("FEHLER: Manipulierter Proof wurde fälschlicherweise als gültig akzeptiert!"),
+        Ok(_) => {
+            panic!("FEHLER: Manipulierter Proof wurde fälschlicherweise als gültig akzeptiert!")
+        }
         Err(crypto_err) => {
             println!("\n  ❌ [Externer Prüfer] FEHLER ABGEFANGEN (Erwartetes Verhalten):");
             println!("     Fehlerdetails: {crypto_err}");

@@ -77,10 +77,16 @@ fn test_bm25_avg_doc_len_zero() {
 fn test_bm25_doc_len_zero() {
     // Standard empty document in a search engine: tf = 0 and doc_len = 0
     let score = score_term_with_params(0, 0, 100.0, 5, 50, 1.5, 0.75);
-    assert_eq!(score, 0.0, "Score for an empty document (tf=0, doc_len=0) must be 0.0");
+    assert_eq!(
+        score, 0.0,
+        "Score for an empty document (tf=0, doc_len=0) must be 0.0"
+    );
 
     let score_std = score_term(0, 0, 100.0, 5, 50);
-    assert_eq!(score_std, 0.0, "score_term for an empty document must be 0.0");
+    assert_eq!(
+        score_std, 0.0,
+        "score_term for an empty document must be 0.0"
+    );
 }
 
 /// Test 7: k1 = 0.0 (keine TF-Sättigung) → Score soll gleich dem reinen IDF-Wert entsprechen (unabhängig von tf > 0 und doc_len).

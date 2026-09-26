@@ -14,7 +14,7 @@
 
 ### Kalibrierungs-Dimension (P8, wenn Konfiguration geändert)
 - [ ] Änderung an SlmProfile/Prompt-Template/Modell-Config → Kalibrierungs-Reset-Test vorhanden
-- [ ] Keine neue Ad-hoc-Sigmoid-Logik — stattdessen `contextra-calibration` verwendet
+- [ ] Keine neue Ad-hoc-Sigmoid-Logik — stattdessen `contextra-rank` verwendet
 
 ### Provenienz-Dimension (wenn Graph-Code geändert)
 - [ ] Neue CSR-Kante hat `EdgeProvenance`-Eintrag (INV-GRAPH-PROV-1)
