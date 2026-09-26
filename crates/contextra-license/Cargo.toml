@@ -2,14 +2,13 @@
 workspace = true
 
 [package]
-name = "contextra-avv-generator"
+name = "contextra-license"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "AVV (Auftragsverarbeitungsvertrag) template generator referencing technical guarantees for Contextra"
+description = "License and activation enforcement gate layer for Contextra feature rings"
 
 [dependencies]
 thiserror = { workspace = true }
-serde = { workspace = true }
 contextra-types = { workspace = true }

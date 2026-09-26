@@ -4,8 +4,8 @@ use contextra_avv_generator::{
 use contextra_types::TenantId;
 
 #[test]
-fn test_render_avv_markdown_contains_required_sections() {
-    let tenant_id = TenantId::try_new(42).expect("valid tenant id");
+fn test_render_avv_markdown_contains_required_sections() -> Result<(), Box<dyn std::error::Error>> {
+    let tenant_id = TenantId::try_new(42)?;
     let ctx = AvvContext {
         controller_name: "Kanzlei Dr. Mustermann".to_string(),
         processor_name: "Contextra Cloud GmbH".to_string(),
@@ -15,13 +15,14 @@ fn test_render_avv_markdown_contains_required_sections() {
         deletion_sla_days: 14,
     };
 
-    let markdown = render_avv_markdown(&ctx).expect("rendering should succeed");
+    let markdown = render_avv_markdown(&ctx)?;
 
     // Verify required Art. 28 DSGVO headings
     assert!(markdown.contains("# Vereinbarung zur Auftragsverarbeitung (AVV) gemäß Art. 28 DSGVO"));
     assert!(markdown.contains("## 1. Gegenstand und Dauer der Verarbeitung"));
     assert!(markdown.contains("## 2. Art und Zweck der Verarbeitung"));
-    assert!(markdown.contains("## 3. Art der personenbezogenen Daten und Kategorien betroffener Personen"));
+    assert!(markdown
+        .contains("## 3. Art der personenbezogenen Daten und Kategorien betroffener Personen"));
     assert!(markdown.contains("## 4. Pflichten und Rechte des Verantwortlichen"));
     assert!(markdown.contains("## 5. Technische und organisatorische Maßnahmen (TOM)"));
     assert!(markdown.contains("## 6. Unterauftragsverarbeiter"));
@@ -39,11 +40,12 @@ fn test_render_avv_markdown_contains_required_sections() {
     assert!(markdown.contains("TenantId(42)"));
     assert!(markdown.contains("Hetzner Online GmbH (Hosting Germany)"));
     assert!(markdown.contains("14 Tagen"));
+    Ok(())
 }
 
 #[test]
-fn test_empty_subprocessors_handling() {
-    let tenant_id = TenantId::try_new(100).expect("valid tenant id");
+fn test_empty_subprocessors_handling() -> Result<(), Box<dyn std::error::Error>> {
+    let tenant_id = TenantId::try_new(100)?;
     let ctx = AvvContext {
         controller_name: "Praxis Musterfrau".to_string(),
         processor_name: "Contextra On-Premise".to_string(),
@@ -53,32 +55,31 @@ fn test_empty_subprocessors_handling() {
         deletion_sla_days: 7,
     };
 
-    let markdown = render_avv_markdown(&ctx).expect("rendering should succeed");
+    let markdown = render_avv_markdown(&ctx)?;
 
     assert!(markdown.contains("## 6. Unterauftragsverarbeiter"));
     assert!(markdown.contains("Keine Unterauftragsverarbeiter"));
     assert!(markdown.contains("Die Verarbeitung erfolgt ausschließlich auf eigenen Systemen des Auftragsverarbeiters ohne Einbindung Dritter."));
+    Ok(())
 }
 
 #[test]
-fn test_snapshot_rendering_output() {
-    let tenant_id = TenantId::try_new(999).expect("valid tenant id");
+fn test_snapshot_rendering_output() -> Result<(), Box<dyn std::error::Error>> {
+    let tenant_id = TenantId::try_new(999)?;
     let ctx = AvvContext {
         controller_name: "Test AG".to_string(),
         processor_name: "Contextra GmbH".to_string(),
         tenant_id,
-        technical_measures: vec![
-            TechnicalMeasure {
-                name: "Custom Security Measure".to_string(),
-                description: "Description of custom measure.".to_string(),
-                reference_article: "Art. 32 Abs. 1 DSGVO".to_string(),
-            },
-        ],
+        technical_measures: vec![TechnicalMeasure {
+            name: "Custom Security Measure".to_string(),
+            description: "Description of custom measure.".to_string(),
+            reference_article: "Art. 32 Abs. 1 DSGVO".to_string(),
+        }],
         subprocessors: vec!["Cloud Provider X".to_string()],
         deletion_sla_days: 30,
     };
 
-    let markdown = render_avv_markdown(&ctx).expect("rendering should succeed");
+    let markdown = render_avv_markdown(&ctx)?;
 
     let expected_substrings = [
         "# Vereinbarung zur Auftragsverarbeitung (AVV) gemäß Art. 28 DSGVO",
@@ -98,4 +99,5 @@ fn test_snapshot_rendering_output() {
             expected
         );
     }
+    Ok(())
 }

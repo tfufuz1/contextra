@@ -631,6 +631,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-avv-generator"
+version = "0.1.0"
+dependencies = [
+ "contextra-types",
+ "serde",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
@@ -922,6 +931,14 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "contextra-license"
+version = "0.1.0"
+dependencies = [
+ "contextra-types",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

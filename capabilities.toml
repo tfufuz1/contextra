@@ -41,6 +41,30 @@ ci_class = 'pr'
 spec = ['A2', '0', '4', '9']
 test = "cargo test -p contextra-agent --locked"
 
+[crates.contextra-audit-export]
+ring = 'Ring 4'
+maturity = 'experimental'
+description = 'Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export'
+capabilities = ['gdpr-art30-export']
+path = "crates/contextra-audit-export"
+unsafe_island = false
+may_depend_on = ['contextra-types']
+ci_class = 'pr'
+spec = ['16']
+test = "cargo test -p contextra-audit-export --locked"
+
+[crates.contextra-avv-generator]
+ring = 'Ring 4'
+maturity = 'experimental'
+description = 'AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO'
+capabilities = ['avv-generation']
+path = "crates/contextra-avv-generator"
+unsafe_island = false
+may_depend_on = ['contextra-types']
+ci_class = 'pr'
+spec = ['2', '15']
+test = "cargo test -p contextra-avv-generator --locked"
+
 [crates.contextra-checkpoint]
 ring = 'Ring 1'
 maturity = 'stable'
@@ -172,6 +196,18 @@ may_depend_on = ['contextra-core', 'contextra-crypto']
 ci_class = 'pr'
 spec = ['A2', '0', '4', '9']
 test = "cargo test -p contextra-kvcache --locked"
+
+[crates.contextra-license]
+ring = 'Ring 4'
+maturity = 'experimental'
+description = 'Lizenz- und Aktivierungsprüfung für Contextra Feature-Ringe'
+capabilities = ['license-gate']
+path = "crates/contextra-license"
+unsafe_island = false
+may_depend_on = ['contextra-types']
+ci_class = 'pr'
+spec = ['14', '15']
+test = "cargo test -p contextra-license --locked"
 
 [crates.contextra-mcp]
 ring = 'Ring 4'
