@@ -130,6 +130,45 @@ pub async fn handle_cloud_query(
     handle_cloud_query_with_guard(request, classifier, None).await
 }
 
+/// Handles a cloud query request bound to a tenant scope, enforcing matching `TenantId` before execution.
+pub async fn handle_cloud_query_scoped(
+    request: contextra_types::TenantScoped<CloudQueryRequest>,
+    expected_tenant_id: &contextra_types::TenantId,
+    classifier: &dyn EgressClassifier,
+) -> Result<CloudQueryResponse, EgressError> {
+    let req = request
+        .into_inner_checked(expected_tenant_id)
+        .map_err(|e| EgressError::invalid_params(e.to_string()))?;
+    handle_cloud_query(req, classifier).await
+}
+
+/// Extended cloud query handler enforcing tenant scope matching alongside DLP classifier and Layer 4 guard.
+pub async fn handle_cloud_query_scoped_with_guard(
+    request: contextra_types::TenantScoped<CloudQueryRequest>,
+    expected_tenant_id: &contextra_types::TenantId,
+    classifier: &dyn EgressClassifier,
+    egress_guard: Option<&dyn EgressGuardCheck>,
+) -> Result<CloudQueryResponse, EgressError> {
+    let req = request
+        .into_inner_checked(expected_tenant_id)
+        .map_err(|e| EgressError::invalid_params(e.to_string()))?;
+    handle_cloud_query_with_guard(req, classifier, egress_guard).await
+}
+
+/// Extended cloud query handler enforcing tenant scope matching, DLP classifier, Layer 4 guard, and bulk volume detector.
+pub async fn handle_cloud_query_scoped_with_bulk_detector(
+    request: contextra_types::TenantScoped<CloudQueryRequest>,
+    expected_tenant_id: &contextra_types::TenantId,
+    classifier: &dyn EgressClassifier,
+    egress_guard: Option<&dyn EgressGuardCheck>,
+    bulk_detector: Option<(&BulkExfiltrationDetector, SessionId)>,
+) -> Result<CloudQueryResponse, EgressError> {
+    let req = request
+        .into_inner_checked(expected_tenant_id)
+        .map_err(|e| EgressError::invalid_params(e.to_string()))?;
+    handle_cloud_query_with_bulk_detector(req, classifier, egress_guard, bulk_detector).await
+}
+
 pub async fn handle_cloud_query_with_guard(
     request: CloudQueryRequest,
     classifier: &dyn EgressClassifier,
@@ -242,6 +281,7 @@ fn evaluate_classification_result(classification: EgressClassification) -> Resul
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

@@ -269,6 +269,47 @@ impl KeyManager {
         })
     }
 
+    /// Derives a sub-key for KV-cache segment encryption with strict compile-time tenant scope enforcement.
+    ///
+    /// Unpacks `scoped_fingerprint` only if the inner bound `TenantId` matches `expected_tenant_id`.
+    /// Returns [`CryptoError::InvalidInput`] if a tenant scope violation occurs.
+    pub fn derive_kv_key_scoped(
+        &self,
+        scoped_fingerprint: contextra_types::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
+        expected_tenant_id: &contextra_types::TenantId,
+    ) -> Result<Self> {
+        let fingerprint = scoped_fingerprint
+            .into_inner_checked(expected_tenant_id)
+            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        self.derive_kv_key(*expected_tenant_id, fingerprint)
+    }
+
+    /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId`.
+    pub fn cipher_for(
+        &self,
+        tenant_id: contextra_types::TenantId,
+    ) -> Result<Self> {
+        let dummy_fp = crate::kv_cipher::ModelFingerprint {
+            hash: [0u8; 32],
+            model_id: "default_tenant_cipher".to_string(),
+            quantization: "raw".to_string(),
+        };
+        self.derive_kv_key(tenant_id, &dummy_fp)
+    }
+
+    /// Derives a tenant-isolated `KeyManager` instance enforcing compile-time `TenantScoped` verification.
+    /// Unpacks `scoped_key` only if the bound `TenantId` matches `expected_tenant_id`.
+    pub fn cipher_for_scoped<T>(
+        &self,
+        scoped_key: contextra_types::TenantScoped<T>,
+        expected_tenant_id: &contextra_types::TenantId,
+    ) -> Result<Self> {
+        let _unpacked = scoped_key
+            .into_inner_checked(expected_tenant_id)
+            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        self.cipher_for(*expected_tenant_id)
+    }
+
     /// Derives an integrity key for HMAC-SHA256.
     pub fn integrity_key(&self) -> Result<[u8; 32]> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
@@ -344,6 +385,7 @@ impl KeyManager {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -664,6 +706,42 @@ mod tests {
             key_1.inspect_key_bytes_for_test(),
             key_2.inspect_key_bytes_for_test()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_derive_kv_key_scoped_enforces_tenant_isolation() -> Result<()> {
+        use crate::kv_cipher::ModelFingerprint;
+        use contextra_types::{TenantId, TenantScoped};
+
+        let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
+        let tenant_a = TenantId::try_new(100).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        let tenant_b = TenantId::try_new(200).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+
+        let fp = ModelFingerprint {
+            hash: [0x42; 32],
+            model_id: "scoped-model".to_string(),
+            quantization: "Q4_0".to_string(),
+        };
+
+        let scoped_fp = TenantScoped::new(tenant_a, &fp);
+
+        // Success path: expected tenant matches bound tenant
+        let key_scoped = km.derive_kv_key_scoped(scoped_fp.clone(), &tenant_a)?;
+        let key_direct = km.derive_kv_key(tenant_a, &fp)?;
+        assert_eq!(
+            key_scoped.inspect_key_bytes_for_test(),
+            key_direct.inspect_key_bytes_for_test(),
+            "derive_kv_key_scoped MUST match derive_kv_key on identical tenant"
+        );
+
+        // Mismatch path: attempting to unpack tenant_a payload with expected tenant_b fails
+        let err = km.derive_kv_key_scoped(scoped_fp, &tenant_b).unwrap_err();
+        assert!(
+            matches!(err, CryptoError::InvalidInput(ref msg) if msg.contains("tenant scope mismatch")),
+            "Expected tenant scope mismatch error, got: {:?}", err
+        );
+
         Ok(())
     }
 
