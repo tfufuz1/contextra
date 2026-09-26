@@ -189,6 +189,8 @@ pub enum EgressVaultError {
     InvalidPattern { pattern: String, reason: String },
     #[error("Payload size exceeds limit: {size} bytes > {limit} limit")]
     PayloadTooLarge { size: usize, limit: usize },
+    #[error("Tenant scope violation: {0}")]
+    TenantScopeViolation(#[from] contextra_types::TenantScopeViolation),
 }
 
 /// Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation.
@@ -352,6 +354,35 @@ impl EgressVault {
         &self.surrogate_vault
     }
 
+    /// Classifies a `TenantScoped` payload for egress export only if the bound `TenantId`
+    /// matches `expected_tenant_id`. If a tenant scope violation occurs, returns `Block(BlockReason::PolicyDenied(...))`.
+    pub async fn classify_scoped(
+        &self,
+        payload: contextra_types::TenantScoped<&str>,
+        expected_tenant_id: &contextra_types::TenantId,
+    ) -> EgressClassification {
+        match payload.into_inner_checked(expected_tenant_id) {
+            Ok(unpacked) => self.classify(unpacked).await,
+            Err(err) => EgressClassification::Block(BlockReason::PolicyDenied(err.to_string())),
+        }
+    }
+
+    /// Tokenizes and replaces recognized entities in a `TenantScoped` payload only if the bound
+    /// `TenantId` matches `expected_tenant_id`. Re-wraps the sanitized output in a `TenantScoped<String>`.
+    pub fn sanitize_and_vault_scoped(
+        &self,
+        payload: contextra_types::TenantScoped<&str>,
+        expected_tenant_id: &contextra_types::TenantId,
+        recognizer: &dyn EntityRecognizer,
+    ) -> Result<(contextra_types::TenantScoped<String>, usize), EgressVaultError> {
+        let text = payload.into_inner_checked(expected_tenant_id)?;
+        let (sanitized_text, count) = self.sanitize_and_vault(text, recognizer)?;
+        Ok((
+            contextra_types::TenantScoped::new(*expected_tenant_id, sanitized_text),
+            count,
+        ))
+    }
+
     /// Tokenisiert und ersetzt erkannte strukturierte Regex-Muster sowie unstrukturierte NER-Entitäten
     /// durch sitzungsstabile Surrogate und speichert die Zuordnungen im `SurrogateVault`.
     ///
@@ -457,6 +488,7 @@ impl EgressClassifier for EgressVault {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use std::time::Instant;
@@ -724,6 +756,42 @@ mod tests {
         drop(surrogate_vault);
 
         assert!(weak_vault.upgrade().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_classify_scoped_and_sanitize_scoped_tenant_isolation() {
+        use contextra_types::{TenantId, TenantScoped};
+
+        let vault = EgressVault::try_default().expect("valid vault");
+        let tenant_a = TenantId::try_new(10).expect("valid tenant_a");
+        let tenant_b = TenantId::try_new(20).expect("valid tenant_b");
+
+        let payload_a = "Clean public text";
+        let scoped_a = TenantScoped::new(tenant_a, payload_a);
+
+        // Success path: matching tenant_id
+        let res_ok = vault.classify_scoped(scoped_a.clone(), &tenant_a).await;
+        assert_eq!(res_ok, EgressClassification::Allow);
+
+        // Failure path: mismatched tenant_id blocks request
+        let res_mismatch = vault.classify_scoped(scoped_a.clone(), &tenant_b).await;
+        if let EgressClassification::Block(BlockReason::PolicyDenied(reason)) = res_mismatch {
+            assert!(reason.contains("tenant scope mismatch"));
+        } else {
+            panic!("Expected PolicyDenied block for tenant scope mismatch, got {:?}", res_mismatch);
+        }
+
+        // sanitize_and_vault_scoped success and mismatch
+        let (sanitized_scoped, count) = vault
+            .sanitize_and_vault_scoped(scoped_a.clone(), &tenant_a, &NoOpRecognizer)
+            .expect("sanitize_and_vault_scoped succeeds with matching tenant");
+        assert_eq!(count, 0);
+        assert_eq!(sanitized_scoped.tenant_id(), &tenant_a);
+
+        let err_sanitized = vault
+            .sanitize_and_vault_scoped(scoped_a, &tenant_b, &NoOpRecognizer)
+            .unwrap_err();
+        assert!(matches!(err_sanitized, EgressVaultError::TenantScopeViolation(_)));
     }
 
     #[test]

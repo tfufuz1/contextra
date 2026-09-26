@@ -79,6 +79,19 @@ impl EgressGuard {
         self.timeout
     }
 
+    /// Checks a `TenantScoped` egress payload for bulk exfiltration only if the bound `TenantId`
+    /// matches `expected_tenant_id`. Returns `Block(BlockReason::PolicyDenied(...))` on tenant scope mismatch.
+    pub async fn check_scoped(
+        &self,
+        payload: contextra_types::TenantScoped<&str>,
+        expected_tenant_id: &contextra_types::TenantId,
+    ) -> EgressClassification {
+        match payload.into_inner_checked(expected_tenant_id) {
+            Ok(unpacked) => self.check(unpacked).await,
+            Err(err) => EgressClassification::Block(BlockReason::PolicyDenied(err.to_string())),
+        }
+    }
+
     /// Prüft einen Egress-Payload auf mögliche Bulk-Exfiltration gegen die Collection.
     ///
     /// - Liefert `Allow`, wenn `payload.len() < min_bytes`.
@@ -147,6 +160,7 @@ impl EgressClassifier for EgressGuard {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -169,6 +183,34 @@ mod tests {
                 }
                 res
             })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_check_scoped_tenant_isolation() {
+        use contextra_types::{TenantId, TenantScoped};
+
+        let engine = Arc::new(MockSearchEngine {
+            results: Ok(vec![]),
+            delay: None,
+        });
+        let guard = EgressGuard::new(engine, 0.85, 128);
+
+        let tenant_a = TenantId::try_new(11).expect("valid tenant_a");
+        let tenant_b = TenantId::try_new(22).expect("valid tenant_b");
+
+        let scoped_payload = TenantScoped::new(tenant_a, "short text");
+
+        // Matching tenant succeeds
+        let res_ok = guard.check_scoped(scoped_payload.clone(), &tenant_a).await;
+        assert_eq!(res_ok, EgressClassification::Allow);
+
+        // Mismatched tenant blocks
+        let res_mismatch = guard.check_scoped(scoped_payload, &tenant_b).await;
+        if let EgressClassification::Block(BlockReason::PolicyDenied(reason)) = res_mismatch {
+            assert!(reason.contains("tenant scope mismatch"));
+        } else {
+            panic!("Expected PolicyDenied block on mismatch, got {:?}", res_mismatch);
         }
     }
 

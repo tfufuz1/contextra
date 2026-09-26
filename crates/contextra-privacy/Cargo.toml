@@ -10,6 +10,7 @@ rust-version.workspace = true
 description = "Cloud Egress Security, DLP & Exfiltration Protection for Contextra (Ring 3)"
 
 [dependencies]
+contextra-types = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -23,5 +24,6 @@ blake3 = { workspace = true }
 regex = { workspace = true }
 
 [dev-dependencies]
+contextra-crypto = { workspace = true, features = ["test-utils"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
