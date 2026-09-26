@@ -211,3 +211,13 @@ use contextra_db::collection::Collection;
 // ✅ KORREKT — Tatsächlicher Pfad (vorher grep nutzen):
 use contextra_db::Collection;
 ```
+
+## FEHLER-KLASSE 14: Fälschlicher Compliance-Beleg durch ungenutzte Referenzimplementierung
+
+**Symptom**: Agent bewertet eine Invariante oder System-Eigenschaft als erfüllt, weil eine konforme Referenzimplementierung im Code existiert, ohne zu verifizieren, ob diese Implementierung auch tatsächlich im produktiven Ausführungspfad aufgerufen wird (z. B. wenn stattdessen eine parallele, nicht-konforme Variante instanziiert wird).
+
+**Heilmittel**: Vor Aussagen zur Invarianten-Compliance stets per Call-Graph / grep den tatsächlichen Aufrufpfad im Produktionscode verifizieren:
+```bash
+grep -rn "<TYPNAME>" crates/ --include="*.rs"
+```
+Sicherstellen, wer den Typ zur Laufzeit in produktiven Modulen (außerhalb von `#[cfg(test)]`) instanziiert und verwendet.

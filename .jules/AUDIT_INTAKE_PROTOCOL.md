@@ -32,6 +32,21 @@
 
 ---
 
+## 🔍 Call-Graph-Verifikation vor Invarianten-Freigabe
+
+Vor jeder Aussage „Invariante X ist erfüllt, weil Typ/Funktion Y existiert und die geforderte Eigenschaft hat" MUSS zusätzlich per grep/Call-Graph verifiziert werden, ob Typ/Funktion Y auch tatsächlich von produktivem, nicht-Test-Code instanziiert und aufgerufen wird.
+
+> **Fallbeispiel (Audit 2026-09-26)**: Bei der Überprüfung der `KvKeyLocks`-Invariante existierte zwar eine konforme Implementierung in `contextra-store`, jedoch wurde im produktiven Pfad der Engine in `contextra-engine` eine parallele, abweichende Variante verwendet. Reine Existenz-Checks eines Typnamens reichen daher nicht aus — der tatsächliche Aufrufpfad (Call-Graph) im Produktionscode muss stets verifiziert werden.
+
+---
+
+## 🏗️ Feature-Flag-vollständige Ring-Layering-Analyse
+
+Bei Prüfungen der Schichten-Architektur und Ring-Layering-Integrität reichen Analysen auf Basis von Default-Feature-Abhängigkeiten nicht aus, da optionale Abhängigkeiten (z. B. hinter `optional = true`-Flags) Architektur-Verstöße verdecken können.
+Ring-Layering-Prüfungen MÜSSEN zwingend `cargo metadata --all-features` bzw. eine äquivalente Feature-Flag-vollständige Analyse verwenden. Der Gate-Check `check-ring-layering-full` (ausführbar via `cargo xtask check-ring-layering-full`) gilt als verbindliches Werkzeug dafür.
+
+---
+
 ## 🔒 Verdict-Unabhängigkeitspflicht (Audit-Workflow v2)
 
 Jedes Audit-Ergebnis und `VERDICT:`-Tag in Audit-Reports unter `docs/audits/*.md` unterliegt der strikten Zwei-Session-Unabhängigkeitspflicht.

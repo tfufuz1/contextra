@@ -22,6 +22,13 @@ Um Halluzinationen und veraltete Fakten zu vermeiden, gilt für jede Jules-Sessi
 
 ---
 
+## 📜 Audit-Report & Remediation-Prompts Kontext-Anker (2026-09-26)
+
+- **Audit-Report**: `CONTEXTRA_AUDIT_REPORT.md` dokumentiert den umfassenden System-Audit (Funde in Ring-2-Leaf, Compaction-Speicherbudget, `KvKeyLocks`-Divergenz, `BanditError`-Fehlergrenze, `ConstantTimeEq`-Lücke).
+- **Remediation-Prompts**: `CONTEXTRA_FIX_PROMPTS.md` enthält 10 isolierte Behebungs-Prompts (P1–P10) als Kontext-Anker für Folge-Sessions, die auf diese Historie referenzieren müssen.
+
+---
+
 ## 📐 Crate-Topologie & Referenzen
 
 Vollständige Schichten-Architektur (Layer 0–6) sowie DAG-Regeln: siehe `AGENTS.md` Abschnitt **"Crate-Topologie"**.
