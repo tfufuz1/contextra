@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall).
+// ZWECK: Eviction-Worker (nicht-blockierender Hot-Path LRU / Attention) und emergency_wipe (synchroner Notfall).
 // STAND: TS:2026-09-15T00:00:00Z
 
 //! # Eviction-Architektur
@@ -15,7 +15,11 @@
 //!    Sicherheits-Alarm). Synchron, blockierend, garantiert vor Rückkehr
 //!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
 
+use super::attention_score::{AttentionScoreSource, NullAttentionScoreSource};
 use super::store::TenantIsolatedKvStore;
+use contextra_ports::{AttentionExporter, RequestId};
+use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::sync::mpsc;
 use std::sync::Arc;
 
@@ -25,9 +29,50 @@ enum EvictionCommand {
     Shutdown,
 }
 
+/// Adapter: translates request-centered [`AttentionExporter`] (Ring 2 interface) into
+/// segment-centered [`AttentionScoreSource`] (Ring 1 interface).
+struct ExporterBackedScoreSource {
+    exporter: Arc<dyn AttentionExporter>,
+    segment_map: RwLock<HashMap<u64, RequestId>>,
+}
+
+impl ExporterBackedScoreSource {
+    fn new(exporter: Arc<dyn AttentionExporter>) -> Self {
+        Self {
+            exporter,
+            segment_map: RwLock::new(HashMap::new()),
+        }
+    }
+
+    #[allow(dead_code)]
+    fn register_segment_mapping(&self, segment_id: u64, request_id: RequestId) {
+        self.segment_map.write().insert(segment_id, request_id);
+    }
+}
+
+impl AttentionScoreSource for ExporterBackedScoreSource {
+    fn importance_score(&self, segment_id: u64) -> Option<f32> {
+        let request_id = self
+            .segment_map
+            .read()
+            .get(&segment_id)
+            .copied()
+            .unwrap_or(RequestId(segment_id));
+
+        let weights = self.exporter.export_attention_weights(request_id)?;
+        if weights.is_empty() {
+            return None;
+        }
+
+        let sum: f32 = weights.iter().copied().sum();
+        Some(sum / weights.len() as f32)
+    }
+}
+
 /// Regelmäßiger Eviction-Pfad (VRAM > 80%-Trigger). NICHT im Async-Executor,
 /// da regelmäßige Zeroize-Operationen den Tokio-Scheduler blockieren würden.
 pub struct EvictionWorker {
+    attention_source: Arc<RwLock<Arc<dyn AttentionScoreSource>>>,
     sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
     handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
 }
@@ -35,6 +80,11 @@ pub struct EvictionWorker {
 impl EvictionWorker {
     /// Spawnt den Eviction-Worker auf einem dedizierten OS-Thread.
     pub fn spawn(store: Arc<TenantIsolatedKvStore>) -> Self {
+        let attention_source = Arc::new(RwLock::new(
+            Arc::new(NullAttentionScoreSource) as Arc<dyn AttentionScoreSource>
+        ));
+        let worker_source = Arc::clone(&attention_source);
+
         let (sender, receiver) = mpsc::channel::<EvictionCommand>();
         let handle_opt = std::thread::Builder::new()
             .name("kv-eviction-worker".into())
@@ -42,7 +92,8 @@ impl EvictionWorker {
                 while let Ok(cmd) = receiver.recv() {
                     match cmd {
                         EvictionCommand::EvictLru { target_free_bytes } => {
-                            let freed = store.evict_lru_fair(target_free_bytes);
+                            let source = worker_source.read().clone();
+                            let freed = store.evict_fair(target_free_bytes, source.as_ref());
                             tracing::debug!(
                                 freed_bytes = freed,
                                 "KV eviction worker: LRU evict done"
@@ -65,9 +116,18 @@ impl EvictionWorker {
             .ok();
 
         Self {
+            attention_source,
             sender: parking_lot::Mutex::new(sender),
             handle: parking_lot::Mutex::new(handle_opt),
         }
+    }
+
+    /// Builder-Methode zur Injektion eines echten Attention-Backends.
+    pub fn with_attention_exporter(self, exporter: Arc<dyn AttentionExporter>) -> Self {
+        let adapter: Arc<dyn AttentionScoreSource> =
+            Arc::new(ExporterBackedScoreSource::new(exporter));
+        *self.attention_source.write() = adapter;
+        self
     }
 
     /// Nicht-blockierender Trigger vom Hot-Path aus.
