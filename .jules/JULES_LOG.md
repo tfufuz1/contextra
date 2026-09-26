@@ -151,3 +151,17 @@ Um die Entwicklung in Contextra zu optimieren, werden folgende 5 Säulen durchge
 ---
 
 *Optimierungsplan und Diagnostik-Log erfolgreich erstellt und aktualisiert.*
+
+---
+
+## 6. System-Audit & Remediation-Prompts Protokoll (2026-09-26)
+
+- **Audit durchgeführt**: Umfassender System-Audit des Contextra-Workspace abgeschlossen (`CONTEXTRA_AUDIT_REPORT.md`).
+- **Remediation-Prompts**: 10 parallele Behebungs-Prompts (P1–P10) in `CONTEXTRA_FIX_PROMPTS.md` erstellt.
+- **Fünf priorisierte Hauptbefunde**:
+  1. **Ring-2-Leaf-Verstoß**: Direktimport von Ring-2-Leaf-Crates in Inferenz-Modulen.
+  2. **Compaction-Speicherbudget**: Fehlende Peak-Memory-Grenzprüfungen beim LSM-Compaction-Lauf.
+  3. **KvKeyLocks-Divergenz**: `KvKeyLocks`-Implementierungsabweichung zwischen `contextra-store` und `contextra-engine`.
+  4. **BanditError-Fehlergrenze**: Unzureichende Fehlerbehandlung/Clamping an den Bandit-Scoring-Grenzen.
+  5. **ConstantTimeEq-Lücke**: Verwendung funktional korrekter Bibliotheks-Verifikation ohne expliziten Garantienachweis für Laufzeit-Konstanz.
+- **Qualitätssicherung & Prozess-Leitplanken**: Aktualisierung von `.jules/AUDIT_INTAKE_PROTOCOL.md` (Call-Graph-Verifikation & Ring-Layering `--all-features`), `.jules/COMMON_LLM_ERRORS.md` (Fehler-Klasse 14 für fälschlichen Compliance-Beleg), `.jules/JULES_CONTEXT.md` und `.jules/JULES_LOG.md`.
