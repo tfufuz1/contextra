@@ -13,7 +13,10 @@ impl LcgRng {
     }
 
     fn next_u64(&mut self) -> u64 {
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.state
     }
 
@@ -202,8 +205,8 @@ fn test_sherman_morrison_collinear_stability_bounded_growth() {
 
         for i in 0..d {
             for j in 0..d {
-                a_matrix[i * d + j] = (effective_gamma as f64) * a_matrix[i * d + j]
-                    + (x[i] as f64) * (x[j] as f64);
+                a_matrix[i * d + j] =
+                    (effective_gamma as f64) * a_matrix[i * d + j] + (x[i] as f64) * (x[j] as f64);
             }
         }
 

@@ -37,9 +37,9 @@ impl From<FcTsError> for contextra_types::ContextraError {
             FcTsError::NonFinite => contextra_types::ContextraError::InvalidInput(
                 "Non-finite numerical value encountered".to_string(),
             ),
-            FcTsError::InvalidConfig(msg) => {
-                contextra_types::ContextraError::InvalidInput(format!("Invalid configuration: {msg}"))
-            }
+            FcTsError::InvalidConfig(msg) => contextra_types::ContextraError::InvalidInput(
+                format!("Invalid configuration: {msg}"),
+            ),
         }
     }
 }
@@ -632,12 +632,16 @@ pub struct DiagonalApproximationBandit {
 
 impl DiagonalApproximationBandit {
     /// Erstellt eine neue `DiagonalApproximationBandit`-Referenzpolitik mit der gegebenen Propensitätsmap.
-    pub fn new(propensities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>) -> Self {
+    pub fn new(
+        propensities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+    ) -> Self {
         Self { propensities }
     }
 
     /// Erstellt eine `DiagonalApproximationBandit`-Referenzpolitik aus Strategie-Propensitäts-Paaren.
-    pub fn from_pairs(pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>) -> Self {
+    pub fn from_pairs(
+        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
+    ) -> Self {
         Self {
             propensities: pairs.into_iter().collect(),
         }
@@ -655,7 +659,10 @@ pub trait OffPolicyCompatibility {
     /// unter der Referenz-Policy gemessen wird, während FC-TS diesem Arm
     /// eine positive Sampling-Wahrscheinlichkeit zuweist (Verstoß gegen
     /// die Positivitätsannahme — IPS-Gewichte würden divergieren).
-    fn verify_positivity(&self, reference_policy: &DiagonalApproximationBandit) -> Result<(), OffPolicyError>;
+    fn verify_positivity(
+        &self,
+        reference_policy: &DiagonalApproximationBandit,
+    ) -> Result<(), OffPolicyError>;
 }
 
 /// Fehlerzustände bei der Off-Policy-Kompatibilitätsprüfung.
@@ -681,12 +688,16 @@ pub struct FcTsSamplingDistribution {
 
 impl FcTsSamplingDistribution {
     /// Erstellt eine neue `FcTsSamplingDistribution`-Instanz mit der gegebenen Wahrscheinlichkeitsmap.
-    pub fn new(probabilities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>) -> Self {
+    pub fn new(
+        probabilities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+    ) -> Self {
         Self { probabilities }
     }
 
     /// Erstellt eine `FcTsSamplingDistribution`-Instanz aus Strategie-Wahrscheinlichkeits-Paaren.
-    pub fn from_pairs(pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>) -> Self {
+    pub fn from_pairs(
+        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
+    ) -> Self {
         Self {
             probabilities: pairs.into_iter().collect(),
         }
@@ -699,7 +710,10 @@ impl FcTsSamplingDistribution {
 }
 
 impl OffPolicyCompatibility for FcTsSamplingDistribution {
-    fn verify_positivity(&self, reference_policy: &DiagonalApproximationBandit) -> Result<(), OffPolicyError> {
+    fn verify_positivity(
+        &self,
+        reference_policy: &DiagonalApproximationBandit,
+    ) -> Result<(), OffPolicyError> {
         for (&strategy, &prob) in &self.probabilities {
             if prob > 0.0 {
                 let ref_p = reference_policy.propensity(strategy);
@@ -778,7 +792,10 @@ impl FcTsArmSet {
 }
 
 impl OffPolicyCompatibility for FcTsArmSet {
-    fn verify_positivity(&self, reference_policy: &DiagonalApproximationBandit) -> Result<(), OffPolicyError> {
+    fn verify_positivity(
+        &self,
+        reference_policy: &DiagonalApproximationBandit,
+    ) -> Result<(), OffPolicyError> {
         let default_strategies = [
             contextra_types::RetrievalStrategy::Vector,
             contextra_types::RetrievalStrategy::Text,

@@ -1,8 +1,8 @@
 //! Property-Tests und Unit-Tests für Off-Policy-Kompatibilität und Bandit-Default-Flip-Gate (§B.3.2).
 
 use contextra_adapt::{
-    BanditDefaultFlipGate, BanditShadowReport, DefaultBanditFlipGate,
-    DiagonalApproximationBandit, FcTsSamplingDistribution, OffPolicyCompatibility, OffPolicyError,
+    BanditDefaultFlipGate, BanditShadowReport, DefaultBanditFlipGate, DiagonalApproximationBandit,
+    FcTsSamplingDistribution, OffPolicyCompatibility, OffPolicyError,
     MAX_CUMULATIVE_REGRET_THRESHOLD, MIN_BANDIT_SHADOW_SAMPLES,
 };
 use contextra_types::{ContextraError, RetrievalStrategy};

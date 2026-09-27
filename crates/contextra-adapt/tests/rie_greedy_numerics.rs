@@ -5,7 +5,8 @@
 use contextra_adapt::{RieGreedyError, RieGreedyProfile};
 
 #[test]
-fn test_uncertainty_growth_after_discounting_and_update() -> Result<(), Box<dyn std::error::Error>> {
+fn test_uncertainty_growth_after_discounting_and_update() -> Result<(), Box<dyn std::error::Error>>
+{
     let dim = 3;
     let lambda = 1.0;
     let gamma = 0.8; // Starkes Vergessen
@@ -124,7 +125,10 @@ fn test_non_finite_input_handling() -> Result<(), Box<dyn std::error::Error>> {
     let mut profile = RieGreedyProfile::new(2, 1.0, 0.9);
 
     let nan_context = [f32::NAN, 1.0f32];
-    assert_eq!(profile.predict(&nan_context), Err(RieGreedyError::NonFinite));
+    assert_eq!(
+        profile.predict(&nan_context),
+        Err(RieGreedyError::NonFinite)
+    );
     assert_eq!(
         profile.update(&nan_context, 1.0),
         Err(RieGreedyError::NonFinite)
