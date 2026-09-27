@@ -1,6 +1,7 @@
 use super::config::LsmConfig;
 use super::group_commit::PendingCommitQueue;
 use super::guard::LsmState;
+use super::observer::{ObserverRegistry, WalObserver};
 use crate::compaction::CompactionEngine;
 use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::Wal;
@@ -40,6 +41,7 @@ pub struct LsmStorage {
     pub(super) wal_queue_depth: Arc<std::sync::atomic::AtomicUsize>,
     pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
+    pub(super) observer_registry: ObserverRegistry,
 }
 
 impl Drop for LsmStorage {
@@ -104,4 +106,24 @@ impl LsmStorage {
     /// Maximum threshold for surviving entries during rollback below which entries are retained in memtable
     /// instead of creating a new SSTable (M-4 optimization).
     pub const ROLLBACK_INLINE_THRESHOLD_ENTRIES: usize = 1;
+
+    /// Registers a new WAL observer.
+    pub fn register_observer(&self, observer: Arc<dyn WalObserver>) {
+        self.observer_registry.register_observer(observer);
+    }
+
+    /// Deregisters an observer matching the provided `Arc` reference via pointer equality.
+    pub fn deregister_observer(&self, observer: &Arc<dyn WalObserver>) {
+        self.observer_registry.deregister_observer(observer);
+    }
+
+    /// Sets the maximum latency threshold for observer callbacks.
+    pub fn set_max_observer_latency(&self, latency: std::time::Duration) {
+        self.observer_registry.set_max_observer_latency(latency);
+    }
+
+    /// Returns the current maximum latency threshold for observer callbacks.
+    pub fn max_observer_latency(&self) -> std::time::Duration {
+        self.observer_registry.max_observer_latency()
+    }
 }

@@ -29,6 +29,20 @@ pub struct SeqLogEntry {
     pub delete_seq: Option<u64>,
 }
 
+impl SeqLogEntry {
+    /// Returns `true` if this log entry is visible at snapshot sequence number `as_of`.
+    ///
+    /// # Visibility Rule
+    /// An entry is visible if `insert_seq <= as_of` AND (`delete_seq` is `None` OR `delete_seq > as_of`).
+    ///
+    /// # Complexity
+    /// $O(1)$ allocation-free, loop-free check using at most two integer comparisons.
+    #[inline]
+    pub fn is_visible(&self, as_of: u64) -> bool {
+        self.insert_seq <= as_of && self.delete_seq.is_none_or(|del| del > as_of)
+    }
+}
+
 /// Represents a historical sequence log change (insert or delete) for delta replaying.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SeqLogChange {
@@ -282,8 +296,37 @@ impl SequenceLog {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_seq_log_entry_is_visible_o1() {
+        let doc = DocId::from_key("doc1").expect("valid doc id");
+
+        // Active entry (no delete)
+        let active_entry = SeqLogEntry {
+            doc_id: doc,
+            insert_seq: 10,
+            delete_seq: None,
+        };
+        assert!(!active_entry.is_visible(9));
+        assert!(active_entry.is_visible(10));
+        assert!(active_entry.is_visible(100));
+
+        // Deleted entry
+        let deleted_entry = SeqLogEntry {
+            doc_id: doc,
+            insert_seq: 10,
+            delete_seq: Some(20),
+        };
+        assert!(!deleted_entry.is_visible(9));
+        assert!(deleted_entry.is_visible(10));
+        assert!(deleted_entry.is_visible(19));
+        // Boundary case: delete_seq == as_of -> NOT visible (delete_seq > as_of is strict)
+        assert!(!deleted_entry.is_visible(20));
+        assert!(!deleted_entry.is_visible(21));
+    }
 
     #[test]
     fn test_sequence_log_insert_delete_visibility() {

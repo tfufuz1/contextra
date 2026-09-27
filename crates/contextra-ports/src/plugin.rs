@@ -198,12 +198,18 @@ impl PluginRegistry {
                 }
                 if plugin_map.contains_key(&req_str) {
                     // req_str must come before p_name
-                    adj.get_mut(&req_str).expect("req_str in adj").push(p_name.clone());
-                    *in_degree.get_mut(p_name).expect("p_name in in_degree") += 1;
+                    if let Some(adj_vec) = adj.get_mut(&req_str) {
+                        adj_vec.push(p_name.clone());
+                    }
+                    if let Some(deg) = in_degree.get_mut(p_name) {
+                        *deg += 1;
+                    }
                 } else {
                     // Dependency is missing (neither active nor in pending batch)
                     // Increment in-degree so p_name can never be resolved
-                    *in_degree.get_mut(p_name).expect("p_name in in_degree") += 1;
+                    if let Some(deg) = in_degree.get_mut(p_name) {
+                        *deg += 1;
+                    }
                 }
             }
         }
@@ -217,16 +223,17 @@ impl PluginRegistry {
         }
 
         let mut sorted_order: Vec<String> = Vec::new();
-        while let Some(next_name) = ready.iter().cloned().next() {
+        while let Some(next_name) = ready.iter().next().cloned() {
             ready.remove(&next_name);
             sorted_order.push(next_name.clone());
 
             if let Some(neighbors) = adj.get(&next_name) {
                 for neighbor in neighbors {
-                    let deg = in_degree.get_mut(neighbor).expect("neighbor in in_degree");
-                    *deg -= 1;
-                    if *deg == 0 {
-                        ready.insert(neighbor.clone());
+                    if let Some(deg) = in_degree.get_mut(neighbor) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            ready.insert(neighbor.clone());
+                        }
                     }
                 }
             }
@@ -245,13 +252,14 @@ impl PluginRegistry {
 
         // 4. Activation in topological order
         for p_name in &sorted_order {
-            let plugin = plugin_map.get(p_name).expect("plugin exists");
-            plugin.activate()?;
-            let cap = plugin.capability();
-            let declared_conflicts: Vec<String> =
-                plugin.conflicts().iter().map(|s| s.to_string()).collect();
-            self.active.insert(p_name.clone(), cap);
-            self.active_conflicts.insert(p_name.clone(), declared_conflicts);
+            if let Some(plugin) = plugin_map.get(p_name) {
+                plugin.activate()?;
+                let cap = plugin.capability();
+                let declared_conflicts: Vec<String> =
+                    plugin.conflicts().iter().map(|s| s.to_string()).collect();
+                self.active.insert(p_name.clone(), cap);
+                self.active_conflicts.insert(p_name.clone(), declared_conflicts);
+            }
         }
 
         Ok(())

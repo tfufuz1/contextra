@@ -17,10 +17,18 @@ static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
 static PROTECTED_REGEX: OnceLock<Regex> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
+#[allow(clippy::panic)]
 fn get_protected_regex() -> &'static Regex {
     PROTECTED_REGEX.get_or_init(|| {
-        Regex::new(r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
-            .unwrap_or_else(|_| Regex::new(r"$^").unwrap_or_else(|_| unreachable!()))
+        if let Ok(re) = Regex::new(
+            r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+        ) {
+            re
+        } else if let Ok(fallback) = Regex::new(r"$^") {
+            fallback
+        } else {
+            panic!("protected regex initialization failed")
+        }
     })
 }
 

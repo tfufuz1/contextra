@@ -46,10 +46,18 @@ pub mod wal;
 // Tracking-Issue: [ISSUE-NUMMER]
 
 #[cfg(not(loom))]
-pub use compaction::{CompactionConfig, CompactionEngine};
+pub use compaction::{
+    adaptive::{
+        AdaptiveCompactionPlan, AdaptiveCompactionPlanner, CompactionStrategy,
+        CostBasedAdaptivePlanner, WorkloadMetrics, WorkloadMetricsSnapshot,
+    },
+    CompactionConfig, CompactionEngine,
+};
 pub use kv_locks::{KeyGuard, KvKeyLocks, LockError, MultiKeyGuard};
 #[cfg(not(loom))]
-pub use lsm::{LsmConfig, LsmStorage};
+pub use lsm::{
+    CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
+};
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
 #[cfg(not(loom))]

@@ -594,6 +594,7 @@ dependencies = [
  "blake3",
  "contextra-ports",
  "contextra-types",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -676,6 +677,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
+ "contextra-core",
  "contextra-ports",
  "contextra-store",
  "contextra-testkit",
@@ -809,6 +811,7 @@ dependencies = [
  "contextra-rank",
  "contextra-store",
  "contextra-sys",
+ "contextra-testkit",
  "contextra-text",
  "contextra-types",
  "contextra-vector",
@@ -1025,6 +1028,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "contextra-crypto",
+ "contextra-ports",
  "contextra-types",
  "parking_lot 0.12.5",
  "rand 0.8.8",

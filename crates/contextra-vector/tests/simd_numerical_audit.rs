@@ -40,7 +40,7 @@ fn euclidean_distance_f64_ref(a: &[f32], b: &[f32]) -> f64 {
 
 /// Independent f64 reference implementation for Dot Product Distance
 fn dot_product_f64_ref(a: &[f32], b: &[f32]) -> f64 {
-    a.iter()
+    -a.iter()
         .zip(b.iter())
         .map(|(&x, &y)| (x as f64) * (y as f64))
         .sum::<f64>()

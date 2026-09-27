@@ -72,6 +72,7 @@ pub(super) use std::sync::atomic::Ordering;
 pub mod config;
 mod engine;
 mod guard;
+pub mod observer;
 mod validate;
 
 pub mod commit;
@@ -87,6 +88,7 @@ pub mod ops;
 
 pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::LsmStorage;
+pub use observer::{CommittedBatch, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin};
 pub(super) use guard::{CommitGuard, LsmState};
 pub(super) use validate::validate_key;
 

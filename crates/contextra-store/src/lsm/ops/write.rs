@@ -4,6 +4,7 @@ use super::super::group_commit::{
     execute_group_commit_append, GroupCommitRequest, PendingCommitQueue, WalQueueGuard,
 };
 use super::super::guard::CommitGuard;
+use super::super::observer::WriteOrigin;
 use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
 use contextra_core::{ContextraError, IndexOp, Result, StorageEngine, TxId, TOMBSTONE_BIT};
@@ -264,6 +265,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {
+        let entries_for_observer = wal_entries.entries().to_vec();
         let single_append_res = match storage.config.durability_mode {
             DurabilityMode::Full => wal.append_batch(wal_entries).await,
             DurabilityMode::WalNoHmac => {
@@ -294,6 +296,8 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 e
             )));
         }
+
+        storage.notify_commit_observers(&entries_for_observer, tx_id, WriteOrigin::UserWrite);
 
         // MemTable ist intern per parking_lot::RwLock nebenläufigkeitssicher; die äußere
         // LsmState-Sperre schützt ausschließlich die Struktur des immutable_memtables-Vektors,
@@ -395,6 +399,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         drop(queue_guard);
 
         let wal = storage.wal.read().await.clone();
+        let leader_entries_for_observer = leader_wal_entries.entries().to_vec();
         let mut all_wal_entries = leader_wal_entries;
         for r in pending_queue.requests.iter() {
             all_wal_entries.extend(r.wal_entries.clone());
@@ -445,6 +450,11 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 }
             }
             return Err(ContextraError::Storage(err_msg));
+        }
+
+        storage.notify_commit_observers(&leader_entries_for_observer, leader_tx_id, WriteOrigin::UserWrite);
+        for r in &pending_queue.requests {
+            storage.notify_commit_observers(r.wal_entries.entries(), r.tx_id, WriteOrigin::UserWrite);
         }
 
         type MemUpdateBatch<'a> = (TxId, &'a [(Vec<u8>, Vec<u8>, u64)]);

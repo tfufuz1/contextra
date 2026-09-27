@@ -502,6 +502,10 @@ mod tests {
             ContextraError::KvQuantization("test".into()),
             ContextraError::DurabilityConfig("test".into()),
             ContextraError::PinBudgetExceeded("test".into()),
+            ContextraError::CrossDeviceLink {
+                source_path: "/a/file.sst".into(),
+                target_path: "/b/file.sst".into(),
+            },
         ];
         for v in &variants {
             let _ = format!("{v}");
@@ -1049,6 +1053,25 @@ mod tests {
         match err {
             ContextraError::PinBudgetExceeded(msg) => assert_eq!(msg, "Tenant 10 requested 100MB"),
             _ => panic!("Expected PinBudgetExceeded variant"),
+        }
+    }
+
+    #[test]
+    fn test_cross_device_link_display_and_helper() {
+        let err = ContextraError::cross_device_link("/mnt/a/1.sst", "/mnt/b/1.sst");
+        assert_eq!(
+            err.to_string(),
+            "Cross-device link failed: cannot hard link '/mnt/a/1.sst' to '/mnt/b/1.sst' across distinct filesystems/mounts"
+        );
+        match err {
+            ContextraError::CrossDeviceLink {
+                source_path,
+                target_path,
+            } => {
+                assert_eq!(source_path, "/mnt/a/1.sst");
+                assert_eq!(target_path, "/mnt/b/1.sst");
+            }
+            _ => panic!("Expected CrossDeviceLink variant"),
         }
     }
 

@@ -30,12 +30,16 @@
 // REVIEW-PASS[2/2] (TS: 2026-09-16T16:23:23Z) (SESSION: 8d62c439) PRÜFER-KONTEXT: FRESH
 
 mod guard;
+mod hardlink_cloner;
 mod manifest;
 mod meta;
 mod orphan;
 mod store;
 
 pub use guard::{CheckpointGuard, PinGuard};
+pub use hardlink_cloner::{
+    CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult,
+};
 pub use manifest::CheckpointManifest;
 pub use meta::{CheckpointMeta, StateCheckpoint};
 #[allow(deprecated)]

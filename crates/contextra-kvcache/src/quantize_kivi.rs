@@ -722,6 +722,65 @@ mod tests {
         assert_eq!(sample, decompressed);
     }
 
+    #[test]
+    fn test_v3_kivi_quantization_cosine_similarity_reconstruction() {
+        // Generate a synthetic attention KV tensor view [num_tokens: 32, num_channels: 64]
+        let num_tokens = 32;
+        let num_channels = 64;
+        let total_elems = num_tokens * num_channels;
+
+        let mut keys = Vec::with_capacity(total_elems);
+        let mut values = Vec::with_capacity(total_elems);
+
+        for t in 0..num_tokens {
+            for c in 0..num_channels {
+                // Keys: per-channel grouping (key_group_size 16)
+                let k_val = ((t as f32 * 0.1).sin() + (c as f32 * 0.05).cos()) * 2.5;
+                keys.push(k_val);
+
+                // Values: per-token quantization in KIVI. Generate values with smooth token-wise variation
+                let v_val = (t as f32 * 0.2).sin() + 1.5 + (c as f32 * 0.01);
+                values.push(v_val);
+            }
+        }
+
+        let raw = KvTensorView::new(keys.clone(), values.clone(), num_tokens, num_channels).unwrap();
+
+        let config = KiviQuantizeConfig {
+            key_group_size: 16,
+            quantize_values: true,
+        };
+
+        let block = kivi_quantize(&raw, config).unwrap();
+        let decompressed = kivi_dequantize(&block.packed, &block.meta).unwrap();
+
+        // Calculate Cosine Similarity between original raw and reconstructed keys/values
+        fn compute_cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+            let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+            let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm_a == 0.0 || norm_b == 0.0 {
+                0.0
+            } else {
+                dot / (norm_a * norm_b)
+            }
+        }
+
+        let key_cos_sim = compute_cosine_similarity(&keys, &decompressed.keys);
+        let val_cos_sim = compute_cosine_similarity(&values, &decompressed.values);
+
+        assert!(
+            key_cos_sim > 0.99,
+            "Key reconstruction Cosine Similarity must be > 0.99, got {:.6}",
+            key_cos_sim
+        );
+        assert!(
+            val_cos_sim > 0.99,
+            "Value reconstruction Cosine Similarity must be > 0.99, got {:.6}",
+            val_cos_sim
+        );
+    }
+
     proptest! {
         #[test]
         fn prop_compression_roundtrip(vec in proptest::collection::vec(0u8..255u8, 0..100)) {

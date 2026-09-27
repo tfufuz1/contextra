@@ -16,6 +16,7 @@ graph-connectivity-health = []
 edge-reinforcement-learning = []
 ppr-forward-push = []
 k-path-diffusion = []
+apprh-diffusion = []
 
 # Deprecated alias features for backward compatibility with contextra-db
 physio-percolation = ["graph-connectivity-health"]

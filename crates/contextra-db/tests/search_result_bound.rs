@@ -94,11 +94,29 @@ async fn proof_search_never_exceeds_k() {
 
     // B-1 Regression Guard: Ensure no unannotated usize::MAX in db source files
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let search_rs_path =
-        Path::new(&manifest_dir).join("../contextra-engine/src/collection/search.rs");
-    let _file_content = std::fs::read_to_string(&search_rs_path)
+    let search_dir =
+        Path::new(&manifest_dir).join("../contextra-engine/src/collection/search");
+    let search_dir = if search_dir.exists() {
+        search_dir
+    } else {
+        Path::new("crates/contextra-engine/src/collection/search").to_path_buf()
+    };
+
+    let mut _file_content = String::new();
+    if search_dir.is_dir() {
+        for entry in std::fs::read_dir(&search_dir).expect("read_dir search") {
+            let entry = entry.expect("dir entry");
+            if entry.path().extension().and_then(|s| s.to_str()) == Some("rs") {
+                _file_content.push_str(&std::fs::read_to_string(entry.path()).unwrap());
+            }
+        }
+    } else {
+        _file_content = std::fs::read_to_string(
+            Path::new(&manifest_dir).join("../contextra-engine/src/collection/search.rs"),
+        )
         .or_else(|_| std::fs::read_to_string("crates/contextra-engine/src/collection/search.rs"))
         .expect("Failed to read search.rs");
+    }
 
     let violations = _file_content
         .lines()
@@ -177,10 +195,6 @@ async fn proof_search_with_k_zero_returns_empty() {
 #[test]
 fn proof_usize_max_removed_from_search_path() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let search_rs_path =
-        Path::new(&manifest_dir).join("../contextra-engine/src/collection/search.rs");
-    let _file_content = std::fs::read_to_string(&search_rs_path)
-        .or_else(|_| std::fs::read_to_string("crates/contextra-engine/src/collection/search.rs"));
 
     let mut unannotated_found = Vec::new();
 
