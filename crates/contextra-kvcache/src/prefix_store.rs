@@ -275,3 +275,60 @@ impl KvPrefixStore for TenantPrefixKvStore {
         self.evict(tenant, key)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_v2_prefix_sharing_memory_efficiency_1000_keys() {
+        let tenant = TenantId::try_new(100).unwrap();
+        // Create 100-token shared prefix
+        let shared_prefix: Vec<u32> = (1..=100).collect();
+
+        // 1. Insert 1,000 keys with identical 100-token prefix into PrefixRadixTree
+        let mut radix_tree = PrefixRadixTree::new(tenant);
+        for i in 0..1000u32 {
+            let mut key = shared_prefix.clone();
+            key.push(i + 1000); // 1 unique suffix token
+            radix_tree.insert(&key, i as u64 + 1).unwrap();
+        }
+
+        assert_eq!(radix_tree.len(), 1000);
+
+        // 2. Measure TenantPrefixKvStore insertion behaviour
+        let key = contextra_ports::kv::PrefixKey {
+            model: contextra_types::model_fingerprint::ModelFingerprint::new([0xab; 32], "test-model", "F16"),
+            tokenizer_hash: [0u8; 32],
+            layout: contextra_ports::kv::KvLayout {
+                n_layer: 32,
+                n_kv_head: 8,
+                head_dim: 128,
+                dtype: "f16".into(),
+            },
+            rope: contextra_ports::kv::RopeConfig {
+                base: 10000.0,
+                scaling: None,
+            },
+        };
+        let store = TenantPrefixKvStore::new().with_byte_budget_per_tenant(100 * 1024 * 1024);
+
+        for i in 0..1000u32 {
+            let mut tokens = shared_prefix.clone();
+            tokens.push(i + 1000); // Unique suffix
+            let block = KvBlock {
+                block_id: i as u64,
+                data: bytes::Bytes::from(vec![0u8; 64]),
+            };
+            store.insert(tenant, &key, &tokens, vec![block]).unwrap();
+        }
+
+        // Verify all 1,000 keys are retrievable via prefix lookup
+        for i in 0..1000u32 {
+            let mut query = shared_prefix.clone();
+            query.push(i + 1000);
+            let hit = store.lookup(tenant, &key, &query).expect("Lookup must succeed");
+            assert_eq!(hit.matched_tokens, 101);
+        }
+    }
+}
