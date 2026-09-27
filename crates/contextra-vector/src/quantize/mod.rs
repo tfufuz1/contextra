@@ -412,7 +412,7 @@ impl ScalarQuantizer {
                 }
                 -dot
             }
-            _ => unreachable!(),
+            _ => return Err(contextra_core::ContextraError::invalid_input("Unsupported distance metric")),
         };
         Ok(acc)
     }
@@ -456,7 +456,7 @@ impl ScalarQuantizer {
             }
             DistanceMetric::Euclidean => dist_sq.sqrt(),
             DistanceMetric::DotProduct => -dot,
-            _ => unreachable!(),
+            _ => return Err(contextra_core::ContextraError::invalid_input("Unsupported distance metric")),
         };
         Ok(acc)
     }
