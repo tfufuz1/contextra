@@ -28,3 +28,7 @@ path = "tests/ssi_write_skew.rs"
 [[test]]
 name = "ssi_determinism_proptest"
 path = "tests/ssi_determinism_proptest.rs"
+
+[[test]]
+name = "visibility_proptest"
+path = "tests/visibility_proptest.rs"
