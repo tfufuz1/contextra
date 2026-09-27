@@ -301,6 +301,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
+ "contextra-core",
  "contextra-ports",
  "contextra-types",
  "dirs",
@@ -493,6 +494,7 @@ name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "contextra-ports",
  "contextra-types",
  "parking_lot",
  "rand",
