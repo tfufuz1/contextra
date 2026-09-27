@@ -85,6 +85,8 @@ pub use hyperedge_suggest::{
     HyperedgeSuggestError, ValidatedHyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
 };
 pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
+#[cfg(feature = "k-path-diffusion")]
+pub use path_rag::{KPathConfig, KPathDiffusion, KPathResult};
 #[cfg(feature = "graph-connectivity-health")]
 pub use percolation::{
     compute_percolation_health, find_rebonding_candidates, should_trigger_rebonding,

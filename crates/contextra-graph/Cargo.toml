@@ -15,6 +15,7 @@ docid-128 = ["contextra-types/docid-128", "contextra-store/docid-128"]
 graph-connectivity-health = []
 edge-reinforcement-learning = []
 ppr-forward-push = []
+k-path-diffusion = []
 
 # Deprecated alias features for backward compatibility with contextra-db
 physio-percolation = ["graph-connectivity-health"]

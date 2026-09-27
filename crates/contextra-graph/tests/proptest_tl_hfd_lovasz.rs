@@ -262,8 +262,7 @@ fn test_audit_f3_regression_15_node_hypergraph_truncation_cutoff() {
 
     // Case A: max_sort_size = 14 (just below 15)
     let truncated_14 = truncate_participants(&participants, get_x, 14);
-    let (trunc_fe_14, trunc_max_14, trunc_min_14) =
-        compute_lovasz_extension(&truncated_14, get_x);
+    let (trunc_fe_14, trunc_max_14, trunc_min_14) = compute_lovasz_extension(&truncated_14, get_x);
 
     let delta_14 = (full_fe - trunc_fe_14).abs();
     assert!(
@@ -275,8 +274,7 @@ fn test_audit_f3_regression_15_node_hypergraph_truncation_cutoff() {
 
     // Case B: max_sort_size = 13
     let truncated_13 = truncate_participants(&participants, get_x, 13);
-    let (trunc_fe_13, trunc_max_13, trunc_min_13) =
-        compute_lovasz_extension(&truncated_13, get_x);
+    let (trunc_fe_13, trunc_max_13, trunc_min_13) = compute_lovasz_extension(&truncated_13, get_x);
 
     let delta_13 = (full_fe - trunc_fe_13).abs();
     assert!(

@@ -7,6 +7,12 @@
 //! INTEGRATION: PathRAG liefert ein RRF-Signal neben Vektor- und BM25-Signal.
 //! Resultat von to_rrf_signal() wird in FusionEngine als drittes Signal eingespeist.
 
+#[cfg(feature = "k-path-diffusion")]
+pub mod k_path;
+
+#[cfg(feature = "k-path-diffusion")]
+pub use k_path::{KPathConfig, KPathDiffusion, KPathResult};
+
 pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use ahash::AHashMap;
 use contextra_types::DocId;
