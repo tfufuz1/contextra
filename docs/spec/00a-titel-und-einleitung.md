@@ -4,12 +4,12 @@ chapter: "00a"
 ---
 # Contextra — Finale Konsolidierte Gesamtspezifikation (Fassung 4 · SOTA-Algorithmen-Integration & Architekten-Review)
 
-> **Namenshinweis:** Dieses Dokument bezeichnete das Projekt bis Fassung 2.1 als „MemFuse". Mit Fassung 3
+> **Namenshinweis:** Dieses Dokument bezeichnete das Projekt bis Fassung 2.1 als „Contextra". Mit Fassung 3
 > ist der Produktname verbindlich **Contextra**. Die Umbenennung wurde mechanisch (Suchen/Ersetzen über den
-> gesamten Dokumenttext, keine Handarbeit) durchgeführt: `MemFuse` → `Contextra`, `memfuse-*`-Crate-Präfixe →
+> gesamten Dokumenttext, keine Handarbeit) durchgeführt: `Contextra` → `Contextra`, `contextra-*`-Crate-Präfixe →
 > `contextra-*`. Grund für den Namenswechsel und Prüfung der Registry-Verfügbarkeit (crates.io, PyPI, npm):
 > siehe Gespräch/Beratungsprotokoll; der bisherige Name kollidierte mit einem fremd belegten PyPI-Paket
-> (`memfuse`, Autor Calvin Ku) sowie mit mehreren gleichnamigen GitHub-Projekten. Frühere Bezeichnung „MemFuse
+> (`contextra`, Autor Calvin Ku) sowie mit mehreren gleichnamigen GitHub-Projekten. Frühere Bezeichnung „Contextra
 > Cognitive OS" wird nicht fortgeführt; siehe §2 zur aktualisierten Positionierung als eingebettete,
 > air-gapped-fähige Gedächtnisschicht statt „Cognitive OS"/„LLM OS" (Empfehlung der strategischen
 > Tiefenberatung, §3.3 dieses Beratungsdokuments — dort auch als Begründung archiviert).

@@ -452,7 +452,7 @@ mod tests {
             .divergence_history
             .back()
             .copied()
-            .expect("KL divergence should be recorded");
+            .expect("unreachable: watcher.update called with non-empty scores guarantees KL divergence is recorded in history");
 
         assert!(
             latest_kl.is_finite(),
@@ -483,7 +483,7 @@ mod tests {
             .divergence_history
             .back()
             .copied()
-            .expect("KL divergence should be recorded");
+            .expect("unreachable: watcher.update called with non-empty scores guarantees KL divergence is recorded in history");
 
         // Bei Clipping auf MAX_BIN_KL_CONTRIBUTION (10.0) für Bin 0 plus den kleinen Beiträgen der anderen Bins
         // muss der Wert strikt kleiner sein als der unclipped Wert (~13.12) und nahe 10.0 liegen.
@@ -547,7 +547,7 @@ mod tests {
             .divergence_history
             .back()
             .copied()
-            .expect("KL divergence should be recorded");
+            .expect("unreachable: watcher.update called with non-empty scores guarantees KL divergence is recorded in history");
 
         assert!(
             (actual_kl - expected_kl).abs() < 1e-6,

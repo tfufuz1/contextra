@@ -6,7 +6,7 @@ chapter: "00d"
 
 > **Geltung:** Dieser Teil führt jeden in Teil A2/§17/§18/§20 als offen (🔴), unverifiziert (🔍) oder als
 > Bridge/Stub markierten Punkt gegen den zum Prüfzeitpunkt tatsächlichen Repository-Zustand nach
-> (`github.com/tfufuz1/memfuse`, HEAD `d37a70b6`, 2.436 Commits Historie) und übernimmt die Priorisierung der
+> (`github.com/tfufuz1/contextra`, HEAD `d37a70b6`, 2.436 Commits Historie) und übernimmt die Priorisierung der
 > externen strategischen Tiefenberatung. Geprüft wurde durch Live-Klon und direkte Verifikation
 > (Datei-Existenz, `wc -l`, `grep` auf Funktions-/Typnamen, `git log`-Commit-Nachrichten und Cargo.toml-Inhalte)
 > — **nicht** aus Sekundärquellen übernommen, sofern nicht ausdrücklich als „laut Commit-Historie, nicht im
@@ -18,10 +18,10 @@ chapter: "00d"
 | Bereich | Referenz in dieser Spec | Status Fassung 2.1 | Status Fassung 3 (verifiziert) |
 |---|---|---|---|
 | Produkt-Fassade `remember/recall/forget/relate` | §2, §A2 | 🔴 nicht vorhanden, 50-Zeilen-Skelett | 🟢 `crates/contextra/src/agent_memory.rs` implementiert und über `lib.rs` re-exportiert; `AgentMemory` mit allen vier Methoden |
-| `contextra-rank`-Crate (vormals `memfuse-rank`) | §4, §A2.1 | 🔴 existiert nicht | 🟢 eigenes Crate, ~2.012 LOC, im Workspace registriert |
+| `contextra-rank`-Crate (vormals `contextra-rank`) | §4, §A2.1 | 🔴 existiert nicht | 🟢 eigenes Crate, ~2.012 LOC, im Workspace registriert |
 | `contextra-db`-Strangler-Shell | §A2.1 (D#-Tabelle) | 🔴 16.221 LOC, kein reines Re-Export | 🟢 auf 1.849 LOC reduziert (`lib.rs` allein 882 Zeilen), expliziter Commit „reduce contextra-db to pure re-export strangler shell" |
-| `contextra-core`-Deprecation | §A2.1 | 🔴 kein `#[deprecated]` | 🟢 20 `#[deprecated]`-Attribute, Crate ist reine Deprecation-Shell (136 Zeilen) |
-| MCP-Tool `contextra_forget` (vormals `memfuse_forget`) | §11, §16 (Abnahmekriterien MCP) | 🔴 fehlte | 🟢 implementiert, inkl. Pflichtparameter `confirm: true` als bewusste Sicherheitshürde |
+| `contextra-rank`-Crate (vormals `contextra-rank`) | §4, §A2.1 | 🔴 existiert nicht | 🟢 eigenes Crate, ~2.012 LOC, im Workspace registriert |
+| MCP-Tool `contextra_forget` (vormals `contextra_forget`) | §11, §16 (Abnahmekriterien MCP) | 🔴 fehlte | 🟢 implementiert, inkl. Pflichtparameter `confirm: true` als bewusste Sicherheitshürde |
 | PyPI-Publish-Workflow-Risiko | §10 (Sicherheitsmodell, Supply Chain) | 🔴 aktiver Tag-Trigger auf `v*.*.*`, höchstes Einzelrisiko laut Vorberichten | 🟢 Trigger entfernt; nur noch `workflow_dispatch` mit Pflichtfeld `confirm_package_name`, geprüft gegen den im Paket deklarierten Namen |
 | `default-members` (Workspace) | §0 (Meta) | 🔴 `contextra-infer-onnx` fälschlich enthalten, `contextra-sys`/`contextra-privacy` fehlten | 🟢 bereinigt: `infer-onnx` entfernt, `sys`/`privacy` ergänzt |
 | Pflicht-Integrationstests AK-4, AK-14, AK-15 | §15 (Test-Spezifikation) | 🔴 drei von vier AK-Tests fehlten | 🟢 `signal_kind_no_new_variant.rs`, `kv_locks_stable_shard.rs`, `ips_requires_propensity.rs` vorhanden |
