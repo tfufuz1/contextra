@@ -34,7 +34,7 @@ Fassung 3 **inhaltlich unverändert** in diese Datei übernommen.
 Alle Befunde durch direkten `git clone https://github.com/tfufuz1/contextra.git` plus `grep -n`/`wc -l`/`view`
 erhoben, nicht aus Sekundärquellen übernommen, sofern nicht ausdrücklich als Übernahme aus Teil C gekennzeichnet:
 
-- `git log -1`: `4b9387d6 … refactor(rename): memfuse -> contextra (mechanical, script-driven) (#3494)` —
+- `git log -1`: `4b9387d6 … refactor(rename): contextra -> contextra (mechanical, script-driven) (#3494)` —
   identischer Commit wie in Teil C zitiert.
 - `ppr.rs`: `forward_push_ppr` (Z. 177), `DensePowerIteration` (Z. 124), `PprAlgorithm::ShadowMode` (Z. 137) — bestätigt.
 - `fusion.rs`: 1332 Zeilen; `BoundedTopK<T>` Z. 222; `rrf_k`-Parameter Z. 419–439; `SignalKind`-Enum Z. 316–325
