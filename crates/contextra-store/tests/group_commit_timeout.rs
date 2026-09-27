@@ -101,3 +101,72 @@ async fn test_group_commit_follower_timeout_and_queue_recovery() {
         Some(bytes::Bytes::from_static(b"v_subsequent"))
     );
 }
+
+#[tokio::test]
+async fn test_group_commit_follower_timeout_preserves_other_followers() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        tx_timeout: Duration::from_millis(100),
+        group_commit_window_micros: 20_000, // 20ms batching window
+        ..Default::default()
+    };
+
+    let storage = Arc::new(LsmStorage::new(config).await.expect("new storage"));
+
+    let tx_leader = TxId::new(10);
+    let tx_follower_timeout = TxId::new(11);
+
+    storage.put(tx_leader, b"k_leader", b"v_leader").await.expect("put leader");
+    storage.put(tx_follower_timeout, b"k_f1", b"v_f1").await.expect("put f1");
+
+    // Configure Fault Injection: delay WAL append batch containing tx_leader by 400ms
+    DELAY_APPEND_FOR_TX.store(tx_leader.inner(), Ordering::SeqCst);
+    DELAY_APPEND_MS.store(400, Ordering::SeqCst);
+
+    let barrier = Arc::new(tokio::sync::Barrier::new(2));
+
+    let storage_leader = Arc::clone(&storage);
+    let barrier_leader = Arc::clone(&barrier);
+    let task_leader = tokio::spawn(async move {
+        barrier_leader.wait().await;
+        storage_leader.commit(tx_leader).await
+    });
+
+    let storage_f1 = Arc::clone(&storage);
+    let barrier_f1 = Arc::clone(&barrier);
+    let task_f1 = tokio::spawn(async move {
+        barrier_f1.wait().await;
+        storage_f1.commit(tx_follower_timeout).await
+    });
+
+    let (res_leader, res_f1) = tokio::join!(task_leader, task_f1);
+    let res_leader = res_leader.expect("leader join");
+    let res_f1 = res_f1.expect("f1 join");
+
+    DELAY_APPEND_FOR_TX.store(0, Ordering::SeqCst);
+    DELAY_APPEND_MS.store(0, Ordering::SeqCst);
+
+    let (follower_res, leader_res) = if res_leader.is_err() {
+        (res_leader, res_f1)
+    } else {
+        (res_f1, res_leader)
+    };
+
+    assert!(leader_res.is_ok(), "Leader commit must succeed: {:?}", leader_res);
+    let follower_err = follower_res.expect_err("Follower must time out");
+    assert!(
+        matches!(follower_err, ContextraError::CommitTimeout { .. }),
+        "Expected CommitTimeout, got {:?}",
+        follower_err
+    );
+
+    // Verify leader data was written properly and queue is clear for new transaction
+    let tx_next = TxId::new(12);
+    storage.put(tx_next, b"k_next", b"v_next").await.expect("put next");
+    let res_next = storage.commit(tx_next).await;
+    assert!(res_next.is_ok(), "Subsequent commit must succeed: {:?}", res_next);
+
+    let v_leader = storage.get(b"k_leader").await.expect("get leader");
+    assert_eq!(v_leader, Some(bytes::Bytes::from_static(b"v_leader")));
+}
