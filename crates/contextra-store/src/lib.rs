@@ -49,7 +49,10 @@ pub mod wal;
 pub use compaction::{CompactionConfig, CompactionEngine};
 pub use kv_locks::{KeyGuard, KvKeyLocks, LockError, MultiKeyGuard};
 #[cfg(not(loom))]
-pub use lsm::{LsmConfig, LsmStorage};
+pub use lsm::{
+    CommittedBatch, LsmConfig, LsmStorage, WalEntryRef, WalObserver, WriteOrigin,
+    DEFAULT_MAX_OBSERVER_LATENCY,
+};
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
 #[cfg(not(loom))]

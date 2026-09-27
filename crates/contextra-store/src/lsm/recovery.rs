@@ -434,6 +434,7 @@ impl LsmStorage {
             wal_queue_depth,
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
+            observers: parking_lot::RwLock::new(Vec::new()),
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {

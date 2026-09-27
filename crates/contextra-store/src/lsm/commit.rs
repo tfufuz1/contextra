@@ -1,5 +1,6 @@
 use super::*;
-use contextra_core::TxId;
+use contextra_core::{TxId, TOMBSTONE_BIT};
+use std::sync::Arc;
 
 impl LsmStorage {
     pub fn clear_intent_locks_for_tx(&self, tx_id: TxId) {
@@ -92,6 +93,93 @@ impl LsmStorage {
                 *seq,
                 tx_id.inner(),
             );
+        }
+        self.notify_observers(mem_updates, tx_id);
+    }
+
+    /// Registers a WAL observer for commit change data capture notifications.
+    pub fn register_observer(&self, observer: Arc<dyn WalObserver>) {
+        let mut obs = self.observers.write();
+        obs.push(observer);
+    }
+
+    /// Deregisters a previously registered WAL observer.
+    pub fn deregister_observer(&self, observer: &Arc<dyn WalObserver>) {
+        let mut obs = self.observers.write();
+        obs.retain(|o| !Arc::ptr_eq(o, observer));
+    }
+
+    /// Synchronously notifies all registered observers of committed WAL entries.
+    /// Observers exceeding `DEFAULT_MAX_OBSERVER_LATENCY` are immediately deregistered (fail-open).
+    pub(super) fn notify_observers(&self, mem_updates: &[(Vec<u8>, Vec<u8>, u64)], tx_id: TxId) {
+        let obs_guard = self.observers.read();
+        if obs_guard.is_empty() {
+            return;
+        }
+
+        let ops: Vec<crate::wal::WalOp> = mem_updates
+            .iter()
+            .map(|(key, value, seq)| {
+                if (seq & TOMBSTONE_BIT) != 0 {
+                    crate::wal::WalOp::Delete {
+                        tx_id,
+                        key: key.clone(),
+                    }
+                } else {
+                    crate::wal::WalOp::Put {
+                        tx_id,
+                        key: key.clone(),
+                        value: value.clone(),
+                    }
+                }
+            })
+            .collect();
+
+        let entries: Vec<WalEntryRef<'_>> = ops
+            .iter()
+            .zip(mem_updates.iter())
+            .map(|(op, (_k, _v, seq))| {
+                let raw_seq = if (seq & TOMBSTONE_BIT) != 0 {
+                    seq & !TOMBSTONE_BIT
+                } else {
+                    *seq
+                };
+                WalEntryRef { op, seq_no: raw_seq }
+            })
+            .collect();
+
+        if entries.is_empty() {
+            return;
+        }
+
+        let max_seq = entries.iter().map(|e| e.seq_no).max().unwrap_or(0);
+        let batch = CommittedBatch {
+            entries,
+            origin: WriteOrigin::UserWrite,
+        };
+
+        let mut slow_observers = Vec::new();
+        for observer in obs_guard.iter() {
+            let start = std::time::Instant::now();
+            observer.on_commit(&batch, max_seq, tx_id);
+            let elapsed = start.elapsed();
+            if elapsed > DEFAULT_MAX_OBSERVER_LATENCY {
+                slow_observers.push((Arc::clone(observer), elapsed));
+            }
+        }
+        drop(obs_guard);
+
+        if !slow_observers.is_empty() {
+            let mut obs_write = self.observers.write();
+            for (slow_obs, elapsed) in slow_observers {
+                tracing::warn!(
+                    tx_id = %tx_id.inner(),
+                    latency_us = elapsed.as_micros(),
+                    "WAL observer exceeded latency limit ({:?}); deregistering observer",
+                    DEFAULT_MAX_OBSERVER_LATENCY
+                );
+                obs_write.retain(|o| !Arc::ptr_eq(o, &slow_obs));
+            }
         }
     }
 }
