@@ -12,8 +12,11 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.4"
 [features]
-default = ["bandit-routing"]
+default = ["bandit-routing", "flow-corrected-thompson"]
 bandit-routing = []
 egress-sherman-morrison = ["bandit-routing"]
 flow-corrected-thompson = ["bandit-routing"]
