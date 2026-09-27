@@ -854,7 +854,7 @@ async fn test_no_retry_on_4xx_codes() {
                     400 => "HTTP/1.1 400 Bad Request",
                     404 => "HTTP/1.1 404 Not Found",
                     429 => "HTTP/1.1 429 Too Many Requests",
-                    _ => unreachable!(),
+                    _ => "HTTP/1.1 400 Bad Request",
                 };
                 let body = format!("{{\"error\":\"HTTP {}\"}}", status);
                 let response = format!(
