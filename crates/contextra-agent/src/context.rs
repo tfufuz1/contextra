@@ -12,6 +12,7 @@
 
 use contextra_db::{Collection, Contextra};
 use contextra_store::LsmStorage;
+use contextra_types::error::{CacheDirective, StepId};
 use contextra_types::{ContextraError, Result, TokenBudget};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -84,6 +85,10 @@ pub struct AgentContext {
     pub state_collection: Arc<Collection<LsmStorage>>,
     pub budget: TokenBudget,
     pub status: AgentStatus,
+    /// Active cache directive for the current workflow step.
+    pub current_cache_directive: CacheDirective,
+    /// History of cache directives set per step ID.
+    pub step_directives: HashMap<u64, CacheDirective>,
     /// Accumulates results and state transfers between steps.
     pub memory: HashMap<String, serde_json::Value>,
     /// History of attached background telemetry events.
@@ -128,10 +133,40 @@ impl AgentContext {
             state_collection,
             budget,
             status: AgentStatus::Idle,
+            current_cache_directive: CacheDirective::Auto,
+            step_directives: HashMap::new(),
             memory: HashMap::new(),
             events: VecDeque::new(),
             pending_routing_decision: None,
         })
+    }
+
+    /// Sets the active cache directive for the context.
+    pub fn set_cache_directive(&mut self, directive: CacheDirective) {
+        self.current_cache_directive = directive;
+    }
+
+    /// Returns the active cache directive for the context.
+    pub fn get_cache_directive(&self) -> &CacheDirective {
+        &self.current_cache_directive
+    }
+
+    /// Records a cache directive for a specific step ID.
+    pub fn set_step_cache_directive(&mut self, step_id: StepId, directive: CacheDirective) {
+        self.current_cache_directive = directive.clone();
+        self.step_directives.insert(step_id.inner(), directive);
+    }
+
+    /// Returns the appropriate `CacheDirective` for a workflow node / prompt role.
+    pub fn directive_for_node(&self, node_id: &str, step_id: StepId) -> CacheDirective {
+        let lower = node_id.to_lowercase();
+        if lower.contains("system") || lower.contains("prompt") {
+            CacheDirective::Pin { ttl: None }
+        } else if lower.contains("reasoning") || lower.contains("transient") {
+            CacheDirective::ReleaseAfterStep { step_id }
+        } else {
+            CacheDirective::Auto
+        }
     }
 
     /// Integrates a background telemetry event into the agent context memory and history.
@@ -164,6 +199,46 @@ impl AgentContext {
         }
         self.attach_event(event);
         Ok(())
+    }
+}
+
+/// Agent execution engine helper managing per-step cache directives during workflow execution.
+#[derive(Debug, Clone, Default)]
+pub struct AgentEngine {
+    /// Active cache directive set during step execution.
+    pub current_directive: CacheDirective,
+}
+
+impl AgentEngine {
+    /// Constructs a new `AgentEngine`.
+    pub fn new() -> Self {
+        Self {
+            current_directive: CacheDirective::Auto,
+        }
+    }
+
+    /// Determines the appropriate `CacheDirective` for a node ID / prompt role.
+    ///
+    /// - System prompt nodes -> `CacheDirective::Pin { ttl: None }`
+    /// - Transient reasoning steps -> `CacheDirective::ReleaseAfterStep { step_id }`
+    /// - Default -> `CacheDirective::Auto`
+    pub fn directive_for_step(&self, node_id: &str, step_id: StepId) -> CacheDirective {
+        let lower = node_id.to_lowercase();
+        if lower.contains("system") || lower.contains("prompt") {
+            CacheDirective::Pin { ttl: None }
+        } else if lower.contains("reasoning") || lower.contains("transient") {
+            CacheDirective::ReleaseAfterStep { step_id }
+        } else {
+            CacheDirective::Auto
+        }
+    }
+
+    /// Executes step configuration, updating context with per-step cache directives.
+    pub fn run(&mut self, ctx: &mut AgentContext, step_id: StepId, node_id: &str) -> CacheDirective {
+        let directive = self.directive_for_step(node_id, step_id);
+        self.current_directive = directive.clone();
+        ctx.set_step_cache_directive(step_id, directive.clone());
+        directive
     }
 }
 

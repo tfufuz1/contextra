@@ -6,7 +6,7 @@ chapter: "00e"
 
 > **Rolle dieses Teils:** Ich (Principal Senior Rust Architect für Contextra) habe für diese Fassung das
 > Repository `github.com/tfufuz1/contextra` live geklont (`git clone`, `HEAD 4b9387d6119be17180de21a0ea5b2be98121357a`,
-> Commit-Message „refactor(rename): memfuse -> contextra (mechanical, script-driven) (#3494)") — **derselbe
+> Commit-Message „refactor(rename): contextra -> contextra (mechanical, script-driven) (#3494)") — **derselbe
 > Commit**, gegen den bereits Teil C des Deep-Research-Berichts geprüft wurde. Das erlaubt einen direkten,
 > reproduzierbaren Zweitabgleich statt einer bloßen Übernahme fremder Befunde. Methodik: `grep`/`wc -l` auf
 > Datei-, Funktions- und Typnamen, `view` auf vollständige Modulinhalte, keine Ausführung von `cargo build`

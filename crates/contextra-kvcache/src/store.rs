@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use contextra_types::{ContextraError, TenantId};
+pub use contextra_types::error::{CacheDirective, StepId};
 use lru::LruCache;
 use parking_lot::RwLock;
 
@@ -21,6 +22,15 @@ use super::segment::KvSegment;
 /// Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache.
 pub type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>;
 
+/// Maximum allowed total pinned bytes per tenant for un-expiring pinned segments (`Pin { ttl: None }`).
+pub const MAX_PINNED_BYTES_PER_TENANT: u64 = 64 << 20; // 64 MiB
+
+#[derive(Debug, Clone)]
+struct SegmentMeta {
+    directive: CacheDirective,
+    pinned_at: std::time::Instant,
+}
+
 /// Kapselt den LRU-Cache und den Prefix-Radix-Baum aller KV-Segmente eines einzelnen Tenants.
 struct TenantState {
     #[allow(dead_code)]
@@ -28,6 +38,8 @@ struct TenantState {
     cache: LruCache<u64, KvSegment>,
     radix_tree: PrefixRadixTree,
     total_bytes: usize,
+    pinned_bytes: u64,
+    segment_meta: AHashMap<u64, SegmentMeta>,
 }
 
 impl TenantState {
@@ -37,12 +49,37 @@ impl TenantState {
             cache: LruCache::new(capacity),
             radix_tree: PrefixRadixTree::new(tenant_id),
             total_bytes: 0,
+            pinned_bytes: 0,
+            segment_meta: AHashMap::new(),
         }
     }
 
     /// O(1) insert. Evictiert das älteste unreferenzierte Segment, falls capacity überschritten.
     /// Garantiert, dass aktive Blöcke (`active_refs > 0`) niemals verworfen werden.
+    #[allow(dead_code)]
     fn insert_returning_evicted(&mut self, segment: KvSegment) -> Option<KvSegment> {
+        self.insert_returning_evicted_with_directive(segment, &CacheDirective::Auto)
+            .ok()
+            .flatten()
+    }
+
+    /// Insert with explicit cache directive and pin budget checking.
+    fn insert_returning_evicted_with_directive(
+        &mut self,
+        segment: KvSegment,
+        directive: &CacheDirective,
+    ) -> Result<Option<KvSegment>, ContextraError> {
+        let req_bytes = segment.len() as u64;
+
+        if matches!(directive, CacheDirective::Pin { ttl: None }) {
+            if self.pinned_bytes.saturating_add(req_bytes) > MAX_PINNED_BYTES_PER_TENANT {
+                return Err(ContextraError::pin_budget_exceeded(format!(
+                    "Tenant {:?} requested {} pinned bytes, exceeding limit of {} bytes (current pinned: {})",
+                    self.tenant_id, req_bytes, MAX_PINNED_BYTES_PER_TENANT, self.pinned_bytes
+                )));
+            }
+        }
+
         let id = segment.segment_id;
         let bytes = segment.len();
 
@@ -62,9 +99,27 @@ impl TenantState {
 
         if let Some((_, old)) = self.cache.push(id, segment) {
             self.total_bytes = self.total_bytes.saturating_sub(old.len());
+            if let Some(old_meta) = self.segment_meta.remove(&id) {
+                if matches!(old_meta.directive, CacheDirective::Pin { ttl: None }) {
+                    self.pinned_bytes = self.pinned_bytes.saturating_sub(old.len() as u64);
+                }
+            }
         }
+
         self.total_bytes = self.total_bytes.saturating_add(bytes);
-        evicted
+        if matches!(directive, CacheDirective::Pin { ttl: None }) {
+            self.pinned_bytes = self.pinned_bytes.saturating_add(req_bytes);
+        }
+
+        self.segment_meta.insert(
+            id,
+            SegmentMeta {
+                directive: directive.clone(),
+                pinned_at: std::time::Instant::now(),
+            },
+        );
+
+        Ok(evicted)
     }
 
     /// O(1) get mit LRU-Update.
@@ -92,7 +147,28 @@ impl TenantState {
     fn remove(&mut self, id: u64) -> Option<KvSegment> {
         let seg = self.cache.pop(&id)?;
         self.total_bytes = self.total_bytes.saturating_sub(seg.len());
+        if let Some(meta) = self.segment_meta.remove(&id) {
+            if matches!(meta.directive, CacheDirective::Pin { ttl: None }) {
+                self.pinned_bytes = self.pinned_bytes.saturating_sub(seg.len() as u64);
+            }
+        }
         Some(seg)
+    }
+
+    /// Releases transient segments associated with a completed step.
+    fn release_step(&mut self, step_id: StepId) {
+        let ids_to_release: Vec<u64> = self
+            .segment_meta
+            .iter()
+            .filter_map(|(&id, meta)| match &meta.directive {
+                CacheDirective::ReleaseAfterStep { step_id: target } if *target == step_id => Some(id),
+                _ => None,
+            })
+            .collect();
+
+        for id in ids_to_release {
+            self.remove(id);
+        }
     }
 
     /// Candidate eviction selection incorporating LRU access age and attention scores.
@@ -105,13 +181,25 @@ impl TenantState {
             return None;
         }
 
+        let now = std::time::Instant::now();
         let unref_ids: Vec<u64> = self
             .cache
             .iter()
             .rev()
             .filter_map(|(&id, seg)| {
                 if seg.active_refs() == 0 {
-                    Some(id)
+                    let is_pinned = self.segment_meta.get(&id).map_or(false, |meta| {
+                        match &meta.directive {
+                            CacheDirective::Pin { ttl: None } => true,
+                            CacheDirective::Pin { ttl: Some(dur) } => now < meta.pinned_at + *dur,
+                            _ => false,
+                        }
+                    });
+                    if !is_pinned {
+                        Some(id)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -257,8 +345,17 @@ impl TenantIsolatedKvStore {
         (tenant.inner() as usize) & (self.shard_count - 1)
     }
 
-    /// Fügt ein Segment für einen bestimmten Tenant ein.
-    pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
+    /// Inserts a segment with an explicit declarative cache directive.
+    pub fn insert_segment_with_directive(
+        &self,
+        tenant: TenantId,
+        segment: KvSegment,
+        directive: CacheDirective,
+    ) -> Result<(), ContextraError> {
+        if matches!(directive, CacheDirective::NeverCache) {
+            return Ok(());
+        }
+
         let idx = self.shard_idx(tenant);
         let capacity = self.segment_capacity;
         let evicted = {
@@ -266,13 +363,32 @@ impl TenantIsolatedKvStore {
             let state = shard
                 .entry(tenant)
                 .or_insert_with(|| TenantState::new(tenant, capacity));
-            state.insert_returning_evicted(segment)
+            state.insert_returning_evicted_with_directive(segment, &directive)?
         };
 
         if let Some(ev) = evicted {
             let handler_opt = self.spill_handler.read().clone();
             if let Some(handler) = handler_opt {
                 handler(tenant, ev.segment_id, ev.to_spill_bytes());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Fügt ein Segment für einen bestimmten Tenant ein.
+    pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
+        let _ = self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto);
+    }
+
+    /// Releases transient cache segments created during a specific step.
+    pub fn release_step(&self, tenant: TenantId, step_id: StepId) {
+        let idx = self.shard_idx(tenant);
+        let mut shard = self.shards[idx].lock.write();
+        if let Some(state) = shard.get_mut(&tenant) {
+            state.release_step(step_id);
+            if state.is_empty() {
+                shard.remove(&tenant);
             }
         }
     }
