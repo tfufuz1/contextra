@@ -314,7 +314,8 @@ mod tests {
     }
 
     #[test]
-    fn test_approve_transition_success_and_double_approve_fails() -> Result<(), ApprovalTransitionError> {
+    fn test_approve_transition_success_and_double_approve_fails(
+    ) -> Result<(), ApprovalTransitionError> {
         let caps = WasmCapabilities::default();
         let request = ApprovalRequest::new("req-1".to_string(), &caps, 1000, 5000);
 
@@ -359,9 +360,7 @@ mod tests {
         assert!(request.is_expired(1600));
 
         // Attempting to approve after expiration fails
-        let err_approve = request
-            .clone()
-            .approve("admin".to_string(), 1500);
+        let err_approve = request.clone().approve("admin".to_string(), 1500);
 
         assert_eq!(
             err_approve,
