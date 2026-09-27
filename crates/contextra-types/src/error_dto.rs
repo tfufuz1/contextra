@@ -345,6 +345,17 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "actual_hmac": actual_hmac,
                 })),
             },
+            ContextraError::CrossDeviceLink {
+                source_path,
+                target_path,
+            } => Self {
+                kind: "CrossDeviceLink".to_string(),
+                message: err.to_string(),
+                details: Some(serde_json::json!({
+                    "source_path": source_path,
+                    "target_path": target_path,
+                })),
+            },
         }
     }
 }
@@ -501,6 +512,13 @@ mod tests {
                     actual_hmac: [0x22; 32],
                 },
                 "WalTruncationDetected",
+            ),
+            (
+                ContextraError::CrossDeviceLink {
+                    source_path: "/a".into(),
+                    target_path: "/b".into(),
+                },
+                "CrossDeviceLink",
             ),
         ];
 

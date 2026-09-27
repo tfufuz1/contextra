@@ -20,7 +20,7 @@ pub mod wasi;
 pub use approval::{
     classify_risk, ApprovalRequest, ApprovalRisk, ApprovalStatus, ApprovalTransitionError,
 };
-pub use capabilities::WasmCapabilities;
+pub use capabilities::{MergeOperatorCapabilities, WasmCapabilities};
 pub use error::SandboxError;
 pub use executor::WasmExecutor;
 pub use output::WasmOutput;

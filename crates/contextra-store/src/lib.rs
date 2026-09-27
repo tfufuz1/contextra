@@ -51,7 +51,7 @@ pub use compaction::{
         AdaptiveCompactionPlan, AdaptiveCompactionPlanner, CompactionStrategy,
         CostBasedAdaptivePlanner, WorkloadMetrics, WorkloadMetricsSnapshot,
     },
-    CompactionConfig, CompactionEngine,
+    CompactionConfig, CompactionEngine, MergeOperator, TtlMetadata,
 };
 pub use kv_locks::{KeyGuard, KvKeyLocks, LockError, MultiKeyGuard};
 #[cfg(not(loom))]
