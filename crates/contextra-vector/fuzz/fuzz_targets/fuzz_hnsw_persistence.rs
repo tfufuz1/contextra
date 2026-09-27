@@ -77,6 +77,7 @@ fuzz_target!(|input: HnswPersistInput| {
             quantize: false,
             quantizer_recalibration_sample_size: 100,
             quantizer_drift_threshold: 0.10,
+            compute_pool: None,
         };
 
         let index = match HnswIndex::try_new(config.clone()) {
