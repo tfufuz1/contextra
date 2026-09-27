@@ -20,3 +20,11 @@ thiserror = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }
 proptest = "1.4"
+
+[[test]]
+name = "ssi_write_skew"
+path = "tests/ssi_write_skew.rs"
+
+[[test]]
+name = "ssi_determinism_proptest"
+path = "tests/ssi_determinism_proptest.rs"

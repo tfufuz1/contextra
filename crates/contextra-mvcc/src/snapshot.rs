@@ -139,6 +139,7 @@ impl Drop for SnapshotGuard {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use proptest::prop_assert_eq;
