@@ -24,7 +24,7 @@ cargo run -p contextra-mcp --bin contextra-mcp -- --db-path ~/.contextra --allow
 
 ### Voraussetzungen & Provider
 
-- Ein laufendes [Ollama](https://ollama.com) Instanz (Standard-URL: `http://localhost:11434`) mit installiertem Embedding-Modell (z. B. `nomic-embed-text`) oder ein alternativer Provider (ONNX / Mock).
+- Standardmäßig nutzt `contextra-mcp` den Mock-Provider (oder Candle/ONNX). Optional kann über das Opt-in Feature `ollama` eine laufende Ollama-Instanz angebunden werden.
 
 ### Entwicklermodus (Kompilierung aus Quellcode)
 
@@ -48,7 +48,7 @@ Der Server kommuniziert ausschließlich über Standard I/O (stdio) via JSON-RPC 
 | `--db-path <PFAD>` | `./contextra_data` | Pfad zum Contextra-Datenbankverzeichnis |
 | `--allow-write` | *deaktiviert* | Schreibende Operationen (`contextra_insert`) erlauben |
 | `--read-only` | *aktiviert* | Erzwingt Read-Only-Modus (Schreibzugriffe gesperrt) |
-| `--provider <TYPE>` | `ollama` | Embedding-Provider (`ollama`, `onnx`, `mock`) |
+| `--provider <TYPE>` | `mock` | Embedding-Provider (`mock`, `candle`, `onnx`, `ollama` [opt-in]) |
 | `--ollama-url <URL>` | `http://localhost:11434` | Ollama-Server URL |
 | `--embed-model <NAME>` | `nomic-embed-text` | Name des Ollama Embedding-Modells |
 | `--onnx-model-path <PFAD>` | *keiner* | Pfad zum ONNX-Modell (nur bei ONNX-Feature) |

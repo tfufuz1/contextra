@@ -1,6 +1,6 @@
-# Contextra Cognitive OS — Systemarchitektur & Ring-Modell
+# Contextra Memory Engine — Systemarchitektur & Ring-Modell
 
-Dieses Dokument ist die maßgebliche technische Architekturbeschreibung des Contextra Cognitive OS. Es übersetzt die normative Gesamtspezifikation (`README.md`) in eine vertiefte Systembeschreibung, dokumentiert den tatsächlichen Crate-Bestand, das Ring-0–4-Modell, die Layering-Invarianten und die bekannten Abweichungen zwischen dem Soll- und Ist-Zustand.
+Dieses Dokument ist die maßgebliche technische Architekturbeschreibung der Contextra Memory Engine. Es übersetzt die normative Gesamtspezifikation (`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`) in eine vertiefte Systembeschreibung, dokumentiert den Crate-Bestand (34 Crates), das Ring-0–4-Modell, die Single-Node Ein-Prozess-Garantie (`cargo add contextra`), die Layering-Invarianten und das Inferenz-Modell (Candle als Standard).
 
 ---
 
@@ -45,7 +45,7 @@ Im Zielmodell (`ARCHITECTURE.md` / `README.md` §4.2) erhält die Engine stattde
 <a id="2-crate-inventar"></a>
 ## 2. Crate-Inventar (Ist-Zustand)
 
-Die folgende Tabelle führt alle 33 im Repository unter `crates/` vorgefundenen Fach-Crates auf, eingeordnet in das Ring-Modell basierend auf ihrem tatsächlichen Stand:
+Die folgende Tabelle führt alle 34 im Repository unter `crates/` vorgefundenen Fach-Crates auf, eingeordnet in das Ring-Modell basierend auf Spezifikation v9:
 
 | Crate-Name | Ring | Verantwortlichkeit (1 Satz) | Status |
 |---|---|---|---|

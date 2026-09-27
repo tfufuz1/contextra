@@ -9,7 +9,7 @@ Kommuniziert mit Ollama-Instanzen für Embedding- und LLM-Inferenz, führt Promp
 ## Ring-Zugehörigkeit & Status
 
 - **Ring:** Ring 2 (Blatt-Crate / HTTP-Inferenz)
-- **Status:** 🟢 Fertig
+- **Status:** 🟢 Fertig (Rein Opt-in via `ollama` Feature, aus `default-members` ausgelagert gemäß Spezifikation v9)
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
 ## Öffentliche API-Übersicht

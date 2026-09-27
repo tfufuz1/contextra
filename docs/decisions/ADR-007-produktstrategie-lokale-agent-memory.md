@@ -1,8 +1,8 @@
-# ADR-007: Produktstrategie — Lokale Agent-Memory-Library (Richtung C) [TEILWEISE ERSETZT durch ADR-018 bzgl. Vertriebskanal-Priorisierung, 2026-08-24]
+# ADR-007: Produktstrategie — Lokale Agent-Memory-Library (Pure Rust) [AKTUALISIERT durch Spezifikation v9, 2026-09-27]
 
-*   **Datum**: 2026-07-19
+*   **Datum**: 2026-07-19 (Aktualisiert: 2026-09-27)
 *   **Status**: ✅ Final
-*   **Entscheidung**: Contextra wird als **eingebettete 4-Signal-Memory-Engine für lokale AI-Agenten** positioniert — kein Server, kein Docker, kein Cloud-Account. Primäre Vertriebskanäle: `pip install contextra` (PyPI) und `cargo add contextra-db` (crates.io). Richtung A (Sovereign Edge-DB) ist der langfristige Erweiterungspfad auf derselben Codebasis, nicht ein separater Pivot.
+*   **Entscheidung**: Contextra wird als **air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten** positioniert — ein `cargo add contextra`, kein Server. Primärer Vertriebskanal: Pure Rust Bibliothek (`cargo add contextra`) und B2B2G-Systemhäuser. Python-Bindings (`contextra-py`) sind rein opt-in und aus default-members ausgelagert.
 *   **Alternativen**:
     - (A) Air-Gapped / Sovereign Edge-DB — strategisch wertvoll, aber Enterprise-Vertrieb als Solo-Entwickler aktuell nicht realisierbar.
     - (B) DACH Enterprise-Search (Morphologie-Fokus) — das Morphologie-Merkmal ist zu schmal für ein eigenständiges Produkt, aber wertvoll als Differenzierungsfeature innerhalb von C.

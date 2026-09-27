@@ -1,6 +1,6 @@
 # Contextra
 
-Contextra ist eine souveräne, vollständig lokal betriebene Gedächtnis- und Ausführungsschicht für KI-Agenten, geschrieben in Pure Rust. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25 / BM25F), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und Contextual-Bandit-Routing in einem einzigen, latenzarmen lokalen Speicher- und Inferenzkern.
+Contextra ist eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — ein `cargo add`, kein Server. Sie vereint Vektor-Einbettungen (HNSW / DiskANN), Volltextsuche (BM25 / BM25F), Graph-Traversierungen (Forward-Push PPR, Leiden-Community-Detection) und hybride Signal-Fusion in einer eingebetteten Pure Rust Bibliothek.
 
 > **Dokumentationsstand:** Normativ abgestimmt mit der **[Finalen Produktspezifikation (Synthese)](docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**.
 
@@ -9,12 +9,13 @@ Contextra ist eine souveräne, vollständig lokal betriebene Gedächtnis- und Au
 ## Produktthese & Alleinstellungsmerkmale
 
 1. **Beweisbarkeit statt Zusage:** Löschung (`DeletionProof`), Datenzugriff und Agentenhandlungen sind kryptographisch nachprüfbar und ohne Contextra-Zugriff extern verifizierbar.
-2. **Air-Gap-Fähigkeit:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys und ohne Telemetrie.
-3. **Deterministische Performance:** Pure Rust, kein GC, Kaltstart < 50 ms, Zero-Panic-Garantie im Produktionspfad.
-4. **Ein Kern, zwei Märkte:** Ein einziger verifizierter Kern bedient sowohl den performance-getriebenen Personal-/Agent-AI-Nutzer als auch den nachweispflichtigen regulierten Betrieb (über Feature-Kompilation entkoppelt):
-   - **Ring `fast`:** MIT/Apache-2.0, quelloffen. Vektor+Text+Graph-Retrieval, Bandit-Routing, lokale Inferenz.
+2. **Air-Gap-Fähigkeit & Ein-Prozess-Garantie:** Läuft vollständig ohne Netzwerk, ohne externe API-Keys, ohne separaten Serverprozess und ohne Telemetrie im selben Prozess wie die Anwendung des Nutzers (`cargo add contextra`).
+3. **Pure Rust Inferenz (Candle):** Lokale GGUF-Inferenz ohne C++ / CUDA FFI-Abhängigkeiten oder extern laufende Dämonen.
+4. **Deterministische Performance:** Pure Rust, kein GC, Kaltstart < 50 ms, Zero-Panic-Garantie im Produktionspfad (P7) und injizierter Determinismus (P28).
+5. **Drei abgestufte Feature-Ringe:**
+   - **Ring `fast`:** MIT/Apache-2.0, quelloffen. Vektor+Text+Graph-Retrieval, Candle-Inferenz, Bandit-Routing.
    - **Ring `sovereign`:** Quelloffener Krypto-Code (Löschbeweis, Privacy-Gateway, Zero-Net-Traffic).
-   - **Ring `compliance`:** Closed-Source, kommerziell (Lizenzschicht, Mandanten-Scoping, BSI/GDPR-Reporting).
+   - **Ring `compliance`:** Kommerziell (Lizenzschicht, Mandanten-Scoping, BSI/DSGVO-Reporting).
 
 ---
 
@@ -29,10 +30,11 @@ Contextra ist eine souveräne, vollständig lokal betriebene Gedächtnis- und Au
 | **Contextual-Bandit-Routing** | `fast` | `contextra-adapt` | 🟢 Produktiv | LinUCB, Sherman-Morrison, FC-TS, Lyapunov-Drift-Regler & PID. |
 | **LSM Storage Engine & WAL** | `fast` | `contextra-store` | 🟢 Produktiv | LSM-Tree, WAL (Group-Commit, HMAC-Kette), MVCC-Pinning. |
 | **KV-Cache v2 & Zero-Copy IPC** | `fast` | `contextra-kvcache` | 🟢 Produktiv | Prefix-Radix-Baum, Tiering, AEAD, Segmentdateien. |
-| **Local Inference Backends** | `fast` | `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx` | 🟢 Produktiv | GGUF/Candle, Ollama HTTP, ONNX/ort Reranker. |
-| **Model Context Protocol** | `fast` | `contextra-mcp` | 🟢 Produktiv | JSON-RPC 2.0 stdio MCP Server für AI Agenten. |
-| **Python Bindings (`contextra-py`)** | `fast` | `contextra-py` | 🟢 Produktiv | PyO3 FFI Bindings für Python, GIL-safe, Zero-Copy NumPy. |
-| **WASM-Sandbox** | `fast` | `contextra-sandbox` | 🟢 Produktiv | Wasmtime Isolation, Fuel / Wall-Clock Budgets. |
+| **Local Inference Backend (Candle)** | `fast` | `contextra-infer-candle` | 🟢 Produktiv | Pure Rust GGUF/Candle als Standard-Inferenzbackend. |
+| **Opt-in Inference Backends** | `fast` | `contextra-infer-ollama`, `contextra-infer-onnx` | 🟢 Produktiv | Ollama HTTP & ONNX/ort Reranker (explizites Opt-in). |
+| **Model Context Protocol** | `fast` | `contextra-mcp` | 🟢 Produktiv | JSON-RPC 2.0 stdio MCP Server für AI Agenten (`contextra` ohne Ollama). |
+| **Python Bindings (`contextra-py`)** | Opt-in | `contextra-py` | 🟢 Produktiv | FFI-Bindings für Python (aus default-members entfernt). |
+| **WASM-Sandbox** | Opt-in | `contextra-sandbox` | 🟢 Produktiv | Wasmtime Isolation (aus default-members entfernt). |
 | **Kryptographischer Löschbeweis** | `sovereign` | `contextra-crypto` | 🟢 Produktiv | `DeletionProof`, AEAD-Schlüsselhierarchie, Anti-Tamper. |
 | **Privacy Gateway** | `sovereign` | `contextra-privacy` | 🟢 Produktiv | Egress-Gateway, PII-Vault, DLP, Prompt-Injection-Filter. |
 | **Lizenz- & Compliance-Schicht** | `compliance` | `contextra-license` | 🔒 Closed | Lizenzdurchsetzung, BSI TR-02102-1 Audit, Mandanten-Scoping. | <!-- crate-ref-ignore -->
@@ -41,11 +43,11 @@ Contextra ist eine souveräne, vollständig lokal betriebene Gedächtnis- und Au
 
 ## Installation & Einbindung
 
-Füge `contextra-db` oder `contextra` zu deiner `Cargo.toml` hinzu:
+Füge `contextra` zu deiner `Cargo.toml` hinzu:
 
 ```toml
 [dependencies]
-contextra-db = "0.1"
+contextra = "0.1"
 tokio = { version = "1.0", features = ["full"] }
 serde_json = "1.0"
 ```
