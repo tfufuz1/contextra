@@ -948,8 +948,12 @@ dependencies = [
 name = "contextra-license"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "contextra-ports",
  "contextra-types",
+ "ed25519-dalek",
+ "rand 0.8.8",
+ "serde",
  "thiserror 2.0.20",
 ]
 

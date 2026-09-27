@@ -11,5 +11,11 @@ description = "License and activation enforcement gate layer for Contextra featu
 
 [dependencies]
 thiserror = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+
+[dev-dependencies]
+rand = { workspace = true }
