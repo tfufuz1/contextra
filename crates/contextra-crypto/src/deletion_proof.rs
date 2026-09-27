@@ -21,8 +21,21 @@
 use crate::error::CryptoError;
 #[cfg(test)]
 use contextra_crypto::error::CryptoError;
-use contextra_types::{CollectionId, ContextraError, DocId, Result, TenantId, TxId};
+use contextra_types::{
+    error::HnswDeletionError, CollectionId, ContextraError, DocId, Result, TenantId, TxId,
+};
 use serde::{Deserialize, Serialize};
+
+/// Attestation confirming synchronous neighborhood graph repair for vector deletions.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GraphRepairAttestation {
+    /// Document ID whose neighborhood pointers were repaired.
+    pub doc_id: DocId,
+    /// Verified confirmation that no ghost pointers remain.
+    pub verified_no_ghost_pointers: bool,
+    /// Unix timestamp when the repair was attested.
+    pub attested_at: i64,
+}
 
 /// Berechnet den Blake3-Hash einer deterministisch sortierten Liste gelöschter Schlüssel mit Längenpräfix.
 ///
@@ -277,6 +290,9 @@ pub struct DeletionProof {
     pub covered_layers: Vec<DeletionLayer>,
     /// Pflicht für DSGVO Art. 17-Compliance.
     pub excluded_scopes: Vec<ExcludedScope>,
+    /// Attestierungen synchroner Nachbarschaftsreparaturen im HNSW-Graphen.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub graph_repair: Vec<GraphRepairAttestation>,
     /// Kryptographische Quittung H(hmac_prev || delete_event) der WAL-HMAC-Kette.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub wal_chain_receipt: Option<[u8; 32]>,
@@ -370,6 +386,7 @@ impl DeletionProof {
             signature: signature.to_vec(),
             covered_layers,
             excluded_scopes,
+            graph_repair: Vec::new(),
             wal_chain_receipt,
             integrity_warning: None,
         })
@@ -382,6 +399,8 @@ impl DeletionProof {
         deleted_after_tx: TxId,
         covered_layers: Vec<LayerCleanupProof>,
         excluded_scopes: Vec<ExcludedScope>,
+        attested_at: i64,
+        graph_repair: &[GraphRepairAttestation],
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         Self::create_with_wal_receipt_v3(
@@ -391,6 +410,8 @@ impl DeletionProof {
             covered_layers,
             excluded_scopes,
             None,
+            attested_at,
+            graph_repair,
             signing_key,
         )
     }
@@ -403,59 +424,55 @@ impl DeletionProof {
         covered_layers: Vec<LayerCleanupProof>,
         excluded_scopes: Vec<ExcludedScope>,
         wal_chain_receipt: Option<[u8; 32]>,
+        attested_at: i64,
+        graph_repair: &[GraphRepairAttestation],
         signing_key: &ed25519_dalek::SigningKey,
     ) -> Result<Self> {
         deleted_keys.sort();
         let deleted_keys_hash = hash_deleted_keys_length_prefixed(&deleted_keys);
 
-        let scope_bytes =
-            bincode::serialize(&scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
-        let tx_bytes = deleted_after_tx.0.to_le_bytes();
-
         let covered_layers: Vec<DeletionLayer> =
             covered_layers.into_iter().map(|p| p.layer).collect();
 
-        let covered_layers_bytes = bincode::serialize(&covered_layers)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
-        let excluded_scopes_bytes = bincode::serialize(&excluded_scopes)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+        if covered_layers.contains(&DeletionLayer::HnswIndex) && graph_repair.is_empty() {
+            return Err(ContextraError::GraphRepairFailed(
+                HnswDeletionError::VerificationFailed {
+                    remaining_pointers: 1,
+                },
+            ));
+        }
 
-        let receipt_bytes = wal_chain_receipt.unwrap_or([0u8; 32]);
-        let receipt_part = if wal_chain_receipt.is_some() {
-            receipt_bytes.as_slice()
+        let timestamp = if attested_at >= 0 {
+            attested_at as u64
         } else {
-            &[]
+            0u64
         };
 
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        let mut payload = Vec::new();
-        payload.extend_from_slice(&scope_bytes);
-        payload.extend_from_slice(&deleted_keys_hash);
-        payload.extend_from_slice(&tx_bytes);
-        payload.extend_from_slice(&timestamp.to_le_bytes());
-        payload.extend_from_slice(&covered_layers_bytes);
-        payload.extend_from_slice(&excluded_scopes_bytes);
-        payload.extend_from_slice(receipt_part);
-
-        use ed25519_dalek::Signer;
-        let sig = signing_key.sign(&payload);
-
-        Ok(Self {
+        let proof_stub = Self {
             signature_version: 3,
             scope,
             deleted_keys_hash,
             deleted_after_tx,
             timestamp,
-            signature: sig.to_bytes().to_vec(),
+            signature: Vec::new(),
             covered_layers,
             excluded_scopes,
+            graph_repair: graph_repair.to_vec(),
             wal_chain_receipt,
             integrity_warning: None,
-        })
+        };
+
+        let payload = proof_stub
+            .construct_v3_payload()
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+
+        use ed25519_dalek::Signer;
+        let sig = signing_key.sign(&payload);
+
+        let mut proof = proof_stub;
+        proof.signature = sig.to_bytes().to_vec();
+
+        Ok(proof)
     }
 
     /// Verifiziert Signatur.
@@ -743,6 +760,8 @@ mod tests {
                 LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
             ],
             vec![ExcludedScope::LlmParameterMemory],
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();
@@ -766,6 +785,8 @@ mod tests {
             TxId(10),
             vec![],
             vec![],
+            1700000000,
+            &[],
             keypair1.signing_key(),
         )
         .unwrap();
@@ -785,6 +806,8 @@ mod tests {
             TxId(10),
             vec![],
             vec![],
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();
@@ -809,6 +832,8 @@ mod tests {
             ],
             vec![ExcludedScope::LlmParameterMemory],
             Some([0xABu8; 32]),
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();
@@ -861,6 +886,8 @@ mod tests {
             TxId(10),
             vec![],
             vec![],
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();
@@ -915,6 +942,7 @@ mod tests {
             signature: v1_signature.to_vec(),
             covered_layers: vec![],
             excluded_scopes: vec![],
+            graph_repair: vec![],
             wal_chain_receipt: None,
             integrity_warning: None,
         };
@@ -935,6 +963,8 @@ mod tests {
             TxId(10),
             vec![],
             vec![],
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();
@@ -945,6 +975,8 @@ mod tests {
             TxId(10),
             vec![],
             vec![],
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();
@@ -1243,6 +1275,7 @@ mod tests {
             signature: v1_signature.to_vec(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            graph_repair: vec![],
             wal_chain_receipt: None,
             integrity_warning: None,
         };
@@ -1300,6 +1333,7 @@ mod tests {
             signature: v1_signature.to_vec(),
             covered_layers: vec![DeletionLayer::LsmMemtable],
             excluded_scopes: vec![ExcludedScope::LlmParameterMemory],
+            graph_repair: vec![],
             wal_chain_receipt: None,
             integrity_warning: None,
         };
@@ -1436,6 +1470,8 @@ mod tests {
                 LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
             ],
             vec![ExcludedScope::LlmParameterMemory],
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();
@@ -1498,6 +1534,8 @@ mod tests {
                 LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
             ],
             vec![ExcludedScope::LlmParameterMemory],
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();
@@ -1521,6 +1559,8 @@ mod tests {
             ],
             vec![ExcludedScope::LlmParameterMemory],
             Some([0xABu8; 32]),
+            1700000000,
+            &[],
             keypair.signing_key(),
         )
         .unwrap();

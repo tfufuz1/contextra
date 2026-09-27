@@ -23,7 +23,7 @@ Inkompatibilitäten der vorherigen Prompter-Version (v32):
 
 | Ring / Layer | Crate Name | Cargo Package | Rolle & Hauptaufgabe | Tier | Risk |
 |---|---|---|---|---|---|
-| **Ring 0 / L0** | `contextra-wire` | `contextra-wire` | Unsafe Island, FlatBuffers IPC DTO Code Generator (`schemas/memfuse.fbs`) | Tier 2 | `gen` |
+| **Ring 0 / L0** | `contextra-wire` | `contextra-wire` | Unsafe Island, FlatBuffers IPC DTO Code Generator (`schemas/contextra.fbs`) | Tier 2 | `gen` |
 | **Ring 0 / L0** | `contextra-sys` | `contextra-sys` | C/FFI Bindings & Sys-Wrapper | Tier 2 | `ffi` |
 | **Ring 0 / L3** | `contextra-simd` | `contextra-simd` | SIMD Vektordistanz-Routinen (AVX2/NEON/Highway) | Tier 2 | `simd` |
 | **Ring 0 / L0** | `contextra-types` | `contextra-types` | Kanonische Domain-Typen: `DocId`, `TxId`, `TenantId`, `Embedding` | Tier 2 | `none` |

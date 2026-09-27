@@ -6,6 +6,9 @@
 
 pub use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 
+pub mod signed_gate;
+pub use signed_gate::{LicensePayload, SignedLicenseGate};
+
 /// Offener Default: alles unterhalb `Fast` ist immer erlaubt (Open-Source-Ring bleibt frei).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct OpenFastGate;

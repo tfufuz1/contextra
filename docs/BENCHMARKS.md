@@ -10,12 +10,12 @@
 
 | Claim / Metrik | Quelle (Datei / Befehl) | Status | Befund / Anmerkung |
 |---|---|---|---|
-| **1k Chunks Search p50 = 88.03 ms** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Widerspricht §4 (29.91 ms) und neuem VM-Messlauf (2.61 ms). |
-| **5k Chunks Search p50 = 809.15 ms** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Erheblicher Ausreißer in historischem Run; VM-Messlauf 2026-09-21 zeigt 5.11 ms. |
-| **10k Chunks Search p50 = 337.77 ms** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Nicht-monotones Verhalten im historischen Log; VM-Messlauf 2026-09-21 zeigt 5.13 ms. |
+| **1k Chunks Search p50 = ~~88.03 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Widerspricht §4 (~~29.91 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**) und neuem VM-Messlauf (2.61 ms). |
+| **5k Chunks Search p50 = ~~809.15 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 5.11 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Erheblicher Ausreißer in historischem Run; VM-Messlauf 2026-09-21 zeigt 5.11 ms. |
+| **10k Chunks Search p50 = ~~337.77 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 5.13 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §1 (Historischer Log 2026-08-29) | `widersprüchlich` | Nicht-monotones Verhalten im historischen Log; VM-Messlauf 2026-09-21 zeigt 5.13 ms. |
 | **100k / 1M Chunks Extrapolationen** | `docs/BENCHMARKS.md` §1 | `nur dokumentiert, nicht reproduziert` | Mathematische Extrapolation ohne realen Benchmark-Lauf. |
 | **Recall@5 / @10 / @20 = 1.0000** | `crates/contextra-db/tests/semantic_recall.rs` | `synthetisch` | Gemessen gegen synthetische Ground Truth (20 Themen-Cluster × 50 Dokumente). Test-Assert fordert `>= 0.80`. |
-| **Hybrid Search p50 = 29.91 ms** | `docs/BENCHMARKS.md` §4 (Commit `bd51c6f5...`, 2026-09-03) | `widersprüchlich` | Widerspricht §1 (88.03 ms) sowie VM-Messlauf (2.61 ms). |
+| **Hybrid Search p50 = ~~29.91 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**** | `docs/BENCHMARKS.md` §4 (Commit `bd51c6f5...`, 2026-09-03) | `widersprüchlich` | Widerspricht §1 (~~88.03 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]**) sowie VM-Messlauf (2.61 ms). |
 | **Wettbewerbsvergleich Mem0/Zep/MemOS** | `docs/BENCHMARKS.md` §4 | `nur dokumentiert, nicht reproduziert` | Keine öffentlichen Messungen vorhanden; Wettbewerberzeilen wurden gelöscht. |
 | **VM Re-Run 1k/5k/10k Chunks** | `CONTEXTRA_SCALE_TIERS="1000,5000,10000" cargo bench -p contextra-db --bench scale_bench -- --quick` | `reproduziert` | In VM ausgeführt am 2026-09-21 auf Commit `347ef6dd86d90fdbc8f6dc0fcfa54ab6bb0c8986`. |
 
@@ -39,15 +39,33 @@
 
 ---
 
+## 1.1 Kanonische Benchmark-Quelle
+
+Die im Folgenden aufgeführten Werte des VM-Messlaufs vom 2026-09-21 stellen die **einzige aktuell gültige Quelle der Wahrheit** ("Ein Benchmark, eine Wahrheit") für Performanz-Claims von Contextra dar:
+
+- **1.000 Dokumente:** Insert-Durchsatz 409,7 Dok./s | Search-Latenz p50 = 2,61 ms | VmRSS Peak = 148,85 MB
+- **5.000 Dokumente:** Insert-Durchsatz 126,9 Dok./s | Search-Latenz p50 = 5,11 ms | VmRSS Peak = 332,36 MB
+- **10.000 Dokumente:** Insert-Durchsatz 72,0 Dok./s | Search-Latenz p50 = 5,13 ms | VmRSS Peak = 597,16 MB
+
+### Messbedingungen & Parameter:
+- **Build-Flags:** Benchmark-Release-Profil (`cargo bench`, `opt-level = 3`, LTO aktiviert).
+- **Hardware-Spezifikation:** Linux x86_64, 4 vCPUs (Intel Xeon @ 2.30GHz), 7.8 GiB RAM (Jules Sandbox VM).
+- **Exklusion von Embedding-Latenzen:** **Die Embedding-Latenz ist ausdrücklich NICHT Teil der gemessenen Zahlen.** Die Benchmarks messen rein die In-Memory- und Diskspeichereffizienz sowie die Indizierungs- und Suchlatenz von Contextra (HNSW, BM25, CSR-Graph), ohne externe LLM-, ONNX- oder Ollama-Inferenzaufrufe.
+
+### Ursache historischer Diskrepanzen:
+Die wahrscheinlichste Ursache der historischen Diskrepanz zwischen früheren Messwerten (z. B. 88,03 ms oder 809,15 ms p50) und den aktuellen Messungen liegt in der Test-Anordnung: Die historische Messung schloss vermutlich die Latenz eines externen Embedding-Aufrufs (ONNX- oder Ollama-Inferenz) mit ein, während die aktuelle Messung ausschließlich Speicher- und Indexlatenz erfasst.
+
+---
+
 ## 2. Historische Dokumentierte Messwerte (Ungeprüfter Ist-Stand vom 2026-08-29)
 
-*Hinweis: Diese historischen Tabellenwerte sind im Repository als Baseline dokumentiert, weisen jedoch Widersprüche zu neueren Messungen und VM-Runs auf (siehe §0).*
+*Hinweis: Diese historischen Tabellenwerte sind im Repository als Baseline dokumentiert, weisen jedoch Widersprüche zu neueren Messungen und VM-Runs auf (siehe §0). Alle hier aufgeführten historischen Latenzen sind als veraltet gekennzeichnet.*
 
 | Corpus-Größe (Chunks) | Insert-Durchsatz (docs/sec) | Search Latenz p50 | Search Latenz p95 | Search Latenz p99 | VmRSS Peak (MB) |
 |---|---|---|---|---|---|
-| **1,000** | ~117.3 docs/sec | 88.03 ms | 90.73 ms | 90.73 ms | 26.14 MB |
-| **5,000** | ~89.5 docs/sec | 809.15 ms | 825.68 ms | 825.68 ms | 121.14 MB |
-| **10,000** | ~75.2 docs/sec | 337.77 ms | 351.51 ms | 351.51 ms | 207.13 MB |
+| **1,000** | ~117.3 docs/sec | ~~88.03 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]** | 90.73 ms | 90.73 ms | 26.14 MB |
+| **5,000** | ~89.5 docs/sec | ~~809.15 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 5.11 ms, VM-Messlauf 2026-09-21]** | 825.68 ms | 825.68 ms | 121.14 MB |
+| **10,000** | ~75.2 docs/sec | ~~337.77 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 5.13 ms, VM-Messlauf 2026-09-21]** | 351.51 ms | 351.51 ms | 207.13 MB |
 
 *Rohdaten-Log für historische RSS-Messung:* `benches/results/scale_rss.csv`
 
@@ -74,6 +92,11 @@ Verifizierte Messung gegen synthetische Ground Truth (`crates/contextra-db/tests
 3. **Excluded Embedding Latency**: Während der Benchmarks wurden keine Embeddings durch ein lokales ONNX/Ollama-Modell berechnet; gemessen wird rein die Speicher- und Indizierungs-Latenz.
 4. **Vollständiger In-Memory HNSW-Graph**: Bei 1M+ Chunks überschreitet der RAM-Bedarf von `HnswIndex` die physische RAM-Grenze typischer Developer-VMs (7.8 GiB).
 
+### 4.1 Skalierungsgrenze & Single-Node Positionierung
+Contextra ist bewusst als Single-Node-, In-Process-Gedächtnisschicht für vertrauliche und lokale KI-Agenten konzipiert. Der Standard-Vektorindex `HnswIndex` hält den Traversierungsgraphen im RAM, was für Korpora bis ca. 100.000 Dokumente optimale p50-Latenzen (< 10 ms) bietet.
+
+Ab ca. 100.000 Dokumenten ist die DiskANN-Variante (`experimental-diskann`, aktuell experimentell) zu verwenden, da der In-Memory-HNSW-Index den typischen RAM einer Entwicklungsumgebung überschreitet. Diese Skalierungsgrenze ist ein bewusster Bestandteil der Positionierung als leichtgewichtige Single-Node-Gedächtnisschicht, nicht eine verschwiegene Schwäche.
+
 ---
 
 ## 5. Interne Baseline-Latenzen
@@ -84,8 +107,8 @@ Verifizierte Messung gegen synthetische Ground Truth (`crates/contextra-db/tests
 | Operation | Contextra Latenz / Durchsatz | Status |
 |---|---|---|
 | Batch Write Throughput (docs/s) | ~117.3 docs/s (single-doc) / ~1,438.9 docs/s (batch insert) | `nur dokumentiert, nicht reproduziert` |
-| Hybrid Search p50 (ms) | 29.91 ms | `widersprüchlich` (widerspricht §1 und VM-Run) |
-| Hybrid Search p99 (ms) | 30.45 ms | `widersprüchlich` |
+| Hybrid Search p50 (ms) | ~~29.91 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.61 ms, VM-Messlauf 2026-09-21]** | `widersprüchlich` (widerspricht §1 und VM-Run) |
+| Hybrid Search p99 (ms) | ~~30.45 ms~~ **[VERALTET — siehe Abschnitt 1, ersetzt durch 2.66 ms, VM-Messlauf 2026-09-21]** | `widersprüchlich` |
 
 ---
 

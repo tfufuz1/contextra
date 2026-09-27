@@ -13,6 +13,80 @@
 // DOWNSTREAM: contextra-store, contextra-index, contextra-db konvertieren via `?` und `From`.
 
 use thiserror::Error;
+use crate::DocId;
+
+/// Errors that can occur during HNSW graph deletion and repair operations.
+#[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum HnswDeletionError {
+    /// Target node with doc_id not found in graph.
+    #[error("Node for doc_id {0:?} not found in HNSW index")]
+    NodeNotFound(DocId),
+
+    /// Graph repair resulted in a disconnected graph component.
+    #[error("Graph repair resulted in disconnected component for node {0:?}")]
+    DisconnectedComponent(DocId),
+
+    /// Verification failed with remaining ghost pointers.
+    #[error("Verification failed: {remaining_pointers} remaining ghost pointers found")]
+    VerificationFailed {
+        /// Number of ghost pointers remaining in the graph.
+        remaining_pointers: usize,
+    },
+}
+
+/// Step identifier in an agent workflow execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[repr(transparent)]
+pub struct StepId(pub u64);
+
+impl StepId {
+    /// Creates a new `StepId` wrapping a `u64`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Returns the inner raw `u64` value.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+}
+
+impl std::fmt::Display for StepId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StepId({})", self.0)
+    }
+}
+
+impl From<u64> for StepId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+/// Declarative agent directive controlling segment caching, pinning, and eviction lifecycle.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CacheDirective {
+    /// Segment is explicitly pinned in memory until TTL expiration or explicit release.
+    Pin {
+        /// Optional maximum duration for which the segment remains pinned. `None` indicates indefinite pinning.
+        ttl: Option<std::time::Duration>,
+    },
+    /// Segment must never be inserted into the cache.
+    NeverCache,
+    /// Standard automatic cache insertion and eviction management.
+    Auto,
+    /// Transient step segment automatically released after completion of the specified step.
+    ReleaseAfterStep {
+        /// Step ID after whose completion this segment should be released.
+        step_id: StepId,
+    },
+}
+
+impl Default for CacheDirective {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
 
 /// Convenience alias for `Result<T, ContextraError>`.
 pub type Result<T> = std::result::Result<T, ContextraError>;
@@ -252,6 +326,14 @@ pub enum ContextraError {
     /// Plugin lifecycle or execution error.
     #[error("Plugin error: {0}")]
     Plugin(String),
+
+    /// KV Cache segment pin memory budget exceeded for a tenant.
+    #[error("Pin budget exceeded: {0}")]
+    PinBudgetExceeded(String),
+
+    /// HNSW graph repair failure.
+    #[error("graph repair failed: {0}")]
+    GraphRepairFailed(#[from] HnswDeletionError),
 }
 
 impl ContextraError {
@@ -328,6 +410,11 @@ impl ContextraError {
         Self::DurabilityConfig(msg.into())
     }
 
+    /// Creates a `PinBudgetExceeded` error.
+    pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
+        Self::PinBudgetExceeded(msg.into())
+    }
+
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
     pub fn is_occ_conflict(&self) -> bool {
         matches!(self, Self::StaleRead(_) | Self::Conflict(_))
@@ -397,6 +484,7 @@ mod tests {
             },
             ContextraError::KvQuantization("test".into()),
             ContextraError::DurabilityConfig("test".into()),
+            ContextraError::PinBudgetExceeded("test".into()),
         ];
         for v in &variants {
             let _ = format!("{v}");
@@ -917,6 +1005,33 @@ mod tests {
                 assert_eq!(index_id, "vec_1001");
             }
             _ => panic!("Expected OrphanedVectorReference, got {:?}", err_orphan),
+        }
+    }
+
+    #[test]
+    fn test_step_id_and_cache_directive() {
+        let step = StepId::new(42);
+        assert_eq!(step.inner(), 42);
+        assert_eq!(format!("{step}"), "StepId(42)");
+        assert_eq!(StepId::from(42), step);
+
+        let dir_auto = CacheDirective::default();
+        assert_eq!(dir_auto, CacheDirective::Auto);
+
+        let dir_pin = CacheDirective::Pin { ttl: None };
+        assert!(matches!(dir_pin, CacheDirective::Pin { ttl: None }));
+
+        let dir_step = CacheDirective::ReleaseAfterStep { step_id: step };
+        assert!(matches!(dir_step, CacheDirective::ReleaseAfterStep { step_id: s } if s.inner() == 42));
+    }
+
+    #[test]
+    fn test_pin_budget_exceeded_display_and_helper() {
+        let err = ContextraError::pin_budget_exceeded("Tenant 10 requested 100MB");
+        assert_eq!(err.to_string(), "Pin budget exceeded: Tenant 10 requested 100MB");
+        match err {
+            ContextraError::PinBudgetExceeded(msg) => assert_eq!(msg, "Tenant 10 requested 100MB"),
+            _ => panic!("Expected PinBudgetExceeded variant"),
         }
     }
 
