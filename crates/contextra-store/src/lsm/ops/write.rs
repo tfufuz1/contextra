@@ -255,9 +255,35 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         last_seq,
     ));
 
-    // --- PHASE 2: Prepare WAL entries under commit_mutex ---
+    use crate::lsm::config::DurabilityMode;
+
+    // --- PHASE 2: Handle DurabilityMode ---
+    if storage.config.durability_mode == DurabilityMode::MemoryOnly {
+        let state = storage.state.write().await;
+        storage.advance_visibility(tx_id);
+        storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
+
+        let should_flush = state.memtable.size() > storage.config.memtable_size_limit;
+        drop(state);
+        if should_flush {
+            storage.flush().await?;
+        }
+
+        storage.cleanup_intent_locks_for_tx(tx_id);
+        drop(_commit_lock);
+        return Ok(());
+    }
+
     let wal = storage.wal.read().await.clone();
-    let (wal_entries, prev_hmac_snapshot) = wal.prepare_batch(wal_ops).await?;
+    let (mut wal_entries, prev_hmac_snapshot) = wal.prepare_batch(wal_ops).await?;
+
+    if storage.config.durability_mode == DurabilityMode::WalNoHmac {
+        let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
+        for entry in wal_entries.0.iter_mut() {
+            entry.checksum = [0u8; 32];
+            entry.prev_hmac = [0u8; 32];
+        }
+    }
 
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {

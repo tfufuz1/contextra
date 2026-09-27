@@ -19,13 +19,18 @@ windows-sys = { version = "0.61", features = [
 
 [features]
 default = []
-encryption-at-rest = ["dep:contextra-crypto"]
+wal-integrity      = ["dep:contextra-crypto"]
+deletion-proof     = ["dep:contextra-crypto", "wal-integrity"]
+encryption-at-rest = ["wal-integrity"]
+memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
 docid-128 = ["contextra-core/docid-128"]
 
 [dependencies]
+serde = { workspace = true }
+contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }
 contextra-core = { workspace = true }
 ahash = { workspace = true }
@@ -58,6 +63,14 @@ proptest = "1.4"
 loom = "0.7"
 futures = "0.3"
 redb = "2"
+
+[[test]]
+name = "durability_mode_feature_gate"
+path = "tests/durability_mode_feature_gate.rs"
+
+[[test]]
+name = "memory_only_crash_semantics"
+path = "tests/memory_only_crash_semantics.rs"
 
 [[test]]
 name = "differential_redb"

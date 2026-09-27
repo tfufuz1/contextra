@@ -304,6 +304,11 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "tx_id": tx_id,
                 })),
             },
+            ContextraError::DurabilityConfig(msg) => Self {
+                kind: "DurabilityConfig".to_string(),
+                message: msg.clone(),
+                details: None,
+            },
         }
     }
 }

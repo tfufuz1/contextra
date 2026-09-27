@@ -48,7 +48,7 @@ pub mod wal;
 pub use compaction::{CompactionConfig, CompactionEngine};
 pub use kv_locks::{KeyGuard, KvKeyLocks, LockError, MultiKeyGuard};
 #[cfg(not(loom))]
-pub use lsm::{LsmConfig, LsmStorage};
+pub use lsm::{DurabilityConfigError, DurabilityMode, LsmConfig, LsmStorage};
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
 #[cfg(not(loom))]

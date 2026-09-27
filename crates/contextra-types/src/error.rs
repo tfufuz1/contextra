@@ -236,6 +236,10 @@ pub enum ContextraError {
         /// Identifier of timed out transaction.
         tx_id: u64,
     },
+
+    /// Durability mode configuration or feature compatibility error.
+    #[error("Durability configuration error: {0}")]
+    DurabilityConfig(String),
 }
 
 impl ContextraError {

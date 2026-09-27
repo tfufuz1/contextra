@@ -85,7 +85,7 @@ mod tests;
 
 pub mod ops;
 
-pub use config::LsmConfig;
+pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::LsmStorage;
 pub(super) use guard::{CommitGuard, LsmState};
 pub(super) use validate::validate_key;
