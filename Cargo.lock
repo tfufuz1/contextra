@@ -1000,6 +1000,8 @@ dependencies = [
  "ahash",
  "bytes",
  "contextra-types",
+ "criterion",
+ "loom",
  "parking_lot 0.12.5",
  "proptest",
  "serde",

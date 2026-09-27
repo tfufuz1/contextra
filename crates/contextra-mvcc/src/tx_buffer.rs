@@ -202,15 +202,20 @@ impl<T: Clone> TxBuffer<T> {
         shard.read().ops.contains_key(&tx)
     }
 
-    /// Registers a new transaction in the buffer.
-    pub fn begin(&self, tx: TxId) {
+    /// Registers a new transaction in the buffer at timestamp `at`.
+    pub fn begin_at(&self, tx: TxId, at: Instant) {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard
             .ops
             .entry(tx)
-            .or_insert_with(|| (Vec::with_capacity(16), Instant::now()));
+            .or_insert_with(|| (Vec::with_capacity(16), at));
         shard.read_sets.entry(tx).or_default();
+    }
+
+    /// Registers a new transaction in the buffer.
+    pub fn begin(&self, tx: TxId) {
+        self.begin_at(tx, Instant::now());
     }
 
     /// Registers a read key and its snapshot sequence number for transaction `tx`.
@@ -349,6 +354,16 @@ impl<T: Clone> TxBuffer<T> {
         self.shards.iter().all(|s| s.read().ops.is_empty())
     }
 
+    /// Cleans up expired transactions relative to timestamp `now`.
+    /// Reaps expired orphan transactions.
+    ///
+    /// # INVARIANT
+    /// Acquires shard locks sequentially in ascending index order (0 to N-1),
+    /// dropping each lock before attempting the next to guarantee deadlock-free execution.
+    pub fn reap_orphans_at(&self, now: Instant) -> Vec<TxId> {
+        self.reap_orphans_bounded_at(usize::MAX, now)
+    }
+
     /// Cleans up expired transactions.
     /// Reaps expired orphan transactions.
     ///
@@ -356,15 +371,15 @@ impl<T: Clone> TxBuffer<T> {
     /// Acquires shard locks sequentially in ascending index order (0 to N-1),
     /// dropping each lock before attempting the next to guarantee deadlock-free execution.
     pub fn reap_orphans(&self) -> Vec<TxId> {
-        self.reap_orphans_bounded(usize::MAX)
+        self.reap_orphans_at(Instant::now())
     }
 
-    /// Reaps up to `max` expired orphan transactions across shards.
+    /// Reaps up to `max` expired orphan transactions across shards relative to timestamp `now`.
     ///
     /// # INVARIANT
     /// Acquires shard locks sequentially in ascending index order (0 to N-1),
     /// dropping each lock before attempting the next to guarantee deadlock-free execution.
-    pub fn reap_orphans_bounded(&self, max: usize) -> Vec<TxId> {
+    pub fn reap_orphans_bounded_at(&self, max: usize, now: Instant) -> Vec<TxId> {
         let mut expired = Vec::new();
         for shard_lock in &self.shards {
             if expired.len() >= max {
@@ -374,7 +389,9 @@ impl<T: Clone> TxBuffer<T> {
                 let tx_timeout = self.tx_timeout;
                 let mut shard_expired = Vec::new();
                 shard.ops.retain(|tx, (_, created)| {
-                    if expired.len() + shard_expired.len() < max && created.elapsed() > tx_timeout {
+                    if expired.len() + shard_expired.len() < max
+                        && now.saturating_duration_since(*created) > tx_timeout
+                    {
                         shard_expired.push(*tx);
                         false
                     } else {
@@ -389,6 +406,15 @@ impl<T: Clone> TxBuffer<T> {
             std::thread::yield_now();
         }
         expired
+    }
+
+    /// Reaps up to `max` expired orphan transactions across shards.
+    ///
+    /// # INVARIANT
+    /// Acquires shard locks sequentially in ascending index order (0 to N-1),
+    /// dropping each lock before attempting the next to guarantee deadlock-free execution.
+    pub fn reap_orphans_bounded(&self, max: usize) -> Vec<TxId> {
+        self.reap_orphans_bounded_at(max, Instant::now())
     }
 
     /// Returns a clone of the pending operations for a transaction.
@@ -747,6 +773,22 @@ mod tests {
         std::thread::sleep(Duration::from_millis(20));
 
         let expired = buffer.reap_orphans();
+        assert_eq!(expired, vec![tx]);
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn test_tx_buffer_reap_orphans_deterministic_time_injection() {
+        let buffer = TxBuffer::<String>::new_with_config(1, Duration::from_secs(10));
+        let tx = TxId::new(100);
+        let now = Instant::now();
+        let past = now.checked_sub(Duration::from_secs(15)).unwrap_or(now);
+
+        // Begin transaction at 15 seconds in the past
+        buffer.begin_at(tx, past);
+
+        // Reaping at `now` (elapsed 15s > timeout 10s) must reap the orphan without real-time delay
+        let expired = buffer.reap_orphans_at(now);
         assert_eq!(expired, vec![tx]);
         assert!(buffer.is_empty());
     }

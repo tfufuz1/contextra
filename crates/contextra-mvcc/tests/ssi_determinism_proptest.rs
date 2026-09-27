@@ -19,10 +19,7 @@ enum TxEvent {
     },
 }
 
-fn simulate_sequence(
-    keys: &[Vec<u8>],
-    events: &[TxEvent],
-) -> Vec<(u64, Result<(), String>)> {
+fn simulate_sequence(keys: &[Vec<u8>], events: &[TxEvent]) -> Vec<(u64, Result<(), String>)> {
     let validator = SequenceLogSsiValidator::new();
     let mut tx_read_sets = std::collections::HashMap::<u64, ReadSet>::new();
     let mut results = Vec::new();
