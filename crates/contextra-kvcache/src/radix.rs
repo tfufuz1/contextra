@@ -420,6 +420,44 @@ mod tests {
     }
 
     #[test]
+    fn test_v1_radix_split_correctness_10k_keys() {
+        let tenant = TenantId::try_new(1).unwrap();
+        let mut tree = PrefixRadixTree::new(tenant);
+        let mut inserted_keys: Vec<(Vec<u32>, u64)> = Vec::with_capacity(10_000);
+
+        // Deterministic PRNG simulation (LCG)
+        let mut state: u64 = 0xdeadbeef_12345678;
+        let mut next_u32 = || {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            (state >> 32) as u32
+        };
+
+        for i in 0..10_000u64 {
+            let len = ((next_u32() % 15) + 1) as usize;
+            let mut key = Vec::with_capacity(len);
+            for _ in 0..len {
+                // Limit vocabulary to 20 to guarantee heavy prefix sharing and tree node splitting
+                key.push(next_u32() % 20);
+            }
+            let block_id = i + 10_000;
+            tree.insert(&key, block_id).unwrap();
+            inserted_keys.push((key, block_id));
+        }
+
+        let mut hits = 0usize;
+        for (key, _expected_id) in &inserted_keys {
+            if let Some(pm) = tree.find_longest_prefix(key, KvReusePolicy::Always) {
+                if pm.matched_len == key.len() {
+                    hits += 1;
+                }
+            }
+        }
+
+        let hit_rate = (hits as f64) / (inserted_keys.len() as f64);
+        assert_eq!(hits, 10_000, "Expected 100% hit rate across 10,000 inserted keys, got hit rate {:.2}%", hit_rate * 100.0);
+    }
+
+    #[test]
     fn test_kv_block_guard_raii_refcounting() {
         let tenant = TenantId::try_new(42).unwrap();
         let ref_counter = Arc::new(AtomicUsize::new(0));
