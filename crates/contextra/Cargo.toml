@@ -28,7 +28,7 @@ thiserror = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
-default = ["fast"]
+default = ["fast", "candle"]
 fast = []
 sovereign = ["contextra-crypto", "contextra-privacy"]
 compliance = ["sovereign", "audit-export", "avv-generator"]

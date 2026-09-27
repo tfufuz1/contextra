@@ -9,7 +9,7 @@ Erzeugt Vektor-Embeddings und führt Cross-Encoder-Reranking über ONNX Runtime 
 ## Ring-Zugehörigkeit & Status
 
 - **Ring:** Ring 2 (Blatt-Crate / Flüchtige Abhängigkeit)
-- **Status:** 🟡 In Migration (Zielzustand: `contextra-infer-onnx`)
+- **Status:** 🟡 Fertig (Rein Opt-in via `onnx` Feature, aus `default-members` ausgelagert gemäß Spezifikation v9)
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
 ## Öffentliche API-Übersicht

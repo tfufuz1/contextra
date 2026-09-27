@@ -6,18 +6,15 @@ chapter: "02"
 
 ### 2.1 Was Contextra ist
 
-Eine eingebettete (embedded) Gedächtnisschicht, kein Cloud-Service. Contextra läuft im Prozess des
-aufrufenden Agenten oder als lokaler MCP-Server — es gibt keine serverseitige Multi-Tenant-Instanz
-und keine Datenübertragung an Dritte, sofern nicht explizit über das Cloud-Egress-Gateway (§10.4)
-angefordert.
+Eine air-gap-fähige, kryptografisch beweisbare Memory-Engine für KI-Agenten — ein `cargo add`, kein Server. Contextra läuft im selben Prozess wie die Anwendung des Nutzers (`cargo add contextra`) oder optional als lokaler MCP-Server — es gibt keine serverseitige Multi-Tenant-Instanz und keine Datenübertragung an Dritte.
 
 ### 2.2 Distributionswege
 
 | Kanal | Paket | Zielgruppe |
 |---|---|---|
-| MCP-Server (primär) | `uvx contextra-mcp --db-path ... --allow-write` | Claude Desktop, Cursor, beliebige MCP-Clients |
-| Python-Bibliothek | `pip install contextra` | In-Process-Einbettung in Python-Agenten |
-| Rust-Crate | `cargo add contextra-db` | Native Rust-Anwendungen |
+| Rust-Crate (primär) | `cargo add contextra` | Native Rust-Anwendungen und Agenten |
+| MCP-Server | `contextra-mcp` | Claude Desktop, Cursor, beliebige MCP-Clients |
+| Python-Bibliothek (Opt-in/Separate) | `contextra-py` | Optionale Python-Bindings in separater CI |
 
 Eine Desktop-Shell (`contextra-tauri`) existierte als Prototyp, ist aber zugunsten der PyPI-Bibliothek <!-- crate-ref-ignore -->
 und des MCP-Servers als primäre Vertriebswege eingestellt (deprecated, ADR-077).

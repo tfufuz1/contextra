@@ -1,8 +1,8 @@
-# ADR-018: Doppelstrategie — PyPI-Library UND Desktop-App (Auflösung ADR-007/ADR-009-Konflikt)
+# ADR-018: Doppelstrategie — PyPI-Library UND Desktop-App (Überholt durch Spezifikation v9, 2026-09-27)
 
 
-*   **Datum**: 2026-08-24
-*   **Status**: ✅ Final
+*   **Datum**: 2026-08-24 (Klassifiziert als DEPRECATED / OVERRIDDEN: 2026-09-27)
+*   **Status**: ❌ Overridden / Deprecated by Spec v9
 *   **Kontext**: ADR-007 (2026-07-19) erklärt PyPI als primären Vertriebskanal und verwirft Desktop-App. ADR-009 (2026-07-20, einen Tag später) beschloss den Aufbau von contextra-tauri. Heute ist contextra-tauri das größte Feature-Investment. Kein ADR hat ADR-007 formal revidiert — beide galten gleichzeitig als "final".
 *   **Entscheidung**: Contextra verfolgt eine bewusste Doppelstrategie:
     - **Kanal 1 — Desktop-App** (contextra-tauri / "Contextra Brain"): Zielgruppe DACH-Unternehmensanwender, nicht-technische Nutzer. Positionierung als lokaler, air-gapped Unternehmensassistent. Aktiv in Entwicklung, primäres UI-Investment.

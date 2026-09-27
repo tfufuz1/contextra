@@ -32,6 +32,8 @@ Jeder Task folgt diesem iterativen Ablauf:
 - **Zero-Panic:** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden; Fehler per `Result` propagieren.
 - **Prozessaufrufe:** Niemals über `sh -c`; Parameter via `shlex` parsen und als Argument-Array übergeben.
 - **Unsafe-Isolierung:** `unsafe` ist streng isoliert auf die drei Unsafe-Inseln (`contextra-simd`, `contextra-sys` und `contextra-wire`). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
+- **Single-Node & Ein-Prozess-Garantie:** Contextra ist ein `cargo add`, kein Server. Multi-Node Horizontal Scaling oder Cluster-Logik sind streng verboten.
+- **Pure Rust Candle Inferenz:** GGUF Inferenz via `contextra-infer-candle` ist das Standard-Inferenzbackend. Ollama (`contextra-infer-ollama`) und ONNX (`contextra-infer-onnx`) sind rein opt-in.
 - **Sync-Kern:** Ring 0 (`contextra-types`, `contextra-ports`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-adapt`, `contextra-crypto`) enthält keine Async-Runtime (`tokio`).
 - **Nichtdeterminismus:** Zeit, Zufall und IDs injizieren; `TxId` über `collection.allocate_tx()` erzeugen.
 - **Speicher & Locks:** SIMD-Puffer (`contextra-simd`) korrekt ausrichten; keine Locks über `.await`-Punkte halten.

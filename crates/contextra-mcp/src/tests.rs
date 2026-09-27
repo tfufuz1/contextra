@@ -86,7 +86,7 @@ async fn test_tools_list_returns_all_tools() {
         .unwrap() // unwrap
         .clone();
     let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
-    assert_eq!(tools.len(), 10);
+    assert_eq!(tools.len(), 11);
     assert!(names.contains(&"contextra_search"));
     assert!(names.contains(&"contextra_insert"));
     assert!(names.contains(&"contextra_get"));
@@ -97,6 +97,7 @@ async fn test_tools_list_returns_all_tools() {
     assert!(names.contains(&"contextra_relate"));
     assert!(names.contains(&"contextra_relate_n_ary"));
     assert!(names.contains(&"contextra_explain"));
+    assert!(names.contains(&"contextra_plugin_status"));
 }
 
 #[tokio::test]

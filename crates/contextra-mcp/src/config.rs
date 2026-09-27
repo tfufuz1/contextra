@@ -28,9 +28,9 @@ pub struct EmbeddingConfig {
 impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
-            provider: "ollama".to_string(),
-            ollama_url: contextra::ollama::DEFAULT_BASE_URL.to_string(),
-            embed_model: contextra::ollama::DEFAULT_EMBED_MODEL.to_string(),
+            provider: "mock".to_string(),
+            ollama_url: "http://localhost:11434".to_string(),
+            embed_model: "nomic-embed-text".to_string(),
             onnx_model_path: None,
             candle_model_dir: None,
         }
@@ -42,13 +42,13 @@ impl EmbeddingConfig {
     pub fn from_env() -> Self {
         let provider = std::env::var("CONTEXTRA_EMBEDDING_PROVIDER")
             .or_else(|_| std::env::var("EMBEDDING_PROVIDER"))
-            .unwrap_or_else(|_| "ollama".to_string());
+            .unwrap_or_else(|_| "mock".to_string());
 
         let ollama_url = std::env::var("CONTEXTRA_OLLAMA_URL")
-            .unwrap_or_else(|_| contextra::ollama::DEFAULT_BASE_URL.to_string());
+            .unwrap_or_else(|_| "http://localhost:11434".to_string());
 
         let embed_model = std::env::var("CONTEXTRA_EMBED_MODEL")
-            .unwrap_or_else(|_| contextra::ollama::DEFAULT_EMBED_MODEL.to_string());
+            .unwrap_or_else(|_| "nomic-embed-text".to_string());
 
         let onnx_model_path = std::env::var("CONTEXTRA_ONNX_MODEL_PATH")
             .ok()
@@ -88,9 +88,18 @@ pub fn create_embedding_provider(
     candle_model_dir: Option<&Path>,
 ) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
     match provider_type.to_lowercase().trim() {
+        #[cfg(feature = "ollama")]
         "ollama" => {
-            let embedder = contextra::ollama::OllamaEmbedder::new(ollama_url, embed_model);
+            let embedder = contextra_infer_ollama::OllamaEmbedder::new(ollama_url, embed_model);
             Ok(Arc::new(embedder))
+        }
+        #[cfg(not(feature = "ollama"))]
+        "ollama" => {
+            let _ = (ollama_url, embed_model);
+            Err(ContextraError::CapabilityUnsupported {
+                capability: "ollama embedding backend".to_string(),
+                reason: "contextra-mcp was built without the 'ollama' feature".to_string(),
+            })
         }
         #[cfg(feature = "onnx")]
         "onnx" => {
@@ -162,8 +171,8 @@ pub struct LlmConfig {
 impl Default for LlmConfig {
     fn default() -> Self {
         Self {
-            provider: "ollama".to_string(),
-            ollama_url: contextra::ollama::DEFAULT_BASE_URL.to_string(),
+            provider: "mock".to_string(),
+            ollama_url: "http://localhost:11434".to_string(),
             llm_model: "llama3.2:3b".to_string(),
             candle_model_dir: None,
         }
@@ -175,10 +184,10 @@ impl LlmConfig {
     pub fn from_env() -> Self {
         let provider = std::env::var("CONTEXTRA_LLM_PROVIDER")
             .or_else(|_| std::env::var("LLM_PROVIDER"))
-            .unwrap_or_else(|_| "ollama".to_string());
+            .unwrap_or_else(|_| "mock".to_string());
 
         let ollama_url = std::env::var("CONTEXTRA_OLLAMA_URL")
-            .unwrap_or_else(|_| contextra::ollama::DEFAULT_BASE_URL.to_string());
+            .unwrap_or_else(|_| "http://localhost:11434".to_string());
 
         let llm_model =
             std::env::var("CONTEXTRA_LLM_MODEL").unwrap_or_else(|_| "llama3.2:3b".to_string());
@@ -214,16 +223,23 @@ pub fn create_llm_text_generator(
     candle_model_dir: Option<&Path>,
 ) -> Result<Arc<dyn LlmTextGenerator>, ContextraError> {
     match provider_type.to_lowercase().trim() {
+        #[cfg(feature = "ollama")]
         "ollama" => {
-            // AI-TAG[SMELL][MAJOR][RESOLVED] Field reassignment on Default::default instance triggers clippy::field_reassign_with_default (ID: AGT-MCP-98350010) (TS: 2026-09-09T14:04:00Z) (SESSION: fdf816df)
-            // FIX: Refactored to struct init expression with ..Default::default() spread.
-            let config = contextra::ollama::OllamaConfig {
+            let config = contextra_infer_ollama::OllamaConfig {
                 base_url: ollama_url.to_string(),
                 model: llm_model.to_string(),
                 ..Default::default()
             };
-            let client = contextra::ollama::OllamaClient::with_config(config);
+            let client = contextra_infer_ollama::OllamaClient::with_config(config);
             Ok(Arc::new(client))
+        }
+        #[cfg(not(feature = "ollama"))]
+        "ollama" => {
+            let _ = (ollama_url, llm_model);
+            Err(ContextraError::CapabilityUnsupported {
+                capability: "ollama LLM backend".to_string(),
+                reason: "contextra-mcp was built without the 'ollama' feature".to_string(),
+            })
         }
         #[cfg(feature = "candle")]
         "candle" => {
@@ -327,9 +343,9 @@ mod tests {
     #[test]
     fn test_embedding_config_defaults() {
         let config = EmbeddingConfig::default();
-        assert_eq!(config.provider, "ollama");
-        assert_eq!(config.ollama_url, contextra::ollama::DEFAULT_BASE_URL);
-        assert_eq!(config.embed_model, contextra::ollama::DEFAULT_EMBED_MODEL);
+        assert_eq!(config.provider, "mock");
+        assert_eq!(config.ollama_url, "http://localhost:11434");
+        assert_eq!(config.embed_model, "nomic-embed-text");
         assert!(config.onnx_model_path.is_none());
         assert!(config.candle_model_dir.is_none());
     }
@@ -337,8 +353,8 @@ mod tests {
     #[test]
     fn test_llm_config_defaults() {
         let config = LlmConfig::default();
-        assert_eq!(config.provider, "ollama");
-        assert_eq!(config.ollama_url, contextra::ollama::DEFAULT_BASE_URL);
+        assert_eq!(config.provider, "mock");
+        assert_eq!(config.ollama_url, "http://localhost:11434");
         assert_eq!(config.llm_model, "llama3.2:3b");
         assert!(config.candle_model_dir.is_none());
     }
@@ -357,6 +373,7 @@ mod tests {
         assert_eq!(provider.embedding_dim(), 768);
     }
 
+    #[cfg(feature = "ollama")]
     #[test]
     fn test_create_embedding_provider_ollama() {
         let provider = create_embedding_provider(
@@ -392,6 +409,7 @@ mod tests {
         assert!(response.contains("[Mock LLM response for: hello]"));
     }
 
+    #[cfg(feature = "ollama")]
     #[test]
     fn test_create_llm_generator_ollama() {
         let generator =
