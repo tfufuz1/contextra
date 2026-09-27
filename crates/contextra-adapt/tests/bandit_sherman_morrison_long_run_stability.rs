@@ -103,3 +103,143 @@ fn test_sherman_morrison_well_conditioned_no_false_positives() {
         }
     }
 }
+
+/// Gauss-Jordan Inversion in f64 für ein d x d Array (Row-Major).
+fn naive_matrix_inverse_f64(a: &[f64], d: usize) -> Option<Vec<f64>> {
+    let mut aug = vec![0.0f64; d * 2 * d];
+    for i in 0..d {
+        for j in 0..d {
+            aug[i * 2 * d + j] = a[i * d + j];
+        }
+        aug[i * 2 * d + d + i] = 1.0;
+    }
+
+    for k in 0..d {
+        let mut max_row = k;
+        let mut max_val = aug[k * 2 * d + k].abs();
+        for i in (k + 1)..d {
+            let val = aug[i * 2 * d + k].abs();
+            if val > max_val {
+                max_val = val;
+                max_row = i;
+            }
+        }
+
+        if max_val < 1e-12 {
+            return None;
+        }
+
+        if max_row != k {
+            for j in 0..(2 * d) {
+                aug.swap(k * 2 * d + j, max_row * 2 * d + j);
+            }
+        }
+
+        let pivot = aug[k * 2 * d + k];
+        for j in 0..(2 * d) {
+            aug[k * 2 * d + j] /= pivot;
+        }
+
+        for i in 0..d {
+            if i != k {
+                let factor = aug[i * 2 * d + k];
+                for j in 0..(2 * d) {
+                    aug[i * 2 * d + j] -= factor * aug[k * 2 * d + j];
+                }
+            }
+        }
+    }
+
+    let mut inv = vec![0.0f64; d * d];
+    for i in 0..d {
+        for j in 0..d {
+            inv[i * d + j] = aug[i * 2 * d + d + j];
+        }
+    }
+    Some(inv)
+}
+
+#[test]
+fn test_sherman_morrison_100k_updates_frobenius_stability() {
+    let d = 8;
+    let mut state = BanditProfileState::cold_start(d, 0.5);
+    state.implementation = BanditImplementation::ShermanMorrison;
+    state.gamma = 0.999;
+
+    let mut a_matrix_f64 = vec![0.0f64; d * d];
+    for i in 0..d {
+        a_matrix_f64[i * d + i] = 1.0;
+    }
+
+    let gamma_f64 = state.gamma as f64;
+
+    // Simple LCG PRNG for synthetic vectors
+    let mut rng_state: u64 = 123456789;
+
+    println!("\n=== Sherman-Morrison 100.000 Updates Frobenius-Norm Stability Test ===");
+
+    for t in 1..=100_000 {
+        // Generate synthetic context vector x
+        let mut x = vec![0.0f32; d];
+        let mut norm_sq = 0.0f32;
+        for i in 0..d {
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let val = ((rng_state >> 33) as f32) / ((1u64 << 31) as f32) - 1.0;
+            x[i] = val;
+            norm_sq += val * val;
+        }
+        let norm = norm_sq.sqrt().max(1e-5);
+        for i in 0..d {
+            x[i] /= norm;
+        }
+
+        // 1. Direct Ground-Truth Matrix Accumulation: A = gamma * A + x x^T
+        for i in 0..d {
+            for j in 0..d {
+                a_matrix_f64[i * d + j] = gamma_f64 * a_matrix_f64[i * d + j] + (x[i] as f64) * (x[j] as f64);
+            }
+        }
+
+        // 2. Incremental Sherman-Morrison update in state.
+        // When interval 1000 is reached, refactorization re-inverts A from ground truth and resets counter.
+        match state.update(&x, 1.0, 0.0, false) {
+            Ok(()) => {}
+            Err(BanditError::PrecisionMatrixDriftDetected { updates_since_reset, .. }) => {
+                if updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL {
+                    // Perform refactorization / re-inversion from current A
+                    let fresh_inv = naive_matrix_inverse_f64(&a_matrix_f64, d)
+                        .expect("Refactorization reinversion must succeed");
+                    for i in 0..(d * d) {
+                        state.inv_a[i] = fresh_inv[i] as f32;
+                    }
+                    // Perform update again on fresh refactorized matrix
+                    let _ = state.update(&x, 1.0, 0.0, false);
+                }
+            }
+            Err(e) => panic!("Unexpected error: {e:?}"),
+        }
+
+        if t % 10_000 == 0 {
+            let ref_inv_f64 = naive_matrix_inverse_f64(&a_matrix_f64, d)
+                .expect("Ground truth matrix reinversion must succeed");
+
+            let mut diff_frob_sq = 0.0f64;
+            let mut ref_frob_sq = 0.0f64;
+
+            for i in 0..(d * d) {
+                let sm_val = state.inv_a[i] as f64;
+                let ref_val = ref_inv_f64[i];
+                let diff = sm_val - ref_val;
+                diff_frob_sq += diff * diff;
+                ref_frob_sq += ref_val * ref_val;
+            }
+
+            let rel_frobenius_err = (diff_frob_sq.sqrt() / ref_frob_sq.sqrt()) as f32;
+            println!("Update {t:6}: Rel. Frobenius-Norm Abweichung = {rel_frobenius_err:.6e}");
+            assert!(
+                rel_frobenius_err < 1e-4,
+                "Relative Frobenius norm deviation at step {t} ({rel_frobenius_err:.6e}) exceeded threshold 1e-4"
+            );
+        }
+    }
+}
