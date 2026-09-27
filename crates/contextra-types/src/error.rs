@@ -335,13 +335,13 @@ pub enum ContextraError {
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(#[from] HnswDeletionError),
 
-    /// Cross-device hard link failure (target directory resides on a different filesystem or mount).
-    #[error("Cross-device link failed: cannot hard link '{source_path}' to '{target_path}' across distinct filesystems/mounts")]
-    CrossDeviceLink {
-        /// Source file path.
-        source_path: String,
-        /// Target link path.
-        target_path: String,
+    /// Subsequent external or malicious truncation of an otherwise consistent WAL chain detected.
+    #[error("WAL truncation attack detected: expected tail HMAC {expected_hmac:?}, actual tail HMAC {actual_hmac:?}")]
+    WalTruncationDetected {
+        /// Expected WAL tail HMAC from manifest high water mark.
+        expected_hmac: [u8; 32],
+        /// Actual computed WAL tail HMAC after replay.
+        actual_hmac: [u8; 32],
     },
 }
 
@@ -424,11 +424,11 @@ impl ContextraError {
         Self::PinBudgetExceeded(msg.into())
     }
 
-    /// Creates a `CrossDeviceLink` error.
-    pub fn cross_device_link(source: impl Into<String>, target: impl Into<String>) -> Self {
-        Self::CrossDeviceLink {
-            source_path: source.into(),
-            target_path: target.into(),
+    /// Creates a `WalTruncationDetected` error.
+    pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {
+        Self::WalTruncationDetected {
+            expected_hmac,
+            actual_hmac,
         }
     }
 

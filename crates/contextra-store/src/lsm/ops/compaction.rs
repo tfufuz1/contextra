@@ -108,12 +108,18 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         .map_err(|e| ContextraError::Storage(format!("SSTable open after flush failed: {}", e)))?;
 
         // === SSTABLE MANIFEST INTEGRATION START ===
+        let current_wal_hmac = *storage.wal.read().await.last_hmac.lock().await;
         storage
             .manifest
-            .append(&crate::manifest::ManifestEntry::Add {
-                path: sst_path.clone(),
-                max_tx: reader.metadata().max_tx_id,
-            })
+            .append_batch(&[
+                crate::manifest::ManifestEntry::Add {
+                    path: sst_path.clone(),
+                    max_tx: reader.metadata().max_tx_id,
+                },
+                crate::manifest::ManifestEntry::WalCheckpoint {
+                    hmac: current_wal_hmac,
+                },
+            ])
             .await?;
         // === SSTABLE MANIFEST INTEGRATION END ===
 

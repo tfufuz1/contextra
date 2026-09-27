@@ -345,15 +345,9 @@ async fn test_wal_legacy_key_fallback_migration() {
     );
 
     // Opening with explicit opt-in must succeed
-    let wal = Wal::open_with_config(
-        &wal_path,
-        WalConfig {
-            allow_legacy_integrity_key_fallback: true,
-            ..Default::default()
-        },
-    )
-    .await
-    .expect("open legacy wal with fallback opt-in"); // expect
+    let wal = Wal::open_for_legacy_migration(&wal_path, None)
+        .await
+        .expect("open legacy wal with fallback opt-in"); // expect
     let entries = wal.replay().await.expect("replay legacy wal"); // expect
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].1.seq_no, 1);
@@ -615,14 +609,7 @@ async fn test_wal_v1_auto_migration_on_min_version_v3() {
     }
 
     // Open with min_wal_version = WalVersion::V3 and legacy key fallback allowed
-    let wal = Wal::open_with_config(
-        &wal_path,
-        WalConfig {
-            allow_legacy_integrity_key_fallback: true,
-            min_wal_version: WalVersion::V3,
-            ..Default::default()
-        },
-    )
+    let wal = Wal::open_for_legacy_migration(&wal_path, None)
     .await
     .expect("open and auto-migrate v1 wal"); // expect
 
@@ -730,14 +717,7 @@ async fn test_full_rewrite_crash_recovery_pipeline() {
     drop(file);
 
     // 4. Wal::open() on the path -> recover_from_bak_if_present recovers backup and replays successfully
-    let wal = Wal::open_with_config(
-        &wal_path,
-        WalConfig {
-            allow_legacy_integrity_key_fallback: true,
-            min_wal_version: WalVersion::V3,
-            ..Default::default()
-        },
-    )
+    let wal = Wal::open_for_legacy_migration(&wal_path, None)
     .await
     .expect("open and recover wal from backup");
 
@@ -799,13 +779,7 @@ async fn test_v1_plaintext_rejected_when_key_manager_active() {
     }
 
     // 3. Opening/replaying WITHOUT KeyManager MUST succeed for the same V1 plaintext entry
-    let wal_no_km = Wal::open_with_config(
-        &wal_path,
-        WalConfig {
-            allow_legacy_integrity_key_fallback: true,
-            ..Default::default()
-        },
-    )
+    let wal_no_km = Wal::open_for_legacy_migration(&wal_path, None)
     .await
     .expect("open without key manager should succeed");
 
@@ -868,14 +842,7 @@ async fn test_split_brain_legacy_fallback_chain_continuity() {
     tokio::fs::write(&key_file_path, normal_key).await.unwrap();
 
     // Opening / replaying with legacy fallback enabled MUST fail during replay/open due to HMAC mismatch
-    let open_res = Wal::open_with_config(
-        &wal_path,
-        WalConfig {
-            allow_legacy_integrity_key_fallback: true,
-            ..Default::default()
-        },
-    )
-    .await;
+    let open_res = Wal::open_for_legacy_migration(&wal_path, None).await;
 
     let replay_err = match open_res {
         Ok(wal) => wal.replay().await.unwrap_err(),

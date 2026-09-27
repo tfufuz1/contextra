@@ -279,6 +279,7 @@ where
                         prev_hmac: entry.prev_hmac,
                     };
 
+                    #[allow(deprecated)]
                     let verify_res = match version {
                         WalVersion::V3 => verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
                         WalVersion::V2 => verifier.verify_and_update_v2(&snapshot, chunk_start_pos),

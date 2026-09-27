@@ -334,15 +334,15 @@ impl From<&ContextraError> for ContextraErrorDto {
                 message: err.to_string(),
                 details: None,
             },
-            ContextraError::CrossDeviceLink {
-                source_path,
-                target_path,
+            ContextraError::WalTruncationDetected {
+                expected_hmac,
+                actual_hmac,
             } => Self {
-                kind: "CrossDeviceLink".to_string(),
+                kind: "WalTruncationDetected".to_string(),
                 message: err.to_string(),
                 details: Some(serde_json::json!({
-                    "source_path": source_path,
-                    "target_path": target_path,
+                    "expected_hmac": expected_hmac,
+                    "actual_hmac": actual_hmac,
                 })),
             },
         }
@@ -496,11 +496,11 @@ mod tests {
                 "GraphRepairFailed",
             ),
             (
-                ContextraError::CrossDeviceLink {
-                    source_path: "/a/1.sst".into(),
-                    target_path: "/b/1.sst".into(),
+                ContextraError::WalTruncationDetected {
+                    expected_hmac: [0x11; 32],
+                    actual_hmac: [0x22; 32],
                 },
-                "CrossDeviceLink",
+                "WalTruncationDetected",
             ),
         ];
 

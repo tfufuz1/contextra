@@ -148,6 +148,25 @@ impl LsmStorage {
             ts_a.cmp(ts_b).then_with(|| path_a.cmp(path_b))
         });
 
+        let manifest_path = config.path.join("MANIFEST");
+        let manifest_exists = manifest_path.exists();
+        let (valid_manifest_sstables, dead_manifest_sstables, manifest_hwm): (
+            Option<std::collections::HashSet<std::path::PathBuf>>,
+            Option<std::collections::HashSet<std::path::PathBuf>>,
+            Option<[u8; 32]>,
+        ) = if manifest_exists {
+            let entries = crate::manifest::Manifest::load(&manifest_path).await?;
+            let valid_set = crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
+                .into_iter()
+                .map(|(path, _rank)| path)
+                .collect();
+            let dead_set = crate::manifest::Manifest::reconstruct_dead_sstables(&entries);
+            let hwm = crate::manifest::Manifest::extract_high_water_mark(&entries);
+            (Some(valid_set), Some(dead_set), hwm)
+        } else {
+            (None, None, None)
+        };
+
         let memtable = MemTable::new();
         let mut max_seq = 0u64;
         let mut max_tx = 0u64;
@@ -155,11 +174,20 @@ impl LsmStorage {
         let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
             std::collections::HashMap::new();
 
+        let mut last_replayed_hmac: Option<[u8; 32]> = None;
+        let mut replayed_hmac_set = std::collections::HashSet::new();
+        replayed_hmac_set.insert([0u8; 32]);
+
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
             let wal_entries = wal.replay().await?;
 
+            if let Some((_, last_entry, _)) = wal_entries.last() {
+                last_replayed_hmac = Some(last_entry.checksum);
+            }
+
             for (lsn, entry, _offset) in &wal_entries {
+                replayed_hmac_set.insert(entry.checksum);
                 let raw_lsn = *lsn & !TOMBSTONE_BIT;
                 if raw_lsn > max_seq {
                     max_seq = raw_lsn;
@@ -213,6 +241,18 @@ impl LsmStorage {
             drop(wal);
         }
 
+        if let Some(expected_hwm) = manifest_hwm {
+            let actual_tail_hmac = last_replayed_hmac.unwrap_or([0u8; 32]);
+            let check_hmac = if replayed_hmac_set.contains(&expected_hwm) {
+                expected_hwm
+            } else {
+                actual_tail_hmac
+            };
+            if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err() {
+                return Err(ContextraError::wal_truncation_detected(expected_hwm, actual_tail_hmac));
+            }
+        }
+
         let active_wal_path = if let Some((_, last_path)) = wal_files.last() {
             last_path.clone()
         } else {
@@ -258,22 +298,6 @@ impl LsmStorage {
         }
         pending_rollbacks.sort_unstable();
 
-        let manifest_path = config.path.join("MANIFEST");
-        let manifest_exists = manifest_path.exists();
-        let (valid_manifest_sstables, dead_manifest_sstables): (
-            Option<std::collections::HashSet<std::path::PathBuf>>,
-            Option<std::collections::HashSet<std::path::PathBuf>>,
-        ) = if manifest_exists {
-            let entries = crate::manifest::Manifest::load(&manifest_path).await?;
-            let valid_set = crate::manifest::Manifest::reconstruct_valid_sstables(&entries)
-                .into_iter()
-                .map(|(path, _rank)| path)
-                .collect();
-            let dead_set = crate::manifest::Manifest::reconstruct_dead_sstables(&entries);
-            (Some(valid_set), Some(dead_set))
-        } else {
-            (None, None)
-        };
 
         let mut sst_files = Vec::new();
         if let Ok(mut entries) = tokio::fs::read_dir(&config.path).await {
@@ -349,13 +373,17 @@ impl LsmStorage {
         let manifest = Arc::new(crate::manifest::Manifest::open(&manifest_path).await?);
         if !manifest_exists {
             let ssts_read = sstables.read().await;
-            let mut add_entries = Vec::with_capacity(ssts_read.len());
+            let mut add_entries = Vec::with_capacity(ssts_read.len() + 1);
             for sst in ssts_read.iter() {
                 add_entries.push(crate::manifest::ManifestEntry::Add {
                     path: sst.file_path().to_path_buf(),
                     max_tx: sst.metadata().max_tx_id,
                 });
             }
+            let initial_wal_hmac = *wal.last_hmac.lock().await;
+            add_entries.push(crate::manifest::ManifestEntry::WalCheckpoint {
+                hmac: initial_wal_hmac,
+            });
             manifest.append_batch(&add_entries).await?;
         }
 
