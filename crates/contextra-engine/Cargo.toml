@@ -39,6 +39,7 @@ sha2 = "0.10"
 
 [dev-dependencies]
 contextra-crypto = { workspace = true }
+contextra-testkit = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 proptest = "1.4"

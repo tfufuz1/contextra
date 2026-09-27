@@ -810,6 +810,7 @@ dependencies = [
  "contextra-rank",
  "contextra-store",
  "contextra-sys",
+ "contextra-testkit",
  "contextra-text",
  "contextra-types",
  "contextra-vector",
