@@ -174,16 +174,18 @@ async fn test_execute_background_consolidation_with_synthesis_pass() {
         turns.push((doc_id, emb));
     }
 
-    // Connect nodes into a graph cluster
-    for i in 1..5 {
-        collection
-            .relate(
-                &format!("turn_{}", i),
-                &format!("turn_{}", i + 1),
-                "connected",
-            )
-            .await
-            .unwrap();
+    // Connect nodes into a graph cluster (clique so Leiden keeps all 5 in 1 community)
+    for i in 1..=5 {
+        for j in (i + 1)..=5 {
+            collection
+                .relate(
+                    &format!("turn_{}", i),
+                    &format!("turn_{}", j),
+                    "connected",
+                )
+                .await
+                .unwrap();
+        }
     }
 
     let consolidation_config = ConsolidationConfig {
@@ -191,6 +193,7 @@ async fn test_execute_background_consolidation_with_synthesis_pass() {
         max_turns_per_segment: 20,
         segment_cohesion_threshold: 0.70,
         near_duplicate_cosine_threshold: 0.95,
+        ..Default::default()
     };
 
     let synthesis_config = SynthesisConfig {
