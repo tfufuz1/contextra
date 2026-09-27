@@ -16,6 +16,7 @@ pub mod maintenance_scheduler;
 pub mod memory_consolidation;
 pub mod semantic_aggregation_facade;
 pub mod synthesis_phase;
+pub mod transitivity_veto;
 
 pub use aggregation_phase::{
     check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,
@@ -46,3 +47,4 @@ pub use memory_consolidation::{
     SynthesisPhaseResult, TurnSegment,
 };
 pub use synthesis_phase::run_synthesis_pass;
+pub use transitivity_veto::{filter_candidates_with_transitivity_veto, validate_transitivity_veto};
