@@ -80,6 +80,7 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
         Err(ContextraError::CrossDeviceLink {
             source_path,
             target_path,
+            ..
         }) => {
             assert!(source_path.contains("000001.sst"));
             assert!(target_path.contains("000001.sst"));
