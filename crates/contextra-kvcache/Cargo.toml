@@ -14,6 +14,7 @@ contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-crypto = { workspace = true }
 ahash = { workspace = true }
+blake3 = { workspace = true }
 lru = "0.16.4"
 parking_lot = { workspace = true }
 tracing = { workspace = true }
@@ -25,6 +26,7 @@ bytes = { workspace = true }
 
 [features]
 default = []
+content-addressed-kv-cache = []
 kv-encryption = ["contextra-crypto/kv-encryption"]
 kvcache-attention-eviction = []
 kvcache-kivi-quant = []

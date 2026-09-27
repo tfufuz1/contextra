@@ -10,6 +10,7 @@ use std::sync::Arc;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::eviction_worker::EvictionWorker;
+#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 use super::quantize_kivi::{
     compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, KiviQuantizeConfig,
     KiviQuantizedBlock, KvTensorView,
@@ -23,6 +24,7 @@ use contextra_crypto::{CryptoError, EncryptedKvLayer, KvSegmentCipher, ModelFing
 #[derive(Debug, Clone)]
 pub enum KvSegmentContent {
     Raw(bytes::Bytes),
+    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
     KiviQuantized(KiviQuantizedBlock),
 }
 
@@ -219,6 +221,7 @@ impl KvSegment {
 
     /// Writes quantized raw KV tensor into segment, enforcing `INV-KIVI-AEAD-ORDER`:
     /// Quantization -> Compression -> AEAD Encryption.
+    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
     pub fn write_quantized(
         &mut self,
         raw_kv: &KvTensorView,
@@ -245,6 +248,7 @@ impl KvSegment {
 
     /// Reads and dequantizes segment data, enforcing `INV-KIVI-AEAD-ORDER`:
     /// AEAD Decryption -> Decompression -> Dequantization.
+    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
     pub fn read_dequantized(
         &self,
         cipher: &dyn contextra_crypto::KvCipher,
@@ -280,6 +284,7 @@ impl KvSegment {
             plaintext,
         )?;
         let ciphertext_copy = encrypted_layer.ciphertext.clone();
+        let content_bytes = bytes::Bytes::copy_from_slice(&ciphertext_copy);
 
         Ok(Self {
             tenant_id,
@@ -290,6 +295,7 @@ impl KvSegment {
             rope_offset,
             active_refs: Arc::new(AtomicUsize::new(0)),
             data: ciphertext_copy,
+            content: KvSegmentContent::Raw(content_bytes),
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
             }),
@@ -485,7 +491,8 @@ mod tests {
             model_fingerprint: Some(fp),
             rope_offset: None,
             active_refs: Arc::new(AtomicUsize::new(0)),
-            data: ciphertext_copy,
+            data: ciphertext_copy.clone(),
+            content: KvSegmentContent::Raw(bytes::Bytes::from(ciphertext_copy)),
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
             }),
