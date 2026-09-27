@@ -12,6 +12,7 @@ description = "Backup and snapshot management for Contextra storage"
 [dependencies]
 contextra-types = { version = "0.1.0", path = "../contextra-types" }
 contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
+contextra-core = { version = "0.1.0", path = "../contextra-core" }
 bytes = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
