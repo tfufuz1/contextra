@@ -88,6 +88,60 @@ impl Default for CacheDirective {
     }
 }
 
+/// Step identifier in an agent workflow execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[repr(transparent)]
+pub struct StepId(pub u64);
+
+impl StepId {
+    /// Creates a new `StepId` wrapping a `u64`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Returns the inner raw `u64` value.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+}
+
+impl std::fmt::Display for StepId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StepId({})", self.0)
+    }
+}
+
+impl From<u64> for StepId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+/// Declarative agent directive controlling segment caching, pinning, and eviction lifecycle.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CacheDirective {
+    /// Segment is explicitly pinned in memory until TTL expiration or explicit release.
+    Pin {
+        /// Optional maximum duration for which the segment remains pinned. `None` indicates indefinite pinning.
+        ttl: Option<std::time::Duration>,
+    },
+    /// Segment must never be inserted into the cache.
+    NeverCache,
+    /// Standard automatic cache insertion and eviction management.
+    Auto,
+    /// Transient step segment automatically released after completion of the specified step.
+    ReleaseAfterStep {
+        /// Step ID after whose completion this segment should be released.
+        step_id: StepId,
+    },
+}
+
+impl Default for CacheDirective {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
 /// Convenience alias for `Result<T, ContextraError>`.
 pub type Result<T> = std::result::Result<T, ContextraError>;
 
