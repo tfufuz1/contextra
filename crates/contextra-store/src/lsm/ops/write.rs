@@ -295,7 +295,10 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             )));
         }
 
-        let state = storage.state.write().await;
+        // MemTable ist intern per parking_lot::RwLock nebenläufigkeitssicher; die äußere
+        // LsmState-Sperre schützt ausschließlich die Struktur des immutable_memtables-Vektors,
+        // nicht den MemTable-Inhalt selbst — ein read()-Guard genügt für apply_mem_updates in beiden Commit-Pfaden.
+        let state = storage.state.read().await;
         storage.advance_visibility(tx_id);
         storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
 
@@ -453,6 +456,9 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
 
         let _commit_lock = storage.commit_mutex.lock().await;
+        // MemTable ist intern per parking_lot::RwLock nebenläufigkeitssicher; die äußere
+        // LsmState-Sperre schützt ausschließlich die Struktur des immutable_memtables-Vektors,
+        // nicht den MemTable-Inhalt selbst — ein read()-Guard genügt für apply_mem_updates in beiden Commit-Pfaden.
         let state = storage.state.read().await;
         for (req_tx_id, mem_updates) in all_updates {
             storage.advance_visibility(req_tx_id);
