@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-27T22:42:00Z (SESSION: 7c14554a)
+// ZWECK: WASI preview1 host function implementations (fd_read, fd_write, proc_exit, clock_time_get, random_get)
+// INVARIANTEN: Zero unsafe code, strict bounds checking on linear memory accesses, OutputLimitExceeded on buffer overflow
+// NICHT-OFFENSICHTLICH: Stdin read copies available slice to release caller borrow; PRNG uses SplitMix64
+// SIEHE AUCH: AGENTS.md §4.18, rules/tag_taxonomy.md
+
 //! WASI preview1 Host Function Implementations (§4.18).
 
 use wasmtime::{Caller, Linker};
