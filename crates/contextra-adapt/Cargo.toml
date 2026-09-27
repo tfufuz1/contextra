@@ -23,6 +23,9 @@ flow-corrected-thompson = ["bandit-routing"]
 sketched-bandit = ["bandit-routing"]
 rie-greedy-personalization = []
 
+[dev-dependencies]
+proptest = "1.4"
+
 [lints]
 workspace = true
 
