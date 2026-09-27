@@ -1,3 +1,9 @@
+// FILE-CONTEXT
+// STAND: 2026-09-27T22:49:25Z (SESSION: 72f4c80d)
+// ZWECK: Zero-copy byte buffer slice wrapper (WireBuffer) for FlatBuffers IPC messages.
+// INVARIANTEN: No pointer transmutes or lifetime erasures; reference counting via Bytes.
+// SIEHE AUCH: docs/audits/contextra-wire_AUDIT_2026-09-27.md
+
 //! Zero-copy adapter abstractions for IPC wire messages.
 
 use bytes::Bytes;

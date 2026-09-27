@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-27T22:49:25Z (SESSION: 72f4c80d)
+// ZWECK: Generic JSON-RPC 2.0 protocol request/response structures for Contextra IPC.
+// INVARIANTEN: Strict adherence to JSON-RPC 2.0 wire specification; zero panic in production paths.
+// NICHT-OFFENSICHTLICH: Result and error fields are omitted when None per spec via #[serde(skip_serializing_if = "Option::is_none")].
+// SIEHE AUCH: docs/audits/contextra-wire_AUDIT_2026-09-27.md
+
 //! Generic JSON-RPC 2.0 protocol types for `Contextra` IPC.
 
 use serde::{Deserialize, Serialize};
