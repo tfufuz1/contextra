@@ -7,20 +7,25 @@
 
 ## 1. Übersicht der GitHub Actions Workflow Jobs
 
-Diese Tabelle listet **alle 24 Jobs** aus den 9 GitHub Actions Workflows des Repositories auf. GitHub Required Status Checks benötigen den **exakten Job-Namen** (Wert des `name:`-Feldes in der Quell-YAML oder, falls `name:` nicht explizit gesetzt ist, den `job-id`-Schlüssel).
+Diese Tabelle listet **alle 56 Jobs** aus den 25 GitHub Actions Workflows des Repositories auf. GitHub Required Status Checks benötigen den **exakten Job-Namen** (Wert des `name:`-Feldes in der Quell-YAML oder, falls `name:` nicht explizit gesetzt ist, den `job-id`-Schlüssel).
 
 | Job-Name (exakt) | Quelldatei | Trigger | Empfehlung (Required Y/N) | Begründung |
 | :--- | :--- | :--- | :---: | :--- |
+| `Check Duplicate Symbols Cross File Gate` (`check-duplicate-symbols-cross-file`) | `.github/workflows/merge-gate.yml` | `push`, `pull_request` | **Y** | Sichert die Einhaltung des Symbol-Eindeutigkeits-Standards über mehrere Rust-Dateien hinweg. |
+| `FlatBuffers Schema Drift Gate` (`flatbuffers-drift-gate`) | `.github/workflows/merge-gate.yml` | `push`, `pull_request` | **Y** | Validiert die Synchronität der generierten FlatBuffers-Schemas mit den Definitionen. |
+| `Capability Marker Drift Gate` (`marker-drift-gate`) | `.github/workflows/merge-gate.yml` | `push`, `pull_request` | **Y** | Verifiziert die Konsistenz der Capability-Marker in der Dokumentation ohne Drift. |
+| `Dependency Policy Gate (cargo deny)` (`dependency-policy-gate`) | `.github/workflows/merge-gate.yml` | `push`, `pull_request` | **Y** | Erzwingt Sicherheits-, Lizenz- und Quelltext-Richtlinien via cargo-deny. |
+| `Phantom Commit Protection Gate` (`phantom-commit-gate`) | `.github/workflows/merge-gate.yml` | `push`, `pull_request` | **Y** | Verhindert Phantom-Commits und prüft Commit-Diff-Integrität in Pull Requests. |
+| `HyperEdge Schema Merge Gate` (`hyperedge-schema-merge`) | `.github/workflows/merge-gate.yml` | `push`, `pull_request` | **Y** | Stellt HyperEdge-Schema-Invarianten in contextra-graph sicher. |
+| `Merge Gate (Schnell)` (`merge-gate`) | `.github/workflows/merge-gate.yml` | `push`, `pull_request` | **Y** | Zentrales, schnelllaufendes Haupt-Merge-Gate (Compile Check, Format, Clippy, Fast Tests). |
 | `Compile Check (cargo check)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Stellt sicher, dass das gesamte Workspace kompiliert (`check-compile`), bevor Änderungen gemergt werden. |
 | `Format Check` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Erzwingt den `rustfmt`-Standard für den gesamten Rust-Code im Repository. |
 | `Clippy (-D warnings)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Verhindert Linter-Warnungen und verstärkende Fehler im Haupt-Workspace. |
-| `Feature Matrix Checks` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Crate-Feature-Kombinationen (`--no-default-features`, `--all-features`, `--features reranking`). |
+| `Feature Matrix Checks (Powerset CI §17)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Crate-Feature-Kombinationen (`--no-default-features`, `--all-features`, `--features reranking`). |
 | `PyPI Wheel Build Check (Maturin Dry-Run)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Validiert vorab, dass `contextra-py` via Maturin fehlerfrei gebaut werden kann. |
 | `Test Suite (cargo-nextest with retries)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt Unit- und Integrationstests des Haupt-Workspace sowie Doc-Tests aus. |
 | `Clippy (contextra-py)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Python-Binding-Code (`contextra-py`) auf Clippy-Warnungen. |
 | `Test Suite (contextra-py)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt die Rust-Tests für das Python-Binding (`contextra-py`) aus. |
-| `Clippy (contextra-tauri --lib)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft die `contextra-tauri` Bibliothek auf Clippy-Warnungen. | <!-- crate-ref-ignore -->
-| `Test Suite (contextra-tauri --lib)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt die Unit- und Integrationstests für `contextra-tauri` aus. | <!-- crate-ref-ignore -->
 | `Cross-Platform Core Tests` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Kern-Crates auf Windows und macOS auf Plattform-Kompatibilität. |
 | `context-gates` | `.github/workflows/context-gates.yml` | `push`, `pull_request` | **Y** | Kanonisches Gate für Governance, Unwraps, DAG, Tag-Grammatik, Review-Coverage und Commit-Qualität. |
 | `Fixture-Smoke-Test & Harness Dry-Run` | `.github/workflows/bench.yml` | `push`, `pull_request`, `workflow_dispatch` | **Y** | Schnelltests für Benchmark-Harness & Smoke-Tests bei jedem PR. |
@@ -36,6 +41,8 @@ Diese Tabelle listet **alle 24 Jobs** aus den 9 GitHub Actions Workflows des Rep
 | `prune` | `.github/workflows/prune-branches.yml` | `schedule` (`0 2 * * *`), `workflow_dispatch` | **N** | Remote-Branch-Bereinigungsjob; ist explizit für PRs deaktiviert (`if: github.event_name != 'pull_request'`). |
 | `overlap-report` | `.github/workflows/prune-branches.yml` | `schedule`, `workflow_dispatch`, `pull_request` | **N** | Advisory-Only Overlap-Bericht (`continue-on-error: true`); soll Merges nicht blockieren. |
 
+*Hinweis: `merge-gate.yml` wird als PR-blockierendes Kern-Gate-Set behandelt und ist separat vom optionalen `rust-ci.yml`/`context-gates.yml` zu betrachten.*
+
 ---
 
 ## 2. Manuelle Verifikationsschritte für einen Repository-Admin
@@ -47,16 +54,21 @@ Um sicherzustellen, dass keine PRs gemergt werden, bei denen kritische Quality G
 2. Option aktivieren: **"Require status checks to pass before merging"**.
 3. Option aktivieren: **"Require branches to be up to date before merging"**.
 4. In der Suchleiste unter *"Status checks that are required"* jeden der oben mit **Empfehlung (Required Y)** markierten Job-Namen suchen und hinzufügen:
+   - `Check Duplicate Symbols Cross File Gate`
+   - `FlatBuffers Schema Drift Gate`
+   - `Capability Marker Drift Gate`
+   - `Dependency Policy Gate (cargo deny)`
+   - `Phantom Commit Protection Gate`
+   - `HyperEdge Schema Merge Gate`
+   - `Merge Gate (Schnell)`
    - `Compile Check (cargo check)`
    - `Format Check`
    - `Clippy (-D warnings)`
-   - `Feature Matrix Checks`
+   - `Feature Matrix Checks (Powerset CI §17)`
    - `PyPI Wheel Build Check (Maturin Dry-Run)`
    - `Test Suite (cargo-nextest with retries)`
    - `Clippy (contextra-py)`
    - `Test Suite (contextra-py)`
-   - `Clippy (contextra-tauri --lib)` <!-- crate-ref-ignore -->
-   - `Test Suite (contextra-tauri --lib)` <!-- crate-ref-ignore -->
    - `Cross-Platform Core Tests`
    - `context-gates`
    - `Fixture-Smoke-Test & Harness Dry-Run`
