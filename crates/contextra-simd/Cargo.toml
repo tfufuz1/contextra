@@ -17,3 +17,8 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 proptest = "1.4"
+criterion = "0.5"
+
+[[bench]]
+name = "simd_bench"
+harness = false
