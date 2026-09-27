@@ -83,7 +83,7 @@ fn test_global_shadow_mode_discrepancy_logging() {
     assert!(!baseline_fused.is_empty());
     assert!(!global_fused.is_empty());
     assert!(
-        discrepancy_ratio >= 0.0 && discrepancy_ratio <= 1.0,
+        (0.0..=1.0).contains(&discrepancy_ratio),
         "discrepancy_ratio must be bounded between 0.0 and 1.0"
     );
 }
