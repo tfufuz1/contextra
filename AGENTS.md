@@ -38,7 +38,7 @@ Jeder Task folgt diesem iterativen Ablauf:
 - **Spec-Sync:** Jede API-Änderung MUSS `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` spiegeln.
 
 ## 7. Nicht tun
-- Kein partielles HNSW-Rewiring oder Teilgraph-Rebuilding (F-02) durchführen wegen Recall-Kollaps und RwLock-Contention; zulässig ist ausschließlich reines Tombstone-Pruning.
+- Kein unkontrolliertes, globales Teilgraph-Rebuilding im HNSW-Index durchführen; zulässig als Ausnahme ist die budgetierte, lokal begrenzte Nachbarschaftsreparatur nach Löschung (`remove_with_graph_repair`, siehe ADR-097).
 - Keine mandantenübergreifenden Datenflüsse, Knowledge-Sharing oder Cross-Tenant-Aggregationen (F-10) herstellen; Mandantenisolation (`TenantId`) ist absolut zur Wahrung von DSGVO-Löschgarantien und KV-Cache-Sicherheit.
 - Keine Realtime-Audio-, Speech-to-Text-, Voice- oder Jarvis-Assistenten-Funktionen (OP-03) integrieren, da Audio-Streaming nicht zum bi-temporalen Speichersubstrat gehört.
 - Keine Veto-Sperren oder Isolationsgrenzen ohne explizites ADR in `docs/decisions/` umgehen.
