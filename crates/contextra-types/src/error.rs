@@ -436,6 +436,14 @@ impl ContextraError {
         Self::PinBudgetExceeded(msg.into())
     }
 
+    /// Creates a `CrossDeviceLink` error.
+    pub fn cross_device_link(source_path: impl Into<String>, target_path: impl Into<String>) -> Self {
+        Self::CrossDeviceLink {
+            source_path: source_path.into(),
+            target_path: target_path.into(),
+        }
+    }
+
     /// Creates a `WalTruncationDetected` error.
     pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {
         Self::WalTruncationDetected {
