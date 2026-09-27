@@ -27,6 +27,12 @@ pub const MAX_SCALING_FACTOR: f64 = 1.0;
 pub const MAX_INTEGRAL: f64 = 10.0;
 
 /// Classical PID controller for dynamically scaling multi-step retrieval parameters (`k_pool`, `max_hops`).
+///
+/// HINWEIS ZUR ANTI-WINDUP STRATEGIE:
+/// Dieser Controller nutzt einfaches Integrations-Clamping auf `[-MAX_INTEGRAL, MAX_INTEGRAL]`.
+/// Für Anwendungsfälle mit expliziter Aktuatorsättigung (z.B. Pool-Größe an Min-/Max-Grenzen)
+/// steht in `pid.rs` der Trait [`AntiWindupController`](crate::AntiWindupController) mit
+/// `update_with_anti_windup` bereit, welcher die Integrationsakkumulation bei Sättigung vollständig aussetzt.
 #[derive(Debug, Clone)]
 pub struct PidLatencyController {
     /// Proportional gain coefficient.
