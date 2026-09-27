@@ -13,10 +13,7 @@
 use rand::RngCore;
 use thiserror::Error;
 
-/// Erzeugt den längenpräfixierten Blake3-Hash für eine Liste gelöschter Schlüssel.
-pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
-    crate::deletion_proof::hash_deleted_keys_length_prefixed(deleted_keys)
-}
+pub use crate::deletion_proof::hash_deleted_keys_length_prefixed;
 
 /// Fehlerzustände bei der Verifikation von Ed25519-Löschbeweisen.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -109,7 +106,7 @@ pub fn verify_deletion_proof_v3(
 
 /// Vorgeschlagenes `SignatureVersion`-Enum für spätere Integration in `deletion_proof.rs`.
 ///
-/// TODO (Separate PR): In `deletion_proof.rs` das `pub signature_version: u8` Feld
+/// AI-TAG[TODO] (TS: 2026-09-27T00:00:00Z) (SESSION: welle4-p17): In `deletion_proof.rs` das `pub signature_version: u8` Feld
 /// durch dieses Enum ersetzen oder konvertieren.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureVersion {
