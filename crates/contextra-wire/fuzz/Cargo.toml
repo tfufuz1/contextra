@@ -1,5 +1,5 @@
 [package]
-name = "contextra-db-fuzz" # <!-- crate-ref-ignore -->
+name = "contextra-wire-fuzz" # <!-- crate-ref-ignore -->
 version = "0.0.0"
 publish = false
 edition = "2021"
@@ -12,12 +12,12 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1.4", features = ["derive"] }
-serde_json = "1"
-contextra-core = { path = "../../contextra-core" }
-contextra-db = { path = ".." }
+bytes = "1"
+flatbuffers = "24"
+contextra-wire = { path = ".." }
 
 [[bin]]
-name = "rrf_fusion"
-path = "fuzz_targets/rrf_fusion.rs"
+name = "fuzz_flatbuffers_ipc"
+path = "fuzz_targets/fuzz_flatbuffers_ipc.rs"
 test = false
 doc = false

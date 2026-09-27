@@ -80,11 +80,12 @@ impl KvCipher for KeyManager {
                 "Ciphertext too short for nonce payload".into(),
             ));
         }
-        let nonce: &[u8; 12] = ciphertext[..12]
-            .try_into()
-            .map_err(|e: std::array::TryFromSliceError| {
-                contextra_types::ContextraError::ParseError(e.to_string())
-            })?;
+        let nonce: &[u8; 12] =
+            ciphertext[..12]
+                .try_into()
+                .map_err(|e: std::array::TryFromSliceError| {
+                    contextra_types::ContextraError::ParseError(e.to_string())
+                })?;
         let ct = &ciphertext[12..];
         self.decrypt_auto_nonce(ct, nonce)
             .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))

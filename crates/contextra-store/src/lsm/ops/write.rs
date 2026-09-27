@@ -349,7 +349,9 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             )),
             Err(_) => {
                 let mut queue_guard = storage.pending_commit_queue.lock().await;
-                *queue_guard = None;
+                if let Some(ref mut queue) = *queue_guard {
+                    queue.requests.retain(|r| r.tx_id != tx_id);
+                }
                 drop(queue_guard);
                 Err(ContextraError::CommitTimeout {
                     tx_id: tx_id.inner(),

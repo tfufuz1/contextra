@@ -3,6 +3,7 @@
 // STAND: TS:2026-09-08T00:00:00Z
 
 #![cfg(feature = "kv-encryption")]
+#![allow(unsafe_code)]
 
 use contextra_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use contextra_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};

@@ -196,7 +196,8 @@ fn test_sherman_morrison_100k_updates_frobenius_stability() {
         // 1. Direct Ground-Truth Matrix Accumulation: A = gamma * A + x x^T
         for i in 0..d {
             for j in 0..d {
-                a_matrix_f64[i * d + j] = gamma_f64 * a_matrix_f64[i * d + j] + (x[i] as f64) * (x[j] as f64);
+                a_matrix_f64[i * d + j] =
+                    gamma_f64 * a_matrix_f64[i * d + j] + (x[i] as f64) * (x[j] as f64);
             }
         }
 
@@ -204,7 +205,10 @@ fn test_sherman_morrison_100k_updates_frobenius_stability() {
         // When interval 1000 is reached, refactorization re-inverts A from ground truth and resets counter.
         match state.update(&x, 1.0, 0.0, false) {
             Ok(()) => {}
-            Err(BanditError::PrecisionMatrixDriftDetected { updates_since_reset, .. }) => {
+            Err(BanditError::PrecisionMatrixDriftDetected {
+                updates_since_reset,
+                ..
+            }) => {
                 if updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL {
                     // Perform refactorization / re-inversion from current A
                     let fresh_inv = naive_matrix_inverse_f64(&a_matrix_f64, d)

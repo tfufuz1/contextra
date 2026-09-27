@@ -2,9 +2,7 @@
 // ZWECK: Determinismus-Tests für SketchedProjection (§13.2 / P28).
 // STAND: TS:2026-09-26T00:00:00Z
 
-use contextra_adapt::bandit::{
-    BanditImplementation, BanditProfileState, SketchMatrix,
-};
+use contextra_adapt::bandit::{BanditImplementation, BanditProfileState, SketchMatrix};
 use contextra_types::TenantId;
 
 #[test]

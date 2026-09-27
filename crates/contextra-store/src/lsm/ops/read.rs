@@ -61,7 +61,10 @@ pub(super) async fn get_at_seq(
     // 3. SSTables (newest first, filtered by seq_no and snapshot_tx)
     let sstables = storage.sstables.read().await.clone();
     for sst in sstables.iter().rev() {
-        if snapshot_tx < sst.metadata().min_tx_id || seq_no < sst.metadata().min_seq {
+        if (sst.metadata().min_tx_id < contextra_core::TxId::INTERNAL_BASE
+            && snapshot_tx < sst.metadata().min_tx_id)
+            || seq_no < sst.metadata().min_seq
+        {
             continue;
         }
         // SSTables already only contain entries up to their last_key.
@@ -74,7 +77,9 @@ pub(super) async fn get_at_seq(
                 tx,
                 snapshot_tx
             );
-            if (seq & !TOMBSTONE_BIT) <= seq_no && tx <= snapshot_tx {
+            if (seq & !TOMBSTONE_BIT) <= seq_no
+                && (tx <= snapshot_tx || tx >= contextra_core::TxId::INTERNAL_BASE)
+            {
                 if (seq & TOMBSTONE_BIT) != 0 {
                     tracing::debug!("LsmStorage::get_at_seq FOUND TOMBSTONE");
                     return Ok(None);

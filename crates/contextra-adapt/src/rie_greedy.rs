@@ -37,9 +37,9 @@ impl From<RieGreedyError> for contextra_types::ContextraError {
             RieGreedyError::NonFinite => contextra_types::ContextraError::InvalidInput(
                 "Non-finite numerical value encountered".to_string(),
             ),
-            RieGreedyError::InvalidConfig(msg) => {
-                contextra_types::ContextraError::InvalidInput(format!("Invalid configuration: {msg}"))
-            }
+            RieGreedyError::InvalidConfig(msg) => contextra_types::ContextraError::InvalidInput(
+                format!("Invalid configuration: {msg}"),
+            ),
         }
     }
 }
