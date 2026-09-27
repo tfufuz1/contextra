@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 
 use contextra_kvcache::{
     kivi_dequantize, kivi_quantize, KiviBlockMeta, KiviQuantizeConfig, KiviQuantizedBlock,
