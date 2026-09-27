@@ -439,6 +439,10 @@ mod tests {
                 },
                 "OrphanedVectorReference",
             ),
+            (
+                ContextraError::KvQuantization("quant error".into()),
+                "KvQuantization",
+            ),
         ];
 
         for (err, expected_kind) in variants {

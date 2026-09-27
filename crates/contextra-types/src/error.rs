@@ -306,6 +306,11 @@ impl ContextraError {
         }
     }
 
+    /// Creates a `KvQuantization` error.
+    pub fn kv_quantization(msg: impl Into<String>) -> Self {
+        Self::KvQuantization(msg.into())
+    }
+
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
     pub fn is_occ_conflict(&self) -> bool {
         matches!(self, Self::StaleRead(_) | Self::Conflict(_))
@@ -373,6 +378,7 @@ mod tests {
                 doc_id: "doc_123".into(),
                 index_id: "idx_456".into(),
             },
+            ContextraError::Plugin("dependency cycle".into()),
         ];
         for v in &variants {
             let _ = format!("{v}");

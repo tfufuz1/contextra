@@ -10,10 +10,21 @@ use std::sync::Arc;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::eviction_worker::EvictionWorker;
+use super::quantize_kivi::{
+    compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, KiviQuantizeConfig,
+    KiviQuantizedBlock, KvTensorView,
+};
 use super::radix::KvBlockGuard;
 
 #[cfg(feature = "kv-encryption")]
 use contextra_crypto::{CryptoError, EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
+
+/// Content representation state for a KV segment.
+#[derive(Debug, Clone)]
+pub enum KvSegmentContent {
+    Raw(bytes::Bytes),
+    KiviQuantized(KiviQuantizedBlock),
+}
 
 /// Aktuelle Version der KV-Segment-Schlüsselableitung.
 /// Erhöhe diesen Wert, wenn sich der HKDF-Info-String oder der Salt-Aufbau ändert.
@@ -155,6 +166,8 @@ pub struct KvSegment {
     pub active_refs: Arc<AtomicUsize>,
     /// Rohe Tensor-Bytes (Klartext oder Ciphertext). WIRD gezeroized beim Drop.
     data: Vec<u8>,
+    #[zeroize(skip)]
+    pub content: KvSegmentContent,
     #[cfg(feature = "kv-encryption")]
     encrypted_payload: Option<EncryptedSegmentPayload>,
 }
@@ -162,6 +175,7 @@ pub struct KvSegment {
 impl KvSegment {
     /// Erstellt ein neues Klartext-KV-Cache-Segment (Default / Zero-Config, P12-konform).
     pub fn new(tenant_id: TenantId, segment_id: u64, data: Vec<u8>) -> Self {
+        let content_bytes = bytes::Bytes::copy_from_slice(&data);
         Self {
             tenant_id,
             segment_id,
@@ -172,6 +186,7 @@ impl KvSegment {
             rope_offset: None,
             active_refs: Arc::new(AtomicUsize::new(0)),
             data,
+            content: KvSegmentContent::Raw(content_bytes),
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
         }
@@ -185,6 +200,7 @@ impl KvSegment {
         #[cfg(feature = "kv-encryption")] model_fingerprint: Option<ModelFingerprint>,
         rope_offset: Option<usize>,
     ) -> Self {
+        let content_bytes = bytes::Bytes::copy_from_slice(&data);
         Self {
             tenant_id,
             segment_id,
@@ -195,8 +211,54 @@ impl KvSegment {
             rope_offset,
             active_refs: Arc::new(AtomicUsize::new(0)),
             data,
+            content: KvSegmentContent::Raw(content_bytes),
             #[cfg(feature = "kv-encryption")]
             encrypted_payload: None,
+        }
+    }
+
+    /// Writes quantized raw KV tensor into segment, enforcing `INV-KIVI-AEAD-ORDER`:
+    /// Quantization -> Compression -> AEAD Encryption.
+    pub fn write_quantized(
+        &mut self,
+        raw_kv: &KvTensorView,
+        config: KiviQuantizeConfig,
+        cipher: &dyn contextra_crypto::KvCipher,
+    ) -> Result<(), ContextraError> {
+
+        // 1. Quantization FIRST
+        let quantized = kivi_quantize(raw_kv, config)?;
+        let serialized_quant = bincode::serialize(&quantized)
+            .map_err(|e| ContextraError::Serialization(e.to_string()))?;
+
+        // 2. Compression
+        let compressed = compress_bytes(&serialized_quant);
+
+        // 3. AEAD Encryption SECOND
+        let encrypted = cipher.seal(&compressed)?;
+
+        self.data = encrypted;
+        self.encrypted = true;
+        self.content = KvSegmentContent::KiviQuantized(quantized);
+        Ok(())
+    }
+
+    /// Reads and dequantizes segment data, enforcing `INV-KIVI-AEAD-ORDER`:
+    /// AEAD Decryption -> Decompression -> Dequantization.
+    pub fn read_dequantized(
+        &self,
+        cipher: &dyn contextra_crypto::KvCipher,
+    ) -> Result<KvTensorView, ContextraError> {
+        // 1. AEAD Decryption FIRST
+        let decrypted = cipher.open(&self.data)?;
+
+        // 2. Decompression
+        let decompressed = decompress_bytes(&decrypted)?;
+
+        // 3. Dequantization SECOND
+        match &self.content {
+            KvSegmentContent::KiviQuantized(block) => kivi_dequantize(&decompressed, &block.meta),
+            KvSegmentContent::Raw(_) => KvTensorView::from_bytes(&decompressed),
         }
     }
 

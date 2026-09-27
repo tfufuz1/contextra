@@ -12,7 +12,7 @@ mod tests;
 pub use encode::*;
 pub use flusher::*;
 pub(crate) use hmac::*;
-pub(crate) use replay::*;
+pub use replay::*;
 
 #[cfg(not(loom))]
 pub(crate) mod fs {

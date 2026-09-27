@@ -107,6 +107,35 @@ impl CloudResponseRehydrator {
     }
 }
 
+/// Evaluates whether PII vault data forces CryptoShred mode for an affected document (INV-COLLECTION-PROFILE-3).
+pub fn pii_vault_forces_crypto_shred(
+    is_pii_match: bool,
+    is_memory_only: bool,
+) -> bool {
+    is_pii_match && !is_memory_only
+}
+
+/// Read-only check for PII Vault coupling (Spec B.1.8 / INV-COLLECTION-PROFILE-3):
+/// If a document contains a PII match AND `durability_mode` is not `MemoryOnly`,
+/// force `KvDeleteMode::CryptoShred` for this document regardless of collection preset.
+pub fn resolve_effective_kv_delete_mode<D, K>(
+    is_pii_match: bool,
+    durability_mode: D,
+    preset_kv_delete_mode: K,
+    crypto_shred_mode: K,
+) -> K
+where
+    D: std::fmt::Debug,
+    K: Copy,
+{
+    let is_memory_only = format!("{:?}", durability_mode).contains("MemoryOnly");
+    if pii_vault_forces_crypto_shred(is_pii_match, is_memory_only) {
+        crypto_shred_mode
+    } else {
+        preset_kv_delete_mode
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloudQueryRequest {
     pub query: String,

@@ -8,6 +8,17 @@ use super::{
     WAL_V3_HEADER,
 };
 
+pub type WalSeq = u64;
+
+pub trait ReplayProgressSink: Send + Sync {
+    fn on_entry_replayed(&self, seq: WalSeq, entries_total_estimate: Option<u64>);
+}
+
+pub struct NoopReplayProgressSink;
+impl ReplayProgressSink for NoopReplayProgressSink {
+    fn on_entry_replayed(&self, _seq: WalSeq, _entries_total_estimate: Option<u64>) {}
+}
+
 impl Wal {
     pub(crate) fn handle_wal_entry_parse_error(
         e: ContextraError,
@@ -38,7 +49,15 @@ impl Wal {
     /// Replays the WAL using memory mapping (`memmap2`) for zero-copy entry decoding.
     /// Falls back to stream replay if mmap or parsing fails.
     pub async fn replay(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
-        let (entries, _) = self.replay_mmap().await?;
+        self.replay_with_sink(&NoopReplayProgressSink).await
+    }
+
+    /// Replays the WAL while notifying the provided `ReplayProgressSink` of progress.
+    pub async fn replay_with_sink<S: ReplayProgressSink>(
+        &self,
+        sink: &S,
+    ) -> Result<Vec<(u64, WalEntry, u64)>> {
+        let (entries, _) = self.replay_mmap_with_sink(sink).await?;
         Ok(entries)
     }
 
@@ -105,6 +124,15 @@ impl Wal {
     /// Returns all valid entries with sequence numbers, entries, end offsets, and detected WAL version.
     #[allow(clippy::type_complexity)]
     pub async fn replay_mmap(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
+        self.replay_mmap_with_sink(&NoopReplayProgressSink).await
+    }
+
+    /// Replays the WAL using zero-copy memory mapping (`mmap`) with progress callback.
+    #[allow(clippy::type_complexity)]
+    pub async fn replay_mmap_with_sink<S: ReplayProgressSink>(
+        &self,
+        sink: &S,
+    ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let std_file = std::fs::File::open(&self.path)
             .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
         let metadata = std_file
@@ -119,14 +147,24 @@ impl Wal {
         let mmap = contextra_sys::mmap_readonly(&std_file)
             .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
 
-        self.parse_mmap_slice(&mmap, file_size)
+        self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
     }
 
-    #[allow(clippy::type_complexity)]
+    #[allow(dead_code, clippy::type_complexity)]
     pub(crate) fn parse_mmap_slice(
         &self,
         mmap: &[u8],
         file_size: u64,
+    ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
+        self.parse_mmap_slice_with_sink(mmap, file_size, &NoopReplayProgressSink)
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn parse_mmap_slice_with_sink<S: ReplayProgressSink>(
+        &self,
+        mmap: &[u8],
+        file_size: u64,
+        sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let slice_len = (file_size as usize).min(mmap.len());
         let slice = mmap
@@ -134,6 +172,7 @@ impl Wal {
             .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
         let mut entries = Vec::new();
         let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
+            sink.on_entry_replayed(seq, None);
             entries.push((seq, entry, pos));
             true
         })?;

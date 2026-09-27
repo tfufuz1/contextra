@@ -21,6 +21,7 @@ pub struct McpServer {
     pub injection_guard: Arc<PromptInjectionGuard>,
     pub egress_classifier: Arc<dyn EgressClassifier>,
     pub routing: Option<Arc<RoutingHandle>>,
+    pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
     #[cfg(feature = "kv-bridge")]
     pub kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
 }
@@ -65,6 +66,7 @@ impl McpServer {
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
             egress_classifier: Arc::new(DefaultEgressClassifier::default()),
             routing: None,
+            plugin_registry: None,
             #[cfg(feature = "kv-bridge")]
             kv_bridge,
         }
@@ -91,6 +93,14 @@ impl McpServer {
 
     pub fn with_routing(mut self, routing: Option<Arc<RoutingHandle>>) -> Self {
         self.routing = routing;
+        self
+    }
+
+    pub fn with_plugin_registry(
+        mut self,
+        registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
+    ) -> Self {
+        self.plugin_registry = registry;
         self
     }
 

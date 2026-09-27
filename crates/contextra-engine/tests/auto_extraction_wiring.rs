@@ -246,3 +246,63 @@ async fn test_auto_extraction_llm_error_best_effort() {
     let doc = col.get("doc-3").await.expect("get doc");
     assert!(doc.is_some(), "Document must be stored");
 }
+
+#[tokio::test]
+async fn test_auto_extraction_default_config_creates_edges_in_graph_index() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = contextra_engine::ContextraConfig {
+        dimension: 4,
+        max_elements: 10_000,
+        ..Default::default()
+    };
+    let db = contextra_engine::Contextra::open_with_config(tmp.path(), config)
+        .await
+        .expect("open db");
+
+    let mock_json = r#"[
+        {"subject": "Carol", "predicate": "manages", "object": "ProjectX", "confidence": 0.95, "source_span": null}
+    ]"#;
+    let mock_llm = Arc::new(MockLlmGenerator::ok(mock_json));
+
+    // Uses AutoExtractionConfig::default() which defaults to enabled: true (unless opt-out feature set)
+    let auto_cfg = AutoExtractionConfig::default();
+
+    let col = db.collection("default").await.expect("collection");
+    col.set_embedder(Arc::new(FakeEmbedder { dim: 4 }))
+        .await
+        .expect("set_embedder");
+    col.set_auto_extraction(mock_llm.clone(), auto_cfg);
+
+    col.insert_text_only("doc-default-cfg", "Carol manages ProjectX.", None)
+        .await
+        .expect("insert_text_only should succeed");
+
+    #[cfg(feature = "entity-extraction")]
+    {
+        if cfg!(not(feature = "auto-extraction-opt-out")) {
+            assert_eq!(
+                mock_llm.call_count.load(Ordering::SeqCst),
+                1,
+                "AutoExtractionConfig::default() should trigger LLM call"
+            );
+
+            let carol_id = contextra_types::EntityId::from_key("Carol").expect("Carol entity id");
+            let proj_id = contextra_types::EntityId::from_key("ProjectX").expect("ProjectX entity id");
+            let neighbors = col
+                .graph_index()
+                .neighbors(carol_id)
+                .await
+                .expect("neighbors");
+            assert!(
+                neighbors.contains(&proj_id),
+                "Graph index must contain auto-extracted relationship between Carol and ProjectX"
+            );
+        } else {
+            assert_eq!(
+                mock_llm.call_count.load(Ordering::SeqCst),
+                0,
+                "When opt-out feature is active, default config must not trigger LLM"
+            );
+        }
+    }
+}

@@ -186,9 +186,10 @@ impl McpSandbox {
     /// Klassifiziert die MCP-Methode bzw. den Tool-Namen in eine `ToolCategory`.
     pub fn classify_method(method: &str) -> ToolCategory {
         match method {
-            "contextra_search" | "contextra_get" | "contextra_collections" => {
-                ToolCategory::DatabaseRead
-            }
+            "contextra_search"
+            | "contextra_get"
+            | "contextra_collections"
+            | "contextra_plugin_status" => ToolCategory::DatabaseRead,
             "contextra_cloud_query" => ToolCategory::CloudEgress,
             "contextra_insert"
             | "contextra_delete"

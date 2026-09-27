@@ -24,10 +24,7 @@ pub use bandit::*;
 pub use decay_controller::*;
 pub use drift::*;
 #[cfg(feature = "flow-corrected-thompson")]
-pub use flow_thompson::{
-    ring3_background_task_token, FcTsArmSet, FcTsConfig, FcTsError, FcTsRng,
-    FlowCorrectedThompsonBandit, Ring3Token, SplitMix64,
-};
+pub use flow_thompson::*;
 pub use homeostat::*;
 #[cfg(feature = "rie-greedy-personalization")]
 pub use rie_greedy::{RieGreedyError, RieGreedyProfile};

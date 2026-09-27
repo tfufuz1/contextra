@@ -19,4 +19,5 @@ ahash = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+proptest = "1.4"
 tokio = { workspace = true, features = ["rt", "macros"] }

@@ -1,0 +1,16 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-adapters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Framework adapters for LangChain, LangGraph, and LlamaIndex using PyO3"
+
+[dependencies]
+contextra-py = { workspace = true }
+pyo3 = { version = "0.24.1", features = ["extension-module", "abi3-py38", "multiple-pymethods", "auto-initialize"] }
+numpy = "0.24"
+serde_json = { workspace = true }
