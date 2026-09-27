@@ -13,3 +13,27 @@ pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
     // 3. Memory pages are managed safely by the kernel page tables.
     unsafe { memmap2::Mmap::map(file) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_mmap_readonly() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!(
+            "contextra_sys_mmap_test_{}.bin",
+            std::process::id()
+        ));
+        {
+            let mut file = File::create(&path).expect("failed to create temp file");
+            file.write_all(b"contextra mmap readonly test payload")
+                .expect("failed to write payload");
+        }
+        let file = File::open(&path).expect("failed to open temp file");
+        let mmap = mmap_readonly(&file).expect("mmap_readonly failed");
+        assert_eq!(&mmap[..], b"contextra mmap readonly test payload");
+        let _ = std::fs::remove_file(path);
+    }
+}
