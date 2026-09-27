@@ -88,7 +88,7 @@ pub mod ops;
 
 pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::LsmStorage;
-pub use observer::{CommittedBatch, WalEntryRef, WalObserver, WriteOrigin, DEFAULT_MAX_OBSERVER_LATENCY};
+pub use observer::{CommittedBatch, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin};
 pub(super) use guard::{CommitGuard, LsmState};
 pub(super) use validate::validate_key;
 
