@@ -20,8 +20,8 @@ windows-sys = { version = "0.61", features = [
 [features]
 default = []
 encryption-at-rest = ["wal-integrity"]
-wal-integrity = ["dep:contextra-crypto"]
-deletion-proof = ["dep:contextra-crypto", "wal-integrity"]
+wal-integrity = []
+deletion-proof = ["wal-integrity"]
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
@@ -34,7 +34,7 @@ contextra-sys = { workspace = true }
 contextra-core = { workspace = true }
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
-contextra-crypto = { workspace = true, optional = true }
+contextra-crypto = { workspace = true }
 bytes = { workspace = true }
 blake3 = { workspace = true }
 crc32fast = { workspace = true }
