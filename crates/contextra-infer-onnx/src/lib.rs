@@ -626,6 +626,8 @@ impl TextEmbedder {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
 
     #[cfg(feature = "onnx")]
