@@ -13,12 +13,10 @@ async fn test_wal_try_append_backpressure_when_queue_full() {
     let tmp = TempDir::new().expect("temp dir");
     let wal_path = tmp.path().join("wal_backpressure.log");
 
-    let config = WalConfig {
-        flusher_config: WalFlusherConfig {
-            batch_window_micros: 0,
-            queue_capacity: 1, // Bounded channel capacity = 1
-        },
-        ..Default::default()
+    let mut config = WalConfig::default();
+    config.flusher_config = WalFlusherConfig {
+        batch_window_micros: 0,
+        queue_capacity: 1, // Bounded channel capacity = 1
     };
 
     let wal = Arc::new(
@@ -174,12 +172,10 @@ async fn test_wal_append_blocks_until_flusher_frees_capacity() {
     let tmp = TempDir::new().expect("temp dir");
     let wal_path = tmp.path().join("wal_blocking.log");
 
-    let config = WalConfig {
-        flusher_config: WalFlusherConfig {
-            batch_window_micros: 200_000,
-            queue_capacity: 1,
-        },
-        ..Default::default()
+    let mut config = WalConfig::default();
+    config.flusher_config = WalFlusherConfig {
+        batch_window_micros: 200_000,
+        queue_capacity: 1,
     };
 
     let wal = Arc::new(

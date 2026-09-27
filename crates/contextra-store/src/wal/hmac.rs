@@ -4,6 +4,9 @@ use std::path::{Path, PathBuf};
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
 
 const LEGACY_KEY_OBFUSCATION_MASK: u8 = 0x5A;
+// INV-WAL-LEGACY-KEY-1: Obfuscated legacy static HMAC integrity key used strictly
+// for backward-compatibility fallback during WAL replay of legacy databases.
+// Note: This key offers no secrecy property once source code is publicly accessible.
 const LEGACY_INTEGRITY_KEY_OBFUSCATED: [u8; 32] = *b"954.?\".(;w34.?=(3.#w1?#w,kZZZZZZ";
 
 /// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
@@ -67,6 +70,11 @@ impl Wal {
     /// Exposes the HMAC integrity key for testing.
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
+    }
+
+    #[doc(hidden)]
+    pub fn legacy_integrity_key_for_test() -> [u8; 32] {
+        legacy_integrity_key()
     }
 
     pub(crate) async fn load_or_create_integrity_key(wal_path: &Path) -> Result<[u8; 32]> {

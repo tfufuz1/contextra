@@ -244,7 +244,7 @@ impl Manifest {
                         .unwrap_or_else(|| path.clone());
                     valid_map.remove(&key);
                 }
-                ManifestEntry::RollbackComplete { .. } => {}
+                ManifestEntry::RollbackComplete { .. } | ManifestEntry::WalCheckpoint { .. } => {}
                 ManifestEntry::Replace {
                     removed,
                     added,
@@ -307,11 +307,23 @@ impl Manifest {
                         }
                     }
                 }
-                ManifestEntry::Add { .. } | ManifestEntry::RollbackComplete { .. } => {}
+                ManifestEntry::Add { .. }
+                | ManifestEntry::RollbackComplete { .. }
+                | ManifestEntry::WalCheckpoint { .. } => {}
             }
         }
 
         dead_set
+    }
+
+    /// Extracts the most recent WAL high-water-mark HMAC from a list of manifest entries.
+    pub fn extract_high_water_mark(entries: &[ManifestEntry]) -> Option<[u8; 32]> {
+        for entry in entries.iter().rev() {
+            if let ManifestEntry::WalCheckpoint { hmac } = entry {
+                return Some(*hmac);
+            }
+        }
+        None
     }
 
     pub fn path(&self) -> &Path {

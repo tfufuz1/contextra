@@ -236,6 +236,7 @@ impl Wal {
     }
 
     #[cfg(feature = "wal-integrity")]
+    #[allow(deprecated)]
     fn verify_entry_snapshot(
         &self,
         snapshot: &WalEntrySnapshot,

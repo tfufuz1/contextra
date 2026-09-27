@@ -70,12 +70,10 @@ fn bench_wal_group_commit_throughput(c: &mut Criterion) {
                         let tmp = TempDir::new().unwrap();
                         let wal_path = tmp.path().join("group_commit_bench.wal");
 
-                        let config = WalConfig {
-                            flusher_config: WalFlusherConfig {
-                                batch_window_micros: batch_window,
-                                queue_capacity: 10_000,
-                            },
-                            ..Default::default()
+                        let mut config = WalConfig::default();
+                        config.flusher_config = WalFlusherConfig {
+                            batch_window_micros: batch_window,
+                            queue_capacity: 10_000,
                         };
 
                         let wal = Arc::new(Wal::open_with_config(&wal_path, config).await.unwrap());
@@ -119,12 +117,10 @@ fn bench_wal_fault_injection_overhead(c: &mut Criterion) {
             let tmp = TempDir::new().unwrap();
             let wal_path = tmp.path().join("fault_overhead.wal");
 
-            let config = WalConfig {
-                flusher_config: WalFlusherConfig {
-                    batch_window_micros: 100,
-                    queue_capacity: 1_024,
-                },
-                ..Default::default()
+            let mut config = WalConfig::default();
+            config.flusher_config = WalFlusherConfig {
+                batch_window_micros: 100,
+                queue_capacity: 1_024,
             };
 
             let wal = Arc::new(Wal::open_with_config(&wal_path, config).await.unwrap());

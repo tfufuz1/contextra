@@ -334,6 +334,17 @@ impl From<&ContextraError> for ContextraErrorDto {
                 message: err.to_string(),
                 details: None,
             },
+            ContextraError::WalTruncationDetected {
+                expected_hmac,
+                actual_hmac,
+            } => Self {
+                kind: "WalTruncationDetected".to_string(),
+                message: err.to_string(),
+                details: Some(serde_json::json!({
+                    "expected_hmac": expected_hmac,
+                    "actual_hmac": actual_hmac,
+                })),
+            },
         }
     }
 }
@@ -483,6 +494,13 @@ mod tests {
             (
                 ContextraError::GraphRepairFailed(crate::error::HnswDeletionError::NodeNotFound(crate::DocId::new(1))),
                 "GraphRepairFailed",
+            ),
+            (
+                ContextraError::WalTruncationDetected {
+                    expected_hmac: [0x11; 32],
+                    actual_hmac: [0x22; 32],
+                },
+                "WalTruncationDetected",
             ),
         ];
 

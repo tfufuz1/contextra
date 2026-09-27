@@ -334,6 +334,15 @@ pub enum ContextraError {
     /// HNSW graph repair failure.
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(#[from] HnswDeletionError),
+
+    /// Subsequent external or malicious truncation of an otherwise consistent WAL chain detected.
+    #[error("WAL truncation attack detected: expected tail HMAC {expected_hmac:?}, actual tail HMAC {actual_hmac:?}")]
+    WalTruncationDetected {
+        /// Expected WAL tail HMAC from manifest high water mark.
+        expected_hmac: [u8; 32],
+        /// Actual computed WAL tail HMAC after replay.
+        actual_hmac: [u8; 32],
+    },
 }
 
 impl ContextraError {
@@ -413,6 +422,14 @@ impl ContextraError {
     /// Creates a `PinBudgetExceeded` error.
     pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
         Self::PinBudgetExceeded(msg.into())
+    }
+
+    /// Creates a `WalTruncationDetected` error.
+    pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {
+        Self::WalTruncationDetected {
+            expected_hmac,
+            actual_hmac,
+        }
     }
 
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.

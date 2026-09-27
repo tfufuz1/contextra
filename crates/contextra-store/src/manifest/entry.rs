@@ -19,6 +19,8 @@ pub enum ManifestEntry {
         added_max_tx: u64,
         rank: u64,
     },
+    /// A WAL high-water-mark entry recording the valid WAL-tail HMAC at flush/checkpoint time.
+    WalCheckpoint { hmac: [u8; 32] },
 }
 
 impl ManifestEntry {
@@ -65,6 +67,10 @@ impl ManifestEntry {
                     payload.extend_from_slice(&(p_bytes.len() as u32).to_le_bytes());
                     payload.extend_from_slice(p_bytes);
                 }
+            }
+            ManifestEntry::WalCheckpoint { hmac } => {
+                payload.push(4u8); // op_tag = 4
+                payload.extend_from_slice(hmac);
             }
         }
 
@@ -299,6 +305,21 @@ impl ManifestEntry {
                     added_max_tx,
                     rank,
                 })
+            }
+            4 => {
+                // WalCheckpoint
+                if remaining.len() < 32 {
+                    return Err(ContextraError::Serialization(
+                        "WalCheckpoint payload too short".into(),
+                    ));
+                }
+                let hmac_bytes = remaining.get(0..32).ok_or_else(|| {
+                    ContextraError::Serialization("WalCheckpoint hmac bytes missing".into())
+                })?;
+                let hmac: [u8; 32] = hmac_bytes
+                    .try_into()
+                    .map_err(|_| ContextraError::Serialization("Invalid hmac format".into()))?;
+                Ok(ManifestEntry::WalCheckpoint { hmac })
             }
             _ => Err(ContextraError::Serialization(format!(
                 "Unknown Manifest op tag: {}",

@@ -288,7 +288,7 @@ pub static FAIL_APPEND_PARTIAL_ONCE: std::sync::atomic::AtomicBool =
 #[derive(Debug, Clone)]
 pub struct WalConfig {
     pub key_manager: Option<Arc<KeyManager>>,
-    pub allow_legacy_integrity_key_fallback: bool,
+    pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub min_wal_version: WalVersion,
     pub flusher_config: WalFlusherConfig,
 }
@@ -339,6 +339,23 @@ impl std::fmt::Debug for Wal {
 impl Wal {
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::open_with_config(path, WalConfig::default()).await
+    }
+
+    /// Explicitly opens a legacy WAL file requiring migration using the legacy integrity key fallback.
+    ///
+    /// **INV-WAL-LEGACY-KEY-1**: This is the ONLY entry point permitted to enable
+    /// `allow_legacy_integrity_key_fallback = true` for legacy WAL migration.
+    pub async fn open_for_legacy_migration(
+        path: impl AsRef<Path>,
+        key_manager: Option<Arc<KeyManager>>,
+    ) -> Result<Self> {
+        let config = WalConfig {
+            key_manager,
+            allow_legacy_integrity_key_fallback: true,
+            min_wal_version: WalVersion::V1,
+            ..Default::default()
+        };
+        Self::open_with_config(path, config).await
     }
 
     /// Opens an existing WAL file solely for read-only replay, without spawning
