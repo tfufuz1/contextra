@@ -1,12 +1,17 @@
 use crate::guard::{CheckpointGuard, PinGuard};
+use crate::hardlink_cloner::{
+    CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult,
+};
 use crate::manifest::CheckpointManifest;
 use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::{monotonic_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
+use contextra_core::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -709,6 +714,22 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         }
 
         Ok(recovered)
+    }
+
+    /// Creates a physical hardlink clone of all SSTable files visible for `seq_no` into `target_dir`.
+    ///
+    /// Delegates to [`DefaultHardlinkCloner`] while holding a snapshot pin in `snapshot_registry`.
+    pub async fn create_hardlink_clone(
+        &self,
+        seq_no: u64,
+        source_dir: &Path,
+        target_dir: &Path,
+        snapshot_registry: &Arc<SnapshotRegistry>,
+    ) -> Result<HardlinkCloneResult> {
+        let cloner = DefaultHardlinkCloner::new();
+        cloner
+            .clone_sstable_hardlinks(seq_no, source_dir, target_dir, snapshot_registry)
+            .await
     }
 }
 

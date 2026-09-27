@@ -1,6 +1,9 @@
+use super::adaptive::{
+    AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics,
+};
 use super::config::CompactionConfig;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
-use contextra_core::{Result, SnapshotRegistry, TOMBSTONE_BIT};
+use contextra_core::{Result, SnapshotRegistry, StorageStats, TOMBSTONE_BIT};
 use crate::wal::KeyManager;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
@@ -17,6 +20,8 @@ pub struct CompactionEngine {
     manifest: Option<Arc<crate::manifest::Manifest>>,
     compaction_counter: AtomicU64,
     pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,
+    workload_metrics: WorkloadMetrics,
+    adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
 }
 
 impl CompactionEngine {
@@ -29,6 +34,16 @@ impl CompactionEngine {
         budget: Arc<contextra_core::ResourceTracker>,
         manifest: Option<Arc<crate::manifest::Manifest>>,
     ) -> Self {
+        let adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>> = if config.enable_adaptive_compaction {
+            Some(Arc::new(CostBasedAdaptivePlanner::new(
+                config.adaptive_read_ratio_threshold,
+                config.min_sstables_per_tier,
+                config.size_ratio,
+            )))
+        } else {
+            None
+        };
+
         Self {
             config,
             snapshot_registry,
@@ -38,6 +53,8 @@ impl CompactionEngine {
             manifest,
             compaction_counter: AtomicU64::new(0),
             pressure_rx: None,
+            workload_metrics: WorkloadMetrics::new(),
+            adaptive_planner,
         }
     }
 
@@ -48,6 +65,27 @@ impl CompactionEngine {
     ) -> Self {
         self.pressure_rx = Some(rx);
         self
+    }
+
+    /// Attaches a custom adaptive compaction planner.
+    pub fn with_adaptive_planner(
+        mut self,
+        planner: Arc<dyn AdaptiveCompactionPlanner>,
+    ) -> Self {
+        self.adaptive_planner = Some(planner);
+        self
+    }
+
+    /// Records a read operation for workload tracking.
+    #[inline]
+    pub fn record_read_op(&self) {
+        self.workload_metrics.record_read();
+    }
+
+    /// Records a write operation for workload tracking.
+    #[inline]
+    pub fn record_write_op(&self, seq_no: u64) {
+        self.workload_metrics.record_write(seq_no);
     }
 
     /// Evaluates whether compaction should run and performs it if needed.
@@ -79,12 +117,44 @@ impl CompactionEngine {
             if ssts.len() < self.config.min_sstables_per_tier {
                 return Ok(false);
             }
-            match self.select_compaction_candidates(&ssts) {
-                Some(candidates) if candidates.len() >= 2 => {
-                    let is_full = candidates.len() == ssts.len();
-                    (candidates, is_full)
+
+            if self.config.enable_adaptive_compaction {
+                if let Some(ref planner) = self.adaptive_planner {
+                    let total_size_bytes = ssts.iter().map(|s| s.metadata().file_size).sum();
+                    let stats = StorageStats {
+                        num_segments: ssts.len(),
+                        total_size_bytes,
+                        memtable_size_bytes: 0,
+                    };
+                    let metrics_snap = self.workload_metrics.snapshot();
+                    let min_seq = self.snapshot_registry.min_active_seqno();
+
+                    if let Some(plan) = planner.plan_compaction(&stats, &metrics_snap, &ssts, min_seq)? {
+                        if plan.candidates.len() >= 2 {
+                            (plan.candidates, plan.is_full_compaction)
+                        } else {
+                            return Ok(false);
+                        }
+                    } else {
+                        return Ok(false);
+                    }
+                } else {
+                    match self.select_compaction_candidates(&ssts) {
+                        Some(candidates) if candidates.len() >= 2 => {
+                            let is_full = candidates.len() == ssts.len();
+                            (candidates, is_full)
+                        }
+                        _ => return Ok(false),
+                    }
                 }
-                _ => return Ok(false),
+            } else {
+                match self.select_compaction_candidates(&ssts) {
+                    Some(candidates) if candidates.len() >= 2 => {
+                        let is_full = candidates.len() == ssts.len();
+                        (candidates, is_full)
+                    }
+                    _ => return Ok(false),
+                }
             }
         };
 

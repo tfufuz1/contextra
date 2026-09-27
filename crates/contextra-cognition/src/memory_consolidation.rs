@@ -38,6 +38,8 @@ pub struct ConsolidationConfig {
     /// Pairs über diesem Wert werden als Duplikate markiert.
     /// SEMANTIK: "Nahezu identisch" — bewusst hoch.
     pub near_duplicate_cosine_threshold: f32,
+    /// Aggregationskonfiguration inklusive Speicherbudget für Konsolidierungs-Prüfungen.
+    pub aggregation_config: crate::aggregation_phase::AggregationConfig,
 }
 
 impl Default for ConsolidationConfig {
@@ -47,6 +49,7 @@ impl Default for ConsolidationConfig {
             max_turns_per_segment: 20,
             segment_cohesion_threshold: 0.70,
             near_duplicate_cosine_threshold: 0.95,
+            aggregation_config: crate::aggregation_phase::AggregationConfig::default(),
         }
     }
 }
@@ -78,7 +81,7 @@ pub struct ConsolidationPhaseResult {
 }
 
 /// Berechnet die Cosine-Similarity zwischen zwei Vektoren ohne `panic!` oder `unwrap()`.
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;
     }
@@ -288,8 +291,11 @@ pub fn run_consolidation_pass(
             .filter_map(|id| turn_map.get(id).map(|emb| (*id, emb.clone())))
             .collect();
 
-        let dup_pairs =
-            detect_near_duplicates(&segment_turns, config.near_duplicate_cosine_threshold);
+        let dup_pairs = crate::transitivity_veto::filter_candidates_with_transitivity_veto(
+            &segment_turns,
+            config.near_duplicate_cosine_threshold,
+            &config.aggregation_config,
+        );
         for (older, _newer) in dup_pairs {
             duplicates.push(older);
         }
@@ -580,6 +586,7 @@ mod tests {
             max_turns_per_segment: 20,
             segment_cohesion_threshold: 0.70,
             near_duplicate_cosine_threshold: 0.95,
+            aggregation_config: crate::aggregation_phase::AggregationConfig::default(),
         };
 
         let segments = group_turns_into_segments(&turns, &config);
@@ -669,6 +676,7 @@ mod tests {
             max_turns_per_segment: 20,
             segment_cohesion_threshold: 0.70,
             near_duplicate_cosine_threshold: 0.95,
+            aggregation_config: crate::aggregation_phase::AggregationConfig::default(),
         };
 
         let segments = group_turns_into_segments(&turns, &config);
@@ -702,6 +710,7 @@ mod tests {
             max_turns_per_segment: 20,
             segment_cohesion_threshold: 0.70,
             near_duplicate_cosine_threshold: 0.95,
+            aggregation_config: crate::aggregation_phase::AggregationConfig::default(),
         };
         let segments = group_turns_into_segments(&turns, &config);
         assert_eq!(

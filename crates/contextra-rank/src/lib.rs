@@ -11,7 +11,10 @@ pub mod fusion;
 #[cfg(feature = "dibud")]
 pub mod dibud;
 
-pub use calibration::{IsotonicCalibrator, PlattScaler};
+pub use calibration::{
+    AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError, IsotonicCalibrator,
+    PlattScaler,
+};
 #[cfg(feature = "dibud")]
 pub use dibud::{
     fuse_exact_prefix, fuse_exact_prefix_async, BudgetedChannel, DiBudFusionState, DiBudOutcome,

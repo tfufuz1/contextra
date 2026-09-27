@@ -144,7 +144,8 @@ impl SketchMatrix {
         hasher.update(&tenant_id.as_u64().to_le_bytes());
         hasher.update(&base_seed.to_le_bytes());
         let hash = hasher.finalize();
-        u64::from_le_bytes(hash.as_bytes()[0..8].try_into().expect("32-byte hash slice"))
+        let bytes: [u8; 8] = hash.as_bytes()[0..8].try_into().unwrap_or([0u8; 8]);
+        u64::from_le_bytes(bytes)
     }
 
     /// SplitMix64-PRNG aus `seed`, Rademacher-Einträge ±1/√k.

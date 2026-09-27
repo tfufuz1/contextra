@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 //! `contextra-privacy` — Cloud Egress Security, DLP & Exfiltration Protection (Ring 3)
 
+pub mod audit_trace;
 pub mod avv_generator;
 pub mod bulk_exfiltration_detector;
 pub mod egress_gateway;
@@ -10,6 +11,7 @@ pub mod error;
 pub mod guarded_payload;
 pub mod processing_registry;
 
+pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
 pub use avv_generator::{generate_avv_draft, AvvContext};
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
@@ -26,6 +28,7 @@ pub use egress_guard::{
 pub use egress_vault::{
     BlockReason, BoxFuture, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
     EgressVaultError, EntityRecognizer, NoOpRecognizer, PolicyCategory, SurrogateVault,
+    MAX_CLASSIFY_PAYLOAD_BYTES,
 };
 pub use error::EgressError;
 pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};

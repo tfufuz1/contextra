@@ -393,6 +393,7 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_v3(
         scope: DeletionScope,
         deleted_keys: Vec<Vec<u8>>,
@@ -417,6 +418,7 @@ impl DeletionProof {
     }
 
     /// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive optionaler WAL-HMAC-Kettenquittung.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_with_wal_receipt_v3(
         scope: DeletionScope,
         mut deleted_keys: Vec<Vec<u8>>,
