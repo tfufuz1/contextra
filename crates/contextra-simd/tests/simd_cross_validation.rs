@@ -195,3 +195,86 @@ proptest! {
         );
     }
 }
+
+#[test]
+fn test_s4_1000_pairs_equivalence_threshold() {
+    let dimensions = [128, 512, 1536, 4096];
+    let num_pairs = 1000;
+
+    for &dim in &dimensions {
+        let mut max_cos_diff = 0.0f32;
+        let mut max_euc_diff = 0.0f32;
+        let mut max_dot_diff = 0.0f32;
+
+        for pair_idx in 0..num_pairs {
+            let a: Vec<f32> = (0..dim)
+                .map(|i| (((i * 17 + pair_idx * 31) % 1000) as f32) / 100.0 - 5.0)
+                .collect();
+            let b: Vec<f32> = (0..dim)
+                .map(|i| (((i * 23 + pair_idx * 37) % 1000) as f32) / 100.0 - 5.0)
+                .collect();
+
+            let cos_s = cosine_distance_scalar(&a, &b);
+            let cos_d = cosine_distance(&a, &b).unwrap();
+            let cos_diff = (cos_s - cos_d).abs();
+            max_cos_diff = max_cos_diff.max(cos_diff);
+
+            let euc_s = euclidean_distance_scalar(&a, &b);
+            let euc_d = euclidean_distance(&a, &b).unwrap();
+            let euc_diff = (euc_s - euc_d).abs();
+            max_euc_diff = max_euc_diff.max(euc_diff);
+
+            let dot_s = dot_product_scalar(&a, &b);
+            let dot_d = dot_product_distance(&a, &b).unwrap();
+            let dot_diff = (dot_s - dot_d).abs();
+            max_dot_diff = max_dot_diff.max(dot_diff);
+        }
+
+        println!("Dim {dim}: max_cos_diff={max_cos_diff:.8e}, max_euc_diff={max_euc_diff:.8e}, max_dot_diff={max_dot_diff:.8e}");
+
+        assert!(
+            max_cos_diff < 1e-5,
+            "Cosine max diff at dim {dim} exceeded 1e-5: {max_cos_diff}"
+        );
+        assert!(
+            max_euc_diff < 1e-3,
+            "Euclidean max diff at dim {dim}: {max_euc_diff}"
+        );
+        assert!(
+            max_dot_diff < 5e-3,
+            "Dot product max diff at dim {dim}: {max_dot_diff}"
+        );
+    }
+}
+
+#[test]
+fn test_s1_zero_vector_and_l2_norm() {
+    let zero = vec![0.0f32; 128];
+    let v = vec![1.0f32; 128];
+
+    assert_eq!(cosine_distance_scalar(&zero, &zero), 1.0);
+    assert_eq!(cosine_distance(&zero, &zero).unwrap(), 1.0);
+    assert_eq!(cosine_distance(&zero, &v).unwrap(), 1.0);
+    assert_eq!(cosine_distance(&v, &zero).unwrap(), 1.0);
+}
+
+#[test]
+fn test_s2_l2_distance_correctness() {
+    let a = vec![3.0f32, 0.0];
+    let b = vec![0.0f32, 4.0];
+    assert_eq!(euclidean_distance_scalar(&a, &b), 5.0);
+    assert_eq!(euclidean_distance(&a, &b).unwrap(), 5.0);
+}
+
+#[test]
+fn test_s3_overflow_behavior() {
+    let norm_a = vec![1.0f32 / (4096.0f32.sqrt()); 4096];
+    let norm_b = vec![1.0f32 / (4096.0f32.sqrt()); 4096];
+    let dot = dot_product_distance(&norm_a, &norm_b).unwrap();
+    assert!(!dot.is_nan() && !dot.is_infinite());
+
+    let huge_a = vec![1e20f32; 128];
+    let huge_b = vec![1e20f32; 128];
+    let huge_dot = dot_product_distance(&huge_a, &huge_b).unwrap();
+    assert!(huge_dot.is_infinite());
+}

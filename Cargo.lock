@@ -1125,6 +1125,7 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "contextra-core",
+ "criterion",
  "proptest",
  "thiserror 2.0.20",
  "tracing",
