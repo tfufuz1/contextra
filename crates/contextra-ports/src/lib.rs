@@ -53,6 +53,8 @@ pub mod metrics;
 pub mod observability;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
+/// Plugin registry and dependency resolution.
+pub mod plugin;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -73,6 +75,7 @@ pub use lifecycle::*;
 pub use metrics::*;
 pub use observability::*;
 pub use rng::*;
+pub use plugin::*;
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
@@ -105,6 +108,7 @@ mod dyn_safety {
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
     fn _assert_dyn_license_gate(_: Option<&dyn LicenseGate>) {}
+    fn _assert_dyn_plugin_manifest(_: Option<&dyn PluginManifest>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -121,5 +125,6 @@ mod dyn_safety {
         _assert_dyn_rng(None);
         _assert_dyn_id_gen(None);
         _assert_dyn_license_gate(None);
+        _assert_dyn_plugin_manifest(None);
     }
 }
