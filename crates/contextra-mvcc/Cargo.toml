@@ -17,9 +17,18 @@ serde = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
 
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }
 proptest = "1.4"
+criterion = { workspace = true }
+loom = "0.7"
+
+[[bench]]
+name = "mvcc_bench"
+harness = false
 
 [[test]]
 name = "ssi_write_skew"
@@ -32,3 +41,7 @@ path = "tests/ssi_determinism_proptest.rs"
 [[test]]
 name = "visibility_proptest"
 path = "tests/visibility_proptest.rs"
+
+[[test]]
+name = "loom_snapshot_registry"
+path = "tests/loom_snapshot_registry.rs"

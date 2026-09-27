@@ -166,14 +166,13 @@ impl SequenceLog {
         self.expired_pins_at(Instant::now())
     }
 
-    /// Calculates the minimum sequence number currently pinned for snapshot retention.
+    /// Calculates the minimum sequence number currently pinned for snapshot retention at timestamp `now`.
     /// Returns `None` if no snapshot sequence numbers are pinned.
     ///
     /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
-    pub fn min_retention_seq(&self) -> Option<u64> {
+    pub fn min_retention_seq_at(&self, now: Instant) -> Option<u64> {
         let min_seq = self.pinned_snapshots.keys().copied().min();
         if let Some(seq) = min_seq {
-            let now = Instant::now();
             if let Some(timestamps) = self.pinned_snapshots.get(&seq) {
                 for &ts in timestamps {
                     let duration = now.saturating_duration_since(ts);
@@ -190,6 +189,14 @@ impl SequenceLog {
             }
         }
         min_seq
+    }
+
+    /// Calculates the minimum sequence number currently pinned for snapshot retention.
+    /// Returns `None` if no snapshot sequence numbers are pinned.
+    ///
+    /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
+    pub fn min_retention_seq(&self) -> Option<u64> {
+        self.min_retention_seq_at(Instant::now())
     }
 
     /// Returns the deletion sequence number of the given document, if currently soft-deleted.
