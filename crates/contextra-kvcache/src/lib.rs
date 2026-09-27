@@ -5,7 +5,6 @@
 //! Stellt den In-Memory LRU-Cache, Eviction-Worker, Tenant-Isolation,
 //! Prefix-Radix-Baum, Tiering und Crypto-Shredding Infrastruktur bereit.
 
-#[cfg(feature = "kvcache-attention-eviction")]
 pub mod attention_score;
 pub mod eviction_worker;
 pub mod prefix_store;
@@ -15,7 +14,6 @@ pub mod radix;
 pub mod segment;
 pub mod store;
 
-#[cfg(feature = "kvcache-attention-eviction")]
 pub use attention_score::{
     rank_for_eviction, rank_for_eviction_weighted, AttentionScoreSource, NullAttentionScoreSource,
 };
