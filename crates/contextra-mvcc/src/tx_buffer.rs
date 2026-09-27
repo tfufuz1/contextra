@@ -10,8 +10,8 @@
 //! order (index 0 to N-1), acquiring and releasing each shard lock one at a time via `try_write()`.
 
 // FILE-CONTEXT
-// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
-// ZWECK: Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen.
+// STAND: 2026-09-27T00:00:00Z (SESSION: e459bd5f)
+// ZWECK: Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen & SSI Read-Set Tracking.
 // INVARIANTEN: Shard-Isolation per TxId; Niemals zwei Shards gleichzeitig sperren (Deadlock-Prävention).
 // HOTSPOTS: 110-380
 // NICHT-OFFENSICHTLICH: Orphan Reaper führt getrennte try_write Locks pro Sharding-Index 0..N-1 durch.
@@ -20,13 +20,14 @@
 // INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
 
 // FILE-CONTEXT
-// STAND:       2026-08-29T15:22:34Z (SESSION: 2c814094)
+// STAND:       2026-09-27T00:00:00Z (SESSION: 2c814094)
 // ZWECK:       Transaktion-Staging-Buffer zwischen Writes und WAL-Commit
 // INVARIANTEN: Bounded capacity enforced (AGT-CORE-001), single shard lock acquired sequentially in index order
 // HOTSPOTS:    TxBuffer::stage_insert(), TxBuffer::commit_tx(), reap_orphans()
 // SIEHE AUCH:  crates/contextra-core/AGENTS.md
 
 use crate::error::{ContextraError, Result};
+use crate::ssi::ReadSet;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
@@ -96,12 +97,14 @@ impl<T: Clone> IndexOp<T> {
 #[derive(Debug)]
 struct TxShard<T: Clone> {
     ops: AHashMap<TxId, (Vec<IndexOp<T>>, Instant)>,
+    read_sets: AHashMap<TxId, ReadSet>,
 }
 
 impl<T: Clone> TxShard<T> {
     fn new() -> Self {
         Self {
             ops: AHashMap::new(),
+            read_sets: AHashMap::new(),
         }
     }
 }
@@ -207,6 +210,35 @@ impl<T: Clone> TxBuffer<T> {
             .ops
             .entry(tx)
             .or_insert_with(|| (Vec::with_capacity(16), Instant::now()));
+        shard.read_sets.entry(tx).or_default();
+    }
+
+    /// Registers a read key and its snapshot sequence number for transaction `tx`.
+    pub fn register_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
+        let shard_idx = self.shard_idx(tx);
+        let mut shard = self.shards[shard_idx].write();
+        shard
+            .read_sets
+            .entry(tx)
+            .or_default()
+            .record_read(key, snapshot_seq);
+    }
+
+    /// Alias for [`TxBuffer::register_read`].
+    pub fn record_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
+        self.register_read(tx, key, snapshot_seq);
+    }
+
+    /// Returns a clone of the accumulated [`ReadSet`] for transaction `tx`, if present.
+    pub fn get_read_set(&self, tx: TxId) -> Option<ReadSet> {
+        let shard_idx = self.shard_idx(tx);
+        let shard = self.shards[shard_idx].read();
+        shard.read_sets.get(&tx).cloned()
+    }
+
+    /// Alias for [`TxBuffer::get_read_set`].
+    pub fn read_set(&self, tx: TxId) -> Option<ReadSet> {
+        self.get_read_set(tx)
     }
 
     /// Stages an operation for the given transaction, checking bounded capacity.
@@ -281,10 +313,11 @@ impl<T: Clone> TxBuffer<T> {
     /// Drains and returns all buffered operations for a transaction.
     ///
     /// Returns an empty vector if the transaction does not exist or has no operations.
-    /// This operation is atomic per shard.
+    /// This operation is atomic per shard and cleans up any tracked [`ReadSet`].
     pub fn drain(&self, tx: TxId) -> Vec<IndexOp<T>> {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
+        shard.read_sets.remove(&tx);
         shard
             .ops
             .remove(&tx)
@@ -292,10 +325,11 @@ impl<T: Clone> TxBuffer<T> {
             .unwrap_or_default()
     }
 
-    /// Discards all buffered operations for a transaction.
+    /// Discards all buffered operations and tracked read-sets for a transaction.
     pub fn discard(&self, tx: TxId) {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
+        shard.read_sets.remove(&tx);
         shard.ops.remove(&tx);
     }
 
@@ -337,14 +371,20 @@ impl<T: Clone> TxBuffer<T> {
                 break;
             }
             if let Some(mut shard) = shard_lock.try_write() {
+                let tx_timeout = self.tx_timeout;
+                let mut shard_expired = Vec::new();
                 shard.ops.retain(|tx, (_, created)| {
-                    if expired.len() < max && created.elapsed() > self.tx_timeout {
-                        expired.push(*tx);
+                    if expired.len() + shard_expired.len() < max && created.elapsed() > tx_timeout {
+                        shard_expired.push(*tx);
                         false
                     } else {
                         true
                     }
                 });
+                for tx in &shard_expired {
+                    shard.read_sets.remove(tx);
+                }
+                expired.extend(shard_expired);
             }
             std::thread::yield_now();
         }
@@ -494,11 +534,35 @@ impl<T: Clone> Default for TxBuffer<T> {
         Self::new()
     }
 }
+
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use proptest::{prop_assert, prop_assert_eq};
     use std::sync::Arc;
+
+    #[test]
+    fn test_tx_buffer_read_set_tracking() {
+        let buffer = TxBuffer::<String>::new();
+        let tx = TxId::new(10);
+        buffer.begin(tx);
+
+        let initial_rs = buffer.get_read_set(tx);
+        assert!(initial_rs.as_ref().is_some_and(|rs| rs.is_empty()));
+
+        buffer.register_read(tx, b"key_a".to_vec(), 100);
+        buffer.record_read(tx, b"key_b".to_vec(), 105);
+
+        let rs = buffer.read_set(tx).expect("read set present");
+        assert_eq!(rs.len(), 2);
+        assert_eq!(rs.get(b"key_a"), Some(100));
+        assert_eq!(rs.get(b"key_b"), Some(105));
+
+        // Drain cleans up read_set
+        buffer.drain(tx);
+        assert!(buffer.get_read_set(tx).is_none());
+    }
 
     #[test]
     fn test_txbuffer_respects_max_ops_limit() {
