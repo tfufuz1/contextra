@@ -940,7 +940,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
- "blake3",
+ "bytes",
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",

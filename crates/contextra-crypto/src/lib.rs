@@ -34,7 +34,7 @@ pub use deletion_proof::{
 };
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
-pub use kv_cipher::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
+pub use kv_cipher::{EncryptedKvLayer, KvCipher, KvSegmentCipher, ModelFingerprint};
 pub use kv_segment::{
     eviction_worker::{emergency_wipe, EvictionWorker},
     segment::KvSegment,

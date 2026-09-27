@@ -304,8 +304,8 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "tx_id": tx_id,
                 })),
             },
-            ContextraError::Plugin(msg) => Self {
-                kind: "Plugin".to_string(),
+            ContextraError::KvQuantization(msg) => Self {
+                kind: "KvQuantization".to_string(),
                 message: msg.clone(),
                 details: None,
             },
@@ -440,8 +440,8 @@ mod tests {
                 "OrphanedVectorReference",
             ),
             (
-                ContextraError::Plugin("plugin error".into()),
-                "Plugin",
+                ContextraError::KvQuantization("quant error".into()),
+                "KvQuantization",
             ),
         ];
 
