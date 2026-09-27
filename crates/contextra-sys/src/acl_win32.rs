@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-27T22:45:00Z (SESSION: 786dca08)
+// ZWECK: Win32 ACL restriction and file ownership verification wrappers (Ring 0)
+// INVARIANTEN: 100% safe Rust facade; zero panic; cross-platform stubs on non-Windows
+// NICHT-OFFENSICHTLICH: Uses Win32 GetNamedSecurityInfoW/SetNamedSecurityInfoW for DACL protection
+// SIEHE AUCH: AGENTS.md, docs/audits/contextra-sys_AUDIT_2026-09-27.md
+
 //! Win32 ACL restriction low-level system call wrapper.
 
 use std::path::Path;

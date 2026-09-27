@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-27T22:45:00Z (SESSION: 786dca08)
+// ZWECK: RAII manager for RAM memory-locked sensitive buffer regions (Ring 0)
+// INVARIANTEN: Automatically releases locked memory regions via mem_unlock on Drop or unlock_all
+// NICHT-OFFENSICHTLICH: Best-effort locking; failures logged via tracing without panicking
+// SIEHE AUCH: AGENTS.md, docs/audits/contextra-sys_AUDIT_2026-09-27.md
+
 //! RAM memory-locking region manager for sensitive vault buffers.
 
 use crate::{mem_lock, mem_unlock};
