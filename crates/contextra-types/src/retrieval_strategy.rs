@@ -17,6 +17,14 @@ pub enum RetrievalStrategy {
     Graph,
     /// Hybrides Verbund-Signal.
     Hybrid,
+    /// Nutzt LeanRAG-aggregierte Hyperkanten-Cluster statt Rohdokumente —
+    /// für Fragen wie "Was sind die Hauptthemen in meiner Wissensbasis?".
+    Global {
+        /// Obergrenze der einbezogenen Community-Knoten.
+        max_community_nodes: Option<usize>,
+        /// Filtert Communities unterhalb dieser Mitgliederzahl heraus.
+        min_community_size: Option<usize>,
+    },
 }
 
 impl fmt::Display for RetrievalStrategy {
@@ -26,6 +34,7 @@ impl fmt::Display for RetrievalStrategy {
             Self::Text => write!(f, "Text"),
             Self::Graph => write!(f, "Graph"),
             Self::Hybrid => write!(f, "Hybrid"),
+            Self::Global { .. } => write!(f, "Global"),
         }
     }
 }
@@ -40,6 +49,14 @@ mod tests {
         assert_eq!(RetrievalStrategy::Text.to_string(), "Text");
         assert_eq!(RetrievalStrategy::Graph.to_string(), "Graph");
         assert_eq!(RetrievalStrategy::Hybrid.to_string(), "Hybrid");
+        assert_eq!(
+            RetrievalStrategy::Global {
+                max_community_nodes: Some(10),
+                min_community_size: Some(3),
+            }
+            .to_string(),
+            "Global"
+        );
     }
 
     #[test]
@@ -49,6 +66,14 @@ mod tests {
             RetrievalStrategy::Text,
             RetrievalStrategy::Graph,
             RetrievalStrategy::Hybrid,
+            RetrievalStrategy::Global {
+                max_community_nodes: Some(20),
+                min_community_size: Some(5),
+            },
+            RetrievalStrategy::Global {
+                max_community_nodes: None,
+                min_community_size: None,
+            },
         ];
 
         for strategy in strategies {
