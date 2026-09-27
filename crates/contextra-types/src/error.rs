@@ -236,6 +236,10 @@ pub enum ContextraError {
         /// Identifier of timed out transaction.
         tx_id: u64,
     },
+
+    /// Plugin activation or dependency error.
+    #[error("Plugin error: {0}")]
+    Plugin(String),
 }
 
 impl ContextraError {
@@ -369,6 +373,7 @@ mod tests {
                 doc_id: "doc_123".into(),
                 index_id: "idx_456".into(),
             },
+            ContextraError::Plugin("dependency cycle".into()),
         ];
         for v in &variants {
             let _ = format!("{v}");

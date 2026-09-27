@@ -262,6 +262,14 @@ impl McpServer {
                                 },
                                 "required": ["id"]
                             }
+                        },
+                        {
+                            "name": "contextra_plugin_status",
+                            "description": "Get status of all active plugins with version, ring, and required feature ring.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {}
+                            }
                         }
                     ]
                 }),
@@ -316,7 +324,8 @@ impl McpServer {
             | "contextra_consolidate"
             | "contextra_cloud_query"
             | "contextra_relate"
-            | "contextra_relate_n_ary" => {
+            | "contextra_relate_n_ary"
+            | "contextra_plugin_status" => {
                 let tool_name = req.method.as_str();
                 match self
                     .sandbox
