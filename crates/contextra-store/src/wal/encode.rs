@@ -1,5 +1,5 @@
 use contextra_core::{ContextraError, Result, TxId};
-#[cfg(feature = "encryption-at-rest")]
+#[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::WalHmac;
 
 use super::MAX_WAL_ENTRY_SIZE;
@@ -118,7 +118,7 @@ impl WalEntry {
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
     ) -> Result<[u8; 32]> {
-        #[cfg(feature = "encryption-at-rest")]
+        #[cfg(feature = "wal-integrity")]
         {
             let mut mac = WalHmac::new(integrity_key)?;
 
@@ -150,7 +150,7 @@ impl WalEntry {
             }
             Ok(mac.finalize())
         }
-        #[cfg(not(feature = "encryption-at-rest"))]
+        #[cfg(not(feature = "wal-integrity"))]
         {
             let _ = (op, seq_no, integrity_key, prev_hmac);
             Ok([0u8; 32])
@@ -164,7 +164,7 @@ impl WalEntry {
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
     ) -> Result<[u8; 32]> {
-        #[cfg(feature = "encryption-at-rest")]
+        #[cfg(feature = "wal-integrity")]
         {
             let mut mac = WalHmac::new(integrity_key)?;
 
@@ -187,7 +187,7 @@ impl WalEntry {
             }
             Ok(mac.finalize())
         }
-        #[cfg(not(feature = "encryption-at-rest"))]
+        #[cfg(not(feature = "wal-integrity"))]
         {
             let _ = (op, seq_no, integrity_key, prev_hmac);
             Ok([0u8; 32])

@@ -1,12 +1,73 @@
 use crate::compaction::CompactionConfig;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum DurabilityMode {
+    Full,
+    WalNoHmac,
+    MemoryOnly,
+}
+
+impl Default for DurabilityMode {
+    fn default() -> Self {
+        Self::Full
+    }
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum DurabilityConfigError {
+    #[error("DurabilityMode::{mode:?} is incompatible with feature '{feature}': {reason}")]
+    IncompatibleCombination {
+        mode: DurabilityMode,
+        feature: &'static str,
+        reason: &'static str,
+    },
+}
+
+impl From<DurabilityConfigError> for contextra_core::ContextraError {
+    fn from(err: DurabilityConfigError) -> Self {
+        contextra_core::ContextraError::DurabilityConfig(err.to_string())
+    }
+}
+
+impl DurabilityMode {
+    pub fn validate_against_features(
+        self,
+        deletion_proof_active: bool,
+        feature_ring: contextra_ports::license::FeatureRing,
+    ) -> Result<(), DurabilityConfigError> {
+        use DurabilityMode::*;
+        match self {
+            Full => Ok(()),
+            WalNoHmac if deletion_proof_active => Err(DurabilityConfigError::IncompatibleCombination {
+                mode: self,
+                feature: "deletion-proof",
+                reason: "no HMAC integrity chain to anchor the proof",
+            }),
+            MemoryOnly
+                if deletion_proof_active
+                    || feature_ring == contextra_ports::license::FeatureRing::Sovereign =>
+            {
+                Err(DurabilityConfigError::IncompatibleCombination {
+                    mode: self,
+                    feature: "deletion-proof / FeatureRing::Sovereign",
+                    reason: "no persistence layer exists to prove deletion from",
+                })
+            }
+            _ => Ok(()),
+        }
+    }
+}
 
 /// LSM storage configuration.
 // SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
 // TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key
 // DONE: LsmConfig akzeptiert Passphrase, AES-256 wird für Disk-I/O verwendet.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 /// Configuration for the LSM storage engine.
 pub struct LsmConfig {
     /// Path to the data directory.
@@ -26,6 +87,8 @@ pub struct LsmConfig {
     /// Number of shards for the block cache.
     /// Default is 64 (increased from 16 to reduce lock contention during concurrent BM25 range scans).
     pub block_cache_shards: usize,
+    /// Durability mode for WAL persistence and integrity checks.
+    pub durability_mode: DurabilityMode,
 }
 
 impl Default for LsmConfig {
@@ -39,6 +102,7 @@ impl Default for LsmConfig {
             encryption_passphrase: None,
             group_commit_window_micros: 500,
             block_cache_shards: 64,
+            durability_mode: DurabilityMode::default(),
         }
     }
 }

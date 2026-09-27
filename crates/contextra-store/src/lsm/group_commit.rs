@@ -1,6 +1,32 @@
-use crate::wal::PreparedBatch;
+use crate::lsm::config::DurabilityMode;
+use crate::wal::{PreparedBatch, Wal};
 use contextra_core::{Result, TxId};
 use std::sync::Arc;
+
+pub(super) async fn execute_group_commit_append(
+    wal: &Wal,
+    durability_mode: DurabilityMode,
+    all_wal_entries: PreparedBatch,
+    truncate_guard: &tokio::sync::MutexGuard<'_, ()>,
+    prev_hmac_snapshot: [u8; 32],
+) -> Result<()> {
+    match durability_mode {
+        DurabilityMode::Full => {
+            wal.append_batch_locked(all_wal_entries, truncate_guard)
+                .await
+        }
+        DurabilityMode::WalNoHmac => {
+            let res = wal
+                .append_batch_locked(all_wal_entries, truncate_guard)
+                .await;
+            if res.is_ok() {
+                let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
+            }
+            res
+        }
+        DurabilityMode::MemoryOnly => Ok(()),
+    }
+}
 
 pub(super) struct GroupCommitRequest {
     pub(super) tx_id: TxId,

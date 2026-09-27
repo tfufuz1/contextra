@@ -69,7 +69,7 @@ pub(super) use contextra_core::{BoxFuture, ContextraError, Result, StorageEngine
 pub(super) use std::path::PathBuf;
 pub(super) use std::sync::atomic::Ordering;
 
-mod config;
+pub mod config;
 mod engine;
 mod guard;
 mod validate;
@@ -85,7 +85,7 @@ mod tests;
 
 pub mod ops;
 
-pub use config::LsmConfig;
+pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::LsmStorage;
 pub(super) use guard::{CommitGuard, LsmState};
 pub(super) use validate::validate_key;

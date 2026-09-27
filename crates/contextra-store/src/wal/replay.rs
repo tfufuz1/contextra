@@ -1,5 +1,5 @@
 use contextra_core::{ContextraError, Result};
-#[cfg(feature = "encryption-at-rest")]
+#[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::PathBuf;
 
@@ -235,7 +235,7 @@ impl Wal {
         }
     }
 
-    #[cfg(feature = "encryption-at-rest")]
+    #[cfg(feature = "wal-integrity")]
     fn verify_entry_snapshot(
         &self,
         snapshot: &WalEntrySnapshot,
@@ -306,9 +306,9 @@ impl Wal {
             return Ok(version);
         }
 
-        #[cfg(feature = "encryption-at-rest")]
+        #[cfg(feature = "wal-integrity")]
         let integrity_key = self.get_integrity_key()?;
-        #[cfg(feature = "encryption-at-rest")]
+        #[cfg(feature = "wal-integrity")]
         let mut verifier = IntegrityVerifier::new(&integrity_key);
         let mut using_legacy_key = false;
 
@@ -408,7 +408,7 @@ impl Wal {
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
-            #[cfg(feature = "encryption-at-rest")]
+            #[cfg(feature = "wal-integrity")]
             {
                 if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some() {
                     let km = match self.key_manager.as_ref() {
@@ -665,7 +665,7 @@ impl Wal {
                 }
             }
 
-            #[cfg(not(feature = "encryption-at-rest"))]
+            #[cfg(not(feature = "wal-integrity"))]
             {
                 let entry = match WalEntry::from_bytes(entry_data_raw) {
                     Ok(e) => e,

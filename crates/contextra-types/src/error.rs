@@ -240,6 +240,18 @@ pub enum ContextraError {
     /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit `deletion_proof_active`.
     #[error("KV delete mode configuration error: {0}")]
     KvDeleteModeConfig(&'static str),
+
+    /// KV-Quantisierungsfehler.
+    #[error("KV quantization error: {0}")]
+    KvQuantization(String),
+
+    /// Durability mode configuration error.
+    #[error("Durability configuration error: {0}")]
+    DurabilityConfig(String),
+
+    /// Plugin lifecycle or execution error.
+    #[error("Plugin error: {0}")]
+    Plugin(String),
 }
 
 impl ContextraError {
@@ -311,6 +323,11 @@ impl ContextraError {
         Self::KvQuantization(msg.into())
     }
 
+    /// Creates a `DurabilityConfig` error.
+    pub fn durability_config(msg: impl Into<String>) -> Self {
+        Self::DurabilityConfig(msg.into())
+    }
+
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
     pub fn is_occ_conflict(&self) -> bool {
         matches!(self, Self::StaleRead(_) | Self::Conflict(_))
@@ -378,7 +395,8 @@ mod tests {
                 doc_id: "doc_123".into(),
                 index_id: "idx_456".into(),
             },
-            ContextraError::Plugin("dependency cycle".into()),
+            ContextraError::KvQuantization("test".into()),
+            ContextraError::DurabilityConfig("test".into()),
         ];
         for v in &variants {
             let _ = format!("{v}");
