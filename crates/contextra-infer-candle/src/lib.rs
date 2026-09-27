@@ -20,6 +20,7 @@
 
 // REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH
 
+pub mod attention_exporter;
 pub mod embedding;
 pub mod embedding_provider;
 pub mod gguf_loader;
@@ -36,6 +37,7 @@ pub mod kv_state;
 #[cfg(feature = "kv-stage-b")]
 pub mod model;
 
+pub use attention_exporter::*;
 pub use embedding::CandleEmbedClient;
 pub use embedding_provider::MAX_CANDLE_EMBED_BATCH_SIZE;
 pub use gasp::{GaspConfig, GaspValidator, DEFAULT_GROUNDING_THRESHOLD};

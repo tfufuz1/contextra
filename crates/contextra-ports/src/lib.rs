@@ -27,6 +27,8 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// Type alias for a pinned, heap-allocated `Stream` that is `Send` and dyn-compatible.
 pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> + Send + 'a>>;
 
+/// Attention exporter trait and request ID types.
+pub mod attention;
 /// Checkpoint and snapshot traits.
 pub mod checkpoint;
 /// Clock port trait and system time implementation.
@@ -53,6 +55,8 @@ pub mod metrics;
 pub mod observability;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
+/// Plugin registry and dependency resolution.
+pub mod plugin;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -60,6 +64,7 @@ pub mod text_index;
 /// Vector retrieval and HNSW indexing traits.
 pub mod vector_index;
 
+pub use attention::*;
 pub use checkpoint::*;
 pub use clock::*;
 pub use embedding::*;
@@ -73,6 +78,7 @@ pub use lifecycle::*;
 pub use metrics::*;
 pub use observability::*;
 pub use rng::*;
+pub use plugin::*;
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
@@ -105,6 +111,7 @@ mod dyn_safety {
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
     fn _assert_dyn_license_gate(_: Option<&dyn LicenseGate>) {}
+    fn _assert_dyn_attention_exporter(_: Option<&dyn AttentionExporter>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -121,5 +128,6 @@ mod dyn_safety {
         _assert_dyn_rng(None);
         _assert_dyn_id_gen(None);
         _assert_dyn_license_gate(None);
+        _assert_dyn_attention_exporter(None);
     }
 }

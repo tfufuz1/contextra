@@ -7,8 +7,8 @@
 // HOTSPOTS: L30-L90 (Power Iteration Matrix-Vector Vector Multiplication)
 // SIEHE AUCH: crates/contextra-graph/src/csr.rs
 
-pub(crate) mod snapshot;
 pub mod shadow_hook;
+pub(crate) mod snapshot;
 
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprAlgorithm, PprConfig};

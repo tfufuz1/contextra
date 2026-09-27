@@ -623,6 +623,95 @@ impl FlowCorrectedThompsonBandit {
     }
 }
 
+/// Referenzpolitik basierend auf Diagonal-Approximation für Off-Policy-Evaluation (§B.3.2).
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiagonalApproximationBandit {
+    /// Propensities P(a | x) pro RetrievalStrategy.
+    pub propensities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+}
+
+impl DiagonalApproximationBandit {
+    /// Erstellt eine neue `DiagonalApproximationBandit`-Referenzpolitik mit der gegebenen Propensitätsmap.
+    pub fn new(propensities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>) -> Self {
+        Self { propensities }
+    }
+
+    /// Erstellt eine `DiagonalApproximationBandit`-Referenzpolitik aus Strategie-Propensitäts-Paaren.
+    pub fn from_pairs(pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>) -> Self {
+        Self {
+            propensities: pairs.into_iter().collect(),
+        }
+    }
+
+    /// Liefert die Propensity P(a | x) für eine gegebene RetrievalStrategy.
+    pub fn propensity(&self, strategy: contextra_types::RetrievalStrategy) -> f32 {
+        self.propensities.get(&strategy).copied().unwrap_or(0.0)
+    }
+}
+
+/// Trait zur Überprüfung der Off-Policy-Kompatibilität zwischen FC-TS und einer Referenzpolitik (§B.3.2).
+pub trait OffPolicyCompatibility {
+    /// Gibt `Err` zurück, wenn für irgendeinen Arm eine Propensity von 0
+    /// unter der Referenz-Policy gemessen wird, während FC-TS diesem Arm
+    /// eine positive Sampling-Wahrscheinlichkeit zuweist (Verstoß gegen
+    /// die Positivitätsannahme — IPS-Gewichte würden divergieren).
+    fn verify_positivity(&self, reference_policy: &DiagonalApproximationBandit) -> Result<(), OffPolicyError>;
+}
+
+/// Fehlerzustände bei der Off-Policy-Kompatibilitätsprüfung.
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum OffPolicyError {
+    /// Ein Arm hat Propensity 0 unter der Referenzpolicy, aber eine positive FC-TS-Sampling-Wahrscheinlichkeit.
+    #[error("arm {0:?} has zero propensity under reference policy but positive FC-TS sampling probability — IPS weight would diverge")]
+    ZeroPropensityViolation(contextra_types::RetrievalStrategy),
+}
+
+impl From<OffPolicyError> for contextra_types::ContextraError {
+    fn from(err: OffPolicyError) -> Self {
+        contextra_types::ContextraError::InvalidInput(err.to_string())
+    }
+}
+
+/// Sampling-Wahrscheinlichkeitsverteilung über FC-TS-Arme/Strategien (§B.3.2).
+#[derive(Debug, Clone, PartialEq)]
+pub struct FcTsSamplingDistribution {
+    /// Mapping von RetrievalStrategy zu FC-TS-Sampling-Wahrscheinlichkeit P_FCTS(a | x).
+    pub probabilities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+}
+
+impl FcTsSamplingDistribution {
+    /// Erstellt eine neue `FcTsSamplingDistribution`-Instanz mit der gegebenen Wahrscheinlichkeitsmap.
+    pub fn new(probabilities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>) -> Self {
+        Self { probabilities }
+    }
+
+    /// Erstellt eine `FcTsSamplingDistribution`-Instanz aus Strategie-Wahrscheinlichkeits-Paaren.
+    pub fn from_pairs(pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>) -> Self {
+        Self {
+            probabilities: pairs.into_iter().collect(),
+        }
+    }
+
+    /// Liefert die FC-TS-Sampling-Wahrscheinlichkeit für eine gegebene RetrievalStrategy.
+    pub fn probability(&self, strategy: contextra_types::RetrievalStrategy) -> f32 {
+        self.probabilities.get(&strategy).copied().unwrap_or(0.0)
+    }
+}
+
+impl OffPolicyCompatibility for FcTsSamplingDistribution {
+    fn verify_positivity(&self, reference_policy: &DiagonalApproximationBandit) -> Result<(), OffPolicyError> {
+        for (&strategy, &prob) in &self.probabilities {
+            if prob > 0.0 {
+                let ref_p = reference_policy.propensity(strategy);
+                if ref_p <= 0.0 {
+                    return Err(OffPolicyError::ZeroPropensityViolation(strategy));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Menge von FC-TS-Armen zur Auswahl der optimalen Aktion.
 #[derive(Debug, Clone)]
 pub struct FcTsArmSet {
@@ -685,6 +774,68 @@ impl FcTsArmSet {
         }
 
         Ok(candidate_idx)
+    }
+}
+
+impl OffPolicyCompatibility for FcTsArmSet {
+    fn verify_positivity(&self, reference_policy: &DiagonalApproximationBandit) -> Result<(), OffPolicyError> {
+        let default_strategies = [
+            contextra_types::RetrievalStrategy::Vector,
+            contextra_types::RetrievalStrategy::Text,
+            contextra_types::RetrievalStrategy::Graph,
+            contextra_types::RetrievalStrategy::Hybrid,
+        ];
+
+        for (idx, _arm) in self.arms.iter().enumerate() {
+            let strategy = default_strategies
+                .get(idx)
+                .copied()
+                .unwrap_or(contextra_types::RetrievalStrategy::Vector);
+            let ref_p = reference_policy.propensity(strategy);
+            if ref_p <= 0.0 {
+                return Err(OffPolicyError::ZeroPropensityViolation(strategy));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Minimale Anzahl an Shadow-Samples für den Bandit-Default-Flip.
+pub const MIN_BANDIT_SHADOW_SAMPLES: u64 = 10_000;
+/// Maximales zulässiges kumulatives Regret für den Bandit-Default-Flip (≤ 0.0).
+pub const MAX_CUMULATIVE_REGRET_THRESHOLD: f64 = 0.0;
+
+/// Aggregierter Shadow-Mode-Bericht für den Bandit-Default-Flip.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct BanditShadowReport {
+    /// Anzahl ausgewerteter Shadow-Mode-Samples.
+    pub sample_count: u64,
+    /// Kumulatives Regret des FC-TS-Kandidaten im Vergleich zur Baseline.
+    pub cumulative_regret: f64,
+    /// p99-Latenz-Differenz (FC-TS − Baseline) in Mikrosekunden.
+    pub p99_latency_delta_us: f64,
+    /// Optionale kumulative Reward-Verbesserung.
+    pub reward_improvement_ratio: Option<f32>,
+}
+
+/// Formales Bandit-Default-Flip-Gate nach analogem Muster wie `DefaultFlipGate` (AP-P15-01).
+pub trait BanditDefaultFlipGate {
+    /// `true` ⇔ alle drei Bedingungen erfüllt:
+    /// 1. `sample_count >= MIN_BANDIT_SHADOW_SAMPLES` (10_000)
+    /// 2. `cumulative_regret <= MAX_CUMULATIVE_REGRET_THRESHOLD` (0.0)
+    /// 3. `p99_latency_delta_us <= 0.0`
+    fn should_flip(&self, report: &BanditShadowReport) -> bool;
+}
+
+/// Standardimplementierung des [`BanditDefaultFlipGate`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DefaultBanditFlipGate;
+
+impl BanditDefaultFlipGate for DefaultBanditFlipGate {
+    fn should_flip(&self, report: &BanditShadowReport) -> bool {
+        report.sample_count >= MIN_BANDIT_SHADOW_SAMPLES
+            && report.cumulative_regret <= MAX_CUMULATIVE_REGRET_THRESHOLD
+            && report.p99_latency_delta_us <= 0.0
     }
 }
 

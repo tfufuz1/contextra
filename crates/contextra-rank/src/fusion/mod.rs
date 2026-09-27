@@ -1,5 +1,6 @@
 //! Hybrid Search Signal Fusion implementations (Reciprocal Rank Fusion & Score Normalization).
 
+mod global;
 mod normalized;
 mod provenance;
 mod resonance;
@@ -9,6 +10,7 @@ mod topk;
 mod types;
 
 pub use contextra_types::FusionStrategy;
+pub use global::{GlobalFusionConfig, GlobalFusionStrategy};
 pub use normalized::{score_normalized_fusion_with_options, weights_to_signal_factors};
 pub use provenance::ProvenanceBuilder;
 pub use resonance::{apply_resonance_bonus, fuse_signals, ResonanceConfig};

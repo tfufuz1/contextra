@@ -110,9 +110,8 @@ fn compute_total_lovasz_objective(
             |node| x.get(&node).copied().unwrap_or(0.0),
             max_sort_size,
         );
-        let (f_e, _, _) = compute_lovasz_extension(&truncated, |node| {
-            x.get(&node).copied().unwrap_or(0.0)
-        });
+        let (f_e, _, _) =
+            compute_lovasz_extension(&truncated, |node| x.get(&node).copied().unwrap_or(0.0));
         total_obj += he.weight * f_e;
     }
 
@@ -296,7 +295,8 @@ fn test_regression_max_hyperedge_sort_size_cutoff_in_full_diffusion() {
     let x_cutoff = run_diffusion(&graph, &seeds, &params_cutoff)
         .expect("Diffusion with cutoff = 2 must succeed");
 
-    let obj_cutoff = compute_total_lovasz_objective(&graph, &x_cutoff, params_cutoff.max_hyperedge_sort_size);
+    let obj_cutoff =
+        compute_total_lovasz_objective(&graph, &x_cutoff, params_cutoff.max_hyperedge_sort_size);
 
     // Config B: Full sort size max_hyperedge_sort_size = 12
     let params_full = TlHfdParams {
@@ -307,7 +307,8 @@ fn test_regression_max_hyperedge_sort_size_cutoff_in_full_diffusion() {
     let x_full = run_diffusion(&graph, &seeds, &params_full)
         .expect("Diffusion with full sort size = 12 must succeed");
 
-    let obj_full = compute_total_lovasz_objective(&graph, &x_full, params_full.max_hyperedge_sort_size);
+    let obj_full =
+        compute_total_lovasz_objective(&graph, &x_full, params_full.max_hyperedge_sort_size);
 
     // Verify bounded objective deviation under cutoff (Audit recommendation F3, §22.2c)
     let diff = (obj_cutoff - obj_full).abs();
