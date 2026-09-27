@@ -1,6 +1,6 @@
 {
-  "timestamp_utc": "1790444223",
-  "worktree_hash": "661f2f14138f8f0fb7ad0055c49040f48afd5510",
+  "timestamp_utc": "1790535629",
+  "worktree_hash": "d3dcc29c0e782e72693fcb770c56f0d7ab3b227f",
   "mode": "full",
   "steps": [
     {
@@ -14,8 +14,8 @@
       "detail": null
     },
     {
-      "name": "check",
-      "status": "PASS",
+      "name": "test",
+      "status": "FAIL",
       "detail": null
     },
     {

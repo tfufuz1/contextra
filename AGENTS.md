@@ -35,7 +35,7 @@ Jeder Task folgt diesem iterativen Ablauf:
 - **Single-Node & Ein-Prozess-Garantie:** Contextra ist ein `cargo add`, kein Server. Multi-Node Horizontal Scaling oder Cluster-Logik sind streng verboten.
 - **Pure Rust Candle Inferenz:** GGUF Inferenz via `contextra-infer-candle` ist das Standard-Inferenzbackend. Ollama (`contextra-infer-ollama`) und ONNX (`contextra-infer-onnx`) sind rein opt-in.
 - **Sync-Kern:** Ring 0 (`contextra-types`, `contextra-ports`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-adapt`, `contextra-crypto`) enthält keine Async-Runtime (`tokio`).
-- **Nichtdeterminismus:** Zeit, Zufall und IDs injizieren; `TxId` über `collection.allocate_tx()` erzeugen.
+- **Nichtdeterminismus:** Zeit, Zufall und IDs injizieren; `TxId` über `collection.allocate_tx()` erzeugen. **Ausnahme (ADR-098):** Kryptografisches Schlüssel-/Saltmaterial MUSS `rand::thread_rng()`/CSPRNG nutzen (kein injizierter Port); reine Dateinamens-Eindeutigkeit ohne Sicherheits-/Sichtbarkeitsbezug darf `SystemTime::now()` nutzen.
 - **Speicher & Locks:** SIMD-Puffer (`contextra-simd`) korrekt ausrichten; keine Locks über `.await`-Punkte halten.
 - **Spec-Sync:** Jede API-Änderung MUSS `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` spiegeln.
 

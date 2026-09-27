@@ -22,6 +22,8 @@ fn verify_external_accepts_valid_proof() {
         TxId::new(100),
         vec![layer_proof],
         vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
         keypair.signing_key(),
     )
     .expect("Failed to create valid v3 proof");
@@ -50,6 +52,8 @@ fn verify_external_rejects_tampered_timestamp() {
         TxId::new(100),
         vec![layer_proof],
         vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
         keypair.signing_key(),
     )
     .expect("Failed to create v3 proof");
@@ -82,6 +86,8 @@ fn verify_external_rejects_tampered_deleted_keys_hash() {
         TxId::new(100),
         vec![layer_proof],
         vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
         keypair.signing_key(),
     )
     .expect("Failed to create v3 proof");
@@ -110,6 +116,8 @@ fn verify_external_rejects_wrong_public_key() {
         TxId::new(100),
         vec![],
         vec![],
+        1700000000,
+        &[],
         keypair1.signing_key(),
     )
     .expect("Failed to create v3 proof");

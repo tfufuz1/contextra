@@ -13,6 +13,26 @@
 // DOWNSTREAM: contextra-store, contextra-index, contextra-db konvertieren via `?` und `From`.
 
 use thiserror::Error;
+use crate::DocId;
+
+/// Errors that can occur during HNSW graph deletion and repair operations.
+#[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum HnswDeletionError {
+    /// Target node with doc_id not found in graph.
+    #[error("Node for doc_id {0:?} not found in HNSW index")]
+    NodeNotFound(DocId),
+
+    /// Graph repair resulted in a disconnected graph component.
+    #[error("Graph repair resulted in disconnected component for node {0:?}")]
+    DisconnectedComponent(DocId),
+
+    /// Verification failed with remaining ghost pointers.
+    #[error("Verification failed: {remaining_pointers} remaining ghost pointers found")]
+    VerificationFailed {
+        /// Number of ghost pointers remaining in the graph.
+        remaining_pointers: usize,
+    },
+}
 
 /// Step identifier in an agent workflow execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
@@ -310,6 +330,10 @@ pub enum ContextraError {
     /// KV Cache segment pin memory budget exceeded for a tenant.
     #[error("Pin budget exceeded: {0}")]
     PinBudgetExceeded(String),
+
+    /// HNSW graph repair failure.
+    #[error("graph repair failed: {0}")]
+    GraphRepairFailed(#[from] HnswDeletionError),
 }
 
 impl ContextraError {

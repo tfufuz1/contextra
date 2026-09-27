@@ -1,5 +1,6 @@
 # AGENTS.md — contextra-crypto (Cargo-Package-Name: `contextra-privacy`)
 > Layer 1 | Encryption-at-Rest, HMAC-Chaining, Zeroize | ~2300 LOC
+<!-- Stand: 2026-09-27 -->
 
 ## 1. Zweck & Architekturrolle
 
@@ -43,6 +44,10 @@ Volatile-Wrapper gekapselt sein.
 Verschlüsselungsoperationen (`encrypt_auto_nonce`) erzeugen zufällige Nonces.
 Auch wenn AES-GCM-SIV resistent gegen Nonce-Reuse ist, MUSS für jede Verschlüsselung
 eine neue, kryptographisch sichere Zufallszahl (`OsRng`) generiert werden.
+
+### Length-Prefixed Key Hash Single Source of Truth (INV-CRYPTO-DUPLICATE-1)
+`hash_deleted_keys_length_prefixed` ist kanonisch in `deletion_proof.rs` definiert.
+Andere Module wie `ed25519_proof.rs` MÜSSEN die Funktion direkt re-exportieren (`pub use crate::deletion_proof::hash_deleted_keys_length_prefixed;`) statt eine Duplikat-Funktion anzulegen.
 
 ## 4. Public API Quick-Reference
 

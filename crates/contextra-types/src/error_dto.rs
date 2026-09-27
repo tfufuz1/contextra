@@ -329,6 +329,11 @@ impl From<&ContextraError> for ContextraErrorDto {
                 message: msg.clone(),
                 details: None,
             },
+            ContextraError::GraphRepairFailed(err) => Self {
+                kind: "GraphRepairFailed".to_string(),
+                message: err.to_string(),
+                details: None,
+            },
         }
     }
 }
@@ -474,6 +479,10 @@ mod tests {
             (
                 ContextraError::PinBudgetExceeded("pin budget error".into()),
                 "PinBudgetExceeded",
+            ),
+            (
+                ContextraError::GraphRepairFailed(crate::error::HnswDeletionError::NodeNotFound(crate::DocId::new(1))),
+                "GraphRepairFailed",
             ),
         ];
 

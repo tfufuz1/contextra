@@ -7,6 +7,7 @@
 //! HNSW (Hierarchical Navigable Small World) vector index module.
 
 pub mod arena;
+pub mod deletion;
 pub mod sq8_bias;
 
 mod acorn_filtered;
@@ -24,6 +25,7 @@ mod tests;
 pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
+pub use deletion::{DeletionStats, GhostFreeVectorIndex};
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,

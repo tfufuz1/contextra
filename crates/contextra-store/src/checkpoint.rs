@@ -20,7 +20,8 @@
 // ARCHITEKTUR: `contextra-checkpoint` stellt den generischen `CheckpointGuard<S: StorageEngine>` und `PersistentCheckpointStore`
 //             bereit. `contextra-store::checkpoint` bietet LSM-spezifische transactional rollbacks (TxId-skopiert).
 use crate::lsm::LsmStorage;
-use contextra_core::{ContextraError, Result, TxId};
+use contextra_core::{Result, TxId};
+use contextra_ports::Clock;
 use std::sync::Arc;
 
 /// Represents a Point-in-Time snapshot of the agent's memory state.
@@ -35,25 +36,21 @@ pub struct StateCheckpoint {
 #[allow(dead_code)]
 pub struct Checkpointer {
     storage: Arc<LsmStorage>,
+    clock: Arc<dyn Clock>,
 }
 
 #[allow(dead_code)]
 impl Checkpointer {
     /// Creates a new Checkpointer.
-    pub const fn new(storage: Arc<LsmStorage>) -> Self {
-        Self { storage }
+    pub fn new(storage: Arc<LsmStorage>, clock: Arc<dyn Clock>) -> Self {
+        Self { storage, clock }
     }
 
     /// Records a new checkpoint at the current transaction ID marking an agent step.
-    // DECISION-REF: AGT-STORE-001 resolved — SystemTime error propagated via Result instead of unwrap_or_default()
+    ///
+    /// Uses the injected [`Clock`] port for deterministic time derivation (INV-CHECKPOINT-DETERMINISM-1).
     pub fn create_checkpoint(&self, tx_id: TxId) -> Result<StateCheckpoint> {
-        let timestamp_ms = u64::try_from(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|e| ContextraError::Storage(format!("System clock error: {e}")))?
-                .as_millis(),
-        )
-        .map_err(|e| ContextraError::Storage(format!("Timestamp overflow: {e}")))?;
+        let timestamp_ms = self.clock.now_unix_nanos() / 1_000_000;
         Ok(StateCheckpoint {
             tx_id,
             timestamp_ms,
@@ -76,7 +73,43 @@ mod tests {
     use super::*;
     use crate::lsm::{LsmConfig, LsmStorage};
     use contextra_core::StorageEngine;
+    use contextra_testkit::ManualClock;
+    use std::time::Duration;
     use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_checkpoint_timestamp_deterministic_with_manual_clock() {
+        let tmp = TempDir::new().expect("temp dir");
+        let config = LsmConfig {
+            path: tmp.path().to_path_buf(),
+            ..Default::default()
+        };
+        let storage = Arc::new(LsmStorage::new(config).await.expect("create storage"));
+
+        // Test 1: ManualClock initialized to 1,000,000,000 nanos = 1,000 ms
+        let manual_clock = Arc::new(ManualClock::new(1_000_000_000));
+        let checkpointer = Checkpointer::new(storage.clone(), manual_clock.clone());
+
+        let tx1 = TxId::new(1);
+        let cp1 = checkpointer.create_checkpoint(tx1).expect("cp1");
+
+        // Calling again without advancing clock yields identical timestamp_ms
+        let tx2 = TxId::new(2);
+        let cp2 = checkpointer.create_checkpoint(tx2).expect("cp2");
+
+        assert_eq!(cp1.timestamp_ms, 1_000);
+        assert_eq!(cp2.timestamp_ms, 1_000);
+        assert_eq!(cp1.timestamp_ms, cp2.timestamp_ms);
+
+        // Test 2: Advancing ManualClock by 5s (5,000 ms)
+        manual_clock.advance(Duration::from_secs(5));
+
+        let tx3 = TxId::new(3);
+        let cp3 = checkpointer.create_checkpoint(tx3).expect("cp3");
+
+        assert_eq!(cp3.timestamp_ms, 6_000);
+        assert_eq!(cp3.timestamp_ms - cp1.timestamp_ms, 5_000);
+    }
 
     #[tokio::test]
     async fn test_rollback_to_checkpoint() {
@@ -86,7 +119,8 @@ mod tests {
             ..Default::default()
         };
         let storage = Arc::new(LsmStorage::new(config).await.expect("create storage")); // expect
-        let checkpointer = Checkpointer::new(storage.clone());
+        let clock = Arc::new(contextra_ports::SystemClock::new());
+        let checkpointer = Checkpointer::new(storage.clone(), clock);
 
         let tx1 = TxId::new(1);
         storage.put(tx1, b"key1", b"val1").await.unwrap(); // unwrap
