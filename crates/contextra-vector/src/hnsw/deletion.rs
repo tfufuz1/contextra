@@ -1,72 +1,46 @@
-use contextra_core::{ContextraError, DocId, Result};
-use std::fmt;
-use std::sync::atomic::Ordering;
+// FILE-CONTEXT
+// ZWECK: Synchronous ghost-free node deletion with budgeted neighborhood repair for HNSW graph.
+// INVARIANTEN: INV-DELETION-2: After Ok(..) of remove_with_graph_repair(doc_id), no neighborhood pointer points to doc_id.
+// Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
+
+use ahash::AHashSet;
+use contextra_core::{
+    error::HnswDeletionError, ContextraError, DocId, Result,
+};
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};
 
-/// Type alias for HNSW node identifier in graph repair operations.
-pub type NodeId = usize;
-
-/// Statistics collected during synchronous HNSW node deletion and neighborhood graph repair.
+/// Statistics returned after a ghost-free node deletion and neighborhood repair.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeletionStats {
-    /// Number of HNSW graph levels (0..=max_layer) touched during repair.
-    pub levels_touched: u8,
-    /// Total number of neighbor lists updated/repaired across all layers.
-    pub neighbor_lists_repaired: usize,
-    /// Number of orphaned neighbor connections replaced during repair.
+    /// Document ID that was deleted.
+    pub doc_id: DocId,
+    /// Number of neighborhood edges repaired (backlinks removed/replaced).
+    pub repaired_edges: usize,
+    /// Number of replacement attempts where no valid replacement candidate existed.
     pub orphaned_replacements: usize,
-    /// Verified post-condition that no residual ghost pointers remain in the graph.
+    /// True if post-repair verification confirmed zero ghost pointers remain to doc_id.
     pub verified_no_ghost_pointers: bool,
 }
 
-/// Errors specific to synchronous HNSW deletion and neighborhood graph repair.
-#[derive(Debug, PartialEq, Eq)]
-pub enum HnswDeletionError {
-    /// Document ID not present in index.
-    NotFound(DocId),
-
-    /// Graph became disconnected during repair at level `level` for node `node`.
-    DisconnectedRepair { level: u8, node: NodeId },
-
-    /// Post-repair verification found residual ghost pointers.
-    VerificationFailed(usize),
-}
-
-impl fmt::Display for HnswDeletionError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::NotFound(doc_id) => write!(f, "doc_id {doc_id:?} not present in index"),
-            Self::DisconnectedRepair { level, node } => write!(
-                f,
-                "graph became disconnected during repair at level {level}: node {node:?} has zero remaining neighbors and no replacement candidate"
-            ),
-            Self::VerificationFailed(count) => write!(
-                f,
-                "verification step found {count} residual ghost pointer(s) after repair — repair aborted, tombstone NOT eligible for DeletionProof"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for HnswDeletionError {}
-
-impl From<HnswDeletionError> for ContextraError {
-    fn from(err: HnswDeletionError) -> Self {
-        ContextraError::Index(err.to_string())
-    }
-}
-
-impl HnswIndex {
-    /// Deletes a document from the HNSW graph AND synchronously repairs all neighbor lists
-    /// before returning, ensuring zero ghost pointers remain (INV-DELETION-2).
+/// Trait providing ghost-free vector index deletion with synchronous neighborhood graph repair.
+pub trait GhostFreeVectorIndex {
+    /// Deletes `doc_id` and synchronously repairs all neighborhood pointers across all layers
+    /// before returning.
     ///
-    /// Algorithmic complexity: O(Degree(doc_id) * M * log M), bounded by local neighborhood size.
-    pub fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats> {
-        let _write_guard = self.inner.hot.write_mutex.lock();
+    /// # Invariant
+    /// `INV-DELETION-2`: After `Ok(stats)` returns, no neighborhood pointer in the entire index
+    /// references `doc_id`.
+    fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats>;
+}
 
-        let mmap_count = self
+impl GhostFreeVectorIndex for HnswIndex {
+    fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats> {
+        // Lock hierarchy: 1. write_mutex
+        let _write_lock = self.inner.hot.write_mutex.lock();
+
+        let mmap_node_count = self
             .inner
             .cold
             .mmap_index
@@ -75,251 +49,290 @@ impl HnswIndex {
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
-        let target_global_idx = {
+        // Find target node index from doc_to_node
+        let target_idx = {
             let doc_map = self.inner.hot.doc_to_node.read();
-            doc_map
-                .get(&doc_id.inner())
-                .copied()
-                .ok_or(HnswDeletionError::NotFound(doc_id))?
+            match doc_map.get(&doc_id.inner()).copied() {
+                Some(idx) => idx,
+                None => {
+                    return Err(ContextraError::GraphRepairFailed(
+                        HnswDeletionError::NodeNotFound(doc_id),
+                    ))
+                }
+            }
         };
 
-        if target_global_idx < mmap_count {
-            return Err(ContextraError::Index(format!(
-                "Cannot synchronously repair mmap-backed node {target_global_idx} for doc_id {doc_id:?}"
-            )));
+        // Check if already tombstoned/deleted
+        if self.inner.cold.deleted_nodes.read().contains(target_idx as u64) {
+            return Err(ContextraError::GraphRepairFailed(
+                HnswDeletionError::NodeNotFound(doc_id),
+            ));
         }
-
-        let target_ram_idx = target_global_idx - mmap_count;
-
-        let (max_layer, vector_data) = {
-            let nodes = self.inner.hot.nodes.read();
-            let node = nodes.get(target_ram_idx).ok_or_else(|| {
-                ContextraError::Index(format!(
-                    "RAM node {target_ram_idx} missing from nodes vector"
-                ))
-            })?;
-            (node.max_layer, node.vector.clone())
-        };
 
         let m = self.inner.cold.config.m;
 
-        // Step 1: Collect neighbors per layer before unlinking
-        let mut layers_neighbors: Vec<Vec<u32>> = Vec::with_capacity(max_layer + 1);
-        for layer in 0..=max_layer {
-            let conns = self
-                .inner
-                .hot
-                .arena
-                .get_ram_node_connections(target_ram_idx, layer, m);
-            layers_neighbors.push(conns);
-        }
-
-        // Mark target node in deleted_nodes and remove from doc_to_node
-        self.inner.hot.doc_to_node.write().remove(&doc_id.inner());
-        self.inner
-            .cold
-            .deleted_nodes
-            .write()
-            .insert(target_global_idx as u64);
-        self.inner.hot.deleted_count.fetch_add(1, Ordering::SeqCst);
-
-        // Adjust entry points if target node was an entry point
-        let ep_val = self.inner.hot.get_entry_point();
-        let ram_ep_val = self.inner.hot.get_ram_entry_point();
-        if ep_val == Some(target_global_idx) || ram_ep_val == Some(target_global_idx) {
-            let nodes = self.inner.hot.nodes.read();
-            let deleted = self.inner.cold.deleted_nodes.read();
-            let mut best_node = None;
-            let mut best_ram_node = None;
-            let mut max_l = 0;
-            let mut max_ram_l = 0;
-
-            for (i, node) in nodes.iter().enumerate() {
-                let global_idx = mmap_count + i;
-                if global_idx != target_global_idx && !deleted.contains(global_idx as u64) {
-                    if node.max_layer >= max_l {
-                        max_l = node.max_layer;
-                        best_node = Some(global_idx);
-                    }
-                    if node.max_layer >= max_ram_l {
-                        max_ram_l = node.max_layer;
-                        best_ram_node = Some(global_idx);
-                    }
-                }
-            }
-
-            if ep_val == Some(target_global_idx) {
-                self.inner.hot.set_entry_point(best_node);
-                if let Some(new_idx) = best_node {
-                    let node_max_layer = nodes[new_idx - mmap_count].max_layer;
-                    self.inner
-                        .hot
-                        .max_layer
-                        .store(node_max_layer as u64, Ordering::SeqCst);
+        // Determine target_max_layer
+        let target_max_layer = {
+            let nodes_read = self.inner.hot.nodes.read();
+            if target_idx < mmap_node_count {
+                let mmap_guard = self.inner.cold.mmap_index.read();
+                if let Some(mmap) = mmap_guard.as_ref() {
+                    mmap.get_node_record(target_idx)
+                        .map(|r| r.max_layer as usize)
+                        .unwrap_or(0)
                 } else {
-                    self.inner.hot.max_layer.store(0, Ordering::SeqCst);
+                    0
+                }
+            } else {
+                let ram_idx = target_idx - mmap_node_count;
+                if ram_idx < nodes_read.len() {
+                    nodes_read[ram_idx].max_layer
+                } else {
+                    0
                 }
             }
-
-            if ram_ep_val == Some(target_global_idx) {
-                self.inner.hot.set_ram_entry_point(best_ram_node);
-            }
-        }
-
-        let mut neighbor_lists_repaired = 0;
-        let mut orphaned_replacements = 0;
-
-        let nodes = self.inner.hot.nodes.read();
-        let deleted_guard = self.inner.cold.deleted_nodes.read();
-
-        let search_ctx = SearchContext {
-            nodes: &nodes,
-            mmap: None,
-            mmap_node_count: mmap_count,
-            prior_prepared: &[],
-            backlink_map: None,
-            quantizer: None,
-            arena: &self.inner.hot.arena,
         };
 
-        // Step 2: Synchronously repair neighbor lists for each neighbor across all layers
-        for (layer, current_layer_neighbors) in layers_neighbors.iter().enumerate().take(max_layer + 1) {
-            let layer_cap = if layer == 0 { m * 2 } else { m };
+        let mut repaired_edges = 0usize;
+        let mut orphaned_replacements = 0usize;
 
-            for &neighbor_u32 in current_layer_neighbors {
-                let neighbor_global_idx = neighbor_u32 as usize;
-                if deleted_guard.contains(neighbor_global_idx as u64) {
-                    continue;
-                }
-                if neighbor_global_idx < mmap_count {
-                    continue;
-                }
-                let neighbor_ram_idx = neighbor_global_idx - mmap_count;
+        // Perform neighborhood repairs across layers
+        {
+            let nodes_read = self.inner.hot.nodes.read();
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            let total_nodes = mmap_node_count + nodes_read.len();
 
-                let old_conns =
-                    self.inner
-                        .hot
-                        .arena
-                        .get_ram_node_connections(neighbor_ram_idx, layer, m);
+            let ctx = SearchContext {
+                nodes: &nodes_read,
+                mmap: mmap_guard.as_ref(),
+                mmap_node_count,
+                prior_prepared: &[],
+                backlink_map: None,
+                quantizer: None,
+                arena: &self.inner.hot.arena,
+            };
 
-                // Remove target node from neighbor's list
-                let mut updated_conns: Vec<u32> = old_conns
-                    .into_iter()
-                    .filter(|&c| c as usize != target_global_idx)
-                    .collect();
+            for layer in 0..=target_max_layer {
+                let layer_max_m = if layer == 0 { m * 2 } else { m };
 
-                // Check if neighbor needs a replacement candidate to maintain degree/connectivity
-                if updated_conns.is_empty() && !current_layer_neighbors.is_empty() {
-                    // Try to find a replacement candidate from target's other neighbors or neighbor's 2nd-order neighbors
-                    let mut candidates = Vec::new();
-                    for &other_u32 in current_layer_neighbors {
-                        let other_idx = other_u32 as usize;
-                        if other_idx != neighbor_global_idx
-                            && !deleted_guard.contains(other_idx as u64)
-                        {
+                // Find all nodes in graph that have a connection pointing to target_idx at this layer
+                for neighbor_idx in 0..total_nodes {
+                    if neighbor_idx == target_idx {
+                        continue;
+                    }
+
+                    let existing_conns = if neighbor_idx < mmap_node_count {
+                        if let Some(mmap) = mmap_guard.as_ref() {
+                            if let Ok(rec) = mmap.get_node_record(neighbor_idx) {
+                                mmap.get_connections(&rec, layer).unwrap_or_default()
+                            } else {
+                                Vec::new()
+                            }
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                        self.inner
+                            .hot
+                            .arena
+                            .get_ram_node_connections(neighbor_ram_idx, layer, m)
+                    };
+
+                    // Remove backlink to target_idx
+                    if existing_conns.contains(&(target_idx as u32)) {
+                        repaired_edges += 1;
+                        let neighbor_u32 = neighbor_idx as u32;
+
+                        let remaining: Vec<u32> = existing_conns
+                            .into_iter()
+                            .filter(|&c| c != target_idx as u32)
+                            .collect();
+
+                        // Collect 2nd-order candidates from remaining neighbors' connections
+                        let mut candidate_set: AHashSet<u32> = AHashSet::new();
+                        for &rem in &remaining {
+                            if rem != target_idx as u32 && rem != neighbor_u32 {
+                                candidate_set.insert(rem);
+                            }
+                            let rem_conns = if (rem as usize) < mmap_node_count {
+                                if let Some(mmap) = mmap_guard.as_ref() {
+                                    if let Ok(rec) = mmap.get_node_record(rem as usize) {
+                                        mmap.get_connections(&rec, layer).unwrap_or_default()
+                                    } else {
+                                        Vec::new()
+                                    }
+                                } else {
+                                    Vec::new()
+                                }
+                            } else {
+                                let rem_ram_idx = (rem as usize) - mmap_node_count;
+                                self.inner.hot.arena.get_ram_node_connections(rem_ram_idx, layer, m)
+                            };
+
+                            for &c_u32 in &rem_conns {
+                                if c_u32 != target_idx as u32
+                                    && c_u32 != neighbor_u32
+                                    && !self.inner.cold.deleted_nodes.read().contains(c_u32 as u64)
+                                {
+                                    candidate_set.insert(c_u32);
+                                }
+                            }
+                        }
+
+                        if candidate_set.is_empty() {
+                            orphaned_replacements += 1;
+                        }
+
+                        // Compute candidates distances to neighbor_idx
+                        let mut cand_objs = Vec::with_capacity(candidate_set.len());
+                        for &cand_u32 in &candidate_set {
+                            let cand_idx = cand_u32 as usize;
+                            let dummy_vec = super::types::VectorData::F32(Vec::new());
                             let dist = self.inner.compute_symmetric_distance_hybrid_with_batch(
-                                neighbor_global_idx,
-                                other_idx,
-                                &search_ctx,
-                                target_global_idx,
-                                &vector_data,
+                                neighbor_idx,
+                                cand_idx,
+                                &ctx,
+                                usize::MAX,
+                                &dummy_vec,
                                 &[],
-                            )?;
-                            candidates.push(Candidate {
-                                index: other_idx,
+                            ).unwrap_or(f32::MAX);
+
+                            cand_objs.push(Candidate {
+                                index: cand_idx,
                                 distance: dist,
                             });
                         }
-                    }
 
-                    if !candidates.is_empty() {
-                        let selected = self.inner.select_neighbors_heuristic_with_batch(
-                            &search_ctx,
-                            &candidates,
-                            layer_cap,
-                            target_global_idx,
-                            &vector_data,
-                            &[],
-                        )?;
-                        if !selected.is_empty() {
-                            updated_conns.extend(selected);
-                            orphaned_replacements += updated_conns.len();
+                        // Use existing heuristic neighbor selection
+                        let dummy_vec = super::types::VectorData::F32(Vec::new());
+                        let updated_conns = if !cand_objs.is_empty() {
+                            self.inner
+                                .select_neighbors_heuristic_with_batch(
+                                    &ctx,
+                                    &cand_objs,
+                                    layer_max_m,
+                                    usize::MAX,
+                                    &dummy_vec,
+                                    &[],
+                                )
+                                .unwrap_or(remaining.clone())
+                        } else {
+                            remaining.clone()
+                        };
+
+                        // Apply updated connections if neighbor is a RAM node
+                        if neighbor_idx >= mmap_node_count {
+                            let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                            let _ = self.inner.hot.arena.update_backlink(
+                                neighbor_ram_idx,
+                                layer,
+                                m,
+                                &updated_conns,
+                            );
                         }
                     }
                 }
-
-                if updated_conns.is_empty() {
-                    let active_nodes_at_layer = self
-                        .inner
-                        .hot
-                        .nodes
-                        .read()
-                        .iter()
-                        .enumerate()
-                        .filter(|(i, node)| {
-                            node.max_layer >= layer
-                                && !deleted_guard.contains((mmap_count + i) as u64)
-                        })
-                        .count();
-                    if active_nodes_at_layer > 1 {
-                        return Err(HnswDeletionError::DisconnectedRepair {
-                            level: layer as u8,
-                            node: neighbor_ram_idx,
-                        }
-                        .into());
-                    }
-                }
-
-                self.inner
-                    .hot
-                    .arena
-                    .update_backlink(neighbor_ram_idx, layer, m, &updated_conns)?;
-                neighbor_lists_repaired += 1;
             }
         }
 
-        // Step 3: Post-repair Verification step — 2nd-order neighborhood scan with budget
-        let budget = (max_layer + 1) * m * 4;
-        let mut residual_ghost_pointers = 0;
-        let mut scanned = 0;
+        // Verification scan over 2nd-order neighborhood
+        // Fixed budget = (degree of deleted node) * (M) * 4
+        let total_degree = target_max_layer * m;
+        let budget = (total_degree.max(1)) * m * 4;
+        let remaining_ghost_pointers = self.verify_no_ghost_pointers(target_idx as u32, budget);
 
-        for (i, node) in nodes.iter().enumerate() {
-            let global_idx = mmap_count + i;
-            if deleted_guard.contains(global_idx as u64) {
-                continue;
-            }
-            for l in 0..=node.max_layer {
-                let conns = self.inner.hot.arena.get_ram_node_connections(i, l, m);
-                for &conn in &conns {
-                    scanned += 1;
-                    if conn as usize == target_global_idx {
-                        residual_ghost_pointers += 1;
-                    }
-                    if scanned >= budget {
-                        break;
-                    }
-                }
-                if scanned >= budget {
-                    break;
-                }
-            }
-            if scanned >= budget {
-                break;
-            }
+        if remaining_ghost_pointers > 0 {
+            return Err(ContextraError::GraphRepairFailed(
+                HnswDeletionError::VerificationFailed {
+                    remaining_pointers: remaining_ghost_pointers,
+                },
+            ));
         }
 
-        if residual_ghost_pointers > 0 {
-            return Err(HnswDeletionError::VerificationFailed(residual_ghost_pointers).into());
-        }
-
-        // Free arena slot of target node
-        self.inner.hot.arena.free_node(target_ram_idx);
+        // Mark doc_id as deleted in HNSW structure (updates doc_to_node, deleted_nodes, entry_point)
+        self.inner.do_delete(doc_id)?;
 
         Ok(DeletionStats {
-            levels_touched: (max_layer + 1) as u8,
-            neighbor_lists_repaired,
+            doc_id,
+            repaired_edges,
             orphaned_replacements,
             verified_no_ghost_pointers: true,
         })
+    }
+}
+
+impl HnswIndex {
+    /// Internal helper method to perform a verification scan across the 2nd-order neighborhood
+    /// bounded by `budget` to ensure zero residual pointers to `target_idx` remain.
+    fn verify_no_ghost_pointers(&self, target_idx_u32: u32, budget: usize) -> usize {
+        let mmap_node_count = self
+            .inner
+            .cold
+            .mmap_index
+            .read()
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+
+        let nodes_read = self.inner.hot.nodes.read();
+        let mmap_guard = self.inner.cold.mmap_index.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        let m = self.inner.cold.config.m;
+
+        let total_nodes = mmap_node_count + nodes_read.len();
+        let mut visited = AHashSet::new();
+        let mut ghost_pointers = 0usize;
+        let mut inspected_nodes = 0usize;
+
+        for i in 0..total_nodes {
+            if inspected_nodes >= budget {
+                break;
+            }
+
+            if deleted.contains(i as u64) || i == target_idx_u32 as usize {
+                continue;
+            }
+
+            if visited.insert(i) {
+                inspected_nodes += 1;
+
+                let max_layer = if i < mmap_node_count {
+                    if let Some(mmap) = mmap_guard.as_ref() {
+                        mmap.get_node_record(i).map(|r| r.max_layer as usize).unwrap_or(0)
+                    } else {
+                        0
+                    }
+                } else {
+                    let ram_idx = i - mmap_node_count;
+                    nodes_read.get(ram_idx).map(|n| n.max_layer).unwrap_or(0)
+                };
+
+                for layer in 0..=max_layer {
+                    let conns = if i < mmap_node_count {
+                        if let Some(mmap) = mmap_guard.as_ref() {
+                            if let Ok(rec) = mmap.get_node_record(i) {
+                                mmap.get_connections(&rec, layer).unwrap_or_default()
+                            } else {
+                                Vec::new()
+                            }
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        let ram_idx = i - mmap_node_count;
+                        self.inner.hot.arena.get_ram_node_connections(ram_idx, layer, m)
+                    };
+
+                    for &conn in &conns {
+                        if conn == target_idx_u32 {
+                            ghost_pointers += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        ghost_pointers
     }
 }

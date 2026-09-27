@@ -114,6 +114,12 @@ async fn run_operator_role(
         LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?,
     ];
 
+    let graph_repair = vec![contextra_crypto::deletion_proof::GraphRepairAttestation {
+        doc_id: contextra_types::DocId::new(101),
+        verified_no_ghost_pointers: true,
+        attested_at: 1700000000,
+    }];
+
     let proof_v3 = DeletionProof::create_v3(
         scope,
         vec![
@@ -123,6 +129,8 @@ async fn run_operator_role(
         TxId::new(105),
         layer_proofs,
         vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &graph_repair,
         keypair.signing_key(),
     )?;
 
