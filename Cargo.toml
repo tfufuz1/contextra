@@ -37,6 +37,12 @@ members = [
     "crates/contextra-license",
 ]
 exclude = ["xtask"]
+# Excluded from default-members per Spezifikation Section 0.5 / A.3 ("Pure Rust, kein Server"):
+# - contextra-sandbox: WASM boundary (opt-in sandbox)
+# - contextra-py: PyO3/NumPy FFI bindings
+# - contextra-infer-ollama: External process provider dependency
+# - contextra-infer-onnx: Native ONNX runtime C-library dependency
+# These crates remain in `members` and can be built explicitly via `cargo build -p <crate>`.
 default-members = [
     "crates/contextra-wire",
     "crates/contextra-sys",
