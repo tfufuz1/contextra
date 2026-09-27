@@ -350,8 +350,8 @@ impl Wal {
         key_manager: Option<Arc<KeyManager>>,
     ) -> Result<Self> {
         let config = WalConfig {
-            key_manager,
             allow_legacy_integrity_key_fallback: true,
+            key_manager,
             min_wal_version: WalVersion::V1,
             ..Default::default()
         };
