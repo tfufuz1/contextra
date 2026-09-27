@@ -301,7 +301,7 @@ capabilities = ['wasmtime-isolation', 'cpu-fuel-budget', 'wall-clock-timeout']
 path = "crates/contextra-sandbox"
 unsafe_island = false
 may_depend_on = ['contextra-core']
-ci_class = 'pr'
+ci_class = 'pr-check-only'
 spec = ['A2', '0', '4']
 test = "cargo test -p contextra-sandbox --locked"
 
