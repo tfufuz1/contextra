@@ -93,6 +93,7 @@ impl LsmStorage {
                 *seq,
                 tx_id.inner(),
             );
+            self.compaction_engine.record_write_op(*seq);
         }
         self.notify_observers(mem_updates, tx_id);
     }

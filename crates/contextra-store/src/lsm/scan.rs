@@ -27,6 +27,7 @@ pub(super) fn check_in_range(
 impl LsmStorage {
     /// Evaluates detailed traversal metrics (evaluated_sstables, bloom_passes, range_passes, block_reads, found) for point lookups.
     pub async fn point_lookup_metrics(&self, key: &[u8]) -> (usize, usize, usize, usize, bool) {
+        self.compaction_engine.record_read_op();
         let sstables = self.sstables.read().await;
         let mut total_eval = 0usize;
         let mut total_bloom_pass = 0usize;
@@ -74,6 +75,7 @@ impl LsmStorage {
     where
         F: Fn(&[u8], u64, u64) -> bool,
     {
+            self.compaction_engine.record_read_op();
         let mut map: std::collections::BTreeMap<Bytes, (Bytes, u64)> =
             std::collections::BTreeMap::new();
         let state = self.state.read().await;

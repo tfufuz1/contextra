@@ -50,6 +50,8 @@ pub mod ppr_stream;
 pub mod provenance;
 pub mod session_dag;
 pub mod tl_hfd;
+#[cfg(feature = "apprh-diffusion")]
+pub mod apprh;
 
 pub use arc_slice::ArcSlice;
 pub use cascade::{
@@ -102,6 +104,11 @@ pub use tl_hfd::{
     shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, DefaultFlipGate, ShadowComparison,
     ShadowDiscrepancyReport, TlHfdError, TlHfdFlipGate, TlHfdParams, MIN_AGREEMENT_THRESHOLD,
     MIN_SHADOW_SAMPLES,
+};
+#[cfg(feature = "apprh-diffusion")]
+pub use apprh::{
+    apprh_local, shadow_compare_forward_push_vs_apprh, ApprhError, ApprhFlipGate, ApprhParams,
+    ApprhShadowComparison, DefaultApprhFlipGate,
 };
 
 /// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
