@@ -12,8 +12,8 @@
 // Neue Varianten nur ANHÄNGEN (niemals umsortieren) → binäre Kompatibilität.
 // DOWNSTREAM: contextra-store, contextra-index, contextra-db konvertieren via `?` und `From`.
 
-use thiserror::Error;
 use crate::DocId;
+use thiserror::Error;
 
 /// Errors that can occur during HNSW graph deletion and repair operations.
 #[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -35,7 +35,9 @@ pub enum HnswDeletionError {
 }
 
 /// Step identifier in an agent workflow execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[repr(transparent)]
 pub struct StepId(pub u64);
 
@@ -431,6 +433,14 @@ impl ContextraError {
     /// Creates a `PinBudgetExceeded` error.
     pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
         Self::PinBudgetExceeded(msg.into())
+    }
+
+    /// Creates a `CrossDeviceLink` error.
+    pub fn cross_device_link(source_path: impl Into<String>, target_path: impl Into<String>) -> Self {
+        Self::CrossDeviceLink {
+            source_path: source_path.into(),
+            target_path: target_path.into(),
+        }
     }
 
     /// Creates a `WalTruncationDetected` error.
@@ -1063,13 +1073,18 @@ mod tests {
         assert!(matches!(dir_pin, CacheDirective::Pin { ttl: None }));
 
         let dir_step = CacheDirective::ReleaseAfterStep { step_id: step };
-        assert!(matches!(dir_step, CacheDirective::ReleaseAfterStep { step_id: s } if s.inner() == 42));
+        assert!(
+            matches!(dir_step, CacheDirective::ReleaseAfterStep { step_id: s } if s.inner() == 42)
+        );
     }
 
     #[test]
     fn test_pin_budget_exceeded_display_and_helper() {
         let err = ContextraError::pin_budget_exceeded("Tenant 10 requested 100MB");
-        assert_eq!(err.to_string(), "Pin budget exceeded: Tenant 10 requested 100MB");
+        assert_eq!(
+            err.to_string(),
+            "Pin budget exceeded: Tenant 10 requested 100MB"
+        );
         match err {
             ContextraError::PinBudgetExceeded(msg) => assert_eq!(msg, "Tenant 10 requested 100MB"),
             _ => panic!("Expected PinBudgetExceeded variant"),

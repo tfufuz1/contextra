@@ -77,7 +77,9 @@ fn test_non_finite_variance_returns_error() {
 
     let mut state = BanditProfileState::cold_start(original_dim, 0.5);
     state.implementation = BanditImplementation::SketchedProjection { projected_dim };
-    state.ensure_sketched_state(projected_dim).expect("valid state setup");
+    state
+        .ensure_sketched_state(projected_dim)
+        .expect("valid state setup");
 
     // Force inv_a matrix entry to NaN or extreme negative
     state.inv_a[0] = f32::NAN;

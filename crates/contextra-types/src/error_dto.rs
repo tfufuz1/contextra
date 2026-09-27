@@ -494,16 +494,15 @@ mod tests {
                 ContextraError::DurabilityConfig("durability error".into()),
                 "DurabilityConfig",
             ),
-            (
-                ContextraError::Plugin("plugin error".into()),
-                "Plugin",
-            ),
+            (ContextraError::Plugin("plugin error".into()), "Plugin"),
             (
                 ContextraError::PinBudgetExceeded("pin budget error".into()),
                 "PinBudgetExceeded",
             ),
             (
-                ContextraError::GraphRepairFailed(crate::error::HnswDeletionError::NodeNotFound(crate::DocId::new(1))),
+                ContextraError::GraphRepairFailed(crate::error::HnswDeletionError::NodeNotFound(
+                    crate::DocId::new(1),
+                )),
                 "GraphRepairFailed",
             ),
             (
