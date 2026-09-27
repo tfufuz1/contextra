@@ -58,29 +58,31 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_facade_open_and_builder_entrypoints() {
+    async fn test_facade_open_and_builder_entrypoints() -> Result<(), Box<dyn std::error::Error>> {
         let base_tmp =
             std::env::temp_dir().join(format!("contextra_facade_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base_tmp);
 
         let db1_path = base_tmp.join("db1");
-        let db1 = open(&db1_path).await.expect("open db1");
-        assert_eq!(db1.len().await.expect("len"), 0);
+        let db1 = open(&db1_path).await?;
+        assert_eq!(db1.len().await?, 0);
 
-        let mut config = ContextraConfig::default();
-        config.dimension = 16;
+        let config = ContextraConfig {
+            dimension: 16,
+            ..Default::default()
+        };
         let db2_path = base_tmp.join("db2");
-        let db2 = open_with_config(&db2_path, config).await.expect("open db2");
-        assert_eq!(db2.len().await.expect("len"), 0);
+        let db2 = open_with_config(&db2_path, config).await?;
+        assert_eq!(db2.len().await?, 0);
 
         let db3_path = base_tmp.join("db3");
         let db3 = builder(32)
             .with_storage_path(&db3_path)
             .build()
-            .await
-            .expect("builder db3");
-        assert_eq!(db3.len().await.expect("len"), 0);
+            .await?;
+        assert_eq!(db3.len().await?, 0);
 
         let _ = std::fs::remove_dir_all(&base_tmp);
+        Ok(())
     }
 }
