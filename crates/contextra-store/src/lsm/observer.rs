@@ -1,7 +1,11 @@
-use contextra_core::TxId;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 use crate::wal::{WalEntry, WalOp};
+use contextra_core::TxId;
+use contextra_ports::{Clock, SystemClock};
+use std::sync::Arc;
+use std::time::Duration;
+
+/// Default maximum latency allowed for WAL observer callback execution (1 millisecond).
+pub const DEFAULT_MAX_OBSERVER_LATENCY: Duration = Duration::from_millis(1);
 
 /// Origin tag indicating where a committed batch originated from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,8 +68,8 @@ pub trait WalObserver: Send + Sync {
     ///
     /// # Fail-Open Contract
     /// Callbacks MUST NOT block longer than `max_observer_latency` (default 1ms).
-    /// If an observer exceeds this limit, it is automatically deregistered and an `ObserverTimeout`
-    /// warning is logged. The commit itself is NEVER delayed or aborted.
+    /// If an observer exceeds this limit or panics, it is automatically deregistered and a
+    /// warning/error is logged. The commit itself is NEVER delayed or aborted.
     fn on_commit(&self, batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId);
 }
 
@@ -73,13 +77,15 @@ pub trait WalObserver: Send + Sync {
 pub struct ObserverRegistry {
     observers: parking_lot::RwLock<Vec<Arc<dyn WalObserver>>>,
     max_observer_latency: parking_lot::RwLock<Duration>,
+    clock: parking_lot::RwLock<Arc<dyn Clock>>,
 }
 
 impl Default for ObserverRegistry {
     fn default() -> Self {
         Self {
             observers: parking_lot::RwLock::new(Vec::new()),
-            max_observer_latency: parking_lot::RwLock::new(Duration::from_millis(1)),
+            max_observer_latency: parking_lot::RwLock::new(DEFAULT_MAX_OBSERVER_LATENCY),
+            clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
         }
     }
 }
@@ -112,10 +118,15 @@ impl ObserverRegistry {
         *self.max_observer_latency.read()
     }
 
+    /// Sets the injected clock port for deterministic execution timing (P28).
+    pub fn set_clock(&self, clock: Arc<dyn Clock>) {
+        *self.clock.write() = clock;
+    }
+
     /// Synchronously notifies all registered observers of a committed batch.
     ///
-    /// Evaluates execution time per observer against `max_observer_latency`. Timed out observers
-    /// are evicted without failing the commit.
+    /// Evaluates execution time per observer against `max_observer_latency` using the injected
+    /// `Clock` port (`monotonic_nanos()`). Timed out or panicking observers are evicted without failing the commit.
     pub fn notify(&self, entries: &[WalEntry], seq_no: u64, tx_id: TxId, origin: WriteOrigin) {
         let observers_snapshot = {
             let guard = self.observers.read();
@@ -131,22 +142,34 @@ impl ObserverRegistry {
             origin,
         };
 
-        let max_latency = self.max_observer_latency();
+        let clock = self.clock.read().clone();
+        let max_latency_nanos = self.max_observer_latency().as_nanos() as u64;
         let mut timed_out: Vec<Arc<dyn WalObserver>> = Vec::new();
 
         for obs in &observers_snapshot {
-            let start = Instant::now();
-            obs.on_commit(&batch, seq_no, tx_id);
-            let elapsed = start.elapsed();
+            let start = clock.monotonic_nanos();
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                obs.on_commit(&batch, seq_no, tx_id);
+            }));
+            let end = clock.monotonic_nanos();
 
-            if elapsed > max_latency {
-                tracing::warn!(
-                    elapsed_us = elapsed.as_micros(),
-                    max_allowed_us = max_latency.as_micros(),
+            if res.is_err() {
+                tracing::error!(
                     tx_id = tx_id.inner(),
-                    "WalObserver exceeded max_observer_latency; deregistering observer"
+                    "WalObserver panicked during on_commit execution; deregistering observer"
                 );
                 timed_out.push(Arc::clone(obs));
+            } else {
+                let elapsed_nanos = end.saturating_sub(start);
+                if elapsed_nanos > max_latency_nanos {
+                    tracing::warn!(
+                        elapsed_us = elapsed_nanos / 1_000,
+                        max_allowed_us = max_latency_nanos / 1_000,
+                        tx_id = tx_id.inner(),
+                        "WalObserver exceeded max_observer_latency; deregistering observer"
+                    );
+                    timed_out.push(Arc::clone(obs));
+                }
             }
         }
 
