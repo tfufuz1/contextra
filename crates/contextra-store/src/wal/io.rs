@@ -307,7 +307,8 @@ where
                             };
                             if legacy_res.is_ok() {
                                 tracing::warn!(
-                                    "WAL nutzt veralteten Integritätsschlüssel — Datenbank sollte neu initialisiert werden"
+                                    "Legacy-WAL-Integritätsschlüssel aktiv für Segment {} — dieses Segment hat keine reale Manipulationssicherheit, da der Rückfallschlüssel öffentlich im Quellcode liegt.",
+                                    path.display()
                                 );
                                 verifier = legacy_verifier;
                                 using_legacy_key = true;
@@ -436,7 +437,8 @@ where
                         };
                         if legacy_res.is_ok() {
                             tracing::warn!(
-                                "WAL nutzt veralteten Integritätsschlüssel — Datenbank sollte neu initialisiert werden"
+                                "Legacy-WAL-Integritätsschlüssel aktiv für Segment {} — dieses Segment hat keine reale Manipulationssicherheit, da der Rückfallschlüssel öffentlich im Quellcode liegt.",
+                                path.display()
                             );
                             verifier = legacy_verifier;
                             using_legacy_key = true;
