@@ -85,6 +85,8 @@ pub use hyperedge_suggest::{
     HyperedgeSuggestError, ValidatedHyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
 };
 pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
+#[cfg(feature = "k-path-diffusion")]
+pub use path_rag::{KPathConfig, KPathDiffusion, KPathResult};
 #[cfg(feature = "graph-connectivity-health")]
 pub use percolation::{
     compute_percolation_health, find_rebonding_candidates, should_trigger_rebonding,
@@ -97,7 +99,9 @@ pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,
 };
 pub use tl_hfd::{
-    shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, ShadowComparison, TlHfdError, TlHfdParams,
+    shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, DefaultFlipGate, ShadowComparison,
+    ShadowDiscrepancyReport, TlHfdError, TlHfdFlipGate, TlHfdParams, MIN_AGREEMENT_THRESHOLD,
+    MIN_SHADOW_SAMPLES,
 };
 
 /// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.

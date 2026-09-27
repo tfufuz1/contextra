@@ -24,10 +24,10 @@
 use pyo3::prelude::*;
 use std::sync::Arc;
 
-mod bindings;
-mod kv_links;
+pub mod bindings;
+pub mod kv_links;
 
-use bindings::*;
+pub use bindings::*;
 
 #[pymodule]
 fn _contextra(_py: Python<'_>, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {

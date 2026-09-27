@@ -8,6 +8,44 @@ use ahash::AHashSet;
 use contextra_types::EntityId;
 use std::cmp::Ordering;
 
+/// Minimum required sample count for shadow mode default flip evaluation.
+pub const MIN_SHADOW_SAMPLES: u64 = 10_000;
+
+/// Minimum required mean top-k Jaccard agreement threshold for shadow mode default flip evaluation.
+pub const MIN_AGREEMENT_THRESHOLD: f32 = 0.85;
+
+/// Aggregated discrepancy report over a shadow mode evaluation window.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShadowDiscrepancyReport {
+    /// Number of evaluated query pairs (ForwardPush vs TL-HFD).
+    pub sample_count: u64,
+    /// Mean Jaccard similarity of top-k entity ID sets between algorithms.
+    pub mean_topk_jaccard: f32,
+    /// p99 latency delta (TL-HFD minus ForwardPush) in microseconds (negative means TL-HFD is faster).
+    pub p99_latency_delta_us: f64,
+    /// Share of cases where TL-HFD achieved >20% higher Recall@10 against ground truth (if available).
+    pub recall_improvement_ratio: Option<f32>,
+}
+
+/// Formal default-flip gate trait evaluating whether TL-HFD can replace ForwardPush as default.
+pub trait DefaultFlipGate {
+    /// Returns `true` iff:
+    /// 1. `sample_count >= MIN_SHADOW_SAMPLES`
+    /// 2. `mean_topk_jaccard >= MIN_AGREEMENT_THRESHOLD`
+    /// 3. `p99_latency_delta_us <= 0.0`
+    fn should_flip(&self, report: &ShadowDiscrepancyReport) -> bool {
+        report.sample_count >= MIN_SHADOW_SAMPLES
+            && report.mean_topk_jaccard >= MIN_AGREEMENT_THRESHOLD
+            && report.p99_latency_delta_us <= 0.0
+    }
+}
+
+/// Standard default flip gate evaluator for TL-HFD.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TlHfdFlipGate;
+
+impl DefaultFlipGate for TlHfdFlipGate {}
+
 /// Result structure of shadow mode comparison between Forward-Push PPR and TL-HFD.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShadowComparison {

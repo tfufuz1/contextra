@@ -25,6 +25,7 @@ half = "2.4"
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-rank = { workspace = true }
+parking_lot = { workspace = true }
 contextra-crypto = { workspace = true, optional = true }
 
 [dev-dependencies]
