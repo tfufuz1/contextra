@@ -143,8 +143,15 @@ fn v3_hmac_is_length_prefixed_no_collision() {
     // Paar 1: key = b"ab", value = b"c"
     let key1 = b"ab".to_vec();
     let val1 = b"c".to_vec();
-    let checksum1 =
-        compute_v3_checksum(integrity_key, prev_hmac, seq_no, tx_id, op_type, &key1, &val1);
+    let checksum1 = compute_v3_checksum(
+        integrity_key,
+        prev_hmac,
+        seq_no,
+        tx_id,
+        op_type,
+        &key1,
+        &val1,
+    );
     let entry1 = WalEntrySnapshot {
         tx_id,
         seq_no,
@@ -158,8 +165,15 @@ fn v3_hmac_is_length_prefixed_no_collision() {
     // Paar 2: key = b"a", value = b"bc"
     let key2 = b"a".to_vec();
     let val2 = b"bc".to_vec();
-    let checksum2 =
-        compute_v3_checksum(integrity_key, prev_hmac, seq_no, tx_id, op_type, &key2, &val2);
+    let checksum2 = compute_v3_checksum(
+        integrity_key,
+        prev_hmac,
+        seq_no,
+        tx_id,
+        op_type,
+        &key2,
+        &val2,
+    );
     let entry2 = WalEntrySnapshot {
         tx_id,
         seq_no,

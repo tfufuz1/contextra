@@ -285,10 +285,7 @@ impl KeyManager {
     }
 
     /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId`.
-    pub fn cipher_for(
-        &self,
-        tenant_id: contextra_types::TenantId,
-    ) -> Result<Self> {
+    pub fn cipher_for(&self, tenant_id: contextra_types::TenantId) -> Result<Self> {
         let dummy_fp = crate::kv_cipher::ModelFingerprint {
             hash: [0u8; 32],
             model_id: "default_tenant_cipher".to_string(),
@@ -720,8 +717,10 @@ mod tests {
         use contextra_types::{TenantId, TenantScoped};
 
         let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
-        let tenant_a = TenantId::try_new(100).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        let tenant_b = TenantId::try_new(200).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        let tenant_a =
+            TenantId::try_new(100).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        let tenant_b =
+            TenantId::try_new(200).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
 
         let fp = ModelFingerprint {
             hash: [0x42; 32],
@@ -744,7 +743,8 @@ mod tests {
         let err = km.derive_kv_key_scoped(scoped_fp, &tenant_b).unwrap_err();
         assert!(
             matches!(err, CryptoError::InvalidInput(ref msg) if msg.contains("tenant scope mismatch")),
-            "Expected tenant scope mismatch error, got: {:?}", err
+            "Expected tenant scope mismatch error, got: {:?}",
+            err
         );
 
         Ok(())
