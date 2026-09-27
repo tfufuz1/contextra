@@ -126,4 +126,9 @@ impl LsmStorage {
     pub fn max_observer_latency(&self) -> std::time::Duration {
         self.observer_registry.max_observer_latency()
     }
+
+    /// Sets the injected clock port for deterministic observer latency evaluation (P28).
+    pub fn set_clock(&self, clock: Arc<dyn contextra_ports::Clock>) {
+        self.observer_registry.set_clock(clock);
+    }
 }
