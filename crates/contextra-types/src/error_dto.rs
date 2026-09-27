@@ -494,16 +494,15 @@ mod tests {
                 ContextraError::DurabilityConfig("durability error".into()),
                 "DurabilityConfig",
             ),
-            (
-                ContextraError::Plugin("plugin error".into()),
-                "Plugin",
-            ),
+            (ContextraError::Plugin("plugin error".into()), "Plugin"),
             (
                 ContextraError::PinBudgetExceeded("pin budget error".into()),
                 "PinBudgetExceeded",
             ),
             (
-                ContextraError::GraphRepairFailed(crate::error::HnswDeletionError::NodeNotFound(crate::DocId::new(1))),
+                ContextraError::GraphRepairFailed(crate::error::HnswDeletionError::NodeNotFound(
+                    crate::DocId::new(1),
+                )),
                 "GraphRepairFailed",
             ),
             (
@@ -515,8 +514,8 @@ mod tests {
             ),
             (
                 ContextraError::CrossDeviceLink {
-                    source_path: "/a/1.sst".into(),
-                    target_path: "/b/1.sst".into(),
+                    source_path: "/mnt/a/1.sst".into(),
+                    target_path: "/mnt/b/1.sst".into(),
                 },
                 "CrossDeviceLink",
             ),
