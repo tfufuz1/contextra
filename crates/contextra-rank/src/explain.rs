@@ -247,8 +247,10 @@ mod tests {
 
     #[test]
     fn test_single_signal_record() {
-        let mut record = ProvenanceRecord::default();
-        record.bm25_score = Some(12.5);
+        let record = ProvenanceRecord {
+            bm25_score: Some(12.5),
+            ..Default::default()
+        };
         let explanation = explain(&record);
         assert_eq!(explanation.entries.len(), 1);
         assert_eq!(explanation.entries[0].signal, SignalKind::Bm25);
@@ -258,12 +260,6 @@ mod tests {
 
     #[test]
     fn test_four_signals_exact_contributions() {
-        let mut record = ProvenanceRecord::default();
-        record.vector_distance = Some(0.1);
-        record.bm25_score = Some(15.0);
-        record.graph_score = Some(0.8);
-        record.rerank_score = Some(0.95);
-
         let mut contribs = AHashMap::new();
         contribs.insert(
             "vector".to_string(),
@@ -297,7 +293,15 @@ mod tests {
                 rrf_contribution: 0.10,
             },
         );
-        record.signal_contributions = contribs;
+
+        let record = ProvenanceRecord {
+            vector_distance: Some(0.1),
+            bm25_score: Some(15.0),
+            graph_score: Some(0.8),
+            rerank_score: Some(0.95),
+            signal_contributions: contribs,
+            ..Default::default()
+        };
 
         let explanation = explain(&record);
         assert_eq!(explanation.entries.len(), 4);
@@ -324,11 +328,6 @@ mod tests {
 
     #[test]
     fn test_sorting_descending_by_contribution_share() {
-        let mut record = ProvenanceRecord::default();
-        record.vector_distance = Some(0.5);
-        record.bm25_score = Some(2.0);
-        record.graph_score = Some(10.0);
-
         let mut contribs = AHashMap::new();
         contribs.insert(
             "vector".to_string(),
@@ -354,7 +353,14 @@ mod tests {
                 rrf_contribution: 0.70,
             },
         );
-        record.signal_contributions = contribs;
+
+        let record = ProvenanceRecord {
+            vector_distance: Some(0.5),
+            bm25_score: Some(2.0),
+            graph_score: Some(10.0),
+            signal_contributions: contribs,
+            ..Default::default()
+        };
 
         let explanation = explain(&record);
         assert_eq!(explanation.entries.len(), 3);
@@ -372,12 +378,6 @@ mod tests {
 
     #[test]
     fn test_to_human_readable_de() {
-        let mut record = ProvenanceRecord::default();
-        record.bm25_score = Some(10.0);
-        record.vector_distance = Some(0.2);
-        record.coherence_bonus = 0.03;
-        record.source_collection = Some("knowledge_base".to_string());
-
         let mut contribs = AHashMap::new();
         contribs.insert(
             "text".to_string(),
@@ -395,7 +395,15 @@ mod tests {
                 rrf_contribution: 0.24,
             },
         );
-        record.signal_contributions = contribs;
+
+        let record = ProvenanceRecord {
+            bm25_score: Some(10.0),
+            vector_distance: Some(0.2),
+            coherence_bonus: 0.03,
+            source_collection: Some("knowledge_base".to_string()),
+            signal_contributions: contribs,
+            ..Default::default()
+        };
 
         let explanation = explain(&record);
         let text = explanation.to_human_readable_de();
