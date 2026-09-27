@@ -334,6 +334,15 @@ pub enum ContextraError {
     /// HNSW graph repair failure.
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(#[from] HnswDeletionError),
+
+    /// Cross-device hard link failure (target directory resides on a different filesystem or mount).
+    #[error("Cross-device link failed: cannot hard link '{source_path}' to '{target_path}' across distinct filesystems/mounts")]
+    CrossDeviceLink {
+        /// Source file path.
+        source_path: String,
+        /// Target link path.
+        target_path: String,
+    },
 }
 
 impl ContextraError {
@@ -415,6 +424,14 @@ impl ContextraError {
         Self::PinBudgetExceeded(msg.into())
     }
 
+    /// Creates a `CrossDeviceLink` error.
+    pub fn cross_device_link(source: impl Into<String>, target: impl Into<String>) -> Self {
+        Self::CrossDeviceLink {
+            source_path: source.into(),
+            target_path: target.into(),
+        }
+    }
+
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
     pub fn is_occ_conflict(&self) -> bool {
         matches!(self, Self::StaleRead(_) | Self::Conflict(_))
@@ -485,6 +502,10 @@ mod tests {
             ContextraError::KvQuantization("test".into()),
             ContextraError::DurabilityConfig("test".into()),
             ContextraError::PinBudgetExceeded("test".into()),
+            ContextraError::CrossDeviceLink {
+                source_path: "/a/file.sst".into(),
+                target_path: "/b/file.sst".into(),
+            },
         ];
         for v in &variants {
             let _ = format!("{v}");
@@ -1032,6 +1053,25 @@ mod tests {
         match err {
             ContextraError::PinBudgetExceeded(msg) => assert_eq!(msg, "Tenant 10 requested 100MB"),
             _ => panic!("Expected PinBudgetExceeded variant"),
+        }
+    }
+
+    #[test]
+    fn test_cross_device_link_display_and_helper() {
+        let err = ContextraError::cross_device_link("/mnt/a/1.sst", "/mnt/b/1.sst");
+        assert_eq!(
+            err.to_string(),
+            "Cross-device link failed: cannot hard link '/mnt/a/1.sst' to '/mnt/b/1.sst' across distinct filesystems/mounts"
+        );
+        match err {
+            ContextraError::CrossDeviceLink {
+                source_path,
+                target_path,
+            } => {
+                assert_eq!(source_path, "/mnt/a/1.sst");
+                assert_eq!(target_path, "/mnt/b/1.sst");
+            }
+            _ => panic!("Expected CrossDeviceLink variant"),
         }
     }
 

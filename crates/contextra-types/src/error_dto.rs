@@ -334,6 +334,17 @@ impl From<&ContextraError> for ContextraErrorDto {
                 message: err.to_string(),
                 details: None,
             },
+            ContextraError::CrossDeviceLink {
+                source_path,
+                target_path,
+            } => Self {
+                kind: "CrossDeviceLink".to_string(),
+                message: err.to_string(),
+                details: Some(serde_json::json!({
+                    "source_path": source_path,
+                    "target_path": target_path,
+                })),
+            },
         }
     }
 }
@@ -483,6 +494,13 @@ mod tests {
             (
                 ContextraError::GraphRepairFailed(crate::error::HnswDeletionError::NodeNotFound(crate::DocId::new(1))),
                 "GraphRepairFailed",
+            ),
+            (
+                ContextraError::CrossDeviceLink {
+                    source_path: "/a/1.sst".into(),
+                    target_path: "/b/1.sst".into(),
+                },
+                "CrossDeviceLink",
             ),
         ];
 
