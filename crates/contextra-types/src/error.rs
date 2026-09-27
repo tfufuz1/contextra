@@ -346,13 +346,12 @@ pub enum ContextraError {
         actual_hmac: [u8; 32],
     },
 
-    /// Cross-device hard link failure (EXDEV).
+    /// Cross-device link error when attempting hardlinks across filesystems or mount points.
     #[error("Cross-device link failed: cannot hard link '{source_path}' to '{target_path}' across distinct filesystems/mounts")]
-    #[non_exhaustive]
     CrossDeviceLink {
-        /// Source path attempted to link from.
+        /// Source path of file to link.
         source_path: String,
-        /// Target path attempted to link to.
+        /// Target path for link creation.
         target_path: String,
     },
 }
