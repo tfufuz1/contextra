@@ -50,6 +50,7 @@ default-members = [
     "crates/contextra-crypto",
     "crates/contextra-privacy",
     "crates/contextra-graph",
+    "crates/contextra-infer-onnx",
     "crates/contextra-mcp",
     "crates/contextra-agent",
     "crates/contextra-infer-ollama",
