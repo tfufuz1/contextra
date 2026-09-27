@@ -410,10 +410,7 @@ impl BanditProfileState {
     }
 
     /// Stellt sicher, dass der Sketched-State für `projected_dim` k ordnungsgemäß initialisiert ist.
-    pub fn ensure_sketched_state(
-        &mut self,
-        projected_dim: usize,
-    ) -> Result<(), BanditError> {
+    pub fn ensure_sketched_state(&mut self, projected_dim: usize) -> Result<(), BanditError> {
         let d = if let Some(ref sketch) = self.sketch_matrix {
             sketch.original_dim
         } else {
@@ -658,11 +655,15 @@ impl BanditProfileState {
             }
             BanditImplementation::SketchedProjection { projected_dim } => {
                 self.ensure_sketched_state(projected_dim)?;
-                let sketch = self.sketch_matrix.as_ref().ok_or_else(|| {
-                    BanditError::InvalidConfig(
-                        "sketch_matrix missing after ensure_sketched_state".into(),
-                    )
-                })?.clone();
+                let sketch = self
+                    .sketch_matrix
+                    .as_ref()
+                    .ok_or_else(|| {
+                        BanditError::InvalidConfig(
+                            "sketch_matrix missing after ensure_sketched_state".into(),
+                        )
+                    })?
+                    .clone();
                 let rx = sketch.project(x);
                 let k = projected_dim;
 
@@ -1138,7 +1139,10 @@ mod tests {
             Err(BanditError::InvalidConfig(msg)) => {
                 assert!(msg.contains("projected_dim must be in (0, original_dim]"));
             }
-            other => panic!("Expected InvalidConfig error for projected_dim=0, got {:?}", other),
+            other => panic!(
+                "Expected InvalidConfig error for projected_dim=0, got {:?}",
+                other
+            ),
         }
     }
 
@@ -1166,7 +1170,10 @@ mod tests {
                     denominator
                 );
             }
-            other => panic!("Expected PrecisionMatrixDriftDetected error, got {:?}", other),
+            other => panic!(
+                "Expected PrecisionMatrixDriftDetected error, got {:?}",
+                other
+            ),
         }
     }
 }

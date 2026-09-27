@@ -3,8 +3,8 @@
 //! Reagiert auf erkannte Verteilungsverschiebungen (`DriftDetected`) durch Aufruf von
 //! `apply_drift_penalty` auf der angegebenen `BanditPolicy`.
 
-use serde::{Deserialize, Serialize};
 use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+use serde::{Deserialize, Serialize};
 
 /// Drift detection signal returned by a [`DriftDetector`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -108,7 +108,10 @@ pub struct EnsembleDriftWatcher {
 
 impl Default for EnsembleDriftWatcher {
     fn default() -> Self {
-        Self::new(LyapunovDriftWatcher::default(), CatoniDriftDetector::default())
+        Self::new(
+            LyapunovDriftWatcher::default(),
+            CatoniDriftDetector::default(),
+        )
     }
 }
 
@@ -228,7 +231,10 @@ mod tests {
                 break;
             }
         }
-        assert!(detected, "CatoniDriftDetector should detect sustained shift");
+        assert!(
+            detected,
+            "CatoniDriftDetector should detect sustained shift"
+        );
     }
 
     #[test]
