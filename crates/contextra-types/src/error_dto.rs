@@ -324,6 +324,11 @@ impl From<&ContextraError> for ContextraErrorDto {
                 message: msg.clone(),
                 details: None,
             },
+            ContextraError::PinBudgetExceeded(msg) => Self {
+                kind: "PinBudgetExceeded".to_string(),
+                message: msg.clone(),
+                details: None,
+            },
         }
     }
 }
@@ -465,6 +470,10 @@ mod tests {
             (
                 ContextraError::Plugin("plugin error".into()),
                 "Plugin",
+            ),
+            (
+                ContextraError::PinBudgetExceeded("pin budget error".into()),
+                "PinBudgetExceeded",
             ),
         ];
 
