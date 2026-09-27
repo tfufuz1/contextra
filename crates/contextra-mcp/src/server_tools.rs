@@ -119,7 +119,7 @@ impl McpServer {
                 Ok(json!(enriched_results))
             }
 
-            "contextra_insert" => {
+            "contextra_insert" | "contextra_upsert" => {
                 // Validate collection parameter if present
                 let col_name = if let Some(col_val) = args.get("collection") {
                     let s = col_val.as_str().ok_or_else(|| {
@@ -918,6 +918,10 @@ impl McpServer {
                     "collection": col_name
                 }))
             }
+
+            "contextra_delete" => self.handle_delete(args).await,
+            "contextra_create_collection" => self.handle_create_collection(args).await,
+            "contextra_drop_collection" => self.handle_drop_collection(args).await,
 
             "contextra_plugin_status" => {
                 let registry = self.plugin_registry.as_ref().map(|r| r.as_ref());
