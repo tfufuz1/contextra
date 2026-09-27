@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use contextra_router::{ArmRegistry, ArmRegistryError};
 use contextra_types::RetrievalStrategy;
 
