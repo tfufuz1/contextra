@@ -1,7 +1,19 @@
 use super::*;
+use super::observer::WriteOrigin;
+use crate::wal::WalEntry;
 use contextra_core::TxId;
 
 impl LsmStorage {
+    /// Notifies registered observers of committed WAL entries for a transaction.
+    pub(super) fn notify_commit_observers(
+        &self,
+        entries: &[WalEntry],
+        tx_id: TxId,
+        origin: WriteOrigin,
+    ) {
+        let seq_no = entries.last().map(|e| e.seq_no).unwrap_or(0);
+        self.observer_registry.notify(entries, seq_no, tx_id, origin);
+    }
     pub fn clear_intent_locks_for_tx(&self, tx_id: TxId) {
         if let Ok(mut locks) = self.intent_locks.lock() {
             locks.retain(|_, locked_tx| *locked_tx != tx_id);

@@ -27,6 +27,7 @@ pub mod kdf;
 pub mod kv_cipher;
 pub mod kv_segment;
 pub mod kv_shredding;
+pub mod wal_completeness;
 pub mod wal_crypto;
 
 pub use crypto::KeyManager as CryptoKey;
@@ -45,3 +46,4 @@ pub use kv_segment::{
     store::TenantIsolatedKvStore,
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
+pub use wal_completeness::verify_wal_chain_completeness;

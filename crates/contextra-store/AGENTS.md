@@ -20,7 +20,7 @@ Einziger Implementor des `StorageEngine` Traits aus `contextra-core`.
 | `memtable.rs` | In-Memory Skip-List mit Sequenznummern, Tombstone-Unterstützung (Ziel: Range-Sharded MemTable) |
 | `sstable.rs` | On-Disk sortierte Segmente: Block-Kompression, Bloom-Filter, Index, CRC32, Block-Cache-Integration (LRU Default / SIEVE Opt-in) |
 | `compaction.rs` | `CompactionEngine` — Hintergrund-Merge von SSTables (Tiered/Leveled) |
-| `checkpoint.rs` | `pub(crate)` — Internes MVCC-Snapshot-Pinning, **NICHT** die öffentliche Checkpoint-API (die ist in `contextra-checkpoint`) |
+| `checkpoint.rs` | `pub(crate)` — Internes MVCC-Snapshot-Pinning via injiziertem `Clock`-Port (P28, INV-CHECKPOINT-DETERMINISM-1), **NICHT** die öffentliche Checkpoint-API (die ist in `contextra-checkpoint`) |
 | `manifest.rs` | Transaktionale Manifest-Verwaltung für SSTable-Generationen |
 | `tenant_codec.rs` | Tenant-spezifische Key-Präfix-Codierung und Scopes |
 | `system_pressure.rs` | Überwachung von Memory- und Disk-Pressure für Flush/Throttling |
