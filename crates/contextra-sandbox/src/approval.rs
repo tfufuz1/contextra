@@ -286,35 +286,41 @@ mod tests {
         let default_caps = WasmCapabilities::default();
         assert_eq!(classify_risk(&default_caps), ApprovalRisk::Low);
 
-        let mut fs_caps = WasmCapabilities::default();
-        fs_caps.allow_filesystem = true;
+        let fs_caps = WasmCapabilities {
+            allow_filesystem: true,
+            ..Default::default()
+        };
         assert_eq!(classify_risk(&fs_caps), ApprovalRisk::Elevated);
 
-        let mut net_caps = WasmCapabilities::default();
-        net_caps.allow_network = true;
+        let net_caps = WasmCapabilities {
+            allow_network: true,
+            ..Default::default()
+        };
         assert_eq!(classify_risk(&net_caps), ApprovalRisk::High);
 
-        let mut egress_caps = WasmCapabilities::default();
-        egress_caps.allow_cloud_egress = true;
+        let egress_caps = WasmCapabilities {
+            allow_cloud_egress: true,
+            ..Default::default()
+        };
         assert_eq!(classify_risk(&egress_caps), ApprovalRisk::High);
 
-        let mut all_caps = WasmCapabilities::default();
-        all_caps.allow_filesystem = true;
-        all_caps.allow_network = true;
-        all_caps.allow_cloud_egress = true;
+        let all_caps = WasmCapabilities {
+            allow_filesystem: true,
+            allow_network: true,
+            allow_cloud_egress: true,
+            ..Default::default()
+        };
         assert_eq!(classify_risk(&all_caps), ApprovalRisk::High);
     }
 
     #[test]
-    fn test_approve_transition_success_and_double_approve_fails() {
+    fn test_approve_transition_success_and_double_approve_fails() -> Result<(), ApprovalTransitionError> {
         let caps = WasmCapabilities::default();
         let request = ApprovalRequest::new("req-1".to_string(), &caps, 1000, 5000);
 
         assert_eq!(request.status, ApprovalStatus::Pending);
 
-        let approved_req = request
-            .approve("admin_user".to_string(), 2000)
-            .expect("Approval should succeed");
+        let approved_req = request.approve("admin_user".to_string(), 2000)?;
 
         assert_eq!(
             approved_req.status,
@@ -324,20 +330,20 @@ mod tests {
             }
         );
 
-        let second_approval_err = approved_req
-            .approve("second_admin".to_string(), 2500)
-            .expect_err("Double approval must fail");
+        let second_approval_res = approved_req.approve("second_admin".to_string(), 2500);
 
-        match second_approval_err {
-            ApprovalTransitionError::InvalidStateTransition {
-                current_status,
-                target_action,
-            } => {
-                assert_eq!(target_action, "approve");
-                assert!(matches!(current_status, ApprovalStatus::Approved { .. }));
-            }
-            _ => panic!("Expected InvalidStateTransition error"),
-        }
+        assert!(
+            matches!(
+                second_approval_res,
+                Err(ApprovalTransitionError::InvalidStateTransition {
+                    target_action: "approve",
+                    current_status: ApprovalStatus::Approved { .. },
+                })
+            ),
+            "Expected InvalidStateTransition error, got {:?}",
+            second_approval_res
+        );
+        Ok(())
     }
 
     #[test]
@@ -355,45 +361,40 @@ mod tests {
         // Attempting to approve after expiration fails
         let err_approve = request
             .clone()
-            .approve("admin".to_string(), 1500)
-            .expect_err("Approval on expired request must fail");
+            .approve("admin".to_string(), 1500);
 
         assert_eq!(
             err_approve,
-            ApprovalTransitionError::Expired {
+            Err(ApprovalTransitionError::Expired {
                 created_at_unix_ms: 1000,
                 ttl_ms: 500,
                 now_unix_ms: 1500,
-            }
+            })
         );
 
         // Attempting to reject after expiration fails
-        let err_reject = request
-            .reject("admin".to_string(), "too late".to_string(), 1600)
-            .expect_err("Rejection on expired request must fail");
+        let err_reject = request.reject("admin".to_string(), "too late".to_string(), 1600);
 
         assert_eq!(
             err_reject,
-            ApprovalTransitionError::Expired {
+            Err(ApprovalTransitionError::Expired {
                 created_at_unix_ms: 1000,
                 ttl_ms: 500,
                 now_unix_ms: 1600,
-            }
+            })
         );
     }
 
     #[test]
-    fn test_reject_transition_success() {
+    fn test_reject_transition_success() -> Result<(), ApprovalTransitionError> {
         let caps = WasmCapabilities::default();
         let request = ApprovalRequest::new("req-3".to_string(), &caps, 1000, 5000);
 
-        let rejected_req = request
-            .reject(
-                "security_officer".to_string(),
-                "untrusted binary".to_string(),
-                2000,
-            )
-            .expect("Rejection should succeed");
+        let rejected_req = request.reject(
+            "security_officer".to_string(),
+            "untrusted binary".to_string(),
+            2000,
+        )?;
 
         assert_eq!(
             rejected_req.status,
@@ -403,6 +404,7 @@ mod tests {
                 rejected_at_unix_ms: 2000,
             }
         );
+        Ok(())
     }
 
     #[test]
@@ -414,16 +416,20 @@ mod tests {
             "Default capabilities should not require approval"
         );
 
-        let mut net_caps = WasmCapabilities::default();
-        net_caps.allow_network = true;
+        let net_caps = WasmCapabilities {
+            allow_network: true,
+            ..Default::default()
+        };
         let high_net_req = ApprovalRequest::new("req-high-net".to_string(), &net_caps, 1000, 5000);
         assert!(
             high_net_req.requires_approval(),
             "Network access requires approval"
         );
 
-        let mut egress_caps = WasmCapabilities::default();
-        egress_caps.allow_cloud_egress = true;
+        let egress_caps = WasmCapabilities {
+            allow_cloud_egress: true,
+            ..Default::default()
+        };
         let high_egress_req =
             ApprovalRequest::new("req-high-egress".to_string(), &egress_caps, 1000, 5000);
         assert!(
@@ -431,8 +437,10 @@ mod tests {
             "Cloud egress requires approval"
         );
 
-        let mut fs_caps = WasmCapabilities::default();
-        fs_caps.allow_filesystem = true;
+        let fs_caps = WasmCapabilities {
+            allow_filesystem: true,
+            ..Default::default()
+        };
         let elevated_fs_req =
             ApprovalRequest::new("req-elevated-fs".to_string(), &fs_caps, 1000, 5000);
         assert!(
@@ -451,9 +459,11 @@ mod tests {
             "default capabilities"
         );
 
-        let mut custom_caps = WasmCapabilities::default();
-        custom_caps.allow_network = true;
-        custom_caps.max_memory_pages = 64;
+        let custom_caps = WasmCapabilities {
+            allow_network: true,
+            max_memory_pages: 64,
+            ..Default::default()
+        };
         let req_custom = ApprovalRequest::new("req-custom".to_string(), &custom_caps, 1000, 5000);
         assert_eq!(
             req_custom.requested_capabilities_summary,
