@@ -19,6 +19,17 @@ pub enum Transport {
     HttpCloud { url: String },
 }
 
+impl Transport {
+    /// Returns whether this transport represents a cloud endpoint.
+    pub fn is_cloud(&self) -> bool {
+        match self {
+            Self::StdioMcp => false,
+            #[cfg(feature = "cloud-egress-guard")]
+            Self::HttpCloud { .. } => true,
+        }
+    }
+}
+
 impl Default for Transport {
     fn default() -> Self {
         Self::StdioMcp
