@@ -61,6 +61,10 @@ pub struct CompactionConfig {
     /// aller MVCC-Write-Locks. Max. 100 ms Delay pro Iteration.
     /// Verhindert NVMe-Queue-Depth-Sättigung die P95-Lese-Latenz von hybrid_search() erhöht.
     pub max_io_bytes_per_second: Option<u64>,
+    /// Ob die last-adaptive Compaction-Strategie aktiviert ist (Default: false).
+    pub enable_adaptive_compaction: bool,
+    /// Leselast-Schwellenwert (0.0 bis 1.0) zur Aktivierung der lese-optimierten Compaction.
+    pub adaptive_read_ratio_threshold: f64,
 }
 
 impl Default for CompactionConfig {
@@ -74,6 +78,8 @@ impl Default for CompactionConfig {
             max_peak_memory_bytes: Some(256 * 1024 * 1024), // 256MB peak memory limit by default
             max_backpressure_wait: Duration::from_secs(30),
             max_io_bytes_per_second: None,
+            enable_adaptive_compaction: false,
+            adaptive_read_ratio_threshold: 0.70,
         }
     }
 }
