@@ -41,6 +41,8 @@ benchmarks/contextra-bench/tests/data/
 # Cargo fuzz corpus & artifacts
 **/fuzz/corpus/
 **/fuzz/artifacts/
+**/fuzz/Cargo.lock
+coverage.json
 
 # Generierte Benchmark-/Test-Ergebnisse
 results/

@@ -53,6 +53,8 @@ fuzz_target!(|input: HnswFuzzInput| {
             rebuild_threshold: 0.9,
             quantize: input.quantize,
             quantizer_recalibration_sample_size: 100,
+            quantizer_drift_threshold: 0.10,
+            compute_pool: None,
         };
 
         let index = match HnswIndex::try_new(config) {
