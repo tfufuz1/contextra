@@ -270,6 +270,57 @@ impl McpServer {
                                 "type": "object",
                                 "properties": {}
                             }
+                        },
+                        {
+                            "name": "contextra_upsert",
+                            "description": "Insert or update a document idempotently by key.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "id":         { "type": "string" },
+                                    "text":       { "type": "string" },
+                                    "vector":     { "type": "array", "items": { "type": "number" } },
+                                    "collection": { "type": "string", "default": "default" },
+                                    "metadata":   { "type": "object" }
+                                },
+                                "required": ["id"]
+                            }
+                        },
+                        {
+                            "name": "contextra_delete",
+                            "description": "Delete a document with HNSW neighborhood graph repair and issue a cryptographic DeletionProof.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "id":         { "type": "string" },
+                                    "collection": { "type": "string", "default": "default" }
+                                },
+                                "required": ["id"]
+                            }
+                        },
+                        {
+                            "name": "contextra_create_collection",
+                            "description": "Create a new collection with specified DeploymentTier.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "collection":      { "type": "string" },
+                                    "deployment_tier": { "type": "string", "enum": ["EdgeMinimal", "PowerUserLocal", "EnterpriseShared", "EnterpriseRegulated"], "default": "PowerUserLocal" }
+                                },
+                                "required": ["collection"]
+                            }
+                        },
+                        {
+                            "name": "contextra_drop_collection",
+                            "description": "Delete an entire collection and issue a collection-wide cryptographic DeletionProof.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "collection": { "type": "string" },
+                                    "confirm":    { "type": "boolean" }
+                                },
+                                "required": ["collection", "confirm"]
+                            }
                         }
                     ]
                 }),
@@ -325,6 +376,10 @@ impl McpServer {
             | "contextra_cloud_query"
             | "contextra_relate"
             | "contextra_relate_n_ary"
+            | "contextra_upsert"
+            | "contextra_delete"
+            | "contextra_create_collection"
+            | "contextra_drop_collection"
             | "contextra_plugin_status" => {
                 let tool_name = req.method.as_str();
                 match self
