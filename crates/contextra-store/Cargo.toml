@@ -35,6 +35,7 @@ bytes = { workspace = true }
 blake3 = { workspace = true }
 crc32fast = { workspace = true }
 parking_lot = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true }
 memmap2 = { workspace = true }
 tracing = { workspace = true }
@@ -51,6 +52,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 [dev-dependencies]
 contextra-testkit = { workspace = true }
 libc = "0.2"
+serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio"] }

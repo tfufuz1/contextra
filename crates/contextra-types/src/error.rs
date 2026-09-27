@@ -237,9 +237,9 @@ pub enum ContextraError {
         tx_id: u64,
     },
 
-    /// KV cache quantization or dequantization error.
-    #[error("KV quantization error: {0}")]
-    KvQuantization(String),
+    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit `deletion_proof_active`.
+    #[error("KV delete mode configuration error: {0}")]
+    KvDeleteModeConfig(&'static str),
 }
 
 impl ContextraError {

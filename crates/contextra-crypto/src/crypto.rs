@@ -377,6 +377,11 @@ impl KeyManager {
         self.nonce_counter.store(0, Ordering::SeqCst);
     }
 
+    /// Access master PRK key bytes for sub-key derivation within contextra-crypto.
+    pub(crate) fn master_key_bytes(&self) -> &[u8] {
+        self.key.as_bytes()
+    }
+
     /// Provides access to the key bytes ONLY during testing.
     #[cfg(any(test, feature = "test-utils"))]
     pub fn inspect_key_bytes_for_test(&self) -> &[u8; 32] {

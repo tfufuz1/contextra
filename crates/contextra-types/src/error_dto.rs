@@ -304,9 +304,9 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "tx_id": tx_id,
                 })),
             },
-            ContextraError::KvQuantization(msg) => Self {
-                kind: "KvQuantization".to_string(),
-                message: msg.clone(),
+            ContextraError::KvDeleteModeConfig(msg) => Self {
+                kind: "KvDeleteModeConfig".to_string(),
+                message: msg.to_string(),
                 details: None,
             },
         }
