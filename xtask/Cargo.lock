@@ -556,6 +556,7 @@ dependencies = [
  "blake3",
  "bytes",
  "contextra-core",
+ "contextra-ports",
  "contextra-sys",
  "crc32fast",
  "lru",

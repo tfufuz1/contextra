@@ -925,7 +925,7 @@ impl McpServer {
                 let reg_ref = match registry {
                     Some(r) => r,
                     None => {
-                        empty_registry = contextra_ports::plugin::PluginRegistry::default();
+                        empty_registry = contextra_ports::plugin::PluginRegistry::new(std::sync::Arc::new(contextra_license::OpenFastGate));
                         &empty_registry
                     }
                 };

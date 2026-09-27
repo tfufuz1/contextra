@@ -972,6 +972,7 @@ dependencies = [
  "contextra-crypto",
  "contextra-infer-candle",
  "contextra-infer-onnx",
+ "contextra-license",
  "contextra-ports",
  "contextra-privacy",
  "contextra-rank",

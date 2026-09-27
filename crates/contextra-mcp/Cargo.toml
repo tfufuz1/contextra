@@ -19,6 +19,7 @@ docid-128 = ["contextra-types/docid-128"]
 contextra = { workspace = true, features = ["ollama", "router"] }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-license = { workspace = true }
 contextra-wire = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-adapt = { workspace = true }
