@@ -1,6 +1,7 @@
 use super::config::LsmConfig;
 use super::group_commit::PendingCommitQueue;
 use super::guard::LsmState;
+use super::observer::WalObserver;
 use crate::compaction::CompactionEngine;
 use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::Wal;
@@ -40,6 +41,7 @@ pub struct LsmStorage {
     pub(super) wal_queue_depth: Arc<std::sync::atomic::AtomicUsize>,
     pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
+    pub(super) observers: parking_lot::RwLock<Vec<Arc<dyn WalObserver>>>,
 }
 
 impl Drop for LsmStorage {

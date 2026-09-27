@@ -28,7 +28,38 @@ pub const PID_MIN_POOL_SIZE_DEFAULT: usize = 50;
 /// Maximale Kandidaten-Pool-Größe.
 pub const PID_MAX_POOL_SIZE_DEFAULT: usize = 200;
 
+/// Erweitert PID-Regler um konditionelles Anti-Windup bei Aktuatorsättigung.
+///
+/// Unterschied zu einfachem Integral-Clamping: Der Integrator akkumuliert
+/// NUR, wenn die Stellgröße nicht gesättigt ist — verhindert träges Abklingen
+/// nach I/O-Spitzen (Back-Calculation Anti-Windup Pattern).
+///
+/// # P28-Konformität
+/// `dt` MUSS aus einem injizierten Clock-Port abgeleitet werden, nicht aus
+/// `SystemTime::now()` direkt.
+pub trait AntiWindupController: Send + Sync {
+    /// Aktualisiert den Regler mit konditionellem Integrator-Update.
+    ///
+    /// `dt`: Zeitdelta seit letztem Update (aus injiziertem Clock-Port).
+    /// `measured_latency_ms`: gemessene Latenz in Millisekunden.
+    /// `is_actuator_saturated`: true, wenn die Stellgröße am konfigurierten
+    ///   Limit liegt (Pool-Größe = max oder = min).
+    ///
+    /// Gibt die neue Pool-Größe zurück.
+    fn update_with_anti_windup(
+        &mut self,
+        dt: Duration,
+        measured_latency_ms: f32,
+        is_actuator_saturated: bool,
+    ) -> usize;
+}
+
 /// PID-Regler zur dynamischen Steuerung der Reranking-Kandidatenpool-Größe basierend auf Latenzmessungen.
+///
+/// # Anti-Windup Strategien
+/// - Standard-Methode [`update`](Self::update): Nutzt einfaches Integrations-Clamping auf `[-max_integral, max_integral]`.
+/// - Erweiterte Methode [`update_with_anti_windup`](AntiWindupController::update_with_anti_windup): Stoppt die
+///   Integrationsakkumulation vollständig, sobald `is_actuator_saturated = true` signalisiert wird (Back-Calculation Pattern).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PidController {
     /// Proportionaler Gewichtsbeiwert $K_p$.
@@ -129,6 +160,40 @@ impl PidController {
         self.integral = 0.0;
         self.prev_error = 0.0;
         self.current_pool_size = None;
+    }
+}
+
+impl AntiWindupController for PidController {
+    fn update_with_anti_windup(
+        &mut self,
+        dt: Duration,
+        measured_latency_ms: f32,
+        is_actuator_saturated: bool,
+    ) -> usize {
+        let current_pool = self.current_pool_size.unwrap_or(self.min_pool_size);
+        if !measured_latency_ms.is_finite() {
+            return current_pool;
+        }
+
+        let dt_s = dt.as_secs_f32().clamp(0.001, 10.0);
+        let error = self.target_latency_ms - measured_latency_ms;
+
+        if !is_actuator_saturated {
+            self.integral =
+                (self.integral + error * dt_s).clamp(-self.max_integral, self.max_integral);
+        }
+
+        let derivative = (error - self.prev_error) / dt_s;
+        let u = self.kp * error + self.ki * self.integral + self.kd * derivative;
+        self.prev_error = error;
+
+        let new_size = (current_pool as f32 + u).round() as isize;
+        let min_s = self.min_pool_size as isize;
+        let max_s = self.max_pool_size as isize;
+
+        let clamped = new_size.clamp(min_s, max_s) as usize;
+        self.current_pool_size = Some(clamped);
+        clamped
     }
 }
 

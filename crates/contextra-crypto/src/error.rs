@@ -51,6 +51,9 @@ pub enum CryptoError {
 
     #[error("unsupported deletion proof version for external verification: {0}")]
     UnsupportedProofVersion(u8),
+
+    #[error("WAL truncation detected: tail HMAC mismatch")]
+    WalTruncationDetected,
 }
 
 impl CryptoError {
