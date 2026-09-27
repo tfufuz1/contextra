@@ -657,7 +657,11 @@ impl BanditProfileState {
             }
             BanditImplementation::SketchedProjection { projected_dim } => {
                 self.ensure_sketched_state(projected_dim)?;
-                let sketch = self.sketch_matrix.as_ref().unwrap().clone();
+                let sketch = self.sketch_matrix.as_ref().ok_or_else(|| {
+                    BanditError::InvalidConfig(
+                        "sketch_matrix missing after ensure_sketched_state".into(),
+                    )
+                })?.clone();
                 let rx = sketch.project(x);
                 let k = projected_dim;
 
@@ -1118,6 +1122,22 @@ mod tests {
                 assert_eq!(updates_since_reset, 1001);
             }
             other => panic!("Expected PrecisionMatrixDriftDetected, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_sketched_projection_invalid_projected_dim_returns_error() {
+        let d = 4;
+        let mut state = BanditProfileState::cold_start(d, 0.5);
+        state.implementation = BanditImplementation::SketchedProjection { projected_dim: 0 };
+
+        let x = vec![1.0f32; d];
+        let res = state.update(&x, 1.0, 0.0, false);
+        match res {
+            Err(BanditError::InvalidConfig(msg)) => {
+                assert!(msg.contains("projected_dim must be in (0, original_dim]"));
+            }
+            other => panic!("Expected InvalidConfig error for projected_dim=0, got {:?}", other),
         }
     }
 
