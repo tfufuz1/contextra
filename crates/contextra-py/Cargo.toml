@@ -12,7 +12,7 @@ description = "Python bindings for Contextra using PyO3"
 
 [lib]
 name = "_contextra"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 test = false
 doctest = false
 

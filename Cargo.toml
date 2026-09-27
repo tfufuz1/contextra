@@ -28,6 +28,7 @@ members = [
     "crates/contextra-ports",
     "crates/contextra-mvcc",
     "crates/contextra-adapt",
+    "crates/contextra-adapters",
     "crates/contextra-kvcache",
     "crates/contextra-engine",
     "crates/contextra-cognition",
