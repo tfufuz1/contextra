@@ -3,10 +3,10 @@
 // INVARIANTEN: Der Hash-Trace ist vollkommen deterministisch aus Payload, Regel-ID und injiziertem Clock-Zeitstempel.
 // Kein thread_rng(), kein Random-Nonce, Zero-Panic.
 
-use contextra_ports::Clock;
 use crate::egress_vault::{
     BlockReason, BoxFuture, EgressClassification, EgressClassifier, EgressVault,
 };
+use contextra_ports::Clock;
 
 /// Extrahiert eine stabile, nicht-leere Regel-Kennung aus einer `EgressClassification`.
 pub fn extract_rule_id(classification: &EgressClassification) -> String {

@@ -64,10 +64,16 @@ async fn test_audit_trace_negatives() -> Result<(), Box<dyn std::error::Error>> 
 
     let (class_sk, trace_sk_t1) = vault.classify_with_trace(payload_sk, &clock1).await;
     let (_, trace_sk_t2) = vault.classify_with_trace(payload_sk, &clock2).await;
-    assert_ne!(trace_sk_t1, trace_sk_t2, "Different timestamps must yield different traces");
+    assert_ne!(
+        trace_sk_t1, trace_sk_t2,
+        "Different timestamps must yield different traces"
+    );
 
     let (class_aws, trace_aws_t1) = vault.classify_with_trace(payload_aws, &clock1).await;
-    assert_ne!(trace_sk_t1, trace_aws_t1, "Different payloads/rules must yield different traces");
+    assert_ne!(
+        trace_sk_t1, trace_aws_t1,
+        "Different payloads/rules must yield different traces"
+    );
 
     let rule_sk = extract_rule_id(&class_sk);
     let rule_aws = extract_rule_id(&class_aws);
@@ -100,7 +106,8 @@ async fn test_audit_trace_parity_with_classify() -> Result<(), Box<dyn std::erro
 }
 
 #[tokio::test]
-async fn test_audit_trace_empty_and_max_boundary_no_panic() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_audit_trace_empty_and_max_boundary_no_panic() -> Result<(), Box<dyn std::error::Error>>
+{
     let vault = EgressVault::try_default()?;
     let clock = FixedClock::new(500);
 

@@ -3,9 +3,7 @@
 
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::kv_cipher::ModelFingerprint;
-use contextra_privacy::egress_gateway::{
-    handle_cloud_query_scoped, CloudQueryRequest,
-};
+use contextra_privacy::egress_gateway::{handle_cloud_query_scoped, CloudQueryRequest};
 use contextra_privacy::egress_vault::{
     BlockReason, EgressClassification, EgressVault, EgressVaultError, NoOpRecognizer,
 };
@@ -51,7 +49,9 @@ async fn test_egress_vault_classify_scoped_isolation() {
     let scoped_payload = TenantScoped::new(tenant_a, payload);
 
     // 1. Success path: Matching TenantId returns Allow
-    let res_ok = vault.classify_scoped(scoped_payload.clone(), &tenant_a).await;
+    let res_ok = vault
+        .classify_scoped(scoped_payload.clone(), &tenant_a)
+        .await;
     assert_eq!(res_ok, EgressClassification::Allow);
 
     // 2. Cross-tenant isolation failure: Mismatched TenantId returns PolicyDenied Block
@@ -73,7 +73,8 @@ fn test_egress_vault_sanitize_scoped_isolation() {
     let scoped_payload = TenantScoped::new(tenant_a, payload);
 
     // 1. Success path: Matching TenantId sanitizes and returns TenantScoped<String>
-    let res_ok = vault.sanitize_and_vault_scoped(scoped_payload.clone(), &tenant_a, &NoOpRecognizer);
+    let res_ok =
+        vault.sanitize_and_vault_scoped(scoped_payload.clone(), &tenant_a, &NoOpRecognizer);
     assert!(res_ok.is_ok());
     let (sanitized_scoped, _count) = res_ok.expect("sanitized result");
     assert_eq!(sanitized_scoped.tenant_id(), &tenant_a);
@@ -86,7 +87,8 @@ fn test_egress_vault_sanitize_scoped_isolation() {
 }
 
 #[tokio::test]
-async fn test_key_manager_derive_kv_key_scoped_isolation() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_key_manager_derive_kv_key_scoped_isolation() -> Result<(), Box<dyn std::error::Error>>
+{
     let tenant_a = TenantId::try_new(100).expect("tenant_a");
     let tenant_b = TenantId::try_new(200).expect("tenant_b");
 
