@@ -1,5 +1,8 @@
+use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
-use super::super::group_commit::{GroupCommitRequest, PendingCommitQueue, WalQueueGuard};
+use super::super::group_commit::{
+    execute_group_commit_append, GroupCommitRequest, PendingCommitQueue, WalQueueGuard,
+};
 use super::super::guard::CommitGuard;
 use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
@@ -261,7 +264,19 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {
-        if let Err(e) = wal.append_batch(wal_entries).await {
+        let single_append_res = match storage.config.durability_mode {
+            DurabilityMode::Full => wal.append_batch(wal_entries).await,
+            DurabilityMode::WalNoHmac => {
+                let res = wal.append_batch(wal_entries).await;
+                if res.is_ok() {
+                    let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
+                }
+                res
+            }
+            DurabilityMode::MemoryOnly => Ok(()),
+        };
+
+        if let Err(e) = single_append_res {
             let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
             let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
             let commit_guard = CommitGuard {
@@ -385,9 +400,14 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let truncate_guard = wal.truncate_lock.lock().await;
         drop(_commit_lock);
 
-        let append_res = wal
-            .append_batch_locked(all_wal_entries, &truncate_guard)
-            .await;
+        let append_res = execute_group_commit_append(
+            &wal,
+            storage.config.durability_mode,
+            all_wal_entries,
+            &truncate_guard,
+            pending_queue.first_prev_hmac,
+        )
+        .await;
         drop(truncate_guard);
 
         if let Err(e) = append_res {

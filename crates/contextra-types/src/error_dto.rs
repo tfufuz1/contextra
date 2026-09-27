@@ -309,6 +309,21 @@ impl From<&ContextraError> for ContextraErrorDto {
                 message: msg.to_string(),
                 details: None,
             },
+            ContextraError::KvQuantization(msg) => Self {
+                kind: "KvQuantization".to_string(),
+                message: msg.clone(),
+                details: None,
+            },
+            ContextraError::DurabilityConfig(msg) => Self {
+                kind: "DurabilityConfig".to_string(),
+                message: msg.clone(),
+                details: None,
+            },
+            ContextraError::Plugin(msg) => Self {
+                kind: "Plugin".to_string(),
+                message: msg.clone(),
+                details: None,
+            },
         }
     }
 }
@@ -442,6 +457,14 @@ mod tests {
             (
                 ContextraError::KvQuantization("quant error".into()),
                 "KvQuantization",
+            ),
+            (
+                ContextraError::DurabilityConfig("durability error".into()),
+                "DurabilityConfig",
+            ),
+            (
+                ContextraError::Plugin("plugin error".into()),
+                "Plugin",
             ),
         ];
 

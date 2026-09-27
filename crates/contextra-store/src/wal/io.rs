@@ -1,5 +1,5 @@
 use contextra_core::{ContextraError, Result, TxId};
-#[cfg(feature = "encryption-at-rest")]
+#[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -9,7 +9,7 @@ use super::{
     PreparedBatch, Wal, WalCommand, WalEntry, WalOp, WalVersion,
     MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
 };
-#[cfg(feature = "encryption-at-rest")]
+#[cfg(feature = "wal-integrity")]
 use super::legacy_integrity_key;
 
 #[cfg(feature = "fault-injection")]
@@ -41,10 +41,10 @@ where
         return Ok(version);
     }
 
-    #[cfg(feature = "encryption-at-rest")]
+    #[cfg(feature = "wal-integrity")]
     let key_manager = _key_manager;
 
-    #[cfg(feature = "encryption-at-rest")]
+    #[cfg(feature = "wal-integrity")]
     let integrity_key = if let Some(km) = key_manager {
         km.integrity_key()?
     } else if let Some(key) = fallback_integrity_key {
@@ -53,7 +53,7 @@ where
         return Err(ContextraError::Storage("No integrity key available".into()));
     };
 
-    #[cfg(feature = "encryption-at-rest")]
+    #[cfg(feature = "wal-integrity")]
     let mut verifier = IntegrityVerifier::new(&integrity_key);
     let mut using_legacy_key = false;
     let _ = (path, fallback_integrity_key, allow_legacy_integrity_key_fallback, &mut using_legacy_key);
@@ -145,7 +145,7 @@ where
         let chunk_start_pos = pos;
         pos += (4 + len) as u64;
 
-        #[cfg(feature = "encryption-at-rest")]
+        #[cfg(feature = "wal-integrity")]
         {
             if let (Some(km), WalVersion::V2 | WalVersion::V3) = (key_manager, version) {
                 if entry_data_raw.len() < 12 {
@@ -452,6 +452,26 @@ where
                 if !callback(seq, entry, pos) {
                     break 'scan_loop;
                 }
+            }
+        }
+        #[cfg(not(feature = "wal-integrity"))]
+        {
+            let entry = match WalEntry::from_bytes(&entry_data_raw) {
+                Ok(e) => e,
+                Err(e) => {
+                    if let Some(err) =
+                        Wal::handle_wal_entry_parse_error(e, chunk_start_pos, pos, file_size)
+                    {
+                        return Err(err);
+                    }
+                    break;
+                }
+            };
+
+            entries_count += 1;
+            let seq = entry.seq_no;
+            if !callback(seq, entry, pos) {
+                break 'scan_loop;
             }
         }
     }

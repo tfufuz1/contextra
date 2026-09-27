@@ -19,13 +19,17 @@ windows-sys = { version = "0.61", features = [
 
 [features]
 default = []
-encryption-at-rest = ["dep:contextra-crypto"]
+encryption-at-rest = ["wal-integrity"]
+wal-integrity = ["dep:contextra-crypto"]
+deletion-proof = ["dep:contextra-crypto", "wal-integrity"]
+memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
 docid-128 = ["contextra-core/docid-128"]
 
 [dependencies]
+contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }
 contextra-core = { workspace = true }
 ahash = { workspace = true }

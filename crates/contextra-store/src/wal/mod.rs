@@ -232,16 +232,16 @@ pub(crate) mod fs {
 }
 
 use contextra_core::{ContextraError, Result};
-#[cfg(feature = "encryption-at-rest")]
+#[cfg(feature = "wal-integrity")]
 pub use contextra_crypto::crypto::KeyManager;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-#[cfg(not(feature = "encryption-at-rest"))]
+#[cfg(not(feature = "wal-integrity"))]
 #[derive(Debug, Clone)]
 pub struct KeyManager;
 
-#[cfg(not(feature = "encryption-at-rest"))]
+#[cfg(not(feature = "wal-integrity"))]
 impl KeyManager {
     pub fn try_new(_passphrase: &str, _salt: &[u8]) -> Result<Self> {
         Ok(Self)
@@ -364,7 +364,7 @@ impl Wal {
     ) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
 
-        #[cfg(feature = "encryption-at-rest")]
+        #[cfg(feature = "wal-integrity")]
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
             let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
@@ -373,7 +373,7 @@ impl Wal {
             (None, Some(key))
         };
 
-        #[cfg(not(feature = "encryption-at-rest"))]
+        #[cfg(not(feature = "wal-integrity"))]
         let (derived_key_manager, fallback_integrity_key) = {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
@@ -428,7 +428,7 @@ impl Wal {
         // filename.  This makes the WAL's cryptographic sub-key independent of
         // the filesystem path — renaming or moving the file cannot cause nonce-
         // reuse between two WAL instances sharing the same master key.
-        #[cfg(feature = "encryption-at-rest")]
+        #[cfg(feature = "wal-integrity")]
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
             let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
@@ -437,7 +437,7 @@ impl Wal {
             (None, Some(key))
         };
 
-        #[cfg(not(feature = "encryption-at-rest"))]
+        #[cfg(not(feature = "wal-integrity"))]
         let (derived_key_manager, fallback_integrity_key) = {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
