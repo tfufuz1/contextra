@@ -1,0 +1,21 @@
+name: VETO Review Deadline Gate
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # täglich 06:00 UTC — Frist ist auf Tagesebene relevant, kein PR-Trigger nötig
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+      # Note: check-veto-deadlines will be wired in main.rs in a separate prompt; this workflow will fail until that wiring is completed.
+      - name: Check VETO review deadlines
+        run: cargo xtask check-veto-deadlines
