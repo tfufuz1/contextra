@@ -514,8 +514,8 @@ mod tests {
             ),
             (
                 ContextraError::CrossDeviceLink {
-                    source_path: "/a/1.sst".into(),
-                    target_path: "/b/1.sst".into(),
+                    source_path: "/a".into(),
+                    target_path: "/b".into(),
                 },
                 "CrossDeviceLink",
             ),

@@ -67,9 +67,68 @@ impl Default for WasmCapabilities {
     }
 }
 
+impl WasmCapabilities {
+    /// Returns a strict `WasmCapabilities` preset for pure merge operators.
+    pub fn pure_merge_operator() -> Self {
+        MergeOperatorCapabilities::pure()
+    }
+}
+
+/// Dedicated pure capabilities preset for I/O-free WASM Merge Operators (§4.18).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MergeOperatorCapabilities;
+
+impl MergeOperatorCapabilities {
+    /// Returns a strict `WasmCapabilities` preset for pure merge operators.
+    ///
+    /// # Security Profile
+    /// - `allow_stdout`: `false`
+    /// - `allow_stderr`: `false`
+    /// - `allow_filesystem`: `false`
+    /// - `allow_network`: `false`
+    /// - `allow_clock`: `false` (no `clock_time_get` WASI access)
+    /// - `random_seed`: `None` (no PRNG access)
+    /// - `allow_cloud_egress`: `false`
+    /// - `max_memory_pages`: `16` (1 MB)
+    /// - `max_fuel`: `10_000_000`
+    /// - `max_wall_clock_ms`: `5_000`
+    pub fn pure() -> WasmCapabilities {
+        WasmCapabilities {
+            allow_stdout: false,
+            allow_stderr: false,
+            max_memory_pages: 16, // 1 MB
+            max_fuel: 10_000_000,
+            allow_filesystem: false,
+            allow_network: false,
+            allow_clock: false,
+            allow_cloud_egress: false,
+            max_wall_clock_ms: 5_000,
+            max_module_size_bytes: 10 * 1024 * 1024,
+            max_table_entries: 10_000,
+            max_output_bytes: 1024 * 1024,
+            max_stdin_bytes: 1024 * 1024,
+            random_seed: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_merge_operator_capabilities_pure_strictness() {
+        let caps = MergeOperatorCapabilities::pure();
+        assert!(!caps.allow_stdout, "stdout must be disabled for pure merge operators");
+        assert!(!caps.allow_stderr, "stderr must be disabled for pure merge operators");
+        assert!(!caps.allow_filesystem, "filesystem must be disabled");
+        assert!(!caps.allow_network, "network must be disabled");
+        assert!(!caps.allow_clock, "clock access must be disabled");
+        assert!(!caps.allow_cloud_egress, "cloud egress must be disabled");
+        assert!(caps.random_seed.is_none(), "random seed must be None");
+        assert_eq!(caps.max_fuel, 10_000_000);
+        assert_eq!(caps.max_wall_clock_ms, 5_000);
+    }
 
     #[test]
     fn test_wasm_capabilities_default_cloud_egress_is_false() {
