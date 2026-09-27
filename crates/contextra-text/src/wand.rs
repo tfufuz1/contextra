@@ -507,7 +507,18 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                             }
                         };
 
-                        if !is_tombstone {
+                        let is_posting_valid = if !is_latest {
+                            let prefix = prefix_helper(&c.term);
+                            let mut key = Vec::with_capacity(prefix.len() + 20);
+                            key.extend_from_slice(&prefix);
+                            let mut itoa_buf = itoa::Buffer::new();
+                            key.extend_from_slice(itoa_buf.format(doc_id.inner()).as_bytes());
+                            storage.get_at_seq(&key, seq).await?.is_some()
+                        } else {
+                            true
+                        };
+
+                        if !is_tombstone && is_posting_valid {
                             let score = score_term(
                                 posting.tf,
                                 posting.doc_len,
