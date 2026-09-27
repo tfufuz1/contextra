@@ -343,6 +343,15 @@ pub enum ContextraError {
         /// Actual computed WAL tail HMAC after replay.
         actual_hmac: [u8; 32],
     },
+
+    /// Cross-device hard link failure across distinct filesystems or mount points.
+    #[error("Cross-device link failed: cannot hard link '{source_path}' to '{target_path}' across distinct filesystems/mounts")]
+    CrossDeviceLink {
+        /// Source path being linked.
+        source_path: String,
+        /// Target path for the link.
+        target_path: String,
+    },
 }
 
 impl ContextraError {
@@ -422,6 +431,14 @@ impl ContextraError {
     /// Creates a `PinBudgetExceeded` error.
     pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
         Self::PinBudgetExceeded(msg.into())
+    }
+
+    /// Creates a `CrossDeviceLink` error.
+    pub fn cross_device_link(source_path: impl Into<String>, target_path: impl Into<String>) -> Self {
+        Self::CrossDeviceLink {
+            source_path: source_path.into(),
+            target_path: target_path.into(),
+        }
     }
 
     /// Creates a `WalTruncationDetected` error.
