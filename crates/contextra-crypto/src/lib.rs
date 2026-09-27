@@ -37,13 +37,11 @@ pub use deletion_proof::{
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use kv_cipher::{EncryptedKvLayer, KvCipher, KvSegmentCipher, ModelFingerprint};
-pub use kv_shredding::{
-    derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE,
-};
 pub use kv_segment::{
     eviction_worker::{emergency_wipe, EvictionWorker},
     segment::KvSegment,
     store::TenantIsolatedKvStore,
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
+pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};
 pub use wal_completeness::verify_wal_chain_completeness;

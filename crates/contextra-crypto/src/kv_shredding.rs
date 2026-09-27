@@ -74,17 +74,19 @@ impl KeyRegistry {
     /// If the key does not exist or was revoked, derives a new sub-key from `master_key` and stores it.
     pub fn get_or_derive(&self, master_key: &KeyManager, group_id: u64) -> Result<SubKey> {
         {
-            let read_guard = self.entries.read().map_err(|_| {
-                CryptoError::Crypto("KeyRegistry read lock poisoned".to_string())
-            })?;
+            let read_guard = self
+                .entries
+                .read()
+                .map_err(|_| CryptoError::Crypto("KeyRegistry read lock poisoned".to_string()))?;
             if let Some(key) = read_guard.get(&group_id) {
                 return Ok(key.clone());
             }
         }
 
-        let mut write_guard = self.entries.write().map_err(|_| {
-            CryptoError::Crypto("KeyRegistry write lock poisoned".to_string())
-        })?;
+        let mut write_guard = self
+            .entries
+            .write()
+            .map_err(|_| CryptoError::Crypto("KeyRegistry write lock poisoned".to_string()))?;
         if let Some(key) = write_guard.get(&group_id) {
             return Ok(key.clone());
         }
@@ -148,9 +150,11 @@ impl KeyRegistry {
             .read()
             .map_err(|_| CryptoError::Crypto("KeyRegistry read lock poisoned".to_string()))?;
 
-        let subkey = read_guard
-            .get(&group_id)
-            .ok_or_else(|| CryptoError::Crypto(format!("Sub-key for group {group_id} has been revoked or is missing")))?;
+        let subkey = read_guard.get(&group_id).ok_or_else(|| {
+            CryptoError::Crypto(format!(
+                "Sub-key for group {group_id} has been revoked or is missing"
+            ))
+        })?;
 
         let cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv init failed: {e}")))?;

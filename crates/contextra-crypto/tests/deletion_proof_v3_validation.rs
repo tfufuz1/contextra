@@ -36,10 +36,15 @@ fn test_create_v3_with_empty_graph_repair_for_hnsw_layer_fails() {
     );
 
     match res {
-        Err(ContextraError::GraphRepairFailed(HnswDeletionError::VerificationFailed { remaining_pointers })) => {
+        Err(ContextraError::GraphRepairFailed(HnswDeletionError::VerificationFailed {
+            remaining_pointers,
+        })) => {
             assert_eq!(remaining_pointers, 1);
         }
-        other => panic!("Expected ContextraError::GraphRepairFailed(VerificationFailed), got {:?}", other),
+        other => panic!(
+            "Expected ContextraError::GraphRepairFailed(VerificationFailed), got {:?}",
+            other
+        ),
     }
 }
 
@@ -52,9 +57,8 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
         tenant_id,
     };
 
-    let layer_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
-    ];
+    let layer_proofs =
+        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap()];
 
     let graph_repair = vec![GraphRepairAttestation {
         doc_id: DocId::new(42),
