@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_core::{
     snapshot::SnapshotRegistry,
     tx_buffer::{IndexOp, TxBuffer},

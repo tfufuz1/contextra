@@ -198,8 +198,8 @@ impl PluginRegistry {
                 }
                 if plugin_map.contains_key(&req_str) {
                     // req_str must come before p_name
-                    if let Some(vec) = adj.get_mut(&req_str) {
-                        vec.push(p_name.clone());
+                    if let Some(v) = adj.get_mut(&req_str) {
+                        v.push(p_name.clone());
                     }
                     if let Some(deg) = in_degree.get_mut(p_name) {
                         *deg += 1;
@@ -230,7 +230,7 @@ impl PluginRegistry {
             if let Some(neighbors) = adj.get(&next_name) {
                 for neighbor in neighbors {
                     if let Some(deg) = in_degree.get_mut(neighbor) {
-                        *deg -= 1;
+                        *deg = deg.saturating_sub(1);
                         if *deg == 0 {
                             ready.insert(neighbor.clone());
                         }
