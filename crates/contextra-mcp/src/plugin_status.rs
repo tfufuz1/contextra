@@ -21,6 +21,17 @@ pub struct PluginStatusEntry {
     pub feature_ring_required: contextra_ports::license::FeatureRing,
 }
 
+impl From<contextra_ports::plugin::PluginCapability> for PluginStatusEntry {
+    fn from(cap: contextra_ports::plugin::PluginCapability) -> Self {
+        Self {
+            name: cap.name.to_string(),
+            version: format!("{}.{}.{}", cap.version.0, cap.version.1, cap.version.2),
+            ring: cap.ring,
+            feature_ring_required: cap.feature_ring_required,
+        }
+    }
+}
+
 /// Handler for the `contextra_plugin_status` MCP tool call.
 pub async fn handle_plugin_status(
     registry: &contextra_ports::plugin::PluginRegistry,

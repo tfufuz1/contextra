@@ -106,7 +106,7 @@ pub fn run_reproducible_build_check(args: &[String]) -> bool {
     }
 }
 
-fn execute_build(root_dir: &Path, target_dir: &Path, package: Option<&str>) -> bool {
+pub fn execute_build(root_dir: &Path, target_dir: &Path, package: Option<&str>) -> bool {
     let mut cmd = Command::new("cargo");
     cmd.current_dir(root_dir);
     cmd.arg("build");
@@ -122,8 +122,10 @@ fn execute_build(root_dir: &Path, target_dir: &Path, package: Option<&str>) -> b
         cmd.arg("--workspace");
     }
 
-    // Pass deterministic RUSTFLAGS
-    cmd.env("RUSTFLAGS", "--remap-path-prefix .=.");
+    let remap = format!("--remap-path-prefix {}=/build-root", root_dir.display());
+    cmd.env("RUSTFLAGS", remap);
+    cmd.env("SOURCE_DATE_EPOCH", "1700000000");
+    cmd.env_remove("CARGO_HOME");
 
     let status = cmd.status();
     match status {
@@ -135,7 +137,7 @@ fn execute_build(root_dir: &Path, target_dir: &Path, package: Option<&str>) -> b
     }
 }
 
-fn collect_executable_hashes(release_dir: &Path) -> BTreeMap<String, String> {
+pub fn collect_executable_hashes(release_dir: &Path) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     if !release_dir.is_dir() {
         return map;
@@ -156,7 +158,7 @@ fn collect_executable_hashes(release_dir: &Path) -> BTreeMap<String, String> {
     map
 }
 
-fn is_executable_file(path: &Path) -> bool {
+pub fn is_executable_file(path: &Path) -> bool {
     let file_name = path.file_name().unwrap_or_default().to_string_lossy();
 
     // Skip internal build artifacts
@@ -191,7 +193,7 @@ fn is_executable_file(path: &Path) -> bool {
     true
 }
 
-fn compute_sha256(bytes: &[u8]) -> String {
+pub fn compute_sha256(bytes: &[u8]) -> String {
     let mut h: [u32; 8] = [
         0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
         0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,

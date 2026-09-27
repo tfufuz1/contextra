@@ -105,7 +105,7 @@ mod lint_unsafe_slice_bounds;
 mod migrate_docid_128;
 mod post_merge_report;
 mod record_mutation_score;
-mod reproducible_build;
+use xtask::reproducible_build;
 mod validate_pr_checklist;
 
 pub use check_jules_context_freshness::run_check_jules_context_freshness;
@@ -2091,6 +2091,12 @@ fn main() {
     let subcommand = args.get(1).map(|s| s.as_str()).unwrap_or("sync-docs");
 
     match subcommand {
+        "reproducible-build" | "reproducible-build-check" => {
+            let success = reproducible_build::run_reproducible_build_check(&args[2..]);
+            if !success {
+                process::exit(1);
+            }
+        }
         "debt-audit" => {
             if let Err(e) = gates::debt_audit::run_debt_audit() {
                 eprintln!("{}", e);
