@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 //! Property tests for `PluginRegistry` dependency cycle detection and topological resolution (INV-PLUGIN-DEPENDENCY).
 
 use std::sync::Arc;
@@ -13,11 +15,11 @@ impl LicenseGate for PermissiveLicenseGate {
     }
 }
 
-static STATIC_NAMES: [&'static str; 10] = [
+static STATIC_NAMES: [&str; 10] = [
     "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9",
 ];
 
-static SINGLETON_SLICES: [[&'static str; 1]; 10] = [
+static SINGLETON_SLICES: [[&str; 1]; 10] = [
     ["p0"], ["p1"], ["p2"], ["p3"], ["p4"], ["p5"], ["p6"], ["p7"], ["p8"], ["p9"],
 ];
 
