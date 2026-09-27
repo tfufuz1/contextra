@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn test_single_record() {
         let rec = create_sample_record();
-        let export = generate_registry(&[rec.clone()]);
+        let export = generate_registry(std::slice::from_ref(&rec));
         assert_eq!(export.records.len(), 1);
 
         let md = render_markdown(&export);

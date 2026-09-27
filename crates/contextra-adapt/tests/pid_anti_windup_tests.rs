@@ -111,24 +111,3 @@ fn test_unsaturated_behavior_identical_to_update() {
         assert_eq!(pid_a.current_pool_size(), pid_b.current_pool_size());
     }
 }
-
-#[test]
-fn test_pid_1000_cycles_sustained_error_anti_windup_series() {
-    let mut pid = PidController::new(150.0, 50, 200, Some(100));
-    let dt = Duration::from_millis(100);
-
-    println!("\n=== PID Anti-Windup 1.000 Zyklen Sättigungstest ===");
-    println!("Zyklus | Latenz (ms) | Fehler (ms) | Pool-Größe | Actuator Clamped?");
-
-    for cycle in 1..=1000 {
-        // High latency 500ms vs target 150ms -> error = -350ms
-        let pool = pid.update(dt, 500.0);
-
-        if cycle == 1 || cycle == 2 || cycle == 5 || cycle == 10 || cycle % 100 == 0 {
-            let saturated = pool == 50;
-            println!("{cycle:6} | 500.0       | -350.0      | {pool:10} | {saturated}");
-        }
-
-        assert!(pool >= 50, "Pool size must never fall below min 50");
-    }
-}

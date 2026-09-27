@@ -162,7 +162,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_builder_build_roundtrip() {
+    async fn test_builder_build_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let tmp_path =
             std::env::temp_dir().join(format!("contextra_builder_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp_path);
@@ -171,10 +171,10 @@ mod tests {
             .with_storage_path(&tmp_path)
             .with_distance_metric(DistanceMetric::Cosine)
             .build()
-            .await
-            .expect("build db");
+            .await?;
 
-        assert_eq!(db.len().await.expect("len"), 0);
+        assert_eq!(db.len().await?, 0);
         let _ = std::fs::remove_dir_all(&tmp_path);
+        Ok(())
     }
 }

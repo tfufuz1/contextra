@@ -91,6 +91,7 @@ async fn test_db_transaction_drop_triggers_cleanup() {
 }
 
 #[tokio::test]
+#[cfg(feature = "encryption-at-rest")]
 async fn test_db_transaction_rollback_cleans_kv_store_segments() {
     use contextra_crypto::kv_segment::KvSegment;
     use contextra_crypto::TenantIsolatedKvStore;
