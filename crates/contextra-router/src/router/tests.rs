@@ -2,6 +2,8 @@
 // ZWECK: Unit-Tests für RouterEngine.
 // INVARIANTEN: Instanz-Unabhängigkeit von DecisionIdGeneratoren, Kalibrierungs-Resets.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use super::*;
 use contextra_types::TokenBudget;
 
