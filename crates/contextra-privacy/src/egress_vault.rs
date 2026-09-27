@@ -778,7 +778,10 @@ mod tests {
         if let EgressClassification::Block(BlockReason::PolicyDenied(reason)) = res_mismatch {
             assert!(reason.contains("tenant scope mismatch"));
         } else {
-            panic!("Expected PolicyDenied block for tenant scope mismatch, got {:?}", res_mismatch);
+            panic!(
+                "Expected PolicyDenied block for tenant scope mismatch, got {:?}",
+                res_mismatch
+            );
         }
 
         // sanitize_and_vault_scoped success and mismatch
@@ -791,7 +794,10 @@ mod tests {
         let err_sanitized = vault
             .sanitize_and_vault_scoped(scoped_a, &tenant_b, &NoOpRecognizer)
             .unwrap_err();
-        assert!(matches!(err_sanitized, EgressVaultError::TenantScopeViolation(_)));
+        assert!(matches!(
+            err_sanitized,
+            EgressVaultError::TenantScopeViolation(_)
+        ));
     }
 
     #[test]

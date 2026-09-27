@@ -108,10 +108,7 @@ impl CloudResponseRehydrator {
 }
 
 /// Evaluates whether PII vault data forces CryptoShred mode for an affected document (INV-COLLECTION-PROFILE-3).
-pub fn pii_vault_forces_crypto_shred(
-    is_pii_match: bool,
-    is_memory_only: bool,
-) -> bool {
+pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -> bool {
     is_pii_match && !is_memory_only
 }
 
