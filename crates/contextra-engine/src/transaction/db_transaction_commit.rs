@@ -1,7 +1,11 @@
+use super::compensating_actions::{
+    CommitLedger, CompensateHnswAction, CompensateLsmAction, CompensateTextAction,
+    RollbackStagedAction,
+};
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_types::{ContextraError, Result, TenantId, TxId};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -165,16 +169,15 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 || !hyperedgs.is_empty()
         };
 
-        if let Err(e) = self.commit_text_staged().await {
-            self.rollback_internal().await;
-            return Err(e);
-        }
+        let mut ledger = CommitLedger::new();
+        ledger.push(RollbackStagedAction::new(self.collection.clone(), self.tx_id));
 
-        if let Err(e) = self.commit_graph_staged().await {
-            self.rollback_internal().await;
-            return Err(e);
-        }
-
+        // Phase (a): Write CommitIntent::Pending and commit it to storage durably first (F-20)
+        let intent_tx = TxId::new(
+            self.collection
+                .next_tx
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        );
         let intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
@@ -185,80 +188,102 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             ContextraError::Transaction(format!("Failed to serialize commit intent: {}", e))
         })?;
 
-        self.collection
+        if let Err(e) = self
+            .collection
             .storage
-            .put(self.tx_id, &intent_key, &intent_bytes)
-            .await?;
+            .put(intent_tx, &intent_key, &intent_bytes)
+            .await
+        {
+            ledger.execute_rollback().await;
+            return Err(ContextraError::Transaction(format!(
+                "Failed to write commit intent: {}",
+                e
+            )));
+        }
 
-        if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
-            self.rollback_internal().await;
-            return Err(ContextraError::Transaction(storage_err.to_string()));
+        if let Err(e) = self.collection.storage.commit(intent_tx).await {
+            ledger.execute_rollback().await;
+            return Err(ContextraError::Transaction(format!(
+                "Failed to commit intent transaction: {}",
+                e
+            )));
+        }
+
+        // Phase (b): Execute staged index steps and commit vector, text, graph indices
+        if let Err(e) = self.commit_text_staged().await {
+            ledger.execute_rollback().await;
+            return Err(e);
+        }
+
+        if let Err(e) = self.commit_graph_staged().await {
+            ledger.execute_rollback().await;
+            return Err(e);
         }
 
         if let Err(index_err) = self.collection.index.commit(self.tx_id).await {
-            if let Err(e) = self.collection.index.rollback(self.tx_id).await {
-                tracing::error!(
-                    tx_id = ?self.tx_id,
-                    error = ?e,
-                    "[INV-DB-3] Failed to rollback vector index after commit failure"
-                );
-            }
-            if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
-                tracing::error!(
-                    "[INV-DB-3] CRITICAL: Failed to rollback graph_index after HNSW commit failure: {}",
-                    e
-                );
-            }
-            if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {
-                tracing::error!(
-                    "[INV-DB-3] CRITICAL: Failed to rollback text_index after HNSW commit failure: {}",
-                    e
-                );
-            }
-            self.compensate_lsm(&intent_key, &doc_ids).await;
+            ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
-                "HNSW index commit failed, storage rolled back via compensating tx. Error: {}",
+                "HNSW index commit failed: {}",
                 index_err
             )));
         }
+        let tenant_id = TenantId::try_new(1).unwrap_or_default();
+        ledger.push(CompensateHnswAction::new(
+            self.collection.clone(),
+            tenant_id,
+            Arc::clone(&doc_ids),
+        ));
 
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
-            if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
-                tracing::error!(
-                    "[INV-DB-3] CRITICAL: Failed to rollback graph_index after text commit failure: {}",
-                    e
-                );
-            }
-            if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {
-                tracing::error!(
-                    "[INV-DB-3] CRITICAL: Failed to rollback text_index after text commit failure: {}",
-                    e
-                );
-            }
-            self.compensate_hnsw(&doc_ids).await;
-            self.compensate_lsm(&intent_key, &doc_ids).await;
+            ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
-                "Text index commit failed, storage & HNSW rolled back via compensating tx. Error: {}",
+                "Text index commit failed: {}",
                 text_err
             )));
         }
+        ledger.push(CompensateTextAction::new(
+            self.collection.clone(),
+            Arc::clone(&doc_ids),
+        ));
 
         if let Err(graph_err) = self.collection.graph_index.commit(self.tx_id).await {
-            if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
-                tracing::error!(
-                    "[INV-DB-3] CRITICAL: Failed to rollback graph_index after graph commit failure: {}",
-                    e
-                );
-            }
-            self.compensate_text(&doc_ids).await;
-            self.compensate_hnsw(&doc_ids).await;
-            self.compensate_lsm(&intent_key, &doc_ids).await;
+            ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
-                "Graph index commit failed, storage, HNSW & text index rolled back via compensating tx. Error: {}",
+                "Graph index commit failed: {}",
                 graph_err
             )));
         }
 
+        // Phase (c): Commit storage
+        let f_keys = {
+            let mut guard = match self.staged_forward_keys.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            std::mem::take(&mut *guard)
+        };
+        let r_keys = {
+            let mut guard = match self.staged_reverse_keys.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            std::mem::take(&mut *guard)
+        };
+
+        if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
+            ledger.execute_rollback().await;
+            return Err(ContextraError::Transaction(storage_err.to_string()));
+        }
+
+        ledger.push(CompensateLsmAction::new(
+            self.collection.clone(),
+            intent_key.clone(),
+            Arc::clone(&doc_ids),
+            f_keys,
+            r_keys,
+        ));
+
+        // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(
             self.collection
                 .next_tx
@@ -271,19 +296,35 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 b"{}".to_vec()
             }
         };
-        if let Err(e) = self
-            .collection
-            .storage
-            .put(cleanup_tx, &intent_key, &commit_bytes)
-            .await
-        {
-            tracing::warn!("Failed to write committed intent marker: {}", e);
+
+        let mut committed_marker_written = false;
+        let max_retries = 3;
+        for attempt in 1..=max_retries {
+            let put_res = self
+                .collection
+                .storage
+                .put(cleanup_tx, &intent_key, &commit_bytes)
+                .await;
+            if put_res.is_ok() {
+                if let Ok(()) = self.collection.storage.commit(cleanup_tx).await {
+                    committed_marker_written = true;
+                    break;
+                }
+            }
+            if attempt < max_retries {
+                tokio::time::sleep(std::time::Duration::from_millis(50 * attempt as u64)).await;
+            }
         }
 
-        if let Err(e) = self.collection.storage.commit(cleanup_tx).await {
-            tracing::warn!("Failed to commit cleanup transaction: {}", e);
+        if !committed_marker_written {
+            tracing::error!(
+                tx_id = ?self.tx_id,
+                "[T-06] Failed to write CommitIntent::Committed after {} attempts; transaction marked as commit-uncertain for recovery inspection",
+                max_retries
+            );
         }
 
+        // Phase (e): Finalize
         self.committed.store(true, Ordering::Release);
         Ok(())
     }
