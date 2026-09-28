@@ -80,6 +80,16 @@ impl Manifest {
                     ))
                 })?;
 
+            let mut header = Vec::with_capacity(5);
+            header.extend_from_slice(super::core::MANIFEST_HEADER_MAGIC);
+            header.push(super::core::CURRENT_MANIFEST_VERSION);
+            new_file.write_all(&header).await.map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Failed to write header to temporary MANIFEST {:?}: {e}",
+                    tmp_path
+                ))
+            })?;
+
             for entry in live_entries {
                 let bytes = entry.to_bytes()?;
                 new_file.write_all(&bytes).await.map_err(|e| {

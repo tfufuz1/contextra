@@ -11,6 +11,11 @@ async fn test_recovery_fd_exhaustion_regression() {
     let temp_dir = TempDir::new().unwrap();
     let db_path = temp_dir.path().to_path_buf();
 
+    // Write SALT so directory is valid for opening pre-populated WAL/SSTable files
+    tokio::fs::write(db_path.join("SALT"), &[0u8; 32])
+        .await
+        .unwrap();
+
     // Create 100 small WAL segment files.
     let wal_count = 100;
     for i in 1..=wal_count {

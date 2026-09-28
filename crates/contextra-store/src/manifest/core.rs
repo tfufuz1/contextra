@@ -7,16 +7,21 @@
 
 use contextra_core::{ContextraError, Result};
 use std::path::{Path, PathBuf};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 use super::entry::ManifestEntry;
 use super::recovery::is_valid_tail_truncation_candidate;
 use super::MAX_MANIFEST_ENTRY_SIZE;
+use crate::util::DirLock;
+
+pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
+pub const CURRENT_MANIFEST_VERSION: u8 = 1;
 
 /// Append-only Manifest file handle for recording active SSTable set transitions.
 pub struct Manifest {
     pub(super) path: PathBuf,
     pub(super) file: tokio::sync::Mutex<tokio::fs::File>,
+    pub(super) _dir_lock: Option<DirLock>,
 }
 
 impl std::fmt::Debug for Manifest {
@@ -30,8 +35,16 @@ impl std::fmt::Debug for Manifest {
 impl Manifest {
     /// Opens or creates an append-only Manifest file at `path`.
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_dir_lock(path, None).await
+    }
+
+    /// Opens or creates an append-only Manifest file at `path`, attaching `dir_lock`.
+    pub(crate) async fn open_with_dir_lock(
+        path: impl AsRef<Path>,
+        dir_lock: Option<DirLock>,
+    ) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let (file, is_new) = match tokio::fs::OpenOptions::new()
+        let (mut file, is_new) = match tokio::fs::OpenOptions::new()
             .create_new(true)
             .append(true)
             .read(true)
@@ -60,6 +73,12 @@ impl Manifest {
         };
 
         if is_new {
+            let mut header = Vec::with_capacity(5);
+            header.extend_from_slice(MANIFEST_HEADER_MAGIC);
+            header.push(CURRENT_MANIFEST_VERSION);
+            file.write_all(&header).await.map_err(|e| {
+                ContextraError::Storage(format!("Failed to write MANIFEST header: {}", e))
+            })?;
             file.sync_all().await.map_err(|e| {
                 ContextraError::Storage(format!(
                     "MANIFEST file fsync failed for {}: {}",
@@ -73,6 +92,7 @@ impl Manifest {
         Ok(Self {
             path,
             file: tokio::sync::Mutex::new(file),
+            _dir_lock: dir_lock,
         })
     }
 
@@ -147,6 +167,30 @@ impl Manifest {
         let mut reader = tokio::io::BufReader::new(&mut file);
         let mut entries = Vec::new();
         let mut pos = 0u64;
+
+        if file_size >= 5 {
+            let mut header = [0u8; 5];
+            if reader.read_exact(&mut header).await.is_ok() {
+                if &header[0..4] == MANIFEST_HEADER_MAGIC {
+                    let version = header[4];
+                    if version > CURRENT_MANIFEST_VERSION {
+                        return Err(ContextraError::Storage(format!(
+                            "Unsupported MANIFEST format version: {}",
+                            version
+                        )));
+                    }
+                    pos = 5;
+                } else {
+                    // Legacy version 0 manifest without header magic
+                    reader
+                        .seek(tokio::io::SeekFrom::Start(0))
+                        .await
+                        .map_err(|e| {
+                            ContextraError::Storage(format!("Failed to seek MANIFEST: {}", e))
+                        })?;
+                }
+            }
+        }
 
         loop {
             if pos == file_size {

@@ -14,15 +14,6 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// Storage health state indicator for LsmStorage background workers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StorageHealth {
-    /// Operating normally.
-    Healthy,
-    /// Background flush operations are failing.
-    FlushFailing,
-}
-
 /// LSM-Tree based storage engine.
 pub struct LsmStorage {
     pub(super) config: LsmConfig,
