@@ -2,7 +2,7 @@
 // ZWECK: PerformanceProfile Presets for Contextra (Spec B.1.6, AP-P0-05)
 // INVARIANTEN: INV-PERF-PROFILE-1, INV-PERF-PROFILE-2
 
-use contextra_ports::license::FeatureRing;
+use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_store::lsm::config::{DurabilityConfigError, DurabilityMode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +40,8 @@ pub enum PerformanceProfileError {
     Durability(#[from] DurabilityConfigError),
     #[error("DurabilityMode::Full combined with VectorDeleteMode::BackgroundRepair while deletion-proof is active breaks the deletion-proof guarantee for the vector index")]
     DurabilityVectorMismatch,
+    #[error("feature ring {0:?} requires a valid license: {1}")]
+    LicenseRequired(FeatureRing, LicenseError),
 }
 
 impl PerformanceProfile {
@@ -68,6 +70,14 @@ impl PerformanceProfile {
 }
 
 impl ResolvedProfileConfig {
+    pub fn enforce_license(&self, gate: &dyn LicenseGate) -> Result<(), PerformanceProfileError> {
+        if self.feature_ring != FeatureRing::Fast {
+            gate.check_ring(self.feature_ring)
+                .map_err(|e| PerformanceProfileError::LicenseRequired(self.feature_ring, e))?;
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), PerformanceProfileError> {
         self.durability_mode
             .validate_against_features(self.deletion_proof_active, self.feature_ring)?;
