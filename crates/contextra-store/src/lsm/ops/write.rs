@@ -55,11 +55,6 @@ pub(super) async fn put_if_absent(
             return Ok(false);
         }
     }
-    if storage.tx_buffer.staged_status(key) == Some(true)
-        || matches!(storage.tx_buffer.staged_status(key), Some(true))
-    {
-        return Ok(false);
-    }
 
     // 2. Intent Lock check and registration
     {
@@ -128,6 +123,12 @@ pub(super) async fn put_if_absent(
 
 pub(super) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Result<()> {
     validate_key(key)?;
+    storage.apply_backpressure().await;
+    if !storage.budget.has_memory_capacity() {
+        return Err(ContextraError::Storage(
+            "Memory budget exceeded (95%) — delete staging rejected".into(),
+        ));
+    }
     let doc_id = derive_doc_id(key);
 
     storage.tx_buffer.stage_kv(
@@ -154,6 +155,12 @@ pub(super) async fn delete_many(
     }
     for key in &keys {
         validate_key(key)?;
+    }
+    storage.apply_backpressure().await;
+    if !storage.budget.has_memory_capacity() {
+        return Err(ContextraError::Storage(
+            "Memory budget exceeded (95%) — delete staging rejected".into(),
+        ));
     }
     let count = keys.len() as u64;
     if count == 0 {
@@ -303,7 +310,10 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 }
                 res
             }
-            DurabilityMode::MemoryOnly => Ok(()),
+            DurabilityMode::MemoryOnly => {
+                let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
+                Ok(())
+            }
         };
 
         if let Err(e) = single_append_res {
