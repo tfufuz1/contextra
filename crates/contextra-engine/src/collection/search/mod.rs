@@ -16,8 +16,7 @@ mod hybrid;
 mod hydrate;
 
 pub use checkpoint::{
-    with_pinned_checkpoint, with_pinned_checkpoint_and_guard, with_pinned_checkpoint_at_latest,
-    CheckpointPinGuard,
+    with_pinned_checkpoint, with_pinned_checkpoint_at_latest, CheckpointPinGuard,
 };
 
 use super::{extract_effective_importance, Collection, StoredDocument, StoredDocumentMeta};
