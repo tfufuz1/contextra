@@ -1,0 +1,8 @@
+title = "Mutations-Diff-Gate"
+what = "Durch die Codeänderung ist der Mutations-Test-Score gesunken."
+why = "Mutations-Tests prüfen, ob Testsuiten tatsächliche Logikfehler zuverlässig erkennen."
+fix = "Schreibe zusätzliche Tests, die die überlebenden Mutanten abbilden und töten."
+anti_fix = "Lösche nicht die Quellcodezeilen, um Mutationstests zu umgehen."
+adr = ["ADR-035"]
+related = ["check-mutation-score-gate", "test-integrity"]
+sources = ["docs/gates/mutation-score-enforcement.md"]

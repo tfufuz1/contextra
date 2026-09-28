@@ -1,0 +1,8 @@
+title = "Ring-Schichten-Architekturprüfung"
+what = "Ein Crate greift auf ein höheres Ring-Level zu oder nutzt verbotene Abhängigkeiten (z.B. Async in Ring 0)."
+why = "Sicherheit und Portabilität verlangen strikte Trennung von Ring 0 (synchron) bis Ring 4 (Facade)."
+fix = "Restrukturiere Aufrufe so, dass Vergleiche nur nach innen (niedrigere Ringe) gerichtet sind."
+anti_fix = "Füge keine Async-Runtimes wie Tokio in Ring 0 ein."
+adr = ["ADR-N01", "ADR-104"]
+related = ["check-dag", "check-unsafe-islands"]
+sources = ["capabilities.toml", "ARCHITECTURE.md"]

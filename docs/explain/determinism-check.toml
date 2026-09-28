@@ -1,0 +1,8 @@
+title = "Determinismus-Prüfung"
+what = "Nicht-deterministisches Verhalten (z. B. direkte Systemzeitnutzung, echten Zufall) im Kern entdeckt."
+why = "Kern-Komponenten müssen für Replay und Tests absolut deterministisch arbeiten."
+fix = "Injeziere Zeit (`Clock`) und Zufall (`Rng`) über Ports aus `contextra-ports`."
+anti_fix = "Verwende nicht `std::time::SystemTime::now()` oder `rand::thread_rng()` direkt in Ring 0-3."
+adr = ["ADR-N10", "ADR-N06"]
+related = ["wal-replay-verify", "env-attest"]
+sources = ["CONSTITUTION.md"]

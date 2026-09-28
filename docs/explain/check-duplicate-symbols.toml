@@ -1,0 +1,8 @@
+title = "Doppelte Symbole Prüfer"
+what = "Mehrere öffentlich exportierte Symbole teilen sich denselben Namen im selben Verzeichnis/Modul."
+why = "Namensgleichheiten führen zu Verwirrung und Fehlern bei Re-Exporten und Verlinkung."
+fix = "Benenne das Symbol um oder versehe es mit einem modul-eindeutigen Präfix."
+anti_fix = "Nutze keine bedingte Kompilierung, um Symbole zu verstecken."
+adr = ["ADR-065"]
+related = ["symbol-exists", "check-phantom-files"]
+sources = ["docs/gates/gov-d-cross-file-duplicates.md"]

@@ -1,0 +1,8 @@
+title = "Unsafe-Code Audit"
+what = "Unerlaubter `unsafe`-Block außerhalb zugelassener Unsafe-Inseln gefunden."
+why = "Unsafe-Code ist in Contextra streng auf explizit genehmigte Performance-Inseln beschränkt."
+fix = "Entferne `unsafe` und ersetze es durch sicheren Rust-Code oder fordere eine Insel-Erweiterung per ADR an."
+anti_fix = "Füge keinen `unsafe`-Code ohne SAFETY-Kommentar und ADR-Genehmigung hinzu."
+adr = ["ADR-017", "ADR-N03"]
+related = ["check-unsafe-islands", "lock-audit"]
+sources = ["CONSTITUTION.md", "docs/decisions/ADR-N03-drei-unsafe-inseln.md"]

@@ -1,0 +1,8 @@
+title = "Umgebungs-Attestierung"
+what = "Die Testumgebung weicht von den Voraussetzungen ab (z. B. falsche Toolchain-Version)."
+why = "Nicht-deterministische Builds und Testflaks entstehen meist durch abweichende Umgebungen."
+fix = "Nutze die gepinnte Toolchain-Version aus `rust-toolchain.toml`."
+anti_fix = "Umgehe die Umgebungsprüfung nicht durch lokale Umgebungsvariablen-Hacks."
+adr = ["ADR-004"]
+related = ["determinism-check", "ledger"]
+sources = ["rust-toolchain.toml"]
