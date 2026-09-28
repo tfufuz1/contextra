@@ -117,8 +117,14 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
     let tx_leader = TxId::new(10);
     let tx_follower_timeout = TxId::new(11);
 
-    storage.put(tx_leader, b"k_leader", b"v_leader").await.expect("put leader");
-    storage.put(tx_follower_timeout, b"k_f1", b"v_f1").await.expect("put f1");
+    storage
+        .put(tx_leader, b"k_leader", b"v_leader")
+        .await
+        .expect("put leader");
+    storage
+        .put(tx_follower_timeout, b"k_f1", b"v_f1")
+        .await
+        .expect("put f1");
 
     // Configure Fault Injection: delay WAL append batch containing tx_leader by 400ms
     DELAY_APPEND_FOR_TX.store(tx_leader.inner(), Ordering::SeqCst);
@@ -153,7 +159,11 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
         (res_f1, res_leader)
     };
 
-    assert!(leader_res.is_ok(), "Leader commit must succeed: {:?}", leader_res);
+    assert!(
+        leader_res.is_ok(),
+        "Leader commit must succeed: {:?}",
+        leader_res
+    );
     let follower_err = follower_res.expect_err("Follower must time out");
     assert!(
         matches!(follower_err, ContextraError::CommitTimeout { .. }),
@@ -163,9 +173,16 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
 
     // Verify leader data was written properly and queue is clear for new transaction
     let tx_next = TxId::new(12);
-    storage.put(tx_next, b"k_next", b"v_next").await.expect("put next");
+    storage
+        .put(tx_next, b"k_next", b"v_next")
+        .await
+        .expect("put next");
     let res_next = storage.commit(tx_next).await;
-    assert!(res_next.is_ok(), "Subsequent commit must succeed: {:?}", res_next);
+    assert!(
+        res_next.is_ok(),
+        "Subsequent commit must succeed: {:?}",
+        res_next
+    );
 
     let v_leader = storage.get(b"k_leader").await.expect("get leader");
     assert_eq!(v_leader, Some(bytes::Bytes::from_static(b"v_leader")));

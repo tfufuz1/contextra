@@ -610,8 +610,8 @@ async fn test_wal_v1_auto_migration_on_min_version_v3() {
 
     // Open with min_wal_version = WalVersion::V3 and legacy key fallback allowed
     let wal = Wal::open_for_legacy_migration(&wal_path, None)
-    .await
-    .expect("open and auto-migrate v1 wal"); // expect
+        .await
+        .expect("open and auto-migrate v1 wal"); // expect
 
     // Verify that backup file exists
     assert!(
@@ -718,8 +718,8 @@ async fn test_full_rewrite_crash_recovery_pipeline() {
 
     // 4. Wal::open() on the path -> recover_from_bak_if_present recovers backup and replays successfully
     let wal = Wal::open_for_legacy_migration(&wal_path, None)
-    .await
-    .expect("open and recover wal from backup");
+        .await
+        .expect("open and recover wal from backup");
 
     let replayed = wal.replay().await.expect("replay recovered wal");
     assert_eq!(replayed.len(), 1);
@@ -780,8 +780,8 @@ async fn test_v1_plaintext_rejected_when_key_manager_active() {
 
     // 3. Opening/replaying WITHOUT KeyManager MUST succeed for the same V1 plaintext entry
     let wal_no_km = Wal::open_for_legacy_migration(&wal_path, None)
-    .await
-    .expect("open without key manager should succeed");
+        .await
+        .expect("open without key manager should succeed");
 
     let replayed = wal_no_km
         .replay()

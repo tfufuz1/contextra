@@ -56,8 +56,8 @@ pub use compaction::{
 pub use kv_locks::{KeyGuard, KvKeyLocks, LockError, MultiKeyGuard};
 #[cfg(not(loom))]
 pub use lsm::{
-    CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver,
-    WriteOrigin, DEFAULT_MAX_OBSERVER_LATENCY,
+    CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
+    DEFAULT_MAX_OBSERVER_LATENCY,
 };
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};

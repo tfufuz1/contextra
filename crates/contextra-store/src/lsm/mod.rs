@@ -89,11 +89,11 @@ pub mod ops;
 pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::LsmStorage;
 
+pub(super) use guard::{CommitGuard, LsmState};
 pub use observer::{
     CommittedBatch, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
     DEFAULT_MAX_OBSERVER_LATENCY,
 };
-pub(super) use guard::{CommitGuard, LsmState};
 pub(super) use validate::validate_key;
 
 /// Maximum key size allowed for LSM operations (65,535 bytes).

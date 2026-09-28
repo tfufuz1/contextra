@@ -75,7 +75,7 @@ impl LsmStorage {
     where
         F: Fn(&[u8], u64, u64) -> bool,
     {
-            self.compaction_engine.record_read_op();
+        self.compaction_engine.record_read_op();
         let mut map: std::collections::BTreeMap<Bytes, (Bytes, u64)> =
             std::collections::BTreeMap::new();
         let state = self.state.read().await;

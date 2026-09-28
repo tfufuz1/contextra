@@ -4,9 +4,7 @@
 // STAND: TS:2026-09-26T00:00:00Z
 
 use contextra_core::TxId;
-use contextra_store::wal::{
-    ReplayProgressSink, Wal, WalEntry, WalOp, WalSeq, WAL_V3_HEADER,
-};
+use contextra_store::wal::{ReplayProgressSink, Wal, WalEntry, WalOp, WalSeq, WAL_V3_HEADER};
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -63,8 +61,8 @@ async fn test_wal_recovery_linear_throughput_no_runtime_stall() {
                 key: b"k".to_vec(),
                 value: b"v".to_vec(),
             };
-            let entry = WalEntry::try_new(op, i, &integrity_key, prev_hmac)
-                .expect("construct entry");
+            let entry =
+                WalEntry::try_new(op, i, &integrity_key, prev_hmac).expect("construct entry");
             prev_hmac = entry.checksum;
 
             let bytes = entry.to_bytes().expect("serialize entry");

@@ -737,20 +737,32 @@ async fn run_concurrent_differential(tasks_ops: Vec<Vec<SimpleOp>>) -> Result<()
                     SimpleOp::Put(k, v) => {
                         tx_counter += 1;
                         let tx = TxId::new(tx_counter);
-                        storage_cloned.put(tx, &k, &v).await.map_err(|e| e.to_string())?;
+                        storage_cloned
+                            .put(tx, &k, &v)
+                            .await
+                            .map_err(|e| e.to_string())?;
                         storage_cloned.commit(tx).await.map_err(|e| e.to_string())?;
                     }
                     SimpleOp::Delete(k) => {
                         tx_counter += 1;
                         let tx = TxId::new(tx_counter);
-                        storage_cloned.delete(tx, &k).await.map_err(|e| e.to_string())?;
+                        storage_cloned
+                            .delete(tx, &k)
+                            .await
+                            .map_err(|e| e.to_string())?;
                         storage_cloned.commit(tx).await.map_err(|e| e.to_string())?;
                     }
                     SimpleOp::Flush => {
-                        storage_cloned.force_flush().await.map_err(|e| e.to_string())?;
+                        storage_cloned
+                            .force_flush()
+                            .await
+                            .map_err(|e| e.to_string())?;
                     }
                     SimpleOp::Compact => {
-                        let _ = storage_cloned.maybe_compact().await.map_err(|e| e.to_string())?;
+                        let _ = storage_cloned
+                            .maybe_compact()
+                            .await
+                            .map_err(|e| e.to_string())?;
                     }
                 }
             }

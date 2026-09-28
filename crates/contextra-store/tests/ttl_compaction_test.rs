@@ -12,7 +12,8 @@ use tempfile::TempDir;
 use tokio::sync::RwLock;
 
 #[tokio::test]
-async fn test_ttl_compaction_expiration_with_manual_clock() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_ttl_compaction_expiration_with_manual_clock() -> Result<(), Box<dyn std::error::Error>>
+{
     let temp_dir = TempDir::new()?;
     let path = temp_dir.path();
 
@@ -44,8 +45,12 @@ async fn test_ttl_compaction_expiration_with_manual_clock() -> Result<(), Box<dy
     builder2.finish().await?;
 
     let block_cache = Arc::new(BlockCache::new(16 * 1024 * 1024));
-    let sst1_reader = Arc::new(SstableReader::open_with_key_manager(&sst1_path, Arc::clone(&block_cache), None).await?);
-    let sst2_reader = Arc::new(SstableReader::open_with_key_manager(&sst2_path, Arc::clone(&block_cache), None).await?);
+    let sst1_reader = Arc::new(
+        SstableReader::open_with_key_manager(&sst1_path, Arc::clone(&block_cache), None).await?,
+    );
+    let sst2_reader = Arc::new(
+        SstableReader::open_with_key_manager(&sst2_path, Arc::clone(&block_cache), None).await?,
+    );
 
     let sstables = Arc::new(RwLock::new(vec![sst1_reader, sst2_reader]));
 
@@ -75,7 +80,11 @@ async fn test_ttl_compaction_expiration_with_manual_clock() -> Result<(), Box<dy
 
     // 5. Inspect resulting compacted SSTable list
     let guard = sstables.read().await;
-    assert_eq!(guard.len(), 1, "Compaction must produce exactly 1 output SSTable");
+    assert_eq!(
+        guard.len(),
+        1,
+        "Compaction must produce exactly 1 output SSTable"
+    );
 
     let output_reader = &guard[0];
     let mut stream = output_reader.stream().await?;
@@ -106,7 +115,8 @@ async fn test_ttl_compaction_expiration_with_manual_clock() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn test_ttl_compaction_advancing_manual_clock_expires_remaining_entry() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_ttl_compaction_advancing_manual_clock_expires_remaining_entry(
+) -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
     let path = temp_dir.path();
 
@@ -126,13 +136,20 @@ async fn test_ttl_compaction_advancing_manual_clock_expires_remaining_entry() ->
     b2.finish().await?;
 
     let block_cache = Arc::new(BlockCache::new(16 * 1024 * 1024));
-    let r1 = Arc::new(SstableReader::open_with_key_manager(&sst1_path, Arc::clone(&block_cache), None).await?);
-    let r2 = Arc::new(SstableReader::open_with_key_manager(&sst2_path, Arc::clone(&block_cache), None).await?);
+    let r1 = Arc::new(
+        SstableReader::open_with_key_manager(&sst1_path, Arc::clone(&block_cache), None).await?,
+    );
+    let r2 = Arc::new(
+        SstableReader::open_with_key_manager(&sst2_path, Arc::clone(&block_cache), None).await?,
+    );
 
     let sstables = Arc::new(RwLock::new(vec![r1, r2]));
 
     let engine = CompactionEngine::new_with_ttl(
-        CompactionConfig { min_sstables_per_tier: 2, ..Default::default() },
+        CompactionConfig {
+            min_sstables_per_tier: 2,
+            ..Default::default()
+        },
         Arc::new(SnapshotRegistry::new()),
         Arc::clone(&block_cache),
         None,
@@ -164,7 +181,9 @@ async fn test_ttl_compaction_advancing_manual_clock_expires_remaining_entry() ->
     b3.add(b"another_key", b"another_doc", 12, 3).await?;
     b3.finish().await?;
 
-    let r3 = Arc::new(SstableReader::open_with_key_manager(&sst3_path, Arc::clone(&block_cache), None).await?);
+    let r3 = Arc::new(
+        SstableReader::open_with_key_manager(&sst3_path, Arc::clone(&block_cache), None).await?,
+    );
     sstables.write().await.push(r3);
 
     let res2 = engine.maybe_compact(&sstables, path).await?;

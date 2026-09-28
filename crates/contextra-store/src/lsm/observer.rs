@@ -15,6 +15,13 @@ pub enum WriteOrigin {
     /// Background consolidation from the cognition pipeline.
     CognitionConsolidation,
     /// Compaction rewrite operation.
+    ///
+    /// # Architectural Reservation Note (Audit §4.2)
+    /// RESERVED: Currently not constructed in production LSM compaction paths.
+    /// Compaction operates on previously committed SSTable data. Emitting CDC events during
+    /// compaction without dedicated deduplication logic would generate redundant or misleading
+    /// change stream notifications for entries already delivered as `UserWrite`. This variant
+    /// remains reserved for future physical lifecycle observer capabilities.
     CompactionRewrite,
 }
 
@@ -66,10 +73,21 @@ pub struct CommittedBatch<'a> {
 pub trait WalObserver: Send + Sync {
     /// Notification callback executed synchronously upon batch commit.
     ///
-    /// # Fail-Open Contract
-    /// Callbacks MUST NOT block longer than `max_observer_latency` (default 1ms).
-    /// If an observer exceeds this limit or panics, it is automatically deregistered and a
-    /// warning/error is logged. The commit itself is NEVER delayed or aborted.
+    /// # Contractual Requirement on Implementations (§3.2)
+    /// Implementations MUST NOT block longer than `max_observer_latency` (default 1ms).
+    ///
+    /// # System Runtime Behavior & Timeouts (§3.2)
+    /// Invoking `on_commit()` is strictly synchronous. The LSM runtime CANNOT preemptively
+    /// interrupt or forcibly cancel an observer call that is actively blocking (e.g. in a
+    /// deadlock, infinite loop, or blocking syscall). As a result, a blocking observer WILL
+    /// delay the commit thread until `on_commit()` returns.
+    ///
+    /// Execution latency is measured (`start`/`end` via the injected `Clock` port) strictly AFTER
+    /// `on_commit()` returns. If the measured elapsed duration exceeds `max_observer_latency`
+    /// (or if the callback panics), the observer is automatically deregistered from `ObserverRegistry`.
+    ///
+    /// Third-party `WalObserver` implementers MUST NOT rely on an enforced preemptive timeout
+    /// guarantee, and must ensure callbacks complete execution without blocking.
     fn on_commit(&self, batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId);
 }
 
@@ -86,6 +104,25 @@ impl Default for ObserverRegistry {
             observers: parking_lot::RwLock::new(Vec::new()),
             max_observer_latency: parking_lot::RwLock::new(DEFAULT_MAX_OBSERVER_LATENCY),
             clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_write_origin_compaction_rewrite_reservation() {
+        let origin = WriteOrigin::CompactionRewrite;
+
+        // Exhaustive match test ensures all variants are accounted for
+        match origin {
+            WriteOrigin::UserWrite => panic!("Expected CompactionRewrite"),
+            WriteOrigin::CognitionConsolidation => panic!("Expected CompactionRewrite"),
+            WriteOrigin::CompactionRewrite => {
+                // Verified reserved variant presence per Audit §4.2
+            }
         }
     }
 }

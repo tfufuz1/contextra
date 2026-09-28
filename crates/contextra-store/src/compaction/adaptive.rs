@@ -196,19 +196,21 @@ impl AdaptiveCompactionPlanner for CostBasedAdaptivePlanner {
             0.0
         };
 
-        let (strategy, candidates, is_full_compaction) = if read_ratio >= self.read_ratio_threshold {
+        let (strategy, candidates, is_full_compaction) = if read_ratio >= self.read_ratio_threshold
+        {
             // Read-intensive workload: aggressively merge all available SSTables to minimize read-amplification.
             let mut candidates: Vec<Arc<SstableReader>> = sstables.to_vec();
             candidates.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
             let is_full = candidates.len() == sstables.len();
-            (CompactionStrategy::ReadOptimizedAggressive, candidates, is_full)
+            (
+                CompactionStrategy::ReadOptimizedAggressive,
+                candidates,
+                is_full,
+            )
         } else if read_ratio <= (1.0 - self.read_ratio_threshold) {
             // Write-intensive workload: fallback to standard STCS candidate selection to reduce write-amplification.
-            let candidates = select_stcs_candidates(
-                sstables,
-                self.min_sstables_per_tier,
-                self.size_ratio,
-            );
+            let candidates =
+                select_stcs_candidates(sstables, self.min_sstables_per_tier, self.size_ratio);
             match candidates {
                 Some(c) if c.len() >= 2 => {
                     let is_full = c.len() == sstables.len();
@@ -218,11 +220,8 @@ impl AdaptiveCompactionPlanner for CostBasedAdaptivePlanner {
             }
         } else {
             // Balanced workload: merge top tier or fallback STCS.
-            let candidates = select_stcs_candidates(
-                sstables,
-                self.min_sstables_per_tier,
-                self.size_ratio,
-            );
+            let candidates =
+                select_stcs_candidates(sstables, self.min_sstables_per_tier, self.size_ratio);
             match candidates {
                 Some(c) if c.len() >= 2 => {
                     let is_full = c.len() == sstables.len();
