@@ -9,7 +9,8 @@ use std::time::Duration;
 use contextra_core::error::ContextraError;
 use contextra_core::DistanceMetric;
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
-use contextra_ports::license::LicenseGate;
+use contextra_license::SignedLicenseGate;
+use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenFastGate};
 
 /// A builder for configuring and instantiating `Contextra`.
 ///
@@ -18,8 +19,10 @@ use contextra_ports::license::LicenseGate;
 pub struct ContextraBuilder {
     storage_path: PathBuf,
     config: ContextraConfig,
+    explicit_user_config: bool,
     embedder: Option<Arc<dyn TextEmbeddingEngine>>,
     license_gate: Arc<dyn LicenseGate>,
+    signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
 }
 
@@ -28,11 +31,13 @@ impl std::fmt::Debug for ContextraBuilder {
         f.debug_struct("ContextraBuilder")
             .field("storage_path", &self.storage_path)
             .field("config", &self.config)
+            .field("explicit_user_config", &self.explicit_user_config)
             .field(
                 "embedder",
                 &self.embedder.as_ref().map(|_| "<dyn TextEmbeddingEngine>"),
             )
             .field("license_gate", &"<dyn LicenseGate>")
+            .field("signed_license_error", &self.signed_license_error)
             .field("performance_profile", &self.performance_profile)
             .finish()
     }
@@ -43,8 +48,10 @@ impl Clone for ContextraBuilder {
         Self {
             storage_path: self.storage_path.clone(),
             config: self.config.clone(),
+            explicit_user_config: self.explicit_user_config,
             embedder: self.embedder.clone(),
             license_gate: Arc::clone(&self.license_gate),
+            signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
         }
     }
@@ -59,8 +66,10 @@ impl ContextraBuilder {
                 dimension,
                 ..Default::default()
             },
+            explicit_user_config: false,
             embedder: None,
-            license_gate: Arc::new(contextra_license::OpenFastGate),
+            license_gate: Arc::new(OpenFastGate),
+            signed_license_error: None,
             performance_profile: None,
         }
     }
@@ -111,6 +120,33 @@ impl ContextraBuilder {
     /// Attaches a license gate for feature ring authorization.
     pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {
         self.license_gate = gate;
+        self.signed_license_error = None;
+        self
+    }
+
+    /// Attaches a cryptographic signed license gate (§14.6, §15).
+    pub fn with_signed_license(
+        mut self,
+        payload_bytes: &[u8],
+        signature: &[u8; 64],
+        verifying_key_bytes: &[u8; 32],
+    ) -> Self {
+        match contextra_license::signed_gate::VerifyingKey::from_bytes(verifying_key_bytes) {
+            Ok(key) => {
+                match SignedLicenseGate::from_signed_payload(payload_bytes, signature, key) {
+                    Ok(gate) => {
+                        self.license_gate = Arc::new(gate);
+                        self.signed_license_error = None;
+                    }
+                    Err(e) => {
+                        self.signed_license_error = Some(e.to_string());
+                    }
+                }
+            }
+            Err(_) => {
+                self.signed_license_error = Some(LicenseError::InvalidSignature.to_string());
+            }
+        }
         self
     }
 
@@ -126,22 +162,51 @@ impl ContextraBuilder {
     /// Sets the complete `ContextraConfig` directly.
     pub fn with_config(mut self, config: ContextraConfig) -> Self {
         self.config = config;
+        self.explicit_user_config = true;
         self
     }
 
     /// Builds and initializes the `Contextra` engine instance.
-    pub async fn build(self) -> Result<Contextra, ContextraError> {
-        if let Some(profile) = self.performance_profile {
-            let resolved = profile.resolve();
-            resolved
-                .validate()
-                .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
-            resolved
-                .enforce_license(self.license_gate.as_ref())
-                .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+    pub async fn build(mut self) -> Result<Contextra, ContextraError> {
+        if let Some(ref err_msg) = self.signed_license_error {
+            return Err(ContextraError::PolicyViolation(err_msg.clone()));
         }
 
-        let instance = Contextra::open_with_config(&self.storage_path, self.config).await?;
+        let requested_ring = if let Some(profile) = self.performance_profile {
+            let resolved = profile.resolve();
+            if self.explicit_user_config {
+                if self.config.durability_mode != resolved.durability_mode
+                    || self.config.deletion_proof_active != resolved.deletion_proof_active
+                    || self.config.vector_delete_mode != resolved.vector_delete_mode
+                {
+                    return Err(ContextraError::PolicyViolation(
+                        "Explicit ContextraConfig conflicts with PerformanceProfile settings"
+                            .to_string(),
+                    ));
+                }
+            } else {
+                self.config.durability_mode = resolved.durability_mode;
+                self.config.deletion_proof_active = resolved.deletion_proof_active;
+                self.config.vector_delete_mode = resolved.vector_delete_mode;
+            }
+            resolved.feature_ring
+        } else {
+            FeatureRing::Fast
+        };
+
+        let authorized_token = self
+            .license_gate
+            .authorize(requested_ring)
+            .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+
+        let instance = Contextra::open_authorized(
+            &self.storage_path,
+            self.config,
+            &authorized_token,
+            self.license_gate,
+        )
+        .await?;
+
         if let Some(embedder) = self.embedder {
             Ok(instance.with_embedder(embedder).await)
         } else {
