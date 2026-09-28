@@ -408,3 +408,59 @@ async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
     DELAY_APPEND_FOR_TX.store(0, Ordering::SeqCst);
     DELAY_APPEND_MS.store(0, Ordering::SeqCst);
 }
+
+#[tokio::test]
+async fn test_delete_memory_capacity_exceeded() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        max_ram_mb: 1,
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config).await.expect("create storage");
+
+    storage.budget.consume_memory(1_000_000).expect("fill budget");
+    assert!(!storage.budget.has_memory_capacity());
+
+    let tx = TxId::new(1);
+    let res = storage.delete(tx, b"key").await;
+    assert!(
+        matches!(res, Err(ContextraError::Storage(ref msg)) if msg.contains("Memory budget exceeded")),
+        "delete must fail with Storage error when memory budget is exceeded"
+    );
+
+    let res_many = storage
+        .delete_many(tx, vec![b"key1".to_vec(), b"key2".to_vec()])
+        .await;
+    assert!(
+        matches!(res_many, Err(ContextraError::Storage(ref msg)) if msg.contains("Memory budget exceeded")),
+        "delete_many must fail with Storage error when memory budget is exceeded"
+    );
+}
+
+#[tokio::test]
+async fn test_memory_only_commit_restores_hmac() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        durability_mode: DurabilityMode::MemoryOnly,
+        group_commit_window_micros: 0,
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config).await.expect("create storage");
+
+    let wal = storage.wal.read().await;
+    let hmac_before = wal.last_hmac_snapshot().await;
+    drop(wal);
+
+    let tx = TxId::new(1);
+    storage.put(tx, b"key", b"val").await.expect("put");
+    storage.commit(tx).await.expect("commit");
+
+    let wal = storage.wal.read().await;
+    let hmac_after = wal.last_hmac_snapshot().await;
+    assert_eq!(
+        hmac_after, hmac_before,
+        "last_hmac must be restored to pre-commit state for MemoryOnly durability"
+    );
+}

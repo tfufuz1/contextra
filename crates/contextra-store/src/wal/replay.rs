@@ -226,9 +226,8 @@ impl Wal {
             }
             Err(e) => {
                 tracing::warn!(
-                    "mmap replay failed for WAL {:?}: {}; falling back to stream reader",
-                    self.path,
-                    e
+                    error = ?e,
+                    "scan_entries_mmap: HMAC/integrity verify error during mmap scan, falling back to stream"
                 );
                 self.scan_entries_with_callback(file_size, callback).await
             }

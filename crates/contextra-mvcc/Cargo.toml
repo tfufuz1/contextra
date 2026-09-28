@@ -16,6 +16,7 @@ ahash = { workspace = true }
 serde = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7"

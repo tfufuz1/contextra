@@ -696,10 +696,10 @@ impl LsmStorage {
         }
 
         let entries = wal.replay().await?;
-        eprintln!(
-            "ROLLBACK REPLAY ENTRIES LEN: {}, target_offset: {}",
-            entries.len(),
-            target_offset
+        tracing::debug!(
+            entries_len = entries.len(),
+            target_offset = target_offset,
+            "rollback_to_tx_locked: WAL replay completed"
         );
         let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
             std::collections::HashMap::new();
