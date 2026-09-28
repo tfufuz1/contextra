@@ -38,12 +38,21 @@ async fn test_ssi_write_skew_group_commit_disabled() {
     let barrier_1 = Arc::clone(&barrier);
     let task1 = tokio::spawn(async move {
         let tx1 = TxId::new(10);
-        let _a = storage_1.get_tracked(tx1, b"account_a").await.expect("tracked read A");
-        let _b = storage_1.get_tracked(tx1, b"account_b").await.expect("tracked read B");
+        let _a = storage_1
+            .get_tracked(tx1, b"account_a")
+            .await
+            .expect("tracked read A");
+        let _b = storage_1
+            .get_tracked(tx1, b"account_b")
+            .await
+            .expect("tracked read B");
 
         barrier_1.wait().await;
 
-        storage_1.put(tx1, b"account_a", b"20").await.expect("put A tx1");
+        storage_1
+            .put(tx1, b"account_a", b"20")
+            .await
+            .expect("put A tx1");
         storage_1.commit(tx1).await
     });
 
@@ -51,12 +60,21 @@ async fn test_ssi_write_skew_group_commit_disabled() {
     let barrier_2 = Arc::clone(&barrier);
     let task2 = tokio::spawn(async move {
         let tx2 = TxId::new(20);
-        let _a = storage_2.get_tracked(tx2, b"account_a").await.expect("tracked read A");
-        let _b = storage_2.get_tracked(tx2, b"account_b").await.expect("tracked read B");
+        let _a = storage_2
+            .get_tracked(tx2, b"account_a")
+            .await
+            .expect("tracked read A");
+        let _b = storage_2
+            .get_tracked(tx2, b"account_b")
+            .await
+            .expect("tracked read B");
 
         barrier_2.wait().await;
 
-        storage_2.put(tx2, b"account_b", b"20").await.expect("put B tx2");
+        storage_2
+            .put(tx2, b"account_b", b"20")
+            .await
+            .expect("put B tx2");
         storage_2.commit(tx2).await
     });
 
@@ -64,8 +82,13 @@ async fn test_ssi_write_skew_group_commit_disabled() {
     let res2 = task2.await.expect("task2 join");
 
     let (successes, conflicts) = match (res1, res2) {
-        (Ok(_), Err(ContextraError::Conflict(_))) | (Err(ContextraError::Conflict(_)), Ok(_)) => (1, 1),
-        (r1, r2) => panic!("Expected exactly 1 Ok and 1 Conflict, got: res1={:?}, res2={:?}", r1, r2),
+        (Ok(_), Err(ContextraError::Conflict(_))) | (Err(ContextraError::Conflict(_)), Ok(_)) => {
+            (1, 1)
+        }
+        (r1, r2) => panic!(
+            "Expected exactly 1 Ok and 1 Conflict, got: res1={:?}, res2={:?}",
+            r1, r2
+        ),
     };
 
     assert_eq!(successes, 1);
@@ -86,8 +109,14 @@ async fn test_ssi_write_skew_group_commit_enabled() {
 
     // Initial setup: doctor_1 = active, doctor_2 = active
     let tx0 = TxId::new(1);
-    storage.put(tx0, b"doctor_1", b"active").await.expect("put doc 1");
-    storage.put(tx0, b"doctor_2", b"active").await.expect("put doc 2");
+    storage
+        .put(tx0, b"doctor_1", b"active")
+        .await
+        .expect("put doc 1");
+    storage
+        .put(tx0, b"doctor_2", b"active")
+        .await
+        .expect("put doc 2");
     storage.commit(tx0).await.expect("commit tx0");
 
     let barrier = Arc::new(Barrier::new(2));
@@ -96,12 +125,21 @@ async fn test_ssi_write_skew_group_commit_enabled() {
     let barrier_1 = Arc::clone(&barrier);
     let task1 = tokio::spawn(async move {
         let tx1 = TxId::new(100);
-        let _d1 = storage_1.get_tracked(tx1, b"doctor_1").await.expect("tracked read d1");
-        let _d2 = storage_1.get_tracked(tx1, b"doctor_2").await.expect("tracked read d2");
+        let _d1 = storage_1
+            .get_tracked(tx1, b"doctor_1")
+            .await
+            .expect("tracked read d1");
+        let _d2 = storage_1
+            .get_tracked(tx1, b"doctor_2")
+            .await
+            .expect("tracked read d2");
 
         barrier_1.wait().await;
 
-        storage_1.put(tx1, b"doctor_1", b"inactive").await.expect("put d1 tx1");
+        storage_1
+            .put(tx1, b"doctor_1", b"inactive")
+            .await
+            .expect("put d1 tx1");
         storage_1.commit(tx1).await
     });
 
@@ -109,12 +147,21 @@ async fn test_ssi_write_skew_group_commit_enabled() {
     let barrier_2 = Arc::clone(&barrier);
     let task2 = tokio::spawn(async move {
         let tx2 = TxId::new(200);
-        let _d1 = storage_2.get_tracked(tx2, b"doctor_1").await.expect("tracked read d1");
-        let _d2 = storage_2.get_tracked(tx2, b"doctor_2").await.expect("tracked read d2");
+        let _d1 = storage_2
+            .get_tracked(tx2, b"doctor_1")
+            .await
+            .expect("tracked read d1");
+        let _d2 = storage_2
+            .get_tracked(tx2, b"doctor_2")
+            .await
+            .expect("tracked read d2");
 
         barrier_2.wait().await;
 
-        storage_2.put(tx2, b"doctor_2", b"inactive").await.expect("put d2 tx2");
+        storage_2
+            .put(tx2, b"doctor_2", b"inactive")
+            .await
+            .expect("put d2 tx2");
         storage_2.commit(tx2).await
     });
 
@@ -122,8 +169,13 @@ async fn test_ssi_write_skew_group_commit_enabled() {
     let res2 = task2.await.expect("task2 join");
 
     let (successes, conflicts) = match (res1, res2) {
-        (Ok(_), Err(ContextraError::Conflict(_))) | (Err(ContextraError::Conflict(_)), Ok(_)) => (1, 1),
-        (r1, r2) => panic!("Expected exactly 1 Ok and 1 Conflict in group commit, got: res1={:?}, res2={:?}", r1, r2),
+        (Ok(_), Err(ContextraError::Conflict(_))) | (Err(ContextraError::Conflict(_)), Ok(_)) => {
+            (1, 1)
+        }
+        (r1, r2) => panic!(
+            "Expected exactly 1 Ok and 1 Conflict in group commit, got: res1={:?}, res2={:?}",
+            r1, r2
+        ),
     };
 
     assert_eq!(successes, 1);
@@ -151,18 +203,27 @@ async fn test_ssi_conflict_rejection_no_sequence_gap_or_wal_leak() {
 
     // Tx1 reads key_x
     let tx1 = TxId::new(10);
-    let val = storage.get_tracked(tx1, b"key_x").await.expect("get_tracked");
+    let val = storage
+        .get_tracked(tx1, b"key_x")
+        .await
+        .expect("get_tracked");
     assert_eq!(val, Some(bytes::Bytes::from_static(b"v1")));
 
     // Tx2 concurrently mutates key_x and commits
     let tx2 = TxId::new(20);
-    storage.put(tx2, b"key_x", b"v2").await.expect("put key_x tx2");
+    storage
+        .put(tx2, b"key_x", b"v2")
+        .await
+        .expect("put key_x tx2");
     storage.commit(tx2).await.expect("commit tx2");
 
     let seq_after_tx2 = storage.next_seq_no_for_test();
 
     // Tx1 now stages a write to key_y and attempts to commit
-    storage.put(tx1, b"key_y", b"attempted_y").await.expect("put key_y tx1");
+    storage
+        .put(tx1, b"key_y", b"attempted_y")
+        .await
+        .expect("put key_y tx1");
     let commit_res = storage.commit(tx1).await;
 
     assert!(
@@ -187,7 +248,10 @@ async fn test_ssi_conflict_rejection_no_sequence_gap_or_wal_leak() {
 
     let reopened = LsmStorage::new(config).await.expect("reopen storage");
     let y_reopened = reopened.get(b"key_y").await.expect("get key_y reopened");
-    assert_eq!(y_reopened, None, "Uncommitted key_y must not exist in replayed storage");
+    assert_eq!(
+        y_reopened, None,
+        "Uncommitted key_y must not exist in replayed storage"
+    );
 }
 
 /// K5 Test 4 / Task 9 Regressionstest: Confirm that untracked `get()` reads do NOT trigger SSI conflicts.
@@ -220,7 +284,10 @@ async fn test_untracked_get_no_conflict_regression() {
 
         barrier_1.wait().await;
 
-        storage_1.put(tx1, b"account_a", b"20").await.expect("put A tx1");
+        storage_1
+            .put(tx1, b"account_a", b"20")
+            .await
+            .expect("put A tx1");
         storage_1.commit(tx1).await
     });
 
@@ -234,7 +301,10 @@ async fn test_untracked_get_no_conflict_regression() {
 
         barrier_2.wait().await;
 
-        storage_2.put(tx2, b"account_b", b"20").await.expect("put B tx2");
+        storage_2
+            .put(tx2, b"account_b", b"20")
+            .await
+            .expect("put B tx2");
         storage_2.commit(tx2).await
     });
 
@@ -242,6 +312,14 @@ async fn test_untracked_get_no_conflict_regression() {
     let res2 = task2.await.expect("task2 join");
 
     // Both commits succeed because reads were UNTRACKED (documented behavior)
-    assert!(res1.is_ok(), "Tx1 with untracked get() should succeed: {:?}", res1);
-    assert!(res2.is_ok(), "Tx2 with untracked get() should succeed: {:?}", res2);
+    assert!(
+        res1.is_ok(),
+        "Tx1 with untracked get() should succeed: {:?}",
+        res1
+    );
+    assert!(
+        res2.is_ok(),
+        "Tx2 with untracked get() should succeed: {:?}",
+        res2
+    );
 }

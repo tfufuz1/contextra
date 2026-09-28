@@ -72,15 +72,15 @@ pub(super) async fn write_salt_atomically(
 }
 
 pub(super) async fn directory_is_pristine(path: &std::path::Path) -> Result<bool> {
-    let mut entries = tokio::fs::read_dir(path)
-        .await
-        .map_err(|e| ContextraError::Storage(format!("Failed to read data dir for pristine check: {e}")))?;
+    let mut entries = tokio::fs::read_dir(path).await.map_err(|e| {
+        ContextraError::Storage(format!("Failed to read data dir for pristine check: {e}"))
+    })?;
 
-    while let Some(entry) = entries
-        .next_entry()
-        .await
-        .map_err(|e| ContextraError::Storage(format!("Failed to read directory entry for pristine check: {e}")))?
-    {
+    while let Some(entry) = entries.next_entry().await.map_err(|e| {
+        ContextraError::Storage(format!(
+            "Failed to read directory entry for pristine check: {e}"
+        ))
+    })? {
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
         if name_str.starts_with("wal-")
@@ -379,10 +379,7 @@ impl LsmStorage {
                         .as_ref()
                         .is_some_and(|dead_set| dead_set.contains(path_key))
                     {
-                        tracing::info!(
-                            "Removing dead SSTable file proven by MANIFEST: {:?}",
-                            path
-                        );
+                        tracing::info!("Removing dead SSTable file proven by MANIFEST: {:?}", path);
                         if let Err(e) = tokio::fs::remove_file(&path).await {
                             tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
                         }

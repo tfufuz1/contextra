@@ -17,7 +17,10 @@ async fn test_salt_unreadable_fails_open() {
     };
 
     let res = LsmStorage::new(config).await;
-    assert!(res.is_err(), "LsmStorage::new must fail when SALT is unreadable");
+    assert!(
+        res.is_err(),
+        "LsmStorage::new must fail when SALT is unreadable"
+    );
     let err = res.err().unwrap();
     let err_str = err.to_string();
     assert!(
@@ -63,7 +66,9 @@ async fn test_salt_missing_pristine_creates_salt() {
         ..Default::default()
     };
 
-    let storage = LsmStorage::new(config).await.expect("LsmStorage::new should succeed on pristine directory");
+    let storage = LsmStorage::new(config)
+        .await
+        .expect("LsmStorage::new should succeed on pristine directory");
     let salt_path = db_path.join("SALT");
     assert!(salt_path.exists(), "SALT file should have been created");
     let salt_bytes = fs::read(&salt_path).unwrap();
@@ -82,10 +87,15 @@ async fn test_dirlock_same_process_conflict() {
         ..Default::default()
     };
 
-    let _storage1 = LsmStorage::new(config.clone()).await.expect("First LsmStorage::new should succeed");
+    let _storage1 = LsmStorage::new(config.clone())
+        .await
+        .expect("First LsmStorage::new should succeed");
 
     let res2 = LsmStorage::new(config).await;
-    assert!(res2.is_err(), "Second LsmStorage::new on same directory must fail with DirLock conflict");
+    assert!(
+        res2.is_err(),
+        "Second LsmStorage::new on same directory must fail with DirLock conflict"
+    );
     let err_str = res2.err().unwrap().to_string();
     assert!(
         err_str.contains("Datenverzeichnis bereits in Benutzung"),
@@ -106,7 +116,12 @@ async fn test_dirlock_subprocess_conflict() {
         let res = LsmStorage::new(config).await;
         match res {
             Ok(_) => std::process::exit(0),
-            Err(e) if e.to_string().contains("Datenverzeichnis bereits in Benutzung") => std::process::exit(42),
+            Err(e)
+                if e.to_string()
+                    .contains("Datenverzeichnis bereits in Benutzung") =>
+            {
+                std::process::exit(42)
+            }
             Err(e) => {
                 eprintln!("Unexpected error in child process: {}", e);
                 std::process::exit(1);
@@ -122,7 +137,9 @@ async fn test_dirlock_subprocess_conflict() {
         ..Default::default()
     };
 
-    let _storage = LsmStorage::new(config).await.expect("First open in main process should succeed");
+    let _storage = LsmStorage::new(config)
+        .await
+        .expect("First open in main process should succeed");
 
     let exe = std::env::current_exe().unwrap();
     let status = std::process::Command::new(exe)

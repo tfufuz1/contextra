@@ -390,7 +390,9 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     let _commit_lock = storage.commit_mutex.lock().await;
                     {
                         let mut q = storage.pending_commit_queue.lock().await;
-                        if q.as_ref().is_some_and(|pq| pq.requests.iter().any(|r| r.tx_id == tx_id)) {
+                        if q.as_ref()
+                            .is_some_and(|pq| pq.requests.iter().any(|r| r.tx_id == tx_id))
+                        {
                             q.take();
                         }
                     }
@@ -399,17 +401,27 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     let append_res = wal.append_batch(wal_entries).await;
                     if let Err(e) = append_res {
                         storage.cleanup_intent_locks_for_tx(tx_id);
-                        Err(ContextraError::Storage(format!("Commit failed at WAL append after leader cancellation: {}", e)))
+                        Err(ContextraError::Storage(format!(
+                            "Commit failed at WAL append after leader cancellation: {}",
+                            e
+                        )))
                     } else {
-                        storage.notify_commit_observers(&entries_for_obs, tx_id, WriteOrigin::UserWrite);
+                        storage.notify_commit_observers(
+                            &entries_for_obs,
+                            tx_id,
+                            WriteOrigin::UserWrite,
+                        );
                         let state = storage.state.read().await;
                         storage.advance_visibility(tx_id);
                         storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
-                        let should_flush = state.memtable.size() > storage.config.memtable_size_limit;
+                        let should_flush =
+                            state.memtable.size() > storage.config.memtable_size_limit;
                         drop(state);
                         if should_flush {
                             if let Err(e) = storage.flush().await {
-                                tracing::warn!("Flush failed after leader cancellation fallback: {e}");
+                                tracing::warn!(
+                                    "Flush failed after leader cancellation fallback: {e}"
+                                );
                             }
                         }
                         storage.cleanup_intent_locks_for_tx(tx_id);
@@ -530,9 +542,17 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             return Err(ContextraError::Storage(err_msg));
         }
 
-        storage.notify_commit_observers(&leader_entries_for_observer, leader_tx_id, WriteOrigin::UserWrite);
+        storage.notify_commit_observers(
+            &leader_entries_for_observer,
+            leader_tx_id,
+            WriteOrigin::UserWrite,
+        );
         for r in &pending_queue.requests {
-            storage.notify_commit_observers(r.wal_entries.entries(), r.tx_id, WriteOrigin::UserWrite);
+            storage.notify_commit_observers(
+                r.wal_entries.entries(),
+                r.tx_id,
+                WriteOrigin::UserWrite,
+            );
         }
 
         type MemUpdateBatch<'a> = (TxId, &'a [(Vec<u8>, Vec<u8>, u64)]);

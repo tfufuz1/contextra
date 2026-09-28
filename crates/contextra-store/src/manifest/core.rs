@@ -182,9 +182,12 @@ impl Manifest {
                     pos = 5;
                 } else {
                     // Legacy version 0 manifest without header magic
-                    reader.seek(tokio::io::SeekFrom::Start(0)).await.map_err(|e| {
-                        ContextraError::Storage(format!("Failed to seek MANIFEST: {}", e))
-                    })?;
+                    reader
+                        .seek(tokio::io::SeekFrom::Start(0))
+                        .await
+                        .map_err(|e| {
+                            ContextraError::Storage(format!("Failed to seek MANIFEST: {}", e))
+                        })?;
                 }
             }
         }

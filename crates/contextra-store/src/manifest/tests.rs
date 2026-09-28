@@ -310,6 +310,11 @@ async fn test_manifest_rollover_crash_injection_preserves_old_manifest() {
     manifest.append(&entry2).await.expect("append entry 2");
     drop(manifest);
 
+    // Write SALT so directory is valid for LsmStorage recovery
+    tokio::fs::write(dir.path().join("SALT"), &[0u8; 32])
+        .await
+        .expect("write salt");
+
     // Simulate crash before rename: leftover temp file MANIFEST.new.123.456 exists
     let leftover_tmp = dir.path().join("MANIFEST.new.123.456");
     tokio::fs::write(&leftover_tmp, b"partial manifest content from crash")

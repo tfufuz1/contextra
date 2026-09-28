@@ -554,9 +554,8 @@ impl Wal {
                             &path,
                             key_manager.as_deref(),
                             fallback_integrity_key,
-                            allow_legacy_integrity_key_fallback.load(
-                                std::sync::atomic::Ordering::SeqCst,
-                            ),
+                            allow_legacy_integrity_key_fallback
+                                .load(std::sync::atomic::Ordering::SeqCst),
                             &legacy_key_used,
                             |seq, entry, pos| item_tx.send((seq, entry, pos)).is_ok(),
                         )
