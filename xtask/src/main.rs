@@ -2134,6 +2134,12 @@ pub fn run_check_review_coverage(tags: &[TagItem]) -> bool {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let subcommand = args.get(1).map(|s| s.as_str()).unwrap_or("sync-docs");
+    if let Some(code) = xtask::harness::dispatch_with_builtin(
+        subcommand,
+        if args.len() >= 2 { &args[2..] } else { &[] },
+    ) {
+        process::exit(code);
+    }
 
     match subcommand {
         "reproducible-build" | "reproducible-build-check" => {
