@@ -130,18 +130,17 @@ fn scan_rs_file(
         }
 
         // 1. ShellInterpolation
-        if check_shell {
-            if line_trimmed.contains(r#"Command::new("sh")"#)
+        if check_shell
+            && (line_trimmed.contains(r#"Command::new("sh")"#)
                 || line_trimmed.contains(r#"Command::new("bash")"#)
-                || line_trimmed.contains(r#".arg("-c")"#)
-            {
-                findings.push(SecurityFinding {
-                    file: rel_path.clone(),
-                    line: line_num,
-                    pattern: SecurityPattern::ShellInterpolation,
-                    context: line_trimmed.to_string(),
-                });
-            }
+                || line_trimmed.contains(r#".arg("-c")"#))
+        {
+            findings.push(SecurityFinding {
+                file: rel_path.clone(),
+                line: line_num,
+                pattern: SecurityPattern::ShellInterpolation,
+                context: line_trimmed.to_string(),
+            });
         }
 
         // 2. StdFsInAsync

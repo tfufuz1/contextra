@@ -111,7 +111,7 @@ impl<'a> DebtAstVisitor<'a> {
 
     fn check_item(&mut self, item: &syn::Item, parent_in_test: bool, current_scope: &str) {
         let attrs = get_item_attrs(item);
-        let in_test = parent_in_test || attrs.map_or(false, has_test_attribute);
+        let in_test = parent_in_test || attrs.is_some_and(has_test_attribute);
 
         if in_test {
             return;
@@ -139,7 +139,11 @@ impl<'a> DebtAstVisitor<'a> {
                 self.check_block(&item_fn.block, &fn_scope);
             }
             syn::Item::Impl(item_impl) => {
-                let type_name = item_impl.self_ty.to_token_stream().to_string().replace(' ', "");
+                let type_name = item_impl
+                    .self_ty
+                    .to_token_stream()
+                    .to_string()
+                    .replace(' ', "");
                 let impl_scope = if current_scope == "<top-level>" {
                     type_name
                 } else {
@@ -410,7 +414,7 @@ fn collect_test_lines(syn_file: &syn::File) -> HashSet<usize> {
 
     fn walk_item(item: &syn::Item, parent_in_test: bool, set: &mut HashSet<usize>) {
         let attrs = get_item_attrs(item);
-        let in_test = parent_in_test || attrs.map_or(false, has_test_attribute);
+        let in_test = parent_in_test || attrs.is_some_and(has_test_attribute);
 
         if in_test {
             let span = item.span();
@@ -518,10 +522,10 @@ pub fn run_debt_audit() -> Result<(), String> {
         .arg("audit")
         .arg("--version")
         .output()
-        .map_or(false, |o| o.status.success())
+        .is_ok_and(|o| o.status.success())
     {
         let status = std::process::Command::new("cargo").arg("audit").status();
-        if status.map_or(false, |s| !s.success()) {
+        if status.is_ok_and(|s| !s.success()) {
             println!("⚠️ Audit warnings — manuell prüfen");
         }
     } else {

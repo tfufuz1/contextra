@@ -145,7 +145,9 @@ fn execute_cmd(
     }
 
     let cmd_str = format!("{} {}", program, args.join(" "));
-    let output = cmd.output().map_err(|e| GateCheckError::IoError(e.to_string()))?;
+    let output = cmd
+        .output()
+        .map_err(|e| GateCheckError::IoError(e.to_string()))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -254,7 +256,14 @@ fn run_gate_one(opts: GateCheckOptions) -> Result<GateCheckReport, GateCheckErro
     execute_cmd(
         &loom_step,
         "cargo",
-        &["test", "--workspace", "--features", "loom", "--", "--test-threads=1"],
+        &[
+            "test",
+            "--workspace",
+            "--features",
+            "loom",
+            "--",
+            "--test-threads=1",
+        ],
         &[("RUSTFLAGS", "--cfg loom")],
     )?;
     report.passed_steps.push(loom_step);
@@ -264,7 +273,13 @@ fn run_gate_one(opts: GateCheckOptions) -> Result<GateCheckReport, GateCheckErro
     execute_cmd(
         &layering_step,
         "cargo",
-        &["test", "--manifest-path", "xtask/Cargo.toml", "--test", "layering"],
+        &[
+            "test",
+            "--manifest-path",
+            "xtask/Cargo.toml",
+            "--test",
+            "layering",
+        ],
         &[],
     )?;
     report.passed_steps.push(layering_step);
@@ -274,7 +289,13 @@ fn run_gate_one(opts: GateCheckOptions) -> Result<GateCheckReport, GateCheckErro
     execute_cmd(
         &ring_full_step,
         "cargo",
-        &["run", "--manifest-path", "xtask/Cargo.toml", "--", "check-ring-layering-full"],
+        &[
+            "run",
+            "--manifest-path",
+            "xtask/Cargo.toml",
+            "--",
+            "check-ring-layering-full",
+        ],
         &[],
     )?;
     report.passed_steps.push(ring_full_step);
@@ -284,7 +305,13 @@ fn run_gate_one(opts: GateCheckOptions) -> Result<GateCheckReport, GateCheckErro
     execute_cmd(
         &dup_primitives_step,
         "cargo",
-        &["run", "--manifest-path", "xtask/Cargo.toml", "--", "check-duplicate-core-primitives"],
+        &[
+            "run",
+            "--manifest-path",
+            "xtask/Cargo.toml",
+            "--",
+            "check-duplicate-core-primitives",
+        ],
         &[],
     )?;
     report.passed_steps.push(dup_primitives_step);

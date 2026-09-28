@@ -8,7 +8,10 @@ use std::process::Command;
 
 #[derive(Debug)]
 pub enum ArtifactHeaderError {
-    CommandFailed { command: &'static str, details: String },
+    CommandFailed {
+        command: &'static str,
+        details: String,
+    },
     Utf8Error(std::string::FromUtf8Error),
     JsonError(serde_json::Error),
     IoError(std::io::Error),

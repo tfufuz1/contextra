@@ -122,10 +122,20 @@ pub fn render_marker_table(capabilities: &Capabilities) -> String {
 }
 
 pub fn load_capabilities_from_file(path: &Path) -> Result<Capabilities, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read capabilities file '{}': {}", path.display(), e))?;
-    toml::from_str::<Capabilities>(&content)
-        .map_err(|e| format!("Failed to parse capabilities file '{}': {}", path.display(), e))
+    let content = fs::read_to_string(path).map_err(|e| {
+        format!(
+            "Failed to read capabilities file '{}': {}",
+            path.display(),
+            e
+        )
+    })?;
+    toml::from_str::<Capabilities>(&content).map_err(|e| {
+        format!(
+            "Failed to parse capabilities file '{}': {}",
+            path.display(),
+            e
+        )
+    })
 }
 
 pub fn run_generate_markers(output_path: Option<&Path>) -> Result<(), String> {
@@ -143,8 +153,13 @@ pub fn run_generate_markers(output_path: Option<&Path>) -> Result<(), String> {
         let _ = fs::create_dir_all(parent);
     }
 
-    fs::write(target_path, &rendered)
-        .map_err(|e| format!("Failed to write markers output to '{}': {}", target_path.display(), e))?;
+    fs::write(target_path, &rendered).map_err(|e| {
+        format!(
+            "Failed to write markers output to '{}': {}",
+            target_path.display(),
+            e
+        )
+    })?;
 
     println!(
         "✅ Capability markers successfully written to '{}'.",

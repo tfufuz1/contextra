@@ -644,7 +644,9 @@ pub fn check_duplicate_intent() -> Result<(), String> {
     let remote_commits = get_remote_branch_commits();
     candidate_commits.extend(remote_commits);
 
-    let is_ci = env::var("CONTEXTRA_CI").map(|v| v == "true").unwrap_or(false)
+    let is_ci = env::var("CONTEXTRA_CI")
+        .map(|v| v == "true")
+        .unwrap_or(false)
         || env::var("GITHUB_ACTIONS").is_ok();
     let token = env::var("GITHUB_TOKEN")
         .ok()
@@ -992,7 +994,10 @@ mod tests {
         let overlaps = compute_symbol_overlap(&map_a, &map_b);
         assert_eq!(overlaps.len(), 1, "Expected 1 colliding file");
         let (file, symbols) = &overlaps[0];
-        assert_eq!(file, &PathBuf::from("crates/contextra-store/src/sstable.rs"));
+        assert_eq!(
+            file,
+            &PathBuf::from("crates/contextra-store/src/sstable.rs")
+        );
         assert!(symbols.contains("binary_search_in_block"));
     }
 
@@ -1140,7 +1145,10 @@ mod tests {
         let overlaps = compute_symbol_overlap(&map_a, &map_b);
         assert_eq!(overlaps.len(), 1, "Expected 1 overlapping file");
         let (file, symbols) = &overlaps[0];
-        assert_eq!(file, &PathBuf::from("crates/contextra-store/src/sstable.rs"));
+        assert_eq!(
+            file,
+            &PathBuf::from("crates/contextra-store/src/sstable.rs")
+        );
         assert!(
             symbols.contains("binary_search_in_block"),
             "Expected binary_search_in_block symbol overlap"
@@ -1198,7 +1206,10 @@ diff --git a/crates/contextra-store/src/sstable.rs b/crates/contextra-store/src/
             "Must detect symbol overlap in sstable.rs"
         );
         let (file, symbols) = &overlaps[0];
-        assert_eq!(file, &PathBuf::from("crates/contextra-store/src/sstable.rs"));
+        assert_eq!(
+            file,
+            &PathBuf::from("crates/contextra-store/src/sstable.rs")
+        );
         assert!(symbols.contains("BlockCache"), "Must contain BlockCache");
         assert!(
             symbols.contains("binary_search_in_block"),

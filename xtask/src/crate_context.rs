@@ -32,7 +32,7 @@ fn count_crate_loc(crate_dir: &Path) -> usize {
     for entry in WalkDir::new(&src_dir)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file() && e.path().extension().map_or(false, |ext| ext == "rs"))
+        .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "rs"))
     {
         if let Ok(content) = fs::read_to_string(entry.path()) {
             total_lines += content.lines().count();
@@ -72,7 +72,7 @@ fn scan_crate_ai_tags(root: &Path, crate_dir: &Path) -> Vec<String> {
     for entry in WalkDir::new(crate_dir)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file() && e.path().extension().map_or(false, |ext| ext == "rs"))
+        .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "rs"))
     {
         let path = entry.path();
         if let Ok(content) = fs::read_to_string(path) {

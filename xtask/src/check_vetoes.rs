@@ -190,7 +190,10 @@ pub fn check_vetoes() -> Result<(), String> {
     let root = crate::find_root_dir();
     let vetoes_path = root.join("VETOES.md");
     if !vetoes_path.exists() {
-        println!("ℹ️ VETOES.md existiert nicht in {}, überspringe Prüfung.", root.display());
+        println!(
+            "ℹ️ VETOES.md existiert nicht in {}, überspringe Prüfung.",
+            root.display()
+        );
         return Ok(());
     }
     let vetoes_content = fs::read_to_string(&vetoes_path)

@@ -24,9 +24,7 @@ pub struct PrimitiveOccurrence {
 
 /// Scannt alle Crate-Quellcodedateien (`crates/*/src/**/*.rs`) auf `struct` und `type`
 /// Deklarationen und identifiziert Symbole, die in mehr als einem Crate unabhängig definiert sind.
-pub fn scan_duplicate_core_primitives(
-    root_dir: &Path,
-) -> Result<Vec<PrimitiveDuplicate>, String> {
+pub fn scan_duplicate_core_primitives(root_dir: &Path) -> Result<Vec<PrimitiveDuplicate>, String> {
     let decl_re = Regex::new(
         r"^(?:pub(?:\([^)]+\))?\s+)?(?:async\s+|unsafe\s+)?(struct|type)\s+([A-Za-z_][A-Za-z0-9_]*)",
     )
@@ -39,10 +37,7 @@ pub fn scan_duplicate_core_primitives(
 
     let mut occurrences_map: HashMap<(String, String), Vec<PrimitiveOccurrence>> = HashMap::new();
 
-    for entry in WalkDir::new(&crates_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if !path.is_file() || path.extension().and_then(|s| s.to_str()) != Some("rs") {
             continue;
@@ -90,10 +85,7 @@ pub fn scan_duplicate_core_primitives(
                             file_path: rel_path.clone(),
                             line_number: line_num,
                         };
-                        occurrences_map
-                            .entry((kind, symbol))
-                            .or_default()
-                            .push(occ);
+                        occurrences_map.entry((kind, symbol)).or_default().push(occ);
                     }
                 }
             }
@@ -118,16 +110,27 @@ pub fn scan_duplicate_core_primitives(
         // Group by crate name
         let mut by_crate: HashMap<String, Vec<PrimitiveOccurrence>> = HashMap::new();
         for occ in occs {
-            by_crate.entry(occ.crate_name.clone()).or_default().push(occ);
+            by_crate
+                .entry(occ.crate_name.clone())
+                .or_default()
+                .push(occ);
         }
 
         if by_crate.len() > 1 {
             let mut all_occs = Vec::new();
             for (_c_name, mut c_occs) in by_crate {
-                c_occs.sort_by(|a, b| a.file_path.cmp(&b.file_path).then_with(|| a.line_number.cmp(&b.line_number)));
+                c_occs.sort_by(|a, b| {
+                    a.file_path
+                        .cmp(&b.file_path)
+                        .then_with(|| a.line_number.cmp(&b.line_number))
+                });
                 all_occs.extend(c_occs);
             }
-            all_occs.sort_by(|a, b| a.crate_name.cmp(&b.crate_name).then_with(|| a.file_path.cmp(&b.file_path)));
+            all_occs.sort_by(|a, b| {
+                a.crate_name
+                    .cmp(&b.crate_name)
+                    .then_with(|| a.file_path.cmp(&b.file_path))
+            });
 
             duplicates.push(PrimitiveDuplicate {
                 symbol_name,
@@ -185,7 +188,9 @@ pub fn run_check_duplicate_core_primitives() -> Result<bool, String> {
     let duplicates = scan_duplicate_core_primitives(&root_dir)?;
 
     if duplicates.is_empty() {
-        println!("✅ check-duplicate-core-primitives: Keine Crate-übergreifenden Duplikate gefunden.");
+        println!(
+            "✅ check-duplicate-core-primitives: Keine Crate-übergreifenden Duplikate gefunden."
+        );
         return Ok(true);
     }
 
@@ -212,7 +217,10 @@ pub fn run_check_duplicate_core_primitives() -> Result<bool, String> {
         );
 
         for occ in &dup.occurrences {
-            println!("      {}:{} (Crate: {})", occ.file_path, occ.line_number, occ.crate_name);
+            println!(
+                "      {}:{} (Crate: {})",
+                occ.file_path, occ.line_number, occ.crate_name
+            );
         }
     }
 
@@ -239,7 +247,11 @@ mod tests {
         );
 
         let dup = kv_locks_dup.unwrap();
-        let crates: Vec<_> = dup.occurrences.iter().map(|o| o.crate_name.as_str()).collect();
+        let crates: Vec<_> = dup
+            .occurrences
+            .iter()
+            .map(|o| o.crate_name.as_str())
+            .collect();
         assert!(crates.contains(&"contextra-store"));
         assert!(crates.contains(&"contextra-engine"));
     }

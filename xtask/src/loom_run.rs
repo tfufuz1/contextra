@@ -118,7 +118,7 @@ pub fn run_loom(test_filter: Option<&str>, root: &Path) -> Result<LoomRunResult,
                 file.crate_name, file.path, status_str
             ));
         }
-        report_content.push_str("\n");
+        report_content.push('\n');
     }
 
     let _ = fs::write(&report_path, report_content);

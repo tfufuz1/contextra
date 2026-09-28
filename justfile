@@ -423,3 +423,66 @@ mutants-crypto *ARGS:
 # Alias für mutants-crypto
 mutants *ARGS:
 	cargo mutants --package contextra-crypto {{ARGS}}
+
+check-marker-drift:
+    cargo xtask check-marker-drift
+
+shell-commit-audit *ARGS:
+    cargo xtask shell-commit-audit {{ARGS}}
+
+workspace-verify *ARGS:
+    cargo xtask workspace-verify {{ARGS}}
+
+panic-inventory *ARGS:
+    cargo xtask panic-inventory {{ARGS}}
+
+security-scan *ARGS:
+    cargo xtask security-scan {{ARGS}}
+
+feature-matrix *ARGS:
+    cargo xtask feature-matrix {{ARGS}}
+
+check-ring-capabilities-consistency:
+    cargo xtask check-ring-capabilities-consistency
+
+loom-run *ARGS:
+    cargo xtask loom-run {{ARGS}}
+
+bench-compile *ARGS:
+    cargo xtask bench-compile {{ARGS}}
+
+bench-download *ARGS:
+    cargo xtask bench-download {{ARGS}}
+
+context-pack *ARGS:
+    cargo xtask context-pack {{ARGS}}
+
+session-init *ARGS:
+    cargo xtask session-init {{ARGS}}
+
+env-validate:
+    cargo xtask env-validate
+
+crate-context CRATE *ARGS:
+    cargo xtask crate-context {{CRATE}} {{ARGS}}
+
+audit-integrity-check *ARGS:
+    cargo xtask audit-integrity-check {{ARGS}}
+
+tag-health *ARGS:
+    cargo xtask tag-health {{ARGS}}
+
+hotspot-report *ARGS:
+    cargo xtask hotspot-report {{ARGS}}
+
+commit-health *ARGS:
+    cargo xtask commit-health {{ARGS}}
+
+py-test *ARGS:
+    cargo xtask py-test {{ARGS}}
+
+check-veto-deadlines:
+    cargo xtask check-veto-deadlines
+
+full-audit:
+    cargo xtask workspace-verify --mode=audit

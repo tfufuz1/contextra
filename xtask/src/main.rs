@@ -49,9 +49,13 @@ fn chrono_or_today() -> String {
 // ANCHOR[DEBT:XTASK-DATE-001] STATUS:DONE (ID: AGT-XTASK-2c814094) (TS: 2026-08-29T15:22:34Z) (SESSION: 2c814094)
 // AUFGABE: chrono_or_today() lieferte statischen String "2026-08-27" — behoben durch Systemaufruf
 // GATE:    grep -v "2026-08-27" WORKING_STATE.md
+mod audit_integrity_check;
+mod bench_compile;
+mod bench_download;
 mod bench_gate;
 mod check_action_pinning;
 mod check_adr_deadlines;
+mod check_agents_freshness;
 mod check_agents_integrity;
 mod check_audit_duplication;
 mod check_audit_tool_evidence;
@@ -59,54 +63,69 @@ mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
 mod check_commit_messages;
 mod check_compile;
-mod check_mutation_score_gate;
-use xtask::gates;
 mod check_coverage_gate;
 mod check_doc_references;
+mod check_duplicate_core_primitives;
 mod check_duplicate_intent;
 mod check_duplicate_symbols;
 mod check_ffi_panic_boundary;
 mod check_flatbuffers_drift;
 mod check_jules_context_freshness;
+mod check_manifest_completeness;
 mod check_max_results_unbound;
 mod check_module_reachability;
+mod check_mutation_score_gate;
+use xtask::gates;
 mod check_nan_validation_in_hot_loop;
 mod check_orphan_modules;
 mod check_phantom_files;
 mod check_placeholder_refs;
 mod check_recall_stability;
-mod check_duplicate_core_primitives;
 mod check_result_dropped_on_io;
 mod check_ring0_async_purity;
+mod check_ring_capabilities_consistency;
 mod check_ring_layering;
 mod check_stale_tags;
-mod check_manifest_completeness;
 mod check_toc_integrity;
-mod check_agents_freshness;
-
-pub mod agent_lifecycle;
-pub mod proof;
-pub mod generators;
 mod check_toctou_trait_defaults;
 mod check_type_registry;
 mod check_unsafe_islands;
 mod check_vetoes;
 mod check_workflow_commands;
 mod claim;
+mod commit_health;
+mod context_pack;
+mod crate_context;
+mod env_validate;
+mod feature_matrix;
 mod gate_check;
 mod gen_feature_catalog;
 mod gen_prompter_data;
 mod generate_adr;
 mod generate_markers;
+mod hotspot_report;
 mod init_audit_fix;
 mod jules_preflight;
 mod jules_submit_gate;
 mod lint_unsafe_slice_bounds;
+mod loom_run;
 mod migrate_docid_128;
+mod panic_inventory;
 mod post_merge_report;
+mod py_test;
 mod record_mutation_score;
 use xtask::reproducible_build;
+mod security_scan;
+mod session_init;
+mod shell_commit_audit;
+mod tag_health;
 mod validate_pr_checklist;
+mod veto_deadline_gate;
+mod workspace_verify;
+
+pub mod agent_lifecycle;
+pub mod generators;
+pub mod proof;
 
 pub use check_jules_context_freshness::run_check_jules_context_freshness;
 
@@ -586,9 +605,21 @@ pub fn get_workspace_crates_from_root(
 
         let (ring, maturity, description, status) =
             if let Some(entry) = capabilities.crates.get(&name) {
-                let ring = entry.ring.clone().unwrap_or_else(|| "unklassifiziert".to_string());
-                let maturity = entry.maturity.clone().unwrap_or_else(|| "unklassifiziert".to_string());
-                let desc = entry.description.clone().unwrap_or_else(|| if cargo_desc.is_empty() { "unklassifiziert".to_string() } else { cargo_desc.clone() });
+                let ring = entry
+                    .ring
+                    .clone()
+                    .unwrap_or_else(|| "unklassifiziert".to_string());
+                let maturity = entry
+                    .maturity
+                    .clone()
+                    .unwrap_or_else(|| "unklassifiziert".to_string());
+                let desc = entry.description.clone().unwrap_or_else(|| {
+                    if cargo_desc.is_empty() {
+                        "unklassifiziert".to_string()
+                    } else {
+                        cargo_desc.clone()
+                    }
+                });
                 let st = match maturity.as_str() {
                     "stable" => "🟢 stable".to_string(),
                     "experimental" => "🟡 experimental".to_string(),
@@ -597,7 +628,16 @@ pub fn get_workspace_crates_from_root(
                 };
                 (ring, maturity, desc, st)
             } else {
-                ("unklassifiziert".to_string(), "unklassifiziert".to_string(), if cargo_desc.is_empty() { "unklassifiziert".to_string() } else { cargo_desc.clone() }, "🔴 unklassifiziert".to_string())
+                (
+                    "unklassifiziert".to_string(),
+                    "unklassifiziert".to_string(),
+                    if cargo_desc.is_empty() {
+                        "unklassifiziert".to_string()
+                    } else {
+                        cargo_desc.clone()
+                    },
+                    "🔴 unklassifiziert".to_string(),
+                )
             };
 
         let status = if name == "contextra-embed" {
@@ -1066,7 +1106,10 @@ fn generate_dag_topology_section(crates: &[CrateInfo]) -> String {
     }
     out.push_str("```\n\n");
 
-    let core_crates_count = crates.iter().filter(|c| c.name != "contextra-embed").count();
+    let core_crates_count = crates
+        .iter()
+        .filter(|c| c.name != "contextra-embed")
+        .count();
     let has_optional = crates.iter().any(|c| c.name == "contextra-embed");
 
     if has_optional {
@@ -2114,7 +2157,11 @@ fn main() {
             }
         }
         "forensic-test" => {
-            let extra_args = if args.len() > 2 { args[2..].to_vec() } else { Vec::new() };
+            let extra_args = if args.len() > 2 {
+                args[2..].to_vec()
+            } else {
+                Vec::new()
+            };
             if !proof::forensic_test::run_forensic_test(&extra_args) {
                 process::exit(1);
             }
@@ -2317,7 +2364,9 @@ fn main() {
         "check-mutation-score-gate" => {
             let root = find_root_dir();
             let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if let Err(e) = check_mutation_score_gate::run_check_mutation_score_gate(extra_args, &root) {
+            if let Err(e) =
+                check_mutation_score_gate::run_check_mutation_score_gate(extra_args, &root)
+            {
                 eprintln!("❌ check-mutation-score-gate failed: {}", e);
                 process::exit(1);
             }
@@ -2371,7 +2420,14 @@ fn main() {
                 process::exit(1);
             }
         }
-        "check-duplicate-symbols-cross-file" => { #[path = "check_duplicate_symbols_cross_file.rs"] mod check_duplicate_symbols_cross_file; if let Err(e) = check_duplicate_symbols_cross_file::run() { eprintln!("❌ check-duplicate-symbols-cross-file failed: {}", e); process::exit(1); } }
+        "check-duplicate-symbols-cross-file" => {
+            #[path = "check_duplicate_symbols_cross_file.rs"]
+            mod check_duplicate_symbols_cross_file;
+            if let Err(e) = check_duplicate_symbols_cross_file::run() {
+                eprintln!("❌ check-duplicate-symbols-cross-file failed: {}", e);
+                process::exit(1);
+            }
+        }
         "check-duplicate-symbols" => {
             let cross_module = args.iter().any(|arg| arg == "--cross-module");
             let changed_files = get_changed_rs_files_from_git_diff().unwrap_or_default();
@@ -2749,7 +2805,10 @@ fn main() {
 
             match gate_check::run(opts) {
                 Ok(report) => {
-                    println!("✅ Gate Check Level {:?} ERFOLGREICH BESTANDEN", report.level);
+                    println!(
+                        "✅ Gate Check Level {:?} ERFOLGREICH BESTANDEN",
+                        report.level
+                    );
                     if let Some(ref c) = report.crate_name {
                         println!("   Betroffenes Crate: {}", c);
                     }
@@ -2841,9 +2900,510 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-marker-drift" => {
+            let target_path = args.get(2).map(PathBuf::from);
+            if let Err(e) = generate_markers::run_check_marker_drift(target_path.as_deref()) {
+                eprintln!("❌ check-marker-drift failed: {}", e);
+                process::exit(1);
+            }
+            println!("✅ check-marker-drift passed");
+        }
+        "generate-markers" => {
+            let target_path = args.get(2).map(PathBuf::from);
+            if let Err(e) = generate_markers::run_generate_markers(target_path.as_deref()) {
+                eprintln!("❌ generate-markers failed: {}", e);
+                process::exit(1);
+            }
+            println!("✅ generate-markers complete");
+        }
+        "shell-commit-audit" => {
+            let since_days = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--since="))
+                .and_then(|val| val.trim_end_matches('d').parse::<u32>().ok());
+            let fail_on_count = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--fail-on-count="))
+                .and_then(|val| val.parse::<usize>().ok());
+            match shell_commit_audit::run_shell_commit_audit(since_days, fail_on_count) {
+                Ok(report) => {
+                    let substantial = report
+                        .shell_commits
+                        .iter()
+                        .filter(|c| c.has_substantial_diff)
+                        .count();
+                    println!("✅ shell-commit-audit passed: total_commits={}, shell_commits={}, substantial={}", report.total_commits, report.shell_commits.len(), substantial);
+                }
+                Err(e) => {
+                    eprintln!("❌ shell-commit-audit failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "audit-integrity-check" => {
+            let since_days = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--since="))
+                .and_then(|val| val.trim_end_matches('d').parse::<u32>().ok());
+            let fail_on_contradicted = args.iter().any(|arg| arg == "--fail-on-contradicted");
+            match audit_integrity_check::run_audit_integrity_check(since_days, fail_on_contradicted)
+            {
+                Ok(gaps) => {
+                    let suspicious = gaps
+                        .iter()
+                        .filter(|g| {
+                            matches!(
+                                g.severity,
+                                audit_integrity_check::GapSeverity::Suspicious(_)
+                            )
+                        })
+                        .count();
+                    let contradicted = gaps
+                        .iter()
+                        .filter(|g| {
+                            matches!(
+                                g.severity,
+                                audit_integrity_check::GapSeverity::Contradicted(_)
+                            )
+                        })
+                        .count();
+                    println!("✅ audit-integrity-check passed: {} suspicious, {} contradicted gaps found", suspicious, contradicted);
+                }
+                Err(e) => {
+                    eprintln!("❌ audit-integrity-check failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "hotspot-report" => {
+            let since_days = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--since="))
+                .and_then(|val| val.trim_end_matches('d').parse::<u32>().ok())
+                .unwrap_or(30);
+            let top_n = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--top="))
+                .and_then(|val| val.parse::<usize>().ok())
+                .unwrap_or(10);
+            let fail_on_critical = args.iter().any(|arg| arg == "--fail-on-critical");
+            match hotspot_report::run_hotspot_report(since_days, top_n, fail_on_critical) {
+                Ok(hotspots) => {
+                    println!(
+                        "{:<50} | {:<10} | {:<16} | Risk",
+                        "File", "Changes", "Distinct Authors"
+                    );
+                    println!("{:-<50}-|-{:-<10}-|-{:-<16}-|-------", "", "", "");
+                    for h in &hotspots {
+                        let risk_str = match h.risk_level {
+                            hotspot_report::HotspotRisk::Normal => "Normal",
+                            hotspot_report::HotspotRisk::Elevated => "Elevated 🟡",
+                            hotspot_report::HotspotRisk::Critical => "Critical 🔴",
+                        };
+                        println!(
+                            "{:<50} | {:<10} | {:<16} | {}",
+                            h.file, h.changes_in_window, h.distinct_authors, risk_str
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ hotspot-report failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "tag-health" => {
+            let threshold_days = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--threshold-days="))
+                .and_then(|val| val.parse::<i64>().ok())
+                .unwrap_or(30);
+            match tag_health::run_tag_health(threshold_days) {
+                Ok(findings) => {
+                    println!("✅ tag-health check complete: {} findings", findings.len());
+                    for f in &findings {
+                        println!("  {}:{} (tag: {:?})", f.file, f.line, f.tag_id);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ tag-health failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "commit-health" => {
+            let since_days = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--since="))
+                .and_then(|val| val.trim_end_matches('d').parse::<u32>().ok())
+                .unwrap_or(30);
+            let output_path = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--output="))
+                .map(PathBuf::from);
+            match commit_health::run_commit_health(since_days, output_path.as_deref()) {
+                Ok(report_md) => {
+                    println!("{}", report_md);
+                }
+                Err(e) => {
+                    eprintln!("❌ commit-health failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "panic-inventory" => {
+            let crate_filter = args.iter().find_map(|arg| arg.strip_prefix("--crate="));
+            let exclude_tests = args.iter().any(|arg| arg == "--exclude-tests");
+            let strict = args.iter().any(|arg| arg == "--strict");
+            match panic_inventory::run_panic_inventory(crate_filter, exclude_tests, strict) {
+                Ok(panics) => {
+                    println!(
+                        "✅ panic-inventory completed: {} panic entries found",
+                        panics.len()
+                    );
+                }
+                Err(e) => {
+                    eprintln!("❌ panic-inventory failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "security-scan" => {
+            let crate_filter = args.iter().find_map(|arg| arg.strip_prefix("--crate="));
+            let pattern_str = args.iter().find_map(|arg| arg.strip_prefix("--pattern="));
+            let pattern_filter = match pattern_str {
+                Some("shell-interpolation" | "ShellInterpolation") => {
+                    Some(security_scan::SecurityPattern::ShellInterpolation)
+                }
+                Some("std-fs-in-async" | "StdFsInAsync") => {
+                    Some(security_scan::SecurityPattern::StdFsInAsync)
+                }
+                Some("hardcoded-secret" | "HardcodedSecret") => {
+                    Some(security_scan::SecurityPattern::HardcodedSecret)
+                }
+                Some(p) => {
+                    eprintln!("❌ Unknown --pattern option: {}", p);
+                    process::exit(1);
+                }
+                None => None,
+            };
+            match security_scan::run_security_scan(crate_filter, pattern_filter) {
+                Ok(findings) => {
+                    if !findings.is_empty() {
+                        eprintln!(
+                            "❌ security-scan failed: {} security findings found",
+                            findings.len()
+                        );
+                        for f in &findings {
+                            eprintln!(
+                                "  {}:{} [{}] {}",
+                                f.file,
+                                f.line,
+                                f.pattern.as_str(),
+                                f.context
+                            );
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ security-scan passed: zero security findings");
+                }
+                Err(e) => {
+                    eprintln!("❌ security-scan failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "feature-matrix" => {
+            let test = args.iter().any(|arg| arg == "--test");
+            let only = args.iter().find_map(|arg| arg.strip_prefix("--only="));
+            match feature_matrix::run_feature_matrix(test, only) {
+                Ok(results) => {
+                    let failed_count = results.iter().filter(|r| !r.passed).count();
+                    if failed_count > 0 {
+                        eprintln!(
+                            "❌ feature-matrix failed: {} feature combination(s) failed",
+                            failed_count
+                        );
+                        process::exit(1);
+                    }
+                    println!("✅ feature-matrix passed: all feature combinations verified");
+                }
+                Err(e) => {
+                    eprintln!("❌ feature-matrix failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "workspace-verify" => {
+            let mode_str = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--mode="))
+                .unwrap_or("full");
+            let mode = match mode_str {
+                "fast" => workspace_verify::VerifyMode::Fast,
+                "audit" => workspace_verify::VerifyMode::Audit,
+                _ => workspace_verify::VerifyMode::Full,
+            };
+            let only = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--only="))
+                .map(|s| {
+                    s.split(',')
+                        .map(|c| c.trim().to_string())
+                        .filter(|c| !c.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default();
+            let resume_from = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--resume="))
+                .map(|s| s.to_string());
+            let no_clippy = args.iter().any(|arg| arg == "--no-clippy");
+            let config = workspace_verify::WorkspaceVerifyConfig {
+                mode,
+                only,
+                resume_from,
+                stop_on_fail: false,
+                run_clippy: !no_clippy,
+            };
+            let timestamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
+            let output_dir = find_root_dir()
+                .join("target")
+                .join("workspace-verify")
+                .join(timestamp);
+            if let Err(e) = workspace_verify::run_workspace_verify(config, &output_dir) {
+                eprintln!("❌ workspace-verify failed: {}", e);
+                process::exit(1);
+            }
+            println!(
+                "✅ workspace-verify completed: report generated in {}",
+                output_dir.display()
+            );
+        }
+        "check-ring-capabilities-consistency" => {
+            match check_ring_capabilities_consistency::run_check_ring_capabilities_consistency() {
+                Ok(findings) => {
+                    if !findings.is_empty() {
+                        eprintln!("❌ check-ring-capabilities-consistency failed: {} inconsistent crate(s) found:", findings.len());
+                        for f in &findings {
+                            eprintln!(
+                                "  {} (capabilities.toml: {}, ring_layering: {:?})",
+                                f.crate_name,
+                                f.declared_in_capabilities_toml,
+                                f.declared_in_ring_layering
+                            );
+                        }
+                        process::exit(1);
+                    }
+                    println!("✅ check-ring-capabilities-consistency passed");
+                }
+                Err(e) => {
+                    eprintln!("❌ check-ring-capabilities-consistency failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "loom-run" => {
+            let filter = args.iter().find_map(|arg| arg.strip_prefix("--filter="));
+            let root = find_root_dir();
+            match loom_run::run_loom(filter, &root) {
+                Ok(res) => {
+                    if !res.passed {
+                        eprintln!("❌ loom-run failed:\n{}", res.output);
+                        process::exit(1);
+                    }
+                    println!("✅ loom-run passed in {}s", res.duration_secs);
+                }
+                Err(e) => {
+                    eprintln!("❌ loom-run error: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "bench-compile" => {
+            let run_for_real = args.iter().any(|arg| arg == "--run");
+            let root = find_root_dir();
+            match bench_compile::run_bench_compile(run_for_real, &root) {
+                Ok(results) => {
+                    println!(
+                        "✅ bench-compile completed for {} benchmark target(s)",
+                        results.len()
+                    );
+                }
+                Err(e) => {
+                    eprintln!("❌ bench-compile failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "bench-download" => {
+            let dataset_str = args.iter().find_map(|arg| arg.strip_prefix("--dataset="));
+            let dataset = match dataset_str {
+                Some("ann-sift1m") => bench_download::Dataset::AnnSift1m,
+                Some("beir") => bench_download::Dataset::Beir,
+                Some("onnx-test-model") => bench_download::Dataset::OnnxTestModel,
+                Some("all") => bench_download::Dataset::All,
+                Some(other) => {
+                    eprintln!("❌ Unknown dataset '{}'. Valid options: ann-sift1m, beir, onnx-test-model, all", other);
+                    process::exit(1);
+                }
+                None => {
+                    eprintln!("❌ Missing required parameter --dataset=<ann-sift1m|beir|onnx-test-model|all>");
+                    process::exit(1);
+                }
+            };
+            let root = find_root_dir();
+            if let Err(e) = bench_download::run_bench_download(dataset, &root) {
+                eprintln!("❌ bench-download failed: {}", e);
+                process::exit(1);
+            }
+        }
+        "py-test" => {
+            let filter = args.iter().find_map(|arg| arg.strip_prefix("--filter="));
+            let root = find_root_dir();
+            match py_test::run_py_test(filter, &root) {
+                Ok(success) => {
+                    if !success {
+                        eprintln!("❌ py-test failed");
+                        process::exit(1);
+                    }
+                    println!("✅ py-test passed");
+                }
+                Err(e) => {
+                    eprintln!("❌ py-test failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "context-pack" => {
+            let crate_filter = args.iter().find_map(|arg| arg.strip_prefix("--crate="));
+            let fast = args.iter().any(|arg| arg == "--fast");
+            let output_str = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--output="))
+                .unwrap_or(".jules/context/CONTEXT_PACK.md");
+            let output_path = PathBuf::from(output_str);
+            if let Err(e) = context_pack::run_context_pack(crate_filter, fast, &output_path) {
+                eprintln!("❌ context-pack failed: {}", e);
+                process::exit(1);
+            }
+            println!("✅ context-pack generated at {}", output_path.display());
+        }
+        "session-init" => {
+            let crate_name = args.iter().find_map(|arg| arg.strip_prefix("--crate="));
+            let task_description = args.iter().find_map(|arg| arg.strip_prefix("--task="));
+            let output_env = args.iter().any(|arg| arg == "--output-env");
+            match session_init::run_session_init(crate_name, task_description, output_env) {
+                Ok(res) => {
+                    println!("SESSION_HASH: {}", res.session_hash);
+                    println!("Offene BLOCKER: {}", res.open_blockers);
+                }
+                Err(e) => {
+                    eprintln!("❌ session-init failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "env-validate" => {
+            let checks = env_validate::run_env_validate();
+            let mut failed = false;
+            println!("{:<20} | {:<20} | Status", "Tool", "Required Version");
+            println!("{:-<20}-|-{:-<20}-|--------", "", "");
+            for check in &checks {
+                let status_str = match &check.status {
+                    env_validate::ToolStatus::Ok(v) => format!("✅ OK ({})", v),
+                    env_validate::ToolStatus::Missing => {
+                        if check.required {
+                            failed = true;
+                        }
+                        "❌ Missing".to_string()
+                    }
+                    env_validate::ToolStatus::WrongVersion { found, required } => {
+                        if check.required {
+                            failed = true;
+                        }
+                        format!("❌ Wrong Version (found {}, required {})", found, required)
+                    }
+                };
+                println!(
+                    "{:<20} | {:<20} | {}",
+                    check.name, check.version_arg, status_str
+                );
+            }
+            if failed {
+                eprintln!(
+                    "❌ env-validate failed: one or more required tools missing or wrong version"
+                );
+                process::exit(1);
+            }
+            println!("✅ env-validate passed");
+        }
+        "crate-context" => {
+            let crate_name = match args.get(2) {
+                Some(arg) if !arg.starts_with("--") => arg.as_str(),
+                _ => {
+                    eprintln!(
+                        "Usage: cargo xtask crate-context <CRATE> [--format=json] [--output=PFAD]"
+                    );
+                    process::exit(1);
+                }
+            };
+            let format_str = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--format="))
+                .unwrap_or("markdown");
+            let format = match format_str {
+                "json" => crate_context::OutputFormat::Json,
+                _ => crate_context::OutputFormat::Markdown,
+            };
+            let output_path = args
+                .iter()
+                .find_map(|arg| arg.strip_prefix("--output="))
+                .map(PathBuf::from);
+            match crate_context::run_crate_context(crate_name, format, output_path.as_deref()) {
+                Ok(output) => {
+                    if output_path.is_none() {
+                        println!("{}", output);
+                    } else {
+                        println!(
+                            "✅ crate-context written to {}",
+                            output_path.unwrap().display()
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ crate-context failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        "check-veto-deadlines" => {
+            match veto_deadline_gate::run_check_veto_deadlines(chrono::Utc::now()) {
+                Ok(entries) => {
+                    if entries.is_empty() {
+                        println!("✅ check-veto-deadlines: keine anstehenden VETO-Review-Fristen");
+                    } else {
+                        println!("⚠️ check-veto-deadlines: Anstehende VETO-Review-Fristen:");
+                        for entry in &entries {
+                            println!(
+                                "  VETO ID: {}, Feature: {}, Status: {}, Due: {:?}",
+                                entry.veto_id,
+                                entry.feature_id,
+                                entry.status,
+                                entry.conditional_review_due
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ check-veto-deadlines failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: bench-gate, check-bandit-latency-budget, gen-prompter-data, gen-feature-catalog, sync-docs [--check], validate-tags, check-review-coverage, check-consistency, check-agents-integrity, check-jules-context-freshness, check-unsafe-islands [--strict], check-ring-layering [--strict], check-dag, check-vetoes, lint-unsafe-slices, check-recall-stability, check-commit-messages, check-duplicate-symbols [--cross-module], check-orphan-modules, check-module-reachability, check-duplicate-intent, check-placeholder-refs, check-phantom-files, check-doc-references, check-crate-references, check-audit-duplication, check-compile, jules-preflight [--fast], check-type-registry [TITLE], check-manifest-completeness, generate-adr [TITLE], init-audit-fix [HASH], validate-pr-checklist, context-tags [*ARGS], run-community-detection, claim, check-adr-deadlines, check-stale-tags [--threshold-days=N] [--strict], jules-submit-gate [--crate=<CRATE>], check-max-results-unbound, check-toctou-defaults, check-nan-hot-loop, check-result-dropped-io, check-coverage-gate");
+            eprintln!("Available commands: audit-integrity-check, bench-compile, bench-download, bench-gate, bench-trend, check-action-pinning, check-adr-deadlines, check-agents-freshness, check-agents-integrity, check-audit-duplication, check-audit-tool-evidence, check-audit-verdict-independence, check-bandit-latency-budget, check-branch-overlap, check-commit-messages, check-compile, check-consistency, check-coverage-gate, check-crate-references, check-dag, check-doc-references, check-duplicate-core-primitives, check-duplicate-intent, check-duplicate-symbols, check-duplicate-symbols-cross-file, check-ffi-panic-boundary, check-flatbuffers-drift, check-jules-context-freshness, check-manifest-completeness, check-marker-drift, check-max-results-unbound, check-module-reachability, check-mutation-score-gate, check-nan-hot-loop, check-phantom-files, check-placeholder-refs, check-recall-stability, check-result-dropped-io, check-review-coverage, check-ring-capabilities-consistency, check-ring-layering, check-ring-layering-full, check-ring0-async-purity, check-stale-tags, check-toc-integrity, check-toctou-defaults, check-type-registry, check-unsafe-islands, check-veto-deadlines, check-vetoes, check-workflow-commands, claim, commit-health, consolidate-adrs, context-pack, context-tags, crate-context, debt-audit, env-validate, feature-matrix, forensic-test, gate-check, gen-feature-catalog, gen-prompter-data, gen-sbom, generate-adr, generate-diagnostics, generate-markers, hotspot-report, init-audit-fix, jules-preflight, jules-submit-gate, lint-unsafe-slices, loom-run, migrate-docid-128, mutation-score-record, panic-inventory, post-merge-report, pre-push, prune-branches, py-test, regenerate-flatbuffers, reproducible-build, run-community-detection, security-scan, session-init, shell-commit-audit, sync-docs, tag-health, validate-pr-checklist, validate-tags, workspace-verify");
             process::exit(1);
         }
     }
@@ -3849,7 +4409,7 @@ description = "Core crate"
     fn test_workspace_crate_layers_regression() {
         let _guard = TEST_DIR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let crates = get_workspace_crates();
-        assert_eq!(crates.len(), 31, "Expected 31 workspace crates");
+        assert_eq!(crates.len(), 34, "Expected 34 workspace crates");
     }
 
     #[test]
@@ -3933,7 +4493,7 @@ Always ensure all unit tests pass cleanly.
         let capabilities_crates = get_workspace_crates_from_root(&root, &cap_manifest);
 
         assert_eq!(legacy_crates.len(), capabilities_crates.len());
-        assert_eq!(capabilities_crates.len(), 31);
+        assert_eq!(capabilities_crates.len(), 34);
 
         println!("=== GOLDEN-FILE COMPARISON: Legacy vs Capabilities.toml ===");
 

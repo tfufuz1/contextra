@@ -2,8 +2,8 @@
 mod generate_markers;
 
 use generate_markers::{
-    load_capabilities_from_file, render_marker_table, run_check_marker_drift,
-    run_generate_markers, Capabilities,
+    load_capabilities_from_file, render_marker_table, run_check_marker_drift, run_generate_markers,
+    Capabilities,
 };
 use std::fs;
 use tempfile::tempdir;
@@ -43,10 +43,17 @@ capabilities = []
     let caps: Capabilities = toml::from_str(fixture_toml).expect("Failed to parse fixture TOML");
     let table = render_marker_table(&caps);
 
-    assert!(table.contains("| `crate-alpha` | Ring 0 | 🟢 stable | `cap-a`, `cap-b` | Alpha crate description |"));
-    assert!(table.contains("| `crate-beta` | Ring 1 | 🟡 experimental | `cap-c` | Beta crate description |"));
-    assert!(table.contains("| `crate-gamma` | Ring 2 | 🔴 deprecated | - | Gamma crate description |"));
-    assert!(table.contains("| `crate-delta` | Ring 3 | 🔴 custom-status | - | Delta crate description |"));
+    assert!(table.contains(
+        "| `crate-alpha` | Ring 0 | 🟢 stable | `cap-a`, `cap-b` | Alpha crate description |"
+    ));
+    assert!(table.contains(
+        "| `crate-beta` | Ring 1 | 🟡 experimental | `cap-c` | Beta crate description |"
+    ));
+    assert!(
+        table.contains("| `crate-gamma` | Ring 2 | 🔴 deprecated | - | Gamma crate description |")
+    );
+    assert!(table
+        .contains("| `crate-delta` | Ring 3 | 🔴 custom-status | - | Delta crate description |"));
 }
 
 #[test]
@@ -113,11 +120,19 @@ fn test_generate_markers_and_check_drift_end_to_end() {
 
     // Generate output file
     let gen_res = run_generate_markers(Some(&out_file));
-    assert!(gen_res.is_ok(), "run_generate_markers failed: {:?}", gen_res);
+    assert!(
+        gen_res.is_ok(),
+        "run_generate_markers failed: {:?}",
+        gen_res
+    );
 
     // Check drift against unmodified file
     let drift_res = run_check_marker_drift(Some(&out_file));
-    assert!(drift_res.is_ok(), "run_check_marker_drift failed: {:?}", drift_res);
+    assert!(
+        drift_res.is_ok(),
+        "run_check_marker_drift failed: {:?}",
+        drift_res
+    );
 
     // Tamper with generated file
     let mut content = fs::read_to_string(&out_file).unwrap();

@@ -55,10 +55,7 @@ pub fn parse_verdict_line(line: &str, file_path: &str, line_num: usize) -> Optio
     let trimmed = line.trim();
 
     // Check if line contains VERDICT: (case-insensitive)
-    let verdict_idx = match trimmed.to_uppercase().find("VERDICT:") {
-        Some(idx) => idx,
-        None => return None,
-    };
+    let verdict_idx = trimmed.to_uppercase().find("VERDICT:")?;
 
     let after_verdict = &trimmed[verdict_idx + 8..];
     let end_idx = after_verdict.find('(').unwrap_or(after_verdict.len());

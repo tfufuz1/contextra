@@ -1,9 +1,7 @@
 #[path = "../src/check_mutation_score_gate.rs"]
 mod check_mutation_score_gate;
 
-use check_mutation_score_gate::{
-    check_gate, get_mutation_threshold_for_crate, MutationGateError,
-};
+use check_mutation_score_gate::{check_gate, get_mutation_threshold_for_crate, MutationGateError};
 use std::fs;
 use tempfile::tempdir;
 

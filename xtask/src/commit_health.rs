@@ -87,7 +87,7 @@ pub fn run_commit_health_impl(
                 c.deletions
             ));
         }
-        markdown.push_str("\n");
+        markdown.push('\n');
     }
 
     markdown.push_str("## Top 5 Auffällige Audit-Fix-Lücken\n\n");
@@ -132,7 +132,7 @@ pub fn run_commit_health_impl(
                 status_str
             ));
         }
-        markdown.push_str("\n");
+        markdown.push('\n');
     }
 
     markdown.push_str("## Top 5 Hotspots (meistgeänderte Dateien)\n\n");
@@ -151,7 +151,7 @@ pub fn run_commit_health_impl(
             h.file, h.changes_in_window, h.distinct_authors, risk_str
         ));
     }
-    markdown.push_str("\n");
+    markdown.push('\n');
 
     if let Some(out_path) = output {
         if let Some(parent) = out_path.parent() {

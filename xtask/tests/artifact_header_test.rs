@@ -2,8 +2,8 @@ use xtask::artifact_header::ArtifactHeader;
 
 #[test]
 fn test_artifact_header_capture_commit_format() {
-    let header = ArtifactHeader::capture("cargo xtask test")
-        .expect("ArtifactHeader::capture failed");
+    let header =
+        ArtifactHeader::capture("cargo xtask test").expect("ArtifactHeader::capture failed");
 
     assert_eq!(
         header.commit.len(),
@@ -17,7 +17,10 @@ fn test_artifact_header_capture_commit_format() {
         header.commit
     );
     assert_eq!(header.generated_by, "cargo xtask test");
-    assert!(!header.generated_at.is_empty(), "generated_at must not be empty");
+    assert!(
+        !header.generated_at.is_empty(),
+        "generated_at must not be empty"
+    );
     assert!(
         header.toolchain.starts_with("rustc "),
         "toolchain must start with 'rustc ', got '{}'",
@@ -53,16 +56,20 @@ fn test_render_json_deserializable() {
         toolchain: "rustc 1.80.0 (123456789 2024-07-25)".to_string(),
     };
 
-    let json_str = header
-        .render_json()
-        .expect("render_json failed");
+    let json_str = header.render_json().expect("render_json failed");
 
-    let deserialized: ArtifactHeader = serde_json::from_str(&json_str)
-        .expect("Failed to deserialize JSON frontmatter");
+    let deserialized: ArtifactHeader =
+        serde_json::from_str(&json_str).expect("Failed to deserialize JSON frontmatter");
 
     assert_eq!(header, deserialized);
-    assert_eq!(deserialized.commit, "0123456789abcdef0123456789abcdef01234567");
+    assert_eq!(
+        deserialized.commit,
+        "0123456789abcdef0123456789abcdef01234567"
+    );
     assert_eq!(deserialized.generated_by, "cargo xtask test");
     assert_eq!(deserialized.generated_at, "2026-09-17T12:00:00Z");
-    assert_eq!(deserialized.toolchain, "rustc 1.80.0 (123456789 2024-07-25)");
+    assert_eq!(
+        deserialized.toolchain,
+        "rustc 1.80.0 (123456789 2024-07-25)"
+    );
 }

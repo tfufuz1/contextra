@@ -562,7 +562,7 @@ impl Wal {
                         )
                         .await;
 
-                        let _ = file.seek(std::io::SeekFrom::End(0)).await;
+                        let _ = file.seek(std::io::SeekFrom::End(0)).await; // INTENTIONAL-DROP
 
                         let _ = ack.send(res);
                     }

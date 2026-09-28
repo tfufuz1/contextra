@@ -12,7 +12,7 @@ use tempfile::tempdir;
 
 #[test]
 fn test_ring_capabilities_consistency_against_repo() {
-    let root = check_ring_capabilities_consistency::find_root_dir();
+    let root = xtask::find_root_dir();
     let findings = run_check_ring_capabilities_consistency_in_root(&root);
     assert!(
         findings.is_ok(),

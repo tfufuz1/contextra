@@ -49,7 +49,10 @@ impl CommitDiffStats {
 }
 
 /// Ermittelt die Diff-Statistiken für einen gegebenen Commit-SHA mittels `git show --stat --format="" <sha>`.
-pub fn get_commit_diff_stats(sha: &str, repo_dir: Option<&Path>) -> Result<CommitDiffStats, String> {
+pub fn get_commit_diff_stats(
+    sha: &str,
+    repo_dir: Option<&Path>,
+) -> Result<CommitDiffStats, String> {
     let mut cmd = Command::new("git");
     if let Some(dir) = repo_dir {
         cmd.current_dir(dir);
@@ -233,10 +236,7 @@ pub fn count_claim_points(commit_msg: &str) -> usize {
 }
 
 /// Prüft die Integrität eines einzelnen Commits.
-pub fn check_single_commit(
-    sha: &str,
-    repo_dir: Option<&Path>,
-) -> Result<(), String> {
+pub fn check_single_commit(sha: &str, repo_dir: Option<&Path>) -> Result<(), String> {
     let msg = get_commit_message(sha, repo_dir)?;
     let stats = get_commit_diff_stats(sha, repo_dir)?;
     let claims = count_claim_points(&msg);
