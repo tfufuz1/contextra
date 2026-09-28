@@ -99,7 +99,11 @@ mod tests {
     #[test]
     fn test_bsi_mapping_table_exact_entries() {
         let table = bsi_mapping_table();
-        assert_eq!(table.len(), 4, "Mapping table must contain exactly 4 entries");
+        assert_eq!(
+            table.len(),
+            4,
+            "Mapping table must contain exactly 4 entries"
+        );
 
         let primitive_names: Vec<&str> = table.iter().map(|e| e.primitive_name.as_str()).collect();
         assert!(primitive_names.contains(&"Ed25519"));
@@ -108,9 +112,18 @@ mod tests {
         assert!(primitive_names.contains(&"Argon2id"));
 
         for entry in &table {
-            assert!(!entry.primitive_name.is_empty(), "primitive_name must not be empty");
-            assert!(!entry.code_location.is_empty(), "code_location must not be empty");
-            assert!(!entry.bsi_reference.is_empty(), "bsi_reference must not be empty");
+            assert!(
+                !entry.primitive_name.is_empty(),
+                "primitive_name must not be empty"
+            );
+            assert!(
+                !entry.code_location.is_empty(),
+                "code_location must not be empty"
+            );
+            assert!(
+                !entry.bsi_reference.is_empty(),
+                "bsi_reference must not be empty"
+            );
             assert!(!entry.note.is_empty(), "note must not be empty");
         }
     }

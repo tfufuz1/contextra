@@ -5,13 +5,13 @@
 
 use contextra_db::collection::Collection;
 use contextra_graph::csr::CsrGraph;
-use contextra_vector::{HnswConfig, HnswIndex};
 use contextra_ports::EmbeddingError;
 use contextra_ports::{BoxFuture, EmbeddingProvider, TextEmbeddingEngine};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_text::Language;
 use contextra_types::DocId;
+use contextra_vector::{HnswConfig, HnswIndex};
 
 use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;

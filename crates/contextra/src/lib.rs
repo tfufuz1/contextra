@@ -76,10 +76,7 @@ mod tests {
         assert_eq!(db2.len().await?, 0);
 
         let db3_path = base_tmp.join("db3");
-        let db3 = builder(32)
-            .with_storage_path(&db3_path)
-            .build()
-            .await?;
+        let db3 = builder(32).with_storage_path(&db3_path).build().await?;
         assert_eq!(db3.len().await?, 0);
 
         let _ = std::fs::remove_dir_all(&base_tmp);

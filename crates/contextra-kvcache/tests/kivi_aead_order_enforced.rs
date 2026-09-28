@@ -1,9 +1,7 @@
 #![forbid(unsafe_code)]
 
 use contextra_crypto::CryptoKey;
-use contextra_kvcache::{
-    KiviQuantizeConfig, KvSegment, KvSegmentContent, KvTensorView,
-};
+use contextra_kvcache::{KiviQuantizeConfig, KvSegment, KvSegmentContent, KvTensorView};
 use contextra_types::{ContextraError, Result, TenantId};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -29,7 +27,8 @@ impl contextra_crypto::KvCipher for TrackingCipher {
     fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
         self.seal_calls.fetch_add(1, Ordering::SeqCst);
         let (ct, nonce) = self
-            .key.encrypt_auto_nonce(plaintext)
+            .key
+            .encrypt_auto_nonce(plaintext)
             .map_err(|e| ContextraError::Crypto(e.to_string()))?;
         let mut out = Vec::with_capacity(12 + ct.len());
         out.extend_from_slice(&nonce);
@@ -58,7 +57,9 @@ impl contextra_crypto::KvCipher for FailingCipher {
     }
 
     fn open(&self, _ciphertext: &[u8]) -> Result<Vec<u8>> {
-        Err(ContextraError::Crypto("AEAD open authentication failure".into()))
+        Err(ContextraError::Crypto(
+            "AEAD open authentication failure".into(),
+        ))
     }
 }
 
@@ -67,13 +68,8 @@ fn test_inv_kivi_aead_order_enforced_write_and_read() {
     let tenant = TenantId::try_new(101).unwrap();
     let mut segment = KvSegment::new(tenant, 1, vec![0u8; 16]);
 
-    let raw = KvTensorView::new(
-        vec![1.0, 2.0, 3.0, 4.0],
-        vec![10.0, 20.0, 30.0, 40.0],
-        2,
-        2,
-    )
-    .unwrap();
+    let raw =
+        KvTensorView::new(vec![1.0, 2.0, 3.0, 4.0], vec![10.0, 20.0, 30.0, 40.0], 2, 2).unwrap();
 
     let cipher = TrackingCipher::new();
     let config = KiviQuantizeConfig {
@@ -89,7 +85,10 @@ fn test_inv_kivi_aead_order_enforced_write_and_read() {
     // Segment data MUST now contain encrypted ciphertext, NOT raw or plain quantized floats
     assert_ne!(segment.as_bytes(), &vec![0u8; 16]);
     assert!(segment.encrypted);
-    assert!(matches!(segment.content, KvSegmentContent::KiviQuantized(_)));
+    assert!(matches!(
+        segment.content,
+        KvSegmentContent::KiviQuantized(_)
+    ));
 
     // 2. Read dequantized: AEAD Open FIRST, Dequantization SECOND
     assert_eq!(cipher.open_calls.load(Ordering::SeqCst), 0);
@@ -107,19 +106,16 @@ fn test_inv_kivi_aead_order_enforced_decryption_failure_blocks_dequantization() 
     let tenant = TenantId::try_new(101).unwrap();
     let mut segment = KvSegment::new(tenant, 1, vec![0u8; 16]);
 
-    let raw = KvTensorView::new(
-        vec![1.0, 2.0, 3.0, 4.0],
-        vec![10.0, 20.0, 30.0, 40.0],
-        2,
-        2,
-    )
-    .unwrap();
+    let raw =
+        KvTensorView::new(vec![1.0, 2.0, 3.0, 4.0], vec![10.0, 20.0, 30.0, 40.0], 2, 2).unwrap();
 
     let valid_cipher = TrackingCipher::new();
     let failing_cipher = FailingCipher;
     let config = KiviQuantizeConfig::default();
 
-    segment.write_quantized(&raw, config, &valid_cipher).unwrap();
+    segment
+        .write_quantized(&raw, config, &valid_cipher)
+        .unwrap();
 
     // Reading with failing cipher MUST fail at step 1 (AEAD Open)
     let res = segment.read_dequantized(&failing_cipher);

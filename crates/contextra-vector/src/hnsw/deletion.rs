@@ -4,9 +4,7 @@
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 
 use ahash::AHashSet;
-use contextra_core::{
-    error::HnswDeletionError, ContextraError, DocId, Result,
-};
+use contextra_core::{error::HnswDeletionError, ContextraError, DocId, Result};
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};
@@ -63,7 +61,13 @@ impl GhostFreeVectorIndex for HnswIndex {
         };
 
         // Check if already tombstoned/deleted
-        if self.inner.cold.deleted_nodes.read().contains(target_idx as u64) {
+        if self
+            .inner
+            .cold
+            .deleted_nodes
+            .read()
+            .contains(target_idx as u64)
+        {
             return Err(ContextraError::GraphRepairFailed(
                 HnswDeletionError::NodeNotFound(doc_id),
             ));
@@ -167,7 +171,10 @@ impl GhostFreeVectorIndex for HnswIndex {
                                 }
                             } else {
                                 let rem_ram_idx = (rem as usize) - mmap_node_count;
-                                self.inner.hot.arena.get_ram_node_connections(rem_ram_idx, layer, m)
+                                self.inner
+                                    .hot
+                                    .arena
+                                    .get_ram_node_connections(rem_ram_idx, layer, m)
                             };
 
                             for &c_u32 in &rem_conns {
@@ -189,14 +196,17 @@ impl GhostFreeVectorIndex for HnswIndex {
                         for &cand_u32 in &candidate_set {
                             let cand_idx = cand_u32 as usize;
                             let dummy_vec = super::types::VectorData::F32(Vec::new());
-                            let dist = self.inner.compute_symmetric_distance_hybrid_with_batch(
-                                neighbor_idx,
-                                cand_idx,
-                                &ctx,
-                                usize::MAX,
-                                &dummy_vec,
-                                &[],
-                            ).unwrap_or(f32::MAX);
+                            let dist = self
+                                .inner
+                                .compute_symmetric_distance_hybrid_with_batch(
+                                    neighbor_idx,
+                                    cand_idx,
+                                    &ctx,
+                                    usize::MAX,
+                                    &dummy_vec,
+                                    &[],
+                                )
+                                .unwrap_or(f32::MAX);
 
                             cand_objs.push(Candidate {
                                 index: cand_idx,
@@ -299,7 +309,9 @@ impl HnswIndex {
 
                 let max_layer = if i < mmap_node_count {
                     if let Some(mmap) = mmap_guard.as_ref() {
-                        mmap.get_node_record(i).map(|r| r.max_layer as usize).unwrap_or(0)
+                        mmap.get_node_record(i)
+                            .map(|r| r.max_layer as usize)
+                            .unwrap_or(0)
                     } else {
                         0
                     }
@@ -321,7 +333,10 @@ impl HnswIndex {
                         }
                     } else {
                         let ram_idx = i - mmap_node_count;
-                        self.inner.hot.arena.get_ram_node_connections(ram_idx, layer, m)
+                        self.inner
+                            .hot
+                            .arena
+                            .get_ram_node_connections(ram_idx, layer, m)
                     };
 
                     for &conn in &conns {

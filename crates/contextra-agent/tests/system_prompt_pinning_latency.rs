@@ -72,7 +72,10 @@ async fn test_system_prompt_pinning_agent_flow() -> contextra_types::Result<()> 
 
     let directive = engine.run(&mut ctx, step_id, "system_prompt_init");
     assert_eq!(directive, CacheDirective::Pin { ttl: None });
-    assert_eq!(ctx.get_cache_directive(), &CacheDirective::Pin { ttl: None });
+    assert_eq!(
+        ctx.get_cache_directive(),
+        &CacheDirective::Pin { ttl: None }
+    );
 
     Ok(())
 }

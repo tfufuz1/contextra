@@ -14,7 +14,9 @@
 //! eine unzulässige zirkuläre Abhängigkeit erzeugen. Stattdessen wird [`consolidate_semantic_hyperedges`]
 //! als freie Funktion in `contextra-cognition` bereitgestellt.
 
-use crate::aggregation_phase::{check_compaction_budget, AggregationConfig, AggregationPhaseResult};
+use crate::aggregation_phase::{
+    check_compaction_budget, AggregationConfig, AggregationPhaseResult,
+};
 use crate::consolidation_executor::execute_leanrag_aggregation_stage;
 use crate::leanrag_input::{build_leanrag_inputs, DEFAULT_MAX_LEANRAG_NODES};
 use crate::memory_consolidation::CommunityStabilityTracker;

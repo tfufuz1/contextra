@@ -18,13 +18,13 @@
 // without filtering by `last_committed_tx`. As a result, `list_checkpoints()` leaks uncommitted checkpoints
 // and populates the in-memory cache (`self.index`).
 
-use std::sync::Arc;
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_testkit::{FaultConfig, FaultVfs};
 use contextra_types::TxId;
 use serde_json::json;
+use std::sync::Arc;
 use tempfile::TempDir;
 
 /// Maximum IO / truncation points to test in systematic crash loop.
@@ -69,7 +69,8 @@ async fn systematic_crash_at_every_checkpoint_io_point() {
             let _ = storage_arc.put(tx1, b"doc1", b"content_v1").await;
             let _ = storage_arc.commit(tx1).await;
 
-            if let Ok(store) = PersistentCheckpointStore::open(storage_arc.clone(), "test_ns").await {
+            if let Ok(store) = PersistentCheckpointStore::open(storage_arc.clone(), "test_ns").await
+            {
                 // Attempt checkpoint creation (tx_cp in INTERNAL_BASE range so serialization barrier allows restore)
                 let tx_cp = TxId::new(TxId::INTERNAL_BASE + 1000);
                 let cp_res = store
@@ -121,13 +122,14 @@ async fn systematic_crash_at_every_checkpoint_io_point() {
             }
         };
 
-        let recovered_store = match PersistentCheckpointStore::open(recovered_storage, "test_ns").await {
-            Ok(s) => s,
-            Err(_) => {
-                // Checkpoint store recovery failed cleanly
-                continue;
-            }
-        };
+        let recovered_store =
+            match PersistentCheckpointStore::open(recovered_storage, "test_ns").await {
+                Ok(s) => s,
+                Err(_) => {
+                    // Checkpoint store recovery failed cleanly
+                    continue;
+                }
+            };
 
         // Phase 4: Verify checkpoint integrity invariants
         let get_res = recovered_store.get_checkpoint("chk_systematic").await;

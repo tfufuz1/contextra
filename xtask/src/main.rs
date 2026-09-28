@@ -61,6 +61,7 @@ mod check_audit_duplication;
 mod check_audit_tool_evidence;
 mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
+mod check_commit_diff_integrity;
 mod check_commit_messages;
 mod check_compile;
 mod check_coverage_gate;
@@ -2137,6 +2138,13 @@ fn main() {
         "reproducible-build" | "reproducible-build-check" => {
             let success = reproducible_build::run_reproducible_build_check(&args[2..]);
             if !success {
+                process::exit(1);
+            }
+        }
+        "check-commit-diff-integrity" => {
+            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args) {
+                eprintln!("❌ check-commit-diff-integrity failed: {}", e);
                 process::exit(1);
             }
         }

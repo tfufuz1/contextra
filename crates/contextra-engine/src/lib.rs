@@ -120,12 +120,7 @@ mod no_crypto_stubs {
 
         pub fn on_rollback(&self, _tenant: TenantId, _chunk_ids: &[u64]) {}
 
-        pub fn remove_tenant_segment(
-            &self,
-            _tenant: TenantId,
-            _doc_id: contextra_types::DocId,
-        ) {
-        }
+        pub fn remove_tenant_segment(&self, _tenant: TenantId, _doc_id: contextra_types::DocId) {}
     }
 
     impl DeletionProof {
@@ -159,8 +154,9 @@ mod no_crypto_stubs {
 
             use hmac::{Hmac, Mac};
             use sha2::Sha256;
-            let mut mac = Hmac::<Sha256>::new_from_slice(proof_key)
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("HMAC key error: {e}")))?;
+            let mut mac = Hmac::<Sha256>::new_from_slice(proof_key).map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("HMAC key error: {e}"))
+            })?;
             mac.update(&scope_bytes);
             mac.update(&deleted_keys_hash);
             mac.update(&tx_bytes);
@@ -389,7 +385,10 @@ impl std::fmt::Debug for ContextraConfig {
                 &self.encryption_passphrase.as_ref().map(|_| "***"),
             )
             .field("max_ram_mb", &self.max_ram_mb)
-            .field("group_commit_window_micros", &self.group_commit_window_micros)
+            .field(
+                "group_commit_window_micros",
+                &self.group_commit_window_micros,
+            )
             .field("durability_mode", &self.durability_mode)
             .field("memtable_size_limit", &self.memtable_size_limit)
             .field("expiry_reaper_interval", &self.expiry_reaper_interval)

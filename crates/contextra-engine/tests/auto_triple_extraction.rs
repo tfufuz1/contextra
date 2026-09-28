@@ -76,8 +76,12 @@ async fn test_auto_triple_extraction_default_config_creates_graph_edges() -> Res
     col.set_auto_extraction(mock_llm.clone(), auto_cfg);
 
     // 1. Insert document text
-    col.insert_text_only("doc_berlin_1", "Berlin is the capital city of Germany.", None)
-        .await?;
+    col.insert_text_only(
+        "doc_berlin_1",
+        "Berlin is the capital city of Germany.",
+        None,
+    )
+    .await?;
 
     #[cfg(feature = "entity-extraction")]
     {

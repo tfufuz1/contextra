@@ -394,7 +394,10 @@ impl Wal {
             return Ok(());
         }
 
-        if !self.legacy_key_used.load(std::sync::atomic::Ordering::SeqCst) {
+        if !self
+            .legacy_key_used
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
             Self::write_migration_marker_atomically(&self.path).await?;
             self.allow_legacy_integrity_key_fallback
                 .store(false, std::sync::atomic::Ordering::SeqCst);
@@ -737,7 +740,9 @@ impl Wal {
             header_written: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             key_manager: None,
             fallback_integrity_key: Some([1u8; 32]),
-            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
+                false,
+            )),
             legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),

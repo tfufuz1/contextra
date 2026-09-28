@@ -20,9 +20,9 @@ static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>>
 #[allow(clippy::panic)]
 fn get_protected_regex() -> &'static Regex {
     PROTECTED_REGEX.get_or_init(|| {
-        if let Ok(re) = Regex::new(
-            r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
-        ) {
+        if let Ok(re) =
+            Regex::new(r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
+        {
             re
         } else if let Ok(fallback) = Regex::new(r"$^") {
             fallback

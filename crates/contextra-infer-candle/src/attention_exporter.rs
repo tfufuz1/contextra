@@ -42,7 +42,9 @@ impl CandleAttentionExporter {
     /// Enforces [`MAX_TRACKED_REQUESTS`] ring-buffer capacity limit.
     pub fn record_attention_weights(&self, request_id: RequestId, weights: Vec<f32>) {
         let mut state = self.state.lock();
-        if let std::collections::hash_map::Entry::Occupied(mut entry) = state.weights.entry(request_id) {
+        if let std::collections::hash_map::Entry::Occupied(mut entry) =
+            state.weights.entry(request_id)
+        {
             entry.insert(weights);
             return;
         }

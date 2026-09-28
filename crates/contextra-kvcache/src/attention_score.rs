@@ -81,6 +81,7 @@ pub fn rank_for_eviction_weighted(
         .map(|&(id, instant)| (id, instant, scores.importance_score(id)))
         .collect();
 
+    // // NAN-CHECK-OK: Eviction candidate ranking filters non-finite scores before compute
     let valid_scores: Vec<f32> = raw_scores
         .iter()
         .filter_map(|(_, _, s)| *s)
@@ -199,11 +200,7 @@ mod tests {
     fn test_v5_numerical_stability_edge_cases() {
         let base = Instant::now();
         // Edge Case 1: Identical timestamps (zero time_span_secs)
-        let candidates_same_time = vec![
-            (10, base),
-            (20, base),
-            (30, base),
-        ];
+        let candidates_same_time = vec![(10, base), (20, base), (30, base)];
 
         let mut scores_map = HashMap::new();
         scores_map.insert(10, 5.0);
@@ -223,9 +220,12 @@ mod tests {
         let mut uniform_map = HashMap::new();
         uniform_map.insert(100, 42.0);
         uniform_map.insert(200, 42.0);
-        let uniform_source = MapAttentionSource { scores: uniform_map };
+        let uniform_source = MapAttentionSource {
+            scores: uniform_map,
+        };
 
-        let ranked_uniform = rank_for_eviction_weighted(&candidates_diff_time, &uniform_source, 0.5);
+        let ranked_uniform =
+            rank_for_eviction_weighted(&candidates_diff_time, &uniform_source, 0.5);
         // With uniform scores, fallback to LRU age: oldest (100) evicted first
         assert_eq!(ranked_uniform, vec![100, 200]);
 
@@ -233,9 +233,12 @@ mod tests {
         let mut non_finite_map = HashMap::new();
         non_finite_map.insert(100, f32::NAN);
         non_finite_map.insert(200, f32::INFINITY);
-        let non_finite_source = MapAttentionSource { scores: non_finite_map };
+        let non_finite_source = MapAttentionSource {
+            scores: non_finite_map,
+        };
 
-        let ranked_non_finite = rank_for_eviction_weighted(&candidates_diff_time, &non_finite_source, 0.5);
+        let ranked_non_finite =
+            rank_for_eviction_weighted(&candidates_diff_time, &non_finite_source, 0.5);
         assert_eq!(ranked_non_finite, vec![100, 200]);
     }
 }

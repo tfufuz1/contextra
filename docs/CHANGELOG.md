@@ -4,11 +4,18 @@
 
 | Zeitstempel | Crate/Datei | Typ | ID | Session | Status | Review-Pässe (unabhängig) | Beschreibung |
 |---|---|---|---|---|---|---|---|
+| `TS:2026-09-27T00:00:00Z` | `crates/contextra-cognition/src/transitivity_veto.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Transitivity Veto Inspection & Orchestration for Near-Duplicate Memory Consolidation. |
+| `TS:2026-09-27T00:00:00Z` | `crates/contextra-cognition/tests/transitivity_veto_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tests für Transitivity Veto Inspektion, Orchestrierung & Budget-Steuerung. |
 | `TS:2026-09-27T00:00:00Z` | `crates/contextra-crypto/tests/deletion_proof_hash_collision.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tests verifying collision prevention via length-prefixed hashing for DeletionProof. |
+| `TS:2026-09-26T00:00:00Z` | `crates/contextra-adapt/tests/sketched_projection_config_validation.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Konfigurations- und Validierungstests für SketchedProjection (§13.2). |
+| `TS:2026-09-26T00:00:00Z` | `crates/contextra-adapt/tests/sketched_projection_determinism.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Determinismus-Tests für SketchedProjection (§13.2 / P28). |
+| `TS:2026-09-26T00:00:00Z` | `crates/contextra-adapt/tests/sketched_projection_vs_sherman_morrison.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Differential-Test SketchedProjection vs. ShermanMorrison baseline (§13.2). |
+| `TS:2026-09-26T00:00:00Z` | `crates/contextra-crypto/tests/legacy_hmac_collision_property.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-Test for legacy v2 HMAC length-prefixed deletion keys hashing function against collisions. |
+| `TS:2026-09-26T00:00:00Z` | `crates/contextra-store/tests/wal_recovery_runtime_stall.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Runtime stall test for WAL recovery replay to detect non-linear (O(n²)) complexity regressions. |
 | `TS:2026-09-25T15:10:00Z` | `crates/contextra-crypto/benches/deletion_proof_latency_bench.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Criterion benchmark for cryptographic deletion proof issuance and verification latency. |
 | `TS:2026-09-17T19:00:00Z (SESSION: jules-agent-budget)` | `crates/contextra-agent/src/budget.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Token budget RAII reservation abstraction for agent workflow steps. |
 | `TS:2026-09-17T00:00:00Z` | `crates/contextra-crypto/tests/deletion_proof_prefix_collision_proptest.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | AK-21 Collision test for length-prefixed key hash function hash_deleted_keys_length_prefixed. |
-| `TS:2026-09-15T00:00:00Z` | `crates/contextra-kvcache/src/eviction_worker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall). |
+| `TS:2026-09-15T00:00:00Z` | `crates/contextra-kvcache/src/eviction_worker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Eviction-Worker (nicht-blockierender Hot-Path LRU / Attention) und emergency_wipe (synchroner Notfall). |
 | `TS:2026-09-15T00:00:00Z` | `crates/contextra-kvcache/src/prefix_store.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Mandantenisolierter KV-Prefix-Store mit Byte-Budget & LRU-Eviction (Spec §9.2). |
 | `TS:2026-09-15T00:00:00Z` | `crates/contextra-kvcache/src/radix.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prefix-Radix-Baum über Token-Sequenzen, RAII-Guards & KvReusePolicy (§9.2). |
 | `TS:2026-09-15T00:00:00Z` | `crates/contextra-kvcache/src/segment.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvSegment mit Zeroize-Garantie, Tier-2 AEAD-Verschlüsselung & Crypto-Shredding. |
@@ -100,6 +107,23 @@
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/contextra-engine/src/collection/tests/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit-Tests für Collection-CRUD, Indizierung, Repair und Grenzwerte. |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/contextra-engine/src/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working). |
 | `TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)` | `crates/contextra-engine/src/transaction/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen. |
+| `2026-09-28T00:00:00Z (SESSION: e459bd5f)` | `crates/contextra-mvcc/src/tx_buffer.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen, ReadSet-Limits & Watermark-Tracking. |
+| `2026-09-28T00:00:00Z` | `crates/contextra-checkpoint/src/hardlink_cloner.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone. |
+| `2026-09-28T00:00:00Z` | `crates/contextra-mvcc/src/ssi.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | In-memory SSI Read-Set Tracking, Write-Skew-Konfliktvalidierung, Fail-Closed Pruning und atomare Commit-Registrierung. |
+| `2026-09-27T22:49:25Z (SESSION: 72f4c80d)` | `crates/contextra-wire/src/adapter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Zero-copy byte buffer slice wrapper (WireBuffer) for FlatBuffers IPC messages. |
+| `2026-09-27T22:49:25Z (SESSION: 72f4c80d)` | `crates/contextra-wire/src/jsonrpc.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Generic JSON-RPC 2.0 protocol request/response structures for Contextra IPC. |
+| `2026-09-27T22:49:25Z (SESSION: 72f4c80d)` | `crates/contextra-wire/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC bindings and zero-copy adapters. |
+| `2026-09-27T22:45:00Z (SESSION: 786dca08)` | `crates/contextra-sys/src/acl_win32.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Win32 ACL restriction and file ownership verification wrappers (Ring 0) |
+| `2026-09-27T22:45:00Z (SESSION: 786dca08)` | `crates/contextra-sys/src/vault.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RAII manager for RAM memory-locked sensitive buffer regions (Ring 0) |
+| `2026-09-27T22:42:00Z (SESSION: 7c14554a)` | `crates/contextra-sandbox/src/wasi.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | WASI preview1 host function implementations (fd_read, fd_write, proc_exit, clock_time_get, random_get) |
+| `2026-09-27T19:30:00Z` | `crates/contextra-rank/tests/conformal_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integration and invariant verification test suite for Adaptive Conformal Prediction (conformal.rs). |
+| `2026-09-27T00:00:00Z` | `crates/contextra-adapt/tests/pid_anti_windup_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests für conditional Back-Calculation Anti-Windup im PID-Regler. |
+| `2026-09-27T00:00:00Z` | `crates/contextra-crypto/src/ed25519_proof.rs` | `AI-TAG` | `-` | `welle4-p17` | `OPEN` | `-` | /// AI-TAG[TODO] (TS: 2026-09-27T00:00:00Z) (SESSION: welle4-p17): In `deletion_proof.rs` das `pub signature_version: u8` Feld |
+| `2026-09-27T00:00:00Z` | `crates/contextra-store/src/compaction/adaptive.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Workload-adaptive Compaction-Strategie (EcoTune / ArceKV inspiriert) |
+| `2026-09-26T02:30:00Z` | `crates/contextra-store/tests/wal_lifecycle_crash_point_matrix.rs` | `ANCHOR` | `TEST:STO-WAL-LIFECYCLE-MATRIX` | `chaos-matrix` | `DONE` | `0` | // ANCHOR[TEST:STO-WAL-LIFECYCLE-MATRIX] STATUS:DONE (TS:2026-09-26T02:30:00Z) (SESSION: chaos-matrix) |
+| `2026-09-26T00:00:00Z (SESSION: KV-BRIDGE-ZERO-COPY-IMPL)` | `crates/contextra-infer-candle/src/kv_bridge.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store (RAM Tier 1 + LSM Tier 2 Spill via KvBridgeStorage Port). |
+| `2026-09-26T00:00:00Z` | `crates/contextra-ports/src/kv_bridge_port.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvBridgeStorage Port-Trait (Ring 0) zur Abstraktion von Tier-2 KV-Cache Persistence für Ring-2 Adaptern. |
+| `2026-09-25T00:00:00Z` | `crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs` | `ANCHOR` | `TEST:CHK-005` | `-` | `DONE` | `0` | // ANCHOR[TEST:CHK-005] STATUS:DONE (TS:2026-09-25T00:00:00Z) |
 | `2026-09-25T00:00:00Z` | `crates/contextra-sandbox/src/approval.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Human Approval Data Model & Pure State Machine for WASM Guest Execution (§4.18) |
 | `2026-09-24` | `crates/contextra-graph/src/ppr/snapshot.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Multi-Version Concurrency Control (MVCC) snapshot-isolated PPR computation. |
 | `2026-09-22T00:00:00Z` | `crates/contextra-infer-candle/src/inference/prefix_reuse.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Prefix reuse helper structs, context, and key/seed builders for KV cache stage B (Spec §9.2). |
@@ -118,7 +142,6 @@
 | `2026-09-18T00:00:00Z` | `crates/contextra-store/tests/fault_injection_recovery.rs` | `ANCHOR` | `TEST:STO-002` | `a4f61283` | `DONE` | `0` | // ANCHOR[TEST:STO-002] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283) |
 | `2026-09-18T00:00:00Z` | `crates/contextra-store/tests/manifest_crash_no_resurrection.rs` | `ANCHOR` | `TEST:STO-005` | `a4f61283` | `DONE` | `0` | // ANCHOR[TEST:STO-005] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283) |
 | `2026-09-18T00:00:00Z` | `crates/contextra-store/tests/wal_systematic_crash.rs` | `ANCHOR` | `TEST:STO-004` | `a4f61283` | `DONE` | `0` | // ANCHOR[TEST:STO-004] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283) |
-| `2026-09-17T00:00:00Z (SESSION: KV-BRIDGE-ZERO-COPY-IMPL)` | `crates/contextra-infer-candle/src/kv_bridge.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | KvBridgeAdapter verbindet Retrieval-Chunks mit mandantenisoliertem KV-Cache-Store (RAM Tier 1 + LSM Tier 2 Spill). |
 | `2026-09-16T21:00:00Z (SESSION: IP-07)` | `crates/contextra-types/src/tombstone.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Trait und Referenzimplementierung für Tombstone-Semantik (IP-07 / ADR-041). |
 | `2026-09-16T16:47:30Z` | `crates/contextra-py/src/lib.rs` | `REVIEW-PASS` | `-` | `29edb6a4` | `-` | `-` | // REVIEW-PASS[1/2] Systematischer Review der contextra-py PyO3 FFI Bindings (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-16T16:47:30Z) (SESSION: 29edb6a4) |
 | `2026-09-16T16:24:19Z` | `crates/contextra-infer-ollama/src/lib.rs` | `REVIEW-PASS` | `-` | `4b816c9a` | `PASS` | `-` | // REVIEW-PASS[2/2] STATUS:PASS (TS: 2026-09-16T16:24:19Z) (SESSION: 4b816c9a) PRÜFER-KONTEXT: FRESH - Independent diff review verified: prompt injection XML-escaping, retry & backoff error classification, forbid(unsafe_code) invariant, and 91 tests green. |
@@ -149,6 +172,8 @@
 | `2026-09-15T00:00:00Z` | `crates/contextra-ports/src/text_index.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | TextIndex, TextEmbeddingEngine & SegmentSynthesizer Trait-Definitionen für BM25/Inverted Index. |
 | `2026-09-15T00:00:00Z` | `crates/contextra-ports/src/vector_index.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | VectorIndex Trait & VectorIndexStats für HNSW/Vektor-Indizes. |
 | `2026-09-15` | `crates/contextra-db/tests/proptest_search_invariants.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Property-based Tests für Retrieval- & Search-Invarianten in contextra-db (RRF, BM25, End-to-End). |
+| `2026-09-15` | `crates/contextra-store/src/manifest/core.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Kernimplementierung des Manifests zum Lesen, Schreiben, Rollover und Reconstruct aktiver SSTables. |
+| `2026-09-15` | `crates/contextra-store/src/manifest/entry.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Datenstruktur und (De-)Serialisierungslogik für SSTable-Manifest-Einträge (ManifestEntry). |
 | `2026-09-13T14:29:07Z` | `crates/contextra-mcp/src/io.rs` | `AI-TAG` | `AGT-MCP-782aa62e` | `23626761` | `RESOLVED` | `0` | // AI-TAG[SMELL][RESOLVED] Missing inactivity timeout on stdio read_line_bounded (ID: AGT-MCP-782aa62e) (TS: 2026-09-13T14:29:07Z) (SESSION: 23626761) |
 | `2026-09-13T01:45:00Z` | `crates/contextra-infer-ollama/src/lib.rs` | `REVIEW-PASS` | `-` | `6e371f4e` | `PASS` | `-` | // REVIEW-PASS[3/3] STATUS:PASS (TS: 2026-09-13T01:45:00Z) (SESSION: 6e371f4e) PRÜFER-KONTEXT: FRESH - Tier 3 deep audit complete: verified prompt injection structural isolation, proptest evasion matrix, concurrency stress tests, and ML calibration provenance. |
 | `2026-09-13T01:42:00Z (SESSION: 50c8c755)` | `crates/contextra-infer-candle/tests/kv_bridge_and_stress_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integration tests for KV-Bridge fail-open behavior, fingerprint mismatches, GASP grounding, and backpressure saturation. |
@@ -196,7 +221,6 @@
 | `2026-09-09T15:45:22Z (SESSION: 6cae458a)` | `crates/contextra-infer-candle/src/gguf_loader.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | GGUF model container header and metadata parser for Candle models. |
 | `2026-09-09T15:45:22Z (SESSION: 6cae458a)` | `crates/contextra-infer-candle/src/model_registry.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Model fingerprinting and CandleQuantization definitions. |
 | `2026-09-09T14:43:31Z (SESSION: a69d21e4)` | `crates/contextra-types/src/types/domain/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Kanonische Domain-Typen (DocId, EntityId, TxId, TenantId, Embedding, DistanceMetric, Edge, Entity). |
-| `2026-09-09T14:04:00Z` | `crates/contextra-mcp/src/config.rs` | `AI-TAG` | `AGT-MCP-98350010` | `fdf816df` | `RESOLVED` | `0` | // AI-TAG[SMELL][MAJOR][RESOLVED] Field reassignment on Default::default instance triggers clippy::field_reassign_with_default (ID: AGT-MCP-98350010) (TS: 2026-09-09T14:04:00Z) (SESSION: fdf816df) |
 | `2026-09-09T13:22:45Z` | `crates/contextra-text/src/morphology/tests.rs` | `REVIEW-PASS` | `TEST:TXT-001` | `dc71d70` | `PASS` | `8` | // REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-09T13:22:45Z) (SESSION: dc71d70) |
 | `2026-09-09T13:17:00Z` | `crates/contextra-crypto/src/kv_segment/eviction_worker.rs` | `AI-TAG` | `AGT-CRYPTO-edaee52e` | `a413a598` | `RESOLVED` | `0` | // AI-TAG[CONCURRENCY][MAJOR][RESOLVED] EvictionWorker is Sync via Mutex protection of sender and handle (ID: AGT-CRYPTO-edaee52e) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598) |
 | `2026-09-09T13:17:00Z` | `crates/contextra-crypto/src/kv_segment/segment.rs` | `AI-TAG` | `AGT-CRYPTO-fae9dd56` | `a413a598` | `RESOLVED` | `0` | // AI-TAG[CRYPTO][MAJOR][RESOLVED] Fail fast on missing encrypted payload/nonce instead of dummy zero nonce (ID: AGT-CRYPTO-fae9dd56) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598) |
@@ -265,7 +289,6 @@
 | `2026-08-30T18:53:58Z (SESSION: b1234567)` | `crates/contextra-graph/src/session_dag.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Session-DAG für persistente, azyklische Agent-State-Verzweigung (Contextra Session-DAG Pattern) |
 | `2026-08-30T18:51:56Z (SESSION: e459bd5f)` | `crates/contextra-mvcc/src/seq_log.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Shared Versioned Sequence Log für Snapshot-isolierte Index-Suchen (_at Familie). |
 | `2026-08-30T18:51:56Z (SESSION: e459bd5f)` | `crates/contextra-mvcc/src/snapshot.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | SnapshotRegistry für MVCC-sichere Reads und minimal aktive Sequenznummern. |
-| `2026-08-30T18:51:56Z (SESSION: e459bd5f)` | `crates/contextra-mvcc/src/tx_buffer.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen. |
 | `2026-08-30T18:51:56Z (SESSION: e459bd5f)` | `crates/contextra-types/src/types/budget.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Token- und Resource-Budget-Management mit atomarem Tracking & Memory Backpressure. |
 | `2026-08-30T18:51:56Z (SESSION: e459bd5f)` | `crates/contextra-types/src/types/filter.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Kanonische Metadata Filter DSL (FilterExpr) und Evaluierungs-Engine. |
 | `2026-08-30T18:51:56Z (SESSION: e459bd5f)` | `crates/contextra-types/src/types/importance.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Memory Importance Scoring und Recency-Decay Berechnungen (ADR-025). |
@@ -277,7 +300,6 @@
 | `2026-08-30T15:00:19Z` | `crates/contextra-agent/src/graph.rs` | `AI-TAG` | `-` | `283abf0f` | `RESOLVED` | `-` | // AI-TAG[HARDENING][CRITICAL] RESOLVED: Validates non-empty Node ID and description for graph nodes. (TS:2026-08-30T15:00:19Z) (SESSION: 283abf0f) |
 | `2026-08-30T15:00:19Z` | `crates/contextra-agent/src/graph.rs` | `AI-TAG` | `-` | `283abf0f` | `RESOLVED` | `-` | // AI-TAG[HARDENING][CRITICAL] RESOLVED: Validates non-empty from/to endpoints for workflow edges. (TS:2026-08-30T15:00:19Z) (SESSION: 283abf0f) |
 | `2026-08-29T18:30:00Z` | `crates/contextra-db/tests/fusion_edge_cases_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Standalone Randfall- & Mutation-Testsuite für Reciprocal Rank Fusion (fusion.rs). |
-| `2026-08-29T15:22:34Z (SESSION: 2c814094)` | `crates/contextra-mvcc/src/tx_buffer.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Transaktion-Staging-Buffer zwischen Writes und WAL-Commit |
 | `2026-08-29T12:00:00Z` | `crates/contextra-mvcc/src/tx_buffer.rs` | `AI-TAG` | `AGT-CORE-001` | `a3f29c1d` | `RESOLVED` | `0` | // AI-TAG[SMELL][MINOR] RESOLVED: AGT-CORE-001 — Bounded staging capacity enforced (TS:2026-08-29T12:00:00Z) (SESSION: a3f29c1d) |
 | `2026-08-29T11:00:00Z` | `crates/contextra-db/tests/semantic_recall.rs` | `REVIEW-PASS` | `PERF:EVAL-001` | `c9f5e2b3` | `PASS` | `1` | // REVIEW-PASS[2/2] STATUS:PASS (ID: PERF:EVAL-001) (TS: 2026-08-29T11:00:00Z) (SESSION: c9f5e2b3) |
 | `2026-08-29T10:00:00Z` | `crates/contextra-db/tests/semantic_recall.rs` | `REVIEW-PASS` | `PERF:EVAL-001` | `b8e4f1a2` | `PASS` | `1` | // REVIEW-PASS[1/2] STATUS:PASS (ID: PERF:EVAL-001) (TS: 2026-08-29T10:00:00Z) (SESSION: b8e4f1a2) |
@@ -303,11 +325,15 @@
 | `` | `crates/contextra-cognition/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Contextra Cognition Engine (Layer 3 - Cognition). |
 | `` | `crates/contextra-cognition/src/maintenance_scheduler.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Zentraler MaintenanceScheduler für koordiniertes, sequenzielles Ausführen aller Background-Maintenance-Prozesse (ADR-079). |
 | `` | `crates/contextra-cognition/src/memory_consolidation.rs` | `AI-TAG` | `AGT-DB-660fbb5f` | `-` | `RESOLVED` | `0` | /// AI-TAG[SLEEP][MINOR] RESOLVED: AGT-DB-660fbb5f — Position im turns-Slice wird anstelle des |
+| `` | `crates/contextra-cognition/src/semantic_aggregation_facade.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Öffentliche Facade-Schnittstelle für LeanRAG Stage-3-Hyperkantenaggregatierung (Spec §5.3, §12.4). |
 | `` | `crates/contextra-crypto/src/deletion_proof.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-R3-1: DeletionProof signature_version 2 erweitert Signatur-Payload um covered_layers & excluded_scopes zur Vermeidung von Cross-Context-Fälschungen. |
 | `` | `crates/contextra-crypto/src/ed25519_proof.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Standalone Ed25519 asymmetric signature creation and external verification for deletion proofs (version 3). |
 | `` | `crates/contextra-crypto/src/kdf.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Versionierter Key Derivation Function (KDF) Header und Argon2id Schlüsselableitung für Passphrasen. |
+| `` | `crates/contextra-crypto/src/kv_shredding.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | HKDF-Sub-Key-Ableitung und Key-Registry für KV-Crypto-Shredding (AP-P0-06). |
+| `` | `crates/contextra-crypto/src/wal_completeness.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Verification of WAL log tail completeness against checkpoint manifest high-water-mark to detect truncation attacks. |
 | `` | `crates/contextra-crypto/tests/ed25519_proof_external_verify.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integration tests for external verification of Ed25519 deletion proofs (version 3). |
 | `` | `crates/contextra-crypto/tests/kdf_argon2id.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tests für Argon2id KDF Header, Parameter-Validierung, Parser-Robustheit und KeyManager Integration. |
+| `` | `crates/contextra-crypto/tests/wal_completeness_tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit & proptest verification for WAL chain completeness checks. |
 | `` | `crates/contextra-db/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Contextra Database Strangler Shell / Re-export Facade (Layer 3). |
 | `` | `crates/contextra-db/tests/cross_domain_chaos_matrix_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/contextra-db/tests/diskann_collection_fallback.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Collection Integration Fallback Test (Pflichttest 3). |
@@ -318,6 +344,8 @@
 | `` | `crates/contextra-engine/src/background_workers/hyperedge_worker.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Worker-Task und FIFO-Queue zur verzögerten Kaskaden-Tombstoning-Verarbeitung von Hyperedges. |
 | `` | `crates/contextra-engine/src/background_workers/orphan_workers.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Worker-Tasks zur Bereinigung verwaister Transaktionen (Orphan Cleanup) und HNSW-Index-Rebuilds. |
 | `` | `crates/contextra-engine/src/background_workers/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit-Tests für background_workers Submodule. |
+| `` | `crates/contextra-engine/src/collection/crud/auto_extraction.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Ingestion-Hook fuer LLM-gestuetzte Entitaetsextraktion (OpenIE). |
+| `` | `crates/contextra-engine/src/collection/query_builder/scope.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Scoping-Typen und Query-Builder Ergänzung für ACORN-Hard-Boundary (Spec §5.3, §8.5, §10.4). |
 | `` | `crates/contextra-engine/src/collection/search/basic.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Einfache Suchvarianten (search, search_with_filter, search_with_filter_expr, search_text) für Collection. |
 | `` | `crates/contextra-engine/src/collection/search/checkpoint.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RAII CheckpointPinGuard und higher-order helper functions für Snapshot-Pinning während Suchoperationen. |
 | `` | `crates/contextra-engine/src/collection/search/filtered.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Filter-Familie (Selectivity, Match-DocIDs, search_filtered) für Collection. |
@@ -328,6 +356,9 @@
 | `` | `crates/contextra-engine/src/collection/search/hybrid/query.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Hybrid-Familie Submodule für Query-basierte Suche. |
 | `` | `crates/contextra-engine/src/collection/search/hydrate.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Hydrierungs-Familie (hydrate_from_scored_at, hydrate_from_tuples_at) für Collection. |
 | `` | `crates/contextra-engine/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Contextra Core Engine Orchestrator & Facade (Layer 3 - Engine). |
+| `` | `crates/contextra-engine/tests/auto_extraction_default_enabled.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Testet den kompilierte Default-Wert fuer AutoExtractionConfig (enabled: true vs. opt-out). |
+| `` | `crates/contextra-engine/tests/auto_extraction_wiring.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Integrationstests fuer die Verdrahtung von AutoExtraction in Collection::insert_text_only. |
+| `` | `crates/contextra-engine/tests/openie_determinism_and_provenance.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Determinismus- & Provenienztests fuer OpenIE Tripel-Extraktion und edge.source_doc_id-Kaskade. |
 | `` | `crates/contextra-mcp/src/bulk_exfiltration_detector.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 Bulk-Exfiltration-Detektor (Re-export from contextra-privacy) |
 | `` | `crates/contextra-mcp/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries (Re-export from contextra-privacy) |
 | `` | `crates/contextra-mcp/src/egress_guard.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 EgressGuard (Re-export from contextra-privacy) |
@@ -335,9 +366,11 @@
 | `` | `crates/contextra-ports/src/graph_index.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md) |
 | `` | `crates/contextra-ports/src/lifecycle.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md) |
 | `` | `crates/contextra-ports/src/vector_index.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md) |
+| `` | `crates/contextra-privacy/src/audit_trace.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Deterministische Audit-Trace-Generierung für Egress-Klassifikationsentscheidungen (INV-EGRESS-AUDIT-1 / P28). |
 | `` | `crates/contextra-privacy/src/bulk_exfiltration_detector.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-4 Bulk-Exfiltration-Detektor (Volumen/Zeitfenster pro Session) |
 | `` | `crates/contextra-privacy/src/egress_gateway.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Egress Security Gateway & Classifier Enforcement for Cloud Queries |
 | `` | `crates/contextra-privacy/src/egress_vault.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Cloud-Egress-Vault mit Layer-1-Regex-Klassifikation und Fail-Closed-Semantik. |
+| `` | `crates/contextra-privacy/tests/pii_vault_forces_crypto_shred.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Test PII vault forces CryptoShred under DeploymentTier::EdgeMinimal (INV-COLLECTION-PROFILE-3) |
 | `` | `crates/contextra-router/src/router/dispatch_core.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Kern-Routing-Dispatch und Kaskaden-/Bandit-Profilauswahl für RouterEngine. |
 | `` | `crates/contextra-router/src/router/lifecycle.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Konstruktions- und Profilverwaltungs-Methoden (Hot-Reload) für RouterEngine. |
 | `` | `crates/contextra-router/src/router/outcomes.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Outcome-Recording, Kalibrierungs- und Drift-Statistiken für RouterEngine. |
@@ -351,6 +384,9 @@
 | `` | `crates/contextra-simd/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Layer-0 Ring-0 Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Dispatch. |
 | `` | `crates/contextra-store/examples/chaos_writer.rs` | `FILE-CONTEXT` | `-` | `chaos_power_cut` | `-` | `-` |  |
 | `` | `crates/contextra-store/src/compaction/engine.rs` | `AI-TAG` | `-` | `-` | `RESOLVED` | `-` | // AI-TAG[SMELL][RESOLVED] audit-H-3: LsmStorage hält eine persistente CompactionEngine-Instanz (LsmStorage.compaction_engine), wodurch Compaction-State & Zähler erhalten bleiben. |
+| `` | `crates/contextra-store/src/kv/delete_mode.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Definition von KvDeleteMode (TombstoneOnly vs CryptoShred). |
+| `` | `crates/contextra-store/src/kv/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Key-Value Segment-Verwaltung und Löschmodi (TombstoneOnly, CryptoShred). |
+| `` | `crates/contextra-store/src/kv/segment.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Verdrahtung von KvDeleteMode und contextra_crypto::kv_shredding für KV-Segment-Verschlüsselung und Crypto-Shredding (AP-P0-06 / Spec B.1.8). |
 | `` | `crates/contextra-store/src/util.rs` | `FILE-CONTEXT` | `-` | `8f882f1f` | `-` | `-` |  |
 | `` | `crates/contextra-store/tests/chaos_dropped_write.rs` | `FILE-CONTEXT` | `-` | `283abf0f` | `-` | `-` |  |
 | `` | `crates/contextra-store/tests/chaos_matrix.rs` | `FILE-CONTEXT` | `-` | `283abf0f` | `-` | `-` |  |
@@ -358,6 +394,7 @@
 | `` | `crates/contextra-store/tests/chaos_task_massacre.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/contextra-store/tests/disk_full_during_write.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/contextra-store/tests/fsync_timeout_rollback.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
+| `` | `crates/contextra-store/tests/kv_delete_mode_wiring_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Tests for KV Delete Mode & Crypto-Shredding wiring in contextra-store. |
 | `` | `crates/contextra-store/tests/wal_hmac_chain_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Regressionstest — WAL HMAC-Kette enthält keine Gabelungen nach Group-Commit. |
 | `` | `crates/contextra-store/tests/wal_hmac_rollback_race.rs` | `FILE-CONTEXT` | `-` | `b448084` | `-` | `-` |  |
 | `` | `crates/contextra-store/tests/wal_truncate_ordering.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität. |
@@ -377,7 +414,9 @@
 | `` | `crates/contextra-vector/src/diskann/filtered.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | DiskANN-gefilterte Vektorsuche via adaptivem Oversampling mit Post-Filter (Spec §7.3 / ADR-013). |
 | `` | `crates/contextra-vector/src/diskann/predicate_augmented.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Additiver, rein lesender Prototyp für prädikatsbewusste Graph-Traversierung (ACORN-γ-Prinzip). |
 | `` | `crates/contextra-vector/src/distance.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Distanzberechnungen und Vektor-Dequantisierung via contextra-simd. |
+| `` | `crates/contextra-vector/src/hnsw/acorn_filtered.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | ACORN Prädikats-gefilterte Graph-Suche (Patel et al. 2024) für HnswIndex. |
 | `` | `crates/contextra-vector/src/hnsw/arena.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Arena-Allocator (HnswArena) für HNSW-Nachbarlisten mit 64-Byte-Alignment, Slot-Freilisten und CAS-Relinking. |
+| `` | `crates/contextra-vector/src/hnsw/deletion.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Synchronous ghost-free node deletion with budgeted neighborhood repair for HNSW graph. |
 | `` | `crates/contextra-vector/src/hnsw/mod.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | HNSW Vector Index mit Layer Descent, Soft-Deletes und transaktionalem Staging (TxBuffer). |
 | `` | `crates/contextra-vector/src/hnsw/sq8_bias.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Quantisierungs-Bias-Kalibrierung (Sq8Bias) für SQ8-Quantisierung im HNSW Index Header. |
 | `` | `crates/contextra-vector/src/persistence/header.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - Header-Format. |
@@ -385,9 +424,14 @@
 | `` | `crates/contextra-vector/src/persistence/node.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - NodeRecord-Format. |
 | `` | `crates/contextra-vector/src/persistence/tests.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Unit-Tests für HNSW Persistenz-Schicht. |
 | `` | `crates/contextra-vector/src/quantize_rabitq.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | RaBitQ-Quantisierer (Binär-Quantisierung mit orthogonaler Rotation und Fehlerkorrektur). |
+| `` | `crates/contextra-vector/tests/acorn_hnsw_differential.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Differential-Testing & Recall-Regressionstests für HnswIndex::search_knn_acorn (Spec §8.5, §22.4). |
 | `` | `crates/contextra-vector/tests/diskann_corruption_fallback_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Corruption detection and DiskAnnFallbackPolicy test (Pflichttest 2). |
 | `` | `crates/contextra-vector/tests/diskann_fault_injection_test.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1). |
 | `` | `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` |  |
 | `` | `crates/contextra/src/agent_memory.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Agent Memory Facade (Ring 4) — Provides a clean remember/recall/forget/relate API for AI Agents. |
 | `` | `crates/contextra/src/builder.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Contextra Composition Root Builder (Ring 4). |
+| `` | `crates/contextra/src/collection_profile.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | CollectionProfile & DeploymentTier Presets for Contextra (Spec B.1.8, AP-P0-05) |
 | `` | `crates/contextra/src/lib.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Contextra Primary Facade & Composition Root (Ring 4). |
+| `` | `crates/contextra/src/performance_profile.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | PerformanceProfile Presets for Contextra (Spec B.1.6, AP-P0-05) |
+| `` | `crates/contextra/tests/collection_profile_matrix.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Test matrix of PerformanceProfile x KvDeleteMode combinations (Spec B.1.8) |
+| `` | `crates/contextra/tests/deployment_tier_presets_valid.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Test deployment tier presets validation (Spec B.1.8 / INV-COLLECTION-PROFILE-2) |

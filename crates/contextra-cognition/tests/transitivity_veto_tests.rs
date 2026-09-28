@@ -4,9 +4,7 @@
 // STAND: TS:2026-09-27T00:00:00Z
 
 use contextra_cognition::aggregation_phase::{AggregationConfig, AggregationNode};
-use contextra_cognition::memory_consolidation::{
-    run_consolidation_pass, ConsolidationConfig,
-};
+use contextra_cognition::memory_consolidation::{run_consolidation_pass, ConsolidationConfig};
 use contextra_cognition::transitivity_veto::{
     filter_candidates_with_transitivity_veto, validate_transitivity_veto,
 };

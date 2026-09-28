@@ -419,7 +419,10 @@ async fn test_delete_memory_capacity_exceeded() {
     };
     let storage = LsmStorage::new(config).await.expect("create storage");
 
-    storage.budget.consume_memory(1_000_000).expect("fill budget");
+    storage
+        .budget
+        .consume_memory(1_000_000)
+        .expect("fill budget");
     assert!(!storage.budget.has_memory_capacity());
 
     let tx = TxId::new(1);

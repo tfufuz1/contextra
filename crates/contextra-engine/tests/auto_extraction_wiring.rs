@@ -287,7 +287,8 @@ async fn test_auto_extraction_default_config_creates_edges_in_graph_index() {
             );
 
             let carol_id = contextra_types::EntityId::from_key("Carol").expect("Carol entity id");
-            let proj_id = contextra_types::EntityId::from_key("ProjectX").expect("ProjectX entity id");
+            let proj_id =
+                contextra_types::EntityId::from_key("ProjectX").expect("ProjectX entity id");
             let neighbors = col
                 .graph_index()
                 .neighbors(carol_id)

@@ -172,7 +172,10 @@ fn test_kv_locks_try_lock_blocking() {
 
     // Initially available
     let guard = locks.try_lock_for(key);
-    assert!(guard.is_some(), "try_lock_for should succeed when lock is free");
+    assert!(
+        guard.is_some(),
+        "try_lock_for should succeed when lock is free"
+    );
 
     // Second try_lock on same shard should fail (WouldBlock)
     let second_try = locks.try_lock_shard(shard_idx);

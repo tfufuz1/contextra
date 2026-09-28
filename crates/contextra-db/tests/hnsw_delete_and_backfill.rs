@@ -3,10 +3,10 @@
 
 use contextra_db::{Contextra, ContextraConfig};
 use contextra_graph::CsrGraph;
-use contextra_vector::{HnswConfig, HnswIndex};
 use contextra_ports::{VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId};
+use contextra_vector::{HnswConfig, HnswIndex};
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

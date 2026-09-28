@@ -69,11 +69,12 @@ impl KvSegmentManager {
     ) -> Result<KvSegmentPayload, ContextraError> {
         match self.config.delete_mode {
             KvDeleteMode::CryptoShred => {
-                let master_key = self.master_key.as_ref().ok_or(
-                    ContextraError::KvDeleteModeConfig(
-                        "Master key is required for CryptoShred mode",
-                    ),
-                )?;
+                let master_key =
+                    self.master_key
+                        .as_ref()
+                        .ok_or(ContextraError::KvDeleteModeConfig(
+                            "Master key is required for CryptoShred mode",
+                        ))?;
                 let (ciphertext, nonce) = self
                     .registry
                     .encrypt_with_group(master_key, group_id, plaintext)

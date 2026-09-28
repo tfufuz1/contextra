@@ -56,13 +56,8 @@ async fn test_expiry_reaper_cleans_expired_working_memory() -> contextra_types::
     let vec = [0.1, 0.2, 0.3, 0.4];
 
     // 1. Insert document with TTL = 3 transaction commits
-    col.insert_with_ttl(
-        "wm_doc_1",
-        &vec,
-        Some(json!({ "type": "working" })),
-        3,
-    )
-    .await?;
+    col.insert_with_ttl("wm_doc_1", &vec, Some(json!({ "type": "working" })), 3)
+        .await?;
 
     // 2. Insert Permanent Semantic Memory (no TTL)
     col.insert_typed(
@@ -75,7 +70,10 @@ async fn test_expiry_reaper_cleans_expired_working_memory() -> contextra_types::
 
     // Immediately after insert, wm_doc_1 must be retrievable
     let doc_wm_before = col.get("wm_doc_1").await?;
-    assert!(doc_wm_before.is_some(), "wm_doc_1 must exist before TTL expires");
+    assert!(
+        doc_wm_before.is_some(),
+        "wm_doc_1 must exist before TTL expires"
+    );
 
     // 3. Perform 3 transaction commits to exceed TTL
     for i in 0..3 {

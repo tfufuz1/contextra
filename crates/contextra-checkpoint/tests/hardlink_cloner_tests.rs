@@ -36,8 +36,14 @@ async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types:
     assert!(target2.exists());
     assert!(!target_dir.path().join("ignore.txt").exists());
 
-    assert_eq!(fs::read(&target1).map_err(ContextraError::Io)?, b"sstable_data_1");
-    assert_eq!(fs::read(&target2).map_err(ContextraError::Io)?, b"sstable_data_2");
+    assert_eq!(
+        fs::read(&target1).map_err(ContextraError::Io)?,
+        b"sstable_data_1"
+    );
+    assert_eq!(
+        fs::read(&target2).map_err(ContextraError::Io)?,
+        b"sstable_data_2"
+    );
 
     #[cfg(unix)]
     {
@@ -86,7 +92,9 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
             assert!(target_path.contains("000001.sst"));
             Ok(())
         }
-        Err(other) => Err(ContextraError::Internal(format!("Expected CrossDeviceLink error, got: {other:?}"))),
+        Err(other) => Err(ContextraError::Internal(format!(
+            "Expected CrossDeviceLink error, got: {other:?}"
+        ))),
         Ok(_) => {
             // In case /dev/shm happens to be on the same filesystem in some container environments,
             // verify hardlink created successfully
@@ -96,7 +104,8 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
 }
 
 #[tokio::test]
-async fn test_snapshot_registry_compaction_gc_exclusion_during_cloning() -> contextra_types::Result<()> {
+async fn test_snapshot_registry_compaction_gc_exclusion_during_cloning(
+) -> contextra_types::Result<()> {
     let source_dir = TempDir::new().map_err(ContextraError::Io)?;
     let target_dir = TempDir::new().map_err(ContextraError::Io)?;
 

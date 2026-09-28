@@ -36,7 +36,6 @@ pub use context_compaction::{
     ConsolidationSession, ContextCompactor, StatusToken,
 };
 pub use graph_sink::CsrGraphSuperEdgeSink;
-pub use semantic_aggregation_facade::consolidate_semantic_hyperedges;
 pub use leanrag_input::{build_leanrag_inputs, LeanRagInputs, DEFAULT_MAX_LEANRAG_NODES};
 pub use maintenance_config::MaintenanceConfig;
 pub use maintenance_scheduler::MaintenanceScheduler;
@@ -46,5 +45,6 @@ pub use memory_consolidation::{
     ConsolidationConfig, ConsolidationPhaseResult, MetaChunk, SynthesisConfig,
     SynthesisPhaseResult, TurnSegment,
 };
+pub use semantic_aggregation_facade::consolidate_semantic_hyperedges;
 pub use synthesis_phase::run_synthesis_pass;
 pub use transitivity_veto::{filter_candidates_with_transitivity_veto, validate_transitivity_veto};

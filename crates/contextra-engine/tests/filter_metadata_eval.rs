@@ -4,7 +4,8 @@ use serde_json::json;
 use tempfile::TempDir;
 
 #[tokio::test]
-async fn test_filter_metadata_expression_evaluation_and_error_paths() -> contextra_types::Result<()> {
+async fn test_filter_metadata_expression_evaluation_and_error_paths() -> contextra_types::Result<()>
+{
     let tmp = TempDir::new().expect("Failed to create temporary directory");
     let config = ContextraConfig {
         dimension: 4,
@@ -43,7 +44,12 @@ async fn test_filter_metadata_expression_evaluation_and_error_paths() -> context
         field: "lang".to_string(),
         value: json!("rust"),
     };
-    let res_eq = col.query().vector(&query_vec).filter(expr_eq).execute().await?;
+    let res_eq = col
+        .query()
+        .vector(&query_vec)
+        .filter(expr_eq)
+        .execute()
+        .await?;
 
     assert_eq!(res_eq.len(), 1);
     assert_eq!(res_eq[0].id, "doc_f1");
@@ -59,7 +65,12 @@ async fn test_filter_metadata_expression_evaluation_and_error_paths() -> context
             value: json!(4),
         }),
     );
-    let res_and = col.query().vector(&query_vec).filter(expr_and).execute().await?;
+    let res_and = col
+        .query()
+        .vector(&query_vec)
+        .filter(expr_and)
+        .execute()
+        .await?;
 
     assert_eq!(res_and.len(), 1);
     assert_eq!(res_and[0].id, "doc_f1");
@@ -69,7 +80,12 @@ async fn test_filter_metadata_expression_evaluation_and_error_paths() -> context
         field: "lang".to_string(),
         values: vec![json!("rust"), json!("python")],
     };
-    let res_in = col.query().vector(&query_vec).filter(expr_in).execute().await?;
+    let res_in = col
+        .query()
+        .vector(&query_vec)
+        .filter(expr_in)
+        .execute()
+        .await?;
 
     assert_eq!(res_in.len(), 2);
     let ids: Vec<&str> = res_in.iter().map(|r| r.id.as_str()).collect();
@@ -81,7 +97,12 @@ async fn test_filter_metadata_expression_evaluation_and_error_paths() -> context
         field: "category".to_string(),
         value: json!("hobby"),
     }));
-    let res_not = col.query().vector(&query_vec).filter(expr_not_hobby).execute().await?;
+    let res_not = col
+        .query()
+        .vector(&query_vec)
+        .filter(expr_not_hobby)
+        .execute()
+        .await?;
 
     assert_eq!(res_not.len(), 2);
     let not_ids: Vec<&str> = res_not.iter().map(|r| r.id.as_str()).collect();

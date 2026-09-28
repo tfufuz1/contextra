@@ -177,7 +177,7 @@ impl DiskAnnIndex {
             let computed_hmac = hmac.finalize();
 
             if computed_hmac.ct_eq(&buf_hmac).into() {
-                bitset.insert(doc_id);
+                bitset.insert(doc_id as u64);
             } else {
                 tracing::error!(
                     offset = entry_offset,

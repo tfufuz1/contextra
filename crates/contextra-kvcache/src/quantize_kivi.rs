@@ -169,8 +169,8 @@ pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<K
             packed_keys: Vec::new(),
             packed_values: Vec::new(),
         };
-        let packed_bytes =
-            bincode::serialize(&payload).map_err(|e| ContextraError::Serialization(e.to_string()))?;
+        let packed_bytes = bincode::serialize(&payload)
+            .map_err(|e| ContextraError::Serialization(e.to_string()))?;
         return Ok(KiviQuantizedBlock {
             meta,
             packed: packed_bytes,
@@ -323,8 +323,8 @@ pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<K
         packed_keys,
         packed_values,
     };
-    let packed = bincode::serialize(&payload)
-        .map_err(|e| ContextraError::Serialization(e.to_string()))?;
+    let packed =
+        bincode::serialize(&payload).map_err(|e| ContextraError::Serialization(e.to_string()))?;
 
     Ok(KiviQuantizedBlock { meta, packed })
 }
@@ -692,13 +692,8 @@ mod tests {
 
     #[test]
     fn test_kivi_quantize_dequantize_roundtrip_simple() {
-        let raw = KvTensorView::new(
-            vec![1.0, 2.0, 3.0, 4.0],
-            vec![10.0, 20.0, 30.0, 40.0],
-            2,
-            2,
-        )
-        .unwrap();
+        let raw = KvTensorView::new(vec![1.0, 2.0, 3.0, 4.0], vec![10.0, 20.0, 30.0, 40.0], 2, 2)
+            .unwrap();
 
         let config = KiviQuantizeConfig {
             key_group_size: 16,
@@ -744,7 +739,8 @@ mod tests {
             }
         }
 
-        let raw = KvTensorView::new(keys.clone(), values.clone(), num_tokens, num_channels).unwrap();
+        let raw =
+            KvTensorView::new(keys.clone(), values.clone(), num_tokens, num_channels).unwrap();
 
         let config = KiviQuantizeConfig {
             key_group_size: 16,
