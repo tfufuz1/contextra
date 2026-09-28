@@ -31,12 +31,8 @@ fn test_adaptive_compaction_determinism() {
         memtable_size_bytes: 512,
     };
 
-    let plan1 = planner
-        .plan_compaction(&stats, &snap1, &[], 0)
-        .unwrap();
-    let plan2 = planner
-        .plan_compaction(&stats, &snap2, &[], 0)
-        .unwrap();
+    let plan1 = planner.plan_compaction(&stats, &snap1, &[], 0).unwrap();
+    let plan2 = planner.plan_compaction(&stats, &snap2, &[], 0).unwrap();
 
     assert_eq!(plan1, plan2);
 

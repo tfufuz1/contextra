@@ -56,7 +56,9 @@ async fn test_external_wal_truncation_attack_detected() {
 
     let mut wal_bytes = fs::read(&wal_path).await.expect("read wal");
     wal_bytes.truncate(offset_first as usize);
-    fs::write(&wal_path, wal_bytes).await.expect("write truncated wal");
+    fs::write(&wal_path, wal_bytes)
+        .await
+        .expect("write truncated wal");
 
     // 3. Attempting to open LSM storage must fail with WalTruncationDetected
     let reopen_res = LsmStorage::new(config).await;
@@ -66,7 +68,10 @@ async fn test_external_wal_truncation_attack_detected() {
     );
     let err = reopen_res.err().unwrap();
     match err {
-        ContextraError::WalTruncationDetected { expected_hmac, actual_hmac } => {
+        ContextraError::WalTruncationDetected {
+            expected_hmac,
+            actual_hmac,
+        } => {
             assert_eq!(expected_hmac, hwm_hmac);
             assert_ne!(actual_hmac, expected_hmac);
         }
@@ -117,7 +122,9 @@ async fn test_crash_incomplete_tail_write_recovered_without_truncation_error() {
     // 2. Append torn/incomplete entry bytes at the tail simulating a process crash mid-write after entry 2
     let mut wal_bytes = fs::read(&wal_path).await.expect("read wal");
     wal_bytes.extend_from_slice(&[0x00, 0x00, 0x10, 0x00, 0xDE, 0xAD, 0xBE, 0xEF]); // incomplete payload
-    fs::write(&wal_path, wal_bytes).await.expect("write wal with torn tail");
+    fs::write(&wal_path, wal_bytes)
+        .await
+        .expect("write wal with torn tail");
 
     // 3. Opening LSM storage MUST succeed by ignoring torn tail write without WalTruncationDetected
     let reopen_res = LsmStorage::new(config).await;
@@ -151,7 +158,9 @@ async fn test_legacy_key_migration_isolation() {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&WAL_V3_HEADER);
         bytes.extend_from_slice(&legacy_entry.to_bytes().expect("to_bytes"));
-        fs::write(&wal_path, bytes).await.expect("write legacy file");
+        fs::write(&wal_path, bytes)
+            .await
+            .expect("write legacy file");
     }
 
     // 3. Standard open MUST fail because active key != legacy key and fallback is false
@@ -166,7 +175,9 @@ async fn test_legacy_key_migration_isolation() {
     );
 
     // 4. Migration open MUST succeed by using legacy fallback
-    let mig_wal = Wal::open_for_legacy_migration(&wal_path, None).await.expect("open_for_legacy_migration");
+    let mig_wal = Wal::open_for_legacy_migration(&wal_path, None)
+        .await
+        .expect("open_for_legacy_migration");
     let entries = mig_wal.replay().await.expect("replay migration wal");
     assert_eq!(entries.len(), 1);
 }

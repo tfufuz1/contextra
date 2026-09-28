@@ -2,12 +2,12 @@ use super::*;
 use crate::compaction::CompactionEngine;
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
+use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
 use contextra_core::{
     ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId,
     TOMBSTONE_BIT,
 };
-use crate::wal::KeyManager;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -249,8 +249,12 @@ impl LsmStorage {
             } else {
                 actual_tail_hmac
             };
-            if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err() {
-                return Err(ContextraError::wal_truncation_detected(expected_hwm, actual_tail_hmac));
+            if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err()
+            {
+                return Err(ContextraError::wal_truncation_detected(
+                    expected_hwm,
+                    actual_tail_hmac,
+                ));
             }
         }
 
@@ -298,7 +302,6 @@ impl LsmStorage {
             }
         }
         pending_rollbacks.sort_unstable();
-
 
         let mut sst_files = Vec::new();
         if let Ok(mut entries) = tokio::fs::read_dir(&config.path).await {
@@ -464,6 +467,7 @@ impl LsmStorage {
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
+            ssi_validator: Arc::new(contextra_mvcc::SequenceLogSsiValidator::new()),
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {
@@ -692,7 +696,11 @@ impl LsmStorage {
         }
 
         let entries = wal.replay().await?;
-        eprintln!("ROLLBACK REPLAY ENTRIES LEN: {}, target_offset: {}", entries.len(), target_offset);
+        eprintln!(
+            "ROLLBACK REPLAY ENTRIES LEN: {}, target_offset: {}",
+            entries.len(),
+            target_offset
+        );
         let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
             std::collections::HashMap::new();
 

@@ -417,7 +417,8 @@ impl Wal {
 
             #[cfg(feature = "wal-integrity")]
             {
-                if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some() {
+                if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some()
+                {
                     let km = match self.key_manager.as_ref() {
                         Some(km) => km,
                         None => {
@@ -426,7 +427,10 @@ impl Wal {
                     };
                     if entry_data_raw.len() < 12 {
                         if pos >= file_size {
-                            tracing::warn!("WAL truncated during read at offset {}", chunk_start_pos);
+                            tracing::warn!(
+                                "WAL truncated during read at offset {}",
+                                chunk_start_pos
+                            );
                             break;
                         }
                         return Err(ContextraError::Storage(
@@ -445,7 +449,10 @@ impl Wal {
                     };
                     nonce.copy_from_slice(nonce_slice);
                     let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
-                        ContextraError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
+                        ContextraError::wal_corruption(
+                            chunk_start_pos,
+                            "WAL entry missing ciphertext",
+                        )
                     })?;
                     let decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                         Ok(data) => data,
@@ -545,7 +552,9 @@ impl Wal {
                         let (op_type, key, value) = match &entry.op {
                             WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
                             WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
-                            WalOp::TxEnd { committed, .. } => (2u8, Vec::new(), vec![*committed as u8]),
+                            WalOp::TxEnd { committed, .. } => {
+                                (2u8, Vec::new(), vec![*committed as u8])
+                            }
                         };
 
                         let snapshot = WalEntrySnapshot {
@@ -633,9 +642,12 @@ impl Wal {
                     let entry = match WalEntry::from_bytes(entry_data) {
                         Ok(e) => e,
                         Err(e) => {
-                            if let Some(err) =
-                                Self::handle_wal_entry_parse_error(e, chunk_start_pos, pos, file_size)
-                            {
+                            if let Some(err) = Self::handle_wal_entry_parse_error(
+                                e,
+                                chunk_start_pos,
+                                pos,
+                                file_size,
+                            ) {
                                 return Err(err);
                             }
                             break;

@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-15
+// ZWECK: Kernimplementierung des Manifests zum Lesen, Schreiben, Rollover und Reconstruct aktiver SSTables.
+// INVARIANTEN: Atomare Schreiboperationen via Buffer & Sync; Tail-Truncation Recovery bei unvollständigem Frame am EOF.
+// HOTSPOTS: load, reconstruct_valid_sstables, append_batch
+// NICHT-OFFENSICHTLICH: `next_rank` in `reconstruct_valid_sstables` ist ein monoton wachsender Zähler über die Add/Replace-Historie und NICHT identisch mit dem zur Kompaktierungszeit lokal berechneten `insertion_point`. Diese Diskrepanz ist bewusst folgenlos, da `rank` bei der Recovery in `lsm/recovery.rs` verworfen wird (`.map(|(path, _rank)| path)`).
+
 use contextra_core::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -225,6 +232,12 @@ impl Manifest {
     /// and their rank (shadowing order: smaller rank = older) from a sequence of manifest entries.
     pub fn reconstruct_valid_sstables(entries: &[ManifestEntry]) -> Vec<(PathBuf, u64)> {
         let mut valid_map = std::collections::HashMap::new();
+        // `next_rank` führt eine reine Monotonie-über-die-Add-Historie und ist NICHT identisch mit dem
+        // zur Kompaktierungszeit lokal berechneten `insertion_point` (siehe `lsm/ops/compaction.rs`).
+        // Diese Diskrepanz zwischen den Zähldomänen ist bewusst folgenlos, weil `rank` bei der Recovery
+        // an keiner Stelle für Sortier- oder Sichtbarkeitsentscheidungen konsultiert wird:
+        // `recovery.rs` verwirft den Wert explizit via `.map(|(path, _rank)| path)`. Die Lese-Sichtbarkeit
+        // richtet sich ausschließlich nach `SstableMetadata::max_seq`.
         let mut next_rank = 0u64;
 
         for entry in entries {

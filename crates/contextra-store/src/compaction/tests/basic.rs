@@ -945,7 +945,10 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
     }
 
     let result = engine.maybe_compact(&sstables, tmp.path()).await;
-    assert!(result.is_err(), "Compaction should fail due to peak memory budget excess");
+    assert!(
+        result.is_err(),
+        "Compaction should fail due to peak memory budget excess"
+    );
 
     let err = result.unwrap_err();
     match err {
@@ -962,7 +965,9 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
         file_names.push(entry.file_name().to_string_lossy().to_string());
     }
     assert!(
-        !file_names.iter().any(|name| name.starts_with("sst-compact-")),
+        !file_names
+            .iter()
+            .any(|name| name.starts_with("sst-compact-")),
         "No compacted SSTable output file should be written when pre-merge peak limit is exceeded"
     );
 }
@@ -1057,7 +1062,10 @@ async fn test_compaction_backpressure_timeout_exceeded() {
         .merge_sstables(&[sst1, sst2], &output_path, u64::MAX, true)
         .await;
 
-    assert!(result.is_err(), "Merge should fail with timeout when budget is exhausted");
+    assert!(
+        result.is_err(),
+        "Merge should fail with timeout when budget is exhausted"
+    );
     match result.unwrap_err() {
         contextra_core::ContextraError::MemoryBudgetExceeded { .. } => {}
         other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),

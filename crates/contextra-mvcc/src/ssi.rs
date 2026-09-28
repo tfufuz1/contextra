@@ -8,11 +8,11 @@
 //! - [`SequenceLogSsiValidator`]: Reference validator implementation using MVCC sequence tracking.
 
 // FILE-CONTEXT
-// STAND: 2026-09-27T00:00:00Z
-// ZWECK: In-memory SSI Read-Set Tracking und Write-Skew-Konfliktvalidierung.
+// STAND: 2026-09-28T00:00:00Z
+// ZWECK: In-memory SSI Read-Set Tracking, Write-Skew-Konfliktvalidierung, Fail-Closed Pruning und atomare Commit-Registrierung.
 // INVARIANTEN: INV-MVCC-SSI-1: Konfliktauflösung ist rein datengetrieben (Sequenznummernvergleich) und deterministisch.
-// HOTSPOTS: 35-120
-// NICHT-OFFENSICHTLICH: Speicherverbrauch pro Transaktion wächst linear O(R) mit der Anzahl gelesener Schlüssel.
+// HOTSPOTS: 35-180
+// NICHT-OFFENSICHTLICH: Pruning unter `committed_writes` Schreib-Lock garantiert atomaren Wasserstand. Fail-closed Protection verweigert Reads mit snapshot_seq < pruned_through.
 // SIEHE AUCH: crates/contextra-mvcc/src/seq_log.rs, crates/contextra-mvcc/src/tx_buffer.rs
 
 use crate::error::{ContextraError, Result};
@@ -21,6 +21,7 @@ use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
 use std::hash::Hasher;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 /// Tracked read keys and their snapshot sequence numbers for Serializable Snapshot Isolation (SSI).
@@ -29,9 +30,11 @@ use std::sync::Arc;
 /// Memory consumption per transaction grows linearly $O(R)$ with the number of read keys $R$,
 /// where each entry retains a key byte vector (`Vec<u8>`) and an 8-byte (`u64`) snapshot sequence number.
 /// High read-volume transactions should limit or monitor read-set size to avoid unbounded memory growth.
+/// Use [`crate::tx_buffer::try_register_read`] with [`crate::tx_buffer::DEFAULT_MAX_READ_SET_KEYS`] to enforce bounded limits.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReadSet {
     keys: AHashMap<Vec<u8>, u64>,
+    min_snapshot_seq: Option<u64>,
 }
 
 impl ReadSet {
@@ -39,6 +42,7 @@ impl ReadSet {
     pub fn new() -> Self {
         Self {
             keys: AHashMap::default(),
+            min_snapshot_seq: None,
         }
     }
 
@@ -56,6 +60,11 @@ impl ReadSet {
                 }
             })
             .or_insert(snapshot_seq);
+
+        self.min_snapshot_seq = Some(
+            self.min_snapshot_seq
+                .map_or(snapshot_seq, |curr| curr.min(snapshot_seq)),
+        );
     }
 
     /// Alias for [`ReadSet::record_read`].
@@ -78,9 +87,16 @@ impl ReadSet {
         self.keys.len()
     }
 
-    /// Clears all tracked read keys.
+    /// Clears all tracked read keys and resets the cached minimum snapshot sequence.
     pub fn clear(&mut self) {
         self.keys.clear();
+        self.min_snapshot_seq = None;
+    }
+
+    /// Returns the lowest snapshot sequence number recorded across all read keys in this set,
+    /// or `None` if the set is empty.
+    pub fn min_snapshot_seq(&self) -> Option<u64> {
+        self.min_snapshot_seq
     }
 
     /// Returns an iterator over tracked read keys and their snapshot sequence numbers.
@@ -119,12 +135,17 @@ pub trait SsiValidator {
 pub struct SequenceLogSsiValidator {
     committed_writes: Arc<RwLock<AHashMap<Vec<u8>, u64>>>,
     sequence_log: Option<Arc<RwLock<SequenceLog>>>,
+    pruned_through: Arc<AtomicU64>,
 }
 
 impl SequenceLogSsiValidator {
     /// Creates a new [`SequenceLogSsiValidator`] with empty committed write tracking.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            committed_writes: Arc::new(RwLock::new(AHashMap::default())),
+            sequence_log: None,
+            pruned_through: Arc::new(AtomicU64::new(0)),
+        }
     }
 
     /// Creates a new [`SequenceLogSsiValidator`] attached to an existing [`SequenceLog`].
@@ -132,7 +153,31 @@ impl SequenceLogSsiValidator {
         Self {
             committed_writes: Arc::new(RwLock::new(AHashMap::default())),
             sequence_log: Some(seq_log),
+            pruned_through: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// Prunes tracked committed writes with `commit_seq <= bound_seq`.
+    ///
+    /// Atomically updates `pruned_through` watermark monotonically under the `committed_writes` write lock.
+    /// Returns the number of entries removed.
+    pub fn prune_through(&self, bound_seq: u64) -> usize {
+        let mut writes = self.committed_writes.write();
+        let initial_len = writes.len();
+        writes.retain(|_, &mut commit_seq| commit_seq > bound_seq);
+        let removed = initial_len.saturating_sub(writes.len());
+        self.pruned_through.fetch_max(bound_seq, Ordering::SeqCst);
+        removed
+    }
+
+    /// Returns the current `pruned_through` watermark sequence number.
+    pub fn pruned_through(&self) -> u64 {
+        self.pruned_through.load(Ordering::SeqCst)
+    }
+
+    /// Returns the number of committed keys currently tracked.
+    pub fn tracked_commit_keys(&self) -> usize {
+        self.committed_writes.read().len()
     }
 
     /// Records a committed write for `key` at sequence number `commit_seq`.
@@ -166,21 +211,35 @@ impl SequenceLogSsiValidator {
                 .or_insert(commit_seq);
         }
     }
-}
 
-impl SsiValidator for SequenceLogSsiValidator {
-    fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()> {
+    /// Validates `read_set` against `committed_writes` map and `sequence_log`.
+    fn validate_internal(
+        &self,
+        committed_writes: &AHashMap<Vec<u8>, u64>,
+        tx_id: TxId,
+        read_set: &ReadSet,
+    ) -> Result<()> {
         if read_set.is_empty() {
             return Ok(());
         }
 
-        let committed_writes = self.committed_writes.read();
+        let pruned_through = self.pruned_through.load(Ordering::SeqCst);
 
         // Sort read keys deterministically by key bytes to guarantee reproducible validation order
         let mut entries: Vec<(&Vec<u8>, &u64)> = read_set.iter().collect();
         entries.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
         for (key, &snapshot_seq) in entries {
+            if snapshot_seq < pruned_through {
+                return Err(ContextraError::Conflict(format!(
+                    "Serializable isolation violation for TxId({}): snapshot too old (snapshot_seq {} < pruned_through {}) for key '{:?}'",
+                    tx_id.inner(),
+                    snapshot_seq,
+                    pruned_through,
+                    String::from_utf8_lossy(key)
+                )));
+            }
+
             // 1. Direct key commit sequence check
             if let Some(&commit_seq) = committed_writes.get(key) {
                 if commit_seq > snapshot_seq {
@@ -216,6 +275,38 @@ impl SsiValidator for SequenceLogSsiValidator {
 
         Ok(())
     }
+
+    /// Atomically validates `read_set` and records `write_keys` at `commit_seq` under a single write lock.
+    pub fn validate_and_record<'a>(
+        &self,
+        tx_id: TxId,
+        read_set: &ReadSet,
+        write_keys: impl IntoIterator<Item = &'a [u8]>,
+        commit_seq: u64,
+    ) -> Result<()> {
+        let mut writes = self.committed_writes.write();
+        self.validate_internal(&writes, tx_id, read_set)?;
+
+        for key in write_keys {
+            writes
+                .entry(key.to_vec())
+                .and_modify(|existing| {
+                    if commit_seq > *existing {
+                        *existing = commit_seq;
+                    }
+                })
+                .or_insert(commit_seq);
+        }
+
+        Ok(())
+    }
+}
+
+impl SsiValidator for SequenceLogSsiValidator {
+    fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()> {
+        let committed_writes = self.committed_writes.read();
+        self.validate_internal(&committed_writes, tx_id, read_set)
+    }
 }
 
 fn derive_doc_id_for_key(key: &[u8]) -> DocId {
@@ -239,6 +330,7 @@ mod tests {
         let mut rs = ReadSet::new();
         assert!(rs.is_empty());
         assert_eq!(rs.len(), 0);
+        assert_eq!(rs.min_snapshot_seq(), None);
 
         rs.record_read(b"key1".to_vec(), 10);
         rs.record_read(b"key2".to_vec(), 15);
@@ -248,17 +340,21 @@ mod tests {
         assert_eq!(rs.get(b"key1"), Some(10));
         assert_eq!(rs.get(b"key2"), Some(15));
         assert_eq!(rs.get(b"key3"), None);
+        assert_eq!(rs.min_snapshot_seq(), Some(10));
 
         // Lower snapshot sequence replaces higher
         rs.record_read(b"key1".to_vec(), 5);
         assert_eq!(rs.get(b"key1"), Some(5));
+        assert_eq!(rs.min_snapshot_seq(), Some(5));
 
-        // Higher snapshot sequence ignored
+        // Higher snapshot sequence ignored for key1, min remains 5
         rs.record_read(b"key1".to_vec(), 20);
         assert_eq!(rs.get(b"key1"), Some(5));
+        assert_eq!(rs.min_snapshot_seq(), Some(5));
 
         rs.clear();
         assert!(rs.is_empty());
+        assert_eq!(rs.min_snapshot_seq(), None);
     }
 
     #[test]

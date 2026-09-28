@@ -197,9 +197,7 @@ fn bench_sequential_write(c: &mut Criterion) {
         }
         let redb_bytes = calculate_dir_size(redb_tmp.path()).unwrap_or(0);
 
-        println!(
-            "\n--- PHYSICAL DISK AMPLIFICATION ({NUM_ITEMS} items, {VALUE_SIZE}B values) ---"
-        );
+        println!("\n--- PHYSICAL DISK AMPLIFICATION ({NUM_ITEMS} items, {VALUE_SIZE}B values) ---");
         println!(
             "  contextra-store physical dir size: {} bytes ({:.2} MB)",
             lsm_bytes,
@@ -230,7 +228,10 @@ fn bench_random_read(c: &mut Criterion) {
     let lsm_storage = rt.block_on(async {
         let storage = LsmStorage::new(lsm_config).await.unwrap();
         let mut tx_counter = 1u64;
-        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+        for chunk in (0..PREPOPULATE_COUNT)
+            .collect::<Vec<_>>()
+            .chunks(BATCH_SIZE)
+        {
             let tx = TxId::new(tx_counter);
             tx_counter += 1;
             for &i in chunk {
@@ -248,7 +249,10 @@ fn bench_random_read(c: &mut Criterion) {
     let redb_db = {
         let db = Database::create(&redb_path).unwrap();
         setup_redb_table(&db);
-        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+        for chunk in (0..PREPOPULATE_COUNT)
+            .collect::<Vec<_>>()
+            .chunks(BATCH_SIZE)
+        {
             let mut write_txn = db.begin_write().unwrap();
             write_txn.set_durability(Durability::Immediate);
             {
@@ -314,7 +318,10 @@ fn bench_range_scan(c: &mut Criterion) {
     let lsm_storage = rt.block_on(async {
         let storage = LsmStorage::new(lsm_config).await.unwrap();
         let mut tx_counter = 1u64;
-        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+        for chunk in (0..PREPOPULATE_COUNT)
+            .collect::<Vec<_>>()
+            .chunks(BATCH_SIZE)
+        {
             let tx = TxId::new(tx_counter);
             tx_counter += 1;
             for &i in chunk {
@@ -331,7 +338,10 @@ fn bench_range_scan(c: &mut Criterion) {
     let redb_db = {
         let db = Database::create(&redb_path).unwrap();
         setup_redb_table(&db);
-        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+        for chunk in (0..PREPOPULATE_COUNT)
+            .collect::<Vec<_>>()
+            .chunks(BATCH_SIZE)
+        {
             let mut write_txn = db.begin_write().unwrap();
             write_txn.set_durability(Durability::Immediate);
             {
@@ -447,7 +457,10 @@ fn bench_mixed_workload(c: &mut Criterion) {
                         let mut tx_counter = 1u64;
 
                         // Pre-populate
-                        for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+                        for chunk in (0..PREPOPULATE_COUNT)
+                            .collect::<Vec<_>>()
+                            .chunks(BATCH_SIZE)
+                        {
                             let tx = TxId::new(tx_counter);
                             tx_counter += 1;
                             for &i in chunk {
@@ -498,7 +511,10 @@ fn bench_mixed_workload(c: &mut Criterion) {
                     setup_redb_table(&db);
 
                     // Pre-populate
-                    for chunk in (0..PREPOPULATE_COUNT).collect::<Vec<_>>().chunks(BATCH_SIZE) {
+                    for chunk in (0..PREPOPULATE_COUNT)
+                        .collect::<Vec<_>>()
+                        .chunks(BATCH_SIZE)
+                    {
                         let mut write_txn = db.begin_write().unwrap();
                         write_txn.set_durability(Durability::Immediate);
                         {

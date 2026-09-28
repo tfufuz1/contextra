@@ -17,10 +17,7 @@ const TIME_POINTS_PER_CMD: usize = 15;
 /// Runs a single lifecycle test step for a given WalCommand variant and fault time point index.
 ///
 /// Returns (success, error_description)
-async fn test_command_crash_point(
-    cmd_type: &str,
-    time_point: usize,
-) -> Result<bool, String> {
+async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<bool, String> {
     let vfs = FaultVfs::new();
     let tmp = TempDir::new().map_err(|e| format!("TempDir creation failed: {e}"))?;
     let wal_path = tmp.path().join("lifecycle_matrix.wal");
@@ -97,7 +94,10 @@ async fn test_command_crash_point(
             // Truncate to half the file size
             let current_size = wal.size();
             let trunc_offset = (current_size * (time_point as u64 % 10 + 1)) / 12;
-            cmd_attempt_ok = wal.truncate(trunc_offset, last_hmac_before_cmd).await.is_ok();
+            cmd_attempt_ok = wal
+                .truncate(trunc_offset, last_hmac_before_cmd)
+                .await
+                .is_ok();
         }
         "Seal" => {
             vfs.set_config(FaultConfig {
@@ -223,7 +223,9 @@ async fn wal_crash_matrix_full_command_coverage() {
                     total_passed += 1;
                 }
                 Ok(false) => {
-                    failure_reports.push(format!("Command '{cmd_type}' failed at time_point {time_point}"));
+                    failure_reports.push(format!(
+                        "Command '{cmd_type}' failed at time_point {time_point}"
+                    ));
                 }
                 Err(err_msg) => {
                     failure_reports.push(format!(

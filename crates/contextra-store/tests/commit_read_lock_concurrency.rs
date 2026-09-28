@@ -13,11 +13,7 @@ async fn test_commit_read_lock_concurrency_mode(window_micros: u64) {
         ..Default::default()
     };
 
-    let storage = Arc::new(
-        LsmStorage::new(config)
-            .await
-            .expect("create storage"),
-    );
+    let storage = Arc::new(LsmStorage::new(config).await.expect("create storage"));
 
     // Prepare a key/value batch
     let num_items = 50;

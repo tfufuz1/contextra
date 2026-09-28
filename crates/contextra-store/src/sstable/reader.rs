@@ -4,9 +4,9 @@ use super::bloom::BloomFilter;
 use super::builder::SstableMetadata;
 use super::io::pread_exact;
 use super::stream::SstableStream;
+use crate::wal::KeyManager;
 use bytes::Bytes;
 use contextra_core::{ContextraError, Result};
-use crate::wal::KeyManager;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 

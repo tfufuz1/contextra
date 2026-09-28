@@ -4,13 +4,15 @@ use super::guard::LsmState;
 use super::observer::{ObserverRegistry, WalObserver};
 use crate::compaction::CompactionEngine;
 use crate::sstable::{BlockCache, SstableReader};
-use crate::wal::Wal;
-use contextra_core::{ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId};
 use crate::wal::KeyManager;
+use crate::wal::Wal;
+use bytes::Bytes;
+use contextra_core::{ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use super::ops::read;
 
 /// LSM-Tree based storage engine.
 pub struct LsmStorage {
@@ -42,6 +44,7 @@ pub struct LsmStorage {
     pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
+    pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
 }
 
 impl Drop for LsmStorage {
@@ -130,5 +133,30 @@ impl LsmStorage {
     /// Sets the injected clock port for deterministic observer latency evaluation (P28).
     pub fn set_clock(&self, clock: Arc<dyn contextra_ports::Clock>) {
         self.observer_registry.set_clock(clock);
+    }
+
+    /// Performs a tracked read for transaction `tx_id`.
+    ///
+    /// Evaluates `snapshot_seq = next_seq_no - 1` ONCE (K2), registers the read key in `TxBuffer`,
+    /// and reads the key at `snapshot_seq`.
+    pub async fn get_tracked(&self, tx_id: TxId, key: &[u8]) -> Result<Option<Bytes>> {
+        read::get_tracked(self, tx_id, key).await
+    }
+
+    /// Performs a tracked read for transaction `tx_id` at an explicit `snapshot_seq`.
+    ///
+    /// Registers the read key in `TxBuffer` at `snapshot_seq` and reads the key at `snapshot_seq`.
+    pub async fn get_at_seq_tracked(
+        &self,
+        tx_id: TxId,
+        key: &[u8],
+        snapshot_seq: u64,
+    ) -> Result<Option<Bytes>> {
+        read::get_at_seq_tracked(self, tx_id, key, snapshot_seq).await
+    }
+
+    /// Returns the current `next_seq_no` value for testing verification.
+    pub fn next_seq_no_for_test(&self) -> u64 {
+        self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 }

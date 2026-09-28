@@ -1,7 +1,5 @@
 use contextra_core::{StorageEngine, TxId};
-use contextra_store::{
-    CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin,
-};
+use contextra_store::{CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -100,16 +98,9 @@ async fn test_observer_single_commit_called_once() {
     storage.commit(tx).await.expect("commit");
 
     assert_eq!(observer.commit_count.load(Ordering::SeqCst), 1);
+    assert_eq!(observer.last_tx_id.lock().unwrap().expect("last_tx_id"), tx);
     assert_eq!(
-        observer.last_tx_id.lock().unwrap().expect("last_tx_id"),
-        tx
-    );
-    assert_eq!(
-        observer
-            .last_origin
-            .lock()
-            .unwrap()
-            .expect("last_origin"),
+        observer.last_origin.lock().unwrap().expect("last_origin"),
         WriteOrigin::UserWrite
     );
     assert!(observer.last_max_seq.lock().unwrap().expect("max_seq") > 0);
@@ -220,11 +211,7 @@ async fn test_zero_observers_regression() {
     storage.put(tx, b"key_reg", b"val_reg").await.expect("put");
     storage.commit(tx).await.expect("commit");
 
-    let val = storage
-        .get(b"key_reg")
-        .await
-        .expect("get")
-        .expect("found");
+    let val = storage.get(b"key_reg").await.expect("get").expect("found");
     assert_eq!(&val[..], b"val_reg");
 
     storage.close().await.expect("close");
