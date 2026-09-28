@@ -16,21 +16,31 @@ echo "============================================================"
 echo ""
 echo "[1/8] Verifying Rust toolchain..."
 
-rustup toolchain install 1.89.0 --profile minimal 2>/dev/null || true
+if ! rustup toolchain install 1.89.0 --profile minimal; then
+    echo "❌ Failed to install Rust toolchain 1.89.0"
+    exit 1
+fi
+
 rustup default 1.89.0
 
 RUST_VERSION=$(rustc --version)
 echo "  ✅ $RUST_VERSION"
 
-rustup component add clippy rustfmt 2>/dev/null || true
-echo "  ✅ clippy + rustfmt installed"
+PINNED_CHANNEL="1.89.0"
+if [[ "$RUST_VERSION" != *"$PINNED_CHANNEL"* ]]; then
+    echo "❌ Toolchain mismatch: Expected $PINNED_CHANNEL, got: $RUST_VERSION"
+    exit 1
+fi
+
+rustup component add clippy rustfmt 2>/dev/null || echo "  ⚠️ Warning: Could not add clippy/rustfmt components via rustup"
+echo "  ✅ clippy + rustfmt checked"
 
 # ── 2. System Libraries & FlatBuffers Compiler ──────────────────────────────
 echo ""
 echo "[2/8] Installing system libraries and FlatBuffers compiler..."
 
 if command -v apt-get &>/dev/null; then
-    sudo apt-get update -q 2>/dev/null || true
+    sudo apt-get update -q 2>/dev/null || echo "  ⚠️ Warning: apt-get update failed"
     sudo apt-get install -y -q \
         libwebkit2gtk-4.1-dev \
         libgtk-3-dev \
@@ -40,7 +50,7 @@ if command -v apt-get &>/dev/null; then
         flatbuffers-compiler \
         pkg-config \
         curl \
-        2>/dev/null || echo "  ⚠️ Some apt packages unavailable (acceptable fallback)"
+        2>/dev/null || echo "  ⚠️ Warning: Some apt packages unavailable (acceptable fallback)"
 fi
 
 echo "  ✅ System libraries step finished"
@@ -60,17 +70,17 @@ if ! command -v ast-grep &>/dev/null && command -v sg &>/dev/null; then
     SG_PATH=$(which sg)
     SG_DIR=$(dirname "$SG_PATH")
     if [ -w "$SG_DIR" ]; then
-        ln -sf "$SG_PATH" "$SG_DIR/ast-grep" 2>/dev/null || true
+        ln -sf "$SG_PATH" "$SG_DIR/ast-grep" 2>/dev/null || echo "  ⚠️ Warning: Could not symlink sg to ast-grep"
     fi
 fi
 
 if command -v ast-grep &>/dev/null || command -v sg &>/dev/null; then
     echo "  ✅ ast-grep / sg is available"
 else
-    cargo install ast-grep --locked --quiet 2>/dev/null || npm install -g @ast-grep/cli 2>/dev/null || echo "  ⚠️ ast-grep install skipped"
+    cargo install ast-grep --locked --quiet 2>/dev/null || npm install -g @ast-grep/cli 2>/dev/null || echo "  ⚠️ Warning: ast-grep install skipped"
 fi
 
-git config core.hooksPath .githooks || true
+git config core.hooksPath .githooks || echo "  ⚠️ Warning: Could not set core.hooksPath"
 echo "  ✅ git hooks configured to .githooks"
 
 # ── 5. Essential Cargo Tools (just, nextest, audit, deny, llvm-cov) ─────────
@@ -83,7 +93,7 @@ for tool in "${CARGO_TOOLS[@]}"; do
         echo "  ✅ $tool is available"
     else
         echo "  ℹ️ Installing $tool..."
-        cargo install "$tool" --quiet 2>/dev/null || echo "  ⚠️ Could not install $tool (optional)"
+        cargo install "$tool" --quiet 2>/dev/null || echo "  ⚠️ Warning: Could not install $tool (optional)"
     fi
 done
 
@@ -123,6 +133,13 @@ if grep -q "axum" crates/contextra-mcp/Cargo.toml 2>/dev/null; then
     exit 1
 else
     echo "  ✅ ADR-010: axum not in contextra-mcp (stdio-only MCP)"
+fi
+
+if cargo run --manifest-path xtask/Cargo.toml -- harness-list 2>/dev/null | grep -q "env-attest"; then
+    echo "  → Executing cargo xtask env-attest..."
+    cargo run --manifest-path xtask/Cargo.toml -- env-attest
+else
+    echo "  ⚠️ Warning: xtask env-attest command not available yet"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
