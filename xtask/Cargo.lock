@@ -475,6 +475,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
