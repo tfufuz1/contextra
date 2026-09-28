@@ -1,0 +1,450 @@
+name: Merge Verdict Gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  protected-paths:
+    name: protected-paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run protected-paths gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask protected-paths --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/protected-paths.json
+
+      - name: Upload protected-paths artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-protected-paths
+          path: gate-results/protected-paths.json
+
+  gate-weakening:
+    name: gate-weakening
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run gate-weakening gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask gate-weakening --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/gate-weakening.json
+
+      - name: Upload gate-weakening artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-gate-weakening
+          path: gate-results/gate-weakening.json
+
+  ratchet:
+    name: ratchet
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run ratchet gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask ratchet --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/ratchet.json
+
+      - name: Upload ratchet artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-ratchet
+          path: gate-results/ratchet.json
+
+  doc-truth:
+    name: doc-truth
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run doc-truth gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask doc-truth --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/doc-truth.json
+
+      - name: Upload doc-truth artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-doc-truth
+          path: gate-results/doc-truth.json
+
+  registry-check:
+    name: registry-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run registry-check gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask registry-check --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/registry-check.json
+
+      - name: Upload registry-check artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-registry-check
+          path: gate-results/registry-check.json
+
+  scope-guard:
+    name: scope-guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run scope-guard gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask scope-guard --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/scope-guard.json
+
+      - name: Upload scope-guard artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-scope-guard
+          path: gate-results/scope-guard.json
+
+  diff-budget:
+    name: diff-budget
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run diff-budget gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask diff-budget --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/diff-budget.json
+
+      - name: Upload diff-budget artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-diff-budget
+          path: gate-results/diff-budget.json
+
+  claims-in-pr:
+    name: claims-in-pr
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run claims-in-pr gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask claims-in-pr --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/claims-in-pr.json
+
+      - name: Upload claims-in-pr artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-claims-in-pr
+          path: gate-results/claims-in-pr.json
+
+  test-integrity:
+    name: test-integrity
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run test-integrity gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask test-integrity --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/test-integrity.json
+
+      - name: Upload test-integrity artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-test-integrity
+          path: gate-results/test-integrity.json
+
+  task-card:
+    name: task-card
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run task-card gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask task-card --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/task-card.json
+
+      - name: Upload task-card artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-task-card
+          path: gate-results/task-card.json
+
+  ledger:
+    name: ledger
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run ledger gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask ledger --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/ledger.json
+
+      - name: Upload ledger artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-ledger
+          path: gate-results/ledger.json
+
+  can-merge:
+    name: can-merge
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run can-merge gate
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          mkdir -p gate-results
+          cargo xtask can-merge --json --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }} > gate-results/can-merge.json
+
+      - name: Upload can-merge artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-can-merge
+          path: gate-results/can-merge.json
+
+  deep-gates:
+    uses: ./.github/workflows/deep-gates.yml
+
+  verdict:
+    name: verdict
+    runs-on: ubuntu-latest
+    needs:
+      - protected-paths
+      - gate-weakening
+      - ratchet
+      - doc-truth
+      - registry-check
+      - scope-guard
+      - diff-budget
+      - claims-in-pr
+      - test-integrity
+      - task-card
+      - ledger
+      - can-merge
+      - deep-gates
+    if: always()
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Download all gate artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: gate-*
+          merge-multiple: true
+          path: gate-results
+
+      - name: Run verdict aggregation
+        run: |
+          cargo xtask verdict --results-dir gate-results --required governance/verdict-required.toml
