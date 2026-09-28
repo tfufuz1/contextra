@@ -33,7 +33,6 @@ struct SegmentMeta {
 
 /// Kapselt den LRU-Cache und den Prefix-Radix-Baum aller KV-Segmente eines einzelnen Tenants.
 struct TenantState {
-    #[allow(dead_code)]
     tenant_id: TenantId,
     cache: LruCache<u64, KvSegment>,
     radix_tree: PrefixRadixTree,
@@ -54,14 +53,6 @@ impl TenantState {
         }
     }
 
-    /// O(1) insert. Evictiert das älteste unreferenzierte Segment, falls capacity überschritten.
-    /// Garantiert, dass aktive Blöcke (`active_refs > 0`) niemals verworfen werden.
-    #[allow(dead_code)]
-    fn insert_returning_evicted(&mut self, segment: KvSegment) -> Option<KvSegment> {
-        self.insert_returning_evicted_with_directive(segment, &CacheDirective::Auto)
-            .ok()
-            .flatten()
-    }
 
     /// Insert with explicit cache directive and pin budget checking.
     fn insert_returning_evicted_with_directive(
@@ -71,13 +62,13 @@ impl TenantState {
     ) -> Result<Option<KvSegment>, ContextraError> {
         let req_bytes = segment.len() as u64;
 
-        if matches!(directive, CacheDirective::Pin { ttl: None }) {
-            if self.pinned_bytes.saturating_add(req_bytes) > MAX_PINNED_BYTES_PER_TENANT {
-                return Err(ContextraError::pin_budget_exceeded(format!(
-                    "Tenant {:?} requested {} pinned bytes, exceeding limit of {} bytes (current pinned: {})",
-                    self.tenant_id, req_bytes, MAX_PINNED_BYTES_PER_TENANT, self.pinned_bytes
-                )));
-            }
+        if matches!(directive, CacheDirective::Pin { ttl: None })
+            && self.pinned_bytes.saturating_add(req_bytes) > MAX_PINNED_BYTES_PER_TENANT
+        {
+            return Err(ContextraError::pin_budget_exceeded(format!(
+                "Tenant {:?} requested {} pinned bytes, exceeding limit of {} bytes (current pinned: {})",
+                self.tenant_id, req_bytes, MAX_PINNED_BYTES_PER_TENANT, self.pinned_bytes
+            )));
         }
 
         let id = segment.segment_id;
@@ -128,7 +119,7 @@ impl TenantState {
     }
 
     /// O(1) get für Entschlüsselung — benötigt &mut wegen LRU-Update.
-    #[allow(dead_code)]
+    #[cfg(feature = "kv-encryption")]
     fn get_segment_ref_mut(&mut self, id: u64) -> Option<&KvSegment> {
         self.cache.get(&id)
     }
@@ -188,7 +179,7 @@ impl TenantState {
             .rev()
             .filter_map(|(&id, seg)| {
                 if seg.active_refs() == 0 {
-                    let is_pinned = self.segment_meta.get(&id).map_or(false, |meta| {
+                    let is_pinned = self.segment_meta.get(&id).is_some_and(|meta| {
                         match &meta.directive {
                             CacheDirective::Pin { ttl: None } => true,
                             CacheDirective::Pin { ttl: Some(dur) } => now < meta.pinned_at + *dur,
@@ -549,7 +540,7 @@ impl TenantIsolatedKvStore {
     }
 
     /// Globale LRU Eviction unter Schutz aktiver Referenzen.
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn evict_lru_global(&self, target_free_bytes: usize) -> usize {
         let mut freed = 0;
 
