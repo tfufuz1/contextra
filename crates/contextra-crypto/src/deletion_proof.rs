@@ -155,19 +155,6 @@ impl LayerCleanupProof {
         })
     }
 
-    /// Fabrikfunktion — MUSS unmittelbar nach erfolgreicher, verifizierter physischer
-    /// Bereinigung (LSM-Compaction, WAL-Truncation, HNSW-Purge, ...) aufgerufen werden,
-    /// um einen Proof für den jeweiligen Layer zu erzeugen.
-    #[deprecated(
-        note = "use new_after_verified_empty, which requires proof of an actual empty post-cleanup scan"
-    )]
-    #[allow(dead_code)]
-    pub(crate) fn new_after_physical_cleanup(layer: DeletionLayer) -> Self {
-        Self {
-            layer,
-            _private: (),
-        }
-    }
 
     /// Erzeugt einen Proof für `layer` NUR, wenn `verification` bestätigt,
     /// dass die physische Bereinigung tatsächlich abgeschlossen ist.
