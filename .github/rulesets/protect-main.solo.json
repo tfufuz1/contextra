@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/github-ruleset.json",
-  "name": "protect-main",
-  "description": "Standard Branch Protection ruleset for team operations requiring code owner review, last push approval, and all required quality gates.",
+  "name": "protect-main-solo",
+  "description": "Solo Operations Branch Protection ruleset without review constraints (required_approving_review_count: 0, require_code_owner_review: false, require_last_push_approval: false) while maintaining non-negotiable status check gates.",
   "target": "branch",
   "enforcement": "active",
   "bypass_actors": [],
@@ -24,10 +24,10 @@
     {
       "type": "pull_request",
       "parameters": {
-        "required_approving_review_count": 1,
+        "required_approving_review_count": 0,
         "dismiss_stale_reviews_on_push": true,
-        "require_code_owner_review": true,
-        "require_last_push_approval": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
         "required_review_thread_resolution": true
       }
     },

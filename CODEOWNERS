@@ -1,5 +1,7 @@
 # CODEOWNERS - Contextra Governance & Ownership
 #
+# WARNUNG: Handles sind Platzhalter, ohne existierende Teams ignoriert GitHub diese Datei.
+#
 # Fachliche Begründung: CONTEXTRA_SPEC_2_.md §15.5 (Crate-Tier-Modell nach Kritikalität).
 # Diese Datei definiert die automatische Zuordnung von Code-Ownern für Pull Requests
 # basierend auf der Architektur-Kritikalität der verschiedenen Komponenten.
@@ -27,9 +29,18 @@
 /crates/contextra-rank/                @contextra/intelligence-tier3
 /crates/contextra-adapt/               @contextra/intelligence-tier3
 
-# Build & Infrastruktur
+# Build & Infrastruktur & Governance Tooling
+/.github/                              @contextra/build-infra
 /xtask/                                @contextra/build-infra
+/governance/                           @contextra/build-infra
 /justfile                              @contextra/build-infra
+/rust-toolchain.toml                   @contextra/build-infra
+/deny.toml                             @contextra/build-infra
+/capabilities.toml                     @contextra/build-infra
+/AGENTS.md                             @contextra/build-infra
+/.jules/setup/                         @contextra/build-infra
+/.github/rulesets/                     @contextra/build-infra
+/CODEOWNERS                            @contextra/build-infra
 
 # Architektur-Dokumentation & Entscheidungen
 /DECISIONS.md                          @contextra/architecture-board

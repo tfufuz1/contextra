@@ -23,10 +23,11 @@ Diese Tabelle listet **alle 56 Jobs** aus den 25 GitHub Actions Workflows des Re
 | `Clippy (-D warnings)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Verhindert Linter-Warnungen und verstärkende Fehler im Haupt-Workspace. |
 | `Feature Matrix Checks (Powerset CI §17)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Crate-Feature-Kombinationen (`--no-default-features`, `--all-features`, `--features reranking`). |
 | `PyPI Wheel Build Check (Maturin Dry-Run)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Validiert vorab, dass `contextra-py` via Maturin fehlerfrei gebaut werden kann. |
-| `Test Suite (cargo-nextest with retries)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt Unit- und Integrationstests des Haupt-Workspace sowie Doc-Tests aus. |
+| `Test Suite (cargo-nextest)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt Unit- und Integrationstests des Haupt-Workspace sowie Doc-Tests aus. |
 | `Clippy (contextra-py)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Python-Binding-Code (`contextra-py`) auf Clippy-Warnungen. |
 | `Test Suite (contextra-py)` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Führt die Rust-Tests für das Python-Binding (`contextra-py`) aus. |
 | `Cross-Platform Core Tests` | `.github/workflows/rust-ci.yml` | `push`, `pull_request` | **Y** | Prüft Kern-Crates auf Windows und macOS auf Plattform-Kompatibilität. |
+| `verdict` | `.github/workflows/verdict.yml` | `pull_request` | **Y** | Zentrales aggregiertes Merge-Urteil (`verdict`), prüft alle Einzel-Gates fail-closed. |
 | `context-gates` | `.github/workflows/context-gates.yml` | `push`, `pull_request` | **Y** | Kanonisches Gate für Governance, Unwraps, DAG, Tag-Grammatik, Review-Coverage und Commit-Qualität. |
 | `Fixture-Smoke-Test & Harness Dry-Run` | `.github/workflows/bench.yml` | `push`, `pull_request`, `workflow_dispatch` | **Y** | Schnelltests für Benchmark-Harness & Smoke-Tests bei jedem PR. |
 | `Retrieval Accuracy Benchmark (contextra-bench)` | `.github/workflows/bench.yml` | `push`, `pull_request`, `workflow_dispatch` | **Y** | Misst Retrieval-Genauigkeit und stützt die Regressions-Verifikation bei PRs. |
@@ -66,10 +67,11 @@ Um sicherzustellen, dass keine PRs gemergt werden, bei denen kritische Quality G
    - `Clippy (-D warnings)`
    - `Feature Matrix Checks (Powerset CI §17)`
    - `PyPI Wheel Build Check (Maturin Dry-Run)`
-   - `Test Suite (cargo-nextest with retries)`
+   - `Test Suite (cargo-nextest)`
    - `Clippy (contextra-py)`
    - `Test Suite (contextra-py)`
    - `Cross-Platform Core Tests`
+   - `verdict`
    - `context-gates`
    - `Fixture-Smoke-Test & Harness Dry-Run`
    - `Retrieval Accuracy Benchmark (contextra-bench)`
@@ -78,7 +80,32 @@ Um sicherzustellen, dass keine PRs gemergt werden, bei denen kritische Quality G
 
 ---
 
-## 3. Bekannter historischer Vorfall
+## 3. Manuelle Schritte zur Aktivierung der Governance & Rulesets
+
+1. **Ruleset Importieren:**
+   - In GitHub `Settings` → `Code and automation` → `Rules` → `Rulesets` aufrufen.
+   - Wählen Sie die passende Variante:
+     - `.github/rulesets/protect-main.json` (Standard für Team-Betrieb mit Code Owner Reviews).
+     - `.github/rulesets/protect-main.solo.json` (Solo-Betrieb ohne Review-Zwang).
+   - Ruleset als JSON importieren und als `active` aktivieren.
+
+2. **Bypass-Liste & Administrator-Einschluss prüfen:**
+   - Sicherstellen, dass `Include administrators` in der Ruleset-Konfiguration aktiviert ist.
+   - Verifizieren, dass die `bypass_actors`-Liste vollständig leer (`[]`) ist, damit auch Admins keine fehlerhaften Gates umgehen können.
+
+3. **Echte CODEOWNERS-Handles eintragen:**
+   - In `CODEOWNERS` die Platzhalter-Handles (`@contextra/*`) durch reale GitHub-Team- oder Nutzer-Handles ersetzen (mindestens N-3 Vier-Augen-Prinzip).
+
+4. **Merge-Reihenfolge der parallelen Sessions beachten:**
+   - Merges auf `main` dürfen erst **NACH** den parallelen Sessions 1–3 und 5–9 erfolgen. Wenn `verdict` gemergt wird, bevor alle Sub-Harnesses auf `main` existieren, meldet `verdict` fehlende Artefakte und schlägt ROT fehl.
+
+5. **Verifikation per Rote-Karte-Test:**
+   - Erstelle einen absichtlich fehlerhaften PR (z. B. fehlerhafter Test oder geschützter Pfad ohne Freigabe).
+   - Bestätige, dass der Merge-Button von GitHub unmissverständlich ausgegraut/blockiert bleibt („Rote-Karte-Test“).
+
+---
+
+## 4. Bekannter historischer Vorfall
 
 **Präzedenzfall (2026-08-24 bis 2026-09-11):**
 Über einen Zeitraum von 18 Tagen schlug das `check-compile`-Gate in der CI durchgehend fehl, ohne dass Merges auf den `main`-Branch blockiert wurden. Grund dafür war, dass das Gate zwar in den Workflow-Dateien definiert war, aber in den GitHub-Repository-Einstellungen nicht als "Required Status Check" registriert war (oder Admin-Overrides erlaubt waren). Dieser Vorfall (APM-CI-9: Unverified Merge Gate) zeigt eindrücklich, dass das bloße Vorhandensein von CI-Jobs ohne explizite Branch Protection den Haupt-Branch nicht vor fehlerhaftem Code schützt.
