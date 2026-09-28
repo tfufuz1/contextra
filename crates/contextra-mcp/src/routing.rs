@@ -80,9 +80,6 @@ pub struct RoutingHandle {
     pub _drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider>,
 }
 
-/// Conditionally sets up `RouterEngine`, `IsotonicCalibrator`, and `PidController` if routing profiles are configured.
-/// Attaches their `Weak` pointers to `db` via `set_router`, `set_calibrator`, and `set_pid_controller`.
-/// Returns `Some(RoutingHandle)` if profiles were present, or `None` if no profiles were configured.
 pub async fn setup_routing(
     db: &Arc<Contextra>,
     config: &RouterConfig,

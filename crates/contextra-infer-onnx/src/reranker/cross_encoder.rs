@@ -14,7 +14,6 @@ use super::onnx::OnnxReranker;
 #[allow(clippy::large_enum_variant)]
 enum RerankerBackend {
     /// Passthrough-Backend, falls das `onnx`-Feature deaktiviert ist.
-    #[allow(dead_code)]
     Passthrough,
     /// Echtes Inferenz-Backend über ONNX Runtime.
     #[cfg(feature = "onnx")]
