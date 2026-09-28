@@ -36,6 +36,7 @@ pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes
         current_max_seq,
         res.is_some()
     );
+    storage.compaction_engine.record_read_op();
     Ok(res)
 }
 
