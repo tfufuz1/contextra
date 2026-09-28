@@ -3,7 +3,7 @@
 //! # Architecture Role (Ring 0)
 //!
 //! Provides in-memory SSI conflict detection for transactions:
-//! - [`ReadSet`]: Tracks read keys and their snapshot sequence numbers per transaction.
+//! - [`ReadSet`]: Tracks read keys, range prefixes, and their snapshot sequence numbers per transaction.
 //! - [`SsiValidator`]: Trait for checking concurrent write conflicts against a transaction's `ReadSet`.
 //! - [`SequenceLogSsiValidator`]: Reference validator implementation using MVCC sequence tracking.
 
@@ -11,7 +11,7 @@
 // STAND: 2026-09-28T00:00:00Z
 // ZWECK: In-memory SSI Read-Set Tracking, Write-Skew-Konfliktvalidierung, Fail-Closed Pruning und atomare Commit-Registrierung.
 // INVARIANTEN: INV-MVCC-SSI-1: Konfliktauflösung ist rein datengetrieben (Sequenznummernvergleich) und deterministisch.
-// HOTSPOTS: 35-180
+// HOTSPOTS: 35-220
 // NICHT-OFFENSICHTLICH: Pruning unter `committed_writes` Schreib-Lock garantiert atomaren Wasserstand. Fail-closed Protection verweigert Reads mit snapshot_seq < pruned_through.
 // SIEHE AUCH: crates/contextra-mvcc/src/seq_log.rs, crates/contextra-mvcc/src/tx_buffer.rs
 
@@ -20,20 +20,29 @@ use crate::seq_log::SequenceLog;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
+use std::collections::BTreeMap;
 use std::hash::Hasher;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-/// Tracked read keys and their snapshot sequence numbers for Serializable Snapshot Isolation (SSI).
+/// Default maximum tracked committed write keys in [`SequenceLogSsiValidator`] (1,000,000 keys).
+pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
+
+/// Tracked read keys, range prefixes, and their snapshot sequence numbers for Serializable Snapshot Isolation (SSI).
 ///
 /// # Memory Overhead & Risk Analysis
-/// Memory consumption per transaction grows linearly $O(R)$ with the number of read keys $R$,
-/// where each entry retains a key byte vector (`Vec<u8>`) and an 8-byte (`u64`) snapshot sequence number.
+/// Memory consumption per transaction grows linearly $O(R + P)$ with the number of read keys $R$ and range prefixes $P$,
+/// where each entry retains a key/prefix byte vector (`Vec<u8>`) and an 8-byte (`u64`) snapshot sequence number.
 /// High read-volume transactions should limit or monitor read-set size to avoid unbounded memory growth.
 /// Use [`crate::tx_buffer::try_register_read`] with [`crate::tx_buffer::DEFAULT_MAX_READ_SET_KEYS`] to enforce bounded limits.
+///
+/// # Range Reads & Phantom Protection
+/// SSI protects point reads directly via recorded keys. Range scans (e.g. prefix scans) MUST call
+/// [`ReadSet::record_prefix`] to enable phantom protection against concurrent key insertions matching the prefix.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReadSet {
     keys: AHashMap<Vec<u8>, u64>,
+    prefixes: AHashMap<Vec<u8>, u64>,
     min_snapshot_seq: Option<u64>,
 }
 
@@ -42,6 +51,7 @@ impl ReadSet {
     pub fn new() -> Self {
         Self {
             keys: AHashMap::default(),
+            prefixes: AHashMap::default(),
             min_snapshot_seq: None,
         }
     }
@@ -67,6 +77,27 @@ impl ReadSet {
         );
     }
 
+    /// Records a range prefix read operation at `snapshot_seq` for phantom protection.
+    ///
+    /// SSI protects point reads directly; range scans are protected against phantoms
+    /// only when `record_prefix` is explicitly called.
+    pub fn record_prefix(&mut self, prefix: impl Into<Vec<u8>>, snapshot_seq: u64) {
+        let p = prefix.into();
+        self.prefixes
+            .entry(p)
+            .and_modify(|existing_seq| {
+                if snapshot_seq < *existing_seq {
+                    *existing_seq = snapshot_seq;
+                }
+            })
+            .or_insert(snapshot_seq);
+
+        self.min_snapshot_seq = Some(
+            self.min_snapshot_seq
+                .map_or(snapshot_seq, |curr| curr.min(snapshot_seq)),
+        );
+    }
+
     /// Alias for [`ReadSet::record_read`].
     pub fn register_read(&mut self, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         self.record_read(key, snapshot_seq);
@@ -77,23 +108,24 @@ impl ReadSet {
         self.keys.get(key).copied()
     }
 
-    /// Returns `true` if no read keys are tracked in this set.
+    /// Returns `true` if no read keys or range prefixes are tracked in this set.
     pub fn is_empty(&self) -> bool {
-        self.keys.is_empty()
+        self.keys.is_empty() && self.prefixes.is_empty()
     }
 
-    /// Returns the number of read keys tracked in this set.
+    /// Returns the total number of read keys and range prefixes tracked in this set.
     pub fn len(&self) -> usize {
-        self.keys.len()
+        self.keys.len() + self.prefixes.len()
     }
 
-    /// Clears all tracked read keys and resets the cached minimum snapshot sequence.
+    /// Clears all tracked read keys, range prefixes, and resets the cached minimum snapshot sequence.
     pub fn clear(&mut self) {
         self.keys.clear();
+        self.prefixes.clear();
         self.min_snapshot_seq = None;
     }
 
-    /// Returns the lowest snapshot sequence number recorded across all read keys in this set,
+    /// Returns the lowest snapshot sequence number recorded across all read keys and prefixes in this set,
     /// or `None` if the set is empty.
     pub fn min_snapshot_seq(&self) -> Option<u64> {
         self.min_snapshot_seq
@@ -104,9 +136,19 @@ impl ReadSet {
         self.keys.iter()
     }
 
+    /// Returns an iterator over tracked range prefixes and their snapshot sequence numbers.
+    pub fn prefixes_iter(&self) -> impl Iterator<Item = (&Vec<u8>, &u64)> {
+        self.prefixes.iter()
+    }
+
     /// Returns the inner map of read keys to snapshot sequence numbers.
     pub fn keys_map(&self) -> &AHashMap<Vec<u8>, u64> {
         &self.keys
+    }
+
+    /// Returns the inner map of range prefixes to snapshot sequence numbers.
+    pub fn prefixes_map(&self) -> &AHashMap<Vec<u8>, u64> {
+        &self.prefixes
     }
 }
 
@@ -124,6 +166,76 @@ pub trait SsiValidator {
     fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()>;
 }
 
+#[derive(Debug, Default)]
+struct CommittedWrites {
+    keys: AHashMap<Vec<u8>, u64>,
+    seq_index: BTreeMap<u64, Vec<Vec<u8>>>,
+}
+
+impl CommittedWrites {
+    fn insert(&mut self, key: Vec<u8>, commit_seq: u64) {
+        if let Some(old_seq) = self.keys.insert(key.clone(), commit_seq) {
+            if old_seq != commit_seq {
+                if let Some(keys) = self.seq_index.get_mut(&old_seq) {
+                    keys.retain(|k| k != &key);
+                    if keys.is_empty() {
+                        self.seq_index.remove(&old_seq);
+                    }
+                }
+            }
+        }
+        self.seq_index.entry(commit_seq).or_default().push(key);
+    }
+
+    fn remove_from_seq(&mut self, first_seq: u64) -> usize {
+        let mut removed = 0;
+        let mut seqs_to_remove = Vec::new();
+
+        for (&seq, keys) in self.seq_index.range(first_seq..) {
+            seqs_to_remove.push(seq);
+            for key in keys {
+                if self.keys.remove(key).is_some() {
+                    removed += 1;
+                }
+            }
+        }
+
+        for seq in seqs_to_remove {
+            self.seq_index.remove(&seq);
+        }
+
+        removed
+    }
+
+    fn prune_through(&mut self, bound_seq: u64) -> usize {
+        let mut removed = 0;
+        let mut seqs_to_remove = Vec::new();
+
+        for (&seq, keys) in self.seq_index.range(..=bound_seq) {
+            seqs_to_remove.push(seq);
+            for key in keys {
+                if self.keys.remove(key).is_some() {
+                    removed += 1;
+                }
+            }
+        }
+
+        for seq in seqs_to_remove {
+            self.seq_index.remove(&seq);
+        }
+
+        removed
+    }
+
+    fn len(&self) -> usize {
+        self.keys.len()
+    }
+
+    fn get(&self, key: &[u8]) -> Option<u64> {
+        self.keys.get(key).copied()
+    }
+}
+
 /// Reference implementation of [`SsiValidator`] backed by MVCC [`SequenceLog`] and committed key tracking.
 ///
 /// Operates strictly in-memory without disk I/O or external storage dependencies.
@@ -131,29 +243,43 @@ pub trait SsiValidator {
 /// # INVARIANT (INV-MVCC-SSI-1)
 /// Conflict resolution is strictly data-driven (sequence number comparison) and deterministic.
 /// Given identical commit sequences and read-sets, repeated executions yield identical outcomes.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SequenceLogSsiValidator {
-    committed_writes: Arc<RwLock<AHashMap<Vec<u8>, u64>>>,
+    committed_writes: Arc<RwLock<CommittedWrites>>,
     sequence_log: Option<Arc<RwLock<SequenceLog>>>,
     pruned_through: Arc<AtomicU64>,
+    max_tracked_keys: usize,
+}
+
+impl Default for SequenceLogSsiValidator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SequenceLogSsiValidator {
-    /// Creates a new [`SequenceLogSsiValidator`] with empty committed write tracking.
+    /// Creates a new [`SequenceLogSsiValidator`] with default maximum commit key capacity (1,000,000 keys).
     pub fn new() -> Self {
+        Self::new_with_bounds(DEFAULT_MAX_TRACKED_COMMIT_KEYS)
+    }
+
+    /// Creates a new [`SequenceLogSsiValidator`] with specified maximum commit key bounds `max_tracked_keys`.
+    pub fn new_with_bounds(max_tracked_keys: usize) -> Self {
         Self {
-            committed_writes: Arc::new(RwLock::new(AHashMap::default())),
+            committed_writes: Arc::new(RwLock::new(CommittedWrites::default())),
             sequence_log: None,
             pruned_through: Arc::new(AtomicU64::new(0)),
+            max_tracked_keys,
         }
     }
 
     /// Creates a new [`SequenceLogSsiValidator`] attached to an existing [`SequenceLog`].
     pub fn with_sequence_log(seq_log: Arc<RwLock<SequenceLog>>) -> Self {
         Self {
-            committed_writes: Arc::new(RwLock::new(AHashMap::default())),
+            committed_writes: Arc::new(RwLock::new(CommittedWrites::default())),
             sequence_log: Some(seq_log),
             pruned_through: Arc::new(AtomicU64::new(0)),
+            max_tracked_keys: DEFAULT_MAX_TRACKED_COMMIT_KEYS,
         }
     }
 
@@ -163,11 +289,18 @@ impl SequenceLogSsiValidator {
     /// Returns the number of entries removed.
     pub fn prune_through(&self, bound_seq: u64) -> usize {
         let mut writes = self.committed_writes.write();
-        let initial_len = writes.len();
-        writes.retain(|_, &mut commit_seq| commit_seq > bound_seq);
-        let removed = initial_len.saturating_sub(writes.len());
+        let removed = writes.prune_through(bound_seq);
         self.pruned_through.fetch_max(bound_seq, Ordering::SeqCst);
         removed
+    }
+
+    /// Removes all committed key registrations with `commit_seq >= first_seq`.
+    ///
+    /// Used when WAL append or commit execution fails after keys were registered conservatively.
+    /// Returns the number of entries removed in $O(K_{\text{removed}})$ time using the sequence index.
+    pub fn forget_from(&self, first_seq: u64) -> usize {
+        let mut writes = self.committed_writes.write();
+        writes.remove_from_seq(first_seq)
     }
 
     /// Returns the current `pruned_through` watermark sequence number.
@@ -180,17 +313,15 @@ impl SequenceLogSsiValidator {
         self.committed_writes.read().len()
     }
 
+    /// Returns the configured maximum commit key tracking limit.
+    pub fn max_tracked_keys(&self) -> usize {
+        self.max_tracked_keys
+    }
+
     /// Records a committed write for `key` at sequence number `commit_seq`.
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
         let mut writes = self.committed_writes.write();
-        writes
-            .entry(key.to_vec())
-            .and_modify(|existing| {
-                if commit_seq > *existing {
-                    *existing = commit_seq;
-                }
-            })
-            .or_insert(commit_seq);
+        writes.insert(key.to_vec(), commit_seq);
     }
 
     /// Records committed writes for multiple keys at sequence number `commit_seq`.
@@ -201,26 +332,29 @@ impl SequenceLogSsiValidator {
     ) {
         let mut writes = self.committed_writes.write();
         for key in keys {
-            writes
-                .entry(key.to_vec())
-                .and_modify(|existing| {
-                    if commit_seq > *existing {
-                        *existing = commit_seq;
-                    }
-                })
-                .or_insert(commit_seq);
+            writes.insert(key.to_vec(), commit_seq);
         }
     }
 
     /// Validates `read_set` against `committed_writes` map and `sequence_log`.
     fn validate_internal(
         &self,
-        committed_writes: &AHashMap<Vec<u8>, u64>,
+        committed_writes: &CommittedWrites,
         tx_id: TxId,
         read_set: &ReadSet,
     ) -> Result<()> {
         if read_set.is_empty() {
             return Ok(());
+        }
+
+        // Fail-closed check if commit key capacity limit is reached or exceeded
+        if committed_writes.len() >= self.max_tracked_keys {
+            return Err(ContextraError::Conflict(format!(
+                "Serializable isolation validation failed for TxId({}): commit key capacity limit reached ({} >= {})",
+                tx_id.inner(),
+                committed_writes.len(),
+                self.max_tracked_keys
+            )));
         }
 
         let pruned_through = self.pruned_through.load(Ordering::SeqCst);
@@ -241,7 +375,7 @@ impl SequenceLogSsiValidator {
             }
 
             // 1. Direct key commit sequence check
-            if let Some(&commit_seq) = committed_writes.get(key) {
+            if let Some(commit_seq) = committed_writes.get(key) {
                 if commit_seq > snapshot_seq {
                     return Err(ContextraError::Conflict(format!(
                         "Serializable isolation violation for TxId({}): key '{:?}' modified at commit_seq {} > snapshot_seq {}",
@@ -273,6 +407,35 @@ impl SequenceLogSsiValidator {
             }
         }
 
+        // Range scan phantom protection checks
+        let mut prefixes: Vec<(&Vec<u8>, &u64)> = read_set.prefixes_iter().collect();
+        prefixes.sort_unstable_by(|(p1, _), (p2, _)| p1.cmp(p2));
+
+        for (prefix, &snapshot_seq) in prefixes {
+            if snapshot_seq < pruned_through {
+                return Err(ContextraError::Conflict(format!(
+                    "Serializable isolation violation for TxId({}): snapshot too old (snapshot_seq {} < pruned_through {}) for range prefix '{:?}'",
+                    tx_id.inner(),
+                    snapshot_seq,
+                    pruned_through,
+                    String::from_utf8_lossy(prefix)
+                )));
+            }
+
+            for (committed_key, &commit_seq) in &committed_writes.keys {
+                if committed_key.starts_with(prefix) && commit_seq > snapshot_seq {
+                    return Err(ContextraError::Conflict(format!(
+                        "Serializable isolation phantom violation for TxId({}): key '{:?}' matching range prefix '{:?}' committed at commit_seq {} > snapshot_seq {}",
+                        tx_id.inner(),
+                        String::from_utf8_lossy(committed_key),
+                        String::from_utf8_lossy(prefix),
+                        commit_seq,
+                        snapshot_seq
+                    )));
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -288,14 +451,7 @@ impl SequenceLogSsiValidator {
         self.validate_internal(&writes, tx_id, read_set)?;
 
         for key in write_keys {
-            writes
-                .entry(key.to_vec())
-                .and_modify(|existing| {
-                    if commit_seq > *existing {
-                        *existing = commit_seq;
-                    }
-                })
-                .or_insert(commit_seq);
+            writes.insert(key.to_vec(), commit_seq);
         }
 
         Ok(())
