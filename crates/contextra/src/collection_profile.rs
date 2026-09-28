@@ -3,6 +3,7 @@
 // INVARIANTEN: INV-COLLECTION-PROFILE-1, INV-COLLECTION-PROFILE-2
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
+use contextra_ports::license::LicenseGate;
 use contextra_store::kv::delete_mode::KvDeleteMode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +36,16 @@ impl CollectionProfile {
         if resolved.deletion_proof_active && self.kv_delete_mode == KvDeleteMode::TombstoneOnly {
             return Err(CollectionProfileError::KvDeleteMismatch);
         }
+        Ok(())
+    }
+
+    pub fn validate_with_license(
+        &self,
+        gate: &dyn LicenseGate,
+    ) -> Result<(), CollectionProfileError> {
+        self.validate()?;
+        let resolved = self.performance.resolve();
+        resolved.enforce_license(gate)?;
         Ok(())
     }
 }

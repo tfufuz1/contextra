@@ -9,6 +9,7 @@ use std::time::Duration;
 use contextra_core::error::ContextraError;
 use contextra_core::DistanceMetric;
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
+use contextra_ports::license::LicenseGate;
 
 /// A builder for configuring and instantiating `Contextra`.
 ///
@@ -18,6 +19,8 @@ pub struct ContextraBuilder {
     storage_path: PathBuf,
     config: ContextraConfig,
     embedder: Option<Arc<dyn TextEmbeddingEngine>>,
+    license_gate: Arc<dyn LicenseGate>,
+    performance_profile: Option<crate::performance_profile::PerformanceProfile>,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -29,6 +32,8 @@ impl std::fmt::Debug for ContextraBuilder {
                 "embedder",
                 &self.embedder.as_ref().map(|_| "<dyn TextEmbeddingEngine>"),
             )
+            .field("license_gate", &"<dyn LicenseGate>")
+            .field("performance_profile", &self.performance_profile)
             .finish()
     }
 }
@@ -39,6 +44,8 @@ impl Clone for ContextraBuilder {
             storage_path: self.storage_path.clone(),
             config: self.config.clone(),
             embedder: self.embedder.clone(),
+            license_gate: Arc::clone(&self.license_gate),
+            performance_profile: self.performance_profile,
         }
     }
 }
@@ -53,6 +60,8 @@ impl ContextraBuilder {
                 ..Default::default()
             },
             embedder: None,
+            license_gate: Arc::new(contextra_license::OpenFastGate),
+            performance_profile: None,
         }
     }
 
@@ -99,6 +108,21 @@ impl ContextraBuilder {
         self
     }
 
+    /// Attaches a license gate for feature ring authorization.
+    pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {
+        self.license_gate = gate;
+        self
+    }
+
+    /// Sets the performance profile preset for the contextra instance.
+    pub fn with_performance_profile(
+        mut self,
+        profile: crate::performance_profile::PerformanceProfile,
+    ) -> Self {
+        self.performance_profile = Some(profile);
+        self
+    }
+
     /// Sets the complete `ContextraConfig` directly.
     pub fn with_config(mut self, config: ContextraConfig) -> Self {
         self.config = config;
@@ -107,6 +131,16 @@ impl ContextraBuilder {
 
     /// Builds and initializes the `Contextra` engine instance.
     pub async fn build(self) -> Result<Contextra, ContextraError> {
+        if let Some(profile) = self.performance_profile {
+            let resolved = profile.resolve();
+            resolved
+                .validate()
+                .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+            resolved
+                .enforce_license(self.license_gate.as_ref())
+                .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+        }
+
         let instance = Contextra::open_with_config(&self.storage_path, self.config).await?;
         if let Some(embedder) = self.embedder {
             Ok(instance.with_embedder(embedder).await)

@@ -574,6 +574,7 @@ dependencies = [
  "contextra-infer-candle",
  "contextra-infer-ollama",
  "contextra-infer-onnx",
+ "contextra-license",
  "contextra-ports",
  "contextra-privacy",
  "contextra-rank",
