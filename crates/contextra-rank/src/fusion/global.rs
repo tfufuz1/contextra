@@ -169,7 +169,7 @@ impl GlobalFusionStrategy {
         let max_nodes = self
             .config
             .max_community_nodes
-            .unwrap_or(usize::MAX)
+            .unwrap_or(max_results)
             .min(max_results);
 
         let mut final_results: Vec<SearchResult> = Vec::with_capacity(max_nodes);

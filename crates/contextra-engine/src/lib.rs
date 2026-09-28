@@ -205,6 +205,7 @@ mod no_crypto_stubs {
 use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
+pub use contextra_store::lsm::DurabilityMode;
 use contextra_store::LsmStorage;
 use contextra_types::{CollectionId, DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
@@ -344,6 +345,22 @@ pub struct ContextraConfig {
     pub max_elements: usize,
     pub distance_metric: contextra_types::DistanceMetric,
     pub encryption_passphrase: Option<String>,
+    /// Maximum RAM the LSM storage engine may use (in MB). Passed directly to LsmConfig::max_ram_mb.
+    /// Default: 2048 (matches LsmConfig default).
+    pub max_ram_mb: u64,
+
+    /// WAL group-commit window in microseconds. 0 = disabled (immediate single commit).
+    /// Passed directly to LsmConfig::group_commit_window_micros.
+    /// Default: 500 (matches LsmConfig default).
+    pub group_commit_window_micros: u64,
+
+    /// Durability mode for WAL persistence. Passed directly to LsmConfig::durability_mode.
+    /// Default: DurabilityMode::Full.
+    pub durability_mode: DurabilityMode,
+
+    /// MemTable flush threshold in bytes. Passed directly to LsmConfig::memtable_size_limit.
+    /// Default: 67_108_864 (64 MiB, matches LsmConfig default).
+    pub memtable_size_limit: usize,
     pub expiry_reaper_interval: std::time::Duration,
     pub orphan_registry_path: Option<std::path::PathBuf>,
     pub community_detection: CommunityDetectionConfig,
@@ -371,6 +388,10 @@ impl std::fmt::Debug for ContextraConfig {
                 "encryption_passphrase",
                 &self.encryption_passphrase.as_ref().map(|_| "***"),
             )
+            .field("max_ram_mb", &self.max_ram_mb)
+            .field("group_commit_window_micros", &self.group_commit_window_micros)
+            .field("durability_mode", &self.durability_mode)
+            .field("memtable_size_limit", &self.memtable_size_limit)
             .field("expiry_reaper_interval", &self.expiry_reaper_interval)
             .field("orphan_registry_path", &self.orphan_registry_path)
             .field("community_detection", &self.community_detection)
@@ -393,6 +414,10 @@ impl Default for ContextraConfig {
             max_elements: 1_000_000,
             distance_metric: contextra_types::DistanceMetric::Cosine,
             encryption_passphrase: None,
+            max_ram_mb: 2048,
+            group_commit_window_micros: 500,
+            durability_mode: DurabilityMode::default(),
+            memtable_size_limit: 64 * 1024 * 1024,
             expiry_reaper_interval: std::time::Duration::from_secs(60),
             orphan_registry_path: None,
             community_detection: CommunityDetectionConfig::default(),
