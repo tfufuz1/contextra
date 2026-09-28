@@ -486,3 +486,9 @@ check-veto-deadlines:
 
 full-audit:
     cargo xtask workspace-verify --mode=audit
+
+harness-list *ARGS:
+    cargo xtask harness-list {{ARGS}}
+
+registry-check *ARGS:
+    cargo xtask registry-check {{ARGS}}

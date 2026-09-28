@@ -6,6 +6,7 @@ pub mod artifact_header;
 pub mod check_duplicate_core_primitives;
 pub mod gates;
 pub mod generate_diagnostics;
+pub mod harness;
 pub mod reproducible_build;
 pub mod session_history;
 
