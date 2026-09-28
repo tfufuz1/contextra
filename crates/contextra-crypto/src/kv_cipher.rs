@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Dedicated AEAD encryption and key isolation for KV-cache segments (contextra-kv-bridge).
+// ZWECK: Dedicated AEAD encryption and key isolation for KV-cache segments (contextra-crypto).
 // INVARIANTEN: Key derivation per (tenant_id, model_fingerprint) tuple via KeyManager HKDF-Expand.
 // NICHT-OFFENSICHTLICH: OsRng generates fresh 12-byte nonces per encrypt call. AES-256-GCM-SIV provides misuse-resistance.
 // STAND: TS:2026-09-08T00:00:00Z
