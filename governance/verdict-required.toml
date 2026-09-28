@@ -1,0 +1,84 @@
+# verdict-required.toml
+# Governance configuration for the verdict harness module.
+# Defines required status check gates and whether they are blocking for PR merge verdict.
+
+# Harness gate commands (Session 2, Session 3, Session 5, Session 6, Session 7, Session 9)
+[[gate]]
+name = "protected-paths"
+blocking = true
+
+[[gate]]
+name = "gate-weakening"
+blocking = true
+
+[[gate]]
+name = "ratchet"
+blocking = true
+
+[[gate]]
+name = "doc-truth"
+blocking = true
+
+[[gate]]
+name = "registry-check"
+blocking = true
+
+[[gate]]
+name = "scope-guard"
+blocking = true
+
+[[gate]]
+name = "diff-budget"
+blocking = true
+
+[[gate]]
+name = "claims-in-pr"
+blocking = true
+
+[[gate]]
+name = "test-integrity"
+blocking = true
+
+[[gate]]
+name = "task-card"
+blocking = true
+
+[[gate]]
+name = "ledger"
+blocking = true
+
+[[gate]]
+name = "can-merge"
+blocking = true
+
+# Reusable deep-gates artifacts (Session 8)
+[[gate]]
+name = "gate-determinism-check"
+blocking = true
+
+[[gate]]
+name = "gate-unsafe-audit"
+blocking = true
+
+[[gate]]
+name = "gate-lock-audit"
+blocking = true
+
+[[gate]]
+name = "gate-wal-replay-verify"
+blocking = true
+
+# Non-blocking gates (after 2 stable weeks set to true)
+# [[gate]]
+# name = "fuzz-smoke"
+# blocking = false
+[[gate]]
+name = "fuzz-smoke"
+blocking = false
+
+# [[gate]]
+# name = "mutants-diff"
+# blocking = false
+[[gate]]
+name = "mutants-diff"
+blocking = false
