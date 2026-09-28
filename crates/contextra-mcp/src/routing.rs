@@ -83,34 +83,6 @@ pub struct RoutingHandle {
 /// Conditionally sets up `RouterEngine`, `IsotonicCalibrator`, and `PidController` if routing profiles are configured.
 /// Attaches their `Weak` pointers to `db` via `set_router`, `set_calibrator`, and `set_pid_controller`.
 /// Returns `Some(RoutingHandle)` if profiles were present, or `None` if no profiles were configured.
-#[allow(dead_code)]
-struct CollectionSearchAdapter(Arc<contextra::Collection>);
-
-impl contextra::router::ports_local::HybridSearchProvider for CollectionSearchAdapter {
-    fn search_hybrid<'a>(
-        &'a self,
-        query_text: &'a str,
-        query_embedding: &'a [f32],
-        top_k: usize,
-    ) -> contextra_ports::BoxFuture<'a, Result<Vec<contextra_types::ContextChunk>, ContextraError>>
-    {
-        let col = self.0.clone();
-        Box::pin(async move {
-            let search_results = col
-                .query()
-                .text(query_text)
-                .vector(query_embedding)
-                .k(top_k)
-                .execute()
-                .await?;
-            search_results
-                .into_iter()
-                .map(contextra_types::ContextChunk::try_from)
-                .collect()
-        })
-    }
-}
-
 pub async fn setup_routing(
     db: &Arc<Contextra>,
     config: &RouterConfig,

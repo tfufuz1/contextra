@@ -547,25 +547,6 @@ pub fn compact_segment_via_context_compactor(
 mod tests {
     use super::*;
 
-    #[allow(dead_code)]
-    fn make_embedding(base: f32, dim: usize) -> Vec<f32> {
-        let mut v = vec![0.0f32; dim];
-        if dim > 0 {
-            v[0] = base;
-            for (i, elem) in v.iter_mut().enumerate().skip(1) {
-                *elem = 0.1 * (i as f32);
-            }
-        }
-        // Normalize
-        let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm > 0.0 {
-            for x in v.iter_mut() {
-                *x /= norm;
-            }
-        }
-        v
-    }
-
     #[test]
     fn test_group_turns_into_segments_two_clusters() {
         // 10 synthetic embeddings: 5 in Cluster A, 5 in Cluster B

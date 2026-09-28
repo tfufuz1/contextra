@@ -120,103 +120,13 @@ impl Mlp {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 enum MlpOrMoe {
     Mlp(Mlp),
-    MoE {
-        n_expert_used: usize,
-        feed_forward_gate_inp: QuantizedMatMul,
-        experts: Vec<Mlp>,
-    },
 }
 
 impl MlpOrMoe {
     fn forward(&self, xs: &Tensor) -> Result<Tensor, ContextraError> {
         match self {
-            Self::MoE {
-                feed_forward_gate_inp,
-                experts,
-                n_expert_used,
-            } => {
-                let (b_size, seq_len, hidden_dim) = xs
-                    .dims3()
-                    .map_err(|e| ContextraError::Internal(format!("Failed dims3: {e}")))?;
-                let xs_reshaped = xs
-                    .reshape(((), hidden_dim))
-                    .map_err(|e| ContextraError::Internal(format!("Failed reshape: {e}")))?;
-                let router_logits = feed_forward_gate_inp.forward(&xs_reshaped)?;
-                let routing_weights = candle_nn::ops::softmax_last_dim(&router_logits)
-                    .map_err(|e| ContextraError::Internal(format!("Softmax error: {e}")))?;
-
-                let routing_weights_vec = routing_weights
-                    .to_dtype(DType::F32)
-                    .map_err(|e| ContextraError::Internal(format!("to_dtype error: {e}")))?
-                    .to_vec2::<f32>()
-                    .map_err(|e| ContextraError::Internal(format!("to_vec2 error: {e}")))?;
-
-                let mut top_x = vec![vec![]; experts.len()];
-                let mut selected_rws = vec![vec![]; experts.len()];
-                for (row_idx, rw) in routing_weights_vec.iter().enumerate() {
-                    let mut dst = (0..rw.len() as u32).collect::<Vec<u32>>();
-                    dst.sort_by(|&i, &j| rw[j as usize].total_cmp(&rw[i as usize]));
-                    let mut sum_routing_weights = 0f32;
-                    for &expert_idx in dst.iter().take(*n_expert_used) {
-                        let expert_idx = expert_idx as usize;
-                        let routing_weight = rw[expert_idx];
-                        sum_routing_weights += routing_weight;
-                        top_x[expert_idx].push(row_idx as u32);
-                    }
-                    for &expert_idx in dst.iter().take(*n_expert_used) {
-                        let expert_idx = expert_idx as usize;
-                        let routing_weight = rw[expert_idx];
-                        let rw_norm = if sum_routing_weights > 0.0 {
-                            routing_weight / sum_routing_weights
-                        } else {
-                            0.0
-                        };
-                        selected_rws[expert_idx].push(rw_norm);
-                    }
-                }
-
-                let mut ys = xs_reshaped
-                    .zeros_like()
-                    .map_err(|e| ContextraError::Internal(format!("zeros_like error: {e}")))?;
-                for (expert_idx, expert_layer) in experts.iter().enumerate() {
-                    let top_x_indices = &top_x[expert_idx];
-                    if top_x_indices.is_empty() {
-                        continue;
-                    }
-                    let top_x_tensor = Tensor::new(top_x_indices.as_slice(), xs.device())
-                        .map_err(|e| ContextraError::Internal(format!("Tensor::new error: {e}")))?;
-                    let selected_rws_tensor =
-                        Tensor::new(selected_rws[expert_idx].as_slice(), xs.device())
-                            .map_err(|e| {
-                                ContextraError::Internal(format!("Tensor::new error: {e}"))
-                            })?
-                            .reshape(((), 1))
-                            .map_err(|e| ContextraError::Internal(format!("reshape error: {e}")))?;
-
-                    let current_state = xs_reshaped
-                        .index_select(&top_x_tensor, 0)
-                        .map_err(|e| ContextraError::Internal(format!("index_select error: {e}")))?
-                        .reshape(((), hidden_dim))
-                        .map_err(|e| ContextraError::Internal(format!("reshape error: {e}")))?;
-                    let current_hidden_states = expert_layer.forward(&current_state)?;
-                    let current_hidden_states = current_hidden_states
-                        .broadcast_mul(&selected_rws_tensor)
-                        .map_err(|e| {
-                            ContextraError::Internal(format!("broadcast_mul error: {e}"))
-                        })?;
-                    ys = ys
-                        .index_add(&top_x_tensor, &current_hidden_states, 0)
-                        .map_err(|e| ContextraError::Internal(format!("index_add error: {e}")))?;
-                }
-
-                let ys = ys
-                    .reshape((b_size, seq_len, hidden_dim))
-                    .map_err(|e| ContextraError::Internal(format!("reshape error: {e}")))?;
-                Ok(ys)
-            }
             Self::Mlp(mlp) => mlp.forward(xs),
         }
     }

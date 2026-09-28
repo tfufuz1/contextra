@@ -44,22 +44,10 @@ impl<'a, S: StorageEngine + ?Sized> CheckpointPinGuard<'a, S> {
         ))
     }
 
-    /// Pin-first, read-after alias for `new_at_latest`.
-    #[allow(dead_code)]
-    pub async fn new_pinning_latest(storage: &'a S) -> Result<(Self, u64)> {
-        Self::new_at_latest(storage).await
-    }
-
     /// Explicitly unpins the checkpoint and consumes the guard, preventing the fallback `Drop` warning.
     pub async fn release(mut self) -> Result<()> {
         self.unpinned = true;
         self.storage.unpin_checkpoint(self.seq).await
-    }
-
-    /// Returns the sequence number protected by this pin guard.
-    #[allow(dead_code)]
-    pub fn seq(&self) -> u64 {
-        self.seq
     }
 }
 
@@ -110,22 +98,3 @@ where
     result
 }
 
-/// Higher-order function passing the guard reference to the closure, ensuring `release()` is ALWAYS called.
-#[allow(dead_code)]
-pub async fn with_pinned_checkpoint_and_guard<S, F, Fut, T>(
-    storage: &S,
-    seq: u64,
-    f: F,
-) -> Result<T>
-where
-    S: StorageEngine + ?Sized,
-    F: FnOnce(&CheckpointPinGuard<S>, u64) -> Fut,
-    Fut: std::future::Future<Output = Result<T>>,
-{
-    let pin_guard = CheckpointPinGuard::new(storage, seq).await?;
-    let result = f(&pin_guard, seq).await;
-    if let Err(e) = pin_guard.release().await {
-        tracing::warn!(error = %e, seq_no = seq, "CheckpointPinGuard release failed");
-    }
-    result
-}

@@ -79,9 +79,6 @@ impl BanditExploration {
 /// to provide meaningful routing signal — the router behaves as a random router.
 pub(crate) const CALIBRATION_WARMUP_WINDOW: u32 = 100;
 
-/// Minimum calibration samples required for high confidence coverage (α=0.05).
-#[allow(dead_code)]
-pub(crate) const CALIBRATION_HIGH_CONFIDENCE_WINDOW: u32 = 200;
 
 /// Maximale TTL für ausstehende Routing-Entscheidungen bevor sie bereinigt werden.
 pub(crate) const PENDING_DECISION_TTL: Duration = Duration::from_secs(300);
@@ -248,7 +245,7 @@ pub(crate) fn compute_profile_scores(
         .collect()
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn compute_max_score(
     profile: &SlmProfile,
     chunks: &[(ContextChunk, Option<u64>)],
@@ -256,7 +253,7 @@ pub(crate) fn compute_max_score(
     score_profile(profile, chunks).max_score
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn select_profile_from_chunks(
     profiles: &[SlmProfile],
     chunks: &[(ContextChunk, Option<u64>)],

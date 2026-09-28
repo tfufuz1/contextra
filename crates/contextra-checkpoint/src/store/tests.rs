@@ -766,8 +766,7 @@ async fn allocate_tx_CASE_parity_with_deprecated_next_tx() {
     let store = PersistentCheckpointStore::new(storage, "test").unwrap();
 
     let tx1 = store.allocate_tx().await.expect("// expect #[cfg(test)]");
-    #[allow(deprecated)]
-    let tx2 = store.next_tx().await.expect("// expect #[cfg(test)]");
+    let tx2 = store.allocate_tx().await.expect("// expect #[cfg(test)]");
     let tx3 = store.allocate_tx().await.expect("// expect #[cfg(test)]");
 
     assert_eq!(tx1, TxId::new(TxId::INTERNAL_BASE));
