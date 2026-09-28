@@ -139,6 +139,12 @@ impl LsmStorage {
     ///
     /// Evaluates `snapshot_seq = next_seq_no - 1` ONCE (K2), registers the read key in `TxBuffer`,
     /// and reads the key at `snapshot_seq`.
+    ///
+    /// # SSI Protection Scope
+    /// ONLY keys read via `get_tracked` or `get_at_seq_tracked` within transaction `tx_id` are registered
+    /// in the transaction's `ReadSet` and receive Serializable Snapshot Isolation (SSI) conflict validation
+    /// during commit. Untracked reads via `StorageEngine::get()` or `LsmStorage::get()` perform point-in-time
+    /// snapshot reads without transaction tracking and do NOT receive SSI write-skew protection.
     pub async fn get_tracked(&self, tx_id: TxId, key: &[u8]) -> Result<Option<Bytes>> {
         read::get_tracked(self, tx_id, key).await
     }
@@ -146,6 +152,12 @@ impl LsmStorage {
     /// Performs a tracked read for transaction `tx_id` at an explicit `snapshot_seq`.
     ///
     /// Registers the read key in `TxBuffer` at `snapshot_seq` and reads the key at `snapshot_seq`.
+    ///
+    /// # SSI Protection Scope
+    /// ONLY keys read via `get_tracked` or `get_at_seq_tracked` within transaction `tx_id` are registered
+    /// in the transaction's `ReadSet` and receive Serializable Snapshot Isolation (SSI) conflict validation
+    /// during commit. Untracked reads via `StorageEngine::get()` or `LsmStorage::get()` perform point-in-time
+    /// snapshot reads without transaction tracking and do NOT receive SSI write-skew protection.
     pub async fn get_at_seq_tracked(
         &self,
         tx_id: TxId,

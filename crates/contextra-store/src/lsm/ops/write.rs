@@ -360,10 +360,11 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     if let Some(ref mut queue) = *queue_guard {
         let _wal_queue_guard = WalQueueGuard::new(Arc::clone(&storage.wal_queue_depth));
         let (tx, rx) = tokio::sync::oneshot::channel();
+        let committed_flag = Arc::clone(&queue.committed_flag);
         let req = GroupCommitRequest {
             tx_id,
-            wal_entries,
-            mem_updates,
+            wal_entries: wal_entries.clone(),
+            mem_updates: mem_updates.clone(),
             sender: tx,
         };
         queue.requests.push(req);
@@ -382,9 +383,40 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
         let res = match tokio::time::timeout(storage.config.tx_timeout, rx).await {
             Ok(Ok(res)) => res,
-            Ok(Err(_)) => Err(ContextraError::Internal(
-                "Group commit leader dropped without sending result".to_string(),
-            )),
+            Ok(Err(_)) => {
+                if committed_flag.load(Ordering::Acquire) {
+                    Ok(())
+                } else {
+                    let _commit_lock = storage.commit_mutex.lock().await;
+                    {
+                        let mut q = storage.pending_commit_queue.lock().await;
+                        if q.as_ref().is_some_and(|pq| pq.requests.iter().any(|r| r.tx_id == tx_id)) {
+                            q.take();
+                        }
+                    }
+                    let wal = storage.wal.read().await.clone();
+                    let entries_for_obs = wal_entries.entries().to_vec();
+                    let append_res = wal.append_batch(wal_entries).await;
+                    if let Err(e) = append_res {
+                        storage.cleanup_intent_locks_for_tx(tx_id);
+                        Err(ContextraError::Storage(format!("Commit failed at WAL append after leader cancellation: {}", e)))
+                    } else {
+                        storage.notify_commit_observers(&entries_for_obs, tx_id, WriteOrigin::UserWrite);
+                        let state = storage.state.read().await;
+                        storage.advance_visibility(tx_id);
+                        storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
+                        let should_flush = state.memtable.size() > storage.config.memtable_size_limit;
+                        drop(state);
+                        if should_flush {
+                            if let Err(e) = storage.flush().await {
+                                tracing::warn!("Flush failed after leader cancellation fallback: {e}");
+                            }
+                        }
+                        storage.cleanup_intent_locks_for_tx(tx_id);
+                        Ok(())
+                    }
+                }
+            }
             Err(_) => {
                 let mut queue_guard = storage.pending_commit_queue.lock().await;
                 if let Some(ref mut queue) = *queue_guard {
@@ -404,10 +436,12 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let leader_mem_updates = mem_updates;
 
         let notify_full = Arc::new(tokio::sync::Notify::new());
+        let committed_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
         *queue_guard = Some(PendingCommitQueue {
             requests: Vec::new(),
             first_prev_hmac: prev_hmac_snapshot,
             notify_full: notify_full.clone(),
+            committed_flag: committed_flag.clone(),
         });
         drop(queue_guard);
         drop(_commit_lock);
@@ -457,6 +491,10 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         )
         .await;
         drop(truncate_guard);
+
+        if append_res.is_ok() {
+            committed_flag.store(true, Ordering::Release);
+        }
 
         if let Err(e) = append_res {
             let _commit_lock = storage.commit_mutex.lock().await;
