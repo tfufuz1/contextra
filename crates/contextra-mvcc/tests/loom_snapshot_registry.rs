@@ -79,8 +79,8 @@ mod loom_tests {
                 r2.release(50);
             });
 
-            t1.join().expect("thread 1 ok");
-            t2.join().expect("thread 2 ok");
+            t1.join().unwrap();
+            t2.join().unwrap();
 
             assert_eq!(registry.min_active_seqno(), u64::MAX);
         });
@@ -108,8 +108,8 @@ mod loom_tests {
                 r2.release(150);
             });
 
-            t1.join().expect("t1 ok");
-            t2.join().expect("t2 ok");
+            t1.join().unwrap();
+            t2.join().unwrap();
 
             assert_eq!(registry.min_active_seqno(), u64::MAX);
         });
@@ -118,6 +118,7 @@ mod loom_tests {
 
 #[cfg(not(loom))]
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod normal_tests {
     use contextra_mvcc::SnapshotRegistry;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -150,7 +151,7 @@ mod normal_tests {
         }
 
         for h in handles {
-            h.join().expect("thread panicked");
+            h.join().expect("thread panicked"); // #[cfg(test)] // expect
         }
 
         assert_eq!(registry.min_active_seqno(), u64::MAX);
