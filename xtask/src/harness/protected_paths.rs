@@ -1,0 +1,550 @@
+//! Module enforcing protected paths restrictions on changed files.
+
+use regex::Regex;
+use serde::Deserialize;
+use std::env;
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+
+#[derive(Debug, Deserialize)]
+pub struct ProtectedPathsConfig {
+    #[serde(default)]
+    pub protected: Vec<ProtectedPathRule>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ProtectedPathRule {
+    pub glob: String,
+    pub reason: String,
+}
+
+pub fn protected_paths_glob_to_regex(glob: &str) -> Result<Regex, String> {
+    let mut regex_str = String::from("^");
+    let chars: Vec<char> = glob.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '*' => {
+                if i + 1 < chars.len() && chars[i + 1] == '*' {
+                    if i + 2 < chars.len() && chars[i + 2] == '/' {
+                        regex_str.push_str("(?:.*/)?");
+                        i += 3;
+                    } else {
+                        regex_str.push_str(".*");
+                        i += 2;
+                    }
+                } else {
+                    regex_str.push_str("[^/]*");
+                    i += 1;
+                }
+            }
+            '?' => {
+                regex_str.push_str("[^/]");
+                i += 1;
+            }
+            '.' | '(' | ')' | '+' | '|' | '^' | '$' | '@' | '%' | '{' | '}' | '[' | ']' | '\\' => {
+                regex_str.push('\\');
+                regex_str.push(chars[i]);
+                i += 1;
+            }
+            c => {
+                regex_str.push(c);
+                i += 1;
+            }
+        }
+    }
+    regex_str.push('$');
+    Regex::new(&regex_str).map_err(|e| format!("Fehler beim Compilieren des Globs '{glob}': {e}"))
+}
+
+pub fn protected_paths_parse_args(args: &[String]) -> (String, String, String, bool) {
+    let mut root = String::new();
+    let mut base = String::new();
+    let mut head = String::from("HEAD");
+    let mut json = false;
+
+    let mut idx = 0;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                if idx + 1 < args.len() {
+                    root = args[idx + 1].clone();
+                    idx += 2;
+                } else {
+                    idx += 1;
+                }
+            }
+            "--base" => {
+                if idx + 1 < args.len() {
+                    base = args[idx + 1].clone();
+                    idx += 2;
+                } else {
+                    idx += 1;
+                }
+            }
+            "--head" => {
+                if idx + 1 < args.len() {
+                    head = args[idx + 1].clone();
+                    idx += 2;
+                } else {
+                    idx += 1;
+                }
+            }
+            "--json" => {
+                json = true;
+                idx += 1;
+            }
+            _ => {
+                idx += 1;
+            }
+        }
+    }
+
+    if root.is_empty() {
+        if let Ok(out) = Command::new("git")
+            .args(["rev-parse", "--show-toplevel"])
+            .output()
+        {
+            if out.status.success() {
+                root = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            }
+        }
+    }
+
+    if base.is_empty() {
+        if let Ok(out) = Command::new("git")
+            .args(["merge-base", "HEAD", "origin/main"])
+            .output()
+        {
+            if out.status.success() {
+                base = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            }
+        }
+        if base.is_empty() {
+            base = String::from("HEAD~1");
+        }
+    }
+
+    (root, base, head, json)
+}
+
+pub fn protected_paths_get_changed_files(
+    root: &str,
+    base: &str,
+    head: &str,
+) -> Result<Vec<String>, String> {
+    let output = Command::new("git")
+        .current_dir(root)
+        .args([
+            "diff",
+            "--name-status",
+            "-z",
+            "--find-renames",
+            &format!("{base}...{head}"),
+        ])
+        .output()
+        .map_err(|e| format!("git diff execution failed: {e}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "git diff failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let mut files = Vec::new();
+    let raw = output.stdout;
+    let parts: Vec<&[u8]> = raw.split(|&b| b == 0).collect();
+
+    let mut i = 0;
+    while i < parts.len() {
+        if parts[i].is_empty() {
+            i += 1;
+            continue;
+        }
+        let status_str = String::from_utf8_lossy(parts[i]);
+        let status_code = status_str.chars().next().unwrap_or(' ');
+        i += 1;
+
+        if status_code == 'R' || status_code == 'C' {
+            if i < parts.len() && !parts[i].is_empty() {
+                files.push(String::from_utf8_lossy(parts[i]).to_string());
+                i += 1;
+            }
+            if i < parts.len() && !parts[i].is_empty() {
+                files.push(String::from_utf8_lossy(parts[i]).to_string());
+                i += 1;
+            }
+        } else if i < parts.len() && !parts[i].is_empty() {
+            files.push(String::from_utf8_lossy(parts[i]).to_string());
+            i += 1;
+        }
+    }
+
+    files.sort();
+    files.dedup();
+    Ok(files)
+}
+
+pub fn protected_paths_get_commits(
+    root: &str,
+    base: &str,
+    head: &str,
+) -> Result<Vec<String>, String> {
+    let output = Command::new("git")
+        .current_dir(root)
+        .args(["log", "--format=%H", &format!("{base}..{head}")])
+        .output()
+        .map_err(|e| format!("git log failed: {e}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "git log failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect())
+}
+
+pub fn protected_paths_get_commit_trailers(
+    root: &str,
+    commit_hash: &str,
+) -> Result<Vec<(String, String)>, String> {
+    let output = Command::new("git")
+        .current_dir(root)
+        .args([
+            "log",
+            "-1",
+            "--format=%(trailers:key=Protected-Change)",
+            commit_hash,
+        ])
+        .output()
+        .map_err(|e| format!("git log trailer failed: {e}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "git log trailer failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut trailers = Vec::new();
+    for line in stdout.lines() {
+        if let Some((k, v)) = line.split_once(':') {
+            trailers.push((k.trim().to_string(), v.trim().to_string()));
+        }
+    }
+    Ok(trailers)
+}
+
+pub fn run_protected_paths(args: &[String]) -> i32 {
+    let (root, base, head, json) = protected_paths_parse_args(args);
+
+    let config_path = Path::new(&root).join("governance/protected-paths.toml");
+    if !config_path.exists() {
+        let msg = format!(
+            "Konfigurationsdatei '{}' nicht gefunden.",
+            config_path.display()
+        );
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "gate": "protected-paths",
+                    "status": "error",
+                    "summary": msg,
+                    "findings": []
+                })
+            );
+        } else {
+            eprintln!("FEHLER [protected-paths]: {msg}");
+        }
+        return 2;
+    }
+
+    let config_str = match fs::read_to_string(&config_path) {
+        Ok(s) => s,
+        Err(e) => {
+            let msg = format!("Fehler beim Lesen von '{}': {e}", config_path.display());
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "gate": "protected-paths",
+                        "status": "error",
+                        "summary": msg,
+                        "findings": []
+                    })
+                );
+            } else {
+                eprintln!("FEHLER [protected-paths]: {msg}");
+            }
+            return 2;
+        }
+    };
+
+    let config: ProtectedPathsConfig = match toml::from_str(&config_str) {
+        Ok(c) => c,
+        Err(e) => {
+            let msg = format!("Fehler beim Parsen von '{}': {e}", config_path.display());
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "gate": "protected-paths",
+                        "status": "error",
+                        "summary": msg,
+                        "findings": []
+                    })
+                );
+            } else {
+                eprintln!("FEHLER [protected-paths]: {msg}");
+            }
+            return 2;
+        }
+    };
+
+    // Verify self-protection of config and module
+    let required_protected = [
+        "governance/protected-paths.toml",
+        "xtask/src/harness/protected_paths.rs",
+    ];
+    for req in required_protected {
+        let mut covered = false;
+        for rule in &config.protected {
+            if let Ok(re) = protected_paths_glob_to_regex(&rule.glob) {
+                if re.is_match(req) {
+                    covered = true;
+                    break;
+                }
+            }
+        }
+        if !covered {
+            let msg = format!("Selbstschutz-Verstoß: Pflichtpfad '{req}' ist nicht in governance/protected-paths.toml erfasst!");
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "gate": "protected-paths",
+                        "status": "fail",
+                        "summary": msg,
+                        "findings": [{
+                            "id": "PP-SELF-PROTECT",
+                            "severity": "error",
+                            "file": "governance/protected-paths.toml",
+                            "line": 0,
+                            "message": msg,
+                            "fix": format!("Füge eine Regel für '{req}' in governance/protected-paths.toml ein.")
+                        }]
+                    })
+                );
+            } else {
+                eprintln!("VERSTOSS [protected-paths]: {msg}");
+            }
+            return 1;
+        }
+    }
+
+    let changed_files = match protected_paths_get_changed_files(&root, &base, &head) {
+        Ok(f) => f,
+        Err(e) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "gate": "protected-paths",
+                        "status": "error",
+                        "summary": e,
+                        "findings": []
+                    })
+                );
+            } else {
+                eprintln!("FEHLER [protected-paths]: {e}");
+            }
+            return 2;
+        }
+    };
+
+    let mut violations = Vec::new();
+    for file in &changed_files {
+        for rule in &config.protected {
+            if let Ok(re) = protected_paths_glob_to_regex(&rule.glob) {
+                if re.is_match(file) {
+                    violations.push((file.clone(), rule.glob.clone(), rule.reason.clone()));
+                }
+            }
+        }
+    }
+
+    if violations.is_empty() {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "gate": "protected-paths",
+                    "status": "pass",
+                    "summary": "Keine geschützten Pfade verändert.",
+                    "findings": []
+                })
+            );
+        } else {
+            println!("PASS [protected-paths]: Keine geschützten Pfade verändert.");
+        }
+        return 0;
+    }
+
+    // Check exception rules
+    let commits = match protected_paths_get_commits(&root, &base, &head) {
+        Ok(c) => c,
+        Err(e) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "gate": "protected-paths",
+                        "status": "error",
+                        "summary": e,
+                        "findings": []
+                    })
+                );
+            } else {
+                eprintln!("FEHLER [protected-paths]: {e}");
+            }
+            return 2;
+        }
+    };
+
+    let pr_labels_env = env::var("PR_LABELS").unwrap_or_default();
+    let pr_labels: Vec<&str> = pr_labels_env.split(',').map(|s| s.trim()).collect();
+    let has_label = pr_labels.contains(&"protected-change");
+
+    let mut all_commits_have_valid_adr = true;
+    let mut missing_adr_reason = String::new();
+
+    if commits.is_empty() {
+        all_commits_have_valid_adr = false;
+        missing_adr_reason = "Keine Commits im angegebenen Bereich gefunden.".to_string();
+    } else {
+        for commit in &commits {
+            let trailers = match protected_paths_get_commit_trailers(&root, commit) {
+                Ok(t) => t,
+                Err(e) => {
+                    all_commits_have_valid_adr = false;
+                    missing_adr_reason = e;
+                    break;
+                }
+            };
+
+            let mut commit_valid = false;
+            for (key, val) in trailers {
+                if key == "Protected-Change" {
+                    let adr_path = Path::new(&root)
+                        .join("docs/decisions")
+                        .join(format!("{val}.md"));
+
+                    let mut exists = adr_path.exists();
+                    if !exists {
+                        if let Ok(entries) =
+                            walkdir::WalkDir::new(Path::new(&root).join("docs/decisions"))
+                                .max_depth(1)
+                                .into_iter()
+                                .collect::<Result<Vec<_>, _>>()
+                        {
+                            for entry in entries {
+                                if let Some(name) = entry.file_name().to_str() {
+                                    if name.starts_with(&format!("{val}-")) && name.ends_with(".md")
+                                    {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if exists {
+                        commit_valid = true;
+                        break;
+                    } else {
+                        missing_adr_reason =
+                            format!("ADR-Datei für '{val}' nicht in docs/decisions/ gefunden.");
+                    }
+                }
+            }
+
+            if !commit_valid {
+                all_commits_have_valid_adr = false;
+                if missing_adr_reason.is_empty() {
+                    missing_adr_reason = format!(
+                        "Commit {commit} besitzt keinen 'Protected-Change: ADR-NNN' Trailer."
+                    );
+                }
+                break;
+            }
+        }
+    }
+
+    if all_commits_have_valid_adr && has_label {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "gate": "protected-paths",
+                    "status": "pass",
+                    "summary": "Geschützte Pfade wurden mit gültigem ADR-Trailer und PR-Label geändert.",
+                    "findings": []
+                })
+            );
+        } else {
+            println!(
+                "PASS [protected-paths]: Geschützte Pfade mit gültiger ADR-Ausnahme geändert."
+            );
+        }
+        return 0;
+    }
+
+    let mut findings = Vec::new();
+    for (file, glob, reason) in &violations {
+        let msg = format!("Geschützter Pfad '{file}' wurde verändert (Regel Glob: '{glob}'). Grund: {reason}. Exception-Status: ADR-Trailer ok = {all_commits_have_valid_adr}, PR-Label 'protected-change' = {has_label}.");
+        let fix = format!("Entferne die Änderungen an '{file}' ODER füge jedem Commit den Trailer 'Protected-Change: ADR-NNN' hinzu, erstelle die ADR-Datei in docs/decisions/ und setze das PR-Label 'protected-change'.");
+        findings.push(serde_json::json!({
+            "id": "PP-PROTECTED-PATH-VIOLATION",
+            "severity": "error",
+            "file": file,
+            "line": 0,
+            "message": msg,
+            "fix": fix
+        }));
+    }
+
+    let summary = format!("Verstoß gegen geschützte Pfade: {} geschützte Datei(en) verändert ohne vollständige Ausnahme. Ursache: {missing_adr_reason}", violations.len());
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "gate": "protected-paths",
+                "status": "fail",
+                "summary": summary,
+                "findings": findings
+            })
+        );
+    } else {
+        eprintln!("VERSTOSS [protected-paths]: {summary}");
+        for (file, glob, reason) in &violations {
+            eprintln!("  WAS: Datei '{file}' verändert (Glob: '{glob}')");
+            eprintln!("  WARUM: {reason} (ADR/AGENTS.md Invariante)");
+            eprintln!("  FIX: Commit Trailer 'Protected-Change: ADR-NNN', ADR in docs/decisions/ erstellen und PR-Label 'protected-change' setzen.");
+        }
+    }
+
+    1
+}

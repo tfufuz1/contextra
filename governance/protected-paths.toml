@@ -1,0 +1,74 @@
+# Governance Protected Paths Configuration
+# Any change to files matching these patterns requires an approved ADR trailer and PR label.
+
+[[protected]]
+glob = ".github/**"
+reason = "CI/CD Workflows und GitHub-Konfigurationen steuern Build- und Gate-Pipelines."
+
+[[protected]]
+glob = "xtask/**"
+reason = "Xtask-Module erzwingen Security- und Governance-Gates im Repository."
+
+[[protected]]
+glob = "justfile"
+reason = "Zentraler Task-Runner definiert Entwickler- und CI-Befehle."
+
+[[protected]]
+glob = "rust-toolchain.toml"
+reason = "Toolchain-Pin garantiert reproduzierbare und sichere Rust-Builds."
+
+[[protected]]
+glob = "deny.toml"
+reason = "Cargo Deny Konfiguration regelt Lizenz-, Dependency- und Sicherheitsprüfungen."
+
+[[protected]]
+glob = "capabilities.toml"
+reason = "Definiert Unsafe-Inseln und Capabilities aller Crates."
+
+[[protected]]
+glob = "AGENTS.md"
+reason = "Zentrale Handlungsanweisungen und Verhaltenskodex für KI-Agenten."
+
+[[protected]]
+glob = ".jules/setup/**"
+reason = "Setup-Skripte für die Agenten-Umgebung."
+
+[[protected]]
+glob = "governance/**"
+reason = "Governance-Konfigurationen und Selbstschutz der Governance-Gates."
+
+[[protected]]
+glob = "CODEOWNERS"
+reason = "Codeowner-Zuweisungen sichern Review-Pflichten ab."
+
+[[protected]]
+glob = ".github/rulesets/**"
+reason = "Repository-Rulesets schützen Branches und Merges."
+
+[[protected]]
+glob = ".githooks/**"
+reason = "Git-Hooks sichern lokale Commits."
+
+[[protected]]
+glob = "CONSTITUTION.md"
+reason = "Projektverfassung und Kernprinzipien."
+
+[[protected]]
+glob = "VETOES.md"
+reason = "Veto-Dokumentation für Governance-Entscheidungen."
+
+[[protected]]
+glob = "supply-chain/**"
+reason = "Supply-Chain-Sicherheitsprüfungen und Baselines."
+
+[[protected]]
+glob = ".cargo/**"
+reason = "Cargo-Konfigurationen und Build-Flags."
+
+[[protected]]
+glob = "sgconfig.yml"
+reason = "Ast-Grep / Static Analysis Regeln."
+
+[[protected]]
+glob = "xtask/registry.toml"
+reason = "Registry-Konfiguration der Xtask-Gates."
