@@ -52,6 +52,11 @@ chapter: "19"
 | `contextra-py` in Root-Workspace | ⚠️ Opus 2.5 | §9.4, §17 |
 | Feature-Powerset CI | ⚠️ Opus 3.1 | §15.4, §17 |
 | Panic-Inventar-Gate | ⚠️ Opus 3.2 | §15.4, §17 |
+| SSI Read-Set-Validierung Verdrahtung im Commit-Pfad (`INV-MVCC-SSI-1`) | ⚠️ Audit 2026-09-28 (Fix in Arbeit) | §5.2, AUDITREPORT §2.1, §3.1 (`contextra-mvcc/ssi.rs`, `contextra-store/lsm/commit.rs`, `ops/read.rs`) (*Status zu verifizieren vor Merge*) |
+| Signaturbasiertes Lizenz-Gate Enforcement in Facade (`INV-LICENSE-2`) | ⚠️ Audit 2026-09-28 (Fix in Arbeit) | §14, AUDITREPORT §2.2 (`contextra/src/lib.rs`, `contextra-license/signed_gate.rs`) (*Status zu verifizieren vor Merge*) |
+| WalObserver-Vertragshärtung & WriteOrigin (`INV-STORE-OBSERVER-1`) | ⚠️ Audit 2026-09-28 (Fix in Arbeit) | §5.3, AUDITREPORT §3.2, §4.2 (`contextra-store/lsm/commit.rs`, `observer.rs`) (*Status zu verifizieren vor Merge*) |
+| Exit-Pfad aus Legacy-HMAC-Fallback-Modus | ⚠️ Audit 2026-09-28 (Fix in Arbeit) | §5.3, AUDITREPORT §4.3 (`contextra-store/wal/hmac.rs`) (*Status zu verifizieren vor Merge*) |
+| Manifest-Feld `rank`-Spezifikationskorrektur | ⚠️ Audit 2026-09-28 (Fix in Arbeit) | §5.5, AUDITREPORT §4.1 (`contextra-store/sstable/manifest.rs`, `docs/spec/05-speicherschicht.md`) (*Status zu verifizieren vor Merge*) |
 
 ---
 

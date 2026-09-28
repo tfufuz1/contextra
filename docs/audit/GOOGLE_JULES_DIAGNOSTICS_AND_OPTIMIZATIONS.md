@@ -79,3 +79,33 @@ Der Durchlauf von `cargo run --manifest-path xtask/Cargo.toml -- jules-preflight
    * Vermeide globale Unscoped-Tests (`cargo test --workspace`). Nutze stattdessen targeted Cargo Commands oder `cargo nextest run -p <crate>`.
 3. **xtask Refactoring:**
    * Beschleunigung von `check-crate-references` in `xtask` zur Reduzierung der CI/Preflight-Zeiten für schnelle Turnarounds.
+
+---
+
+## 5. Externer Audit-Befund & Parallele Fix-Aufträge (2026-09-28)
+
+### 5.1 Referenz & Kernbefunde
+Der externe Auditreport `AUDITREPORT_contextra_LSM_WAL_MVCC_2026-09-28_v2.md` (Audit-Datum: 2026-09-28, geprüfter Basis-Commit: `85d0b6af1b0b518456f3288d9d6358a69e6ca556`) identifizierte strukturelle Härtungs- und Dokumentationslücken im Workspace. Die sechs priorisierten Maßnahmen aus Abschnitt 6 des Reports gliedern sich wie folgt:
+
+1. **SSI Read-Set-Validierung & Commit-/Read-Path Härtung (AUDITREPORT §2.1, §3.1, §3.3):** Verdrahtung des `SsiValidator` im Transaktions-Commit-Pfad und lückenlose Erfassung des `ReadSet` bei Leseoperationen zur Verhinderung von Write-Skew.
+2. **Signaturbasiertes Lizenz-Gate Enforcement in Facade (AUDITREPORT §2.2):** Anbindung und Durchsetzung des `SignedLicenseGate` in der öffentlichen Facade `contextra` unter Erhalt des Fast-Ring Fail-Open Prinzips (`INV-LICENSE-2`).
+3. **WalObserver-Vertragshärtung & WriteOrigin-Verdrahtung (AUDITREPORT §3.2, §4.2):** Beseitigung der Fail-Open-Limitation beim Observer (blockierende Fehlerbehandlung statt Panic) und Anreicherung der Benachrichtigungen um die `WriteOrigin`.
+4. **Erzwungener Exit-Pfad aus Legacy-HMAC-Fallback (AUDITREPORT §4.3):** Gezielter Abbruch- bzw. Konvertierungs-Pfad für den unsicheren Legacy-HMAC-Fallback-Modus zur Unterbindung potenzieller Downgrade-Angriffe.
+5. **Manifest-Feld `rank`-Dokumentationskorrektur (AUDITREPORT §4.1):** Präzisierung der Dokumentation bezüglich der SSTable-Eigenschaft `rank` im LSM-Manifest.
+6. **Behebung interner Audit-Dokumentationsschwächen (AUDITREPORT §5):** Einführung einer zweistufigen Statusbewertung ("Modul-Existenz" vs. "Produktive Verdrahtung & Integration") und methodische Erfassung der `WalObserver`-Scope-Lücke in den internen Auditberichten.
+
+### 5.2 Parallele Fix-Aufträge und Zieldateien
+Zur Umsetzung der ersten fünf Punkte wurden zeitgleich fünf dedizierte Code-Fix-Aufträge gestartet:
+
+* **Fix-Auftrag 1 (SSI/Write-Skew Schutz-Verdrahtung):**
+  * *Zieldateien:* `crates/contextra-mvcc/src/ssi.rs`, `crates/contextra-store/src/lsm/commit.rs`, `crates/contextra-store/src/lsm/ops/read.rs`
+* **Fix-Auftrag 2 (Signaturbasiertes Lizenz-Gate in Facade):**
+  * *Zieldateien:* `crates/contextra/src/lib.rs`, `crates/contextra-license/src/signed_gate.rs`
+* **Fix-Auftrag 3 (WalObserver-Vertragshärtung & WriteOrigin):**
+  * *Zieldateien:* `crates/contextra-store/src/lsm/commit.rs`, `crates/contextra-store/src/lsm/observer.rs`
+* **Fix-Auftrag 4 (HMAC Exit-Pfad):**
+  * *Zieldateien:* `crates/contextra-store/src/wal/hmac.rs`
+* **Fix-Auftrag 5 (Manifest Rank Dokumentation):**
+  * *Zieldateien:* `crates/contextra-store/src/sstable/manifest.rs`, `docs/spec/05-speicherschicht.md`
+
+> **Hinweis zur Governance:** Der Umsetzungsstatus aller fünf parallel laufenden Code-Fixes ist konservativ gekennzeichnet und muss vor dem finalen Merge der Dokumentation gegen die tatsächlich gemergten PR-Ergebnisse verifiziert werden.
