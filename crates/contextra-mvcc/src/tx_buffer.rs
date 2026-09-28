@@ -10,21 +10,14 @@
 //! order (index 0 to N-1), acquiring and releasing each shard lock one at a time via `try_write()`.
 
 // FILE-CONTEXT
-// STAND: 2026-09-27T00:00:00Z (SESSION: e459bd5f)
-// ZWECK: Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen & SSI Read-Set Tracking.
-// INVARIANTEN: Shard-Isolation per TxId; Niemals zwei Shards gleichzeitig sperren (Deadlock-Prävention).
+// STAND: 2026-09-28T00:00:00Z (SESSION: e459bd5f)
+// ZWECK: Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen, ReadSet-Limits & Watermark-Tracking.
+// INVARIANTEN: Shard-Isolation per TxId; Niemals zwei Shards gleichzeitig sperren (Deadlock-Prävention); Bounded ReadSet via try_register_read.
 // HOTSPOTS: 110-380
-// NICHT-OFFENSICHTLICH: Orphan Reaper führt getrennte try_write Locks pro Sharding-Index 0..N-1 durch.
-// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md
+// NICHT-OFFENSICHTLICH: Orphan Reaper & min_read_snapshot führen getrennte Locks pro Shard 0..N-1 durch; keinesfalls verschachtelt.
+// SIEHE AUCH: crates/contextra-mvcc/src/ssi.rs
 
 // INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
-
-// FILE-CONTEXT
-// STAND:       2026-09-27T00:00:00Z (SESSION: 2c814094)
-// ZWECK:       Transaktion-Staging-Buffer zwischen Writes und WAL-Commit
-// INVARIANTEN: Bounded capacity enforced (AGT-CORE-001), single shard lock acquired sequentially in index order
-// HOTSPOTS:    TxBuffer::stage_insert(), TxBuffer::commit_tx(), reap_orphans()
-// SIEHE AUCH:  crates/contextra-core/AGENTS.md
 
 use crate::error::{ContextraError, Result};
 use crate::ssi::ReadSet;
@@ -40,6 +33,11 @@ pub const DEFAULT_SHARD_COUNT: usize = 64;
 /// Recommended maximum operations per single transaction to guard against memory exhaustion DoS.
 // AI-TAG[SMELL][MINOR] RESOLVED: AGT-CORE-001 — Bounded staging capacity enforced (TS:2026-08-29T12:00:00Z) (SESSION: a3f29c1d)
 pub const DEFAULT_MAX_OPS_PER_TX: usize = 10_000;
+
+/// Default maximum number of read keys tracked per transaction's [`ReadSet`].
+///
+/// Prevents unbounded memory growth during large read scans (~100,000 keys * ~100B per key = ~10MB per active transaction).
+pub const DEFAULT_MAX_READ_SET_KEYS: usize = 100_000;
 
 /// Configuration options for `TxBuffer`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,7 +129,7 @@ impl KeyShard {
 /// Each shard is protected by an independent `parking_lot::RwLock`.
 /// Standard acquisition order: Read-lock for queries, Write-lock for mutations.
 /// To avoid deadlocks, cross-shard operations must never acquire more than
-/// one shard lock simultaneously. Operations that process all shards (like `reap_orphans()`)
+/// one shard lock simultaneously. Operations that process all shards (like `reap_orphans()` or `min_read_snapshot()`)
 /// MUST iterate over shards sequentially in ascending index order (from shard 0 to N-1)
 /// and release each lock before acquiring the next.
 #[derive(Debug)]
@@ -229,9 +227,59 @@ impl<T: Clone> TxBuffer<T> {
             .record_read(key, snapshot_seq);
     }
 
+    /// Registers a read key and its snapshot sequence number for transaction `tx`,
+    /// enforcing a maximum key count limit `max_keys` on new key insertions.
+    ///
+    /// Updating an existing key's snapshot sequence is always allowed even if `max_keys` is reached.
+    ///
+    /// # Errors
+    /// Returns `Err(ContextraError::LimitExceeded)` if a new key is added and `read_set.len() >= max_keys`.
+    pub fn try_register_read(
+        &self,
+        tx: TxId,
+        key: impl Into<Vec<u8>>,
+        snapshot_seq: u64,
+        max_keys: usize,
+    ) -> Result<()> {
+        let shard_idx = self.shard_idx(tx);
+        let mut shard = self.shards[shard_idx].write();
+        let rs = shard.read_sets.entry(tx).or_default();
+
+        let k = key.into();
+        if rs.get(&k).is_none() && rs.len() >= max_keys {
+            return Err(ContextraError::limit_exceeded(
+                max_keys,
+                format!("Read set size limit exceeded for transaction {tx}"),
+            ));
+        }
+
+        rs.record_read(k, snapshot_seq);
+        Ok(())
+    }
+
     /// Alias for [`TxBuffer::register_read`].
     pub fn record_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         self.register_read(tx, key, snapshot_seq);
+    }
+
+    /// Returns the lowest snapshot sequence number across all read sets of all active transactions in all shards.
+    ///
+    /// # Concurrency & Atomicity Note
+    /// Iterates through shards sequentially in ascending order (0 to N-1), acquiring and releasing a single shard read lock at a time.
+    /// The returned minimum snapshot sequence is NOT an atomic snapshot across all shards.
+    /// Callers determining a safe pruning watermark MUST compute:
+    /// `min(min_read_snapshot(), last_allocated_seq_before_call)`.
+    pub fn min_read_snapshot(&self) -> Option<u64> {
+        let mut overall_min: Option<u64> = None;
+        for shard_lock in &self.shards {
+            let shard = shard_lock.read();
+            for rs in shard.read_sets.values() {
+                if let Some(min_seq) = rs.min_snapshot_seq() {
+                    overall_min = Some(overall_min.map_or(min_seq, |curr| curr.min(min_seq)));
+                }
+            }
+        }
+        overall_min
     }
 
     /// Returns a clone of the accumulated [`ReadSet`] for transaction `tx`, if present.
