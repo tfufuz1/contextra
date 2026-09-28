@@ -9,6 +9,21 @@ async fn test_get_nonexistent() {
 }
 
 #[tokio::test]
+async fn test_get_records_read_op() {
+    let (storage, _tmp) = test_storage().await;
+
+    let res1 = storage.get(b"nonexistent_key").await.expect("get");
+    assert_eq!(res1, None);
+
+    let tx1 = TxId::new(1);
+    storage.put(tx1, b"existing_key", b"value").await.unwrap();
+    storage.commit(tx1).await.unwrap();
+
+    let res2 = storage.get(b"existing_key").await.expect("get");
+    assert_eq!(res2, Some(bytes::Bytes::from_static(b"value")));
+}
+
+#[tokio::test]
 async fn test_scan_range() {
     let (storage, _tmp) = test_storage().await;
 
