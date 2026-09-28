@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GateStep {
@@ -30,20 +29,51 @@ pub fn get_ledger_path() -> PathBuf {
     root.join(".jules").join("gate_ledger.json")
 }
 
-pub fn git_stash_create_hash() -> String {
-    let output = Command::new("git").arg("stash").arg("create").output();
+pub fn submit_gate_tree_hash() -> String {
+    submit_gate_tree_hash_in_dir(None)
+}
 
-    match output {
+pub fn submit_gate_tree_hash_in_dir(workdir: Option<&std::path::Path>) -> String {
+    let temp_index = match tempfile::NamedTempFile::new() {
+        Ok(t) => t,
+        Err(_) => return "UNKNOWN_WORKTREE_HASH".to_string(),
+    };
+    let temp_path = temp_index.path().to_path_buf();
+
+    let mut cmd_read = Command::new("git");
+    cmd_read.env("GIT_INDEX_FILE", &temp_path);
+    if let Some(dir) = workdir {
+        cmd_read.current_dir(dir);
+    }
+    let _ = cmd_read.args(["read-tree", "HEAD"]).output();
+
+    let mut cmd_add = Command::new("git");
+    cmd_add.env("GIT_INDEX_FILE", &temp_path);
+    if let Some(dir) = workdir {
+        cmd_add.current_dir(dir);
+    }
+    let add_out = cmd_add.args(["add", "-A"]).output();
+
+    if let Ok(out) = add_out {
+        if !out.status.success() {
+            return "UNKNOWN_WORKTREE_HASH".to_string();
+        }
+    } else {
+        return "UNKNOWN_WORKTREE_HASH".to_string();
+    }
+
+    let mut cmd_tree = Command::new("git");
+    cmd_tree.env("GIT_INDEX_FILE", &temp_path);
+    if let Some(dir) = workdir {
+        cmd_tree.current_dir(dir);
+    }
+    let tree_out = cmd_tree.args(["write-tree"]).output();
+
+    match tree_out {
         Ok(out) if out.status.success() => {
             let hash = String::from_utf8_lossy(&out.stdout).trim().to_string();
             if hash.is_empty() {
-                // If working tree has no uncommitted changes relative to HEAD, get HEAD commit hash
-                let head_out = Command::new("git").args(["rev-parse", "HEAD"]).output();
-                if let Ok(h_out) = head_out {
-                    String::from_utf8_lossy(&h_out.stdout).trim().to_string()
-                } else {
-                    "UNKNOWN_WORKTREE_HASH".to_string()
-                }
+                "UNKNOWN_WORKTREE_HASH".to_string()
             } else {
                 hash
             }
@@ -53,9 +83,7 @@ pub fn git_stash_create_hash() -> String {
 }
 
 pub fn iso8601_now() -> String {
-    let start = SystemTime::now();
-    let since_epoch = start.duration_since(UNIX_EPOCH).unwrap_or_default();
-    format!("{}", since_epoch.as_secs())
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
 pub fn write_ledger(entry: &GateLedgerEntry) -> Result<(), String> {
@@ -75,17 +103,22 @@ pub fn read_ledger() -> Option<GateLedgerEntry> {
 }
 
 pub fn verify_ledger_matches_worktree() -> bool {
-    let current_hash = git_stash_create_hash();
+    let current_hash = submit_gate_tree_hash();
+    if current_hash == "UNKNOWN_WORKTREE_HASH" {
+        eprintln!("❌ [SUBMIT-GATE]: Worktree-Hash konnte nicht ermittelt werden.");
+        return false;
+    }
     match read_ledger() {
         Some(entry)
             if entry.overall_status == "PASS"
                 && entry.mode == "full"
                 && entry.worktree_hash == current_hash =>
         {
+            println!("ℹ️ [SUBMIT-GATE]: Lokaler (beratender) PASS-Ledger verifiziert.");
             true
         }
         Some(entry) => {
-            eprintln!("❌ [SUBMIT-GATE]: Ledger ungültig oder veraltet.");
+            eprintln!("❌ [SUBMIT-GATE]: Lokaler (beratender) Ledger ungültig oder veraltet.");
             eprintln!(
                 "   Ledger status: {}, mode: {}, worktree_hash: {}",
                 entry.overall_status, entry.mode, entry.worktree_hash
@@ -94,7 +127,7 @@ pub fn verify_ledger_matches_worktree() -> bool {
             false
         }
         None => {
-            eprintln!("❌ [SUBMIT-GATE]: Kein Ledger (.jules/gate_ledger.json) gefunden.");
+            eprintln!("❌ [SUBMIT-GATE]: Kein lokaler (beratender) Ledger (.jules/gate_ledger.json) gefunden.");
             false
         }
     }
@@ -253,7 +286,7 @@ pub fn run_full_gate_chain() -> GateLedgerEntry {
         overall_ok = false;
     }
 
-    let worktree_hash = git_stash_create_hash();
+    let worktree_hash = submit_gate_tree_hash();
     let entry = GateLedgerEntry {
         timestamp_utc: iso8601_now(),
         worktree_hash,
@@ -304,10 +337,7 @@ pub fn run_jules_submit_gate(crate_name: Option<&str>) -> bool {
             let ancestor_status = Command::new("git")
                 .args(["merge-base", "--is-ancestor", "origin/main", "HEAD"])
                 .status();
-            match ancestor_status {
-                Ok(ast) if ast.success() => true,
-                _ => false,
-            }
+            matches!(ancestor_status, Ok(ast) if ast.success())
         }
         _ => false,
     };
@@ -321,7 +351,7 @@ pub fn run_jules_submit_gate(crate_name: Option<&str>) -> bool {
     }
 
     // ── 6.2 HARD-GATE LEDGER VERIFIKATION ──────────────────────────────
-    println!("→ [6.2 Hard-Gate-Ledger-Check]: Prüfe worktree-gebundenen PASS-Ledger...");
+    println!("→ [6.2 Hard-Gate-Ledger-Check]: Prüfe worktree-gebundenen PASS-Ledger (lokal, beratend)...");
     if verify_ledger_matches_worktree() {
         println!("✅ [6.2 Hard-Gate-Ledger-Check]: Gültiger PASS-Ledger für aktuellen Worktree verifiziert.");
     } else {
@@ -385,5 +415,72 @@ pub fn run_jules_submit_gate(crate_name: Option<&str>) -> bool {
     } else {
         eprintln!("❌ SUBMIT GATE FEHLEGESCHLAGEN.");
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_iso8601_now_rfc3339() {
+        let ts = iso8601_now();
+        let parsed = chrono::DateTime::parse_from_rfc3339(&ts);
+        assert!(parsed.is_ok(), "Timestamp {} should be valid RFC-3339", ts);
+    }
+
+    #[test]
+    fn test_submit_gate_tree_hash_changes() {
+        let temp_dir = tempfile::tempdir().expect("Failed to create tempdir");
+        let dir = temp_dir.path();
+
+        let run_git = |args: &[&str]| {
+            let status = Command::new("git")
+                .current_dir(dir)
+                .args(args)
+                .status()
+                .expect("Failed to run git");
+            assert!(status.success());
+        };
+
+        run_git(&["init"]);
+        run_git(&["config", "user.name", "Test"]);
+        run_git(&["config", "user.email", "test@example.com"]);
+
+        fs::write(dir.join("tracked.txt"), "hello").unwrap();
+        run_git(&["add", "tracked.txt"]);
+        run_git(&["commit", "-m", "initial commit"]);
+
+        let hash_base = submit_gate_tree_hash_in_dir(Some(dir));
+        assert_ne!(hash_base, "UNKNOWN_WORKTREE_HASH");
+
+        // Adding an ignored file shouldn't change the tree hash
+        fs::write(dir.join(".gitignore"), "*.log\n").unwrap();
+        run_git(&["add", ".gitignore"]);
+        run_git(&["commit", "-m", "add gitignore"]);
+        let hash_with_ignore = submit_gate_tree_hash_in_dir(Some(dir));
+
+        fs::write(dir.join("ignored.log"), "log content").unwrap();
+        let hash_with_ignored_file = submit_gate_tree_hash_in_dir(Some(dir));
+        assert_eq!(
+            hash_with_ignore, hash_with_ignored_file,
+            "Ignored file must not alter tree hash"
+        );
+
+        // Untracked file changes tree hash
+        fs::write(dir.join("untracked.txt"), "new file").unwrap();
+        let hash_untracked = submit_gate_tree_hash_in_dir(Some(dir));
+        assert_ne!(
+            hash_with_ignore, hash_untracked,
+            "Untracked file must alter tree hash"
+        );
+
+        // Tracked file modification changes tree hash
+        fs::write(dir.join("tracked.txt"), "hello modified").unwrap();
+        let hash_modified = submit_gate_tree_hash_in_dir(Some(dir));
+        assert_ne!(
+            hash_untracked, hash_modified,
+            "Modifying tracked file must alter tree hash"
+        );
     }
 }
