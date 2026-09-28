@@ -2,13 +2,6 @@
 //!
 //! Provides persistent key-value storage with WAL, `MemTable`,
 //! `SSTable`, and background compaction.
-//!
-//! # Checkpoint-Architektur
-//! `contextra-store` enthält ein lokales, crate-internes Checkpointing (`pub(crate) mod checkpoint`).
-//! Dieses dient ausschließlich als internes MVCC-Snapshot-Pinning (gekoppelt an `SnapshotRegistry`)
-//! und darf niemals von außerhalb dieses Crates verwendet werden.
-//! Die öffentliche, benannte Checkpoint-API gemäß ADR-011 ("Consolidated Checkpoint Subsystem Architecture")
-//! befindet sich im Crate `contextra-checkpoint`.
 
 // INVARIANT: LSM-Tree Storage Engine (Triebwerk — Layer 1).
 // DATEN-PFAD: Client → TxBuffer → WAL → MemTable → SSTable → Compaction
@@ -21,11 +14,8 @@
 #![allow(unexpected_cfgs)]
 
 #[cfg(not(loom))]
-pub(crate) mod checkpoint;
-#[cfg(not(loom))]
 pub mod compaction;
 pub mod kv;
-pub mod kv_locks;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
@@ -53,7 +43,6 @@ pub use compaction::{
     },
     CompactionConfig, CompactionEngine, MergeOperator, TtlMetadata,
 };
-pub use kv_locks::{KeyGuard, KvKeyLocks, LockError, MultiKeyGuard};
 #[cfg(not(loom))]
 pub use lsm::{
     CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,

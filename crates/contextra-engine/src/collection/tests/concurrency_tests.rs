@@ -125,70 +125,32 @@ async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> contextra_t
 }
 
 #[tokio::test]
-async fn test_kv_locks_poisoning_visibility() -> contextra_types::Result<()> {
+async fn test_kv_locks_guard_release_on_panic_unwind() -> contextra_types::Result<()> {
     use crate::collection::kv_lock::KvKeyLocks;
     use std::sync::Arc;
-    use std::thread;
 
     let locks = Arc::new(KvKeyLocks::new());
-    let key = "poison_key";
+    let key = "panic_key";
     let shard_idx = locks.shard_idx(key);
 
-    // Step 1: Thread panics while holding the lock
+    // Step 1: Task panics while holding the lock
     let locks_clone = locks.clone();
-    let handle = thread::spawn(move || {
-        let _guard = locks_clone.lock_shard(shard_idx);
-        panic!("Simulated thread panic while holding KvKeyLocks shard lock");
+    let handle = tokio::spawn(async move {
+        let _guard = locks_clone.lock_shard(shard_idx).await;
+        panic!("Simulated task panic while holding KvKeyLocks shard lock");
     });
 
-    assert!(handle.join().is_err(), "Thread should have panicked");
+    assert!(handle.await.is_err(), "Task should have panicked");
 
-    // Step 2: Verify that the shard lock is poisoned
+    // Step 2: Verify that Tokio Mutex guard is automatically released on unwind and next lock succeeds
+    let res =
+        tokio::time::timeout(std::time::Duration::from_millis(100), locks.lock_for(key)).await;
     assert!(
-        locks.is_shard_poisoned(shard_idx),
-        "Shard lock should be marked poisoned after thread panic"
-    );
-
-    // Step 3: Second thread/caller attempts to acquire the lock and experiences poisoning recovery with tracing log
-    let guard = locks.lock_for(key).await;
-    drop(guard);
-
-    // Shard remains poisoned in std::sync::RwLock
-    assert!(
-        locks.is_shard_poisoned(shard_idx),
-        "Shard lock remains poisoned for visibility"
+        res.is_ok(),
+        "Lock acquisition must succeed after task panic unwind"
     );
 
     Ok(())
-}
-
-#[test]
-fn test_kv_locks_try_lock_blocking() {
-    use crate::collection::kv_lock::KvKeyLocks;
-
-    let locks = KvKeyLocks::new();
-    let key = "test_key";
-    let shard_idx = locks.shard_idx(key);
-
-    // Initially available
-    let guard = locks.try_lock_for(key);
-    assert!(guard.is_some(), "try_lock_for should succeed when lock is free");
-
-    // Second try_lock on same shard should fail (WouldBlock)
-    let second_try = locks.try_lock_shard(shard_idx);
-    assert!(
-        second_try.is_none(),
-        "try_lock_shard should return None when lock is held"
-    );
-
-    drop(guard);
-
-    // Available again
-    let third_try = locks.try_lock_for(key);
-    assert!(
-        third_try.is_some(),
-        "try_lock_for should succeed after guard drop"
-    );
 }
 
 #[tokio::test]
