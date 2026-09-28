@@ -205,7 +205,8 @@ mod no_crypto_stubs {
 use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
-use contextra_store::{lsm::DurabilityMode, LsmStorage};
+pub use contextra_store::lsm::DurabilityMode;
+use contextra_store::LsmStorage;
 use contextra_types::{CollectionId, DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde::{Deserialize, Serialize};
