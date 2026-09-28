@@ -44,7 +44,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if res.is_ok() {
             if let Some((generator, cfg)) = self.auto_extraction_config() {
                 if cfg.enabled {
-                    if let Err(e) = auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await {
+                    if let Err(e) =
+                        auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await
+                    {
                         tracing::warn!(doc_id = %id, error = %e, "Auto extraction failed during insert_text_only");
                     }
                 }
@@ -90,7 +92,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if res.is_ok() {
             if let Some((generator, cfg)) = self.auto_extraction_config() {
                 if cfg.enabled {
-                    if let Err(e) = auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await {
+                    if let Err(e) =
+                        auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await
+                    {
                         tracing::warn!(doc_id = %id, error = %e, "Auto extraction failed during upsert_text_only");
                     }
                 }
