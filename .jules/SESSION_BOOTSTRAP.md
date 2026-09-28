@@ -7,39 +7,17 @@
   Eintrag existiert. `just check-vetoes` läuft automatisch, ist aber kein Ersatz
   für manuelles Lesen vor Arbeitsbeginn an physio-*/Nucleation-artigen Features.
 
-## Phase 0 — Session-Identität etablieren & Task-Claiming (30 Sekunden)
-
-**Primärquelle:** Das Environment-Setup-Skript liefert SESSION_HASH und TS bereits
-unter `[10/10] Session Identity`. Nutze diese Werte direkt.
-
-Falls kein Setup-Skript gelaufen ist (z.B. manueller Start):
+## Phase 0 — Session-Identität etablieren, Task-Claiming & Context Pack erzeugen (30 Sekunden)
 
 ```bash
-# SESSION-Hash generieren (verwende diesen für ALLE Tags dieser Session)
-SESSION_HASH=$(date -u +%Y%m%d%H%M%S | sha256sum | head -c 8)
-echo "SESSION: $SESSION_HASH"
-
-# Aktuellen Timestamp ermitteln
-TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-echo "TS: $TS"
+cargo xtask session-init --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>" --output-env
+source .jules/session.env
+cargo xtask context-pack --crate <CRATE_NAME>
 ```
 
-**Pflichtschritt — Task-Claiming vor Arbeitsbeginn:**
-```bash
-# Task-Claiming & TTL-Bereinigung vor jeder Crate-Bearbeitung
-bash .jules/verify/claim_precheck.sh --prune-expired --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>"
-```
+Der Befehl `context-pack` erzeugt `.jules/context/CONTEXT_PACK.md`. Dies ist die einzige Datei, die ein Agent zu Sessionbeginn lesen muss, statt der zuvor 8–12 dort aufgezählten Einzeldateien.
 
-**Konsistenzregel:** Ein Session-Hash MUSS für die gesamte Sitzung konsistent bleiben.
-Niemals mid-session neu generieren — außer nach explizitem Neustart des Environments.
-
-## Phase 1 — Context Pack laden & Offene Kritische Issues prüfen (30 Sekunden)
-
-```bash
-# Dichte Kontext-Erzeugung in EINER Datei
-bash .jules/context/gen_context_pack.sh
-```
-Lade danach nur `.jules/context/CONTEXT_PACK.md` via `read_file` (1 Tool-Call statt 8-12 Explorations-Aufrufen).
+## Phase 1 — Offene Kritische Issues prüfen (30 Sekunden)
 
 ```bash
 # BLOCKER und CRITICAL Tags — bei Fund: STOP, zuerst beheben

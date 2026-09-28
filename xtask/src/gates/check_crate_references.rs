@@ -239,7 +239,11 @@ mod tests {
         let refs = extract_crate_references(line);
         assert_eq!(
             refs,
-            vec!["contextra-core", "contextra-nonexistent-123", "contextra-store"]
+            vec![
+                "contextra-core",
+                "contextra-nonexistent-123",
+                "contextra-store"
+            ]
         );
     }
 

@@ -92,11 +92,7 @@ pub fn check_gate(crate_name: &str, root: &Path) -> Result<MutationGateReport, M
     }
 
     let file = fs::File::open(&history_file).map_err(|e| {
-        MutationGateError::IoError(format!(
-            "Failed to open {}: {}",
-            history_file.display(),
-            e
-        ))
+        MutationGateError::IoError(format!("Failed to open {}: {}", history_file.display(), e))
     })?;
     let reader = BufReader::new(file);
 
@@ -128,8 +124,8 @@ pub fn check_gate(crate_name: &str, root: &Path) -> Result<MutationGateReport, M
         }
     }
 
-    let entry = last_matching
-        .ok_or_else(|| MutationGateError::NoHistoryFound(crate_name.to_string()))?;
+    let entry =
+        last_matching.ok_or_else(|| MutationGateError::NoHistoryFound(crate_name.to_string()))?;
 
     let score_pct = if entry.total_mutants > 0 {
         (entry.caught as f64 / entry.total_mutants as f64) * 100.0

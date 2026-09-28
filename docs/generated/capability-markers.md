@@ -8,6 +8,8 @@
 | `contextra` | Ring 4 | 🟢 stable | `public-api`, `facade` | Haupt-Library Facade für Endanwender |
 | `contextra-adapt` | Ring 0 | 🟡 experimental | `model-adaption`, `pid-latency-controller` | Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller) |
 | `contextra-agent` | Ring 3 | 🟢 stable | `in-memory-audit`, `agent-pipeline` | Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline |
+| `contextra-audit-export` | Ring 4 | 🟡 experimental | `gdpr-art30-export` | Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export |
+| `contextra-avv-generator` | Ring 4 | 🟡 experimental | `avv-generation` | AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO |
 | `contextra-checkpoint` | Ring 1 | 🟢 stable | `blake3-checkpoints`, `orphan-recovery` | Persistent Checkpoint Engine und Blake3 Manifest-Verifikation |
 | `contextra-cognition` | Ring 3 | 🟢 stable | `sleep-cycle-consolidation`, `session-grouping` | Konsolidierungs- und Background Sleep Passes |
 | `contextra-core` | Ring 0 | 🟢 stable | `tombstone-semantics`, `tx-buffer` | Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer |
@@ -19,6 +21,7 @@
 | `contextra-infer-ollama` | Ring 2 | 🟢 stable | `ollama-client`, `remote-embeddings` | Ollama External Provider Client und Embeddings Integration |
 | `contextra-infer-onnx` | Ring 2 | 🟡 experimental | `onnx-embeddings`, `cross-encoder-reranking` | ONNX Embeddings und Cross-Encoder Reranking Execution Provider |
 | `contextra-kvcache` | Ring 1 | 🟢 stable | `kv-tiered-cache`, `kv-bridge-storage` | Stufenmodell KV-Cache Storage & Offloading |
+| `contextra-license` | Ring 4 | 🟡 experimental | `license-gate` | Lizenz- und Aktivierungsprüfung für Contextra Feature-Ringe |
 | `contextra-mcp` | Ring 4 | 🟢 stable | `mcp-protocol`, `cloud-egress-gateway` | Model Context Protocol Server & Cloud Egress Gateway |
 | `contextra-mvcc` | Ring 0 | 🟢 stable | `snapshot-isolation`, `lockless-read` | Multi-Version Concurrency Control und Isolation-Mechanismen |
 | `contextra-ports` | Ring 0 | 🟢 stable | `trait-interfaces`, `ring0-decoupling` | Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung |

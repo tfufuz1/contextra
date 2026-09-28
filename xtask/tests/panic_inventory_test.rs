@@ -63,7 +63,7 @@ mod tests {
         .iter()
         .find(|e| e.kind == PanicKind::Expect)
         .unwrap();
-    assert_eq!(expect_entry.line, 18);
+    assert_eq!(expect_entry.line, 19);
     assert!(expect_entry.is_test_code);
 }
 

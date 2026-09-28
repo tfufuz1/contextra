@@ -7,9 +7,7 @@ use std::process::Command;
 
 pub fn run_check_branch_overlap() -> bool {
     println!("=== Running xtask check-branch-overlap ===");
-    let output = Command::new("git")
-        .args(["status", "--short"])
-        .output();
+    let output = Command::new("git").args(["status", "--short"]).output();
 
     match output {
         Ok(out) if out.status.success() => {

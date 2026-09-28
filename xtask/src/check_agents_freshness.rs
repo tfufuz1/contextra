@@ -17,9 +17,7 @@ pub struct FreshnessViolation {
 pub fn get_changed_files_from_git() -> Vec<String> {
     // Check working tree status first, fallback to merge-base / HEAD~1
     let mut files = Vec::new();
-    let status_output = Command::new("git")
-        .args(["status", "--porcelain"])
-        .output();
+    let status_output = Command::new("git").args(["status", "--porcelain"]).output();
 
     if let Ok(out) = status_output {
         if out.status.success() {
@@ -51,7 +49,10 @@ pub fn get_changed_files_from_git() -> Vec<String> {
     files
 }
 
-pub fn check_agents_freshness_for_files(changed_files: &[String], root: &Path) -> Vec<FreshnessViolation> {
+pub fn check_agents_freshness_for_files(
+    changed_files: &[String],
+    root: &Path,
+) -> Vec<FreshnessViolation> {
     let mut violations = Vec::new();
 
     // Check for global waiver marker in latest commit message
@@ -143,9 +144,7 @@ mod tests {
 
     #[test]
     fn test_agents_freshness_stale() {
-        let changed = vec![
-            "crates/contextra-core/src/lib.rs".to_string(),
-        ];
+        let changed = vec!["crates/contextra-core/src/lib.rs".to_string()];
         let root = crate::find_root_dir();
         let violations = check_agents_freshness_for_files(&changed, &root);
         assert_eq!(violations.len(), 1);

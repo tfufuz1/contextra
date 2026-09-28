@@ -20,15 +20,18 @@ pub const EXEMPT_CRATES: &[&str] = &["contextra-bench", "xtask"];
 
 /// Parst die Workspace-Mitglieder aus der Root-`Cargo.toml` und löst für jeden
 /// Elementpfad den Crate-Namen aus dem jeweiligen `Cargo.toml` (`[package] name`) auf.
-pub fn extract_workspace_member_crates(
-    root: &Path,
-) -> Result<BTreeMap<String, PathBuf>, String> {
+pub fn extract_workspace_member_crates(root: &Path) -> Result<BTreeMap<String, PathBuf>, String> {
     let root_cargo_path = root.join("Cargo.toml");
     let content = fs::read_to_string(&root_cargo_path)
         .map_err(|e| format!("Fehler beim Lesen von {}: {}", root_cargo_path.display(), e))?;
 
-    let root_toml: toml::Value = toml::from_str(&content)
-        .map_err(|e| format!("Fehler beim Parsen von {}: {}", root_cargo_path.display(), e))?;
+    let root_toml: toml::Value = toml::from_str(&content).map_err(|e| {
+        format!(
+            "Fehler beim Parsen von {}: {}",
+            root_cargo_path.display(),
+            e
+        )
+    })?;
 
     let members = root_toml
         .get("workspace")
@@ -96,11 +99,20 @@ pub fn extract_workspace_member_crates(
 /// Parst `capabilities.toml` und extrahiert alle Schlüssel unter `[crates]`.
 pub fn extract_capabilities_crates(root: &Path) -> Result<BTreeSet<String>, String> {
     let capabilities_path = root.join("capabilities.toml");
-    let content = fs::read_to_string(&capabilities_path)
-        .map_err(|e| format!("Fehler beim Lesen von {}: {}", capabilities_path.display(), e))?;
+    let content = fs::read_to_string(&capabilities_path).map_err(|e| {
+        format!(
+            "Fehler beim Lesen von {}: {}",
+            capabilities_path.display(),
+            e
+        )
+    })?;
 
     let capabilities_toml: toml::Value = toml::from_str(&content).map_err(|e| {
-        format!("Fehler beim Parsen von {}: {}", capabilities_path.display(), e)
+        format!(
+            "Fehler beim Parsen von {}: {}",
+            capabilities_path.display(),
+            e
+        )
     })?;
 
     let crates_table = capabilities_toml

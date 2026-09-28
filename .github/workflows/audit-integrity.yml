@@ -1,0 +1,14 @@
+name: Audit Integrity Check
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - run: cargo xtask audit-integrity-check --since=7d --fail-on-contradicted

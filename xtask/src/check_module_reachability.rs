@@ -159,7 +159,11 @@ fn strip_comments_and_strings(source: &str) -> String {
                 true
             } else if i + 3 < len && chars[i + 1] == '\\' && chars[i + 3] == '\'' {
                 true
-            } else if i + 4 < len && chars[i + 1] == '\\' && chars[i + 2] == 'x' && chars[i + 4] == '\'' {
+            } else if i + 4 < len
+                && chars[i + 1] == '\\'
+                && chars[i + 2] == 'x'
+                && chars[i + 4] == '\''
+            {
                 true
             } else if i + 3 < len && chars[i + 1] == '\\' && chars[i + 2] == 'u' {
                 let mut found_end = false;

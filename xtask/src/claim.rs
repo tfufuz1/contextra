@@ -352,13 +352,9 @@ fn run_claim_local(args: &[String]) -> bool {
         return false;
     }
 
-    if let Err(e) = write_session_snapshot(
-        &root,
-        &krate,
-        &issue,
-        "Phase 1: Exploration & Claim",
-        None,
-    ) {
+    if let Err(e) =
+        write_session_snapshot(&root, &krate, &issue, "Phase 1: Exploration & Claim", None)
+    {
         eprintln!("⚠️ Fehler beim Schreiben des Session-Snapshots: {}", e);
     }
 

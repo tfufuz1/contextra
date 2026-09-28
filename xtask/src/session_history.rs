@@ -138,10 +138,7 @@ pub fn append_entry_with_config(
     }
 
     let serialized = serde_json::to_string(entry)?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
 
     writeln!(file, "{}", serialized)?;
     Ok(())
@@ -192,8 +189,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let log_path = dir.path().join("session_history.jsonl");
 
-        let entry = SessionHistoryEntry::new("sess-1", "preflight")
-            .with_crate("xtask");
+        let entry = SessionHistoryEntry::new("sess-1", "preflight").with_crate("xtask");
 
         let config = RotationConfig::default();
         append_entry_with_config(&entry, &config, &log_path).unwrap();

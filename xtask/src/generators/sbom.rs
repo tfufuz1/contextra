@@ -7,9 +7,7 @@ use std::process::Command;
 
 pub fn run_gen_sbom() -> bool {
     println!("=== Running xtask gen-sbom ===");
-    let status = Command::new("cargo")
-        .args(["tree", "--workspace"])
-        .status();
+    let status = Command::new("cargo").args(["tree", "--workspace"]).status();
 
     match status {
         Ok(st) if st.success() => {

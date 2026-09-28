@@ -15,8 +15,8 @@ pub fn run_check_action_pinning(workflows_dir: &Path) -> Result<Vec<String>, Str
         ));
     }
 
-    let sha_regex = Regex::new(r"^[0-9a-f]{40}$")
-        .map_err(|e| format!("Failed to compile SHA regex: {}", e))?;
+    let sha_regex =
+        Regex::new(r"^[0-9a-f]{40}$").map_err(|e| format!("Failed to compile SHA regex: {}", e))?;
     let uses_regex = Regex::new(r"\buses:\s*([^\s#]+)")
         .map_err(|e| format!("Failed to compile uses regex: {}", e))?;
 
@@ -32,13 +32,19 @@ pub fn run_check_action_pinning(workflows_dir: &Path) -> Result<Vec<String>, Str
             let is_yml = path
                 .extension()
                 .and_then(|ext| ext.to_str())
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("yml") || ext.eq_ignore_ascii_case("yaml"));
+                .is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("yml") || ext.eq_ignore_ascii_case("yaml")
+                });
 
             if is_yml {
                 let content = match fs::read_to_string(path) {
                     Ok(c) => c,
                     Err(e) => {
-                        return Err(format!("Failed to read workflow file {}: {}", path.display(), e))
+                        return Err(format!(
+                            "Failed to read workflow file {}: {}",
+                            path.display(),
+                            e
+                        ))
                     }
                 };
 

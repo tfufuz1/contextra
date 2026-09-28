@@ -173,7 +173,7 @@ pub fn run_audit_integrity_check_impl(
                         }
 
                         if let Some(commit_dt) = parse_iso_datetime(commit_date) {
-                            if commit_dt >= audit_dt {
+                            if commit_dt > audit_dt {
                                 let gap_seconds = (commit_dt - audit_dt).num_seconds();
                                 let gap_hours = gap_seconds as f64 / 3600.0;
 

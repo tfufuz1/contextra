@@ -31,19 +31,14 @@ pub fn get_ledger_path() -> PathBuf {
 }
 
 pub fn git_stash_create_hash() -> String {
-    let output = Command::new("git")
-        .arg("stash")
-        .arg("create")
-        .output();
+    let output = Command::new("git").arg("stash").arg("create").output();
 
     match output {
         Ok(out) if out.status.success() => {
             let hash = String::from_utf8_lossy(&out.stdout).trim().to_string();
             if hash.is_empty() {
                 // If working tree has no uncommitted changes relative to HEAD, get HEAD commit hash
-                let head_out = Command::new("git")
-                    .args(["rev-parse", "HEAD"])
-                    .output();
+                let head_out = Command::new("git").args(["rev-parse", "HEAD"]).output();
                 if let Ok(h_out) = head_out {
                     String::from_utf8_lossy(&h_out.stdout).trim().to_string()
                 } else {
@@ -70,8 +65,7 @@ pub fn write_ledger(entry: &GateLedgerEntry) -> Result<(), String> {
     }
     let json = serde_json::to_string_pretty(entry)
         .map_err(|e| format!("Serialization error for ledger: {e}"))?;
-    fs::write(&path, json)
-        .map_err(|e| format!("Failed to write ledger at {}: {e}", path.display()))
+    fs::write(&path, json).map_err(|e| format!("Failed to write ledger at {}: {e}", path.display()))
 }
 
 pub fn read_ledger() -> Option<GateLedgerEntry> {
@@ -92,7 +86,10 @@ pub fn verify_ledger_matches_worktree() -> bool {
         }
         Some(entry) => {
             eprintln!("❌ [SUBMIT-GATE]: Ledger ungültig oder veraltet.");
-            eprintln!("   Ledger status: {}, mode: {}, worktree_hash: {}", entry.overall_status, entry.mode, entry.worktree_hash);
+            eprintln!(
+                "   Ledger status: {}, mode: {}, worktree_hash: {}",
+                entry.overall_status, entry.mode, entry.worktree_hash
+            );
             eprintln!("   Aktueller Worktree-Hash: {}", current_hash);
             false
         }
@@ -119,86 +116,142 @@ pub fn run_full_gate_chain() -> GateLedgerEntry {
         status: if fmt_ok { "PASS".into() } else { "FAIL".into() },
         detail: None,
     });
-    if !fmt_ok { overall_ok = false; }
+    if !fmt_ok {
+        overall_ok = false;
+    }
 
     // 2. clippy
     println!("→ Step 2/8: cargo clippy --workspace --all-targets --locked");
     let clippy_status = Command::new("cargo")
-        .args(["clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"])
+        .args([
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--locked",
+            "--",
+            "-D",
+            "warnings",
+        ])
         .status();
     let clippy_ok = matches!(clippy_status, Ok(s) if s.success());
     steps.push(GateStep {
         name: "clippy".to_string(),
-        status: if clippy_ok { "PASS".into() } else { "FAIL".into() },
+        status: if clippy_ok {
+            "PASS".into()
+        } else {
+            "FAIL".into()
+        },
         detail: None,
     });
-    if !clippy_ok { overall_ok = false; }
+    if !clippy_ok {
+        overall_ok = false;
+    }
 
     // 3. test
     println!("→ Step 3/8: cargo test --workspace --exclude contextra-py --locked");
     let test_status = Command::new("cargo")
-        .args(["test", "--workspace", "--exclude", "contextra-py", "--locked"])
+        .args([
+            "test",
+            "--workspace",
+            "--exclude",
+            "contextra-py",
+            "--locked",
+        ])
         .status();
     let test_ok = matches!(test_status, Ok(s) if s.success());
     steps.push(GateStep {
         name: "test".to_string(),
-        status: if test_ok { "PASS".into() } else { "FAIL".into() },
+        status: if test_ok {
+            "PASS".into()
+        } else {
+            "FAIL".into()
+        },
         detail: None,
     });
-    if !test_ok { overall_ok = false; }
+    if !test_ok {
+        overall_ok = false;
+    }
 
     // 4. check-ring-layering
     println!("→ Step 4/8: xtask check-ring-layering");
-    let ring_ok = match crate::check_ring_layering::run_check_ring_layering_full(false) {
-        Ok(passed) => passed,
-        Err(_) => false,
-    };
+    let ring_ok =
+        crate::check_ring_layering::run_check_ring_layering_full(false).unwrap_or_default();
     steps.push(GateStep {
         name: "check-ring-layering".to_string(),
-        status: if ring_ok { "PASS".into() } else { "FAIL".into() },
+        status: if ring_ok {
+            "PASS".into()
+        } else {
+            "FAIL".into()
+        },
         detail: None,
     });
-    if !ring_ok { overall_ok = false; }
+    if !ring_ok {
+        overall_ok = false;
+    }
 
     // 5. check-vetoes
     println!("→ Step 5/8: xtask check-vetoes");
     let vetoes_ok = crate::check_vetoes::check_vetoes().is_ok();
     steps.push(GateStep {
         name: "check-vetoes".to_string(),
-        status: if vetoes_ok { "PASS".into() } else { "FAIL".into() },
+        status: if vetoes_ok {
+            "PASS".into()
+        } else {
+            "FAIL".into()
+        },
         detail: None,
     });
-    if !vetoes_ok { overall_ok = false; }
+    if !vetoes_ok {
+        overall_ok = false;
+    }
 
     // 6. check-agents-integrity
     println!("→ Step 6/8: xtask check-agents-integrity");
     let agents_ok = crate::check_agents_integrity::run_check_agents_integrity();
     steps.push(GateStep {
         name: "check-agents-integrity".to_string(),
-        status: if agents_ok { "PASS".into() } else { "FAIL".into() },
+        status: if agents_ok {
+            "PASS".into()
+        } else {
+            "FAIL".into()
+        },
         detail: None,
     });
-    if !agents_ok { overall_ok = false; }
+    if !agents_ok {
+        overall_ok = false;
+    }
 
     // 7. check-phantom-files
     println!("→ Step 7/8: xtask check-phantom-files");
     let phantom_ok = crate::check_phantom_files::run_check_phantom_files();
     steps.push(GateStep {
         name: "check-phantom-files".to_string(),
-        status: if phantom_ok { "PASS".into() } else { "FAIL".into() },
+        status: if phantom_ok {
+            "PASS".into()
+        } else {
+            "FAIL".into()
+        },
         detail: None,
     });
-    if !phantom_ok { overall_ok = false; }
+    if !phantom_ok {
+        overall_ok = false;
+    }
 
     // 8. debt-audit
     println!("→ Step 8/8: xtask debt-audit");
     let debt_ok = crate::gates::debt_audit::run_debt_audit().is_ok();
     steps.push(GateStep {
         name: "debt-audit".to_string(),
-        status: if debt_ok { "PASS".into() } else { "FAIL".into() },
+        status: if debt_ok {
+            "PASS".into()
+        } else {
+            "FAIL".into()
+        },
         detail: None,
     });
-    if !debt_ok { overall_ok = false; }
+    if !debt_ok {
+        overall_ok = false;
+    }
 
     let worktree_hash = git_stash_create_hash();
     let entry = GateLedgerEntry {
@@ -206,13 +259,20 @@ pub fn run_full_gate_chain() -> GateLedgerEntry {
         worktree_hash,
         mode: "full".to_string(),
         steps,
-        overall_status: if overall_ok { "PASS".to_string() } else { "FAIL".to_string() },
+        overall_status: if overall_ok {
+            "PASS".to_string()
+        } else {
+            "FAIL".to_string()
+        },
     };
 
     if let Err(e) = write_ledger(&entry) {
         eprintln!("⚠️ Konnte Gate-Ledger nicht schreiben: {e}");
     } else {
-        println!("✅ Gate Ledger erfolgreich geschrieben unter {}", get_ledger_path().display());
+        println!(
+            "✅ Gate Ledger erfolgreich geschrieben unter {}",
+            get_ledger_path().display()
+        );
     }
 
     entry

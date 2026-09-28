@@ -6,7 +6,7 @@
 
 use regex::Regex;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub const DEFAULT_TOC_TARGETS: &[&str] = &[
     "docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md",
@@ -25,7 +25,13 @@ pub fn slugify(heading: &str) -> String {
     clean
         .to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())
@@ -51,7 +57,10 @@ pub fn check_toc_integrity_content(content: &str, file_rel_path: &str) -> Vec<To
 
     // 1. Check TOC items (detected between top header and body)
     let mut in_toc = false;
-    let toc_item_re = Regex::new(r"^(?:\d+\.|\*|-)\s+(?:\[(.*?)\]\(#.*?\)|(?:\*\*)?(.*?)(?:\*\*)?)(?:\s+—|\s*:|\s*$)").unwrap();
+    let toc_item_re = Regex::new(
+        r"^(?:\d+\.|\*|-)\s+(?:\[(.*?)\]\(#.*?\)|(?:\*\*)?(.*?)(?:\*\*)?)(?:\s+—|\s*:|\s*$)",
+    )
+    .unwrap();
 
     for (idx, line) in content.lines().enumerate() {
         let line_num = idx + 1;
@@ -64,12 +73,11 @@ pub fn check_toc_integrity_content(content: &str, file_rel_path: &str) -> Vec<To
             continue;
         }
 
-        if in_toc {
-            if trimmed.starts_with("# ") || trimmed.starts_with("## ") {
-                if !trimmed.to_lowercase().contains("inhaltsverzeichnis") {
-                    in_toc = false;
-                }
-            }
+        if in_toc
+            && (trimmed.starts_with("# ") || trimmed.starts_with("## "))
+            && !trimmed.to_lowercase().contains("inhaltsverzeichnis")
+        {
+            in_toc = false;
         }
 
         if in_toc {
@@ -83,9 +91,7 @@ pub fn check_toc_integrity_content(content: &str, file_rel_path: &str) -> Vec<To
                 if !item_text.is_empty() && !item_text.starts_with("Inhaltsverzeichnis") {
                     let norm_item = item_text.to_lowercase();
                     let matches_heading = headings_by_text.iter().any(|h| {
-                        h == &norm_item
-                            || h.contains(&norm_item)
-                            || norm_item.contains(h)
+                        h == &norm_item || h.contains(&norm_item) || norm_item.contains(h)
                     });
 
                     if !matches_heading {
@@ -104,7 +110,8 @@ pub fn check_toc_integrity_content(content: &str, file_rel_path: &str) -> Vec<To
     }
 
     // 2. Check cross-references like "siehe Teil X", "siehe Anhang Y", "siehe §N"
-    let ref_re = Regex::new(r"(?i)\bsiehe\s+(Teil\s+[A-Z\d]+|Anhang\s+[A-Z\d]+|§\d+(?:\.\d+)*)\b").unwrap();
+    let ref_re =
+        Regex::new(r"(?i)\bsiehe\s+(Teil\s+[A-Z\d]+|Anhang\s+[A-Z\d]+|§\d+(?:\.\d+)*)\b").unwrap();
     for (idx, line) in content.lines().enumerate() {
         let line_num = idx + 1;
         let trimmed = line.trim();
@@ -114,14 +121,16 @@ pub fn check_toc_integrity_content(content: &str, file_rel_path: &str) -> Vec<To
                 let target = target_ref.as_str();
                 let target_norm = target.to_lowercase();
 
-                let found = headings_by_text.iter().any(|h| h.contains(&target_norm))
-                    || content.to_lowercase().contains(&target_norm);
+                let found = headings_by_text.iter().any(|h| h.contains(&target_norm));
 
                 if !found {
                     violations.push(TocViolation {
                         file: file_rel_path.to_string(),
                         line: line_num,
-                        message: format!("Verwaister Querverweis: '{}' nicht im Dokument gefunden", target),
+                        message: format!(
+                            "Verwaister Querverweis: '{}' nicht im Dokument gefunden",
+                            target
+                        ),
                     });
                 }
             }
@@ -167,7 +176,10 @@ pub fn run_check_toc_integrity(targets: &[PathBuf]) -> Result<(), String> {
 
     if !all_violations.is_empty() {
         for v in &all_violations {
-            eprintln!("❌ [check-toc-integrity]: {}:{} — {}", v.file, v.line, v.message);
+            eprintln!(
+                "❌ [check-toc-integrity]: {}:{} — {}",
+                v.file, v.line, v.message
+            );
         }
         return Err(format!(
             "check-toc-integrity failed with {} violation(s)",
@@ -185,7 +197,10 @@ mod tests {
 
     #[test]
     fn test_slugify() {
-        assert_eq!(slugify("# 1. Einleitung & Übersicht"), "1-einleitung-bersicht");
+        assert_eq!(
+            slugify("# 1. Einleitung & Übersicht"),
+            "1-einleitung-übersicht"
+        );
         assert_eq!(slugify("## §3.1 Invarianten"), "3-1-invarianten");
     }
 

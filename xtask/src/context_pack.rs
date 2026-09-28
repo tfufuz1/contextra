@@ -42,7 +42,7 @@ pub fn scan_critical_tags(root: &Path, crate_filter: Option<&str>) -> Vec<String
     for entry in WalkDir::new(&scan_dir)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file() && e.path().extension().map_or(false, |ext| ext == "rs"))
+        .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "rs"))
     {
         let path = entry.path();
         if let Ok(content) = fs::read_to_string(path) {

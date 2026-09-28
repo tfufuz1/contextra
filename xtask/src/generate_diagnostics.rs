@@ -27,7 +27,10 @@ pub fn run_generate_diagnostics() -> Result<(), String> {
 
     let gates: &[(&str, &[&str])] = &[
         ("check-flatbuffers-drift", &["check-flatbuffers-drift"]),
-        ("check-bandit-latency-budget", &["check-bandit-latency-budget"]),
+        (
+            "check-bandit-latency-budget",
+            &["check-bandit-latency-budget"],
+        ),
         ("check-module-reachability", &["check-module-reachability"]),
         (
             "check-duplicate-symbols-cross-file",
@@ -112,7 +115,10 @@ pub fn run_generate_diagnostics() -> Result<(), String> {
     fs::write(&report_path, &md)
         .map_err(|e| format!("Failed to write report to {}: {}", report_path.display(), e))?;
 
-    println!("\n✅ Diagnostic report successfully written to {}", report_path.display());
+    println!(
+        "\n✅ Diagnostic report successfully written to {}",
+        report_path.display()
+    );
 
     let any_failed = results.iter().any(|r| !r.passed);
     if any_failed {

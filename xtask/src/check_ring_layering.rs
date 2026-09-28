@@ -47,16 +47,26 @@ pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
         "contextra-store" | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
 
         // Ring 2
-        "contextra-sandbox" | "contextra-infer-onnx" | "contextra-infer-candle"
+        "contextra-sandbox"
+        | "contextra-infer-onnx"
+        | "contextra-infer-candle"
         | "contextra-infer-ollama" => Some(Ring::Ring2),
 
         // Ring 3
-        "contextra-engine" | "contextra-cognition" | "contextra-privacy"
-        | "contextra-router" | "contextra-agent" | "contextra-db" => Some(Ring::Ring3),
+        "contextra-engine"
+        | "contextra-cognition"
+        | "contextra-privacy"
+        | "contextra-router"
+        | "contextra-agent"
+        | "contextra-db" => Some(Ring::Ring3),
 
         // Ring 4
-        "contextra" | "contextra-mcp" | "contextra-py" | "contextra-audit-export"
-        | "contextra-avv-generator" | "contextra-license" => Some(Ring::Ring4),
+        "contextra"
+        | "contextra-mcp"
+        | "contextra-py"
+        | "contextra-audit-export"
+        | "contextra-avv-generator"
+        | "contextra-license" => Some(Ring::Ring4),
 
         // Tooling
         "contextra-testkit" | "xtask" | "contextra-bench" => Some(Ring::Tooling),
@@ -217,7 +227,12 @@ pub fn check_ring_layering_from_metadata_json(
                 (Ring::Ring2, Ring::Ring0, _) => {
                     let allowed_ring0 = matches!(
                         dep_name.as_str(),
-                        "contextra-types" | "contextra-ports" | "contextra-crypto" | "contextra-core" | "contextra-simd" | "contextra-rank"
+                        "contextra-types"
+                            | "contextra-ports"
+                            | "contextra-crypto"
+                            | "contextra-core"
+                            | "contextra-simd"
+                            | "contextra-rank"
                     );
                     if allowed_ring0 {
                         None
@@ -279,7 +294,10 @@ pub fn run_check_ring_layering_full(strict: bool) -> Result<bool, String> {
     run_check_ring_layering_with_options(strict, true)
 }
 
-pub fn run_check_ring_layering_with_options(strict: bool, all_features: bool) -> Result<bool, String> {
+pub fn run_check_ring_layering_with_options(
+    strict: bool,
+    all_features: bool,
+) -> Result<bool, String> {
     println!(
         "=== Running xtask check-ring-layering (strict={}, all_features={}) ===",
         strict, all_features

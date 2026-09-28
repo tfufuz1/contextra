@@ -14,11 +14,22 @@ fn get_manifest_path() -> &'static str {
 fn test_gate_check_level_zero_missing_crate_arg() {
     let manifest_path = get_manifest_path();
     let output = Command::new("cargo")
-        .args(["run", "--manifest-path", manifest_path, "--", "gate-check", "--level", "0"])
+        .args([
+            "run",
+            "--manifest-path",
+            manifest_path,
+            "--",
+            "gate-check",
+            "--level",
+            "0",
+        ])
         .output()
         .expect("Failed to execute xtask gate-check");
 
-    assert!(!output.status.success(), "gate-check --level 0 without --crate must fail");
+    assert!(
+        !output.status.success(),
+        "gate-check --level 0 without --crate must fail"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let combined = format!("{}\n{}", stdout, stderr);
@@ -65,11 +76,22 @@ fn test_gate_check_level_zero_with_valid_crate() {
 fn test_gate_check_level_two_not_implemented() {
     let manifest_path = get_manifest_path();
     let output = Command::new("cargo")
-        .args(["run", "--manifest-path", manifest_path, "--", "gate-check", "--level", "2"])
+        .args([
+            "run",
+            "--manifest-path",
+            manifest_path,
+            "--",
+            "gate-check",
+            "--level",
+            "2",
+        ])
         .output()
         .expect("Failed to execute xtask gate-check");
 
-    assert!(!output.status.success(), "gate-check --level 2 must fail as not implemented");
+    assert!(
+        !output.status.success(),
+        "gate-check --level 2 must fail as not implemented"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let combined = format!("{}\n{}", stdout, stderr);
