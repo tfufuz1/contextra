@@ -2,9 +2,7 @@
 #![cfg(not(loom))]
 
 use contextra_core::{StorageEngine, TxId};
-use contextra_store::{
-    CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin,
-};
+use contextra_store::{CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin};
 use contextra_testkit::ManualClock;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -86,12 +84,9 @@ impl WalObserver for RecordingObserver {
         if let Some((ref clock, advance)) = self.clock_advance {
             clock.advance(advance);
         }
-        self.records.lock().push((
-            seq_no,
-            tx_id,
-            batch.origin,
-            batch.entries.len(),
-        ));
+        self.records
+            .lock()
+            .push((seq_no, tx_id, batch.origin, batch.entries.len()));
     }
 }
 
@@ -143,7 +138,10 @@ async fn test_observer_ordering_single_and_group_commit() {
         let tx = TxId::new(i);
         let key = format!("k_{i}");
         let val = format!("v_{i}");
-        storage1.put(tx, key.as_bytes(), val.as_bytes()).await.unwrap();
+        storage1
+            .put(tx, key.as_bytes(), val.as_bytes())
+            .await
+            .unwrap();
         storage1.commit(tx).await.unwrap();
     }
 
@@ -153,7 +151,10 @@ async fn test_observer_ordering_single_and_group_commit() {
         let expected_tx = TxId::new((idx + 1) as u64);
         assert_eq!(recs1[idx].1, expected_tx);
         if idx > 0 {
-            assert!(recs1[idx].0 > recs1[idx - 1].0, "seq numbers must strictly increase");
+            assert!(
+                recs1[idx].0 > recs1[idx - 1].0,
+                "seq numbers must strictly increase"
+            );
         }
     }
     storage1.close().await.unwrap();
@@ -186,7 +187,10 @@ async fn test_observer_ordering_single_and_group_commit() {
     assert_eq!(recs2.len(), 10);
     let notified_txs: Vec<u64> = recs2.iter().map(|r| r.1.inner()).collect();
     for i in 100..110 {
-        assert!(notified_txs.contains(&i), "Missing notification for TxId({i})");
+        assert!(
+            notified_txs.contains(&i),
+            "Missing notification for TxId({i})"
+        );
     }
 
     storage2.close().await.unwrap();
@@ -259,7 +263,10 @@ async fn test_observer_panic_isolation() {
     storage.put(tx1, b"p_key1", b"p_val1").await.unwrap();
     // Commit MUST NOT panic or fail when an observer panics
     let commit_res = storage.commit(tx1).await;
-    assert!(commit_res.is_ok(), "Commit must succeed despite panicking observer");
+    assert!(
+        commit_res.is_ok(),
+        "Commit must succeed despite panicking observer"
+    );
 
     assert_eq!(records_healthy.lock().len(), 1);
     assert_eq!(records_panic.lock().len(), 0);

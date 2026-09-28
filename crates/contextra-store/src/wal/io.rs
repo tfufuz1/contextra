@@ -5,12 +5,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-use super::{
-    PreparedBatch, Wal, WalCommand, WalEntry, WalOp, WalVersion,
-    MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
-};
 #[cfg(feature = "wal-integrity")]
 use super::legacy_integrity_key;
+use super::{
+    PreparedBatch, Wal, WalCommand, WalEntry, WalOp, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER,
+    WAL_V3_HEADER,
+};
 
 #[cfg(feature = "fault-injection")]
 use super::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
@@ -56,7 +56,12 @@ where
     #[cfg(feature = "wal-integrity")]
     let mut verifier = IntegrityVerifier::new(&integrity_key);
     let mut using_legacy_key = false;
-    let _ = (path, fallback_integrity_key, allow_legacy_integrity_key_fallback, &mut using_legacy_key);
+    let _ = (
+        path,
+        fallback_integrity_key,
+        allow_legacy_integrity_key_fallback,
+        &mut using_legacy_key,
+    );
 
     if file_size >= 4 {
         let mut header_buf = [0u8; 4];
@@ -258,7 +263,10 @@ where
                                 } else {
                                     format!("Deserialization failed: {e}")
                                 };
-                                return Err(ContextraError::wal_corruption(chunk_start_pos, reason));
+                                return Err(ContextraError::wal_corruption(
+                                    chunk_start_pos,
+                                    reason,
+                                ));
                             }
                         }
                     };
@@ -291,20 +299,20 @@ where
 
                     if let Err(e) = verify_res {
                         if !using_legacy_key && allow_legacy_integrity_key_fallback {
-                            let mut legacy_verifier = IntegrityVerifier::new(&legacy_integrity_key());
+                            let mut legacy_verifier =
+                                IntegrityVerifier::new(&legacy_integrity_key());
                             legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
-                            let legacy_res = match version {
-                                WalVersion::V3 => {
-                                    legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
-                                }
-                                WalVersion::V2 => {
-                                    legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
-                                }
-                                WalVersion::V1 => {
-                                    legacy_verifier.skip_hmac_verify_legacy(&snapshot);
-                                    Ok(())
-                                }
-                            };
+                            let legacy_res =
+                                match version {
+                                    WalVersion::V3 => legacy_verifier
+                                        .verify_and_update_v3(&snapshot, chunk_start_pos),
+                                    WalVersion::V2 => legacy_verifier
+                                        .verify_and_update_v2(&snapshot, chunk_start_pos),
+                                    WalVersion::V1 => {
+                                        legacy_verifier.skip_hmac_verify_legacy(&snapshot);
+                                        Ok(())
+                                    }
+                                };
                             if legacy_res.is_ok() {
                                 tracing::warn!(
                                     "Legacy-WAL-Integritätsschlüssel aktiv für Segment {} — dieses Segment hat keine reale Manipulationssicherheit, da der Rückfallschlüssel öffentlich im Quellcode liegt.",
@@ -346,7 +354,10 @@ where
                     let mut nonce = [0u8; 12];
                     nonce.copy_from_slice(nonce_slice);
                     let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
-                        ContextraError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
+                        ContextraError::wal_corruption(
+                            chunk_start_pos,
+                            "WAL entry missing ciphertext",
+                        )
                     })?;
                     decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                         Ok(data) => data,
@@ -948,7 +959,9 @@ mod tests {
             let mut file = super::super::fs::File::create(&file_path)
                 .await
                 .expect("file create failed");
-            file.write_all(&WAL_V3_HEADER).await.expect("write header failed");
+            file.write_all(&WAL_V3_HEADER)
+                .await
+                .expect("write header failed");
             file.flush().await.expect("flush failed");
         }
 

@@ -161,7 +161,8 @@ async fn test_u32_max_v_len_boundary_no_panic() {
             .write(true)
             .open(&file_path)
             .expect("Open SSTable for corrupt write");
-        file.write_all(&raw_file_bytes).expect("Write corrupted file");
+        file.write_all(&raw_file_bytes)
+            .expect("Write corrupted file");
         file.sync_all().expect("Sync corrupted file");
     }
 

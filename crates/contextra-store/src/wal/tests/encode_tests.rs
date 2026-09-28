@@ -1,6 +1,6 @@
 use super::*;
-use contextra_core::TxId;
 use crate::wal::KeyManager;
+use contextra_core::TxId;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;

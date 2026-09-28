@@ -1,9 +1,7 @@
 #![cfg(not(loom))]
 
 use contextra_core::{StorageEngine, TxId};
-use contextra_store::lsm::{
-    CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin,
-};
+use contextra_store::lsm::{CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
@@ -44,13 +42,9 @@ impl WalObserver for TestObserver {
         if let Some(delay) = self.delay {
             std::thread::sleep(delay);
         }
-        self.invocations.lock().push((
-            self.id,
-            seq_no,
-            tx_id,
-            batch.origin,
-            batch.entries.len(),
-        ));
+        self.invocations
+            .lock()
+            .push((self.id, seq_no, tx_id, batch.origin, batch.entries.len()));
     }
 }
 
@@ -136,7 +130,10 @@ async fn test_observer_fail_open_timeout_deregistration() {
 
     let tx1 = TxId::new(30);
     storage.put(tx1, b"k3", b"v3").await.expect("put 1");
-    storage.commit(tx1).await.expect("commit 1 should succeed (fail-open)");
+    storage
+        .commit(tx1)
+        .await
+        .expect("commit 1 should succeed (fail-open)");
 
     // The slow observer ran once
     assert_eq!(invocations.lock().len(), 1);

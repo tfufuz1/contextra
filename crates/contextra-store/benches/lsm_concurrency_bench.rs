@@ -134,5 +134,9 @@ Expected Baseline JSON (benchmarks/results/lsm_concurrency_baseline.json):
 }
 */
 
-criterion_group!(benches, bench_lsm_concurrent_commits, bench_lsm_compaction_extreme_load);
+criterion_group!(
+    benches,
+    bench_lsm_concurrent_commits,
+    bench_lsm_compaction_extreme_load
+);
 criterion_main!(benches);

@@ -42,11 +42,13 @@ impl DurabilityMode {
         use DurabilityMode::*;
         match self {
             Full => Ok(()),
-            WalNoHmac if deletion_proof_active => Err(DurabilityConfigError::IncompatibleCombination {
-                mode: self,
-                feature: "deletion-proof",
-                reason: "no HMAC integrity chain to anchor the proof",
-            }),
+            WalNoHmac if deletion_proof_active => {
+                Err(DurabilityConfigError::IncompatibleCombination {
+                    mode: self,
+                    feature: "deletion-proof",
+                    reason: "no HMAC integrity chain to anchor the proof",
+                })
+            }
             MemoryOnly
                 if deletion_proof_active
                     || feature_ring == contextra_ports::license::FeatureRing::Sovereign =>

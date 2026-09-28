@@ -1,10 +1,8 @@
-use super::adaptive::{
-    AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics,
-};
+use super::adaptive::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 use super::config::CompactionConfig;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
-use contextra_core::{Result, SnapshotRegistry, StorageStats, TOMBSTONE_BIT};
 use crate::wal::KeyManager;
+use contextra_core::{Result, SnapshotRegistry, StorageStats, TOMBSTONE_BIT};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -35,15 +33,16 @@ impl CompactionEngine {
         budget: Arc<contextra_core::ResourceTracker>,
         manifest: Option<Arc<crate::manifest::Manifest>>,
     ) -> Self {
-        let adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>> = if config.enable_adaptive_compaction {
-            Some(Arc::new(CostBasedAdaptivePlanner::new(
-                config.adaptive_read_ratio_threshold,
-                config.min_sstables_per_tier,
-                config.size_ratio,
-            )))
-        } else {
-            None
-        };
+        let adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>> =
+            if config.enable_adaptive_compaction {
+                Some(Arc::new(CostBasedAdaptivePlanner::new(
+                    config.adaptive_read_ratio_threshold,
+                    config.min_sstables_per_tier,
+                    config.size_ratio,
+                )))
+            } else {
+                None
+            };
 
         Self {
             config,
@@ -97,10 +96,7 @@ impl CompactionEngine {
     }
 
     /// Attaches a custom adaptive compaction planner.
-    pub fn with_adaptive_planner(
-        mut self,
-        planner: Arc<dyn AdaptiveCompactionPlanner>,
-    ) -> Self {
+    pub fn with_adaptive_planner(mut self, planner: Arc<dyn AdaptiveCompactionPlanner>) -> Self {
         self.adaptive_planner = Some(planner);
         self
     }
@@ -158,7 +154,9 @@ impl CompactionEngine {
                     let metrics_snap = self.workload_metrics.snapshot();
                     let min_seq = self.snapshot_registry.min_active_seqno();
 
-                    if let Some(plan) = planner.plan_compaction(&stats, &metrics_snap, &ssts, min_seq)? {
+                    if let Some(plan) =
+                        planner.plan_compaction(&stats, &metrics_snap, &ssts, min_seq)?
+                    {
                         if plan.candidates.len() >= 2 {
                             (plan.candidates, plan.is_full_compaction)
                         } else {
@@ -651,7 +649,8 @@ impl CompactionEngine {
                     let wait_start = std::time::Instant::now();
                     while !self.budget.has_memory_capacity() {
                         if wait_start.elapsed() >= self.config.max_backpressure_wait {
-                            let limit_bytes = self.config.max_memory_bytes.unwrap_or(128 * 1024 * 1024);
+                            let limit_bytes =
+                                self.config.max_memory_bytes.unwrap_or(128 * 1024 * 1024);
                             let used_mb = limit_bytes.div_ceil(1024 * 1024);
                             let limit_mb = limit_bytes.div_ceil(1024 * 1024);
                             tracing::error!(

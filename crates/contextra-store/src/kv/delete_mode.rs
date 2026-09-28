@@ -39,7 +39,8 @@ mod tests {
 
         let tombstone = KvDeleteMode::TombstoneOnly;
         let serialized_t = serde_json::to_string(&tombstone).expect("serialize");
-        let deserialized_t: KvDeleteMode = serde_json::from_str(&serialized_t).expect("deserialize");
+        let deserialized_t: KvDeleteMode =
+            serde_json::from_str(&serialized_t).expect("deserialize");
         assert_eq!(tombstone, deserialized_t);
     }
 }

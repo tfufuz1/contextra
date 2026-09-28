@@ -88,7 +88,8 @@ fn bench_wal_group_commit_throughput(c: &mut Criterion) {
                                     key: format!("p_{producer_id}_k").into_bytes(),
                                     value: format!("p_{producer_id}_v").into_bytes(),
                                 };
-                                let (batch, _) = wal_clone.prepare_batch(vec![(op, seq)]).await.unwrap();
+                                let (batch, _) =
+                                    wal_clone.prepare_batch(vec![(op, seq)]).await.unwrap();
                                 wal_clone.append_batch(batch).await.unwrap();
                             }));
                         }

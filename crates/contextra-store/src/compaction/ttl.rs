@@ -12,7 +12,9 @@ pub const TTL_HEADER_SIZE: usize = 12;
 /// Expiration timestamps are computed strictly prior to compaction at write time (`clock.now_unix_nanos() + ttl_duration`).
 /// Compaction performs purely a comparison operation (`entry.expires_at_unix_nanos < clock.now_unix_nanos()`)
 /// without calculating new expiration times.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct TtlMetadata {
     /// Absolute expiration timestamp in nanoseconds since UNIX epoch.
     pub expires_at_unix_nanos: u64,
@@ -22,7 +24,9 @@ impl TtlMetadata {
     /// Creates a new `TtlMetadata` with an explicit absolute expiration timestamp in nanoseconds since UNIX epoch.
     #[inline]
     pub const fn new(expires_at_unix_nanos: u64) -> Self {
-        Self { expires_at_unix_nanos }
+        Self {
+            expires_at_unix_nanos,
+        }
     }
 
     /// Evaluates whether an entry with this expiration timestamp is expired at `now_unix_nanos`.
@@ -48,7 +52,9 @@ impl TtlMetadata {
         if value.len() >= TTL_HEADER_SIZE && &value[0..4] == TTL_MAGIC_PREFIX {
             let ts_bytes: [u8; 8] = value[4..12].try_into().ok()?;
             let expires_at_unix_nanos = u64::from_le_bytes(ts_bytes);
-            Some(Self { expires_at_unix_nanos })
+            Some(Self {
+                expires_at_unix_nanos,
+            })
         } else {
             None
         }

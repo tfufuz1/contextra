@@ -1,5 +1,5 @@
-use super::*;
 use super::observer::WriteOrigin;
+use super::*;
 use crate::wal::WalEntry;
 use contextra_core::TxId;
 
@@ -12,7 +12,8 @@ impl LsmStorage {
         origin: WriteOrigin,
     ) {
         let seq_no = entries.last().map(|e| e.seq_no).unwrap_or(0);
-        self.observer_registry.notify(entries, seq_no, tx_id, origin);
+        self.observer_registry
+            .notify(entries, seq_no, tx_id, origin);
     }
 
     pub fn clear_intent_locks_for_tx(&self, tx_id: TxId) {

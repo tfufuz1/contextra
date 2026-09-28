@@ -7,7 +7,11 @@ fn test_durability_mode_feature_gate_matrix() {
 
     let durability_modes = [Full, WalNoHmac, MemoryOnly];
     let deletion_proof_states = [false, true];
-    let feature_rings = [FeatureRing::Fast, FeatureRing::Sovereign, FeatureRing::Compliance];
+    let feature_rings = [
+        FeatureRing::Fast,
+        FeatureRing::Sovereign,
+        FeatureRing::Compliance,
+    ];
 
     let mut evaluated_count = 0;
 
@@ -69,5 +73,8 @@ fn test_durability_mode_feature_gate_matrix() {
         }
     }
 
-    assert_eq!(evaluated_count, 18, "Must evaluate exactly 3x2x3 = 18 matrix combinations");
+    assert_eq!(
+        evaluated_count, 18,
+        "Must evaluate exactly 3x2x3 = 18 matrix combinations"
+    );
 }

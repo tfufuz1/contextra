@@ -104,11 +104,9 @@ async fn test_open_for_legacy_migration_accepts_and_logs_warning() {
     .await
     .expect("open_for_legacy_migration must accept legacy segment");
 
-    let entries = tracing::dispatcher::with_default(&dispatch, || async {
-        wal.replay().await
-    })
-    .await
-    .expect("replay legacy segment");
+    let entries = tracing::dispatcher::with_default(&dispatch, || async { wal.replay().await })
+        .await
+        .expect("replay legacy segment");
 
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].1.seq_no, 10);
