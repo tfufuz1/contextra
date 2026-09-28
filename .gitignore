@@ -54,3 +54,8 @@ results/
 .jules/SESSION.md
 .jules/verify/claim_precheck.sh
 .jules/context/
+
+# Jules local state and gate artifacts (untracked)
+/.jules/gate_ledger.json
+/.jules/session.env
+/.jules/local/
