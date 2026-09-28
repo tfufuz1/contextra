@@ -307,11 +307,6 @@ impl HnswIndex {
         *self.inner.cold.sq8_bias.read()
     }
 
-    /// Returns a reference to the quantizer RwLock for crate-internal access.
-    #[allow(dead_code)]
-    pub(crate) fn quantizer_lock(&self) -> &RwLock<Option<crate::quantize::ScalarQuantizer>> {
-        &self.inner.cold.quantizer
-    }
 
     pub fn deleted_ratio(&self) -> f64 {
         self.inner.deleted_ratio()

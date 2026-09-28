@@ -327,7 +327,7 @@ fn hash_key_u64(s: &str) -> u64 {
 }
 
 #[inline]
-#[allow(dead_code)]
+#[cfg(feature = "docid-128")]
 fn hash_key_u128(s: &str) -> u128 {
     let hash = blake3::hash(s.as_bytes());
     let mut buf = [0u8; 16];

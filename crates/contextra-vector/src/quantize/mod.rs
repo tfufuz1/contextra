@@ -206,20 +206,7 @@ impl ScalarQuantizer {
         &self.maxes
     }
 
-    /// Returns a reference to per-dimension scale factors.
-    #[allow(dead_code)]
-    pub fn scales(&self) -> &[f32] {
-        &self.scales
-    }
-
-    /// Returns a reference to per-dimension inverse scale factors.
-    #[allow(dead_code)]
-    pub fn inv_scales(&self) -> &[f32] {
-        &self.inv_scales
-    }
-
     /// Returns the target dimension of the quantizer.
-    #[allow(dead_code)]
     pub fn dimension(&self) -> usize {
         self.dimension
     }
@@ -251,7 +238,6 @@ impl ScalarQuantizer {
     /// Checks if recalibration / index rebuild is required based on cumulative quantization drift ratio.
     ///
     /// Requires at least 20 queries to avoid false positives on small initial samples.
-    #[allow(dead_code)]
     pub fn is_rebuild_required(&self, threshold: f32) -> bool {
         let total = self.total_queries.load(Ordering::Relaxed);
         if total < 20 {

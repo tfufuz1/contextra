@@ -23,10 +23,6 @@ pub(crate) const PENDING_FLUSH_THRESHOLD_MIN: u64 = 50;
 pub(crate) const PENDING_FLUSH_THRESHOLD_MAX: u64 = 1_000;
 pub(crate) const PENDING_FLUSH_THRESHOLD_FACTOR: f64 = 0.05;
 
-#[allow(dead_code)]
-#[deprecated(note = "Verwende compute_adaptive_flush_threshold(). Siehe ADR-068.")]
-pub(crate) const PENDING_FLUSH_THRESHOLD: u64 = PENDING_FLUSH_THRESHOLD_MIN;
-
 #[inline]
 pub(crate) fn compute_adaptive_flush_threshold(n_persisted: u64) -> u64 {
     let adaptive = (n_persisted as f64 * PENDING_FLUSH_THRESHOLD_FACTOR).floor() as u64;
@@ -172,7 +168,7 @@ impl DiskAnnFooter {
         buf
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "experimental-diskann")]
     pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < Self::SIZE {
             return Err(ContextraError::Storage("DiskANN footer too small".into()));
