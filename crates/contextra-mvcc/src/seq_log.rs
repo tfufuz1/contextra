@@ -177,11 +177,11 @@ impl SequenceLog {
                 for &ts in timestamps {
                     let duration = now.saturating_duration_since(ts);
                     if duration > self.max_pin_duration {
-                        eprintln!(
-                            "[WARN contextra_mvcc::seq_log] Snapshot pin active for seq_no {} exceeds max duration of {:?} (elapsed: {:?})",
-                            seq,
-                            self.max_pin_duration,
-                            duration
+                        tracing::warn!(
+                            seq_no = seq,
+                            max_pin_duration = ?self.max_pin_duration,
+                            elapsed = ?duration,
+                            "Snapshot pin active beyond max duration"
                         );
                         break;
                     }
