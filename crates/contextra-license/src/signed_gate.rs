@@ -6,7 +6,8 @@ use std::sync::Arc;
 use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_types::TenantId;
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+pub use ed25519_dalek::VerifyingKey;
+use ed25519_dalek::{Signature, Signer, Verifier};
 use serde::{Deserialize, Serialize};
 
 /// License payload containing tenant binding, granted feature rings, optional expiration timestamp,
@@ -92,6 +93,28 @@ impl SignedLicenseGate {
     /// Returns a reference to the public Ed25519 verifying key.
     pub fn verifying_key(&self) -> &VerifyingKey {
         &self.verifying_key
+    }
+
+    /// Generates a valid signed payload, signature, and verifying key bytes for testing purposes.
+    pub fn create_test_signed_payload(
+        rings: Vec<FeatureRing>,
+        expires_at: Option<i64>,
+    ) -> (Vec<u8>, [u8; 64], [u8; 32]) {
+        let secret_bytes = [42u8; 32];
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_bytes);
+        let verifying_key_bytes = signing_key.verifying_key().to_bytes();
+
+        let payload = LicensePayload {
+            tenant_id: TenantId::SYSTEM,
+            allowed_rings: rings,
+            expires_at,
+            feature_flags: BTreeMap::new(),
+        };
+
+        let payload_bytes = bincode::serialize(&payload).unwrap_or_default();
+        let signature = signing_key.sign(&payload_bytes).to_bytes();
+
+        (payload_bytes, signature, verifying_key_bytes)
     }
 }
 

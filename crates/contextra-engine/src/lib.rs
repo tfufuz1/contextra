@@ -120,12 +120,7 @@ mod no_crypto_stubs {
 
         pub fn on_rollback(&self, _tenant: TenantId, _chunk_ids: &[u64]) {}
 
-        pub fn remove_tenant_segment(
-            &self,
-            _tenant: TenantId,
-            _doc_id: contextra_types::DocId,
-        ) {
-        }
+        pub fn remove_tenant_segment(&self, _tenant: TenantId, _doc_id: contextra_types::DocId) {}
     }
 
     impl DeletionProof {
@@ -159,8 +154,9 @@ mod no_crypto_stubs {
 
             use hmac::{Hmac, Mac};
             use sha2::Sha256;
-            let mut mac = Hmac::<Sha256>::new_from_slice(proof_key)
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("HMAC key error: {e}")))?;
+            let mut mac = Hmac::<Sha256>::new_from_slice(proof_key).map_err(|e| {
+                contextra_types::ContextraError::Internal(format!("HMAC key error: {e}"))
+            })?;
             mac.update(&scope_bytes);
             mac.update(&deleted_keys_hash);
             mac.update(&tx_bytes);
@@ -201,10 +197,12 @@ mod no_crypto_stubs {
         }
     }
 }
+use contextra_ports::license::LicenseGate;
 #[cfg(feature = "sandbox")]
 use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
+pub use contextra_ports::VectorDeleteMode;
 pub use contextra_store::lsm::DurabilityMode;
 use contextra_store::LsmStorage;
 use contextra_types::{CollectionId, DocId, TenantId};
@@ -358,6 +356,14 @@ pub struct ContextraConfig {
     /// Default: DurabilityMode::Full.
     pub durability_mode: DurabilityMode,
 
+    /// Controls whether deletion proof generation and HMAC integrity guarantees are active.
+    /// Default: false.
+    pub deletion_proof_active: bool,
+
+    /// Controls vector index deletion repair behavior.
+    /// Default: VectorDeleteMode::BackgroundRepair.
+    pub vector_delete_mode: VectorDeleteMode,
+
     /// MemTable flush threshold in bytes. Passed directly to LsmConfig::memtable_size_limit.
     /// Default: 67_108_864 (64 MiB, matches LsmConfig default).
     pub memtable_size_limit: usize,
@@ -389,8 +395,13 @@ impl std::fmt::Debug for ContextraConfig {
                 &self.encryption_passphrase.as_ref().map(|_| "***"),
             )
             .field("max_ram_mb", &self.max_ram_mb)
-            .field("group_commit_window_micros", &self.group_commit_window_micros)
+            .field(
+                "group_commit_window_micros",
+                &self.group_commit_window_micros,
+            )
             .field("durability_mode", &self.durability_mode)
+            .field("deletion_proof_active", &self.deletion_proof_active)
+            .field("vector_delete_mode", &self.vector_delete_mode)
             .field("memtable_size_limit", &self.memtable_size_limit)
             .field("expiry_reaper_interval", &self.expiry_reaper_interval)
             .field("orphan_registry_path", &self.orphan_registry_path)
@@ -417,6 +428,8 @@ impl Default for ContextraConfig {
             max_ram_mb: 2048,
             group_commit_window_micros: 500,
             durability_mode: DurabilityMode::default(),
+            deletion_proof_active: false,
+            vector_delete_mode: VectorDeleteMode::BackgroundRepair,
             memtable_size_limit: 64 * 1024 * 1024,
             expiry_reaper_interval: std::time::Duration::from_secs(60),
             orphan_registry_path: None,
@@ -434,6 +447,8 @@ pub struct Contextra {
     storage: Arc<LsmStorage>,
     next_tx: Arc<AtomicU64>,
     dimension: usize,
+    config: ContextraConfig,
+    license_gate: Arc<dyn LicenseGate>,
     expiry_reaper_interval: std::time::Duration,
     community_detection_threshold: u64,
     collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
@@ -459,6 +474,16 @@ impl Contextra {
     #[doc(hidden)]
     pub fn inner_storage(&self) -> Arc<LsmStorage> {
         self.storage.clone()
+    }
+
+    /// Returns a reference to the active [`ContextraConfig`].
+    pub fn config(&self) -> &ContextraConfig {
+        &self.config
+    }
+
+    /// Returns a reference to the attached [`LicenseGate`].
+    pub fn license_gate(&self) -> Arc<dyn LicenseGate> {
+        Arc::clone(&self.license_gate)
     }
 }
 
