@@ -24,7 +24,8 @@ fn generate_random_vector(dim: usize, rng: &mut StdRng) -> Vec<f32> {
 /// bei extrem großen/komplexen Datensätzen vereinzelte geringfügige Abweichungen von der exakten O(n) Brute-Force-Suche.
 /// Daher verlangt Spec §22.4 eine Recall@k-Toleranz von >= 95 %.
 #[tokio::test]
-async fn test_differential_acorn_hnsw_vs_naive_reference() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_differential_acorn_hnsw_vs_naive_reference() -> Result<(), Box<dyn std::error::Error>>
+{
     struct TestConfig {
         seed: u64,
         num_points: usize,
@@ -149,7 +150,8 @@ async fn test_differential_acorn_hnsw_vs_naive_reference() -> Result<(), Box<dyn
 /// ACORN search_knn_acorn weiterhin k Ergebnisse (oder alle verbleibenden), während das klassische Post-Filtering
 /// (Nicht-ACORN-Suche + Filter) bei gleicher Beam-Breite wegen Beam-Verhungerung beweisbar weniger Ergebnisse liefert.
 #[tokio::test]
-async fn test_high_selectivity_beam_starvation_regression() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_high_selectivity_beam_starvation_regression() -> Result<(), Box<dyn std::error::Error>>
+{
     let seed = 9999;
     let mut rng = StdRng::seed_from_u64(seed);
 

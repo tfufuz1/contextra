@@ -236,7 +236,12 @@ where
             let doc_key = self
                 .collection
                 .namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-            if let Some(bytes) = self.collection.storage().get_at_seq(&doc_key, seq_no).await? {
+            if let Some(bytes) = self
+                .collection
+                .storage()
+                .get_at_seq(&doc_key, seq_no)
+                .await?
+            {
                 let (id, metadata) = if let Ok(meta) =
                     serde_json::from_slice::<crate::collection::StoredDocumentMeta>(&bytes)
                 {

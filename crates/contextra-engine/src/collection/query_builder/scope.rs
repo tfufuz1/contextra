@@ -2,10 +2,10 @@
 // ZWECK: Scoping-Typen und Query-Builder Ergänzung für ACORN-Hard-Boundary (Spec §5.3, §8.5, §10.4).
 // INVARIANTEN: allowed_doc_ids als BTreeSet für deterministische Iteration (P-Systeminvariante 3).
 
-use std::collections::BTreeSet;
+use super::builder::HybridQueryBuilder;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::DocId;
-use super::builder::HybridQueryBuilder;
+use std::collections::BTreeSet;
 
 /// Scoping constraint defining an explicit hard-boundary set of allowed document IDs
 /// for predicate-agnostic vector search (ACORN-Hard-Boundary, Spec §5.3, §8.5).

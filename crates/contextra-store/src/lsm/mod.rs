@@ -55,11 +55,14 @@
 //! disk I/O (`wal.append_batch`) and re-acquired afterwards for MemTable updates / visibility advancement (and on error for WAL rollback).
 //!
 //! ## Lock Hierarchy & Concurrency Control
-//! To prevent deadlocks, locks across the LSM storage engine must be acquired in the following order:
-//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations. Released before disk I/O in group commit leader happy path, and re-acquired for MemTable update and visibility advancement.
-//! 2. `state` write lock (`tokio::sync::RwLock<LsmState>`) - Protects active/immutable memtable pointers & WAL.
-//! 3. `sstables` write lock (`tokio::sync::RwLock<Vec<Arc<SstableReader>>>`) - Protects SSTable set.
-//!    Read locks on `state` and `sstables` may be acquired concurrently without holding `commit_mutex`.
+//! To prevent deadlocks, locks across the LSM storage engine must be acquired in the following strict order:
+//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations.
+//! 2. `pending_commit_queue` (`tokio::sync::Mutex<Option<PendingCommitQueue>>`) - Protects group commit queue coordination.
+//! 3. `state` write lock (`tokio::sync::RwLock<LsmState>`) - Protects active/immutable memtable pointers & active WAL handle.
+//! 4. `wal` (`RwLock<Arc<Wal>>`) - Protects active WAL reference.
+//! 5. `wal.truncate_lock` (`tokio::sync::Mutex<()>`) - Innermost WAL I/O truncation/append guard.
+//!
+//! Note: `intent_locks` (`std::Mutex`) and `tx_buffer` shards are leaf locks; no `.await` points are permitted while holding leaf locks.
 
 pub(super) use crate::memtable::MemTable;
 pub(super) use crate::sstable::{SstableBuilder, SstableReader};
@@ -87,12 +90,12 @@ mod tests;
 pub mod ops;
 
 pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
-pub use engine::LsmStorage;
+pub use engine::{LsmStorage, StorageHealth};
 
 pub(super) use guard::{CommitGuard, LsmState};
 pub use observer::{
-    CommittedBatch, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
-    DEFAULT_MAX_OBSERVER_LATENCY,
+    AsyncObserverAdapter, CommitContext, CommittedBatch, ObserverRegistry, WalEntryRef,
+    WalObserver, WriteOrigin, DEFAULT_MAX_OBSERVER_LATENCY,
 };
 pub(super) use validate::validate_key;
 

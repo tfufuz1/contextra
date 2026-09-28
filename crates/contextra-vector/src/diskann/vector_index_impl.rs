@@ -67,12 +67,12 @@ impl VectorIndex for DiskAnnIndex {
             return hnsw.delete(tx, id).await;
         }
 
-        let doc_id_u64 = id.inner();
+        let doc_id_raw = id.inner();
 
-        if self.inner.tombstones.read().contains(doc_id_u64 as u64) {
+        if self.inner.tombstones.read().contains(doc_id_raw) {
             return Err(ContextraError::NotFound(format!(
                 "DocId {} not found in index or already deleted",
-                doc_id_u64
+                doc_id_raw
             )));
         }
 
@@ -87,11 +87,11 @@ impl VectorIndex for DiskAnnIndex {
         if !exists_in_doc_ids && !exists_in_pending {
             return Err(ContextraError::NotFound(format!(
                 "DocId {} not found in DiskANN index",
-                doc_id_u64
+                doc_id_raw
             )));
         }
 
-        self.inner.tombstones.write().insert(doc_id_u64 as u64);
+        self.inner.tombstones.write().insert(doc_id_raw);
 
         let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
         Self::append_to_tombstone_wal(&tombstone_wal, id).await?;
@@ -133,12 +133,12 @@ impl VectorIndex for DiskAnnIndex {
         let mut ids = Vec::new();
 
         for &id in self.inner.doc_ids.read().iter() {
-            if !tombstones.contains(id.inner() as u64) {
+            if !tombstones.contains(id.inner()) {
                 ids.push(id);
             }
         }
         for (id, _) in self.inner.pending_inserts.read().iter() {
-            if !tombstones.contains(id.inner() as u64) && !ids.contains(id) {
+            if !tombstones.contains(id.inner()) && !ids.contains(id) {
                 ids.push(*id);
             }
         }

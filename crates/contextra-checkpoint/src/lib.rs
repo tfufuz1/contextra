@@ -37,9 +37,7 @@ mod orphan;
 mod store;
 
 pub use guard::{CheckpointGuard, PinGuard};
-pub use hardlink_cloner::{
-    CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult,
-};
+pub use hardlink_cloner::{CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult};
 pub use manifest::CheckpointManifest;
 pub use meta::{CheckpointMeta, StateCheckpoint};
 #[allow(deprecated)]

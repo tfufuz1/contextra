@@ -1,8 +1,5 @@
 use contextra::Contextra;
-use contextra_mcp::{
-    protocol::JsonRpcRequest,
-    McpServer,
-};
+use contextra_mcp::{protocol::JsonRpcRequest, McpServer};
 use contextra_ports::BoxFuture;
 use serde_json::json;
 use std::sync::Arc;
@@ -43,7 +40,8 @@ async fn setup_server() -> (McpServer, TempDir) {
     let col = db.collection("default").await.expect("collection");
     let dim = col.dimension();
     let embedder = Arc::new(MockEmbedder { dimension: dim });
-    let server = McpServer::with_write_permission(Arc::new(db), embedder, true).expect("server new");
+    let server =
+        McpServer::with_write_permission(Arc::new(db), embedder, true).expect("server new");
     (server, tmp)
 }
 
@@ -95,8 +93,8 @@ async fn test_contextra_plugin_status_tools_call() {
         .as_str()
         .expect("content text");
 
-    let status_val: serde_json::Value = serde_json::from_str(content_text)
-        .expect("payload must deserialize from valid JSON");
+    let status_val: serde_json::Value =
+        serde_json::from_str(content_text).expect("payload must deserialize from valid JSON");
 
     assert!(status_val.get("plugins").is_some());
     assert!(status_val.get("feature_ring_active").is_some());

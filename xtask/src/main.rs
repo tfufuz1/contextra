@@ -61,13 +61,15 @@ mod check_audit_duplication;
 mod check_audit_tool_evidence;
 mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
+mod check_commit_diff_integrity;
 mod check_commit_messages;
 mod check_compile;
 mod check_coverage_gate;
 mod check_doc_references;
-mod check_duplicate_core_primitives;
+use xtask::check_duplicate_core_primitives;
 mod check_duplicate_intent;
 mod check_duplicate_symbols;
+mod check_duplicate_symbols_cross_file;
 mod check_ffi_panic_boundary;
 mod check_flatbuffers_drift;
 mod check_jules_context_freshness;
@@ -2132,11 +2134,24 @@ pub fn run_check_review_coverage(tags: &[TagItem]) -> bool {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let subcommand = args.get(1).map(|s| s.as_str()).unwrap_or("sync-docs");
+    if let Some(code) = xtask::harness::dispatch_with_builtin(
+        subcommand,
+        if args.len() >= 2 { &args[2..] } else { &[] },
+    ) {
+        process::exit(code);
+    }
 
     match subcommand {
         "reproducible-build" | "reproducible-build-check" => {
             let success = reproducible_build::run_reproducible_build_check(&args[2..]);
             if !success {
+                process::exit(1);
+            }
+        }
+        "check-commit-diff-integrity" => {
+            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args) {
+                eprintln!("❌ check-commit-diff-integrity failed: {}", e);
                 process::exit(1);
             }
         }
@@ -2414,6 +2429,15 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-commit-diff-integrity" => {
+            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+            if let Err(e) =
+                check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
+            {
+                eprintln!("❌ check-commit-diff-integrity failed: {}", e);
+                process::exit(1);
+            }
+        }
         "check-commit-messages" => {
             if let Err(e) = check_commit_messages::check_commit_messages() {
                 eprintln!("❌ check-commit-messages failed: {}", e);
@@ -2421,8 +2445,6 @@ fn main() {
             }
         }
         "check-duplicate-symbols-cross-file" => {
-            #[path = "check_duplicate_symbols_cross_file.rs"]
-            mod check_duplicate_symbols_cross_file;
             if let Err(e) = check_duplicate_symbols_cross_file::run() {
                 eprintln!("❌ check-duplicate-symbols-cross-file failed: {}", e);
                 process::exit(1);
@@ -3403,7 +3425,7 @@ fn main() {
         }
         other => {
             eprintln!("Unknown xtask command: {}", other);
-            eprintln!("Available commands: audit-integrity-check, bench-compile, bench-download, bench-gate, bench-trend, check-action-pinning, check-adr-deadlines, check-agents-freshness, check-agents-integrity, check-audit-duplication, check-audit-tool-evidence, check-audit-verdict-independence, check-bandit-latency-budget, check-branch-overlap, check-commit-messages, check-compile, check-consistency, check-coverage-gate, check-crate-references, check-dag, check-doc-references, check-duplicate-core-primitives, check-duplicate-intent, check-duplicate-symbols, check-duplicate-symbols-cross-file, check-ffi-panic-boundary, check-flatbuffers-drift, check-jules-context-freshness, check-manifest-completeness, check-marker-drift, check-max-results-unbound, check-module-reachability, check-mutation-score-gate, check-nan-hot-loop, check-phantom-files, check-placeholder-refs, check-recall-stability, check-result-dropped-io, check-review-coverage, check-ring-capabilities-consistency, check-ring-layering, check-ring-layering-full, check-ring0-async-purity, check-stale-tags, check-toc-integrity, check-toctou-defaults, check-type-registry, check-unsafe-islands, check-veto-deadlines, check-vetoes, check-workflow-commands, claim, commit-health, consolidate-adrs, context-pack, context-tags, crate-context, debt-audit, env-validate, feature-matrix, forensic-test, gate-check, gen-feature-catalog, gen-prompter-data, gen-sbom, generate-adr, generate-diagnostics, generate-markers, hotspot-report, init-audit-fix, jules-preflight, jules-submit-gate, lint-unsafe-slices, loom-run, migrate-docid-128, mutation-score-record, panic-inventory, post-merge-report, pre-push, prune-branches, py-test, regenerate-flatbuffers, reproducible-build, run-community-detection, security-scan, session-init, shell-commit-audit, sync-docs, tag-health, validate-pr-checklist, validate-tags, workspace-verify");
+            eprintln!("Available commands: audit-integrity-check, bench-compile, bench-download, bench-gate, bench-trend, check-action-pinning, check-adr-deadlines, check-agents-freshness, check-agents-integrity, check-audit-duplication, check-audit-tool-evidence, check-audit-verdict-independence, check-bandit-latency-budget, check-branch-overlap, check-commit-diff-integrity, check-commit-messages, check-compile, check-consistency, check-coverage-gate, check-crate-references, check-dag, check-doc-references, check-duplicate-core-primitives, check-duplicate-intent, check-duplicate-symbols, check-duplicate-symbols-cross-file, check-ffi-panic-boundary, check-flatbuffers-drift, check-jules-context-freshness, check-manifest-completeness, check-marker-drift, check-max-results-unbound, check-module-reachability, check-mutation-score-gate, check-nan-hot-loop, check-phantom-files, check-placeholder-refs, check-recall-stability, check-result-dropped-io, check-review-coverage, check-ring-capabilities-consistency, check-ring-layering, check-ring-layering-full, check-ring0-async-purity, check-stale-tags, check-toc-integrity, check-toctou-defaults, check-type-registry, check-unsafe-islands, check-veto-deadlines, check-vetoes, check-workflow-commands, claim, commit-health, consolidate-adrs, context-pack, context-tags, crate-context, debt-audit, env-validate, feature-matrix, forensic-test, gate-check, gen-feature-catalog, gen-prompter-data, gen-sbom, generate-adr, generate-diagnostics, generate-markers, hotspot-report, init-audit-fix, jules-preflight, jules-submit-gate, lint-unsafe-slices, loom-run, migrate-docid-128, mutation-score-record, panic-inventory, post-merge-report, pre-push, prune-branches, py-test, regenerate-flatbuffers, reproducible-build, run-community-detection, security-scan, session-init, shell-commit-audit, sync-docs, tag-health, validate-pr-checklist, validate-tags, workspace-verify");
             process::exit(1);
         }
     }

@@ -71,7 +71,7 @@ pub fn compute_co_occurrence_candidates(
         sorted_entities.dedup();
 
         let count = sorted_entities.len();
-        if count < 2 || count > MAX_RELATE_PARTICIPANTS {
+        if !(2..=MAX_RELATE_PARTICIPANTS).contains(&count) {
             continue;
         }
 

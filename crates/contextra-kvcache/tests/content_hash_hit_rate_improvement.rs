@@ -1,8 +1,6 @@
 #![cfg(feature = "content-addressed-kv-cache")]
 
-use contextra_kvcache::{
-    ContentAddressedKvStore, KvLookupResult, KvReusePolicy, PrefixRadixTree,
-};
+use contextra_kvcache::{ContentAddressedKvStore, KvLookupResult, KvReusePolicy, PrefixRadixTree};
 use contextra_types::TenantId;
 
 #[test]
@@ -93,9 +91,18 @@ fn test_content_hash_hit_rate_improvement_agentic_workload() {
     let relative_improvement_pct = ((content_hit_rate - pure_hit_rate) / pure_hit_rate) * 100.0;
 
     println!("Agentic Workload Cache Performance Benchmark:");
-    println!(" Pure Position Radix Hit Rate: {:.2}%", pure_hit_rate * 100.0);
-    println!(" Content-Addressed KV Store Hit Rate: {:.2}%", content_hit_rate * 100.0);
-    println!(" Absolute Hit Rate Increase: +{:.2}%", absolute_improvement * 100.0);
+    println!(
+        " Pure Position Radix Hit Rate: {:.2}%",
+        pure_hit_rate * 100.0
+    );
+    println!(
+        " Content-Addressed KV Store Hit Rate: {:.2}%",
+        content_hit_rate * 100.0
+    );
+    println!(
+        " Absolute Hit Rate Increase: +{:.2}%",
+        absolute_improvement * 100.0
+    );
     println!(" Relative Improvement: +{:.2}%", relative_improvement_pct);
 
     // Target benchmark assertion: +20%–35%+ hit rate improvement

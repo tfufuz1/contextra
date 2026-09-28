@@ -470,7 +470,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub(crate) async fn commit_stats(&self, tx: TxId) -> Result<()> {
         let change = {
             let mut guard = self.staged_stats.lock();
@@ -523,7 +522,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
         self.storage.put(tx, &meta_key, &meta_bytes).await
     }
 
-    #[allow(dead_code)]
     pub(crate) async fn rollback_stats(&self, tx: TxId) -> Result<()> {
         let mut guard = self.staged_stats.lock();
         guard.remove(&tx);

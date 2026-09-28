@@ -35,7 +35,7 @@ impl DeletedView {
     }
 
     /// Creates an empty `DeletedView` when no nodes are deleted or for testing when explicitly intended.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn empty() -> Self {
         Self {
             deleted_nodes: HashSet::new(),
@@ -247,7 +247,13 @@ pub(crate) fn compute_ppr_with_context(
                 }
             }
         }
-        PprAlgorithm::Auto => unreachable!("Auto resolved above"),
+        PprAlgorithm::Auto => {
+            if seed_nodes.len() <= 100 {
+                forward_push_ppr(inner, seed_nodes, config, deleted_nodes, ctx)
+            } else {
+                compute_ppr_dense(inner, seed_nodes, config, deleted_nodes, ctx)
+            }
+        }
     }
 }
 

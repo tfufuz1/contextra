@@ -107,7 +107,7 @@ impl DiskAnnIndex {
 
         for i in 0..disk_count as u32 {
             let node = self.load_node(i)?;
-            if tombstones.contains(node.doc_id.inner() as u64) {
+            if tombstones.contains(node.doc_id.inner()) {
                 continue;
             }
             let vec_f32 = match node.vector {
@@ -354,7 +354,7 @@ impl DiskAnnIndex {
                     header.dimension as usize * 4
                 };
                 let neighbors_size = 4 + (header.max_degree as usize * 4);
-                let doc_id_size = 8;
+                let doc_id_size = std::mem::size_of::<DocId>();
                 let raw_node_size = vector_size + neighbors_size + doc_id_size;
                 let node_size_bytes = raw_node_size.div_ceil(header.sector_size as usize)
                     * header.sector_size as usize;
@@ -408,13 +408,20 @@ impl DiskAnnIndex {
                         .and_then(|o| o.checked_add(neighbors_size))
                         .ok_or_else(|| ContextraError::Index("DocId offset overflow".into()))?;
                     let doc_id_end = doc_id_offset
-                        .checked_add(8)
+                        .checked_add(doc_id_size)
                         .ok_or_else(|| ContextraError::Index("DocId end offset overflow".into()))?;
                     let doc_id_bytes =
                         mmap_ref.get(doc_id_offset..doc_id_end).ok_or_else(|| {
                             ContextraError::Storage("DiskANN file truncated before doc_id".into())
                         })?;
+                    #[cfg(not(feature = "docid-128"))]
                     let doc_id = u64::from_le_bytes(
+                        doc_id_bytes
+                            .try_into()
+                            .map_err(|_| ContextraError::Index("Corrupt doc_id".into()))?,
+                    );
+                    #[cfg(feature = "docid-128")]
+                    let doc_id = u128::from_le_bytes(
                         doc_id_bytes
                             .try_into()
                             .map_err(|_| ContextraError::Index("Corrupt doc_id".into()))?,
@@ -578,13 +585,21 @@ impl DiskAnnIndex {
             .checked_add(skip_bytes)
             .ok_or_else(|| ContextraError::Index("Cursor overflow in padding".into()))?;
 
+        let doc_id_size = std::mem::size_of::<DocId>();
         let doc_id_end = cursor
-            .checked_add(8)
+            .checked_add(doc_id_size)
             .ok_or_else(|| ContextraError::Index("Cursor overflow in DocId".into()))?;
         let doc_id_bytes = node_data
             .get(cursor..doc_id_end)
             .ok_or_else(|| ContextraError::Index("Truncated DocId".into()))?;
+        #[cfg(not(feature = "docid-128"))]
         let doc_id = DocId::from(u64::from_le_bytes(
+            doc_id_bytes
+                .try_into()
+                .map_err(|_| ContextraError::Index("Invalid DocId".into()))?,
+        ));
+        #[cfg(feature = "docid-128")]
+        let doc_id = DocId::from(u128::from_le_bytes(
             doc_id_bytes
                 .try_into()
                 .map_err(|_| ContextraError::Index("Invalid DocId".into()))?,

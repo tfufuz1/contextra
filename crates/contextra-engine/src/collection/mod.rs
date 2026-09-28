@@ -435,7 +435,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self
     }
 
-
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
     #[cfg(feature = "encryption-at-rest")]
     pub fn kv_store(&self) -> Option<&Arc<contextra_crypto::TenantIsolatedKvStore>> {

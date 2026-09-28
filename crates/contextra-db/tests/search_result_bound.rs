@@ -1,8 +1,8 @@
 use contextra_db::{Collection, Language};
 use contextra_graph::CsrGraph;
-use contextra_vector::{HnswConfig, HnswIndex};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::DistanceMetric;
+use contextra_vector::{HnswConfig, HnswIndex};
 use serde_json::json;
 use std::path::Path;
 use std::sync::atomic::AtomicU64;
@@ -94,8 +94,7 @@ async fn proof_search_never_exceeds_k() {
 
     // B-1 Regression Guard: Ensure no unannotated usize::MAX in db source files
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let search_dir =
-        Path::new(&manifest_dir).join("../contextra-engine/src/collection/search");
+    let search_dir = Path::new(&manifest_dir).join("../contextra-engine/src/collection/search");
     let search_dir = if search_dir.exists() {
         search_dir
     } else {

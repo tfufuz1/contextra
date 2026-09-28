@@ -4,7 +4,8 @@ use serde_json::json;
 use tempfile::TempDir;
 
 #[tokio::test]
-async fn test_db_transaction_multi_index_staging_commit_and_rollback() -> contextra_types::Result<()> {
+async fn test_db_transaction_multi_index_staging_commit_and_rollback() -> contextra_types::Result<()>
+{
     let tmp = TempDir::new().expect("Failed to create temporary directory");
     let config = ContextraConfig {
         dimension: 4,
@@ -27,7 +28,10 @@ async fn test_db_transaction_multi_index_staging_commit_and_rollback() -> contex
     .await?;
 
     let doc_id_committed = DocId::from_key("tx_doc_commit")?;
-    tx_commit.stage_text_insert(doc_id_committed, "Transaktions-Text für Commit-Test".to_string());
+    tx_commit.stage_text_insert(
+        doc_id_committed,
+        "Transaktions-Text für Commit-Test".to_string(),
+    );
 
     let entity1 = Entity::new(EntityId::from_key("tx_entity_1")?, "Node1", "Concept");
     let entity2 = Entity::new(EntityId::from_key("tx_entity_2")?, "Node2", "Concept");

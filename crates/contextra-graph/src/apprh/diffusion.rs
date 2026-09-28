@@ -114,6 +114,7 @@ pub fn run_apprh_push<G: PathGraph>(
         for (v, _w) in binary_neighbors {
             let entry = r.entry(v).or_insert(0.0);
             *entry += base_push_share;
+            // // NAN-CHECK-OK: Validate finite residual increment during APPRH binary neighbor push
             if !entry.is_finite() {
                 return Err(ApprhError::NonFinite);
             }

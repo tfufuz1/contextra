@@ -49,7 +49,11 @@ async fn test_tenant_isolation_cross_tenant_document_and_collection_operations(
 
     // 4. Drop collection for Tenant X and verify DeletionProof
     let proof = db
-        .drop_collection("tenant_x_collection", tenant_x_id, b"secret_proof_key_32bytes_1234567")
+        .drop_collection(
+            "tenant_x_collection",
+            tenant_x_id,
+            b"secret_proof_key_32bytes_1234567",
+        )
         .await?;
 
     assert_eq!(

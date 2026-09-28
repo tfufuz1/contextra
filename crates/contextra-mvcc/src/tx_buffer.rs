@@ -25,7 +25,11 @@ use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
+
+/// Single canonical constant for overhead calculation per staged entry (32 bytes).
+pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
 
 /// Default number of shards for the transaction buffer.
 pub const DEFAULT_SHARD_COUNT: usize = 64;
@@ -39,6 +43,16 @@ pub const DEFAULT_MAX_OPS_PER_TX: usize = 10_000;
 /// Prevents unbounded memory growth during large read scans (~100,000 keys * ~100B per key = ~10MB per active transaction).
 pub const DEFAULT_MAX_READ_SET_KEYS: usize = 100_000;
 
+/// Default maximum staged bytes per transaction (16 MiB).
+///
+/// Bounds staging memory per individual transaction while enabling high-throughput bulk operations.
+pub const DEFAULT_MAX_TX_STAGED_BYTES: usize = 16 * 1024 * 1024;
+
+/// Default maximum total staged bytes across all active transactions (256 MiB).
+///
+/// Guards the process memory budget against multi-transaction staging memory exhaustion.
+pub const DEFAULT_MAX_TOTAL_STAGED_BYTES: usize = 256 * 1024 * 1024;
+
 /// Configuration options for `TxBuffer`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxBufferConfig {
@@ -50,6 +64,12 @@ pub struct TxBufferConfig {
     /// Verhindert OOM durch einzelne unbegrenzte Transaktionen.
     /// Default: 10_000 (großzügig, aber bounded).
     pub max_ops_per_tx: usize,
+    /// Maximale Byte-Kapazität von Staging-Einträgen pro einzelnen Transaktion.
+    /// Default: 16 MiB.
+    pub max_tx_staged_bytes: usize,
+    /// Maximale Gesamtkapazität von Staging-Einträgen über alle Transaktionen hinweg.
+    /// Default: 256 MiB.
+    pub max_total_staged_bytes: usize,
 }
 
 impl Default for TxBufferConfig {
@@ -58,6 +78,8 @@ impl Default for TxBufferConfig {
             tx_timeout: Duration::from_secs(30),
             max_active_tx: 64,
             max_ops_per_tx: DEFAULT_MAX_OPS_PER_TX,
+            max_tx_staged_bytes: DEFAULT_MAX_TX_STAGED_BYTES,
+            max_total_staged_bytes: DEFAULT_MAX_TOTAL_STAGED_BYTES,
         }
     }
 }
@@ -92,10 +114,65 @@ impl<T: Clone> IndexOp<T> {
     }
 }
 
+/// Trait for estimating the byte footprint of a staged payload.
+pub trait StagedOpSize {
+    /// Estimates memory footprint in bytes for staging entry overhead accounting.
+    fn staged_bytes(&self) -> usize;
+}
+
+impl<T> StagedOpSize for Vec<T> {
+    fn staged_bytes(&self) -> usize {
+        self.len() * std::mem::size_of::<T>()
+    }
+}
+
+impl StagedOpSize for (Vec<u8>, Vec<u8>) {
+    fn staged_bytes(&self) -> usize {
+        self.0.len() + self.1.len()
+    }
+}
+
+impl StagedOpSize for String {
+    fn staged_bytes(&self) -> usize {
+        self.len()
+    }
+}
+
+impl StagedOpSize for usize {
+    fn staged_bytes(&self) -> usize {
+        std::mem::size_of::<usize>()
+    }
+}
+
+impl StagedOpSize for u64 {
+    fn staged_bytes(&self) -> usize {
+        std::mem::size_of::<u64>()
+    }
+}
+
+impl StagedOpSize for u8 {
+    fn staged_bytes(&self) -> usize {
+        std::mem::size_of::<u8>()
+    }
+}
+
+impl<T: Clone + StagedOpSize> IndexOp<T> {
+    /// Estimates total memory footprint in bytes including fixed overhead and payload size.
+    pub fn estimated_bytes(&self) -> usize {
+        STAGING_ENTRY_OVERHEAD_BYTES
+            + match self {
+                IndexOp::Insert { data, .. } => data.staged_bytes(),
+                IndexOp::Delete { data: Some(d), .. } => d.staged_bytes(),
+                IndexOp::Delete { data: None, .. } => 0,
+            }
+    }
+}
+
 #[derive(Debug)]
 struct TxShard<T: Clone> {
     ops: AHashMap<TxId, (Vec<IndexOp<T>>, Instant)>,
     read_sets: AHashMap<TxId, ReadSet>,
+    staged_bytes: AHashMap<TxId, usize>,
 }
 
 impl<T: Clone> TxShard<T> {
@@ -103,6 +180,7 @@ impl<T: Clone> TxShard<T> {
         Self {
             ops: AHashMap::new(),
             read_sets: AHashMap::new(),
+            staged_bytes: AHashMap::new(),
         }
     }
 }
@@ -138,6 +216,7 @@ pub struct TxBuffer<T: Clone> {
     key_shards: Vec<RwLock<KeyShard>>,
     tx_timeout: Duration,
     config: TxBufferConfig,
+    global_staged_bytes: AtomicUsize,
 }
 
 impl<T: Clone> TxBuffer<T> {
@@ -176,7 +255,13 @@ impl<T: Clone> TxBuffer<T> {
             key_shards,
             tx_timeout: config.tx_timeout,
             config,
+            global_staged_bytes: AtomicUsize::new(0),
         }
+    }
+
+    /// Returns the current total staged bytes across all active transactions.
+    pub fn staged_bytes(&self) -> usize {
+        self.global_staged_bytes.load(Ordering::Relaxed)
     }
 
     #[inline]
@@ -209,6 +294,7 @@ impl<T: Clone> TxBuffer<T> {
             .entry(tx)
             .or_insert_with(|| (Vec::with_capacity(16), at));
         shard.read_sets.entry(tx).or_default();
+        shard.staged_bytes.entry(tx).or_insert(0);
     }
 
     /// Registers a new transaction in the buffer.
@@ -294,56 +380,109 @@ impl<T: Clone> TxBuffer<T> {
         self.get_read_set(tx)
     }
 
-    /// Stages an operation for the given transaction, checking bounded capacity.
-    ///
-    /// # BREAKING CHANGE
-    /// Returns `Result<(), ContextraError>` to enforce bounded capacity limits.
-    pub fn stage(&self, tx: TxId, op: IndexOp<T>) -> Result<()> {
+    /// Stages an operation for the given transaction, checking bounded capacity and byte budget.
+    pub fn stage(&self, tx: TxId, op: IndexOp<T>) -> Result<()>
+    where
+        T: StagedOpSize,
+    {
         self.stage_bounded(tx, op)
     }
 
-    /// Stages an operation for the given transaction, enforcing `max_ops_per_tx` limit.
-    pub fn stage_bounded(&self, tx: TxId, op: IndexOp<T>) -> Result<()> {
+    /// Stages an operation for the given transaction, enforcing `max_ops_per_tx` and byte limits.
+    pub fn stage_bounded(&self, tx: TxId, op: IndexOp<T>) -> Result<()>
+    where
+        T: StagedOpSize,
+    {
+        let op_bytes = op.estimated_bytes();
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
+
+        let curr_tx_bytes = *shard.staged_bytes.entry(tx).or_insert(0);
+        if curr_tx_bytes + op_bytes > self.config.max_tx_staged_bytes {
+            return Err(ContextraError::Storage(format!(
+                "Transaction {tx} staging budget exceeded: {} + {op_bytes} > {}",
+                curr_tx_bytes, self.config.max_tx_staged_bytes
+            )));
+        }
+
+        let curr_global = self.global_staged_bytes.load(Ordering::Relaxed);
+        if curr_global + op_bytes > self.config.max_total_staged_bytes {
+            return Err(ContextraError::Storage(format!(
+                "Global staging budget exceeded: {curr_global} + {op_bytes} > {}",
+                self.config.max_total_staged_bytes
+            )));
+        }
+
+        let max_ops = self.config.max_ops_per_tx;
         let entry = shard
             .ops
             .entry(tx)
             .or_insert_with(|| (Vec::with_capacity(16), Instant::now()));
 
-        if entry.0.len() >= self.config.max_ops_per_tx {
+        if entry.0.len() >= max_ops {
             return Err(ContextraError::Transaction(format!(
                 "Transaction {} exceeded max staging capacity ({} ops)",
-                tx, self.config.max_ops_per_tx
+                tx, max_ops
             )));
         }
 
         entry.0.push(op);
+        shard
+            .staged_bytes
+            .entry(tx)
+            .and_modify(|b| *b += op_bytes);
+        self.global_staged_bytes
+            .fetch_add(op_bytes, Ordering::Relaxed);
         Ok(())
     }
 
     /// Stages multiple operations for a transaction in a single shard lock acquisition.
-    ///
-    /// All `ops` must belong to the same transaction. Since `shard_idx` is a pure
-    /// function of `tx.inner()`, all operations for a given `TxId` always land in
-    /// the same shard — a single write-lock acquisition covers the entire batch.
-    pub fn stage_many(&self, tx: TxId, ops: impl IntoIterator<Item = IndexOp<T>>) -> Result<()> {
+    pub fn stage_many(&self, tx: TxId, ops: impl IntoIterator<Item = IndexOp<T>>) -> Result<()>
+    where
+        T: StagedOpSize,
+    {
+        let ops_vec: Vec<_> = ops.into_iter().collect();
+        let total_op_bytes: usize = ops_vec.iter().map(|op| op.estimated_bytes()).sum();
+
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
+
+        let curr_tx_bytes = *shard.staged_bytes.entry(tx).or_insert(0);
+        if curr_tx_bytes + total_op_bytes > self.config.max_tx_staged_bytes {
+            return Err(ContextraError::Storage(format!(
+                "Transaction {tx} staging budget exceeded: {} + {total_op_bytes} > {}",
+                curr_tx_bytes, self.config.max_tx_staged_bytes
+            )));
+        }
+
+        let curr_global = self.global_staged_bytes.load(Ordering::Relaxed);
+        if curr_global + total_op_bytes > self.config.max_total_staged_bytes {
+            return Err(ContextraError::Storage(format!(
+                "Global staging budget exceeded: {curr_global} + {total_op_bytes} > {}",
+                self.config.max_total_staged_bytes
+            )));
+        }
+
+        let max_ops = self.config.max_ops_per_tx;
         let entry = shard
             .ops
             .entry(tx)
             .or_insert_with(|| (Vec::new(), Instant::now()));
 
-        let ops_vec: Vec<_> = ops.into_iter().collect();
-        if entry.0.len() + ops_vec.len() > self.config.max_ops_per_tx {
+        if entry.0.len() + ops_vec.len() > max_ops {
             return Err(ContextraError::Transaction(format!(
                 "Transaction {} exceeded max staging capacity ({} ops)",
-                tx, self.config.max_ops_per_tx
+                tx, max_ops
             )));
         }
 
         entry.0.extend(ops_vec);
+        shard
+            .staged_bytes
+            .entry(tx)
+            .and_modify(|b| *b += total_op_bytes);
+        self.global_staged_bytes
+            .fetch_add(total_op_bytes, Ordering::Relaxed);
         Ok(())
     }
 
@@ -366,11 +505,16 @@ impl<T: Clone> TxBuffer<T> {
     /// Drains and returns all buffered operations for a transaction.
     ///
     /// Returns an empty vector if the transaction does not exist or has no operations.
-    /// This operation is atomic per shard and cleans up any tracked [`ReadSet`].
+    /// This operation is atomic per shard and cleans up tracked [`ReadSet`] and byte budgets.
     pub fn drain(&self, tx: TxId) -> Vec<IndexOp<T>> {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard.read_sets.remove(&tx);
+        let tx_bytes = shard.staged_bytes.remove(&tx).unwrap_or(0);
+        if tx_bytes > 0 {
+            self.global_staged_bytes
+                .fetch_sub(tx_bytes, Ordering::Relaxed);
+        }
         shard
             .ops
             .remove(&tx)
@@ -383,6 +527,11 @@ impl<T: Clone> TxBuffer<T> {
         let shard_idx = self.shard_idx(tx);
         let mut shard = self.shards[shard_idx].write();
         shard.read_sets.remove(&tx);
+        let tx_bytes = shard.staged_bytes.remove(&tx).unwrap_or(0);
+        if tx_bytes > 0 {
+            self.global_staged_bytes
+                .fetch_sub(tx_bytes, Ordering::Relaxed);
+        }
         shard.ops.remove(&tx);
     }
 
@@ -448,6 +597,11 @@ impl<T: Clone> TxBuffer<T> {
                 });
                 for tx in &shard_expired {
                     shard.read_sets.remove(tx);
+                    let tx_bytes = shard.staged_bytes.remove(tx).unwrap_or(0);
+                    if tx_bytes > 0 {
+                        self.global_staged_bytes
+                            .fetch_sub(tx_bytes, Ordering::Relaxed);
+                    }
                 }
                 expired.extend(shard_expired);
             }

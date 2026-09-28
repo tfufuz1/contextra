@@ -52,6 +52,7 @@ async fn test_flush_creates_sstable() {
             .expect("put");
     }
     storage.commit(tx).await.expect("commit");
+    storage.force_flush().await.expect("force flush");
 
     for i in 0..10u8 {
         let key = format!("key-{:03}", i);

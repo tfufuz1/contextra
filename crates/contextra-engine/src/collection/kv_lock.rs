@@ -1,4 +1,4 @@
-use std::sync::{RwLock, RwLockWriteGuard};
+use tokio::sync::{Mutex, MutexGuard};
 
 const KV_LOCK_SHARDS: usize = 16;
 
@@ -8,13 +8,13 @@ const SEED_B: u64 = 0xBF58_476D_1CE4_E5B9;
 const SEED_C: u64 = 0x94D0_49BB_1331_11EB;
 const SEED_D: u64 = 0x2545_F491_4F6C_DD1D;
 
-/// RAII guard holding a write lock for a key shard.
+/// RAII guard holding a lock for a key shard.
 pub(crate) struct KeyGuard<'a> {
-    _guard: RwLockWriteGuard<'a, ()>,
+    _guard: MutexGuard<'a, ()>,
 }
 
 pub(crate) struct KvKeyLocks {
-    shards: [RwLock<()>; KV_LOCK_SHARDS],
+    shards: [Mutex<()>; KV_LOCK_SHARDS],
     hasher: ahash::RandomState,
 }
 
@@ -32,51 +32,31 @@ impl KvKeyLocks {
         (self.hasher.hash_one(key) as usize) % KV_LOCK_SHARDS
     }
 
-    pub fn lock_shard<'a>(&'a self, idx: usize) -> KeyGuard<'a> {
-        let guard = match self.shards[idx].write() {
-            Ok(g) => g,
-            Err(poisoned) => {
-                tracing::error!(
-                    shard_idx = idx,
-                    "KvKeyLocks shard RwLock was poisoned due to a thread panic; recovering write lock via into_inner()"
-                );
-                poisoned.into_inner()
-            }
-        };
+    pub async fn lock_shard<'a>(&'a self, idx: usize) -> KeyGuard<'a> {
+        let guard = self.shards[idx].lock().await;
         KeyGuard { _guard: guard }
     }
 
     pub async fn lock_for<'a>(&'a self, key: &str) -> KeyGuard<'a> {
         let idx = self.shard_idx(key);
-        self.lock_shard(idx)
+        self.lock_shard(idx).await
     }
 
-    #[allow(dead_code)]
-    pub fn try_lock_shard<'a>(&'a self, idx: usize) -> Option<KeyGuard<'a>> {
-        match self.shards[idx].try_write() {
-            Ok(g) => Some(KeyGuard { _guard: g }),
-            Err(std::sync::TryLockError::Poisoned(poisoned)) => {
-                tracing::error!(
-                    shard_idx = idx,
-                    "KvKeyLocks shard RwLock was poisoned due to a thread panic; recovering write lock via into_inner()"
-                );
-                Some(KeyGuard {
-                    _guard: poisoned.into_inner(),
-                })
-            }
-            Err(std::sync::TryLockError::WouldBlock) => None,
+    /// Locks multiple shards in ascending shard index order to prevent deadlocks across operations.
+    /// Deduplicates by lock shard index to prevent self-deadlock when multiple keys map to the same shard.
+    pub async fn lock_many_sorted<'a>(
+        &'a self,
+        keys: impl IntoIterator<Item = &'a str>,
+    ) -> Vec<KeyGuard<'a>> {
+        let mut shard_indices: Vec<usize> = keys.into_iter().map(|k| self.shard_idx(k)).collect();
+        shard_indices.sort_unstable();
+        shard_indices.dedup();
+
+        let mut guards = Vec::with_capacity(shard_indices.len());
+        for idx in shard_indices {
+            guards.push(self.lock_shard(idx).await);
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn try_lock_for<'a>(&'a self, key: &str) -> Option<KeyGuard<'a>> {
-        let idx = self.shard_idx(key);
-        self.try_lock_shard(idx)
-    }
-
-    #[allow(dead_code)]
-    pub fn is_shard_poisoned(&self, idx: usize) -> bool {
-        self.shards[idx].is_poisoned()
+        guards
     }
 }
 

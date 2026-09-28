@@ -6,11 +6,11 @@
 
 use contextra_db::Collection;
 use contextra_graph::csr::CsrGraph;
-use contextra_vector::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use contextra_ports::VectorIndex;
 use contextra_store::LsmStorage;
 use contextra_text::Language;
 use contextra_types::{DistanceMetric, DocId};
+use contextra_vector::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 

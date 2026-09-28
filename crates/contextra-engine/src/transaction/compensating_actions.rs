@@ -9,7 +9,7 @@ pub trait CompensatingAction: Send + Sync {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>>;
 }
 
-/// A ledger of compensating actions collected during 2PC, executed in reverse order on failure.
+/// A ledger of compensating actions collected during 2PC, executed in reverse order (LIFO) on failure.
 #[derive(Default)]
 pub struct CommitLedger {
     actions: Vec<Box<dyn CompensatingAction>>,
@@ -44,8 +44,7 @@ pub struct CompensateLsmAction<S: StorageEngine, V: VectorIndex> {
 }
 
 impl<S: StorageEngine, V: VectorIndex> CompensateLsmAction<S, V> {
-    #[allow(dead_code)]
-    pub(super) fn new(
+    pub fn new(
         collection: Collection<S, V>,
         intent_key: Vec<u8>,
         doc_ids: Arc<Vec<DocId>>,
@@ -183,8 +182,7 @@ pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {
 }
 
 impl<S: StorageEngine, V: VectorIndex> CompensateHnswAction<S, V> {
-    #[allow(dead_code)]
-    pub(super) fn new(
+    pub fn new(
         collection: Collection<S, V>,
         tenant_id: TenantId,
         doc_ids: Arc<Vec<DocId>>,
@@ -233,8 +231,7 @@ pub struct CompensateTextAction<S: StorageEngine, V: VectorIndex> {
 }
 
 impl<S: StorageEngine, V: VectorIndex> CompensateTextAction<S, V> {
-    #[allow(dead_code)]
-    pub(super) fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
+    pub fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
         Self {
             collection,
             doc_ids,
@@ -279,8 +276,7 @@ pub struct RollbackStagedAction<S: StorageEngine, V: VectorIndex> {
 }
 
 impl<S: StorageEngine, V: VectorIndex> RollbackStagedAction<S, V> {
-    #[allow(dead_code)]
-    pub(super) fn new(collection: Collection<S, V>, tx_id: TxId) -> Self {
+    pub fn new(collection: Collection<S, V>, tx_id: TxId) -> Self {
         Self { collection, tx_id }
     }
 }

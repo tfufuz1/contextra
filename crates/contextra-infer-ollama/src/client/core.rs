@@ -854,8 +854,8 @@ impl OllamaClient {
 }
 
 /// Parsed RAG prompt template components.
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 pub(crate) struct ParsedPrompt {
     pub system: String,
     pub instructions: String,
@@ -866,7 +866,7 @@ pub(crate) struct ParsedPrompt {
 /// Parses an XML RAG prompt template into system, instructions, context, and user_query parts.
 ///
 /// Returns `Err(ContextraError::Internal(...))` if XML structure is invalid or malformed.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn parse_prompt_template(
     prompt: &str,
 ) -> std::result::Result<ParsedPrompt, ContextraError> {

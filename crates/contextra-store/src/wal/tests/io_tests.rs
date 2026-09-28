@@ -451,8 +451,6 @@ async fn test_disk_full_mid_append_batch_rollback() -> Result<()> {
         "append_batch must return Err when fault injection triggers WAL append failure"
     );
 
-    wal.restore_last_hmac(prev_hmac_snapshot).await?;
-
     drop(wal);
     let wal_reopened = Wal::open(&wal_path).await?;
     let entries = wal_reopened.replay().await?;

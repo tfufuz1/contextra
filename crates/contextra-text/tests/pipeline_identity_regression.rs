@@ -246,13 +246,17 @@ async fn test_snapshot_isolation_same_doc_id_update() -> Result<()> {
 
     // Step 1: Insert Doc A at tx1
     let tx1 = TxId::new(1);
-    index.insert(tx1, doc_id, "Softwarearchitektur Alphatest").await?;
+    index
+        .insert(tx1, doc_id, "Softwarearchitektur Alphatest")
+        .await?;
     index.commit(tx1).await?;
     let seq_a = storage.last_seq_no().await?;
 
     // Step 2: Update same doc_id to Doc A' at tx2
     let tx2 = TxId::new(2);
-    index.insert(tx2, doc_id, "Datenbankverbindung Betatest").await?;
+    index
+        .insert(tx2, doc_id, "Datenbankverbindung Betatest")
+        .await?;
     index.commit(tx2).await?;
     let seq_a_prime = storage.last_seq_no().await?;
 
@@ -263,10 +267,15 @@ async fn test_snapshot_isolation_same_doc_id_update() -> Result<()> {
 
     // Query at historical seq_a for "Datenbankverbindung" MUST NOT find doc_id
     let res_beta_at_seq_a = index.search_at("Datenbankverbindung", 10, seq_a).await?;
-    assert!(res_beta_at_seq_a.is_empty(), "Datenbankverbindung was inserted after seq_a");
+    assert!(
+        res_beta_at_seq_a.is_empty(),
+        "Datenbankverbindung was inserted after seq_a"
+    );
 
     // Query at latest seq_a_prime for "Softwarearchitektur" should be masked/updated by tombstone if replaced, or found if term preserved
-    let res_beta_at_latest = index.search_at("Datenbankverbindung", 10, seq_a_prime).await?;
+    let res_beta_at_latest = index
+        .search_at("Datenbankverbindung", 10, seq_a_prime)
+        .await?;
     assert_eq!(res_beta_at_latest.len(), 1);
     assert_eq!(res_beta_at_latest[0].doc_id, doc_id);
 
@@ -284,14 +293,19 @@ async fn test_transaction_rollback_cleans_entry() -> Result<()> {
     let doc_id = DocId::new(999);
     let tx = TxId::new(55);
 
-    index.insert(tx, doc_id, "Sicherheitskonzept und Datenschutz").await?;
+    index
+        .insert(tx, doc_id, "Sicherheitskonzept und Datenschutz")
+        .await?;
 
     // Perform rollback
     index.rollback(tx).await?;
 
     // Search should return nothing
     let results = index.search("Sicherheitskonzept", 10).await?;
-    assert!(results.is_empty(), "Rollback must remove staged text index entries");
+    assert!(
+        results.is_empty(),
+        "Rollback must remove staged text index entries"
+    );
 
     Ok(())
 }

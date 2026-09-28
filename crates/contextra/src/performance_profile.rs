@@ -2,15 +2,9 @@
 // ZWECK: PerformanceProfile Presets for Contextra (Spec B.1.6, AP-P0-05)
 // INVARIANTEN: INV-PERF-PROFILE-1, INV-PERF-PROFILE-2
 
+pub use contextra_ports::license::VectorDeleteMode;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_store::lsm::config::{DurabilityConfigError, DurabilityMode};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum VectorDeleteMode {
-    SynchronousRepair,
-    BackgroundRepair,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]

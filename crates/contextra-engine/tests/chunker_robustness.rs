@@ -1,4 +1,6 @@
-use contextra_engine::chunker::{chunk_text, chunk_text_with_overlap, ChunkerConfig, MarkdownChunker};
+use contextra_engine::chunker::{
+    chunk_text, chunk_text_with_overlap, ChunkerConfig, MarkdownChunker,
+};
 use contextra_types::DocId;
 
 #[test]
@@ -26,10 +28,7 @@ fn test_chunker_markdown_utf8_and_boundary_safety() {
     );
 
     for chunk in &chunks {
-        assert!(
-            !chunk.content.is_empty(),
-            "Chunk content must not be empty"
-        );
+        assert!(!chunk.content.is_empty(), "Chunk content must not be empty");
         // Verify valid UTF-8 string integrity
         assert!(
             std::str::from_utf8(chunk.content.as_bytes()).is_ok(),

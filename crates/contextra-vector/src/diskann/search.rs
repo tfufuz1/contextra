@@ -380,7 +380,7 @@ impl DiskAnnIndex {
                 break;
             }
             let node = self.load_node(c.index)?;
-            if tombstones.contains(node.doc_id.inner() as u64) {
+            if tombstones.contains(node.doc_id.inner()) {
                 continue;
             }
             let score = match metric {

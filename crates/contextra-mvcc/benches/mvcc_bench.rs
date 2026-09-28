@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use contextra_mvcc::{SeqLogEntry, SnapshotRegistry};
 use contextra_types::DocId;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};

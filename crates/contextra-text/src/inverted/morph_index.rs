@@ -17,7 +17,11 @@ impl<S: StorageEngine> BM25MorphIndex<S> {
         tokenizer: Arc<dyn MorphologicalTokenizer>,
     ) -> Self {
         Self {
-            inner: InvertedIndex::new_with_language(storage, namespace, super::types::Language::German),
+            inner: InvertedIndex::new_with_language(
+                storage,
+                namespace,
+                super::types::Language::German,
+            ),
             tokenizer,
         }
     }

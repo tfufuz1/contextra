@@ -40,11 +40,7 @@ async fn test_crud_error_path_robustness_returns_typed_errors() -> contextra_typ
     }
 
     // 2. Vector dimension mismatch on search
-    let search_mismatch_res = col
-        .query()
-        .embedding(&[1.0, 2.0])
-        .execute()
-        .await;
+    let search_mismatch_res = col.query().embedding(&[1.0, 2.0]).execute().await;
 
     match search_mismatch_res {
         Err(ContextraError::EmbeddingDimensionMismatch { expected, got }) => {
@@ -78,11 +74,7 @@ async fn test_crud_error_path_robustness_returns_typed_errors() -> contextra_typ
     }
 
     let invalid_id_insert = col
-        .insert(
-            "doc\0invalid_null_byte",
-            &[0.1, 0.2, 0.3, 0.4],
-            None,
-        )
+        .insert("doc\0invalid_null_byte", &[0.1, 0.2, 0.3, 0.4], None)
         .await;
 
     match invalid_id_insert {

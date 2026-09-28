@@ -1,12 +1,11 @@
-use contextra_engine::{
-    Contextra, ContextraConfig, ExportDocumentV1, SCHEMA_VERSION_V1,
-};
+use contextra_engine::{Contextra, ContextraConfig, ExportDocumentV1, SCHEMA_VERSION_V1};
 use contextra_types::ContextraError;
 use serde_json::json;
 use tempfile::TempDir;
 
 #[tokio::test]
-async fn test_export_import_collection_roundtrip_and_schema_validation() -> contextra_types::Result<()> {
+async fn test_export_import_collection_roundtrip_and_schema_validation(
+) -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create temporary directory");
     let config = ContextraConfig {
         dimension: 4,

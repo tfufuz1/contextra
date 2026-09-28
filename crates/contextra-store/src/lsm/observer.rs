@@ -9,20 +9,10 @@ pub const DEFAULT_MAX_OBSERVER_LATENCY: Duration = Duration::from_millis(1);
 
 /// Origin tag indicating where a committed batch originated from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum WriteOrigin {
     /// Regular user/application write transaction.
     UserWrite,
-    /// Background consolidation from the cognition pipeline.
-    CognitionConsolidation,
-    /// Compaction rewrite operation.
-    ///
-    /// # Architectural Reservation Note (Audit §4.2)
-    /// RESERVED: Currently not constructed in production LSM compaction paths.
-    /// Compaction operates on previously committed SSTable data. Emitting CDC events during
-    /// compaction without dedicated deduplication logic would generate redundant or misleading
-    /// change stream notifications for entries already delivered as `UserWrite`. This variant
-    /// remains reserved for future physical lifecycle observer capabilities.
-    CompactionRewrite,
 }
 
 /// Lightweight view reference into a `WalEntry`.
@@ -63,6 +53,14 @@ impl<'a> WalEntryRef<'a> {
     }
 }
 
+/// Context describing a committed transaction passed to observers.
+#[derive(Debug, Clone, Copy)]
+pub struct CommitContext {
+    pub tx_id: TxId,
+    pub origin: WriteOrigin,
+    pub durable: bool,
+}
+
 /// Batch of committed WAL entries passed to observers.
 pub struct CommittedBatch<'a> {
     pub entries: Vec<WalEntryRef<'a>>,
@@ -71,23 +69,18 @@ pub struct CommittedBatch<'a> {
 
 /// Synchronous, deterministic observer interface for committed WAL batches.
 pub trait WalObserver: Send + Sync {
+    /// Indicates whether this observer requires durable WAL commits.
+    ///
+    /// Returns `false` by default. Observers setting this to `false` will also receive notifications
+    /// for `DurabilityMode::MemoryOnly` commits.
+    fn requires_durability(&self) -> bool {
+        false
+    }
+
     /// Notification callback executed synchronously upon batch commit.
     ///
-    /// # Contractual Requirement on Implementations (§3.2)
-    /// Implementations MUST NOT block longer than `max_observer_latency` (default 1ms).
-    ///
-    /// # System Runtime Behavior & Timeouts (§3.2)
-    /// Invoking `on_commit()` is strictly synchronous. The LSM runtime CANNOT preemptively
-    /// interrupt or forcibly cancel an observer call that is actively blocking (e.g. in a
-    /// deadlock, infinite loop, or blocking syscall). As a result, a blocking observer WILL
-    /// delay the commit thread until `on_commit()` returns.
-    ///
-    /// Execution latency is measured (`start`/`end` via the injected `Clock` port) strictly AFTER
-    /// `on_commit()` returns. If the measured elapsed duration exceeds `max_observer_latency`
-    /// (or if the callback panics), the observer is automatically deregistered from `ObserverRegistry`.
-    ///
-    /// Third-party `WalObserver` implementers MUST NOT rely on an enforced preemptive timeout
-    /// guarantee, and must ensure callbacks complete execution without blocking.
+    /// Invoked synchronously on the commit path. The storage engine enforces no internal timeout;
+    /// implementations must complete execution rapidly without blocking or waiting on I/O.
     fn on_commit(&self, batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId);
 }
 
@@ -113,21 +106,62 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_write_origin_compaction_rewrite_reservation() {
-        let origin = WriteOrigin::CompactionRewrite;
-
-        // Exhaustive match test ensures all variants are accounted for
+    fn test_write_origin_user_write() {
+        let origin = WriteOrigin::UserWrite;
         match origin {
-            WriteOrigin::UserWrite => panic!("Expected CompactionRewrite"),
-            WriteOrigin::CognitionConsolidation => panic!("Expected CompactionRewrite"),
-            WriteOrigin::CompactionRewrite => {
-                // Verified reserved variant presence per Audit §4.2
-            }
+            WriteOrigin::UserWrite => {}
+            _ => panic!("Expected UserWrite"),
         }
     }
 }
 
+/// Non-blocking, bounded async adapter wrapper for `WalObserver` implementations.
+pub struct AsyncObserverAdapter {
+    inner: Arc<dyn WalObserver>,
+    sender: tokio::sync::mpsc::Sender<(u64, TxId, WriteOrigin)>,
+}
+
+impl AsyncObserverAdapter {
+    pub fn new(inner: Arc<dyn WalObserver>, capacity: usize) -> (Self, tokio::task::JoinHandle<()>) {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<(u64, TxId, WriteOrigin)>(capacity);
+        let obs_clone = Arc::clone(&inner);
+
+        let handle = tokio::spawn(async move {
+            while let Some((seq_no, tx_id, origin)) = rx.recv().await {
+                let empty_batch = CommittedBatch {
+                    entries: Vec::new(),
+                    origin,
+                };
+                obs_clone.on_commit(&empty_batch, seq_no, tx_id);
+            }
+        });
+
+        (
+            Self {
+                inner,
+                sender: tx,
+            },
+            handle,
+        )
+    }
+}
+
+impl WalObserver for AsyncObserverAdapter {
+    fn requires_durability(&self) -> bool {
+        self.inner.requires_durability()
+    }
+
+    fn on_commit(&self, _batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId) {
+        let _ = self.sender.try_send((seq_no, tx_id, WriteOrigin::UserWrite));
+    }
+}
+
 impl ObserverRegistry {
+    /// Returns true if no observers are registered.
+    pub fn is_empty(&self) -> bool {
+        self.observers.read().is_empty()
+    }
+
     /// Creates a new, empty `ObserverRegistry`.
     pub fn new() -> Self {
         Self::default()
@@ -160,11 +194,8 @@ impl ObserverRegistry {
         *self.clock.write() = clock;
     }
 
-    /// Synchronously notifies all registered observers of a committed batch.
-    ///
-    /// Evaluates execution time per observer against `max_observer_latency` using the injected
-    /// `Clock` port (`monotonic_nanos()`). Timed out or panicking observers are evicted without failing the commit.
-    pub fn notify(&self, entries: &[WalEntry], seq_no: u64, tx_id: TxId, origin: WriteOrigin) {
+    /// Synchronously notifies all registered observers of a committed batch with explicit CommitContext.
+    pub fn notify_with_context(&self, entries: &[WalEntry], seq_no: u64, ctx: CommitContext) {
         let observers_snapshot = {
             let guard = self.observers.read();
             if guard.is_empty() {
@@ -176,7 +207,7 @@ impl ObserverRegistry {
         let wal_refs: Vec<WalEntryRef<'_>> = entries.iter().map(WalEntryRef::new).collect();
         let batch = CommittedBatch {
             entries: wal_refs,
-            origin,
+            origin: ctx.origin,
         };
 
         let clock = self.clock.read().clone();
@@ -184,28 +215,30 @@ impl ObserverRegistry {
         let mut timed_out: Vec<Arc<dyn WalObserver>> = Vec::new();
 
         for obs in &observers_snapshot {
-            let start = clock.monotonic_nanos();
-            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                obs.on_commit(&batch, seq_no, tx_id);
-            }));
-            let end = clock.monotonic_nanos();
+            if ctx.durable || !obs.requires_durability() {
+                let start = clock.monotonic_nanos();
+                let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    obs.on_commit(&batch, seq_no, ctx.tx_id);
+                }));
+                let end = clock.monotonic_nanos();
 
-            if res.is_err() {
-                tracing::error!(
-                    tx_id = tx_id.inner(),
-                    "WalObserver panicked during on_commit execution; deregistering observer"
-                );
-                timed_out.push(Arc::clone(obs));
-            } else {
-                let elapsed_nanos = end.saturating_sub(start);
-                if elapsed_nanos > max_latency_nanos {
-                    tracing::warn!(
-                        elapsed_us = elapsed_nanos / 1_000,
-                        max_allowed_us = max_latency_nanos / 1_000,
-                        tx_id = tx_id.inner(),
-                        "WalObserver exceeded max_observer_latency; deregistering observer"
+                if res.is_err() {
+                    tracing::error!(
+                        tx_id = ctx.tx_id.inner(),
+                        "WalObserver panicked during on_commit execution; deregistering observer"
                     );
                     timed_out.push(Arc::clone(obs));
+                } else {
+                    let elapsed_nanos = end.saturating_sub(start);
+                    if elapsed_nanos > max_latency_nanos {
+                        tracing::warn!(
+                            elapsed_us = elapsed_nanos / 1_000,
+                            max_allowed_us = max_latency_nanos / 1_000,
+                            tx_id = ctx.tx_id.inner(),
+                            "WalObserver exceeded max_observer_latency; deregistering observer"
+                        );
+                        timed_out.push(Arc::clone(obs));
+                    }
                 }
             }
         }
@@ -214,5 +247,18 @@ impl ObserverRegistry {
             let mut guard = self.observers.write();
             guard.retain(|obs| !timed_out.iter().any(|to| Arc::ptr_eq(obs, to)));
         }
+    }
+
+    /// Synchronously notifies all registered observers of a committed batch.
+    pub fn notify(&self, entries: &[WalEntry], seq_no: u64, tx_id: TxId, origin: WriteOrigin) {
+        self.notify_with_context(
+            entries,
+            seq_no,
+            CommitContext {
+                tx_id,
+                origin,
+                durable: true,
+            },
+        );
     }
 }

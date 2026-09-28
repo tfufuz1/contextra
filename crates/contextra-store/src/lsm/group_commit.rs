@@ -16,13 +16,9 @@ pub(super) async fn execute_group_commit_append(
                 .await
         }
         DurabilityMode::WalNoHmac => {
-            let res = wal
-                .append_batch_locked(all_wal_entries, truncate_guard)
-                .await;
-            if res.is_ok() {
-                let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
-            }
-            res
+            let _ = prev_hmac_snapshot;
+            wal.append_batch_locked(all_wal_entries, truncate_guard)
+                .await
         }
         DurabilityMode::MemoryOnly => Ok(()),
     }

@@ -1,5 +1,5 @@
 //! Subcommand to verify that all xtask subcommands referenced in GitHub workflow files
-//! actually exist as match arms in `xtask/src/main.rs`.
+//! actually exist as match arms in `xtask/src/main.rs` or as harness modules in `xtask/src/harness/*.rs`.
 
 use regex::Regex;
 use std::collections::HashSet;
@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
-/// Extracts all valid xtask subcommand names defined in `xtask/src/main.rs`.
+/// Extracts all valid xtask subcommand names defined in `xtask/src/main.rs` and `xtask/src/harness/*.rs`.
 pub fn extract_valid_subcommands(main_rs_content: &str) -> HashSet<String> {
     let mut valid_commands = HashSet::new();
     let str_regex = Regex::new(r#""([a-z0-9_-]+)""#).expect("Valid regex");
@@ -23,6 +23,30 @@ pub fn extract_valid_subcommands(main_rs_content: &str) -> HashSet<String> {
     }
 
     valid_commands
+}
+
+/// Extracts harness subcommands from `xtask/src/harness/*.rs` plus builtins.
+pub fn extract_harness_subcommands(harness_dir: &Path) -> HashSet<String> {
+    let mut harness_cmds = HashSet::new();
+    harness_cmds.insert("harness-list".to_string());
+    harness_cmds.insert("harness-help".to_string());
+
+    if harness_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(harness_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().map_or(false, |e| e == "rs") {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        if stem != "mod" {
+                            harness_cmds.insert(stem.replace('_', "-"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    harness_cmds
 }
 
 /// Structure representing a subcommand invocation found in a workflow file.
@@ -71,7 +95,10 @@ pub fn run_check_workflow_commands(root: &Path) -> bool {
         }
     };
 
-    let valid_subcommands = extract_valid_subcommands(&main_rs_content);
+    let mut valid_subcommands = extract_valid_subcommands(&main_rs_content);
+    let harness_subcommands = extract_harness_subcommands(&root.join("xtask/src/harness"));
+    valid_subcommands.extend(harness_subcommands);
+
     if valid_subcommands.is_empty() {
         eprintln!(
             "❌ No valid xtask subcommands extracted from {}",
@@ -81,7 +108,7 @@ pub fn run_check_workflow_commands(root: &Path) -> bool {
     }
 
     println!(
-        "Found {} valid xtask subcommands in main.rs",
+        "Found {} valid xtask subcommands (main.rs + harness)",
         valid_subcommands.len()
     );
 
@@ -186,6 +213,46 @@ jobs:
         run: cargo run -p xtask -- check-compile
       - name: Step 2
         run: cargo xtask check-dag
+"#;
+        fs::write(workflows_dir.join("test.yml"), workflow_content).expect("write workflow.yml");
+
+        assert!(run_check_workflow_commands(root));
+    }
+
+    #[test]
+    fn test_valid_harness_workflow() {
+        let dir = tempdir().expect("tempdir creation");
+        let root = dir.path();
+
+        let xtask_src = root.join("xtask/src");
+        let harness_dir = xtask_src.join("harness");
+        fs::create_dir_all(&harness_dir).expect("create_dir_all");
+        let main_rs_content = r#"
+fn main() {
+    match subcommand {
+        "sync-docs" => {}
+        _ => {}
+    }
+}
+"#;
+        fs::write(xtask_src.join("main.rs"), main_rs_content).expect("write main.rs");
+        fs::write(
+            harness_dir.join("dummy_check.rs"),
+            "//! Dummy summary\npub fn run_dummy_check(_args: &[String]) -> i32 { 0 }",
+        )
+        .expect("write dummy harness");
+
+        let workflows_dir = root.join(".github/workflows");
+        fs::create_dir_all(&workflows_dir).expect("create workflows dir");
+        let workflow_content = r#"
+name: Test Workflow
+jobs:
+  test:
+    steps:
+      - name: Step 1
+        run: cargo xtask dummy-check
+      - name: Step 2
+        run: cargo xtask harness-list
 "#;
         fs::write(workflows_dir.join("test.yml"), workflow_content).expect("write workflow.yml");
 

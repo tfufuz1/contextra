@@ -1,8 +1,8 @@
 use contextra_db::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;
-use contextra_vector::{HnswConfig, HnswIndex};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::TxId;
+use contextra_vector::{HnswConfig, HnswIndex};
 use serde_json::json;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;

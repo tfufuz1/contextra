@@ -10,9 +10,9 @@ use std::sync::atomic::Ordering;
 
 use contextra_core::DocId;
 
-use crate::acorn::{AcornError, FilteredIndex};
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};
+use crate::acorn::{AcornError, FilteredIndex};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct CandidateWithDoc {
@@ -145,7 +145,9 @@ impl FilteredIndex for HnswIndex {
 
         // Augmented search beam size ef_acorn
         let base_ef = self.inner.cold.config.ef_search.max(k);
-        let ef_acorn = base_ef.saturating_mul(gamma as usize).min(total_nodes.max(1));
+        let ef_acorn = base_ef
+            .saturating_mul(gamma as usize)
+            .min(total_nodes.max(1));
 
         // Hot path: Visited tracking uses Vec<bool> (zero hash table allocator latency)
         let mut visited = vec![false; total_nodes];
@@ -186,7 +188,10 @@ impl FilteredIndex for HnswIndex {
 
                         // Zero-Cross-Contamination: test predicate before considering match
                         if predicate(doc_id) {
-                            valid_matches.push(CandidateWithDoc { doc_id, distance: dist });
+                            valid_matches.push(CandidateWithDoc {
+                                doc_id,
+                                distance: dist,
+                            });
                             if valid_matches.len() > max_valid_capacity {
                                 valid_matches.pop();
                             }
@@ -253,7 +258,10 @@ impl FilteredIndex for HnswIndex {
 
                         // Zero-Cross-Contamination: strictly filter by predicate
                         if predicate(doc_id) {
-                            valid_matches.push(CandidateWithDoc { doc_id, distance: dist });
+                            valid_matches.push(CandidateWithDoc {
+                                doc_id,
+                                distance: dist,
+                            });
                             if valid_matches.len() > max_valid_capacity {
                                 valid_matches.pop();
                             }
@@ -273,7 +281,10 @@ impl FilteredIndex for HnswIndex {
         // Deduplicate doc_ids if any duplicate node entries exist
         let mut results = Vec::with_capacity(k);
         for item in sorted_valid {
-            if !results.iter().any(|(id, _): &(DocId, f32)| *id == item.doc_id) {
+            if !results
+                .iter()
+                .any(|(id, _): &(DocId, f32)| *id == item.doc_id)
+            {
                 results.push((item.doc_id, item.distance));
                 if results.len() >= k {
                     break;

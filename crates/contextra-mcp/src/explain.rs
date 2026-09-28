@@ -146,7 +146,8 @@ mod tests {
         fn embed_batch<'a>(
             &'a self,
             texts: &'a [&'a str],
-        ) -> BoxFuture<'a, std::result::Result<Vec<Vec<f32>>, contextra_ports::EmbeddingError>> {
+        ) -> BoxFuture<'a, std::result::Result<Vec<Vec<f32>>, contextra_ports::EmbeddingError>>
+        {
             Box::pin(async move { Ok(vec![vec![0.1f32; self.dimension]; texts.len()]) })
         }
     }
@@ -216,7 +217,9 @@ mod tests {
         let resp = server.handle(req).await;
         let res_val = serde_json::to_value(&resp).expect("value");
         assert_eq!(res_val["result"]["isError"], true);
-        let text = res_val["result"]["content"][0]["text"].as_str().expect("str");
+        let text = res_val["result"]["content"][0]["text"]
+            .as_str()
+            .expect("str");
         assert!(text.contains("id"));
 
         let direct_req = make_request("contextra_explain", json!({ "collection": "default" }));

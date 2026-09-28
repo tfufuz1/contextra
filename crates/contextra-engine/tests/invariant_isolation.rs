@@ -1,8 +1,8 @@
 use contextra_engine::{Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;
-use tokio::sync::Barrier;
 use tempfile::TempDir;
+use tokio::sync::Barrier;
 
 #[tokio::test]
 async fn test_mvcc_isolation_uncommitted_writes_invisible() -> contextra_types::Result<()> {
@@ -34,7 +34,9 @@ async fn test_mvcc_isolation_uncommitted_writes_invisible() -> contextra_types::
 
     // Task A: Performs an uncommitted insert_op inside a transaction
     let task_a = tokio::spawn(async move {
-        let tx_a = db_col.begin_transaction().expect("begin_transaction failed");
+        let tx_a = db_col
+            .begin_transaction()
+            .expect("begin_transaction failed");
         db_col
             .insert_op(
                 &tx_a,
@@ -135,7 +137,8 @@ async fn test_mvcc_isolation_uncommitted_writes_invisible() -> contextra_types::
     );
 
     // Clean close
-    let db_owned = Arc::try_unwrap(db).map_err(|_| contextra_types::ContextraError::Internal("Arc unwrap failed".into()))?;
+    let db_owned = Arc::try_unwrap(db)
+        .map_err(|_| contextra_types::ContextraError::Internal("Arc unwrap failed".into()))?;
     db_owned.close().await?;
     Ok(())
 }

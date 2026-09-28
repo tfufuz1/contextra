@@ -258,7 +258,8 @@ impl PluginRegistry {
                 let declared_conflicts: Vec<String> =
                     plugin.conflicts().iter().map(|s| s.to_string()).collect();
                 self.active.insert(p_name.clone(), cap);
-                self.active_conflicts.insert(p_name.clone(), declared_conflicts);
+                self.active_conflicts
+                    .insert(p_name.clone(), declared_conflicts);
             }
         }
 

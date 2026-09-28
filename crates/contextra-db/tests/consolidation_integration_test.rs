@@ -178,11 +178,7 @@ async fn test_execute_background_consolidation_with_synthesis_pass() {
     for i in 1..=5 {
         for j in (i + 1)..=5 {
             collection
-                .relate(
-                    &format!("turn_{}", i),
-                    &format!("turn_{}", j),
-                    "connected",
-                )
+                .relate(&format!("turn_{}", i), &format!("turn_{}", j), "connected")
                 .await
                 .unwrap();
         }
