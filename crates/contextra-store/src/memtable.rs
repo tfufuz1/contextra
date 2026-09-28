@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-08-30T15:00:19Z (SESSION: 283abf0f)
 // ZWECK: In-Memory BTreeMap MemTable-Sharding mit MVCC Snapshot-Isolation.
-// INVARIANTEN: Sharding per 64-Bit-Avalanche-Hash-Mixer modulo SHARD_COUNT; tombstone via TOMBSTONE_BIT in seq_no.
+// INVARIANTEN: Sharding per Range-Sharding über 2-Byte-Key-Präfixe; tombstone via TOMBSTONE_BIT in seq_no.
 // NICHT-OFFENSICHTLICH: Rollback(tx_id) entfernt alle Einträge der Transaktion atomar aus allen Shards.
 //   iter() nutzt size()-basierte Kapazitätsschätzung (AVG_ENTRY_BYTES=64) um Reallokationen
 //   beim Flush zu minimieren. put() pre-allokiert Vec<MemTableEntry> mit capacity=2 für den
@@ -16,10 +16,9 @@
 //! contention when multiple coroutines insert concurrently (e.g. the 8-way
 //! `buffer_unordered` ingestion pipeline).
 //!
-//! The shard for a given key is selected deterministically via a fast
-//! (<5ns) 64-bit avalanche hash mixer over the full key, taken modulo
-//! `SHARD_COUNT` to prevent lock contention on shared key
-//! prefixes (e.g. `__col:`, `__docid:`).
+//! Range-sharding maps keys deterministically to lexicographical range shards via
+//! a fast 2-byte prefix calculation (`(b0 << 8) | b1`), preserving key monotonicity
+//! across shards.
 //!
 //! Within each shard, each key maps to a versioned list of values, enabling
 //! Snapshot Isolation through point-in-time reads.
@@ -29,10 +28,6 @@
 //! - **INVARIANT 2**: Tombstone entries have TOMBSTONE_BIT set in seq_no.
 //! - **INVARIANT 3**: flush() serializes entries in ascending key order (required by SSTable format).
 //! - **INVARIANT 4**: rollback(tx_id) removes ALL entries from that transaction atomically.
-
-// INVARIANT: In-Memory Sortierter Puffer (hot writes), sharded for concurrency.
-// AI-NOTE: Sharding pattern mirrors contextra-core::TxBuffer<T> (ADR-implicit).
-//          Key difference: TxBuffer shards by TxId, MemTable shards by key bytes.
 
 use bytes::Bytes;
 use contextra_core::{TxId, TOMBSTONE_BIT};
@@ -140,6 +135,15 @@ impl MemTable {
         let mut entries = self.shards[shard_idx].entries.write();
 
         let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
+        #[cfg(debug_assertions)]
+        if let Some((last_seq, _, _)) = versions.last() {
+            let raw_seq = seq_no & !TOMBSTONE_BIT;
+            let last_raw_seq = last_seq & !TOMBSTONE_BIT;
+            debug_assert!(
+                raw_seq >= last_raw_seq,
+                "Sequence numbers for a key in memtable must be monotonically non-decreasing: raw_seq {raw_seq} < last_raw_seq {last_raw_seq}"
+            );
+        }
         versions.push((seq_no, value, tx_id));
 
         // Note: Simple size tracking (sums all versions)

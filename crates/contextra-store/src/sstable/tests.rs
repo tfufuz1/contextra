@@ -84,7 +84,6 @@ async fn test_block_bloom_filter() {
 
     assert!(check_bloom(b"apple", bloom));
     assert!(check_bloom(b"banana", bloom));
-    // Might have false positive, but definitely shouldn't have many false positives for random strings
     assert!(!check_bloom(b"cherry", bloom));
 }
 
@@ -250,6 +249,51 @@ async fn test_sstable_scan_range() {
 }
 
 #[tokio::test]
+async fn test_sstable_v2_multi_version_get_at() {
+    let tmp = TempDir::new().expect("temp dir"); // expect
+    let path = tmp.path().join("v2_multiversion.sst");
+    let bc = create_block_cache(1);
+
+    let mut builder = SstableBuilder::create(&path).await.expect("create builder");
+    // Write entries for key1 in order key ASC, seq DESC
+    builder
+        .add(b"key1", b"val_v2", 20, 2)
+        .await
+        .expect("add v2");
+    builder
+        .add(b"key1", b"val_v1", 10, 1)
+        .await
+        .expect("add v1");
+    builder.finish().await.expect("finish builder");
+
+    let reader = SstableReader::open(&path, bc).await.expect("open reader");
+
+    // Query at max_seq=25 -> should get v2
+    let res_25 = reader
+        .get_at(b"key1", 25, u64::MAX)
+        .await
+        .expect("get_at 25");
+    assert_eq!(
+        res_25.map(|(v, seq, tx)| (v, seq, tx)),
+        Some((Bytes::from("val_v2"), 20, 2))
+    );
+
+    // Query at max_seq=15 -> should get v1
+    let res_15 = reader
+        .get_at(b"key1", 15, u64::MAX)
+        .await
+        .expect("get_at 15");
+    assert_eq!(
+        res_15.map(|(v, seq, tx)| (v, seq, tx)),
+        Some((Bytes::from("val_v1"), 10, 1))
+    );
+
+    // Query at max_seq=5 -> None
+    let res_5 = reader.get_at(b"key1", 5, u64::MAX).await.expect("get_at 5");
+    assert!(res_5.is_none());
+}
+
+#[tokio::test]
 async fn test_mfsx_bloom_filter_crc_recovery_no_false_rejections() {
     let tmp = TempDir::new().expect("temp dir"); // expect
     let sst_path = tmp.path().join("mfsx_crc_recovery.sst");
@@ -338,7 +382,6 @@ async fn test_bloom_filter_integration() {
     // 3. Backward compatibility (Manually create 12-byte trailer file)
     let old_sst_path = tmp.path().join("old_sst.sst");
     {
-        // Use builder to create a valid SSTable first
         let mut builder = SstableBuilder::create(&old_sst_path)
             .await
             .expect("create old sub"); // expect
@@ -348,20 +391,10 @@ async fn test_bloom_filter_integration() {
             .expect("add"); // expect
         builder.finish().await.expect("finish"); // expect
 
-        // Now manually truncate the trailer from 20 to 12 bytes
-        // The file currently has: [data][index][bloom][bloom_off][index_off][magic] (total trailer 20)
-        // We want to simulate: [data][index][index_off][magic] (total trailer 12)
-        // Actually, just writing a 12-byte trailer pointing to the index is enough.
         let data = tokio::fs::read(&old_sst_path).await.expect("read"); // expect
         let file_size = data.len();
         let index_off = u64::from_le_bytes(data[file_size - 12..file_size - 4].try_into().unwrap()); // unwrap
 
-        let mut new_data = data[0..file_size - 20].to_vec(); // remove new trailer and bloom
-                                                             // index likely ends at bloom_off. Let's just use the index_off we found.
-        new_data.truncate((file_size - 20) as usize); // this might cut off some index if bloom was there
-                                                      // Re-read data up to index_offset + index_size
-                                                      // Actually, simpler: just rewrite a 12-byte trailer at the end of a valid data+index block.
-                                                      // Let's just trust SstableReader to handle it if we only provide 12 bytes.
         let mut f = tokio::fs::File::create(&old_sst_path)
             .await
             .expect("recreate"); // expect
@@ -397,7 +430,6 @@ async fn test_sstable_block_crc_corruption() {
     // Corrupt the first block
     {
         let mut data = tokio::fs::read(&path).await.expect("read"); // expect
-                                                                    // Blocks start at 0. Let's flip a bit at offset 10.
         if data.len() > 10 {
             data[10] ^= 0xFF;
             tokio::fs::write(&path, data).await.expect("write"); // expect
@@ -431,20 +463,17 @@ async fn test_sstable_block_crc_corruption() {
 
 #[test]
 fn test_block_cache_extreme_values() {
-    // Darf nicht paniken oder overflowlen – prüft alle Grenzfälle.
-    let _ = create_block_cache(0); // minimum → floor auf 256 Blöcke
-    let _ = create_block_cache(1); // normal
-    let _ = create_block_cache(usize::MAX); // overflow-Test → saturating → cap
-    let _ = create_block_cache(usize::MAX / 2); // near-overflow → saturating → cap
+    let _ = create_block_cache(0);
+    let _ = create_block_cache(1);
+    let _ = create_block_cache(usize::MAX);
+    let _ = create_block_cache(usize::MAX / 2);
 }
 
 #[tokio::test]
 async fn test_block_cache_eviction_under_load() {
-    // Create a 10-byte capacity per shard cache directly (for 6-byte blocks)
     let cache = Arc::new(BlockCache::new(10));
 
     let file_id = 1u64;
-    // Find 3 offsets that map to the exact same shard index using ahash
     let target_shard = cache.shard_idx(file_id, 0);
     let mut offsets = vec![0u64];
     let mut candidate = 1u64;
@@ -459,18 +488,15 @@ async fn test_block_cache_eviction_under_load() {
     let offset2 = offsets[1];
     let offset3 = offsets[2];
 
-    // 1. Insert block 1 -> populates shard
     cache.insert(file_id, offset1, Bytes::from_static(b"block1"));
     assert_eq!(cache.len(), 1);
     assert!(cache.contains(file_id, offset1));
 
-    // 2. Insert block 2 -> evicts block 1 in same shard
     cache.insert(file_id, offset2, Bytes::from_static(b"block2"));
     assert_eq!(cache.len(), 1);
     assert!(!cache.contains(file_id, offset1));
     assert!(cache.contains(file_id, offset2));
 
-    // 3. Insert block 3 -> evicts block 2 in same shard
     cache.insert(file_id, offset3, Bytes::from_static(b"block3"));
     assert_eq!(cache.len(), 1);
     assert!(!cache.contains(file_id, offset1));
@@ -480,11 +506,9 @@ async fn test_block_cache_eviction_under_load() {
 
 #[tokio::test]
 async fn test_block_cache_byte_capacity_eviction_threshold() {
-    // Set per-shard capacity to 20 bytes
     let cache = Arc::new(BlockCache::new(20));
     let file_id = 100u64;
 
-    // Find offsets mapping to shard 0
     let mut offsets = Vec::new();
     let mut cand = 0u64;
     while offsets.len() < 2 {
@@ -494,14 +518,13 @@ async fn test_block_cache_byte_capacity_eviction_threshold() {
         cand += 1;
     }
 
-    let block1 = Bytes::from(vec![0u8; 15]); // 15 bytes
-    let block2 = Bytes::from(vec![1u8; 10]); // 10 bytes (total 25 > 20 capacity_bytes)
+    let block1 = Bytes::from(vec![0u8; 15]);
+    let block2 = Bytes::from(vec![1u8; 10]);
 
     cache.insert(file_id, offsets[0], block1);
     assert_eq!(cache.len(), 1);
     assert!(cache.contains(file_id, offsets[0]));
 
-    // Insert block2, causing total bytes (25) to exceed shard capacity (20) -> evicts block1
     cache.insert(file_id, offsets[1], block2);
     assert_eq!(cache.len(), 1);
     assert!(
@@ -524,7 +547,6 @@ async fn test_sstable_builder_duplicate_keys_coexist() {
 
     let reader = SstableReader::open(&path, bc).await.expect("open"); // expect #[cfg(test)]
 
-    // 1. Verify via iter()
     let iter_entries = reader.iter().await.expect("iter"); // expect #[cfg(test)]
     assert_eq!(
         iter_entries.len(),
@@ -540,7 +562,6 @@ async fn test_sstable_builder_duplicate_keys_coexist() {
         (Bytes::from_static(b"k"), Bytes::from_static(b"val2"), 2)
     );
 
-    // 2. Verify via stream()
     let reader_arc = Arc::new(reader);
     let mut stream = reader_arc.stream().await.expect("stream"); // expect #[cfg(test)]
     let e1 = stream.next().await.expect("next").expect("entry 1"); // expect #[cfg(test)]
@@ -560,28 +581,23 @@ async fn test_sstable_builder_duplicate_keys_coexist() {
 
 #[test]
 fn test_bloom_filter_boundary_clamping() {
-    // Test extreme elements input
     let bf = BloomFilter::new(usize::MAX, 0.01);
     assert!(bf.num_bits <= 128 * 1024 * 1024 * 8);
 
-    // Test corrupted bytes input
     let mut corrupted_data = vec![0u8; 16];
-    // Set num_bits to huge value
     corrupted_data[8..16].copy_from_slice(&(u64::MAX).to_le_bytes());
     let res = BloomFilter::from_bytes(&corrupted_data);
     assert!(res.is_err());
 
-    // Test capacity cap on from_bytes
     let mut valid_header = vec![0u8; 24];
-    valid_header[0..8].copy_from_slice(&1u64.to_le_bytes()); // num_hashes
-    valid_header[8..16].copy_from_slice(&1000u64.to_le_bytes()); // num_bits
+    valid_header[0..8].copy_from_slice(&1u64.to_le_bytes());
+    valid_header[8..16].copy_from_slice(&1000u64.to_le_bytes());
     let bf_res = BloomFilter::from_bytes(&valid_header);
     assert!(bf_res.is_ok());
 }
 
 #[test]
 fn test_bloom_filter_roundtrip_and_too_short_bytes() {
-    // Test roundtrip
     let mut bf = BloomFilter::new(50, 0.01);
     bf.insert(b"test-key-1");
     bf.insert(b"test-key-2");
@@ -592,7 +608,6 @@ fn test_bloom_filter_roundtrip_and_too_short_bytes() {
     assert!(restored.may_contain(b"test-key-2"));
     assert!(!restored.may_contain(b"non-existent-key"));
 
-    // Test deserialization with too short data (< 16 bytes)
     let short_bytes = vec![0u8; 15];
     let err = BloomFilter::from_bytes(&short_bytes);
     assert!(matches!(err, Err(ContextraError::Storage(_))));
@@ -610,7 +625,7 @@ fn test_block_builder_min_max_clamping() {
     assert_eq!(bb_small.block_size, 512);
 
     let bb_huge = BlockBuilder::new(100 * 1024 * 1024);
-    assert_eq!(bb_huge.block_size, 64 * 1024 * 1024);
+    assert_eq!(bb_huge.block_size, 64 * 1024);
 }
 
 #[tokio::test]
@@ -620,16 +635,13 @@ async fn test_sstable_builder_rejects_empty_and_oversized_inputs() {
 
     let mut builder = SstableBuilder::create(&path).await.expect("create"); // expect
 
-    // 1. Empty key reject
     let err_empty = builder.add(b"", b"val", 1, 1).await;
     assert!(matches!(err_empty, Err(ContextraError::InvalidInput(_))));
 
-    // 2. Oversized key (>65535) reject
     let oversized_key = vec![0xAA; 65536];
     let err_key = builder.add(&oversized_key, b"val", 1, 1).await;
     assert!(matches!(err_key, Err(ContextraError::InvalidInput(_))));
 
-    // 3. Oversized value (>MAX_VALUE_SIZE) reject
     let oversized_val = vec![0xBB; crate::lsm::MAX_VALUE_SIZE + 1];
     let err_val = builder.add(b"valid_key", &oversized_val, 1, 1).await;
     assert!(matches!(err_val, Err(ContextraError::InvalidInput(_))));
@@ -637,7 +649,6 @@ async fn test_sstable_builder_rejects_empty_and_oversized_inputs() {
 
 #[test]
 fn test_binary_search_vs_linear_search_equivalence() {
-    // Test randomized blocks with 1..=64 entries to ensure binary search matches linear search exactly
     for num_entries in 1..=64 {
         let mut builder = BlockBuilder::new(64 * 1024);
         let mut expected_entries = Vec::new();
@@ -653,9 +664,7 @@ fn test_binary_search_vs_linear_search_equivalence() {
         let offsets_len = num_offsets * 2;
         let offsets_start = n - 2 - offsets_len;
 
-        // 1. Verify all present keys
         for (key, _val) in &expected_entries {
-            // Linear search
             let mut linear_res = None;
             for idx in 0..num_offsets {
                 let off_pos = offsets_start + idx * 2;
@@ -670,7 +679,6 @@ fn test_binary_search_vs_linear_search_equivalence() {
                 }
             }
 
-            // Binary search
             let bin_res =
                 block_search::binary_search_entry_in_block(&block, offsets_start, num_offsets, key)
                     .expect("binary search should not error");
@@ -688,7 +696,6 @@ fn test_binary_search_vs_linear_search_equivalence() {
             }
         }
 
-        // 2. Verify non-existent keys
         let non_existent_keys = [
             b"key_-001".as_slice(),
             b"key_9999".as_slice(),
@@ -724,7 +731,6 @@ async fn test_sharded_block_cache_concurrency_stress() {
 
         handles.push(tokio::spawn(async move {
             for i in 0..ops_per_task {
-                // Unique key targeting different shards
                 let file_id = (task_id as u64) + 1;
                 let block_offset = (i as u64) * 4096;
                 let val = Bytes::from(format!("data_{}_{}", task_id, i));
@@ -751,37 +757,31 @@ async fn test_block_cache_shards_config_validation() {
 
     let tmp = TempDir::new().expect("temp dir");
 
-    // 0 shards -> Err
     let config_zero = LsmConfig {
         path: tmp.path().join("zero"),
         block_cache_shards: 0,
         ..Default::default()
     };
-    assert!(LsmStorage::new(config_zero).await.is_err());
+    assert!(LsmStorage::open(config_zero).await.is_err());
 
-    // Non-power-of-two shards (e.g. 15) -> Err
     let config_non_pow2 = LsmConfig {
         path: tmp.path().join("non_pow2"),
         block_cache_shards: 15,
         ..Default::default()
     };
-    assert!(LsmStorage::new(config_non_pow2).await.is_err());
+    assert!(LsmStorage::open(config_non_pow2).await.is_err());
 
-    // Power of two shards (e.g. 32) -> Ok
     let config_valid = LsmConfig {
         path: tmp.path().join("valid"),
         block_cache_shards: 32,
         ..Default::default()
     };
-    let storage = LsmStorage::new(config_valid).await;
+    let storage = LsmStorage::open(config_valid).await;
     assert!(storage.is_ok());
 }
 
 #[test]
 fn test_block_cache_sequential_scan_sharding_distribution() {
-    // Verification of sharding distribution during sequential scans with constant file_id.
-    // The hashing function `ahash::RandomState::hash_one((file_id, offset))` distributes
-    // sequential block offsets (4KB increments) evenly across all shards.
     let num_shards = 64;
     let cache = BlockCache::new_with_shards(16, num_shards);
     let file_id = 100u64;
@@ -794,7 +794,6 @@ fn test_block_cache_sequential_scan_sharding_distribution() {
         shard_counts[shard] += 1;
     }
 
-    // Ensure every shard received at least one block offset (no dead shards in sequential scan)
     let empty_shards = shard_counts.iter().filter(|&&c| c == 0).count();
     assert_eq!(
         empty_shards, 0,
@@ -802,7 +801,6 @@ fn test_block_cache_sequential_scan_sharding_distribution() {
         shard_counts
     );
 
-    // Verify standard deviation or max load to ensure uniform distribution
     let expected_avg = num_blocks as f64 / num_shards as f64;
     for (idx, &count) in shard_counts.iter().enumerate() {
         let diff = (count as f64 - expected_avg).abs();

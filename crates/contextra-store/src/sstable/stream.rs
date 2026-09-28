@@ -41,13 +41,13 @@ impl SstableStream {
                     continue; // Empty or malformed block, try next
                 }
 
-                self.num_offsets = u16::from_le_bytes(
+                self.num_offsets = usize::from(u16::from_le_bytes(
                     block_data
                         .get(n.saturating_sub(2)..n)
                         .ok_or_else(|| ContextraError::Storage("missing num_offsets".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ));
 
                 let offsets_len = self.num_offsets * 2;
                 if n < 10 + offsets_len {
@@ -61,22 +61,22 @@ impl SstableStream {
             if let Some(block_data) = &self.current_block {
                 if self.entry_idx < self.num_offsets {
                     let off_pos = self.offsets_start + self.entry_idx * 2;
-                    let entry_off = u16::from_le_bytes(
+                    let entry_off = usize::from(u16::from_le_bytes(
                         block_data
                             .get(off_pos..off_pos + 2)
                             .ok_or_else(|| ContextraError::Storage("missing off_pos".into()))?
                             .try_into()
                             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                    ) as usize;
+                    ));
 
                     let mut ep = entry_off;
-                    let k_len = u16::from_le_bytes(
+                    let k_len = usize::from(u16::from_le_bytes(
                         block_data
                             .get(ep..ep + 2)
                             .ok_or_else(|| ContextraError::Storage("missing k_len".into()))?
                             .try_into()
                             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                    ) as usize;
+                    ));
                     ep += 2;
                     let entry_key = block_data
                         .get(ep..ep + k_len)
@@ -101,14 +101,22 @@ impl SstableStream {
                     );
                     ep += 8;
 
-                    let v_len = u32::from_le_bytes(
+                    let v_len = usize::try_from(u32::from_le_bytes(
                         block_data
                             .get(ep..ep + 4)
                             .ok_or_else(|| ContextraError::Storage("missing v_len".into()))?
                             .try_into()
                             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                    ) as usize;
+                    ))
+                    .map_err(|_| {
+                        ContextraError::Storage("value length exceeds platform usize".into())
+                    })?;
                     ep += 4;
+                    if ep + v_len > block_data.len() {
+                        return Err(ContextraError::Storage(
+                            "malformed block: value length out of bounds".into(),
+                        ));
+                    }
                     let entry_val = block_data.slice(ep..ep + v_len);
                     self.entry_idx += 1;
                     return Ok(Some((

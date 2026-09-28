@@ -41,7 +41,7 @@ impl SstableReader {
                 continue;
             }
 
-            let num_offsets = u16::from_le_bytes(
+            let num_offsets = usize::from(u16::from_le_bytes(
                 block_data
                     .get(n.saturating_sub(2)..n)
                     .ok_or_else(|| {
@@ -49,7 +49,7 @@ impl SstableReader {
                     })?
                     .try_into()
                     .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ) as usize;
+            ));
 
             let offsets_len = num_offsets * 2;
             if n < 10 + offsets_len {
@@ -72,22 +72,22 @@ impl SstableReader {
             let mut broke = false;
             for i in block_start_i..num_offsets {
                 let off_pos = offsets_start + i * 2;
-                let entry_off = u16::from_le_bytes(
+                let entry_off = usize::from(u16::from_le_bytes(
                     block_data
                         .get(off_pos..off_pos + 2)
                         .ok_or_else(|| ContextraError::Storage("malformed block: off_pos".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ));
 
                 let mut ep = entry_off;
-                let k_len = u16::from_le_bytes(
+                let k_len = usize::from(u16::from_le_bytes(
                     block_data
                         .get(ep..ep + 2)
                         .ok_or_else(|| ContextraError::Storage("malformed block: k_len".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ));
                 ep += 2;
                 let entry_key = block_data
                     .get(ep..ep + k_len)
@@ -120,7 +120,7 @@ impl SstableReader {
                             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                     );
                     ep += 8;
-                    let v_len = u32::from_le_bytes(
+                    let v_len = usize::try_from(u32::from_le_bytes(
                         block_data
                             .get(ep..ep + 4)
                             .ok_or_else(|| {
@@ -128,7 +128,10 @@ impl SstableReader {
                             })?
                             .try_into()
                             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                    ) as usize;
+                    ))
+                    .map_err(|_| {
+                        ContextraError::Storage("value length exceeds platform usize".into())
+                    })?;
                     ep += 4;
                     if ep + v_len > block_data.len() {
                         return Err(ContextraError::Storage(
@@ -183,7 +186,7 @@ impl SstableReader {
                 continue;
             }
 
-            let num_offsets = u16::from_le_bytes(
+            let num_offsets = usize::from(u16::from_le_bytes(
                 block_data
                     .get(n.saturating_sub(2)..n)
                     .ok_or_else(|| {
@@ -191,7 +194,7 @@ impl SstableReader {
                     })?
                     .try_into()
                     .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ) as usize;
+            ));
 
             let offsets_len = num_offsets * 2;
             if n < 10 + offsets_len {
@@ -214,22 +217,22 @@ impl SstableReader {
 
             for i in start_offset_idx..num_offsets {
                 let off_pos = offsets_start + i * 2;
-                let entry_off = u16::from_le_bytes(
+                let entry_off = usize::from(u16::from_le_bytes(
                     block_data
                         .get(off_pos..off_pos + 2)
                         .ok_or_else(|| ContextraError::Storage("malformed block: off_pos".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ));
 
                 let mut ep = entry_off;
-                let k_len = u16::from_le_bytes(
+                let k_len = usize::from(u16::from_le_bytes(
                     block_data
                         .get(ep..ep + 2)
                         .ok_or_else(|| ContextraError::Storage("malformed block: k_len".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ));
                 ep += 2;
                 let entry_key = block_data
                     .get(ep..ep + k_len)
@@ -272,13 +275,16 @@ impl SstableReader {
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                 );
                 ep += 8;
-                let v_len = u32::from_le_bytes(
+                let v_len = usize::try_from(u32::from_le_bytes(
                     block_data
                         .get(ep..ep + 4)
                         .ok_or_else(|| ContextraError::Storage("malformed block: v_len".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ))
+                .map_err(|_| {
+                    ContextraError::Storage("value length exceeds platform usize".into())
+                })?;
                 ep += 4;
                 if ep + v_len > block_data.len() {
                     return Err(ContextraError::Storage(

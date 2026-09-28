@@ -1,9 +1,17 @@
 use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};
+use crate::compaction::retain_key_versions;
+use bytes::Bytes;
 use contextra_core::{ContextraError, Result, TOMBSTONE_BIT};
+use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+/// Flushes the active MemTable to an SSTable.
+///
+/// MUST NOT be called while holding `commit_mutex` (will deadlock).
+/// Rotation (WAL swap and MemTable swap) is performed under `commit_mutex` to prevent
+/// concurrent sequence allocation races during rotation.
 pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
     // ── Phase 0: Schnellcheck (Read-Lock, kein I/O) ──────────────────────
     let has_active_memtable = {
@@ -15,8 +23,6 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
     }; // read lock freigegeben
 
     // ── Phase 1: Pre-Allokierung der neuen WAL VOR dem Write-Lock ────────
-    // WAL-Erstellung (Datei erstellen, Header schreiben) erfolgt außerhalb des State-Locks,
-    // um Tokio-Worker-Thread Blockaden bei Disk-Latenz-Spikes zu verhindern (Fix E).
     let new_wal_opt = if has_active_memtable {
         let flush_id = storage.flush_counter.fetch_add(1, Ordering::SeqCst);
         let wal_path = storage
@@ -29,20 +35,16 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         None
     };
 
-    // ── Phase 2: Atomarer Swap unter Write-Lock ──────────────────────────
-    let (to_flush, old_wal_path) = {
-        // INVARIANT-LOCK-2 (Atomarer Memtable-Swap):
-        // Write-Lock serialisiert diesen Swap atomar gegen alle parallelen commit()-Aufrufe im
-        // Single-Commit-Pfad (die ebenfalls state.write() halten). Nach erfolgreichem Swap zeigt
-        // `state.memtable` auf einen frischen, leeren Memtable; der alte wird als immutable weitergeführt.
-        // Group-Commit-Leader-Pfade halten hier bereits commit_mutex, sodass kein Commit simultan
-        // in den neu-swapped Memtable schreibt, bevor dieser korrekt initialisiert ist.
+    // ── Phase 2: Atomarer Swap unter commit_mutex und state.write() ──────
+    let (to_flush, old_wal_opt, old_wal_hmac) = {
+        let _commit_lock = storage.commit_mutex.lock().await;
+
         let mut state = storage.state.write().await;
         if state.memtable.is_empty() && state.immutable_memtables.is_empty() {
             return Ok(());
         }
 
-        let old_wal_path = if !state.memtable.is_empty() {
+        let (old_wal_opt, old_wal_hmac) = if !state.memtable.is_empty() {
             let new_wal = match new_wal_opt {
                 Some(w) => w,
                 None => {
@@ -60,17 +62,17 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                 let mut wal_guard = storage.wal.write().await;
                 std::mem::replace(&mut *wal_guard, Arc::new(new_wal))
             };
+            old_wal.sealed.store(true, Ordering::SeqCst);
+            let hmac = *old_wal.last_hmac.lock().await;
             state.immutable_memtables.push(old_memtable);
-            let path = old_wal.path().to_path_buf();
-            drop(old_wal);
-            Some(path)
+            (Some(old_wal), hmac)
         } else {
-            None
+            (None, [0u8; 32])
         };
 
         let to_flush = state.immutable_memtables.clone();
-        (to_flush, old_wal_path)
-    }; // write lock freigegeben
+        (to_flush, old_wal_opt, old_wal_hmac)
+    }; // commit_mutex, state.write, and storage.wal released!
 
     let count = storage.segment_counter.fetch_add(1, Ordering::Relaxed);
     let seq = storage.next_seq_no.load(Ordering::Relaxed);
@@ -82,18 +84,27 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
     // ── Phase 3: Expensive I/O & Atomic Transition ──────────────────────────
     let phase3_res: Result<()> = async {
+        let floor_seq = storage.snapshot_registry.min_active_seqno();
+
+        let mut key_map: BTreeMap<Bytes, Vec<(Bytes, u64, u64)>> = BTreeMap::new();
+
+        for mt in &to_flush {
+            for (k, v, seq, tx) in mt.iter() {
+                key_map.entry(k).or_default().push((v, seq, tx));
+            }
+        }
+
         let mut builder =
             SstableBuilder::create_with_key_manager(&sst_path, storage.key_manager.clone()).await?;
 
-        let mut map = std::collections::BTreeMap::new();
-        for mt in &to_flush {
-            for (k, v, seq, tx) in mt.iter_latest() {
-                map.insert(k, (v, seq, tx));
+        for (k, mut versions) in key_map {
+            versions.sort_by(|a, b| (b.1 & !TOMBSTONE_BIT).cmp(&(a.1 & !TOMBSTONE_BIT)));
+            let retained = retain_key_versions(versions, |(_, seq, _)| *seq, floor_seq);
+            for (v, seq, tx) in retained {
+                builder.add(&k, &v, seq, tx).await?;
             }
         }
-        for (k, (v, seq, tx)) in map {
-            builder.add(&k, &v, seq, tx).await?;
-        }
+
         builder
             .finish()
             .await
@@ -108,7 +119,6 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         .map_err(|e| ContextraError::Storage(format!("SSTable open after flush failed: {}", e)))?;
 
         // === SSTABLE MANIFEST INTEGRATION START ===
-        let current_wal_hmac = *storage.wal.read().await.last_hmac.lock().await;
         storage
             .manifest
             .append_batch(&[
@@ -116,9 +126,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                     path: sst_path.clone(),
                     max_tx: reader.metadata().max_tx_id,
                 },
-                crate::manifest::ManifestEntry::WalCheckpoint {
-                    hmac: current_wal_hmac,
-                },
+                crate::manifest::ManifestEntry::WalCheckpoint { hmac: old_wal_hmac },
             ])
             .await?;
         // === SSTABLE MANIFEST INTEGRATION END ===
@@ -149,19 +157,17 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         drop(sstables);
         drop(state);
 
-        // Best-effort delete of old WAL (non-critical if it fails, as it will be replayed safely)
-        if let Some(ref path) = old_wal_path {
-            if let Err(e) = tokio::fs::remove_file(path).await {
-                tracing::debug!("Could not delete old WAL {:?}: {}", path, e);
+        // Delete old WAL only after SST and manifest entry are durable and truncate_lock acquired
+        if let Some(ref old_wal) = old_wal_opt {
+            let _trunc_guard = old_wal.truncate_lock.lock().await;
+            if let Err(e) = tokio::fs::remove_file(old_wal.path()).await {
+                tracing::debug!("Could not delete old WAL {:?}: {}", old_wal.path(), e);
             }
         }
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();
         storage.budget.release_memory(bytes_freed);
 
-        // M-6 FIX: Reset drift counter after successful flush.
-        // After a flush, the budget is accurately reflected via release_memory().
-        // Drift accumulated during this memtable's lifetime is now irrelevant.
         storage
             .budget_tracking_drift_bytes
             .store(0, std::sync::atomic::Ordering::Relaxed);
@@ -172,9 +178,6 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
     .await;
 
     if let Err(ref e) = phase3_res {
-        // Cleanup on Phase 3 failure:
-        // Retain old memtables in state.immutable_memtables for continued read availability.
-        // storage.budget.release_memory() is NOT called because memory is still in use.
         if sst_path.exists() {
             if let Err(rm_err) = tokio::fs::remove_file(&sst_path).await {
                 tracing::warn!(

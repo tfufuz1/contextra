@@ -1,5 +1,7 @@
 use super::block_cache::{BlockCache, SSTABLE_MAGIC_LEGACY, SSTABLE_MAGIC_MFSX};
-use super::block_search::{binary_search_entry_in_block, block_binary_search};
+use super::block_search::{
+    binary_search_entry_in_block, binary_search_first_index_in_block, get_entry_at_index,
+};
 use super::bloom::BloomFilter;
 use super::builder::SstableMetadata;
 use super::io::pread_exact;
@@ -90,11 +92,10 @@ impl SstableReader {
 
         let file = Arc::new(file);
 
-        // Read trailer: last 54 bytes (v1) or 52 bytes (v0)
+        // Read trailer: last 54 bytes (v1/v2) or 52 bytes (v0)
         let trailer_data = {
             let f = Arc::clone(&file);
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
-                // We read up to 54 bytes to check for v1 trailer
                 let mut buf = vec![0u8; 54.min(file_size as usize)];
                 let offset = file_size.saturating_sub(54);
                 pread_exact(&f, &mut buf, offset)?;
@@ -110,9 +111,6 @@ impl SstableReader {
             return Err(ContextraError::Storage("Invalid trailer".into()));
         }
 
-        // Detect version and magic (FIND-STO-003)
-        // v1: [..., version:u16][magic:u32] at the end (54 bytes)
-        // v0: [..., magic:u32] at the end (52 bytes)
         let mut format_version = 0u16;
         let mut is_mfsx = false;
 
@@ -159,8 +157,7 @@ impl SstableReader {
         let mut max_seq = 0;
 
         let index_offset = if is_mfsx {
-            // MFSX trailer (v0 or v1)
-            let base = if format_version >= 1 { 0 } else { 2 }; // Offset into our 54-byte buffer
+            let base = if format_version >= 1 { 0 } else { 2 };
             min_tx_id = u64::from_le_bytes(
                 trailer_data[base..base + 8]
                     .try_into()
@@ -195,13 +192,11 @@ impl SstableReader {
                     .map_err(|_| ContextraError::ParseError("Invalid index_offset".into()))?,
             )
         } else {
-            // Read magic from the very end of 54-byte buffer (which would be the same as end of 52-byte if we read 54)
             let magic_legacy =
                 u32::from_le_bytes(trailer_data[50..54].try_into().map_err(|_| {
                     ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
                 })?);
             if magic_legacy == SSTABLE_MAGIC_LEGACY {
-                // Backward-compatible 12-byte trailer: [index_offset: u64][magic: u32]
                 u64::from_le_bytes(
                     trailer_data[42..50]
                         .try_into()
@@ -317,11 +312,11 @@ impl SstableReader {
         let index_len = index_bytes.len();
 
         while pos + 10 <= index_len {
-            let key_len = u16::from_le_bytes(
+            let key_len = usize::from(u16::from_le_bytes(
                 index_bytes[pos..pos + 2]
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("corrupted index: key_len".into()))?,
-            ) as usize;
+            ));
             pos += 2;
 
             if pos + key_len + 8 > index_len {
@@ -359,11 +354,10 @@ impl SstableReader {
             )
             .await?;
             if block.len() >= 2 {
-                let k_len = u16::from_le_bytes(
-                    block[0..2]
-                        .try_into()
-                        .map_err(|_| ContextraError::ParseError("corrupted block: k_len".into()))?,
-                ) as usize;
+                let k_len =
+                    usize::from(u16::from_le_bytes(block[0..2].try_into().map_err(
+                        |_| ContextraError::ParseError("corrupted block: k_len".into()),
+                    )?));
                 if block.len() >= 2 + k_len {
                     block.slice(2..2 + k_len)
                 } else {
@@ -473,10 +467,15 @@ impl SstableReader {
         Ok(block)
     }
 
-    /// Retrieves a value from the SSTable by key.
-    pub async fn get(&self, key: &[u8]) -> Result<Option<(Bytes, u64, u64)>> {
+    /// Retrieves a value, sequence number, and transaction ID from the SSTable by key
+    /// bounded by maximum sequence number (`max_seq`) and maximum transaction ID (`max_tx`).
+    pub async fn get_at(
+        &self,
+        key: &[u8],
+        max_seq: u64,
+        max_tx: u64,
+    ) -> Result<Option<(Bytes, u64, u64)>> {
         // 1. Whole-SSTable Bloom Filter Pre-check
-        // SPECCED: Only if bloom filter is present (backward compatibility)
         if let Some(bloom) = &self.bloom_filter {
             if !bloom.may_contain(key) {
                 return Ok(None);
@@ -487,134 +486,161 @@ impl SstableReader {
             return Ok(None);
         }
 
-        let idx = match self.index.binary_search_by(|(k, _)| k.as_ref().cmp(key)) {
+        let mut start_idx = match self.index.binary_search_by(|(k, _)| k.as_ref().cmp(key)) {
             Ok(i) => i,
             Err(i) => i,
         };
 
-        if idx >= self.index.len() {
-            return Ok(None);
+        // Rewind start_idx to the earliest block whose last_key >= key (handles multi-block key spans)
+        while start_idx > 0 && self.index[start_idx - 1].0.as_ref() >= key {
+            start_idx -= 1;
         }
 
-        let offset = self
-            .index
-            .get(idx)
-            .ok_or_else(|| ContextraError::Storage("index out of bounds".into()))?
-            .1;
-        let next_offset = if idx + 1 < self.index.len() {
-            self.index
-                .get(idx + 1)
-                .ok_or_else(|| ContextraError::Storage("index out of bounds".into()))?
-                .1
-        } else {
-            self.index_offset
-        };
+        let max_seq_raw = max_seq & !contextra_core::TOMBSTONE_BIT;
 
-        let block_data = self.get_block(offset, next_offset).await?;
+        for idx in start_idx..self.index.len() {
+            let (block_last_key, offset) = &self.index[idx];
+            let next_offset = if idx + 1 < self.index.len() {
+                self.index[idx + 1].1
+            } else {
+                self.index_offset
+            };
 
-        let n = block_data.len();
-        if n < 10 {
-            return Err(ContextraError::Storage("block too small".into()));
-        }
+            let block_data = self.get_block(*offset, next_offset).await?;
 
-        let num_offsets = u16::from_le_bytes(
-            block_data
-                .get(n.saturating_sub(2)..n)
-                .ok_or_else(|| {
-                    ContextraError::Storage("malformed block: missing num_offsets".into())
-                })?
-                .try_into()
-                .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-        ) as usize;
+            let n = block_data.len();
+            if n < 10 {
+                return Err(ContextraError::Storage("block too small".into()));
+            }
 
-        let offsets_len = num_offsets.saturating_mul(2);
-        if n < offsets_len.saturating_add(10) {
-            return Err(ContextraError::Storage(
-                "malformed block: num_offsets too large".into(),
+            let num_offsets = usize::from(u16::from_le_bytes(
+                block_data
+                    .get(n.saturating_sub(2)..n)
+                    .ok_or_else(|| {
+                        ContextraError::Storage("malformed block: missing num_offsets".into())
+                    })?
+                    .try_into()
+                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
             ));
-        }
-        let offsets_start = n.saturating_sub(2).saturating_sub(offsets_len);
-        let bloom_offset = offsets_start.saturating_sub(8);
-        let bloom = u64::from_le_bytes(
-            block_data
-                .get(bloom_offset..bloom_offset.saturating_add(8))
-                .ok_or_else(|| {
-                    ContextraError::Storage("malformed block: missing bloom filter".into())
-                })?
-                .try_into()
-                .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-        );
 
-        // Bloom check
-        let hash = blake3::hash(key);
-        let hash_bytes = hash.as_bytes();
-        let mut may_contain = true;
-        // Safety: blake3 outputs 32 bytes, i * 2 + 1 is max 7.
-        for i in 0..4 {
-            let chunk = u16::from_le_bytes([
-                *hash_bytes.get(i * 2).unwrap_or(&0),
-                *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
-            ]);
-            let bit = chunk % 64;
-            if (bloom & (1 << bit)) == 0 {
-                may_contain = false;
+            let offsets_len = num_offsets.saturating_mul(2);
+            if n < offsets_len.saturating_add(10) {
+                return Err(ContextraError::Storage(
+                    "malformed block: num_offsets too large".into(),
+                ));
+            }
+            let offsets_start = n.saturating_sub(2).saturating_sub(offsets_len);
+            let bloom_offset = offsets_start.saturating_sub(8);
+            let bloom = u64::from_le_bytes(
+                block_data
+                    .get(bloom_offset..bloom_offset.saturating_add(8))
+                    .ok_or_else(|| {
+                        ContextraError::Storage("malformed block: missing bloom filter".into())
+                    })?
+                    .try_into()
+                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+            );
+
+            // Block bloom check
+            let hash = blake3::hash(key);
+            let hash_bytes = hash.as_bytes();
+            let mut may_contain = true;
+            for i in 0..4 {
+                let chunk = u16::from_le_bytes([
+                    *hash_bytes.get(i * 2).unwrap_or(&0),
+                    *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
+                ]);
+                let bit = chunk % 64;
+                if (bloom & (1 << bit)) == 0 {
+                    may_contain = false;
+                    break;
+                }
+            }
+
+            if may_contain {
+                if let Some(first_entry_idx) = binary_search_first_index_in_block(
+                    &block_data,
+                    offsets_start,
+                    num_offsets,
+                    key,
+                )? {
+                    for entry_i in first_entry_idx..num_offsets {
+                        let (entry_off, k_len) =
+                            get_entry_at_index(&block_data, offsets_start, entry_i)?;
+                        let mut ep = entry_off + 2;
+                        let entry_key = block_data
+                            .get(ep..ep + k_len)
+                            .ok_or_else(|| ContextraError::Storage("malformed block".into()))?;
+                        if entry_key != key {
+                            break;
+                        }
+                        ep += k_len;
+
+                        let seq_no = u64::from_le_bytes(
+                            block_data
+                                .get(ep..ep + 8)
+                                .ok_or_else(|| {
+                                    ContextraError::Storage("malformed block: seq_no".into())
+                                })?
+                                .try_into()
+                                .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+                        );
+                        ep += 8;
+                        let tx_id = u64::from_le_bytes(
+                            block_data
+                                .get(ep..ep + 8)
+                                .ok_or_else(|| {
+                                    ContextraError::Storage("malformed block: tx_id".into())
+                                })?
+                                .try_into()
+                                .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+                        );
+                        ep += 8;
+                        let v_len = usize::try_from(u32::from_le_bytes(
+                            block_data
+                                .get(ep..ep + 4)
+                                .ok_or_else(|| {
+                                    ContextraError::Storage("malformed block: v_len".into())
+                                })?
+                                .try_into()
+                                .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+                        ))
+                        .map_err(|_| {
+                            ContextraError::Storage("value length exceeds platform usize".into())
+                        })?;
+                        ep += 4;
+                        if ep + v_len > block_data.len() {
+                            return Err(ContextraError::Storage(
+                                "malformed block: value length out of bounds".into(),
+                            ));
+                        }
+
+                        let raw_seq = seq_no & !contextra_core::TOMBSTONE_BIT;
+                        if raw_seq <= max_seq_raw
+                            && (tx_id <= max_tx || tx_id >= contextra_core::TxId::INTERNAL_BASE)
+                        {
+                            let entry_val = block_data.slice(ep..ep + v_len);
+                            return Ok(Some((entry_val, seq_no, tx_id)));
+                        }
+                    }
+                }
+            }
+
+            if block_last_key.as_ref() != key {
                 break;
             }
         }
 
-        if !may_contain {
-            return Ok(None);
-        }
+        Ok(None)
+    }
 
-        if let Some(entry_off) = block_binary_search(&block_data, offsets_start, num_offsets, key)?
-        {
-            let k_len = u16::from_le_bytes(
-                block_data
-                    .get(entry_off..entry_off + 2)
-                    .ok_or_else(|| ContextraError::Storage("malformed block: k_len".into()))?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ) as usize;
-            let mut ep = entry_off + 2 + k_len;
-            let seq_no = u64::from_le_bytes(
-                block_data
-                    .get(ep..ep + 8)
-                    .ok_or_else(|| ContextraError::Storage("malformed block: seq_no".into()))?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            );
-            ep += 8;
-            let tx_id = u64::from_le_bytes(
-                block_data
-                    .get(ep..ep + 8)
-                    .ok_or_else(|| ContextraError::Storage("malformed block: tx_id".into()))?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            );
-            ep += 8;
-            let v_len = u32::from_le_bytes(
-                block_data
-                    .get(ep..ep + 4)
-                    .ok_or_else(|| ContextraError::Storage("malformed block: v_len".into()))?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ) as usize;
-            ep += 4;
-            if ep + v_len > block_data.len() {
-                return Err(ContextraError::Storage(
-                    "malformed block: value length out of bounds".into(),
-                ));
-            }
-            let entry_val = block_data.slice(ep..ep + v_len);
-            Ok(Some((entry_val, seq_no, tx_id)))
-        } else {
-            Ok(None)
-        }
+    /// Retrieves a value from the SSTable by key.
+    pub async fn get(&self, key: &[u8]) -> Result<Option<(Bytes, u64, u64)>> {
+        self.get_at(key, u64::MAX, u64::MAX).await
     }
 
     /// Metrics result for point lookup instrumentation.
     pub async fn lookup_metrics(&self, key: &[u8]) -> (bool, bool, bool, bool) {
-        // Returns (bloom_passed, range_passed, block_read, key_found)
         if let Some(bloom) = &self.bloom_filter {
             if !bloom.may_contain(key) {
                 return (false, false, false, false);
@@ -659,7 +685,7 @@ impl SstableReader {
 
         let num_offsets = match block_data.get(n.saturating_sub(2)..n) {
             Some(slice) => match slice.try_into() {
-                Ok(arr) => u16::from_le_bytes(arr) as usize,
+                Ok(arr) => usize::from(u16::from_le_bytes(arr)),
                 Err(_) => return (true, true, true, false),
             },
             None => return (true, true, true, false),
@@ -750,7 +776,7 @@ impl SstableReader {
                 continue;
             }
 
-            let num_offsets = u16::from_le_bytes(
+            let num_offsets = usize::from(u16::from_le_bytes(
                 block_data
                     .get(n.saturating_sub(2)..n)
                     .ok_or_else(|| {
@@ -758,7 +784,7 @@ impl SstableReader {
                     })?
                     .try_into()
                     .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ) as usize;
+            ));
 
             let offsets_len = num_offsets * 2;
             if n < 10 + offsets_len {
@@ -770,22 +796,22 @@ impl SstableReader {
 
             for i in 0..num_offsets {
                 let off_pos = offsets_start + i * 2;
-                let entry_off = u16::from_le_bytes(
+                let entry_off = usize::from(u16::from_le_bytes(
                     block_data
                         .get(off_pos..off_pos + 2)
                         .ok_or_else(|| ContextraError::Storage("malformed block: off_pos".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ));
 
                 let mut ep = entry_off;
-                let k_len = u16::from_le_bytes(
+                let k_len = usize::from(u16::from_le_bytes(
                     block_data
                         .get(ep..ep + 2)
                         .ok_or_else(|| ContextraError::Storage("malformed block: k_len".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ));
                 ep += 2;
                 let _entry_key = block_data
                     .get(ep..ep + k_len)
@@ -808,13 +834,16 @@ impl SstableReader {
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                 );
                 ep += 8;
-                let v_len = u32::from_le_bytes(
+                let v_len = usize::try_from(u32::from_le_bytes(
                     block_data
                         .get(ep..ep + 4)
                         .ok_or_else(|| ContextraError::Storage("malformed block: v_len".into()))?
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ) as usize;
+                ))
+                .map_err(|_| {
+                    ContextraError::Storage("value length exceeds platform usize".into())
+                })?;
                 ep += 4;
                 if ep + v_len > block_data.len() {
                     return Err(ContextraError::Storage(
