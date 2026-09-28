@@ -1,0 +1,65 @@
+name: Flake Report Nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  flake-report:
+    name: Flake Report Run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Install nextest
+        uses: taiki-e/install-action@45fceba0fc176f41d2aee1ca9d6598ba628eea62 # nextest
+
+      - name: Run Flake Report
+        run: |
+          cargo run --manifest-path xtask/Cargo.toml -- flake-report --runs 10 --json > flake_output.json || true
+          cat flake_output.json
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: flake-report-results
+          path: .jules/local/flake-report.json
+
+      - name: Process Flake Issues
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('.jules/local/flake-report.json')) {
+              return;
+            }
+            const data = JSON.parse(fs.readFileSync('.jules/local/flake-report.json', 'utf8'));
+            if (data.flaky_detected) {
+              const title = '[flake] Automated Nightly Flake Report Detection';
+              const issues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+              });
+              const exists = issues.data.some(i => i.title === title);
+              if (!exists) {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: title,
+                  body: `Nightly Flake Report hat Test-Flakiness erkannt.\nRuns: ${data.runs}\nSuccessful: ${data.successful_runs}\nRate: ${data.success_rate * 100}%`,
+                });
+              }
+            }

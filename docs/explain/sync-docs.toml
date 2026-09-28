@@ -1,0 +1,8 @@
+title = "Dokumentations-Synchronisationsprüfung"
+what = "Generierte Doku-Artefakte (z.B. WORKING_STATE.md) stimmen nicht mit dem Code überein."
+why = "Garantiert Konsistenz aller automatisch erzeugten Übersichtsdokumente."
+fix = "Führe `cargo xtask sync-docs` aus und committe die geänderten Dateien."
+anti_fix = "Editiere generierte Markdown-Dateien nicht von Hand."
+adr = ["ADR-N08"]
+related = ["doc-truth", "registry-check"]
+sources = ["capabilities.toml", "AGENTS.md"]

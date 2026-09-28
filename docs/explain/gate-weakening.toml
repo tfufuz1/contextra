@@ -1,0 +1,8 @@
+title = "Verbot der Aufweichung von Qualitätsgates"
+what = "Ein Qualitätsgate, Lint, Schwelle oder Baseline wurde abgeschwächt oder entfernt."
+why = "Das Schwächen von Regelsätzen verschleiert technische Schulden und verletzt das Invarianten-Sicherheitsversprechen."
+fix = "Mache die Modifikation der Gates/Schwellen rückgängig und behebe den zugrundeliegenden Fehler im Code."
+anti_fix = "Verwende keine #[allow(...)] Attribute oder künstliche Schwellenanhebungen."
+adr = ["ADR-035"]
+related = ["ratchet", "protected-paths"]
+sources = ["CONSTITUTION.md", "AGENTS.md"]
