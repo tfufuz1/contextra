@@ -1,5 +1,5 @@
 # Contextra — Jules Session Bootstrap
-> Maschinenausführbare Checkliste. Jede Session MUSS mit dieser
+> Mascinenausführbare Checkliste. Jede Session MUSS mit dieser
 > Sequenz beginnen, bevor Code geschrieben oder Dateien geändert werden.
 
 - **VETOES.md** (Root): Permanent abgelehnte oder eingeschränkt akzeptierte Features.
@@ -10,39 +10,36 @@
 ## Phase 0 — Session-Identität etablieren, Task-Claiming & Context Pack erzeugen (30 Sekunden)
 
 ```bash
-cargo xtask session-init --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>" --output-env
+cargo xtask session-init --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>" --output-env <!-- harness:planned --> <!-- doc-ref-ignore -->
 source .jules/session.env
-cargo xtask context-pack --crate <CRATE_NAME>
+cargo xtask context-pack --crate <CRATE_NAME> <!-- harness:planned --> <!-- doc-ref-ignore -->
 ```
 
-Der Befehl `context-pack` erzeugt `.jules/context/CONTEXT_PACK.md`. Dies ist die einzige Datei, die ein Agent zu Sessionbeginn lesen muss, statt der zuvor 8–12 dort aufgezählten Einzeldateien.
+Der Befehl `context-pack` erzeugt `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->. Dies ist die einzige Datei, die ein Agent zu Sessionbeginn lesen muss.
 
 ## Phase 1 — Offene Kritische Issues prüfen (30 Sekunden)
 
 ```bash
 # BLOCKER und CRITICAL Tags — bei Fund: STOP, zuerst beheben
-echo "=== BLOCKER/CRITICAL AI-TAGs ==="
 grep -rn "AI-TAG\[.*\]\[BLOCKER\]\|AI-TAG\[.*\]\[CRITICAL\]" crates/ \
   --include="*.rs" | grep -v "RESOLVED" || echo "  ✅ Keine"
 
 # Offene ANCHORS mit IN-PROGRESS Status
-echo "=== IN-PROGRESS ANCHORS ==="
 grep -rn "ANCHOR\[.*\] STATUS:IN-PROGRESS" crates/ \
   --include="*.rs" || echo "  (keine)"
 
 # WORKING_STATE.md lesen (autogeneriert, immer aktuell)
-echo "=== WORKING STATE ==="
 head -50 WORKING_STATE.md
 ```
 
 ## Phase 2 — Toolchain verifizieren (30 Sekunden)
 
 ```bash
-# Verifiziere Build-Grundlage (ohne Nix-Shell zuerst probieren)
-cargo check --workspace --exclude contextra-tauri 2>&1 | tail -5 <!-- crate-ref-ignore -->
+# Verifiziere Build-Grundlage
+cargo check --workspace
 
 # Falls cargo nicht im PATH: Rust-Toolchain aktivieren
-# source "$HOME/.cargo/env" && cargo check --workspace --exclude contextra-tauri <!-- crate-ref-ignore -->
+# source "$HOME/.cargo/env" && cargo check --workspace
 ```
 
 ## Phase 3 — Aufgaben-spezifischen Kontext laden
@@ -51,9 +48,9 @@ Lade basierend auf der Aufgabe:
 
 | Aufgabe-Typ | Zu lesende Dateien |
 |-------------|-------------------|
-| Code in `contextra-store/*` | `crates/contextra-store/AGENTS.md`, `rules/wal_crypto.md`, `rules/async-io.md` |
-| Code in `contextra-vector/*` | `crates/contextra-vector/AGENTS.md`, `rules/simd_safety.md` |
-| Code in `contextra-db/*` | `crates/contextra-db/AGENTS.md` |
+| Code in `contextra-store/*` <!-- doc-ref-ignore --> | `crates/contextra-store/AGENTS.md`, `rules/wal_crypto.md`, `rules/async-io.md` |
+| Code in `contextra-vector/*` <!-- doc-ref-ignore --> | `crates/contextra-vector/AGENTS.md`, `rules/simd_safety.md` |
+| Code in `contextra-db/*` <!-- doc-ref-ignore --> | `crates/contextra-db/AGENTS.md` |
 | Neue Dependency | `rules/dependencies.md` → Cargo.lock prüfen → crates.io verifizieren |
 | Neue API-Oberfläche | `CONSTITUTION.md`, `docs/TYPE_REGISTRY.md` |
 | ADR schreiben | `docs/decisions/` (letzte 5 ADRs lesen), `CONSTITUTION.md §Governance` |
@@ -65,14 +62,12 @@ Lade basierend auf der Aufgabe:
 
 ```bash
 # API-Halluzinations-Schutz: Signatur vor Nutzung verifizieren
-# Beispiel: Bevor du eine Methode auf Collection aufrufst:
 grep -n "pub fn <METHODE>" crates/contextra-db/src/collection.rs
 
 # Typ-Dopplungs-Schutz: Typ-Register prüfen
 grep "<TYPNAME>" docs/TYPE_REGISTRY.md
 
 # DAG-Prüfung: Keine Layer-Verletzung
-# Layer 0 darf nicht von Layer 1+ importieren, etc.
 ```
 
 ## Phase 5 — Session-Ende (VOR letztem Commit)
@@ -98,12 +93,12 @@ just sync-docs-check
 
 ## Phase 6 — Pre-Submit Gate (BLOCKIEREND — kein Submit ohne ✅)
 
-> **Invariante:** Führe zwingend `cargo xtask jules-submit-gate --crate <DEIN-CRATE>` aus.
+> **Invariante:** Führe zwingend `cargo xtask jules-submit-gate --crate <DEIN-CRATE>` aus. <!-- harness:planned --> <!-- doc-ref-ignore -->
 > Kein submit() vor ✅ SUBMIT GATE BESTANDEN. Bei Fehlschlag: STOP, Fix, Phase 6 erneut durchlaufen.
 
 ```bash
 # Pre-Submit Gate ausführen (Schritte 6.1–6.5 automatisiert)
-cargo xtask jules-submit-gate --crate <DEIN-CRATE>
+cargo xtask jules-submit-gate --crate <DEIN-CRATE> <!-- harness:planned --> <!-- doc-ref-ignore -->
 ```
 
 > **Regel für Commit-Messages:** Jede in der PR-Beschreibung unter

@@ -122,10 +122,11 @@ unsafe { ptr::copy_nonoverlapping(src, dst, len) }
 unsafe { ptr::copy_nonoverlapping(src, dst, len) }
 ```
 
-**unsafe ist NUR erlaubt in** (AGENTS.md §4):
-- `crates/contextra-vector/src/distance.rs` (SIMD)
-- `crates/contextra-vector/src/diskann.rs` (Mmap)
-- `crates/contextra-vector/src/persistence.rs` (Mmap)
+**unsafe ist NUR erlaubt in Unsafe-Inseln** (AGENTS.md §6, capabilities.toml):
+- `crates/contextra-simd`
+- `crates/contextra-sys`
+- `crates/contextra-wire`
+- `crates/contextra-crypto`
 
 ## FEHLER-KLASSE 7: Test-Mirroring
 
@@ -214,7 +215,7 @@ use contextra_db::Collection;
 
 ## FEHLER-KLASSE 14: Fälschlicher Compliance-Beleg durch ungenutzte Referenzimplementierung
 
-**Symptom**: Agent bewertet eine Invariante oder System-Eigenschaft als erfüllt, weil eine konforme Referenzimplementierung im Code existiert, ohne zu verifizieren, ob diese Implementierung auch tatsächlich im produktiven Ausführungspfad aufgerufen wird (z. B. wenn stattdessen eine parallele, nicht-konforme Variante instanziiert wird).
+**Symptom**: Agent bewertet eine Invariante oder System-Eigenschaft als erfüllt, weil eine konforme Referenzimplementierung im Code existiert, ohne zu verifizieren, ob diese Implementierung auch tatsächlich im produktiven Ausführungspfad aufgerufen wird.
 
 **Heilmittel**: Vor Aussagen zur Invarianten-Compliance stets per Call-Graph / grep den tatsächlichen Aufrufpfad im Produktionscode verifizieren:
 ```bash

@@ -6,7 +6,7 @@ This document describes the automated weekly proactive audit pipeline and mutati
 
 ## 1. Setup & Requirements
 
-*(Hinweis: Das Label `jules-audit` ist historisch und wird im automatisierten Workflow nicht mehr aktiv verwendet, da Audit-Aufträge nun als Repository-Artefakt via PR übermittelt werden. Die PR-Erstellung erfolgt über die GitHub Action `peter-evans/create-pull-request@v6`.)*
+*(Hinweis: Das Label `jules-audit` ist historisch und wird im automatisierten Workflow nicht mehr aktiv verwendet, da Audit-Aufträge nun als Repository-Artefakt via PR übermittelt werden. Die PR-Erstellung erfolgt über die GitHub Action `peter-evans/create-pull-request@v6` <!-- doc-ref-ignore -->.)*
 
 ---
 
@@ -18,13 +18,13 @@ Er besteht aus zwei unabhängigen Jobs:
 
 ### Job 1: `prepare-audit-context`
 - Sammelt alle Commit-Logs der letzten 7 Tage (`git log --since="7 days ago" --oneline --no-merges`).
-- Prüft vor Erstellung, ob bereits eine unbearbeitete `.jules/pending-audit-task.md` existiert:
-  - Falls existiert und nicht mit `STATUS: DONE` markiert ist, wird eine Workflow-Log-Warnung (`::warning::`) ausgegeben und der neue Auftrag wird als weiterer Abschnitt angehängt (kein Fehlschlag des Jobs, verhindert Datenverlust).
+- Prüft vor Erstellung, ob bereits eine unbearbeitete `.jules/pending-audit-task.md` <!-- doc-ref-ignore --> existiert:
+  - Falls existiert und nicht mit `STATUS: DONE` markiert ist, wird eine Workflow-Log-Warnung (`::warning::`) ausgegeben und der neue Auftrag wird als weiterer Abschnitt angehängt.
   - Falls nicht existiert oder mit `STATUS: DONE` markiert ist, wird die Datei mit dem Header (`STATUS: OPEN`, `CREATED: YYYY-MM-DD`) neu erstellt.
-- Öffnet automatisch einen Pull Request gegen `main` auf dem Branch `automated/weekly-audit-task-<Datum>` via `peter-evans/create-pull-request@v6`.
+- Öffnet automatisch einen Pull Request gegen `main` auf dem Branch `automated/weekly-audit-task-<Datum>` <!-- doc-ref-ignore --> via `peter-evans/create-pull-request@v6` <!-- doc-ref-ignore -->.
 - Der Auftragstext verweist strikt auf `.jules/AUDIT_INTAKE_PROTOCOL.md` und fordert die Prüfung auf:
   1. Race Conditions / TOCTOU-Fehler
-  2. Neue `.unwrap()` / `.expect()` außerhalb der Baseline (`.unwrap-baseline.json`)
+  2. Neue `.unwrap()` / `.expect()` außerhalb der Baseline (`.github/unwrap_baseline.txt`)
   3. Silent-Failure-Pattern (`let _ = ...` bei I/O-Operationen)
   4. DAG-Grenzverletzungen in `Cargo.toml`-Dependencies
 
@@ -35,17 +35,17 @@ Er besteht aus zwei unabhängigen Jobs:
   - **Woche 1**: `contextra-vector`
   - **Woche 2**: `contextra-agent`
   - **Woche 3**: `contextra-db`
-- Löst für den berechneten Fokus-Crate den `mutation-testing.yml`-Workflow via `workflow_dispatch` aus.
+- Löst für den berechneten Fokus-Crate den `mutation-testing.yml` <!-- doc-ref-ignore --> Workflow via `workflow_dispatch` aus.
 
 ---
 
 ## 3. Workflow für die Bearbeitung (Artefakt-Handoff)
 
 Statt manueller Issue-Zuweisung wird der Audit-Auftrag direkt als Artefakt im Repository verarbeitet:
-1. Der automatische PR mit Branch `automated/weekly-audit-task-<Datum>` wird gemergt.
-2. Eine neue Jules-Session prüft beim Empfehlungsschritt in Phase 1 von `.jules/SESSION_BOOTSTRAP.md`, ob `.jules/pending-audit-task.md` mit `STATUS: OPEN` existiert.
+1. Der automatische PR mit Branch `automated/weekly-audit-task-<Datum>` <!-- doc-ref-ignore --> wird gemergt.
+2. Eine neue Jules-Session prüft beim Empfehlungsschritt in Phase 1 von `.jules/SESSION_BOOTSTRAP.md`, ob `.jules/pending-audit-task.md` <!-- doc-ref-ignore --> mit `STATUS: OPEN` existiert.
 3. Jules arbeitet den Auftrag gemäß `.jules/AUDIT_INTAKE_PROTOCOL.md` ab.
-4. Nach Abschluss (oder wenn kein Fund verifiziert werden kann) wird der Header der Datei `.jules/pending-audit-task.md` auf `STATUS: DONE` gesetzt.
+4. Nach Abschluss wird der Header der Datei `.jules/pending-audit-task.md` <!-- doc-ref-ignore --> auf `STATUS: DONE` gesetzt.
 
 ---
 
