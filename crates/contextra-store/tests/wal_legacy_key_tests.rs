@@ -71,7 +71,7 @@ async fn test_regular_open_rejects_legacy_integrity_key() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_open_for_legacy_migration_accepts_and_logs_warning() {
     let dir = tempdir().expect("tempdir");
     let wal_path = dir.path().join("legacy_migration.wal");
@@ -96,17 +96,15 @@ async fn test_open_for_legacy_migration_accepts_and_logs_warning() {
     // Set up log capture
     let logs = Arc::new(Mutex::new(Vec::<String>::new()));
     let collector = LogCollector(logs.clone());
-    let dispatch = tracing::Dispatch::new(collector);
 
-    let wal = tracing::dispatcher::with_default(&dispatch, || async {
-        Wal::open_for_legacy_migration(&wal_path, None).await
-    })
-    .await
-    .expect("open_for_legacy_migration must accept legacy segment");
+    let _guard = tracing::subscriber::set_default(collector);
+    tracing::callsite::rebuild_interest_cache();
 
-    let entries = tracing::dispatcher::with_default(&dispatch, || async { wal.replay().await })
+    let wal = Wal::open_for_legacy_migration(&wal_path, None)
         .await
-        .expect("replay legacy segment");
+        .expect("open_for_legacy_migration must accept legacy segment");
+
+    let entries = wal.replay().await.expect("replay legacy segment");
 
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].1.seq_no, 10);

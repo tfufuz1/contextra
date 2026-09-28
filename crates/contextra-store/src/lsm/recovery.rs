@@ -150,6 +150,7 @@ impl LsmStorage {
 
         let manifest_path = config.path.join("MANIFEST");
         let manifest_exists = manifest_path.exists();
+        #[allow(clippy::type_complexity)]
         let (valid_manifest_sstables, dead_manifest_sstables, manifest_hwm): (
             Option<std::collections::HashSet<std::path::PathBuf>>,
             Option<std::collections::HashSet<std::path::PathBuf>>,

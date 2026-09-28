@@ -123,7 +123,9 @@ impl Wal {
         let poisoned = Arc::clone(&self.poisoned);
         let key_manager = self.key_manager.clone();
         let fallback_integrity_key = self.fallback_integrity_key;
-        let allow_legacy_integrity_key_fallback = self.allow_legacy_integrity_key_fallback;
+        let allow_legacy_integrity_key_fallback =
+            Arc::clone(&self.allow_legacy_integrity_key_fallback);
+        let legacy_key_used = Arc::clone(&self.legacy_key_used);
 
         let handle = tokio::spawn(async move {
             let mut pending_cmd: Option<WalCommand> = None;
@@ -552,7 +554,10 @@ impl Wal {
                             &path,
                             key_manager.as_deref(),
                             fallback_integrity_key,
-                            allow_legacy_integrity_key_fallback,
+                            allow_legacy_integrity_key_fallback.load(
+                                std::sync::atomic::Ordering::SeqCst,
+                            ),
+                            &legacy_key_used,
                             |seq, entry, pos| item_tx.send((seq, entry, pos)).is_ok(),
                         )
                         .await;

@@ -181,6 +181,83 @@ impl Wal {
         }
     }
 
+    pub(crate) fn migration_marker_path(wal_path: &Path) -> PathBuf {
+        PathBuf::from(format!("{}.rekeyed", wal_path.display()))
+    }
+
+    pub(crate) async fn has_migration_marker(wal_path: &Path) -> bool {
+        let marker = Self::migration_marker_path(wal_path);
+        super::fs::try_exists(&marker).await.unwrap_or(false)
+    }
+
+    pub(crate) async fn write_migration_marker_atomically(wal_path: &Path) -> Result<()> {
+        let marker_path = Self::migration_marker_path(wal_path);
+        let parent = marker_path.parent().unwrap_or_else(|| Path::new("."));
+        let parent_dir = if parent.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            parent
+        };
+
+        use rand::RngCore;
+        use tokio::io::AsyncWriteExt;
+
+        let tmp_path = parent_dir.join(format!(
+            "{}.tmp.{}.{}",
+            marker_path
+                .file_name()
+                .map(|s| s.to_string_lossy())
+                .unwrap_or_default(),
+            std::process::id(),
+            rand::thread_rng().next_u64()
+        ));
+
+        let mut options = super::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+
+        let mut file = match options.open(&tmp_path).await {
+            Ok(f) => f,
+            Err(e) => {
+                return Err(ContextraError::Storage(format!(
+                    "Failed to create temporary WAL migration marker file at {}: {}",
+                    tmp_path.display(),
+                    e
+                )));
+            }
+        };
+
+        let marker_content = b"rekeyed=v3\n";
+        if let Err(e) = file.write_all(marker_content).await {
+            let _ = super::fs::remove_file(&tmp_path).await;
+            return Err(ContextraError::Storage(format!(
+                "Failed to write WAL migration marker: {}",
+                e
+            )));
+        }
+
+        if let Err(e) = file.sync_all().await {
+            let _ = super::fs::remove_file(&tmp_path).await;
+            return Err(ContextraError::Storage(format!(
+                "Failed to sync WAL migration marker file: {}",
+                e
+            )));
+        }
+        drop(file);
+
+        if let Err(e) = super::fs::rename(&tmp_path, &marker_path).await {
+            let _ = super::fs::remove_file(&tmp_path).await;
+            return Err(ContextraError::Storage(format!(
+                "Failed to rename WAL migration marker from {} to {}: {}",
+                tmp_path.display(),
+                marker_path.display(),
+                e
+            )));
+        }
+
+        crate::util::fsync_parent_dir(&marker_path).await?;
+        Ok(())
+    }
+
     pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {
         let uuid_path = {
             let mut p = wal_path.as_os_str().to_os_string();
