@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-09-15
+// ZWECK: Datenstruktur und (De-)Serialisierungslogik für SSTable-Manifest-Einträge (ManifestEntry).
+// INVARIANTEN: Binäre Abwärtskompatibilität der Serialisierung; CRC32-Integritätsprüfung für jeden Eintrag.
+// HOTSPOTS: to_bytes, from_bytes
+// NICHT-OFFENSICHTLICH: Das Feld `rank` in `ManifestEntry::Replace` dient ausschließlich als Zähler während des Manifest-Replays und NICHT als Sortierkriterium für die Lese-Sichtbarkeit.
+
 use contextra_core::{ContextraError, Result};
 use std::path::PathBuf;
 
@@ -17,6 +24,12 @@ pub enum ManifestEntry {
         removed: Vec<PathBuf>,
         added: PathBuf,
         added_max_tx: u64,
+        /// Dieses Feld dient ausschließlich einer historischen Existenz-/Gültigkeitszähler-Funktion
+        /// während des Manifest-Replays (siehe `core::reconstruct_valid_sstables`) und wird NICHT für die
+        /// Bestimmung der Lese-Sichtbarkeitsreihenfolge verwendet — diese wird ausschließlich über
+        /// `SstableMetadata::max_seq` bestimmt (siehe `lsm/ops/compaction.rs`,
+        /// `sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT)`). Zukünftige Wartende dürfen `rank`
+        /// NICHT als Sortierkriterium interpretieren oder heranziehen.
         rank: u64,
     },
     /// A WAL high-water-mark entry recording the valid WAL-tail HMAC at flush/checkpoint time.
