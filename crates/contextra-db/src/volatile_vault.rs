@@ -216,24 +216,6 @@ impl VolatileContextVault {
         }
     }
 
-    /// Interne Funktion: Chunks aus dem Vault entnehmen, damit der Aufrufer
-    /// sie in den permanenten Index committen kann.
-    ///
-    /// ACHTUNG: Nach diesem Aufruf liegt die Verantwortung für das Zeroize beim
-    /// Aufrufer. Diese Funktion ist `pub(crate)` — nicht Teil der öffentlichen API.
-    /// Externe Aufrufer nutzen den `CollectionEngine`-Adapter (kommt in einem
-    /// Folge-PR, sobald `context_scope.rs` vorliegt).
-    #[allow(dead_code)]
-    pub(crate) fn drain_for_commit(&mut self) -> Vec<VaultChunk> {
-        self.consumed = true;
-
-        // munlock vor dem Drain (Chunks verlassen den Vault — mlock-Bindung aufheben).
-        self.mlock_regions.unlock_all();
-
-        self.current_bytes = 0;
-        std::mem::take(&mut self.chunks)
-    }
-
     /// Wie viele Bytes liegen aktuell im Vault (RAM)?
     pub fn current_size_bytes(&self) -> usize {
         self.current_bytes

@@ -347,15 +347,6 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         Ok(TxId::new(TxId::INTERNAL_BASE + raw))
     }
 
-    #[deprecated(
-        since = "0.1.0",
-        note = "Use `allocate_tx()` instead — both methods are functionally identical, `allocate_tx()` is the canonical public API."
-    )]
-    #[allow(dead_code)]
-    async fn next_tx(&self) -> Result<TxId> {
-        self.allocate_tx().await
-    }
-
     pub fn skipped_rollback_count(&self) -> u64 {
         self.skipped_rollbacks.load(Ordering::Relaxed)
     }

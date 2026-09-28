@@ -79,9 +79,6 @@ impl BanditExploration {
 /// to provide meaningful routing signal — the router behaves as a random router.
 pub(crate) const CALIBRATION_WARMUP_WINDOW: u32 = 100;
 
-/// Minimum calibration samples required for high confidence coverage (α=0.05).
-#[allow(dead_code)]
-pub(crate) const CALIBRATION_HIGH_CONFIDENCE_WINDOW: u32 = 200;
 
 /// Maximale TTL für ausstehende Routing-Entscheidungen bevor sie bereinigt werden.
 pub(crate) const PENDING_DECISION_TTL: Duration = Duration::from_secs(300);
@@ -186,7 +183,9 @@ pub(crate) const COMMUNITY_RELEVANCE_BOOST: f32 = 1.2;
 #[derive(Debug, Clone)]
 pub(crate) struct ProfileScoring {
     pub aggregated_score: f32,
+    #[cfg(test)]
     pub max_score: f32,
+    #[cfg(test)]
     pub community_matched: bool,
 }
 
@@ -195,7 +194,9 @@ pub(crate) fn score_profile(
     chunks: &[(ContextChunk, Option<u64>)],
 ) -> ProfileScoring {
     let mut aggregated_score = 0.0f32;
+    #[cfg(test)]
     let mut max_score = 0.0f32;
+    #[cfg(test)]
     let mut community_matched = profile.domain_communities.is_empty();
 
     for (chunk, comm_id) in chunks {
@@ -207,7 +208,10 @@ pub(crate) fn score_profile(
             || comm_id.is_some_and(|cid| profile.domain_communities.contains(&cid));
 
         if is_match {
-            community_matched = true;
+            #[cfg(test)]
+            {
+                community_matched = true;
+            }
             let boost = if comm_id.is_some_and(|cid| profile.domain_communities.contains(&cid)) {
                 COMMUNITY_RELEVANCE_BOOST
             } else {
@@ -215,6 +219,7 @@ pub(crate) fn score_profile(
             };
             let boosted_relevance = chunk.relevance * boost;
             aggregated_score += boosted_relevance;
+            #[cfg(test)]
             if boosted_relevance > max_score {
                 max_score = boosted_relevance;
             }
@@ -223,7 +228,9 @@ pub(crate) fn score_profile(
 
     ProfileScoring {
         aggregated_score,
+        #[cfg(test)]
         max_score,
+        #[cfg(test)]
         community_matched,
     }
 }
@@ -248,7 +255,7 @@ pub(crate) fn compute_profile_scores(
         .collect()
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn compute_max_score(
     profile: &SlmProfile,
     chunks: &[(ContextChunk, Option<u64>)],
@@ -256,7 +263,7 @@ pub(crate) fn compute_max_score(
     score_profile(profile, chunks).max_score
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn select_profile_from_chunks(
     profiles: &[SlmProfile],
     chunks: &[(ContextChunk, Option<u64>)],

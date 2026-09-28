@@ -18,6 +18,7 @@ mod tests;
 
 pub use config::*;
 pub use core::OllamaClient;
+#[cfg(test)]
 #[allow(unused_imports)]
 pub(crate) use core::{parse_prompt_template, ParsedPrompt};
 pub use errors::*;
