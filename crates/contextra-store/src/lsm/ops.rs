@@ -1,6 +1,6 @@
 mod compaction;
 mod maintenance;
-mod read;
+pub(super) mod read;
 mod write;
 
 use super::*;

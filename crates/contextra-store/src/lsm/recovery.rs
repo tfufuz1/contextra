@@ -463,6 +463,7 @@ impl LsmStorage {
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
+            ssi_validator: Arc::new(contextra_mvcc::SequenceLogSsiValidator::new()),
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {
