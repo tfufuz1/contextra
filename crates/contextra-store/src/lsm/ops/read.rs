@@ -5,6 +5,27 @@ use bytes::Bytes;
 use contextra_core::{Result, StorageEngine, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 
+pub(crate) async fn get_tracked(
+    storage: &LsmStorage,
+    tx_id: contextra_core::TxId,
+    key: &[u8],
+) -> Result<Option<Bytes>> {
+    validate_key(key)?;
+    let snapshot_seq = storage.next_seq_no.load(Ordering::Acquire).saturating_sub(1);
+    get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await
+}
+
+pub(crate) async fn get_at_seq_tracked(
+    storage: &LsmStorage,
+    tx_id: contextra_core::TxId,
+    key: &[u8],
+    snapshot_seq: u64,
+) -> Result<Option<Bytes>> {
+    validate_key(key)?;
+    storage.tx_buffer.register_read(tx_id, key, snapshot_seq);
+    storage.get_at_seq(key, snapshot_seq).await
+}
+
 pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
     validate_key(key)?;
     let current_max_seq = storage.next_seq_no.load(Ordering::Acquire);

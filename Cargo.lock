@@ -1144,6 +1144,7 @@ dependencies = [
  "contextra-core",
  "contextra-crypto",
  "contextra-graph",
+ "contextra-mvcc",
  "contextra-ports",
  "contextra-sys",
  "contextra-testkit",

@@ -443,17 +443,6 @@ impl ContextraError {
         }
     }
 
-    /// Creates a `CrossDeviceLink` error.
-    pub fn cross_device_link(
-        source_path: impl Into<String>,
-        target_path: impl Into<String>,
-    ) -> Self {
-        Self::CrossDeviceLink {
-            source_path: source_path.into(),
-            target_path: target_path.into(),
-        }
-    }
-
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
     pub fn is_occ_conflict(&self) -> bool {
         matches!(self, Self::StaleRead(_) | Self::Conflict(_))

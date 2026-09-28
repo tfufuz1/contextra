@@ -8,6 +8,7 @@ use super::super::observer::WriteOrigin;
 use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
 use contextra_core::{ContextraError, IndexOp, Result, StorageEngine, TxId, TOMBSTONE_BIT};
+use contextra_mvcc::SsiValidator;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -204,10 +205,25 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     // FIX: Commit-Mutex serialisiert fetch_add + wal.prepare_batch.
     let _commit_lock = storage.commit_mutex.lock().await;
 
+    // 1. ReadSet VOR drain_kv auslesen (K1: TxBuffer::drain entfernt das ReadSet!)
+    let read_set = storage.tx_buffer.get_read_set(tx_id);
+
+    // 2. Transaktions-Operationen aus TxBuffer entnehmen
     let ops = storage.tx_buffer.drain_kv(tx_id);
     if ops.is_empty() {
         storage.cleanup_intent_locks_for_tx(tx_id);
         return Ok(());
+    }
+
+    // 3. SSI ReadSet Validierung unter commit_mutex VOR der Sequenznummern-Vergabe (K3)
+    // Wenn Konflikt vorliegt: Abbruch BEVOR next_seq_no per fetch_add inkrementiert wird!
+    if let Some(ref rs) = read_set {
+        if !rs.is_empty() {
+            if let Err(e) = storage.ssi_validator.validate(tx_id, rs) {
+                storage.cleanup_intent_locks_for_tx(tx_id);
+                return Err(e);
+            }
+        }
     }
 
     let mut wal_ops = Vec::with_capacity(ops.len() + 1);
@@ -258,6 +274,18 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         },
         last_seq,
     ));
+
+    // 5. Committed Keys für SSI-Validierung registrieren (K3, K4)
+    // Im Group-Commit-Pfad wird die commit_mutex VOR dem WAL-Append freigegeben.
+    // Zeichnest du erst nach dem Append auf, validieren zwei Transaktionen desselben Batches
+    // beide gegen einen leeren Validator und der Write-Skew passiert.
+    // Schlägt der WAL-Append später fehl, bleiben reservierte Keys stehen; das erzeugt nur
+    // zusätzliche (konservative) Konflikte, niemals fälschlich akzeptierte Commits.
+    // Verwendet die rohe seq_no ohne TOMBSTONE_BIT und schließt Deletes mit ein.
+    for (key, _, seq_no) in &mem_updates {
+        let raw_seq = seq_no & !TOMBSTONE_BIT;
+        storage.ssi_validator.record_commit_key(key, raw_seq);
+    }
 
     // --- PHASE 2: Prepare WAL entries under commit_mutex ---
     let wal = storage.wal.read().await.clone();
