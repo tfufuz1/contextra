@@ -255,8 +255,11 @@ impl Wal {
         };
 
         if let Err(e) = verify_res {
-            eprintln!("REPLAY_MMAP VERIFY ERROR: {:?}", e);
-            if !*using_legacy_key && self.allow_legacy_integrity_key_fallback {
+            if !*using_legacy_key
+                && self
+                    .allow_legacy_integrity_key_fallback
+                    .load(std::sync::atomic::Ordering::SeqCst)
+            {
                 let mut legacy_verifier = IntegrityVerifier::new(&legacy_integrity_key());
                 legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
                 let legacy_res = match version {
@@ -278,6 +281,8 @@ impl Wal {
                     );
                     *verifier = legacy_verifier;
                     *using_legacy_key = true;
+                    self.legacy_key_used
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
                     Ok(())
                 } else {
                     Err(e.into())
@@ -415,7 +420,9 @@ impl Wal {
                 if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some() {
                     let km = match self.key_manager.as_ref() {
                         Some(km) => km,
-                        None => unreachable!(),
+                        None => {
+                            return Err(ContextraError::Storage("Key manager missing".into()));
+                        }
                     };
                     if entry_data_raw.len() < 12 {
                         if pos >= file_size {

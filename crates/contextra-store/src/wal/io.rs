@@ -15,6 +15,7 @@ use super::legacy_integrity_key;
 #[cfg(feature = "fault-injection")]
 use super::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
 
+#[allow(deprecated, clippy::too_many_arguments)]
 pub(crate) async fn do_scan_entries_with_callback<F>(
     file: &mut super::fs::File,
     file_size: u64,
@@ -22,6 +23,7 @@ pub(crate) async fn do_scan_entries_with_callback<F>(
     _key_manager: Option<&super::KeyManager>,
     fallback_integrity_key: Option<[u8; 32]>,
     allow_legacy_integrity_key_fallback: bool,
+    legacy_key_used: &std::sync::atomic::AtomicBool,
     mut callback: F,
 ) -> Result<WalVersion>
 where
@@ -312,6 +314,7 @@ where
                                 );
                                 verifier = legacy_verifier;
                                 using_legacy_key = true;
+                                legacy_key_used.store(true, std::sync::atomic::Ordering::SeqCst);
                             } else {
                                 return Err(e.into());
                             }
@@ -442,6 +445,7 @@ where
                             );
                             verifier = legacy_verifier;
                             using_legacy_key = true;
+                            legacy_key_used.store(true, std::sync::atomic::Ordering::SeqCst);
                         } else {
                             return Err(e.into());
                         }
@@ -961,6 +965,7 @@ mod tests {
         let fallback_key = [1u8; 32];
         let mut scanned_entries = Vec::new();
 
+        let dummy_legacy_flag = std::sync::atomic::AtomicBool::new(false);
         let res = do_scan_entries_with_callback(
             &mut file,
             4,
@@ -968,6 +973,7 @@ mod tests {
             None,
             Some(fallback_key),
             false,
+            &dummy_legacy_flag,
             |_seq, entry, _pos| {
                 scanned_entries.push(entry);
                 true

@@ -436,7 +436,10 @@ impl ContextraError {
     }
 
     /// Creates a `CrossDeviceLink` error.
-    pub fn cross_device_link(source_path: impl Into<String>, target_path: impl Into<String>) -> Self {
+    pub fn cross_device_link(
+        source_path: impl Into<String>,
+        target_path: impl Into<String>,
+    ) -> Self {
         Self::CrossDeviceLink {
             source_path: source_path.into(),
             target_path: target_path.into(),
@@ -448,17 +451,6 @@ impl ContextraError {
         Self::WalTruncationDetected {
             expected_hmac,
             actual_hmac,
-        }
-    }
-
-    /// Creates a `CrossDeviceLink` error.
-    pub fn cross_device_link(
-        source_path: impl Into<String>,
-        target_path: impl Into<String>,
-    ) -> Self {
-        Self::CrossDeviceLink {
-            source_path: source_path.into(),
-            target_path: target_path.into(),
         }
     }
 

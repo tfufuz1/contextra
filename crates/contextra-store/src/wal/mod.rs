@@ -310,7 +310,8 @@ pub struct Wal {
     pub(crate) header_written: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) key_manager: Option<Arc<KeyManager>>,
     pub(crate) fallback_integrity_key: Option<[u8; 32]>,
-    pub(crate) allow_legacy_integrity_key_fallback: bool,
+    pub(crate) allow_legacy_integrity_key_fallback: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) legacy_key_used: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,
     pub(crate) flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::Sender<WalCommand>>>,
     pub(crate) flusher_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
@@ -345,17 +346,85 @@ impl Wal {
     ///
     /// **INV-WAL-LEGACY-KEY-1**: This is the ONLY entry point permitted to enable
     /// `allow_legacy_integrity_key_fallback = true` for legacy WAL migration.
+    ///
+    /// # Forced Migration Workflow
+    /// Calling this function automatically triggers a one-time forced migration (rekeying):
+    /// - **(a) Automated Rekeying**: Replays all entries using the static XOR legacy key fallback and
+    ///   rewrites the WAL log as V3 entries signed with a freshly generated, secure, file-local
+    ///   integrity key (persisted in `.wal_integrity_key`).
+    /// - **(b) Permanent Opt-Out**: Upon successful migration, a `.rekeyed` migration marker is
+    ///   atomically written to disk, permanently disabling legacy fallback for this `Wal` handle and
+    ///   for future process restarts on this file path.
+    /// - **(c) Cryptographic Isolation**: The static XOR-obfuscated legacy key (`wal/hmac.rs`)
+    ///   remains intentionally weak solely for one-time transitional reading of legacy files; it is
+    ///   never used for new writes after migration.
+    /// - **(d) Error Boundary**: If rekeying fails (e.g., I/O write error), an `Err(...)` is returned,
+    ///   preventing silent ongoing operation in legacy mode.
     pub async fn open_for_legacy_migration(
         path: impl AsRef<Path>,
         key_manager: Option<Arc<KeyManager>>,
     ) -> Result<Self> {
+        let path_ref = path.as_ref();
+        if Self::has_migration_marker(path_ref).await {
+            tracing::info!(
+                "WAL {:?} already has migration marker; opening via standard secure path.",
+                path_ref
+            );
+            return Self::open_with_key_manager(path_ref, key_manager).await;
+        }
+
         let config = WalConfig {
             allow_legacy_integrity_key_fallback: true,
             key_manager,
             min_wal_version: WalVersion::V1,
             ..Default::default()
         };
-        Self::open_with_config(path, config).await
+        let wal = Self::open_with_config(path_ref, config).await?;
+        wal.rekey_from_legacy().await?;
+        Ok(wal)
+    }
+
+    /// Performs forced rekeying of a legacy WAL segment to a secure integrity key.
+    pub(crate) async fn rekey_from_legacy(&self) -> Result<()> {
+        if Self::has_migration_marker(&self.path).await {
+            self.allow_legacy_integrity_key_fallback
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+            self.legacy_key_used
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+            return Ok(());
+        }
+
+        if !self.legacy_key_used.load(std::sync::atomic::Ordering::SeqCst) {
+            Self::write_migration_marker_atomically(&self.path).await?;
+            self.allow_legacy_integrity_key_fallback
+                .store(false, std::sync::atomic::Ordering::SeqCst);
+            return Ok(());
+        }
+
+        // 1. Replay all entries using current legacy-enabled handle
+        let entries = self.replay().await?;
+
+        // 2. Ensure secure integrity key exists on disk
+        let _secure_key = Self::load_or_create_integrity_key(&self.path).await?;
+
+        // 3. Rewrite all entries using the secure key
+        self.rewrite_as_v3(&entries).await?;
+
+        // 4. Atomically write the migration marker file
+        Self::write_migration_marker_atomically(&self.path).await?;
+
+        // 5. Permanently disable legacy fallback and clear legacy_key_used flag
+        self.allow_legacy_integrity_key_fallback
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        self.legacy_key_used
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+
+        tracing::info!(
+            "WAL segment {:?} successfully rekeyed from legacy static key to secure key.",
+            self.path
+        );
+
+        Ok(())
     }
 
     /// Opens an existing WAL file solely for read-only replay, without spawning
@@ -407,7 +476,10 @@ impl Wal {
             header_written: Arc::new(std::sync::atomic::AtomicBool::new(file_len > 0)),
             key_manager: derived_key_manager,
             fallback_integrity_key,
-            allow_legacy_integrity_key_fallback: config.allow_legacy_integrity_key_fallback,
+            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
+                config.allow_legacy_integrity_key_fallback,
+            )),
+            legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             flusher_task: std::sync::Mutex::new(None),
@@ -509,7 +581,10 @@ impl Wal {
             header_written: Arc::new(std::sync::atomic::AtomicBool::new(metadata.len() > 0)),
             key_manager: derived_key_manager,
             fallback_integrity_key,
-            allow_legacy_integrity_key_fallback: config.allow_legacy_integrity_key_fallback,
+            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
+                config.allow_legacy_integrity_key_fallback,
+            )),
+            legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             flusher_task: std::sync::Mutex::new(None),
@@ -563,7 +638,9 @@ impl Wal {
                                 format!("Failed to create backup copy {:?}: {}", bak_path, e)
                             }
                             (_, Err(e)) => format!("Failed to rewrite WAL as V3: {}", e),
-                            (Ok(_), Ok(_)) => unreachable!(),
+                            (Ok(_), Ok(_)) => {
+                                "Unexpected state during backup and rewrite".to_string()
+                            }
                         };
                         return Err(ContextraError::invalid_input(format!(
                             "Configuration error: WAL version {:?} is below min_wal_version {:?} and migration failed: {}",
@@ -660,7 +737,8 @@ impl Wal {
             header_written: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             key_manager: None,
             fallback_integrity_key: Some([1u8; 32]),
-            allow_legacy_integrity_key_fallback: false,
+            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
             flusher_tx: std::sync::RwLock::new(None),
             flusher_task: std::sync::Mutex::new(None),

@@ -12,18 +12,10 @@ use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
 use std::sync::Arc;
 
 /// Configuration for KV segment storage and shredding behavior.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct KvSegmentConfig {
     /// Delete mode specifying whether segments are tombstone-only or crypto-shredded.
     pub delete_mode: KvDeleteMode,
-}
-
-impl Default for KvSegmentConfig {
-    fn default() -> Self {
-        Self {
-            delete_mode: KvDeleteMode::default(),
-        }
-    }
 }
 
 /// Representation of a written KV segment (encrypted or raw payload with group_id and nonce).
@@ -77,11 +69,11 @@ impl KvSegmentManager {
     ) -> Result<KvSegmentPayload, ContextraError> {
         match self.config.delete_mode {
             KvDeleteMode::CryptoShred => {
-                let master_key = self.master_key.as_ref().ok_or_else(|| {
+                let master_key = self.master_key.as_ref().ok_or(
                     ContextraError::KvDeleteModeConfig(
                         "Master key is required for CryptoShred mode",
-                    )
-                })?;
+                    ),
+                )?;
                 let (ciphertext, nonce) = self
                     .registry
                     .encrypt_with_group(master_key, group_id, plaintext)
