@@ -1,0 +1,150 @@
+name: Deep Gates Orchestrator
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  gate-determinism-check:
+    name: Determinism Check Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Run determinism-check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cargo run --manifest-path xtask/Cargo.toml -- determinism-check --json --base "$BASE_SHA" --head "$HEAD_SHA" > determinism-check.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: gate-determinism-check
+          path: determinism-check.json
+
+  gate-unsafe-audit:
+    name: Unsafe Audit Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Run unsafe-audit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cargo run --manifest-path xtask/Cargo.toml -- unsafe-audit --json --miri > unsafe-audit.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: gate-unsafe-audit
+          path: unsafe-audit.json
+
+  gate-lock-audit:
+    name: Lock Audit Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Run lock-audit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cargo run --manifest-path xtask/Cargo.toml -- lock-audit --json --base "$BASE_SHA" --head "$HEAD_SHA" > lock-audit.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: gate-lock-audit
+          path: lock-audit.json
+
+  gate-wal-replay-verify:
+    name: WAL Replay Verify Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Run wal-replay-verify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cargo run --manifest-path xtask/Cargo.toml -- wal-replay-verify --json --base "$BASE_SHA" --head "$HEAD_SHA" > wal-replay-verify.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: gate-wal-replay-verify
+          path: wal-replay-verify.json
+
+  gate-mutants-diff:
+    name: Mutants Diff Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: taiki-e/install-action@e0956f9d9dbb1e627ef0de00822045c6cd14c74e # cargo-mutants
+      - name: Run mutants-diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cargo run --manifest-path xtask/Cargo.toml -- mutants-diff --json --base "$BASE_SHA" --head "$HEAD_SHA" > mutants-diff.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: gate-mutants-diff
+          path: mutants-diff.json
+
+  gate-fuzz-smoke:
+    name: Fuzz Smoke Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --quiet
+      - name: Run fuzz-smoke
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cargo run --manifest-path xtask/Cargo.toml -- fuzz-smoke --json --base "$BASE_SHA" --head "$HEAD_SHA" > fuzz-smoke.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: gate-fuzz-smoke
+          path: fuzz-smoke.json

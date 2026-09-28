@@ -1,0 +1,8 @@
+[missing_safety_comments]
+"crates/contextra-crypto/src/crypto.rs" = 0
+"crates/contextra-crypto/src/deletion_proof.rs" = 0
+"crates/contextra-simd/src/kernels/avx2.rs" = 0
+"crates/contextra-simd/src/kernels/scalar.rs" = 0
+"crates/contextra-simd/src/kernels/sse.rs" = 0
+"crates/contextra-sys/src/mmap.rs" = 0
+"crates/contextra-wire/src/contextra_generated.rs" = 0
