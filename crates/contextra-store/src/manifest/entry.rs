@@ -24,6 +24,8 @@ pub enum ManifestEntry {
         removed: Vec<PathBuf>,
         added: PathBuf,
         added_max_tx: u64,
+        /// Existenzprüfung, keine Sortierung
+        ///
         /// Dieses Feld dient ausschließlich einer historischen Existenz-/Gültigkeitszähler-Funktion
         /// während des Manifest-Replays (siehe `core::reconstruct_valid_sstables`) und wird NICHT für die
         /// Bestimmung der Lese-Sichtbarkeitsreihenfolge verwendet — diese wird ausschließlich über

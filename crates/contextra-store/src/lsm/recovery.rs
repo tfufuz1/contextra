@@ -2,6 +2,7 @@ use super::*;
 use crate::compaction::CompactionEngine;
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
+use crate::util::DirLock;
 use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
 use contextra_core::{
@@ -70,6 +71,30 @@ pub(super) async fn write_salt_atomically(
     write_res
 }
 
+pub(super) async fn directory_is_pristine(path: &std::path::Path) -> Result<bool> {
+    let mut entries = tokio::fs::read_dir(path)
+        .await
+        .map_err(|e| ContextraError::Storage(format!("Failed to read data dir for pristine check: {e}")))?;
+
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| ContextraError::Storage(format!("Failed to read directory entry for pristine check: {e}")))?
+    {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if name_str.starts_with("wal-")
+            || name_str == "wal.log"
+            || name_str.ends_with(".sst")
+            || name_str == "MANIFEST"
+        {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
+}
+
 struct PendingTxOp {
     lsn: u64,
     op: WalOp,
@@ -90,21 +115,34 @@ impl LsmStorage {
 
         crate::util::fsync_parent_dir(&config.path).await?;
 
+        let dir_lock = DirLock::acquire(&config.path, config.durability_mode)?;
+
         let salt_path = config.path.join("SALT");
-        let salt = if let Ok(buf) = tokio::fs::read(&salt_path).await {
-            if buf.len() != 32 {
-                return Err(ContextraError::Storage(format!(
-                    "Invalid SALT length: expected 32, got {}",
-                    buf.len()
-                )));
+        let salt = match tokio::fs::read(&salt_path).await {
+            Ok(buf) => {
+                if buf.len() != 32 {
+                    return Err(ContextraError::Storage(format!(
+                        "Invalid SALT length: expected 32, got {}",
+                        buf.len()
+                    )));
+                }
+                buf
             }
-            buf
-        } else {
-            let mut buf = [0u8; 32];
-            use rand::Rng;
-            rand::thread_rng().fill(&mut buf);
-            write_salt_atomically(&salt_path, &buf).await?;
-            buf.to_vec()
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                if !directory_is_pristine(&config.path).await? {
+                    return Err(ContextraError::Storage(
+                        "SALT file missing in non-pristine database directory".into(),
+                    ));
+                }
+                let mut buf = [0u8; 32];
+                use rand::Rng;
+                rand::thread_rng().fill(&mut buf);
+                write_salt_atomically(&salt_path, &buf).await?;
+                buf.to_vec()
+            }
+            Err(e) => {
+                return Err(ContextraError::Storage(format!("SALT nicht lesbar: {e}")));
+            }
         };
 
         let key_manager = config
@@ -119,7 +157,11 @@ impl LsmStorage {
             .await
             .map_err(|e| ContextraError::Storage(format!("Failed to read data dir: {}", e)))?;
 
-        while let Ok(Some(entry)) = entries.next_entry().await {
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed to read directory entry: {e}")))?
+        {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
             if name_str.starts_with("wal-") && name_str.ends_with(".log") {
@@ -282,21 +324,26 @@ impl LsmStorage {
         let tx_buffer = TxBuffer::new_with_config(16, config.tx_timeout);
 
         let mut pending_rollbacks = Vec::new();
-        if let Ok(mut entries) = tokio::fs::read_dir(&config.path).await {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                let path = entry.path();
-                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if file_name.starts_with("rollback-") && file_name.ends_with(".intent") {
-                    let hex_part = &file_name[9..file_name.len() - 7];
-                    if hex_part.len() == 16 {
-                        if let Ok(target_tx) = u64::from_str_radix(hex_part, 16) {
-                            tracing::error!(
-                                target_tx = target_tx,
-                                intent_path = ?path,
-                                "Unfinished rollback intent file detected during LsmStorage startup! Recovery required."
-                            );
-                            pending_rollbacks.push(target_tx);
-                        }
+        let mut entries = tokio::fs::read_dir(&config.path)
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed to read data dir: {e}")))?;
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed to read directory entry: {e}")))?
+        {
+            let path = entry.path();
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if file_name.starts_with("rollback-") && file_name.ends_with(".intent") {
+                let hex_part = &file_name[9..file_name.len() - 7];
+                if hex_part.len() == 16 {
+                    if let Ok(target_tx) = u64::from_str_radix(hex_part, 16) {
+                        tracing::error!(
+                            target_tx = target_tx,
+                            intent_path = ?path,
+                            "Unfinished rollback intent file detected during LsmStorage startup! Recovery required."
+                        );
+                        pending_rollbacks.push(target_tx);
                     }
                 }
             }
@@ -304,44 +351,49 @@ impl LsmStorage {
         pending_rollbacks.sort_unstable();
 
         let mut sst_files = Vec::new();
-        if let Ok(mut entries) = tokio::fs::read_dir(&config.path).await {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                let path = entry.path();
-                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if file_name.ends_with(".tmp")
-                    || path.extension().is_some_and(|ext| ext == "tmp")
-                    || file_name.starts_with("SALT.tmp.")
-                    || file_name.starts_with("MANIFEST.new.")
-                {
-                    tracing::warn!("Removing leftover un-renamed temp file: {:?}", path);
-                    if let Err(e) = tokio::fs::remove_file(&path).await {
-                        tracing::warn!("Failed to remove leftover temp file {:?}: {}", path, e);
-                    }
-                } else if path.extension().is_some_and(|ext| ext == "sst") {
-                    if let Some(ref valid_set) = valid_manifest_sstables {
-                        let path_key = std::path::Path::new(file_name);
-                        if valid_set.contains(path_key) {
-                            sst_files.push(path);
-                        } else if dead_manifest_sstables
-                            .as_ref()
-                            .is_some_and(|dead_set| dead_set.contains(path_key))
-                        {
-                            tracing::info!(
-                                "Removing dead SSTable file proven by MANIFEST: {:?}",
-                                path
-                            );
-                            if let Err(e) = tokio::fs::remove_file(&path).await {
-                                tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
-                            }
-                        } else {
-                            tracing::warn!(
-                                "Unmanifested or orphaned SSTable file found in data directory (skipping): {:?}",
-                                path
-                            );
+        let mut entries = tokio::fs::read_dir(&config.path)
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed to read data dir: {e}")))?;
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| ContextraError::Storage(format!("Failed to read directory entry: {e}")))?
+        {
+            let path = entry.path();
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if file_name.ends_with(".tmp")
+                || path.extension().is_some_and(|ext| ext == "tmp")
+                || file_name.starts_with("SALT.tmp.")
+                || file_name.starts_with("MANIFEST.new.")
+            {
+                tracing::warn!("Removing leftover un-renamed temp file: {:?}", path);
+                if let Err(e) = tokio::fs::remove_file(&path).await {
+                    tracing::warn!("Failed to remove leftover temp file {:?}: {}", path, e);
+                }
+            } else if path.extension().is_some_and(|ext| ext == "sst") {
+                if let Some(ref valid_set) = valid_manifest_sstables {
+                    let path_key = std::path::Path::new(file_name);
+                    if valid_set.contains(path_key) {
+                        sst_files.push(path);
+                    } else if dead_manifest_sstables
+                        .as_ref()
+                        .is_some_and(|dead_set| dead_set.contains(path_key))
+                    {
+                        tracing::info!(
+                            "Removing dead SSTable file proven by MANIFEST: {:?}",
+                            path
+                        );
+                        if let Err(e) = tokio::fs::remove_file(&path).await {
+                            tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
                         }
                     } else {
-                        sst_files.push(path);
+                        tracing::warn!(
+                            "Unmanifested or orphaned SSTable file found in data directory (skipping): {:?}",
+                            path
+                        );
                     }
+                } else {
+                    sst_files.push(path);
                 }
             }
         }
@@ -374,7 +426,9 @@ impl LsmStorage {
         sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
         let sstables = Arc::new(RwLock::new(sstables));
 
-        let manifest = Arc::new(crate::manifest::Manifest::open(&manifest_path).await?);
+        let manifest = Arc::new(
+            crate::manifest::Manifest::open_with_dir_lock(&manifest_path, Some(dir_lock)).await?,
+        );
         if !manifest_exists {
             let ssts_read = sstables.read().await;
             let mut add_entries = Vec::with_capacity(ssts_read.len() + 1);

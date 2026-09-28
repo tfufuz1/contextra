@@ -1,8 +1,49 @@
 // FILE-CONTEXT: Utility functions for contextra-store (fsync helpers, etc.) (TS: 2026-08-29T17:17:31Z) (SESSION: 8f882f1f)
 //! Utility functions for storage engine operations.
 
+use crate::lsm::config::DurabilityMode;
 use contextra_core::{ContextraError, Result};
+use std::fs::{File, TryLockError};
 use std::path::Path;
+
+/// Handle for exclusive database directory locking.
+#[derive(Debug)]
+pub(crate) struct DirLock {
+    _file: Option<File>,
+}
+
+impl DirLock {
+    /// Acquires an exclusive lock on `dir/LOCK`.
+    pub(crate) fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
+        let lock_path = dir.join("LOCK");
+        let file = File::create(&lock_path).map_err(|e| {
+            ContextraError::Storage(format!(
+                "Failed to open/create LOCK file at {}: {e}",
+                lock_path.display()
+            ))
+        })?;
+
+        match file.try_lock() {
+            Ok(()) => Ok(Self { _file: Some(file) }),
+            Err(TryLockError::WouldBlock) => Err(ContextraError::Storage(
+                "Datenverzeichnis bereits in Benutzung".into(),
+            )),
+            Err(TryLockError::Error(e)) => {
+                if durability_mode == DurabilityMode::Full {
+                    Err(ContextraError::Storage(format!(
+                        "Dateisperre auf diesem Dateisystem nicht unterstützt: {e}"
+                    )))
+                } else {
+                    tracing::warn!(
+                        "Dateisperre auf diesem Dateisystem nicht unterstützt ({}); fahre ohne Sperre fort: {e}",
+                        lock_path.display()
+                    );
+                    Ok(Self { _file: None })
+                }
+            }
+        }
+    }
+}
 
 /// Performs fsync on the parent directory of `path`.
 ///
