@@ -300,24 +300,17 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {
-        let entries_for_observer = wal_entries.entries().to_vec();
+        let entries_for_observer = if storage.has_observers() {
+            wal_entries.entries().to_vec()
+        } else {
+            Vec::new()
+        };
         let single_append_res = match storage.config.durability_mode {
-            DurabilityMode::Full => wal.append_batch(wal_entries).await,
-            DurabilityMode::WalNoHmac => {
-                let res = wal.append_batch(wal_entries).await;
-                if res.is_ok() {
-                    let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
-                }
-                res
-            }
-            DurabilityMode::MemoryOnly => {
-                let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
-                Ok(())
-            }
+            DurabilityMode::Full | DurabilityMode::WalNoHmac => wal.append_batch(wal_entries).await,
+            DurabilityMode::MemoryOnly => Ok(()),
         };
 
         if let Err(e) = single_append_res {
-            let _ = wal.restore_last_hmac(prev_hmac_snapshot).await;
             let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
             let commit_guard = CommitGuard {
                 _lock: &_commit_lock,
@@ -335,19 +328,20 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             )));
         }
 
-        storage.notify_commit_observers(&entries_for_observer, tx_id, WriteOrigin::UserWrite);
+        let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
+        storage.notify_commit_observers(&entries_for_observer, tx_id, WriteOrigin::UserWrite, is_durable);
 
         // MemTable ist intern per parking_lot::RwLock nebenläufigkeitssicher; die äußere
         // LsmState-Sperre schützt ausschließlich die Struktur des immutable_memtables-Vektors,
         // nicht den MemTable-Inhalt selbst — ein read()-Guard genügt für apply_mem_updates in beiden Commit-Pfaden.
         let state = storage.state.read().await;
-        storage.advance_visibility(tx_id);
         storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
+        storage.advance_visibility(tx_id);
 
         let should_flush = state.memtable.size() > storage.config.memtable_size_limit;
         drop(state);
         if should_flush {
-            storage.flush().await?;
+            storage.request_flush();
         }
 
         storage.cleanup_intent_locks_for_tx(tx_id);
@@ -395,22 +389,25 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                         }
                     }
                     let wal = storage.wal.read().await.clone();
-                    let entries_for_obs = wal_entries.entries().to_vec();
+                    let entries_for_obs = if storage.has_observers() {
+                        wal_entries.entries().to_vec()
+                    } else {
+                        Vec::new()
+                    };
                     let append_res = wal.append_batch(wal_entries).await;
                     if let Err(e) = append_res {
                         storage.cleanup_intent_locks_for_tx(tx_id);
                         Err(ContextraError::Storage(format!("Commit failed at WAL append after leader cancellation: {}", e)))
                     } else {
-                        storage.notify_commit_observers(&entries_for_obs, tx_id, WriteOrigin::UserWrite);
+                        let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
+                        storage.notify_commit_observers(&entries_for_obs, tx_id, WriteOrigin::UserWrite, is_durable);
                         let state = storage.state.read().await;
-                        storage.advance_visibility(tx_id);
                         storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
+                        storage.advance_visibility(tx_id);
                         let should_flush = state.memtable.size() > storage.config.memtable_size_limit;
                         drop(state);
                         if should_flush {
-                            if let Err(e) = storage.flush().await {
-                                tracing::warn!("Flush failed after leader cancellation fallback: {e}");
-                            }
+                            storage.request_flush();
                         }
                         storage.cleanup_intent_locks_for_tx(tx_id);
                         Ok(())
@@ -473,7 +470,11 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         drop(queue_guard);
 
         let wal = storage.wal.read().await.clone();
-        let leader_entries_for_observer = leader_wal_entries.entries().to_vec();
+        let leader_entries_for_observer = if storage.has_observers() {
+            leader_wal_entries.entries().to_vec()
+        } else {
+            Vec::new()
+        };
         let mut all_wal_entries = leader_wal_entries;
         for r in pending_queue.requests.iter() {
             all_wal_entries.extend(r.wal_entries.clone());
@@ -498,7 +499,6 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
         if let Err(e) = append_res {
             let _commit_lock = storage.commit_mutex.lock().await;
-            let _ = wal.restore_last_hmac(pending_queue.first_prev_hmac).await;
             let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
             let commit_guard = CommitGuard {
                 _lock: &_commit_lock,
@@ -530,9 +530,10 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             return Err(ContextraError::Storage(err_msg));
         }
 
-        storage.notify_commit_observers(&leader_entries_for_observer, leader_tx_id, WriteOrigin::UserWrite);
+        let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
+        storage.notify_commit_observers(&leader_entries_for_observer, leader_tx_id, WriteOrigin::UserWrite, is_durable);
         for r in &pending_queue.requests {
-            storage.notify_commit_observers(r.wal_entries.entries(), r.tx_id, WriteOrigin::UserWrite);
+            storage.notify_commit_observers(r.wal_entries.entries(), r.tx_id, WriteOrigin::UserWrite, is_durable);
         }
 
         type MemUpdateBatch<'a> = (TxId, &'a [(Vec<u8>, Vec<u8>, u64)]);
@@ -549,16 +550,14 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         // nicht den MemTable-Inhalt selbst — ein read()-Guard genügt für apply_mem_updates in beiden Commit-Pfaden.
         let state = storage.state.read().await;
         for (req_tx_id, mem_updates) in all_updates {
-            storage.advance_visibility(req_tx_id);
             storage.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
+            storage.advance_visibility(req_tx_id);
         }
 
         let needs_flush = state.memtable.size() > storage.config.memtable_size_limit;
         drop(state);
         if needs_flush {
-            if let Err(flush_err) = storage.flush().await {
-                tracing::error!("Flush failed after group commit: {}", flush_err);
-            }
+            storage.request_flush();
         }
 
         let mut batch_txs = vec![leader_tx_id];

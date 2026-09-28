@@ -1,7 +1,7 @@
 use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
-use contextra_core::TxId;
+use contextra_core::{TxId, TOMBSTONE_BIT};
 
 impl LsmStorage {
     /// Notifies registered observers of committed WAL entries for a transaction.
@@ -10,34 +10,41 @@ impl LsmStorage {
         entries: &[WalEntry],
         tx_id: TxId,
         origin: WriteOrigin,
+        durable: bool,
     ) {
         let seq_no = entries.last().map(|e| e.seq_no).unwrap_or(0);
-        self.observer_registry
-            .notify(entries, seq_no, tx_id, origin);
+        let ctx = CommitContext {
+            tx_id,
+            origin,
+            durable,
+        };
+        self.observer_registry.notify_with_context(entries, seq_no, ctx);
+    }
+
+    /// Clears intent locks matching a predicate, gracefully recovering from poisoned locks.
+    pub fn cleanup_intent_locks_where<F>(&self, mut predicate: F)
+    where
+        F: FnMut(TxId) -> bool,
+    {
+        let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
+        locks.retain(|_, locked_tx| !predicate(*locked_tx));
     }
 
     pub fn clear_intent_locks_for_tx(&self, tx_id: TxId) {
-        if let Ok(mut locks) = self.intent_locks.lock() {
-            locks.retain(|_, locked_tx| *locked_tx != tx_id);
-        }
+        self.cleanup_intent_locks_where(|t| t == tx_id);
     }
 
     /// Removes all intent lock registrations associated with transactions strictly newer than target_tx.
     pub fn clear_intent_locks_above_tx(&self, target_tx: TxId) {
-        if let Ok(mut locks) = self.intent_locks.lock() {
-            locks.retain(|_, locked_tx| *locked_tx <= target_tx);
-        }
+        self.cleanup_intent_locks_where(|t| t > target_tx);
     }
 
-    /// Forces a flush (to be used by PersistentCheckpointStore or tests).
     pub(super) fn cleanup_intent_locks_for_tx(&self, tx_id: TxId) {
-        let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
-        locks.retain(|_, v| *v != tx_id);
+        self.cleanup_intent_locks_where(|t| t == tx_id);
     }
 
     pub(super) fn cleanup_intent_locks_for_txs(&self, tx_ids: &[TxId]) {
-        let mut locks = self.intent_locks.lock().unwrap_or_else(|e| e.into_inner());
-        locks.retain(|_, v| !tx_ids.contains(v));
+        self.cleanup_intent_locks_where(|t| tx_ids.contains(&t));
     }
 
     /// Suspends execution briefly if memory usage exceeds 80% to apply backpressure.
@@ -54,6 +61,12 @@ impl LsmStorage {
     /// `tx_id == 0` is ignored with a warning to prevent MVCC blackout.
     #[inline]
     pub(super) fn advance_visibility(&self, tx_id: TxId) {
+        if tx_id.inner() == 0 {
+            tracing::debug!(
+                "LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout"
+            );
+            return;
+        }
         if tx_id.inner() < TxId::INTERNAL_BASE {
             let mut current = self.last_committed_tx.load(Ordering::Acquire);
             while tx_id.inner() > current {
@@ -66,11 +79,6 @@ impl LsmStorage {
                     Ok(_) => break,
                     Err(actual) => current = actual,
                 }
-            }
-            if tx_id.inner() == 0 {
-                tracing::warn!(
-                    "LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout"
-                );
             }
         }
     }
@@ -87,7 +95,12 @@ impl LsmStorage {
         mem_updates: &[(Vec<u8>, Vec<u8>, u64)],
         tx_id: TxId,
     ) {
+        let mut max_seq = 0u64;
         for (key, value, seq) in mem_updates {
+            let raw_seq = seq & !TOMBSTONE_BIT;
+            if raw_seq > max_seq {
+                max_seq = raw_seq;
+            }
             let entry_size = key.len() + value.len() + 8;
             if let Err(e) = self.budget.consume_memory(entry_size as u64) {
                 self.budget_tracking_drift_bytes
@@ -107,6 +120,20 @@ impl LsmStorage {
                 tx_id.inner(),
             );
             self.compaction_engine.record_write_op(*seq);
+        }
+        if max_seq > 0 {
+            let mut current = self.last_applied_seq.load(Ordering::Acquire);
+            while max_seq > current {
+                match self.last_applied_seq.compare_exchange_weak(
+                    current,
+                    max_seq,
+                    Ordering::Release,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(actual) => current = actual,
+                }
+            }
         }
     }
 }
