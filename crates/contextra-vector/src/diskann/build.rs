@@ -11,7 +11,44 @@ use super::format::{
 use super::types::{DiskAnnIndex, SearchCandidate};
 use crate::distance::compute_distance_trusted;
 use contextra_core::{ContextraError, DocId, Result};
-use roaring::RoaringTreemap;
+#[cfg(not(feature = "docid-128"))]
+pub(crate) type TombstoneSet = roaring::RoaringTreemap;
+
+#[cfg(feature = "docid-128")]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct TombstoneSet {
+    pub(crate) set: std::collections::HashSet<u128>,
+}
+
+#[cfg(feature = "docid-128")]
+impl TombstoneSet {
+    pub(crate) fn new() -> Self {
+        Self {
+            set: std::collections::HashSet::new(),
+        }
+    }
+
+    pub(crate) fn insert(&mut self, id: u128) -> bool {
+        self.set.insert(id)
+    }
+
+    pub(crate) fn contains(&self, id: u128) -> bool {
+        self.set.contains(&id)
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.set.len()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.set.is_empty()
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.set.clear();
+    }
+}
+
 use std::sync::atomic::Ordering;
 
 impl DiskAnnIndex {
@@ -99,11 +136,11 @@ impl DiskAnnIndex {
     }
 
     /// Reads and verifies uncommitted tombstone entries from `tombstone.wal`.
-    pub(crate) fn read_tombstone_wal(path: &std::path::Path) -> Result<RoaringTreemap> {
+    pub(crate) fn read_tombstone_wal(path: &std::path::Path) -> Result<TombstoneSet> {
         use std::io::Read;
         use subtle::ConstantTimeEq;
 
-        let mut bitset = RoaringTreemap::new();
+        let mut bitset = TombstoneSet::new();
 
         if !path.exists() {
             return Ok(bitset);

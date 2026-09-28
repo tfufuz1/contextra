@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 //! `contextra-avv-generator`
 //!
 //! Generates AVV (Auftragsverarbeitungsvertrag) template documents referencing Contextra's

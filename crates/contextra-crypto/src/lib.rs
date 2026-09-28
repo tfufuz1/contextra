@@ -5,7 +5,7 @@
 // HOTSPOTS: [1-25]
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
-#![cfg_attr(not(test), forbid(unsafe_code))]
+#![forbid(unsafe_code)]
 
 //! Cryptography module for Contextra.
 //!
