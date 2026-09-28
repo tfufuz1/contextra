@@ -1,0 +1,99 @@
+[[phase.start]]
+cmd = ["cargo", "xtask", "env-attest"]
+required = false
+
+[[phase.start]]
+cmd = ["cargo", "xtask", "task-card", "lint"]
+required = true
+
+[[phase.start]]
+cmd = ["cargo", "xtask", "claim"]
+required = true
+
+[[phase.start]]
+cmd = ["cargo", "xtask", "context-pack"]
+required = true
+
+[[phase.check]]
+cmd = ["cargo", "fmt", "--check"]
+required = true
+
+[[phase.check]]
+cmd = ["cargo", "clippy", "--workspace", "--exclude", "contextra-tauri", "--", "-D", "warnings"]
+required = true
+
+[[phase.check]]
+cmd = ["cargo", "xtask", "scope-guard"]
+required = false
+
+[[phase.check]]
+cmd = ["cargo", "xtask", "protected-paths"]
+required = false
+
+[[phase.check]]
+cmd = ["cargo", "xtask", "check-duplicate-symbols"]
+required = true
+
+[[phase.check]]
+cmd = ["cargo", "xtask", "symbol-exists"]
+required = false
+
+[[phase.verify]]
+cmd = ["cargo", "test"]
+required = true
+
+[[phase.verify]]
+cmd = ["cargo", "xtask", "check-dag"]
+required = true
+
+[[phase.verify]]
+cmd = ["cargo", "xtask", "check-ring-layering"]
+required = true
+
+[[phase.verify]]
+cmd = ["cargo", "xtask", "check-vetoes"]
+required = true
+
+[[phase.verify]]
+cmd = ["cargo", "xtask", "ratchet", "check"]
+required = false
+
+[[phase.verify]]
+cmd = ["cargo", "xtask", "determinism-check"]
+required = false
+
+[[phase.verify]]
+cmd = ["cargo", "xtask", "unsafe-audit"]
+required = false
+
+[[phase.verify]]
+cmd = ["cargo", "xtask", "lock-audit"]
+required = false
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "gate-weakening"]
+required = false
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "test-integrity"]
+required = false
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "diff-budget"]
+required = false
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "session-report"]
+required = false
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "claims-in-pr"]
+required = false
+
+[[phase.submit]]
+cmd = ["cargo", "xtask", "ledger"]
+required = false
+
+[[phase.stop]]
+cmd = ["cargo", "xtask", "loop-guard", "stop"]
+required = false
