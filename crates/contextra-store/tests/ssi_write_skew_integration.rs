@@ -1,5 +1,7 @@
 //! Integration tests for Serializable Snapshot Isolation (SSI) write-skew conflict detection.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use contextra_core::{ContextraError, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use std::sync::Arc;
@@ -186,4 +188,60 @@ async fn test_ssi_conflict_rejection_no_sequence_gap_or_wal_leak() {
     let reopened = LsmStorage::new(config).await.expect("reopen storage");
     let y_reopened = reopened.get(b"key_y").await.expect("get key_y reopened");
     assert_eq!(y_reopened, None, "Uncommitted key_y must not exist in replayed storage");
+}
+
+/// K5 Test 4 / Task 9 Regressionstest: Confirm that untracked `get()` reads do NOT trigger SSI conflicts.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_untracked_get_no_conflict_regression() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        group_commit_window_micros: 0,
+        ..Default::default()
+    };
+
+    let storage = Arc::new(LsmStorage::new(config).await.expect("new storage"));
+
+    // Initial setup: Account A = 100, Account B = 100
+    let tx0 = TxId::new(1);
+    storage.put(tx0, b"account_a", b"100").await.expect("put A");
+    storage.put(tx0, b"account_b", b"100").await.expect("put B");
+    storage.commit(tx0).await.expect("commit tx0");
+
+    let barrier = Arc::new(Barrier::new(2));
+
+    let storage_1 = Arc::clone(&storage);
+    let barrier_1 = Arc::clone(&barrier);
+    let task1 = tokio::spawn(async move {
+        let tx1 = TxId::new(10);
+        // Untracked reads via StorageEngine::get / LsmStorage::get
+        let _a = storage_1.get(b"account_a").await.expect("untracked read A");
+        let _b = storage_1.get(b"account_b").await.expect("untracked read B");
+
+        barrier_1.wait().await;
+
+        storage_1.put(tx1, b"account_a", b"20").await.expect("put A tx1");
+        storage_1.commit(tx1).await
+    });
+
+    let storage_2 = Arc::clone(&storage);
+    let barrier_2 = Arc::clone(&barrier);
+    let task2 = tokio::spawn(async move {
+        let tx2 = TxId::new(20);
+        // Untracked reads via StorageEngine::get / LsmStorage::get
+        let _a = storage_2.get(b"account_a").await.expect("untracked read A");
+        let _b = storage_2.get(b"account_b").await.expect("untracked read B");
+
+        barrier_2.wait().await;
+
+        storage_2.put(tx2, b"account_b", b"20").await.expect("put B tx2");
+        storage_2.commit(tx2).await
+    });
+
+    let res1 = task1.await.expect("task1 join");
+    let res2 = task2.await.expect("task2 join");
+
+    // Both commits succeed because reads were UNTRACKED (documented behavior)
+    assert!(res1.is_ok(), "Tx1 with untracked get() should succeed: {:?}", res1);
+    assert!(res2.is_ok(), "Tx2 with untracked get() should succeed: {:?}", res2);
 }

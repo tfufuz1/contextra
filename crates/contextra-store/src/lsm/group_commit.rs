@@ -54,4 +54,5 @@ pub(super) struct PendingCommitQueue {
     pub(super) requests: Vec<GroupCommitRequest>,
     pub(super) first_prev_hmac: [u8; 32],
     pub(super) notify_full: Arc<tokio::sync::Notify>,
+    pub(super) committed_flag: Arc<std::sync::atomic::AtomicBool>,
 }
