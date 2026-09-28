@@ -1,0 +1,23 @@
+[[allow]]
+path = "crates/contextra-crypto/src/"
+pattern = "rand::thread_rng"
+reason = "ADR-098 allows rand::thread_rng() for cryptographic key and salt generation"
+adr = "ADR-098"
+
+[[allow]]
+path = "crates/contextra-store/src/lsm/recovery.rs"
+pattern = "rand::thread_rng"
+reason = "ADR-098 allows rand::thread_rng() for cryptographic salt generation"
+adr = "ADR-098"
+
+[[allow]]
+path = "crates/contextra-store/src/wal/hmac.rs"
+pattern = "rand::thread_rng"
+reason = "ADR-098 allows rand::thread_rng() for HMAC key and salt generation"
+adr = "ADR-098"
+
+[[allow]]
+path = "crates/contextra-mcp/src/sandbox.rs"
+pattern = "rand::thread_rng"
+reason = "ADR-098 allows rand::thread_rng() for sandbox key generation"
+adr = "ADR-098"
