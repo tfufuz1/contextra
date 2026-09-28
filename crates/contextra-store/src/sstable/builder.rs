@@ -21,7 +21,7 @@ impl BlockBuilder {
         Self {
             data: BytesMut::new(),
             offsets: Vec::new(),
-            block_size: block_size.clamp(512, 64 * 1024 * 1024),
+            block_size: block_size.clamp(512, 64 * 1024),
             bloom: 0,
         }
     }
@@ -29,7 +29,7 @@ impl BlockBuilder {
     fn update_bloom(&mut self, key: &[u8]) {
         let hash = blake3::hash(key);
         let bytes = hash.as_bytes();
-        // Use 4 x 11-bit chunks from the 256-bit hash for Bloom filter bits (64-bit filter)
+        // Use 4 x 16-bit chunks modulo 64 from the 256-bit hash for Bloom filter bits (64-bit filter)
         // Safety: blake3 outputs 32 bytes, i * 2 + 1 is max 7.
         for i in 0..4 {
             let chunk = u16::from_le_bytes([
@@ -42,20 +42,33 @@ impl BlockBuilder {
     }
 
     pub fn add(&mut self, key: &[u8], value: &[u8], seq_no: u64, tx_id: u64) -> bool {
-        // size: key_len(2) + key + seq_no(8) + tx_id(8) + val_len(2) + value + bloom(8) + offsets + offset count (2 bytes)
+        // size: key_len(2) + key + seq_no(8) + tx_id(8) + val_len(4) + value + bloom(8) + offsets + offset count (2 bytes)
         if !self.data.is_empty()
-            && self.current_size() + key.len() + value.len() + 20 > self.block_size
+            && self.current_size() + key.len() + value.len() + 22 > self.block_size
         {
             return false;
         }
 
+        let key_len_u16 = match u16::try_from(key.len()) {
+            Ok(l) => l,
+            Err(_) => return false,
+        };
+        let val_len_u32 = match u32::try_from(value.len()) {
+            Ok(l) => l,
+            Err(_) => return false,
+        };
+        let offset_u16 = match u16::try_from(self.data.len()) {
+            Ok(o) => o,
+            Err(_) => return false,
+        };
+
         self.update_bloom(key);
-        self.offsets.push(self.data.len() as u16);
-        self.data.put_u16_le(key.len() as u16);
+        self.offsets.push(offset_u16);
+        self.data.put_u16_le(key_len_u16);
         self.data.put_slice(key);
         self.data.put_u64_le(seq_no);
         self.data.put_u64_le(tx_id);
-        self.data.put_u32_le(value.len() as u32);
+        self.data.put_u32_le(val_len_u32);
         self.data.put_slice(value);
         true
     }
@@ -147,11 +160,6 @@ impl SstableBuilder {
             last_key: None,
             offset: 0,
             key_manager: derived_km,
-            // Initialize with capacity 1000 (will grow if needed, or we just trust the final size)
-            // Actually, we don't know the final size, but we can re-create it at finish or just use a large enough default.
-            // Better: use a dynamic filter if possible, but standard Bloom needs N.
-            // We'll use a fixed large capacity or estimate from previous runs.
-            // For now, let's use a very conservative 100k capacity bitset.
             bloom_filter: BloomFilter::new(100_000, 0.01),
             key_count: 0,
             min_tx_id: u64::MAX,
@@ -250,7 +258,10 @@ impl SstableBuilder {
         let mut index_builder = BytesMut::new();
 
         for (key, offset) in &self.index {
-            index_builder.put_u16_le(key.len() as u16);
+            let key_len_u16 = u16::try_from(key.len()).map_err(|_| {
+                ContextraError::InvalidInput("Index key length exceeds u16::MAX".into())
+            })?;
+            index_builder.put_u16_le(key_len_u16);
             index_builder.put_slice(key);
             index_builder.put_u64_le(*offset);
         }
@@ -285,8 +296,8 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(format!("SSTable bloom write failed: {}", e)))?;
 
-        // Write trailer: [min_tx][max_tx][min_seq][max_seq][bloom_offset][index_offset][magic]
-        // This is 52 bytes.
+        // Write trailer: [min_tx][max_tx][min_seq][max_seq][bloom_offset][index_offset][version=2][magic]
+        // This is 54 bytes.
         self.file
             .write_u64_le(self.min_tx_id)
             .await
@@ -312,9 +323,9 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-        // FIND-STO-003: Extension point — format version (v1 = 54 byte trailer)
+        // Format version 2 (multi-version key support)
         self.file
-            .write_u16_le(1)
+            .write_u16_le(2)
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 

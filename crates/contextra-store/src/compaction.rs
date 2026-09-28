@@ -4,6 +4,7 @@ pub mod adaptive;
 mod config;
 mod engine;
 pub mod merge_operator;
+pub mod retention;
 pub mod ttl;
 
 #[cfg(test)]
@@ -13,4 +14,5 @@ pub use adaptive::*;
 pub use config::*;
 pub use engine::*;
 pub use merge_operator::*;
+pub use retention::*;
 pub use ttl::*;

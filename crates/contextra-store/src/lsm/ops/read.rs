@@ -92,9 +92,7 @@ pub(super) async fn get_at_seq(
         {
             continue;
         }
-        // SSTables already only contain entries up to their last_key.
-        // But we still need to check the entry's seq_no and tx_id.
-        if let Some((val, seq, tx)) = sst.get(key).await? {
+        if let Some((val, seq, tx)) = sst.get_at(key, seq_no, snapshot_tx).await? {
             tracing::debug!(
                 "LsmStorage::get_at_seq SSTable check: seq={} target_seq={} tx={} snapshot_tx={}",
                 seq & !TOMBSTONE_BIT,
@@ -102,17 +100,12 @@ pub(super) async fn get_at_seq(
                 tx,
                 snapshot_tx
             );
-            if (seq & !TOMBSTONE_BIT) <= seq_no
-                && (tx <= snapshot_tx || tx >= contextra_core::TxId::INTERNAL_BASE)
-            {
-                if (seq & TOMBSTONE_BIT) != 0 {
-                    tracing::debug!("LsmStorage::get_at_seq FOUND TOMBSTONE");
-                    return Ok(None);
-                }
-                tracing::debug!("LsmStorage::get_at_seq MATCH found in SSTable");
-                return Ok(Some(val));
+            if (seq & TOMBSTONE_BIT) != 0 {
+                tracing::debug!("LsmStorage::get_at_seq FOUND TOMBSTONE");
+                return Ok(None);
             }
-            tracing::debug!("LsmStorage::get_at_seq SKIPPED entry due to seq/tx filter");
+            tracing::debug!("LsmStorage::get_at_seq MATCH found in SSTable");
+            return Ok(Some(val));
         }
     }
 
