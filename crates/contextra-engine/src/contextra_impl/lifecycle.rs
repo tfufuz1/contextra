@@ -26,6 +26,10 @@ impl Contextra {
         let lsm_config = contextra_store::LsmConfig {
             path: path.as_ref().to_path_buf(),
             encryption_passphrase: config.encryption_passphrase.clone(),
+            max_ram_mb: config.max_ram_mb,
+            group_commit_window_micros: config.group_commit_window_micros,
+            durability_mode: config.durability_mode.clone(),
+            memtable_size_limit: config.memtable_size_limit,
             ..Default::default()
         };
 
@@ -474,6 +478,23 @@ mod consolidation_launcher_tests {
     {
         let dir = tempdir().unwrap();
         let config = ContextraConfig::default(); // no launcher set
+
+        let db = Contextra::open_with_config(dir.path(), config).await?;
+        db.close().await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_custom_lsm_configuration_passthrough() -> contextra_types::Result<()> {
+        let dir = tempdir().unwrap();
+        let config = ContextraConfig {
+            max_ram_mb: 512,
+            durability_mode: DurabilityMode::MemoryOnly,
+            group_commit_window_micros: 100,
+            memtable_size_limit: 32 * 1024 * 1024,
+            ..Default::default()
+        };
 
         let db = Contextra::open_with_config(dir.path(), config).await?;
         db.close().await?;

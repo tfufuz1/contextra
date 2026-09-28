@@ -560,6 +560,7 @@ dependencies = [
  "bytes",
  "contextra-core",
  "contextra-crypto",
+ "contextra-mvcc",
  "contextra-ports",
  "contextra-sys",
  "crc32fast",
