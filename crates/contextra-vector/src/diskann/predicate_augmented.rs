@@ -69,7 +69,7 @@ impl DiskAnnIndex {
         }
 
         let ep_passes =
-            !tombstones.contains(ep_node.doc_id.inner() as u64) && filter(ep_node.doc_id);
+            !tombstones.contains(ep_node.doc_id.inner()) && filter(ep_node.doc_id);
 
         let mut queue = BinaryHeap::new(); // Min-heap by distance ( Reverse(SearchCandidate) )
         let mut matching_results = Vec::new();
@@ -107,7 +107,7 @@ impl DiskAnnIndex {
                 }
 
                 let nbr_passes =
-                    !tombstones.contains(nbr_node.doc_id.inner() as u64) && filter(nbr_node.doc_id);
+                    !tombstones.contains(nbr_node.doc_id.inner()) && filter(nbr_node.doc_id);
 
                 if nbr_passes {
                     matching_results.push((nbr_node.doc_id, nbr_dist));
@@ -127,7 +127,7 @@ impl DiskAnnIndex {
                         }
                         if !visited.contains(&hop2_idx) {
                             let hop2_node = self.load_node(hop2_idx)?;
-                            let hop2_passes = !tombstones.contains(hop2_node.doc_id.inner() as u64)
+                            let hop2_passes = !tombstones.contains(hop2_node.doc_id.inner())
                                 && filter(hop2_node.doc_id);
 
                             if hop2_passes {

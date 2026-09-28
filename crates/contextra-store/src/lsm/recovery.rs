@@ -439,6 +439,9 @@ impl LsmStorage {
         });
         task_tracker.close();
 
+        let flush_notify = Arc::new(tokio::sync::Notify::new());
+        let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
+
         let storage = Self {
             config,
             key_manager,
@@ -456,6 +459,9 @@ impl LsmStorage {
             manifest,
             next_seq_no: AtomicU64::new(max_seq.saturating_add(1)),
             last_committed_tx: AtomicU64::new(max_tx),
+            last_applied_seq: AtomicU64::new(max_seq),
+            flush_notify,
+            health,
             commit_mutex: tokio::sync::Mutex::new(()),
             cancel_token,
             task_tracker,

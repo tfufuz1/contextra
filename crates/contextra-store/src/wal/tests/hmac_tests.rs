@@ -320,7 +320,7 @@ async fn test_hmac_chain_intact_after_append_failure() {
 
     let hmac_before = wal.last_hmac_snapshot().await;
 
-    // 2. Prepare a second batch that advances last_hmac
+    // 2. Prepare a second batch (without mutating last_hmac before append)
     let op2 = WalOp::Put {
         tx_id: TxId::new(2),
         key: b"k2".to_vec(),
@@ -330,10 +330,10 @@ async fn test_hmac_chain_intact_after_append_failure() {
         .prepare_batch(vec![(op2, 2)])
         .await
         .expect("prepare batch 2");
-    assert_ne!(
+    assert_eq!(
         wal.last_hmac_snapshot().await,
         hmac_before,
-        "prepare_batch should advance in-memory last_hmac"
+        "prepare_batch must not advance last_hmac before append"
     );
     assert_eq!(prev_hmac, hmac_before);
 
@@ -346,16 +346,11 @@ async fn test_hmac_chain_intact_after_append_failure() {
         "append_batch must fail on fault-injected append failure"
     );
 
-    // Restore last_hmac as lsm commit would do upon append failure
-    wal.restore_last_hmac(prev_hmac)
-        .await
-        .expect("restore last hmac");
-
-    // 4. Verify last_hmac_snapshot is back to hmac_before
+    // 4. Verify last_hmac_snapshot remains unchanged after failed append
     let hmac_after = wal.last_hmac_snapshot().await;
     assert_eq!(
         hmac_after, hmac_before,
-        "last_hmac_snapshot must match value before failed prepare_batch"
+        "last_hmac_snapshot must match value before failed append"
     );
 }
 

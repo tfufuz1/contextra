@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // STAND: 2026-09-09T12:44:49Z (SESSION: c74a1828)
-// ZWECK: Property-based tests for contextra-candle components (fingerprinting, GaspValidator, and clients).
+// ZWECK: Property-based tests for contextra-infer-candle components (fingerprinting, GaspValidator, and clients).
 // INVARIANTEN: Property tests must cover arbitrary inputs without panicking or producing illegal confidence/grounding scores.
 
 use contextra_infer_candle::gasp::{GaspConfig, GaspValidator};

@@ -44,7 +44,7 @@ impl ExporterBackedScoreSource {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     fn register_segment_mapping(&self, segment_id: u64, request_id: RequestId) {
         self.segment_map.write().insert(segment_id, request_id);
     }

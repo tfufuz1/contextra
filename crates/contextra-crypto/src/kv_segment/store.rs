@@ -51,11 +51,6 @@ impl TenantState {
         self.cache.get(&id).map(|s| s.as_bytes().to_vec())
     }
 
-    /// O(1) get für Entschlüsselung — benötigt &mut wegen LRU-Update.
-    #[allow(dead_code)]
-    fn get_segment_ref_mut(&mut self, id: u64) -> Option<&KvSegment> {
-        self.cache.get(&id).map(|s| s as &KvSegment)
-    }
 
     /// O(1) entfernen. Gibt das Segment zurück (ZeroizeOnDrop beim Caller).
     fn remove(&mut self, id: u64) -> Option<KvSegment> {
@@ -311,7 +306,7 @@ impl TenantIsolatedKvStore {
     }
 
     /// Dies ist GLOBALES LRU ohne Tenant-Fairness. Für faire Multi-Tenant-Eviction siehe `evict_lru_fair()`.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn evict_lru_global(&self, target_free_bytes: usize) -> usize {
         let mut freed = 0;
 

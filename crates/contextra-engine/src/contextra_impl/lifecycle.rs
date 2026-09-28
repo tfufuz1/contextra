@@ -1,17 +1,49 @@
 use crate::*;
+use contextra_ports::license::{AuthorizedRing, FeatureRing, LicenseGate, OpenFastGate};
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
 use std::path::Path;
 use std::sync::Arc;
 
 impl Contextra {
+    /// Opens or creates a `Contextra` instance at `path` enforcing `deletion_proof_active = false`
+    /// and using default [`contextra_ports::license::LicenseGate`].
     #[tracing::instrument(level = "trace", skip(path))]
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_config(path, ContextraConfig::default()).await
+        let mut config = ContextraConfig::default();
+        config.deletion_proof_active = false;
+        let fast_gate = Arc::new(OpenFastGate);
+        let token = fast_gate
+            .authorize(FeatureRing::Fast)
+            .map_err(|e| contextra_types::ContextraError::PolicyViolation(e.to_string()))?;
+        Self::open_authorized(path, config, &token, fast_gate).await
     }
 
+    /// Opens or creates a `Contextra` instance at `path` with explicit `config`, forcing
+    /// `deletion_proof_active = false` (as no authorized token was provided) and using default [`LicenseGate`].
     #[tracing::instrument(level = "trace", skip(path, config))]
-    pub async fn open_with_config(path: impl AsRef<Path>, config: ContextraConfig) -> Result<Self> {
+    pub async fn open_with_config(path: impl AsRef<Path>, mut config: ContextraConfig) -> Result<Self> {
+        config.deletion_proof_active = false;
+        let fast_gate = Arc::new(OpenFastGate);
+        let token = fast_gate
+            .authorize(FeatureRing::Fast)
+            .map_err(|e| contextra_types::ContextraError::PolicyViolation(e.to_string()))?;
+        Self::open_authorized(path, config, &token, fast_gate).await
+    }
+
+    /// Opens or creates a `Contextra` instance with an explicitly authorized [`AuthorizedRing`] token
+    /// and attached [`LicenseGate`].
+    #[tracing::instrument(level = "trace", skip(path, config, authorized_ring, gate))]
+    pub async fn open_authorized(
+        path: impl AsRef<Path>,
+        mut config: ContextraConfig,
+        authorized_ring: &AuthorizedRing,
+        gate: Arc<dyn LicenseGate>,
+    ) -> Result<Self> {
+        if authorized_ring.ring() == FeatureRing::Fast {
+            config.deletion_proof_active = false;
+        }
+
         if config.dimension == 0 {
             return Err(contextra_types::ContextraError::invalid_input(
                 "dimension must be > 0",
@@ -74,6 +106,8 @@ impl Contextra {
             storage,
             next_tx,
             dimension: config.dimension,
+            config: config.clone(),
+            license_gate: gate,
             expiry_reaper_interval: config.expiry_reaper_interval,
             community_detection_threshold: config.community_detection.auto_trigger_threshold,
             collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),

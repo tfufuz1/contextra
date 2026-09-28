@@ -35,7 +35,7 @@ impl DeletedView {
     }
 
     /// Creates an empty `DeletedView` when no nodes are deleted or for testing when explicitly intended.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn empty() -> Self {
         Self {
             deleted_nodes: HashSet::new(),

@@ -41,14 +41,20 @@ pub fn get_active_workspace_members(root: &Path) -> Result<HashSet<String>, Stri
         .and_then(|p| p.as_array())
         .ok_or_else(|| "Missing 'packages' array in cargo metadata output".to_string())?;
 
-    let workspace_members: HashSet<String> = packages
-        .iter()
-        .filter_map(|pkg| {
-            pkg.get("name")
-                .and_then(|n| n.as_str())
-                .map(|s| s.to_string())
-        })
-        .collect();
+    let mut workspace_members: HashSet<String> = HashSet::new();
+
+    for pkg in packages {
+        if let Some(name) = pkg.get("name").and_then(|n| n.as_str()) {
+            workspace_members.insert(name.to_string());
+        }
+        if let Some(targets) = pkg.get("targets").and_then(|t| t.as_array()) {
+            for target in targets {
+                if let Some(t_name) = target.get("name").and_then(|n| n.as_str()) {
+                    workspace_members.insert(t_name.to_string());
+                }
+            }
+        }
+    }
 
     Ok(workspace_members)
 }
@@ -94,6 +100,7 @@ pub fn should_check_file(rel_path_str: &str) -> bool {
     // Ausnahmen
     if clean.starts_with("docs/decisions/")
         || clean.starts_with("docs/archive/")
+        || clean.starts_with("docs/audits/")
         || clean == "docs/GESAMTSPEZIFIKATION.md"
     {
         return false;
@@ -159,7 +166,7 @@ pub fn scan_and_check_workspace(root: &Path) -> Result<Vec<CrateRefViolation>, S
             if clean == "target" || clean == ".git" || clean == "node_modules" {
                 return false;
             }
-            if clean == "docs/decisions" || clean == "docs/archive" {
+            if clean == "docs/decisions" || clean == "docs/archive" || clean == "docs/audits" {
                 return false;
             }
             true

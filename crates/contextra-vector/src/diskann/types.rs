@@ -10,7 +10,7 @@ use ahash::AHashMap;
 use contextra_core::{ContextraError, DocId, Result};
 use memmap2::Mmap;
 use parking_lot::RwLock;
-use roaring::RoaringTreemap;
+use super::build::TombstoneSet;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 
@@ -42,7 +42,7 @@ pub(crate) struct DiskAnnIndexInner {
     /// Flag um überlappende persist_delta-Hintergrundläufe zu verhindern.
     pub(crate) flushing_in_progress: AtomicBool,
     pub(crate) hnsw_fallback: RwLock<Option<Arc<crate::hnsw::HnswIndex>>>,
-    pub(crate) tombstones: RwLock<RoaringTreemap>,
+    pub(crate) tombstones: RwLock<TombstoneSet>,
     pub(crate) compute_pool: ComputePool,
 }
 
@@ -111,7 +111,7 @@ impl DiskAnnIndex {
                 pending_count: AtomicU64::new(0),
                 flushing_in_progress: AtomicBool::new(false),
                 hnsw_fallback: RwLock::new(None),
-                tombstones: RwLock::new(RoaringTreemap::new()),
+                tombstones: RwLock::new(TombstoneSet::new()),
                 compute_pool,
             }),
         })

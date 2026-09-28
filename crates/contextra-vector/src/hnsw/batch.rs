@@ -87,13 +87,3 @@ pub(super) struct SearchContext<'a> {
     pub(super) quantizer: Option<Cow<'a, crate::quantize::ScalarQuantizer>>,
     pub(super) arena: &'a HnswArena,
 }
-#[allow(dead_code)]
-struct _OldSearchContext<'a> {
-    nodes: &'a [HnswNode],
-    mmap: Option<&'a crate::persistence::MmapIndex>,
-    mmap_node_count: usize,
-    prior_prepared: &'a [PreparedInsert],
-    backlink_map: Option<&'a BacklinkTable>,
-    quantizer: Option<Cow<'a, crate::quantize::ScalarQuantizer>>,
-    arena: &'a HnswArena,
-}

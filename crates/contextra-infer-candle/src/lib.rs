@@ -1,9 +1,9 @@
 // FILE-CONTEXT
 // STAND: 2026-09-16T16:13:00Z (SESSION: afafdd44)
-// ZWECK: Crate root for contextra-candle native GGUF inference backend.
+// ZWECK: Crate root for contextra-infer-candle native GGUF inference backend.
 // INVARIANTEN: Zero unsafe code in crate; re-exports core inference types and gasp validator.
 
-//! `contextra-candle`: Native Candle GGUF ML Inferenz-Backend für Contextra.
+//! `contextra-infer-candle`: Native Candle GGUF ML Inferenz-Backend für Contextra.
 //!
 //! # Architektur-Strategie
 //!

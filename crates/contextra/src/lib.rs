@@ -40,17 +40,21 @@ pub fn builder(dimension: usize) -> ContextraBuilder {
     ContextraBuilder::new(dimension)
 }
 
-/// Opens or creates a `Contextra` instance at the given storage path using default configuration.
+/// Opens or creates a `Contextra` instance at the given storage path using default configuration and `OpenFastGate`.
 pub async fn open(path: impl AsRef<std::path::Path>) -> Result<Contextra, ContextraError> {
-    Contextra::open(path).await
+    builder(768).with_storage_path(path.as_ref()).build().await
 }
 
-/// Opens or creates a `Contextra` instance at the given storage path with an explicit configuration.
+/// Opens or creates a `Contextra` instance at the given storage path with an explicit configuration and `OpenFastGate`.
 pub async fn open_with_config(
     path: impl AsRef<std::path::Path>,
     config: ContextraConfig,
 ) -> Result<Contextra, ContextraError> {
-    Contextra::open_with_config(path, config).await
+    builder(config.dimension)
+        .with_storage_path(path.as_ref())
+        .with_config(config)
+        .build()
+        .await
 }
 
 #[cfg(test)]

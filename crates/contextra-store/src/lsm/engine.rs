@@ -14,6 +14,15 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Storage health state indicator for LsmStorage background workers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageHealth {
+    /// Operating normally.
+    Healthy,
+    /// Background flush operations are failing.
+    FlushFailing,
+}
+
 /// LSM-Tree based storage engine.
 pub struct LsmStorage {
     pub(super) config: LsmConfig,
@@ -32,6 +41,9 @@ pub struct LsmStorage {
     pub(super) manifest: Arc<crate::manifest::Manifest>,
     pub(super) next_seq_no: AtomicU64,
     pub(super) last_committed_tx: AtomicU64,
+    pub(super) last_applied_seq: AtomicU64,
+    pub(super) flush_notify: Arc<tokio::sync::Notify>,
+    pub(super) health: Arc<parking_lot::RwLock<StorageHealth>>,
     /// Mutex to serialize commits and prevent snapshot inversion (parallel seq_no holes).
     pub(super) commit_mutex: tokio::sync::Mutex<()>,
     pub(super) cancel_token: tokio_util::sync::CancellationToken,
@@ -165,6 +177,26 @@ impl LsmStorage {
         snapshot_seq: u64,
     ) -> Result<Option<Bytes>> {
         read::get_at_seq_tracked(self, tx_id, key, snapshot_seq).await
+    }
+
+    /// Returns the highest sequence number applied to the MemTable and published.
+    pub fn last_applied_seq(&self) -> u64 {
+        self.last_applied_seq.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Returns the current storage health status.
+    pub fn health(&self) -> StorageHealth {
+        *self.health.read()
+    }
+
+    /// Requests an asynchronous background flush without blocking the caller or holding commit locks.
+    pub fn request_flush(&self) {
+        self.flush_notify.notify_one();
+    }
+
+    /// Returns true if at least one observer is registered.
+    pub fn has_observers(&self) -> bool {
+        !self.observer_registry.is_empty()
     }
 
     /// Returns the current `next_seq_no` value for testing verification.

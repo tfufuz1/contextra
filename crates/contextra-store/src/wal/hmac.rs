@@ -47,13 +47,6 @@ impl Wal {
         Ok((PreparedBatch(entries), prev_hmac))
     }
 
-    /// Restores `last_hmac` to a previous state after an append failure.
-    pub async fn restore_last_hmac(&self, hmac: [u8; 32]) -> Result<()> {
-        let mut hmac_guard = self.last_hmac.lock().await;
-        *hmac_guard = hmac;
-        Ok(())
-    }
-
     /// Internal helper to retrieve or derive the 256-bit integrity key for HMAC chaining.
     pub(crate) fn get_integrity_key(&self) -> Result<[u8; 32]> {
         if let Some(km) = &self.key_manager {

@@ -33,7 +33,6 @@ struct SegmentMeta {
 
 /// Kapselt den LRU-Cache und den Prefix-Radix-Baum aller KV-Segmente eines einzelnen Tenants.
 struct TenantState {
-    #[allow(dead_code)]
     tenant_id: TenantId,
     cache: LruCache<u64, KvSegment>,
     radix_tree: PrefixRadixTree,
@@ -54,14 +53,6 @@ impl TenantState {
         }
     }
 
-    /// O(1) insert. Evictiert das älteste unreferenzierte Segment, falls capacity überschritten.
-    /// Garantiert, dass aktive Blöcke (`active_refs > 0`) niemals verworfen werden.
-    #[allow(dead_code)]
-    fn insert_returning_evicted(&mut self, segment: KvSegment) -> Option<KvSegment> {
-        self.insert_returning_evicted_with_directive(segment, &CacheDirective::Auto)
-            .ok()
-            .flatten()
-    }
 
     /// Insert with explicit cache directive and pin budget checking.
     fn insert_returning_evicted_with_directive(
@@ -128,7 +119,7 @@ impl TenantState {
     }
 
     /// O(1) get für Entschlüsselung — benötigt &mut wegen LRU-Update.
-    #[allow(dead_code)]
+    #[cfg(feature = "kv-encryption")]
     fn get_segment_ref_mut(&mut self, id: u64) -> Option<&KvSegment> {
         self.cache.get(&id)
     }
@@ -551,7 +542,7 @@ impl TenantIsolatedKvStore {
     }
 
     /// Globale LRU Eviction unter Schutz aktiver Referenzen.
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn evict_lru_global(&self, target_free_bytes: usize) -> usize {
         let mut freed = 0;
 

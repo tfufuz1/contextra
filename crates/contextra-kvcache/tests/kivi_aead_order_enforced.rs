@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 
 use contextra_crypto::CryptoKey;
 use contextra_kvcache::{KiviQuantizeConfig, KvSegment, KvSegmentContent, KvTensorView};
