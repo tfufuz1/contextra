@@ -35,8 +35,8 @@ members = [
     "crates/contextra-audit-export",
     "crates/contextra-avv-generator",
     "crates/contextra-license",
+    "xtask",
 ]
-exclude = ["xtask"]
 # Excluded from default-members per Spezifikation Section 0.5 / A.3 ("Pure Rust, kein Server"):
 # - contextra-sandbox: WASM boundary (opt-in sandbox)
 # - contextra-py: PyO3/NumPy FFI bindings
