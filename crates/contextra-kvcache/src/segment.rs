@@ -228,7 +228,6 @@ impl KvSegment {
         config: KiviQuantizeConfig,
         cipher: &dyn contextra_crypto::KvCipher,
     ) -> Result<(), ContextraError> {
-
         // 1. Quantization FIRST
         let quantized = kivi_quantize(raw_kv, config)?;
         let serialized_quant = bincode::serialize(&quantized)

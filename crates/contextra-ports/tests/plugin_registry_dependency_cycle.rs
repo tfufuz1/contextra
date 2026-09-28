@@ -2,10 +2,10 @@
 
 //! Property tests for `PluginRegistry` dependency cycle detection and topological resolution (INV-PLUGIN-DEPENDENCY).
 
-use std::sync::Arc;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_ports::plugin::{PluginCapability, PluginError, PluginManifest, PluginRegistry};
 use proptest::prelude::*;
+use std::sync::Arc;
 
 struct PermissiveLicenseGate;
 
@@ -15,12 +15,19 @@ impl LicenseGate for PermissiveLicenseGate {
     }
 }
 
-static STATIC_NAMES: [&str; 10] = [
-    "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9",
-];
+static STATIC_NAMES: [&str; 10] = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"];
 
 static SINGLETON_SLICES: [[&str; 1]; 10] = [
-    ["p0"], ["p1"], ["p2"], ["p3"], ["p4"], ["p5"], ["p6"], ["p7"], ["p8"], ["p9"],
+    ["p0"],
+    ["p1"],
+    ["p2"],
+    ["p3"],
+    ["p4"],
+    ["p5"],
+    ["p6"],
+    ["p7"],
+    ["p8"],
+    ["p9"],
 ];
 
 fn get_single_req(index: usize) -> &'static [&'static str] {

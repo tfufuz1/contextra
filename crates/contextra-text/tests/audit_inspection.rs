@@ -1,4 +1,6 @@
-use contextra_text::morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
+use contextra_text::morphology::{
+    normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer,
+};
 use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
 
 #[test]
@@ -63,8 +65,14 @@ fn inspect_umlaut_bimap() {
         // Check if query for tok_u matches index of tok_a
         let match_a_in_u = tok_u.iter().any(|t| tok_a.contains(t));
 
-        println!("  Match '{}' in indexed '{}': {}", ae_word, umlaut_word, match_u_in_a);
-        println!("  Match '{}' in indexed '{}': {}", umlaut_word, ae_word, match_a_in_u);
+        println!(
+            "  Match '{}' in indexed '{}': {}",
+            ae_word, umlaut_word, match_u_in_a
+        );
+        println!(
+            "  Match '{}' in indexed '{}': {}",
+            umlaut_word, ae_word, match_a_in_u
+        );
     }
 }
 
@@ -86,33 +94,66 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     }
 
     impl StorageEngine for LocalMockStorage {
-        fn get<'a>(&'a self, key: &'a [u8]) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
+        fn get<'a>(
+            &'a self,
+            key: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
             Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
         }
-        fn put<'a>(&'a self, _tx: TxId, key: &'a [u8], val: &'a [u8]) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+        fn put<'a>(
+            &'a self,
+            _tx: TxId,
+            key: &'a [u8],
+            val: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
             Box::pin(async move {
                 let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
-                self.store.write().entry(key.to_vec()).or_default().push((val.to_vec(), seq));
+                self.store
+                    .write()
+                    .entry(key.to_vec())
+                    .or_default()
+                    .push((val.to_vec(), seq));
                 Ok(())
             })
         }
-        fn delete<'a>(&'a self, _tx: TxId, key: &'a [u8]) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+        fn delete<'a>(
+            &'a self,
+            _tx: TxId,
+            key: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
             Box::pin(async move {
                 let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
-                self.store.write().entry(key.to_vec()).or_default().push((Vec::new(), seq | contextra_types::TOMBSTONE_BIT));
+                self.store
+                    .write()
+                    .entry(key.to_vec())
+                    .or_default()
+                    .push((Vec::new(), seq | contextra_types::TOMBSTONE_BIT));
                 Ok(())
             })
         }
-        fn commit<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+        fn commit<'a>(
+            &'a self,
+            _tx: TxId,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn rollback<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+        fn rollback<'a>(
+            &'a self,
+            _tx: TxId,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn rollback_to_tx<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+        fn rollback_to_tx<'a>(
+            &'a self,
+            _tx: TxId,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
             Box::pin(async move { Ok(()) })
         }
-        fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
+        fn get_at_seq<'a>(
+            &'a self,
+            key: &'a [u8],
+            seq: u64,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
             Box::pin(async move {
                 let store = self.store.read();
                 if let Some(versions) = store.get(key) {
@@ -129,25 +170,65 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
                 Ok(None)
             })
         }
-        fn last_seq_no<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<u64>> {
+        fn last_seq_no<'a>(
+            &'a self,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<u64>> {
             Box::pin(async move { Ok(self.next_seq.load(Ordering::SeqCst)) })
         }
-        fn last_tx_id<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<TxId>> {
+        fn last_tx_id<'a>(
+            &'a self,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<TxId>> {
             Box::pin(async move { Ok(TxId::new(0)) })
         }
-        fn flush<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn stats<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>> {
-            Box::pin(async move { Ok(contextra_ports::StorageStats { num_segments: 0, total_size_bytes: 0, memtable_size_bytes: 0 }) })
+        fn flush<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
         }
-        fn pin_checkpoint<'a>(&'a self, _id: u64) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn unpin_checkpoint<'a>(&'a self, _id: u64) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn scan<'a>(&'a self, _: std::ops::Bound<&'a [u8]>, _: std::ops::Bound<&'a [u8]>, _: Option<usize>) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn stats<'a>(
+            &'a self,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>>
+        {
+            Box::pin(async move {
+                Ok(contextra_ports::StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn pin_checkpoint<'a>(
+            &'a self,
+            _id: u64,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(
+            &'a self,
+            _id: u64,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>>
+        {
             Box::pin(async move { Ok(Vec::new()) })
         }
-        fn scan_prefix<'a>(&'a self, prefix: &'a [u8]) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn scan_prefix<'a>(
+            &'a self,
+            prefix: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>>
+        {
             self.scan_prefix_at(prefix, u64::MAX)
         }
-        fn scan_prefix_at<'a>(&'a self, prefix: &'a [u8], seq: u64) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn scan_prefix_at<'a>(
+            &'a self,
+            prefix: &'a [u8],
+            seq: u64,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>>
+        {
             Box::pin(async move {
                 let store = self.store.read();
                 let mut res = Vec::new();
@@ -190,7 +271,8 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     assert!(!cached_avgdl_100.is_empty());
 
     // Check avgdl is 10.0
-    let avgdl_x1000 = index.stats().await?.num_tokens as f64 / index.stats().await?.num_documents as f64;
+    let avgdl_x1000 =
+        index.stats().await?.num_tokens as f64 / index.stats().await?.num_documents as f64;
     assert_eq!(avgdl_x1000, 10.0, "avgdl after 100 docs must be 10.0");
 
     // Delete 50 documents
@@ -202,8 +284,12 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     }
 
     assert_eq!(index.len().await, 50);
-    let avgdl_50 = index.stats().await?.num_tokens as f64 / index.stats().await?.num_documents as f64;
-    assert_eq!(avgdl_50, 10.0, "avgdl after deleting 50 docs must remain 10.0");
+    let avgdl_50 =
+        index.stats().await?.num_tokens as f64 / index.stats().await?.num_documents as f64;
+    assert_eq!(
+        avgdl_50, 10.0,
+        "avgdl after deleting 50 docs must remain 10.0"
+    );
 
     Ok(())
 }
@@ -221,14 +307,23 @@ fn test_b6_morphology_idempotency_and_proper_nouns() {
     // Calling decompose on individual parts must return each part unsplit (idempotency)
     for part in &parts {
         let second_decomp = splitter.decompose(part);
-        assert_eq!(second_decomp, vec![*part], "Decomposing already split component '{}' must be idempotent", part);
+        assert_eq!(
+            second_decomp,
+            vec![*part],
+            "Decomposing already split component '{}' must be idempotent",
+            part
+        );
     }
 
     // 2. Unknown Stems / Proper Nouns protection test:
     // Unknown proper noun or company name "contextrasystems"
     let unknown_noun = "contextrasystems";
     let decomp_unknown = splitter.decompose(unknown_noun);
-    assert_eq!(decomp_unknown, vec![unknown_noun], "Unknown proper noun/word must fall back to unsplit original token");
+    assert_eq!(
+        decomp_unknown,
+        vec![unknown_noun],
+        "Unknown proper noun/word must fall back to unsplit original token"
+    );
 }
 
 #[tokio::test]
@@ -249,27 +344,66 @@ async fn test_b5_wand_vs_bruteforce_1000_docs_3_terms() -> contextra_types::Resu
     }
 
     impl StorageEngine for LocalMockStorage {
-        fn get<'a>(&'a self, key: &'a [u8]) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
+        fn get<'a>(
+            &'a self,
+            key: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
             Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
         }
-        fn put<'a>(&'a self, _tx: TxId, key: &'a [u8], val: &'a [u8]) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+        fn put<'a>(
+            &'a self,
+            _tx: TxId,
+            key: &'a [u8],
+            val: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
             Box::pin(async move {
                 let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
-                self.store.write().entry(key.to_vec()).or_default().push((val.to_vec(), seq));
+                self.store
+                    .write()
+                    .entry(key.to_vec())
+                    .or_default()
+                    .push((val.to_vec(), seq));
                 Ok(())
             })
         }
-        fn delete<'a>(&'a self, _tx: TxId, key: &'a [u8]) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+        fn delete<'a>(
+            &'a self,
+            _tx: TxId,
+            key: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
             Box::pin(async move {
                 let seq = self.next_seq.fetch_add(1, Ordering::SeqCst);
-                self.store.write().entry(key.to_vec()).or_default().push((Vec::new(), seq | contextra_types::TOMBSTONE_BIT));
+                self.store
+                    .write()
+                    .entry(key.to_vec())
+                    .or_default()
+                    .push((Vec::new(), seq | contextra_types::TOMBSTONE_BIT));
                 Ok(())
             })
         }
-        fn commit<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn rollback<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn rollback_to_tx<'a>(&'a self, _tx: TxId) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
+        fn commit<'a>(
+            &'a self,
+            _tx: TxId,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback<'a>(
+            &'a self,
+            _tx: TxId,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn rollback_to_tx<'a>(
+            &'a self,
+            _tx: TxId,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn get_at_seq<'a>(
+            &'a self,
+            key: &'a [u8],
+            seq: u64,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
             Box::pin(async move {
                 let store = self.store.read();
                 if let Some(versions) = store.get(key) {
@@ -286,23 +420,65 @@ async fn test_b5_wand_vs_bruteforce_1000_docs_3_terms() -> contextra_types::Resu
                 Ok(None)
             })
         }
-        fn last_seq_no<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<u64>> {
+        fn last_seq_no<'a>(
+            &'a self,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<u64>> {
             Box::pin(async move { Ok(self.next_seq.load(Ordering::SeqCst)) })
         }
-        fn last_tx_id<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<TxId>> { Box::pin(async move { Ok(TxId::new(0)) }) }
-        fn flush<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn stats<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>> {
-            Box::pin(async move { Ok(contextra_ports::StorageStats { num_segments: 0, total_size_bytes: 0, memtable_size_bytes: 0 }) })
+        fn last_tx_id<'a>(
+            &'a self,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<TxId>> {
+            Box::pin(async move { Ok(TxId::new(0)) })
         }
-        fn pin_checkpoint<'a>(&'a self, _id: u64) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn unpin_checkpoint<'a>(&'a self, _id: u64) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> { Box::pin(async move { Ok(()) }) }
-        fn scan<'a>(&'a self, _: std::ops::Bound<&'a [u8]>, _: std::ops::Bound<&'a [u8]>, _: Option<usize>) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn flush<'a>(&'a self) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn stats<'a>(
+            &'a self,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>>
+        {
+            Box::pin(async move {
+                Ok(contextra_ports::StorageStats {
+                    num_segments: 0,
+                    total_size_bytes: 0,
+                    memtable_size_bytes: 0,
+                })
+            })
+        }
+        fn pin_checkpoint<'a>(
+            &'a self,
+            _id: u64,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn unpin_checkpoint<'a>(
+            &'a self,
+            _id: u64,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+            Box::pin(async move { Ok(()) })
+        }
+        fn scan<'a>(
+            &'a self,
+            _: std::ops::Bound<&'a [u8]>,
+            _: std::ops::Bound<&'a [u8]>,
+            _: Option<usize>,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>>
+        {
             Box::pin(async move { Ok(Vec::new()) })
         }
-        fn scan_prefix<'a>(&'a self, prefix: &'a [u8]) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn scan_prefix<'a>(
+            &'a self,
+            prefix: &'a [u8],
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>>
+        {
             self.scan_prefix_at(prefix, u64::MAX)
         }
-        fn scan_prefix_at<'a>(&'a self, prefix: &'a [u8], seq: u64) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        fn scan_prefix_at<'a>(
+            &'a self,
+            prefix: &'a [u8],
+            seq: u64,
+        ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>>
+        {
             Box::pin(async move {
                 let store = self.store.read();
                 let mut res = Vec::new();
@@ -370,7 +546,10 @@ async fn test_b5_wand_vs_bruteforce_1000_docs_3_terms() -> contextra_types::Resu
     let query_terms = ["alpha", "beta", "gamma"];
     let mut dfs: HashMap<&str, u32> = HashMap::new();
     for term in &query_terms {
-        let df = doc_tokens.values().filter(|toks| toks.contains(&term.to_string())).count() as u32;
+        let df = doc_tokens
+            .values()
+            .filter(|toks| toks.contains(&term.to_string()))
+            .count() as u32;
         dfs.insert(term, df);
     }
 
@@ -395,7 +574,8 @@ async fn test_b5_wand_vs_bruteforce_1000_docs_3_terms() -> contextra_types::Resu
 
     // Sort brute-force candidates by score desc, doc_id asc
     brute_force_scores.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| a.0.cmp(&b.0))
     });
 
@@ -412,7 +592,10 @@ async fn test_b5_wand_vs_bruteforce_1000_docs_3_terms() -> contextra_types::Resu
         assert!(
             (wand_item.1 - brute_item.1).abs() < 1e-5,
             "Rank {} Score mismatch for doc {:?}: WAND {} vs Brute-Force {}",
-            i, wand_item.0, wand_item.1, brute_item.1
+            i,
+            wand_item.0,
+            wand_item.1,
+            brute_item.1
         );
     }
 

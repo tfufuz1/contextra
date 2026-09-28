@@ -1,10 +1,10 @@
 use contextra_db::transaction::DbTransaction;
 use contextra_db::Collection;
 use contextra_graph::CsrGraph;
-use contextra_vector::HnswIndex;
 use contextra_ports::GraphIndex;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{Edge, Entity, EntityId, PprConfig};
+use contextra_vector::HnswIndex;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::tempdir;

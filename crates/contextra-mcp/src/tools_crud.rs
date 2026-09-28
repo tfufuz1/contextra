@@ -172,10 +172,7 @@ impl McpServer {
         col.delete(id).await.map_err(McpError::from)?;
 
         let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
-        let scope = DeletionScope::Document {
-            doc_id,
-            tenant_id,
-        };
+        let scope = DeletionScope::Document { doc_id, tenant_id };
 
         // Construct layer cleanup proofs confirming 0 remaining live entries
         let layer_proofs = vec![

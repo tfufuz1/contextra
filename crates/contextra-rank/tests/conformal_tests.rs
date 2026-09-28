@@ -180,13 +180,21 @@ fn test_conformal_threshold_clamping_and_invalidation() {
     for _ in 0..50 {
         let _ = cal.update(1.0, 5.0);
     }
-    assert_eq!(cal.threshold(), 0.8, "Threshold should be clamped to max_threshold 0.8");
+    assert_eq!(
+        cal.threshold(),
+        0.8,
+        "Threshold should be clamped to max_threshold 0.8"
+    );
 
     // Drive threshold down
     for _ in 0..50 {
         let _ = cal.update(0.0, 5.0);
     }
-    assert_eq!(cal.threshold(), 0.2, "Threshold should be clamped to min_threshold 0.2");
+    assert_eq!(
+        cal.threshold(),
+        0.2,
+        "Threshold should be clamped to min_threshold 0.2"
+    );
 
     // Test ConfigFingerprint invalidation (P8 compliance)
     let fp1 = ConfigFingerprint::new("model-a", "Q4_0", "tmpl-1", 0.7);

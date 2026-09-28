@@ -53,10 +53,10 @@ pub mod lifecycle;
 pub mod metrics;
 /// Observability and lifecycle re-exports.
 pub mod observability;
-/// Random number generator port trait and SplitMix64 implementation.
-pub mod rng;
 /// Plugin registry and dependency resolution.
 pub mod plugin;
+/// Random number generator port trait and SplitMix64 implementation.
+pub mod rng;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -77,8 +77,8 @@ pub use license::*;
 pub use lifecycle::*;
 pub use metrics::*;
 pub use observability::*;
-pub use rng::*;
 pub use plugin::*;
+pub use rng::*;
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;

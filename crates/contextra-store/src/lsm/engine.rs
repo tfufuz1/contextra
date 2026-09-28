@@ -2,6 +2,7 @@ use super::config::LsmConfig;
 use super::group_commit::PendingCommitQueue;
 use super::guard::LsmState;
 use super::observer::{ObserverRegistry, WalObserver};
+use super::ops::read;
 use crate::compaction::CompactionEngine;
 use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
@@ -12,7 +13,6 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use super::ops::read;
 
 /// Storage health state indicator for LsmStorage background workers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

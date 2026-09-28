@@ -3,7 +3,8 @@ use serde_json::json;
 use tempfile::TempDir;
 
 #[tokio::test]
-async fn test_query_builder_as_of_historical_time_travel_filtering() -> contextra_types::Result<()> {
+async fn test_query_builder_as_of_historical_time_travel_filtering() -> contextra_types::Result<()>
+{
     let tmp = TempDir::new().expect("Failed to create temporary directory");
     let config = ContextraConfig {
         dimension: 4,
@@ -41,12 +42,7 @@ async fn test_query_builder_as_of_historical_time_travel_filtering() -> contextr
     .await?;
 
     // 1. Time-travel query at t = 30 (when Version 1 was active)
-    let results_t30 = col
-        .query()
-        .vector(&vec)
-        .as_of(30)
-        .execute()
-        .await?;
+    let results_t30 = col.query().vector(&vec).as_of(30).execute().await?;
 
     assert_eq!(
         results_t30.len(),
@@ -59,12 +55,7 @@ async fn test_query_builder_as_of_historical_time_travel_filtering() -> contextr
     );
 
     // 2. Time-travel query at t = 60 (when Version 2 was active)
-    let results_t60 = col
-        .query()
-        .vector(&vec)
-        .as_of(60)
-        .execute()
-        .await?;
+    let results_t60 = col.query().vector(&vec).as_of(60).execute().await?;
 
     assert_eq!(
         results_t60.len(),
@@ -77,12 +68,7 @@ async fn test_query_builder_as_of_historical_time_travel_filtering() -> contextr
     );
 
     // 3. Boundary test: Query at t = 5 (before any document was valid)
-    let results_t5 = col
-        .query()
-        .vector(&vec)
-        .as_of(5)
-        .execute()
-        .await?;
+    let results_t5 = col.query().vector(&vec).as_of(5).execute().await?;
 
     assert!(
         results_t5.is_empty(),
@@ -90,12 +76,7 @@ async fn test_query_builder_as_of_historical_time_travel_filtering() -> contextr
     );
 
     // 4. Boundary test: Query at t = 100 (exact upper bound, exclusive)
-    let results_t100 = col
-        .query()
-        .vector(&vec)
-        .as_of(100)
-        .execute()
-        .await?;
+    let results_t100 = col.query().vector(&vec).as_of(100).execute().await?;
 
     assert!(
         results_t100.is_empty(),

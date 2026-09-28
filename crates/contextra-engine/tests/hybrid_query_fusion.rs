@@ -24,7 +24,8 @@ impl TextEmbeddingEngine for FakeEmbedder {
 }
 
 #[tokio::test]
-async fn test_hybrid_query_fusion_signals_ranking_and_k_zero_boundary() -> contextra_types::Result<()> {
+async fn test_hybrid_query_fusion_signals_ranking_and_k_zero_boundary(
+) -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create temporary directory");
     let config = ContextraConfig {
         dimension: 4,
@@ -51,7 +52,8 @@ async fn test_hybrid_query_fusion_signals_ranking_and_k_zero_boundary() -> conte
     )
     .await?;
 
-    col.relate("doc_fusion_1", "doc_fusion_2", "SIMILAR_TOPIC").await?;
+    col.relate("doc_fusion_1", "doc_fusion_2", "SIMILAR_TOPIC")
+        .await?;
 
     // 2. Execute Hybrid Query combining vector, text, and anchor entities
     let anchor_id = EntityId::from_key("doc_fusion_1")?;
@@ -89,12 +91,7 @@ async fn test_hybrid_query_fusion_signals_ranking_and_k_zero_boundary() -> conte
     }
 
     // 3. Boundary test: Query with k = 0 MUST return empty results vector
-    let k_zero_results = col
-        .query()
-        .text("Quantum")
-        .k(0)
-        .execute()
-        .await?;
+    let k_zero_results = col.query().text("Quantum").k(0).execute().await?;
 
     assert!(
         k_zero_results.is_empty(),

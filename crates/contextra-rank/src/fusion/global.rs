@@ -112,9 +112,9 @@ impl GlobalFusionStrategy {
         community_members.retain(|_, members| members.len() >= min_size);
 
         if community_members.is_empty() {
-            return Err(ContextraError::InvalidInput(
-                format!("No communities satisfy min_community_size requirement ({min_size})"),
-            ));
+            return Err(ContextraError::InvalidInput(format!(
+                "No communities satisfy min_community_size requirement ({min_size})"
+            )));
         }
 
         // 2. Intra-community RRF per community.

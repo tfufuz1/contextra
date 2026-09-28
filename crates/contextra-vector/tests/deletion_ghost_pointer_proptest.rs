@@ -1,7 +1,5 @@
 use contextra_core::{DocId, TxId, VectorIndex};
-use contextra_vector::hnsw::{
-    GhostFreeVectorIndex, HnswConfig, HnswIndex,
-};
+use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex};
 use proptest::prelude::*;
 
 proptest! {

@@ -454,7 +454,12 @@ mod tests {
         }
 
         let hit_rate = (hits as f64) / (inserted_keys.len() as f64);
-        assert_eq!(hits, 10_000, "Expected 100% hit rate across 10,000 inserted keys, got hit rate {:.2}%", hit_rate * 100.0);
+        assert_eq!(
+            hits,
+            10_000,
+            "Expected 100% hit rate across 10,000 inserted keys, got hit rate {:.2}%",
+            hit_rate * 100.0
+        );
     }
 
     #[test]
@@ -510,9 +515,8 @@ mod tests {
         }
 
         let tenant = TenantId::try_new(100).unwrap();
-        let mut store = ContentAddressedKvStore::new(tenant).with_semantic_config(
-            SemanticCacheConfig::new(Arc::new(MockEmbedder), 0.95),
-        );
+        let mut store = ContentAddressedKvStore::new(tenant)
+            .with_semantic_config(SemanticCacheConfig::new(Arc::new(MockEmbedder), 0.95));
 
         // 1. Position match: insert [1, 2, 3, 4, 5]
         store.insert(tenant, &[1, 2, 3, 4, 5], 1001).unwrap();
@@ -547,7 +551,9 @@ mod tests {
         // Manually insert into content_index only
         let hash = ContentAddressedKvStore::hash_tokens(&[50, 60, 70]);
         let seg_ref = KvSegmentRef::new(3003, tenant, vec![50, 60, 70]);
-        store_content_only.content_index.insert((tenant, hash), seg_ref);
+        store_content_only
+            .content_index
+            .insert((tenant, hash), seg_ref);
 
         let res3 = store_content_only.lookup(tenant, &[50, 60, 70]);
         match res3 {
@@ -736,7 +742,8 @@ impl ContentAddressedKvStore {
 
         // 1. Exact prefix match check
         let prefix_match = if tenant == self.position_index.tenant_id() {
-            self.position_index.find_longest_prefix(token_ids, self.reuse_policy)
+            self.position_index
+                .find_longest_prefix(token_ids, self.reuse_policy)
         } else {
             self.tenant_position_trees
                 .get(&tenant)
@@ -804,9 +811,8 @@ impl ContentAddressedKvStore {
         let hash = Self::hash_tokens(tokens);
         let removed = self.content_index.remove(&(tenant, hash));
 
-        self.semantic_entries.retain(|(t, _, seg)| {
-            !(*t == tenant && seg.matched_tokens == tokens)
-        });
+        self.semantic_entries
+            .retain(|(t, _, seg)| !(*t == tenant && seg.matched_tokens == tokens));
 
         removed
     }

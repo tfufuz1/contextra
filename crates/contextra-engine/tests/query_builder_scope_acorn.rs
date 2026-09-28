@@ -110,7 +110,9 @@ impl FilteredIndex for MockFilteredIndex {
     }
 }
 
-async fn create_mock_collection(name: &str) -> (Collection<LsmStorage, MockFilteredIndex>, TempDir) {
+async fn create_mock_collection(
+    name: &str,
+) -> (Collection<LsmStorage, MockFilteredIndex>, TempDir) {
     let dir = TempDir::new().unwrap();
     let lsm_config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -165,12 +167,20 @@ async fn test_acorn_hard_boundary_scoping_returns_only_allowed_doc_ids() {
     col.insert("doc-1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"tenant": "A"})))
         .await
         .unwrap();
-    col.insert("doc-2", &[0.95, 0.05, 0.0, 0.0], Some(json!({"tenant": "B"})))
-        .await
-        .unwrap();
-    col.insert("doc-3", &[0.90, 0.10, 0.0, 0.0], Some(json!({"tenant": "A"})))
-        .await
-        .unwrap();
+    col.insert(
+        "doc-2",
+        &[0.95, 0.05, 0.0, 0.0],
+        Some(json!({"tenant": "B"})),
+    )
+    .await
+    .unwrap();
+    col.insert(
+        "doc-3",
+        &[0.90, 0.10, 0.0, 0.0],
+        Some(json!({"tenant": "A"})),
+    )
+    .await
+    .unwrap();
 
     let doc1_id = DocId::from_key("doc-1").unwrap();
     let doc3_id = DocId::from_key("doc-3").unwrap();

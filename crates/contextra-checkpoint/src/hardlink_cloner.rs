@@ -143,10 +143,14 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
                     let is_sst = path
                         .extension()
                         .is_some_and(|ext| ext == "sst" || ext == "tmp");
-                    if is_sst || path.file_name().is_some_and(|f| f.to_string_lossy().contains(".sst")) {
-                        let file_name = path
+                    if is_sst
+                        || path
                             .file_name()
-                            .ok_or_else(|| ContextraError::invalid_input("Invalid file name in SST directory"))?;
+                            .is_some_and(|f| f.to_string_lossy().contains(".sst"))
+                    {
+                        let file_name = path.file_name().ok_or_else(|| {
+                            ContextraError::invalid_input("Invalid file name in SST directory")
+                        })?;
                         let target_path = target_dir.join(file_name);
 
                         // Remove existing link if present

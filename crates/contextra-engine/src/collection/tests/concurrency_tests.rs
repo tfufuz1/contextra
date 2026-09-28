@@ -153,6 +153,38 @@ async fn test_kv_locks_guard_release_on_panic_unwind() -> contextra_types::Resul
     Ok(())
 }
 
+#[test]
+fn test_kv_locks_try_lock_blocking() {
+    use crate::collection::kv_lock::KvKeyLocks;
+
+    let locks = KvKeyLocks::new();
+    let key = "test_key";
+    let shard_idx = locks.shard_idx(key);
+
+    // Initially available
+    let guard = locks.try_lock_for(key);
+    assert!(
+        guard.is_some(),
+        "try_lock_for should succeed when lock is free"
+    );
+
+    // Second try_lock on same shard should fail (WouldBlock)
+    let second_try = locks.try_lock_shard(shard_idx);
+    assert!(
+        second_try.is_none(),
+        "try_lock_shard should return None when lock is held"
+    );
+
+    drop(guard);
+
+    // Available again
+    let third_try = locks.try_lock_for(key);
+    assert!(
+        third_try.is_some(),
+        "try_lock_for should succeed after guard drop"
+    );
+}
+
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_collection_next_tx_sequence() {

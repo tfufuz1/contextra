@@ -1,4 +1,6 @@
-use contextra_kvcache::store::{CacheDirective, StepId, TenantIsolatedKvStore, MAX_PINNED_BYTES_PER_TENANT};
+use contextra_kvcache::store::{
+    CacheDirective, StepId, TenantIsolatedKvStore, MAX_PINNED_BYTES_PER_TENANT,
+};
 use contextra_kvcache::KvSegment;
 use contextra_types::{ContextraError, TenantId};
 use std::time::Duration;
@@ -100,7 +102,10 @@ fn test_cache_directive_pin_budget_exceeded() {
                 "Error message must indicate exceeding limit: {msg}"
             );
         }
-        other => panic!("Expected ContextraError::PinBudgetExceeded, got {:?}", other),
+        other => panic!(
+            "Expected ContextraError::PinBudgetExceeded, got {:?}",
+            other
+        ),
     }
 
     assert_eq!(

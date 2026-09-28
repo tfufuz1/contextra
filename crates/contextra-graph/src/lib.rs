@@ -30,6 +30,8 @@
 // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-10T19:23:40Z) (SESSION: bd6ff800)
 // PRÜFER-KONTEXT: FRESH - Verified zero-unsafe invariant, zero unhandled panics, AGT-GRAPH-001 TxId origin assertions, and 133/133 tests green.
 
+#[cfg(feature = "apprh-diffusion")]
+pub mod apprh;
 pub mod arc_slice;
 pub mod cascade;
 pub mod community;
@@ -50,9 +52,12 @@ pub mod ppr_stream;
 pub mod provenance;
 pub mod session_dag;
 pub mod tl_hfd;
-#[cfg(feature = "apprh-diffusion")]
-pub mod apprh;
 
+#[cfg(feature = "apprh-diffusion")]
+pub use apprh::{
+    apprh_local, shadow_compare_forward_push_vs_apprh, ApprhError, ApprhFlipGate, ApprhParams,
+    ApprhShadowComparison, DefaultApprhFlipGate,
+};
 pub use arc_slice::ArcSlice;
 pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
@@ -104,11 +109,6 @@ pub use tl_hfd::{
     shadow_compare_forward_push_vs_tl_hfd, tl_hfd_local, DefaultFlipGate, ShadowComparison,
     ShadowDiscrepancyReport, TlHfdError, TlHfdFlipGate, TlHfdParams, MIN_AGREEMENT_THRESHOLD,
     MIN_SHADOW_SAMPLES,
-};
-#[cfg(feature = "apprh-diffusion")]
-pub use apprh::{
-    apprh_local, shadow_compare_forward_push_vs_apprh, ApprhError, ApprhFlipGate, ApprhParams,
-    ApprhShadowComparison, DefaultApprhFlipGate,
 };
 
 /// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.

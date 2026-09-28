@@ -49,8 +49,7 @@ fn bench_long_mem_eval(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(5));
 
     let fixture_path = get_fixture_path("tests/fixtures/long_mem_eval_fixture.json");
-    let cases =
-        load_from_jsonl(&fixture_path).expect("Failed to load LongMemEval fixture dataset");
+    let cases = load_from_jsonl(&fixture_path).expect("Failed to load LongMemEval fixture dataset");
 
     group.bench_function("hybrid_retrieval_fixture", |b| {
         b.to_async(&rt).iter_custom(|iters| {

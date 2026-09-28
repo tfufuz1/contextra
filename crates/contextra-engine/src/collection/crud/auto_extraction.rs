@@ -75,7 +75,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         config: AutoExtractionConfig,
     ) {
         let key = Arc::as_ptr(&self.kv_locks) as usize;
-        AUTO_EXTRACTION_REGISTRY.write().insert(key, (generator, config));
+        AUTO_EXTRACTION_REGISTRY
+            .write()
+            .insert(key, (generator, config));
     }
 
     /// Returns the configured auto extraction generator and config, if present.
@@ -109,7 +111,9 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
 
     #[cfg(feature = "entity-extraction")]
     {
-        let triples = match crate::extraction::extract_triples(text, generator, &cfg.entity_config).await {
+        let triples = match crate::extraction::extract_triples(text, generator, &cfg.entity_config)
+            .await
+        {
             Ok(t) => t,
             Err(e) => {
                 tracing::warn!(doc_id = %doc_id, error = %e, "extract_triples failed during auto extraction");
@@ -127,7 +131,12 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
             }
 
             match collection
-                .relate_with_provenance(&triple.subject, &triple.object, &triple.predicate, Some(doc_id))
+                .relate_with_provenance(
+                    &triple.subject,
+                    &triple.object,
+                    &triple.predicate,
+                    Some(doc_id),
+                )
                 .await
             {
                 Ok(_) => {

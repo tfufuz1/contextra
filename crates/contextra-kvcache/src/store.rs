@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use ahash::AHashMap;
-use contextra_types::{ContextraError, TenantId};
 pub use contextra_types::error::{CacheDirective, StepId};
+use contextra_types::{ContextraError, TenantId};
 use lru::LruCache;
 use parking_lot::RwLock;
 
@@ -152,7 +152,9 @@ impl TenantState {
             .segment_meta
             .iter()
             .filter_map(|(&id, meta)| match &meta.directive {
-                CacheDirective::ReleaseAfterStep { step_id: target } if *target == step_id => Some(id),
+                CacheDirective::ReleaseAfterStep { step_id: target } if *target == step_id => {
+                    Some(id)
+                }
                 _ => None,
             })
             .collect();
@@ -173,29 +175,29 @@ impl TenantState {
         }
 
         let now = std::time::Instant::now();
-        let unref_ids: Vec<u64> = self
-            .cache
-            .iter()
-            .rev()
-            .filter_map(|(&id, seg)| {
-                if seg.active_refs() == 0 {
-                    let is_pinned = self.segment_meta.get(&id).is_some_and(|meta| {
-                        match &meta.directive {
+        let unref_ids: Vec<u64> =
+            self.cache
+                .iter()
+                .rev()
+                .filter_map(|(&id, seg)| {
+                    if seg.active_refs() == 0 {
+                        let is_pinned = self.segment_meta.get(&id).is_some_and(|meta| match &meta
+                            .directive
+                        {
                             CacheDirective::Pin { ttl: None } => true,
                             CacheDirective::Pin { ttl: Some(dur) } => now < meta.pinned_at + *dur,
                             _ => false,
+                        });
+                        if !is_pinned {
+                            Some(id)
+                        } else {
+                            None
                         }
-                    });
-                    if !is_pinned {
-                        Some(id)
                     } else {
                         None
                     }
-                } else {
-                    None
-                }
-            })
-            .collect();
+                })
+                .collect();
 
         if unref_ids.is_empty() {
             return None;

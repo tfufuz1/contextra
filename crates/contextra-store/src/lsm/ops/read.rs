@@ -11,7 +11,10 @@ pub(crate) async fn get_tracked(
     key: &[u8],
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let snapshot_seq = storage.next_seq_no.load(Ordering::Acquire).saturating_sub(1);
+    let snapshot_seq = storage
+        .next_seq_no
+        .load(Ordering::Acquire)
+        .saturating_sub(1);
     get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await
 }
 

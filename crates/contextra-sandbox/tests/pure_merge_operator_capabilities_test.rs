@@ -41,14 +41,20 @@ async fn test_pure_merge_operator_denies_clock_access() -> TestResult {
         .await?;
 
     let errno = i32::from_le_bytes(output.stdout[0..4].try_into()?);
-    assert_eq!(errno, 2, "Expected ERRNO_ACCES (2) for clock_time_get under pure capabilities");
+    assert_eq!(
+        errno, 2,
+        "Expected ERRNO_ACCES (2) for clock_time_get under pure capabilities"
+    );
 
     // Under exact MergeOperatorCapabilities::pure() without allow_stdout, output is empty
     let pure_caps = MergeOperatorCapabilities::pure();
     let pure_output = executor
         .execute(&wasm_bytes, b"", &pure_caps, Duration::from_secs(1))
         .await?;
-    assert!(pure_output.stdout.is_empty(), "Stdout must be empty when allow_stdout=false");
+    assert!(
+        pure_output.stdout.is_empty(),
+        "Stdout must be empty when allow_stdout=false"
+    );
 
     Ok(())
 }
@@ -89,7 +95,10 @@ async fn test_pure_merge_operator_denies_random_access() -> TestResult {
         .await?;
 
     let errno = i32::from_le_bytes(output.stdout[0..4].try_into()?);
-    assert_eq!(errno, 52, "Expected ERRNO_NOSYS (52) for random_get under pure capabilities");
+    assert_eq!(
+        errno, 52,
+        "Expected ERRNO_NOSYS (52) for random_get under pure capabilities"
+    );
 
     Ok(())
 }

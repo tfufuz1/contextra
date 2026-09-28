@@ -24,11 +24,11 @@ pub use quantize_kivi::{
     compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, pack_kivi_block,
     unpack_kivi_block, KiviBlockMeta, KiviQuantizeConfig, KiviQuantizedBlock, KvTensorView,
 };
-pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 #[cfg(feature = "content-addressed-kv-cache")]
 pub use radix::{
     ContentAddressedKvStore, KvLookupResult, KvSegmentRef, SemanticCacheConfig, SemanticEmbedder,
 };
+pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 pub use segment::{
     KvSegment, KvSegmentContent, ShreddableSegmentKey, Tier2EncryptedSegment,
     CURRENT_KV_KEY_DERIVATION_VERSION,

@@ -298,7 +298,11 @@ mod tests {
 
         // 2. Measure TenantPrefixKvStore insertion behaviour
         let key = contextra_ports::kv::PrefixKey {
-            model: contextra_types::model_fingerprint::ModelFingerprint::new([0xab; 32], "test-model", "F16"),
+            model: contextra_types::model_fingerprint::ModelFingerprint::new(
+                [0xab; 32],
+                "test-model",
+                "F16",
+            ),
             tokenizer_hash: [0u8; 32],
             layout: contextra_ports::kv::KvLayout {
                 n_layer: 32,
@@ -327,7 +331,9 @@ mod tests {
         for i in 0..1000u32 {
             let mut query = shared_prefix.clone();
             query.push(i + 1000);
-            let hit = store.lookup(tenant, &key, &query).expect("Lookup must succeed");
+            let hit = store
+                .lookup(tenant, &key, &query)
+                .expect("Lookup must succeed");
             assert_eq!(hit.matched_tokens, 101);
         }
     }

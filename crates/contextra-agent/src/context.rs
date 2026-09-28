@@ -234,7 +234,12 @@ impl AgentEngine {
     }
 
     /// Executes step configuration, updating context with per-step cache directives.
-    pub fn run(&mut self, ctx: &mut AgentContext, step_id: StepId, node_id: &str) -> CacheDirective {
+    pub fn run(
+        &mut self,
+        ctx: &mut AgentContext,
+        step_id: StepId,
+        node_id: &str,
+    ) -> CacheDirective {
         let directive = self.directive_for_step(node_id, step_id);
         self.current_directive = directive.clone();
         ctx.set_step_cache_directive(step_id, directive.clone());

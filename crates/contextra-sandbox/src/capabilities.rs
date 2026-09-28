@@ -119,8 +119,14 @@ mod tests {
     #[test]
     fn test_merge_operator_capabilities_pure_strictness() {
         let caps = MergeOperatorCapabilities::pure();
-        assert!(!caps.allow_stdout, "stdout must be disabled for pure merge operators");
-        assert!(!caps.allow_stderr, "stderr must be disabled for pure merge operators");
+        assert!(
+            !caps.allow_stdout,
+            "stdout must be disabled for pure merge operators"
+        );
+        assert!(
+            !caps.allow_stderr,
+            "stderr must be disabled for pure merge operators"
+        );
         assert!(!caps.allow_filesystem, "filesystem must be disabled");
         assert!(!caps.allow_network, "network must be disabled");
         assert!(!caps.allow_clock, "clock access must be disabled");
