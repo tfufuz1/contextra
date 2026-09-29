@@ -235,15 +235,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
     }
 
-    /// Checks if a `doc_id` collision exists for a different user key string using tracked transaction reads.
-    pub(crate) async fn check_doc_id_collision_tracked(
-        &self,
-        tx: contextra_types::TxId,
-        doc_id: DocId,
-        id: &str,
-    ) -> Result<()> {
+    /// Checks if a `doc_id` collision exists for a different user key string (untracked).
+    #[allow(dead_code)]
+    pub(crate) async fn check_doc_id_collision(&self, doc_id: DocId, id: &str) -> Result<()> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-        if let Some(val) = self.storage.get_tracked(tx, &doc_key).await? {
+        if let Some(val) = self.storage.get(&doc_key).await? {
             let existing_id = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Some(meta.id)
             } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
@@ -263,12 +259,15 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 
-    /// Legacy untracked collision check for non-transactional contexts and unit tests.
-    #[allow(dead_code)] // Untracked legacy helper for non-transactional contexts and unit tests
-    pub(crate) async fn check_doc_id_collision(&self, doc_id: DocId, id: &str) -> Result<()> {
-        // SSI: nicht tx-gebunden — untracked Kollisionsprüfung außerhalb einer Transaktion
+    /// Checks if a `doc_id` collision exists for a different user key string (SSI tracked).
+    pub(crate) async fn check_doc_id_collision_tracked(
+        &self,
+        tx: contextra_types::TxId,
+        doc_id: DocId,
+        id: &str,
+    ) -> Result<()> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-        if let Some(val) = self.storage.get(&doc_key).await? {
+        if let Some(val) = self.storage.get_tracked(tx, &doc_key).await? {
             let existing_id = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Some(meta.id)
             } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
@@ -319,14 +318,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
 
-        let old_user_val = self
-            .storage
-            .get_at_seq_tracked(tx, &user_key, u64::MAX)
-            .await?;
-        let old_doc_val = self
-            .storage
-            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
-            .await?;
+        let old_user_val = self.storage.get_at_seq_tracked(tx, &user_key, u64::MAX).await?;
+        let old_doc_val = self.storage.get_at_seq_tracked(tx, &doc_key, u64::MAX).await?;
 
         let data = serde_json::to_vec(&stored)?;
         self.storage.put(tx, &user_key, &data).await?;

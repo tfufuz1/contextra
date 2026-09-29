@@ -19,7 +19,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let mut skipped_tombstones = 0usize;
         for sd in scored_docs {
             let doc_key = self.namespaced_key(&sd.doc_id.inner().to_le_bytes(), 1);
-            // SSI: nicht tx-gebunden — Hydrierung von Suchergebnissen am Snapshot
             if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {
                 let (id, metadata) =
                     if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
@@ -66,7 +65,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let mut skipped_tombstones = 0usize;
         for (doc_id, score) in scored_tuples {
             let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-            // SSI: nicht tx-gebunden — Hydrierung von Suchergebnissen am Snapshot
             if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {
                 let (id, metadata) =
                     if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {

@@ -58,14 +58,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
 
-        let old_user_val = self
-            .storage
-            .get_at_seq_tracked(tx, &user_key, u64::MAX)
-            .await?;
-        let old_doc_val = self
-            .storage
-            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
-            .await?;
+        let old_user_val = self.storage.get_at_seq_tracked(tx, &user_key, u64::MAX).await?;
+        let old_doc_val = self.storage.get_at_seq_tracked(tx, &doc_key, u64::MAX).await?;
         let is_update = old_user_val.is_some() || old_doc_val.is_some();
 
         // Stage removal from old text index
