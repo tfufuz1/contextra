@@ -286,7 +286,10 @@ impl LsmStorage {
 
         if let Some(expected_hwm) = manifest_hwm {
             let actual_tail_hmac = last_replayed_hmac.unwrap_or([0u8; 32]);
-            let check_hmac = if replayed_hmac_set.contains(&expected_hwm) {
+            let check_hmac = if replayed_hmac_set.contains(&expected_hwm)
+                || (last_replayed_hmac.is_none()
+                    && valid_manifest_sstables.as_ref().is_some_and(|s| !s.is_empty()))
+            {
                 expected_hwm
             } else {
                 actual_tail_hmac
@@ -493,6 +496,8 @@ impl LsmStorage {
         let flush_notify = Arc::new(tokio::sync::Notify::new());
         let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));
 
+        let ssi_max_tracked_keys = config.ssi_max_tracked_keys;
+
         let storage = Self {
             config,
             key_manager,
@@ -524,7 +529,11 @@ impl LsmStorage {
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
-            ssi_validator: Arc::new(contextra_mvcc::SequenceLogSsiValidator::new()),
+            ssi_validator: Arc::new(
+                contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(
+                    ssi_max_tracked_keys,
+                ),
+            ),
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {

@@ -91,6 +91,9 @@ pub struct LsmConfig {
     pub block_cache_shards: usize,
     /// Durability mode for WAL persistence and integrity checks.
     pub durability_mode: DurabilityMode,
+    /// Maximum capacity of committed write keys tracked in SSI validator before pruning or rejecting.
+    /// Default is 1,000,000 keys.
+    pub ssi_max_tracked_keys: usize,
 }
 
 impl Default for LsmConfig {
@@ -105,6 +108,7 @@ impl Default for LsmConfig {
             group_commit_window_micros: 500,
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
+            ssi_max_tracked_keys: 1_000_000,
         }
     }
 }

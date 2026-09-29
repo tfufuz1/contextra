@@ -294,6 +294,11 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         storage.ssi_validator.record_commit_key(key, raw_seq);
     }
 
+    let first_seq = mem_updates
+        .first()
+        .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+        .unwrap_or(0);
+
     // --- PHASE 2: Prepare WAL entries under commit_mutex ---
     let wal = storage.wal.read().await.clone();
     let (wal_entries, prev_hmac_snapshot) = wal.prepare_batch(wal_ops).await?;
@@ -311,6 +316,9 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         };
 
         if let Err(e) = single_append_res {
+            if first_seq > 0 {
+                storage.ssi_validator.forget_from(first_seq);
+            }
             let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
             let commit_guard = CommitGuard {
                 _lock: &_commit_lock,
@@ -404,10 +412,12 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                             e
                         )))
                     } else {
+                        let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
                         storage.notify_commit_observers(
                             &entries_for_obs,
                             tx_id,
                             WriteOrigin::UserWrite,
+                            is_durable,
                         );
                         let state = storage.state.read().await;
                         storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
@@ -510,6 +520,19 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         }
 
         if let Err(e) = append_res {
+            if first_seq > 0 {
+                storage.ssi_validator.forget_from(first_seq);
+            }
+            for r in &pending_queue.requests {
+                let r_first_seq = r
+                    .mem_updates
+                    .first()
+                    .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+                    .unwrap_or(0);
+                if r_first_seq > 0 {
+                    storage.ssi_validator.forget_from(r_first_seq);
+                }
+            }
             let _commit_lock = storage.commit_mutex.lock().await;
             let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
             let commit_guard = CommitGuard {
@@ -542,16 +565,19 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             return Err(ContextraError::Storage(err_msg));
         }
 
+        let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
         storage.notify_commit_observers(
             &leader_entries_for_observer,
             leader_tx_id,
             WriteOrigin::UserWrite,
+            is_durable,
         );
         for r in &pending_queue.requests {
             storage.notify_commit_observers(
                 r.wal_entries.entries(),
                 r.tx_id,
                 WriteOrigin::UserWrite,
+                is_durable,
             );
         }
 

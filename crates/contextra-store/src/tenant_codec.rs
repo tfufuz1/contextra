@@ -96,6 +96,24 @@ pub trait StorageEngineHandle: Send + Sync + 'static {
         key: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>>;
+    fn get_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, Result<Option<Bytes>>>;
+    fn get_at_seq_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<Bytes>>>;
+    #[allow(clippy::type_complexity)]
+    fn scan_prefix_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>>;
+    fn supports_ssi_tracking_handle(&self) -> bool;
     fn put_handle<'a>(
         &'a self,
         tx_id: TxId,
@@ -178,6 +196,31 @@ impl StorageEngineHandle for LsmStorage {
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
         self.get_at_seq(key, seq_no)
+    }
+    fn get_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        Box::pin(self.get_tracked(tx_id, key))
+    }
+    fn get_at_seq_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        Box::pin(self.get_at_seq_tracked(tx_id, key, seq))
+    }
+    fn scan_prefix_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(self.scan_prefix_tracked(tx_id, prefix))
+    }
+    fn supports_ssi_tracking_handle(&self) -> bool {
+        self.supports_ssi_tracking()
     }
     fn put_handle<'a>(
         &'a self,
@@ -296,6 +339,31 @@ impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
         (**self).get_at_seq(key, seq_no)
+    }
+    fn get_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        (**self).get_tracked(tx_id, key)
+    }
+    fn get_at_seq_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        (**self).get_at_seq_tracked(tx_id, key, seq)
+    }
+    fn scan_prefix_tracked_handle<'a>(
+        &'a self,
+        tx_id: TxId,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        (**self).scan_prefix_tracked(tx_id, prefix)
+    }
+    fn supports_ssi_tracking_handle(&self) -> bool {
+        (**self).supports_ssi_tracking()
     }
     fn put_handle<'a>(
         &'a self,
@@ -494,6 +562,46 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
             let physical_key = self.make_key(key);
             self.inner.get_at_seq_handle(&physical_key, seq_no).await
         })
+    }
+
+    fn get_tracked<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        Box::pin(async move {
+            let physical_key = self.make_key(key);
+            self.inner.get_tracked_handle(tx_id, &physical_key).await
+        })
+    }
+
+    fn get_at_seq_tracked<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        Box::pin(async move {
+            let physical_key = self.make_key(key);
+            self.inner
+                .get_at_seq_tracked_handle(tx_id, &physical_key, seq)
+                .await
+        })
+    }
+
+    fn scan_prefix_tracked<'a>(
+        &'a self,
+        tx_id: TxId,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move {
+            let physical_prefix = self.make_key(prefix);
+            let raw_res = self
+                .inner
+                .scan_prefix_tracked_handle(tx_id, &physical_prefix)
+                .await?;
+            Ok(self.filter_strip_batch(raw_res))
+        })
+    }
+
+    fn supports_ssi_tracking(&self) -> bool {
+        self.inner.supports_ssi_tracking_handle()
     }
 
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {

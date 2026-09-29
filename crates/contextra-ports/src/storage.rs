@@ -208,6 +208,50 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// Retrieves a value by key at a specific sequence number (MVCC).
     fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Bytes>>>;
 
+    /// Retrieves a value by key tracked within transaction `tx_id` for SSI read-set validation.
+    ///
+    /// # ReadSet Tracking
+    /// Untracked: Default implementation delegates to [`StorageEngine::get`] and registriert KEINE Lesezugriffe im ReadSet.
+    /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys in the transaction's `ReadSet`.
+    fn get_tracked<'a>(&'a self, _tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        self.get(key)
+    }
+
+    /// Retrieves a value by key at `seq` tracked within transaction `tx_id` for SSI read-set validation.
+    ///
+    /// # ReadSet Tracking
+    /// Untracked: Default implementation delegates to [`StorageEngine::get_at_seq`] and registriert KEINE Lesezugriffe im ReadSet.
+    /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys in the transaction's `ReadSet`.
+    fn get_at_seq_tracked<'a>(
+        &'a self,
+        _tx_id: TxId,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        self.get_at_seq(key, seq)
+    }
+
+    /// Scans a range of keys with given prefix tracked within transaction `tx_id` for SSI read-set validation.
+    ///
+    /// # ReadSet Tracking
+    /// Untracked: Default implementation delegates to [`StorageEngine::scan_prefix`] and registriert KEINE Lesezugriffe im ReadSet.
+    /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys/prefixes in the transaction's `ReadSet`.
+    #[allow(clippy::type_complexity)]
+    fn scan_prefix_tracked<'a>(
+        &'a self,
+        _tx_id: TxId,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        self.scan_prefix(prefix)
+    }
+
+    /// Returns `true` if this storage engine implementation actively tracks read-sets for SSI validation.
+    ///
+    /// Default implementation returns `false`.
+    fn supports_ssi_tracking(&self) -> bool {
+        false
+    }
+
     /// Stores a key-value pair as part of a transaction.
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>>;
 
