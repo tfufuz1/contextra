@@ -71,7 +71,7 @@ fn main() {
         }
     }
 
-    let generated_code = generate_harness_code(&modules);
+    let generated_code = generate_harness_code(&manifest_dir, &modules);
     let dest_path = out_dir.join("harness_generated.rs");
     fs::write(&dest_path, generated_code)
         .unwrap_or_else(|e| panic!("Failed to write generated harness code to {}: {}", dest_path.display(), e));
@@ -136,14 +136,19 @@ pub fn extract_main_subcommands(main_rs_content: &str) -> std::collections::Hash
     cmds
 }
 
-fn generate_harness_code(modules: &[(String, String)]) -> String {
+fn generate_harness_code(manifest_dir: &str, modules: &[(String, String)]) -> String {
     let mut code = String::new();
     code.push_str("// Auto-generated harness dispatch code. DO NOT EDIT.\n\n");
 
     for (stem, _) in modules {
+        let harness_path = Path::new(manifest_dir)
+            .join("src")
+            .join("harness")
+            .join(format!("{}.rs", stem));
+        let path_str = harness_path.to_str().unwrap().replace('\\', "/");
         code.push_str(&format!(
-            "#[path = \"../../../../../src/harness/{}.rs\"]\nmod {};\n\n",
-            stem, stem
+            "#[path = \"{}\"]\nmod {};\n\n",
+            path_str, stem
         ));
     }
 
