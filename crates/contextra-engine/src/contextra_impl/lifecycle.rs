@@ -119,6 +119,7 @@ impl Contextra {
             expiry_reaper_interval: config.expiry_reaper_interval,
             community_detection_threshold: config.community_detection.auto_trigger_threshold,
             collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),
+            tenant_collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),
             cancel_token: cancel_token.clone(),
             task_tracker: task_tracker.clone(),
             embedder: parking_lot::RwLock::new(None),
@@ -139,21 +140,23 @@ impl Contextra {
 
         db.init_embedding_backend(&config.embedding_backend).await?;
 
-        let default_col = db.collection("default").await?;
+        if config.tenant_policy != TenantPolicy::Required {
+            let default_col = db.collection("default").await?;
 
-        if config.consolidation_enabled {
-            if let Some(launcher) = config.consolidation_launcher.as_ref() {
-                let handle = launcher(
-                    default_col,
-                    config.consolidation_interval,
-                    config.max_llm_calls_per_cycle,
-                    cancel_token.clone(),
-                );
-                task_tracker.spawn(async move {
-                    if let Err(e) = handle.await {
-                        tracing::warn!(error = %e, "ConsolidationEngine task failed or was cancelled");
-                    }
-                });
+            if config.consolidation_enabled {
+                if let Some(launcher) = config.consolidation_launcher.as_ref() {
+                    let handle = launcher(
+                        default_col,
+                        config.consolidation_interval,
+                        config.max_llm_calls_per_cycle,
+                        cancel_token.clone(),
+                    );
+                    task_tracker.spawn(async move {
+                        if let Err(e) = handle.await {
+                            tracing::warn!(error = %e, "ConsolidationEngine task failed or was cancelled");
+                        }
+                    });
+                }
             }
         }
 
@@ -193,6 +196,9 @@ impl Contextra {
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn initialize_collections(&self) -> Result<()> {
+        if self.config.tenant_policy == TenantPolicy::Required {
+            return Ok(());
+        }
         let col_idx_prefix = b"__col_idx:\x00";
         // SSI: nicht tx-gebunden
         let entries = self.storage.scan_prefix(col_idx_prefix).await?;
@@ -432,6 +438,8 @@ impl Contextra {
         self.shutdown();
         self.task_tracker.close();
         self.task_tracker.wait().await;
+        self.collections.write().await.clear();
+        self.tenant_collections.write().await.clear();
     }
 }
 
@@ -446,8 +454,8 @@ impl Contextra {
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn close(self) -> Result<()> {
         self.wait_shutdown().await;
-        self.storage.close().await?;
         self.flush().await?;
+        self.storage.close().await?;
         Ok(())
     }
 
