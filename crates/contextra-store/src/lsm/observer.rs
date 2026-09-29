@@ -331,6 +331,10 @@ impl ObserverRegistry {
     }
 
     /// Synchronously notifies all registered observers of a committed batch with explicit CommitContext.
+    ///
+    /// When invoked within a multi-threaded Tokio async runtime context, blocking execution is offloaded via
+    /// `tokio::task::block_in_place` to ensure transaction commit paths on Tokio runtime worker threads
+    /// remain non-blocking.
     pub fn notify_with_context(&self, entries: &[WalEntry], seq_no: u64, ctx: CommitContext) {
         let observers_snapshot = {
             let guard = self.observers.read();
@@ -350,91 +354,104 @@ impl ObserverRegistry {
 
         let mut panicking: Vec<Arc<dyn WalObserver>> = Vec::new();
 
-        for worker in &observers_snapshot {
-            if !ctx.durable && worker.inner.requires_durability() {
-                continue;
-            }
+        let mut run_notify = || {
+            for worker in &observers_snapshot {
+                if !ctx.durable && worker.inner.requires_durability() {
+                    continue;
+                }
 
-            if worker.is_circuit_breaker_open(now_nanos) {
-                worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                continue;
-            }
+                if worker.is_circuit_breaker_open(now_nanos) {
+                    worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                    continue;
+                }
 
-            let event = CommitEvent {
-                entries: entries.to_vec(),
-                seq_no,
-                tx_id: ctx.tx_id,
-                origin: ctx.origin,
-            };
+                let event = CommitEvent {
+                    entries: entries.to_vec(),
+                    seq_no,
+                    tx_id: ctx.tx_id,
+                    origin: ctx.origin,
+                };
 
-            let (done_tx, done_rx) = sync_channel(1);
-            let task = WorkerTask { event, done_tx };
+                let (done_tx, done_rx) = sync_channel(1);
+                let task = WorkerTask { event, done_tx };
 
-            if worker.sender.try_send(task).is_err() {
-                worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
-                worker
-                    .circuit_breaker_open_until_nanos
-                    .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
-                tracing::warn!(
-                    tx_id = ctx.tx_id.inner(),
-                    "WalObserver queue full; dropped event and tripped circuit breaker"
-                );
-                continue;
-            }
+                if worker.sender.try_send(task).is_err() {
+                    worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                    worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
+                    worker
+                        .circuit_breaker_open_until_nanos
+                        .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
+                    tracing::warn!(
+                        tx_id = ctx.tx_id.inner(),
+                        "WalObserver queue full; dropped event and tripped circuit breaker"
+                    );
+                    continue;
+                }
 
-            match done_rx.recv_timeout(max_latency) {
-                Ok(WorkResult::Completed { elapsed_nanos }) => {
-                    if elapsed_nanos > max_latency_nanos {
+                match done_rx.recv_timeout(max_latency) {
+                    Ok(WorkResult::Completed { elapsed_nanos }) => {
+                        if elapsed_nanos > max_latency_nanos {
+                            worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                            worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
+                            worker.circuit_breaker_open_until_nanos.store(
+                                now_nanos.saturating_add(cooldown_nanos),
+                                Ordering::Relaxed,
+                            );
+                            tracing::warn!(
+                                elapsed_us = elapsed_nanos / 1_000,
+                                max_allowed_us = max_latency_nanos / 1_000,
+                                tx_id = ctx.tx_id.inner(),
+                                "WalObserver exceeded max_observer_latency; tripped circuit breaker"
+                            );
+                        } else {
+                            worker.consecutive_drops.store(0, Ordering::Relaxed);
+                            worker
+                                .circuit_breaker_open_until_nanos
+                                .store(0, Ordering::Relaxed);
+                        }
+                    }
+                    Ok(WorkResult::Panicked) => {
+                        worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                        worker
+                            .circuit_breaker_open_until_nanos
+                            .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
+                        tracing::error!(
+                            tx_id = ctx.tx_id.inner(),
+                            "WalObserver panicked during on_commit execution; deregistering observer"
+                        );
+                        panicking.push(Arc::clone(&worker.inner));
+                    }
+                    Err(RecvTimeoutError::Timeout) => {
+                        worker.dropped_count.fetch_add(1, Ordering::Relaxed);
                         worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
                         worker.circuit_breaker_open_until_nanos.store(
                             now_nanos.saturating_add(cooldown_nanos),
                             Ordering::Relaxed,
                         );
                         tracing::warn!(
-                            elapsed_us = elapsed_nanos / 1_000,
                             max_allowed_us = max_latency_nanos / 1_000,
                             tx_id = ctx.tx_id.inner(),
-                            "WalObserver exceeded max_observer_latency; tripped circuit breaker"
+                            "WalObserver timed out on commit path; tripped circuit breaker and continuing"
                         );
-                    } else {
-                        worker.consecutive_drops.store(0, Ordering::Relaxed);
+                    }
+                    Err(RecvTimeoutError::Disconnected) => {
+                        worker.dropped_count.fetch_add(1, Ordering::Relaxed);
                         worker
                             .circuit_breaker_open_until_nanos
-                            .store(0, Ordering::Relaxed);
+                            .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
                     }
                 }
-                Ok(WorkResult::Panicked) => {
-                    worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                    worker
-                        .circuit_breaker_open_until_nanos
-                        .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
-                    tracing::error!(
-                        tx_id = ctx.tx_id.inner(),
-                        "WalObserver panicked during on_commit execution; deregistering observer"
-                    );
-                    panicking.push(Arc::clone(&worker.inner));
-                }
-                Err(RecvTimeoutError::Timeout) => {
-                    worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                    worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
-                    worker.circuit_breaker_open_until_nanos.store(
-                        now_nanos.saturating_add(cooldown_nanos),
-                        Ordering::Relaxed,
-                    );
-                    tracing::warn!(
-                        max_allowed_us = max_latency_nanos / 1_000,
-                        tx_id = ctx.tx_id.inner(),
-                        "WalObserver timed out on commit path; tripped circuit breaker and continuing"
-                    );
-                }
-                Err(RecvTimeoutError::Disconnected) => {
-                    worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                    worker
-                        .circuit_breaker_open_until_nanos
-                        .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
-                }
             }
+        };
+
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
+                tokio::task::block_in_place(run_notify);
+            } else {
+                run_notify();
+            }
+        } else {
+            run_notify();
         }
 
         if !panicking.is_empty() {

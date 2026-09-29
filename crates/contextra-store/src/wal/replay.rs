@@ -259,7 +259,8 @@ impl Wal {
                     .allow_legacy_integrity_key_fallback
                     .load(std::sync::atomic::Ordering::SeqCst)
             {
-                let mut legacy_verifier = IntegrityVerifier::new(&legacy_integrity_key());
+                let legacy_key = legacy_integrity_key()?;
+                let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
                 legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
                 let legacy_res = match version {
                     WalVersion::V3 => {
