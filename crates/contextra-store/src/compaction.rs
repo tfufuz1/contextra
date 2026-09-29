@@ -5,7 +5,6 @@ mod config;
 mod engine;
 pub mod merge_operator;
 pub mod retention;
-pub mod ttl;
 
 #[cfg(test)]
 mod tests;
@@ -15,4 +14,7 @@ pub use config::*;
 pub use engine::*;
 pub use merge_operator::*;
 pub use retention::*;
-pub use ttl::*;
+
+/// Removed TTL feature stub per Decision Option B.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TtlMetadata;

@@ -1,4 +1,5 @@
 use super::*;
+use crate::memtable::is_valid_range_bounds;
 use contextra_core::{Result, TOMBSTONE_BIT};
 
 pub(super) enum SstableScanMode<'a> {
@@ -69,7 +70,7 @@ impl LsmStorage {
         mode: SstableScanMode<'_>,
         entry_filter: F,
         check_accumulator: bool,
-        per_source_limit: Option<usize>,
+        _per_source_limit: Option<usize>,
         context_name: &str,
     ) -> Result<std::collections::BTreeMap<Bytes, (Bytes, u64)>>
     where
@@ -82,6 +83,12 @@ impl LsmStorage {
         let sstables = self.sstables.read().await;
 
         let last_tx = self.last_committed_tx.load(Ordering::Acquire);
+
+        if let SstableScanMode::Range(s, e) = mode {
+            if !is_valid_range_bounds(s, e) {
+                return Ok(map);
+            }
+        }
 
         // 1. SSTables
         for sst in sstables.iter() {
@@ -129,11 +136,7 @@ impl LsmStorage {
                         });
                     }
                     source_count += 1;
-                    if let Some(lim) = per_source_limit {
-                        if source_count >= lim {
-                            break;
-                        }
-                    }
+                    let _ = source_count;
                 }
             }
         }

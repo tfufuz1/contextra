@@ -2,6 +2,7 @@ use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
 use contextra_core::{TxId, TOMBSTONE_BIT};
+use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
 
 impl LsmStorage {
     /// Notifies registered observers of committed WAL entries for a transaction.
@@ -101,7 +102,7 @@ impl LsmStorage {
             if raw_seq > max_seq {
                 max_seq = raw_seq;
             }
-            let entry_size = key.len() + value.len() + 8;
+            let entry_size = key.len() + value.len() + STAGING_ENTRY_OVERHEAD_BYTES;
             if let Err(e) = self.budget.consume_memory(entry_size as u64) {
                 self.budget_tracking_drift_bytes
                     .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);

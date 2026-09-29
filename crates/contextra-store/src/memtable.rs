@@ -31,6 +31,7 @@
 
 use bytes::Bytes;
 use contextra_core::{TxId, TOMBSTONE_BIT};
+use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::ops::Bound;
@@ -42,6 +43,18 @@ const _: () = assert!(TOMBSTONE_BIT == 1u64 << 63);
 #[inline]
 pub const fn is_tombstone(seq: u64) -> bool {
     (seq & TOMBSTONE_BIT) != 0
+}
+
+/// Validates whether start and end key range bounds define a non-empty, valid interval (`start <= end`).
+#[inline]
+pub fn is_valid_range_bounds(start: Bound<&[u8]>, end: Bound<&[u8]>) -> bool {
+    match (start, end) {
+        (Bound::Included(s), Bound::Included(e)) => s <= e,
+        (Bound::Included(s), Bound::Excluded(e))
+        | (Bound::Excluded(s), Bound::Included(e))
+        | (Bound::Excluded(s), Bound::Excluded(e)) => s < e,
+        _ => true,
+    }
 }
 
 type SequenceNumber = u64;
@@ -130,7 +143,7 @@ impl MemTable {
 
     /// Inserts a key-value pair with a sequence number and transaction ID.
     pub fn put(&self, key: Bytes, value: Bytes, seq_no: u64, tx_id: u64) {
-        let additional_size = key.len() + value.len() + 16; // Added tx_id
+        let additional_size = key.len() + value.len() + STAGING_ENTRY_OVERHEAD_BYTES;
         let shard_idx = Self::shard_for(&key);
         let mut entries = self.shards[shard_idx].entries.write();
 
@@ -194,7 +207,7 @@ impl MemTable {
             entries.retain(|key, versions| {
                 versions.retain(|(_seq, val, tx)| {
                     if *tx == tx_id {
-                        total_freed_size += key.len() + val.len() + 16;
+                        total_freed_size += key.len() + val.len() + STAGING_ENTRY_OVERHEAD_BYTES;
                         false
                     } else {
                         new_min_tx = new_min_tx.min(*tx);
@@ -410,6 +423,9 @@ impl MemTable {
     ) where
         F: Fn(&[u8], u64, u64) -> bool,
     {
+        if !is_valid_range_bounds(start, end) {
+            return;
+        }
         let max_tx_val = max_tx.inner();
         let max_seq = seq_no & !TOMBSTONE_BIT;
         let shard_range = Self::shard_range_for_bounds(start, end);
