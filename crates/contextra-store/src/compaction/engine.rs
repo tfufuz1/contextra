@@ -198,51 +198,6 @@ impl CompactionEngine {
         // Explicit fsync of output file and parent directory
         crate::util::fsync_parent_dir(&output_path).await?;
 
-        // 4. Check consistency under read-lock before writing MANIFEST
-        let (all_present, insertion_point, old_paths) = {
-            let ssts = sstables.read().await;
-
-            let all_present = input_ssts
-                .iter()
-                .all(|inp| ssts.iter().any(|sst| Arc::ptr_eq(inp, sst)));
-
-            if !all_present {
-                (false, 0, Vec::new())
-            } else {
-                let insertion_point = ssts
-                    .iter()
-                    .position(|sst| input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)))
-                    .unwrap_or(ssts.len());
-
-                let old_paths: Vec<PathBuf> = input_ssts
-                    .iter()
-                    .filter_map(|inp| {
-                        ssts.iter()
-                            .find(|sst| Arc::ptr_eq(inp, sst))
-                            .map(|sst| sst.file_path().to_path_buf())
-                    })
-                    .collect();
-
-                (true, insertion_point as u64, old_paths)
-            }
-        };
-
-        if !all_present {
-            // Concurrent modification detected — abort compaction, clean up output file without writing MANIFEST entry
-            tracing::warn!(
-                "Compaction aborted: input SSTables modified during merge \
-                 (concurrent flush or rollback detected)"
-            );
-            if let Err(e) = tokio::fs::remove_file(&output_path).await {
-                tracing::warn!(
-                    "Failed to clean up aborted compaction output {:?}: {}",
-                    output_path,
-                    e
-                );
-            }
-            return Ok(false);
-        }
-
         // Open the new SSTable reader
         let new_reader = Arc::new(
             SstableReader::open_with_key_manager(
@@ -253,31 +208,65 @@ impl CompactionEngine {
             .await?,
         );
 
-        // 5. Write EXACTLY ONE atomic `Replace` entry to MANIFEST and fsync
-        if let Some(ref manifest) = self.manifest {
-            manifest
-                .append(&crate::manifest::ManifestEntry::Replace {
-                    removed: old_paths.clone(),
-                    added: output_path.clone(),
-                    added_max_tx: new_reader.metadata().max_tx_id,
-                    rank: insertion_point,
-                })
-                .await?;
-        }
-
-        // 6. In-memory SSTable swap under write-lock — mirroring already-persisted MANIFEST state
-        {
+        // 4. In-memory SSTable swap under write-lock with MANIFEST durability
+        let old_paths = {
             let mut ssts = sstables.write().await;
 
-            // Remove input SSTables by identity (Arc::ptr_eq), not by raw index
+            let start_opt = ssts.iter().position(|s| Arc::ptr_eq(s, &input_ssts[0]));
+            let is_contiguous = match start_opt {
+                Some(start) => {
+                    if start + input_ssts.len() <= ssts.len() {
+                        input_ssts.iter().enumerate().all(|(idx, inp)| {
+                            Arc::ptr_eq(inp, &ssts[start + idx])
+                        })
+                    } else {
+                        false
+                    }
+                }
+                None => false,
+            };
+
+            if !is_contiguous {
+                tracing::warn!(
+                    "Compaction aborted under write lock: input SSTables are no longer contiguous or modified \
+                     (concurrent flush or rollback detected)"
+                );
+                if let Err(e) = tokio::fs::remove_file(&output_path).await {
+                    tracing::warn!(
+                        "Failed to clean up aborted compaction output {:?}: {}",
+                        output_path,
+                        e
+                    );
+                }
+                return Ok(false);
+            }
+
+            let insertion_point = start_opt.unwrap_or(0);
+            let old_paths: Vec<PathBuf> = input_ssts
+                .iter()
+                .map(|s| s.file_path().to_path_buf())
+                .collect();
+
+            // 5. Write EXACTLY ONE atomic `Replace` entry to MANIFEST before swapping in-memory state
+            if let Some(ref manifest) = self.manifest {
+                manifest
+                    .append(&crate::manifest::ManifestEntry::Replace {
+                        removed: old_paths.clone(),
+                        added: output_path.clone(),
+                        added_max_tx: new_reader.metadata().max_tx_id,
+                        rank: 0,
+                    })
+                    .await?;
+            }
+
+            // Remove input SSTables by identity (Arc::ptr_eq), which form a contiguous window
             ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
 
             // Add new SSTable at insertion point
-            let insert_idx = (insertion_point as usize).min(ssts.len());
+            let insert_idx = insertion_point.min(ssts.len());
             ssts.insert(insert_idx, new_reader);
 
             // Re-sort SSTable list by max_seq to guarantee shadowing/visibility order.
-            // Non-input SSTables might lie between the oldest and newest input SSTables.
             ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
             debug_assert!(
@@ -286,7 +275,9 @@ impl CompactionEngine {
                         <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
                 "SSTable list must be sorted by max_seq in ascending order after compaction swap"
             );
-        }
+
+            old_paths
+        };
 
         // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
@@ -342,97 +333,74 @@ impl CompactionEngine {
         &self,
         ssts: &[Arc<SstableReader>],
     ) -> Option<Vec<Arc<SstableReader>>> {
-        if ssts.len() < 2 {
+        if ssts.len() < self.config.min_sstables_per_tier {
             return None;
         }
 
-        // Group SSTables by size tier
-        let mut tiers: Vec<Vec<usize>> = Vec::new();
+        let min_tier = self.config.min_sstables_per_tier;
 
-        for (i, sst) in ssts.iter().enumerate() {
-            let size = sst.metadata().file_size;
-            let mut placed = false;
+        // 1. Evaluate all contiguous sub-ranges ssts[start..end]
+        // Candidates MUST form a contiguous subslice in `ssts`.
+        let mut best_tier_range: Option<(usize, usize)> = None;
+        let mut best_tier_len = 0usize;
+        let mut best_tier_size = u64::MAX;
 
-            for tier in &mut tiers {
-                if let Some(&neighbor_idx) = tier.last() {
-                    if let Some(neighbor_sst) = ssts.get(neighbor_idx) {
-                        let neighbor_size = neighbor_sst.metadata().file_size;
-                        let ratio = if size > neighbor_size {
-                            size as f64 / neighbor_size.max(1) as f64
-                        } else {
-                            neighbor_size as f64 / size.max(1) as f64
-                        };
+        for start in 0..ssts.len() {
+            for end in (start + min_tier)..=ssts.len() {
+                let window = &ssts[start..end];
+                let min_sz = window
+                    .iter()
+                    .map(|s| s.metadata().file_size)
+                    .min()
+                    .unwrap_or(1)
+                    .max(1);
+                let max_sz = window
+                    .iter()
+                    .map(|s| s.metadata().file_size)
+                    .max()
+                    .unwrap_or(1)
+                    .max(1);
+                let ratio = max_sz as f64 / min_sz as f64;
 
-                        if ratio <= self.config.size_ratio {
-                            tier.push(i);
-                            placed = true;
-                            break;
-                        }
+                if ratio <= self.config.size_ratio {
+                    let win_len = end - start;
+                    let win_size: u64 = window.iter().map(|s| s.metadata().file_size).sum();
+
+                    if win_len > best_tier_len
+                        || (win_len == best_tier_len && win_size < best_tier_size)
+                    {
+                        best_tier_len = win_len;
+                        best_tier_size = win_size;
+                        best_tier_range = Some((start, end));
                     }
                 }
             }
-
-            if !placed {
-                tiers.push(vec![i]);
-            }
         }
 
-        // Return the most-filled tier with enough candidates (FIND-STO-002)
-        // Tie-breaker: prefer tiers with smaller files (likely closer to L0)
-        tiers.sort_by(|a, b| {
-            b.len().cmp(&a.len()).then_with(|| {
-                let a_size = a
-                    .first()
-                    .and_then(|&i| ssts.get(i))
-                    .map(|s| s.metadata().file_size)
-                    .unwrap_or(0);
-                let b_size = b
-                    .first()
-                    .and_then(|&i| ssts.get(i))
-                    .map(|s| s.metadata().file_size)
-                    .unwrap_or(0);
-                a_size.cmp(&b_size)
-            })
-        });
-
-        for tier in tiers {
-            if tier.len() >= self.config.min_sstables_per_tier {
-                let mut sorted_tier = tier;
-                sorted_tier.sort_by_key(|&i| {
-                    ssts.get(i)
-                        .map(|s| s.metadata().max_seq & !TOMBSTONE_BIT)
-                        .unwrap_or(0)
-                });
-                return Some(
-                    sorted_tier
-                        .into_iter()
-                        .filter_map(|i| ssts.get(i).cloned())
-                        .collect(),
-                );
-            }
+        if let Some((start, end)) = best_tier_range {
+            return Some(ssts[start..end].to_vec());
         }
 
-        // Fallback: if total SSTable count is very high, compact the smallest ones
-        if ssts.len() >= self.config.min_sstables_per_tier * 2 {
-            let mut by_size: Vec<(usize, u64)> = ssts
-                .iter()
-                .enumerate()
-                .map(|(i, s)| (i, s.metadata().file_size))
-                .collect();
-            by_size.sort_by_key(|&(_, size)| size);
-            let count = self.config.min_sstables_per_tier;
-            let mut indices: Vec<usize> = by_size[..count].iter().map(|&(i, _)| i).collect();
-            indices.sort_by_key(|&i| {
-                ssts.get(i)
-                    .map(|s| s.metadata().max_seq & !TOMBSTONE_BIT)
-                    .unwrap_or(0)
-            });
-            return Some(
-                indices
-                    .into_iter()
-                    .filter_map(|i| ssts.get(i).cloned())
-                    .collect(),
-            );
+        // 2. Fallback for large SSTable counts: select contiguous window of min_tier size with smallest total size
+        if ssts.len() >= min_tier * 2 {
+            let mut best_fallback_start = None;
+            let mut min_fallback_size = u64::MAX;
+
+            for start in 0..=(ssts.len() - min_tier) {
+                let end = start + min_tier;
+                let total_size: u64 = ssts[start..end]
+                    .iter()
+                    .map(|s| s.metadata().file_size)
+                    .sum();
+                if total_size < min_fallback_size {
+                    min_fallback_size = total_size;
+                    best_fallback_start = Some(start);
+                }
+            }
+
+            if let Some(start) = best_fallback_start {
+                return Some(ssts[start..start + min_tier].to_vec());
+            }
         }
 
         None
