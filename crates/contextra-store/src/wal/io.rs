@@ -748,17 +748,6 @@ impl Wal {
         Ok(())
     }
 
-    /// Helper for creating entries bound to this WAL's current chain.
-    #[allow(dead_code)]
-    #[deprecated(
-        note = "Use prepare_batch with a single-element Vec instead — direct use bypasses chain-fork protection"
-    )]
-    pub(crate) async fn create_entry(&self, op: WalOp, seq_no: u64) -> Result<WalEntry> {
-        let last_hmac = self.last_hmac.lock().await;
-        let integrity_key = self.get_integrity_key()?;
-        WalEntry::try_new(op, seq_no, &integrity_key, *last_hmac)
-    }
-
     /// Scans the WAL entry by entry, executing full HMAC chain validation, CRC checks, and key manager decryption.
     ///
     /// Invokes `callback(seq_no, entry, end_offset)` for each valid entry.
@@ -942,7 +931,7 @@ impl Wal {
     }
 }
 
-#[allow(dead_code)]
+#[cfg(windows)]
 pub(crate) fn set_restrictive_file_acl(path: &Path) -> Result<()> {
     contextra_sys::set_restrictive_file_acl(path)
         .map_err(|e| ContextraError::Storage(e.to_string()))

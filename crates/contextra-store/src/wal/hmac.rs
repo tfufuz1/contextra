@@ -70,6 +70,13 @@ impl Wal {
         legacy_integrity_key()
     }
 
+    /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).
+    ///
+    /// **SECURITY NOTE**: Storing `.wal_integrity_key` adjacent to the WAL file protects
+    /// against accidental bitrot and storage device corruption. It does NOT protect against
+    /// malicious filesystem tampering, as an attacker with write access to the directory
+    /// can also alter or replace `.wal_integrity_key`. For cryptographic tamper resistance,
+    /// an active `KeyManager` (passphrase-derived keying) must be supplied.
     pub(crate) async fn load_or_create_integrity_key(wal_path: &Path) -> Result<[u8; 32]> {
         let parent = wal_path.parent().unwrap_or_else(|| Path::new(""));
         let dir_path = if parent.as_os_str().is_empty() {
@@ -334,22 +341,16 @@ impl Wal {
             }
             drop(file);
 
-            if let Err(e) = super::fs::rename(&tmp_path, &uuid_path).await {
-                let _ = super::fs::remove_file(&tmp_path).await;
-                if uuid_path.exists() {
-                    return read_uuid_file(&uuid_path).await;
+            let link_res = super::fs::hard_link(&tmp_path, &uuid_path).await;
+            let _ = super::fs::remove_file(&tmp_path).await;
+
+            match link_res {
+                Ok(()) => {
+                    crate::util::fsync_parent_dir(&uuid_path).await?;
+                    Ok(bytes)
                 }
-                return Err(ContextraError::Storage(format!(
-                    "Failed to rename WAL UUID sidecar from {} to {}: {}",
-                    tmp_path.display(),
-                    uuid_path.display(),
-                    e
-                )));
+                Err(_) => read_uuid_file(&uuid_path).await,
             }
-
-            crate::util::fsync_parent_dir(&uuid_path).await?;
-
-            Ok(bytes)
         }
     }
 }
