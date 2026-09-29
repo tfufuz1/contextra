@@ -64,6 +64,7 @@ impl SstableReader {
                 offsets_start,
                 num_offsets,
                 prefix,
+                self.format_version >= 3,
             )? {
                 Ok(i) => i,
                 Err(i) => i,
@@ -206,8 +207,13 @@ impl SstableReader {
 
             let start_offset_idx = match start {
                 Bound::Included(s) | Bound::Excluded(s) => {
-                    match binary_search_index_in_block(&block_data, offsets_start, num_offsets, s)?
-                    {
+                    match binary_search_index_in_block(
+                        &block_data,
+                        offsets_start,
+                        num_offsets,
+                        s,
+                        self.format_version >= 3,
+                    )? {
                         Ok(idx) => idx,
                         Err(idx) => idx,
                     }

@@ -109,6 +109,12 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
+    pub async fn simulate_wal_append_failure_for_tx_for_test(&self, _tx_id: u64) {
+        #[cfg(feature = "fault-injection")]
+        crate::wal::FAIL_APPEND_FOR_TX.store(_tx_id, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[doc(hidden)]
     pub async fn restore_wal_file_handle_for_test(&self) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -196,7 +202,8 @@ impl LsmStorage {
 
     /// Returns the highest sequence number applied to the MemTable and published.
     pub fn last_applied_seq(&self) -> u64 {
-        self.last_applied_seq.load(std::sync::atomic::Ordering::Acquire)
+        self.last_applied_seq
+            .load(std::sync::atomic::Ordering::Acquire)
     }
 
     /// Returns the current storage health status.

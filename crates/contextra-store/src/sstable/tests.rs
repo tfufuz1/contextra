@@ -58,7 +58,11 @@ async fn test_block_bloom_filter() {
     let bloom_bytes = block.get(bloom_pos..bloom_pos + 32).expect("bloom slice");
     let mut bloom_words = [0u64; 4];
     for w in 0..4 {
-        bloom_words[w] = u64::from_le_bytes(bloom_bytes[w * 8..(w + 1) * 8].try_into().expect("u64 word"));
+        bloom_words[w] = u64::from_le_bytes(
+            bloom_bytes[w * 8..(w + 1) * 8]
+                .try_into()
+                .expect("u64 word"),
+        );
     }
     assert!(bloom_words.iter().any(|&w| w > 0));
 
@@ -676,9 +680,14 @@ fn test_binary_search_vs_linear_search_equivalence() {
                 }
             }
 
-            let bin_res =
-                block_search::binary_search_entry_in_block(&block, offsets_start, num_offsets, key, true)
-                    .expect("binary search should not error");
+            let bin_res = block_search::binary_search_entry_in_block(
+                &block,
+                offsets_start,
+                num_offsets,
+                key,
+                true,
+            )
+            .expect("binary search should not error");
 
             assert_eq!(
                 linear_res,
@@ -699,9 +708,14 @@ fn test_binary_search_vs_linear_search_equivalence() {
             b"key_0000_foo".as_slice(),
         ];
         for nek in non_existent_keys {
-            let bin_res =
-                block_search::binary_search_entry_in_block(&block, offsets_start, num_offsets, nek, true)
-                    .expect("binary search should not error");
+            let bin_res = block_search::binary_search_entry_in_block(
+                &block,
+                offsets_start,
+                num_offsets,
+                nek,
+                true,
+            )
+            .expect("binary search should not error");
             assert!(
                 bin_res.is_none(),
                 "Non-existent key {:?} found in block with {} entries",

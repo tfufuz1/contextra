@@ -15,8 +15,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 
+static TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[tokio::test]
 async fn test_group_commit_follower_timeout_and_queue_recovery() {
+    let _lock_guard = TEST_LOCK.lock().await;
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
@@ -34,9 +37,9 @@ async fn test_group_commit_follower_timeout_and_queue_recovery() {
     storage.put(tx1, b"k_tx1", b"v_tx1").await.expect("put tx1");
     storage.put(tx2, b"k_tx2", b"v_tx2").await.expect("put tx2");
 
-    // 2. Configure Fault Injection: delay WAL append batch containing tx1 by 500ms
+    // 2. Configure Fault Injection: delay WAL append batch containing tx1 by 1000ms
     DELAY_APPEND_FOR_TX.store(tx1.inner(), Ordering::SeqCst);
-    DELAY_APPEND_MS.store(500, Ordering::SeqCst);
+    DELAY_APPEND_MS.store(1000, Ordering::SeqCst);
 
     let barrier = Arc::new(tokio::sync::Barrier::new(2));
 
@@ -51,6 +54,7 @@ async fn test_group_commit_follower_timeout_and_queue_recovery() {
     let barrier_b = Arc::clone(&barrier);
     let task_b = tokio::spawn(async move {
         barrier_b.wait().await;
+        tokio::time::sleep(Duration::from_millis(1)).await;
         storage_b.commit(tx2).await
     });
 
@@ -64,14 +68,14 @@ async fn test_group_commit_follower_timeout_and_queue_recovery() {
 
     // 3. Verifiziere: Mindestens eine Transaktion schlägt fehl mit CommitTimeout (der Follower)
     let follower_res = if res_a.is_err() {
-        res_a
+        &res_a
     } else if res_b.is_err() {
-        res_b
+        &res_b
     } else {
         panic!("One transaction must time out and return Err(CommitTimeout)");
     };
 
-    let err = follower_res.expect_err("Expected error");
+    let err = follower_res.as_ref().expect_err("Expected error");
     assert!(
         matches!(err, ContextraError::CommitTimeout { .. }),
         "Expected CommitTimeout, got {:?}",
@@ -104,6 +108,7 @@ async fn test_group_commit_follower_timeout_and_queue_recovery() {
 
 #[tokio::test]
 async fn test_group_commit_follower_timeout_preserves_other_followers() {
+    let _lock_guard = TEST_LOCK.lock().await;
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
@@ -126,9 +131,9 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
         .await
         .expect("put f1");
 
-    // Configure Fault Injection: delay WAL append batch containing tx_leader by 400ms
+    // Configure Fault Injection: delay WAL append batch containing tx_leader by 1000ms
     DELAY_APPEND_FOR_TX.store(tx_leader.inner(), Ordering::SeqCst);
-    DELAY_APPEND_MS.store(400, Ordering::SeqCst);
+    DELAY_APPEND_MS.store(1000, Ordering::SeqCst);
 
     let barrier = Arc::new(tokio::sync::Barrier::new(2));
 
@@ -143,6 +148,7 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
     let barrier_f1 = Arc::clone(&barrier);
     let task_f1 = tokio::spawn(async move {
         barrier_f1.wait().await;
+        tokio::time::sleep(Duration::from_millis(1)).await;
         storage_f1.commit(tx_follower_timeout).await
     });
 
@@ -154,9 +160,9 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
     DELAY_APPEND_MS.store(0, Ordering::SeqCst);
 
     let (follower_res, leader_res) = if res_leader.is_err() {
-        (res_leader, res_f1)
+        (&res_leader, &res_f1)
     } else {
-        (res_f1, res_leader)
+        (&res_f1, &res_leader)
     };
 
     assert!(
@@ -164,7 +170,13 @@ async fn test_group_commit_follower_timeout_preserves_other_followers() {
         "Leader commit must succeed: {:?}",
         leader_res
     );
-    let follower_err = follower_res.expect_err("Follower must time out");
+    assert!(
+        follower_res.is_err(),
+        "Follower must time out: leader={:?}, follower={:?}",
+        res_leader,
+        res_f1
+    );
+    let follower_err = follower_res.as_ref().unwrap_err();
     assert!(
         matches!(follower_err, ContextraError::CommitTimeout { .. }),
         "Expected CommitTimeout, got {:?}",
