@@ -317,8 +317,6 @@ pub struct Wal {
     pub(crate) flusher_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
     pub(crate) sealed: Arc<std::sync::atomic::AtomicBool>,
     pub truncate_lock: Arc<tokio::sync::Mutex<()>>,
-    #[allow(dead_code)]
-    pub(crate) simulate_append_failure: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) poisoned: Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -488,7 +486,6 @@ impl Wal {
             flusher_task: std::sync::Mutex::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
@@ -593,7 +590,6 @@ impl Wal {
             flusher_task: std::sync::Mutex::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
 
@@ -749,7 +745,6 @@ impl Wal {
             flusher_task: std::sync::Mutex::new(None),
             sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            simulate_append_failure: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
         if let Err(e) = wal.enable_flusher_with_config(
