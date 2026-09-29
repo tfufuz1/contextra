@@ -36,6 +36,14 @@ impl Contextra {
             ));
         }
 
+        let cache_key = (tenant_id, name.to_string());
+
+        let read_guard = self.tenant_collections.read().await;
+        if let Some(col) = read_guard.get(&cache_key) {
+            return Ok(Arc::clone(col));
+        }
+        drop(read_guard);
+
         let tenant_storage = Arc::new(contextra_store::tenant_codec::TenantScopedStorage::new(
             self.storage.clone(),
             tenant_id,
@@ -78,19 +86,54 @@ impl Contextra {
         col.load_text_stats().await?;
         col.migrate_doc_keys_v1().await?;
 
-        Ok(Arc::new(col))
+        let col_arc = Arc::new(col);
+
+        let mut write_guard = self.tenant_collections.write().await;
+        if let Some(existing) = write_guard.get(&cache_key) {
+            return Ok(Arc::clone(existing));
+        }
+        write_guard.insert(cache_key, Arc::clone(&col_arc));
+
+        let worker_handle = background_workers::start_expiry_cleanup_worker(
+            Arc::clone(&col_arc),
+            self.expiry_reaper_interval,
+            self.cancel_token.clone(),
+        );
+        self.task_tracker.spawn(async move {
+            if let Err(e) = worker_handle.await {
+                tracing::warn!(error = %e, "Expiry cleanup worker task failed or was cancelled");
+            }
+        });
+
+        Ok(col_arc)
     }
 
+    /// Retrieves or creates an un-tenanted [`Collection`] handle (Admin / Single-Tenant path).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContextraError::InvalidInput`] if [`TenantPolicy::Required`] is configured.
     pub async fn collection(&self, name: &str) -> Result<Arc<Collection<LsmStorage>>> {
         self.collection_with_language(name, Language::English).await
     }
 
+    /// Retrieves or creates an un-tenanted [`Collection`] handle with specified language (Admin / Single-Tenant path).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContextraError::InvalidInput`] if [`TenantPolicy::Required`] is configured.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn collection_with_language(
         &self,
         name: &str,
         language: Language,
     ) -> Result<Arc<Collection<LsmStorage>>> {
+        if self.config.tenant_policy == TenantPolicy::Required {
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Non-tenant collection access is forbidden when TenantPolicy::Required is active. Use collection_for_tenant instead.",
+            ));
+        }
+
         if name.len() > 64 {
             return Err(contextra_types::ContextraError::invalid_input(
                 "Collection name too long (max 64)",
@@ -336,6 +379,10 @@ impl Contextra {
         })?;
 
         self.collections.write().await.remove(name);
+        self.tenant_collections
+            .write()
+            .await
+            .remove(&(tenant_id, name.to_string()));
 
         Ok(proof)
     }
