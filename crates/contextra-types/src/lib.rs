@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 //! `Contextra` Types — Canonical domain models, IDs, budgets, filters, and error types.
 //!
 //! # Architecture Role (Ring 0)

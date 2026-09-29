@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 #![forbid(unsafe_code)]
 
 pub mod arm_registry;

@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 #![forbid(unsafe_code)]
 //! Layer-7-Rand-Crate ohne jegliche unsafe-Toleranz — verarbeitet direkt untrusted stdio-Input, siehe ADR-010.
 

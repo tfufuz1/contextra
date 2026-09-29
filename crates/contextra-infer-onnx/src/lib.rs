@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 // FILE-CONTEXT
 // STAND: 2026-09-15T16:10:40Z (SESSION: ec33599e)
 // ZWECK: In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG).
