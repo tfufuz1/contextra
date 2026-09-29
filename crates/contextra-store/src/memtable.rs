@@ -100,6 +100,15 @@ impl MemTable {
     ///
     /// Constructs a 16-bit big-endian value from the first two bytes of the key to maintain
     /// strict monotonicity: `keyA <= keyB => shard_for(keyA) <= shard_for(keyB)`.
+    ///
+    /// ## Design Rationale & Trade-offs
+    /// Range sharding is required so that `shard_range_for_prefix` can restrict prefix scans
+    /// (e.g. `scan_prefix_into`) to a single shard (for 2+ byte prefixes) or a small range of shards.
+    /// Keys sharing identical 2-byte prefixes (such as system prefixes `__col:`, `__meta:`, `__sys:`
+    /// or tenant prefixes `t1:`, `t2:`) map to the same shard by design. Replacing range sharding
+    /// with a hash mixer would destroy key monotonicity and force every prefix and range scan
+    /// to query all 16 shards.
+    ///
     /// Zero-panic and zero-allocation.
     #[inline]
     pub fn shard_for(key: &[u8]) -> usize {
@@ -501,11 +510,11 @@ mod tests {
         mt.put(Bytes::from("key1"), Bytes::from("val1"), 1, 1);
         mt.put(Bytes::from("key2"), Bytes::from("val2"), 2, 2);
 
-        let (val, seq) = mt.get(b"key1").expect("key1 should exist"); // expect
+        let (val, seq) = mt.get(b"key1").expect("key1 should exist"); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"val1");
         assert_eq!(seq, 1);
 
-        let (val, seq) = mt.get(b"key2").expect("key2 should exist"); // expect
+        let (val, seq) = mt.get(b"key2").expect("key2 should exist"); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"val2");
         assert_eq!(seq, 2);
 
@@ -523,25 +532,25 @@ mod tests {
         assert!(mt.get_at_seq(b"key1", 5, u64::MAX).is_none());
 
         // Exact match
-        let (val, seq, tx) = mt.get_at_seq(b"key1", 20, u64::MAX).unwrap(); // unwrap
+        let (val, seq, tx) = mt.get_at_seq(b"key1", 20, u64::MAX).unwrap(); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"v2");
         assert_eq!(seq, 20);
         assert_eq!(tx, 2);
 
         // Between versions
-        let (val, seq, tx) = mt.get_at_seq(b"key1", 25, u64::MAX).unwrap(); // unwrap
+        let (val, seq, tx) = mt.get_at_seq(b"key1", 25, u64::MAX).unwrap(); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"v2");
         assert_eq!(seq, 20);
         assert_eq!(tx, 2);
 
         // Filtered by max_tx: seq 20 has tx=2, max_tx=1 should fallback to seq 10 tx 1
-        let (val, seq, tx) = mt.get_at_seq(b"key1", 25, 1).unwrap(); // unwrap
+        let (val, seq, tx) = mt.get_at_seq(b"key1", 25, 1).unwrap(); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"v1");
         assert_eq!(seq, 10);
         assert_eq!(tx, 1);
 
         // Latest version
-        let (val, seq, tx) = mt.get_at_seq(b"key1", 100, u64::MAX).unwrap(); // unwrap
+        let (val, seq, tx) = mt.get_at_seq(b"key1", 100, u64::MAX).unwrap(); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"v3");
         assert_eq!(seq, 30);
         assert_eq!(tx, 3);
@@ -572,7 +581,7 @@ mod tests {
         mt.put(key.clone(), Bytes::new(), 20 | TOMBSTONE_BIT, 2);
 
         // Read at seq 15 -> should get val1
-        let (val, seq, tx) = mt.get_at_seq(&key, 15, u64::MAX).expect("Should find v1"); // expect
+        let (val, seq, tx) = mt.get_at_seq(&key, 15, u64::MAX).expect("Should find v1"); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"val1");
         assert_eq!(seq, 10);
         assert_eq!(tx, 1);
@@ -580,7 +589,7 @@ mod tests {
         // Read at seq 25 -> should get tombstone
         let (val, seq, tx) = mt
             .get_at_seq(&key, 25, u64::MAX)
-            .expect("Should find tombstone"); // expect
+            .expect("Should find tombstone"); // #[cfg(test)]
         assert_eq!(val.len(), 0);
         assert_eq!(seq, 20 | TOMBSTONE_BIT);
         assert_eq!(tx, 2);
@@ -635,16 +644,16 @@ mod tests {
         let mt = MemTable::new();
         assert_eq!(mt.size(), 0);
 
-        // Put key (len 4), val (len 4), overhead 16 => size = 24
+        // Put key (len 4), val (len 4), overhead STAGING_ENTRY_OVERHEAD_BYTES (32) => size = 40
         let key1 = Bytes::from("key1");
         let val1 = Bytes::from("val1");
         mt.put(key1, val1, 1, 1);
-        assert_eq!(mt.size(), 24);
+        assert_eq!(mt.size(), 40);
 
-        // Put delete tombstone: key (len 4), val (len 0), overhead 16 => size += 20
+        // Put delete tombstone: key (len 4), val (len 0), overhead STAGING_ENTRY_OVERHEAD_BYTES (32) => size += 36
         let key1_del = Bytes::from("key1");
         mt.put(key1_del, Bytes::new(), 2 | TOMBSTONE_BIT, 1);
-        assert_eq!(mt.size(), 44);
+        assert_eq!(mt.size(), 76);
     }
 
     #[test]
@@ -680,9 +689,9 @@ mod tests {
         assert!(mt.get(b"keyB2").is_some());
 
         // Verify size tracking updated after rollback
-        // Originally: tx A = 3 * (5 + 5 + 16) = 78; tx B = 2 * (5 + 5 + 16) = 52. Total = 130.
-        // After rollback tx A: remaining size should be 52.
-        assert_eq!(mt.size(), 52);
+        // Originally: tx A = 3 * (5 + 5 + 32) = 126; tx B = 2 * (5 + 5 + 32) = 84. Total = 210.
+        // After rollback tx A: remaining size should be 84.
+        assert_eq!(mt.size(), 84);
     }
 
     #[test]
@@ -739,7 +748,7 @@ mod tests {
             })
             .collect();
         for h in handles {
-            h.join().expect("thread panicked"); // #[cfg(test)] // expect
+            h.join().expect("thread panicked"); // #[cfg(test)]
         }
         assert_eq!(mt.iter_latest().len(), 1000);
     }
@@ -767,7 +776,7 @@ mod tests {
 
         mt.rollback(999); // should do nothing
         assert!(!mt.is_empty());
-        assert_eq!(mt.get(b"k").expect("should exist").0.as_ref(), b"v"); // expect
+        assert_eq!(mt.get(b"k").expect("should exist").0.as_ref(), b"v"); // #[cfg(test)]
         assert_eq!(mt.tx_range(), (10, 10));
 
         // Rollback existing tx
@@ -929,7 +938,7 @@ mod tests {
             }
         });
 
-        writer_handle.join().expect("writer finished");
-        scanner_handle.join().expect("scanner finished");
+        writer_handle.join().expect("writer finished"); // #[cfg(test)]
+        scanner_handle.join().expect("scanner finished"); // #[cfg(test)]
     }
 }
