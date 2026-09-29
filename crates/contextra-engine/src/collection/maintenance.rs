@@ -247,10 +247,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
                             if has_text {
                                 if let Some(text) = extract_text(&stored.metadata) {
-                                    self.text_index
-                                        .upsert_document(recovery_tx, doc_id, &text)
-                                        .await?;
-                                    recovered_text = true;
+                                    let already_indexed = match self.text_index.search_bm25(&text, 10, None).await {
+                                        Ok(hits) => hits.iter().any(|(id, _)| *id == doc_id),
+                                        Err(_) => false,
+                                    };
+                                    if !already_indexed {
+                                        self.text_index
+                                            .upsert_document(recovery_tx, doc_id, &text)
+                                            .await?;
+                                        recovered_text = true;
+                                    }
                                 }
                             }
 
@@ -272,6 +278,25 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                 }
                             }
                         }
+                    } else {
+                        // Crash recovery window (d): Pending intent without storage document!
+                        // Compensate/remove orphaned index entries across vector, text, and graph.
+                        let _ = self.index.delete(recovery_tx, doc_id).await;
+                        recovered_any = true;
+
+                        if has_text {
+                            let _ = self.text_index.delete_document(recovery_tx, doc_id).await;
+                            recovered_text = true;
+                        }
+
+                        if has_graph {
+                            let eid = EntityId::new(doc_id.inner());
+                            let _ = self.graph_index.remove_entity(recovery_tx, eid).await;
+                            if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
+                                let _ = self.graph_index.remove_entity(recovery_tx, eid_str).await;
+                            }
+                            recovered_graph = true;
+                        }
                     }
                 }
                 // Cleanup recovered intent
@@ -289,6 +314,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if recovered_graph {
             self.graph_index.commit(recovery_tx).await?;
         }
+        self.storage.commit(recovery_tx).await?;
 
         // 2. Fallback: Full scan for documents missing from index (FIND-DB-004: Parallel Batching)
         let fallback_tx = self.allocate_tx()?;
@@ -338,6 +364,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if fallback_text {
             self.text_index.commit(fallback_tx).await?;
         }
+        self.storage.commit(fallback_tx).await?;
 
         if repair_count > 0 {
             tracing::info!(

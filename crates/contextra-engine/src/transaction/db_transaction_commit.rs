@@ -5,7 +5,7 @@ use super::compensating_actions::{
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, Result, TenantId, TxId};
+use contextra_types::{ContextraError, EntityId, Result, TenantId, TxId};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -172,6 +172,30 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         let mut ledger = CommitLedger::new();
         ledger.push(RollbackStagedAction::new(self.collection.clone(), self.tx_id));
 
+        // Register CompensateLsmAction so storage keys are compensated if any subsequent commit step fails
+        let f_keys = {
+            let mut guard = match self.staged_forward_keys.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            std::mem::take(&mut *guard)
+        };
+        let r_keys = {
+            let mut guard = match self.staged_reverse_keys.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            std::mem::take(&mut *guard)
+        };
+
+        ledger.push(CompensateLsmAction::new(
+            self.collection.clone(),
+            intent_key.clone(),
+            Arc::clone(&doc_ids),
+            f_keys,
+            r_keys,
+        ));
+
         // Phase (a): Write CommitIntent::Pending and commit it to storage durably first (F-20)
         let intent_tx = TxId::new(
             self.collection
@@ -236,6 +260,18 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
             ledger.execute_rollback().await;
+            let comp_tx = TxId::new(
+                self.collection
+                    .next_tx
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            );
+            for &doc_id in doc_ids.iter() {
+                let eid = EntityId::new(doc_id.inner());
+                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
+                if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
+                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
+                }
+            }
             return Err(ContextraError::Transaction(format!(
                 "Text index commit failed: {}",
                 text_err
@@ -248,6 +284,18 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         if let Err(graph_err) = self.collection.graph_index.commit(self.tx_id).await {
             ledger.execute_rollback().await;
+            let comp_tx = TxId::new(
+                self.collection
+                    .next_tx
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            );
+            for &doc_id in doc_ids.iter() {
+                let eid = EntityId::new(doc_id.inner());
+                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
+                if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
+                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
+                }
+            }
             return Err(ContextraError::Transaction(format!(
                 "Graph index commit failed: {}",
                 graph_err
@@ -255,33 +303,22 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         // Phase (c): Commit storage
-        let f_keys = {
-            let mut guard = match self.staged_forward_keys.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-        let r_keys = {
-            let mut guard = match self.staged_reverse_keys.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
         if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
             ledger.execute_rollback().await;
+            let comp_tx = TxId::new(
+                self.collection
+                    .next_tx
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            );
+            for &doc_id in doc_ids.iter() {
+                let eid = EntityId::new(doc_id.inner());
+                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
+                if let Ok(eid_str) = EntityId::from_key(&doc_id.inner().to_string()) {
+                    let _ = self.collection.graph_index.remove_entity(comp_tx, eid_str).await;
+                }
+            }
             return Err(ContextraError::Transaction(storage_err.to_string()));
         }
-
-        ledger.push(CompensateLsmAction::new(
-            self.collection.clone(),
-            intent_key.clone(),
-            Arc::clone(&doc_ids),
-            f_keys,
-            r_keys,
-        ));
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(
