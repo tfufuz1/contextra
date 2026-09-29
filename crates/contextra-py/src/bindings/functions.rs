@@ -75,12 +75,34 @@ pub fn open(
     Ok(PyContextra::new(Arc::new(db), rt, worker_threads, poisoned))
 }
 
-#[pyfunction]
-#[allow(clippy::panic)]
-pub fn _trigger_panic_for_test(py: Python<'_>, message: Option<String>) -> PyResult<()> {
+/// Helper function to trigger a panic inside `run_blocking_ffi` for testing FFI panic isolation.
+///
+/// # Panics
+///
+/// bewusst; nur Testhook für FFI-Panic-Isolation; Panic wird durch run_blocking_ffi in PyErr übersetzt
+pub(crate) fn trigger_panic_helper(
+    py: Python<'_>,
+    poisoned: &AtomicBool,
+    message: Option<String>,
+) -> PyResult<()> {
     let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
-    let dummy_poison = AtomicBool::new(false);
-    run_blocking_ffi(py, &dummy_poison, move || -> PyResult<()> {
-        panic!("{}", msg);
+    run_blocking_ffi(py, poisoned, move || -> PyResult<()> {
+        // Testhook für FFI-Panic-Isolation: Panic wird von run_blocking_ffi in PyErr übersetzt
+        #[allow(clippy::panic)]
+        {
+            panic!("{}", msg);
+        }
     })
+}
+
+/// Internal helper function for testing FFI panic isolation.
+///
+/// # Panics
+///
+/// bewusst; nur Testhook für FFI-Panic-Isolation; Panic wird durch run_blocking_ffi in PyErr übersetzt
+#[pyfunction]
+#[pyo3(signature = (message=None))]
+pub fn _trigger_panic_for_test(py: Python<'_>, message: Option<String>) -> PyResult<()> {
+    let dummy_poison = AtomicBool::new(false);
+    trigger_panic_helper(py, &dummy_poison, message)
 }
