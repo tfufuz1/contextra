@@ -642,14 +642,28 @@ impl LsmStorage {
             .map_err(|e| ContextraError::Internal(e.to_string()))??;
         }
 
-        let mut state = self.state.write().await;
+        let state = self.state.write().await;
         let wal = self.wal.read().await.clone();
 
         let (target_offset, target_hmac) = wal.find_tx_offset(target_tx).await?;
         wal.truncate(target_offset, target_hmac).await?;
 
-        state.memtable = Arc::new(MemTable::new());
-        state.immutable_memtables.clear();
+        fn prune_memtable_above_tx(memtable: &crate::memtable::MemTable, target_tx: u64) {
+            let txs_to_rollback: std::collections::HashSet<u64> = memtable
+                .iter()
+                .into_iter()
+                .map(|(_, _, _, tx)| tx)
+                .filter(|&tx| tx > target_tx)
+                .collect();
+            for tx_id in txs_to_rollback {
+                memtable.rollback(tx_id);
+            }
+        }
+
+        prune_memtable_above_tx(&state.memtable, target_tx.inner());
+        for imm in &state.immutable_memtables {
+            prune_memtable_above_tx(imm, target_tx.inner());
+        }
 
         let mut sstables_lock = self.sstables.write().await;
         let mut sst_to_remove = Vec::new();
@@ -722,9 +736,17 @@ impl LsmStorage {
 
         sstables_lock.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
-        let mut max_seq = 0;
+        let mut max_seq = 0u64;
         for sst in sstables_lock.iter() {
             max_seq = max_seq.max(sst.metadata().max_seq & !TOMBSTONE_BIT);
+        }
+        for (_, _, seq, _) in state.memtable.iter() {
+            max_seq = max_seq.max(seq & !TOMBSTONE_BIT);
+        }
+        for imm in &state.immutable_memtables {
+            for (_, _, seq, _) in imm.iter() {
+                max_seq = max_seq.max(seq & !TOMBSTONE_BIT);
+            }
         }
         drop(sstables_lock);
 
@@ -758,60 +780,6 @@ impl LsmStorage {
                     intent_path,
                     e
                 );
-            }
-        }
-
-        let entries = wal.replay().await?;
-        tracing::debug!(
-            entries_len = entries.len(),
-            target_offset = target_offset,
-            "rollback_to_tx_locked: WAL replay completed"
-        );
-        let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
-            std::collections::HashMap::new();
-
-        for (seq, entry, _offset) in entries {
-            if (seq & !TOMBSTONE_BIT) > max_seq {
-                max_seq = seq & !TOMBSTONE_BIT;
-            }
-            match entry.op {
-                WalOp::Put { .. } | WalOp::Delete { .. } => {
-                    let tx_id = entry.tx_id().inner();
-                    pending_tx_map.entry(tx_id).or_default().push(PendingTxOp {
-                        lsn: seq,
-                        op: entry.op,
-                    });
-                }
-                WalOp::TxEnd { tx_id, committed } => {
-                    let tx_raw = tx_id.inner();
-                    if committed {
-                        if let Some(ops) = pending_tx_map.remove(&tx_raw) {
-                            for op in ops {
-                                match op.op {
-                                    WalOp::Put { key, value, tx_id } => {
-                                        state.memtable.put(
-                                            bytes::Bytes::from(key),
-                                            bytes::Bytes::from(value),
-                                            op.lsn,
-                                            tx_id.inner(),
-                                        );
-                                    }
-                                    WalOp::Delete { key, tx_id } => {
-                                        state.memtable.put(
-                                            bytes::Bytes::from(key),
-                                            bytes::Bytes::new(),
-                                            op.lsn | TOMBSTONE_BIT,
-                                            tx_id.inner(),
-                                        );
-                                    }
-                                    WalOp::TxEnd { .. } => {}
-                                }
-                            }
-                        }
-                    } else {
-                        pending_tx_map.remove(&tx_raw);
-                    }
-                }
             }
         }
 

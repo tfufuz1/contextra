@@ -303,6 +303,9 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     let wal = storage.wal.read().await.clone();
     let (wal_entries, prev_hmac_snapshot) = wal.prepare_batch(wal_ops).await?;
 
+    // Track last committed tx BEFORE batch preparation so batch rollback targets exact prior state
+    let rollback_target_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
+
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {
         let entries_for_observer = if storage.has_observers() {
@@ -310,20 +313,27 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         } else {
             Vec::new()
         };
-        let single_append_res = match storage.config.durability_mode {
-            DurabilityMode::Full | DurabilityMode::WalNoHmac => wal.append_batch(wal_entries).await,
-            DurabilityMode::MemoryOnly => Ok(()),
+        let durability_mode = storage.config.durability_mode;
+        let append_handle = tokio::spawn(async move {
+            match durability_mode {
+                DurabilityMode::Full | DurabilityMode::WalNoHmac => wal.append_batch(wal_entries).await,
+                DurabilityMode::MemoryOnly => Ok(()),
+            }
+        });
+
+        let single_append_res = match append_handle.await {
+            Ok(res) => res,
+            Err(join_err) => Err(ContextraError::Internal(format!("WAL append task panicked: {join_err}"))),
         };
 
         if let Err(e) = single_append_res {
             if first_seq > 0 {
                 storage.ssi_validator.forget_from(first_seq);
             }
-            let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
             let commit_guard = CommitGuard {
                 _lock: &_commit_lock,
             };
-            if let Err(rollback_err) = storage.rollback_to_tx_locked(last_tx, &commit_guard).await {
+            if let Err(rollback_err) = storage.rollback_to_tx_locked(rollback_target_tx, &commit_guard).await {
                 tracing::error!(
                     "Failed to execute rollback_to_tx_locked after failed WAL append: {}",
                     rollback_err
@@ -331,7 +341,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             }
             storage.cleanup_intent_locks_for_tx(tx_id);
             return Err(ContextraError::Storage(format!(
-                "Commit failed (at WAL append), WAL rollback executed: {}",
+                "Commit failed (at WAL append), WAL rollback executed: WAL append failed: {}",
                 e
             )));
         }
@@ -361,7 +371,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
     if let Some(ref mut queue) = *queue_guard {
         let _wal_queue_guard = WalQueueGuard::new(Arc::clone(&storage.wal_queue_depth));
-        let (tx, rx) = tokio::sync::oneshot::channel();
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
         let committed_flag = Arc::clone(&queue.committed_flag);
         let req = GroupCommitRequest {
             tx_id,
@@ -383,7 +393,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             notify.notify_one();
         }
 
-        let res = match tokio::time::timeout(storage.config.tx_timeout, rx).await {
+        let res = match tokio::time::timeout(storage.config.tx_timeout, &mut rx).await {
             Ok(Ok(res)) => res,
             Ok(Err(_)) => {
                 if committed_flag.load(Ordering::Acquire) {
@@ -438,13 +448,34 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             }
             Err(_) => {
                 let mut queue_guard = storage.pending_commit_queue.lock().await;
-                if let Some(ref mut queue) = *queue_guard {
-                    queue.requests.retain(|r| r.tx_id != tx_id);
+                let queue_active = queue_guard.is_some();
+                let taken_by_leader = queue_guard
+                    .as_ref()
+                    .is_some_and(|q| !q.requests.iter().any(|r| r.tx_id == tx_id));
+
+                if queue_active && !taken_by_leader {
+                    if let Some(ref mut queue) = *queue_guard {
+                        queue.requests.retain(|r| r.tx_id != tx_id);
+                    }
+                    drop(queue_guard);
+                    Err(ContextraError::CommitTimeout {
+                        tx_id: tx_id.inner(),
+                    })
+                } else {
+                    drop(queue_guard);
+                    match rx.await {
+                        Ok(res) => res,
+                        Err(_) => {
+                            if committed_flag.load(Ordering::Acquire) {
+                                Ok(())
+                            } else {
+                                Err(ContextraError::CommitTimeout {
+                                    tx_id: tx_id.inner(),
+                                })
+                            }
+                        }
+                    }
                 }
-                drop(queue_guard);
-                Err(ContextraError::CommitTimeout {
-                    tx_id: tx_id.inner(),
-                })
             }
         };
         storage.cleanup_intent_locks_for_tx(tx_id);
@@ -502,18 +533,26 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             all_wal_entries.extend(r.wal_entries.clone());
         }
 
-        let truncate_guard = wal.truncate_lock.lock().await;
         drop(_commit_lock);
 
-        let append_res = execute_group_commit_append(
-            &wal,
-            storage.config.durability_mode,
-            all_wal_entries,
-            &truncate_guard,
-            pending_queue.first_prev_hmac,
-        )
-        .await;
-        drop(truncate_guard);
+        let wal_clone = wal.clone();
+        let durability_mode = storage.config.durability_mode;
+        let append_handle = tokio::spawn(async move {
+            let truncate_guard = wal_clone.truncate_lock.lock().await;
+            execute_group_commit_append(
+                &wal_clone,
+                durability_mode,
+                all_wal_entries,
+                &truncate_guard,
+                pending_queue.first_prev_hmac,
+            )
+            .await
+        });
+
+        let append_res = match append_handle.await {
+            Ok(res) => res,
+            Err(join_err) => Err(ContextraError::Internal(format!("Group commit append task panicked: {join_err}"))),
+        };
 
         if append_res.is_ok() {
             committed_flag.store(true, Ordering::Release);
@@ -534,11 +573,10 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 }
             }
             let _commit_lock = storage.commit_mutex.lock().await;
-            let last_tx = TxId::new(storage.last_committed_tx.load(Ordering::Acquire));
             let commit_guard = CommitGuard {
                 _lock: &_commit_lock,
             };
-            let rollback_res = storage.rollback_to_tx_locked(last_tx, &commit_guard).await;
+            let rollback_res = storage.rollback_to_tx_locked(rollback_target_tx, &commit_guard).await;
 
             let err_msg = if let Err(ref rollback_err) = rollback_res {
                 tracing::error!(
@@ -547,7 +585,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 );
                 format!("Fatal double-fault: WAL append failed ({e}) and subsequent rollback failed: {rollback_err}")
             } else {
-                format!("Commit failed (at WAL append), WAL rollback executed: {e}")
+                format!("Commit failed (at WAL append), WAL rollback executed: WAL append failed: {e}")
             };
 
             let mut batch_txs = vec![leader_tx_id];
