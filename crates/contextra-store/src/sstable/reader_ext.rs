@@ -46,6 +46,7 @@ impl SstableReader {
             let (num_offsets, offsets_start, _) =
                 parse_block_trailer(&block_data, self.format_version)?;
 
+            let is_v3 = self.format_version >= 3;
             let block_start_i = match binary_search_index_in_block(
                 &block_data,
                 offsets_start,
@@ -170,15 +171,11 @@ impl SstableReader {
             let (num_offsets, offsets_start, _) =
                 parse_block_trailer(&block_data, self.format_version)?;
 
+            let is_v3 = self.format_version >= 3;
             let start_offset_idx = match start {
                 Bound::Included(s) | Bound::Excluded(s) => {
-                    match binary_search_index_in_block(
-                        &block_data,
-                        offsets_start,
-                        num_offsets,
-                        s,
-                        is_v3,
-                    )? {
+                    match binary_search_index_in_block(&block_data, offsets_start, num_offsets, s, is_v3)?
+                    {
                         Ok(idx) => idx,
                         Err(idx) => idx,
                     }
