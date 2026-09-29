@@ -1,5 +1,5 @@
-use super::block_search::binary_search_index_in_block;
-use super::reader::SstableReader;
+use super::block_search::{binary_search_index_in_block, get_entry_at_index};
+use super::reader::{parse_block_trailer, SstableReader};
 use bytes::Bytes;
 use contextra_core::{ContextraError, Result};
 
@@ -8,7 +8,7 @@ impl SstableReader {
     pub async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes, u64, u64)>> {
         let mut results = Vec::with_capacity(16);
 
-        let start_idx = match self.index.binary_search_by(|(k, _)| k.as_ref().cmp(prefix)) {
+        let mut start_idx = match self.index.binary_search_by(|(k, _)| k.as_ref().cmp(prefix)) {
             Ok(i) => i,
             Err(i) => {
                 if i > 0 {
@@ -18,6 +18,13 @@ impl SstableReader {
                 }
             }
         };
+
+        // Rewind start_idx to the earliest block whose last_key >= prefix
+        while start_idx > 0 && self.index[start_idx - 1].0.as_ref() >= prefix {
+            start_idx -= 1;
+        }
+
+        let is_v3 = self.format_version >= 3;
 
         for idx in start_idx..self.index.len() {
             let offset = self
@@ -36,34 +43,15 @@ impl SstableReader {
 
             let block_data = self.get_block(offset, next_offset).await?;
 
-            let n = block_data.len();
-            if n < 10 {
-                continue;
-            }
-
-            let num_offsets = usize::from(u16::from_le_bytes(
-                block_data
-                    .get(n.saturating_sub(2)..n)
-                    .ok_or_else(|| {
-                        ContextraError::Storage("malformed block: missing num_offsets".into())
-                    })?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ));
-
-            let offsets_len = num_offsets * 2;
-            if n < 10 + offsets_len {
-                return Err(ContextraError::Storage(
-                    "malformed block: num_offsets too large".into(),
-                ));
-            }
-            let offsets_start = n - 2 - offsets_len;
+            let (num_offsets, offsets_start, _) =
+                parse_block_trailer(&block_data, self.format_version)?;
 
             let block_start_i = match binary_search_index_in_block(
                 &block_data,
                 offsets_start,
                 num_offsets,
                 prefix,
+                is_v3,
             )? {
                 Ok(i) => i,
                 Err(i) => i,
@@ -71,26 +59,18 @@ impl SstableReader {
 
             let mut broke = false;
             for i in block_start_i..num_offsets {
-                let off_pos = offsets_start + i * 2;
-                let entry_off = usize::from(u16::from_le_bytes(
-                    block_data
-                        .get(off_pos..off_pos + 2)
-                        .ok_or_else(|| ContextraError::Storage("malformed block: off_pos".into()))?
-                        .try_into()
-                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ));
+                let (entry_off, k_len) = get_entry_at_index(&block_data, offsets_start, i, is_v3)?;
 
-                let mut ep = entry_off;
-                let k_len = usize::from(u16::from_le_bytes(
-                    block_data
-                        .get(ep..ep + 2)
-                        .ok_or_else(|| ContextraError::Storage("malformed block: k_len".into()))?
-                        .try_into()
-                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ));
-                ep += 2;
+                let mut ep = entry_off.checked_add(2).ok_or_else(|| {
+                    ContextraError::Storage("overflow calculating entry offset".into())
+                })?;
+
                 let entry_key = block_data
-                    .get(ep..ep + k_len)
+                    .get(
+                        ep..ep.checked_add(k_len).ok_or_else(|| {
+                            ContextraError::Storage("overflow calculating entry key length".into())
+                        })?,
+                    )
                     .ok_or_else(|| ContextraError::Storage("malformed block: entry_key".into()))?;
                 ep += k_len;
 
@@ -133,7 +113,11 @@ impl SstableReader {
                         ContextraError::Storage("value length exceeds platform usize".into())
                     })?;
                     ep += 4;
-                    if ep + v_len > block_data.len() {
+                    let is_out_of_bounds = match ep.checked_add(v_len) {
+                        Some(end) => end > block_data.len(),
+                        None => true,
+                    };
+                    if is_out_of_bounds {
                         return Err(ContextraError::Storage(
                             "malformed block: value length out of bounds".into(),
                         ));
@@ -164,6 +148,8 @@ impl SstableReader {
             return Ok(results);
         }
 
+        let is_v3 = self.format_version >= 3;
+
         for idx in 0..self.index.len() {
             let offset = self
                 .index
@@ -181,33 +167,18 @@ impl SstableReader {
 
             let block_data = self.get_block(offset, next_offset).await?;
 
-            let n = block_data.len();
-            if n < 10 {
-                continue;
-            }
-
-            let num_offsets = usize::from(u16::from_le_bytes(
-                block_data
-                    .get(n.saturating_sub(2)..n)
-                    .ok_or_else(|| {
-                        ContextraError::Storage("malformed block: missing num_offsets".into())
-                    })?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ));
-
-            let offsets_len = num_offsets * 2;
-            if n < 10 + offsets_len {
-                return Err(ContextraError::Storage(
-                    "malformed block: num_offsets too large".into(),
-                ));
-            }
-            let offsets_start = n - 2 - offsets_len;
+            let (num_offsets, offsets_start, _) =
+                parse_block_trailer(&block_data, self.format_version)?;
 
             let start_offset_idx = match start {
                 Bound::Included(s) | Bound::Excluded(s) => {
-                    match binary_search_index_in_block(&block_data, offsets_start, num_offsets, s)?
-                    {
+                    match binary_search_index_in_block(
+                        &block_data,
+                        offsets_start,
+                        num_offsets,
+                        s,
+                        is_v3,
+                    )? {
                         Ok(idx) => idx,
                         Err(idx) => idx,
                     }
@@ -216,26 +187,18 @@ impl SstableReader {
             };
 
             for i in start_offset_idx..num_offsets {
-                let off_pos = offsets_start + i * 2;
-                let entry_off = usize::from(u16::from_le_bytes(
-                    block_data
-                        .get(off_pos..off_pos + 2)
-                        .ok_or_else(|| ContextraError::Storage("malformed block: off_pos".into()))?
-                        .try_into()
-                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ));
+                let (entry_off, k_len) = get_entry_at_index(&block_data, offsets_start, i, is_v3)?;
 
-                let mut ep = entry_off;
-                let k_len = usize::from(u16::from_le_bytes(
-                    block_data
-                        .get(ep..ep + 2)
-                        .ok_or_else(|| ContextraError::Storage("malformed block: k_len".into()))?
-                        .try_into()
-                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ));
-                ep += 2;
+                let mut ep = entry_off.checked_add(2).ok_or_else(|| {
+                    ContextraError::Storage("overflow calculating entry offset".into())
+                })?;
+
                 let entry_key = block_data
-                    .get(ep..ep + k_len)
+                    .get(
+                        ep..ep.checked_add(k_len).ok_or_else(|| {
+                            ContextraError::Storage("overflow calculating entry key length".into())
+                        })?,
+                    )
                     .ok_or_else(|| ContextraError::Storage("malformed block: entry_key".into()))?;
                 ep += k_len;
 
@@ -286,7 +249,11 @@ impl SstableReader {
                     ContextraError::Storage("value length exceeds platform usize".into())
                 })?;
                 ep += 4;
-                if ep + v_len > block_data.len() {
+                let is_out_of_bounds = match ep.checked_add(v_len) {
+                    Some(end) => end > block_data.len(),
+                    None => true,
+                };
+                if is_out_of_bounds {
                     return Err(ContextraError::Storage(
                         "malformed block: value length out of bounds".into(),
                     ));

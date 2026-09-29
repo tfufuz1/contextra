@@ -8,52 +8,76 @@ use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-/// A builder for SSTable data blocks (Format v3: 256-bit Bloom, 32-bit offsets).
+/// A builder for SSTable data blocks (Format v4 default, supports v3).
 pub struct BlockBuilder {
     data: BytesMut,
     offsets: Vec<u32>,
     pub(super) block_size: usize,
-    bloom: [u64; 4],
+    key_hashes: Vec<(u64, u64)>,
+    v3_bloom: [u64; 4],
+    format_version: u16,
 }
 
 impl BlockBuilder {
     pub fn new(block_size: usize) -> Self {
+        Self::new_with_version(block_size, 4)
+    }
+
+    pub fn new_with_version(block_size: usize, format_version: u16) -> Self {
         Self {
             data: BytesMut::new(),
             offsets: Vec::new(),
             block_size: block_size.clamp(512, 64 * 1024),
-            bloom: [0u64; 4],
+            key_hashes: Vec::new(),
+            v3_bloom: [0u64; 4],
+            format_version,
         }
     }
 
     fn update_bloom(&mut self, key: &[u8]) {
-        let hash = blake3::hash(key);
-        let bytes = hash.as_bytes();
-        // Use 8 x 16-bit chunks modulo 256 from the 256-bit hash for Bloom filter bits (256-bit filter)
-        // Safety: blake3 outputs 32 bytes, i * 2 + 1 is max 15.
-        for i in 0..8 {
-            let chunk = u16::from_le_bytes([
-                *bytes.get(i * 2).unwrap_or(&0),
-                *bytes.get(i * 2 + 1).unwrap_or(&0),
-            ]);
-            let bit_idx = chunk as usize % 256;
-            self.bloom[bit_idx / 64] |= 1u64 << (bit_idx % 64);
+        if self.format_version >= 4 {
+            self.key_hashes.push(BloomFilter::hash_pair(key));
+        } else {
+            let hash = blake3::hash(key);
+            let bytes = hash.as_bytes();
+            for i in 0..8 {
+                let chunk = u16::from_le_bytes([
+                    *bytes.get(i * 2).unwrap_or(&0),
+                    *bytes.get(i * 2 + 1).unwrap_or(&0),
+                ]);
+                let bit_idx = chunk as usize % 256;
+                self.v3_bloom[bit_idx / 64] |= 1u64 << (bit_idx % 64);
+            }
         }
     }
 
     pub fn add(&mut self, key: &[u8], value: &[u8], seq_no: u64, tx_id: u64) -> bool {
-        // Format v3 size calculation:
-        // entry payload: key_len(2) + key + seq_no(8) + tx_id(8) + val_len(4) + value
-        // block trailer: bloom(32) + offsets (offsets.len() * 4) + offset count (4 bytes)
         let entry_header_and_meta_len = 22usize; // 2 + 8 + 8 + 4
-        if !self.data.is_empty()
-            && self
-                .current_size()
+        let projected_n = self.offsets.len().saturating_add(1);
+
+        let projected_total_len = if self.format_version >= 4 {
+            let projected_bits = projected_n.saturating_mul(10).next_multiple_of(64);
+            let projected_bloom_bytes = projected_bits / 8;
+            self.data
+                .len()
                 .saturating_add(key.len())
                 .saturating_add(value.len())
                 .saturating_add(entry_header_and_meta_len)
-                > self.block_size
-        {
+                .saturating_add(projected_bloom_bytes)
+                .saturating_add(projected_n.saturating_mul(4))
+                .saturating_add(8)
+        } else {
+            self.data
+                .len()
+                .saturating_add(key.len())
+                .saturating_add(value.len())
+                .saturating_add(entry_header_and_meta_len)
+                .saturating_add(32) // v3 fixed bloom
+                .saturating_add(projected_n.saturating_mul(4))
+                .saturating_add(4)
+        };
+
+        if !self.data.is_empty() && projected_total_len > self.block_size {
             return false;
         }
 
@@ -82,12 +106,27 @@ impl BlockBuilder {
     }
 
     pub fn current_size(&self) -> usize {
-        // data + bloom(32) + offsets(u32 * len) + offset count (4 bytes)
-        self.data
-            .len()
-            .saturating_add(32)
-            .saturating_add(self.offsets.len().saturating_mul(4))
-            .saturating_add(4)
+        let n = self.offsets.len();
+        if self.format_version >= 4 {
+            let num_bits = if n == 0 {
+                64
+            } else {
+                n.saturating_mul(10).next_multiple_of(64)
+            };
+            let bloom_bytes = num_bits / 8;
+
+            self.data
+                .len()
+                .saturating_add(bloom_bytes)
+                .saturating_add(n.saturating_mul(4))
+                .saturating_add(8)
+        } else {
+            self.data
+                .len()
+                .saturating_add(32)
+                .saturating_add(n.saturating_mul(4))
+                .saturating_add(4)
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -96,14 +135,47 @@ impl BlockBuilder {
 
     /// Finalizes the block and returns the bytes.
     pub fn build(mut self) -> Bytes {
-        for word in &self.bloom {
-            self.data.put_u64_le(*word);
+        let n = self.offsets.len();
+        if self.format_version >= 4 {
+            let num_bits = if n == 0 {
+                64
+            } else {
+                n.saturating_mul(10).next_multiple_of(64)
+            };
+            let bloom_len = num_bits / 8;
+            let mut bloom_vec = vec![0u8; bloom_len];
+
+            if num_bits > 0 {
+                for &(h1, h2) in &self.key_hashes {
+                    for i in 0..7u64 {
+                        let bit_idx = (h1.wrapping_add(i.wrapping_mul(h2)) as usize) % num_bits;
+                        bloom_vec[bit_idx / 8] |= 1u8 << (bit_idx % 8);
+                    }
+                }
+            }
+
+            self.data.put_slice(&bloom_vec);
+
+            for &offset in &self.offsets {
+                self.data.put_u32_le(offset);
+            }
+
+            let bloom_len_u32 = u32::try_from(bloom_len).unwrap_or(u32::MAX);
+            self.data.put_u32_le(bloom_len_u32);
+
+            let num_offsets_u32 = u32::try_from(n).unwrap_or(u32::MAX);
+            self.data.put_u32_le(num_offsets_u32);
+        } else {
+            for word in &self.v3_bloom {
+                self.data.put_u64_le(*word);
+            }
+            for &offset in &self.offsets {
+                self.data.put_u32_le(offset);
+            }
+            let num_offsets_u32 = u32::try_from(n).unwrap_or(u32::MAX);
+            self.data.put_u32_le(num_offsets_u32);
         }
-        for &offset in &self.offsets {
-            self.data.put_u32_le(offset);
-        }
-        let num_offsets_u32 = u32::try_from(self.offsets.len()).unwrap_or(u32::MAX);
-        self.data.put_u32_le(num_offsets_u32);
+
         self.data.freeze()
     }
 }
@@ -140,6 +212,7 @@ pub struct SstableBuilder {
     max_tx_id: u64,
     min_seq: u64,
     max_seq: u64,
+    format_version: u16,
 }
 
 impl SstableBuilder {
@@ -169,7 +242,7 @@ impl SstableBuilder {
         Ok(Self {
             path: path_ref.to_path_buf(),
             file,
-            block_builder: BlockBuilder::new(BLOCK_SIZE),
+            block_builder: BlockBuilder::new_with_version(BLOCK_SIZE, 4),
             index: Vec::new(),
             first_key: None,
             last_key: None,
@@ -181,7 +254,14 @@ impl SstableBuilder {
             max_tx_id: 0,
             min_seq: u64::MAX,
             max_seq: 0,
+            format_version: 4,
         })
+    }
+
+    /// Explicitly configures the SSTable format version to write (default: 4).
+    pub fn set_format_version(&mut self, version: u16) {
+        self.format_version = version;
+        self.block_builder = BlockBuilder::new_with_version(BLOCK_SIZE, version);
     }
 
     /// Adds a key-value pair to the SSTable being built.
@@ -234,8 +314,11 @@ impl SstableBuilder {
             .last_key
             .clone()
             .ok_or_else(|| ContextraError::Storage("Missing last_key".into()))?;
-        let block_data =
-            std::mem::replace(&mut self.block_builder, BlockBuilder::new(BLOCK_SIZE)).build();
+        let block_data = std::mem::replace(
+            &mut self.block_builder,
+            BlockBuilder::new_with_version(BLOCK_SIZE, self.format_version),
+        )
+        .build();
 
         // Compute CRC before encryption
         let crc = crc32fast::hash(&block_data);
@@ -253,9 +336,8 @@ impl SstableBuilder {
             block = new_block.freeze();
         }
 
-        let block_len = u64::try_from(block.len()).map_err(|_| {
-            ContextraError::Storage("Block size exceeds u64::MAX".into())
-        })?;
+        let block_len = u64::try_from(block.len())
+            .map_err(|_| ContextraError::Storage("Block size exceeds u64::MAX".into()))?;
 
         self.file
             .write_all(&block)
@@ -263,9 +345,10 @@ impl SstableBuilder {
             .map_err(|e| ContextraError::Storage(format!("SSTable block write failed: {}", e)))?;
 
         self.index.push((last_key, self.offset));
-        self.offset = self.offset.checked_add(block_len).ok_or_else(|| {
-            ContextraError::Storage("SSTable offset overflow".into())
-        })?;
+        self.offset = self
+            .offset
+            .checked_add(block_len)
+            .ok_or_else(|| ContextraError::Storage("SSTable offset overflow".into()))?;
         Ok(())
     }
 
@@ -299,14 +382,13 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(format!("SSTable index write failed: {}", e)))?;
 
-        let index_write_len = u64::try_from(index_to_write.len()).map_err(|_| {
-            ContextraError::Storage("Index bytes length overflow".into())
-        })?;
+        let index_write_len = u64::try_from(index_to_write.len())
+            .map_err(|_| ContextraError::Storage("Index bytes length overflow".into()))?;
 
         // SPECCED: Write the whole-SSTable Bloom filter
-        let bloom_offset = index_offset.checked_add(index_write_len).ok_or_else(|| {
-            ContextraError::Storage("Bloom offset overflow".into())
-        })?;
+        let bloom_offset = index_offset
+            .checked_add(index_write_len)
+            .ok_or_else(|| ContextraError::Storage("Bloom offset overflow".into()))?;
         let bloom_data = self.bloom_filter.to_bytes();
 
         // Add CRC to bloom
@@ -321,7 +403,7 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(format!("SSTable bloom write failed: {}", e)))?;
 
-        // Write trailer: [min_tx][max_tx][min_seq][max_seq][bloom_offset][index_offset][version=3][magic]
+        // Write trailer: [min_tx][max_tx][min_seq][max_seq][bloom_offset][index_offset][version=4][magic]
         // This is 54 bytes.
         self.file
             .write_u64_le(self.min_tx_id)
@@ -348,9 +430,9 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-        // Format version 3 (256-bit block bloom & 32-bit offsets)
+        // Format version (default 4)
         self.file
-            .write_u16_le(3)
+            .write_u16_le(self.format_version)
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 

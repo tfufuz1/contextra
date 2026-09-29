@@ -72,7 +72,7 @@ impl BloomFilter {
 
     /// Erzeugt zwei unabhängige 64-bit Hashes aus dem Blake3-Digest.
     /// h1 = erste 8 Bytes, h2 = Bytes 8-15 (oder fallback zu h1 ^ const)
-    fn hash_pair(key: &[u8]) -> (u64, u64) {
+    pub fn hash_pair(key: &[u8]) -> (u64, u64) {
         let hash = blake3::hash(key);
         let bytes = hash.as_bytes();
 
