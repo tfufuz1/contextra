@@ -37,8 +37,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let tx = db_tx.tx_id;
 
-        let old_user_val = self.storage.get_at_seq_tracked(tx, &user_key, u64::MAX).await?;
-        let old_doc_val = self.storage.get_at_seq_tracked(tx, &doc_key, u64::MAX).await?;
+        let old_user_val = self
+            .storage
+            .get_at_seq_tracked(tx, &user_key, u64::MAX)
+            .await?;
+        let old_doc_val = self
+            .storage
+            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .await?;
 
         db_tx.stage_text_delete(doc_id);
 

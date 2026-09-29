@@ -27,14 +27,14 @@ async fn test_write_skew_prevention_via_engine_api() -> contextra_types::Result<
 
     // Transaction 1: Doctor 1 reads both doctors (check if at least 2 are on call) then updates doctor_1
     let tx1 = col.begin_transaction()?;
-    let doc1_tx1 = col.get_tracked(&tx1, "doctor_1").await?;
-    let doc2_tx1 = col.get_tracked(&tx1, "doctor_2").await?;
+    let doc1_tx1 = col.get_tracked(tx1.tx_id, "doctor_1").await?;
+    let doc2_tx1 = col.get_tracked(tx1.tx_id, "doctor_2").await?;
     assert!(doc1_tx1.is_some() && doc2_tx1.is_some());
 
     // Transaction 2: Doctor 2 reads both doctors (check if at least 2 are on call) then updates doctor_2
     let tx2 = col.begin_transaction()?;
-    let doc1_tx2 = col.get_tracked(&tx2, "doctor_1").await?;
-    let doc2_tx2 = col.get_tracked(&tx2, "doctor_2").await?;
+    let doc1_tx2 = col.get_tracked(tx2.tx_id, "doctor_1").await?;
+    let doc2_tx2 = col.get_tracked(tx2.tx_id, "doctor_2").await?;
     assert!(doc1_tx2.is_some() && doc2_tx2.is_some());
 
     // Tx1 updates doctor_1
@@ -149,18 +149,18 @@ proptest! {
             let v1_k1 = init1;
             let v1_k2 = init2;
             if read1_k1 || (!read1_k1 && !read1_k2) {
-                col.get_tracked(&tx1, "k1").await.unwrap();
+                col.get_tracked(tx1.tx_id, "k1").await.unwrap();
             }
             if read1_k2 {
-                col.get_tracked(&tx1, "k2").await.unwrap();
+                col.get_tracked(tx1.tx_id, "k2").await.unwrap();
             }
 
             // Tx2 reads
             if read2_k1 {
-                col.get_tracked(&tx2, "k1").await.unwrap();
+                col.get_tracked(tx2.tx_id, "k1").await.unwrap();
             }
             if read2_k2 || (!read2_k1 && !read2_k2) {
-                col.get_tracked(&tx2, "k2").await.unwrap();
+                col.get_tracked(tx2.tx_id, "k2").await.unwrap();
             }
 
             // Tx1 writes

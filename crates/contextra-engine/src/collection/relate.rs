@@ -26,7 +26,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let key_str = format!("{}:{}:{}", from, label, to);
         let key = self.namespaced_key(key_str.as_bytes(), 2);
-        let old_val = self.storage.get_at_seq_tracked(db_tx.tx_id, &key, u64::MAX).await?;
+        let old_val = self
+            .storage
+            .get_at_seq_tracked(db_tx.tx_id, &key, u64::MAX)
+            .await?;
 
         let val = serde_json::json!({
             "from": from,

@@ -28,52 +28,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.get_at_snapshot(id, u64::MAX).await
     }
 
-    /// Retrieves a document by its user-provided string ID within a transaction (tracked for SSI).
-    #[tracing::instrument(level = "trace", skip(self, db_tx))]
-    pub async fn get_tracked(
-        &self,
-        db_tx: &crate::transaction::DbTransaction<S, V>,
-        id: &str,
-    ) -> Result<Option<crate::Document>> {
-        self.get_at_snapshot_tracked(db_tx, id, u64::MAX).await
-    }
-
     /// Retrieves a document at a specific snapshot point.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<crate::Document>> {
         validate_doc_id(id)?;
         let key = self.namespaced_key(id.as_bytes(), 0);
         if let Some(data) = self.storage.get_at_seq(&key, seq_no).await? {
-            if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&data) {
-                return Ok(Some(crate::Document {
-                    id: stored.id,
-                    metadata: stored.metadata,
-                }));
-            } else if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&data) {
-                return Ok(Some(crate::Document {
-                    id: id.to_string(),
-                    metadata: Some(val),
-                }));
-            }
-        }
-        Ok(None)
-    }
-
-    /// Retrieves a document at a specific snapshot point within a transaction (tracked for SSI).
-    #[tracing::instrument(level = "trace", skip(self, db_tx))]
-    pub async fn get_at_snapshot_tracked(
-        &self,
-        db_tx: &crate::transaction::DbTransaction<S, V>,
-        id: &str,
-        seq_no: u64,
-    ) -> Result<Option<crate::Document>> {
-        validate_doc_id(id)?;
-        let key = self.namespaced_key(id.as_bytes(), 0);
-        if let Some(data) = self
-            .storage
-            .get_at_seq_tracked(db_tx.tx_id, &key, seq_no)
-            .await?
-        {
             if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&data) {
                 return Ok(Some(crate::Document {
                     id: stored.id,
@@ -305,5 +265,32 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         Ok(results)
+    }
+
+    /// Fetches a document by user ID and tracks the read in the active transaction's `ReadSet`.
+    pub async fn get_tracked(&self, tx: TxId, id: &str) -> Result<Option<StoredDocument>> {
+        let key = self.namespaced_key(id.as_bytes(), 0);
+        if let Some(bytes) = self.storage.get_tracked(tx, &key).await? {
+            let doc: StoredDocument = serde_json::from_slice(&bytes)?;
+            Ok(Some(doc))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Fetches a document snapshot bounded by `seq` and tracks the read in `tx`'s `ReadSet`.
+    pub async fn get_at_seq_tracked(
+        &self,
+        tx: TxId,
+        id: &str,
+        max_seq: u64,
+    ) -> Result<Option<StoredDocument>> {
+        let key = self.namespaced_key(id.as_bytes(), 0);
+        if let Some(bytes) = self.storage.get_at_seq_tracked(tx, &key, max_seq).await? {
+            let doc: StoredDocument = serde_json::from_slice(&bytes)?;
+            Ok(Some(doc))
+        } else {
+            Ok(None)
+        }
     }
 }
