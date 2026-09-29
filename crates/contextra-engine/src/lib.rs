@@ -337,6 +337,16 @@ impl Default for EmbeddingBackend {
     }
 }
 
+/// Tenant isolation enforcement policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum TenantPolicy {
+    /// Non-tenant collection access (`collection(...)`) is allowed (Default / Admin / Single-tenant path).
+    #[default]
+    Optional,
+    /// Non-tenant collection access is forbidden; callers MUST use tenant-scoped handles (`collection_for_tenant(...)`).
+    Required,
+}
+
 #[derive(Clone)]
 pub struct ContextraConfig {
     pub dimension: usize,
@@ -375,11 +385,18 @@ pub struct ContextraConfig {
     pub consolidation_interval: std::time::Duration,
     pub max_llm_calls_per_cycle: usize,
     pub consolidation_launcher: Option<ConsolidationLauncher>,
+    /// Policy controlling whether multi-tenant isolation is required.
+    pub tenant_policy: TenantPolicy,
 }
 
 impl ContextraConfig {
     pub fn with_consolidation_launcher(mut self, launcher: ConsolidationLauncher) -> Self {
         self.consolidation_launcher = Some(launcher);
+        self
+    }
+
+    pub fn with_tenant_policy(mut self, policy: TenantPolicy) -> Self {
+        self.tenant_policy = policy;
         self
     }
 }
@@ -414,6 +431,7 @@ impl std::fmt::Debug for ContextraConfig {
                 "consolidation_launcher",
                 &self.consolidation_launcher.as_ref().map(|_| "Fn(...)"),
             )
+            .field("tenant_policy", &self.tenant_policy)
             .finish()
     }
 }
@@ -439,9 +457,15 @@ impl Default for ContextraConfig {
             consolidation_interval: std::time::Duration::from_secs(6 * 3600),
             max_llm_calls_per_cycle: 10,
             consolidation_launcher: None,
+            tenant_policy: TenantPolicy::Optional,
         }
     }
 }
+
+pub type TenantCollectionMap = ahash::AHashMap<
+    (TenantId, String),
+    Arc<Collection<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>>,
+>;
 
 pub struct Contextra {
     storage: Arc<LsmStorage>,
@@ -452,6 +476,7 @@ pub struct Contextra {
     expiry_reaper_interval: std::time::Duration,
     community_detection_threshold: u64,
     collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
+    tenant_collections: tokio::sync::RwLock<TenantCollectionMap>,
     cancel_token: tokio_util::sync::CancellationToken,
     task_tracker: tokio_util::task::TaskTracker,
     embedder: parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>,

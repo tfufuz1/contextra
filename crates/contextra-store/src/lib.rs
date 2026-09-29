@@ -54,4 +54,4 @@ pub use manifest::{Manifest, ManifestEntry};
 #[cfg(not(loom))]
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 #[cfg(not(loom))]
-pub use tenant_codec::TenantKeyCodec;
+pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
