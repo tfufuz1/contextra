@@ -60,7 +60,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let tx = self.allocate_tx()?;
         let doc_key = self.namespaced_key(&from.inner().to_le_bytes(), 1);
 
-        if let Some(bytes) = self.storage.get_at_seq(&doc_key, u64::MAX).await? {
+        if let Some(bytes) = self
+            .storage
+            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .await?
+        {
             let mut doc_id_str = None;
             let mut updated_links = false;
 
@@ -130,7 +134,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             if updated_links {
                 if let Some(ref id_str) = doc_id_str {
                     let user_key = self.namespaced_key(id_str.as_bytes(), 0);
-                    if let Some(user_bytes) = self.storage.get_at_seq(&user_key, u64::MAX).await? {
+                    if let Some(user_bytes) = self
+                        .storage
+                        .get_at_seq_tracked(tx, &user_key, u64::MAX)
+                        .await?
+                    {
                         if let Ok(mut full_doc) =
                             serde_json::from_slice::<StoredDocument>(&user_bytes)
                         {
@@ -191,6 +199,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         doc_id: DocId,
     ) -> Result<Vec<contextra_types::domain::MemoryLink>> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+        // SSI: nicht tx-gebunden — reiner Lesezugriff für Link-Abfrage
         if let Some(bytes) = self.storage.get_at_seq(&doc_key, u64::MAX).await? {
             if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
                 if let Some(obj) = meta.metadata.as_ref().and_then(|m| m.as_object()) {

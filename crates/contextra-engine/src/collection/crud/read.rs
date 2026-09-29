@@ -33,6 +33,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<crate::Document>> {
         validate_doc_id(id)?;
         let key = self.namespaced_key(id.as_bytes(), 0);
+        // SSI: nicht tx-gebunden — reiner Lesezugriff für Dokumentenabfrage
         if let Some(data) = self.storage.get_at_seq(&key, seq_no).await? {
             if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&data) {
                 return Ok(Some(crate::Document {
@@ -52,6 +53,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Returns the latest transaction ID for a document (via `updated_at_tx` or `created_at_tx`).
     pub async fn get_doc_tx(&self, doc_id: DocId) -> Result<Option<TxId>> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+        // SSI: nicht tx-gebunden — reiner Lesezugriff für TxId-Metadaten
         if let Some(bytes) = self.storage.get(&doc_key).await? {
             if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
                 if let Some(ref m) = meta.metadata {
