@@ -1,13 +1,56 @@
+// ZWECK: Multi-Index Transaktions-Commit (2PC) für Contextra Engine
+//
+// Führt die 2-Phasen-Commit-Logik über LSM-Storage, HNSW-Vektorindex,
+// BM25-Textindex und CSR-Graphindex aus.
+
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
 use super::compensating_actions::{
     CommitLedger, CompensateHnswAction, CompensateLsmAction, CompensateTextAction,
-    RollbackStagedAction,
+    CompensatingAction, RollbackStagedAction,
 };
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, Result, TenantId, TxId};
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{ContextraError, DocId, EntityId, Result, TenantId, TxId};
+
+struct CompensateGraphAction<S: StorageEngine, V: VectorIndex> {
+    collection: crate::Collection<S, V>,
+    doc_ids: Arc<Vec<DocId>>,
+}
+
+impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAction<S, V> {
+    fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let comp_tx = TxId::new(
+                self.collection
+                    .next_tx
+                    .fetch_add(1, Ordering::SeqCst),
+            );
+            for &doc_id in self.doc_ids.iter() {
+                let eid = EntityId::from_doc_id(doc_id);
+                if let Err(e) = self
+                    .collection
+                    .graph_index
+                    .remove_entity(comp_tx, eid)
+                    .await
+                {
+                    tracing::error!(
+                        "[INV-DB-3] Compensating graph remove_entity failed for eid {:?}: {}",
+                        eid,
+                        e
+                    );
+                }
+            }
+            if let Err(e) = self.collection.graph_index.commit(comp_tx).await {
+                tracing::error!("[INV-DB-3] Compensating graph commit failed: {}", e);
+                return Err(e);
+            }
+            Ok(())
+        })
+    }
+}
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     pub(super) async fn commit_text_staged(&self) -> Result<()> {
@@ -170,13 +213,16 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         };
 
         let mut ledger = CommitLedger::new();
-        ledger.push(RollbackStagedAction::new(self.collection.clone(), self.tx_id));
+        ledger.push(RollbackStagedAction::new(
+            self.collection.clone(),
+            self.tx_id,
+        ));
 
         // Phase (a): Write CommitIntent::Pending and commit it to storage durably first (F-20)
         let intent_tx = TxId::new(
             self.collection
                 .next_tx
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+                .fetch_add(1, Ordering::SeqCst),
         );
         let intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
@@ -253,6 +299,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 graph_err
             )));
         }
+        ledger.push(CompensateGraphAction {
+            collection: self.collection.clone(),
+            doc_ids: Arc::clone(&doc_ids),
+        });
 
         // Phase (c): Commit storage
         let f_keys = {
@@ -270,24 +320,32 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             std::mem::take(&mut *guard)
         };
 
-        if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
-            ledger.execute_rollback().await;
-            return Err(ContextraError::Transaction(storage_err.to_string()));
-        }
-
-        ledger.push(CompensateLsmAction::new(
+        let lsm_action = CompensateLsmAction::new(
             self.collection.clone(),
             intent_key.clone(),
             Arc::clone(&doc_ids),
             f_keys,
             r_keys,
-        ));
+        );
+
+        if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
+            if let Err(e) = lsm_action.execute().await {
+                tracing::error!(
+                    "[INV-DB-3] CompensateLsmAction failed post storage commit error: {}",
+                    e
+                );
+            }
+            ledger.execute_rollback().await;
+            return Err(ContextraError::Transaction(storage_err.to_string()));
+        }
+
+        ledger.push(lsm_action);
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(
             self.collection
                 .next_tx
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+                .fetch_add(1, Ordering::SeqCst),
         );
         let commit_bytes = match serde_json::to_vec(&CommitIntent::Committed) {
             Ok(b) => b,

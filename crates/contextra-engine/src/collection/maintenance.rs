@@ -209,71 +209,112 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     has_graph
                 );
 
+                let mut any_doc_in_storage = false;
                 for &doc_id in doc_ids.iter() {
                     let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-                    // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
-                    if let Some(val) = self.storage.get(&doc_key).await? {
-                        let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
-                            .map(|m| m.id)
-                            .ok();
+                    if self.storage.get(&doc_key).await?.is_some() {
+                        any_doc_in_storage = true;
+                        break;
+                    }
+                }
 
-                        let mut stored_doc = None;
-                        if let Some(ref id_str) = meta_id {
-                            let user_key = self.namespaced_key(id_str.as_bytes(), 0);
-                            // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
-                            if let Some(user_val) = self.storage.get(&user_key).await? {
-                                if let Ok(stored) =
-                                    serde_json::from_slice::<StoredDocument>(&user_val)
-                                {
-                                    stored_doc = Some(stored);
-                                }
-                            }
-                        }
+                if any_doc_in_storage {
+                    for &doc_id in doc_ids.iter() {
+                        let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+                        // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
+                        if let Some(val) = self.storage.get(&doc_key).await? {
+                            let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
+                                .map(|m| m.id)
+                                .ok();
 
-                        if stored_doc.is_none() {
-                            if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
-                                stored_doc = Some(full);
-                            }
-                        }
-
-                        if let Some(stored) = stored_doc {
-                            if !indexed_ids.contains(&doc_id) {
-                                self.index
-                                    .insert(recovery_tx, doc_id, &stored.embedding)
-                                    .await?;
-                                repair_count += 1;
-                                recovered_any = true;
-                            }
-
-                            if has_text {
-                                if let Some(text) = extract_text(&stored.metadata) {
-                                    self.text_index
-                                        .upsert_document(recovery_tx, doc_id, &text)
-                                        .await?;
-                                    recovered_text = true;
-                                }
-                            }
-
-                            if has_graph {
-                                if let Ok(eid) = EntityId::from_key(&stored.id) {
-                                    let entity =
-                                        contextra_types::Entity::new(eid, &stored.id, "Document");
-                                    if let Err(e) =
-                                        self.graph_index.add_entity(recovery_tx, entity).await
+                            let mut stored_doc = None;
+                            if let Some(ref id_str) = meta_id {
+                                let user_key = self.namespaced_key(id_str.as_bytes(), 0);
+                                // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
+                                if let Some(user_val) = self.storage.get(&user_key).await? {
+                                    if let Ok(stored) =
+                                        serde_json::from_slice::<StoredDocument>(&user_val)
                                     {
-                                        tracing::warn!(
-                                            doc_id = %stored.id,
-                                            error = %e,
-                                            "Konnte Entity bei Graph-Integritäts-Wiederherstellung nicht hinzufügen"
+                                        stored_doc = Some(stored);
+                                    }
+                                }
+                            }
+
+                            if stored_doc.is_none() {
+                                if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
+                                    stored_doc = Some(full);
+                                }
+                            }
+
+                            if let Some(stored) = stored_doc {
+                                if !indexed_ids.contains(&doc_id) {
+                                    self.index
+                                        .insert(recovery_tx, doc_id, &stored.embedding)
+                                        .await?;
+                                    repair_count += 1;
+                                    recovered_any = true;
+                                }
+
+                                if has_text {
+                                    if let Some(text) = extract_text(&stored.metadata) {
+                                        self.text_index
+                                            .upsert_document(recovery_tx, doc_id, &text)
+                                            .await?;
+                                        recovered_text = true;
+                                    }
+                                }
+
+                                if has_graph {
+                                    if let Ok(eid) = EntityId::from_key(&stored.id) {
+                                        let entity = contextra_types::Entity::new(
+                                            eid, &stored.id, "Document",
                                         );
-                                    } else {
-                                        recovered_graph = true;
+                                        if let Err(e) =
+                                            self.graph_index.add_entity(recovery_tx, entity).await
+                                        {
+                                            tracing::warn!(
+                                                doc_id = %stored.id,
+                                                error = %e,
+                                                "Konnte Entity bei Graph-Integritäts-Wiederherstellung nicht hinzufügen"
+                                            );
+                                        } else {
+                                            recovered_graph = true;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                } else {
+                    // Storage commit NEVER completed! Compensate index entries.
+                    for &doc_id in doc_ids.iter() {
+                        if let Err(e) = self.index.delete(recovery_tx, doc_id).await {
+                            tracing::warn!(?doc_id, error = %e, "Konnte verwaisten Vektor-Index-Eintrag bei Recovery nicht löschen");
+                        } else {
+                            recovered_any = true;
+                        }
+
+                        if has_text {
+                            if let Err(e) =
+                                self.text_index.delete_document(recovery_tx, doc_id).await
+                            {
+                                tracing::warn!(?doc_id, error = %e, "Konnte verwaisten Text-Index-Eintrag bei Recovery nicht löschen");
+                            } else {
+                                recovered_text = true;
+                            }
+                        }
+
+                        if has_graph {
+                            let eid = EntityId::from_doc_id(doc_id);
+                            if let Err(e) = self.graph_index.remove_entity(recovery_tx, eid).await {
+                                tracing::warn!(?eid, error = %e, "Konnte verwaisten Graph-Index-Eintrag bei Recovery nicht löschen");
+                            } else {
+                                recovered_graph = true;
+                            }
+                        }
+                    }
                 }
+
                 // Cleanup recovered intent
                 if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
                     tracing::warn!(key = ?intent_key, "Konnte wiederhergestellte TxIntent nicht löschen: {e}");
