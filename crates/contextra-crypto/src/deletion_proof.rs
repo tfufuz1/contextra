@@ -17,6 +17,7 @@
 //! INVARIANTE INV-DELETION-1: DeletionProof::create() wird NUR nach
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
+use crate::ed25519_proof::{DeletionProofError, SignatureVersion};
 #[cfg(not(test))]
 use crate::error::CryptoError;
 #[cfg(test)]
@@ -154,7 +155,6 @@ impl LayerCleanupProof {
             _private: (),
         })
     }
-
 
     /// Erzeugt einen Proof für `layer` NUR, wenn `verification` bestätigt,
     /// dass die physische Bereinigung tatsächlich abgeschlossen ist.
@@ -464,16 +464,30 @@ impl DeletionProof {
         Ok(proof)
     }
 
+    /// Parst und liefert die typsichere Signaturversion des Beweises.
+    ///
+    /// # Errors
+    /// Gibt [`DeletionProofError::UnsupportedVersion`] zurück, wenn `signature_version` einen ungültigen/unbekannten Wert enthält.
+    pub fn signature_version_typed(
+        &self,
+    ) -> std::result::Result<SignatureVersion, DeletionProofError> {
+        SignatureVersion::try_from(self.signature_version)
+    }
+
     /// Verifiziert Signatur.
     /// NICHT-GARANTIE: Prüft nur Signatur, nicht ob Storage tatsächlich bereinigt ist.
     pub fn verify<'a>(&self, key: impl Into<VerificationKey<'a>>) -> Result<bool> {
+        let version = self
+            .signature_version_typed()
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+
         let key = key.into();
         let scope_bytes =
             bincode::serialize(&self.scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
 
-        match self.signature_version {
-            1 => {
+        match version {
+            SignatureVersion::V1 => {
                 let proof_key = match key {
                     VerificationKey::Hmac(k) => k,
                     VerificationKey::Ed25519(_) => {
@@ -489,7 +503,7 @@ impl DeletionProof {
                 use subtle::ConstantTimeEq;
                 Ok(expected.as_slice().ct_eq(&self.signature).into())
             }
-            2 => {
+            SignatureVersion::V2 => {
                 let proof_key = match key {
                     VerificationKey::Hmac(k) => k,
                     VerificationKey::Ed25519(_) => {
@@ -522,7 +536,7 @@ impl DeletionProof {
                 use subtle::ConstantTimeEq;
                 Ok(expected.as_slice().ct_eq(&self.signature).into())
             }
-            3 => {
+            SignatureVersion::V3 => {
                 let verifying_key = match key {
                     VerificationKey::Ed25519(vk) => vk,
                     VerificationKey::Hmac(_) => {
@@ -543,9 +557,6 @@ impl DeletionProof {
 
                 Ok(verifying_key.verify(&payload, &sig).is_ok())
             }
-            v => Err(ContextraError::Internal(format!(
-                "Unsupported DeletionProof signature_version: {v}"
-            ))),
         }
     }
 
