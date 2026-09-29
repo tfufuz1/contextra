@@ -1,3 +1,5 @@
+// ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
+
 use contextra_core::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 
@@ -9,8 +11,42 @@ const LEGACY_KEY_OBFUSCATION_MASK: u8 = 0x5A;
 // Dieser Schlüssel hat keine Geheimhaltungseigenschaft mehr, sobald der Quellcode öffentlich einsehbar ist.
 const LEGACY_INTEGRITY_KEY_OBFUSCATED: [u8; 32] = *b"954.?\".(;w34.?=(3.#w1?#w,kZZZZZZ";
 
-/// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
-pub(crate) const fn legacy_integrity_key() -> [u8; 32] {
+static LEGACY_KEY_WARN_ONCE: std::sync::Once = std::sync::Once::new();
+
+/// Emits a process-wide one-time warning log when the legacy HMAC integrity key path is used.
+///
+/// **SECURITY**: This message intentionally contains NO key material or secret data.
+pub(crate) fn warn_legacy_key_use_once(context_msg: &str) {
+    LEGACY_KEY_WARN_ONCE.call_once(|| {
+        tracing::warn!(
+            "Legacy-WAL-Integritätsschlüssel im Einsatz ({context_msg}) — dieses Format bietet keine echte Manipulationssicherheit, da der Schlüssel öffentlich ist. Bitte migriere die WAL-Datei auf ein neues Schlüsselformat."
+        );
+    });
+}
+
+/// Status indicating whether a WAL segment or key configuration uses the obfuscated legacy key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LegacyKeyStatus {
+    /// A standard, secure integrity key (e.g. from `.wal_integrity_key` or `KeyManager`) is in use.
+    Standard,
+    /// The legacy obfuscated key is active and requires migration.
+    LegacyActive,
+}
+
+impl LegacyKeyStatus {
+    /// Returns `true` if the status is [`LegacyKeyStatus::LegacyActive`].
+    pub const fn is_legacy(self) -> bool {
+        matches!(self, Self::LegacyActive)
+    }
+
+    /// Returns `true` if the status is [`LegacyKeyStatus::Standard`].
+    pub const fn is_standard(self) -> bool {
+        matches!(self, Self::Standard)
+    }
+}
+
+/// Internal const helper for deobfuscating the legacy static integrity key bytes.
+pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
     let mut out = [0u8; 32];
     let mut i = 0;
     while i < 32 {
@@ -18,6 +54,54 @@ pub(crate) const fn legacy_integrity_key() -> [u8; 32] {
         i += 1;
     }
     out
+}
+
+/// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
+pub(crate) fn legacy_integrity_key() -> [u8; 32] {
+    warn_legacy_key_use_once("legacy_integrity_key");
+    deobfuscate_legacy_integrity_key()
+}
+
+/// Migrates a legacy integrity key to a new 32-byte key material state.
+///
+/// # Chain Compatibility
+/// When migrating a legacy WAL segment to a new integrity key format, HMAC chain validation
+/// during replay must verify historical entries using the legacy key before signing new entries
+/// or rewriting segments using `new_key_material`.
+///
+/// # Security & Zeroize Note
+/// `contextra-store` does not use a `zeroize` dependency. To avoid non-volatile manual memory
+/// wipes, key material in memory is handled via standard Rust slice operations without manual zeroing.
+///
+/// # Errors
+/// Returns [`ContextraError::Storage`] if `legacy` does not match the expected legacy integrity key,
+/// if `new_key_material` is not 32 bytes long, or if `new_key_material` is identical to `legacy`.
+pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8; 32]> {
+    warn_legacy_key_use_once("migrate_legacy_key");
+
+    let expected_legacy = deobfuscate_legacy_integrity_key();
+    if legacy != expected_legacy {
+        return Err(ContextraError::Storage(
+            "Provided legacy key material does not match expected legacy integrity key".into(),
+        ));
+    }
+
+    if new_key_material.len() != 32 {
+        return Err(ContextraError::Storage(format!(
+            "New key material must be exactly 32 bytes, got {}",
+            new_key_material.len()
+        )));
+    }
+
+    if new_key_material == expected_legacy {
+        return Err(ContextraError::Storage(
+            "New key material cannot be identical to the legacy integrity key".into(),
+        ));
+    }
+
+    let mut derived = [0u8; 32];
+    derived.copy_from_slice(new_key_material);
+    Ok(derived)
 }
 
 impl Wal {
@@ -258,6 +342,7 @@ impl Wal {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {
         let uuid_path = {
             let mut p = wal_path.as_os_str().to_os_string();
