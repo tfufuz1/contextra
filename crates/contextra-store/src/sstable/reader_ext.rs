@@ -52,7 +52,7 @@ impl SstableReader {
                 offsets_start,
                 num_offsets,
                 prefix,
-                is_v3,
+                self.format_version >= 3,
             )? {
                 Ok(i) => i,
                 Err(i) => i,
@@ -179,7 +179,7 @@ impl SstableReader {
                         offsets_start,
                         num_offsets,
                         s,
-                        is_v3,
+                        self.format_version >= 3,
                     )? {
                         Ok(idx) => idx,
                         Err(idx) => idx,
