@@ -7,6 +7,7 @@ Dieses Verzeichnis `docs/spec/` enthält die vollständige, verbindliche Gesamts
 ## Hauptspezifikation
 
 - **[`CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`](CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)**: Normative Mikrofeingranulare Schnittstellen- und Implementierungsspezifikation des Zielprodukts (Synthese aller Vorkapitel).
+- **[`../FEATURES_SPECIFICATION.md`](../FEATURES_SPECIFICATION.md)**: Vollständige Feature- und Funktionsspezifikation über alle 33 Crates, inklusive versteckter Mechanismen und Cargo-Feature-Flags.
 
 ## Hinweis zur Namenskollision 'Anhang E'
 
