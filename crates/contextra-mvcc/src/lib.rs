@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 //! `Contextra` MVCC — Multi-Version Concurrency Control, Sequence Log, Transaction Staging, and SSI Validation.
 //!
 //! # Architecture Role (Ring 0)

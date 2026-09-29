@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 //! Checkpoint-Registry für Time-Travel und MVCC-basiertes Snapshotting (gemäß ADR-011).
 //!
 //! # Öffentliche Checkpoint-Subsystem Architecture (ADR-011)

@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 // FILE-CONTEXT
 // ZWECK: Contextra Cognition Engine (Layer 3 - Cognition).
 // INVARIANTEN: No unsafe code; depends on contextra-engine; zero cyclic dependencies.

@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 //! Contextra Graph — CSR-Graph for Entity-Relation Traversal & Session DAG.
 //!
 //! This crate provides the graph signal (Signal 3) for the 5-Signal Fusion

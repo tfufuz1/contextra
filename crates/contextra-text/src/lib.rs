@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 // FILE-CONTEXT: Layer 1 text search integration facade (contextra-text).
 // ZWECK: Exportiert Bm25Scorer, InvertedIndex, Morphologie-Tools und BM25-Modelle für DB-Hybrid-Suche.
 // INVARIANTEN: #![forbid(unsafe_code)], TextIndex-Trait Implementierung ist fully async & transaction-aware.

@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 // FILE-CONTEXT
 // STAND: 2026-09-16T16:13:00Z (SESSION: afafdd44)
 // ZWECK: Crate root for contextra-infer-candle native GGUF inference backend.

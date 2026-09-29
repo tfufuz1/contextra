@@ -525,9 +525,12 @@ pub enum VectorDeleteMode { SynchronousRepair, BackgroundRepair }
 pub enum PerformanceProfile {
     #[default]
     Compliance, // DurabilityMode::Full + SynchronousRepair + Löschbeweis aktiv
-    Balanced,   // WalNoHmac + BackgroundRepair, kein Löschbeweis
+    Balanced,   // DurabilityMode::Full + BackgroundRepair, zur Wahrung von Absturzsicherheit und Löschbeweis-Integrität
+    Sovereign,  // DurabilityMode::Full + SynchronousRepair + FeatureRing::Sovereign
     BareMetal,  // MemoryOnly + BackgroundRepair, kein Löschbeweis
 }
+
+`ContextraBuilder::build()` erzwingt die Lizenzprüfung für JEDEN Instanziierungspfad. Ohne explizites Performance-Profil wird das Token `AuthorizedRing` für `FeatureRing::Fast` angefordert. Bei gesetztem Performance-Profil wird der zugehörige Feature-Ring autorisiert und dessen Konfiguration (`durability_mode`, `deletion_proof_active`, `vector_delete_mode`) wird in der `ContextraConfig` angewendet. `contextra::open()` und `open_with_config()` delegieren an den Builder und gewähren ausschließlich den Fast-Ring mit `deletion_proof_active = false`.
 
 // Nutzerfreundliche, grob gerasterte Bereitstellungsprofile (öffentliche API)
 pub enum DeploymentTier {
@@ -580,6 +583,49 @@ Die Funktion zur längenpräfixierten Hashbildung über gelöschte Schlüssel be
 Ein synthetisches Write-Ahead-Log mit einer Million Einträgen wird über das fehlerinjizierende virtuelle Testdateisystem erzeugt; der Wiedergabedurchsatz muss über den gesamten Testlauf hinweg über 50 Prozent des Anfangsdurchsatzes bleiben. Dieser Test deckt eingeschlichene quadratische Laufzeitkomplexität auf, die bei linearem Wachstum der Log-Größe unbemerkt bliebe. Neue Schnittstelle: ein Fortschritts-Sink-Trait für die Wiedergabe. **P0-8 (additiv, kein Breaking Change).**
 
 ---
+
+
+open_for_legacy_migration(path, config) führt eine atomare Migration durch und setzt die Bestätigungsmarkierung .rekeyed.
+
+
+### B.1.9 Manifest-Header & Verzeichnisspartssperre (P0-9 / J03)
+
+`DirLock` erwirbt eine exklusive Dateisperre auf `LOCK` über `std::fs::File::try_lock()` für die Lebensdauer von `LsmStorage`. Das Lesen des SALT schlägt bei I/O-Fehlern fehl; ein fehlendes SALT wird nur erzeugt, wenn das Verzeichnis pristin ist (keine WAL-, SST- oder MANIFEST-Dateien). Manifest-Header verwenden den 5-Byte Header `MFMN\x01` (Version 1), der bei Initialisierung und atomarem Rollover geschrieben wird.
+
+
+### B.1.10 SSI ReadSet Isolation (J04)
+
+DbTransaction führt Multi-Index-Commits unter SSI (Serializable Snapshot Isolation) aus. Ein `ReadSet` speichert gelesene Schlüssel und Sequenznummern; bei Schreib-Lese-Überlappung oder Write-Skew-Anomalien schlägt der Commit mit `ContextraError::Conflict` fehl.
+
+
+### B.1.11 Memory Accounting & Staging Budget (J05)
+
+Arbeitsgedächtnis und LSM-Commit-Budget-Accounting verwenden einheitlich `STAGING_ENTRY_OVERHEAD_BYTES` (32 Bytes). Scans vermeiden verfrühte `per_source_limit`-Trunkierungen, und `is_valid_range_bounds` verhindert BTreeMap-Bereichs-Panics bei invertierten oder leeren exklusiven Grenzen.
+
+
+### B.1.12 Engine Multi-Index 2PC Commit (J06)
+
+Engine Multi-Index-Transaktionen führen einen atomaren 2PC-Commit über Storage-, Vektor-, Text- und Graph-Indizes mittels eines einheitlichen `CommitLedger` (LIFO-Stack) aus. `CommitIntent::Pending` wird dauerhaft in den Storage geschrieben, bevor Index-Staging und Commits stattfinden. `CommitIntent::Committed` nutzt bounded retry mit Backoff; bei persistentem Fehler prüft die Recovery das Vorhandensein der Storage-Transaktion vor der Index-Kompensation.
+
+
+### B.1.13 Mandantenisolation via TenantScopedStorage (J08)
+
+TenantScopedStorage<S: StorageEngine> verpackt eine StorageEngine und erzwingt Mandantenisolation (INV-TENANT-2) auf Speicherebene, indem alle Schlüssel automatisch mit `t:{tenant_id}:` präfigiert und Scan-Ergebnisse transparent gefiltered und entpräfigiert werden.
+
+
+### B.1.14 StorageEngine SSI ReadSet Tracking Interface (K01)
+
+`StorageEngine` bietet dyn-kompatible Methoden `get_tracked`, `get_at_seq_tracked`, `scan_prefix_tracked` und `supports_ssi_tracking(&self) -> bool`. Standardimplementierungen auf `StorageEngine` delegieren an ungetrackte Reads (`get`, `get_at_seq`, `scan_prefix`) und liefern `supports_ssi_tracking() == false`. `LsmStorage` und `TenantScopedStorage` implementieren `supports_ssi_tracking() == true`.
+
+
+### B.1.15 WAL Integrität und DurabilityMode::WalNoHmac (K02)
+
+WAL-Einträge verwenden eine stufenweise HMAC-SHA256-Verkettung zur Sicherung der Log-Integrität. Öffnen über `open_for_legacy_migration` erzwingt eine atomare Rekeying-Migration auf ein frisch erzeugtes `.wal_integrity_key` und setzt den Marker `.rekeyed`, wodurch der Legacy-Schlüssel-Pfad nach der Migration dauerhaft gesperrt wird. Sidecar-Dateien (`.wal_integrity_key` und `.uuid`) werden atomic-link-basiert erzeugt, um Concurrency-Races auszuschließen. Im Modus `DurabilityMode::WalNoHmac` wird die HMAC-Verkettung übersprungen (Zero-Key), während die individuelle CRC32-Prüfsumme je Eintrag weiterhin strikt validiert wird.
+
+
+### B.1.16 Engine Transactional Read-Set Integration & Write-Skew Prevention (L01)
+
+`Collection` transaktionsgebundene CRUD- und Beziehungs-Operationen führen LSM Point Lookups via `get_tracked` und `get_at_seq_tracked` unter der aktiven Transaktions-`TxId` aus (`insert_op`, `update_op`, `delete_op`, `link_memories`, `relate_with_provenance`, `update_document_importance`). Nicht-transaktionale Reads bleiben ungetrackt mit expliziten `// SSI: nicht tx-gebunden` Kommentaren. Alle konkurrierenden transaktionalen Modifikationen erzwingen Serialisierbarkeit und weisen Write-Skew-Anomalien mit `ContextraError::Conflict` oder `ContextraError::Transaction` ab.
 
 ## B.2 Phase 1: Fast-Ring öffentlich machen
 

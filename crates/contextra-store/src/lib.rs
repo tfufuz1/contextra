@@ -1,3 +1,4 @@
+#![deny(dead_code)]
 //! `Contextra` Store — LSM-Tree based storage engine.
 //!
 //! Provides persistent key-value storage with WAL, `MemTable`,
