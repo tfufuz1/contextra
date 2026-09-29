@@ -6,6 +6,7 @@ use std::sync::atomic::Ordering;
 
 use contextra_core::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
 
+use super::adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats};
 use super::arena::BacklinkTable;
 use super::batch::{PreparedInsert, SearchContext};
 use super::types::{Candidate, HnswIndex, HnswIndexCore, VectorData};
@@ -421,5 +422,319 @@ impl HnswIndex {
         });
 
         Ok(results)
+    }
+
+    /// Performs an adaptive search (Ada-ef) on the HNSW index, dynamically adjusting search depth `ef`.
+    pub async fn search_adaptive(
+        &self,
+        query: &[f32],
+        k: usize,
+        policy: &AdaptiveEfPolicy,
+    ) -> Result<Vec<ScoredDocument>> {
+        self.search_adaptive_filtered(query, k, policy, None).await
+    }
+
+    /// Performs an adaptive search (Ada-ef) with custom document filter predicate.
+    pub async fn search_adaptive_filtered(
+        &self,
+        query: &[f32],
+        k: usize,
+        policy: &AdaptiveEfPolicy,
+        filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
+    ) -> Result<Vec<ScoredDocument>> {
+        let (docs, _stats) = self
+            .search_adaptive_with_stats(query, k, policy, filter)
+            .await?;
+        Ok(docs)
+    }
+
+    /// Performs an adaptive search (Ada-ef) returning scored documents along with execution statistics.
+    pub async fn search_adaptive_with_stats(
+        &self,
+        query: &[f32],
+        k: usize,
+        policy: &AdaptiveEfPolicy,
+        filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
+    ) -> Result<(Vec<ScoredDocument>, AdaptiveEfStats)> {
+        policy.validate()?;
+
+        if let Some(ref err) = self.inner.cold.validation_error {
+            return Err(ContextraError::invalid_input(format!(
+                "Invalid index configuration: {err}"
+            )));
+        }
+        if query.len() != self.inner.cold.config.dimension {
+            return Err(ContextraError::invalid_input(format!(
+                "Expected dimension {}, got {}",
+                self.inner.cold.config.dimension,
+                query.len()
+            )));
+        }
+
+        if k == 0 {
+            return Ok((
+                Vec::new(),
+                AdaptiveEfStats {
+                    final_ef: policy.min_ef,
+                    rounds: 0,
+                    converged: true,
+                },
+            ));
+        }
+
+        if k > contextra_core::MAX_SEARCH_K {
+            return Err(ContextraError::invalid_input(format!(
+                "Requested k ({k}) exceeds maximum allowed search limit ({}).",
+                contextra_core::MAX_SEARCH_K
+            )));
+        }
+
+        for (i, &val) in query.iter().enumerate() {
+            if !val.is_finite() {
+                return Err(ContextraError::invalid_input(format!(
+                    "Query vector element at index {i} is not finite (value: {val})."
+                )));
+            }
+        }
+
+        let query_quantized = if self.inner.cold.config.quantize {
+            self.inner
+                .cold
+                .quantizer
+                .read()
+                .as_ref()
+                .map(|q| q.quantize(query))
+                .transpose()?
+        } else {
+            None
+        };
+
+        let mut ep = Vec::new();
+        if let Some(global_ep) = self.inner.hot.get_entry_point() {
+            ep.push(global_ep);
+        }
+        if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
+            if !ep.contains(&ram_ep) {
+                ep.push(ram_ep);
+            }
+        }
+
+        if ep.is_empty() {
+            let nodes = self.inner.hot.nodes.read();
+            let deleted = self.inner.cold.deleted_nodes.read();
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            let mmap_node_count = mmap_guard
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            let total = mmap_node_count + nodes.len();
+            for i in 0..total {
+                if !deleted.contains(i as u64) {
+                    ep.push(i);
+                    self.inner.hot.set_entry_point(Some(i));
+                    break;
+                }
+            }
+        }
+
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+
+        let mut filter_eps = Vec::new();
+        if let Some(f) = filter {
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            let mmap_node_count = mmap_guard
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            let q_guard = if self.inner.cold.config.quantize {
+                Some(self.inner.cold.quantizer.read())
+            } else {
+                None
+            };
+            let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
+            let ctx = SearchContext {
+                nodes: &nodes,
+                mmap: mmap_guard.as_ref(),
+                mmap_node_count,
+                prior_prepared: &[],
+                backlink_map: None,
+                quantizer: q_ref.map(Cow::Borrowed),
+                arena: &self.inner.hot.arena,
+            };
+
+            let factor = if self.inner.cold.config.quantize {
+                4
+            } else {
+                2
+            };
+            let max_filter_eps = policy.max_ef.max(k) * factor;
+
+            let total_nodes = mmap_node_count + nodes.len();
+            for i in (0..total_nodes).rev() {
+                if !ep.contains(&(i as _)) {
+                    if deleted.contains(i as u64) {
+                        continue;
+                    }
+                    if let Ok(doc_id) = self.inner.resolve_doc_id(i, &ctx) {
+                        if f(doc_id) {
+                            ep.push(i);
+                            filter_eps.push(i);
+                            if filter_eps.len() >= max_filter_eps {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if ep.is_empty() {
+            return Ok((
+                Vec::new(),
+                AdaptiveEfStats {
+                    final_ef: policy.min_ef,
+                    rounds: 0,
+                    converged: true,
+                },
+            ));
+        }
+
+        let max_layer = self.inner.hot.max_layer.load(Ordering::SeqCst) as usize;
+
+        for layer in (1..=max_layer).rev() {
+            let best = self
+                .inner
+                .search_layer(query, query_quantized.as_deref(), &ep, 1, layer)?;
+            if let Some(closest) = best.first() {
+                ep = vec![closest.index];
+            }
+        }
+
+        if let Some(ram_ep) = self.inner.hot.get_ram_entry_point() {
+            if !ep.contains(&ram_ep) {
+                ep.push(ram_ep);
+            }
+        }
+
+        for f_ep in filter_eps {
+            if !ep.contains(&f_ep) {
+                ep.push(f_ep);
+            }
+        }
+
+        let mut state_machine = AdaptiveEfStateMachine::new(policy.clone(), k);
+
+        let final_results = loop {
+            let current_ef = state_machine.current_ef();
+            let ef = if self.inner.cold.config.quantize {
+                current_ef.max(k) * 4
+            } else {
+                current_ef.max(k)
+            };
+
+            let candidates = self.inner.search_layer(
+                query,
+                query_quantized.as_deref(),
+                &ep,
+                ef,
+                0,
+            )?;
+
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            let mmap_node_count = mmap_guard
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            let q_guard = if self.inner.cold.config.quantize {
+                Some(self.inner.cold.quantizer.read())
+            } else {
+                None
+            };
+            let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
+            let ctx = SearchContext {
+                nodes: &nodes,
+                mmap: mmap_guard.as_ref(),
+                mmap_node_count,
+                prior_prepared: &[],
+                backlink_map: None,
+                quantizer: q_ref.map(Cow::Borrowed),
+                arena: &self.inner.hot.arena,
+            };
+
+            let mut results = Vec::with_capacity(k);
+
+            for c in candidates.iter() {
+                if deleted.contains(c.index as u64) {
+                    continue;
+                }
+                if c.index >= mmap_node_count {
+                    if let Some(node) = nodes.get(c.index - mmap_node_count) {
+                        if node.committed_tx == 0 {
+                            continue;
+                        }
+                    }
+                }
+                let doc_id = self.inner.resolve_doc_id(c.index, &ctx)?;
+
+                if let Some(f) = filter {
+                    if !f(doc_id) {
+                        continue;
+                    }
+                }
+
+                let final_dist = if self.inner.cold.config.quantize {
+                    self.inner.resolve_dist(c.index, query, None, &ctx)?
+                } else {
+                    c.distance
+                };
+
+                let score = match self.inner.cold.config.distance_metric {
+                    DistanceMetric::Cosine => 1.0 - final_dist,
+                    DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
+                    DistanceMetric::DotProduct => -final_dist,
+                    other => {
+                        return Err(ContextraError::Index(format!(
+                            "Unsupported DistanceMetric variant in search_adaptive(): {other:?}"
+                        )));
+                    }
+                };
+                results.push(ScoredDocument::new(doc_id, score));
+            }
+
+            if results.len() > k {
+                results.select_nth_unstable_by(k - 1, |a, b| {
+                    b.score
+                        .total_cmp(&a.score)
+                        .then_with(|| a.doc_id.cmp(&b.doc_id))
+                });
+                results.truncate(k);
+            }
+            results.sort_by(|a, b| {
+                b.score
+                    .total_cmp(&a.score)
+                    .then_with(|| a.doc_id.cmp(&b.doc_id))
+            });
+
+            let top_k_ids: Vec<DocId> = results.iter().map(|sd| sd.doc_id).collect();
+
+            if state_machine.step(&top_k_ids) {
+                break results;
+            }
+        };
+
+        let score = self.inner.connectivity_score();
+        if score < self.inner.cold.config.rebuild_threshold {
+            let deleted_ratio = (1.0 - score) * 100.0;
+            let err = contextra_core::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+            tracing::warn!(
+                error = %err,
+                connectivity_score = score,
+                rebuild_threshold = self.inner.cold.config.rebuild_threshold,
+                "HNSW index degraded — consider calling rebuild()"
+            );
+        }
+
+        Ok((final_results, state_machine.stats()))
     }
 }
