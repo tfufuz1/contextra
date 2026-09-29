@@ -1,7 +1,7 @@
 use super::intent::{CommitIntent, StagedKeyOp};
 use crate::Collection;
 use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
+use contextra_types::{ContextraError, DocId, EntityId, Result, TenantId, TxId};
 use std::sync::Arc;
 
 /// Trait representing an undo operation to be executed during transaction rollback/compensation.
@@ -170,6 +170,38 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateLsmActio
                 ));
             }
 
+            Ok(())
+        })
+    }
+}
+
+pub struct CompensateGraphAction<S: StorageEngine, V: VectorIndex> {
+    pub(super) collection: Collection<S, V>,
+    pub(super) doc_ids: Arc<Vec<DocId>>,
+}
+
+impl<S: StorageEngine, V: VectorIndex> CompensateGraphAction<S, V> {
+    pub fn new(collection: Collection<S, V>, doc_ids: Arc<Vec<DocId>>) -> Self {
+        Self { collection, doc_ids }
+    }
+}
+
+impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAction<S, V> {
+    fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let comp_tx = TxId::new(
+                self.collection
+                    .next_tx
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            );
+            for &doc_id in self.doc_ids.iter() {
+                let eid = EntityId::new(doc_id.inner());
+                let _ = self.collection.graph_index.remove_entity(comp_tx, eid).await;
+            }
+            if let Err(e) = self.collection.graph_index.commit(comp_tx).await {
+                tracing::error!("[INV-DB-3] Compensating graph commit failed: {}", e);
+                return Err(e);
+            }
             Ok(())
         })
     }

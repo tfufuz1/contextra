@@ -1,9 +1,10 @@
 // FILE-CONTEXT
-// STAND: 2026-09-15
+// STAND: 2026-09-29 (S-01 / T-04)
 // ZWECK: Datenstruktur und (De-)Serialisierungslogik für SSTable-Manifest-Einträge (ManifestEntry).
 // INVARIANTEN: Binäre Abwärtskompatibilität der Serialisierung; CRC32-Integritätsprüfung für jeden Eintrag.
 // HOTSPOTS: to_bytes, from_bytes
-// NICHT-OFFENSICHTLICH: Das Feld `rank` in `ManifestEntry::Replace` dient ausschließlich als Zähler während des Manifest-Replays und NICHT als Sortierkriterium für die Lese-Sichtbarkeit.
+// FORMATABKÜNDIGUNG (S-01 / T-04): Der Schreibpfad schreibt kein rank mehr in Replace-Einträge (schreibt stets 0u64 für binäre Nutzlastkompatibilität).
+// Der Reader akzeptiert bestehende Einträge mit rank weiterhin und ignoriert das Feld für Sortierung oder Sichtbarkeit.
 
 use contextra_core::{ContextraError, Result};
 use std::path::PathBuf;
@@ -66,11 +67,11 @@ impl ManifestEntry {
                 removed,
                 added,
                 added_max_tx,
-                rank,
+                rank: _,
             } => {
                 payload.push(3u8); // op_tag = 3
                 payload.extend_from_slice(&added_max_tx.to_le_bytes());
-                payload.extend_from_slice(&rank.to_le_bytes());
+                payload.extend_from_slice(&0u64.to_le_bytes()); // Abgekündigtes rank-Feld (S-01): stets 0u64
                 let added_str = added.to_string_lossy();
                 let added_bytes = added_str.as_bytes();
                 payload.extend_from_slice(&(added_bytes.len() as u32).to_le_bytes());

@@ -75,11 +75,17 @@ pub fn open(
     Ok(PyContextra::new(Arc::new(db), rt, worker_threads, poisoned))
 }
 
-/// Helper function to trigger a panic inside `run_blocking_ffi` for testing FFI panic isolation.
+/// Internal helper function to trigger an unwinding panic inside `run_blocking_ffi` for testing FFI panic isolation.
 ///
-/// # Panics
+/// # Intention
+/// Serves exclusively as a test hook for verifying Python FFI panic boundary isolation (`run_blocking_ffi` / `catch_unwind`).
 ///
-/// bewusst; nur Testhook für FFI-Panic-Isolation; Panic wird durch run_blocking_ffi in PyErr übersetzt
+/// # Scope
+/// Internal test helper, restricted to `_trigger_panic_for_test` for integration and Python test suites.
+///
+/// # Risks
+/// Triggers panic unwinding. If called outside `run_blocking_ffi` or `catch_unwind`, it will abort or unwind across FFI boundaries.
+#[doc(hidden)]
 pub(crate) fn trigger_panic_helper(
     py: Python<'_>,
     poisoned: &AtomicBool,
@@ -87,19 +93,22 @@ pub(crate) fn trigger_panic_helper(
 ) -> PyResult<()> {
     let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
     run_blocking_ffi(py, poisoned, move || -> PyResult<()> {
-        // Testhook für FFI-Panic-Isolation: Panic wird von run_blocking_ffi in PyErr übersetzt
-        #[allow(clippy::panic)]
-        {
-            panic!("{}", msg);
-        }
+        std::panic::resume_unwind(Box::new(msg));
     })
 }
 
-/// Internal helper function for testing FFI panic isolation.
+/// Internal Python binding function for testing FFI panic isolation.
 ///
-/// # Panics
+/// # Intention
+/// Exposed to Python test suite (`tests/test_panic_isolation.py` and `tests/test_panic_to_pyerr.py`) to verify
+/// that panics occurring within Rust core operations are caught and mapped to `PyRuntimeError`.
 ///
-/// bewusst; nur Testhook für FFI-Panic-Isolation; Panic wird durch run_blocking_ffi in PyErr übersetzt
+/// # Scope
+/// Internal test hook only (`#[doc(hidden)]`).
+///
+/// # Risks
+/// Explicitly triggers a panic payload unwind via `std::panic::resume_unwind`.
+#[doc(hidden)]
 #[pyfunction]
 #[pyo3(signature = (message=None))]
 pub fn _trigger_panic_for_test(py: Python<'_>, message: Option<String>) -> PyResult<()> {

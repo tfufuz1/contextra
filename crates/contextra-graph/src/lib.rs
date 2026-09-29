@@ -56,7 +56,8 @@ pub mod tl_hfd;
 
 #[cfg(feature = "apprh-diffusion")]
 pub use apprh::{
-    apprh_local, shadow_compare_forward_push_vs_apprh, ApprhError, ApprhFlipGate, ApprhParams,
+    apprh_local, forward_push_apprh, shadow_compare_forward_push_vs_apprh, ApprhError,
+    ApprhFlipGate, ApprhMode, ApprhParams, ApprhSelector, ApprhSelectorConfig,
     ApprhShadowComparison, DefaultApprhFlipGate,
 };
 pub use arc_slice::ArcSlice;
@@ -100,6 +101,8 @@ pub use percolation::{
     compute_percolation_health, find_rebonding_candidates, should_trigger_rebonding,
     PercolationConfig,
 };
+#[cfg(feature = "apprh-diffusion")]
+pub use ppr::compute_ppr_with_apprh_selector;
 pub use ppr::{DeletedView, PprContext};
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};

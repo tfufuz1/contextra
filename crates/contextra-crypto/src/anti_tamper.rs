@@ -111,35 +111,24 @@ mod tests {
         assert!(debug_str.contains("REDACTED"));
     }
 
-    // AI-TAG[CORRECTNESS][MAJOR][RESOLVED] Refactored zeroize test using ManuallyDrop (ID: AGT-CRYPTO-7519b7cd) (TS: 2026-09-03T19:31:53Z) (SESSION: a413a598)
-    // RESOLVED: Refactored test to use ManuallyDrop and explicit Zeroize::zeroize without post-drop raw pointer dereferencing on stack memory, eliminating UAF/UB.
+    // AI-TAG[CORRECTNESS][MAJOR][RESOLVED] Refactored zeroize test to use safe Accessor API (ID: AGT-CRYPTO-7519b7cd) (TS: 2026-09-08T00:00:00Z) (SESSION: a413a598)
+    // RESOLVED: Replaced unsafe pointer dereferencing with safe as_bytes() accessor, maintaining 100% safe Rust compliance under #![forbid(unsafe_code)].
     #[test]
-    #[allow(unsafe_code)]
     fn test_zeroize_on_drop_wipes_memory() {
-        use std::mem::ManuallyDrop;
-
         let raw: [u8; 32] = [0xCD; 32];
-        let mut key = ManuallyDrop::new(VolatileEncryptionKey::new(raw));
-        let ptr = key.as_bytes().as_ptr();
+        let mut key = VolatileEncryptionKey::new(raw);
 
-        // Precondition: check that memory contains original non-zero key bytes
-        // SAFETY: `key` is alive in ManuallyDrop wrapper and `ptr` points directly to its buffer.
-        unsafe {
-            let slice = std::slice::from_raw_parts(ptr, 32);
-            assert_eq!(slice, &[0xCD; 32]);
-        }
+        // Precondition: check that key contains original non-zero key bytes
+        assert_eq!(key.as_bytes(), &[0xCD; 32]);
 
-        // Action: Explicitly invoke zeroize without deallocating/dropping stack frame memory
-        Zeroize::zeroize(&mut *key);
+        // Action: Explicitly invoke zeroize on volatile encryption key
+        Zeroize::zeroize(&mut key);
 
-        // Postcondition: Check that memory was zeroed in place without UAF
-        // SAFETY: `key` memory is still allocated within ManuallyDrop wrapper in this stack frame.
-        unsafe {
-            let cleared_slice = std::slice::from_raw_parts(ptr, 32);
-            assert_eq!(
-                cleared_slice, &[0x00; 32],
-                "Memory MUST be zeroed after zeroize"
-            );
-        }
+        // Postcondition: Check that memory was zeroed via safe as_bytes() accessor
+        assert_eq!(
+            key.as_bytes(),
+            &[0x00; 32],
+            "Memory MUST be zeroed after zeroize"
+        );
     }
 }
