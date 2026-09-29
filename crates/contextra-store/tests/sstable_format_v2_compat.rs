@@ -36,10 +36,7 @@ async fn test_sstable_v3_write_and_read() {
         .await
         .expect("open reader");
 
-    assert!(
-        reader.format_version >= 3,
-        "Written SSTable should be format v3"
-    );
+    assert!(reader.format_version >= 3, "Written SSTable should be format v3");
 
     for i in 0..100 {
         let key = format!("key_{:04}", i);
@@ -123,27 +120,15 @@ async fn test_sstable_v3_multi_version_duplicate_keys_in_same_block() {
     assert_eq!(all_entries.len(), 3);
     assert_eq!(
         all_entries[0],
-        (
-            Bytes::from_static(b"shared_key"),
-            Bytes::from_static(b"v3_payload"),
-            300
-        )
+        (Bytes::from_static(b"shared_key"), Bytes::from_static(b"v3_payload"), 300)
     );
     assert_eq!(
         all_entries[1],
-        (
-            Bytes::from_static(b"shared_key"),
-            Bytes::from_static(b"v2_payload"),
-            200
-        )
+        (Bytes::from_static(b"shared_key"), Bytes::from_static(b"v2_payload"), 200)
     );
     assert_eq!(
         all_entries[2],
-        (
-            Bytes::from_static(b"shared_key"),
-            Bytes::from_static(b"v1_payload"),
-            100
-        )
+        (Bytes::from_static(b"shared_key"), Bytes::from_static(b"v1_payload"), 100)
     );
 }
 
@@ -357,9 +342,7 @@ async fn test_chaos_bitflip_corruption_returns_error_no_panic() {
             data[offset] ^= 0xFF;
         }
     }
-    tokio::fs::write(&sst_path, data)
-        .await
-        .expect("write corrupted file");
+    tokio::fs::write(&sst_path, data).await.expect("write corrupted file");
 
     // Opening corrupted reader must return Result::Err or fail safely on get() without panicking
     let open_res = SstableReader::open(&sst_path, bc).await;

@@ -18,11 +18,7 @@ impl StorageEngine for LsmStorage {
         Box::pin(read::get_at_seq(self, key, seq_no))
     }
 
-    fn get_tracked<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+    fn get_tracked<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
         Box::pin(read::get_tracked(self, tx_id, key))
     }
 

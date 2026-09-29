@@ -66,12 +66,10 @@ pub async fn verify_storage_against_reference_model(
 
     let snapshot_map = model.snapshot_map_at(confirmed_seq);
     for (key, expected_val) in snapshot_map {
-        let actual_val = storage.get(&key).await.map_err(|e| {
-            format!(
-                "Storage get error for key {:?}: {e}",
-                String::from_utf8_lossy(&key)
-            )
-        })?;
+        let actual_val = storage
+            .get(&key)
+            .await
+            .map_err(|e| format!("Storage get error for key {:?}: {e}", String::from_utf8_lossy(&key)))?;
 
         if actual_val.as_deref() != Some(expected_val.as_slice()) {
             return Err(format!(
