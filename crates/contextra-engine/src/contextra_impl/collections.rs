@@ -4,6 +4,83 @@ use contextra_types::{Result, TxId};
 use std::sync::Arc;
 
 impl Contextra {
+    pub async fn collection_for_tenant(
+        &self,
+        name: &str,
+        tenant_id: TenantId,
+    ) -> Result<Arc<Collection<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>>>
+    {
+        self.collection_with_language_and_tenant(name, Language::English, tenant_id)
+            .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn collection_with_language_and_tenant(
+        &self,
+        name: &str,
+        language: Language,
+        tenant_id: TenantId,
+    ) -> Result<Arc<Collection<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>>>
+    {
+        if name.len() > 64 {
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Collection name too long (max 64)",
+            ));
+        }
+        if !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(contextra_types::ContextraError::invalid_input(
+                "Invalid characters in collection name",
+            ));
+        }
+
+        let tenant_storage = Arc::new(contextra_store::tenant_codec::TenantScopedStorage::new(
+            self.storage.clone(),
+            tenant_id,
+        ));
+
+        let hnsw_config = HnswConfig {
+            dimension: self.dimension,
+            ..Default::default()
+        };
+        let index = Arc::new(HnswIndex::try_new(hnsw_config)?);
+
+        let mut graph =
+            contextra_graph::CsrGraph::load_from_storage(tenant_storage.as_ref()).await?;
+        graph.set_storage(tenant_storage.clone());
+        let graph_index = Arc::new(graph);
+
+        let mut col = Collection::new(
+            name.to_string(),
+            tenant_storage.clone(),
+            index,
+            graph_index,
+            Arc::clone(&self.next_tx),
+            self.dimension,
+            language,
+        );
+        col.set_community_detection_trigger_threshold(self.community_detection_threshold);
+
+        if let Some(emb) = self.embedder.read().as_ref() {
+            col = col.with_embedder(Arc::clone(emb));
+        }
+
+        if name != "default" {
+            let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
+            let tx = self.allocate_tx()?;
+            tenant_storage.put(tx, &col_idx_key, b"{}").await?;
+            tenant_storage.commit(tx).await?;
+        }
+
+        col.load_index().await?;
+        col.load_text_stats().await?;
+        col.migrate_doc_keys_v1().await?;
+
+        Ok(Arc::new(col))
+    }
+
     pub async fn collection(&self, name: &str) -> Result<Arc<Collection<LsmStorage>>> {
         self.collection_with_language(name, Language::English).await
     }
@@ -140,18 +217,27 @@ impl Contextra {
             ));
         }
 
+        let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
+            self.storage.clone(),
+            tenant_id,
+        );
+
         let col_data_prefix = format!("__col:{}:", name);
         let txt_data_prefix = format!("__txt:{}:", name);
         let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
 
         let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
 
-        let col_entries = self.storage.scan_prefix(col_data_prefix.as_bytes()).await?;
+        let col_entries = tenant_storage
+            .scan_prefix(col_data_prefix.as_bytes())
+            .await?;
         for (k, _) in col_entries {
             deleted_keys.push(k);
         }
 
-        let txt_entries = self.storage.scan_prefix(txt_data_prefix.as_bytes()).await?;
+        let txt_entries = tenant_storage
+            .scan_prefix(txt_data_prefix.as_bytes())
+            .await?;
         for (k, _) in txt_entries {
             deleted_keys.push(k);
         }
@@ -160,20 +246,24 @@ impl Contextra {
 
         let tx = self.allocate_tx()?;
 
-        self.storage
+        tenant_storage
             .delete_prefix(tx, col_data_prefix.as_bytes())
             .await?;
 
-        self.storage
+        tenant_storage
             .delete_prefix(tx, txt_data_prefix.as_bytes())
             .await?;
 
-        self.storage.delete(tx, &col_idx_key).await?;
+        tenant_storage.delete(tx, &col_idx_key).await?;
 
-        self.storage.commit(tx).await?;
+        tenant_storage.commit(tx).await?;
 
-        let remaining_col_data = self.storage.scan_prefix(col_data_prefix.as_bytes()).await?;
-        let remaining_txt_data = self.storage.scan_prefix(txt_data_prefix.as_bytes()).await?;
+        let remaining_col_data = tenant_storage
+            .scan_prefix(col_data_prefix.as_bytes())
+            .await?;
+        let remaining_txt_data = tenant_storage
+            .scan_prefix(txt_data_prefix.as_bytes())
+            .await?;
 
         let mut hasher = blake3::Hasher::new();
         hasher.update(name.as_bytes());
