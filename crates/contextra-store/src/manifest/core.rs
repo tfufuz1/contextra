@@ -1,9 +1,9 @@
 // FILE-CONTEXT
-// STAND: 2026-09-15
+// STAND: 2026-09-29 (S-01 / T-04)
 // ZWECK: Kernimplementierung des Manifests zum Lesen, Schreiben, Rollover und Reconstruct aktiver SSTables.
 // INVARIANTEN: Atomare Schreiboperationen via Buffer & Sync; Tail-Truncation Recovery bei unvollständigem Frame am EOF.
 // HOTSPOTS: load, reconstruct_valid_sstables, append_batch
-// NICHT-OFFENSICHTLICH: `next_rank` in `reconstruct_valid_sstables` ist ein monoton wachsender Zähler über die Add/Replace-Historie und NICHT identisch mit dem zur Kompaktierungszeit lokal berechneten `insertion_point`. Diese Diskrepanz ist bewusst folgenlos, da `rank` bei der Recovery in `lsm/recovery.rs` verworfen wird (`.map(|(path, _rank)| path)`).
+// FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
 
 use contextra_core::{ContextraError, Result};
 use std::path::{Path, PathBuf};
@@ -305,7 +305,6 @@ impl Manifest {
                 ManifestEntry::Replace {
                     removed,
                     added,
-                    rank,
                     ..
                 } => {
                     for p in removed {
@@ -319,10 +318,8 @@ impl Manifest {
                         .file_name()
                         .map(PathBuf::from)
                         .unwrap_or_else(|| added.clone());
-                    valid_map.insert(key, *rank);
-                    if *rank >= next_rank {
-                        next_rank = rank + 1;
-                    }
+                    valid_map.insert(key, next_rank);
+                    next_rank += 1;
                 }
             }
         }

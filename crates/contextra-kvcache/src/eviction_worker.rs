@@ -18,6 +18,7 @@
 use super::attention_score::{AttentionScoreSource, NullAttentionScoreSource};
 use super::store::TenantIsolatedKvStore;
 use contextra_ports::{AttentionExporter, RequestId};
+use contextra_types::TenantId;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -33,7 +34,7 @@ enum EvictionCommand {
 /// segment-centered [`AttentionScoreSource`] (Ring 1 interface).
 struct ExporterBackedScoreSource {
     exporter: Arc<dyn AttentionExporter>,
-    segment_map: RwLock<HashMap<u64, RequestId>>,
+    segment_map: RwLock<HashMap<(TenantId, u64), RequestId>>,
 }
 
 impl ExporterBackedScoreSource {
@@ -43,22 +44,21 @@ impl ExporterBackedScoreSource {
             segment_map: RwLock::new(HashMap::new()),
         }
     }
-
-    #[cfg_attr(not(test), allow(dead_code))]
-    fn register_segment_mapping(&self, segment_id: u64, request_id: RequestId) {
-        self.segment_map.write().insert(segment_id, request_id);
-    }
 }
 
 impl AttentionScoreSource for ExporterBackedScoreSource {
     fn importance_score(&self, segment_id: u64) -> Option<f32> {
-        let request_id = self
-            .segment_map
-            .read()
-            .get(&segment_id)
-            .copied()
-            .unwrap_or(RequestId(segment_id));
+        self.importance_score_for_tenant(TenantId::SYSTEM, segment_id)
+    }
 
+    fn importance_score_for_tenant(&self, tenant_id: TenantId, segment_id: u64) -> Option<f32> {
+        let request_id = {
+            let map = self.segment_map.read();
+            map.get(&(tenant_id, segment_id)).copied()
+        }
+        .unwrap_or(RequestId(segment_id));
+
+        // Note: Read lock is dropped before calling external exporter
         let weights = self.exporter.export_attention_weights(request_id)?;
         if weights.is_empty() {
             return None;
@@ -66,6 +66,16 @@ impl AttentionScoreSource for ExporterBackedScoreSource {
 
         let sum: f32 = weights.iter().copied().sum();
         Some(sum / weights.len() as f32)
+    }
+
+    fn register_segment(&self, tenant_id: TenantId, segment_id: u64, request_id: RequestId) {
+        self.segment_map
+            .write()
+            .insert((tenant_id, segment_id), request_id);
+    }
+
+    fn unregister_segment(&self, tenant_id: TenantId, segment_id: u64) {
+        self.segment_map.write().remove(&(tenant_id, segment_id));
     }
 }
 
@@ -75,6 +85,7 @@ pub struct EvictionWorker {
     attention_source: Arc<RwLock<Arc<dyn AttentionScoreSource>>>,
     sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
     handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
+    store: Arc<TenantIsolatedKvStore>,
 }
 
 impl EvictionWorker {
@@ -85,6 +96,7 @@ impl EvictionWorker {
         ));
         let worker_source = Arc::clone(&attention_source);
 
+        let worker_store = Arc::clone(&store);
         let (sender, receiver) = mpsc::channel::<EvictionCommand>();
         let handle_opt = std::thread::Builder::new()
             .name("kv-eviction-worker".into())
@@ -93,7 +105,7 @@ impl EvictionWorker {
                     match cmd {
                         EvictionCommand::EvictLru { target_free_bytes } => {
                             let source = worker_source.read().clone();
-                            let freed = store.evict_fair(target_free_bytes, source.as_ref());
+                            let freed = worker_store.evict_fair(target_free_bytes, source.as_ref());
                             tracing::debug!(
                                 freed_bytes = freed,
                                 "KV eviction worker: LRU evict done"
@@ -119,6 +131,7 @@ impl EvictionWorker {
             attention_source,
             sender: parking_lot::Mutex::new(sender),
             handle: parking_lot::Mutex::new(handle_opt),
+            store,
         }
     }
 
@@ -126,8 +139,33 @@ impl EvictionWorker {
     pub fn with_attention_exporter(self, exporter: Arc<dyn AttentionExporter>) -> Self {
         let adapter: Arc<dyn AttentionScoreSource> =
             Arc::new(ExporterBackedScoreSource::new(exporter));
-        *self.attention_source.write() = adapter;
+        *self.attention_source.write() = Arc::clone(&adapter);
+        self.store.set_attention_source(Arc::clone(&adapter));
         self
+    }
+
+    /// Registriert eine Zuordnung von `(tenant_id, segment_id)` zu einer `request_id`.
+    pub fn register_segment_request(
+        &self,
+        tenant_id: TenantId,
+        segment_id: u64,
+        request_id: RequestId,
+    ) {
+        self.attention_source
+            .read()
+            .register_segment(tenant_id, segment_id, request_id);
+    }
+
+    /// Entfernt die Zuordnung für `(tenant_id, segment_id)`.
+    pub fn unregister_segment_request(&self, tenant_id: TenantId, segment_id: u64) {
+        self.attention_source
+            .read()
+            .unregister_segment(tenant_id, segment_id);
+    }
+
+    /// Liefert die aktuell konfigurierte AttentionScoreSource.
+    pub fn attention_source(&self) -> Arc<dyn AttentionScoreSource> {
+        self.attention_source.read().clone()
     }
 
     /// Nicht-blockierender Trigger vom Hot-Path aus.

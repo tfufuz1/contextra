@@ -5,6 +5,8 @@
 //! Provides traits and ranking logic for KV-cache segment eviction, combining
 //! traditional LRU access timestamps with LLM attention importance scores.
 
+use contextra_ports::RequestId;
+use contextra_types::TenantId;
 use std::time::Instant;
 
 /// Dyn-compatible source for segment attention importance scores.
@@ -18,6 +20,19 @@ pub trait AttentionScoreSource: Send + Sync {
     /// Lower values indicate lower retention importance (more evictable).
     /// Returns `None` if no attention score is available for the segment.
     fn importance_score(&self, segment_id: u64) -> Option<f32>;
+
+    /// Returns the importance score for a given tenant and `segment_id`.
+    ///
+    /// Default implementation delegates to [`importance_score`](Self::importance_score).
+    fn importance_score_for_tenant(&self, _tenant_id: TenantId, segment_id: u64) -> Option<f32> {
+        self.importance_score(segment_id)
+    }
+
+    /// Registers a segment mapping from `(tenant_id, segment_id)` to `request_id`.
+    fn register_segment(&self, _tenant_id: TenantId, _segment_id: u64, _request_id: RequestId) {}
+
+    /// Unregisters a segment mapping for `(tenant_id, segment_id)` when evicted or released.
+    fn unregister_segment(&self, _tenant_id: TenantId, _segment_id: u64) {}
 }
 
 /// Default implementation that provides no attention scores (pure LRU behavior).
@@ -53,6 +68,16 @@ pub fn rank_for_eviction_weighted(
     scores: &dyn AttentionScoreSource,
     attention_weight: f32,
 ) -> Vec<u64> {
+    rank_for_eviction_weighted_for_tenant(TenantId::SYSTEM, candidates, scores, attention_weight)
+}
+
+/// Ranks eviction candidates for a specific tenant combining normalized LRU access age and attention scores.
+pub fn rank_for_eviction_weighted_for_tenant(
+    tenant_id: TenantId,
+    candidates: &[(u64, Instant)],
+    scores: &dyn AttentionScoreSource,
+    attention_weight: f32,
+) -> Vec<u64> {
     if candidates.is_empty() {
         return Vec::new();
     }
@@ -78,7 +103,13 @@ pub fn rank_for_eviction_weighted(
     // Collect candidate importance scores and find min/max
     let raw_scores: Vec<(u64, Instant, Option<f32>)> = candidates
         .iter()
-        .map(|&(id, instant)| (id, instant, scores.importance_score(id)))
+        .map(|&(id, instant)| {
+            (
+                id,
+                instant,
+                scores.importance_score_for_tenant(tenant_id, id),
+            )
+        })
         .collect();
 
     // // NAN-CHECK-OK: Eviction candidate ranking filters non-finite scores before compute

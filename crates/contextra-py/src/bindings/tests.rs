@@ -166,6 +166,27 @@ mod tests {
     }
 
     #[test]
+    fn test_trigger_panic_helper_resume_unwind_containment() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let poison = AtomicBool::new(false);
+            let res = functions::trigger_panic_helper(
+                py,
+                &poison,
+                Some("Test resume_unwind message".to_string()),
+            );
+            assert!(res.is_err());
+            assert!(poison.load(Ordering::SeqCst));
+            if let Err(py_err) = res {
+                assert!(py_err.is_instance_of::<PyRuntimeError>(py));
+                let msg = py_err.value(py).to_string();
+                assert!(msg.contains("Rust panic caught at FFI boundary"));
+                assert!(msg.contains("Test resume_unwind message"));
+            }
+        });
+    }
+
+    #[test]
     fn test_run_blocking_ffi_panic_containment() {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
