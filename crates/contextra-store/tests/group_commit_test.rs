@@ -51,7 +51,7 @@ async fn test_group_commit_200_parallel_tasks_durability_and_replay_parity() {
         let val = storage.get(&key).await.expect("get succeeds");
         assert_eq!(
             val,
-            Some(expected_val),
+            Some(bytes::Bytes::from(expected_val)),
             "Key gk_{:04} missing or mismatch in active storage",
             i
         );
@@ -59,6 +59,8 @@ async fn test_group_commit_200_parallel_tasks_durability_and_replay_parity() {
 
     // Close original storage (flush active memtable to disk)
     storage.close().await.expect("close succeeds");
+    drop(storage);
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     // Reopen storage from disk and verify WAL/SSTable replay parity
     let reopened = LsmStorage::new(config).await.expect("reopen storage");
@@ -68,7 +70,7 @@ async fn test_group_commit_200_parallel_tasks_durability_and_replay_parity() {
         let val = reopened.get(&key).await.expect("get succeeds after reopen");
         assert_eq!(
             val,
-            Some(expected_val),
+            Some(bytes::Bytes::from(expected_val)),
             "Key gk_{:04} missing or mismatch after WAL/SSTable replay",
             i
         );

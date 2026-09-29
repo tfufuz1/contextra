@@ -97,9 +97,8 @@ impl SstableReader {
         // Read trailer: last 54 bytes (v1/v2/v3) or 52 bytes (v0)
         let trailer_data = {
             let f = Arc::clone(&file);
-            let read_len = usize::try_from(54u64.min(file_size)).map_err(|_| {
-                ContextraError::Storage("File size conversion failed".into())
-            })?;
+            let read_len = usize::try_from(54u64.min(file_size))
+                .map_err(|_| ContextraError::Storage("File size conversion failed".into()))?;
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                 let mut buf = vec![0u8; read_len];
                 let offset = file_size.saturating_sub(54);
@@ -229,9 +228,10 @@ impl SstableReader {
                 file_size.saturating_sub(20)
             };
 
-            let bloom_read_len = usize::try_from(bloom_end.saturating_sub(bloom_offset)).map_err(|_| {
-                ContextraError::Storage("Bloom filter read length conversion failed".into())
-            })?;
+            let bloom_read_len =
+                usize::try_from(bloom_end.saturating_sub(bloom_offset)).map_err(|_| {
+                    ContextraError::Storage("Bloom filter read length conversion failed".into())
+                })?;
 
             let bloom_data_raw = {
                 let f = Arc::clone(&file);
@@ -290,9 +290,10 @@ impl SstableReader {
                 })
             };
 
-            let index_read_len = usize::try_from(index_end.saturating_sub(index_offset)).map_err(|_| {
-                ContextraError::Storage("Index read length conversion failed".into())
-            })?;
+            let index_read_len =
+                usize::try_from(index_end.saturating_sub(index_offset)).map_err(|_| {
+                    ContextraError::Storage("Index read length conversion failed".into())
+                })?;
 
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                 let mut buf = vec![0u8; index_read_len];
@@ -549,7 +550,9 @@ impl SstableReader {
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                 ))
-                .map_err(|_| ContextraError::Storage("num_offsets exceeds platform usize".into()))?;
+                .map_err(|_| {
+                    ContextraError::Storage("num_offsets exceeds platform usize".into())
+                })?;
 
                 let offsets_len = num_offsets.saturating_mul(4);
                 if n < offsets_len.saturating_add(36) {
@@ -583,9 +586,12 @@ impl SstableReader {
             // Block bloom check
             let may_contain = if is_v3 {
                 let bloom_start = offsets_start.saturating_sub(32);
-                let bloom_bytes = block_data
-                    .get(bloom_start..bloom_start + 32)
-                    .ok_or_else(|| ContextraError::Storage("malformed block: missing bloom filter".into()))?;
+                let bloom_bytes =
+                    block_data
+                        .get(bloom_start..bloom_start + 32)
+                        .ok_or_else(|| {
+                            ContextraError::Storage("malformed block: missing bloom filter".into())
+                        })?;
                 let mut bloom_words = [0u64; 4];
                 for w in 0..4 {
                     bloom_words[w] = u64::from_le_bytes(
@@ -923,7 +929,9 @@ impl SstableReader {
                         .try_into()
                         .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                 ))
-                .map_err(|_| ContextraError::Storage("num_offsets exceeds platform usize".into()))?;
+                .map_err(|_| {
+                    ContextraError::Storage("num_offsets exceeds platform usize".into())
+                })?;
 
                 let offsets_len = num_offsets.saturating_mul(4);
                 if n < offsets_len.saturating_add(36) {

@@ -1,5 +1,5 @@
 use crate::lsm::config::DurabilityMode;
-use crate::wal::{PreparedBatch, Wal};
+use crate::wal::{PreparedBatch, Wal, WalOp};
 use contextra_core::{Result, TxId};
 use std::sync::Arc;
 
@@ -7,18 +7,24 @@ pub(super) async fn execute_group_commit_append(
     wal: &Wal,
     durability_mode: DurabilityMode,
     all_wal_entries: PreparedBatch,
-    truncate_guard: &tokio::sync::MutexGuard<'_, ()>,
-    prev_hmac_snapshot: [u8; 32],
+    truncate_guard: tokio::sync::MutexGuard<'_, ()>,
 ) -> Result<()> {
     match durability_mode {
-        DurabilityMode::Full => {
-            wal.append_batch_locked(all_wal_entries, truncate_guard)
-                .await
-        }
-        DurabilityMode::WalNoHmac => {
-            let _ = prev_hmac_snapshot;
-            wal.append_batch_locked(all_wal_entries, truncate_guard)
-                .await
+        DurabilityMode::Full | DurabilityMode::WalNoHmac => {
+            let start_offset = wal.size();
+            let start_hmac = wal.last_hmac_snapshot().await;
+            let append_res = wal
+                .append_batch_locked(all_wal_entries, &truncate_guard)
+                .await;
+            if append_res.is_err() {
+                drop(truncate_guard);
+                if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {
+                    tracing::error!(
+                        "Failed to truncate WAL after failed group append_batch: {trunc_err}"
+                    );
+                }
+            }
+            append_res
         }
         DurabilityMode::MemoryOnly => Ok(()),
     }
@@ -26,7 +32,7 @@ pub(super) async fn execute_group_commit_append(
 
 pub(super) struct GroupCommitRequest {
     pub(super) tx_id: TxId,
-    pub(super) wal_entries: PreparedBatch,
+    pub(super) wal_ops: Vec<(WalOp, u64)>,
     pub(super) mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
     pub(super) sender: tokio::sync::oneshot::Sender<Result<()>>,
 }
@@ -48,7 +54,6 @@ impl Drop for WalQueueGuard {
 
 pub(super) struct PendingCommitQueue {
     pub(super) requests: Vec<GroupCommitRequest>,
-    pub(super) first_prev_hmac: [u8; 32],
     pub(super) notify_full: Arc<tokio::sync::Notify>,
     pub(super) committed_flag: Arc<std::sync::atomic::AtomicBool>,
 }

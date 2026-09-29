@@ -85,10 +85,10 @@ proptest! {
         }
 
         // Test block_binary_search (must never panic regardless of mutated bytes)
-        let _ = block_binary_search(&mutated_block, offsets_start, num_offsets, &search_key);
+        let _ = block_binary_search(&mutated_block, offsets_start, num_offsets, &search_key, true);
 
         // Test binary_search_entry_in_block (must never panic)
-        let _ = binary_search_entry_in_block(&mutated_block, offsets_start, num_offsets, &search_key);
+        let _ = binary_search_entry_in_block(&mutated_block, offsets_start, num_offsets, &search_key, true);
 
         // Calculate derived num_offsets and offsets_start if block ends with u16 num_offsets
         if mutated_block.len() >= 2 {
@@ -97,8 +97,8 @@ proptest! {
             let offsets_len = derived_num_offsets.saturating_mul(2);
             if n >= 2 + offsets_len + 8 {
                 let derived_offsets_start = n - 2 - offsets_len;
-                let _ = block_binary_search(&mutated_block, derived_offsets_start, derived_num_offsets, &search_key);
-                let _ = binary_search_entry_in_block(&mutated_block, derived_offsets_start, derived_num_offsets, &search_key);
+                let _ = block_binary_search(&mutated_block, derived_offsets_start, derived_num_offsets, &search_key, true);
+                let _ = binary_search_entry_in_block(&mutated_block, derived_offsets_start, derived_num_offsets, &search_key, true);
             }
         }
     }

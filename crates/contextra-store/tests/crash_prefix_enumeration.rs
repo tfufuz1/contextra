@@ -26,7 +26,9 @@ async fn test_wal_prefix_crash_enumeration() {
     let mut model = ReferenceModel::new();
 
     // 1. Setup primary storage with a sequence of 5 committed batch transactions
-    let storage = LsmStorage::new(config.clone()).await.expect("open LsmStorage");
+    let storage = LsmStorage::new(config.clone())
+        .await
+        .expect("open LsmStorage");
 
     let num_batches = 5;
     for batch_idx in 1..=num_batches {
@@ -70,7 +72,10 @@ async fn test_wal_prefix_crash_enumeration() {
         }
     };
 
-    let total_wal_bytes = tokio::fs::metadata(&wal_path).await.expect("WAL metadata").len() as usize;
+    let total_wal_bytes = tokio::fs::metadata(&wal_path)
+        .await
+        .expect("WAL metadata")
+        .len() as usize;
     assert!(total_wal_bytes > 0, "WAL file must be non-empty");
 
     // 2. Enumerate WAL truncations at 20 granular byte offsets across total WAL length
@@ -108,7 +113,14 @@ async fn test_wal_prefix_crash_enumeration() {
                 // Invariant (b): Recovered state matches ReferenceModel for a valid prefix of confirmed commits
                 let mut max_matched_seq = 0;
                 for commit_seq in 1..=num_batches {
-                    if verify_storage_against_reference_model(&recovered_storage, &model, commit_seq as u64).await.is_ok() {
+                    if verify_storage_against_reference_model(
+                        &recovered_storage,
+                        &model,
+                        commit_seq as u64,
+                    )
+                    .await
+                    .is_ok()
+                    {
                         max_matched_seq = commit_seq;
                     } else {
                         break;

@@ -253,9 +253,8 @@ impl SstableBuilder {
             block = new_block.freeze();
         }
 
-        let block_len = u64::try_from(block.len()).map_err(|_| {
-            ContextraError::Storage("Block size exceeds u64::MAX".into())
-        })?;
+        let block_len = u64::try_from(block.len())
+            .map_err(|_| ContextraError::Storage("Block size exceeds u64::MAX".into()))?;
 
         self.file
             .write_all(&block)
@@ -263,9 +262,10 @@ impl SstableBuilder {
             .map_err(|e| ContextraError::Storage(format!("SSTable block write failed: {}", e)))?;
 
         self.index.push((last_key, self.offset));
-        self.offset = self.offset.checked_add(block_len).ok_or_else(|| {
-            ContextraError::Storage("SSTable offset overflow".into())
-        })?;
+        self.offset = self
+            .offset
+            .checked_add(block_len)
+            .ok_or_else(|| ContextraError::Storage("SSTable offset overflow".into()))?;
         Ok(())
     }
 
@@ -299,14 +299,13 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(format!("SSTable index write failed: {}", e)))?;
 
-        let index_write_len = u64::try_from(index_to_write.len()).map_err(|_| {
-            ContextraError::Storage("Index bytes length overflow".into())
-        })?;
+        let index_write_len = u64::try_from(index_to_write.len())
+            .map_err(|_| ContextraError::Storage("Index bytes length overflow".into()))?;
 
         // SPECCED: Write the whole-SSTable Bloom filter
-        let bloom_offset = index_offset.checked_add(index_write_len).ok_or_else(|| {
-            ContextraError::Storage("Bloom offset overflow".into())
-        })?;
+        let bloom_offset = index_offset
+            .checked_add(index_write_len)
+            .ok_or_else(|| ContextraError::Storage("Bloom offset overflow".into()))?;
         let bloom_data = self.bloom_filter.to_bytes();
 
         // Add CRC to bloom

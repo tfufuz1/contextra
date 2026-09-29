@@ -89,9 +89,10 @@ async fn proof_trait_default_removed() {
 #[test]
 fn proof_put_if_absent_default_trait_removed() {
     let source = include_str!("../../contextra-ports/src/storage.rs");
-    let has_toctou = source.contains("fn put_if_absent")
-        && source.contains("self.get(key)")
-        && source.contains("self.put(tx_id");
+    let has_toctou = source.split("fn put_if_absent").skip(1).any(|block| {
+        let body = block.split('}').next().unwrap_or("");
+        body.contains("self.get") && body.contains("self.put")
+    });
     assert!(!has_toctou, "REGRESSION B-1: TOCTOU-Default zurückgekehrt");
 }
 
