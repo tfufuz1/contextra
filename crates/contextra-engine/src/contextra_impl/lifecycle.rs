@@ -10,8 +10,10 @@ impl Contextra {
     /// and using default [`contextra_ports::license::LicenseGate`].
     #[tracing::instrument(level = "trace", skip(path))]
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let mut config = ContextraConfig::default();
-        config.deletion_proof_active = false;
+        let config = ContextraConfig {
+            deletion_proof_active: false,
+            ..Default::default()
+        };
         let fast_gate = Arc::new(OpenFastGate);
         let token = fast_gate
             .authorize(FeatureRing::Fast)
@@ -60,16 +62,22 @@ impl Contextra {
             encryption_passphrase: config.encryption_passphrase.clone(),
             max_ram_mb: config.max_ram_mb,
             group_commit_window_micros: config.group_commit_window_micros,
-            durability_mode: config.durability_mode.clone(),
+            durability_mode: config.durability_mode,
             memtable_size_limit: config.memtable_size_limit,
             ..Default::default()
         };
 
         let storage = Arc::new(LsmStorage::new(lsm_config).await?);
+        if !storage.supports_ssi_tracking() {
+            tracing::warn!(
+                "Storage engine does not support SSI tracking; serializable isolation may be degraded"
+            );
+        }
         let last_tx = storage.last_tx_id().await?.inner();
         let next_tx = Arc::new(AtomicU64::new(last_tx + 1));
 
         let dim_key = b"__meta:dimension";
+        // SSI: nicht tx-gebunden
         if let Some(stored_dim_bytes) = storage.get(dim_key).await? {
             if let Ok(s) = std::str::from_utf8(&stored_dim_bytes) {
                 if let Ok(stored_dim) = s.parse::<usize>() {
@@ -186,6 +194,7 @@ impl Contextra {
     #[tracing::instrument(level = "trace", skip(self))]
     async fn initialize_collections(&self) -> Result<()> {
         let col_idx_prefix = b"__col_idx:\x00";
+        // SSI: nicht tx-gebunden
         let entries = self.storage.scan_prefix(col_idx_prefix).await?;
         for (k, _) in entries {
             let name_bytes = &k[col_idx_prefix.len()..];
@@ -390,6 +399,7 @@ impl Contextra {
         };
 
         let default_prefix = b"__tx_intent:";
+        // SSI: nicht tx-gebunden
         let entries = self.storage.scan_prefix(default_prefix).await?;
         for (key, value) in entries {
             process_intent(key, value);
@@ -423,6 +433,15 @@ impl Contextra {
         self.task_tracker.close();
         self.task_tracker.wait().await;
     }
+}
+
+impl Drop for Contextra {
+    fn drop(&mut self) {
+        self.cancel_token.cancel();
+    }
+}
+
+impl Contextra {
 
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn close(self) -> Result<()> {
