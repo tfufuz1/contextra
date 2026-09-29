@@ -204,6 +204,30 @@ impl Contextra {
         Ok(sorted_names)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn list_collections_for_tenant(&self, tenant_id: TenantId) -> Result<Vec<String>> {
+        let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
+            self.storage.clone(),
+            tenant_id,
+        );
+        let col_idx_prefix = b"__col_idx:\x00";
+        let entries = tenant_storage.scan_prefix(col_idx_prefix).await?;
+
+        let mut names = std::collections::HashSet::new();
+        names.insert("default".to_string());
+
+        for (k, _) in entries {
+            let name_bytes = &k[col_idx_prefix.len()..];
+            if let Ok(name) = String::from_utf8(name_bytes.to_vec()) {
+                names.insert(name);
+            }
+        }
+
+        let mut sorted_names: Vec<String> = names.into_iter().collect();
+        sorted_names.sort();
+        Ok(sorted_names)
+    }
+
     #[tracing::instrument(level = "trace", skip(self, proof_key))]
     pub async fn drop_collection(
         &self,
