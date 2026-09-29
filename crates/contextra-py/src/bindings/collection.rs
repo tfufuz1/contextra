@@ -44,13 +44,13 @@ impl PyCollection {
     }
 
     /// Internal helper method for testing FFI panic isolation and engine poisoning.
+    ///
+    /// # Panics
+    ///
+    /// bewusst; nur Testhook für FFI-Panic-Isolation; Panic wird durch run_blocking_ffi in PyErr übersetzt
     #[pyo3(signature = (message=None))]
-    #[allow(clippy::panic)]
     pub fn _trigger_panic_for_test(&self, py: Python<'_>, message: Option<String>) -> PyResult<()> {
-        let msg = message.unwrap_or_else(|| "Test panic for FFI isolation".to_string());
-        run_blocking_ffi(py, &self.poisoned, move || -> PyResult<()> {
-            panic!("{}", msg);
-        })
+        crate::bindings::functions::trigger_panic_helper(py, &self.poisoned, message)
     }
 
     /// Returns statistics for the collection's vector index.
