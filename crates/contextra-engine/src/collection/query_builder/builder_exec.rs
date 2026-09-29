@@ -236,6 +236,7 @@ where
             let doc_key = self
                 .collection
                 .namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+            // SSI: nicht tx-gebunden — Hydrierung von ACORN-Suchergebnissen am Snapshot
             if let Some(bytes) = self
                 .collection
                 .storage()

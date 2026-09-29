@@ -4,7 +4,7 @@ use crate::collection::{
     ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
 };
 use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{DocId, EntityId, Result, EXPIRY_METADATA_KEY};
+use contextra_types::{DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Inserts a text document, automatically generating its embedding.
@@ -238,7 +238,35 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Checks if a `doc_id` collision exists for a different user key string.
     pub(crate) async fn check_doc_id_collision(&self, doc_id: DocId, id: &str) -> Result<()> {
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+        // SSI: nicht tx-gebunden — nicht-transaktionale Kollisionsprüfung
         if let Some(val) = self.storage.get(&doc_key).await? {
+            let existing_id = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
+                Some(meta.id)
+            } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
+                Some(full.id)
+            } else {
+                None
+            };
+
+            if let Some(existing) = existing_id {
+                if existing != id {
+                    return Err(contextra_types::ContextraError::Internal(format!(
+                        "DocId-Kollision erkannt für Schlüssel '{id}' — bitte Support kontaktieren"
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) async fn check_doc_id_collision_tracked(
+        &self,
+        tx: TxId,
+        doc_id: DocId,
+        id: &str,
+    ) -> Result<()> {
+        let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+        if let Some(val) = self.storage.get_tracked(tx, &doc_key).await? {
             let existing_id = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Some(meta.id)
             } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
@@ -270,7 +298,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let tx = db_tx.tx_id;
         let doc_id = DocId::from_key(id)?;
 
-        self.check_doc_id_collision(doc_id, id).await?;
+        self.check_doc_id_collision_tracked(tx, doc_id, id).await?;
 
         let mut metadata = metadata;
         let text_opt = extract_text(&metadata);
@@ -289,8 +317,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
 
-        let old_user_val = self.storage.get_at_seq(&user_key, u64::MAX).await?;
-        let old_doc_val = self.storage.get_at_seq(&doc_key, u64::MAX).await?;
+        let old_user_val = self
+            .storage
+            .get_at_seq_tracked(tx, &user_key, u64::MAX)
+            .await?;
+        let old_doc_val = self
+            .storage
+            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
+            .await?;
 
         let data = serde_json::to_vec(&stored)?;
         self.storage.put(tx, &user_key, &data).await?;

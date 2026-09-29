@@ -266,4 +266,31 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         Ok(results)
     }
+
+    /// Fetches a document by user ID and tracks the read in the active transaction's `ReadSet`.
+    pub async fn get_tracked(&self, tx: TxId, id: &str) -> Result<Option<StoredDocument>> {
+        let key = self.namespaced_key(id.as_bytes(), 0);
+        if let Some(bytes) = self.storage.get_tracked(tx, &key).await? {
+            let doc: StoredDocument = serde_json::from_slice(&bytes)?;
+            Ok(Some(doc))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Fetches a document snapshot bounded by `seq` and tracks the read in `tx`'s `ReadSet`.
+    pub async fn get_at_seq_tracked(
+        &self,
+        tx: TxId,
+        id: &str,
+        max_seq: u64,
+    ) -> Result<Option<StoredDocument>> {
+        let key = self.namespaced_key(id.as_bytes(), 0);
+        if let Some(bytes) = self.storage.get_at_seq_tracked(tx, &key, max_seq).await? {
+            let doc: StoredDocument = serde_json::from_slice(&bytes)?;
+            Ok(Some(doc))
+        } else {
+            Ok(None)
+        }
+    }
 }

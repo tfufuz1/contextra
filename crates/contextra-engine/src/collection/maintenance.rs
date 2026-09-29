@@ -189,6 +189,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         // If target_id was not yet committed, consolidation aborted; delete the intent.
                         let target_doc_key =
                             self.namespaced_key(&target_id.inner().to_le_bytes(), 1);
+                        // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                         if self.storage.get(&target_doc_key).await?.is_some() {
                             (Arc::new(vec![target_id]), true, false)
                         } else {
@@ -210,6 +211,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
                 for &doc_id in doc_ids.iter() {
                     let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+                    // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                     if let Some(val) = self.storage.get(&doc_key).await? {
                         let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
                             .map(|m| m.id)
@@ -218,6 +220,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         let mut stored_doc = None;
                         if let Some(ref id_str) = meta_id {
                             let user_key = self.namespaced_key(id_str.as_bytes(), 0);
+                            // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                             if let Some(user_val) = self.storage.get(&user_key).await? {
                                 if let Ok(stored) =
                                     serde_json::from_slice::<StoredDocument>(&user_val)
@@ -593,15 +596,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         importance_score: f32,
         model_id: &str,
     ) -> Result<()> {
+        let tx = self.allocate_tx()?;
         let user_key = self.namespaced_key(doc_id.as_bytes(), 0);
-        let Some(data) = self.storage.get(&user_key).await? else {
+        let Some(data) = self.storage.get_tracked(tx, &user_key).await? else {
             return Err(contextra_types::ContextraError::NotFound(format!(
                 "Document not found: {doc_id}"
             )));
         };
         let mut stored: StoredDocument = serde_json::from_slice(&data)?;
-
-        let tx = self.allocate_tx()?;
         let doc_id_typed = DocId::from_key(doc_id)?;
         let doc_key = self.namespaced_key(&doc_id_typed.inner().to_le_bytes(), 1);
 
@@ -703,6 +705,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             format!("__graph:community:{}", entity_id.inner()).as_bytes(),
             4,
         );
+        // SSI: nicht tx-gebunden — reiner Lesezugriff für Community-Abfrage
         if let Some(bytes) = self.storage.get(&key).await? {
             let comm_id: u64 = serde_json::from_slice(&bytes).map_err(|e| {
                 contextra_types::ContextraError::Internal(format!("community deserialize: {e}"))
