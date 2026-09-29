@@ -135,6 +135,9 @@ async fn test_observer_fail_open_timeout_deregistration() {
         .await
         .expect("commit 1 should succeed (fail-open)");
 
+    // Wait for slow observer background execution to finish
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
     // The slow observer ran once
     assert_eq!(invocations.lock().len(), 1);
 
