@@ -1,6 +1,6 @@
 use super::compensating_actions::{
     CommitLedger, CompensateHnswAction, CompensateLsmAction, CompensateTextAction,
-    RollbackStagedAction,
+    CompensatingAction, RollbackStagedAction,
 };
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
@@ -170,7 +170,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         };
 
         let mut ledger = CommitLedger::new();
-        ledger.push(RollbackStagedAction::new(self.collection.clone(), self.tx_id));
+        ledger.push(RollbackStagedAction::new(
+            self.collection.clone(),
+            self.tx_id,
+        ));
 
         // Register CompensateLsmAction so storage keys are compensated if any subsequent commit step fails
         let f_keys = {
@@ -301,6 +304,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 graph_err
             )));
         }
+        ledger.push(CompensateGraphAction {
+            collection: self.collection.clone(),
+            doc_ids: Arc::clone(&doc_ids),
+        });
 
         // Phase (c): Commit storage
         if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {

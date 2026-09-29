@@ -2,11 +2,15 @@
 
 pub mod diffusion;
 pub mod error;
+pub mod gate_monitor;
 pub mod params;
 pub mod shadow;
 
 pub use diffusion::run_apprh_push;
 pub use error::ApprhError;
+pub use gate_monitor::{
+    ApprhGateMonitor, ApprhGateMonitorConfig, ApprhGateMonitorSnapshot, ApprhObservationRecord,
+};
 pub use params::ApprhParams;
 pub use shadow::{
     shadow_compare_forward_push_vs_apprh, ApprhFlipGate, ApprhShadowComparison,

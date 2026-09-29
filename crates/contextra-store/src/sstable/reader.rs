@@ -30,6 +30,8 @@ pub struct SstableReader {
     pub(super) bloom_filter: Option<BloomFilter>,
     /// Whether blocks have CRC32 checksums.
     pub(super) has_crc: bool,
+    /// Format version of the SSTable file (0, 1, 2, or 3).
+    pub format_version: u16,
 }
 
 impl SstableReader {
@@ -92,11 +94,14 @@ impl SstableReader {
 
         let file = Arc::new(file);
 
-        // Read trailer: last 54 bytes (v1/v2) or 52 bytes (v0)
+        // Read trailer: last 54 bytes (v1/v2/v3) or 52 bytes (v0)
         let trailer_data = {
             let f = Arc::clone(&file);
+            let read_len = usize::try_from(54u64.min(file_size)).map_err(|_| {
+                ContextraError::Storage("File size conversion failed".into())
+            })?;
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
-                let mut buf = vec![0u8; 54.min(file_size as usize)];
+                let mut buf = vec![0u8; read_len];
                 let offset = file_size.saturating_sub(54);
                 pread_exact(&f, &mut buf, offset)?;
                 Ok(buf)
@@ -146,6 +151,14 @@ impl SstableReader {
                     format_version = 0;
                 }
             }
+        }
+
+        // Unknown format version error check
+        if is_mfsx && format_version > 3 {
+            return Err(ContextraError::Storage(format!(
+                "Unsupported SSTable format version: {}",
+                format_version
+            )));
         }
 
         let mut has_bloom = false;
@@ -216,11 +229,14 @@ impl SstableReader {
                 file_size.saturating_sub(20)
             };
 
+            let bloom_read_len = usize::try_from(bloom_end.saturating_sub(bloom_offset)).map_err(|_| {
+                ContextraError::Storage("Bloom filter read length conversion failed".into())
+            })?;
+
             let bloom_data_raw = {
                 let f = Arc::clone(&file);
                 tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
-                    let mut buf =
-                        vec![0u8; (bloom_end as usize).saturating_sub(bloom_offset as usize)];
+                    let mut buf = vec![0u8; bloom_read_len];
                     pread_exact(&f, &mut buf, bloom_offset)?;
                     Ok(buf)
                 })
@@ -261,7 +277,7 @@ impl SstableReader {
         let index_data_raw = {
             let f = Arc::clone(&file);
             let index_end = if has_bloom {
-                bloom_offset as usize
+                bloom_offset
             } else {
                 file_size.saturating_sub(if is_mfsx {
                     if format_version >= 1 {
@@ -271,10 +287,15 @@ impl SstableReader {
                     }
                 } else {
                     12
-                }) as usize
+                })
             };
+
+            let index_read_len = usize::try_from(index_end.saturating_sub(index_offset)).map_err(|_| {
+                ContextraError::Storage("Index read length conversion failed".into())
+            })?;
+
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
-                let mut buf = vec![0u8; index_end.saturating_sub(index_offset as usize)];
+                let mut buf = vec![0u8; index_read_len];
                 pread_exact(&f, &mut buf, index_offset)?;
                 Ok(buf)
             })
@@ -393,6 +414,7 @@ impl SstableReader {
             key_manager: derived_km,
             bloom_filter,
             has_crc,
+            format_version,
         })
     }
 
@@ -404,7 +426,9 @@ impl SstableReader {
         has_crc: bool,
         path: &Path,
     ) -> Result<Bytes> {
-        let len = next_offset.saturating_sub(offset) as usize;
+        let len = usize::try_from(next_offset.saturating_sub(offset)).map_err(|_| {
+            ContextraError::Storage("Block offset difference exceeds platform usize".into())
+        })?;
         let data = tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
             let mut buf = vec![0u8; len];
             pread_exact(&file, &mut buf, offset)?;
@@ -497,6 +521,7 @@ impl SstableReader {
         }
 
         let max_seq_raw = max_seq & !contextra_core::TOMBSTONE_BIT;
+        let is_v3 = self.format_version >= 3;
 
         for idx in start_idx..self.index.len() {
             let (block_last_key, offset) = &self.index[idx];
@@ -509,53 +534,110 @@ impl SstableReader {
             let block_data = self.get_block(*offset, next_offset).await?;
 
             let n = block_data.len();
-            if n < 10 {
+            let min_block_meta_len = if is_v3 { 36 } else { 10 }; // v3: bloom(32) + num_offsets(4); v0..v2: bloom(8) + num_offsets(2)
+            if n < min_block_meta_len {
                 return Err(ContextraError::Storage("block too small".into()));
             }
 
-            let num_offsets = usize::from(u16::from_le_bytes(
-                block_data
-                    .get(n.saturating_sub(2)..n)
-                    .ok_or_else(|| {
-                        ContextraError::Storage("malformed block: missing num_offsets".into())
-                    })?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ));
+            let (num_offsets, _offsets_len, offsets_start) = if is_v3 {
+                let num_offsets = usize::try_from(u32::from_le_bytes(
+                    block_data
+                        .get(n.saturating_sub(4)..n)
+                        .ok_or_else(|| {
+                            ContextraError::Storage("malformed block: missing num_offsets".into())
+                        })?
+                        .try_into()
+                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+                ))
+                .map_err(|_| ContextraError::Storage("num_offsets exceeds platform usize".into()))?;
 
-            let offsets_len = num_offsets.saturating_mul(2);
-            if n < offsets_len.saturating_add(10) {
-                return Err(ContextraError::Storage(
-                    "malformed block: num_offsets too large".into(),
+                let offsets_len = num_offsets.saturating_mul(4);
+                if n < offsets_len.saturating_add(36) {
+                    return Err(ContextraError::Storage(
+                        "malformed block: num_offsets too large".into(),
+                    ));
+                }
+                let offsets_start = n.saturating_sub(4).saturating_sub(offsets_len);
+                (num_offsets, offsets_len, offsets_start)
+            } else {
+                let num_offsets = usize::from(u16::from_le_bytes(
+                    block_data
+                        .get(n.saturating_sub(2)..n)
+                        .ok_or_else(|| {
+                            ContextraError::Storage("malformed block: missing num_offsets".into())
+                        })?
+                        .try_into()
+                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                 ));
-            }
-            let offsets_start = n.saturating_sub(2).saturating_sub(offsets_len);
-            let bloom_offset = offsets_start.saturating_sub(8);
-            let bloom = u64::from_le_bytes(
-                block_data
-                    .get(bloom_offset..bloom_offset.saturating_add(8))
-                    .ok_or_else(|| {
-                        ContextraError::Storage("malformed block: missing bloom filter".into())
-                    })?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            );
+
+                let offsets_len = num_offsets.saturating_mul(2);
+                if n < offsets_len.saturating_add(10) {
+                    return Err(ContextraError::Storage(
+                        "malformed block: num_offsets too large".into(),
+                    ));
+                }
+                let offsets_start = n.saturating_sub(2).saturating_sub(offsets_len);
+                (num_offsets, offsets_len, offsets_start)
+            };
 
             // Block bloom check
-            let hash = blake3::hash(key);
-            let hash_bytes = hash.as_bytes();
-            let mut may_contain = true;
-            for i in 0..4 {
-                let chunk = u16::from_le_bytes([
-                    *hash_bytes.get(i * 2).unwrap_or(&0),
-                    *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
-                ]);
-                let bit = chunk % 64;
-                if (bloom & (1 << bit)) == 0 {
-                    may_contain = false;
-                    break;
+            let may_contain = if is_v3 {
+                let bloom_start = offsets_start.saturating_sub(32);
+                let bloom_bytes = block_data
+                    .get(bloom_start..bloom_start + 32)
+                    .ok_or_else(|| ContextraError::Storage("malformed block: missing bloom filter".into()))?;
+                let mut bloom_words = [0u64; 4];
+                for w in 0..4 {
+                    bloom_words[w] = u64::from_le_bytes(
+                        bloom_bytes[w * 8..(w + 1) * 8]
+                            .try_into()
+                            .map_err(|_| ContextraError::Storage("invalid bloom slice".into()))?,
+                    );
                 }
-            }
+
+                let hash = blake3::hash(key);
+                let hash_bytes = hash.as_bytes();
+                let mut contains = true;
+                for i in 0..8 {
+                    let chunk = u16::from_le_bytes([
+                        *hash_bytes.get(i * 2).unwrap_or(&0),
+                        *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
+                    ]);
+                    let bit_idx = chunk as usize % 256;
+                    if (bloom_words[bit_idx / 64] & (1u64 << (bit_idx % 64))) == 0 {
+                        contains = false;
+                        break;
+                    }
+                }
+                contains
+            } else {
+                let bloom_offset = offsets_start.saturating_sub(8);
+                let bloom = u64::from_le_bytes(
+                    block_data
+                        .get(bloom_offset..bloom_offset.saturating_add(8))
+                        .ok_or_else(|| {
+                            ContextraError::Storage("malformed block: missing bloom filter".into())
+                        })?
+                        .try_into()
+                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+                );
+
+                let hash = blake3::hash(key);
+                let hash_bytes = hash.as_bytes();
+                let mut contains = true;
+                for i in 0..4 {
+                    let chunk = u16::from_le_bytes([
+                        *hash_bytes.get(i * 2).unwrap_or(&0),
+                        *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
+                    ]);
+                    let bit = chunk % 64;
+                    if (bloom & (1 << bit)) == 0 {
+                        contains = false;
+                        break;
+                    }
+                }
+                contains
+            };
 
             if may_contain {
                 if let Some(first_entry_idx) = binary_search_first_index_in_block(
@@ -563,10 +645,11 @@ impl SstableReader {
                     offsets_start,
                     num_offsets,
                     key,
+                    is_v3,
                 )? {
                     for entry_i in first_entry_idx..num_offsets {
                         let (entry_off, k_len) =
-                            get_entry_at_index(&block_data, offsets_start, entry_i)?;
+                            get_entry_at_index(&block_data, offsets_start, entry_i, is_v3)?;
                         let mut ep = entry_off + 2;
                         let entry_key = block_data
                             .get(ep..ep + k_len)
@@ -678,54 +761,105 @@ impl SstableReader {
             Err(_) => return (true, true, false, false),
         };
 
+        let is_v3 = self.format_version >= 3;
         let n = block_data.len();
-        if n < 10 {
+        let min_len = if is_v3 { 36 } else { 10 };
+        if n < min_len {
             return (true, true, true, false);
         }
 
-        let num_offsets = match block_data.get(n.saturating_sub(2)..n) {
-            Some(slice) => match slice.try_into() {
-                Ok(arr) => usize::from(u16::from_le_bytes(arr)),
-                Err(_) => return (true, true, true, false),
-            },
-            None => return (true, true, true, false),
-        };
+        let (num_offsets, _offsets_len, offsets_start) = if is_v3 {
+            let num_offsets = match block_data.get(n.saturating_sub(4)..n) {
+                Some(slice) => match slice.try_into() {
+                    Ok(arr) => usize::try_from(u32::from_le_bytes(arr)).unwrap_or(0),
+                    Err(_) => return (true, true, true, false),
+                },
+                None => return (true, true, true, false),
+            };
+            let offsets_len = num_offsets.saturating_mul(4);
+            if n < offsets_len.saturating_add(36) {
+                return (true, true, true, false);
+            }
+            let offsets_start = n.saturating_sub(4).saturating_sub(offsets_len);
+            (num_offsets, offsets_len, offsets_start)
+        } else {
+            let num_offsets = match block_data.get(n.saturating_sub(2)..n) {
+                Some(slice) => match slice.try_into() {
+                    Ok(arr) => usize::from(u16::from_le_bytes(arr)),
+                    Err(_) => return (true, true, true, false),
+                },
+                None => return (true, true, true, false),
+            };
 
-        let offsets_len = num_offsets.saturating_mul(2);
-        if n < offsets_len.saturating_add(10) {
-            return (true, true, true, false);
-        }
-        let offsets_start = n.saturating_sub(2).saturating_sub(offsets_len);
-        let bloom_offset = offsets_start.saturating_sub(8);
-        let bloom = match block_data.get(bloom_offset..bloom_offset.saturating_add(8)) {
-            Some(slice) => match slice.try_into() {
-                Ok(arr) => u64::from_le_bytes(arr),
-                Err(_) => return (true, true, true, false),
-            },
-            None => return (true, true, true, false),
+            let offsets_len = num_offsets.saturating_mul(2);
+            if n < offsets_len.saturating_add(10) {
+                return (true, true, true, false);
+            }
+            let offsets_start = n.saturating_sub(2).saturating_sub(offsets_len);
+            (num_offsets, offsets_len, offsets_start)
         };
 
         // Block bloom check
-        let hash = blake3::hash(key);
-        let hash_bytes = hash.as_bytes();
-        let mut may_contain = true;
-        for i in 0..4 {
-            let chunk = u16::from_le_bytes([
-                *hash_bytes.get(i * 2).unwrap_or(&0),
-                *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
-            ]);
-            let bit = chunk % 64;
-            if (bloom & (1 << bit)) == 0 {
-                may_contain = false;
-                break;
+        let may_contain = if is_v3 {
+            let bloom_start = offsets_start.saturating_sub(32);
+            if let Some(bloom_bytes) = block_data.get(bloom_start..bloom_start + 32) {
+                let mut bloom_words = [0u64; 4];
+                for w in 0..4 {
+                    bloom_words[w] = match bloom_bytes[w * 8..(w + 1) * 8].try_into() {
+                        Ok(arr) => u64::from_le_bytes(arr),
+                        Err(_) => return (true, true, true, false),
+                    };
+                }
+                let hash = blake3::hash(key);
+                let hash_bytes = hash.as_bytes();
+                let mut contains = true;
+                for i in 0..8 {
+                    let chunk = u16::from_le_bytes([
+                        *hash_bytes.get(i * 2).unwrap_or(&0),
+                        *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
+                    ]);
+                    let bit_idx = chunk as usize % 256;
+                    if (bloom_words[bit_idx / 64] & (1u64 << (bit_idx % 64))) == 0 {
+                        contains = false;
+                        break;
+                    }
+                }
+                contains
+            } else {
+                return (true, true, true, false);
             }
-        }
+        } else {
+            let bloom_offset = offsets_start.saturating_sub(8);
+            let bloom = match block_data.get(bloom_offset..bloom_offset.saturating_add(8)) {
+                Some(slice) => match slice.try_into() {
+                    Ok(arr) => u64::from_le_bytes(arr),
+                    Err(_) => return (true, true, true, false),
+                },
+                None => return (true, true, true, false),
+            };
+
+            let hash = blake3::hash(key);
+            let hash_bytes = hash.as_bytes();
+            let mut contains = true;
+            for i in 0..4 {
+                let chunk = u16::from_le_bytes([
+                    *hash_bytes.get(i * 2).unwrap_or(&0),
+                    *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
+                ]);
+                let bit = chunk % 64;
+                if (bloom & (1 << bit)) == 0 {
+                    contains = false;
+                    break;
+                }
+            }
+            contains
+        };
 
         if !may_contain {
             return (true, true, true, false);
         }
 
-        match binary_search_entry_in_block(&block_data, offsets_start, num_offsets, key) {
+        match binary_search_entry_in_block(&block_data, offsets_start, num_offsets, key, is_v3) {
             Ok(Some(_)) => (true, true, true, true),
             _ => (true, true, true, false),
         }
@@ -754,6 +888,8 @@ impl SstableReader {
             return Ok(results);
         }
 
+        let is_v3 = self.format_version >= 3;
+
         for idx in 0..self.index.len() {
             let offset = self
                 .index
@@ -772,46 +908,56 @@ impl SstableReader {
             let block_data = self.get_block(offset, next_offset).await?;
 
             let n = block_data.len();
-            if n < 10 {
+            let min_len = if is_v3 { 36 } else { 10 };
+            if n < min_len {
                 continue;
             }
 
-            let num_offsets = usize::from(u16::from_le_bytes(
-                block_data
-                    .get(n.saturating_sub(2)..n)
-                    .ok_or_else(|| {
-                        ContextraError::Storage("malformed block: missing num_offsets".into())
-                    })?
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-            ));
+            let (num_offsets, offsets_start) = if is_v3 {
+                let num_offsets = usize::try_from(u32::from_le_bytes(
+                    block_data
+                        .get(n.saturating_sub(4)..n)
+                        .ok_or_else(|| {
+                            ContextraError::Storage("malformed block: missing num_offsets".into())
+                        })?
+                        .try_into()
+                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+                ))
+                .map_err(|_| ContextraError::Storage("num_offsets exceeds platform usize".into()))?;
 
-            let offsets_len = num_offsets * 2;
-            if n < 10 + offsets_len {
-                return Err(ContextraError::Storage(
-                    "malformed block: num_offsets too large".into(),
+                let offsets_len = num_offsets.saturating_mul(4);
+                if n < offsets_len.saturating_add(36) {
+                    return Err(ContextraError::Storage(
+                        "malformed block: num_offsets too large".into(),
+                    ));
+                }
+                let offsets_start = n.saturating_sub(4).saturating_sub(offsets_len);
+                (num_offsets, offsets_start)
+            } else {
+                let num_offsets = usize::from(u16::from_le_bytes(
+                    block_data
+                        .get(n.saturating_sub(2)..n)
+                        .ok_or_else(|| {
+                            ContextraError::Storage("malformed block: missing num_offsets".into())
+                        })?
+                        .try_into()
+                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
                 ));
-            }
-            let offsets_start = n - 2 - offsets_len;
+
+                let offsets_len = num_offsets * 2;
+                if n < 10 + offsets_len {
+                    return Err(ContextraError::Storage(
+                        "malformed block: num_offsets too large".into(),
+                    ));
+                }
+                let offsets_start = n - 2 - offsets_len;
+                (num_offsets, offsets_start)
+            };
 
             for i in 0..num_offsets {
-                let off_pos = offsets_start + i * 2;
-                let entry_off = usize::from(u16::from_le_bytes(
-                    block_data
-                        .get(off_pos..off_pos + 2)
-                        .ok_or_else(|| ContextraError::Storage("malformed block: off_pos".into()))?
-                        .try_into()
-                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ));
+                let (entry_off, k_len) = get_entry_at_index(&block_data, offsets_start, i, is_v3)?;
 
                 let mut ep = entry_off;
-                let k_len = usize::from(u16::from_le_bytes(
-                    block_data
-                        .get(ep..ep + 2)
-                        .ok_or_else(|| ContextraError::Storage("malformed block: k_len".into()))?
-                        .try_into()
-                        .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
-                ));
                 ep += 2;
                 let _entry_key = block_data
                     .get(ep..ep + k_len)
