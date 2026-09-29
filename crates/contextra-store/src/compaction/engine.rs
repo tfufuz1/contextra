@@ -20,7 +20,6 @@ pub struct CompactionEngine {
     pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,
     workload_metrics: WorkloadMetrics,
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
-    clock: Option<Arc<dyn contextra_ports::Clock>>,
 }
 
 impl CompactionEngine {
@@ -55,35 +54,7 @@ impl CompactionEngine {
             pressure_rx: None,
             workload_metrics: WorkloadMetrics::new(),
             adaptive_planner,
-            clock: None,
         }
-    }
-
-    /// Creates a new compaction engine with TTL checking enabled using the provided Clock.
-    pub fn new_with_ttl(
-        config: CompactionConfig,
-        snapshot_registry: Arc<SnapshotRegistry>,
-        block_cache: Arc<BlockCache>,
-        key_manager: Option<Arc<KeyManager>>,
-        budget: Arc<contextra_core::ResourceTracker>,
-        manifest: Option<Arc<crate::manifest::Manifest>>,
-        clock: Arc<dyn contextra_ports::Clock>,
-    ) -> Self {
-        let mut engine = Self::new(
-            config,
-            snapshot_registry,
-            block_cache,
-            key_manager,
-            budget,
-            manifest,
-        );
-        engine.clock = Some(clock);
-        engine
-    }
-
-    /// Returns a reference to the injected Clock, if configured.
-    pub fn clock(&self) -> Option<&Arc<dyn contextra_ports::Clock>> {
-        self.clock.as_ref()
     }
 
     /// Attaches a system pressure watch receiver to enable pressure-aware compaction backpressure.
@@ -682,19 +653,6 @@ impl CompactionEngine {
             let is_tombstone = (item.seq & TOMBSTONE_BIT) != 0;
             let raw_seq = item.seq & !TOMBSTONE_BIT;
 
-            // INV-TTL-1: Compaction-Sweep TTL Expiration Check
-            // Compaction performs purely a comparison operation: entry.expires_at_unix_nanos < clock.now_unix_nanos().
-            // It NEVER calculates a new expiration timestamp itself.
-            let is_expired = if let Some(ref clock) = self.clock {
-                if let Some(ttl_meta) = super::ttl::TtlMetadata::parse_from_value(&item.value) {
-                    ttl_meta.is_expired(clock.now_unix_nanos())
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
             if last_key.as_ref() != Some(&item.key) {
                 floor_emitted = false;
             }
@@ -703,10 +661,7 @@ impl CompactionEngine {
             // Keep all versions with raw_seq >= min_snapshot_seq (visible to active or future snapshots)
             // PLUS the newest version with raw_seq < min_snapshot_seq (the "floor" version).
             // All further, older versions for the key below min_snapshot_seq are discarded.
-            // Invariant: Expired TTL entries are unconditionally discarded regardless of snapshot min_seq.
-            let keep = if is_expired {
-                false
-            } else if raw_seq >= min_snapshot_seq {
+            let keep = if raw_seq >= min_snapshot_seq {
                 true
             } else if !floor_emitted {
                 floor_emitted = true;
