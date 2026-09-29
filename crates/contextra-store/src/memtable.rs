@@ -576,11 +576,11 @@ mod tests {
         mt.put(Bytes::from("key1"), Bytes::from("val1"), 1, 1);
         mt.put(Bytes::from("key2"), Bytes::from("val2"), 2, 2);
 
-        let (val, seq) = mt.get(b"key1").expect("key1 should exist"); // expect
+        let (val, seq) = mt.get(b"key1").expect("key1 should exist"); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"val1");
         assert_eq!(seq, 1);
 
-        let (val, seq) = mt.get(b"key2").expect("key2 should exist"); // expect
+        let (val, seq) = mt.get(b"key2").expect("key2 should exist"); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"val2");
         assert_eq!(seq, 2);
 
@@ -598,25 +598,25 @@ mod tests {
         assert!(mt.get_at_seq(b"key1", 5, u64::MAX).is_none());
 
         // Exact match
-        let (val, seq, tx) = mt.get_at_seq(b"key1", 20, u64::MAX).unwrap(); // unwrap
+        let (val, seq, tx) = mt.get_at_seq(b"key1", 20, u64::MAX).unwrap(); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"v2");
         assert_eq!(seq, 20);
         assert_eq!(tx, 2);
 
         // Between versions
-        let (val, seq, tx) = mt.get_at_seq(b"key1", 25, u64::MAX).unwrap(); // unwrap
+        let (val, seq, tx) = mt.get_at_seq(b"key1", 25, u64::MAX).unwrap(); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"v2");
         assert_eq!(seq, 20);
         assert_eq!(tx, 2);
 
         // Filtered by max_tx: seq 20 has tx=2, max_tx=1 should fallback to seq 10 tx 1
-        let (val, seq, tx) = mt.get_at_seq(b"key1", 25, 1).unwrap(); // unwrap
+        let (val, seq, tx) = mt.get_at_seq(b"key1", 25, 1).unwrap(); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"v1");
         assert_eq!(seq, 10);
         assert_eq!(tx, 1);
 
         // Latest version
-        let (val, seq, tx) = mt.get_at_seq(b"key1", 100, u64::MAX).unwrap(); // unwrap
+        let (val, seq, tx) = mt.get_at_seq(b"key1", 100, u64::MAX).unwrap(); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"v3");
         assert_eq!(seq, 30);
         assert_eq!(tx, 3);
@@ -647,7 +647,7 @@ mod tests {
         mt.put(key.clone(), Bytes::new(), 20 | TOMBSTONE_BIT, 2);
 
         // Read at seq 15 -> should get val1
-        let (val, seq, tx) = mt.get_at_seq(&key, 15, u64::MAX).expect("Should find v1"); // expect
+        let (val, seq, tx) = mt.get_at_seq(&key, 15, u64::MAX).expect("Should find v1"); // #[cfg(test)]
         assert_eq!(val.as_ref(), b"val1");
         assert_eq!(seq, 10);
         assert_eq!(tx, 1);
@@ -655,7 +655,7 @@ mod tests {
         // Read at seq 25 -> should get tombstone
         let (val, seq, tx) = mt
             .get_at_seq(&key, 25, u64::MAX)
-            .expect("Should find tombstone"); // expect
+            .expect("Should find tombstone"); // #[cfg(test)]
         assert_eq!(val.len(), 0);
         assert_eq!(seq, 20 | TOMBSTONE_BIT);
         assert_eq!(tx, 2);
@@ -814,7 +814,7 @@ mod tests {
             })
             .collect();
         for h in handles {
-            h.join().expect("thread panicked"); // #[cfg(test)] // expect
+            h.join().expect("thread panicked"); // #[cfg(test)]
         }
         assert_eq!(mt.iter_latest().len(), 1000);
     }
@@ -842,7 +842,7 @@ mod tests {
 
         mt.rollback(999); // should do nothing
         assert!(!mt.is_empty());
-        assert_eq!(mt.get(b"k").expect("should exist").0.as_ref(), b"v"); // expect
+        assert_eq!(mt.get(b"k").expect("should exist").0.as_ref(), b"v"); // #[cfg(test)]
         assert_eq!(mt.tx_range(), (10, 10));
 
         // Rollback existing tx
@@ -1004,7 +1004,7 @@ mod tests {
             }
         });
 
-        writer_handle.join().expect("writer finished");
-        scanner_handle.join().expect("scanner finished");
+        writer_handle.join().expect("writer finished"); // #[cfg(test)]
+        scanner_handle.join().expect("scanner finished"); // #[cfg(test)]
     }
 }

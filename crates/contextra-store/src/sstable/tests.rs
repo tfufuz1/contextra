@@ -48,18 +48,18 @@ async fn test_block_bloom_filter_v4() {
     let num_offsets = u32::from_le_bytes(
         block
             .get(n.saturating_sub(4)..n)
-            .expect("test")
+            .expect("test") // #[cfg(test)]
             .try_into()
-            .expect("test"),
+            .expect("test"), // #[cfg(test)]
     ) as usize;
     assert_eq!(num_offsets, 2);
 
     let bloom_len = u32::from_le_bytes(
         block
             .get(n.saturating_sub(8)..n.saturating_sub(4))
-            .expect("test")
+            .expect("test") // #[cfg(test)]
             .try_into()
-            .expect("test"),
+            .expect("test"), // #[cfg(test)]
     ) as usize;
 
     let offsets_start = n - 8 - (num_offsets * 4);
@@ -95,8 +95,8 @@ fn test_block_binary_search_duplicate_keys_returns_first_index() {
 
     let block = builder.build();
     let n = block.len();
-    let num_offsets = u32::from_le_bytes(block[n - 4..n].try_into().unwrap()) as usize;
-    let _bloom_len = u32::from_le_bytes(block[n - 8..n - 4].try_into().unwrap()) as usize;
+    let num_offsets = u32::from_le_bytes(block[n - 4..n].try_into().unwrap()) as usize; // #[cfg(test)]
+    let _bloom_len = u32::from_le_bytes(block[n - 8..n - 4].try_into().unwrap()) as usize; // #[cfg(test)]
     let offsets_start = n - 8 - (num_offsets * 4);
 
     let res = block_search::binary_search_index_in_block(
@@ -106,7 +106,7 @@ fn test_block_binary_search_duplicate_keys_returns_first_index() {
         b"dup_key",
         true,
     )
-    .expect("search should succeed");
+    .expect("search should succeed"); // #[cfg(test)]
 
     assert_eq!(
         res,
@@ -121,58 +121,58 @@ fn test_block_binary_search_duplicate_keys_returns_first_index() {
         b"dup_key",
         true,
     )
-    .expect("search should succeed");
+    .expect("search should succeed"); // #[cfg(test)]
     assert_eq!(first_idx, Some(0));
 }
 
 #[tokio::test]
 async fn test_sstable_bloom_integration() {
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("test.sst");
     let bc = create_block_cache(1);
 
-    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // expect
-    builder.add(b"key1", b"val1", 1, 0).await.expect("add key1"); // expect
-    builder.add(b"key2", b"val2", 2, 0).await.expect("add key2"); // expect
-    builder.finish().await.expect("finish builder"); // expect
+    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // #[cfg(test)]
+    builder.add(b"key1", b"val1", 1, 0).await.expect("add key1"); // #[cfg(test)]
+    builder.add(b"key2", b"val2", 2, 0).await.expect("add key2"); // #[cfg(test)]
+    builder.finish().await.expect("finish builder"); // #[cfg(test)]
 
-    let reader = SstableReader::open(&path, bc).await.expect("open reader"); // expect
+    let reader = SstableReader::open(&path, bc).await.expect("open reader"); // #[cfg(test)]
 
     // Positive lookup
-    let res = reader.get(b"key1").await.expect("get key1"); // expect
-    assert_eq!(res.expect("exists").0.as_ref(), b"val1"); // expect
+    let res = reader.get(b"key1").await.expect("get key1"); // #[cfg(test)]
+    assert_eq!(res.expect("exists").0.as_ref(), b"val1"); // #[cfg(test)]
 
     // Negative lookup (should be caught by bloom or range check)
-    let res = reader.get(b"nonexistent").await.expect("get nonexistent"); // expect
+    let res = reader.get(b"nonexistent").await.expect("get nonexistent"); // #[cfg(test)]
     assert!(res.is_none());
 }
 
 #[tokio::test]
 async fn test_mmap_read_correct_values() {
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("mmap_test.sst");
     let bc = create_block_cache(1);
 
-    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // expect
+    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // #[cfg(test)]
     for i in 0..100 {
         let key = format!("key-{:03}", i);
         let val = format!("val-{:03}", i);
         builder
             .add(key.as_bytes(), val.as_bytes(), i as u64, 0)
             .await
-            .expect("add"); // expect
+            .expect("add"); // #[cfg(test)]
     }
-    builder.finish().await.expect("finish"); // expect
+    builder.finish().await.expect("finish"); // #[cfg(test)]
 
-    let reader = SstableReader::open(&path, bc).await.expect("open"); // expect
+    let reader = SstableReader::open(&path, bc).await.expect("open"); // #[cfg(test)]
     for i in 0..100 {
         let key = format!("key-{:03}", i);
         let expected = format!("val-{:03}", i);
         let res = reader
             .get(key.as_bytes())
             .await
-            .expect("get") // expect
-            .expect("exists"); // expect
+            .expect("get") // #[cfg(test)]
+            .expect("exists"); // #[cfg(test)]
         assert_eq!(res.0.as_ref(), expected.as_bytes());
         assert_eq!(res.1, i as u64);
     }
@@ -181,22 +181,22 @@ async fn test_mmap_read_correct_values() {
 #[tokio::test]
 async fn test_mmap_concurrent_readers() {
     use std::sync::Arc;
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("mmap_concurrent.sst");
     let bc = create_block_cache(1);
 
-    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // expect
+    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // #[cfg(test)]
     for i in 0..100 {
         let key = format!("key-{:03}", i);
         let val = format!("val-{:03}", i);
         builder
             .add(key.as_bytes(), val.as_bytes(), i as u64, 0)
             .await
-            .expect("add"); // expect
+            .expect("add"); // #[cfg(test)]
     }
-    builder.finish().await.expect("finish"); // expect
+    builder.finish().await.expect("finish"); // #[cfg(test)]
 
-    let reader = Arc::new(SstableReader::open(&path, bc).await.expect("open")); // expect
+    let reader = Arc::new(SstableReader::open(&path, bc).await.expect("open")); // #[cfg(test)]
     let mut handles = Vec::new();
 
     for _ in 0..16 {
@@ -205,66 +205,66 @@ async fn test_mmap_concurrent_readers() {
             for i in 0..100 {
                 let key = format!("key-{:03}", i);
                 let expected = format!("val-{:03}", i);
-                let res = r.get(key.as_bytes()).await.expect("get").expect("exists"); // expect
+                let res = r.get(key.as_bytes()).await.expect("get").expect("exists"); // #[cfg(test)]
                 assert_eq!(res.0.as_ref(), expected.as_bytes());
             }
         }));
     }
 
     for h in handles {
-        h.await.expect("task failed"); // expect
+        h.await.expect("task failed"); // #[cfg(test)]
     }
 }
 
 #[tokio::test]
 async fn test_sstable_scan_prefix() {
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("scan_prefix.sst");
     let bc = create_block_cache(1);
 
-    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // expect
-    builder.add(b"apple/1", b"a1", 1, 0).await.expect("add"); // expect
-    builder.add(b"apple/2", b"a2", 2, 0).await.expect("add"); // expect
-    builder.add(b"banana/1", b"b1", 3, 0).await.expect("add"); // expect
-    builder.add(b"cherry/1", b"c1", 4, 0).await.expect("add"); // expect
-    builder.finish().await.expect("finish"); // expect
+    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // #[cfg(test)]
+    builder.add(b"apple/1", b"a1", 1, 0).await.expect("add"); // #[cfg(test)]
+    builder.add(b"apple/2", b"a2", 2, 0).await.expect("add"); // #[cfg(test)]
+    builder.add(b"banana/1", b"b1", 3, 0).await.expect("add"); // #[cfg(test)]
+    builder.add(b"cherry/1", b"c1", 4, 0).await.expect("add"); // #[cfg(test)]
+    builder.finish().await.expect("finish"); // #[cfg(test)]
 
-    let reader = SstableReader::open(&path, bc).await.expect("open"); // expect
+    let reader = SstableReader::open(&path, bc).await.expect("open"); // #[cfg(test)]
 
-    let apples = reader.scan_prefix(b"apple/").await.expect("scan"); // expect
+    let apples = reader.scan_prefix(b"apple/").await.expect("scan"); // #[cfg(test)]
     assert_eq!(apples.len(), 2);
     assert_eq!(apples[0].0.as_ref(), b"apple/1");
     assert_eq!(apples[1].0.as_ref(), b"apple/2");
 
-    let bananas = reader.scan_prefix(b"banana/").await.expect("scan"); // expect
+    let bananas = reader.scan_prefix(b"banana/").await.expect("scan"); // #[cfg(test)]
     assert_eq!(bananas.len(), 1);
     assert_eq!(bananas[0].0.as_ref(), b"banana/1");
 
-    let non = reader.scan_prefix(b"zebra").await.expect("scan"); // expect
+    let non = reader.scan_prefix(b"zebra").await.expect("scan"); // #[cfg(test)]
     assert!(non.is_empty());
 }
 
 #[tokio::test]
 async fn test_sstable_scan_range() {
     use std::ops::Bound;
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("scan_range.sst");
     let bc = create_block_cache(1);
 
-    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // expect
-    builder.add(b"a", b"1", 1, 0).await.expect("add"); // expect
-    builder.add(b"b", b"2", 2, 0).await.expect("add"); // expect
-    builder.add(b"c", b"3", 3, 0).await.expect("add"); // expect
-    builder.add(b"d", b"4", 4, 0).await.expect("add"); // expect
-    builder.finish().await.expect("finish"); // expect
+    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // #[cfg(test)]
+    builder.add(b"a", b"1", 1, 0).await.expect("add"); // #[cfg(test)]
+    builder.add(b"b", b"2", 2, 0).await.expect("add"); // #[cfg(test)]
+    builder.add(b"c", b"3", 3, 0).await.expect("add"); // #[cfg(test)]
+    builder.add(b"d", b"4", 4, 0).await.expect("add"); // #[cfg(test)]
+    builder.finish().await.expect("finish"); // #[cfg(test)]
 
-    let reader = SstableReader::open(&path, bc).await.expect("open"); // expect
+    let reader = SstableReader::open(&path, bc).await.expect("open"); // #[cfg(test)]
 
     // Included Range [b, c]
     let res = reader
         .scan_range(Bound::Included(b"b"), Bound::Included(b"c"))
         .await
-        .expect("scan"); // expect
+        .expect("scan"); // #[cfg(test)]
     assert_eq!(res.len(), 2);
     assert_eq!(res[0].0.as_ref(), b"b");
     assert_eq!(res[1].0.as_ref(), b"c");
@@ -273,7 +273,7 @@ async fn test_sstable_scan_range() {
     let res = reader
         .scan_range(Bound::Excluded(b"b"), Bound::Excluded(b"d"))
         .await
-        .expect("scan"); // expect
+        .expect("scan"); // #[cfg(test)]
     assert_eq!(res.len(), 1);
     assert_eq!(res[0].0.as_ref(), b"c");
 
@@ -281,36 +281,36 @@ async fn test_sstable_scan_range() {
     let res = reader
         .scan_range(Bound::Unbounded, Bound::Included(b"b"))
         .await
-        .expect("scan"); // expect
+        .expect("scan"); // #[cfg(test)]
     assert_eq!(res.len(), 2);
     assert_eq!(res[0].0.as_ref(), b"a");
 }
 
 #[tokio::test]
 async fn test_sstable_v2_multi_version_get_at() {
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("v2_multiversion.sst");
     let bc = create_block_cache(1);
 
-    let mut builder = SstableBuilder::create(&path).await.expect("create builder");
+    let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // #[cfg(test)]
     // Write entries for key1 in order key ASC, seq DESC
     builder
         .add(b"key1", b"val_v2", 20, 2)
         .await
-        .expect("add v2");
+        .expect("add v2"); // #[cfg(test)]
     builder
         .add(b"key1", b"val_v1", 10, 1)
         .await
-        .expect("add v1");
-    builder.finish().await.expect("finish builder");
+        .expect("add v1"); // #[cfg(test)]
+    builder.finish().await.expect("finish builder"); // #[cfg(test)]
 
-    let reader = SstableReader::open(&path, bc).await.expect("open reader");
+    let reader = SstableReader::open(&path, bc).await.expect("open reader"); // #[cfg(test)]
 
     // Query at max_seq=25 -> should get v2
     let res_25 = reader
         .get_at(b"key1", 25, u64::MAX)
         .await
-        .expect("get_at 25");
+        .expect("get_at 25"); // #[cfg(test)]
     assert_eq!(
         res_25.map(|(v, seq, tx)| (v, seq, tx)),
         Some((Bytes::from("val_v2"), 20, 2))
@@ -320,20 +320,20 @@ async fn test_sstable_v2_multi_version_get_at() {
     let res_15 = reader
         .get_at(b"key1", 15, u64::MAX)
         .await
-        .expect("get_at 15");
+        .expect("get_at 15"); // #[cfg(test)]
     assert_eq!(
         res_15.map(|(v, seq, tx)| (v, seq, tx)),
         Some((Bytes::from("val_v1"), 10, 1))
     );
 
     // Query at max_seq=5 -> None
-    let res_5 = reader.get_at(b"key1", 5, u64::MAX).await.expect("get_at 5");
+    let res_5 = reader.get_at(b"key1", 5, u64::MAX).await.expect("get_at 5"); // #[cfg(test)]
     assert!(res_5.is_none());
 }
 
 #[tokio::test]
 async fn test_mfsx_bloom_filter_crc_recovery_no_false_rejections() {
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let sst_path = tmp.path().join("mfsx_crc_recovery.sst");
     let bc = create_block_cache(1);
 
@@ -346,21 +346,21 @@ async fn test_mfsx_bloom_filter_crc_recovery_no_false_rejections() {
     {
         let mut builder = SstableBuilder::create(&sst_path)
             .await
-            .expect("create builder"); // expect
+            .expect("create builder"); // #[cfg(test)]
         for (seq, key) in keys.iter().enumerate() {
             let val = format!("val_{}", seq).into_bytes();
             builder
                 .add(key, &val, seq as u64 + 1, 1)
                 .await
-                .expect("add key"); // expect
+                .expect("add key"); // #[cfg(test)]
         }
-        builder.finish().await.expect("finish builder"); // expect
+        builder.finish().await.expect("finish builder"); // #[cfg(test)]
     }
 
     // 2. Reopen reader (simulating process restart)
     let reader = SstableReader::open(&sst_path, bc)
         .await
-        .expect("reopen reader"); // expect
+        .expect("reopen reader"); // #[cfg(test)]
 
     assert!(
         reader.bloom_filter.is_some(),
@@ -373,8 +373,8 @@ async fn test_mfsx_bloom_filter_crc_recovery_no_false_rejections() {
         let res = reader
             .get(key)
             .await
-            .expect("get key")
-            .expect("key must exist"); // expect
+            .expect("get key") // #[cfg(test)]
+            .expect("key must exist"); // #[cfg(test)]
         let expected_val = format!("val_{}", seq).into_bytes();
         assert_eq!(
             res.0.as_ref(),
@@ -387,33 +387,33 @@ async fn test_mfsx_bloom_filter_crc_recovery_no_false_rejections() {
 
 #[tokio::test]
 async fn test_bloom_filter_integration() {
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let sst_path = tmp.path().join("bloom_test.sst");
     let bc = create_block_cache(1);
 
     // 1. Create SSTable with bloom filter
     {
-        let mut builder = SstableBuilder::create(&sst_path).await.expect("create"); // expect
+        let mut builder = SstableBuilder::create(&sst_path).await.expect("create"); // #[cfg(test)]
         builder
             .add(b"active-key", b"value", 100, 0)
             .await
-            .expect("add"); // expect
-        builder.finish().await.expect("finish"); // expect
+            .expect("add"); // #[cfg(test)]
+        builder.finish().await.expect("finish"); // #[cfg(test)]
     }
 
     // 2. Open and verify
     {
         let reader = SstableReader::open(&sst_path, bc.clone())
             .await
-            .expect("open"); // expect
+            .expect("open"); // #[cfg(test)]
         assert!(reader.bloom_filter.is_some(), "Should have bloom filter");
 
         // Positive check
-        let res = reader.get(b"active-key").await.expect("get"); // expect
+        let res = reader.get(b"active-key").await.expect("get"); // #[cfg(test)]
         assert!(res.is_some());
 
         // Negative check (Bloom should say NO)
-        let res = reader.get(b"missing-key-xyz-123").await.expect("get"); // expect
+        let res = reader.get(b"missing-key-xyz-123").await.expect("get"); // #[cfg(test)]
         assert!(res.is_none());
     }
 
@@ -422,30 +422,30 @@ async fn test_bloom_filter_integration() {
     {
         let mut builder = SstableBuilder::create(&old_sst_path)
             .await
-            .expect("create old sub"); // expect
+            .expect("create old sub"); // #[cfg(test)]
         builder
             .add(b"old-key", b"old-value", 10, 0)
             .await
-            .expect("add"); // expect
-        builder.finish().await.expect("finish"); // expect
+            .expect("add"); // #[cfg(test)]
+        builder.finish().await.expect("finish"); // #[cfg(test)]
 
-        let data = tokio::fs::read(&old_sst_path).await.expect("read"); // expect
+        let data = tokio::fs::read(&old_sst_path).await.expect("read"); // #[cfg(test)]
         let file_size = data.len();
-        let index_off = u64::from_le_bytes(data[file_size - 12..file_size - 4].try_into().unwrap()); // unwrap
+        let index_off = u64::from_le_bytes(data[file_size - 12..file_size - 4].try_into().unwrap()); // #[cfg(test)]
 
         let mut f = tokio::fs::File::create(&old_sst_path)
             .await
-            .expect("recreate"); // expect
-        f.write_all(&data[0..file_size - 24]).await.unwrap(); // expect
-        f.write_u64_le(index_off).await.expect("write ioff"); // expect
-        f.write_u32_le(0x4D465354).await.expect("write magic"); // expect
-        f.sync_all().await.expect("sync"); // expect
+            .expect("recreate"); // #[cfg(test)]
+        f.write_all(&data[0..file_size - 24]).await.unwrap(); // #[cfg(test)]
+        f.write_u64_le(index_off).await.expect("write ioff"); // #[cfg(test)]
+        f.write_u32_le(0x4D465354).await.expect("write magic"); // #[cfg(test)]
+        f.sync_all().await.expect("sync"); // #[cfg(test)]
     }
 
     {
         let reader = SstableReader::open(&old_sst_path, bc)
             .await
-            .expect("open old"); // expect
+            .expect("open old"); // #[cfg(test)]
         assert!(
             reader.bloom_filter.is_none(),
             "Old SST should not have bloom filter"
@@ -455,22 +455,22 @@ async fn test_bloom_filter_integration() {
 
 #[tokio::test]
 async fn test_sstable_block_crc_corruption() {
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("crc_corrupt.sst");
     let bc = create_block_cache(1);
 
     {
-        let mut builder = SstableBuilder::create(&path).await.expect("create"); // expect
-        builder.add(b"key1", b"val1", 1, 0).await.expect("add"); // expect
-        builder.finish().await.expect("finish"); // expect
+        let mut builder = SstableBuilder::create(&path).await.expect("create"); // #[cfg(test)]
+        builder.add(b"key1", b"val1", 1, 0).await.expect("add"); // #[cfg(test)]
+        builder.finish().await.expect("finish"); // #[cfg(test)]
     }
 
     // Corrupt the first block
     {
-        let mut data = tokio::fs::read(&path).await.expect("read"); // expect
+        let mut data = tokio::fs::read(&path).await.expect("read"); // #[cfg(test)]
         if data.len() > 10 {
             data[10] ^= 0xFF;
-            tokio::fs::write(&path, data).await.expect("write"); // expect
+            tokio::fs::write(&path, data).await.expect("write"); // #[cfg(test)]
         }
     }
 
@@ -574,18 +574,18 @@ async fn test_block_cache_byte_capacity_eviction_threshold() {
 
 #[tokio::test]
 async fn test_sstable_builder_duplicate_keys_coexist() {
-    let tmp = TempDir::new().expect("temp dir"); // expect #[cfg(test)]
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("duplicate_keys.sst");
     let bc = create_block_cache(1);
 
-    let mut builder = SstableBuilder::create(&path).await.expect("create"); // expect #[cfg(test)]
-    builder.add(b"k", b"val1", 1, 10).await.expect("add seq 1"); // expect #[cfg(test)]
-    builder.add(b"k", b"val2", 2, 20).await.expect("add seq 2"); // expect #[cfg(test)]
-    builder.finish().await.expect("finish"); // expect #[cfg(test)]
+    let mut builder = SstableBuilder::create(&path).await.expect("create"); // #[cfg(test)]
+    builder.add(b"k", b"val1", 1, 10).await.expect("add seq 1"); // #[cfg(test)]
+    builder.add(b"k", b"val2", 2, 20).await.expect("add seq 2"); // #[cfg(test)]
+    builder.finish().await.expect("finish"); // #[cfg(test)]
 
-    let reader = SstableReader::open(&path, bc).await.expect("open"); // expect #[cfg(test)]
+    let reader = SstableReader::open(&path, bc).await.expect("open"); // #[cfg(test)]
 
-    let iter_entries = reader.iter().await.expect("iter"); // expect #[cfg(test)]
+    let iter_entries = reader.iter().await.expect("iter"); // #[cfg(test)]
     assert_eq!(
         iter_entries.len(),
         2,
@@ -625,7 +625,7 @@ fn test_bloom_filter_roundtrip_and_too_short_bytes() {
     bf.insert(b"test-key-2");
     let bytes = bf.to_bytes();
 
-    let restored = BloomFilter::from_bytes(&bytes).expect("deserialization should succeed"); // expect
+    let restored = BloomFilter::from_bytes(&bytes).expect("deserialization should succeed"); // #[cfg(test)]
     assert!(restored.may_contain(b"test-key-1"));
     assert!(restored.may_contain(b"test-key-2"));
     assert!(!restored.may_contain(b"non-existent-key"));
@@ -652,10 +652,10 @@ fn test_block_builder_min_max_clamping() {
 
 #[tokio::test]
 async fn test_sstable_builder_rejects_empty_and_oversized_inputs() {
-    let tmp = TempDir::new().expect("temp dir"); // expect
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
     let path = tmp.path().join("boundary_test.sst");
 
-    let mut builder = SstableBuilder::create(&path).await.expect("create"); // expect
+    let mut builder = SstableBuilder::create(&path).await.expect("create"); // #[cfg(test)]
 
     let err_empty = builder.add(b"", b"val", 1, 1).await;
     assert!(matches!(err_empty, Err(ContextraError::InvalidInput(_))));
@@ -682,8 +682,8 @@ fn test_binary_search_vs_linear_search_equivalence() {
         }
         let block = builder.build();
         let n = block.len();
-        let num_offsets = u32::from_le_bytes(block[n - 4..n].try_into().unwrap()) as usize;
-        let _bloom_len = u32::from_le_bytes(block[n - 8..n - 4].try_into().unwrap()) as usize;
+        let num_offsets = u32::from_le_bytes(block[n - 4..n].try_into().unwrap()) as usize; // #[cfg(test)]
+        let _bloom_len = u32::from_le_bytes(block[n - 8..n - 4].try_into().unwrap()) as usize; // #[cfg(test)]
         let offsets_len = num_offsets * 4;
         let offsets_start = n - 8 - offsets_len;
 
@@ -692,8 +692,8 @@ fn test_binary_search_vs_linear_search_equivalence() {
             for idx in 0..num_offsets {
                 let off_pos = offsets_start + idx * 4;
                 let entry_off =
-                    u32::from_le_bytes(block[off_pos..off_pos + 4].try_into().unwrap()) as usize;
-                let k_len = u16::from_le_bytes(block[entry_off..entry_off + 2].try_into().unwrap())
+                    u32::from_le_bytes(block[off_pos..off_pos + 4].try_into().unwrap()) as usize; // #[cfg(test)]
+                let k_len = u16::from_le_bytes(block[entry_off..entry_off + 2].try_into().unwrap()) // #[cfg(test)]
                     as usize;
                 let entry_key = &block[entry_off + 2..entry_off + 2 + k_len];
                 if entry_key == key {
@@ -709,7 +709,7 @@ fn test_binary_search_vs_linear_search_equivalence() {
                 key,
                 true,
             )
-            .expect("binary search should not error");
+            .expect("binary search should not error"); // #[cfg(test)]
 
             assert_eq!(
                 linear_res,
@@ -737,7 +737,7 @@ fn test_binary_search_vs_linear_search_equivalence() {
                 nek,
                 true,
             )
-            .expect("binary search should not error");
+            .expect("binary search should not error"); // #[cfg(test)]
             assert!(
                 bin_res.is_none(),
                 "Non-existent key {:?} found in block with {} entries",
@@ -777,7 +777,7 @@ async fn test_sharded_block_cache_concurrency_stress() {
     }
 
     for h in handles {
-        h.await.expect("task panicked");
+        h.await.expect("task panicked"); // #[cfg(test)]
     }
 
     assert_eq!(completed.load(Ordering::SeqCst), num_tasks);
@@ -788,7 +788,7 @@ async fn test_sharded_block_cache_concurrency_stress() {
 async fn test_block_cache_shards_config_validation() {
     use crate::lsm::{LsmConfig, LsmStorage};
 
-    let tmp = TempDir::new().expect("temp dir");
+    let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
 
     let config_zero = LsmConfig {
         path: tmp.path().join("zero"),
@@ -884,7 +884,7 @@ async fn test_block_cache_32_concurrent_readers_hotset_latency() {
     }
 
     for h in handles {
-        h.await.expect("reader task completed");
+        h.await.expect("reader task completed"); // #[cfg(test)]
     }
 
     let elapsed = start.elapsed();
