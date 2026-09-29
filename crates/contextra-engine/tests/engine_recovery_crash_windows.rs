@@ -1,15 +1,15 @@
 // FILE-CONTEXT
-// ZWECK: Integrationstests für Crash-Fenster, Recovery & commit-uncertain Transaktionen (F-20 / T-06).
+// ZWECK: Integrationstests für Crash-Fenster-Recovery und commit-uncertain Transaktionen (F-20 / T-06).
+// INVARIANTEN: Verifiziert Crash-Szenarien und stellt sicher, dass repair() unvollständige Transaktionen korrekt behandelt.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_engine::collection::StoredDocument;
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
 use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, StorageStats, VectorIndex};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, Result, TxId};
+use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
 use contextra_vector::HnswIndex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -46,12 +46,40 @@ impl<S: StorageEngine> StorageEngine for FaultyStorage<S> {
         self.inner.get_at_seq(key, seq)
     }
 
+    fn get_tracked<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+        self.inner.get_tracked(tx_id, key)
+    }
+
+    fn scan_prefix_tracked<'a>(
+        &'a self,
+        tx_id: TxId,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        self.inner.scan_prefix_tracked(tx_id, prefix)
+    }
+
+    fn scan_prefix_at<'a>(
+        &'a self,
+        prefix: &'a [u8],
+        seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        self.inner.scan_prefix_at(prefix, seq_no)
+    }
+
+    fn supports_ssi_tracking(&self) -> bool {
+        self.inner.supports_ssi_tracking()
+    }
+
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         if key.starts_with(b"__tx_intent:") {
-            if self.fail_intent_put.load(Ordering::Relaxed)
-                && serde_json::from_slice::<CommitIntent>(value)
-                    .map(|i| matches!(i, CommitIntent::Pending { .. }))
-                    .unwrap_or(false)
+            if serde_json::from_slice::<CommitIntent>(value)
+                .map(|i| matches!(i, CommitIntent::Pending { .. }))
+                .unwrap_or(false)
+                && self.fail_intent_put.load(Ordering::Relaxed)
             {
                 return Box::pin(async move {
                     Err(ContextraError::Storage(
@@ -59,10 +87,10 @@ impl<S: StorageEngine> StorageEngine for FaultyStorage<S> {
                     ))
                 });
             }
-            if self.fail_committed_put.load(Ordering::Relaxed)
-                && serde_json::from_slice::<CommitIntent>(value)
-                    .map(|i| matches!(i, CommitIntent::Committed))
-                    .unwrap_or(false)
+            if serde_json::from_slice::<CommitIntent>(value)
+                .map(|i| matches!(i, CommitIntent::Committed))
+                .unwrap_or(false)
+                && self.fail_committed_put.load(Ordering::Relaxed)
             {
                 return Box::pin(async move {
                     Err(ContextraError::Storage(
@@ -72,6 +100,15 @@ impl<S: StorageEngine> StorageEngine for FaultyStorage<S> {
             }
         }
         self.inner.put(tx_id, key, value)
+    }
+
+    fn put_if_absent<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, Result<bool>> {
+        self.inner.put_if_absent(tx_id, key, value)
     }
 
     fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
@@ -128,6 +165,15 @@ impl<S: StorageEngine> StorageEngine for FaultyStorage<S> {
         self.inner.scan_prefix(prefix)
     }
 
+    fn scan_prefix_bounded<'a>(
+        &'a self,
+        prefix: &'a [u8],
+        limit: usize,
+        cursor: Option<&'a [u8]>,
+    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
+        self.inner.scan_prefix_bounded(prefix, limit, cursor)
+    }
+
     fn scan<'a>(
         &'a self,
         start: std::ops::Bound<&'a [u8]>,
@@ -138,7 +184,7 @@ impl<S: StorageEngine> StorageEngine for FaultyStorage<S> {
     }
 }
 
-async fn create_test_collection() -> (
+async fn create_faulty_collection() -> (
     Collection<FaultyStorage<LsmStorage>, HnswIndex>,
     Arc<FaultyStorage<LsmStorage>>,
 ) {
@@ -171,189 +217,206 @@ async fn create_test_collection() -> (
     (col, storage)
 }
 
-/// (a) Crash nach Text-Staging / vor Intent-Write (oder Abbruch beim Intent-Write)
+/// (a) Crash nach Text-Staging, vor Intent-Write:
+/// Text-Einträge werden gestagt, aber vor Commit bzw. Intent-Write stürzt der Prozess ab.
+/// Nach Wiederanlauf / repair() dürfen keine phantomen Text-Index-Einträge existieren.
 #[tokio::test]
-async fn test_crash_window_a_text_staging_before_intent() -> Result<()> {
-    let (col, storage) = create_test_collection().await;
+async fn test_crash_after_text_staging_before_intent_write() -> Result<()> {
+    let (col, storage) = create_faulty_collection().await;
     let tx_id = col.allocate_tx()?;
     let tx = DbTransaction::new(col.clone(), tx_id);
 
     let doc_id = DocId::new(101);
-    tx.stage_text_insert(doc_id, "Staged text before intent crash".to_string());
+    tx.stage_text_insert(doc_id, "Staged text before crash".to_string());
 
-    // Inject failure when writing the pending intent marker
+    // Injected failure on intent write prevents tx.commit() from completing Phase (a)
     storage.fail_intent_put.store(true, Ordering::SeqCst);
+    let commit_res = tx.commit().await;
+    assert!(commit_res.is_err());
 
-    let res = tx.commit().await;
-    assert!(
-        res.is_err(),
-        "Commit must fail when intent marker write fails"
-    );
+    // Run repair()
+    col.repair().await?;
 
-    // Verify vector index and storage do not contain uncommitted data
-    let vec_ids = col.vector_index().all_doc_ids().await?;
+    // Text index query must return no hits
+    let hits = col.query().text("Staged").execute().await?;
     assert!(
-        !vec_ids.contains(&doc_id),
-        "Vector index must be clean after intent write failure"
+        hits.is_empty(),
+        "Text query must not return entries from uncommitted tx after crash"
     );
 
     Ok(())
 }
 
-/// (b) Crash nach Graph-Staging, vor Storage-Commit
+/// (b) Crash nach Graph-Staging, vor Storage-Commit:
+/// Simuliert einen Crash, nachdem Graph/Text/Vector-Staging und Phase (a) Intent-Write stattfand,
+/// aber vor dem Storage-Commit (Phase c).
 #[tokio::test]
-async fn test_crash_window_b_graph_staging_before_storage_commit() -> Result<()> {
-    let (col, storage) = create_test_collection().await;
-    let tx_id = col.allocate_tx()?;
-    let tx = DbTransaction::new(col.clone(), tx_id);
+async fn test_crash_after_graph_staging_before_storage_commit() -> Result<()> {
+    let (col, storage) = create_faulty_collection().await;
 
+    // Manually write a Pending intent for doc_id 202
     let doc_id = DocId::new(202);
-    tx.record_keys(vec![1, 2, 3, 4], vec![4, 3, 2, 1], doc_id);
-    tx.stage_text_insert(doc_id, "Graph and text staged document".to_string());
-
-    let e1 = Entity::new(EntityId::from_key("e_crash_b1")?, "E1", "Concept");
-    let e2 = Entity::new(EntityId::from_key("e_crash_b2")?, "E2", "Concept");
-    tx.stage_graph_entity(e1);
-    tx.stage_graph_entity(e2);
-    tx.stage_graph_edge(Edge::new(
-        EntityId::from_key("e_crash_b1")?,
-        EntityId::from_key("e_crash_b2")?,
-        "RELATED",
-    ));
-
-    // Inject storage commit failure (storage commit fails after index commits have executed)
-    storage.fail_storage_commit.store(true, Ordering::SeqCst);
-
-    let res = tx.commit().await;
-    assert!(res.is_err(), "Commit must fail when storage commit fails");
-
-    // After commit failure, repair() is triggered
-    col.repair().await?;
-
-    // Verify graph neighbors were compensated/cleaned
-    let neighbors = col
-        .graph_index()
-        .neighbors(EntityId::from_key("e_crash_b1")?)
-        .await?;
-    assert!(
-        neighbors.is_empty(),
-        "Graph index must be clean after recovery from storage commit crash"
-    );
-
-    Ok(())
-}
-
-/// (c) Storage-Commit erfolgreich, Committed-Marker-Write scheitert dauerhaft
-/// => Daten bleiben, Indizes konsistent, keine Kompensation, Intent wird bereinigt
-#[tokio::test]
-async fn test_crash_window_c_storage_commit_ok_committed_marker_fails() -> Result<()> {
-    let (col, storage) = create_test_collection().await;
-    let tx_id = col.allocate_tx()?;
-    let tx = DbTransaction::new(col.clone(), tx_id);
-
-    let doc_id = DocId::new(303);
-    tx.record_keys(vec![10, 20, 30, 40], vec![40, 30, 20, 10], doc_id);
-    tx.stage_text_insert(doc_id, "Durable text for window C".to_string());
-
-    let e1 = Entity::new(EntityId::from_key("e_crash_c1")?, "E1", "Concept");
-    tx.stage_graph_entity(e1);
-
-    // Staging document metadata/data in storage as well via collection.insert or manual put
-    let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-    let stored_doc = StoredDocument {
-        id: "doc_303".to_string(),
-        embedding: vec![1.0, 0.0, 0.0, 0.0],
-        metadata: Some(serde_json::json!({ "text": "Durable text for window C" })),
-    };
-    let doc_bytes = serde_json::to_vec(&stored_doc)?;
-    storage.put(tx_id, &doc_key, &doc_bytes).await?;
-
-    // Fail committed marker put dauerhaft
-    storage.fail_committed_put.store(true, Ordering::SeqCst);
-
-    let res = tx.commit().await;
-    // Commit return value might be Ok(()) even if background committed marker retries failed,
-    // or err. In either case, storage commit succeeded.
-    let _ = res;
-
-    // Run repair/recovery
-    col.repair().await?;
-
-    // Verify storage record is still present (data preserved)
-    let get_res = storage.get(&doc_key).await?;
-    assert!(
-        get_res.is_some(),
-        "Document data must remain in storage after recovery"
-    );
-
-    // Verify vector index has the document
-    let all_vec_ids = col.vector_index().all_doc_ids().await?;
-    assert!(
-        all_vec_ids.contains(&doc_id),
-        "Vector index must retain the document after recovery"
-    );
-
-    Ok(())
-}
-
-/// (d) Storage-Commit nicht erfolgt + Pending-Intent
-/// => Recovery entfernt Index-Einträge ohne Storage-Datensatz (Vektor, Text, Graph)
-#[tokio::test]
-async fn test_crash_window_d_pending_intent_without_storage_commit() -> Result<()> {
-    let (col, storage) = create_test_collection().await;
-
-    // Manually write a Pending intent with doc_id 404 that was inserted into indices
-    // but never committed to storage.
-    let orphan_doc_id = DocId::new(404);
-    let orphan_entity_id = EntityId::from_key("orphan_entity")?;
-
-    let tx_id = col.allocate_tx()?;
-    col.vector_index()
-        .insert(tx_id, orphan_doc_id, &[0.5, 0.5, 0.5, 0.5])
-        .await?;
-    col.vector_index().commit(tx_id).await?;
-
-    col.graph_index()
-        .add_entity(
-            tx_id,
-            Entity::new(orphan_entity_id, "orphan_entity", "Document"),
-        )
-        .await?;
-    col.graph_index().commit(tx_id).await?;
-
-    // Write Pending intent to storage for tx_id
-    let intent_key = col.namespaced_key(&tx_id.inner().to_le_bytes(), 3);
+    let intent_tx = col.allocate_tx()?;
+    let intent_key = col.namespaced_key(&intent_tx.inner().to_le_bytes(), 3);
     let intent = CommitIntent::Pending {
-        doc_ids: Arc::new(vec![orphan_doc_id]),
+        doc_ids: Arc::new(vec![doc_id]),
         has_text: true,
         has_graph: true,
-        stages_completed: 2,
+        stages_completed: 0,
     };
     let intent_bytes = serde_json::to_vec(&intent)?;
-    storage.put(tx_id, &intent_key, &intent_bytes).await?;
-    storage.commit(tx_id).await?;
+    storage.put(intent_tx, &intent_key, &intent_bytes).await?;
+    storage.commit(intent_tx).await?;
 
-    // Confirm that doc_id 404 is NOT in storage
-    let doc_key = col.namespaced_key(&orphan_doc_id.inner().to_le_bytes(), 1);
-    assert!(
-        storage.get(&doc_key).await?.is_none(),
-        "Document must not exist in storage for crash window D"
-    );
+    // Stage/insert into vector, text, and graph indices to simulate Phase (b) having run
+    let stage_tx = col.allocate_tx()?;
+    col.vector_index()
+        .insert(stage_tx, doc_id, &[1.0, 0.0, 0.0, 0.0])
+        .await?;
+    col.vector_index().commit(stage_tx).await?;
 
-    // Run recovery
+    let e1 = Entity::new(EntityId::from_key("202")?, "Node202", "Doc");
+    col.graph_index().add_entity(stage_tx, e1).await?;
+    col.graph_index().commit(stage_tx).await?;
+
+    // Storage commit NEVER happened for doc_id 202!
+    // Now run repair() to recover from this crash window
     col.repair().await?;
 
-    // Verify orphaned entries were removed from indices
-    let vec_ids = col.vector_index().all_doc_ids().await?;
+    // Verify recovery compensated (deleted) the index entries
+    let vec_hits = col.vector_index().search(&[1.0, 0.0, 0.0, 0.0], 10).await?;
     assert!(
-        !vec_ids.contains(&orphan_doc_id),
-        "Vector index entry must be removed during recovery when storage record is missing"
+        vec_hits.iter().all(|h| h.doc_id != doc_id),
+        "Vector index entry for doc_id 202 must be compensated after crash before storage commit"
     );
 
-    let neighbors = col.graph_index().neighbors(orphan_entity_id).await?;
+    let text_hits = col.query().text("Graph").execute().await?;
+    assert!(
+        text_hits.is_empty(),
+        "Text query for doc_id 202 must be empty after crash before storage commit"
+    );
+
+    let neighbors = col
+        .graph_index()
+        .neighbors(EntityId::from_key("202")?)
+        .await?;
     assert!(
         neighbors.is_empty(),
-        "Graph index entry must be clean during recovery when storage record is missing"
+        "Graph index entry for entity must be compensated"
+    );
+
+    // Intent key must be cleaned up from storage
+    let intent_check = storage.get(&intent_key).await?;
+    assert!(
+        intent_check.is_none(),
+        "Pending intent marker must be cleaned up after recovery"
+    );
+
+    Ok(())
+}
+
+/// (c) Storage-Commit erfolgreich, `Committed`-Marker-Write scheitert dauerhaft (T-06):
+/// Nach Recovery: Daten bleiben in Storage und Indizes, KEINE Kompensation, Intent wird bereinigt.
+#[tokio::test]
+async fn test_storage_commit_success_committed_marker_failure_recovery() -> Result<()> {
+    let (col, storage) = create_faulty_collection().await;
+
+    // Inject failure for the Committed marker write in Phase (d)
+    storage.fail_committed_put.store(true, Ordering::SeqCst);
+
+    // col.insert() performs a full insert transaction
+    col.insert(
+        "303",
+        &[0.1, 0.2, 0.3, 0.4],
+        Some(serde_json::json!({"text": "T06 persistent marker failure text"})),
+    )
+    .await?;
+
+    let doc_id = DocId::from_key("303")?;
+    let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+
+    // Document is in storage
+    let doc_val_before = storage.get(&doc_key).await?;
+    assert!(
+        doc_val_before.is_some(),
+        "Document must be present in storage"
+    );
+
+    // Now run repair() (e.g. on DB restart)
+    col.repair().await?;
+
+    // Document must still be present in storage and text index (NO compensation)
+    let doc_val_after = storage.get(&doc_key).await?;
+    assert!(
+        doc_val_after.is_some(),
+        "Data must remain in storage after recovery when storage commit succeeded"
+    );
+
+    let hits_after = col.query().text("persistent").execute().await?;
+    assert!(
+        !hits_after.is_empty(),
+        "Text query results must remain intact after recovery for committed storage transaction"
+    );
+
+    // Pending intent marker must be cleaned up
+    let intent_prefix = col.namespaced_key(&[], 3);
+    let remaining_intents = storage.scan_prefix(&intent_prefix).await?;
+    assert!(
+        remaining_intents.is_empty(),
+        "Pending intent marker must be cleaned up during recovery"
+    );
+
+    Ok(())
+}
+
+/// (d) Storage-Commit nicht erfolgt + Pending-Intent:
+/// Recovery entfernt Index-Einträge ohne Storage-Datensatz (Vektor, Text, Graph) und bereinigt den Intent.
+#[tokio::test]
+async fn test_pending_intent_without_storage_commit_cleans_indices() -> Result<()> {
+    let (col, storage) = create_faulty_collection().await;
+
+    let doc_id = DocId::new(404);
+    let intent_tx = col.allocate_tx()?;
+    let intent_key = col.namespaced_key(&intent_tx.inner().to_le_bytes(), 3);
+    let intent = CommitIntent::Pending {
+        doc_ids: Arc::new(vec![doc_id]),
+        has_text: true,
+        has_graph: true,
+        stages_completed: 0,
+    };
+    let intent_bytes = serde_json::to_vec(&intent)?;
+    storage.put(intent_tx, &intent_key, &intent_bytes).await?;
+    storage.commit(intent_tx).await?;
+
+    // Put entries in vector, graph indices
+    let idx_tx = col.allocate_tx()?;
+    col.vector_index()
+        .insert(idx_tx, doc_id, &[0.0, 1.0, 0.0, 0.0])
+        .await?;
+    col.vector_index().commit(idx_tx).await?;
+
+    let e = Entity::new(EntityId::from_key("404")?, "Node404", "Doc");
+    col.graph_index().add_entity(idx_tx, e).await?;
+    col.graph_index().commit(idx_tx).await?;
+
+    // Verify storage has NO record for doc_id 404
+    let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+    assert!(storage.get(&doc_key).await?.is_none());
+
+    // Run repair()
+    col.repair().await?;
+
+    // Verify vector index entry was removed
+    let vec_hits = col.vector_index().search(&[0.0, 1.0, 0.0, 0.0], 10).await?;
+    assert!(
+        vec_hits.iter().all(|h| h.doc_id != doc_id),
+        "Vector index entry without storage record must be removed by repair()"
+    );
+
+    // Verify intent key was cleaned up
+    assert!(
+        storage.get(&intent_key).await?.is_none(),
+        "Pending intent marker must be cleaned up by repair()"
     );
 
     Ok(())

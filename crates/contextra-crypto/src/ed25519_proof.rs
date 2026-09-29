@@ -104,10 +104,10 @@ pub fn verify_deletion_proof_v3(
         .map_err(|e| DeletionProofError::InvalidSignature(e.to_string()))
 }
 
-/// Vorgeschlagenes `SignatureVersion`-Enum für spätere Integration in `deletion_proof.rs`.
+/// `SignatureVersion`-Enum für typsichere Versionierung von DeletionProof-Signaturen.
 ///
-/// AI-TAG[TODO] (TS: 2026-09-27T00:00:00Z) (SESSION: welle4-p17): In `deletion_proof.rs` das `pub signature_version: u8` Feld
-/// durch dieses Enum ersetzen oder konvertieren.
+/// AI-TAG[TODO][RESOLVED] (TS: 2026-09-27T00:00:00Z) (SESSION: welle4-p17): In `deletion_proof.rs` das `pub signature_version: u8` Feld
+/// über TryFrom<u8> und `signature_version_typed()` konvertieren und in `verify()` absichern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureVersion {
     /// HMAC-SHA256 legacy scope-only signature (version 1)

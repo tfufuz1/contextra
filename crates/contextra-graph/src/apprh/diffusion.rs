@@ -68,9 +68,12 @@ pub fn run_apprh_push<G: PathGraph>(
             break;
         }
 
-        // 1. Collect and sort binary neighbors by EntityId
+        // 1. Collect and sort binary neighbors by EntityId and weight bit-pattern
         let mut binary_neighbors = graph.neighbors_with_weights(u);
-        binary_neighbors.sort_by_key(|(v, _)| *v);
+        binary_neighbors.sort_by(|a, b| {
+            a.0.cmp(&b.0)
+                .then_with(|| a.1.to_bits().cmp(&b.1.to_bits()))
+        });
         binary_neighbors.dedup_by_key(|(v, _)| *v);
 
         // 2. Collect and sort hyperedges by HyperEdgeId
