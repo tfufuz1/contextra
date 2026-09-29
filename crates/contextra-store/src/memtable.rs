@@ -141,10 +141,17 @@ impl MemTable {
 
     /// Deterministic shard selector mapping keys to independent shards.
     ///
-    /// Standard user keys are mapped to lexicographical range shards via 2-byte prefix calculation
-    /// (`(b0 << 8) | b1`).
-    /// Reserved system key prefixes (starting with `__`) use hash-sharding on the key remainder
-    /// after the prefix to distribute system writes evenly across all shards.
+    /// Constructs a 16-bit big-endian value from the first two bytes of the key to maintain
+    /// strict monotonicity: `keyA <= keyB => shard_for(keyA) <= shard_for(keyB)`.
+    ///
+    /// ## Design Rationale & Trade-offs
+    /// Range sharding is required so that `shard_range_for_prefix` can restrict prefix scans
+    /// (e.g. `scan_prefix_into`) to a single shard (for 2+ byte prefixes) or a small range of shards.
+    /// Keys sharing identical 2-byte prefixes (such as system prefixes `__col:`, `__meta:`, `__sys:`
+    /// or tenant prefixes `t1:`, `t2:`) map to the same shard by design. Replacing range sharding
+    /// with a hash mixer would destroy key monotonicity and force every prefix and range scan
+    /// to query all 16 shards.
+    ///
     /// Zero-panic and zero-allocation.
     #[inline]
     pub fn shard_for(key: &[u8]) -> usize {
@@ -703,18 +710,16 @@ mod tests {
         let mt = MemTable::new();
         assert_eq!(mt.size(), 0);
 
-        // Put key (len 4), val (len 4), overhead STAGING_ENTRY_OVERHEAD_BYTES
+        // Put key (len 4), val (len 4), overhead STAGING_ENTRY_OVERHEAD_BYTES (32) => size = 40
         let key1 = Bytes::from("key1");
         let val1 = Bytes::from("val1");
         mt.put(key1, val1, 1, 1);
-        let expected1 = 4 + 4 + STAGING_ENTRY_OVERHEAD_BYTES;
-        assert_eq!(mt.size(), expected1);
+        assert_eq!(mt.size(), 40);
 
-        // Put delete tombstone: key (len 4), val (len 0), overhead STAGING_ENTRY_OVERHEAD_BYTES
+        // Put delete tombstone: key (len 4), val (len 0), overhead STAGING_ENTRY_OVERHEAD_BYTES (32) => size += 36
         let key1_del = Bytes::from("key1");
         mt.put(key1_del, Bytes::new(), 2 | TOMBSTONE_BIT, 1);
-        let expected2 = expected1 + 4 + 0 + STAGING_ENTRY_OVERHEAD_BYTES;
-        assert_eq!(mt.size(), expected2);
+        assert_eq!(mt.size(), 76);
     }
 
     #[test]
@@ -750,8 +755,9 @@ mod tests {
         assert!(mt.get(b"keyB2").is_some());
 
         // Verify size tracking updated after rollback
-        let tx_b_expected = 2 * (5 + 5 + STAGING_ENTRY_OVERHEAD_BYTES);
-        assert_eq!(mt.size(), tx_b_expected);
+        // Originally: tx A = 3 * (5 + 5 + 32) = 126; tx B = 2 * (5 + 5 + 32) = 84. Total = 210.
+        // After rollback tx A: remaining size should be 84.
+        assert_eq!(mt.size(), 84);
     }
 
     #[test]

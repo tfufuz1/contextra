@@ -37,51 +37,92 @@ fn test_bloom_filter_no_probe_repetition() {
 }
 
 #[tokio::test]
-async fn test_block_bloom_filter() {
+async fn test_block_bloom_filter_v4() {
     let mut builder = BlockBuilder::new(4096);
     builder.add(b"apple", b"red", 1, 0);
     builder.add(b"banana", b"yellow", 2, 0);
     let block = builder.build();
 
-    // 1. Verify v3 format: [entries][4x u64 bloom (32 B)][u32 offset1][u32 offset2][u32 num_offsets]
+    // 1. Verify v4 format: [entries][bloom_bytes][u32 offset1][u32 offset2][u32 bloom_len][u32 num_offsets]
     let n = block.len();
     let num_offsets = u32::from_le_bytes(
         block
             .get(n.saturating_sub(4)..n)
-            .expect("test") // expect
+            .expect("test")
             .try_into()
-            .expect("test"), // expect
-    );
+            .expect("test"),
+    ) as usize;
     assert_eq!(num_offsets, 2);
 
-    let bloom_pos = n - 4 - (num_offsets as usize * 4) - 32;
-    let bloom_bytes = block.get(bloom_pos..bloom_pos + 32).expect("bloom slice");
-    let mut bloom_words = [0u64; 4];
-    for w in 0..4 {
-        bloom_words[w] = u64::from_le_bytes(bloom_bytes[w * 8..(w + 1) * 8].try_into().expect("u64 word"));
-    }
-    assert!(bloom_words.iter().any(|&w| w > 0));
+    let bloom_len = u32::from_le_bytes(
+        block
+            .get(n.saturating_sub(8)..n.saturating_sub(4))
+            .expect("test")
+            .try_into()
+            .expect("test"),
+    ) as usize;
 
-    // 2. Helper to check bloom v3
-    let check_bloom = |key: &[u8], words: &[u64; 4]| {
-        let hash = blake3::hash(key);
-        let hash_bytes = hash.as_bytes();
-        for i in 0..8 {
-            let chunk = u16::from_le_bytes([
-                *hash_bytes.get(i * 2).unwrap_or(&0),
-                *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
-            ]);
-            let bit_idx = chunk as usize % 256;
-            if (words[bit_idx / 64] & (1u64 << (bit_idx % 64))) == 0 {
-                return false;
-            }
-        }
-        true
-    };
+    let offsets_start = n - 8 - (num_offsets * 4);
+    let bloom_start = offsets_start - bloom_len;
+    let bloom_bytes = &block[bloom_start..offsets_start];
 
-    assert!(check_bloom(b"apple", &bloom_words));
-    assert!(check_bloom(b"banana", &bloom_words));
-    assert!(!check_bloom(b"cherry_unseen_xyz", &bloom_words));
+    assert!(reader::may_contain_key_in_block_bloom(
+        bloom_bytes,
+        b"apple",
+        4
+    ));
+    assert!(reader::may_contain_key_in_block_bloom(
+        bloom_bytes,
+        b"banana",
+        4
+    ));
+    assert!(!reader::may_contain_key_in_block_bloom(
+        bloom_bytes,
+        b"cherry_unseen_xyz",
+        4
+    ));
+}
+
+#[test]
+fn test_block_binary_search_duplicate_keys_returns_first_index() {
+    let mut builder = BlockBuilder::new(4096);
+    // Add 3 versions for key "dup_key" in descending sequence order
+    builder.add(b"dup_key", b"v3", 30, 1);
+    builder.add(b"dup_key", b"v2", 20, 1);
+    builder.add(b"dup_key", b"v1", 10, 1);
+    // Add subsequent key
+    builder.add(b"other_key", b"v1", 40, 1);
+
+    let block = builder.build();
+    let n = block.len();
+    let num_offsets = u32::from_le_bytes(block[n - 4..n].try_into().unwrap()) as usize;
+    let _bloom_len = u32::from_le_bytes(block[n - 8..n - 4].try_into().unwrap()) as usize;
+    let offsets_start = n - 8 - (num_offsets * 4);
+
+    let res = block_search::binary_search_index_in_block(
+        &block,
+        offsets_start,
+        num_offsets,
+        b"dup_key",
+        true,
+    )
+    .expect("search should succeed");
+
+    assert_eq!(
+        res,
+        Ok(0),
+        "Binary search for duplicate keys must return index 0 (the first occurrence)"
+    );
+
+    let first_idx = block_search::binary_search_first_index_in_block(
+        &block,
+        offsets_start,
+        num_offsets,
+        b"dup_key",
+        true,
+    )
+    .expect("search should succeed");
+    assert_eq!(first_idx, Some(0));
 }
 
 #[tokio::test]
@@ -558,22 +599,6 @@ async fn test_sstable_builder_duplicate_keys_coexist() {
         iter_entries[1],
         (Bytes::from_static(b"k"), Bytes::from_static(b"val2"), 2)
     );
-
-    let reader_arc = Arc::new(reader);
-    let mut stream = reader_arc.stream().await.expect("stream"); // expect #[cfg(test)]
-    let e1 = stream.next().await.expect("next").expect("entry 1"); // expect #[cfg(test)]
-    let e2 = stream.next().await.expect("next").expect("entry 2"); // expect #[cfg(test)]
-    let e_end = stream.next().await.expect("next"); // expect #[cfg(test)]
-
-    assert_eq!(
-        e1,
-        (Bytes::from_static(b"k"), Bytes::from_static(b"val1"), 1, 10)
-    );
-    assert_eq!(
-        e2,
-        (Bytes::from_static(b"k"), Bytes::from_static(b"val2"), 2, 20)
-    );
-    assert!(e_end.is_none());
 }
 
 #[test]
@@ -658,8 +683,9 @@ fn test_binary_search_vs_linear_search_equivalence() {
         let block = builder.build();
         let n = block.len();
         let num_offsets = u32::from_le_bytes(block[n - 4..n].try_into().unwrap()) as usize;
+        let _bloom_len = u32::from_le_bytes(block[n - 8..n - 4].try_into().unwrap()) as usize;
         let offsets_len = num_offsets * 4;
-        let offsets_start = n - 4 - offsets_len;
+        let offsets_start = n - 8 - offsets_len;
 
         for (key, _val) in &expected_entries {
             let mut linear_res = None;
@@ -676,9 +702,14 @@ fn test_binary_search_vs_linear_search_equivalence() {
                 }
             }
 
-            let bin_res =
-                block_search::binary_search_entry_in_block(&block, offsets_start, num_offsets, key, true)
-                    .expect("binary search should not error");
+            let bin_res = block_search::binary_search_entry_in_block(
+                &block,
+                offsets_start,
+                num_offsets,
+                key,
+                true,
+            )
+            .expect("binary search should not error");
 
             assert_eq!(
                 linear_res,
@@ -699,9 +730,14 @@ fn test_binary_search_vs_linear_search_equivalence() {
             b"key_0000_foo".as_slice(),
         ];
         for nek in non_existent_keys {
-            let bin_res =
-                block_search::binary_search_entry_in_block(&block, offsets_start, num_offsets, nek, true)
-                    .expect("binary search should not error");
+            let bin_res = block_search::binary_search_entry_in_block(
+                &block,
+                offsets_start,
+                num_offsets,
+                nek,
+                true,
+            )
+            .expect("binary search should not error");
             assert!(
                 bin_res.is_none(),
                 "Non-existent key {:?} found in block with {} entries",

@@ -178,6 +178,7 @@ proptest! {
         rt.block_on(async {
             let (storage, tmp, ground_truth, layout) = setup_sstable_and_ground_truth(60).await;
             storage.wait_shutdown().await;
+            drop(storage);
 
             if !layout.data_block_ranges.is_empty() {
                 let block_idx = block_idx_seed % layout.data_block_ranges.len();
@@ -259,6 +260,7 @@ proptest! {
         rt.block_on(async {
             let (storage, tmp, ground_truth, layout) = setup_sstable_and_ground_truth(50).await;
             storage.wait_shutdown().await;
+            drop(storage);
 
             let bloom_end = layout.file_size - 54;
             if bloom_end > layout.bloom_offset {
@@ -330,6 +332,7 @@ proptest! {
         rt.block_on(async {
             let (storage, tmp, ground_truth, layout) = setup_sstable_and_ground_truth(50).await;
             storage.wait_shutdown().await;
+            drop(storage);
 
             if layout.bloom_offset > layout.index_offset {
                 let index_len = layout.bloom_offset - layout.index_offset;
