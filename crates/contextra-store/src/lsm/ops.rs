@@ -18,11 +18,36 @@ impl StorageEngine for LsmStorage {
         Box::pin(read::get_at_seq(self, key, seq_no))
     }
 
+    fn get_tracked<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        Box::pin(read::get_tracked(self, tx_id, key))
+    }
+
+    fn get_at_seq_tracked<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        seq: u64,
+    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
+        Box::pin(read::get_at_seq_tracked(self, tx_id, key, seq))
+    }
+
     fn scan_prefix<'a>(
         &'a self,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(read::scan_prefix(self, prefix))
+    }
+
+    fn scan_prefix_tracked<'a>(
+        &'a self,
+        tx_id: TxId,
+        prefix: &'a [u8],
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(read::scan_prefix_tracked(self, tx_id, prefix))
+    }
+
+    fn supports_ssi_tracking(&self) -> bool {
+        true
     }
 
     fn scan_prefix_bounded<'a>(

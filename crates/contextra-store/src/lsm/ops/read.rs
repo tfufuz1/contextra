@@ -11,10 +11,7 @@ pub(crate) async fn get_tracked(
     key: &[u8],
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let snapshot_seq = storage
-        .next_seq_no
-        .load(Ordering::Acquire)
-        .saturating_sub(1);
+    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
     get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await
 }
 
@@ -25,21 +22,33 @@ pub(crate) async fn get_at_seq_tracked(
     snapshot_seq: u64,
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    storage.tx_buffer.register_read(tx_id, key, snapshot_seq);
+    storage.tx_buffer.register_read(tx_id, key.to_vec(), snapshot_seq);
     storage.get_at_seq(key, snapshot_seq).await
+}
+
+pub(crate) async fn scan_prefix_tracked(
+    storage: &LsmStorage,
+    tx_id: contextra_core::TxId,
+    prefix: &[u8],
+) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;
+    for (k, _) in &results {
+        storage.tx_buffer.register_read(tx_id, k.clone(), snapshot_seq);
+    }
+    Ok(results)
 }
 
 pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let current_max_seq = storage.next_seq_no.load(Ordering::Acquire);
-    let res = storage.get_at_seq(key, current_max_seq).await?;
+    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    let res = storage.get_at_seq(key, snapshot_seq).await?;
     tracing::debug!(
         "LsmStorage::get key={:?} seq={} found={}",
         String::from_utf8_lossy(key),
-        current_max_seq,
+        snapshot_seq,
         res.is_some()
     );
-    storage.compaction_engine.record_read_op();
     Ok(res)
 }
 
@@ -49,6 +58,7 @@ pub(super) async fn get_at_seq(
     seq_no: u64,
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
+    storage.compaction_engine.record_read_op();
     // Genau EINMAL laden — Snapshot-Konsistenz über die gesamte Methode (INVARIANT-2)
     let snapshot_tx = storage.last_committed_tx.load(Ordering::Acquire);
     let (memtable, immutable_memtables) = {

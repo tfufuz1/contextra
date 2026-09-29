@@ -14,6 +14,13 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Health status of the storage engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum StorageHealth {
+    Healthy,
+    FlushFailing,
+}
+
 /// LSM-Tree based storage engine.
 pub struct LsmStorage {
     pub(super) config: LsmConfig,
@@ -57,6 +64,11 @@ impl Drop for LsmStorage {
 }
 
 impl LsmStorage {
+    /// Opens or recovers an LSM storage instance with the given configuration.
+    pub async fn open(config: LsmConfig) -> Result<Self> {
+        Self::new(config).await
+    }
+
     /// Returns a watch receiver for monitoring system pressure levels.
     pub fn pressure_receiver(
         &self,
@@ -168,6 +180,18 @@ impl LsmStorage {
         snapshot_seq: u64,
     ) -> Result<Option<Bytes>> {
         read::get_at_seq_tracked(self, tx_id, key, snapshot_seq).await
+    }
+
+    /// Performs a tracked prefix scan for transaction `tx_id`.
+    ///
+    /// Evaluates `snapshot_seq = last_applied_seq` ONCE, scans all matching entries, and registers
+    /// each scanned key in transaction `tx_id`'s `ReadSet`.
+    pub async fn scan_prefix_tracked(
+        &self,
+        tx_id: TxId,
+        prefix: &[u8],
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        read::scan_prefix_tracked(self, tx_id, prefix).await
     }
 
     /// Returns the highest sequence number applied to the MemTable and published.

@@ -243,8 +243,9 @@ async fn test_ssi_conflict_rejection_no_sequence_gap_or_wal_leak() {
     let y_mem = storage.get(b"key_y").await.expect("get key_y");
     assert_eq!(y_mem, None);
 
-    // Close storage and reopen to verify no WAL entries were appended for tx1
+    // Close storage and drop instance to release DirLock before reopening
     storage.close().await.expect("close storage");
+    drop(storage);
 
     let reopened = LsmStorage::new(config).await.expect("reopen storage");
     let y_reopened = reopened.get(b"key_y").await.expect("get key_y reopened");
