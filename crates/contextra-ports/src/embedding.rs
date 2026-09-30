@@ -39,6 +39,24 @@ impl<'a> ContextSegment<'a> {
     }
 }
 
+/// Text embedding engine trait.
+pub trait TextEmbeddingEngine: Send + Sync + 'static {
+    /// Generates an embedding for the given text.
+    fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, crate::Result<Vec<f32>>>;
+
+    /// Generates embeddings for multiple texts.
+    /// Default implementation executes sequential calls.
+    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, crate::Result<Vec<Vec<f32>>>> {
+        Box::pin(async move {
+            let mut results = Vec::with_capacity(texts.len());
+            for text in texts {
+                results.push(self.embed(text).await?);
+            }
+            Ok(results)
+        })
+    }
+}
+
 /// Error types encountered during embedding operations.
 #[derive(Debug, Error)]
 pub enum EmbeddingError {
@@ -126,7 +144,7 @@ pub trait LlmTextGeneratorStreaming: LlmTextGenerator {
 }
 
 /// Blanket implementation of `TextEmbeddingEngine` for any `EmbeddingProvider`.
-impl<T: EmbeddingProvider> super::TextEmbeddingEngine for T {
+impl<T: EmbeddingProvider> TextEmbeddingEngine for T {
     fn embed<'a>(&'a self, text: &'a str) -> BoxFuture<'a, crate::Result<Vec<f32>>> {
         Box::pin(async move {
             T::embed(self, text)

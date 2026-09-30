@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Low-level unsafe system abstractions and FFI island for Contextra (Ring 0)"
 
+[package.metadata.contextra]
+ring = "0"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",

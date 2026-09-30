@@ -38,158 +38,203 @@ Das System erzwingt strikte Directed Acyclic Graph (DAG) Modularität.
 
 **Konkretes Negativ-Beispiel für eine verbotene Aufwärtskante:**
 In einer früheren Version hing das Datenbank-Crate `contextra-db` (damals Layer 2 / Ring 3) direkt von `contextra-infer-candle` und `contextra-infer-ollama` (damals Layer 3 / Ring 2) ab, um Embedding-Backends direkt zu instanziieren. Dies verletzte P5, da eine Kern-Engine von konkreten Inferenz-Adaptern abhing.
-Im Zielmodell (`ARCHITECTURE.md` / `README.md` §4.2) erhält die Engine stattdessen Trait-Objekte (`Arc<dyn Embedder>`) aus `contextra-ports` (Ring 0), und die konkrete Verdrahtung erfolgt ausschließlich in Ring 4 (`contextra` Fassade).
+Im Zielmodell (`ARCHITECTURE.md` / `README.md` §4.2) erhält die Engine stattdessen Trait-Objekte (`Arc<dyn EmbeddingProvider>`) aus `contextra-ports` (Ring 0), und die konkrete Verdrahtung erfolgt ausschließlich in Ring 4 (`contextra` Fassade).
 
 ---
 
-<a id="2-crate-inventar"></a>
+<!-- BEGIN GENERATED -->
 ## 2. Crate-Inventar (Ist-Zustand)
 
-Die folgende Tabelle führt alle 34 im Repository unter `crates/` vorgefundenen Fach-Crates auf, eingeordnet in das Ring-Modell basierend auf Spezifikation v9:
+Die folgende Tabelle führt alle 35 im Workspace definierten Crates auf, eingeordnet in das Ring-Modell:
 
-| Crate-Name | Ring | Verantwortlichkeit (1 Satz) | Status |
-|---|---|---|---|
-| `contextra-types` | 0 | Identifikatoren (`DocId`, `TxId`, `TenantId`), Filter-AST und Kernel-Budgets. | Fertig |
-| `contextra-ports` | 0 | `dyn`-kompatible Trait-Definitionen für Storage, Indizes, Embedder und System-Uhren. | Fertig |
-| `contextra-mvcc` | 0 | `SeqLog`, `SnapshotRegistry` und transaktionaler `TxBuffer`. | Fertig |
-| `contextra-wire` | 0 | FlatBuffers-IPC-Generat und Zero-Copy-Adapter (Unsafe-Insel). | Fertig |
-| `contextra-sys` | 0 | System-Abstraktionen für `mmap`, `mlock` und Win32-ACLs (Unsafe-Insel). | Fertig |
-| `contextra-simd` | 0 | AVX2/AVX-512/NEON SIMD-Distanzberechnungskerne mit Laufzeit-Dispatch (Unsafe-Insel). | Fertig |
-| `contextra-crypto` | 0 | AES-256-GCM-SIV, WAL-HMAC-Integritätsketten, Zeroize und Deletion-Proofs. | In Migration |
-| `contextra-vector` | 0 | HNSW- und DiskANN-Vektorindex-Implementierungen (vormals `contextra-vector`). | In Migration |
-| `contextra-text` | 0 | BM25/BM25F-Volltextindexierung und deutsche Kompositazerlegung. | Fertig |
-| `contextra-graph` | 0 | Compressed Sparse Row (CSR) Graph, Forward-Push PPR, Leiden und Hyperkanten. | Fertig |
-| `contextra-rank` | 0 | 4-Signal-Retrieval-Fusion, Score-Kalibrierung und Drift-Messung. | In Migration |
-| `contextra-adapt` | 0 | LinUCB-Bandit-Mathematik, Lyapunov-Drift-Wächter und PID-Regler. | Fertig |
-| `contextra-core` | 0 | Re-Export-Fassade über `types`, `ports`, `mvcc` und `wire` zur Abwärtskompatibilität während der Migration. | Fertig |
-| `contextra-audit-export` | 0 (Utility, kein Kern-Datenpfad) | Generator für Verarbeitungsverzeichnisse gemäß DSGVO Art. 30 ohne direkten Kern-Datenpfadeingriff. | Fertig |
-| `contextra-avv-generator` | 0 (Utility, kein Kern-Datenpfad) | Template-Generator für Auftragsverarbeitungsverträge (AVV) auf Basis technischer Garantie-Spezifikationen. | Fertig |
-| `contextra-license` | 0 (Utility, kein Kern-Datenpfad) | Lizenzierungs- und Aktivierungsprüfung für Feature-Ringe. | Fertig |
-| `contextra-store` | 1 | LSM-Tree Storage Engine mit WAL-Group-Commit und HMAC-Integritätsprüfung. | Fertig |
-| `contextra-kvcache` | 1 | Verschlüsselter Prefix-Radix-Baum und KV-Cache-Segment-Verwaltung. | Fertig |
-| `contextra-checkpoint` | 1 | Time-Travel-Registry und Checkpoint-Verwaltung ohne globalen Zustand. | Fertig |
-| `contextra-infer-candle` | 2 | Native GGUF-Modell-Inferenz via Candle (vormals `contextra-infer-candle`). | In Migration |
-| `contextra-infer-ollama` | 2 | HTTP-Inferenz-Client für Ollama mit Contextual-Chunk-Prefixing (vormals `contextra-infer-ollama`). | In Migration |
-| `contextra-infer-onnx` | 2 | ONNX-Embeddings und Reranking via `ort` (vormals `contextra-infer-onnx`). | In Migration |
-| `contextra-sandbox` | 2 | WASM-Ausführungs-Isolation mit Fuel- und Wall-Clock-Limits via Wasmtime. | Fertig |
-| `contextra-engine` | 3 | Collection-LSM-Anbindung, Multi-Index-Pläne und Schreibtransaktionen (vormals Teil von `contextra-db`). | In Migration |
-| `contextra-cognition` | 3 | Hintergrund-Kompaktierung, Synthese und Konsolidierungs-Scheduler. | In Migration |
-| `contextra-privacy` | 3 | Cloud-Egress Privacy Gateway, PII-Vault, Surrogat-Tokenisierung und DLP. | In Migration |
-| `contextra-router` | 3 | SLM-Profil-Routing und MCP-Dispatch (Numerik nach `adapt` ausgelagert). | In Migration |
-| `contextra-agent` | 3 | Agenten-Workflow-Engine mit auditierbarer State-Machine und DLQ. | Fertig |
-| `contextra-db` | 3 (Legacy-Fassade) | Monolithische Übergangsfassade für Speicher-, Such- und Indexzugriffe während der Zerlegung (siehe §4.2 & `docs/refactor/router-db-edge-audit.md`). | In Migration |
-| `contextra` | 4 | Öffentliche Haupt-Fassade und Composition Root für Rust-Anwendungen. | Fertig |
-| `contextra-mcp` | 4 | Stdio-JSON-RPC MCP-Server-Protokoll-Adapter. | In Migration |
-| `contextra-py` | 4 | PyO3 Python-FFI-Bindings. | In Migration |
-| `contextra-testkit` | Tooling | Deterministische Test-Utilities (`ManualClock`, `InMemoryStorageEngine`, `FaultVfs`) für Unit- und Integrationstests. | Fertig |
+| Crate-Name | Ring | Verantwortlichkeit |
+|---|---|---|
+| `contextra-adapt` | Ring 0 | Adaptive controllers, bandits, and PID regulators for Contextra |
+| `contextra-audit-export` | Ring 0 | GDPR Article 30 Processing Register export generator for Contextra |
+| `contextra-avv-generator` | Ring 0 | AVV (Auftragsverarbeitungsvertrag) template generator referencing technical guarantees for Contextra |
+| `contextra-core` | Ring 0 | Deprecated Strangler Facade re-exporting Ring-0 types, traits, MVCC, and wire IPC for Contextra |
+| `contextra-crypto` | Ring 0 | Encryption at Rest and KV-Cache Security utilities for Contextra |
+| `contextra-graph` | Ring 0 | CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion) |
+| `contextra-mvcc` | Ring 0 | Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for Contextra |
+| `contextra-ports` | Ring 0 | Canonical dyn-compatible port traits for Contextra subsystems |
+| `contextra-rank` | Ring 0 | 4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS |
+| `contextra-simd` | Ring 0 | Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island) |
+| `contextra-sys` | Ring 0 | Low-level unsafe system abstractions and FFI island for Contextra (Ring 0) |
+| `contextra-text` | Ring 0 | Contextra — Text processing and BM25 search for Hybrid Search |
+| `contextra-types` | Ring 0 | Canonical domain types, IDs, budgets, filters, and error types for Contextra |
+| `contextra-vector` | Ring 0 | HNSW vector index with SIMD distance computation for Contextra |
+| `contextra-wire` | Ring 0 | Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zero-copy adapters for Contextra |
+| `contextra-checkpoint` | Ring 1 | Backup and snapshot management for Contextra storage |
+| `contextra-kvcache` | Ring 1 | Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra |
+| `contextra-store` | Ring 1 | LSM-Tree storage engine for Contextra |
+| `contextra-infer-candle` | Ring 2 | Native Candle GGUF ML inference backend for Contextra |
+| `contextra-infer-ollama` | Ring 2 | Keine Beschreibung |
+| `contextra-infer-onnx` | Ring 2 | Keine Beschreibung |
+| `contextra-sandbox` | Ring 2 | WASM Execution Boundary for Contextra MCP CodeExecution Permission |
+| `contextra-agent` | Ring 3 | Persistent agent workflow engine for Contextra — checkpoint/execute/audit loop |
+| `contextra-cognition` | Ring 3 | Contextra — Memory consolidation, compaction, and context management |
+| `contextra-db` | Ring 3 | Contextra — Embedded hybrid-search for AI agents |
+| `contextra-engine` | Ring 3 | Contextra — Core storage, index, and transaction orchestrator engine |
+| `contextra-privacy` | Ring 3 | Cloud Egress Security, DLP & Exfiltration Protection for Contextra (Ring 3) |
+| `contextra-router` | Ring 3 | Keine Beschreibung |
+| `contextra` | Ring 4 | Contextra — Embedded hybrid-search for AI agents (Facade) |
+| `contextra-license` | Ring 4 | License and activation enforcement gate layer for Contextra feature rings |
+| `contextra-mcp` | Ring 4 | Keine Beschreibung |
+| `contextra-py` | Ring 4 | Python bindings for Contextra using PyO3 |
+| `contextra-bench` | Tooling | Contextra — Reproducible Benchmark Harness for Retrieval Accuracy |
+| `contextra-testkit` | Tooling | Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for Contextra |
+| `xtask` | Tooling | Keine Beschreibung |
 
 ---
 
-<a id="3-abhaengigkeitsdiagramm"></a>
 ## 3. Abhängigkeitsdiagramm
 
-Das folgende Mermaid-Diagramm bildet die tatsächlichen `[dependencies]` zwischen allen Crates unter `crates/` zum Ausführungszeitpunkt ab:
+Das folgende Mermaid-Diagramm bildet die tatsächlichen `[dependencies]` zwischen den Workspace-Crates ab:
 
 ```mermaid
 graph TD
-    contextra_adapt[contextra-adapt]
-    contextra_agent[contextra-agent] --> contextra_core[contextra-core]
+    contextra[contextra] --> contextra_core[contextra-core]
+    contextra[contextra] --> contextra_crypto[contextra-crypto]
+    contextra[contextra] --> contextra_db[contextra-db]
+    contextra[contextra] --> contextra_infer_candle[contextra-infer-candle]
+    contextra[contextra] --> contextra_infer_ollama[contextra-infer-ollama]
+    contextra[contextra] --> contextra_infer_onnx[contextra-infer-onnx]
+    contextra[contextra] --> contextra_license[contextra-license]
+    contextra[contextra] --> contextra_ports[contextra-ports]
+    contextra[contextra] --> contextra_privacy[contextra-privacy]
+    contextra[contextra] --> contextra_rank[contextra-rank]
+    contextra[contextra] --> contextra_router[contextra-router]
+    contextra[contextra] --> contextra_store[contextra-store]
+    contextra_adapt[contextra-adapt] --> contextra_ports[contextra-ports]
+    contextra_adapt[contextra-adapt] --> contextra_types[contextra-types]
+    contextra_agent[contextra-agent] --> contextra_checkpoint[contextra-checkpoint]
     contextra_agent[contextra-agent] --> contextra_db[contextra-db]
     contextra_agent[contextra-agent] --> contextra_graph[contextra-graph]
-    contextra_agent[contextra-agent] --> contextra_checkpoint[contextra-checkpoint]
-    contextra_agent[contextra-agent] --> contextra_store[contextra-store]
+    contextra_agent[contextra-agent] --> contextra_ports[contextra-ports]
     contextra_agent[contextra-agent] --> contextra_router[contextra-router]
-    contextra_audit_export[contextra-audit-export] --> contextra_types[contextra-types]
+    contextra_agent[contextra-agent] --> contextra_store[contextra-store]
+    contextra_agent[contextra-agent] --> contextra_types[contextra-types]
     contextra_audit_export[contextra-audit-export] --> contextra_ports[contextra-ports]
+    contextra_audit_export[contextra-audit-export] --> contextra_types[contextra-types]
     contextra_avv_generator[contextra-avv-generator] --> contextra_types[contextra-types]
-    contextra_calibration[contextra-rank] --> contextra_core[contextra-core]
-    contextra_calibration[contextra-rank] --> contextra_adapt[contextra-adapt]
-    contextra_candle[contextra-infer-candle] --> contextra_core[contextra-core]
-    contextra_candle[contextra-infer-candle] --> contextra_calibration[contextra-rank]
-    contextra_candle[contextra-infer-candle] --> contextra_crypto[contextra-crypto]
-    contextra_candle[contextra-infer-candle] --> contextra_store[contextra-store]
+    contextra_bench[contextra-bench] --> contextra_core[contextra-core]
+    contextra_bench[contextra-bench] --> contextra_db[contextra-db]
+    contextra_bench[contextra-bench] --> contextra_graph[contextra-graph]
+    contextra_bench[contextra-bench] --> contextra_infer_onnx[contextra-infer-onnx]
+    contextra_bench[contextra-bench] --> contextra_store[contextra-store]
+    contextra_bench[contextra-bench] --> contextra_text[contextra-text]
+    contextra_bench[contextra-bench] --> contextra_vector[contextra-vector]
     contextra_checkpoint[contextra-checkpoint] --> contextra_core[contextra-core]
+    contextra_checkpoint[contextra-checkpoint] --> contextra_ports[contextra-ports]
+    contextra_checkpoint[contextra-checkpoint] --> contextra_types[contextra-types]
     contextra_cognition[contextra-cognition] --> contextra_engine[contextra-engine]
-    contextra_cognition[contextra-cognition] --> contextra_types[contextra-types]
+    contextra_cognition[contextra-cognition] --> contextra_graph[contextra-graph]
     contextra_cognition[contextra-cognition] --> contextra_ports[contextra-ports]
     contextra_cognition[contextra-cognition] --> contextra_store[contextra-store]
-    contextra_cognition[contextra-cognition] --> contextra_index[contextra-vector]
-    contextra_cognition[contextra-cognition] --> contextra_graph[contextra-graph]
-    contextra_core[contextra-core] --> contextra_types[contextra-types]
-    contextra_core[contextra-core] --> contextra_ports[contextra-ports]
+    contextra_cognition[contextra-cognition] --> contextra_types[contextra-types]
+    contextra_cognition[contextra-cognition] --> contextra_vector[contextra-vector]
     contextra_core[contextra-core] --> contextra_mvcc[contextra-mvcc]
+    contextra_core[contextra-core] --> contextra_ports[contextra-ports]
+    contextra_core[contextra-core] --> contextra_types[contextra-types]
     contextra_core[contextra-core] --> contextra_wire[contextra-wire]
-    contextra_crypto[contextra-crypto] --> contextra_core[contextra-core]
-    contextra_db[contextra-db] --> contextra_engine[contextra-engine]
-    contextra_db[contextra-db] --> contextra_cognition[contextra-cognition]
-    contextra_db[contextra-db] --> contextra_sys[contextra-sys]
-    contextra_db[contextra-db] --> contextra_core[contextra-core]
-    contextra_db[contextra-db] --> contextra_crypto[contextra-crypto]
-    contextra_db[contextra-db] --> contextra_store[contextra-store]
-    contextra_db[contextra-db] --> contextra_index[contextra-vector]
-    contextra_db[contextra-db] --> contextra_text[contextra-text]
-    contextra_db[contextra-db] --> contextra_checkpoint[contextra-checkpoint]
-    contextra_db[contextra-db] --> contextra_graph[contextra-graph]
-    contextra_db[contextra-db] --> contextra_calibration[contextra-rank]
+    contextra_crypto[contextra-crypto] --> contextra_types[contextra-types]
     contextra_db[contextra-db] --> contextra_adapt[contextra-adapt]
-    contextra_embed[contextra-infer-onnx] --> contextra_core[contextra-core]
-    contextra_embed[contextra-infer-onnx] --> contextra_calibration[contextra-rank]
-    contextra_embed[contextra-infer-onnx] --> contextra_candle[contextra-infer-candle]
-    contextra_engine[contextra-engine] --> contextra_sys[contextra-sys]
-    contextra_engine[contextra-engine] --> contextra_types[contextra-types]
-    contextra_engine[contextra-engine] --> contextra_ports[contextra-ports]
-    contextra_engine[contextra-engine] --> contextra_mvcc[contextra-mvcc]
-    contextra_engine[contextra-engine] --> contextra_crypto[contextra-crypto]
-    contextra_engine[contextra-engine] --> contextra_store[contextra-store]
-    contextra_engine[contextra-engine] --> contextra_index[contextra-vector]
-    contextra_engine[contextra-engine] --> contextra_text[contextra-text]
-    contextra_engine[contextra-engine] --> contextra_checkpoint[contextra-checkpoint]
-    contextra_engine[contextra-engine] --> contextra_graph[contextra-graph]
-    contextra_engine[contextra-engine] --> contextra_calibration[contextra-rank]
+    contextra_db[contextra-db] --> contextra_checkpoint[contextra-checkpoint]
+    contextra_db[contextra-db] --> contextra_cognition[contextra-cognition]
+    contextra_db[contextra-db] --> contextra_crypto[contextra-crypto]
+    contextra_db[contextra-db] --> contextra_engine[contextra-engine]
+    contextra_db[contextra-db] --> contextra_graph[contextra-graph]
+    contextra_db[contextra-db] --> contextra_ports[contextra-ports]
+    contextra_db[contextra-db] --> contextra_rank[contextra-rank]
+    contextra_db[contextra-db] --> contextra_store[contextra-store]
+    contextra_db[contextra-db] --> contextra_sys[contextra-sys]
+    contextra_db[contextra-db] --> contextra_text[contextra-text]
+    contextra_db[contextra-db] --> contextra_types[contextra-types]
+    contextra_db[contextra-db] --> contextra_vector[contextra-vector]
     contextra_engine[contextra-engine] --> contextra_adapt[contextra-adapt]
-    contextra_graph[contextra-graph] --> contextra_core[contextra-core]
-    contextra_index[contextra-vector] --> contextra_core[contextra-core]
-    contextra_index[contextra-vector] --> contextra_crypto[contextra-crypto]
-    contextra_index[contextra-vector] --> contextra_simd[contextra-simd]
-    contextra_kvcache[contextra-kvcache] --> contextra_core[contextra-core]
+    contextra_engine[contextra-engine] --> contextra_checkpoint[contextra-checkpoint]
+    contextra_engine[contextra-engine] --> contextra_crypto[contextra-crypto]
+    contextra_engine[contextra-engine] --> contextra_graph[contextra-graph]
+    contextra_engine[contextra-engine] --> contextra_mvcc[contextra-mvcc]
+    contextra_engine[contextra-engine] --> contextra_ports[contextra-ports]
+    contextra_engine[contextra-engine] --> contextra_rank[contextra-rank]
+    contextra_engine[contextra-engine] --> contextra_store[contextra-store]
+    contextra_engine[contextra-engine] --> contextra_sys[contextra-sys]
+    contextra_engine[contextra-engine] --> contextra_text[contextra-text]
+    contextra_engine[contextra-engine] --> contextra_types[contextra-types]
+    contextra_engine[contextra-engine] --> contextra_vector[contextra-vector]
+    contextra_graph[contextra-graph] --> contextra_adapt[contextra-adapt]
+    contextra_graph[contextra-graph] --> contextra_ports[contextra-ports]
+    contextra_graph[contextra-graph] --> contextra_types[contextra-types]
+    contextra_infer_candle[contextra-infer-candle] --> contextra_crypto[contextra-crypto]
+    contextra_infer_candle[contextra-infer-candle] --> contextra_ports[contextra-ports]
+    contextra_infer_candle[contextra-infer-candle] --> contextra_rank[contextra-rank]
+    contextra_infer_candle[contextra-infer-candle] --> contextra_types[contextra-types]
+    contextra_infer_ollama[contextra-infer-ollama] --> contextra_ports[contextra-ports]
+    contextra_infer_ollama[contextra-infer-ollama] --> contextra_rank[contextra-rank]
+    contextra_infer_ollama[contextra-infer-ollama] --> contextra_types[contextra-types]
+    contextra_infer_onnx[contextra-infer-onnx] --> contextra_infer_candle[contextra-infer-candle]
+    contextra_infer_onnx[contextra-infer-onnx] --> contextra_ports[contextra-ports]
+    contextra_infer_onnx[contextra-infer-onnx] --> contextra_rank[contextra-rank]
+    contextra_infer_onnx[contextra-infer-onnx] --> contextra_types[contextra-types]
     contextra_kvcache[contextra-kvcache] --> contextra_crypto[contextra-crypto]
+    contextra_kvcache[contextra-kvcache] --> contextra_ports[contextra-ports]
+    contextra_kvcache[contextra-kvcache] --> contextra_types[contextra-types]
+    contextra_license[contextra-license] --> contextra_ports[contextra-ports]
     contextra_license[contextra-license] --> contextra_types[contextra-types]
-    contextra_mcp[contextra-mcp] --> contextra_db[contextra-db]
-    contextra_mcp[contextra-mcp] --> contextra_core[contextra-core]
-    contextra_mcp[contextra-mcp] --> contextra_crypto[contextra-crypto]
-    contextra_mcp[contextra-mcp] --> contextra_ollama[contextra-infer-ollama]
-    contextra_mcp[contextra-mcp] --> contextra_router[contextra-router]
-    contextra_mcp[contextra-mcp] --> contextra_calibration[contextra-rank]
-    contextra_mcp[contextra-mcp] --> contextra_embed[contextra-infer-onnx]
+    contextra_mcp[contextra-mcp] --> contextra[contextra]
+    contextra_mcp[contextra-mcp] --> contextra_adapt[contextra-adapt]
     contextra_mcp[contextra-mcp] --> contextra_agent[contextra-agent]
-    contextra_mcp[contextra-mcp] --> contextra_candle[contextra-infer-candle]
+    contextra_mcp[contextra-mcp] --> contextra_crypto[contextra-crypto]
+    contextra_mcp[contextra-mcp] --> contextra_infer_candle[contextra-infer-candle]
+    contextra_mcp[contextra-mcp] --> contextra_infer_ollama[contextra-infer-ollama]
+    contextra_mcp[contextra-mcp] --> contextra_infer_onnx[contextra-infer-onnx]
+    contextra_mcp[contextra-mcp] --> contextra_license[contextra-license]
+    contextra_mcp[contextra-mcp] --> contextra_ports[contextra-ports]
+    contextra_mcp[contextra-mcp] --> contextra_privacy[contextra-privacy]
+    contextra_mcp[contextra-mcp] --> contextra_rank[contextra-rank]
+    contextra_mcp[contextra-mcp] --> contextra_types[contextra-types]
+    contextra_mcp[contextra-mcp] --> contextra_wire[contextra-wire]
     contextra_mvcc[contextra-mvcc] --> contextra_types[contextra-types]
-    contextra_ollama[contextra-infer-ollama] --> contextra_core[contextra-core]
-    contextra_ollama[contextra-infer-ollama] --> contextra_calibration[contextra-rank]
     contextra_ports[contextra-ports] --> contextra_types[contextra-types]
+    contextra_privacy[contextra-privacy] --> contextra_ports[contextra-ports]
     contextra_privacy[contextra-privacy] --> contextra_types[contextra-types]
-    contextra_py[contextra-py] --> contextra_router[contextra-router]
-    contextra_py[contextra-py] --> contextra_calibration[contextra-rank]
+    contextra_py[contextra-py] --> contextra_adapt[contextra-adapt]
     contextra_py[contextra-py] --> contextra_core[contextra-core]
     contextra_py[contextra-py] --> contextra_db[contextra-db]
-    contextra_router[contextra-router] --> contextra_core[contextra-core]
+    contextra_py[contextra-py] --> contextra_rank[contextra-rank]
+    contextra_py[contextra-py] --> contextra_router[contextra-router]
+    contextra_py[contextra-py] --> contextra_store[contextra-store]
+    contextra_rank[contextra-rank] --> contextra_ports[contextra-ports]
+    contextra_rank[contextra-rank] --> contextra_types[contextra-types]
     contextra_router[contextra-router] --> contextra_adapt[contextra-adapt]
-    contextra_router[contextra-router] --> contextra_store[contextra-store]
-    contextra_router[contextra-router] --> contextra_db[contextra-db]
-    contextra_sandbox[contextra-sandbox] --> contextra_core[contextra-core]
+    contextra_router[contextra-router] --> contextra_ports[contextra-ports]
+    contextra_router[contextra-router] --> contextra_privacy[contextra-privacy]
+    contextra_router[contextra-router] --> contextra_types[contextra-types]
+    contextra_router[contextra-router] --> contextra_wire[contextra-wire]
+    contextra_sandbox[contextra-sandbox]
     contextra_simd[contextra-simd] --> contextra_core[contextra-core]
-    contextra_store[contextra-store] --> contextra_sys[contextra-sys]
     contextra_store[contextra-store] --> contextra_core[contextra-core]
     contextra_store[contextra-store] --> contextra_crypto[contextra-crypto]
-    contextra_testkit[contextra-testkit] --> contextra_core[contextra-core]
-    contextra_text[contextra-text] --> contextra_core[contextra-core]
-    contextra[contextra] --> contextra_core[contextra-core]
-    contextra[contextra] --> contextra_db[contextra-db]
-    contextra[contextra] --> contextra_candle[contextra-infer-candle]
-    contextra[contextra] --> contextra_ollama[contextra-infer-ollama]
-    contextra[contextra] --> contextra_embed[contextra-infer-onnx]
-    contextra[contextra] --> contextra_router[contextra-router]
+    contextra_store[contextra-store] --> contextra_mvcc[contextra-mvcc]
+    contextra_store[contextra-store] --> contextra_ports[contextra-ports]
+    contextra_store[contextra-store] --> contextra_sys[contextra-sys]
+    contextra_sys[contextra-sys]
+    contextra_testkit[contextra-testkit] --> contextra_ports[contextra-ports]
+    contextra_testkit[contextra-testkit] --> contextra_types[contextra-types]
+    contextra_text[contextra-text] --> contextra_ports[contextra-ports]
+    contextra_text[contextra-text] --> contextra_types[contextra-types]
+    contextra_types[contextra-types]
+    contextra_vector[contextra-vector] --> contextra_core[contextra-core]
+    contextra_vector[contextra-vector] --> contextra_crypto[contextra-crypto]
+    contextra_vector[contextra-vector] --> contextra_simd[contextra-simd]
+    contextra_vector[contextra-vector] --> contextra_sys[contextra-sys]
+    contextra_wire[contextra-wire]
+    xtask[xtask] --> contextra_bench[contextra-bench]
+    xtask[xtask] --> contextra_router[contextra-router]
+    xtask[xtask] --> contextra_types[contextra-types]
 ```
+<!-- END GENERATED -->
 
 ---
 
@@ -205,11 +250,11 @@ Während der schrittweisen Strangler-Migration (§20) existieren vorübergehende
    * *SOLL:* `contextra-db` wird in `engine`/`cognition`/`rank`/`adapt`/`router`/`privacy` zerlegt. `contextra-router` darf nicht von `contextra-db` abhängen.
    * *IST:* `contextra-db` existiert weiterhin als Fassade. `contextra-router` importiert noch `contextra-db` (dokumentiertes Audit: `docs/refactor/router-db-edge-audit.md`).
 3. **Inferenz-Namenskonvention:**
-   * *SOLL:* Umbenennung in `contextra-infer-candle`, `contextra-infer-ollama` und `contextra-infer-onnx`.
-   * *IST:* Crates heißen aktuell noch `contextra-infer-candle`, `contextra-infer-ollama` und `contextra-infer-onnx`.
+   * *SOLL:* Die Inferenz-Crates tragen vereinheitlichte Namen `contextra-infer-candle`, `contextra-infer-ollama` und `contextra-infer-onnx`.
+   * *IST:* Vollständig umbenannt und im Workspace unter diesen Namen registriert (vormals `contextra-candle`, `contextra-ollama`, `contextra-embed`).
 4. **Vektorindex-Namenskonvention:**
-   * *SOLL:* Umbenennung in `contextra-vector`.
-   * *IST:* Crate heisst aktuell noch `contextra-vector`.
+   * *SOLL:* Das Vektorindex-Crate heißt `contextra-vector`.
+   * *IST:* Vollständig umbenannt und im Workspace als `contextra-vector` registriert (vormals `contextra-index`).
 5. **Legacy-Calibration-Crate:**
    * *SOLL:* `contextra-rank` geht in `contextra-adapt` und `contextra-rank` auf.
    * *IST:* `contextra-rank` existiert aktuell noch als eigenständiges Crate.

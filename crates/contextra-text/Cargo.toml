@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Contextra — Text processing and BM25 search for Hybrid Search"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }

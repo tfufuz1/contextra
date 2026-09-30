@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for Contextra"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
 contextra-types = { workspace = true }
 parking_lot = { workspace = true }

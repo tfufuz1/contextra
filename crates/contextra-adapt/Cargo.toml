@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Adaptive controllers, bandits, and PID regulators for Contextra"
 
+[package.metadata.contextra]
+ring = "0"
+
 [dependencies]
 blake3 = { workspace = true }
 contextra-ports = { workspace = true }

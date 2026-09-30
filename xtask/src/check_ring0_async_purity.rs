@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use crate::check_ring_layering::{get_crate_ring, Ring};
+use crate::check_ring_layering::{get_workspace_ring_map, Ring};
 
 pub const DENY_LIST: &[&str] = &["tokio", "async-std", "smol", "futures-executor"];
 
@@ -116,12 +116,12 @@ pub fn run_check_ring0_async_purity() -> Result<bool, String> {
     let allowlist = load_allowlist(&allowlist_path)?;
 
     // Alle Ring 0 Crates ermitteln
-    let workspace_crates = crate::get_workspace_crates();
-    let mut ring0_crates: Vec<String> = workspace_crates
-        .iter()
-        .filter_map(|c| {
-            if get_crate_ring(&c.name) == Some(Ring::Ring0) {
-                Some(c.name.clone())
+    let ring_map = get_workspace_ring_map()?;
+    let mut ring0_crates: Vec<String> = ring_map
+        .into_iter()
+        .filter_map(|(name, ring)| {
+            if ring == Ring::Ring0 {
+                Some(name)
             } else {
                 None
             }

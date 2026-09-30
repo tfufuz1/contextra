@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Contextra — Memory consolidation, compaction, and context management"
 
+[package.metadata.contextra]
+ring = "3"
+
 [dependencies]
 contextra-engine = { workspace = true }
 contextra-types = { workspace = true }

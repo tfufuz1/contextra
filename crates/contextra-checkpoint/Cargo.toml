@@ -9,6 +9,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Backup and snapshot management for Contextra storage"
 
+[package.metadata.contextra]
+ring = "1"
+
 [dependencies]
 contextra-types = { version = "0.1.0", path = "../contextra-types" }
 contextra-ports = { version = "0.1.0", path = "../contextra-ports" }

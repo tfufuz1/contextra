@@ -10,6 +10,9 @@ rust-version.workspace = true
 default-run = "contextra-bench"
 description = "Contextra — Reproducible Benchmark Harness for Retrieval Accuracy"
 
+[package.metadata.contextra]
+ring = "tooling"
+
 [lib]
 name = "contextra_bench"
 path = "src/lib.rs"

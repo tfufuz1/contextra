@@ -1,5 +1,10 @@
-# ADR-103: Lücken-Dokumentation (Ausgelassenes ADR-103)
+# ADR-103: Dokumentation der ADR-103 Lücke
 
-* **Datum**: 2026-09-28
-* **Status**: ✅ Final
-* **Entscheidung**: Die ADR-Nummer ADR-103 wurde im Zuge paralleler Refactoring-Sessions übersprungen. Das nächste vergebene ADR ist ADR-104.
+## Status
+Akzeptiert
+
+## Kontext
+ADR-103 war historisch nicht vergeben oder wurde während der ADR-Konsolidierung übersprungen.
+
+## Entscheidung
+ADR-103 wird hiermit formal als Lückendokumentation registriert.

@@ -8,6 +8,9 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[package.metadata.contextra]
+ring = "2"
+
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
