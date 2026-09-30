@@ -1,6 +1,8 @@
 use super::audit::{SecurityAuditLogger, SecurityAuditRecord};
 use super::policy::{PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};
+use contextra_ports::{Clock, SystemClock};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use unicode_normalization::UnicodeNormalization;
 
 /// Vornormalisiertes Injection-Pattern zur Performance-Optimierung.
@@ -27,13 +29,26 @@ pub struct NormalizedPattern {
 ///
 /// Für defense-in-depth wird die Kombination mit LLM-seitigem
 /// Instruction-Hierarchy-Enforcement (system > user > tool-output) empfohlen.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct PromptInjectionGuard {
     policy: QuarantinePolicy,
     pub redaction_placeholder: String,
     patterns: Vec<String>,
     normalized_patterns: Vec<NormalizedPattern>,
     audit_logger: SecurityAuditLogger,
+    clock: Arc<dyn Clock>,
+}
+
+impl std::fmt::Debug for PromptInjectionGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PromptInjectionGuard")
+            .field("policy", &self.policy)
+            .field("redaction_placeholder", &self.redaction_placeholder)
+            .field("patterns", &self.patterns)
+            .field("normalized_patterns", &self.normalized_patterns)
+            .field("audit_logger", &self.audit_logger)
+            .finish()
+    }
 }
 
 impl Default for PromptInjectionGuard {
@@ -74,7 +89,22 @@ impl PromptInjectionGuard {
             patterns,
             normalized_patterns,
             audit_logger,
+            clock: Arc::new(SystemClock::new()),
         }
+    }
+
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    pub fn clock(&self) -> &Arc<dyn Clock> {
+        &self.clock
+    }
+
+    fn get_timestamp(&self) -> String {
+        let secs = self.clock.now_unix_nanos() / 1_000_000_000;
+        format!("UNIX_TIMESTAMP:{secs}")
     }
 
     /// Gibt die Standard-Erkennungsmuster zurück.
@@ -585,7 +615,7 @@ impl PromptInjectionGuard {
                     }
 
                     // 2. Sicherheits-Audit-Log schreiben
-                    let timestamp = chrono_or_simple_timestamp();
+                    let timestamp = self.get_timestamp();
                     let record = SecurityAuditRecord {
                         timestamp,
                         event_type: "SUSPICIOUS_PROMPT_INJECTION_DETECTED".to_string(),
@@ -602,11 +632,4 @@ impl PromptInjectionGuard {
             false
         }
     }
-}
-
-fn chrono_or_simple_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let start = SystemTime::now();
-    let since_epoch = start.duration_since(UNIX_EPOCH).unwrap_or_default();
-    format!("UNIX_TIMESTAMP:{}", since_epoch.as_secs())
 }
