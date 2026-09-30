@@ -1,5 +1,5 @@
 use super::compensating_actions::{
-    CommitLedger, CompensateGraphAction, CompensateHnswAction, CompensateLsmAction,
+    CommitLedger, CompensateGraphAction, CompensateHnswAction,
     CompensateTextAction, RollbackStagedAction,
 };
 use super::db_transaction::DbTransaction;

@@ -45,6 +45,24 @@ Abhängigkeiten dürfen ausschließlich **von höheren Ringen auf tiefere Ringe*
 - **Ring `sovereign` (Quelloffen, Opt-in Aktivierung):** Quellcode bleibt offen (Löschbeweis `DeletionProof`, Privacy Gateway, Zero-Net-Traffic). Aktivierung ist wegen Latenzkosten opt-in.
 - **Ring `compliance` (Closed-Source, Commercial):** Quellcode verlässt das Haus nie. Vertrieb als signiertes Binary/Appliance. Beinhaltet Lizenzschicht (`contextra-license`), BSI TR-02102-1 Mapping und Mandanten-Scoping. <!-- crate-ref-ignore -->
 
+### 1.3 Auto-Entity-Extraktion Konfiguration & Abschaltwege
+
+Die automatische OpenIE-Entitätsextraktion beim Einfügen von Dokumenten verfügt über zwei steuerbare Abschaltwege und eine strikte Vorrangordnung:
+
+1. **Compile-Zeit Opt-Out (`auto-extraction-opt-out` Feature):**
+   Das Aktivieren des Cargo-Features `auto-extraction-opt-out` deaktiviert die Entitätsextraktion statisch für den gesamten Build, unabhängig von jeglicher Laufzeit-Konfiguration.
+2. **Laufzeit-Konfiguration (`AutoExtractionMode` / `CollectionProfile`):**
+   Wenn das Compile-Zeit-Feature nicht gesetzt ist, erfolgt die Steuerung dynamisch per Collection über `AutoExtractionMode` (`Enabled` vs. `Disabled`) im `CollectionProfile` bzw. in `AutoExtractionConfig`.
+
+**Vorrangordnung (Precedence):**
+`Compile-Zeit Opt-Out (Feature)` **>** `Laufzeit Mode (Disabled)` **>** `Default Mode (Enabled)`
+
+*Falls `auto-extraction-opt-out` aktiv ist, hat eine Laufzeit-Einstellung `AutoExtractionMode::Enabled` keine Wirkung.*
+
+**Deployment-Tier Defaults & Spec D.6 Status:**
+- `EdgeMinimal`, `PowerUserLocal` und `EnterpriseShared` nutzen `DEFAULT_AUTO_EXTRACTION_MODE` (`AutoExtractionMode::Enabled`).
+- `EnterpriseRegulated` nutzt den benannten Tier-Default `ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT` (`AutoExtractionMode::Enabled`). Der Status ist im Code und in der Spezifikation als `DECISION-PENDING (Spec D.6)` hinterlegt.
+
 ---
 
 <a id="2-vier-schichten-modell"></a>
@@ -173,15 +191,28 @@ Das Repository erzwingt `#![forbid(unsafe_code)]` in allen Crates mit exakt **dr
 
 Jeder `unsafe`-Block erfordert zwingend eine `// SAFETY:`-Begründung.
 
-### 6.2 Locking-Disziplin
+### 6.2 Locking-Disziplin & Lock-Familien
 
 ```
 collections (RwLock) → kv_locks (schlüssel-granular via KvKeyLocks) → embedder (RwLock)
 ```
 
 - Mehrfach-Locks werden ausnahmslos in fester Reihenfolge von links nach rechts akquiriert.
-- `KvKeyLocks` akquiriert Shard-Indizes zwingend in aufsteigend sortierter Reihenfolge (`acquire_multi_sorted`), um Deadlocks auszuschließen.
+- `KvKeyLocks` akquiriert Shard-Indizes zwingend in aufsteigend sortierter und deduplizierter Reihenfolge via `lock_many_sorted` und die reine synchrone Funktion `sorted_unique_shards`, um Selbst- und Kreuz-Deadlocks auszuschließen.
 - Kein `.await` unter gehaltenen synchronen Mutex/RwLock-Guards.
+
+#### Lock-Familien im Workspace
+
+Contextra setzt drei explizit getrennte Lock-Familien ein, je nach Latenz-, Async- und Verifikationsanforderungen:
+
+1. **`parking_lot` (`parking_lot::Mutex`, `parking_lot::RwLock`)**:
+   - *Verwendungszweck*: Synchroner Hot-Path, In-Memory-Indexstrukturen, Skipartitionierung und Caches (`MemTable`, `SkipList`, `InvertedIndex` Staged Stats, `HnswIndex` Node-Locks).
+   - *Regel*: Höchste Performance, kein Overhead für Async-Contexts; Guards dürfen **niemals** über `.await`-Punkte hinweg gehalten werden.
+2. **`tokio::sync` (`tokio::sync::Mutex`, `tokio::sync::RwLock`)**:
+   - *Verwendungszweck*: Asynchrone Schichten, bei denen Sperren über `.await`-Abläufe oder langlaufende I/O-Operationen gehalten werden müssen (z. B. `KvKeyLocks` in `Collection`, Hintergrund-Maintance, Transaktions-Commit-Pipeline).
+   - *Regel*: Verhindert Thread-Blocking der Tokio-Worker-Threads bei Latenzen im I/O-Pfad.
+3. **`std::sync` (`std::sync::Mutex`, `std::sync::RwLock`)**:
+   - *Verwendungszweck*: Standard-Bibliothekssynchronisation für statische/lazy Initialisierungen (`std::sync::LazyLock`), einfache synchrone State-Kapselung sowie Nebenläufigkeitsmodellierung in Loom-Tests (unter `cfg(loom)` abstrahiert via `loom::sync::Mutex`).
 
 ---
 

@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Lückenlose Abdeckung aller Collection- und Storage-Operationen unter Mandanten-Isolation (TenantScopedStorage N21).
 // INVARIANTEN: Strikte Key-Isolation (INV-TENANT-2); Keine un-tenanted Keys im Storage für Mandanten-Aktionen; Mandant B sieht niemals Daten von Mandant A.
