@@ -50,6 +50,7 @@ contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [features]
 default = []
+reranking = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)
 encryption-at-rest = ["dep:contextra-crypto", "contextra-store/encryption-at-rest"]
 bench = []
@@ -62,4 +63,4 @@ edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = []
 entity-extraction = []
-auto-extraction-opt-out = []
+auto-extraction-opt-out = ["contextra-types/auto-extraction-opt-out"]

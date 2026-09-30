@@ -49,7 +49,23 @@ impl McpServer {
         };
 
         // Initialize collection profile and resolve configuration
-        let profile = tier.resolve();
+        let mut profile = tier.resolve();
+
+        if let Some(ae_val) = args.get("auto_extraction") {
+            let ae_str = ae_val.as_str().ok_or_else(|| {
+                McpError::invalid_params("Invalid params: 'auto_extraction' must be a string ('enabled' or 'disabled')")
+            })?;
+            match ae_str.to_lowercase().as_str() {
+                "enabled" => profile.auto_extraction = contextra::collection_profile::AutoExtractionMode::Enabled,
+                "disabled" => profile.auto_extraction = contextra::collection_profile::AutoExtractionMode::Disabled,
+                invalid => {
+                    return Err(McpError::invalid_params(format!(
+                        "Invalid auto_extraction '{invalid}'. Valid options are: 'enabled', 'disabled'"
+                    )));
+                }
+            }
+        }
+
         profile.validate().map_err(|e| {
             McpError::invalid_params(format!("Invalid collection profile configuration: {e}"))
         })?;
@@ -61,6 +77,7 @@ impl McpServer {
             "ok": true,
             "collection": name,
             "deployment_tier": tier_str,
+            "auto_extraction": format!("{:?}", profile.auto_extraction).to_lowercase(),
             "kv_delete_mode": format!("{:?}", profile.kv_delete_mode)
         }))
     }

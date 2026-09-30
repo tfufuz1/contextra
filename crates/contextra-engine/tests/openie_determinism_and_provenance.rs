@@ -4,7 +4,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_engine::collection::crud::{AutoExtractionConfig, EntityExtractionConfig};
+use contextra_engine::collection::crud::{AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig};
 #[cfg(feature = "entity-extraction")]
 use contextra_engine::extraction::extract_triples;
 use contextra_ports::{BoxFuture, LlmTextGenerator, TextEmbeddingEngine};
@@ -112,6 +112,7 @@ async fn test_openie_edge_provenance_source_doc_id() {
     ]"#;
     let mock_llm = Arc::new(DeterministicMockLlm::new(mock_json));
     let auto_cfg = AutoExtractionConfig {
+        mode: AutoExtractionMode::Enabled,
         enabled: true,
         entity_config: EntityExtractionConfig {
             enabled: true,
@@ -168,6 +169,7 @@ async fn test_openie_deletion_orphan_simulation() {
     ]"#;
     let mock_llm = Arc::new(DeterministicMockLlm::new(mock_json));
     let auto_cfg = AutoExtractionConfig {
+        mode: AutoExtractionMode::Enabled,
         enabled: true,
         entity_config: EntityExtractionConfig {
             enabled: true,

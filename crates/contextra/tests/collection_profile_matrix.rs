@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: Test matrix of PerformanceProfile x KvDeleteMode combinations (Spec B.1.8)
 
-use contextra::collection_profile::{CollectionProfile, CollectionProfileError, LsmTuning};
+use contextra::collection_profile::{AutoExtractionMode, CollectionProfile, CollectionProfileError, LsmTuning};
 use contextra::performance_profile::PerformanceProfile;
 use contextra_store::kv::delete_mode::KvDeleteMode;
 
@@ -28,6 +28,7 @@ fn test_collection_profile_matrix() {
                 performance: perf,
                 kv_delete_mode: kv,
                 lsm_tuning: dummy_tuning,
+                auto_extraction: AutoExtractionMode::Enabled,
             };
 
             let res = profile.validate();

@@ -8,6 +8,7 @@ use crate::collection::Collection;
 #[cfg(feature = "entity-extraction")]
 pub use crate::extraction::EntityExtractionConfig;
 use contextra_ports::{LlmTextGenerator, StorageEngine, VectorIndex};
+pub use contextra_types::AutoExtractionMode;
 use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -34,19 +35,53 @@ impl Default for EntityExtractionConfig {
 /// Konfiguration fuer die automatische Entitaetsextraktion beim Einfuegen von Dokumenten.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoExtractionConfig {
+    /// Laufzeit-Modus fuer die automatische Extraktion (Default: Enabled, bzw. Disabled wenn Feature `auto-extraction-opt-out` aktiv ist).
+    #[serde(default)]
+    pub mode: AutoExtractionMode,
     /// Ob die automatische Extraktion aktiviert ist (Default: true, bzw. false wenn Feature `auto-extraction-opt-out` aktiv ist).
     pub enabled: bool,
     /// Konfiguration fuer die unterliegende Entitaetsextraktion.
     pub entity_config: EntityExtractionConfig,
 }
 
+impl AutoExtractionConfig {
+    /// Erstellt eine neue `AutoExtractionConfig` mit dem angegebenen Modus.
+    pub fn new(mode: AutoExtractionMode) -> Self {
+        Self {
+            mode,
+            enabled: mode.is_enabled(),
+            entity_config: EntityExtractionConfig::default(),
+        }
+    }
+
+    /// Setzt den Laufzeit-Modus (Builder Pattern).
+    pub fn with_mode(mut self, mode: AutoExtractionMode) -> Self {
+        self.mode = mode;
+        self.enabled = mode.is_enabled();
+        self
+    }
+
+    /// Prueft, ob die automatische Extraktion unter Beruecksichtigung aller Abschaltwege aktiv ist.
+    ///
+    /// Precedence:
+    /// 1. Compile-Zeit feature `auto-extraction-opt-out` -> erzwungen `false`
+    /// 2. Laufzeit `mode == AutoExtractionMode::Disabled` -> `false`
+    /// 3. Laufzeit `enabled == false` -> `false`
+    #[inline]
+    pub fn is_enabled(&self) -> bool {
+        if cfg!(feature = "auto-extraction-opt-out") {
+            return false;
+        }
+        self.enabled && self.mode.is_enabled()
+    }
+}
+
 impl Default for AutoExtractionConfig {
     fn default() -> Self {
+        let mode = AutoExtractionMode::default();
         Self {
-            #[cfg(not(feature = "auto-extraction-opt-out"))]
-            enabled: true,
-            #[cfg(feature = "auto-extraction-opt-out")]
-            enabled: false,
+            mode,
+            enabled: mode.is_enabled(),
             entity_config: EntityExtractionConfig::default(),
         }
     }
@@ -105,7 +140,7 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
     generator: &dyn LlmTextGenerator,
     cfg: &AutoExtractionConfig,
 ) -> Result<usize> {
-    if !cfg.enabled {
+    if !cfg.is_enabled() {
         return Ok(0);
     }
 

@@ -468,6 +468,72 @@ async fn test_search_validates_empty_or_oversized_query() {
 }
 
 #[tokio::test]
+async fn test_create_collection_with_auto_extraction_param() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // 1. Create collection with auto_extraction = "disabled"
+    let req1 = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_create_collection",
+            "arguments": {
+                "collection": "disabled_ae_col",
+                "deployment_tier": "PowerUserLocal",
+                "auto_extraction": "disabled"
+            }
+        }),
+    );
+    let resp1 = server.handle(req1).await;
+    assert!(resp1.error.is_none());
+    let res1_val = serde_json::to_value(&resp1).unwrap();
+    let text1 = res1_val["result"]["content"][0]["text"].as_str().unwrap();
+    let json1: Value = serde_json::from_str(text1).unwrap();
+    assert_eq!(json1["ok"], true);
+    assert_eq!(json1["collection"], "disabled_ae_col");
+    assert_eq!(json1["auto_extraction"], "disabled");
+
+    // 2. Create collection with auto_extraction = "enabled"
+    let req2 = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_create_collection",
+            "arguments": {
+                "collection": "enabled_ae_col",
+                "deployment_tier": "EnterpriseRegulated",
+                "auto_extraction": "enabled"
+            }
+        }),
+    );
+    let resp2 = server.handle(req2).await;
+    assert!(resp2.error.is_none());
+    let res2_val = serde_json::to_value(&resp2).unwrap();
+    let text2 = res2_val["result"]["content"][0]["text"].as_str().unwrap();
+    let json2: Value = serde_json::from_str(text2).unwrap();
+    assert_eq!(json2["ok"], true);
+    assert_eq!(json2["collection"], "enabled_ae_col");
+    assert_eq!(json2["auto_extraction"], "enabled");
+
+    // 3. Create collection omitting auto_extraction (inherits tier default: "enabled")
+    let req3 = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_create_collection",
+            "arguments": {
+                "collection": "default_ae_col",
+                "deployment_tier": "EnterpriseRegulated"
+            }
+        }),
+    );
+    let resp3 = server.handle(req3).await;
+    assert!(resp3.error.is_none());
+    let res3_val = serde_json::to_value(&resp3).unwrap();
+    let text3 = res3_val["result"]["content"][0]["text"].as_str().unwrap();
+    let json3: Value = serde_json::from_str(text3).unwrap();
+    assert_eq!(json3["ok"], true);
+    assert_eq!(json3["auto_extraction"], "enabled");
+}
+
+#[tokio::test]
 async fn test_insert_validates_vector_nan_inf_and_empty() {
     let (server, _tmp) = create_mock_server().await;
 

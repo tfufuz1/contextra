@@ -16,6 +16,6 @@ mod update;
 #[cfg(test)]
 mod tests;
 
-pub use auto_extraction::{AutoExtractionConfig, EntityExtractionConfig};
+pub use auto_extraction::{AutoExtractionConfig, AutoExtractionMode, EntityExtractionConfig};
 pub(super) use internal::validate_doc_id;
 pub use read::{DEFAULT_SCAN_LIMIT, HARD_SCAN_CEILING, MAX_SCAN_RESULTS};
