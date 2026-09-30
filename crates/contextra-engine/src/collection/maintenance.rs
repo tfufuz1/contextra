@@ -511,10 +511,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// and `importance` metadata for TxId-based decay sweep (`effective_score < DECAY_DELETION_THRESHOLD`).
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn trigger_expiry_cleanup(&self) -> Result<usize> {
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?
-            .as_millis() as u64;
+        let now_ms = self.clock.read().now_unix_nanos() / 1_000_000;
 
         let now_tx = self.next_tx.load(Ordering::SeqCst);
         let user_prefix = self.namespaced_key(b"", 0);

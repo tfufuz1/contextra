@@ -105,3 +105,74 @@ async fn test_expiry_reaper_cleans_expired_working_memory() -> contextra_types::
     db.close().await?;
     Ok(())
 }
+
+struct TestClock {
+    nanos: std::sync::atomic::AtomicU64,
+}
+
+impl contextra_ports::Clock for TestClock {
+    fn now_unix_nanos(&self) -> u64 {
+        self.nanos.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.nanos.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+#[tokio::test]
+async fn test_trigger_expiry_cleanup_with_custom_clock() -> contextra_types::Result<()> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+
+    let tmp = TempDir::new().expect("Failed to create temporary directory");
+    let config = ContextraConfig {
+        dimension: 4,
+        consolidation_enabled: false,
+        ..Default::default()
+    };
+
+    let db = Contextra::open_with_config(tmp.path(), config).await?;
+    let col = db.collection("custom_clock_col").await?;
+
+    let test_clock = Arc::new(TestClock {
+        nanos: AtomicU64::new(10_000_000_000), // 10,000 ms
+    });
+    col.set_clock(test_clock.clone());
+
+    let vec = [0.1, 0.2, 0.3, 0.4];
+
+    // Document created at 10,000 ms with TTL 5,000 ms (expires at 15,000 ms)
+    col.insert(
+        "doc_ttl_wall",
+        &vec,
+        Some(json!({
+            "created_at_ms": 10_000,
+            "ttl_ms": 5_000
+        })),
+    )
+    .await?;
+
+    // 1. At 10,000 ms (now_ms < expire_at 15,000 ms) -> not expired
+    let cleaned = col.trigger_expiry_cleanup().await?;
+    assert_eq!(cleaned, 0, "Document must not be expired at 10,000 ms");
+    assert!(col.get("doc_ttl_wall").await?.is_some());
+
+    // 2. Advance clock to 14,999 ms -> not expired
+    test_clock.nanos.store(14_999_000_000, Ordering::Relaxed);
+    let cleaned = col.trigger_expiry_cleanup().await?;
+    assert_eq!(cleaned, 0, "Document must not be expired at 14,999 ms");
+    assert!(col.get("doc_ttl_wall").await?.is_some());
+
+    // 3. Advance clock to 15,000 ms -> expired
+    test_clock.nanos.store(15_000_000_000, Ordering::Relaxed);
+    let cleaned = col.trigger_expiry_cleanup().await?;
+    assert_eq!(cleaned, 1, "Document must be expired at 15,000 ms");
+    assert!(
+        col.get("doc_ttl_wall").await?.is_none(),
+        "doc_ttl_wall must be deleted after expiry cleanup"
+    );
+
+    db.close().await?;
+    Ok(())
+}
