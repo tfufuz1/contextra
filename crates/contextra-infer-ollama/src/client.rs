@@ -20,6 +20,6 @@ pub use config::*;
 pub use core::OllamaClient;
 #[cfg(test)]
 #[allow(unused_imports)]
-pub(crate) use core::{parse_prompt_template, ParsedPrompt};
+pub(crate) use core::{parse_prompt_template, retry_jitter, ParsedPrompt};
 pub use errors::*;
 pub use validation::*;
