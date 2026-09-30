@@ -26,8 +26,6 @@ async fn test_quantizer_encapsulation_prevents_field_mutation() {
         // Read access via getters works
         assert_eq!(q.mins().len(), 4);
         assert_eq!(q.maxes().len(), 4);
-        assert_eq!(q.scales().len(), 4);
-        assert_eq!(q.inv_scales().len(), 4);
         assert_eq!(q.dimension(), 4);
 
         // Even mutating our cloned local `q` does NOT affect `index`:

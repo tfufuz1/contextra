@@ -5,7 +5,7 @@ mod query;
 
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{extract_effective_importance, Collection};
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_ports::{GraphIndex, Reranker, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, EntityId, Result, TxId};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
@@ -30,7 +30,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// k_pool=20 → Recall@5=0.458; k_pool=100 → Recall@5=0.888 (Qualitätsknie).
     pub const DEFAULT_MIN_RERANK_CANDIDATES: usize = 100;
 
-    #[cfg(feature = "reranking")]
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, text, vector, reranker, anchor_entities))]
@@ -39,7 +38,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         text: &str,
         vector: &[f32],
         k: usize,
-        reranker: Option<&contextra_infer_onnx::CrossEncoderReranker>,
+        reranker: Option<&dyn Reranker>,
         anchor_entities: Option<&[contextra_types::EntityId]>,
     ) -> Result<Vec<crate::SearchResult>> {
         let mut builder = self.query().text(text).vector(vector).k(k);

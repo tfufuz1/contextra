@@ -107,6 +107,7 @@ async fn test_consolidation_pass_cascades_edge_invalidation() {
         max_turns_per_segment: 20,
         segment_cohesion_threshold: 0.70,
         near_duplicate_cosine_threshold: 0.95,
+        ..Default::default()
     };
 
     let result = execute_consolidation_pass(&collection, &turns, &consolidation_config)

@@ -18,10 +18,7 @@
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
 use crate::ed25519_proof::{DeletionProofError, SignatureVersion};
-#[cfg(not(test))]
 use crate::error::CryptoError;
-#[cfg(test)]
-use contextra_crypto::error::CryptoError;
 use contextra_types::{
     error::HnswDeletionError, CollectionId, ContextraError, DocId, Result, TenantId, TxId,
 };

@@ -2,10 +2,11 @@
 // STAND: 2026-09-15T16:10:40Z (SESSION: ec33599e)
 // ZWECK: Haupt-Reranker-API (`CrossEncoderReranker`) und Backend-Abstraktion.
 
+use contextra_ports::{BoxFuture, Reranker};
 use contextra_rank::PlattScaler;
-use contextra_types::{ConfigFingerprint, ContextraError};
+use contextra_types::{ConfigFingerprint, ContextraError, RerankResult};
 
-use super::config::{RerankConfig, RerankResult, MAX_CANDIDATES};
+use super::config::{RerankConfig, MAX_CANDIDATES};
 
 #[cfg(feature = "onnx")]
 use super::onnx::OnnxReranker;
@@ -181,5 +182,23 @@ impl CrossEncoderReranker {
                 onnx.rerank(_query, candidates, &calib).await
             }
         }
+    }
+}
+
+impl Reranker for CrossEncoderReranker {
+    fn rerank<'a>(
+        &'a self,
+        query: &'a str,
+        candidates: &'a [String],
+    ) -> BoxFuture<'a, Result<Vec<RerankResult>, ContextraError>> {
+        Box::pin(self.rerank(query, candidates))
+    }
+
+    fn record_implicit_feedback(&self, results: &[RerankResult], implicit_relevant_k: usize) {
+        self.record_implicit_feedback(results, implicit_relevant_k);
+    }
+
+    fn rerank_deadline_ms(&self) -> Option<u64> {
+        self._config.rerank_deadline_ms
     }
 }
