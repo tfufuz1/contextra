@@ -526,3 +526,12 @@ impl Default for ConfigFingerprint {
         Self::new("default", "F16", "", 0.0)
     }
 }
+
+/// Result of a cross-encoder reranking operation over a single candidate document.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RerankResult {
+    /// Original index of the candidate document in the pre-reranking candidate array.
+    pub original_index: usize,
+    /// Cross-encoder relevance score (higher indicates greater relevance).
+    pub score: f32,
+}
