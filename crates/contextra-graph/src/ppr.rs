@@ -105,6 +105,46 @@ pub(crate) fn compute_ppr(
     compute_ppr_with_context(inner, seed_nodes, config, deleted_nodes, &mut ctx)
 }
 
+/// Calculates Personalized PageRank using APPRH selector routing and hysteresis gate evaluation (P1.3).
+#[cfg(feature = "apprh-diffusion")]
+pub fn compute_ppr_with_apprh_selector(
+    inner: &GraphInner,
+    seed_nodes: &[EntityId],
+    config: &PprConfig,
+    deleted_nodes: &DeletedView,
+    ctx: &mut PprContext,
+    selector: &crate::apprh::ApprhSelector,
+    apprh_params: &crate::apprh::ApprhParams,
+) -> Vec<(EntityId, f32)> {
+    let ppr_params = crate::path_rag::PprParams {
+        alpha: if config.damping_factor.is_nan()
+            || config.damping_factor <= 0.0
+            || config.damping_factor >= 1.0
+        {
+            0.15
+        } else {
+            1.0 - config.damping_factor
+        },
+        epsilon: if config.convergence_epsilon.is_nan() || config.convergence_epsilon <= 0.0 {
+            1e-6
+        } else {
+            config.convergence_epsilon
+        },
+        hyperedge_decay: apprh_params.hyperedge_decay_factor,
+    };
+
+    match selector.evaluate_and_run(inner, seed_nodes, &ppr_params, apprh_params) {
+        Ok(results) => results,
+        Err(err) => {
+            tracing::warn!(
+                error = %err,
+                "APPRH selector dispatch failed; falling back to standard PPR"
+            );
+            compute_ppr_with_context(inner, seed_nodes, config, deleted_nodes, ctx)
+        }
+    }
+}
+
 /// Calculates Personalized PageRank (PPR) over a compacted `GraphInner` state using a reusable [`PprContext`].
 ///
 /// # Invarianten
