@@ -390,8 +390,8 @@ pub fn check_ring_layering_from_metadata_json(
     // Detect stale allowlist entries (entries in LAYER_ALLOWLIST that were not matched by any active violation)
     for entry in LAYER_ALLOWLIST {
         if !matched_allowlist_entries.contains(&(entry.from_crate, entry.to_crate)) {
-            let from_ring = get_crate_ring(entry.from_crate).unwrap_or(Ring::Ring0);
-            let to_ring = get_crate_ring(entry.to_crate).unwrap_or(Ring::Ring0);
+            let from_ring = ring_map.get(entry.from_crate).copied().unwrap_or(Ring::Ring0);
+            let to_ring = ring_map.get(entry.to_crate).copied().unwrap_or(Ring::Ring0);
             violations.push(RingViolation {
                 from_crate: entry.from_crate.to_string(),
                 from_ring,
@@ -551,11 +551,13 @@ mod tests {
                     "name": "contextra-types",
                     "dependencies": [
                         { "name": "contextra-graph", "kind": null }
-                    ]
+                    ],
+                    "metadata": { "contextra": { "ring": "0" } }
                 },
                 {
                     "name": "contextra-graph",
-                    "dependencies": []
+                    "dependencies": [],
+                    "metadata": { "contextra": { "ring": "0" } }
                 }
             ],
             "workspace_members": ["contextra-types", "contextra-graph"]
@@ -577,13 +579,14 @@ mod tests {
                 {
                     "name": "contextra-engine",
                     "dependencies": [
-                        { "name": "contextra-store", "kind": null }
+                        { "name": "contextra-agent", "kind": null }
                     ],
-                    "metadata": { "contextra": { "ring": "0" } }
+                    "metadata": { "contextra": { "ring": "3" } }
                 },
                 {
                     "name": "contextra-agent",
-                    "dependencies": []
+                    "dependencies": [],
+                    "metadata": { "contextra": { "ring": "3" } }
                 }
             ],
             "workspace_members": ["contextra-engine", "contextra-agent"]
@@ -622,7 +625,8 @@ mod tests {
             "packages": [
                 {
                     "name": "contextra-types",
-                    "dependencies": []
+                    "dependencies": [],
+                    "metadata": { "contextra": { "ring": "0" } }
                 }
             ],
             "workspace_members": ["contextra-types"]

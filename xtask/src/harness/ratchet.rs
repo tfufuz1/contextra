@@ -127,7 +127,6 @@ pub fn ratchet_measure_repo(root: &str) -> RatchetConfig {
     let mut unsafe_blocks: BTreeMap<String, u64> = BTreeMap::new();
 
     let unsafe_islands = [
-        "contextra-crypto",
         "contextra-simd",
         "contextra-sys",
         "contextra-wire",
