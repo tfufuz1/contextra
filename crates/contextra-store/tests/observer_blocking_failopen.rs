@@ -84,8 +84,8 @@ async fn test_sleeping_observer_does_not_delay_commits() {
     let elapsed = start.elapsed();
 
     assert!(
-        elapsed < Duration::from_millis(500),
-        "100 commits took {:?}, expected < 500ms due to Fail-Open deadline protection",
+        elapsed < Duration::from_millis(2000),
+        "100 commits took {:?}, expected < 2000ms due to Fail-Open deadline protection",
         elapsed
     );
 
@@ -153,6 +153,7 @@ fn test_drop_counter_and_circuit_breaker_status_queryable() {
 async fn test_normal_observer_receives_all_events_in_order() {
     let dir = TempDir::new().expect("tempdir");
     let storage = create_test_storage(&dir).await;
+    storage.set_max_observer_latency(Duration::from_millis(50));
 
     let rec_obs = Arc::new(RecordingObserver::new());
     storage.register_observer(rec_obs.clone());

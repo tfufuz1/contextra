@@ -4,6 +4,7 @@ pub mod diffusion;
 pub mod error;
 pub mod gate_monitor;
 pub mod params;
+pub mod selector;
 pub mod shadow;
 
 pub use diffusion::run_apprh_push;
@@ -12,6 +13,7 @@ pub use gate_monitor::{
     ApprhGateMonitor, ApprhGateMonitorConfig, ApprhGateMonitorSnapshot, ApprhObservationRecord,
 };
 pub use params::ApprhParams;
+pub use selector::{ApprhMode, ApprhSelector, ApprhSelectorConfig};
 pub use shadow::{
     shadow_compare_forward_push_vs_apprh, ApprhFlipGate, ApprhShadowComparison,
     DefaultApprhFlipGate,
@@ -35,6 +37,38 @@ pub fn apprh_local<G: PathGraph>(
     params: &ApprhParams,
 ) -> Result<AHashMap<EntityId, f32>, ApprhError> {
     run_apprh_push(graph, seeds, params)
+}
+
+/// Spec-compliant additive APPRH operator (Spec Y.1.2).
+///
+/// Computes Averaging-based Personalized PageRank for Hypergraphs (APPRH) over a generic [`PathGraph`].
+/// Strictly orders push candidates and neighbor iterations by [`EntityId`] for bit-identical IEEE-754 determinism.
+///
+/// # Errors
+/// Returns [`contextra_types::ContextraError::InvalidInput`] if `hyperedge_decay_factor` is non-finite or outside `(0.0, 1.0]`.
+pub fn forward_push_apprh<G: PathGraph>(
+    graph: &G,
+    seeds: &[EntityId],
+    params: &PprParams,
+    hyperedge_decay_factor: f32,
+) -> Result<AHashMap<EntityId, f32>, contextra_types::ContextraError> {
+    if !hyperedge_decay_factor.is_finite()
+        || hyperedge_decay_factor <= 0.0
+        || hyperedge_decay_factor > 1.0
+    {
+        return Err(contextra_types::ContextraError::InvalidInput(format!(
+            "hyperedge_decay_factor must be in (0.0, 1.0] and finite, got {}",
+            hyperedge_decay_factor
+        )));
+    }
+
+    let apprh_params = ApprhParams {
+        ppr: params.clone(),
+        hyperedge_decay_factor,
+        max_iterations: 10_000,
+    };
+
+    run_apprh_push(graph, seeds, &apprh_params).map_err(Into::into)
 }
 
 impl CsrGraph {

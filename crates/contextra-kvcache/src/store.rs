@@ -13,7 +13,7 @@ use lru::LruCache;
 use parking_lot::RwLock;
 
 use super::attention_score::{
-    rank_for_eviction_weighted, AttentionScoreSource, NullAttentionScoreSource,
+    rank_for_eviction_weighted_for_tenant, AttentionScoreSource, NullAttentionScoreSource,
 };
 use super::eviction_worker::EvictionWorker;
 use super::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
@@ -53,12 +53,12 @@ impl TenantState {
         }
     }
 
-
     /// Insert with explicit cache directive and pin budget checking.
     fn insert_returning_evicted_with_directive(
         &mut self,
         segment: KvSegment,
         directive: &CacheDirective,
+        scores: &dyn AttentionScoreSource,
     ) -> Result<Option<KvSegment>, ContextraError> {
         let req_bytes = segment.len() as u64;
 
@@ -75,7 +75,7 @@ impl TenantState {
         let bytes = segment.len();
 
         let evicted = if self.cache.len() >= self.cache.cap().get() {
-            self.pop_lru()
+            self.pop_lru(scores)
         } else {
             None
         };
@@ -219,15 +219,24 @@ impl TenantState {
             })
             .collect();
 
-        let ranked = rank_for_eviction_weighted(&candidates, scores, attention_weight);
+        let ranked = rank_for_eviction_weighted_for_tenant(
+            self.tenant_id,
+            &candidates,
+            scores,
+            attention_weight,
+        );
         let target_id = ranked.first().copied()?;
-        self.remove(target_id)
+        let removed = self.remove(target_id);
+        if removed.is_some() {
+            scores.unregister_segment(self.tenant_id, target_id);
+        }
+        removed
     }
 
     /// LRU-Eviction unter Schutz aktiver Referenzen (`active_refs == 0`).
     /// Iteriert von LRU (Least Recently Used) zu MRU.
-    fn pop_lru(&mut self) -> Option<KvSegment> {
-        self.pop_eviction_candidate(&NullAttentionScoreSource, 0.5)
+    fn pop_lru(&mut self, scores: &dyn AttentionScoreSource) -> Option<KvSegment> {
+        self.pop_eviction_candidate(scores, 0.5)
     }
 
     /// Fügt eine Token-Sequenz in den Radix-Baum ein.
@@ -287,6 +296,7 @@ pub struct TenantIsolatedKvStore {
     eviction_round_offsets: Box<[AtomicUsize]>,
     segment_capacity: NonZeroUsize,
     spill_handler: RwLock<Option<SpillHandler>>,
+    attention_source: Arc<RwLock<Arc<dyn AttentionScoreSource>>>,
 }
 
 impl TenantIsolatedKvStore {
@@ -317,7 +327,20 @@ impl TenantIsolatedKvStore {
             segment_capacity: NonZeroUsize::new(Self::DEFAULT_SEGMENT_CAPACITY_PER_TENANT)
                 .unwrap_or(NonZeroUsize::MIN),
             spill_handler: RwLock::new(None),
+            attention_source: Arc::new(RwLock::new(
+                Arc::new(NullAttentionScoreSource) as Arc<dyn AttentionScoreSource>
+            )),
         }
+    }
+
+    /// Setzt die konfigurierte Standard-AttentionScoreSource für diesen Store.
+    pub fn set_attention_source(&self, source: Arc<dyn AttentionScoreSource>) {
+        *self.attention_source.write() = source;
+    }
+
+    /// Liefert die konfigurierte Standard-AttentionScoreSource für diesen Store.
+    pub fn attention_source(&self) -> Arc<dyn AttentionScoreSource> {
+        self.attention_source.read().clone()
     }
 
     /// Erstellt einen Store mit konfigurierter Segment-Kapazität pro Tenant.
@@ -351,12 +374,13 @@ impl TenantIsolatedKvStore {
 
         let idx = self.shard_idx(tenant);
         let capacity = self.segment_capacity;
+        let scores = self.attention_source();
         let evicted = {
             let mut shard = self.shards[idx].lock.write();
             let state = shard
                 .entry(tenant)
                 .or_insert_with(|| TenantState::new(tenant, capacity));
-            state.insert_returning_evicted_with_directive(segment, &directive)?
+            state.insert_returning_evicted_with_directive(segment, &directive, scores.as_ref())?
         };
 
         if let Some(ev) = evicted {
@@ -440,12 +464,19 @@ impl TenantIsolatedKvStore {
             return;
         }
         let idx = self.shard_idx(tenant);
+        let scores = self.attention_source();
         let _deferred: Vec<KvSegment> = {
             let mut shard = self.shards[idx].lock.write();
             if let Some(state) = shard.get_mut(&tenant) {
                 let removed = segment_ids
                     .iter()
-                    .filter_map(|&id| state.remove(id))
+                    .filter_map(|&id| {
+                        let seg = state.remove(id);
+                        if seg.is_some() {
+                            scores.unregister_segment(tenant, id);
+                        }
+                        seg
+                    })
                     .collect();
                 if state.is_empty() {
                     shard.remove(&tenant);
@@ -541,64 +572,6 @@ impl TenantIsolatedKvStore {
             .unwrap_or(0)
     }
 
-    /// Globale LRU Eviction unter Schutz aktiver Referenzen.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn evict_lru_global(&self, target_free_bytes: usize) -> usize {
-        let mut freed = 0;
-
-        'outer: while freed < target_free_bytes {
-            let mut made_progress = false;
-            let start_shard =
-                self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
-
-            for s_idx in 0..self.shard_count {
-                if freed >= target_free_bytes {
-                    break 'outer;
-                }
-                let shard_idx = (start_shard + s_idx) % self.shard_count;
-
-                let evicted_opt: Option<(TenantId, KvSegment)> = {
-                    let mut shard = self.shards[shard_idx].lock.write();
-                    let tenant_opt = shard.keys().copied().next();
-                    if let Some(tenant) = tenant_opt {
-                        if let Some(state) = shard.get_mut(&tenant) {
-                            if let Some(seg) = state.pop_lru() {
-                                if state.is_empty() {
-                                    shard.remove(&tenant);
-                                }
-                                Some((tenant, seg))
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                };
-
-                if let Some((tenant, evicted)) = evicted_opt {
-                    freed += evicted.len();
-                    made_progress = true;
-                    tracing::debug!(
-                        tenant_id = tenant.inner(),
-                        segment_id = evicted.segment_id,
-                        freed_bytes = evicted.len(),
-                        "KV eviction worker: evicted segment"
-                    );
-                    drop(evicted);
-                }
-            }
-
-            if !made_progress {
-                break;
-            }
-        }
-
-        freed
-    }
-
     const MAX_ROUNDS_PER_LOCK_ACQUISITION: usize = 4;
 
     /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Attention-Scores (Default 50/50 Gewichtung).
@@ -625,7 +598,8 @@ impl TenantIsolatedKvStore {
 
     /// Evictiert KV-Segmente unter Erhaltung von Tenant-Fairness und Guard-Schutz (`active_refs == 0`).
     pub fn evict_lru_fair(&self, target_free_bytes: usize) -> usize {
-        self.evict_fair(target_free_bytes, &NullAttentionScoreSource)
+        let source = self.attention_source();
+        self.evict_fair(target_free_bytes, source.as_ref())
     }
 
     #[cfg(test)]
@@ -739,10 +713,12 @@ impl TenantIsolatedKvStore {
 
     pub fn clear_all(&self) {
         let mut all_segments: Vec<KvSegment> = Vec::new();
+        let scores = self.attention_source();
         for shard in self.shards.iter() {
             let mut s = shard.lock.write();
-            for (_, mut state) in s.drain() {
-                while let Some(seg) = state.pop_lru() {
+            for (tenant, mut state) in s.drain() {
+                while let Some(seg) = state.pop_lru(scores.as_ref()) {
+                    scores.unregister_segment(tenant, seg.segment_id);
                     all_segments.push(seg);
                 }
             }
@@ -961,13 +937,6 @@ mod tests {
     }
 
     #[test]
-    fn test_evict_lru_global_visibility_or_deprecation() {
-        let _store = TenantIsolatedKvStore::new();
-        let tenant = TenantId::try_new(1).unwrap();
-        let _seg = KvSegment::new(tenant, 1, vec![1, 2, 3]);
-    }
-
-    #[test]
     fn test_evict_lru_fair_rotation_prevents_low_id_bias() {
         let store = TenantIsolatedKvStore::new();
 
@@ -1027,7 +996,7 @@ mod tests {
     }
 
     #[test]
-    fn test_store_clear_all_and_global_lru() {
+    fn test_store_clear_all_and_fair_lru() {
         let store = TenantIsolatedKvStore::new();
         let tenant_a = TenantId::try_new(1).unwrap();
         let tenant_b = TenantId::try_new(2).unwrap();
@@ -1038,8 +1007,8 @@ mod tests {
         assert_eq!(store.get_tenant_segment_len(tenant_a), 1);
         assert_eq!(store.get_tenant_segment_len(tenant_b), 1);
 
-        let freed = store.evict_lru_global(200);
-        assert!(freed >= 200);
+        let freed = store.evict_lru_fair(200);
+        assert!(freed >= 256);
         assert_eq!(
             store.get_tenant_segment_len(tenant_a) + store.get_tenant_segment_len(tenant_b),
             1

@@ -5,17 +5,22 @@ use std::path::{Path, PathBuf};
 
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
 
+#[cfg(feature = "legacy-wal-key")]
 const LEGACY_KEY_OBFUSCATION_MASK: u8 = 0x5A;
+
 // INV-WAL-LEGACY-KEY-1: Obfuscated legacy static HMAC integrity key used strictly
 // for backward-compatibility fallback during WAL replay of legacy databases.
 // Dieser Schlüssel hat keine Geheimhaltungseigenschaft mehr, sobald der Quellcode öffentlich einsehbar ist.
+#[cfg(feature = "legacy-wal-key")]
 const LEGACY_INTEGRITY_KEY_OBFUSCATED: [u8; 32] = *b"954.?\".(;w34.?=(3.#w1?#w,kZZZZZZ";
 
+#[cfg(feature = "legacy-wal-key")]
 static LEGACY_KEY_WARN_ONCE: std::sync::Once = std::sync::Once::new();
 
 /// Emits a process-wide one-time warning log when the legacy HMAC integrity key path is used.
 ///
 /// **SECURITY**: This message intentionally contains NO key material or secret data.
+#[cfg(feature = "legacy-wal-key")]
 pub(crate) fn warn_legacy_key_use_once(context_msg: &str) {
     LEGACY_KEY_WARN_ONCE.call_once(|| {
         tracing::warn!(
@@ -46,6 +51,7 @@ impl LegacyKeyStatus {
 }
 
 /// Internal const helper for deobfuscating the legacy static integrity key bytes.
+#[cfg(feature = "legacy-wal-key")]
 pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
     let mut out = [0u8; 32];
     let mut i = 0;
@@ -57,9 +63,17 @@ pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
 }
 
 /// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
-pub(crate) fn legacy_integrity_key() -> [u8; 32] {
+#[cfg(feature = "legacy-wal-key")]
+pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
     warn_legacy_key_use_once("legacy_integrity_key");
-    deobfuscate_legacy_integrity_key()
+    Ok(deobfuscate_legacy_integrity_key())
+}
+
+#[cfg(not(feature = "legacy-wal-key"))]
+pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
+    Err(ContextraError::Storage(
+        "Legacy WAL key support is disabled at compile time. Enable Cargo feature 'legacy-wal-key' to allow legacy key fallback.".into()
+    ))
 }
 
 /// Migrates a legacy integrity key to a new 32-byte key material state.
@@ -76,6 +90,7 @@ pub(crate) fn legacy_integrity_key() -> [u8; 32] {
 /// # Errors
 /// Returns [`ContextraError::Storage`] if `legacy` does not match the expected legacy integrity key,
 /// if `new_key_material` is not 32 bytes long, or if `new_key_material` is identical to `legacy`.
+#[cfg(feature = "legacy-wal-key")]
 pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8; 32]> {
     warn_legacy_key_use_once("migrate_legacy_key");
 
@@ -102,6 +117,13 @@ pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8;
     let mut derived = [0u8; 32];
     derived.copy_from_slice(new_key_material);
     Ok(derived)
+}
+
+#[cfg(not(feature = "legacy-wal-key"))]
+pub fn migrate_legacy_key(_legacy: &[u8], _new_key_material: &[u8]) -> Result<[u8; 32]> {
+    Err(ContextraError::Storage(
+        "Legacy WAL key support is disabled at compile time. Recompile with Cargo feature 'legacy-wal-key' to perform legacy key migration.".into()
+    ))
 }
 
 impl Wal {
@@ -151,7 +173,7 @@ impl Wal {
 
     #[doc(hidden)]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
-        legacy_integrity_key()
+        legacy_integrity_key().unwrap_or_default()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).
@@ -274,7 +296,36 @@ impl Wal {
         super::fs::try_exists(&marker).await.unwrap_or(false)
     }
 
+    pub(crate) fn calculate_retirement_marker_hash(wal_path: &Path, new_key: &[u8; 32]) -> String {
+        let parent = wal_path.parent().unwrap_or_else(|| Path::new("."));
+        let dir_path = if parent.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            parent
+        };
+        let dir_str = dir_path
+            .canonicalize()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| dir_path.to_string_lossy().to_string());
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"contextra-wal-retirement-v1\n");
+        hasher.update(dir_str.as_bytes());
+        hasher.update(b"\n");
+        hasher.update(new_key);
+        let hash = hasher.finalize();
+        format!("rekeyed=v3:blake3:{}\n", hash.to_hex())
+    }
+
     pub(crate) async fn write_migration_marker_atomically(wal_path: &Path) -> Result<()> {
+        let new_key = Self::load_or_create_integrity_key(wal_path).await?;
+        Self::write_migration_marker_with_key_atomically(wal_path, &new_key).await
+    }
+
+    pub(crate) async fn write_migration_marker_with_key_atomically(
+        wal_path: &Path,
+        new_key: &[u8; 32],
+    ) -> Result<()> {
         let marker_path = Self::migration_marker_path(wal_path);
         let parent = marker_path.parent().unwrap_or_else(|| Path::new("."));
         let parent_dir = if parent.as_os_str().is_empty() {
@@ -310,8 +361,8 @@ impl Wal {
             }
         };
 
-        let marker_content = b"rekeyed=v3\n";
-        if let Err(e) = file.write_all(marker_content).await {
+        let marker_content = Self::calculate_retirement_marker_hash(wal_path, new_key);
+        if let Err(e) = file.write_all(marker_content.as_bytes()).await {
             let _ = super::fs::remove_file(&tmp_path).await;
             return Err(ContextraError::Storage(format!(
                 "Failed to write WAL migration marker: {}",
@@ -342,100 +393,4 @@ impl Wal {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {
-        let uuid_path = {
-            let mut p = wal_path.as_os_str().to_os_string();
-            p.push(".uuid");
-            PathBuf::from(p)
-        };
-
-        async fn read_uuid_file(path: &Path) -> Result<[u8; 16]> {
-            let bytes = super::fs::read(path).await.map_err(|e| {
-                ContextraError::Storage(format!("Failed to read WAL UUID sidecar: {}", e))
-            })?;
-            if bytes.len() != 16 {
-                return Err(ContextraError::Storage(format!(
-                    "WAL UUID sidecar has unexpected length: {} (expected 16)",
-                    bytes.len()
-                )));
-            }
-            let mut arr = [0u8; 16];
-            arr.copy_from_slice(&bytes);
-            Ok(arr)
-        }
-
-        if uuid_path.exists() {
-            read_uuid_file(&uuid_path).await
-        } else {
-            use rand::RngCore;
-            use tokio::io::AsyncWriteExt;
-
-            let uuid = uuid::Uuid::new_v4();
-            let bytes = *uuid.as_bytes();
-
-            let uuid_filename = uuid_path
-                .file_name()
-                .map(|s| s.to_string_lossy())
-                .unwrap_or_default();
-            let tmp_filename = format!(
-                "{}.tmp.{}.{}",
-                uuid_filename,
-                std::process::id(),
-                rand::thread_rng().next_u64()
-            );
-
-            let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));
-            let tmp_path = if parent.as_os_str().is_empty() {
-                PathBuf::from(tmp_filename)
-            } else {
-                parent.join(tmp_filename)
-            };
-
-            let mut options = super::fs::OpenOptions::new();
-            options.write(true).create_new(true);
-
-            let mut file = match options.open(&tmp_path).await {
-                Ok(f) => f,
-                Err(e) => {
-                    if uuid_path.exists() {
-                        return read_uuid_file(&uuid_path).await;
-                    }
-                    return Err(ContextraError::Storage(format!(
-                        "Failed to create temporary WAL UUID sidecar at {}: {}",
-                        tmp_path.display(),
-                        e
-                    )));
-                }
-            };
-
-            if let Err(e) = file.write_all(&bytes).await {
-                let _ = super::fs::remove_file(&tmp_path).await;
-                return Err(ContextraError::Storage(format!(
-                    "Failed to write WAL UUID sidecar: {}",
-                    e
-                )));
-            }
-
-            if let Err(e) = file.sync_all().await {
-                let _ = super::fs::remove_file(&tmp_path).await;
-                return Err(ContextraError::Storage(format!(
-                    "Failed to sync WAL UUID sidecar file: {}",
-                    e
-                )));
-            }
-            drop(file);
-
-            let link_res = super::fs::hard_link(&tmp_path, &uuid_path).await;
-            let _ = super::fs::remove_file(&tmp_path).await;
-
-            match link_res {
-                Ok(()) => {
-                    crate::util::fsync_parent_dir(&uuid_path).await?;
-                    Ok(bytes)
-                }
-                Err(_) => read_uuid_file(&uuid_path).await,
-            }
-        }
-    }
 }

@@ -251,93 +251,73 @@ fn select_stcs_candidates(
     min_sstables_per_tier: usize,
     size_ratio: f64,
 ) -> Option<Vec<Arc<SstableReader>>> {
-    if ssts.len() < 2 {
+    if ssts.len() < min_sstables_per_tier {
         return None;
     }
 
-    let mut tiers: Vec<Vec<usize>> = Vec::new();
+    let min_tier = min_sstables_per_tier;
 
-    for (i, sst) in ssts.iter().enumerate() {
-        let size = sst.metadata().file_size;
-        let mut placed = false;
+    // 1. Evaluate all contiguous sub-ranges ssts[start..end]
+    let mut best_tier_range: Option<(usize, usize)> = None;
+    let mut best_tier_len = 0usize;
+    let mut best_tier_size = u64::MAX;
 
-        for tier in &mut tiers {
-            if let Some(&neighbor_idx) = tier.last() {
-                if let Some(neighbor_sst) = ssts.get(neighbor_idx) {
-                    let neighbor_size = neighbor_sst.metadata().file_size;
-                    let ratio = if size > neighbor_size {
-                        size as f64 / neighbor_size.max(1) as f64
-                    } else {
-                        neighbor_size as f64 / size.max(1) as f64
-                    };
+    for start in 0..ssts.len() {
+        for end in (start + min_tier)..=ssts.len() {
+            let window = &ssts[start..end];
+            let min_sz = window
+                .iter()
+                .map(|s| s.metadata().file_size)
+                .min()
+                .unwrap_or(1)
+                .max(1);
+            let max_sz = window
+                .iter()
+                .map(|s| s.metadata().file_size)
+                .max()
+                .unwrap_or(1)
+                .max(1);
+            let ratio = max_sz as f64 / min_sz as f64;
 
-                    if ratio <= size_ratio {
-                        tier.push(i);
-                        placed = true;
-                        break;
-                    }
+            if ratio <= size_ratio {
+                let win_len = end - start;
+                let win_size: u64 = window.iter().map(|s| s.metadata().file_size).sum();
+
+                if win_len > best_tier_len
+                    || (win_len == best_tier_len && win_size < best_tier_size)
+                {
+                    best_tier_len = win_len;
+                    best_tier_size = win_size;
+                    best_tier_range = Some((start, end));
                 }
             }
         }
-
-        if !placed {
-            tiers.push(vec![i]);
-        }
     }
 
-    tiers.sort_by(|a, b| {
-        b.len().cmp(&a.len()).then_with(|| {
-            let a_size = a
-                .first()
-                .and_then(|&i| ssts.get(i))
-                .map(|s| s.metadata().file_size)
-                .unwrap_or(0);
-            let b_size = b
-                .first()
-                .and_then(|&i| ssts.get(i))
-                .map(|s| s.metadata().file_size)
-                .unwrap_or(0);
-            a_size.cmp(&b_size)
-        })
-    });
-
-    for tier in tiers {
-        if tier.len() >= min_sstables_per_tier {
-            let mut sorted_tier = tier;
-            sorted_tier.sort_by_key(|&i| {
-                ssts.get(i)
-                    .map(|s| s.metadata().max_seq & !TOMBSTONE_BIT)
-                    .unwrap_or(0)
-            });
-            return Some(
-                sorted_tier
-                    .into_iter()
-                    .filter_map(|i| ssts.get(i).cloned())
-                    .collect(),
-            );
-        }
+    if let Some((start, end)) = best_tier_range {
+        return Some(ssts[start..end].to_vec());
     }
 
-    if ssts.len() >= min_sstables_per_tier * 2 {
-        let mut by_size: Vec<(usize, u64)> = ssts
-            .iter()
-            .enumerate()
-            .map(|(i, s)| (i, s.metadata().file_size))
-            .collect();
-        by_size.sort_by_key(|&(_, size)| size);
-        let count = min_sstables_per_tier;
-        let mut indices: Vec<usize> = by_size[..count].iter().map(|&(i, _)| i).collect();
-        indices.sort_by_key(|&i| {
-            ssts.get(i)
-                .map(|s| s.metadata().max_seq & !TOMBSTONE_BIT)
-                .unwrap_or(0)
-        });
-        return Some(
-            indices
-                .into_iter()
-                .filter_map(|i| ssts.get(i).cloned())
-                .collect(),
-        );
+    // 2. Fallback for large SSTable counts
+    if ssts.len() >= min_tier * 2 {
+        let mut best_fallback_start = None;
+        let mut min_fallback_size = u64::MAX;
+
+        for start in 0..=(ssts.len() - min_tier) {
+            let end = start + min_tier;
+            let total_size: u64 = ssts[start..end]
+                .iter()
+                .map(|s| s.metadata().file_size)
+                .sum();
+            if total_size < min_fallback_size {
+                min_fallback_size = total_size;
+                best_fallback_start = Some(start);
+            }
+        }
+
+        if let Some(start) = best_fallback_start {
+            return Some(ssts[start..start + min_tier].to_vec());
+        }
     }
 
     None

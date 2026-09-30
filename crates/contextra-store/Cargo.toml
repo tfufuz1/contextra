@@ -27,6 +27,7 @@ fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
 docid-128 = ["contextra-core/docid-128"]
+legacy-wal-key = []
 
 [dependencies]
 contextra-ports = { workspace = true }
@@ -71,6 +72,36 @@ redb = "2"
 [[test]]
 name = "differential_redb"
 path = "tests/differential/redb_operation_sequence.rs"
+
+[[test]]
+name = "hmac_legacy_key_migration"
+path = "tests/hmac_legacy_key_migration.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_key_forced_migration"
+path = "tests/wal_legacy_key_forced_migration.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_key_tests"
+path = "tests/wal_legacy_key_tests.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_migration_crash"
+path = "tests/wal_legacy_migration_crash.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_legacy_key_retirement_marker"
+path = "tests/wal_legacy_key_retirement_marker.rs"
+required-features = ["legacy-wal-key"]
+
+[[test]]
+name = "wal_truncation_and_legacy_isolation"
+path = "tests/wal_truncation_and_legacy_isolation.rs"
+required-features = ["legacy-wal-key"]
 
 [[bench]]
 name = "sstable_bench"

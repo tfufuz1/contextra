@@ -22,7 +22,9 @@ pub(crate) async fn get_at_seq_tracked(
     snapshot_seq: u64,
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    storage.tx_buffer.register_read(tx_id, key.to_vec(), snapshot_seq);
+    storage
+        .tx_buffer
+        .register_read(tx_id, key.to_vec(), snapshot_seq);
     storage.get_at_seq(key, snapshot_seq).await
 }
 
@@ -34,7 +36,9 @@ pub(crate) async fn scan_prefix_tracked(
     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
     let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;
     for (k, _) in &results {
-        storage.tx_buffer.register_read(tx_id, k.clone(), snapshot_seq);
+        storage
+            .tx_buffer
+            .register_read(tx_id, k.clone(), snapshot_seq);
     }
     Ok(results)
 }

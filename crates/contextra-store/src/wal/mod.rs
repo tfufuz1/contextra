@@ -304,6 +304,13 @@ impl Default for WalConfig {
     }
 }
 
+impl WalConfig {
+    pub fn with_legacy_fallback(mut self, allow: bool) -> Self {
+        self.allow_legacy_integrity_key_fallback = allow;
+        self
+    }
+}
+
 pub struct Wal {
     pub(crate) path: PathBuf,
     pub(crate) size: Arc<std::sync::atomic::AtomicU64>,
@@ -450,11 +457,16 @@ impl Wal {
         config: WalConfig,
     ) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
+        let has_marker = Self::has_migration_marker(&path).await;
+        let allow_legacy_fallback = if has_marker {
+            false
+        } else {
+            config.allow_legacy_integrity_key_fallback
+        };
 
         #[cfg(feature = "wal-integrity")]
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
-            (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
+            (Some(Arc::new(km.derive_file_key(path.as_os_str().as_encoded_bytes())?)), None)
         } else {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
@@ -478,7 +490,7 @@ impl Wal {
             key_manager: derived_key_manager,
             fallback_integrity_key,
             allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
-                config.allow_legacy_integrity_key_fallback,
+                allow_legacy_fallback,
             )),
             legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
@@ -519,8 +531,7 @@ impl Wal {
         // reuse between two WAL instances sharing the same master key.
         #[cfg(feature = "wal-integrity")]
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
-            (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
+            (Some(Arc::new(km.derive_file_key(path.as_os_str().as_encoded_bytes())?)), None)
         } else {
             let key = Self::load_or_create_integrity_key(&path).await?;
             (None, Some(key))
@@ -575,6 +586,13 @@ impl Wal {
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
+        let has_marker = Self::has_migration_marker(&path).await;
+        let allow_legacy_fallback = if has_marker {
+            false
+        } else {
+            config.allow_legacy_integrity_key_fallback
+        };
+
         let wal = Self {
             path: path.clone(),
             size: Arc::new(std::sync::atomic::AtomicU64::new(metadata.len())),
@@ -582,7 +600,7 @@ impl Wal {
             key_manager: derived_key_manager,
             fallback_integrity_key,
             allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
-                config.allow_legacy_integrity_key_fallback,
+                allow_legacy_fallback,
             )),
             legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
@@ -673,6 +691,10 @@ impl Wal {
 
     pub fn is_poisoned(&self) -> bool {
         self.poisoned.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    pub fn allow_legacy_fallback_for_test(&self) -> bool {
+        self.allow_legacy_integrity_key_fallback.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Recovers a poisoned `Wal` handle after a suspected torn write event.

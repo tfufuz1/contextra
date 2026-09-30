@@ -1,8 +1,11 @@
 use super::*;
+#[cfg(feature = "encryption-at-rest")]
 use crate::wal::KeyManager;
 use contextra_core::TxId;
+#[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;
+#[cfg(feature = "encryption-at-rest")]
 use tokio::fs;
 
 #[test]
