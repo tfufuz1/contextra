@@ -249,9 +249,10 @@ pub fn check_ring_layering_from_metadata_json(
     let mut matched_allowlist_entries: HashSet<(&'static str, &'static str)> = HashSet::new();
 
     for (pkg_name, pkg) in &workspace_packages {
-        let from_ring = ring_map.get(pkg_name).copied().ok_or_else(|| {
-            format!("Missing ring metadata for package '{}'", pkg_name)
-        })?;
+        let from_ring = ring_map
+            .get(pkg_name)
+            .copied()
+            .ok_or_else(|| format!("Missing ring metadata for package '{}'", pkg_name))?;
 
         for dep in &pkg.dependencies {
             let dep_name = &dep.name;
@@ -568,7 +569,9 @@ mod tests {
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].from_crate, "contextra-types");
         assert_eq!(violations[0].to_crate, "contextra-graph");
-        assert!(violations[0].rule_reason.contains("Ring 0 backward dependency edge"));
+        assert!(violations[0]
+            .rule_reason
+            .contains("Ring 0 backward dependency edge"));
     }
 
     #[test]
@@ -597,7 +600,9 @@ mod tests {
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].from_crate, "contextra-engine");
         assert_eq!(violations[0].to_crate, "contextra-agent");
-        assert!(violations[0].rule_reason.contains("Ring 3 backward dependency edge"));
+        assert!(violations[0]
+            .rule_reason
+            .contains("Ring 3 backward dependency edge"));
     }
 
     #[test]

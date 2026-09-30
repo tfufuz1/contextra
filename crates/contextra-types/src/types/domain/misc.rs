@@ -40,6 +40,15 @@ mod hex {
     }
 }
 
+/// Result of a cross-encoder reranking operation for a candidate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RerankResult {
+    /// Candidate index in the input slice.
+    pub original_index: usize,
+    /// Relevance score assigned by the cross-encoder.
+    pub score: f32,
+}
+
 /// Defines a frozen workflow state acting as a savepoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkflowState {

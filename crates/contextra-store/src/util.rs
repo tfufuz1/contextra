@@ -9,8 +9,8 @@ use crate::lsm::config::DurabilityMode;
 #[cfg(not(loom))]
 use std::fs::{File, TryLockError};
 
-#[cfg(not(loom))]
 /// Handle for exclusive database directory locking.
+#[cfg(not(loom))]
 #[derive(Debug)]
 pub(crate) struct DirLock {
     _file: Option<File>,
