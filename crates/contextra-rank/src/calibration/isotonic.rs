@@ -1,7 +1,10 @@
 //! Isotonic Calibration via PAVA (Pool-Adjacent Violators Algorithm).
 
+use contextra_ports::{Clock, SystemClock};
 use contextra_types::ConfigFingerprint;
 use std::collections::VecDeque;
+use std::fmt;
+use std::sync::Arc;
 
 const ECE_BINS: usize = 10;
 const DEFAULT_WARMUP_REQUIRED: u32 = 50;
@@ -9,7 +12,7 @@ const DEFAULT_MAX_OBSERVATIONS: usize = 2000;
 const REBUILD_THRESHOLD_NEW_OBS: usize = 10;
 
 /// Isotonic Calibrator using Pool-Adjacent Violators Algorithm.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IsotonicCalibrator {
     observations: VecDeque<(f32, bool)>,
     warmup_required: u32,
@@ -20,6 +23,27 @@ pub struct IsotonicCalibrator {
     fingerprint: Option<ConfigFingerprint>,
     last_calibration_at: Option<u64>,
     cached_ece: Option<f32>,
+    clock: Arc<dyn Clock>,
+}
+
+impl fmt::Debug for IsotonicCalibrator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("IsotonicCalibrator")
+            .field("observations", &self.observations)
+            .field("warmup_required", &self.warmup_required)
+            .field("max_observations", &self.max_observations)
+            .field("cached_model", &self.cached_model)
+            .field("model_dirty", &self.model_dirty)
+            .field(
+                "observations_since_rebuild",
+                &self.observations_since_rebuild,
+            )
+            .field("fingerprint", &self.fingerprint)
+            .field("last_calibration_at", &self.last_calibration_at)
+            .field("cached_ece", &self.cached_ece)
+            .field("clock", &"<dyn Clock>")
+            .finish()
+    }
 }
 
 impl IsotonicCalibrator {
@@ -35,7 +59,14 @@ impl IsotonicCalibrator {
             fingerprint: None,
             last_calibration_at: None,
             cached_ece: None,
+            clock: Arc::new(SystemClock::new()),
         }
+    }
+
+    /// Sets a custom clock port for deterministic time access.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     /// Creates an `IsotonicCalibrator` with defaults (Warmup: 50, Max Obs: 2000).
@@ -165,12 +196,7 @@ impl IsotonicCalibrator {
         );
         self.model_dirty = false;
         self.observations_since_rebuild = 0;
-        self.last_calibration_at = Some(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0),
-        );
+        self.last_calibration_at = Some(self.clock.now_unix_nanos() / 1_000_000_000);
         self.cached_ece = self.calculate_ece();
     }
 
@@ -248,5 +274,42 @@ impl IsotonicCalibrator {
             ece += (bin_n / n) * (avg_confidence - avg_accuracy).abs();
         }
         Some(ece)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct FixedTestClock(u64);
+
+    impl Clock for FixedTestClock {
+        fn now_unix_nanos(&self) -> u64 {
+            self.0
+        }
+
+        fn monotonic_nanos(&self) -> u64 {
+            0
+        }
+    }
+
+    #[test]
+    fn test_isotonic_calibrator_deterministic_clock() {
+        let clock = Arc::new(FixedTestClock(1_700_000_000_000_000_000));
+        let mut cal1 = IsotonicCalibrator::new(2, 100).with_clock(clock.clone());
+        let mut cal2 = IsotonicCalibrator::new(2, 100).with_clock(clock);
+
+        cal1.record_outcome(0.1, false);
+        cal1.record_outcome(0.9, true);
+
+        cal2.record_outcome(0.1, false);
+        cal2.record_outcome(0.9, true);
+
+        cal1.force_rebuild();
+        cal2.force_rebuild();
+
+        assert_eq!(cal1.last_calibration_at(), Some(1_700_000_000));
+        assert_eq!(cal2.last_calibration_at(), Some(1_700_000_000));
+        assert_eq!(cal1.last_calibration_at(), cal2.last_calibration_at());
     }
 }
