@@ -1,9 +1,10 @@
 use crate::meta::StateCheckpoint;
+use contextra_ports::SystemClock;
 use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 /// Type alias for sequence numbers managed as pinned checkpoint identifiers.
 pub type PinId = u64;
@@ -41,11 +42,8 @@ fn default_data_dir() -> std::path::PathBuf {
     dirs::data_local_dir().unwrap_or_else(std::env::temp_dir)
 }
 
-pub(crate) fn monotonic_timestamp_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
+pub(crate) fn clock_timestamp_ms(clock: &dyn contextra_ports::Clock) -> u64 {
+    clock.now_unix_nanos() / 1_000_000
 }
 
 fn orphan_pin_file_path() -> std::path::PathBuf {
@@ -81,10 +79,7 @@ impl OrphanRegistry {
 
     /// Synchronously registers an orphaned sequence pin and persists to disk.
     pub fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
-        let wall_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
+        let wall_ms = clock_timestamp_ms(self.inner.clock().as_ref());
         self.inner.register_orphan_sync(PinnedSeqNoOrphan {
             seq_no: pin_id,
             timestamp_ms: wall_ms,
@@ -185,12 +180,24 @@ impl OrphanState {
 }
 
 /// Instance-scoped orphan registry for checkpoints and pinned sequence numbers (ADR-053).
-#[derive(Debug)]
 pub struct InstanceOrphanRegistry {
     pins: Mutex<Vec<PinnedSeqNoOrphan>>,
     checkpoints: Mutex<Vec<StateCheckpoint>>,
     persist_path: std::path::PathBuf,
     is_dirty: AtomicBool,
+    clock: Arc<dyn contextra_ports::Clock>,
+}
+
+impl std::fmt::Debug for InstanceOrphanRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InstanceOrphanRegistry")
+            .field("pins", &self.pins)
+            .field("checkpoints", &self.checkpoints)
+            .field("persist_path", &self.persist_path)
+            .field("is_dirty", &self.is_dirty)
+            .field("clock", &"<dyn Clock>")
+            .finish()
+    }
 }
 
 impl Default for InstanceOrphanRegistry {
@@ -205,7 +212,21 @@ impl InstanceOrphanRegistry {
         Self::load_sync(&path)
     }
 
+    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    pub fn set_clock(&mut self, clock: Arc<dyn contextra_ports::Clock>) {
+        self.clock = clock;
+    }
+
+    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+        &self.clock
+    }
+
     pub fn load_sync(path: &std::path::Path) -> Self {
+        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
         if !path.as_os_str().is_empty() {
             if let Ok(data) = std::fs::read(path) {
                 if let Ok(state) = serde_json::from_slice::<OrphanState>(&data) {
@@ -214,6 +235,7 @@ impl InstanceOrphanRegistry {
                         checkpoints: Mutex::new(state.checkpoints),
                         persist_path: path.to_path_buf(),
                         is_dirty: AtomicBool::new(false),
+                        clock,
                     };
                 }
             }
@@ -223,6 +245,7 @@ impl InstanceOrphanRegistry {
             checkpoints: Mutex::new(Vec::new()),
             persist_path: path.to_path_buf(),
             is_dirty: AtomicBool::new(false),
+            clock,
         }
     }
 
@@ -476,8 +499,9 @@ mod tests {
 
     #[test]
     fn timestamp_ms_is_monotonic() {
-        let t1 = monotonic_timestamp_ms();
-        let t2 = monotonic_timestamp_ms();
+        let clock = SystemClock::new();
+        let t1 = clock_timestamp_ms(&clock);
+        let t2 = clock_timestamp_ms(&clock);
         assert!(t2 >= t1, "Timestamp must be monotonic");
     }
 
@@ -570,8 +594,9 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn prop_monotonic_timestamp_ms_increases_or_equals(_n: u8) {
-            let ts1 = monotonic_timestamp_ms();
-            let ts2 = monotonic_timestamp_ms();
+            let clock = SystemClock::new();
+            let ts1 = clock_timestamp_ms(&clock);
+            let ts2 = clock_timestamp_ms(&clock);
             proptest::prop_assert!(ts2 >= ts1);
         }
     }

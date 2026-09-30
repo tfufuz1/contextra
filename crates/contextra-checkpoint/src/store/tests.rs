@@ -183,7 +183,7 @@ async fn test_orphan_recovery_on_startup() {
     storage.pin_checkpoint(seq_no).await.unwrap();
     store.register_pinned_seq_no_orphan(PinnedSeqNoOrphan {
         seq_no,
-        timestamp_ms: monotonic_timestamp_ms(),
+        timestamp_ms: store.monotonic_timestamp_ms(),
     });
 
     assert!(storage.pinned.lock().contains(&seq_no));

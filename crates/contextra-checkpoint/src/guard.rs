@@ -1,9 +1,9 @@
 use crate::meta::StateCheckpoint;
-use crate::orphan::{InstanceOrphanRegistry, PinnedSeqNoOrphan};
+use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinnedSeqNoOrphan};
+use contextra_ports::SystemClock;
 use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// RAII-Guard für gepinnte Checkpoint-Sequenznummern (gemäß ADR-015).
 /// Garantiert, dass eine gepinnte Sequenznummer bei einem Fehler oder Panic während des Schreibens
@@ -13,6 +13,7 @@ pub struct PinGuard<S: contextra_ports::StorageEngine> {
     storage: Arc<S>,
     seq_no: Option<u64>,
     orphan_registry: Arc<InstanceOrphanRegistry>,
+    pinned_at_ms: u64,
 }
 
 impl<S: contextra_ports::StorageEngine> PinGuard<S> {
@@ -21,11 +22,13 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
         seq_no: u64,
         orphan_registry: Arc<InstanceOrphanRegistry>,
     ) -> Result<Self> {
+        let pinned_at_ms = clock_timestamp_ms(orphan_registry.clock().as_ref());
         storage.pin_checkpoint(seq_no).await?;
         Ok(Self {
             storage,
             seq_no: Some(seq_no),
             orphan_registry,
+            pinned_at_ms,
         })
     }
 
@@ -49,13 +52,11 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
 impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
     fn drop(&mut self) {
         if let Some(seq_no) = self.seq_no.take() {
-            let wall_ms = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
+            // Drop has no async context; pinned_at_ms recorded during pin() guarantees
+            // deterministic orphan timestamps regardless of drop execution time.
             let orphan = PinnedSeqNoOrphan {
                 seq_no,
-                timestamp_ms: wall_ms,
+                timestamp_ms: self.pinned_at_ms,
             };
             self.orphan_registry.register_orphan_sync(orphan);
             tracing::warn!(
@@ -125,16 +126,8 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
 
     /// Erstellt einen neuen CheckpointGuard für einen Agenten-Schritt.
     pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self> {
-        let wall_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
-        let cp = StateCheckpoint {
-            tx_id: tx,
-            timestamp_ms: wall_ms,
-            namespace: Some("agent_step".to_string()),
-        };
-        Ok(Self::new(cp, storage, "agent_step"))
+        let clock = Arc::new(SystemClock::new());
+        Self::for_agent_step_with_clock(storage, tx, clock).await
     }
 
     pub async fn for_agent_step_with_registry(
@@ -142,10 +135,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         tx: TxId,
         orphan_registry: Arc<InstanceOrphanRegistry>,
     ) -> Result<Self> {
-        let wall_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
+        let wall_ms = clock_timestamp_ms(orphan_registry.clock().as_ref());
         let cp = StateCheckpoint {
             tx_id: tx,
             timestamp_ms: wall_ms,
@@ -157,6 +147,23 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             "agent_step",
             orphan_registry,
         ))
+    }
+
+    pub async fn for_agent_step_with_clock(
+        storage: Arc<S>,
+        tx: TxId,
+        clock: Arc<dyn contextra_ports::Clock>,
+    ) -> Result<Self> {
+        let ns = "agent_step";
+        let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
+        let registry = Arc::new(InstanceOrphanRegistry::new(orphan_path).with_clock(clock.clone()));
+        let wall_ms = clock_timestamp_ms(clock.as_ref());
+        let cp = StateCheckpoint {
+            tx_id: tx,
+            timestamp_ms: wall_ms,
+            namespace: Some(ns.to_string()),
+        };
+        Ok(Self::with_registry(cp, storage, ns, registry))
     }
 
     pub fn checkpoint(&self) -> Result<&StateCheckpoint> {
