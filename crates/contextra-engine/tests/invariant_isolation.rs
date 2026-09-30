@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use serde_json::json;
 use std::sync::Arc;

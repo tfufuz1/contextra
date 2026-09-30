@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Integrationstests fuer die Verdrahtung von AutoExtraction in Collection::insert_text_only.
 

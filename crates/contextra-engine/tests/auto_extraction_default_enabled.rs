@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Testet den kompilierte Default-Wert fuer AutoExtractionConfig (enabled: true vs. opt-out).
 

@@ -1,3 +1,4 @@
+#![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Integrationstests für Crash-Fenster-Recovery und commit-uncertain Transaktionen (F-20 / T-06).
 // INVARIANTEN: Verifiziert Crash-Szenarien und stellt sicher, dass repair() unvollständige Transaktionen korrekt behandelt.
