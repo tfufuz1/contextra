@@ -40,18 +40,23 @@ Das System erzwingt strikte Directed Acyclic Graph (DAG) Modularität.
 In einer früheren Version hing das Datenbank-Crate `contextra-db` (damals Layer 2 / Ring 3) direkt von `contextra-infer-candle` und `contextra-infer-ollama` (damals Layer 3 / Ring 2) ab, um Embedding-Backends direkt zu instanziieren. Dies verletzte P5, da eine Kern-Engine von konkreten Inferenz-Adaptern abhing.
 Im Zielmodell (`ARCHITECTURE.md` / `README.md` §4.2) erhält die Engine stattdessen Trait-Objekte (`Arc<dyn EmbeddingProvider>`) aus `contextra-ports` (Ring 0), und die konkrete Verdrahtung erfolgt ausschließlich in Ring 4 (`contextra` Fassade).
 
-### 1.3 ABI & On-Disk Format (`docid-128`)
+### 1.3 Auto-Entity-Extraktion Konfiguration & Abschaltwege
 
-Die Repräsentation des primären Dokument-Bezeichners `DocId` wird im Kernel über das Feature-Flag `docid-128` gesteuert:
-* **64-Bit Standard-Modus (Default):** `DocId` kapselt ein `u64` primitive (8-Byte BLAKE3 Trunkierung).
-* **128-Bit Erweitert-Modus (`docid-128`):** `DocId` kapselt ein `u128` primitive (16-Byte BLAKE3 Trunkierung, ADR-082) mit 16-Byte Ausrichtung (`#[repr(C, align(16))]`).
+Die automatische OpenIE-Entitätsextraktion beim Einfügen von Dokumenten verfügt über zwei steuerbare Abschaltwege und eine strikte Vorrangordnung:
 
-**Auswirkungen auf On-Disk Format & In-Memory ABI:**
-1. **On-Disk Repräsentation:** Die Aktivierung von `docid-128` ändert das binäre Layout von SSTable-Key-Header-Strukturen, Inverted-Index Posting-Listen, HNSW-Knoten-Persistenz-Headern und WAL-Sätzen.
-2. **Schema-Manifest Validation (`schema.rs`):** Die Invarianten bezüglich der On-Disk Breite werden über `DocIdWidth` und `ManifestSchemaVersion` in `contextra-types/src/schema.rs` gewahrt:
-   - `DocIdWidth::current()` liefert je nach aktiver Feature-Konfiguration `DocIdWidth::Bit64` oder `DocIdWidth::Bit128`.
-   - Manifeste protokollieren die verwendete Breite (`doc_id_width`) explizit als Teil der `ManifestSchemaVersion` (`V1` = 64-Bit, `V2` = 128-Bit).
-   - Beim Laden von Indizes/SSTables validiert `ManifestSchemaVersion::is_compatible_with_current_build()`, ob das On-Disk Format des Manifests mit der Kompilierzeit-Konfiguration des ausführenden Binaries übereinstimmt, andernfalls wird der Aufruf fail-closed abgebrochen.
+1. **Compile-Zeit Opt-Out (`auto-extraction-opt-out` Feature):**
+   Das Aktivieren des Cargo-Features `auto-extraction-opt-out` deaktiviert die Entitätsextraktion statisch für den gesamten Build, unabhängig von jeglicher Laufzeit-Konfiguration.
+2. **Laufzeit-Konfiguration (`AutoExtractionMode` / `CollectionProfile`):**
+   Wenn das Compile-Zeit-Feature nicht gesetzt ist, erfolgt die Steuerung dynamisch per Collection über `AutoExtractionMode` (`Enabled` vs. `Disabled`) im `CollectionProfile` bzw. in `AutoExtractionConfig`.
+
+**Vorrangordnung (Precedence):**
+`Compile-Zeit Opt-Out (Feature)` **>** `Laufzeit Mode (Disabled)` **>** `Default Mode (Enabled)`
+
+*Falls `auto-extraction-opt-out` aktiv ist, hat eine Laufzeit-Einstellung `AutoExtractionMode::Enabled` keine Wirkung.*
+
+**Deployment-Tier Defaults & Spec D.6 Status:**
+- `EdgeMinimal`, `PowerUserLocal` und `EnterpriseShared` nutzen `DEFAULT_AUTO_EXTRACTION_MODE` (`AutoExtractionMode::Enabled`).
+- `EnterpriseRegulated` nutzt den benannten Tier-Default `ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT` (`AutoExtractionMode::Enabled`). Der Status ist im Code und in der Spezifikation als `DECISION-PENDING (Spec D.6)` hinterlegt.
 
 ---
 
