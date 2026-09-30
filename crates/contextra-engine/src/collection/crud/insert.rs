@@ -454,7 +454,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         self.apply_insert_backpressure().await;
         let _guard = self.kv_locks.lock_for(id).await;
-        drop(_guard);
         let db_tx = self.begin_transaction()?;
         let result = self.update_op(&db_tx, id, embedding, metadata).await;
 

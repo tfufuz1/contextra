@@ -378,7 +378,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             fused_results.truncate(k);
 
             let fused_results = self
-                .apply_community_boost_post_rrf(
+                .apply_community_boost_post_fusion(
                     fused_results,
                     target_community_id,
                     Self::DEFAULT_COMMUNITY_BOOST,

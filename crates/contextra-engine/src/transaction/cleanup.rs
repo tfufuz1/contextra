@@ -42,6 +42,7 @@ pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
 ///   Recovery preserves the committed transaction and updates the intent marker to `Committed`.
 /// - If storage records do NOT exist, storage commit never completed. Recovery compensates
 ///   any leftover index entries via compensating actions and updates the intent to `Aborted`.
+#[allow(dead_code)]
 pub async fn recover_pending_intents<S: StorageEngine>(
     storage: &S,
     next_tx: &std::sync::atomic::AtomicU64,

@@ -64,8 +64,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         anchor_entities: Option<&[contextra_types::EntityId]>,
         weights: Option<&contextra_types::FusionWeights>,
     ) -> Result<Vec<crate::SearchResult>> {
-        self.hybrid_search_with_strategy(text, vector, k, anchor_entities, weights, None, None)
-            .await
+        self.hybrid_search_with_strategy(
+            text,
+            vector,
+            k,
+            anchor_entities,
+            weights,
+            None,
+            None,
+            None,
+        )
+        .await
     }
 
     /// Performs hybrid search with custom signal fusion weights and graph traversal strategy.
@@ -82,6 +91,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         weights: Option<&contextra_types::FusionWeights>,
         strategy: Option<&contextra_types::GraphTraversalStrategy>,
         same_community_as: Option<EntityId>,
+        fusion_strategy: Option<contextra_types::FusionStrategy>,
     ) -> Result<Vec<crate::SearchResult>> {
         if k == 0 {
             return Ok(Vec::new());
@@ -221,18 +231,20 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 signal_sets.push(("graph".to_string(), graph_results, gw));
             }
 
+            let selected_fusion_strategy = fusion_strategy.unwrap_or_default();
+
             let mut fused = crate::fusion::fuse_search_results_with_strategy(
                 signal_sets,
                 k.saturating_mul(Self::OVERFETCH_FACTOR),
                 crate::fusion::MetadataMergePriority::default(),
                 true,
                 None,
-                contextra_types::FusionStrategy::Rrf,
+                selected_fusion_strategy,
             );
             fused.truncate(k);
 
             let boosted = self
-                .apply_community_boost_post_rrf(
+                .apply_community_boost_post_fusion(
                     fused,
                     target_community_id,
                     Self::DEFAULT_COMMUNITY_BOOST,
@@ -243,15 +255,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         .await
     }
 
-    /// Standard overfetch factor applied to candidate limits before RRF fusion to balance OOM protection and recall.
+    /// Standard overfetch factor applied to candidate limits before fusion to balance OOM protection and recall.
     pub const OVERFETCH_FACTOR: usize = 3;
 
-    /// Standard community boost factor applied to RRF scores for matching community members.
+    /// Standard community boost factor applied to post-fusion scores for matching community members.
     pub const DEFAULT_COMMUNITY_BOOST: f32 = 1.2;
 
-    /// Multiplies the post-RRF scores of results belonging to `target_community_id` by `boost_factor`,
+    /// Multiplies the post-fusion scores of results belonging to `target_community_id` by `boost_factor`,
     /// then re-sorts descending by score with deterministic secondary sorting by document ID.
-    pub(super) async fn apply_community_boost_post_rrf(
+    ///
+    /// Formerly named `apply_community_boost_post_rrf`; renamed to `apply_community_boost_post_fusion`
+    /// because community boosting applies post-fusion consistently across both RRF and ScoreNormalized strategies.
+    pub(super) async fn apply_community_boost_post_fusion(
         &self,
         mut results: Vec<crate::SearchResult>,
         target_community_id: Option<u64>,
