@@ -185,7 +185,7 @@ impl Contextra {
                     let _ = (model_name, cache_dir);
                     tracing::debug!(
                         "EmbeddingBackend::Onnx requested, but 'onnx' feature is disabled in this build. \
-                         Recompile with feature 'onnx' or 'reranking' to enable local ONNX embeddings."
+                         Recompile with feature 'onnx' to enable local ONNX embeddings."
                     );
                 }
             }
