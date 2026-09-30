@@ -25,6 +25,10 @@ path = "src/main.rs"
 name = "compare-baseline"
 path = "src/bin/compare_baseline.rs"
 
+[[bin]]
+name = "scale-100k"
+path = "src/bin/scale_100k.rs"
+
 [dependencies]
 contextra-core = { workspace = true }
 contextra-store = { workspace = true }

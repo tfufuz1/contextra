@@ -802,6 +802,10 @@ fn generate_markdown_summary(report: &BenchmarkReport) -> String {
     let mut out = String::new();
     out.push_str("# Contextra — Retrieval Accuracy Benchmark Report\n\n");
     out.push_str(&format!(
+        "Hinweis: Diese Zahlen messen nur Speicher- und Indexlatenz bzw. Retrieval-Genauigkeit auf dem genannten Testkorpus. Embedding-Inferenz addiert 10 bis 500 ms. Der Testkorpus umfasst {} Chunks und {} Abfragen; die Zahlen sind nicht auf größere Bestände extrapolierbar.\n\n",
+        report.corpus_size_docs, report.total_test_queries
+    ));
+    out.push_str(&format!(
         "**Stand / Zeitstempel**: `{}`\n",
         report.timestamp
     ));
