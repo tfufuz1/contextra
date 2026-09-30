@@ -85,6 +85,12 @@ pub struct WasmExecutor {
     engine: Engine,
 }
 
+impl std::fmt::Debug for WasmExecutor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WasmExecutor").finish()
+    }
+}
+
 impl WasmExecutor {
     /// Erstellt einen neuen WasmExecutor.
     ///
@@ -98,6 +104,26 @@ impl WasmExecutor {
         let engine = Engine::new(&config)
             .map_err(|e| SandboxError::Runtime(format!("Engine init failed: {}", e)))?;
         Ok(Self { engine })
+    }
+
+    /// Validates a WASM binary without executing it.
+    ///
+    /// Checks binary size limits and attempts module compilation.
+    pub fn validate_module(
+        &self,
+        wasm_bytes: &[u8],
+        max_module_size_bytes: usize,
+    ) -> Result<(), SandboxError> {
+        if wasm_bytes.len() > max_module_size_bytes {
+            return Err(SandboxError::InvalidModule(format!(
+                "WASM module binary size ({} bytes) exceeds maximum allowed size ({} bytes)",
+                wasm_bytes.len(),
+                max_module_size_bytes
+            )));
+        }
+
+        Module::validate(&self.engine, wasm_bytes)
+            .map_err(|e| SandboxError::InvalidModule(e.to_string()))
     }
 
     /// Führt ein WASM-Binary mit Capability-Einschränkungen aus.
