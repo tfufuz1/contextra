@@ -10,14 +10,8 @@ pub use contextra_rank::PlattScaler as PlattScaledSigmoid;
 /// Maximale Anzahl von Kandidaten pro Reranking-Aufruf zur Vermeidung unbegrenzter Allokationen.
 pub const MAX_CANDIDATES: usize = 10_000;
 
-/// Ergebnis einer Reranking-Operation.
-#[derive(Debug, Clone)]
-pub struct RerankResult {
-    /// Ursprünglicher Index im Kandidaten-Array
-    pub original_index: usize,
-    /// Cross-Encoder Relevanz-Score (höher = relevanter)
-    pub score: f32,
-}
+/// Re-export `RerankResult` from `contextra_types` for backward compatibility.
+pub use contextra_types::RerankResult;
 
 /// Konfiguration für Cross-Encoder Reranking.
 #[derive(Debug, Clone)]

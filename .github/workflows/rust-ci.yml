@@ -167,6 +167,19 @@ jobs:
                test_scalar_u8_no_oob \
             2>&1
 
+  cargo-hack-feature-check:
+    name: Cargo Hack Feature Flag Matrix Check
+    runs-on: ubuntu-latest
+    needs: [compile-check]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: taiki-e/install-action@cargo-hack
+      - name: Run cargo hack --each-feature --workspace --no-dev-deps
+        run: cargo hack check --each-feature --workspace --no-dev-deps
+
   feature-matrix:
     name: Feature Matrix Checks (Powerset CI §17)
     runs-on: ubuntu-latest
