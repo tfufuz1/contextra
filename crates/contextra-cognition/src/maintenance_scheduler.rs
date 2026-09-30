@@ -12,7 +12,7 @@ use crate::maintenance_config::MaintenanceConfig;
 use crate::memory_consolidation::ConsolidationConfig;
 use contextra_engine::collection::{Collection, StoredDocument};
 use contextra_engine::decay_controller::AdaptiveDecayController;
-use contextra_ports::{StorageEngine, VectorIndex};
+use contextra_ports::{Clock, StorageEngine, SystemClock, VectorIndex};
 use contextra_types::{ContextraError, DocId, TxId};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -26,6 +26,7 @@ pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex = contextra_vec
     #[cfg(feature = "edge-reinforcement-learning")]
     edge_reinforcement_buffer: Option<Arc<contextra_graph::EdgeReinforcementBuffer>>,
     active_sessions: Arc<AtomicUsize>,
+    clock: Arc<dyn Clock>,
 }
 
 impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<S, V> {
@@ -42,7 +43,14 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
             #[cfg(feature = "edge-reinforcement-learning")]
             edge_reinforcement_buffer: None,
             active_sessions: Arc::new(AtomicUsize::new(0)),
+            clock: Arc::new(SystemClock::new()),
         }
+    }
+
+    /// Setzt die Uhr für den `MaintenanceScheduler` (Standard: `SystemClock::new()`).
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     /// Setzt den optionalen `EdgeReinforcementBuffer` für F-03.
@@ -110,7 +118,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
         tracing::debug!(collection = %self.collection.name(), "MaintenanceScheduler tick started");
 
         // Step a: WAL-Intent schreiben
-        if let Err(err) = write_tick_intent(&self.collection).await {
+        if let Err(err) = write_tick_intent_with_clock(&self.collection, self.clock.as_ref()).await
+        {
             tracing::error!(
                 collection = %self.collection.name(),
                 error = %err,
@@ -264,7 +273,9 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
         }
 
         // Step g: WAL-Intent als abgeschlossen markieren
-        if let Err(err) = complete_tick_intent(&self.collection).await {
+        if let Err(err) =
+            complete_tick_intent_with_clock(&self.collection, self.clock.as_ref()).await
+        {
             tracing::error!(
                 collection = %self.collection.name(),
                 error = %err,
@@ -276,16 +287,21 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     }
 }
 
+#[allow(dead_code)]
 async fn write_tick_intent<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
+) -> Result<TxId, ContextraError> {
+    write_tick_intent_with_clock(collection, &SystemClock::new()).await
+}
+
+async fn write_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
+    collection: &Collection<S, V>,
+    clock: &dyn Clock,
 ) -> Result<TxId, ContextraError> {
     let tx = collection.allocate_tx()?;
     let payload = serde_json::to_vec(&serde_json::json!({
         "status": "pending",
-        "timestamp_ms": std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0),
+        "timestamp_ms": clock.now_unix_nanos() / 1_000_000,
     }))?;
     collection
         .storage()
@@ -295,16 +311,21 @@ async fn write_tick_intent<S: StorageEngine, V: VectorIndex>(
     Ok(tx)
 }
 
+#[allow(dead_code)]
 async fn complete_tick_intent<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
+) -> Result<(), ContextraError> {
+    complete_tick_intent_with_clock(collection, &SystemClock::new()).await
+}
+
+async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
+    collection: &Collection<S, V>,
+    clock: &dyn Clock,
 ) -> Result<(), ContextraError> {
     let tx = collection.allocate_tx()?;
     let payload = serde_json::to_vec(&serde_json::json!({
         "status": "completed",
-        "timestamp_ms": std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0),
+        "timestamp_ms": clock.now_unix_nanos() / 1_000_000,
     }))?;
     collection
         .storage()
@@ -456,5 +477,49 @@ mod tests {
         assert_eq!(scheduler.decrement_active_sessions(), 1);
         assert_eq!(scheduler.decrement_active_sessions(), 0);
         assert_eq!(scheduler.decrement_active_sessions(), 0); // saturating
+    }
+
+    struct TestClock {
+        nanos: u64,
+    }
+
+    impl Clock for TestClock {
+        fn now_unix_nanos(&self) -> u64 {
+            self.nanos
+        }
+
+        fn monotonic_nanos(&self) -> u64 {
+            self.nanos
+        }
+    }
+
+    #[tokio::test]
+    async fn test_maintenance_scheduler_with_custom_clock() {
+        let col = create_test_collection().await;
+        let config = MaintenanceConfig {
+            tick_interval_secs: 1,
+            decay_enabled: false,
+            percolation_enabled: false,
+            replicator_enabled: false,
+            background_consolidation_enabled: false,
+            ..Default::default()
+        };
+
+        let fixed_nanos = 1_700_000_000_000_000_000u64;
+        let test_clock = Arc::new(TestClock { nanos: fixed_nanos });
+
+        let scheduler = Arc::new(
+            MaintenanceScheduler::new(config, col.clone(), ConsolidationConfig::default())
+                .with_clock(test_clock),
+        );
+
+        scheduler.run_tick().await;
+
+        let prefix = b"__maintenance_intent:tick".to_vec();
+        let entries = col.storage().scan_prefix(&prefix).await.unwrap();
+        assert!(!entries.is_empty(), "WAL intent key should exist");
+        let val: serde_json::Value = serde_json::from_slice(&entries[0].1).unwrap();
+        assert_eq!(val["status"], "completed");
+        assert_eq!(val["timestamp_ms"], 1_700_000_000_000u64);
     }
 }

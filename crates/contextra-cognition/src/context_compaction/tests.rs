@@ -420,6 +420,50 @@ async fn test_consolidation_aborts_on_delete_failure(
     Ok(())
 }
 
+#[test]
+fn test_compactor_jitter_reproducible_and_in_bounds() {
+    use contextra_ports::{Rng, SeededRng};
+
+    let rng1 = SeededRng::new(42);
+    let rng2 = SeededRng::new(42);
+
+    let mut sequence1 = Vec::new();
+    let mut sequence2 = Vec::new();
+
+    for _ in 0..100 {
+        let jitter1 = rng1.next_u64() % 11;
+        let jitter2 = rng2.next_u64() % 11;
+
+        assert!(
+            jitter1 <= 10,
+            "Jitter must be in range 0..=10, got {jitter1}"
+        );
+        assert!(
+            jitter2 <= 10,
+            "Jitter must be in range 0..=10, got {jitter2}"
+        );
+
+        sequence1.push(jitter1);
+        sequence2.push(jitter2);
+    }
+
+    assert_eq!(
+        sequence1, sequence2,
+        "Jitter sequence with same seed must be reproducible"
+    );
+}
+
+#[test]
+fn test_compactor_with_rng_builder() {
+    use contextra_ports::SeededRng;
+
+    let budget = TokenBudget::new(100, 0);
+    let rng = Arc::new(SeededRng::new(12345));
+    let compactor = ContextCompactor::new(budget, CompactionStrategy::Truncate).with_rng(rng);
+
+    assert_eq!(compactor.compact(vec![]).tokens_used, 0);
+}
+
 #[tokio::test]
 async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_monotonically(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
